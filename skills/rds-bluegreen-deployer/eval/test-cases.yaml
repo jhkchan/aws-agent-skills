@@ -1,0 +1,154 @@
+# Eval test cases for rds-bluegreen-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across Blue/Green scenarios
+# (Aurora MySQL major version upgrade, RDS PostgreSQL parameter group
+# change, switchover with validation, schema change in green,
+# unsupported engine prerequisite failure).
+skill: rds-bluegreen-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: aurora-mysql-major-version-upgrade
+    description: >-
+      Deploy a Blue/Green Deployment for an Aurora MySQL cluster to
+      perform a major version upgrade from 5.7 to 8.0 in green.
+      Expects READY_TO_DEPLOY with green environment validation,
+      replication from blue, and switchover timeout configured.
+    input: |
+      Create an RDS Blue/Green Deployment for my Aurora MySQL cluster
+      prod-mysql-db (aurora-mysql 5.7.mysql_aurora.2.11.0) in
+      us-east-1, account 123456789012. I want to upgrade to MySQL 8.0
+      (8.0.mysql_aurora.3.04.0) in the green environment. Use
+      parameter group prod-mysql80-params for green. I have connection
+      retry logic in my application. Switchover timeout 300 seconds.
+      Tags: Environment=production, Upgrade=mysql57-to-80.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "aurora-mysql"
+        - "5.7"
+        - "8.0"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "green"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: rds-postgres-parameter-change
+    description: >-
+      Deploy a Blue/Green Deployment for an RDS PostgreSQL instance to
+      apply a parameter group change. Expects READY_TO_DEPLOY with
+      parameter group noted, green validation, and replication active.
+    input: |
+      Create an RDS Blue/Green Deployment for my RDS PostgreSQL
+      instance prod-pg-db (postgres 14.10) in us-east-1, account
+      123456789012. I want to apply a new parameter group
+      prod-pg14-tuned in the green environment with changed
+      shared_buffers and work_mem. Same engine version (14.10). My app
+      has connection retry logic. Tags: Environment=production,
+      Change=parameter-group.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "postgres"
+        - "prod-pg14-tuned"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: switchover-with-validation
+    description: >-
+      Perform switchover of an existing Blue/Green Deployment after
+      green validation. Expects READY_TO_DEPLOY with validation passed,
+      switchover timeout set, and endpoint DNS auto-follow noted.
+    input: |
+      I have an RDS Blue/Green Deployment bg-prod-upgrade-2026 for my
+      Aurora PostgreSQL cluster prod-pg-cluster (aurora-postgresql
+      13.9) in us-east-1. The green environment green-prod-pg-cluster
+      is running PostgreSQL 15.4. Green validation passed: engine
+      version confirmed, replication lag is under 1 second, query
+      performance is within baseline. I want to switch over.
+      Switchover timeout 600 seconds. My application uses the cluster
+      endpoint and has retry logic.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "switchover"
+        - "600"
+        - "CNAME"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: schema-change-in-green
+    description: >-
+      Deploy a Blue/Green Deployment and apply a schema change (ALTER
+      TABLE) in the green environment before switchover. Expects
+      READY_TO_DEPLOY with schema change noted in green, blue frozen,
+      and validation step included.
+    input: |
+      Create an RDS Blue/Green Deployment for my RDS MySQL instance
+      prod-orders-db (mysql 8.0.35) in us-east-1, account
+      123456789012. Same engine version 8.0.35. I need to apply a
+      schema change in green: ALTER TABLE orders ADD COLUMN
+      status_code INT DEFAULT 0. Also apply parameter group
+      prod-mysql80-tuned. Application has retry logic. Tags:
+      Environment=production, Change=schema-and-params.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ALTER TABLE"
+        - "green"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: unsupported-engine-sqlserver
+    description: >-
+      Operator requests a Blue/Green Deployment for a SQL Server
+      instance, which is not supported. This is a prerequisite
+      failure. Expects PREREQUISITES_MISSING with engine support cited.
+    input: |
+      Create an RDS Blue/Green Deployment for my RDS SQL Server
+      instance prod-sqlserver-db (sqlserver-ex 15.00.4043.16) in
+      us-east-1, account 123456789012. I want to upgrade to SQL Server
+      2022 in green. Parameter group prod-sqlserver2022-params.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "sqlserver"
+        - "not supported"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

@@ -1,0 +1,185 @@
+# Eval test cases for ssm-association-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the OPERATION_COMPLETED /
+# REVIEW_REQUIRED classification across association configurations
+# (tag-targeted scheduled association with integer rate control and
+# KMS-encrypted S3 output, instance-ID-targeted association for pet
+# servers, compliance-driven remediation association, multi-document
+# step-document association, missing KMS key on output bucket).
+skill: ssm-association-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: tag-target-scheduled-association
+    description: >-
+      Create a State Manager association that targets instances by tag
+      (Environment=production), runs on a rate(30 minutes) schedule,
+      applies at creation, uses integer rate control
+      (max-concurrency=10, max-errors=3), and routes output to an S3
+      bucket with SSE-KMS. Expects OPERATION_COMPLETED with integer
+      rate control cited, tag target flagged dynamic, and KMS-encrypted
+      output verified.
+    input: |
+      Create an SSM State Manager association named
+      PatchProductionFleet in us-east-1. Use document
+      AWS-ApplyPatchBaseline. Target instances tagged
+      Environment=production. Schedule rate(30 minutes). Run
+      immediately on creation. Allow 10 instances in parallel and stop
+      after 3 errors. Parameters: Operation=Install, SnapshotId=latest.
+      Route output to s3://my-ssm-output/ssm-output/ (bucket has
+      SSE-KMS with key arn:aws:kms:us-east-1:123456789012:key/abc123).
+      Tags: Environment=production, Owner=cloudops.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "AWS-ApplyPatchBaseline"
+        - "tag:Environment=production"
+        - "max-concurrency=10"
+        - "max-errors=3"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+        - "10%"
+
+  - id: instance-id-target-association
+    description: >-
+      Create a State Manager association that targets specific instance
+      IDs (static targeting). Expects OPERATION_COMPLETED with
+      InstanceIds targeting flagged as static and apply-at-creation
+      enabled for first-run validation.
+    input: |
+      Create an SSM State Manager association named
+      HardenPetServers in us-east-1. Use custom document
+      Custom-HardenBaseline (default version). Target instance IDs
+      i-aaa111bb222 and i-ccc333dd444. Schedule cron(0 0 3 ? * SUN *)
+      (03:00 UTC every Sunday). Run on creation. Integer rate control:
+      max-concurrency=1, max-errors=1. Route output to
+      s3://my-ssm-output/ssm-output/ (SSE-KMS enabled). Parameters:
+      Mode=Strict.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "Custom-HardenBaseline"
+        - "i-aaa111bb222"
+        - "i-ccc333dd444"
+        - "InstanceIds"
+        - "static"
+        - "max-concurrency=1"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: compliance-remediation-association
+    description: >-
+      Create a State Manager association that drives compliance and is
+      wired for auto-remediation on non-compliance via an EventBridge
+      rule. Expects OPERATION_COMPLETED with compliance reporting
+      noted, EventBridge remediation pattern cited, and document
+      idempotency flagged as a prerequisite for remediation.
+    input: |
+      Create an SSM State Manager association named
+      InventoryProduction in us-east-1. Use document
+      AWS-GatherSoftwareInventory. Target instances tagged
+      Environment=production. Schedule rate(30 minutes). Apply at
+      creation. Integer rate control: max-concurrency=50,
+      max-errors=5. Output to s3://my-ssm-output/ssm-output/ (SSE-KMS).
+      Wire this association for auto-remediation when the compliance
+      state flips to NON_COMPLIANT — EventBridge rule triggering
+      StartAssociationsOnce. Confirm AWS-GatherSoftwareInventory is
+      idempotent.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "AWS-GatherSoftwareInventory"
+        - "NON_COMPLIANT"
+        - "EventBridge"
+        - "StartAssociationsOnce"
+        - "idempotent"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: multi-document-step-association
+    description: >-
+      Create a custom step-document that runs install-then-configure in
+      sequence, then bind an association to it. Expects
+      OPERATION_COMPLETED with the step-document cited, default version
+      set, and the association pinned to the document's default
+      version.
+    input: |
+      Create an SSM State Manager association named
+      ProvisionWebFleet in us-east-1. Use a custom step document
+      Custom-WebFleetProvision that runs two steps in sequence:
+      installPackage (yum install -y httpd) then configureService
+      (systemctl enable and start httpd). Document is at
+      ./custom-webfleet-provision.yaml. Set the document default
+      version. Target instances tagged Role=web. Schedule
+      cron(0 0 4 ? * MON-FRI *) (04:00 UTC Mon-Fri). Apply at creation.
+      Integer rate control: max-concurrency=5, max-errors=2. Output to
+      s3://my-ssm-output/ssm-output/ (SSE-KMS enabled).
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "Custom-WebFleetProvision"
+        - "default version"
+        - "tag:Role=web"
+        - "max-concurrency=5"
+        - "max-errors=2"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: missing-s3-kms-key
+    description: >-
+      Operator requests an association whose output S3 bucket exists
+      but has SSE-S3 (no customer-managed KMS key). This is a review
+      failure — execution artifacts can contain secrets and need
+      customer-managed KMS for production.
+    input: |
+      Create an SSM State Manager association named
+      PatchDevFleet in us-east-1. Use document
+      AWS-ApplyPatchBaseline. Target instances tagged
+      Environment=dev. Schedule rate(1 hour). Apply at creation.
+      Integer rate control: max-concurrency=5, max-errors=2. Route
+      output to s3://dev-ssm-output/output/ — this bucket has SSE-S3
+      (S3-managed keys) but no customer-managed KMS key.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "KMS"
+        - "SSE-S3"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "dev-ssm-output"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPERATION_COMPLETED"

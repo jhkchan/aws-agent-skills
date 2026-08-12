@@ -1,0 +1,49 @@
+# Eval configuration for cloudformation-cfn-lint-operator.
+#
+# Maps each eval case to its external prompt and baseline files so the same
+# case can run with-skill (SKILL.md loaded) vs without-skill (baseline only)
+# for delta comparison. This is the canonical structured-eval eval surface.
+#
+# The legacy eval/test-cases.yaml is preserved as the CI assertion-layer shim
+# discovered by eval/run_eval.py (skills/*/eval/*.yaml glob). This file does
+# not replace it — it adds the structured with-skill-vs-baseline dimension.
+skill_name: cloudformation-cfn-lint-operator
+snapshot_date: "2026-08-11"
+baseline_model: amazon.nova-pro-v1:0
+judge_model_id: openai.gpt-oss-120b-1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+legacy_spec: ../eval/test-cases.yaml
+
+evals:
+  - id: cfn-lint-changeset-clean
+    difficulty: hard
+    prompt_file: prompts/cfn-lint-changeset-clean.md
+    baseline_file: baselines/cfn-lint-changeset-clean.md
+    expected_verdict: OPERATION_COMPLETED
+
+  - id: drift-detection-stack-policy
+    difficulty: medium
+    prompt_file: prompts/drift-detection-stack-policy.md
+    baseline_file: baselines/drift-detection-stack-policy.md
+    expected_verdict: OPERATION_COMPLETED
+
+  - id: sam-transform-validation
+    difficulty: medium
+    prompt_file: prompts/sam-transform-validation.md
+    baseline_file: baselines/sam-transform-validation.md
+    expected_verdict: OPERATION_COMPLETED
+
+  - id: nested-stack-validation
+    difficulty: medium
+    prompt_file: prompts/nested-stack-validation.md
+    baseline_file: baselines/nested-stack-validation.md
+    expected_verdict: OPERATION_COMPLETED
+
+  - id: cfn-nag-critical-findings
+    difficulty: easy
+    prompt_file: prompts/cfn-nag-critical-findings.md
+    baseline_file: baselines/cfn-nag-critical-findings.md
+    expected_verdict: REVIEW_REQUIRED

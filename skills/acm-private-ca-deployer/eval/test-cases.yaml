@@ -1,0 +1,157 @@
+# Eval test cases for acm-private-ca-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across ACM PCA provisioning
+# (root CA with CRL, subordinate CA signed by parent, end-entity
+# certificate issuance, CA deletion with waiting period, missing CRL
+# bucket policy prerequisite failure).
+skill: acm-private-ca-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: root-ca-with-crl
+    description: >-
+      Provision a root CA with RSA_2048 key, SHA256withRSA signing, and
+      CRL revocation configured with an S3 bucket and bucket policy.
+      Expects READY_TO_DEPLOY with CRL bucket, bucket policy, self-signed
+      root certificate, and ACTIVE status noted.
+    input: |
+      Create a private root CA in us-east-1, account 123456789012.
+      Key algorithm RSA_2048, signing algorithm SHA256withRSA.
+      Subject: CN=Example Root CA, O=Example Org, C=US. Enable CRL
+      revocation with S3 bucket acm-pca-crl-123456789012-us-east-1,
+      expiration 7 days, CNAME crl.example.com. Self-signed root
+      certificate valid 10 years using RootCACertificate/V1 template.
+      Tags: Environment=production, Purpose=trust-anchor.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ROOT"
+        - "RSA_2048"
+        - "SHA256withRSA"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "acm-pca-crl-123456789012-us-east-1"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: subordinate-ca-signed-by-root
+    description: >-
+      Provision a subordinate CA signed by an existing active root CA.
+      Expects READY_TO_DEPLOY with parent CA permission verified,
+      parent-signed certificate, SubordinateCACertificate_PathLen0
+      template, and ACM integration permission noted.
+    input: |
+      Create a subordinate CA in us-east-1, account 123456789012.
+      Parent root CA ARN: arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/aaaa-bbbb-cccc.
+      The parent CA is ACTIVE and has create-permission granted.
+      Key algorithm RSA_2048, signing algorithm SHA256withRSA.
+      Subject: CN=Example Subordinate CA, O=Example Org, C=US.
+      Enable CRL with bucket acm-pca-crl-123456789012-us-east-1,
+      expiration 7 days. Also enable OCSP. Subordinate certificate
+      valid 5 years using SubordinateCACertificate_PathLen0/V1 template.
+      Grant ACM service principal permission for managed cert lifecycle.
+      Tags: Environment=production, Purpose=issuing-ca.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "SUBORDINATE"
+        - "create-permission"
+        - "acm.amazonaws.com"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: end-entity-certificate-issuance
+    description: >-
+      Issue an end-entity TLS certificate from an active subordinate CA.
+      Expects READY_TO_DEPLOY with EndEntityCertificate_CertPassedPathLen_0
+      template, 365-day validity, and verification commands.
+    input: |
+      Issue an end-entity certificate from subordinate CA
+      arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/dddd-eeee-ffff
+      in us-east-1. The subordinate CA is ACTIVE. CSR is ready at
+      server.csr. Signing algorithm SHA256withRSA. Use template
+      EndEntityCertificate/CertPassedPathLen/0. Validity 365 days.
+      Tags: Environment=production, Service=api.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "EndEntityCertificate"
+        - "CertPassedPathLen"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ca-deletion-waiting-period
+    description: >-
+      Delete a private CA with the mandatory 30-day waiting period.
+      Expects READY_TO_DEPLOY with waiting period noted, restore
+      capability during the window, and permanent deletion after.
+    input: |
+      Delete the subordinate CA
+      arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/dddd-eeee-ffff
+      in us-east-1 with a 30-day permanent deletion waiting period.
+      Existing certificates should remain valid during this period.
+      Document the restore capability.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "waiting period"
+        - "30"
+        - "restore"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-crl-bucket-policy
+    description: >-
+      Operator requests CRL revocation but the S3 bucket does not have
+      a policy granting the ACM PCA service principal write access.
+      This is a prerequisite failure.
+      Expects PREREQUISITES_MISSING with the missing bucket policy cited.
+    input: |
+      Create a private root CA in us-east-1, account 123456789012.
+      Key algorithm RSA_2048, signing algorithm SHA256withRSA.
+      Subject: CN=Example Root CA, O=Example Org, C=US. Enable CRL
+      revocation with S3 bucket acm-pca-crl-123456789012-us-east-1.
+      The S3 bucket exists but does NOT have a bucket policy granting
+      acm-pca.amazonaws.com write access.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "bucket policy"
+        - "acm-pca.amazonaws.com"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

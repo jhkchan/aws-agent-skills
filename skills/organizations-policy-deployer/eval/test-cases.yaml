@@ -1,0 +1,163 @@
+# Eval test cases for organizations-policy-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across SCP topologies
+# (root Deny-list with break-glass, OU Allow-list with
+# FullAWSAccess detach, multi-OU inheritance intersection, tag
+# policy integration with enforced_for, and Allow-list attached
+# without detaching FullAWSAccess).
+skill: organizations-policy-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: root-deny-list-break-glass
+    description: >-
+      Deploy a root-level Deny-list SCP blocking LeaveOrganization
+      and CloudTrail tampering, with a break-glass OU exempted.
+      Expects READY_TO_DEPLOY with Deny-list strategy
+      (FullAWSAccess kept) and break-glass OU carve-out noted.
+    input: |
+      Create an SCP named root-guardrails that denies
+      organizations:LeaveOrganization and the CloudTrail
+      tampering actions (DeleteTrail, StopLogging,
+      PutEventSelectors) across the org. Attach it to the root
+      r-xxxx. Keep FullAWSAccess. Carve out a break-glass path
+      for OU_BreakGlass (ou-bg-001) — the Deny must NOT be
+      inherited there. Organization is in "All features",
+      caller is the management account 123456789012. Tag the
+      policy Governance=root-guardrails.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Deny-list"
+        - "FullAWSAccess"
+        - "r-xxxx"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "break-glass"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: ou-allow-list-fullawsaccess-detach
+    description: >-
+      Deploy an Allow-list SCP at an OU that permits only EC2, S3,
+      RDS, IAM, and CloudWatch Logs. Expects READY_TO_DEPLOY with
+      Allow-list strategy requiring FullAWSAccess detach AFTER
+      the Allow-list is attached.
+    input: |
+      Create an SCP named prod-data-allowlist that allows only
+      ec2:*, s3:*, rds:*, iam:*, and logs:Describe* for the
+      OU_Prod_Data (ou-prod-data-001). This is an Allow-list
+      strategy — detach FullAWSAccess AFTER attaching the
+      Allow-list. Management account 123456789012. Tag the
+      policy Posture=allow-list.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "Allow-list"
+        - "FullAWSAccess"
+        - "ou-prod-data-001"
+        - "DETACHED"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: multi-ou-inherited-intersection
+    description: >-
+      Deploy a Deny-list SCP at a parent OU and verify the
+      inheritance intersection applies at a child account. Expects
+      READY_TO_DEPLOY with the intersection behavior called out
+      (most-restrictive wins, explicit Deny propagates).
+    input: |
+      Create an SCP named prod-deny-root-tamper denying
+      iam:DeleteRole and iam:DetachRolePolicy. Attach it to
+      OU_Prod (ou-prod-001). Account 111122223311 lives under
+      OU_Prod_Data (ou-prod-data-001), a child of OU_Prod. Verify
+      the inheritance intersection is correctly traced at
+      account 111122223311. Management account 123456789012.
+      Keep FullAWSAccess at both OUs.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "intersection"
+        - "111122223311"
+        - "ou-prod-001"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: tag-policy-enforced-for
+    description: >-
+      Create and attach a tag policy that enforces Environment
+      and Owner tags on ec2:instance and s3:bucket, with
+      AllowedValues for Environment. Expects READY_TO_DEPLOY
+      with TAG_POLICIES enablement and enforced_for blocking
+      behavior noted.
+    input: |
+      Create a tag policy named mandatory-tag-policy that
+      enforces two tags: Environment (AllowedValues: dev,
+      staging, production; EnforcedFor ec2:instance and
+      s3:bucket) and Owner (CaseSensitive true). Attach to root
+      r-xxxx. The organization has TAG_POLICIES already enabled.
+      Management account 123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "TAG_POLICIES"
+        - "EnforcedFor"
+        - "Environment"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: allow-list-without-fullawsaccess-detach
+    description: >-
+      Operator requests an Allow-list SCP but does not detach
+      FullAWSAccess at the same entity. This is a prerequisite
+      failure — the Allow-list is silently redundant because the
+      intersection still permits everything FullAWSAccess permits.
+      Expects PREREQUISITES_MISSING with the FullAWSAccess gap
+      cited.
+    input: |
+      Create an SCP named prod-allowlist that allows ec2:* and
+      s3:* for OU_Prod_Apps (ou-prod-apps-001). Do NOT detach
+      FullAWSAccess at this OU. Management account 123456789012.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "FullAWSAccess"
+        - "Allow-list"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "redundant"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

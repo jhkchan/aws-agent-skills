@@ -1,0 +1,181 @@
+{
+  "skill": "organizations-policy-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the Organizations Policy Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across SCP topologies (root Deny-list with break-glass carve-out, OU Allow-list with FullAWSAccess detach, multi-OU inheritance intersection, tag policy with enforced_for, and Allow-list attached without detaching FullAWSAccess). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "root-deny-list-break-glass",
+      "name": "Root Deny-list SCP with break-glass OU carve-out",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Deny-list strategy at root (FullAWSAccess kept), explicit Denies for LeaveOrganization and CloudTrail tampering, break-glass OU exempted via hierarchy",
+      "prompt": "Create an SCP named root-guardrails that denies organizations:LeaveOrganization and the CloudTrail tampering actions (DeleteTrail, StopLogging, PutEventSelectors) across the org. Attach it to the root r-xxxx. Keep FullAWSAccess. Carve out a break-glass path for OU_BreakGlass (ou-bg-001) — the Deny must NOT be inherited there. Organization is in \"All features\", caller is the management account 123456789012. Tag the policy Governance=root-guardrails.",
+      "prompt_file": "prompts/root-deny-list-break-glass.md",
+      "baseline_file": "baselines/root-deny-list-break-glass.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ORGANIZATIONS_POLICY: root-guardrails (p-aaa1bbb2) [SERVICE_CONTROL_POLICY] → root:r-xxxx\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Organization feature set: ALL\n  [✓] Caller in management account: 123456789012\n  [✓] Policy type enabled: SERVICE_CONTROL_POLICY (ENABLED)\n  [✓] Policy created: p-aaa1bbb2 — ENABLED\n  [✓] Policy attached: p-aaa1bbb2 → root:r-xxxx\n  [✓] Strategy: Deny-list (FullAWSAccess kept)\n  [✓] FullAWSAccess at target: KEPT\n  [✓] Break-glass path: OU_BreakGlass (ou-bg-001) — Deny NOT inherited\nVERIFICATION_COMMANDS:\n  aws organizations describe-policy --policy-id p-aaa1bbb2\n  aws organizations list-policies-for-target --target-id r-xxxx --filter SERVICE_CONTROL_POLICY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Deny-list",
+            "FullAWSAccess",
+            "r-xxxx",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "break-glass"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ou-allow-list-fullawsaccess-detach",
+      "name": "OU Allow-list SCP with FullAWSAccess detach",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Allow-list strategy at OU (FullAWSAccess detached AFTER Allow-list attached), IAM/EC2/S3/RDS/Logs permitted",
+      "prompt": "Create an SCP named prod-data-allowlist that allows only ec2:*, s3:*, rds:*, iam:*, and logs:Describe* for the OU_Prod_Data (ou-prod-data-001). This is an Allow-list strategy — detach FullAWSAccess AFTER attaching the Allow-list. Management account 123456789012. Tag the policy Posture=allow-list.",
+      "prompt_file": "prompts/ou-allow-list-fullawsaccess-detach.md",
+      "baseline_file": "baselines/ou-allow-list-fullawsaccess-detach.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ORGANIZATIONS_POLICY: prod-data-allowlist (p-ccc2ddd3) [SERVICE_CONTROL_POLICY] → ou:ou-prod-data-001\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Organization feature set: ALL\n  [✓] Caller in management account: 123456789012\n  [✓] Policy created: p-ccc2ddd3 — ENABLED\n  [✓] Policy attached: p-ccc2ddd3 → ou:ou-prod-data-001\n  [✓] Strategy: Allow-list (FullAWSAccess detached AFTER Allow-list attached)\n  [✓] FullAWSAccess at target: DETACHED (replacement: p-ccc2ddd3)\nVERIFICATION_COMMANDS:\n  aws organizations describe-policy --policy-id p-ccc2ddd3\n  aws organizations list-policies-for-target --target-id ou-prod-data-001 --filter SERVICE_CONTROL_POLICY",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "Allow-list",
+            "FullAWSAccess",
+            "ou-prod-data-001",
+            "DETACHED",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multi-ou-inherited-intersection",
+      "name": "Multi-OU SCP inheritance intersection trace",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — Deny-list SCP at parent OU, intersection inheritance traced at a child account",
+      "prompt": "Create an SCP named prod-deny-root-tamper denying iam:DeleteRole and iam:DetachRolePolicy. Attach it to OU_Prod (ou-prod-001). Account 111122223311 lives under OU_Prod_Data (ou-prod-data-001), a child of OU_Prod. Verify the inheritance intersection is correctly traced at account 111122223311. Management account 123456789012. Keep FullAWSAccess at both OUs.",
+      "prompt_file": "prompts/multi-ou-inherited-intersection.md",
+      "baseline_file": "baselines/multi-ou-inherited-intersection.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ORGANIZATIONS_POLICY: prod-deny-root-tamper (p-eee3fff4) [SERVICE_CONTROL_POLICY] → ou:ou-prod-001\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Policy attached: p-eee3fff4 → ou:ou-prod-001\n  [✓] Inheritance intersection traced at account 111122223311 (chain: root → ou-prod-001 → ou-prod-data-001 → 111122223311)\n  [✓] Effective Deny at 111122223311: iam:DeleteRole, iam:DetachRolePolicy (explicit Deny propagates)\n  [✓] FullAWSAccess at target: KEPT\nVERIFICATION_COMMANDS:\n  aws organizations list-policies-for-target --target-id 111122223311 --filter SERVICE_CONTROL_POLICY\n  aws organizations list-parents --child-id 111122223311",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "intersection",
+            "111122223311",
+            "ou-prod-001",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tag-policy-enforced-for",
+      "name": "Tag policy with enforced_for blocking on EC2 and S3",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — TAG_POLICIES policy type, Environment/Owner tags enforced on ec2:instance and s3:bucket",
+      "prompt": "Create a tag policy named mandatory-tag-policy that enforces two tags: Environment (AllowedValues: dev, staging, production; EnforcedFor ec2:instance and s3:bucket) and Owner (CaseSensitive true). Attach to root r-xxxx. The organization has TAG_POLICIES already enabled. Management account 123456789012.",
+      "prompt_file": "prompts/tag-policy-enforced-for.md",
+      "baseline_file": "baselines/tag-policy-enforced-for.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ORGANIZATIONS_POLICY: mandatory-tag-policy (p-ggg4hhh5) [TAG_POLICIES] → root:r-xxxx\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Policy type enabled: TAG_POLICIES (ENABLED)\n  [✓] Policy created: p-ggg4hhh5 — ENABLED\n  [✓] Policy attached: p-ggg4hhh5 → root:r-xxxx\n  [✓] EnforcedFor: ec2:instance, s3:bucket (non-compliant CreateTags / UntagResources will fail)\n  [✓] Environment AllowedValues: dev, staging, production\nVERIFICATION_COMMANDS:\n  aws organizations describe-policy --policy-id p-ggg4hhh5\n  aws organizations list-policies-for-target --target-id r-xxxx --filter TAG_POLICIES",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "TAG_POLICIES",
+            "EnforcedFor",
+            "Environment",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "allow-list-without-fullawsaccess-detach",
+      "name": "Allow-list SCP attached without detaching FullAWSAccess (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — Allow-list SCP is silently redundant while FullAWSAccess remains attached at the same entity",
+      "prompt": "Create an SCP named prod-allowlist that allows ec2:* and s3:* for OU_Prod_Apps (ou-prod-apps-001). Do NOT detach FullAWSAccess at this OU. Management account 123456789012.",
+      "prompt_file": "prompts/allow-list-without-fullawsaccess-detach.md",
+      "baseline_file": "baselines/allow-list-without-fullawsaccess-detach.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "ORGANIZATIONS_POLICY: prod-allowlist (p-iii5jjj6) [SERVICE_CONTROL_POLICY] → ou:ou-prod-apps-001\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] FullAWSAccess still attached at ou-prod-apps-001 — the Allow-list is silently redundant because the intersection still permits everything FullAWSAccess permits. Detach FullAWSAccess AFTER attaching prod-allowlist to make the Allow-list effective.",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "FullAWSAccess",
+            "Allow-list",
+            "VERDICT",
+            "CHECKLIST",
+            "redundant"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

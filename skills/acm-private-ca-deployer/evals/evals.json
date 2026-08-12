@@ -1,0 +1,178 @@
+{
+  "skill": "acm-private-ca-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the ACM Private CA Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across ACM PCA provisioning (root CA with CRL and S3 bucket policy, subordinate CA signed by parent with ACM integration, end-entity certificate issuance with correct template, CA deletion with 30-day waiting period, missing CRL S3 bucket policy prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "root-ca-with-crl",
+      "name": "Root CA with CRL revocation and S3 bucket policy",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — root CA, RSA_2048, SHA256withRSA, CRL with S3 bucket + policy, self-signed RootCACertificate/V1, ACTIVE status",
+      "prompt": "Create a private root CA in us-east-1, account 123456789012. Key algorithm RSA_2048, signing algorithm SHA256withRSA. Subject: CN=Example Root CA, O=Example Org, C=US. Enable CRL revocation with S3 bucket acm-pca-crl-123456789012-us-east-1, expiration 7 days, CNAME crl.example.com. Self-signed root certificate valid 10 years using RootCACertificate/V1 template. Tags: Environment=production, Purpose=trust-anchor.",
+      "prompt_file": "prompts/root-ca-with-crl.md",
+      "baseline_file": "baselines/root-ca-with-crl.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACM_PCA: arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/aaaa-bbbb-cccc (ROOT, RSA_2048, SHA256withRSA)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] CA type: ROOT\n  [✓] Key algorithm: RSA_2048\n  [✓] Signing algorithm: SHA256withRSA\n  [✓] Subject DN: CN=Example Root CA, O=Example Org, C=US\n  [✓] Revocation: CRL (bucket acm-pca-crl-123456789012-us-east-1, expiration 7 days)\n  [✓] CRL S3 bucket: acm-pca-crl-123456789012-us-east-1 — exists\n  [✓] CRL bucket policy: grants acm-pca.amazonaws.com s3:PutObject\n  [✓] CA status: ACTIVE\n  [✓] CA certificate: self-signed (RootCACertificate/V1, validity 10 years)\nVERIFICATION_COMMANDS:\n  aws acm-pca describe-certificate-authority --certificate-authority-arn <ca-arn> --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "ROOT",
+            "RSA_2048",
+            "SHA256withRSA",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "acm-pca-crl-123456789012-us-east-1"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "subordinate-ca-signed-by-root",
+      "name": "Subordinate CA signed by active root CA with ACM integration",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — subordinate CA, parent CA ACTIVE + create-permission, parent-signed cert, ACM service principal permission for managed lifecycle",
+      "prompt": "Create a subordinate CA in us-east-1, account 123456789012. Parent root CA ARN: arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/aaaa-bbbb-cccc. The parent CA is ACTIVE and has create-permission granted. Key algorithm RSA_2048, signing algorithm SHA256withRSA. Subject: CN=Example Subordinate CA, O=Example Org, C=US. Enable CRL with bucket acm-pca-crl-123456789012-us-east-1, expiration 7 days. Also enable OCSP. Subordinate certificate valid 5 years using SubordinateCACertificate_PathLen0/V1 template. Grant ACM service principal permission for managed cert lifecycle. Tags: Environment=production, Purpose=issuing-ca.",
+      "prompt_file": "prompts/subordinate-ca-signed-by-root.md",
+      "baseline_file": "baselines/subordinate-ca-signed-by-root.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACM_PCA: arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/dddd-eeee-ffff (SUBORDINATE, RSA_2048, SHA256withRSA)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] CA type: SUBORDINATE\n  [✓] Key algorithm: RSA_2048\n  [✓] Signing algorithm: SHA256withRSA\n  [✓] Subject DN: CN=Example Subordinate CA, O=Example Org, C=US\n  [✓] Revocation: CRL + OCSP\n  [✓] CA status: ACTIVE\n  [✓] CA certificate: parent-signed (parent arn:...:aaaa-bbbb-cccc)\n  [✓] Parent CA permission: create-permission granted\n  [✓] ACM integration: create-permission for acm.amazonaws.com",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "SUBORDINATE",
+            "create-permission",
+            "acm.amazonaws.com",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "end-entity-certificate-issuance",
+      "name": "End-entity TLS certificate from subordinate CA",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — end-entity cert from ACTIVE subordinate CA, EndEntityCertificate_CertPassedPathLen_0 template, 365-day validity",
+      "prompt": "Issue an end-entity certificate from subordinate CA arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/dddd-eeee-ffff in us-east-1. The subordinate CA is ACTIVE. CSR is ready at server.csr. Signing algorithm SHA256withRSA. Use template EndEntityCertificate/CertPassedPathLen/0. Validity 365 days. Tags: Environment=production, Service=api.",
+      "prompt_file": "prompts/end-entity-certificate-issuance.md",
+      "baseline_file": "baselines/end-entity-certificate-issuance.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACM_PCA: arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/dddd-eeee-ffff (SUBORDINATE, RSA_2048, SHA256withRSA)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Certificate template: EndEntityCertificate/CertPassedPathLen/0\n  [✓] CA status: ACTIVE\n  [✓] Signing algorithm: SHA256withRSA\n  [✓] Validity: 365 days",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "EndEntityCertificate",
+            "CertPassedPathLen",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ca-deletion-waiting-period",
+      "name": "CA deletion with mandatory 30-day waiting period",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — CA deletion with 30-day waiting period, restore capability documented, permanent deletion after expiry",
+      "prompt": "Delete the subordinate CA arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/dddd-eeee-ffff in us-east-1 with a 30-day permanent deletion waiting period. Existing certificates should remain valid during this period. Document the restore capability.",
+      "prompt_file": "prompts/ca-deletion-waiting-period.md",
+      "baseline_file": "baselines/ca-deletion-waiting-period.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "ACM_PCA: arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/dddd-eeee-ffff (SUBORDINATE)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] CA deletion initiated with 30-day waiting period\n  [✓] Restore capability: restore-certificate-authority available during waiting period\n  [✓] Existing certificates remain valid\nVERIFICATION_COMMANDS:\n  aws acm-pca describe-certificate-authority --certificate-authority-arn <ca-arn> --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "waiting period",
+            "30",
+            "restore",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-crl-bucket-policy",
+      "name": "CRL configured but S3 bucket policy missing (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — S3 bucket exists but no policy granting acm-pca.amazonaws.com write access; CRL publication would silently fail",
+      "prompt": "Create a private root CA in us-east-1, account 123456789012. Key algorithm RSA_2048, signing algorithm SHA256withRSA. Subject: CN=Example Root CA, O=Example Org, C=US. Enable CRL revocation with S3 bucket acm-pca-crl-123456789012-us-east-1. The S3 bucket exists but does NOT have a bucket policy granting acm-pca.amazonaws.com write access.",
+      "prompt_file": "prompts/missing-crl-bucket-policy.md",
+      "baseline_file": "baselines/missing-crl-bucket-policy.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "ACM_PCA: arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/aaaa-bbbb-cccc (ROOT, RSA_2048, SHA256withRSA)\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] CRL bucket policy: FAIL — bucket acm-pca-crl-123456789012-us-east-1 does not grant acm-pca.amazonaws.com s3:PutObject; CRL publication would silently fail",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "bucket policy",
+            "acm-pca.amazonaws.com",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

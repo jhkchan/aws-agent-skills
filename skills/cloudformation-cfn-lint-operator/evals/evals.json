@@ -1,0 +1,175 @@
+{
+  "skill": "cloudformation-cfn-lint-operator",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the CloudFormation cfn-lint Operator. Five-case proven set exercising the OPERATION_COMPLETED / REVIEW_REQUIRED classification across validation scenarios (cfn-lint + validate-template + cfn-nag + ChangeSet all clean, drift detection with stack policy IN_SYNC, SAM transform expansion and validation, nested stack validation across parent+children, cfn-nag CRITICAL findings triggering REVIEW_REQUIRED). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "cfn-lint-changeset-clean",
+      "name": "Full validation pipeline (cfn-lint + validate-template + cfn-nag + ChangeSet) — all clean",
+      "difficulty": "hard",
+      "branch": "OPERATION_COMPLETED — cfn-lint passes, validate-template passes, cfn-nag passes (0 critical), ChangeSet shows 1 Add + 2 Modify with no replacements",
+      "prompt": "Validate my CloudFormation template template.yaml for stack my-app-stack in us-east-1. Run cfn-lint, validate-template, cfn-nag, and create a ChangeSet. The template creates an S3 bucket with encryption enabled and a DynamoDB table. No wildcard IAM. Stack policy protects RDS and S3.",
+      "prompt_file": "prompts/cfn-lint-changeset-clean.md",
+      "baseline_file": "baselines/cfn-lint-changeset-clean.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_output": "CFN_LINT: template.yaml → my-app-stack\nVERDICT: OPERATION_COMPLETED\nCHECKLIST:\n  [✓] Template file: template.yaml\n  [✓] cfn-lint: PASSED (0 errors, 0 warnings)\n  [✓] validate-template: PASSED\n  [✓] cfn-nag: PASSED (0 critical, 0 warnings)\n  [✓] ChangeSet: 1 Add, 2 Modify, 0 Remove — no replacements\n  [✓] Stack policy: Enforced (AWS::RDS::DBInstance, AWS::S3::Bucket)\nVERIFICATION_COMMANDS:\n  cfn-lint template.yaml\n  cfn_nag_scan --input-path template.yaml\n  aws cloudformation describe-change-set --change-set-name <cs-name> --stack-name my-app-stack --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "OPERATION_COMPLETED",
+            "cfn-lint",
+            "validate-template",
+            "cfn-nag",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: REVIEW_REQUIRED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "drift-detection-stack-policy",
+      "name": "Drift detection (IN_SYNC) with stack policy enforcement",
+      "difficulty": "medium",
+      "branch": "OPERATION_COMPLETED — drift detection returns IN_SYNC, stack policy enforced protecting RDS and S3 resources",
+      "prompt": "Run drift detection on my CloudFormation stack my-infra-stack in us-east-1. Also enforce a stack policy that protects AWS::RDS::DBInstance and AWS::S3::Bucket resources from updates. The stack has no drift.",
+      "prompt_file": "prompts/drift-detection-stack-policy.md",
+      "baseline_file": "baselines/drift-detection-stack-policy.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_output": "CFN_LINT: (no template) → my-infra-stack\nVERDICT: OPERATION_COMPLETED\nCHECKLIST:\n  [✓] Drift detection: IN_SYNC (no drift detected)\n  [✓] Stack policy: Enforced (AWS::RDS::DBInstance, AWS::S3::Bucket)\nVERIFICATION_COMMANDS:\n  aws cloudformation describe-stack-resource-drifts --stack-name my-infra-stack --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "OPERATION_COMPLETED",
+            "IN_SYNC",
+            "stack policy",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: REVIEW_REQUIRED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sam-transform-validation",
+      "name": "SAM transform expansion and validation",
+      "difficulty": "medium",
+      "branch": "OPERATION_COMPLETED — SAM template expanded via sam translate, cfn-lint and cfn-nag run on expanded output, all pass",
+      "prompt": "Validate my SAM template template-sam.yaml for stack my-serverless-stack in us-east-1. It has Transform: AWS::Serverless-2016-10-31 with two Serverless::Function resources. Expand the transform first, then run cfn-lint and cfn-nag on the expanded template.",
+      "prompt_file": "prompts/sam-transform-validation.md",
+      "baseline_file": "baselines/sam-transform-validation.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_output": "CFN_LINT: template-sam.yaml → my-serverless-stack\nVERDICT: OPERATION_COMPLETED\nCHECKLIST:\n  [✓] Template file: template-sam.yaml\n  [✓] SAM transform: Expanded via sam translate\n  [✓] cfn-lint (expanded): PASSED\n  [✓] cfn-nag (expanded): PASSED\n  [✓] validate-template: PASSED\nVERIFICATION_COMMANDS:\n  sam translate --template-file template-sam.yaml --output-file template-expanded.yaml\n  cfn-lint template-expanded.yaml\n  cfn_nag_scan --input-path template-expanded.yaml",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "OPERATION_COMPLETED",
+            "sam translate",
+            "cfn-lint",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: REVIEW_REQUIRED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nested-stack-validation",
+      "name": "Nested stack validation across parent and children",
+      "difficulty": "medium",
+      "branch": "OPERATION_COMPLETED — parent and both child templates pass cfn-lint and validate-template independently",
+      "prompt": "Validate my CloudFormation parent template parent-template.yaml for stack my-platform-stack in us-east-1. It references two nested stacks: child-network.yaml and child-database.yaml. Run cfn-lint and validate-template on all three templates.",
+      "prompt_file": "prompts/nested-stack-validation.md",
+      "baseline_file": "baselines/nested-stack-validation.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_output": "CFN_LINT: parent-template.yaml → my-platform-stack\nVERDICT: OPERATION_COMPLETED\nCHECKLIST:\n  [✓] Parent template: parent-template.yaml — cfn-lint PASSED, validate-template PASSED\n  [✓] Child: child-network.yaml — cfn-lint PASSED, validate-template PASSED\n  [✓] Child: child-database.yaml — cfn-lint PASSED, validate-template PASSED\n  [✓] Nested stacks: 2 child templates validated\nVERIFICATION_COMMANDS:\n  cfn-lint parent-template.yaml\n  cfn-lint child-network.yaml\n  cfn-lint child-database.yaml",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "OPERATION_COMPLETED",
+            "nested",
+            "cfn-lint",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: REVIEW_REQUIRED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cfn-nag-critical-findings",
+      "name": "cfn-nag CRITICAL findings (wildcard IAM + unencrypted S3) — review required",
+      "difficulty": "easy",
+      "branch": "REVIEW_REQUIRED — cfn-nag finds 2 CRITICAL findings: IAM policy with Resource:* and S3 bucket without encryption; deployment blocked",
+      "prompt": "Validate my CloudFormation template template.yaml for stack my-app-stack in us-east-1. The template has an IAM role with Resource: \"*\" in its managed policy and an S3 bucket without encryption. Run cfn-lint, validate-template, and cfn-nag.",
+      "prompt_file": "prompts/cfn-nag-critical-findings.md",
+      "baseline_file": "baselines/cfn-nag-critical-findings.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "expected_output": "CFN_LINT: template.yaml → my-app-stack\nVERDICT: REVIEW_REQUIRED\nCHECKLIST:\n  [✓] cfn-lint: PASSED\n  [✓] validate-template: PASSED\n  [!] cfn-nag: CRITICAL FINDINGS (2) — F1: IAM policy with Resource \"*\" in role TaskExecutionRole; W41: S3 bucket without encryption\n  [✓] ChangeSet: Not created (blocked by cfn-nag findings)\nVERIFICATION_COMMANDS:\n  cfn_nag_scan --input-path template.yaml",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "REVIEW_REQUIRED",
+            "cfn-nag",
+            "CRITICAL",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: OPERATION_COMPLETED"
+          ]
+        }
+      ]
+    }
+  ]
+}

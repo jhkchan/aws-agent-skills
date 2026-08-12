@@ -1,0 +1,188 @@
+{
+  "skill": "ssm-association-operator",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the SSM Association Operator. Five-case proven set exercising the OPERATION_COMPLETED / REVIEW_REQUIRED classification across association configurations (tag-targeted scheduled association with integer rate control and KMS-encrypted S3 output, instance-ID-targeted association for pet servers, compliance-driven remediation association with EventBridge wiring, multi-document step-document association, missing customer-managed KMS key on output bucket). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "tag-target-scheduled-association",
+      "name": "Tag-targeted scheduled association with integer rate control and KMS-encrypted output",
+      "difficulty": "hard",
+      "branch": "OPERATION_COMPLETED — tag targets (dynamic), rate(30 minutes) schedule, apply-at-creation, integer rate control (max-concurrency=10, max-errors=3), SSE-KMS output bucket",
+      "prompt": "Create an SSM State Manager association named PatchProductionFleet in us-east-1. Use document AWS-ApplyPatchBaseline. Target instances tagged Environment=production. Schedule rate(30 minutes). Run immediately on creation. Allow 10 instances in parallel and stop after 3 errors. Parameters: Operation=Install, SnapshotId=latest. Route output to s3://my-ssm-output/ssm-output/ (bucket has SSE-KMS with key arn:aws:kms:us-east-1:123456789012:key/abc123). Tags: Environment=production, Owner=cloudops.",
+      "prompt_file": "prompts/tag-target-scheduled-association.md",
+      "baseline_file": "baselines/tag-target-scheduled-association.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_output": "SSM_ASSOCIATION: PatchProductionFleet (a-1a2b3c4d5e6f7g8h9)\nVERDICT: OPERATION_COMPLETED\nCHECKLIST:\n  [✓] Document: AWS-ApplyPatchBaseline (default version)\n  [✓] Targets: tag:Environment=production (dynamic)\n  [✓] Schedule: rate(30 minutes)\n  [✓] Apply-at-creation: ENABLED\n  [✓] Rate control: max-concurrency=10, max-errors=3 (integer form)\n  [✓] Output S3: s3://my-ssm-output/ssm-output/ (SSE-KMS)\n  [✓] Parameters: Operation=Install, SnapshotId=latest\nVERIFICATION_COMMANDS:\n  aws ssm describe-association --association-id a-1a2b3c4d5e6f7g8h9 --region us-east-1\n  aws s3api get-bucket-encryption --bucket my-ssm-output --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "OPERATION_COMPLETED",
+            "AWS-ApplyPatchBaseline",
+            "tag:Environment=production",
+            "max-concurrency=10",
+            "max-errors=3",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: REVIEW_REQUIRED",
+            "10%"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "instance-id-target-association",
+      "name": "Instance-ID-targeted association for pet servers",
+      "difficulty": "medium",
+      "branch": "OPERATION_COMPLETED — static instance-ID targeting, cron(0 0 3 ? * SUN *) schedule, integer rate control (1/1 for one-at-a-time)",
+      "prompt": "Create an SSM State Manager association named HardenPetServers in us-east-1. Use custom document Custom-HardenBaseline (default version). Target instance IDs i-aaa111bb222 and i-ccc333dd444. Schedule cron(0 0 3 ? * SUN *) (03:00 UTC every Sunday). Run on creation. Integer rate control: max-concurrency=1, max-errors=1. Route output to s3://my-ssm-output/ssm-output/ (SSE-KMS enabled). Parameters: Mode=Strict.",
+      "prompt_file": "prompts/instance-id-target-association.md",
+      "baseline_file": "baselines/instance-id-target-association.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_output": "SSM_ASSOCIATION: HardenPetServers (a-2b3c4d5e6f7g8h9i0)\nVERDICT: OPERATION_COMPLETED\nCHECKLIST:\n  [✓] Document: Custom-HardenBaseline (default version)\n  [✓] Targets: InstanceIds=i-aaa111bb222,i-ccc333dd444 (static)\n  [✓] Schedule: cron(0 0 3 ? * SUN *)\n  [✓] Apply-at-creation: ENABLED\n  [✓] Rate control: max-concurrency=1, max-errors=1 (integer form)\n  [✓] Output S3: s3://my-ssm-output/ssm-output/ (SSE-KMS)\n  [✓] Parameters: Mode=Strict",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "OPERATION_COMPLETED",
+            "Custom-HardenBaseline",
+            "i-aaa111bb222",
+            "i-ccc333dd444",
+            "InstanceIds",
+            "static",
+            "max-concurrency=1",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: REVIEW_REQUIRED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "compliance-remediation-association",
+      "name": "Compliance-driven association with EventBridge auto-remediation",
+      "difficulty": "hard",
+      "branch": "OPERATION_COMPLETED — tag targets, GatherSoftwareInventory document, EventBridge rule on NON_COMPLIANT triggering StartAssociationsOnce, idempotency prerequisite",
+      "prompt": "Create an SSM State Manager association named InventoryProduction in us-east-1. Use document AWS-GatherSoftwareInventory. Target instances tagged Environment=production. Schedule rate(30 minutes). Apply at creation. Integer rate control: max-concurrency=50, max-errors=5. Output to s3://my-ssm-output/ssm-output/ (SSE-KMS). Wire this association for auto-remediation when the compliance state flips to NON_COMPLIANT — EventBridge rule triggering StartAssociationsOnce. Confirm AWS-GatherSoftwareInventory is idempotent.",
+      "prompt_file": "prompts/compliance-remediation-association.md",
+      "baseline_file": "baselines/compliance-remediation-association.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_output": "SSM_ASSOCIATION: InventoryProduction (a-3c4d5e6f7g8h9i0j1)\nVERDICT: OPERATION_COMPLETED\nCHECKLIST:\n  [✓] Document: AWS-GatherSoftwareInventory\n  [✓] Targets: tag:Environment=production (dynamic)\n  [✓] Schedule: rate(30 minutes)\n  [✓] Compliance: COMPLIANT (after first run)\n  [✓] Remediation: EventBridge rule on NON_COMPLIANT → StartAssociationsOnce\n  [✓] Idempotency: AWS-GatherSoftwareInventory is idempotent (safe to re-run)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "OPERATION_COMPLETED",
+            "AWS-GatherSoftwareInventory",
+            "NON_COMPLIANT",
+            "EventBridge",
+            "StartAssociationsOnce",
+            "idempotent",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: REVIEW_REQUIRED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "multi-document-step-association",
+      "name": "Custom step-document with sequential install-then-configure",
+      "difficulty": "medium",
+      "branch": "OPERATION_COMPLETED — custom step-document with two sequential mainSteps, default version set, association pinned to default version, tag:Role=web targets",
+      "prompt": "Create an SSM State Manager association named ProvisionWebFleet in us-east-1. Use a custom step document Custom-WebFleetProvision that runs two steps in sequence: installPackage (yum install -y httpd) then configureService (systemctl enable and start httpd). Document is at ./custom-webfleet-provision.yaml. Set the document default version. Target instances tagged Role=web. Schedule cron(0 0 4 ? * MON-FRI *) (04:00 UTC Mon-Fri). Apply at creation. Integer rate control: max-concurrency=5, max-errors=2. Output to s3://my-ssm-output/ssm-output/ (SSE-KMS enabled).",
+      "prompt_file": "prompts/multi-document-step-association.md",
+      "baseline_file": "baselines/multi-document-step-association.md",
+      "expected_verdict": "OPERATION_COMPLETED",
+      "expected_output": "SSM_ASSOCIATION: ProvisionWebFleet (a-4d5e6f7g8h9i0j1k2)\nVERDICT: OPERATION_COMPLETED\nCHECKLIST:\n  [✓] Document: Custom-WebFleetProvision (default version set)\n  [✓] Steps: installPackage → configureService (sequential)\n  [✓] Targets: tag:Role=web (dynamic)\n  [✓] Schedule: cron(0 0 4 ? * MON-FRI *)\n  [✓] Rate control: max-concurrency=5, max-errors=2 (integer form)\n  [✓] Output S3: s3://my-ssm-output/ssm-output/ (SSE-KMS)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "OPERATION_COMPLETED",
+            "Custom-WebFleetProvision",
+            "default version",
+            "tag:Role=web",
+            "max-concurrency=5",
+            "max-errors=2",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: REVIEW_REQUIRED"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-s3-kms-key",
+      "name": "Association with SSE-S3 output bucket (no customer-managed KMS key)",
+      "difficulty": "easy",
+      "branch": "REVIEW_REQUIRED — output bucket has SSE-S3 (S3-managed keys) but no customer-managed KMS key; execution artifacts may contain secrets",
+      "prompt": "Create an SSM State Manager association named PatchDevFleet in us-east-1. Use document AWS-ApplyPatchBaseline. Target instances tagged Environment=dev. Schedule rate(1 hour). Apply at creation. Integer rate control: max-concurrency=5, max-errors=2. Route output to s3://dev-ssm-output/output/ — this bucket has SSE-S3 (S3-managed keys) but no customer-managed KMS key.",
+      "prompt_file": "prompts/missing-s3-kms-key.md",
+      "baseline_file": "baselines/missing-s3-kms-key.md",
+      "expected_verdict": "REVIEW_REQUIRED",
+      "expected_output": "SSM_ASSOCIATION: PatchDevFleet\nVERDICT: REVIEW_REQUIRED\nCHECKLIST:\n  [!] Output S3: s3://dev-ssm-output/output/ has SSE-S3 but no customer-managed KMS key — execution artifacts can contain secrets",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "REVIEW_REQUIRED",
+            "KMS",
+            "SSE-S3",
+            "VERDICT",
+            "CHECKLIST",
+            "dev-ssm-output"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: OPERATION_COMPLETED"
+          ]
+        }
+      ]
+    }
+  ]
+}

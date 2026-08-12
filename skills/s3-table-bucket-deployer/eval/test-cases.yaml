@@ -1,0 +1,168 @@
+# Eval test cases for s3-table-bucket-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across S3 Tables topologies
+# (basic table bucket with Iceberg table, Athena + Lake Formation
+# integration, maintenance configuration, table bucket policy separate
+# from S3 object policy, missing namespace prerequisite failure).
+skill: s3-table-bucket-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: basic-table-bucket-iceberg
+    description: >-
+      Provision an S3 table bucket with a namespace and an Apache
+      Iceberg v2 table including schema and partition spec. Expects
+      READY_TO_DEPLOY with namespace-before-table ordering, Iceberg
+      v2 format, schema columns with types, partition transform, and
+      default maintenance enabled.
+    input: |
+      Create an S3 table bucket named analytics-tables in us-east-1
+      account 123456789012. Create namespace sales_analytics. Create
+      an Iceberg table named orders with columns: order_id (long,
+      required), customer_id (long, required), order_date (timestamp,
+      required), amount (double), status (string). Partition by
+      day(order_date). Use Iceberg v2. Tags: Environment=production,
+      Team=analytics.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "analytics-tables"
+        - "sales_analytics"
+        - "orders"
+        - "ICEBERG"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+        - "s3tables"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: athena-lake-formation-integration
+    description: >-
+      Provision an S3 table bucket with Athena integration via the
+      Iceberg REST catalog and Lake Formation table-level grants.
+      Expects READY_TO_DEPLOY with REST catalog noted, Lake Formation
+      grants applied, and Athena configured to query via REST catalog
+      (not S3 path).
+    input: |
+      Create an S3 table bucket named bi-tables in us-east-1 account
+      123456789012. Create namespace reporting. Create an Iceberg v2
+      table named daily_revenue with columns: date (date), revenue
+      (double), region (string). Partition by day(date). Configure
+      Athena to query this table via the Iceberg REST catalog. Grant
+      Lake Formation SELECT permission on the table to the
+      AthenaUserRole. Tags: Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "bi-tables"
+        - "reporting"
+        - "daily_revenue"
+        - "REST catalog"
+        - "Lake Formation"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: table-maintenance-configuration
+    description: >-
+      Configure table maintenance settings for an S3 Tables Iceberg
+      table: compaction (target file size, min input files), snapshot
+      management (max age, min snapshots), and unreferenced file
+      cleanup (max file age). Expects READY_TO_DEPLOY with all three
+      maintenance types configured.
+    input: |
+      Create an S3 table bucket named ops-tables in us-east-1 account
+      123456789012. Create namespace telemetry. Create an Iceberg v2
+      table named events with columns: event_id (long), event_time
+      (timestamp), event_type (string), payload (string). Partition by
+      day(event_time). Configure maintenance: compaction target file
+      size 512MB, min input files 10. Snapshot management max age 14
+      days, min snapshots 10. Unreferenced file cleanup max file age
+      30 days. Tags: Environment=production, Workload=telemetry.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ops-tables"
+        - "telemetry"
+        - "events"
+        - "compaction"
+        - "snapshot"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: table-bucket-policy-separate
+    description: >-
+      Apply a table bucket policy to an S3 table bucket for cross-
+      account read access. Expects READY_TO_DEPLOY with the policy
+      using s3tables actions (NOT s3 actions), put-table-bucket-policy
+      command, and the separation from regular S3 bucket policy noted.
+    input: |
+      Create an S3 table bucket named shared-tables in us-east-1
+      account 123456789012. Create namespace marketing. Create an
+      Iceberg v2 table named campaigns. Apply a table bucket policy
+      that grants account 999999999999 read access (GetTable,
+      ListTables, ListNamespaces, GetNamespace, GetTableBucket).
+      Tags: Environment=production, Shared=true.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "shared-tables"
+        - "marketing"
+        - "s3tables"
+        - "table bucket policy"
+        - "999999999999"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-namespace-prerequisite
+    description: >-
+      Operator requests creating an Iceberg table in a namespace that
+      has not been created yet. This is a prerequisite failure.
+      Expects PREREQUISITES_MISSING with the missing namespace cited.
+    input: |
+      Create an S3 table bucket named prod-tables in us-east-1 account
+      123456789012. Then create an Iceberg v2 table named users in
+      namespace identity (skip namespace creation). Columns: user_id
+      (long), email (string), created_at (timestamp). Partition by
+      day(created_at).
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "namespace"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "identity"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

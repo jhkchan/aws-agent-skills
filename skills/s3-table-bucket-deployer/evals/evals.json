@@ -1,0 +1,186 @@
+{
+  "skill": "s3-table-bucket-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the S3 Table Bucket Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across S3 Tables topologies (basic table bucket with Iceberg v2 table, Athena + Lake Formation via REST catalog, table maintenance configuration, table bucket policy separate from S3 object policy, missing namespace prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "basic-table-bucket-iceberg",
+      "name": "Basic S3 table bucket with Apache Iceberg v2 table and partition spec",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — table bucket creation, namespace before table (hard dependency), Iceberg v2 format, schema with column types, day partition transform, default maintenance enabled",
+      "prompt": "Create an S3 table bucket named analytics-tables in us-east-1 account 123456789012. Create namespace sales_analytics. Create an Iceberg table named orders with columns: order_id (long, required), customer_id (long, required), order_date (timestamp, required), amount (double), status (string). Partition by day(order_date). Use Iceberg v2. Tags: Environment=production, Team=analytics.",
+      "prompt_file": "prompts/basic-table-bucket-iceberg.md",
+      "baseline_file": "baselines/basic-table-bucket-iceberg.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "S3_TABLES: analytics-tables / sales_analytics / orders\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Table bucket: analytics-tables\n  [✓] Namespace: sales_analytics\n  [✓] Table: orders (ICEBERG v2)\n  [✓] Schema: 5 columns (long, long, timestamp, double, string)\n  [✓] Partition spec: day(order_date)\n  [✓] Maintenance — compaction: ENABLED\n  [✓] Maintenance — snapshot management: ENABLED\n  [✓] Maintenance — unreferenced file cleanup: ENABLED\nVERIFICATION_COMMANDS:\n  aws s3tables get-table --table-bucket-arn arn:aws:s3tables:us-east-1:123456789012:bucket/analytics-tables --namespace sales_analytics --name orders --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "analytics-tables",
+            "sales_analytics",
+            "orders",
+            "ICEBERG",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "s3tables"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "athena-lake-formation-integration",
+      "name": "S3 Tables with Athena integration via Iceberg REST catalog and Lake Formation",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — Athena via REST catalog (not S3 path), Lake Formation table-level SELECT grant, Iceberg v2 table with date partition",
+      "prompt": "Create an S3 table bucket named bi-tables in us-east-1 account 123456789012. Create namespace reporting. Create an Iceberg v2 table named daily_revenue with columns: date (date), revenue (double), region (string). Partition by day(date). Configure Athena to query this table via the Iceberg REST catalog. Grant Lake Formation SELECT permission on the table to the AthenaUserRole. Tags: Environment=production.",
+      "prompt_file": "prompts/athena-lake-formation-integration.md",
+      "baseline_file": "baselines/athena-lake-formation-integration.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "S3_TABLES: bi-tables / reporting / daily_revenue\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Table bucket: bi-tables\n  [✓] Namespace: reporting\n  [✓] Table: daily_revenue (ICEBERG v2)\n  [✓] Athena integration: REST catalog configured\n  [✓] Lake Formation: grants applied (table-level SELECT for AthenaUserRole)\nVERIFICATION_COMMANDS:\n  aws s3tables get-table --table-bucket-arn arn:aws:s3tables:us-east-1:123456789012:bucket/bi-tables --namespace reporting --name daily_revenue --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "bi-tables",
+            "reporting",
+            "daily_revenue",
+            "REST catalog",
+            "Lake Formation",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "table-maintenance-configuration",
+      "name": "S3 Tables Iceberg table with custom maintenance configuration",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — compaction (target 512MB, min 10 files), snapshot management (max 14d, min 10), unreferenced file cleanup (max 30d), all ENABLED with tuned settings",
+      "prompt": "Create an S3 table bucket named ops-tables in us-east-1 account 123456789012. Create namespace telemetry. Create an Iceberg v2 table named events with columns: event_id (long), event_time (timestamp), event_type (string), payload (string). Partition by day(event_time). Configure maintenance: compaction target file size 512MB, min input files 10. Snapshot management max age 14 days, min snapshots 10. Unreferenced file cleanup max file age 30 days. Tags: Environment=production, Workload=telemetry.",
+      "prompt_file": "prompts/table-maintenance-configuration.md",
+      "baseline_file": "baselines/table-maintenance-configuration.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "S3_TABLES: ops-tables / telemetry / events\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Table bucket: ops-tables\n  [✓] Namespace: telemetry\n  [✓] Table: events (ICEBERG v2)\n  [✓] Maintenance — compaction: ENABLED (target 512MB, min 10 files)\n  [✓] Maintenance — snapshot management: ENABLED (max 14d, min 10 snapshots)\n  [✓] Maintenance — unreferenced file cleanup: ENABLED (max 30d)\nVERIFICATION_COMMANDS:\n  aws s3tables get-table-maintenance-configuration --table-bucket-arn arn:aws:s3tables:us-east-1:123456789012:bucket/ops-tables --namespace telemetry --name events --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "ops-tables",
+            "telemetry",
+            "events",
+            "compaction",
+            "snapshot",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "table-bucket-policy-separate",
+      "name": "S3 table bucket policy for cross-account access (separate from S3 bucket policy)",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — put-table-bucket-policy with s3tables actions (NOT s3 actions), cross-account read grant, separation from regular S3 bucket policy noted",
+      "prompt": "Create an S3 table bucket named shared-tables in us-east-1 account 123456789012. Create namespace marketing. Create an Iceberg v2 table named campaigns. Apply a table bucket policy that grants account 999999999999 read access (GetTable, ListTables, ListNamespaces, GetNamespace, GetTableBucket). Tags: Environment=production, Shared=true.",
+      "prompt_file": "prompts/table-bucket-policy-separate.md",
+      "baseline_file": "baselines/table-bucket-policy-separate.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "S3_TABLES: shared-tables / marketing / campaigns\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Table bucket: shared-tables\n  [✓] Namespace: marketing\n  [✓] Table: campaigns (ICEBERG v2)\n  [✓] Table bucket policy: applied (cross-account read for 999999999999 via s3tables actions)\nVERIFICATION_COMMANDS:\n  aws s3tables get-table-bucket-policy --table-bucket-arn arn:aws:s3tables:us-east-1:123456789012:bucket/shared-tables --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "shared-tables",
+            "marketing",
+            "s3tables",
+            "table bucket policy",
+            "999999999999",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "missing-namespace-prerequisite",
+      "name": "S3 table creation without namespace (prerequisite failure)",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — namespace 'identity' does not exist; create-table requires namespace first",
+      "prompt": "Create an S3 table bucket named prod-tables in us-east-1 account 123456789012. Then create an Iceberg v2 table named users in namespace identity (skip namespace creation). Columns: user_id (long), email (string), created_at (timestamp). Partition by day(created_at).",
+      "prompt_file": "prompts/missing-namespace-prerequisite.md",
+      "baseline_file": "baselines/missing-namespace-prerequisite.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "S3_TABLES: prod-tables / identity / users\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Namespace: identity does not exist — namespace must be created before table creation (create-namespace is a hard dependency for create-table)",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "namespace",
+            "VERDICT",
+            "CHECKLIST",
+            "identity"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

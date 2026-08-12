@@ -1,0 +1,178 @@
+# Eval test cases for cloudwatch-metric-stream-deployer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the READY_TO_DEPLOY /
+# PREREQUISITES_MISSING classification across metric stream
+# configurations (JSON stream with single namespace include filter,
+# OpenTelemetry multi-namespace stream for third-party tools, exclude
+# filter streaming all but AWS/Logs, cross-account centralized
+# delivery, missing IAM role trust policy prerequisite failure).
+skill: cloudwatch-metric-stream-deployer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: json-stream-single-namespace
+    description: >-
+      Deploy a JSON-output CloudWatch metric stream targeting a single
+      namespace (AWS/EC2) via a Firehose delivery stream to S3 with
+      SSE-KMS. Expects READY_TO_DEPLOY with the include filter cited,
+      JSON format, Firehose buffering noted, and per-metric cost
+      estimate provided.
+    input: |
+      Create a CloudWatch metric stream named Ec2MetricStream in
+      us-east-1. Output format JSON. Stream only the AWS/EC2 namespace.
+      Statistics: Average, Sum, SampleCount. Use the existing Firehose
+      delivery stream cw-metrics-to-s3 (delivers to
+      s3://my-cloudwatch-metrics/cloudwatch-metrics/ with SSE-KMS key
+      arn:aws:kms:us-east-1:123456789012:key/abc123). IAM role
+      CWMetricStreamRole already exists with trust policy for
+      cloudwatch.amazonaws.com and firehose:PutRecord permission. Tags:
+      Environment=production.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "AWS/EC2"
+        - "json"
+        - "IncludeFilter"
+        - "cw-metrics-to-s3"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: opentelemetry-multi-namespace
+    description: >-
+      Deploy an OpenTelemetry-output metric stream for forwarding to a
+      third-party observability tool, with an include filter for
+      multiple namespaces. Expects READY_TO_DEPLOY with opentelemetry
+      format cited, multiple namespaces in include filter, and the
+      third-party-tool use case noted.
+    input: |
+      Create a CloudWatch metric stream named OtelExportStream in
+      us-east-1. Output format OpenTelemetry. This stream feeds our
+      Datadog integration. Include namespaces: AWS/EC2, AWS/Lambda,
+      AWS/RDS, and ApplicationMetrics. Statistics: Average, p99, Sum.
+      Use Firehose delivery stream otel-firehose (delivers to
+      s3://otel-metrics/data/ with SSE-KMS). IAM role
+      CWMetricStreamRole exists with cloudwatch.amazonaws.com trust.
+      Tags: Environment=production, Consumer=datadog.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "opentelemetry"
+        - "AWS/EC2"
+        - "AWS/Lambda"
+        - "AWS/RDS"
+        - "ApplicationMetrics"
+        - "IncludeFilter"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: exclude-namespace-filter
+    description: >-
+      Deploy a metric stream with an exclude filter that streams all
+      namespaces except AWS/Logs (which is noisy and not needed for
+      operational monitoring). Expects READY_TO_DEPLOY with the
+      exclude filter cited and cost implications noted.
+    input: |
+      Create a CloudWatch metric stream named OpsAllExceptLogs in
+      us-east-1. Output format JSON. Stream all namespaces EXCEPT
+      AWS/Logs (too noisy, not needed for ops). Statistics: Average,
+      Sum. Use Firehose delivery stream ops-firehose (delivers to
+      s3://ops-metrics/data/ with SSE-KMS). IAM role CWMetricStreamRole
+      exists with cloudwatch.amazonaws.com trust. Tags:
+      Environment=production, Purpose=ops-monitoring.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "ExcludeFilter"
+        - "AWS/Logs"
+        - "json"
+        - "ops-firehose"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: cross-account-metrics
+    description: >-
+      Deploy a cross-account metric stream where workload account
+      111111111111 streams metrics to a Firehose in the centralized
+      observability account 123456789012. Expects READY_TO_DEPLOY
+      with cross-account delivery noted, source and destination
+      accounts cited, and the cross-account Firehose permission
+      requirement flagged.
+    input: |
+      Create a CloudWatch metric stream named WorkloadA-to-Observability
+      in us-east-1, account 111111111111. This stream delivers metrics
+      to a Firehose delivery stream central-firehose in the
+      observability account 123456789012. Output format JSON. Include
+      namespaces: AWS/EC2, AWS/Lambda, ApplicationMetrics. Statistics:
+      Average, Sum, SampleCount. The central-firehose delivers to
+      s3://central-observability/metrics/ in account 123456789012.
+      IAM role CWMetricStreamCrossAcctRole in account 111111111111 has
+      cloudwatch.amazonaws.com trust and firehose:PutRecord on the
+      cross-account Firehose ARN. Tags: SourceAccount=111111111111,
+      DestinationAccount=123456789012.
+    expected_verdict: READY_TO_DEPLOY
+    assertions:
+      must_contain:
+        - "READY_TO_DEPLOY"
+        - "cross-account"
+        - "111111111111"
+        - "123456789012"
+        - "central-firehose"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: PREREQUISITES_MISSING"
+
+  - id: missing-firehose-role
+    description: >-
+      Operator requests a metric stream but the IAM role they specify
+      does NOT have cloudwatch.amazonaws.com in its trust policy. This
+      is a prerequisite failure — the metric stream would enter
+      "running" status but silently deliver nothing.
+    input: |
+      Create a CloudWatch metric stream named BrokenStream in
+      us-east-1. Output format JSON. Include namespace AWS/EC2. Use
+      Firehose delivery stream cw-metrics-to-s3 (exists, delivers to
+      s3://my-cloudwatch-metrics/data/ with SSE-KMS). IAM role
+      MyFirehoseRole — but this role's trust policy only allows
+      firehose.amazonaws.com, NOT cloudwatch.amazonaws.com.
+    expected_verdict: PREREQUISITES_MISSING
+    assertions:
+      must_contain:
+        - "PREREQUISITES_MISSING"
+        - "cloudwatch.amazonaws.com"
+        - "trust"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "MyFirehoseRole"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: READY_TO_DEPLOY"

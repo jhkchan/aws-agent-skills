@@ -1,0 +1,177 @@
+{
+  "skill": "rds-bluegreen-deployer",
+  "version": "1.0.0",
+  "snapshot_date": "2026-08-11",
+  "description": "Structured eval definitions for the RDS Blue/Green Deployer. Five-case proven set exercising the READY_TO_DEPLOY / PREREQUISITES_MISSING classification across Blue/Green scenarios (Aurora MySQL major version upgrade in green, RDS PostgreSQL parameter group change, switchover with green validation, schema change in green before switch, unsupported engine prerequisite failure). Each eval maps to a prompt file and a baseline (no-skill) file for with-skill-vs-baseline comparison.",
+  "eval_cases": [
+    {
+      "id": "aurora-mysql-major-version-upgrade",
+      "name": "Aurora MySQL 5.7 to 8.0 major version upgrade via Blue/Green",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — Aurora MySQL Blue/Green, major version upgrade 5.7 to 8.0 in green, parameter group change, green validation, replication active, switchover timeout",
+      "prompt": "Create an RDS Blue/Green Deployment for my Aurora MySQL cluster prod-mysql-db (aurora-mysql 5.7.mysql_aurora.2.11.0) in us-east-1, account 123456789012. I want to upgrade to MySQL 8.0 (8.0.mysql_aurora.3.04.0) in the green environment. Use parameter group prod-mysql80-params for green. I have connection retry logic in my application. Switchover timeout 300 seconds. Tags: Environment=production, Upgrade=mysql57-to-80.",
+      "prompt_file": "prompts/aurora-mysql-major-version-upgrade.md",
+      "baseline_file": "baselines/aurora-mysql-major-version-upgrade.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BLUE_GREEN: prod-mysql-db → green-prod-mysql-db (bg-prod-upgrade-2026)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Source DB (blue): prod-mysql-db (aurora-mysql 5.7)\n  [✓] Engine support: Supported (aurora-mysql)\n  [✓] Blue status: AVAILABLE\n  [✓] Blue/Green deployment: bg-prod-upgrade-2026 — AVAILABLE\n  [✓] Green environment: green-prod-mysql-db (8.0)\n  [✓] Major version upgrade: 5.7 → 8.0 (in green)\n  [✓] Parameter group: prod-mysql80-params (applied to green)\n  [✓] Green validation: PASSED\n  [✓] Replication (blue → green): ACTIVE, lag < 1s\n  [✓] Switchover timeout: 300 seconds\n  [✓] Application retry logic: Configured\n  [✓] Endpoint strategy: CNAME auto-follow (no app change needed)\nVERIFICATION_COMMANDS:\n  aws rds describe-blue-green-deployments --blue-green-deployment-identifier bg-prod-upgrade-2026 --region us-east-1\n  aws rds describe-db-instances --db-instance-identifier green-prod-mysql-db --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "aurora-mysql",
+            "5.7",
+            "8.0",
+            "VERDICT",
+            "CHECKLIST",
+            "VERIFICATION_COMMANDS",
+            "green"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rds-postgres-parameter-change",
+      "name": "RDS PostgreSQL parameter group change via Blue/Green",
+      "difficulty": "hard",
+      "branch": "READY_TO_DEPLOY — RDS PostgreSQL Blue/Green, parameter group change (shared_buffers, work_mem) in green, same engine version, green validation",
+      "prompt": "Create an RDS Blue/Green Deployment for my RDS PostgreSQL instance prod-pg-db (postgres 14.10) in us-east-1, account 123456789012. I want to apply a new parameter group prod-pg14-tuned in the green environment with changed shared_buffers and work_mem. Same engine version (14.10). My app has connection retry logic. Tags: Environment=production, Change=parameter-group.",
+      "prompt_file": "prompts/rds-postgres-parameter-change.md",
+      "baseline_file": "baselines/rds-postgres-parameter-change.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BLUE_GREEN: prod-pg-db → green-prod-pg-db (bg-pg-params-2026)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Source DB (blue): prod-pg-db (postgres 14.10)\n  [✓] Engine support: Supported (postgres)\n  [✓] Blue status: AVAILABLE\n  [✓] Blue/Green deployment: bg-pg-params-2026 — AVAILABLE\n  [✓] Green environment: green-prod-pg-db (14.10)\n  [✓] Parameter group change: prod-pg14-tuned (applied to green)\n  [✓] Green validation: PASSED\n  [✓] Replication (blue → green): ACTIVE, lag < 1s\n  [✓] Endpoint strategy: CNAME auto-follow (no app change needed)\nVERIFICATION_COMMANDS:\n  aws rds describe-blue-green-deployments --blue-green-deployment-identifier bg-pg-params-2026 --region us-east-1\n  aws rds describe-db-instances --db-instance-identifier green-prod-pg-db --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "postgres",
+            "prod-pg14-tuned",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "switchover-with-validation",
+      "name": "Blue/Green switchover after green validation (Aurora PostgreSQL)",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — switchover of existing Blue/Green after green validation passed, switchover timeout 600s, endpoint CNAME auto-follow",
+      "prompt": "I have an RDS Blue/Green Deployment bg-prod-upgrade-2026 for my Aurora PostgreSQL cluster prod-pg-cluster (aurora-postgresql 13.9) in us-east-1. The green environment green-prod-pg-cluster is running PostgreSQL 15.4. Green validation passed: engine version confirmed, replication lag is under 1 second, query performance is within baseline. I want to switch over. Switchover timeout 600 seconds. My application uses the cluster endpoint and has retry logic.",
+      "prompt_file": "prompts/switchover-with-validation.md",
+      "baseline_file": "baselines/switchover-with-validation.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BLUE_GREEN: prod-pg-cluster → green-prod-pg-cluster (bg-prod-upgrade-2026)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Source DB (blue): prod-pg-cluster (aurora-postgresql 13.9)\n  [✓] Green environment: green-prod-pg-cluster (15.4)\n  [✓] Green validation: PASSED (engine version, replication lag, performance)\n  [✓] Replication (blue → green): ACTIVE, lag < 1s\n  [✓] Switchover timeout: 600 seconds\n  [✓] Application retry logic: Configured\n  [✓] Endpoint strategy: CNAME auto-follow (no app change needed)\nVERIFICATION_COMMANDS:\n  aws rds switchover-blue-green-deployment --blue-green-deployment-identifier bg-prod-upgrade-2026 --switchover-timeout 600 --region us-east-1\n  aws rds describe-blue-green-deployments --blue-green-deployment-identifier bg-prod-upgrade-2026 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "switchover",
+            "600",
+            "CNAME",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "schema-change-in-green",
+      "name": "Schema change (ALTER TABLE) in green before switchover",
+      "difficulty": "medium",
+      "branch": "READY_TO_DEPLOY — Blue/Green with schema change and parameter group change in green, blue frozen, green validation step",
+      "prompt": "Create an RDS Blue/Green Deployment for my RDS MySQL instance prod-orders-db (mysql 8.0.35) in us-east-1, account 123456789012. Same engine version 8.0.35. I need to apply a schema change in green: ALTER TABLE orders ADD COLUMN status_code INT DEFAULT 0. Also apply parameter group prod-mysql80-tuned. Application has retry logic. Tags: Environment=production, Change=schema-and-params.",
+      "prompt_file": "prompts/schema-change-in-green.md",
+      "baseline_file": "baselines/schema-change-in-green.md",
+      "expected_verdict": "READY_TO_DEPLOY",
+      "expected_output": "BLUE_GREEN: prod-orders-db → green-prod-orders-db (bg-orders-schema-2026)\nVERDICT: READY_TO_DEPLOY\nCHECKLIST:\n  [✓] Source DB (blue): prod-orders-db (mysql 8.0.35)\n  [✓] Engine support: Supported (mysql)\n  [✓] Blue/Green deployment: bg-orders-schema-2026 — AVAILABLE\n  [✓] Green environment: green-prod-orders-db (8.0.35)\n  [✓] Parameter group: prod-mysql80-tuned (applied to green)\n  [✓] Schema changes: ALTER TABLE orders ADD status_code INT (applied to green ONLY)\n  [✓] Green validation: PASSED\n  [✓] Replication (blue → green): ACTIVE\nVERIFICATION_COMMANDS:\n  aws rds describe-blue-green-deployments --blue-green-deployment-identifier bg-orders-schema-2026 --region us-east-1",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "READY_TO_DEPLOY",
+            "ALTER TABLE",
+            "green",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: PREREQUISITES_MISSING"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "unsupported-engine-sqlserver",
+      "name": "Blue/Green for unsupported engine (SQL Server) — prerequisite failure",
+      "difficulty": "easy",
+      "branch": "PREREQUISITES_MISSING — SQL Server does not support Blue/Green Deployments; only Aurora MySQL/PostgreSQL and RDS MySQL/PostgreSQL are supported",
+      "prompt": "Create an RDS Blue/Green Deployment for my RDS SQL Server instance prod-sqlserver-db (sqlserver-ex 15.00.4043.16) in us-east-1, account 123456789012. I want to upgrade to SQL Server 2022 in green. Parameter group prod-sqlserver2022-params.",
+      "prompt_file": "prompts/unsupported-engine-sqlserver.md",
+      "baseline_file": "baselines/unsupported-engine-sqlserver.md",
+      "expected_verdict": "PREREQUISITES_MISSING",
+      "expected_output": "BLUE_GREEN: prod-sqlserver-db\nVERDICT: PREREQUISITES_MISSING\nCHECKLIST:\n  [✗] Engine support: FAIL — sqlserver is NOT supported by Blue/Green Deployments. Only Aurora MySQL, Aurora PostgreSQL, RDS MySQL, and RDS PostgreSQL are supported.",
+      "files": [],
+      "assertions": [
+        {
+          "type": "must_contain",
+          "values": [
+            "PREREQUISITES_MISSING",
+            "sqlserver",
+            "not supported",
+            "VERDICT",
+            "CHECKLIST"
+          ]
+        },
+        {
+          "type": "must_not_contain",
+          "values": [
+            "Error:",
+            "I cannot",
+            "I'm unable",
+            "VERDICT: READY_TO_DEPLOY"
+          ]
+        }
+      ]
+    }
+  ]
+}

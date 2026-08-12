@@ -1,0 +1,139 @@
+# Eval test cases for cloudformation-cfn-lint-operator
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five-case proven set exercising the OPERATION_COMPLETED /
+# REVIEW_REQUIRED classification across CloudFormation validation
+# scenarios (cfn-lint + validate-template + ChangeSet, drift detection
+# with stack policy, SAM transform validation, nested stack validation,
+# cfn-nag CRITICAL findings review-required failure).
+skill: cloudformation-cfn-lint-operator
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: cfn-lint-changeset-clean
+    description: >-
+      Validate a CloudFormation template with cfn-lint, validate-
+      template, cfn-nag, and create a ChangeSet. All pass with no
+      critical findings. Expects OPERATION_COMPLETED.
+    input: |
+      Validate my CloudFormation template template.yaml for stack
+      my-app-stack in us-east-1. Run cfn-lint, validate-template,
+      cfn-nag, and create a ChangeSet. The template creates an S3
+      bucket with encryption enabled and a DynamoDB table. No wildcard
+      IAM. Stack policy protects RDS and S3.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "cfn-lint"
+        - "validate-template"
+        - "cfn-nag"
+        - "VERDICT"
+        - "CHECKLIST"
+        - "VERIFICATION_COMMANDS"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: drift-detection-stack-policy
+    description: >-
+      Run drift detection and enforce a stack policy on an existing
+      CloudFormation stack. Drift detection returns IN_SYNC and stack
+      policy is enforced. Expects OPERATION_COMPLETED.
+    input: |
+      Run drift detection on my CloudFormation stack my-infra-stack
+      in us-east-1. Also enforce a stack policy that protects
+      AWS::RDS::DBInstance and AWS::S3::Bucket resources from
+      updates. The stack has no drift.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "IN_SYNC"
+        - "stack policy"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: sam-transform-validation
+    description: >-
+      Validate a SAM template by expanding the transform and running
+      cfn-lint and cfn-nag on the expanded output. All checks pass.
+      Expects OPERATION_COMPLETED.
+    input: |
+      Validate my SAM template template-sam.yaml for stack
+      my-serverless-stack in us-east-1. It has Transform:
+      AWS::Serverless-2016-10-31 with two Serverless::Function
+      resources. Expand the transform first, then run cfn-lint and
+      cfn-nag on the expanded template.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "sam translate"
+        - "cfn-lint"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: nested-stack-validation
+    description: >-
+      Validate a CloudFormation parent template with two nested child
+      stacks. Parent and both children pass cfn-lint and validate-
+      template. Expects OPERATION_COMPLETED.
+    input: |
+      Validate my CloudFormation parent template parent-template.yaml
+      for stack my-platform-stack in us-east-1. It references two
+      nested stacks: child-network.yaml and child-database.yaml.
+      Run cfn-lint and validate-template on all three templates.
+    expected_verdict: OPERATION_COMPLETED
+    assertions:
+      must_contain:
+        - "OPERATION_COMPLETED"
+        - "nested"
+        - "cfn-lint"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: REVIEW_REQUIRED"
+
+  - id: cfn-nag-critical-findings
+    description: >-
+      Run cfn-nag on a template with CRITICAL security findings
+      (wildcard IAM and unencrypted S3). cfn-nag blocks deployment.
+      This is a review-required result. Expects REVIEW_REQUIRED.
+    input: |
+      Validate my CloudFormation template template.yaml for stack
+      my-app-stack in us-east-1. The template has an IAM role with
+      Resource: "*" in its managed policy and an S3 bucket without
+      encryption. Run cfn-lint, validate-template, and cfn-nag.
+    expected_verdict: REVIEW_REQUIRED
+    assertions:
+      must_contain:
+        - "REVIEW_REQUIRED"
+        - "cfn-nag"
+        - "CRITICAL"
+        - "VERDICT"
+        - "CHECKLIST"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPERATION_COMPLETED"
