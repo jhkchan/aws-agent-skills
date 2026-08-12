@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert details not usually known by a generic model: exact retention limits (90\u20113653 days or INDEFINITE), precise pre\u2011check priority order, cost breakdowns, recent feature timeline (multi\u2011column partitioning, EDS replication), and a decision tree for each operation. This constitutes genuine delta, though many points (e.g., basic CLI syntax) are already known, so full marks are not awarded."
+      "justification": "Adds concrete, expert\u2011level details not usually memorised: exact retention limits (90\u20113653 days or literal INDEFINITE), required KMS key policy grants, the \"partition\u2011or\u2011perish\" performance rule, recent 2024\u20112026 features (EDS replication, multi\u2011column partitioning, partner non\u2011AWS ingestion flow), cost breakdowns, and a decision\u2011tree of pre\u2011checks. Some content merely restates AWS docs, hence not a perfect 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific procedures: KMS key\u2011policy verification, organization\u2011scope validation, Athena workgroup and Lake Formation grant checks, and a mandatory CONFIRM gate before any state\u2011changing CLI. Only minor generic phrasing (e.g., \"check security\") prevents a perfect score."
+      "justification": "Provides an AWS\u2011specific procedural flow: ordered pre\u2011check list, mandatory CONFIRM gate, capture of pre\u2011state, exact CLI flag usage, pagination notes, and post\u2011verification steps. A few generic statements (e.g., \"check security\") prevent a full score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Provides a thorough NEVER list with concrete reasons (e.g., \"NEVER run a query without WHERE eventTime\" and why). Missing a few niche pitfalls such as forgetting to disable termination protection before delete (mentioned only indirectly) and some partner\u2011registration edge cases, so not full credit."
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., missing KMS grant, cross\u2011region JOIN, zero\u2011row misinterpretation). Some warnings are high\u2011level or overlap with pre\u2011checks, lacking deeper experiential nuance, so two points are deducted."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete (name, description, version, author, license, compatibility, keywords, tags, metadata, verdict_shape, when_to_use, activation_triggers, invocation_schema). The description clearly states WHAT the skill does, WHEN to invoke, and provides reliable activation triggers."
+      "justification": "Frontmatter is complete and well\u2011formed; description clearly states WHAT the skill does, WHEN to invoke, and includes a rich keyword set, activation triggers, and an invocation schema. No missing required fields."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 14,
       "max": 15,
-      "justification": "Layers information well: quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 anti\u2011patterns \u2192 output contract. A small amount of detailed cost tables appears early, which could overload a first glance, but overall the hierarchy is clear."
+      "justification": "Information is layered: quick reference, mindset, pre\u2011flight, process, output contract, anti\u2011patterns, and heuristics. Critical rules are upfront; deeper details are in later sections. Slight overload in the very long \"Mindset\" and \"Step 0\" blocks costs one point."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive operations are tightly constrained by a mandatory CONFIRM gate and exhaustive pre\u2011checks, while creative query writing is left flexible with guidance on partition pruning. One point is deducted because the skill could better calibrate freedom for bulk non\u2011AWS ingestion (e.g., rate\u2011limit guidance)."
+      "justification": "Destructive actions are tightly constrained by CONFIRM gates and pre\u2011checks; creative query work is given appropriate flexibility with partition\u2011pruning guidance. The skill omits an explicit confirm\u2011gate example for delete\u2011eds, a minor calibration gap."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (quick reference, mindset, pre\u2011flight, process, output contract, anti\u2011patterns). Minor ad\u2011hoc ordering of some sections (e.g., cost baselines mixed with mindset) prevents a perfect score."
+      "justification": "Follows a recognizable structure (frontmatter \u2192 overview \u2192 navigation table \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 output contract \u2192 anti\u2011patterns \u2192 heuristics). Not tied to a named industry pattern, so one point is deducted."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 12,
       "max": 15,
-      "justification": "Provides working examples, decision trees, and clear CLI commands, enabling an agent to execute operations. However, the output contract does not accommodate the documented ERROR verdict for malformed input, and pagination handling is mentioned but not integrated into the step\u2011by\u2011step flow, leaving edge cases unaddressed."
+      "justification": "Provides working CLI examples, decision trees, and detailed pre\u2011check sequences, enabling an agent to execute operations. However, there is an inconsistency: the skill mentions a VERDICT: ERROR for malformed input, yet the strict output contract restricts VERDICT to READY, BLOCKED, or COMPLETED. Pagination handling is noted but not fully scripted, and error\u2011handling for API failures is not detailed, leading to execution gaps."
     }
   ],
-  "total_score": 107,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 54426,
-  "latency_ms": 12675,
-  "assertions_passed": false,
-  "assertions_passed_count": 4,
-  "assertions_failed_count": 1
+  "grade": "A",
+  "token_count": 54032,
+  "latency_ms": 16246,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
 }

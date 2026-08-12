@@ -1,0 +1,269 @@
+# Eval test cases for cloudtrail-cost-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimization pattern. Each case's
+# TrailName embeds the test-case id so the model naturally echoes it
+# (avoids assertion-token mismatch). The decision framework in SKILL.md
+# produces exactly the expected verdicts below.
+skill: cloudtrail-cost-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: org-trail-consolidation
+    description: >-
+      Organization with 12 member accounts, each running its own member
+      trail in addition to an org trail. All member trails capture the
+      same management events already covered by the org trail. Expected
+      verdict: FURTHER_OPTIMIZATION_AVAILABLE with member-trail removal.
+    input: |
+      TrailName: aws-organizational-trail-primary
+      IsOrganizationTrail: true
+      IsMultiRegionTrail: true
+      IncludeManagementEvents: true
+      Status: RUNNING
+
+      Organization:
+        ManagementAccount: 111111111111
+        MemberAccounts: 12
+
+      Trail inventory (organization):
+        - aws-organizational-trail-primary (org trail, RUNNING)
+        - member-trail-acct-2 (member trail in acct 222222222222)
+        - member-trail-acct-3 (member trail in acct 333333333333)
+        - member-trail-acct-4 (member trail in acct 444444444444)
+        - member-trail-acct-5 (member trail in acct 555555555555)
+        - member-trail-acct-6 (member trail in acct 666666666666)
+        - member-trail-acct-7 (member trail in acct 777777777777)
+        - member-trail-acct-8 (member trail in acct 888888888888)
+        - member-trail-acct-9 (member trail in acct 999999999999)
+        - member-trail-acct-10 (member trail in acct 101010101010)
+        - member-trail-acct-11 (member trail in acct 111111111112)
+        - member-trail-acct-12 (member trail in acct 121212121212)
+        - member-trail-acct-13 (member trail in acct 131313131313)
+
+      Metrics (last 90 days):
+        - Org trail log files/month: 1,400,000
+        - Member trail log files/month (each): 116,667
+        - Total duplicate log files/month: 1,400,000 (org-mgmt events)
+        - KMS keys: 13 (one per trail)
+        - SNS topics: 13 (one per trail)
+        - S3 storage for duplicate logs: 200 GB
+
+      Region: us-east-1
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "org-trail-consolidation"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "member trail"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: s3-lifecycle-glacier-transition
+    description: >-
+      CloudTrail log bucket with 850 GB of logs in Standard storage, no
+      lifecycle policy. Logs are write-once-read-rarely; 90-day Glacier
+      IR transition is the right curation. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with lifecycle recommendation.
+    input: |
+      TrailName: trail-s3-lifecycle-glacier-transition
+      IsOrganizationTrail: false (standalone account)
+      IsMultiRegionTrail: true
+      IncludeManagementEvents: true
+      Status: RUNNING
+
+      S3 log bucket: cloudtrail-logs-standalone-us-east-1
+      S3 lifecycle policy: NONE
+
+      S3 storage breakdown:
+        - Total size: 850 GB
+        - Older than 30 days: 620 GB
+        - Older than 90 days: 410 GB
+        - Older than 180 days: 180 GB
+        - Storage class breakdown: 100% Standard
+
+      Metrics (last 90 days):
+        - Average monthly growth: 95 GB
+        - S3 GET requests on CloudTrail prefix: 42 (very low read volume)
+        - No Object Lock configured
+
+      Region: us-east-1
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "s3-lifecycle-glacier-transition"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "Glacier"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: data-event-volume-curation
+    description: >-
+      Org trail capturing S3 data events on All Buckets including 142M
+      events/month from log/CDN/backup buckets with no audit value.
+      Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with curated
+      bucket list recommendation.
+    input: |
+      TrailName: aws-organizational-trail-data-event-volume-curation
+      IsOrganizationTrail: true
+      IsMultiRegionTrail: true
+      IncludeManagementEvents: true
+      Status: RUNNING
+
+      Event selectors:
+        - ManagementEvents: true
+        - S3 data events: All Buckets (ReadWriteType: All)
+        - Lambda data events: disabled
+
+      S3 data event volume by bucket (last 30 days):
+        - financial-records/:        12,000,000 events/month (HIGH audit value)
+        - pii-data/:                 4,500,000 events/month  (HIGH audit value)
+        - transaction-logs/:         8,200,000 events/month  (HIGH audit value)
+        - cdn-access-logs/:         47,000,000 events/month  (LOW audit value)
+        - elb-access-logs/:         38,000,000 events/month  (LOW audit value)
+        - cloudtrail-logs/:         22,000,000 events/month  (LOW audit value)
+        - backup-prod/:             10,000,000 events/month  (LOW audit value)
+        - audit-archive/:            800,000 events/month    (LOW audit value)
+
+      Total data events/month: 142,500,000
+      High-value data events/month: 24,700,000 (17%)
+      Low-value data events/month: 117,800,000 (83%)
+
+      Region: us-east-1
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "data-event-volume-curation"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "event selector"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: cloudtrail-lake-scoping
+    description: >-
+      CloudTrail Lake event data store ingesting all event categories
+      (management + data) at 100 GB/month. Only management events are
+      needed for the IAM access analysis use case. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with event-category filter.
+    input: |
+      TrailName: trail-cloudtrail-lake-scoping
+      IsOrganizationTrail: true
+      IsMultiRegionTrail: true
+      IncludeManagementEvents: true
+      Status: RUNNING
+
+      CloudTrail Lake Event Data Store:
+        - EDS ID: 7a7b8c9d-0e1f-2345-6789-0123456789ab
+        - Name: org-audit-eds
+        - Event categories ingested: Management, Data
+        - Retention: 90 days
+        - Monthly ingestion: 100 GB
+          - Management events: 8 GB/month (8%)
+          - Data events: 92 GB/month (92%)
+        - Use case: IAM access pattern analysis (management events only)
+
+      Region: us-east-1
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "cloudtrail-lake-scoping"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "event-category"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-optimized-org-setup
+    description: >-
+      Org trail with curated S3 data events on 3 high-value buckets,
+      S3 lifecycle policy (Glacier IR @ 90d), single shared CMK, no
+      Insights on low-risk accounts, no CloudWatch Logs delivery, no
+      CloudTrail Lake. All seven dimensions pass. Expected verdict:
+      OPTIMIZED.
+    input: |
+      TrailName: trail-already-optimized-org-setup
+      IsOrganizationTrail: true
+      IsMultiRegionTrail: true
+      IncludeManagementEvents: true
+      Status: RUNNING
+
+      Event selectors:
+        - ManagementEvents: true
+        - S3 data events: 3 high-value buckets only (financial-records/,
+          pii-data/, transaction-logs/) — 24,700,000 events/month
+        - Lambda data events: disabled
+
+      S3 log bucket: org-cloudtrail-logs-us-east-1
+      S3 lifecycle policy:
+        - 30 days → INTELLIGENT_TIERING
+        - 90 days → GLACIER_IR
+        - 180 days → DEEP_ARCHIVE
+        - 365 days → EXPIRE
+
+      KMS: 1 shared CMK (alias/cloudtrail-org-cmk)
+      SNS: 1 topic (org-cloudtrail-notifications)
+      Insights: enabled on org-management account only
+      CloudWatch Logs: not configured (S3-only)
+      CloudTrail Lake: not configured
+      Athena: partition projection enabled on cloudtrail_logs table
+
+      Metrics (last 90 days):
+        - Monthly cost: $487.30 (stable)
+        - All dimensions within expected ranges
+
+      Region: us-east-1
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPTIMIZED
+    assertions:
+      must_contain:
+        - "OPTIMIZED"
+        - "already-optimized-org-setup"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+        - "VERDICT: NEED_MORE_INFO"

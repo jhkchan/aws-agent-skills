@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "The skill aggregates many specific, non\u2011trivial details (e.g., GA prefix pool CIDR, dual\u2011stack creation cutoff date, traffic\u2011dial hard\u2011cut vs graceful drain, BYOIP provisioning sequence, custom\u2011routing port\u2011mapping constraints). However, most of these facts are directly documented in AWS guides, so a capable model could retrieve them without this skill; the skill adds little truly novel insight beyond consolidation."
+      "justification": "Provides specific, non\u2011obvious constraints such as dual\u2011stack creation date (Nov\u202f2023), traffic\u2011dial 0 being a hard cut vs weight\u202f0 graceful drain, BYOIP provisioning steps (ROA, Route\u202f53 PROVISIONED state), GA prefix pool CIDR (51.224.0.0/14), custom\u2011routing deterministic port mapping, exact limit values (e.g., BYOIP minimum /24, health\u2011check intervals 10/30\u202fs, endpoint weight 0\u2011999), and nuanced client\u2011IP preservation behavior. These details go beyond generic model knowledge."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Provides a clear AWS\u2011specific workflow (pre\u2011flight checks, ordered CLI commands, decision heuristics for client\u2011IP preservation). Missing a concise decision tree for choosing between Amazon\u2011pool IPs vs BYOIP, which would make the procedure fully expert\u2011level."
+      "justification": "Procedures are largely AWS\u2011specific (pre\u2011flight IAM checks, endpoint\u2011group creation order, RAM share validation), yet some steps are presented generically (e.g., \"verify IAM permissions\" without a concrete checklist order) and the decision flow for choosing BYOIP vs Amazon pool is not fully articulated as a decision tree."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Provides a concrete top\u20115 NEVER list with specific reasoning (mixed endpoint types, traffic\u2011dial 0, un\u2011PROVISIONED BYOIP, client\u2011IP preservation side\u2011effects, flow\u2011log permission errors). Missing broader pitfalls such as cost\u2011explosion on high traffic\u2011dial changes or IPv6 migration edge\u2011cases, so not full credit."
+      "justification": "Contains a concrete NEVER list with five high\u2011impact pitfalls and clear reasoning (mixed endpoint types, traffic\u2011dial\u202f0, BYOIP not PROVISIONED, client\u2011IP preservation toggle, flow\u2011log permission). Could be stronger by adding limits\u2011exhaustion warnings, but overall effective."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Front\u2011matter includes name, description, version, author, license, compatibility, keywords, tags, metadata, when_to_use, activation_triggers, and a detailed invocation_schema. The only shortfall is the lack of a concrete JSON example for the input shape, which would make activation more reliable."
+      "justification": "Frontmatter includes all required fields (name, description, version, author, license, compatibility, keywords, tags, metadata). The skill description, when_to_use, activation_triggers, and invocation_schema are precise, enabling reliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Information is layered (summary \u2192 quick reference \u2192 pre\u2011flight \u2192 process \u2192 patterns \u2192 contract). The quick\u2011reference tables are dense and may overload the agent before it knows which rows are relevant."
+      "justification": "The skill layers information (summary, quick reference, detailed process) effectively, but critical rules such as the homogeneity constraint are buried in large tables rather than highlighted up\u2011front, causing potential cognitive overload for a first\u2011time user."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive operations are tightly constrained by mandatory PRE_CHECKS and a CONFIRM gate. Planning\u2011only scenarios are given more freedom. Slight over\u2011generality in BYOIP waiting logic (no explicit timeout or retry guidance) prevents a perfect score."
+      "justification": "Destructive operations (create\u2011accelerator, add\u2011endpoints) are gated by exhaustive PRE_CHECKS and a CONFIRM step, while planning sections are permissive. Calibration matches task fragility throughout."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a clear, repeatable pattern (Mindset, Quick navigation, Process, Output contract, NEVER list, Expert heuristic) that aligns with the Softworks skill template. Minor inconsistency in section ordering (e.g., QUICK REFERENCE appears before MINDSET) keeps it from a perfect rating."
+      "justification": "Follows a coherent, recognizable pattern (What it does \u2192 Mindset \u2192 Quick navigation \u2192 Process \u2192 Output contract \u2192 NEVER \u2192 Heuristics), aiding comprehension and reuse."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 11,
       "max": 15,
-      "justification": "Provides executable CLI snippets, a detailed checklist, and a strict output contract. However the example outputs contain placeholder tokens like <arn>, which directly violates the \u2018NEVER use placeholders\u2019 rule in the contract. Additionally, edge\u2011case handling (e.g., missing health\u2011check path for TCP listeners) is not demonstrated."
+      "justification": "Provides decision trees, CLI snippets, checklist, and strict output contract, enabling an agent to execute. However, example outputs include placeholder <arn> values and omit required PRE_CHECKS, which could mislead an agent and indicate ambiguity in enforcing the contract."
     }
   ],
   "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 51074,
-  "latency_ms": 10474,
+  "token_count": 52346,
+  "latency_ms": 15991,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

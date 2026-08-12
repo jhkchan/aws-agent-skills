@@ -1,0 +1,274 @@
+# Eval test cases for macie-cost-optimizer
+# Co-located per the eval-backed contract (spec S-002, S-E04).
+# Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
+#
+# Five deterministic cases — one per optimization pattern. Each case's
+# identifier embeds the test-case id so the model naturally echoes it
+# (avoids assertion-token mismatch). The decision framework in SKILL.md
+# produces exactly the expected verdicts below.
+skill: macie-cost-optimizer
+model_id: amazon.nova-pro-v1:0
+profile: default
+region: us-east-1
+temperature: 0.0
+
+test_cases:
+  - id: recurring-to-automated-discovery
+    description: >-
+      Macie deployment running a daily recurring targeted classification
+      job over a 12 TB stable data lake. Automated discovery is enabled
+      but underutilised. Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE
+      with discovery mode migration.
+    input: |
+      DeploymentId: macie-recurring-to-automated-discovery
+      Macie administrator: delegated (org-management)
+      Region: us-east-1
+
+      Classification jobs (last 30 days):
+        - jobId: job-targeted-pci-scan
+          jobType: SCHEDULED (daily, 30 runs/month)
+          buckets: [data-lake-raw, data-lake-curated, data-lake-enriched,
+                    access-logs-prod, cloudtrail-archive, public-assets,
+                    backup-tier-1, backup-tier-2, ml-feature-store,
+                    user-uploads, pii-quarantine, finance-reports,
+                    hr-records, app-configs, system-buckets, temp-staging,
+                    analytics-output, report-snapshots]
+          managedDataIdentifierSelector: ALL
+          sampling: default (per-bucket ceiling)
+          jobsRun: 30
+          bytesProcessed: 37,200,000,000,000 (37.2 TB cumulative)
+          objectsProcessed: 480,000,000
+
+      Automated discovery: ENABLED but scope excludes access-logs
+
+      Cost Explorer (Service=Macie, last 30 days): $37,210.00
+
+      Bucket statistics: 18 buckets total, 4 are log/archive
+      (access-logs-prod, cloudtrail-archive, public-assets,
+      backup-tier-1), 2 are known-safe validated clean.
+
+      Workload context: stable S3 data lake with ~5% monthly churn.
+      PCI compliance scope; only financial and credentials identifiers
+      are required. No daily compliance mandate; monthly cadence
+      acceptable.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "recurring-to-automated-discovery"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "MIGRATION_STEPS"
+        - "automated"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: scan-frequency-reduction
+    description: >-
+      Weekly recurring targeted job on a data lake where the compliance
+      window is quarterly. Reducing to monthly cuts per-GB assessment
+      cost ~4x. Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE.
+    input: |
+      DeploymentId: macie-scan-frequency-reduction
+      Macie administrator: delegated (org-management)
+      Region: us-east-1
+
+      Classification jobs (last 30 days):
+        - jobId: job-weekly-compliance-scan
+          jobType: SCHEDULED (weekly, 4 runs/month)
+          buckets: [data-lake-curated, pii-repository, finance-reports]
+          managedDataIdentifierSelector: INCLUDE (PII + financial)
+          sampling: default
+          jobsRun: 4
+          bytesProcessed: 8,000,000,000,000 (8 TB cumulative)
+          objectsProcessed: 120,000,000
+
+      Automated discovery: DISABLED (compliance team prefers targeted jobs)
+
+      Cost Explorer (Service=Macie, last 30 days): $800.00
+
+      Bucket statistics: 3 buckets, all high-risk regulated data.
+      Quarterly compliance window — no daily or weekly mandate.
+
+      Workload context: HIPAA compliance scope. Targeted jobs are
+      required by compliance policy (cannot switch to automated
+      discovery). Frequency reduction from weekly to monthly is
+      acceptable per the compliance officer's written sign-off.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "scan-frequency-reduction"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "monthly"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: bucket-exclusion-and-identifier-narrowing
+    description: >-
+      Macie deployment where 6 of 20 buckets are logs/archive/system
+      buckets in scope, and managedDataIdentifierSelector is ALL for a
+      PII-only compliance regime. Expected verdict:
+      FURTHER_OPTIMIZATION_AVAILABLE with bucket exclusion + identifier
+      narrowing.
+    input: |
+      DeploymentId: macie-bucket-exclusion-and-identifier-narrowing
+      Macie administrator: delegated (org-management)
+      Region: us-east-1
+
+      Classification jobs (last 30 days):
+        - jobId: job-automated-discovery-weekly
+          jobType: SCHEDULED (weekly)
+          buckets: 20 buckets in scope
+            (including access-logs-prod, cloudtrail-archive,
+            alb-logs, s3-server-access, system-buckets-aws,
+            temp-staging-ephemeral)
+          managedDataIdentifierSelector: ALL
+          sampling: default
+          jobsRun: 4
+          bytesProcessed: 4,800,000,000,000 (4.8 TB cumulative)
+
+      Automated discovery: ENABLED
+
+      Cost Explorer (Service=Macie, last 30 days): $480.00
+
+      Bucket statistics: 20 buckets, 6 are log/archive/system,
+      14 are business data. Compliance regime: GDPR (EU personal data
+      identifiers only required). Prior Macie runs on the 6 log/archive
+      buckets returned zero findings.
+
+      Workload context: GDPR PII detection. Only personal data
+      identifiers are required; financial and credentials categories
+      are not in scope. The 6 log/archive/system buckets have been
+      validated clean by the data governance team.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "bucket-exclusion-and-identifier-narrowing"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "exclude"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: already-optimized-macie
+    description: >-
+      Macie deployment already on automated discovery, default sampling,
+      narrowed identifiers, suppression rules for known-safe prefixes,
+      single delegated administrator, Athena export pipeline. No
+      dimension has positive savings. Expected verdict: OPTIMIZED.
+    input: |
+      DeploymentId: macie-already-optimized-macie
+      Macie administrator: delegated (org-management)
+      Region: us-east-1
+
+      Automated discovery: ENABLED (covers all 12 business-data buckets)
+      Classification jobs: ONE_ONE_TIME only (ad-hoc investigation last
+        quarter — no recurring targeted jobs)
+
+      managedDataIdentifierSelector: INCLUDE (PII + financial only)
+      Sampling: default (per-bucket ceiling)
+      Suppression rules: 3 active (access-logs prefix, public-assets
+        prefix, known-safe-images prefix)
+      Classification export: ENABLED (S3 + Athena pipeline)
+      Bucket statistics: 12 buckets, 0 log/archive buckets in scope
+        (all excluded via classification scope)
+
+      Cost Explorer (Service=Macie, last 30 days): $84.00
+        (automated discovery incremental cost only)
+
+      Workload context: well-tuned Macie deployment. Monthly cost is
+      minimal and proportional to data churn. All log/archive buckets
+      excluded. Identifiers narrowed to compliance scope. Suppression
+      rules prevent known-safe re-evaluation.
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: OPTIMIZED
+    assertions:
+      must_contain:
+        - "OPTIMIZED"
+        - "already-optimized-macie"
+        - "REASON"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: FURTHER_OPTIMIZATION_AVAILABLE"
+        - "VERDICT: NEED_MORE_INFO"
+
+  - id: custom-identifier-and-suppression
+    description: >-
+      Macie deployment with 12 custom data identifiers (several
+      overlapping, some with catastrophic-backtracking regex) and
+      recurring findings on a known-safe prefix with no suppression
+      rule. Expected verdict: FURTHER_OPTIMIZATION_AVAILABLE with custom
+      identifier consolidation + suppression rule.
+    input: |
+      DeploymentId: macie-custom-identifier-and-suppression
+      Macie administrator: delegated (org-management)
+      Region: us-east-1
+
+      Automated discovery: ENABLED
+      Custom data identifiers: 12 configured
+        (including 3 overlapping SSN variants, 2 overlapping credit-card
+        patterns, 1 regex with nested quantifiers causing backtracking,
+        4 identifiers with zero matches in 90 days)
+
+      Managed data identifier selector: INCLUDE (PII only)
+
+      Findings (last 30 days):
+        - 2,400 findings, 2,100 from the same prefix
+          (s3://data-lake/public-assets/) which has been validated
+          as known-safe public marketing collateral
+        - 0 suppression rules currently configured
+
+      Cost Explorer (Service=Macie, last 30 days): $1,240.00
+        (elevated due to custom identifier evaluation overhead and
+        re-evaluation of known-safe prefix)
+
+      Bucket statistics: 15 buckets, all business data.
+      Workload context: marketing company with public brand assets
+      stored in data-lake/public-assets/. The public-assets prefix has
+      been validated by the data governance team as containing only
+      public marketing collateral (images, videos, PDFs).
+
+      Emit the standard optimization block (TARGET, VERDICT, REASON,
+      RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+    expected_verdict: FURTHER_OPTIMIZATION_AVAILABLE
+    assertions:
+      must_contain:
+        - "FURTHER_OPTIMIZATION_AVAILABLE"
+        - "custom-identifier-and-suppression"
+        - "RECOMMENDATION"
+        - "ESTIMATED_SAVINGS"
+        - "suppress"
+      must_not_contain:
+        - "Error:"
+        - "I cannot"
+        - "I'm unable"
+        - "VERDICT: OPTIMIZED"
+        - "VERDICT: NEED_MORE_INFO"

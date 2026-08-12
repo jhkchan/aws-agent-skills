@@ -171,7 +171,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | acm-certificate-deployer | amazon.nova-pro-v1:0 | 101/120 | B | 4/5 | 8.9s | 39946 |
 | acm-certificate-expiry-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 12.0s | 37462 |
 | alb-5xx-troubleshooter | amazon.nova-pro-v1:0 | 108/120 | A | 0/5 | 27.8s | 54221 |
-| alb-unhealthy-target-troubleshooter | amazon.nova-pro-v1:0 | 107/120 | B | 5/5 | 15.1s | 57384 |
+| alb-unhealthy-target-troubleshooter | amazon.nova-pro-v1:0 | 109/120 | A | 5/5 | 12.6s | 56762 |
 | amazon-mq-broker-deployer | amazon.nova-pro-v1:0 | 101/120 | B | 3/5 | 17.2s | 46807 |
 | amplify-app-deployer | amazon.nova-pro-v1:0 | 103/120 | B | 5/5 | 10.6s | 43061 |
 | apigateway-5xx-troubleshooter | amazon.nova-pro-v1:0 | 109/120 | A | 0/5 | 21.4s | 54610 |
@@ -230,7 +230,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | cloudhsm-cluster-posture-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 5.9s | 35489 |
 | cloudtrail-alert-automator | amazon.nova-pro-v1:0 | 104/120 | B | 0/5 | 12.1s | 41382 |
 | cloudtrail-gap-troubleshooter | amazon.nova-pro-v1:0 | 101/120 | B | 5/5 | 12.1s | 40463 |
-| cloudtrail-lake-operator | amazon.nova-pro-v1:0 | 107/120 | B | 4/5 | 12.7s | 54426 |
+| cloudtrail-lake-operator | amazon.nova-pro-v1:0 | 108/120 | A | 5/5 | 16.2s | 54032 |
 | cloudtrail-missing-events-troubleshooter | amazon.nova-pro-v1:0 | 104/120 | B | 0/0 | 11.9s | 38562 |
 | cloudtrail-org-trail-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 9.7s | 38562 |
 | cloudwatch-alarm-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 39.2s | 36433 |
@@ -338,7 +338,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | firewall-manager-deployer | amazon.nova-pro-v1:0 | 112/120 | A | 4/5 | 13.4s | 45698 |
 | fis-experiment-deployer | amazon.nova-pro-v1:0 | 109/120 | A | 4/5 | 35.6s | 42100 |
 | fsx-filesystem-deployer | amazon.nova-pro-v1:0 | 101/120 | B | 4/5 | 6.8s | 41043 |
-| globalaccelerator-deployer | amazon.nova-pro-v1:0 | 107/120 | B | 0/5 | 10.5s | 51074 |
+| globalaccelerator-deployer | amazon.nova-pro-v1:0 | 107/120 | B | 0/5 | 16.0s | 52346 |
 | glue-crawler-deployer | amazon.nova-pro-v1:0 | 108/120 | A | 3/5 | 9.3s | 42050 |
 | glue-crawler-job-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 35.0s | 48227 |
 | glue-job-failure-troubleshooter | amazon.nova-pro-v1:0 | 106/120 | B | 4/5 | 6.2s | 44814 |
@@ -358,7 +358,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | inspector2-finding-troubleshooter | amazon.nova-pro-v1:0 | 99/120 | B | 3/5 | 4.9s | 47381 |
 | iot-core-thing-deployer | amazon.nova-pro-v1:0 | 94/120 | B | 2/5 | 11.1s | 41430 |
 | kafka-connect-troubleshooter | amazon.nova-pro-v1:0 | 108/120 | A | 0/5 | 6.4s | 39678 |
-| kafka-msk-lag-troubleshooter | amazon.nova-pro-v1:0 | 107/120 | B | 0/5 | 37.3s | 63334 |
+| kafka-msk-lag-troubleshooter | amazon.nova-pro-v1:0 | 110/120 | A | 0/5 | 16.6s | 63795 |
 | kafka-msk-troubleshooter | amazon.nova-pro-v1:0 | 105/120 | B | 4/5 | 12.7s | 40144 |
 | keyspaces-keyspace-deployer | amazon.nova-pro-v1:0 | 103/120 | B | 3/5 | 12.5s | 50970 |
 | kinesis-analytics-deployer | amazon.nova-pro-v1:0 | 96/120 | B | 5/5 | 6.5s | 40883 |
@@ -390,14 +390,14 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | msk-cluster-auditor | amazon.nova-pro-v1:0 | 113/120 | A | 6/6 | 12.2s | 36499 |
 | msk-cost-optimizer | amazon.nova-pro-v1:0 | 99/120 | B | 0/5 | 14.8s | 48913 |
 | multi-account-governance-automator | amazon.nova-pro-v1:0 | 101/120 | B | 0/5 | 14.4s | 42424 |
-| mwaa-environment-deployer | amazon.nova-pro-v1:0 | 107/120 | B | 5/5 | 11.2s | 43862 |
+| mwaa-environment-deployer | amazon.nova-pro-v1:0 | 108/120 | A | 5/5 | 13.9s | 43981 |
 | nat-gateway-cost-optimizer | amazon.nova-pro-v1:0 | 109/120 | A | 5/5 | 10.6s | 45090 |
 | nat-gateway-traffic-optimizer | amazon.nova-pro-v1:0 | 102/120 | B | 5/5 | 15.1s | 52346 |
 | neptune-db-cluster-deployer | amazon.nova-pro-v1:0 | 109/120 | A | 3/5 | 15.7s | 46048 |
 | neptune-graph-deployer | amazon.nova-pro-v1:0 | 94/120 | B | 0/0 | 5.5s | 37581 |
 | network-firewall-rule-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 11.8s | 44421 |
 | networkmanager-core-network-auditor | amazon.nova-pro-v1:0 | 111/120 | A | 6/6 | 11.3s | 34956 |
-| opensearch-cluster-troubleshooter | amazon.nova-pro-v1:0 | 107/120 | B | 0/5 | 18.9s | 45676 |
+| opensearch-cluster-troubleshooter | amazon.nova-pro-v1:0 | 110/120 | A | 0/5 | 14.7s | 46438 |
 | opensearch-domain-auditor | amazon.nova-pro-v1:0 | 109/120 | A | 6/6 | 7.9s | 34037 |
 | opensearch-domain-deployer | amazon.nova-pro-v1:0 | 100/120 | B | 2/5 | 5.9s | 40080 |
 | opensearch-index-deployer | amazon.nova-pro-v1:0 | 104/120 | B | 4/5 | 12.3s | 44147 |
@@ -496,7 +496,7 @@ See `skills/<name>/examples/` for full multi-finding walkthroughs per skill.
 | transfer-family-deployer | amazon.nova-pro-v1:0 | 103/120 | B | 4/5 | 10.7s | 46485 |
 | transfer-family-workflow-deployer | amazon.nova-pro-v1:0 | 100/120 | B | 3/5 | 23.1s | 43230 |
 | transit-gateway-deployer | amazon.nova-pro-v1:0 | 97/120 | B | 3/5 | 16.7s | 53864 |
-| transit-gateway-routing-troubleshooter | amazon.nova-pro-v1:0 | 107/120 | B | 0/5 | 10.2s | 46175 |
+| transit-gateway-routing-troubleshooter | amazon.nova-pro-v1:0 | 108/120 | A | 0/5 | 13.7s | 46176 |
 | trustedadvisor-check-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 16.1s | 40241 |
 | verified-permissions-policy-auditor | amazon.nova-pro-v1:0 | 108/120 | A | 6/6 | 10.6s | 40262 |
 | vpc-connectivity-troubleshooter | amazon.nova-pro-v1:0 | 108/120 | A | 0/5 | 39.9s | 71520 |

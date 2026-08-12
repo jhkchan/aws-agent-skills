@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 18,
       "max": 20,
-      "justification": "Provides many specific AWS details (e.g., default Matcher, health\u2011checker IP source, attribute defaults, recent features) that a generic model may not know, but a large portion restates standard documentation without novel decision\u2011tree ordering or unique thresholds, so it falls short of a perfect score."
+      "justification": "Provides extensive expert knowledge not commonly known: exact default values, attribute keys, health\u2011checker IP origin, case\u2011sensitivity of paths, matcher defaults, TLS handling, deregistration delay semantics, slow\u2011start behavior, Lambda health\u2011check specifics, weighted routing mechanics, cross\u2011zone nuances, stickiness effects, proxy protocol and preserve\u2011client\u2011ip implications, ECS grace period, least\u2011outstanding\u2011requests algorithm, enhanced CloudWatch metrics, and recent 2024\u20112026 feature updates."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific (e.g., exact describe\u2011target\u2011health, security\u2011group checks, attribute queries) and encode the senior\u2011engineer mindset. However, a few steps are generic (\u201ccheck security group\u201d) and lack the precise ordering that only ALB experts use, so a small deduction."
+      "justification": "Encodes senior\u2011engineer mindset with a precise diagnostic order, AWS\u2011specific probes (describe\u2011target\u2011health, security\u2011group checks, attribute reads) and clear decision\u2011tree flow. Minor omission: no explicit procedure for verifying listener\u2011protocol compatibility before health\u2011check probing."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "The NEVER list is extensive and gives concrete reasons (e.g., never emit ROOT_CAUSE without a failing probe). It misses a few common pitfalls such as ECS health\u2011check grace period misuse or NLB\u2011specific confusion, hence a minor deduction."
+      "justification": "The NEVER list is extensive and reasoned, but it omits some common pitfalls such as NACL mis\u2011configurations, IAM permission errors on describe calls, and over\u2011permissive logging that can mask health\u2011check failures."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter is complete, description clearly states WHAT, WHEN, and KEYWORDS, activation triggers are enumerated, and the invocation schema/example are well\u2011formed. An agent can reliably decide when to invoke."
+      "justification": "Front\u2011matter, description, when\u2011to\u2011use, activation triggers and invocation schema are present and well\u2011formed; however the activation_triggers list is overly exhaustive, risking false activations in ambiguous contexts."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill is organized into layers (quick start, mindset, philosophy, detailed steps, anti\u2011patterns, safety, remediation). Nevertheless, the initial sections are dense and some critical rules (e.g., confirmation gates) are buried later, causing slight cognitive overload."
+      "justification": "The skill provides a top\u2011level quick\u2011start then deep sections, but the initial document front\u2011loads a large amount of tables, philosophy and anti\u2011patterns before the core decision tree, creating some cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive commands are gated by explicit CONFIRM prompts and a read\u2011only first rule, matching the fragility of ALB configuration changes. One minor gap: the skill permits modify\u2011target\u2011group without first verifying the target\u2019s existence, which could be tighter."
+      "justification": "Calibrates freedom precisely: read\u2011only probes first, mandatory CONFIRM before any state\u2011changing CLI, limits batch remediation, and distinguishes fragile operations from safe ones."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 10,
+      "score": 9,
       "max": 10,
-      "justification": "The document follows a recognizable pattern (quick start \u2192 mindset \u2192 philosophy \u2192 decision tree \u2192 anti\u2011patterns \u2192 safety \u2192 remediation \u2192 deep reference), aiding comprehension."
+      "justification": "The skill follows a recognizable pattern (quick\u2011start \u2192 mindset \u2192 philosophy \u2192 decision tree \u2192 anti\u2011patterns \u2192 remediation), but the mixture of prose, tables and code blocks makes the overall structure slightly ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides concrete CLI probes, decision branches, and output format that an agent can execute. Missing are explicit handling of ambiguous or partially\u2011missing inputs beyond the generic INSUFFICIENT_DATA block, and no guidance for multi\u2011target\u2011group batch remediation edge cases, leading to a small deduction."
+      "justification": "Provides concrete CLI probes, decision branches and output format, enabling an agent to act. Missing are explicit handling of malformed inputs beyond the generic INSUFFICIENT_DATA block and guidance for environments lacking VPC\u2011level curl access."
     }
   ],
-  "total_score": 107,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 57384,
-  "latency_ms": 15102,
+  "grade": "A",
+  "token_count": 56762,
+  "latency_ms": 12565,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

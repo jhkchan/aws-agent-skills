@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill delivers a concrete 14\u2011layer diagnostic decision tree, explicit ordering of checks (association \u2192 propagation \u2192 return path), and nuanced AWS\u2011specific facts (static routes always win, TGW peering is non\u2011transitive, appliance\u2011mode behavior, overlapping CIDR longest\u2011prefix rules, flow\u2011log interpretation). These details go beyond a generic model\u2019s knowledge, but most points are restatements of official docs rather than novel insights, so full credit is not awarded."
+      "justification": "The skill provides a detailed 14\u2011layer diagnostic tree and specific probe commands, which adds expert knowledge, but most of the content restates AWS documentation (e.g., static\u2011route priority, non\u2011transitive peering) without novel thresholds, decision metrics, or previously undocumented edge\u2011case handling."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The skill encodes expert AWS\u2011specific procedures: exact CLI commands per layer, bidirectional routing mindset, and a step\u2011by\u2011step probe hierarchy. However some procedures are generic (e.g., \u201ccheck both directions\u201d) and the invocation schema lacks precise field validation for cross\u2011account peering scenarios, preventing a perfect score."
+      "justification": "Procedures are AWS\u2011specific and ordered correctly (association \u2192 propagation \u2192 return\u2011path check, then static\u2011vs\u2011propagated, then peering, etc.) with exact CLI commands. The only shortfall is a few generic statements like \u201ccheck both directions\u201d that are not tied to a particular TGW API call."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "A thorough NEVER list enumerates common pitfalls (e.g., never emit ROOT_CAUSE without a failing probe, never assume TGW peering is transitive, never use cross\u2011VPC SG references) with clear reasoning. The list omits a few advanced anti\u2011patterns such as IAM permission failures or health\u2011event masking, hence a slight deduction."
+      "justification": "A thorough NEVER list enumerates pitfalls (e.g., never emit ROOT_CAUSE without a failing probe, never assume TGW peering is transitive, never rely on cross\u2011VPC SG references) and explains why. Missing is an explicit warning about ignoring AWS Health events, which can masquerade as routing failures."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when\u2011to\u2011use, activation triggers, and an invocation example are provided. The invocation_schema, however, is vague about required JSON structure and optional fields, which could cause unreliable activation."
+      "justification": "Frontmatter is complete, description, when_to_use, when_not_to_use, activation_triggers, invocation_schema and a concrete example are all present, enabling reliable activation. The only minor gap is that the schema does not enforce required fields via a JSON schema, leaving some ambiguity for automated parsers."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The Quick\u2011Start section gives a concise symptom\u2011to\u2011layer map, with deeper technical details deferred to later sections. Nonetheless the document front\u2011loads a large amount of dense information (mindset, philosophy, full decision tree) that may overwhelm an agent before it reaches the needed layer."
+      "justification": "The document is layered (quick\u2011start, mindset, philosophy, detailed steps), but the initial sections contain a dense amount of information (full symptom\u2011to\u2011layer map, extensive tables) that may overload an agent before it has classified the symptom. A more minimal top\u2011level summary would improve progressive disclosure."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 15,
       "max": 15,
-      "justification": "All diagnostic probes are read\u2011only, and every state\u2011changing remediation command is gated behind an explicit CONFIRM prompt. The calibration matches the fragility of TGW operations perfectly."
+      "justification": "Destructive actions are gated behind explicit CONFIRM prompts, and all diagnostic probes are read\u2011only. The calibration matches the fragility of TGW operations perfectly."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable structure (frontmatter \u2192 quick start \u2192 mindset \u2192 philosophy \u2192 decision tree \u2192 anti\u2011patterns \u2192 safety \u2192 remediation), aiding comprehension. Minor ad\u2011hoc ordering of some sections (e.g., anti\u2011patterns interleaved with safety checks) prevents a perfect score."
+      "justification": "The skill follows a recognizable pattern (quick start \u2192 mindset \u2192 philosophy \u2192 decision tree \u2192 anti\u2011patterns \u2192 remediation). The structure aids comprehension, though the inclusion of both a large table and a narrative decision tree makes the pattern slightly ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides concrete CLI commands, evidence format, and worked examples, enabling an agent to execute the troubleshooting flow. Missing edge\u2011case handling (cross\u2011account peering, pagination of CLI output, IAM permission errors) and some ambiguity in input parsing reduce usability slightly."
+      "justification": "An agent can follow the decision tree, run the exact AWS CLI commands, and produce the required output format. Minor gaps remain: handling of multi\u2011account or cross\u2011region IAM permission errors, and fallback when required topology data is unavailable beyond the generic INSUFFICIENT_DATA block."
     }
   ],
-  "total_score": 107,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 46175,
-  "latency_ms": 10170,
+  "grade": "A",
+  "token_count": 46176,
+  "latency_ms": 13669,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

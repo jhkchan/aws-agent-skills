@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Provides concrete AWS\u2011specific thresholds (85% flood\u2011stage, 75% heap pressure, 20 shards per node), exact default watermarks, and detailed probe commands that a generic model would not enumerate; however it omits a few niche failure modes (e.g., VPC endpoint throttling) so not a perfect 20."
+      "justification": "Adds concrete AWS\u2011specific thresholds (disk low/high/flood 85/90/95\u202f%, JVMHeapPressure >\u202f75\u202f%, shard\u2011per\u2011node \u2248\u202f20) and a decision matrix that a senior OpenSearch engineer would not memorize. Provides exact CLI/API probes and rare edge\u2011case details (e.g., auto\u2011clear of read\u2011only block, UltraWarm migration disk check). Missing only a few niche split\u2011brain diagnostics (e.g., AZ\u2011partition specifics), so not a full 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific mindset (resource\u2011pressure first, then mapping/queries) and detailed procedures for each layer, including exact CLI commands. Missing depth in split\u2011brain detection (only a brief note) and UltraWarm migration steps, so deduct 2 points."
+      "justification": "Encodes expert mindset (resource\u2011pressure first, never start with mapping) and a precise AWS\u2011specific procedure order (pre\u2011flight CLI calls, then layer\u2011by\u2011layer probes). Some steps are generic (\"scale out\") but overall the flow is tightly tied to OpenSearch Service APIs."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never clear flood\u2011stage block before disk <95%). One minor gap: no explicit warning about ignoring IAM policy changes, which are out of scope but could be mentioned."
+      "justification": "Contains a thorough NEVER list with specific reasons (e.g., never clear read\u2011only block before disk <\u202f95\u202f%, never raise thread\u2011pool queues on managed domains). One minor weakness: the list does not explicitly warn against using wildcards in DELETE\u202f/index when snapshots are in\u2011progress, which is a common pitfall."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Complete frontmatter, clear description, when\u2011to\u2011use/when\u2011not\u2011to\u2011use, activation triggers, invocation schema and example. The schema is described in prose rather than a strict JSON schema, so deduct 1 point."
+      "justification": "Full front\u2011matter, clear description, exhaustive activation triggers, precise invocation schema, and a minimal valid example. All required metadata present and unambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Information is layered (quick start, mindset, step\u2011by\u2011step), but the quick\u2011start section front\u2011loads many details (threshold tables, probe commands) which can cause cognitive overload. Deduct 3 points for insufficient early pruning."
+      "justification": "Provides a concise Quick\u2011Start then layers deeper sections (Mindset, Reference table, Process). However, the initial document is long and some critical rules (e.g., mandatory CONFIRM gate) are buried later, causing slight cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions are gated by explicit CONFIRM prompts and safety checks. Slight over\u2011confidence in allowing max_shards_per_node changes without a pre\u2011check leads to a 1\u2011point deduction."
+      "justification": "Destructively\u2011changing actions are gated by explicit CONFIRM prompts and safety checks. Non\u2011destructive diagnostics are unrestricted, matching task fragility perfectly."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (quick start \u2192 mindset \u2192 symptom table \u2192 stepwise process \u2192 anti\u2011patterns \u2192 safety). Minor ad\u2011hoc elements (e.g., mixed markdown tables) prevent a perfect score."
+      "justification": "Follows a recognizable structure (Quick start \u2192 Mindset \u2192 Symptom\u2011layer table \u2192 Process \u2192 Anti\u2011patterns \u2192 Remediation). The pattern is consistent, but the inclusion of a large \u201cAnti\u2011Patterns \u2014 NEVER\u201d block breaks the otherwise clean hierarchy, making the overall layout slightly ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Provides a deterministic output format, decision trees, concrete CLI/API commands, and error\u2011handling (INSUFFICIENT_DATA). Missing a few edge\u2011case branches (e.g., partial metric loss) prevents a perfect score."
+      "justification": "Provides a deterministic output schema, concrete CLI/API probes, and worked examples that an agent can execute. Missing are explicit handling of edge cases such as partial CloudWatch data loss or permission errors from AWS CLI, which could cause the agent to fail without a fallback path."
     }
   ],
-  "total_score": 107,
+  "total_score": 110,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 45676,
-  "latency_ms": 18949,
+  "grade": "A",
+  "token_count": 46438,
+  "latency_ms": 14740,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5
