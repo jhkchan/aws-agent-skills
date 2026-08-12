@@ -1,0 +1,70 @@
+{
+  "skill": "rds-snapshot-operator",
+  "model_id": "amazon.nova-pro-v1:0",
+  "dimensions": [
+    {
+      "id": "D1",
+      "name": "Knowledge Delta",
+      "score": 16,
+      "max": 20,
+      "justification": "Adds expert, non\u2011obvious details such as PITR granularity (5\u202fmin vs sub\u2011second for Aurora), Aurora clone being instant copy\u2011on\u2011write, cross\u2011region KMS re\u2011encryption requirement, backup\u2011retention window not back\u2011filling, cost numbers and limits (1\u201135\u202fdays, 72\u202fh backtrack). These are beyond a generic model's baseline, but much of the content restates official docs, so not a perfect 20."
+    },
+    {
+      "id": "D2",
+      "name": "Mindset + Appropriate Procedures",
+      "score": 14,
+      "max": 15,
+      "justification": "Provides AWS\u2011specific pre\u2011check ordering, exact CLI flags, confirm\u2011gate workflow, and detailed per\u2011operation planning (create, copy, restore, share, clone, export, delete). Some steps are generic (e.g., \"capture pre\u2011state\") but overall the procedures are tightly tied to RDS/Aurora."
+    },
+    {
+      "id": "D3",
+      "name": "Anti-Pattern Quality",
+      "score": 13,
+      "max": 15,
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never delete an instance without a final snapshot, never rely on automated backups for DR, never forget to share KMS key when sharing encrypted snapshots). Missing a few niche pitfalls such as handling storage\u2011auto\u2011scaling impact on snapshot size, so not full credit."
+    },
+    {
+      "id": "D4",
+      "name": "Specification Compliance",
+      "score": 13,
+      "max": 15,
+      "justification": "Frontmatter is complete and activation triggers are listed, but the description of WHEN to invoke the skill is spread across several paragraphs and could be more succinct. The activation triggers include some overlapping phrases, making reliable auto\u2011activation slightly ambiguous."
+    },
+    {
+      "id": "D5",
+      "name": "Progressive Disclosure",
+      "score": 13,
+      "max": 15,
+      "justification": "Information is layered (quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 output \u2192 anti\u2011patterns \u2192 examples). However the document is long and some critical rules (e.g., confirm gate) appear early, causing slight cognitive overload."
+    },
+    {
+      "id": "D6",
+      "name": "Freedom Calibration",
+      "score": 14,
+      "max": 15,
+      "justification": "Destructive actions are tightly constrained by a mandatory CONFIRM gate and REVIEW_REQUIRED verdicts, while planning steps allow flexibility. No over\u2011constrained creative tasks."
+    },
+    {
+      "id": "D7",
+      "name": "Pattern Recognition",
+      "score": 9,
+      "max": 10,
+      "justification": "Follows a recognizable structure (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns). Minor ad\u2011hoc sections (e.g., recent features) prevent a perfect score."
+    },
+    {
+      "id": "D8",
+      "name": "Practical Usability",
+      "score": 13,
+      "max": 15,
+      "justification": "Provides working CLI commands, decision trees, and complete examples that an agent could execute. Lacks explicit error\u2011handling/retry logic and pagination handling in the examples, which could cause failures in edge cases."
+    }
+  ],
+  "total_score": 105,
+  "max_score": 120,
+  "grade": "B",
+  "token_count": 50870,
+  "latency_ms": 17465,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
+}
