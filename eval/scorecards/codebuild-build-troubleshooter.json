@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill compiles many known AWS CodeBuild diagnostics (e.g., 15\u202fGB image size limit, error strings, IAM simulation) but does not introduce truly novel expert insight beyond what a senior engineer could already reference from documentation. The decision tree and thresholds are largely restatements of existing knowledge, so 4 points are deducted."
+      "justification": "The skill provides a thorough decision tree and many concrete CLI probes, but most of the content restates publicly documented CodeBuild troubleshooting steps (e.g., image size limit, IAM simulation, VPC routing). It does not introduce novel thresholds, heuristics, or undocumented edge\u2011case handling that a senior CloudOps engineer would learn."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific and well ordered, but some steps remain generic (e.g., \"read logs\" without specifying exact CloudWatch filter patterns). A fully expert mindset would list precise log\u2011filter expressions or jq queries for each failure type, so 1 point is deducted."
+      "justification": "Procedures are AWS\u2011specific (phase\u2011first probing, simulate\u2011principal\u2011policy, NAT vs VPC endpoint checks). However, the skill omits a key AWS\u2011specific step: verifying the service\u2011role trust relationship (assume role policy) before IAM permission checks, which is a common pitfall in CodeBuild troubleshooting."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "A thorough NEVER list is provided with concrete rationales (e.g., never conflate service\u2011role and source\u2011credential, never add NAT before checking VPC endpoints). The list could be expanded with more edge\u2011case pitfalls (e.g., cross\u2011account KMS key permissions) and the rationale for some items is brief, so a modest deduction applies."
+      "justification": "The NEVER list is extensive and explains why each pattern is bad. It still lacks a few critical anti\u2011patterns, such as never enabling privileged mode globally without confirming Docker\u2011in\u2011Docker is required, and it does not warn about the security impact of granting broad cross\u2011account ECR permissions."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter is complete, the description clearly states WHAT the skill does, WHEN to invoke, and includes a rich keyword list and activation triggers. The only minor issue is that the `invocation_schema` description is a free\u2011form paragraph rather than a strict JSON schema, which could affect reliable activation."
+      "justification": "Frontmatter, description, activation triggers, and invocation schema are present and clear. The schema, however, does not explicitly define required fields (e.g., region) and leaves the exact JSON shape of the input ambiguous, which could cause unreliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The skill layers information (quick start \u2192 navigation table \u2192 detailed decision tree \u2192 worked examples). However, the initial Quick\u2011start section already contains many tables and commands, which may overload an agent before it knows the context. A more minimal top\u2011level summary would improve progressive disclosure."
+      "justification": "The skill starts with a concise quick\u2011start, but many essential rules (e.g., the full NEVER list, detailed decision tree) are buried deep in the document. An agent may need to parse large sections before reaching the core diagnostic steps, leading to cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by a CONFIRM step, which is good. However, the remediation commands contain placeholders (\"...\"), leaving ambiguity about required parameters for state\u2011changing operations. This reduces the calibration precision, so 1 point is deducted."
+      "justification": "Destructive actions are gated by a CONFIRM step, which is appropriate, but remediation blocks sometimes bundle multiple state\u2011changing commands under a single confirmation, reducing granularity of safety checks."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable troubleshooting pattern (quick start, reference table, output contract, NEVER list, decision tree, worked examples) but the layout mixes narrative prose with tables and code blocks in an ad\u2011hoc way, preventing a perfectly clean, reusable template. One point is deducted."
+      "justification": "The skill follows a recognizable structure (mindset \u2192 process \u2192 decision tree \u2192 worked examples), but the layout mixes several patterns (tables, narrative, code blocks) without a single unifying template, making it slightly ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "The decision tree and examples enable an agent to act, but edge cases such as multiple simultaneous FAILED phases, ambiguous error strings, or CLI failure handling are not explicitly covered. Additionally, some remediation commands lack full parameterization, which could cause execution errors. Two points are deducted."
+      "justification": "The decision tree, CLI commands, and output contract enable an agent to act. Missing are explicit handling for error strings that are not in the navigation table and a fallback strategy beyond INSUFFICIENT_DATA for partially matched symptoms, which could leave some real\u2011world cases unaddressed."
     }
   ],
-  "total_score": 105,
+  "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 46339,
-  "latency_ms": 9594,
+  "token_count": 46863,
+  "latency_ms": 8388,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

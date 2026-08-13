@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Provides expert heuristics (governance vs compliance lock immutability, cross\u2011region copy silent\u2011failure prerequisites, retention\u2011window validation) that many models lack, but omits several concrete AWS\u2011specific details (e.g., exact IAM role requirements, full list of required API parameters, default ChangeableForDays value) so the delta is strong but not complete."
+      "justification": "Provides expert\u2011level heuristics not commonly memorised: explicit governance vs compliance lock immutability, silent\u2011failure patterns for cross\u2011region copy, retention\u2011window validation against vault\u2011lock, and a novel \"configuration dependency graph\" table. However much of the content restates AWS documentation, so it stops short of a full 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific procedural flow (create vault \u2192 set lock \u2192 create plan \u2192 selections \u2192 copy) with exact CLI/JSON commands, but some steps (e.g., prerequisite verification) are described generically rather than with a unique AWS\u2011focused decision tree."
+      "justification": "Lists AWS\u2011specific step order (create vault \u2192 lock \u2192 plan \u2192 selections \u2192 copy \u2192 access policy) and includes concrete CLI commands. Missing a few procedural details (e.g., creation of the required IAM service role before selections) and the mindset section is brief, so deduct 2 points."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains a detailed NEVER list of ten concrete pitfalls (e.g., never use AWS\u2011managed KMS key, never pick governance mode for compliance) with explicit reasoning, showing strong anti\u2011pattern awareness; minor omission of a few niche pitfalls (e.g., missing backup service role) prevents a perfect score."
+      "justification": "Contains a detailed \"NEVER\" list with concrete reasons (e.g., why governance mode is unsafe for compliance, why missing KMS policy breaks cross\u2011account copy). Lacks a warning about forgetting S3 bucket versioning for backup\u2011report storage, hence -1."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, includes description, activation keywords, when_to_use, output contract, and metadata. Slight weakness: triggers are only implied via keywords rather than a dedicated, unambiguous activation field."
+      "justification": "Frontmatter is complete, description clearly states purpose, when to invoke, and keywords. The trigger list is extensive but some entries are vague (e.g., \u201cbackup policy\u201d could match many intents), leaving a small ambiguity for reliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses quick\u2011navigation table, separates high\u2011level mindset, heuristics, prerequisites, step\u2011by\u2011step sections, and a NEVER list, preventing overload. However, some deep details (full policy JSON) are buried later, requiring extra scrolling."
+      "justification": "Information is layered: quick navigation, mindset, heuristics, step\u2011by\u2011step, NEVER list, and output format. However, the initial sections are dense and contain many tables, which can overload the agent before it knows which part to consult."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Calibrates specificity for fragile actions (vault lock warnings, retention checks) while allowing flexibility for reporting and optional cross\u2011region copy. No over\u2011constraining of creative tasks, but could tighten validation of cross\u2011account policy prerequisites."
+      "justification": "Destructive actions (vault creation, lock configuration) are tightly constrained with explicit retention windows and prerequisite checks. Creative sections (report plan) are less constrained, which is appropriate. Minor gap: tag validation rules are not explicitly bounded."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable CloudOps skill pattern (metadata, mindset, heuristics, step list, NEVER list, output format) that aligns with other skills, aiding comprehension."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Configuration Graph \u2192 Step\u2011by\u2011step \u2192 NEVER \u2192 Output format). Slight ad\u2011hoc ordering of some tables prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 12,
       "max": 15,
-      "justification": "Provides working CLI snippets, checklist, and verification commands, enabling an agent to execute. Model output shows a malformed cron expression (\"cron(0 5? * MON\u2011SAT *)\") and lacks validation of copy\u2011job concurrency limits, indicating usability gaps."
+      "justification": "Provides a ready\u2011to\u2011use checklist, concrete CLI commands, and worked examples. The first example contains a malformed cron expression (\"cron(0 5? * MON-SAT *)\") and leaves placeholders like <plan-id> unresolved, indicating the skill can emit non\u2011runnable output. It also does not explicitly handle missing IAM role errors."
     }
   ],
-  "total_score": 104,
+  "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 37977,
-  "latency_ms": 13896,
+  "token_count": 37840,
+  "latency_ms": 13404,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

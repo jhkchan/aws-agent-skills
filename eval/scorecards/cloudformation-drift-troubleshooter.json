@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 18,
       "max": 20,
-      "justification": "Adds concrete decision\u2011tree steps, a curated list of immutable CloudFormation properties, a precise IAM condition example (aws:CalledViaFirst), and recent feature notes (nested\u2011stack drift recursion, CDK drift command). However, most of the content restates publicly documented behavior; the novel delta is limited to the curated matrices."
+      "justification": "Provides concrete expert knowledge: immutable\u2011property matrix, exact ChangeSet probing steps, IAM\u202faws:CalledViaFirst condition, nested\u2011stack recursion, CDK drift command, and a decision tree that a senior CloudOps engineer would not infer from generic knowledge."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific decision tree and ordered procedure (detect\u2011drift \u2192 describe\u2011drift \u2192 forensic CloudTrail/Config walk \u2192 immutable\u2011property check \u2192 change\u2011set validation \u2192 remediation). The steps are concrete, but a few are generic (e.g., \u201crun forensic walk\u201d) and could be tighter."
+      "justification": "Encodes AWS\u2011specific procedures in the correct order (detect\u2011drift \u2192 poll status \u2192 classify \u2192 forensic walk \u2192 immutable\u2011property check \u2192 ChangeSet validation \u2192 remediation). The steps are precise and tied to AWS services, not generic troubleshooting."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Provides a thorough NEVER list with concrete reasons (e.g., never update\u2011stack on immutable\u2011property drift without warning). Missing a few edge anti\u2011patterns such as forgetting to add Config rules for NOT_CHECKED resources and the risk of stale drift status, which reduces completeness."
+      "justification": "Contains a detailed NEVER list with concrete reasoning (e.g., never update\u2011stack on immutable property without warning, never omit actor in ROOT_CAUSE, never rely on stale StackDriftStatus). Some warnings are generic (e.g., \u201cnever run drift detection on schedule\u201d could be more explicit), hence a slight deduction."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, activation triggers, when_to_use/when_not_to_use, invocation schema, and output contract are all present and well\u2011described. Minor weakness: the description could more clearly state the exact trigger conditions for nested\u2011stack vs. CDK drift, but overall reliable for activation."
+      "justification": "Full front\u2011matter, clear description, when\u2011to\u2011use/when\u2011not\u2011to\u2011use, activation triggers, and a precise invocation schema. The only minor gap is the lack of an explicit example of the JSON input payload, but activation is otherwise reliable."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The document layers information (activation \u2192 mindset \u2192 quick reference \u2192 step\u2011by\u2011step process \u2192 edge cases). However, the initial sections are dense and include many tables and examples that could overload an agent before it knows which part to use."
+      "justification": "The skill layers information: high\u2011level activation, one\u2011line mindset, quick reference table, then step\u2011by\u2011step process, then deep anti\u2011pattern and edge\u2011case sections. However, the initial sections are dense, causing some cognitive overload, so a small deduction."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (import, update\u2011stack) are tightly gated by ChangeSet validation and immutable\u2011property checks. Creative tasks (policy generation) are left open. No over\u2011constraining of flexible steps, so near\u2011max."
+      "justification": "Destructive actions (import, delete, update\u2011stack) are tightly constrained with verification steps, ChangeSet review, and explicit \u2018NEVER\u2019 warnings. Creative tasks (policy generation) are given more freedom. No over\u2011constrained or under\u2011constrained areas detected."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Activation \u2192 Mindset \u2192 Quick reference \u2192 Process steps \u2192 Output contract \u2192 Anti\u2011patterns \u2192 Edge cases). The structure is consistent and aids comprehension."
+      "justification": "Follows a recognizable pattern (Activation \u2192 Mindset \u2192 Quick reference \u2192 Process steps \u2192 Output contract \u2192 Anti\u2011patterns). The structure is consistent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 14,
       "max": 15,
-      "justification": "Provides working CLI snippets, decision trees, and verification steps. Critical flaw: the example for a DELETED drift uses RESOLUTION\u202f=\u202fRECREATE, which is not listed in the allowed RESOLUTION set (IMPORT, RESET_TO_DRIFT, REVERT_TO_TEMPLATE, REMOVE_FROM_TEMPLATE, ESCALATE_TO_OWNER). This inconsistency would cause an agent to produce an invalid output. Additionally, some remediation steps assume permissions or resources that may not exist, creating edge\u2011case gaps."
+      "justification": "Provides complete decision trees, exact CLI sequences, ChangeSet validation, and verification commands. Edge cases like NOT_CHECKED resources and nested stacks are addressed. Minor omission: no explicit fallback for unsupported resource types beyond a generic Config recommendation."
     }
   ],
-  "total_score": 103,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 46308,
-  "latency_ms": 9388,
-  "assertions_passed": false,
-  "assertions_passed_count": 3,
-  "assertions_failed_count": 2
+  "grade": "A",
+  "token_count": 45911,
+  "latency_ms": 23964,
+  "assertions_passed": true,
+  "assertions_passed_count": 5,
+  "assertions_failed_count": 0
 }

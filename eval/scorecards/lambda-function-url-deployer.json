@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Adds specific expert details not usually memorized: the hard 15\u2011second URL timeout, $LATEST alias constraint, that CORS must be set on the URL (not the handler), RESPONSE_STREAM requirements, provisioned concurrency support for URLs, and a timeline of recent feature releases. However ~4 points are deducted because most of the content restates official documentation rather than providing a novel decision tree or exclusive insider heuristic."
+      "justification": "Adds expert\u2011level specifics not usually restated by a baseline model: the hard 15\u2011second function\u2011URL timeout, the $LATEST alias constraint, automatic dual\u2011stack support, provisioned concurrency applicability to URLs, and detailed streaming\u2011handler requirements. These constitute genuine delta, but the skill does not introduce a novel decision tree or threshold beyond documented AWS behavior, so it falls short of a perfect score."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific provisioning flow (function \u2192 URL \u2192 auth \u2192 CORS \u2192 invoke mode \u2192 CloudFront) with concrete CLI commands. Some steps (e.g., \u201cverify function exists\u201d) are generic checks that any cloud engineer would perform, so 2 points are deducted for lack of exclusively AWS\u2011centric reasoning."
+      "justification": "Offers a clear AWS\u2011specific step\u2011by\u2011step procedure (creation, update, IAM policy, CloudFront setup) and a dependency graph, but the CloudFront custom\u2011domain section is a bit generic and could list the exact order of ACM cert validation \u2192 distribution creation \u2192 origin attachment."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with specific reasons (CORS must be set on the URL, never use NONE auth for internal endpoints, etc.), but omits other common pitfalls such as forgetting to enable provisioned concurrency for latency\u2011sensitive workloads or the inability of CloudFront to sign IAM\u2011auth URLs."
+      "justification": "Contains a solid NEVER list with concrete reasons (CORS only at URL level, never use NONE auth for internal APIs, never assume 15\u202fs matches function timeout, etc.). Missing a specific warning about cost\u2011related pitfalls (e.g., forgetting that function URLs lack request\u2011throttling and can lead to unexpected spend)."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when\u2011to\u2011use, triggers, and a strict output contract with literal labels are provided. Lacks an explicit schema for the PREREQUISITES_MISSING case (e.g., example of missing prerequisite), so one point off."
+      "justification": "Frontmatter is complete, description includes WHAT, WHEN, and KEYWORDS, and the output contract is precisely defined. Slight deduction because the \"when_to_use\" narrative is embedded in a long paragraph rather than a concise bullet list, which could affect reliable trigger detection."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses quick\u2011navigation tables, layered sections, and a concise checklist, but the initial sections are fairly dense and some deep details (e.g., streaming handler signatures) are embedded early rather than truly on\u2011demand."
+      "justification": "Uses quick\u2011navigation and layered sections, but the main body front\u2011loads a large amount of detail (heuristics, dependency graph, full command examples) before the checklist, creating potential cognitive overload for an agent that only needs the minimal checklist."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Calibrates constraints appropriately for destructive or irreversible actions (auth mode, timeout, alias rules) while allowing flexibility for creative tasks; however, the custom\u2011domain section does not warn that IAM\u2011auth URLs cannot be signed by CloudFront, leaving a slight over\u2011freedom."
+      "justification": "Calibrates specificity to task fragility: destructive actions require a prerequisites checklist, streaming mode is gated by runtime support, and auth mode decisions are explicit. The only over\u2011constraint is the requirement to always specify a full CORS block even when NONE auth is chosen and CORS may be optional, leading to a small deduction."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Dependency Graph \u2192 Step\u2011by\u2011step Process \u2192 Output format). The ordering is slightly ad\u2011hoc (e.g., the NEVER list appears after the steps), preventing a perfect score."
+      "justification": "Follows a recognizable structure (Mindset, Heuristics, NEVER list, Output format, Worked examples) but mixes several patterns (tables, narrative, code blocks) without a single canonical template, making the overall pattern slightly ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "An agent can execute the provided CLI commands and produce the checklist, but the skill lacks guidance for idempotent creation (handling existing URLs), does not verify streaming\u2011runtime support in the checklist, and provides no explicit update\u2011flow for existing configurations, which could cause runtime errors."
+      "justification": "Provides working CLI commands, a ready\u2011to\u2011deploy checklist, verification commands, and error\u2011handling guidance. Missing explicit handling for cases such as an already\u2011existing function URL, region mismatches, or partial updates without prior existence, which could cause execution failures; therefore a modest deduction."
     }
   ],
-  "total_score": 104,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 49108,
-  "latency_ms": 15296,
+  "grade": "A",
+  "token_count": 49093,
+  "latency_ms": 9628,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0
