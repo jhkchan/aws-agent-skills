@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert knowledge not usually known by a generic model: explicit break\u2011even formula for I/O\u2011Optimized (storage_GB\u202f\u00d7\u202f0.4\u202fM I/O), precise ACU cost ($0.12/ACU\u2011h), threshold rules (IO\u202f>\u202f30% of bill, MinCapacity\u202f>\u202f2\u202fACU with avg CPU\u202f<\u202f10%), and detailed decision matrices for each cost lever. Some content merely restates AWS docs, preventing a perfect score."
+      "justification": "Provides concrete thresholds (IOUsage >30% of bill, MinCapacity >2 ACU with avg CPU <10%, snapshots >90 days, backtrack >24h) and a precise break\u2011even formula (storage_GB \u00d7 0.4\u202fM I/O) that a generic model would not know. However it restates many well\u2011known Aurora pricing basics without adding new nuance, and it omits deeper RI term\u2011break\u2011even analysis, so full 20 is not earned."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific workflow: data\u2011gate validation, Cost Explorer reconciliation, CloudWatch & Performance Insights collection, ordered step\u2011by\u2011step dimension analysis, and precise CLI commands for each remediation. Only minor generic phrasing (e.g., \u201ccheck data sufficiency\u201d) prevents full marks."
+      "justification": "Encodes an AWS\u2011specific decision tree, exact CLI commands, and a disciplined verification flow (snapshot, CONFIRM, one\u2011dimension\u2011per\u2011window). The only shortfall is a missing explicit ordering for RI evaluation relative to other levers, which leaves a tiny procedural ambiguity."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Provides an extensive NEVER list with concrete reasons (e.g., never switch I/O tier without break\u2011even calc, never drop Serverless MinCapacity below SLA, never buy RI for Serverless). Lacks a few edge\u2011case warnings (e.g., backtrack on low\u2011change workloads), so deduct one point."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never switch I/O tier without break\u2011even, never drop Serverless min\u2011capacity below SLA, never purchase RI for a cluster slated for migration). It lacks a few common pitfalls such as latency impact of I/O\u2011Optimized switch and the risk of under\u2011provisioning ACU for bursty workloads, so two points are deducted."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Full frontmatter, clear description, when_to_use/when_not_to_use, activation_triggers, invocation_schema, and a valid minimal invocation example. All required metadata present and well\u2011formed."
+      "justification": "Front\u2011matter is complete, activation triggers, invocation schema, and example are present, enabling reliable activation. The description of \"when to invoke\" could be tighter (it mixes high\u2011level scenarios with low\u2011level triggers), so one point is deducted."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Top\u2011level sections give a concise overview (what it does, decision tree) and deeper sections are deferred. However, the document is long and some details (e.g., full anti\u2011pattern list) are presented early, causing slight cognitive overload."
+      "justification": "The skill layers information (summary, strict contract, decision tree, detailed steps, anti\u2011patterns, navigation). However the initial sections are dense and present many details before the concise top\u2011level contract, causing some cognitive overload; two points are deducted."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained (snapshot before change, CONFIRM gate, one\u2011dimension\u2011per\u2011window, batch size limit). Creative tasks (e.g., cost triage) are left freer. Minor over\u2011constraint on RI evaluation (no guidance on term selection) costs one point."
+      "justification": "Destructively\u2011changing operations are tightly constrained: mandatory snapshot, CONFIRM gate, one\u2011dimension\u2011per\u2011maintenance\u2011window, batch size limit of three clusters, and explicit safety checks. Calibration matches fragility perfectly."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (Mindset \u2192 Process steps \u2192 Output contract \u2192 Anti\u2011patterns \u2192 Navigation). Minor ad\u2011hoc sections (e.g., quick start, expert heuristic) slightly break the pure pattern."
+      "justification": "Follows a recognizable structure (What it does \u2192 Output contract \u2192 Decision tree \u2192 Stepwise process \u2192 Anti\u2011patterns \u2192 Navigation). It is coherent but does not map exactly onto a named standard pattern (e.g., Mindset\u2011Process\u2011Tool), so one point is deducted."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides actionable CLI snippets, savings formulas, and example output blocks. However, the output contract omits the NEED_MORE_INFO verdict that appears in the decision tree, creating a consistency gap. Some example blocks also omit optional sub\u2011fields, which could cause agent confusion. These issues reduce usability."
+      "justification": "Provides working CLI snippets, decision branches, and savings calculations, enabling an agent to execute the skill. Minor gaps remain: rounding inconsistencies in examples, incomplete handling of mixed\u2011engine clusters, and limited error handling for missing Cost Explorer data beyond the NEED_MORE_INFO branch. Two points are deducted."
     }
   ],
-  "total_score": 107,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 52244,
-  "latency_ms": 16602,
+  "grade": "A",
+  "token_count": 52349,
+  "latency_ms": 22778,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

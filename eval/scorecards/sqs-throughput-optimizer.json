@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 18,
       "max": 20,
-      "justification": "Adds concrete expert thresholds (empty\u2011receive >50% triggers long polling, batch\u2011API >1\u202fM msgs/month, visibility timeout = 6\u00d7 p95, FIFO high\u2011throughput attribute combo). However it omits guidance on cross\u2011region messaging cost and does not address the 256\u202fKB batch payload limit or a concrete method to measure consumer p95, so the knowledge is not fully exhaustive."
+      "justification": "Adds concrete expert knowledge: specific thresholds (empty\u2011receive >50% & WaitTimeSeconds=0), cost formula, KMS per\u2011call cost, FIFO high\u2011throughput mode requirements, visibility\u2011timeout 6\u00d7 processing rule, batch\u2011API payload limits, and a detailed decision tree. Missing only minor region\u2011pricing variations beyond us\u2011east\u20111."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides AWS\u2011specific step\u2011by\u2011step procedures, CLI commands, pre\u2011flight data gate, and a clear decision\u2011tree mindset. Some sections are generic (e.g., \"check security\") and the ordering of steps could be tighter, preventing a full score."
+      "justification": "Encodes AWS\u2011specific reasoning (prioritise empty receives, then batching, then visibility, etc.) and provides exact CLI commands for each step. Some procedures (e.g., \"monitor metrics\") are generic, preventing a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with specific reasoning (e.g., never enable long polling without empty\u2011receive ratio, never migrate Standard\u2192FIFO for throughput). Missing broader pitfalls such as cross\u2011region messaging costs and subtle SSE\u2011KMS cost interactions, so not perfect."
+      "justification": "Provides a concrete NEVER list with five detailed pitfalls and clear rationales (e.g., never enable long polling without empty\u2011receive ratio, never migrate Standard\u2192FIFO for throughput). The list could be broader (e.g., cross\u2011region pitfalls, IAM scope issues)."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, activation triggers, invocation schema, and example are well\u2011defined. The only shortfall is the lack of an explicit versioned pricing matrix in the spec itself (it references an external file), which slightly reduces compliance."
+      "justification": "Front\u2011matter is complete, description, when_to_use, activation_triggers, invocation_schema, and example are all present and well\u2011structured. The only shortfall is the omission of an explicit \"when_not_to_use\" field in the front\u2011matter (it appears only in the narrative), which slightly reduces reliability of activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses layered sections (quick start, mindset, stepwise detail, deep references) to avoid overload. However the initial Quick navigation table and extensive tables front\u2011load a lot of detail, causing some cognitive load before the core decision tree."
+      "justification": "Content is layered: quick start, mindset, decision matrix, pre\u2011flight gate, step\u2011by\u2011step details, anti\u2011patterns, and safety checks. However, the initial sections are dense, which could cause cognitive overload for a first\u2011time user."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Calibrates freedom appropriately: destructive actions require explicit CONFIRM prompts and safety checks; cost\u2011optimization steps are loosely constrained to avoid over\u2011automation. Slight deduction because the skill does not explicitly limit batch\u2011size changes for extremely latency\u2011sensitive workloads."
+      "justification": "Calibrates freedom appropriately: destructive changes require CONFIRM prompts, safety gates, and explicit pre\u2011flight checks. Minor gap: high\u2011throughput FIFO enablement warning could emphasise ordering impact more strongly."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Steps \u2192 Output format \u2192 Anti\u2011patterns \u2192 Safety). Minor ad\u2011hoc naming of sections (e.g., \"Step 0 non\u2011obvious behaviours\") prevents a perfect score."
+      "justification": "Follows a recognizable pattern (What it does \u2192 Navigation \u2192 Quick start \u2192 Mindset \u2192 Process steps \u2192 Output contract \u2192 Anti\u2011patterns \u2192 Safety). The placement of \"Step 0 non\u2011obvious behaviours\" after the pre\u2011flight section feels slightly ad\u2011hoc, preventing a perfectly clean pattern."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 9,
       "max": 15,
-      "justification": "Provides a decision tree, CLI commands, and output template, enabling an agent to act. However the supplied example outputs contain contradictions (e.g., FURTHER_OPTIMIZATION_AVAILABLE with $0 savings) and some math inconsistencies, indicating gaps that would cause mis\u2011classifications in practice."
+      "justification": "Provides decision trees, CLI commands, and exact output format, enabling an agent to act. Yet the supplied example outputs contain critical errors: a FIFO high\u2011throughput example emits VERDICT FURTHER_OPTIMIZATION_AVAILABLE with $0 savings (violates the zero\u2011savings rule) and several math inconsistencies (double\u2011counting empty receives). These gaps undermine reliability."
     }
   ],
-  "total_score": 101,
+  "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 52361,
-  "latency_ms": 16432,
+  "token_count": 51887,
+  "latency_ms": 6058,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0
