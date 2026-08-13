@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Introduces novel expert heuristics (cert\u2011thing\u2011policy triple binding, dependency graph, decision\u2011tree ordering, SQL payload vs DB distinction) that a baseline model would not state. Some sections merely restate standard AWS docs, preventing a perfect score."
+      "justification": "Provides genuine expert heuristics (cert\u2011policy\u2011thing triple binding, dependency graph, common misconceptions) that a baseline model would not enumerate, but a sizable portion restates standard AWS documentation without novel insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides AWS\u2011specific step\u2011by\u2011step procedures (create\u2011thing, create\u2011certificate, attach\u2011policy, attach\u2011thing\u2011principal, IAM role trust for topic rules). Misses an explicit pre\u2011step to create the IAM role before the topic\u2011rule command, a minor omission."
+      "justification": "Offers an AWS\u2011specific step\u2011by\u2011step CLI workflow and decision tree that reflects real\u2011world provisioning order; however a few procedures (e.g., IAM role trust policy verification) are described only generically."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., policies attach to certificates, SQL must quote topic filters, private key handling). Only minor omission of a few edge\u2011case warnings (e.g., IAM role permission granularity)."
+      "justification": "Contains a detailed NEVER list with concrete pitfalls (e.g., attaching policy to thing, using placeholders, missing role ARN) and explains why each is dangerous, showing experience\u2011driven warnings."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter, description, keywords, when_to_use, and strict output contract are all present. The activation trigger relies on a long keyword list rather than a concise, unambiguous flag, making the spec slightly weaker."
+      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS; activation keywords and strict output contract are defined. Minor weakness: 'entry_point: false' is ambiguous for automation but does not break compliance."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Top\u2011level summary, quick\u2011navigation table, and deep\u2011dive sections are well layered. However, the skill dumps large command blocks and full policy JSON early, which can overload the initial read."
+      "justification": "Top\u2011level summary, quick\u2011navigation table, and layered sections (mindset, heuristics, step\u2011by\u2011step commands) prevent overload; however, the long policy JSON appears early, adding some cognitive load before the high\u2011level decision tree."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Calibrates freedom appropriately for provisioning (strict checks, decision tree). No constraints for destructive actions (e.g., delete\u2011thing) are needed here, but the absence of any guard for accidental re\u2011creation is a small gap."
+      "justification": "Constrains destructive actions (no placeholders, require full ARNs, enforce attachment checks) while allowing creative configuration (optional Greengrass, custom authorizer). Slight over\u2011constraint: the skill forces a full checklist even when many optional components are absent."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (mindset, decision tree, NEVER list, stepwise procedure, output format). Minor ad\u2011hoc sections (e.g., raw bash snippets) break the otherwise clean pattern."
+      "justification": "Follows a recognizable pattern: mindset \u2192 decision tree \u2192 NEVER list \u2192 detailed procedural steps \u2192 output format. Structure is coherent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Model output adheres to the required checklist format and avoids prohibited placeholders. Minor issues: some optional lines (e.g., fleet indexing) are simplified, but the agent could execute the checklist successfully."
+      "justification": "Provides a working decision tree, checklist, and concrete CLI examples, enabling an agent to act. The model output deviates from the spec by omitting the required \"Topic rule actions\" line when no rule exists and by using a non\u2011canonical protocol line, indicating gaps in strict usability."
     }
   ],
   "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 41192,
-  "latency_ms": 14134,
+  "token_count": 41599,
+  "latency_ms": 13951,
   "assertions_passed": false,
   "assertions_passed_count": 2,
   "assertions_failed_count": 3

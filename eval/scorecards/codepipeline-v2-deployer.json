@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "The skill supplies concrete, expert\u2011level artifacts that a generic model would not know: a full decision tree for V2 pipeline shape selection, exact JSON structure for trigger filters, detailed KMS key\u2011policy requirements for cross\u2011account access, precise IAM role policy examples, and hardening commands for S3 buckets. These constitute genuine new knowledge. Deducted 3 points because it omits guidance on artifact size limits, multi\u2011region trigger constraints, and the maximum number of stages/actions in a V2 pipeline."
+      "justification": "The skill provides many expert details (trigger filter syntax, cross\u2011account KMS policy, namespace\u2011variable validation), but the majority of the content restates official AWS documentation. It lacks a truly novel decision threshold or ordering that a senior CloudOps engineer would not already know from the docs."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "The skill embeds an AWS\u2011specific mindset (event\u2011driven vs polling, namespace variables, cross\u2011account KMS wiring) and a step\u2011by\u2011step procedure (source \u2192 trigger \u2192 build \u2192 deploy \u2192 approval \u2192 cross\u2011account). The only shortfall is a generic pre\u2011flight permission check that could be more AWS\u2011specific (e.g., using iam:SimulatePrincipalPolicy)."
+      "justification": "Procedures are AWS\u2011specific and ordered (e.g., create KMS key \u2192 bucket \u2192 IAM role \u2192 pipeline), but the exact sequential ordering is only implied, not explicitly enumerated as a mandatory checklist; some advice such as \u201cValidate IAM permissions\u201d is generic rather than a V2\u2011specific heuristic."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "A robust \"NEVER\" list is provided with concrete reasons (unscoped triggers, wildcard IAM resources, PollForSourceChanges, secrets in namespace variables, missing variable validation). Missing are deeper explanations for why wildcard PassRole is dangerous beyond privilege escalation and an explicit anti\u2011pattern for over\u2011permissive S3 bucket policies beyond public\u2011access settings."
+      "justification": "Provides many concrete NEVER rules with reasoning (unscoped triggers, wildcard IAM resources, secrets in namespace variables), yet a few warnings lack explicit impact description (e.g., why wildcards lead to privilege escalation) and could include more failure\u2011mode examples."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are present. The invocation schema is vague (no concrete JSON schema) and the output schema field is missing, which could hinder reliable activation."
+      "justification": "Frontmatter, description, when_to_use, activation_triggers and invocation_schema are present, but the invocation_schema is vague about the exact shape of a \u201cpartial spec\u201d and does not list required field types, making automated validation less reliable."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "The skill presents a concise Mindset and quick\u2011reference checklist up front, then layers deeper technical details (process steps, heuristics, decision tree) later. Slight overload occurs because full IAM policy JSON appears early in the document, which could be deferred to a reference section."
+      "justification": "The skill layers information (quick reference \u2192 detailed sections \u2192 deep references), but the checklist repeats much of the earlier quick\u2011reference table, creating potential cognitive overload; critical anti\u2011pattern rules are buried in later \u201cNEVER\u201d blocks rather than highlighted up front."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive actions (KMS key creation, IAM role creation, pipeline creation) are guarded by pre\u2011flight checks and explicit NEVER rules, showing good calibration. Nonetheless, the CLI examples lack constraints such as required region tags or naming conventions, leaving a small risk of overly permissive execution; two points are deducted."
+      "justification": "Destructive operations (KMS, IAM, S3 bucket creation) are gated by pre\u2011flight checks and NEVER rules, yet the skill still permits creation of cross\u2011account resources without an explicit confirmation prompt, leaving a small freedom gap for high\u2011risk actions."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The document follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Process steps \u2192 Heuristics \u2192 Output format \u2192 Decision tree \u2192 Verification \u2192 Edge cases \u2192 NEVER). Minor inconsistency: heuristics are interleaved with process steps, making the flow slightly ad\u2011hoc."
+      "justification": "The overall structure follows a recognizable pattern (Mindset, Quick reference, Process steps, Decision tree, Output contract), but the mix of tables, prose, and code blocks makes navigation slightly ad\u2011hoc rather than a single, clean template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides a complete output contract, command list, and examples that an agent can follow to provision a V2 pipeline. However, the invocation_schema is vague (no concrete JSON schema) and error\u2011handling guidance for failed KMS policy validation or missing variables is limited, which could hinder flawless execution."
+      "justification": "The skill supplies a usable output contract and command list, but the example outputs omit handling of some required failure cases (e.g., missing trigger filter, empty namespace variable) and sometimes skip optional checklist items without indicating their optionality, which could cause an agent to produce incomplete plans."
     }
   ],
-  "total_score": 107,
+  "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 53094,
-  "latency_ms": 13163,
+  "token_count": 52934,
+  "latency_ms": 33248,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

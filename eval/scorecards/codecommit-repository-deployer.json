@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "The skill provides many specific policy statements, dependency graph, and never\u2011rules that a baseline model would not automatically include, but it stops short of deeper expert insights such as automated rollback strategies, version\u2011controlled policy updates, or handling of name\u2011collision edge cases. Those omissions reduce the delta."
+      "justification": "Adds genuine expert insight such as the silent\u2011failure KMS key\u2011policy requirement, the need for BOTH repository resource policy AND KMS key policy for cross\u2011account access, and a detailed configuration dependency graph. However, a large portion restates standard AWS documentation (e.g., basic CLI commands) that a capable model already knows, so not a full 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific and ordered correctly (repo \u2192 KMS \u2192 approvals \u2192 triggers, etc.). However, the step for verifying that the KMS key policy actually contains the required grant after creation is only mentioned in passing, not as a concrete verification command, leaving a small procedural gap."
+      "justification": "Provides AWS\u2011specific step\u2011by\u2011step CLI procedures, correct ordering (repo \u2192 KMS \u2192 approval rules \u2192 triggers) and dependency checks. The only shortfall is the inclusion of generic \u201cverify prerequisites\u201d steps that are not uniquely AWS\u2011specific."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "The NEVER list is extensive and explains why each pitfall matters, yet it omits a common anti\u2011pattern: relying solely on IAM policies for branch protection without also using approval rule templates, which would be a useful warning."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., missing KMS grant, confusing notifications vs triggers). Missing some common pitfalls such as IAM policy precedence issues and the nuance that the default branch does not exist until the first push, which reduces the score."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 13,
       "max": 15,
-      "justification": "Front\u2011matter is complete, the description clearly states WHAT the skill does, WHEN to invoke, and provides exhaustive activation keywords; the contract is unambiguous."
+      "justification": "Frontmatter is complete, description and when_to_use are thorough, and activation keywords are listed. However, the keyword list may miss synonyms (e.g., \"repo\" alone) and the trigger list is a bit vague, risking missed activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "The skill layers information (quick navigation, mindset, step\u2011by\u2011step, then deep references), but the initial sections contain a large amount of dense tables and heuristics that could overload the agent before the core checklist is reached."
+      "justification": "Uses quick\u2011navigation table, separates mindset, heuristics, and step\u2011by\u2011step sections, which aids layered reading. The main body is dense; some deep details are not hidden behind an explicit \"on\u2011demand\" request, causing potential cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive actions (repo creation, policy changes) are gated by a prerequisite checklist, which is appropriate; however the cross\u2011account KMS verification could be tighter (e.g., require explicit principal ARN validation) so a single point is deducted."
+      "justification": "Calibrates freedom for destructive actions by requiring prerequisite checks and explicit NEVER rules. Yet the contract does not enforce verification of cross\u2011account KMS policy before creation, leaving a fragile path for accidental mis\u2011configuration."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable structure (mindset, quick navigation, step list, NEVER list, output format), but the mixture of narrative, tables, and code blocks makes the pattern slightly ad\u2011hoc rather than a clean, reusable template."
+      "justification": "Follows a recognizable pattern (Mindset, Dependency Graph, Heuristics, Output Format) that aids comprehension. Minor inconsistency in section naming and ordering prevents a perfect match to a canonical pattern."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 11,
       "max": 15,
-      "justification": "An agent can follow the checklist and commands, but the skill lacks decision branches for common failure modes such as an existing repository name conflict, region mismatches, or CLI command errors. Edge\u2011case handling and a fallback plan for partial configurations are not fully covered."
+      "justification": "Provides a ready\u2011to\u2011use checklist, verification commands, and concrete CLI snippets, enabling an agent to act. Lacks a decision tree for partial configurations, omits handling of optional components (e.g., when notification rules are not needed), and some example outputs miss required checklist items, which could cause execution errors."
     }
   ],
-  "total_score": 106,
+  "total_score": 102,
   "max_score": 120,
   "grade": "B",
-  "token_count": 45794,
-  "latency_ms": 14187,
+  "token_count": 49919,
+  "latency_ms": 10044,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

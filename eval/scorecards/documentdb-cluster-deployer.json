@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds genuine expert heuristics not found in a baseline model: storage\u2011autoscaling ceiling head\u2011room rule, index\u2011build blocking behavior, TLS\u2011certificate rotation pitfalls, unsupported MongoDB aggregation stages, change\u2011stream retention sizing, and KMS\u2011key immutability after creation."
+      "justification": "Adds several concrete expert heuristics not commonly known: storage\u2011autoscaling ceiling headroom calculation, mandatory index\u2011before\u2011query rule, change\u2011stream retention sizing, TLS\u2011certificate rotation pitfalls, KMS\u2011key immutability, unsupported MongoDB aggregation stages, background index\u2011build requirement, and global\u2011cluster failover not being automatic. These provide actionable thresholds and decisions a senior CloudOps engineer would value."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Describes AWS\u2011specific provisioning order (subnet group \u2192 cluster \u2192 instances) and detailed CLI steps, but the procedural flow is slightly inconsistent: parameter\u2011group creation is listed after cluster creation despite the need to have it ready for change\u2011streams at creation. This generic sequencing reduces the score."
+      "justification": "Provides AWS\u2011specific CLI ordering (subnet group \u2192 cluster \u2192 instances \u2192 parameter group \u2192 reboot) and a clear mindset. However, the procedure for global\u2011cluster provisioning is only implied, not explicitly ordered (primary cluster must exist before creating the global cluster and secondary). Also omits required IAM permission checks for the orchestrator."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with reasons (e.g., never leave autoscaling ceiling default, never disable TLS, never use t3 in prod). Missing a specific warning about using the default parameter group for production workloads."
+      "justification": "Contains a detailed NEVER list with specific reasons (e.g., disabling TLS, using t3 for production, leaving storage ceiling default, missing indexes). Only minor gap: does not explicitly warn against using retryWrites=true in connection strings, though it is mentioned in a later note."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter, keywords, activation triggers, and a precise output contract are all present. The 'when to use' description is verbose and could be tighter; also the negative trigger list is embedded rather than a separate explicit field."
+      "justification": "Frontmatter is complete, description, keywords, triggers, and when_to_use are present. The output contract is well defined. Slight vagueness in activation keywords (mix of capitalisation) could cause unreliable triggering."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Uses quick\u2011navigation and layered sections, but critical anti\u2011pattern rules (e.g., TLS rotation) are buried deep in expert heuristics, causing some cognitive overload for a first\u2011time reader."
+      "justification": "Uses a quick\u2011navigation table and layers information (high\u2011level mindset, then detailed steps, then deep heuristics). Some sections (full CLI examples and extensive tables) are long and could overload the initial read, but critical rules are still surfaced early."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive actions (cluster creation, KMS key selection) are gated by a prerequisite checklist and PREREQUISITES_MISSING handling. Creative tasks (e.g., indexing strategy) are left flexible. Calibration matches task fragility well."
+      "justification": "Constrains destructive actions by requiring prerequisite verification and a PREREQUISITES_MISSING verdict. Lacks explicit constraints for delete or modify\u2011after\u2011creation operations (e.g., changing KMS key), which remain loosely described."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Configuration graph \u2192 Expert heuristics \u2192 Prerequisites \u2192 Step\u2011by\u2011step \u2192 NEVER \u2192 Output format). Minor inconsistency: multiple 'Expert heuristic' headings break the smooth flow."
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Step\u2011by\u2011step process \u2192 Expert heuristics \u2192 Prerequisites \u2192 Output contract \u2192 Error handling. Structure is consistent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Agent can follow the checklist and run the provided CLI snippets; error\u2011handling sections cover common failures. Lacks explicit guidance for edge cases such as mismatched parameter\u2011group family versions or adding background:true flag in index creation examples."
+      "justification": "Provides a ready\u2011to\u2011deploy checklist, verification commands, and concrete CLI snippets, enabling an agent to act. Edge\u2011case handling (storage full, missing indexes, change\u2011stream failures) is covered, but the skill does not give explicit remediation steps for global\u2011cluster promotion scripts, leaving a gap for full automation."
     }
   ],
-  "total_score": 107,
+  "total_score": 103,
   "max_score": 120,
   "grade": "B",
-  "token_count": 48981,
-  "latency_ms": 9840,
+  "token_count": 46046,
+  "latency_ms": 11189,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

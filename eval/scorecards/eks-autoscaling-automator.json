@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Provides several concrete, non\u2011obvious details (Karpenter v1 API migration, consolidationPolicy budgets, specific spot\u2011diversification families, VPA mode pitfalls, descheduler safety caps) that a generic model would not enumerate, but much of the content restates publicly documented best\u2011practices, so the delta is strong but not maximal."
+      "justification": "Provides concrete, non\u2011trivial expert details not usually known by a generic model: Karpenter v1 API migration (Provisioner \u2192 NodePool, AWSNodeTemplate \u2192 EC2NodeClass), exact consolidation policies (WhenEmpty vs WhenEmptyOrUnderutilized) with recommended budgets, spot\u2011diversification matrix (3\u20114 families, 2+ AZs), VPA mode pitfalls (Auto recreates pods, Off vs Initial), descheduler safety caps (maxNoOfPodsToEvictPerNode, DryRun first), precise tuning values (scaleDownUtilizationThreshold 0.5, HPA behavior windows, disruption budgets 20% and business\u2011hour freeze). These specifics constitute genuine delta knowledge."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific reasoning (choose Karpenter vs CA, migration steps, wave\u2011enable pattern, pre\u2011flight confirmation gate) and concrete CLI/helm commands. Only minor generic phrasing (e.g., \"check security\") prevents a perfect score."
+      "justification": "Provides AWS\u2011specific, step\u2011by\u2011step procedures: Helm install commands for Karpenter, CA, KEDA, detailed NodePool and EC2NodeClass manifests, managed node\u2011group scaling CLI, HPA behavior tuning, and spot\u2011interruption handling. The procedures are concrete and ordered. Minor deduction because some steps are generic (e.g., \"run kubectl get nodes\") and the overall flow could be tighter."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (conflict between Karpenter and CA, disruption budget necessity, spot\u2011family diversification, HPA/VPA conflict, zero scale\u2011down window, etc.). One small omission: no explicit warning about using outdated Karpenter versions beyond v1."
+      "justification": "Contains a thorough \"NEVER\" list with concrete reasons (e.g., running Karpenter and CA together causes provisioning loops, aggressive consolidation without budgets can disrupt 50% of nodes, spot from a single family leads to mass eviction). Only minor omission: no explicit warning about using default service accounts for Karpenter which can be a security pitfall."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS. Activation triggers and invocation schema are present. Slight vagueness in \"deterministic AUTOSCALING block\" wording could cause ambiguous activation."
+      "justification": "Full frontmatter present (name, description, version, author, license, compatibility, keywords, tags, metadata, when_to_use, activation_triggers, invocation_schema). Description clearly states WHAT the skill does, WHEN to invoke, and KEYWORDS. Activation triggers and schema are explicit, enabling reliable agent activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Top\u2011level sections give a high\u2011level mindset and quick navigation before deep manifests, but the document front\u2011loads many detailed tables and code snippets that could overwhelm a first\u2011pass reader."
+      "justification": "Top\u2011level sections (Mindset, Quick navigation, Critical rules) give a concise overview, with deeper technical manifests hidden in later steps. However, the skill is long and some critical configuration snippets (e.g., full NodePool spec) appear early, which could overload a first\u2011time reader."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by a mandatory confirmation step and pre\u2011flight checks; creative tasks have generous freedom. The only shortfall is the lack of an explicit \u201cdry\u2011run only\u201d mode for the initial deployment."
+      "justification": "Destructive actions (helm install, aws eks update) are gated by a mandatory confirmation step and pre\u2011flight safety checks. The skill tightens freedom for high\u2011risk operations (e.g., consolidation budgets, descheduler dry\u2011run) while allowing creative freedom for metric selection and custom HPA policies. Missing explicit dry\u2011run flag for helm installs prevents full calibration."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Navigation \u2192 Steps \u2192 Output \u2192 Anti\u2011patterns \u2192 Appendices). Minor inconsistency in ordering of some sections prevents a perfect score."
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Quick navigation \u2192 Critical rules \u2192 Pre\u2011flight \u2192 Step\u2011wise Process \u2192 Output format \u2192 Anti\u2011patterns \u2192 Safety checks \u2192 Appendices. The structure is coherent, though the inclusion of multiple appendices slightly deviates from a single unified template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The skill supplies working manifests and a clear output format, yet the model\u2019s generated example violates an anti\u2011pattern (HPA scaleUp stabilizationWindowSeconds set to 0 despite guidance to avoid zero windows). This shows the skill does not enforce its own safety rules, reducing reliability."
+      "justification": "Provides working helm/cli commands, full manifests, decision trees, and error handling (AUTOSCALING: \u2026 VERDICT: ERROR). However, it omits some edge\u2011case guidance (IAM role creation for Karpenter, required CRDs for KEDA, explicit version compatibility checks for EKS\u202f1.27+). The example output includes a HPA scaleUp window of 0, which is sub\u2011optimal but not fatal. These gaps prevent a perfect score."
     }
   ],
-  "total_score": 106,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 40822,
-  "latency_ms": 10823,
+  "grade": "A",
+  "token_count": 42120,
+  "latency_ms": 11359,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

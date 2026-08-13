@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Provides many concrete, expert-level details (e.g., exact cost baselines, concurrency thresholds, VPC v2 networking, health\u2011check interval trade\u2011offs, scale\u2011in cooldown behavior) that go beyond a generic model's knowledge. Missing only a few advanced touches such as systematic cost\u2011per\u2011request benchmarking against alternative platforms and multi\u2011region pricing nuances."
+      "justification": "Provides many expert details (e.g., v2 native VPC, exact cost numbers, concurrency\u2011vs\u2011CPU curve) but omits concrete formulas for cost\u2011per\u2011request modeling and precise thresholds for when pause/resume becomes worthwhile, so the delta is strong but not complete."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Defines an AWS\u2011specific workflow: pre\u2011flight CLI calls, ordered priority (pause/resume \u2192 concurrency \u2192 MinSize \u2192 instance type \u2026), and concrete CLI commands. Some steps (e.g., \"monitor latency for 7 days\") are generic observability practices rather than App Runner\u2011unique procedures, resulting in a 2\u2011point deduction."
+      "justification": "Lists AWS\u2011specific pre\u2011flight CLI steps and a clear order of analysis, yet some procedural advice (e.g., \"monitor latency for 7 days\") is generic and not tied to a concrete AWS metric or alarm configuration."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never increase concurrency without latency monitoring, never set MinSize\u202f0 for latency\u2011sensitive production). One minor shortfall: health\u2011check interval pitfalls are mentioned but not tied to a specific failure mode (e.g., false\u2011positive restarts), so 1 point is deducted."
+      "justification": "Contains a solid NEVER list with reasons, but it misses a few domain\u2011specific pitfalls such as forgetting to tag services for Cost Explorer or neglecting to clean up unused auto\u2011scaling configurations, reducing completeness."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter is complete, description, keywords, activation triggers, invocation schema, and example are all present. The only gap is the lack of an explicit \"entry_point\" flag in the front\u2011matter (set to false) which could hinder automated discovery, so 1 point is deducted."
+      "justification": "Front\u2011matter is complete, description, when_to_use, activation_triggers, and invocation schema are all present. The activation trigger list is extensive but omits a few common synonyms (e.g., \"AppRunner cost\" without space), so 1 point is deducted."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill uses a quick\u2011reference table and layered sections (Mindset, Pre\u2011flight, Process, Output, Anti\u2011Patterns). However, the main body front\u2011loads extensive detail (cost tables, extensive expert knowledge) before the concise quick\u2011reference, creating some cognitive overload. Hence 2 points are deducted."
+      "justification": "The skill uses sections and a quick\u2011reference table, yet the initial narrative packs a large amount of detailed data before the concise reference, which can overload the agent on first read."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (pause, resume, update\u2011service) are guarded by a CONFIRMATION GATE and pre\u2011state capture steps. The skill could improve by prescribing an explicit rollback plan for each change, so 1 point is deducted."
+      "justification": "Describes a confirmation gate and safety checks for destructive actions, but the example outputs do not show the confirmation prompt, leaving a small gap in calibrated enforcement."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns). The structure is slightly ad\u2011hoc (e.g., mixing markdown tables with narrative) rather than a strict template, costing 1 point."
+      "justification": "Follows a recognizable Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011Pattern pattern, but the ordering of some sections (e.g., Anti\u2011Patterns after Safety Checks) is slightly ad\u2011hoc, preventing a perfectly clean pattern."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 10,
       "max": 15,
-      "justification": "Provides actionable CLI snippets, decision trees, and examples, but the model output reveals concrete execution gaps: malformed cron expression (\"cron(0 19? * MON-FRI *)\"), unreplaced placeholder <id> in CloudWatch commands, and missing handling of MaxSize constraints. These could cause runtime failures, so points are deducted."
+      "justification": "Provides working CLI snippets and a clear output template, but several examples contain syntax errors (malformed cron expressions, missing required CloudWatch parameters) and include extra fields not defined in the spec, indicating the agent could stumble when executing them."
     }
   ],
-  "total_score": 105,
+  "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 45594,
-  "latency_ms": 11950,
+  "token_count": 46044,
+  "latency_ms": 13813,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

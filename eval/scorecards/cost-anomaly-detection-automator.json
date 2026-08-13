@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides many concrete AWS\u2011specific facts (10\u2011day warm\u2011up, async monitor status, SNS topic\u2011policy JSON, severity\u2011threshold mapping, reversible\u2011within\u201115\u2011min rule). However, a large portion restates publicly documented behavior without adding new decision trees or proprietary heuristics, limiting the true expert delta."
+      "justification": "The skill adds useful specifics (10\u2011day baseline, async monitor status, required SNS topic policy, severity\u2011percentage mapping, decision tree, recent feature notes). However, a large portion restates standard AWS documentation without novel insight, and the decision thresholds are generic recommendations rather than a unique expert rule set."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The four\u2011stage pipeline and ordered steps (detect \u2192 alert \u2192 react \u2192 remediate) are AWS\u2011specific and valuable. Yet several procedures are generic (e.g., \u201ctest in non\u2011prod\u201d, \u201cconfirm before state\u2011changing\u201d) and the skill omits explicit IAM role / permission steps required for cross\u2011account routing, leaving a procedural gap."
+      "justification": "Provides a clear AWS\u2011specific pipeline (monitor \u2192 subscription \u2192 SNS fan\u2011out \u2192 Lambda \u2192 Budgets) with ordered CLI commands. The only shortfall is a lack of detailed IAM role / permission steps for cross\u2011account Lambda execution, which remains a generic \u201censure caller has permission\u201d note."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "The NEVER list is extensive and explains why each pitfall is dangerous. It misses a few nuanced anti\u2011patterns such as neglecting cost allocation tags for downstream chargeback or ignoring cross\u2011region anomaly payloads, which could lead to silent gaps."
+      "justification": "Comprehensive NEVER list with concrete reasons (e.g., missing subscription, wrong SNS policy, destructive Lambda without assessment). Omits a few common pitfalls such as API rate\u2011limit errors and cost\u2011anomaly\u2011detection pricing impact, so 2 points deducted."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter is complete, description, keywords, activation triggers, and invocation schema are well\u2011defined. The spec lacks an explicit \u201cwhen NOT to use this skill\u201d clause, which would improve reliable activation, so one point is deducted."
+      "justification": "Frontmatter, description, keywords, activation triggers, and invocation schema are all present and well\u2011formed. The output schema (fields of the AUTOMATION_DEPLOYED block) is described but not formally enumerated, leading to a minor 1\u2011point deduction."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The document layers information (mindset \u2192 quick navigation \u2192 detailed steps \u2192 anti\u2011patterns), but the initial sections are dense and include many tables and code blocks that can overwhelm an agent before it knows which part to act on. Critical rules are listed early but not isolated enough for rapid lookup."
+      "justification": "Top\u2011level Mindset and Quick navigation give a concise overview, with deeper sections (pre\u2011flight, step\u2011by\u2011step, anti\u2011patterns) revealed later. However the initial document is dense and mixes high\u2011level guidance with detailed code, causing some cognitive overload; 2 points deducted."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Calibrates freedom well for destructive actions (requires reversible within 15\u202fmin, non\u2011prod testing, safety gates). However the auto\u2011remediation Lambda omits the promised right\u2011size logic, leaving a high\u2011risk gap in the destructive path."
+      "justification": "Destructive actions are tightly gated (reversible within 15\u202fmin, dry\u2011run tagging, production\u2011impact assessment). Missing an explicit recommendation for Lambda timeout (e.g., \u226560\u202fs) leads to a 1\u2011point deduction."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable pattern (Mindset, Navigation, Process steps, Anti\u2011Patterns, Appendices). Minor inconsistency arises from mixing markdown tables, narrative, and raw code snippets without a uniform heading hierarchy, making the pattern slightly ad\u2011hoc."
+      "justification": "Follows a recognizable structure: Mindset \u2192 Navigation \u2192 Critical Rules \u2192 Pre\u2011flight \u2192 Process Steps \u2192 Anti\u2011Patterns \u2192 Appendices. Minor ad\u2011hoc elements (e.g., inline decision tree) prevent a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working CLI snippets, Lambda code, error\u2011handling tables, and validation steps, enabling an agent to execute the pipeline. Missing are pagination handling for list\u2011API calls, detailed IAM policy examples for cross\u2011account assume\u2011role, and a fallback strategy when the remediation Lambda fails (e.g., DLQ alarm)."
+      "justification": "Provides working CLI snippets, Lambda code, decision trees, error tables, and validation protocol, enabling an agent to execute the pipeline. Missing are explicit handling of pagination in list APIs, detailed IAM permission error remediation, and a ready\u2011to\u2011run test harness, which limits full cold\u2011start usability."
     }
   ],
-  "total_score": 105,
+  "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 46802,
-  "latency_ms": 9565,
+  "token_count": 45954,
+  "latency_ms": 28373,
   "assertions_passed": false,
   "assertions_passed_count": 1,
   "assertions_failed_count": 4

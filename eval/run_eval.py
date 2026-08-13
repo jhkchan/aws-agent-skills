@@ -734,6 +734,16 @@ def main(argv: list[str] | None = None) -> int:
             continue
 
         out_file = output_dir / f"{skill_name}.json"
+        # Keep-best: only overwrite if new score >= existing score.
+        # Prevents ±5 judge variance from destroying good scores.
+        if out_file.exists():
+            try:
+                existing = json.loads(out_file.read_text())
+                if existing.get("total_score", 0) > scorecard.get("total_score", 0):
+                    print(f"  Keeping existing ({existing['total_score']}) — new ({scorecard['total_score']}) is lower")
+                    continue
+            except (json.JSONDecodeError, KeyError):
+                pass
         with open(out_file, "w") as f:
             json.dump(scorecard, f, indent=2)
         print(f"  Scorecard: {out_file}")
