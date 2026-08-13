@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 15,
       "max": 20,
-      "justification": "The skill aggregates senior\u2011level CloudOps knowledge: a concrete decision matrix (SQL vs Flink, parallelism sizing), explicit checkpoint interval ranges, recent 2024\u20112026 feature changes, VPC\u2011source requirements, and schema\u2011registry handling. These details go beyond what a generic model already knows, but some content merely restates public documentation without novel insight."
+      "justification": "Provides many concrete details (checkpoint intervals, parallelism tuning, recent 2024\u20112026 features) that a baseline model may not know, but it stops short of a full decision tree for runtime selection, exact quota codes, or cost\u2011impact formulas. The added knowledge is useful but not exhaustive."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Defines a clear AWS\u2011specific deployment order, pre\u2011flight safety checks, and a decision matrix, yet omits a concrete IaC generation workflow and detailed error\u2011recovery steps, leading to a 2\u2011point deduction."
+      "justification": "Provides an AWS\u2011specific deployment order (IAM role \u2192 source \u2192 application \u2192 checkpoints \u2192 parallelism) and concrete CLI snippets, yet some steps (e.g., \"verify source exists\") are generic checks that lack deeper AWS\u2011specific nuance such as VPC endpoint validation or service\u2011quota pre\u2011flight."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 12,
       "max": 15,
-      "justification": "Includes a solid NEVER list with reasons for the top five pitfalls, but the full list of 12 is hidden in an external reference and several warnings lack in\u2011line justification, resulting in a 3\u2011point loss."
+      "justification": "Contains a solid top\u20115 NEVER list with reasons, but the full list is only referenced, not presented. Important pitfalls such as cross\u2011account role assumptions, snapshot\u2011restore failures, and idempotent CLI usage are missing from the explicit anti\u2011pattern section."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Frontmatter, description, keywords, and a strict output contract are present, but the activation triggers are described only in vague prose (e.g., \"when the user wants to create\u2026\") rather than precise, machine\u2011readable conditions, costing 2 points."
+      "justification": "Frontmatter, description, keywords, and a strict output contract are present, but the trigger definition is vague (e.g., \"Triggers: Kinesis Data Analytics, Managed Flink\u2026\") and does not give a precise pattern for an agent to reliably decide when to invoke the skill."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The skill offers navigation links and deep\u2011reference files, yet the main body packs extensive CLI scripts, tables, and heuristics together, creating potential cognitive overload and reducing the progressive layering, hence a 3\u2011point deduction."
+      "justification": "Uses a quick\u2011navigation table, top\u2011level contract, then deep sections and external references, which prevents overload. However, the initial navigation table is dense and some critical NEVER rules are hidden in referenced files, forcing extra look\u2011ups."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Destructive actions (IAM role creation, application creation) are accompanied by safety notes, but the skill does not enforce pre\u2011existence checks or region constraints, leaving a small risk of over\u2011permissive execution; 2 points deducted."
+      "justification": "Calibrates freedom appropriately for a potentially destructive create\u2011application flow: extensive pre\u2011flight safety checks, explicit NEVER rules, and optional sections. Could be stricter by mandating confirmation prompts before issuing the final `aws kinesisanalyticsv2 create-application` command."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (frontmatter \u2192 navigation \u2192 contract \u2192 reasoning \u2192 procedure \u2192 anti\u2011patterns \u2192 matrix \u2192 references), with only minor ad\u2011hoc sections like \"Recent AWS features\" that slightly break the pattern, losing 1 point."
+      "justification": "The skill follows a recognizable structure (frontmatter \u2192 navigation \u2192 contract \u2192 reasoning \u2192 procedure \u2192 anti\u2011patterns), yet the ordering of sections (e.g., mixing CLI steps with narrative) is slightly ad\u2011hoc rather than a fully standardized template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 8,
+      "score": 13,
       "max": 15,
-      "justification": "Model output examples violate the strict checklist contract: missing required items (checkpointing and parallelism lines for SQL app), misuse of \"configuration UPDATE\" (should be CUSTOM/DEFAULT), and inconsistent optional sections. These gaps would cause an agent to fail or produce incomplete deployments."
+      "justification": "Provides working CLI examples, decision matrices, and edge\u2011case notes, but lacks explicit error\u2011handling guidance for failed CLI commands or fallback actions, which could leave an agent stranded on a runtime failure."
     }
   ],
-  "total_score": 96,
+  "total_score": 101,
   "max_score": 120,
   "grade": "B",
-  "token_count": 40883,
-  "latency_ms": 6450,
+  "token_count": 41385,
+  "latency_ms": 6637,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 13,
+      "score": 17,
       "max": 20,
-      "justification": "The skill lists several expert\u2011level facts (10\u2011level JSON path limit, 6\u2011field cron requirement, content\u2011filter operator quirks, silent auto\u2011disable behavior) that a senior engineer would find useful, but these facts are already documented and a capable model could retrieve them; the skill therefore adds only a modest incremental knowledge delta."
+      "justification": "The skill provides many expert details (10\u2011level JSON path limit, 6\u2011field cron requirement, auto\u2011disable behavior, cross\u2011account bus policy, Lambda principal scoping). However it omits newer expert nuances such as the $or top\u2011level pattern operator, global endpoint failover implications, and the 256\u202fKB PutEvents size limit, which a senior engineer would expect."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific diagnostic flow (pre\u2011flight read\u2011only probes, test\u2011event\u2011pattern as the decisive probe, exact CLI commands in the correct order). The only shortfall is occasional reliance on generic advice like \u201ccheck the rule state\u201d without tying it to a concrete AWS\u2011specific check sequence."
+      "justification": "Procedures are AWS\u2011specific and well ordered (pre\u2011flight, test\u2011event\u2011pattern, then layer\u2011by\u2011layer probes). The ordering is mostly clear but the decision\u2011tree description sometimes leaves the exact sequence ambiguous (e.g., whether to verify bus mismatch before IAM role checks), costing one point."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never emit ROOT_CAUSE_IDENTIFIED without a failing probe, never assume 5\u2011field cron, never grant events.amazonaws.com without SourceArn). Missing is a deeper explanation of why certain silent failures (e.g., auto\u2011disable on repeated target failures) occur, but overall strong."
+      "justification": "A comprehensive NEVER list is present with concrete reasons (e.g., never assume 200\u202fOK means rule fired, never use 5\u2011field cron). One minor shortfall: the anti\u2011pattern for schedule auto\u2011disable lacks an explicit explanation of the underlying EventBridge validation path, so a point is deducted."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 12,
       "max": 15,
-      "justification": "Frontmatter includes name, description, version, author, license, keywords, activation triggers, invocation schema, and a valid example. The only shortfall is the lack of an explicit machine\u2011readable output schema definition beyond the textual description."
+      "justification": "Frontmatter is rich and includes description, keywords, metadata, and an invocation schema. However, activation_triggers is empty, making reliable automatic activation unclear, and the WHEN\u2011to\u2011use description is verbose but not sharply scoped, leading to a three\u2011point deduction."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Top\u2011level Quick Start gives concise guidance, then layers into Mindset, Philosophy, detailed step\u2011by\u2011step diagnostic tree, and finally deep reference. Critical rules (e.g., confirmation gate) are not buried. Slight overload in the long \u201cAnti\u2011Patterns\u201d block, but overall well\u2011layered."
+      "justification": "The skill layers information well (quick start \u2192 mindset \u2192 detailed steps). A small amount of deep reference material appears early (deep reference tables) which could cause slight cognitive overload before the core flow, costing one point."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions (put\u2011rule, enable\u2011rule, add\u2011permission) are gated behind explicit CONFIRM prompts and a \u2018read\u2011only first\u2019 policy. Creative tasks (pattern analysis) are left open. The only minor gap is the lack of a configurable safety timeout for the confirmation step."
+      "justification": "Destructive actions are gated behind explicit CONFIRM prompts, read\u2011only probes are emphasized, and the skill calibrates freedom appropriately for each operation. No over\u2011 or under\u2011constraining was found."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable structure (Quick start \u2192 Mindset \u2192 Philosophy \u2192 Diagnostic Process \u2192 Anti\u2011Patterns \u2192 References). The layout is consistent with other CloudOps skills, though the mixture of markdown tables and code blocks makes the pattern slightly ad\u2011hoc."
+      "justification": "The document follows a recognizable troubleshooting pattern (quick start, mindset, philosophy, step\u2011by\u2011step decision tree, anti\u2011patterns, remediation), making it easy to parse and apply."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides a complete decision tree, exact CLI commands, sample output format, and worked examples that an agent could execute end\u2011to\u2011end. Missing are explicit handling of edge cases such as malformed JSON in InputTransformer templates that exceed the new size limit, and no fallback when test\u2011event\u2011pattern is unavailable (e.g., IAM\u2011restricted environments)."
+      "justification": "Provides concrete CLI commands, decision trees, verification steps, and example outputs, enabling an agent to act. Slightly lacking are handling of ambiguous false results from test\u2011event\u2011pattern when multiple fields could be wrong, and guidance for batch remediation beyond the 5\u2011rule limit."
     }
   ],
-  "total_score": 102,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 59821,
-  "latency_ms": 9761,
+  "grade": "A",
+  "token_count": 60138,
+  "latency_ms": 12093,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

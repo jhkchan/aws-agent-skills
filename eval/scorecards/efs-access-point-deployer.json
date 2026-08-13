@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert knowledge not usually in a baseline model: silent\u2011failure modes (cross\u2011AZ mount cost, TLS option ignored without amazon\u2011efs\u2011utils, AccessPointArn condition bypass), exact ordering constraints, the specific Null condition in the deny statement, CSI driver IRSA role requirements, and Lambda throughput burst\u2011credit behavior. Deducted for lacking a concise decision tree for choosing Intelligent\u2011Tiering vs. Standard and for some details that a senior engineer might already know."
+      "justification": "Adds deep, non\u2011trivial expert knowledge: silent\u2011failure matrix (cross\u2011AZ fees, TLS option ignored, AccessPointArn condition bypass), exact JSON policy with Null condition, CSI driver IRSA role requirements, Lambda throughput burst\u2011credit behavior, and precise ordering constraints. This goes beyond what a baseline model knows."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides a 9\u2011step AWS\u2011specific provisioning workflow and ties each step to a verification command, showing expert thinking. Deductions for generic steps (e.g., \"install package\") and missing detailed IAM role trust\u2011policy procedure for the EFS CSI driver, which would be required in a real deployment."
+      "justification": "Provides an AWS\u2011specific 9\u2011step provisioning workflow with exact CLI commands, flag usage, and ordering rationale (e.g., mount\u2011target before AP, amazon\u2011efs\u2011utils before TLS). Procedures are concrete to AWS, not generic checklists."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid \"NEVER\" list of five concrete pitfalls with clear \"why it is wrong\" explanations. Deducted because the list is not exhaustive (e.g., no warning about default security groups or over\u2011permissive IAM roles) and some rationales are brief rather than experience\u2011driven depth."
+      "justification": "Contains a focused NEVER list of five real anti\u2011patterns, each with a clear \"why it's wrong\" explanation. Could be richer (more edge cases), but the existing list is concrete and experience\u2011driven."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are present. The activation trigger list is overly verbose and overlapping, and the invocation_schema does not define how ambiguous inputs are disambiguated, making reliable activation slightly weaker."
+      "justification": "Frontmatter, description, activation triggers, and invocation schema are present. The invocation schema is only prose\u2011based, lacking a strict JSON or schema definition, which makes automated activation slightly ambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses layered sections (quick reference, deep reasoning, step\u2011by\u2011step) so a reader can skim or dive deeper. However, the quick\u2011reference table and extensive tables embed many critical rules early, risking cognitive overload, and some essential rules are buried in later tables."
+      "justification": "Information is layered: quick reference, navigation table, deep sections, and detailed step\u2011by\u2011step later. Some sections (e.g., full policy JSON) appear early, adding modest cognitive load, but overall the hierarchy is clear."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Calibrates constraints well for destructive actions: requires prerequisite verification before emitting READY_TO_DEPLOY and marks optional rows. Still leaves some leeway, e.g., it does not enforce pre\u2011check of IAM role permissions for CSI driver or Lambda before proceeding, so a bit too permissive for fragile operations."
+      "justification": "Calibrates tightly for destructive actions: requires PREREQUISITES_MISSING handling, verification step, and explicit checklist before emitting commands. Creative tasks (e.g., optional CSI driver) are not over\u2011constrained."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (overview \u2192 quick navigation \u2192 detailed procedure \u2192 anti\u2011patterns \u2192 output contract). The structure is consistent and aids comprehension."
+      "justification": "Follows a recognizable pattern (metadata \u2192 what it does \u2192 quick navigation \u2192 detailed procedure \u2192 anti\u2011patterns \u2192 output contract). Slightly ad\u2011hoc naming of sections, but overall structure is coherent."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides decision trees, copy\u2011paste CLI commands, verification steps, and concrete examples, enabling an agent to act. Missing handling for partial or ambiguous input specifications, and some example outputs omit optional rows formatting or error handling for invalid parameters, which could cause execution failures."
+      "justification": "Provides concrete CLI snippets, verification commands, and a strict output contract that agents can emit. Minor gap: the invocation schema is informal, which could cause parsing ambiguity for an automated agent."
     }
   ],
-  "total_score": 102,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 44942,
-  "latency_ms": 14933,
+  "token_count": 45719,
+  "latency_ms": 15539,
   "assertions_passed": false,
-  "assertions_passed_count": 3,
-  "assertions_failed_count": 2
+  "assertions_passed_count": 2,
+  "assertions_failed_count": 3
 }

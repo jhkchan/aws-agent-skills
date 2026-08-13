@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Provides many expert\u2011level specifics (CPU\u2011memory coupling 1769\u202fMB\u202f=\u202f1\u202fvCPU, 20\u202f% ARM64 discount, Power Tuning workflow, provisioned\u2011concurrency break\u2011even math, SnapStart limits, batch\u2011size tuning, exact cost formula). However some pricing numbers are inaccurate (e.g., provisioned\u2011concurrency idle cost, request fee) and regional price variations are only vaguely mentioned, preventing a perfect score."
+      "justification": "Provides concrete expert data not usually known by a generic model: exact memory\u2011to\u2011vCPU ratio (1769\u202fMB\u202f=\u202f1\u202fvCPU), precise Lambda pricing constants, Power\u2011Tuning cost breakdown, SnapStart snapshot memory impact, layer extraction overhead per layer, provisioned\u2011concurrency idle cost ($394/month for 1\u202fGB/10\u202fconcurrency), and the 20\u202f% ARM64 discount with runtime compatibility matrix."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific reasoning (U\u2011curve memory tuning, latency\u2011sensitivity check before provisioned concurrency, ARM64 compatibility matrix, batch\u2011size decision tree) and supplies concrete CLI commands. Deductions for occasional generic phrasing (\"check latency\") and lack of a single consolidated decision\u2011tree diagram."
+      "justification": "Encodes AWS\u2011specific decision trees (e.g., provisioned\u2011concurrency break\u2011even, batch\u2011size tuning thresholds, SnapStart eligibility) and exact CLI commands. The procedure is largely concrete, but a few steps remain generic (e.g., \"verify latency\u2011sensitive API\" without a concrete SLO threshold) and the \u201cright\u2011size provisioned concurrency\u201d rule could be more quantitative."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons (e.g., never change memory without Power\u2011Tuning evidence, never enable provisioned concurrency without traffic consistency). The list is comprehensive but could include more nuanced pitfalls (e.g., partial\u2011batch failure handling for SQS) and deeper reasoning for each, so it falls short of a perfect 15."
+      "justification": "Contains a solid NEVER list with specific rationales (e.g., never change memory without Power Tuning evidence, never enable provisioned concurrency without consistent traffic). Additional common pitfalls (IAM permission errors, versioning safety) are omitted, and some warnings lack quantitative thresholds."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Front\u2011matter, description, keywords, activation triggers, invocation schema, and a full example are present. Minor shortfall: the `entry_point` flag is false but no guidance on how an orchestrator should invoke the skill, leaving a tiny ambiguity."
+      "justification": "Front\u2011matter is complete, description, keywords, activation triggers, and invocation schema are well defined. The \"when_to_use\" and \"when_not_to_use\" sections are clear, but the activation trigger list mixes free\u2011text and specific phrases, which could cause unreliable activation in some runtimes."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered: quick start, mindset, detailed steps, safety checks, and references. However, the skill front\u2011loads a large amount of detail (e.g., extensive tables) which may overwhelm a first\u2011time user."
+      "justification": "Uses layered navigation (quick start \u2192 mindset \u2192 detailed steps \u2192 deep references) and keeps the top\u2011level block concise. However, the Quick reference matrix and the full decision tree are fairly dense, adding some cognitive load before the agent has filtered the need."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (CLI updates) are gated by a mandatory CONFIRM prompt and pre\u2011flight safety checks. Creative tasks (cost estimation) are given enough leeway. Slight deduction because the skill does not explicitly limit batch processing to the recommended max of 5 functions per run."
+      "justification": "Destructive actions are gated by explicit CONFIRM prompts, bulk limits (max 5 functions), and safety checks (state must be Active, IAM permissions). Creative tasks (e.g., recommending architecture changes) are given generous freedom. Minor deduction because the skill does not enforce a hard ceiling on memory\u2011upsizing beyond Power Tuning evidence."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a clear, repeatable pattern (What it does \u2192 Navigation \u2192 Mindset \u2192 Stepwise process \u2192 Output contract \u2192 Anti\u2011patterns \u2192 Safety). The only minor inconsistency is the placement of the \u201cRecent AWS features\u201d section after references, which slightly breaks the flow."
+      "justification": "Follows a recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Step\u2011by\u2011step process \u2192 Output contract \u2192 Anti\u2011patterns \u2192 Safety checks). The structure is consistent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 5,
+      "score": 9,
       "max": 15,
-      "justification": "Model outputs show repeated arithmetic errors (e.g., compute cost for 128\u202fMB function calculated as $2,560 instead of ~$540, batch\u2011size example mis\u2011computes request fees). Missing guidance on unit handling and rounding leads to inconsistent savings figures, violating the strict output contract. Consequently an agent would likely produce incorrect recommendations."
+      "justification": "Provides decision trees, CLI commands, and output format, but several example blocks contain factual errors: the provisioned\u2011concurrency example omits idle\u2011cost in the current\u2011monthly calculation, the ESM batch\u2011size example mis\u2011labels the arrow in \"Dimensions checked\", and some savings math inconsistently rounds intermediate values. These gaps would cause an agent to emit incorrect recommendations."
     }
   ],
-  "total_score": 97,
+  "total_score": 101,
   "max_score": 120,
   "grade": "B",
-  "token_count": 46191,
-  "latency_ms": 12022,
+  "token_count": 44547,
+  "latency_ms": 17858,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 15,
+      "score": 17,
       "max": 20,
-      "justification": "The skill aggregates many AWS\u2011specific limits, recent feature notes, and a detailed pre\u2011check ordering that a generic model could retrieve from documentation, but it does not introduce a novel decision tree or undocumented thresholds. The information is useful but largely restates known public data, so the delta is modest."
+      "justification": "Adds substantial expert knowledge: detailed pre\u2011check priority order, explicit limits (endpoint counts, rule limits), recent 2024\u20112026 feature list, and a decision\u2011tree heuristic for inbound vs outbound vs both. However it omits guidance on cross\u2011account rule sharing nuances and on updating existing endpoints, leaving a small knowledge gap."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides AWS\u2011specific procedures: ordered pre\u2011flight checks, mandatory CONFIRM gate, snapshot before update, post\u2011verification steps, and exact CLI syntax. Missing a few edge\u2011case procedures (e.g., handling pagination failures or IAM role assumption failures) prevents a perfect score."
+      "justification": "Provides AWS\u2011specific procedures: exact CLI pre\u2011flight commands, CONFIRM gate, snapshot before update, post\u2011verification steps, and VPC attribute checks. However, some steps are generic (e.g., \"run verification\" without listing the exact AWS CLI for every resource) which prevents a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Provides a concrete top\u20115 NEVER list with clear reasoning (e.g., missing AZ diversity, egress rules, priority collisions). However, it omits other common pitfalls such as RAM cross\u2011account sharing misconfigurations and missing mutation\u2011protection details for firewall groups."
+      "justification": "Contains a concrete NEVER list (top 5) with clear reasoning and additional warnings throughout. Could be stronger by enumerating more anti\u2011patterns (e.g., IAM trust\u2011policy pitfalls, limit\u2011exceed handling), so a modest deduction."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, activation triggers, invocation schema, and a detailed description are present. The \"when to use\" narrative could be tighter, but overall the skill meets the specification requirements."
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present. Activation triggers are overly exhaustive (many synonyms) which could cause spurious activation, thus a slight deduction."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The document layers high\u2011level overview, quick reference, then deep sections. Critical rules (NEVER) are near the end, which may force readers to scroll before seeing warnings. Slight overload in the initial sections reduces the score."
+      "justification": "Content is layered (quick reference, mindset, pre\u2011flight, process, patterns, contract, NEVER, heuristic). Some early sections are dense, causing slight cognitive overload, but overall the hierarchy is logical."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly gated with CONFIRM, pre\u2011checks, and post\u2011verify. Creative tasks (e.g., heuristic selection) are given flexibility. No over\u2011constraining of non\u2011fragile steps, so near\u2011max."
+      "justification": "Destructive actions are tightly constrained with pre\u2011checks, CONFIRM gate, and permission verification. Creative tasks (e.g., custom domain lists) are not over\u2011constrained. Lacks explicit constraints for update\u2011type operations (e.g., preventing accidental overwrite)."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable pattern (What it does \u2192 Quick navigation \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Patterns \u2192 Output contract \u2192 NEVER \u2192 Heuristic). Minor inconsistency in ordering of sections (e.g., COMMON PATTERNS appears after PROCESS) prevents a perfect score."
+      "justification": "Follows a recognizable pattern (overview \u2192 quick navigation \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 contract \u2192 anti\u2011patterns \u2192 heuristic \u2192 references), matching the established skill template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 10,
       "max": 15,
-      "justification": "Provides exact CLI commands and a strict output contract, but the example READY_TO_DEPLOY outputs contain placeholders like <returned-id> and <returned-rule-id>, violating the rule that no placeholders may appear. Also, post\u2011verify steps are marked \"(pending execution)\" without concrete verification commands, reducing usability."
+      "justification": "The skill supplies concrete CLI commands, a strict output contract, and verification steps, enabling an agent to act. However, the example READY_TO_DEPLOY outputs contain placeholders like <returned-id> and <returned-rule-id>, violating the \u2018no placeholders\u2019 rule. Additionally, error handling for failed post\u2011verification steps and pagination failures is not detailed. These critical usability gaps cost 5 points."
     }
   ],
-  "total_score": 100,
+  "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 42767,
-  "latency_ms": 16940,
-  "assertions_passed": true,
-  "assertions_passed_count": 5,
-  "assertions_failed_count": 0
+  "token_count": 44722,
+  "latency_ms": 22494,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
 }

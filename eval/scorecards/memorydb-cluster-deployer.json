@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert knowledge not in a baseline model: immutable configuration matrix (TLS at\u2011rest cannot be added later, data\u2011tiering one\u2011way door), 50% usable\u2011memory rule, 60% write\u2011headroom heuristic, per\u2011shard failover timing (10\u201130\u202fs) and promotion semantics. Minor gap: heuristics are presented without citation, so not fully authoritative."
+      "justification": "Introduces several expert\u2011level heuristics not typically known to a baseline model: immutable configuration dependencies (TLS at\u2011rest, data\u2011tiering, subnet placement), a 50% usable\u2011memory calculator, a quantitative shard\u2011count estimator with headroom factor, detailed failover promotion semantics, and a configuration dependency graph. These provide concrete decision thresholds and ordering that a senior CloudOps engineer would find new."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific provisioning flow (subnet\u2011group \u2192 users \u2192 ACL \u2192 cluster) and detailed CLI commands. Some steps are generic (\"verify prerequisites\") and the ordering of IAM/KMS steps could be clearer, leading to a small deduction."
+      "justification": "Encodes an AWS\u2011specific provisioning workflow (subnet\u2011group \u2192 security\u2011group \u2192 users/ACL \u2192 cluster) with exact CLI flags and Terraform/CFN references. Missing a brief procedure for creating/assigning a KMS CMK or IAM role for custom encryption, which is a minor gap."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with reasons (e.g., never use open\u2011access ACL, never disable TLS, never run with 0 replicas). However, the model output still emitted a READY_TO_DEPLOY checklist for a dev cluster with 0 replicas, violating the NEVER rule, showing the anti\u2011pattern guidance is not enforced."
+      "justification": "Provides a thorough NEVER list (12 items) with concrete reasoning (e.g., never use open\u2011access ACL, never disable TLS, never enable data tiering for uniform workloads). Missing is an explicit warning about IAM/KMS permission pitfalls and forgetting to tag resources for cost allocation."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Front\u2011matter is complete, description clearly states WHEN to invoke, and activation keywords are listed. The only shortfall is the lack of an explicit regex or schema for the trigger, which could affect reliable activation."
+      "justification": "Complete frontmatter, clear description, activation keywords, when_to_use narrative, strict output contract with literal labels, and well\u2011defined checklist template. An agent can reliably determine when to invoke the skill."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The skill layers information (quick navigation, mindset, heuristics, step\u2011by\u2011step, NEVER list, output format). However, critical anti\u2011pattern rules are buried deep in the document, and the initial sections are dense, causing potential cognitive overload."
+      "justification": "Information is layered via quick\u2011navigation table, mindset section, heuristics, then step\u2011by\u2011step procedure. However, the initial sections are dense, causing some cognitive overload before the checklist, which slightly reduces progressive disclosure."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Calibrates tightly for the fragile provisioning task: forces explicit decisions on immutable fields, warns against destructive defaults, and provides clear constraints for TLS, data tiering, and Multi\u2011AZ. Slight deduction for not explicitly limiting node\u2011type choices to supported families in the output contract."
+      "justification": "Destructive actions (cluster creation) are tightly constrained: explicit prerequisite checks, immutable\u2011setting warnings, and required user decisions before any `create\u2011cluster` call. Slightly over\u2011constrains exploratory sizing (no guidance for iterative capacity tuning)."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Dependency Graph \u2192 Heuristics \u2192 Stepwise Procedure \u2192 NEVER list \u2192 Output contract). Not a formal named pattern, but the structure is coherent and aids comprehension."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Steps \u2192 NEVER \u2192 Output format) but mixes ad\u2011hoc sections (e.g., separate \"Expert heuristic\" blocks) that break a clean hierarchical flow. One point deducted."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 8,
+      "score": 12,
       "max": 15,
-      "justification": "Agent can generate a usable checklist and CLI commands, but the provided model outputs include a dev example with 0 replicas marked READY_TO_DEPLOY, contradicting the NEVER rule. Also, the dev example uses a single\u2011AZ subnet group despite the skill\u2019s explicit warning, showing the skill does not reliably prevent unsafe configurations."
+      "justification": "Provides working CLI snippets, decision trees, and error\u2011handling guidance. The third example (dev\u2011memorydb) emits READY_TO_DEPLOY despite having 0 replicas and a single\u2011AZ subnet, which violates the skill's own best\u2011practice rules and should have been flagged as PREREQUISITES_MISSING. This mis\u2011classification reveals a usability gap; deduct three points."
     }
   ],
-  "total_score": 100,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 47090,
-  "latency_ms": 16850,
+  "token_count": 48527,
+  "latency_ms": 14577,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

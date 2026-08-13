@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 14,
+      "score": 16,
       "max": 20,
-      "justification": "Provides concrete thresholds (CPU<30%, Memory<50%, bin\u2011packing ratio >2x, Fargate breakeven 3\u20114 pods per node, Spot up to 90% off, Karpenter 20\u201140% savings, CSP 50\u201172% discount) and a detailed decision tree that a generic model would not enumerate. However most of these numbers are publicly documented, so the added expert insight is moderate rather than maximal."
+      "justification": "Provides many concrete numbers (Fargate pricing, Spot discount up to 90%, Karpenter 20\u201140% savings, CSP discount ranges) and a detailed decision framework, but a large portion restates publicly documented AWS cost facts without novel decision trees or proprietary thresholds, limiting the true expert delta."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific ordered process (pre\u2011flight, bin\u2011packing, right\u2011sizing, Fargate evaluation, Spot checklist, Karpenter migration, Savings Plan) and concrete CLI snippets. Some steps remain generic (e.g., \u201cvalidate input\u201d) and could include more detailed AWS\u2011only nuances, but overall the procedure is domain\u2011specific."
+      "justification": "Encodes AWS\u2011specific procedures: exact CLI commands for data gathering (aws cloudwatch get-metric-statistics, aws eks describe-nodegroup), node\u2011group inventory extraction with jq, Spot readiness checklist (PDB, NTH, multi\u2011AZ), Karpenter migration steps, Savings Plan purchase syntax, and a mandatory CONFIRM gate before any state\u2011changing operation."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 12,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with reasons (e.g., never downsize without checking request\u2011usage ratio, never use Spot without PDB/NTH). However it omits warnings about mixed\u2011instance Spot groups, the impact of heterogeneous instance families on bin\u2011packing, and deeper justification for why Savings Plans never apply to Fargate beyond a brief note."
+      "justification": "Contains a detailed NEVER list with five concrete anti\u2011patterns and explicit why\u2011clauses (e.g., never downsize without checking requests/usage ratio, never recommend Fargate with DaemonSets, never use Spot without PDB and graceful drain, never claim Savings Plan on Fargate, never use a single instance type for Spot/Karpenter)."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter, description, keywords, activation triggers, invocation schema, and example are all present and well\u2011formed. The \"when_to_use\" section is slightly vague on exact metric thresholds, which could cause unreliable activation."
+      "justification": "Full front\u2011matter, clear description, WHEN\u2011TO\u2011USE / WHEN\u2011NOT\u2011TO\u2011USE sections, exhaustive activation_triggers, precise invocation_schema, and a strict output contract with required fields. An agent can reliably decide when to invoke the skill."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The document layers information (Quick start \u2192 Strict output contract \u2192 Mindset \u2192 Process \u2192 References). The Quick start section is dense and includes many details that could overload the initial read, but critical rules are still discoverable without digging into deep references."
+      "justification": "Information is layered: Quick start \u2192 Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process \u2192 Output format \u2192 Heuristics \u2192 NEVER \u2192 Deep references. Critical rules (CONFIRM, safety checks) are highlighted early; detailed CLI snippets are deferred to reference sections, avoiding cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by a mandatory CONFIRM step and pre\u2011flight safety checks (PDB, DaemonSet, Graviton image verification). The only minor over\u2011grant is allowing a downsize recommendation even when bin\u2011packing is marked healthy, which could risk pending pods."
+      "justification": "Destructive actions (node\u2011group updates, Karpenter install) are tightly constrained by a mandatory CONFIRM prompt, batch\u2011size limit, and pre\u2011flight safety checks. Analytic or classification tasks are left freer, matching task fragility."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Quick start, Mindset, Process, Output contract, References) that aids comprehension. The structure is consistent but not a formally named framework."
+      "justification": "Follows a recognizable pattern (Quick start \u2192 Mindset \u2192 Process \u2192 Output contract \u2192 Heuristics \u2192 NEVER \u2192 References) that aligns with the standard skill template used across the repository."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 10,
       "max": 15,
-      "justification": "Examples are largely executable, but one Spot recommendation violates the NEVER rule by suggesting a single instance type, uses vague savings notation (\"~$1,000\"), and omits the required multi\u2011instance alternatives. These gaps reduce the ability of an agent to act reliably."
+      "justification": "Provides decision trees, CLI examples, and migration steps, but the model output examples violate the output contract by omitting required sub\u2011fields (e.g., missing \"Monthly (compute model)\" in several blocks) and sometimes skip the \"Pricing model\" line. Edge cases such as mixed EC2\u202f+\u202fFargate clusters or multi\u2011AZ spot capacity scoring are not fully covered, limiting reliable cold execution."
     }
   ],
-  "total_score": 99,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 44049,
-  "latency_ms": 12759,
+  "token_count": 43282,
+  "latency_ms": 15920,
   "assertions_passed": false,
-  "assertions_passed_count": 4,
-  "assertions_failed_count": 1
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
 }
