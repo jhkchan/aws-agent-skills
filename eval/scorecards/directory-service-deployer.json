@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "The skill compiles many known AWS Directory Service facts (e.g., edition limits, LDAPS steps) that a competent model already knows. It adds some useful heuristics (AD\u2011Connector vs Managed AD decision tree, stub\u2011zone vs forwarder rule) but the majority is restated documentation, so 4 points are deducted."
+      "justification": "Provides several expert\u2011level heuristics not commonly known (e.g., LDAPS certificate lifecycle, one\u2011way replication RPO, stub\u2011zone vs conditional forwarder decision matrix, trust\u2011direction consequences). However, a senior CloudOps engineer could already infer many of these from AWS docs, so the delta is strong but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific (CLI commands, ordering of VPC checks, trust creation) but a few steps are generic or missing (no IAM permission checks, no STS assume\u2011role handling for cross\u2011account sharing). Deduct 2 points."
+      "justification": "Offers AWS\u2011specific step\u2011by\u2011step CLI procedures and a clear decision\u2011tree mindset. Lacks a concrete CLI method for linking IAM Identity Center (only console guidance), which prevents a fully AWS\u2011native procedure."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "The NEVER list contains concrete pitfalls with clear why (e.g., AD Connector cannot do trusts, LDAPS cert expiry). However it omits other common anti\u2011patterns such as cost blow\u2011out from Enterprise edition, over\u2011permissive security groups, and accidental directory deletion. Deduct 2 points."
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., AD Connector cannot be used for trusts, LDAPS cert expiry, wrong trust direction). Missing a few common pitfalls such as insufficient IAM permissions or forgetting to enable VPC DNS hostnames."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, includes description, triggers, keywords, and a clear \"when_to_use\" section. The activation keywords are listed, but the output contract is described only in the body, not in frontmatter metadata, which could affect reliable activation."
+      "justification": "Front\u2011matter is complete, description clearly states WHAT it does, WHEN to invoke, and includes exhaustive keywords. The strict output contract and activation triggers are well defined, enabling reliable skill activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information (summary, quick navigation, detailed steps, references). Yet the quick\u2011navigation table and large heuristic blocks front\u2011load a lot of detail, and the referenced files are not included, causing cognitive overload for the top layer. Deduct 2 points."
+      "justification": "Uses quick\u2011navigation table, layered sections, and separates high\u2011level mindset from detailed CLI steps. Some readers may find the initial heuristic block dense, but critical rules are not buried."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive actions (directory creation) are gated by a prerequisites checklist, which is good. However the skill does not require an explicit user confirmation before emitting READY_TO_DEPLOY, leaving a bit too much freedom for automated pipelines. Deduct 2 points."
+      "justification": "Tightens constraints for destructive actions (prerequisite checks, PREREQUISITES_MISSING verdict). Creative tasks (e.g., choosing trust direction) retain flexibility. Slightly loose on cross\u2011account role assumption details."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The document follows a recognizable pattern (Mindset, Heuristics, Step\u2011by\u2011step, NEVER, Output format). Minor inconsistency in mixing tables, markdown, and raw text makes the pattern slightly ad\u2011hoc. Deduct 1 point."
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Heuristics \u2192 Stepwise process \u2192 Prereqs \u2192 Output format. Structure is coherent, only missing an explicit \u201cPhilosophy\u201d label."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides concrete CLI commands, checklist, error\u2011handling tips, and worked examples, enabling an agent to act. Missing are explicit rollback steps, handling of API throttling, and guidance for partial or incremental updates, which reduces reliability. Deduct 3 points."
+      "justification": "Model output examples match the required checklist format and include working CLI snippets. Lacks CLI guidance for IAM Identity Center linking and does not detail IAM permission checks, which could cause execution failures."
     }
   ],
-  "total_score": 103,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 39952,
-  "latency_ms": 9293,
+  "token_count": 39472,
+  "latency_ms": 10955,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

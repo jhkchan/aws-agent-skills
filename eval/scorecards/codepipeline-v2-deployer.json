@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Provides many concrete V2 specifics (trigger filter pitfalls, namespace variable flow, cross\u2011account KMS policy, IAM role scoping) that a baseline model would not know, but omits some finer details such as the exact syntax for stage condition blocks and the newer condition\u2011key `codepipeline:FullPipelineArn` usage, limiting the expert knowledge delta."
+      "justification": "Provides concrete expert heuristics not found in generic docs: e.g., the silent empty\u2011string risk of missing namespace variables, the exact KMS key\u2011policy grants needed for cross\u2011account deploy, the precise trigger\u2011filter composition (branches, filepaths, tags) and why an unscoped trigger is a blast\u2011radius issue. This is genuine delta beyond a baseline model's knowledge."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Outlines an AWS\u2011specific workflow (trigger creation before bucket, KMS before IAM role, migration checklist) but includes a generic step \"Validate IAM permissions\" without prescribing the precise order of resource creation, which is less than fully procedure\u2011driven."
+      "justification": "Encodes AWS\u2011specific procedural order (pre\u2011flight IAM/KMS checks \u2192 source \u2192 trigger \u2192 build \u2192 namespace validation \u2192 manual approval \u2192 deploy \u2192 cross\u2011account wiring). The step\u2011by\u2011step process is tightly tied to CodePipeline V2 semantics rather than generic CI/CD advice."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains strong NEVER lists (unscoped triggers, wildcard IAM resources, secrets in namespace variables) with clear reasoning, yet misses a few common pitfalls such as using default VPC endpoints for CodePipeline or neglecting to disable legacy CloudWatch Events rules after migration."
+      "justification": "Contains a detailed NEVER list with concrete reasoning (e.g., never use unscoped triggers, never grant wildcard S3/KMS permissions, never store secrets in namespace variables, never leave PollForSourceChanges true). The only minor gap is the list could be grouped more systematically, but the reasoning is explicit."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 15,
       "max": 15,
-      "justification": "Front\u2011matter is complete and includes description, when_to_use, activation_triggers, and invocation_schema, but lacks an explicit output_schema definition and a concrete usage example, making automated activation slightly less reliable."
+      "justification": "Full front\u2011matter, clear description, explicit when_to_use, activation_triggers, and invocation_schema. The output contract is precisely defined with required literal labels, satisfying specification compliance."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered (Mindset \u2192 Quick reference \u2192 Pre\u2011flight \u2192 Process steps), yet the Quick reference checklist and the extensive Mindset section front\u2011load many details, causing some cognitive overload before the agent knows which part to read first."
+      "justification": "Top\u2011level quick reference and checklist are concise; deeper sections (mindset, step\u2011by\u2011step, expert heuristics, decision tree) are revealed later. However, the skill occasionally repeats full command blocks early, which adds some cognitive load."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive actions (KMS, IAM, bucket creation) are tightly constrained with explicit policies, while creative tasks (variable naming) are left flexible. However, the skill does not enforce a mandatory confirmation prompt before creating resources, a minor calibration gap."
+      "justification": "Destructive actions (KMS, IAM, bucket creation) are tightly constrained with NEVER rules; creative parts (trigger filter composition) allow flexibility. Slight over\u2011constraint: the checklist forces a manual approval entry even when optional, limiting some legitimate minimal pipelines."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (Mindset, Quick reference, Process, Decision tree, Anti\u2011pattern list), but the pattern is custom rather than a standard documented template, losing a point for strict adherence."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Quick reference \u2192 Process steps \u2192 Expert heuristics \u2192 Decision tree \u2192 Output contract). The structure is consistent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides a complete output format, decision tree, and working CLI examples, enabling an agent to execute the plan. Missing handling for some edge cases (e.g., pending CodeConnections state, automatic timeout for manual approval) and occasional omission of optional steps (manual approval) in examples reduces usability."
+      "justification": "Provides a working checklist, decision tree, and concrete AWS CLI commands that an agent can execute. Minor usability gaps: examples sometimes omit optional checklist items (e.g., manual approval) yet still claim READY_TO_DEPLOY, which could confuse automation; error handling for unknown source types is not fully fleshed out."
     }
   ],
-  "total_score": 107,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 50979,
-  "latency_ms": 35347,
+  "grade": "A",
+  "token_count": 51505,
+  "latency_ms": 17857,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

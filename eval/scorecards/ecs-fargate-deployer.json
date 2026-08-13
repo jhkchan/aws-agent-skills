@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Provides concrete, expert\u2011level data not usually memorized by a generic model: exact Fargate CPU/memory combo matrix, capacity\u2011provider weight/base strategy, recent 2024\u20112026 feature list, and nuanced heuristics (60/70 rule, AZ spread). However much of the content restates official docs, so not a full 20."
+      "justification": "Provides concrete, expert\u2011level artifacts not commonly known: exact Fargate CPU/memory combo matrix, capacity\u2011provider weight/base strategy, recent 2024\u20112026 feature list, and precise IAM trust policy snippets. This adds substantive new knowledge beyond a baseline model."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific ordering (task definition \u2192 roles \u2192 service \u2192 ALB \u2192 autoscaling) and detailed CLI sequences, showing expert procedural thinking. Missing explicit rollback procedure and failure\u2011recovery steps, which prevents a perfect score."
+      "justification": "Encodes an AWS\u2011specific deployment workflow with ordered steps (task definition \u2192 roles \u2192 network \u2192 ALB \u2192 circuit breaker \u2192 autoscaling) and exact CLI syntax, reflecting senior CloudOps reasoning rather than generic \"check security\" advice."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with reasons (e.g., never use :latest tag, never combine execution and task roles, never use target_type=instance). The list is limited to five items in\u2011skill; the rest are only referenced elsewhere, reducing completeness."
+      "justification": "Contains a concrete NEVER list with explicit rationales (e.g., never use :latest, never combine execution and task roles, never target_type=instance). The list is limited to five items in\u2011line but references a fuller list; more exhaustive coverage would be ideal."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Full frontmatter, clear description, trigger list, when_to_use, and a strict output contract with literal labels. Minor weakness: activation keywords are implicit rather than enumerated, which could cause occasional mis\u2011trigger."
+      "justification": "Full frontmatter, clear description, explicit WHEN_TO_USE, triggers, keywords, and a strict output contract with literal labels. Activation criteria are well defined; only minor vagueness in \u201ckeywords\u201d breadth."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses a navigation table and layered sections (quick contract, reasoning, prerequisites, procedure, matrix, NEVER, edge cases). Still, the skill dumps a large amount of detail up front, which can overload the agent before it knows which part is needed."
+      "justification": "Uses layered sections: quick navigation, strict contract, reasoning, step\u2011by\u2011step procedure, matrix, NEVER, heuristics, edge cases, and deep references. Core checklist is concise; deeper details are deferred to reference files, avoiding overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive actions (service creation, role creation) are gated by a pre\u2011flight checklist and explicit PREREQUISITES_MISSING verdict. Creative tasks (e.g., generating IaC) are left open. Deducted for not explicitly limiting capacity\u2011provider strategy changes after service creation, which could be risky."
+      "justification": "Calibrates freedom appropriately: the skill only generates a checklist, never runs destructive AWS commands. Output constraints are tight, while the internal decision logic (e.g., capacity\u2011provider weighting) is sufficiently detailed for the task."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern: overview \u2192 navigation \u2192 contract \u2192 reasoning \u2192 prerequisites \u2192 step\u2011by\u2011step \u2192 anti\u2011patterns \u2192 heuristics \u2192 edge cases \u2192 references. Slight deviation: references are external files not included, breaking strict pattern continuity."
+      "justification": "Follows a recognizable pattern (metadata \u2192 navigation \u2192 contract \u2192 reasoning \u2192 procedure \u2192 matrix \u2192 anti\u2011patterns \u2192 heuristics \u2192 edge cases \u2192 references). The structure is consistent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 14,
       "max": 15,
-      "justification": "Model output examples obey the contract, showing the skill is usable. Gaps: missing error\u2011handling guidance for CLI failures, reliance on external reference files, and no explicit decision tree for Spot vs. On\u2011Demand beyond heuristics, which could leave an agent uncertain in edge cases."
+      "justification": "Model output examples conform exactly to the contract, correctly flag missing prerequisites, and include functional verification commands. Edge\u2011case handling (cross\u2011account ECR, Spot interruption, health\u2011check alignment) is addressed, making the skill readily usable."
     }
   ],
-  "total_score": 103,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 38442,
-  "latency_ms": 10232,
+  "grade": "A",
+  "token_count": 37991,
+  "latency_ms": 19652,
   "assertions_passed": false,
-  "assertions_passed_count": 1,
-  "assertions_failed_count": 4
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
 }

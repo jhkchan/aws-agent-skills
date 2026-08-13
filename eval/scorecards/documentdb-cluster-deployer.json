@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 18,
       "max": 20,
-      "justification": "Adds several concrete expert heuristics not commonly known: storage\u2011autoscaling ceiling headroom calculation, mandatory index\u2011before\u2011query rule, change\u2011stream retention sizing, TLS\u2011certificate rotation pitfalls, KMS\u2011key immutability, unsupported MongoDB aggregation stages, background index\u2011build requirement, and global\u2011cluster failover not being automatic. These provide actionable thresholds and decisions a senior CloudOps engineer would value."
+      "justification": "Adds multiple expert\u2011level insights not found in a baseline model: explicit storage\u2011autoscaling ceiling heuristic, index\u2011build blocking behavior and mandatory background flag, TLS certificate rotation pitfalls, unsupported MongoDB aggregation stages, KMS key immutability, and detailed change\u2011stream retention consequences. These concrete rules constitute genuine delta."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides AWS\u2011specific CLI ordering (subnet group \u2192 cluster \u2192 instances \u2192 parameter group \u2192 reboot) and a clear mindset. However, the procedure for global\u2011cluster provisioning is only implied, not explicitly ordered (primary cluster must exist before creating the global cluster and secondary). Also omits required IAM permission checks for the orchestrator."
+      "justification": "Encodes AWS\u2011specific provisioning order (subnet group \u2192 security group \u2192 parameter group \u2192 cluster \u2192 instances), exact CLI commands with required flags, and a dependency graph that mirrors real API constraints. Procedures are concrete rather than generic."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 12,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with specific reasons (e.g., disabling TLS, using t3 for production, leaving storage ceiling default, missing indexes). Only minor gap: does not explicitly warn against using retryWrites=true in connection strings, though it is mentioned in a later note."
+      "justification": "Contains a detailed NEVER list with clear reasons (e.g., never skip deletion protection, never use t3 in production). However, the model output includes a READY_TO_DEPLOY example where deletion protection is missing, contradicting the anti\u2011pattern rule, indicating the skill does not enforce all warnings."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, keywords, triggers, and when_to_use are present. The output contract is well defined. Slight vagueness in activation keywords (mix of capitalisation) could cause unreliable triggering."
+      "justification": "Complete frontmatter, clear description, explicit WHEN_TO_USE, activation keywords, and a strict output contract with required literal labels. The skill can be reliably triggered and parsed."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 12,
       "max": 15,
-      "justification": "Uses a quick\u2011navigation table and layers information (high\u2011level mindset, then detailed steps, then deep heuristics). Some sections (full CLI examples and extensive tables) are long and could overload the initial read, but critical rules are still surfaced early."
+      "justification": "Uses a quick\u2011navigation table and layered sections (high\u2011level mindset \u2192 detailed steps \u2192 NEVER \u2192 output format). However, the initial sections are dense and contain many details, which adds some cognitive load before the agent reaches the concise checklist."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Constrains destructive actions by requiring prerequisite verification and a PREREQUISITES_MISSING verdict. Lacks explicit constraints for delete or modify\u2011after\u2011creation operations (e.g., changing KMS key), which remain loosely described."
+      "justification": "Constrains destructive provisioning by requiring a prerequisite verification checklist and explicit READY_TO_DEPLOY/PREREQUISITES_MISSING verdicts. Could be tighter (e.g., explicit confirmation step) but overall matches task fragility."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern: Mindset \u2192 Step\u2011by\u2011step process \u2192 Expert heuristics \u2192 Prerequisites \u2192 Output contract \u2192 Error handling. Structure is consistent and aids comprehension."
+      "justification": "Follows a recognizable pattern: Mindset, Step\u2011by\u2011step process, NEVER list, Output format, and References. The structure is consistent with other CloudOps skills."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 11,
       "max": 15,
-      "justification": "Provides a ready\u2011to\u2011deploy checklist, verification commands, and concrete CLI snippets, enabling an agent to act. Edge\u2011case handling (storage full, missing indexes, change\u2011stream failures) is covered, but the skill does not give explicit remediation steps for global\u2011cluster promotion scripts, leaving a gap for full automation."
+      "justification": "Model output generally matches the contract and provides working CLI snippets. However, examples show inconsistencies: a READY_TO_DEPLOY checklist with deletion protection disabled and another with missing indexing strategy still marked ready, violating the skill\u2019s own anti\u2011pattern rules. These gaps reduce practical reliability."
     }
   ],
   "total_score": 103,
   "max_score": 120,
   "grade": "B",
-  "token_count": 46046,
-  "latency_ms": 11189,
+  "token_count": 47582,
+  "latency_ms": 4574,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides several expert\u2011level gotchas (e.g., SG cross\u2011VPC silently accepted, architecture\u2011mismatch boot failure, IMDSv2 three\u2011field requirement, gp3 vs gp2 cost impact) that a baseline model would not enumerate, but much of the content restates official documentation without novel decision trees, limiting the delta."
+      "justification": "The skill consolidates several non\u2011obvious gotchas (architecture\u2011instance type mismatch, SG\u2011VPC cross\u2011check, the three\u2011field IMDSv2 requirement, silent fallback of targeted capacity reservations, gp3 defaulting) that a baseline model would not enumerate, providing concrete decision tables. However most of these points are documented elsewhere, so the delta is strong but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Offers AWS\u2011specific step order (AMI validation \u2192 architecture check \u2192 instance\u2011type availability \u2192 SG/VPC consistency \u2192 IMDSv2 triple field) and concrete CLI commands, yet some procedures are generic (\"verify prerequisites\") and the exact API call sequence for creating the template is not fully detailed."
+      "justification": "Provides an AWS\u2011specific procedural flow: validate AMI architecture before instance type, verify SG VPC consistency before network interface, set all three IMDSv2 fields together, and enforce DeleteOnTermination. The steps are concrete and ordered. Missing is a brief checklist for IAM role policy validation, which would make the procedure fully exhaustive."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons (e.g., never pair x86_64 AMI with Graviton, never omit HttpTokens=required), but it omits other common pitfalls such as missing IAM role permissions or exceeding user\u2011data size limits, reducing completeness."
+      "justification": "Contains a solid NEVER list with concrete reasons (e.g., never pair x86_64 AMI with Graviton, never omit HttpTokens=required). It omits a few common pitfalls such as user\u2011data size limits, IAM role trust policy misconfigurations, and over\u2011permissive security\u2011group rules, so the anti\u2011pattern coverage is good but not complete."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete and the description explains purpose, triggers, and keywords. However, the activation criteria are expressed in free\u2011text rather than a strict schema, and required input parameters (AMI ID, instance type, etc.) are not formally enumerated, which could hinder reliable invocation."
+      "justification": "Front\u2011matter is complete, description, keywords, triggers, and a strict output contract are defined. The \"when to invoke\" section is verbose but present. The skill lacks a concise, machine\u2011readable activation predicate (e.g., a regex pattern), which could cause unreliable triggering."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses sections, quick\u2011navigation table, and layered detail, but the initial document front\u2011loads large tables (dependency graph, architecture matrix) that may overwhelm a first\u2011pass reader, slightly violating optimal progressive disclosure."
+      "justification": "Uses quick\u2011navigation table, high\u2011level overview, then detailed heuristics and deep\u2011dive references, preventing cognitive overload. Some critical rules (the three\u2011field IMDSv2 requirement) are buried in a later heuristic section, which could be missed on first read."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Calibrates tightly for a destructive operation: requires full prerequisite checklist, explicit IMDSv2 settings, and capacity\u2011reservation validation. The only shortfall is the placeholder launch\u2011template ID in the output, which assumes knowledge that may not exist before creation."
+      "justification": "Destructive actions (launch\u2011template creation) are tightly gated by a prerequisite checklist and a strict literal output format, matching the fragility of the operation. Creative tasks (e.g., optional tag additions) retain flexibility. No over\u2011constrained sections were found."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Heuristics \u2192 Step\u2011by\u2011step \u2192 NEVER \u2192 Output format) that aids comprehension, with only minor ad\u2011hoc phrasing in some sections."
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Step\u2011by\u2011step procedure \u2192 Expert heuristics \u2192 NEVER list \u2192 Output format. The ordering is slightly ad\u2011hoc (e.g., heuristics interleaved with steps) but overall the structure is coherent."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Model output adheres to the required checklist format and correctly flags a prerequisite mismatch. However, it uses placeholder IDs, lacks verification of capacity\u2011reservation matching, and does not demonstrate handling of errors like user\u2011data size overflow, limiting real\u2011world execution reliability."
+      "justification": "Provides decision trees, working CLI examples, verification commands, and error\u2011handling guidance. The sample outputs demonstrate correct formatting. Minor gaps: no explicit handling of root\u2011volume IOPS defaults, no example for the \"open\" capacity\u2011reservation mode, and limited guidance on user\u2011data size enforcement."
     }
   ],
-  "total_score": 103,
+  "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 40942,
-  "latency_ms": 17963,
+  "token_count": 42525,
+  "latency_ms": 15064,
   "assertions_passed": false,
-  "assertions_passed_count": 1,
-  "assertions_failed_count": 4
+  "assertions_passed_count": 2,
+  "assertions_failed_count": 3
 }

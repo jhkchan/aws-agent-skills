@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Provides specific expert heuristics not usually recalled by a baseline model: registry\u2011level replication scope, precise replication\u2011lag expectations per region, storage\u2011cost doubling, exact supported upstream URLs for pull\u2011through cache, and a timeline of recent AWS feature releases. These concrete details constitute genuine delta."
+      "justification": "The skill surfaces several expert\u2011level nuances that a baseline model rarely includes: (1) replication is strictly registry\u2011level (no per\u2011repo filtering); (2) cross\u2011account replication silently fails if the destination registry has REPLICATION_DISALLOWED; (3) replicated images are read\u2011only and deletion must be performed at the source then manually at the replica; (4) pull\u2011through cache only supports four upstream URLs and requires exact prefix mapping; (5) detailed cost model (storage doubles per destination) and lag expectations per region size. These concrete decision points constitute genuine delta knowledge."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific procedures: ordered CLI commands, dependency graph, verification queries, and a step\u2011by\u2011step workflow that mirrors the real put\u2011registry\u2011replication\u2011configuration API flow. Not a generic \"check security\" checklist."
+      "justification": "Provides an AWS\u2011specific procedural flow: verify prerequisites, run put\u2011registry\u2011replication\u2011configuration with exact JSON structure, then create pull\u2011through cache rules with required prefixes, followed by verification via CloudWatch metrics. The ordering (prereq \u2192 replication config \u2192 cache \u2192 monitoring) is explicit and matches AWS best\u2011practice sequences."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with explicit reasons (e.g., replication is registry\u2011level, replicas are read\u2011only, batch\u2011delete is blocked). Lacks a few additional pitfalls such as missing IAM role permissions, but overall strong."
+      "justification": "Contains a detailed NEVER list with specific reasons (e.g., replication is not per\u2011repo, replicas are read\u2011only, delete source does not delete replica). Only minor omission: no explicit warning about using default KMS encryption keys for cross\u2011account replication."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use, activation keywords, and strict output contract are defined. Minor weakness: trigger wording could be tighter (no explicit regex or disambiguation), but activation is still reliable."
+      "justification": "Frontmatter is complete, description, keywords, triggers, and output contract are well defined. The activation keywords are listed, and the output format is strictly specified. The only shortfall is that the \"when_to_use\" section is embedded in metadata rather than a separate clear clause, making automated trigger detection slightly less reliable."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses quick\u2011navigation table and layered sections (mindset, steps, NEVER, output format). However, the initial sections are information\u2011dense and some critical anti\u2011pattern rules are buried later, causing some cognitive overload."
+      "justification": "Information is layered into sections (Mindset, Steps, NEVER, Output), but the document front\u2011loads many details (heuristics, tables, graphs) before the core checklist, which can cause cognitive overload for quick use."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Calibrates freedom appropriately for configuration tasks: destructive actions are warned, replication lag is highlighted, and cost implications are spelled out. Lacks explicit input validation (e.g., 12\u2011digit account\u2011ID format), leaving a small gap for fragile operations."
+      "justification": "Destructive actions (replication configuration) are tightly gated by a prerequisite checklist and explicit verification commands. Creative tasks (cost estimation) are left open. The skill could further restrict cross\u2011account ID format validation, but overall the calibration matches task fragility."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Stepwise Process \u2192 NEVER list \u2192 Output format) that aids comprehension and aligns with established skill templates."
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Heuristics \u2192 Stepwise Process \u2192 NEVER list \u2192 Output format. The structure is consistent with other CloudOps skills, though the inclusion of multiple example blocks interleaved with prose makes the pattern slightly less clean."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 13,
       "max": 15,
-      "justification": "Model output examples mostly follow the required checklist format, but include multiple separate blocks, headings, and code fences, violating the \"no prose\" contract. Some checklist items use \"not specified\" instead of explicit failure marks, and error\u2011handling guidance is limited."
+      "justification": "Provides ready\u2011to\u2011copy CLI commands, a checklist template, verification commands, and error\u2011handling guidance. Missing are explicit handling of API error codes for disabled replication and IAM permission failures, which could cause execution gaps in edge cases."
     }
   ],
-  "total_score": 103,
+  "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 40196,
-  "latency_ms": 13819,
+  "token_count": 38485,
+  "latency_ms": 9582,
   "assertions_passed": false,
-  "assertions_passed_count": 3,
-  "assertions_failed_count": 2
+  "assertions_passed_count": 2,
+  "assertions_failed_count": 3
 }
