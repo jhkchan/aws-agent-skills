@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill introduces concrete, low\u2011level failure modes that are not obvious from generic AWS docs (e.g., throttle\u2011as\u2011AccessDenied, silent routing failures, exact event field names for WriteGetObjectResponse). However, much of the content restates known procedures and CLI syntax, so the delta is strong but not maximal."
+      "justification": "The skill provides many expert details (silent\u2011failure table, throttle\u2011as\u2011AccessDenied trap, exact event key changes, multi\u2011region routing), but a large portion restates publicly documented steps (e.g., generic bucket\u2011baseline checks, standard CLI syntax). It lacks a unique decision\u2011tree threshold (e.g., quantitative rule for when multi\u2011region is justified), so the added delta is strong but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "The skill outlines a clear AWS\u2011specific provisioning workflow (exact CLI commands, policy JSON, role trust, reserved concurrency). One point is deducted because some steps are phrased generically (e.g., \u201cConfirm bucket baseline\u201d) without enumerating all required checks (BPA\u20114, bucket\u2011key enabled, versioning) as a concrete checklist."
+      "justification": "The 9\u2011step AWS\u2011specific procedure, ordering constraints, and exact IAM trust/policy snippets are excellent. However, the bucket\u2011baseline step only mentions generic commands without explicitly verifying the bucket policy needed for Object Lambda (e.g., allowing the Lambda role to GetObject via the standard AP). This generic gap costs one point."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete \"NEVER\" list of five high\u2011impact anti\u2011patterns, each with a clear why. The list could be broader (e.g., missing bucket versioning, mis\u2011configured bucket policies) but the existing items are specific and experience\u2011driven."
+      "justification": "The NEVER list contains five concrete anti\u2011patterns with clear \"why it's wrong\" explanations, which is strong. Missing are other common pitfalls such as forgetting to adjust CloudFront cache behavior when front\u2011ending an Object Lambda AP, and using unsupported Lambda runtimes that lack WriteGetObjectResponse support. These omissions reduce the score."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description, activation triggers, and invocation schema are well defined. The only shortfall is the absence of a concrete example of the input JSON schema, which would aid reliable activation."
+      "justification": "Frontmatter is complete and the description, activation triggers, and invocation schema are present. The specification could be tighter: activation_triggers are plain strings without a defined pattern or regex, and the skill lacks an explicit input_schema field that downstream agents could validate. The description of \"when to use\" is verbose, making reliable activation slightly harder."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "The document layers information (quick reference, navigation table, detailed steps, heuristics, anti\u2011patterns, contract) so an agent can skim or dive deeper. The initial quick\u2011reference table is dense, adding slight cognitive load, but overall disclosure is well staged."
+      "justification": "The skill layers information (quick reference, deep sections) but front\u2011loads a lot of dense tables and heuristics before the core 9\u2011step procedure, which can cause cognitive overload. Critical anti\u2011patterns and the NEVER list appear later, so an agent might miss them on a first read."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive provisioning steps are gated by a strict prerequisites check and a final verification phase, matching the fragility of the operation. Minor inconsistency: one example omits reserved concurrency, but the core skill enforces tight constraints."
+      "justification": "Destructive provisioning steps are tightly constrained by the checklist, verification commands, and explicit NEVER rules. Creative tasks (e.g., writing the Lambda code) are given freedom with examples. The only shortfall is the lack of explicit constraints for multi\u2011region routing failures (e.g., missing Route\u00a053 health checks) which could leave a fragile operation under\u2011specified."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (overview \u2192 navigation \u2192 quick reference \u2192 detailed procedure \u2192 anti\u2011patterns \u2192 output contract). The structure is consistent and aids comprehension."
+      "justification": "The skill follows a recognizable pattern (overview, navigation table, reasoning framework, dependency graph, procedure, NEVER, output contract, decision tree). The inclusion of a \"Quick navigation\" table is slightly ad\u2011hoc but does not break the overall coherence."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 12,
       "max": 15,
-      "justification": "Provides actionable CLI commands, a strict output contract, and self\u2011check checklist, enabling an agent to execute the deployment. Example outputs miss some required checklist rows (e.g., HeadObject in operations) and some verification commands for optional features, indicating incomplete coverage of edge cases."
+      "justification": "An agent could follow the 9\u2011step CLI procedure and emit the required block. The examples show correct labeling and verification commands. However, the examples sometimes omit a verification command for optional rows, and the invocation schema is not machine\u2011parseable, which could cause automation failures. Additionally, the skill does not enforce that every `[\u2713]` has a matching command in the examples, a requirement stated in the contract."
     }
   ],
-  "total_score": 105,
+  "total_score": 102,
   "max_score": 120,
   "grade": "B",
-  "token_count": 43982,
-  "latency_ms": 12915,
+  "token_count": 48523,
+  "latency_ms": 14761,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

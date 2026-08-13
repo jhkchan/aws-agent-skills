@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 14,
+      "score": 15,
       "max": 20,
-      "justification": "The skill consolidates senior\u2011level CloudWatch alarm troubleshooting knowledge (nine\u2011category diagnostic tree, specific CLI probes, case\u2011sensitivity, period\u2011resolution rules) that a generic model might know in parts, but it does not introduce fundamentally new concepts or decision thresholds that a senior engineer would learn for the first time."
+      "justification": "The skill consolidates many expert nuances (case\u2011sensitive dimensions, period\u2011resolution rules, M\u2011of\u2011N evaluation, composite rule short\u2011circuit, anomaly\u2011detector training window, cross\u2011account SNS policy conditions) that a generic model may not enumerate, but it omits newer edge cases such as Metric Streams high\u2011resolution handling and DSP\u2011masked log fields, limiting the delta."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific (exact CLI commands, pre\u2011flight gate, stepwise diagnostic tree) and reflect expert thinking, yet some steps are phrased generically (e.g., \"check the alarm configuration\") rather than prescribing the precise order of AWS calls."
+      "justification": "Provides a clear AWS\u2011specific diagnostic order (describe\u2011alarms \u2192 get\u2011metric\u2011data \u2192 list\u2011metrics \u2192 action\u2011policy checks) and concrete CLI commands, yet lacks a dedicated step to validate composite\u2011alarm rule syntax via API and does not explicitly advise checking the \"ActionsEnabled\" flag before remediation."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "The NEVER list is extensive and gives concrete reasons, but it omits several common pitfalls such as forgetting to set ActionsEnabled, overlooking cross\u2011account SNS/Lambda permissions, and the subtle effects of Metric Streams high\u2011resolution data on period settings. These gaps prevent a fully comprehensive anti\u2011pattern guide."
+      "justification": "The NEVER section lists many concrete pitfalls with clear reasoning (dimension case\u2011sensitivity, period mis\u2011alignment, missing SNS/Lambda permissions, SEARCH in math expressions, etc.). It omits a few common anti\u2011patterns such as forgetting to disable an alarm before editing or overlooking IAM role permissions for cross\u2011account actions beyond SNS/Lambda, reducing completeness."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, activation triggers, invocation schema, and example are present. However, activation_triggers include some overlapping phrases and could be tighter to avoid false positives, and the entry_point flag is set to false without explanation."
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, invocation_schema and an example are present. The invocation_schema is a free\u2011form string rather than a strict JSON schema, which could lead to ambiguous parsing."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information (quick navigation \u2192 mindset \u2192 triage table \u2192 pre\u2011flight \u2192 diagnostic tree \u2192 worked examples) but the initial sections are dense; a novice agent may encounter a large amount of detail before reaching the concise quick\u2011start map, leading to cognitive overload. Better front\u2011loading of the minimal actionable steps would improve the score."
+      "justification": "The document is well\u2011structured with a quick\u2011start navigation and layered sections, but critical anti\u2011pattern warnings and remediation steps are placed after many detailed tables, causing some cognitive overload for a first\u2011time user. A tighter top\u2011level summary of the most\u2011used rules would improve layering."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by a CONFIRM prompt and read\u2011only probes are emphasized, showing good calibration. Nonetheless, the skill still permits state\u2011changing CLI calls (put\u2011metric\u2011alarm, add\u2011permission) without tighter constraints such as automatic dry\u2011run or explicit risk warnings for high\u2011impact changes."
+      "justification": "Destructive operations (put\u2011metric\u2011alarm, add\u2011permission) are gated by an explicit CONFIRM prompt, matching the fragility of the task. The skill still suggests using put\u2011metric\u2011data for test points without a strong warning about polluting metric history, which slightly under\u2011calibrates freedom for that irreversible action."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable structure (navigation \u2192 mindset \u2192 triage \u2192 pre\u2011flight \u2192 decision tree \u2192 output \u2192 anti\u2011patterns \u2192 remediation \u2192 references), which aids comprehension."
+      "justification": "The overall layout follows a recognizable pattern (navigation \u2192 mindset \u2192 triage \u2192 diagnostic tree \u2192 output \u2192 anti\u2011patterns \u2192 remediation). However, the ordering of sections is not perfectly consistent (e.g., remediation appears after anti\u2011patterns, breaking a strict Mindset\u2011Process\u2011Tool flow), making the pattern mildly ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides concrete decision trees, CLI commands, and output format, enabling an agent to act. Missing are explicit error\u2011handling branches for CLI failures, malformed input detection, and guidance for cross\u2011account alarm scenarios, which could cause execution gaps."
+      "justification": "The skill supplies a complete decision tree, concrete CLI commands, output contract, and worked examples, enabling an agent to act. It lacks explicit handling for malformed or ambiguous input (missing AlarmName, incomplete metric data) and does not provide a fallback for AWS service\u2011health outages, leaving edge\u2011case gaps."
     }
   ],
-  "total_score": 100,
+  "total_score": 104,
   "max_score": 120,
   "grade": "B",
-  "token_count": 46316,
-  "latency_ms": 11343,
+  "token_count": 49963,
+  "latency_ms": 10433,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

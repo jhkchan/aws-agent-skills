@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "The skill mostly restates AWS documentation (creation flow, CRL bucket policy, waiting period). The only genuine delta is the explicit heuristic that a subordinate CA requires the parent\u2019s create\u2011permission, which is a nuance many baseline models miss. Because most content is not novel, 4 points are deducted."
+      "justification": "Adds concrete expert knowledge not usually restated: a detailed configuration dependency graph, explicit parent\u2011CA create\u2011permission requirement, exact S3 bucket policy JSON, mandatory 7\u201130\u202fday deletion waiting period, and a decision\u2011tree style hierarchy selector. However, many sections (e.g., basic CLI steps, list of key algorithms) merely restate official documentation, so it falls short of a perfect 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides AWS\u2011specific step order (CSR \u2192 issue \u2192 import, permission creation, bucket policy) and decision trees. However, some procedures are generic (e.g., \u201cverify prerequisites\u201d) and not tied to a concrete AWS CLI sequence, costing 2 points."
+      "justification": "Provides AWS\u2011specific procedural flow (create\u2011CA \u2192 get\u2011CSR \u2192 issue\u2011certificate \u2192 import) and separate subordinate\u2011CA sequence, plus CRL bucket\u2011policy steps. Some checklist items are generic \"verify\" actions without AWS\u2011specific checks, preventing a full score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., missing CRL bucket policy causes silent failure, missing parent permission stalls subordinate CA). Lacks a few additional pitfalls such as forgetting CloudTrail logging or exceeding CA quotas, hence the deduction."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., missing bucket policy silently fails, parent\u2011CA permission required, CA deletion waiting period). Lacks a few common pitfalls such as quota exhaustion, cross\u2011region ARN mismatches, and IAM role misconfigurations, so it is not perfect."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete and the description explains WHAT and WHEN. The activation triggers are present but somewhat vague (e.g., \u201ccreate private certificate authority\u201d could match many intents). The output contract is well defined, but the slight ambiguity costs 2 points."
+      "justification": "Frontmatter is complete, description clearly states WHAT and WHEN, and keywords/triggers are provided. The \"when not to invoke\" clause is vague (only mentions public certs) and could list more exclusion scenarios, thus a small deduction."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Information is layered: quick navigation, high\u2011level mindset, then deep heuristics and step\u2011by\u2011step commands. However, the full CLI scripts are presented early, which could overload a novice operator."
+      "justification": "Uses quick\u2011navigation table, top\u2011level summary, and deep reference sections, which aids layered consumption. Nevertheless, the skill front\u2011loads a large amount of detailed CLI code and tables before the core checklist, creating some cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive actions (CA deletion) are tightly constrained with mandatory waiting period and explicit restore command. Creative actions (certificate issuance) are left flexible. One point off for not enforcing region selection in the examples."
+      "justification": "Calibrates tightly for destructive actions (deletion waiting period, mandatory verification) and enforces strict checklist for CRL and ACM permissions. Creative choices like selecting key algorithm or template remain loosely constrained, leaving room for over\u2011freedom."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable skill pattern (metadata, activation keywords, strict contract, navigation, mindset, heuristics, steps, NEVER, output format, error handling, references). Slight deviation: the 'Quick navigation' table is not a standard section in the reference pattern."
+      "justification": "Follows a recognizable pattern: Mindset, Decision tree, Output contract, NEVER list, and step\u2011by\u2011step sections. Minor ad\u2011hoc elements (Recent features, References) slightly break the uniformity."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides working CLI snippets, decision trees, and error\u2011handling guidance. However, it omits handling of region mismatches, multi\u2011account ARN parsing, and explicit rollback steps on failure. The model output shows correct formatting but no fallback logic, so 3 points are deducted."
+      "justification": "Provides working AWS CLI commands, a ready\u2011to\u2011deploy checklist, verification commands, and error\u2011handling guidance. Missing handling for region parameterization, cross\u2011account IAM role setup, and pagination for list\u2011permissions limits completeness."
     }
   ],
   "total_score": 103,
   "max_score": 120,
   "grade": "B",
-  "token_count": 46345,
-  "latency_ms": 6996,
+  "token_count": 49145,
+  "latency_ms": 9488,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

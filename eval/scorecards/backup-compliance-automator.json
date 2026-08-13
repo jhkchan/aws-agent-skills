@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Provides many concrete AWS CLI commands, control lists, and gotchas, but lacks deeper decision\u2011trees (e.g., how to map a specific compliance framework to the exact set of controls) and omits region\u2011availability constraints for Backup Search. These gaps mean a senior engineer would still need to fill in details."
+      "justification": "Adds concrete expert knowledge: decision tree for compliance design, precise distinction between Vault Lock GOVERNANCE vs LOCK_MODE, specific AWS Backup Audit Manager control names, retention thresholds, and cross\u2011account vault access policy details that a generic model would not enumerate."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Describes AWS\u2011specific procedures (pre\u2011flight gate, cross\u2011account vault setup, Vault Lock workflow) but some steps are generic (e.g., \"run audit\" without explicit ordering of IAM role creation, policy attachment, and schedule creation)."
+      "justification": "Encodes AWS\u2011specific procedures step\u2011by\u2011step (pre\u2011flight spec gate, CLI commands for framework creation, vault lock, cross\u2011account delegation, EventBridge Scheduler, Step Functions orchestration). The mindset section frames compliance as auditable evidence, which is domain\u2011specific."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with reasons, yet the list is not exhaustive (e.g., does not explicitly forbid using GOVERNANCE mode for compliance, even though the NEVER section mentions it) and lacks some common pitfalls such as forgetting to enable cost\u2011allocation tag activation."
+      "justification": "The NEVER section lists concrete pitfalls with reasoning (e.g., never use GOVERNANCE mode for immutability). It omits a few common anti\u2011patterns such as \u201cNever rely on Backup Report Stream as primary audit evidence\u201d or \u201cNever copy into a vault without an explicit access\u2011policy grant\u201d, which would have strengthened the anti\u2011pattern coverage."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are present, but activation triggers are overly broad (many synonyms) which could cause accidental invocation. The schema description is informal rather than a strict JSON schema."
+      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are present. The invocation_schema is a free\u2011form prose description rather than a strict JSON schema, making automated activation ambiguous. Keywords and tags are comprehensive, but the trigger list could be more precise (e.g., missing regex patterns)."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 12,
       "max": 15,
-      "justification": "Uses a quick\u2011navigation table and sections, but the initial \"What this skill does\" block already contains a dense amount of detail, risking cognitive overload before the agent reaches the deeper layers."
+      "justification": "The skill provides a top\u2011level quick\u2011navigation table and then dives into very detailed sections, but critical safety rules (confirmation gate, NEVER list) are buried deep, requiring the agent to read many pages before reaching them. A more layered approach (summary \u2192 safety \u2192 implementation) would reduce cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (Vault Lock, legal\u2011hold creation) are guarded by a \u201cCONFIRM\u201d gate, showing good calibration. The gate is described as a prompt rather than enforced by the skill runtime, leaving room for accidental execution."
+      "justification": "Destructive actions (Vault Lock LOCK_MODE, legal\u2011hold creation) are guarded by explicit confirmation prompts and detailed pre\u2011flight checks. Creative tasks (designing a framework) are left open, which is appropriate. One minor gap: the confirmation prompt is described but not enforced in the strict output contract."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (mindset, pillars, pre\u2011flight, detailed sections, output contract), though the inclusion of Step Functions and heuristics feels ad\u2011hoc and not fully integrated into the core pattern."
+      "justification": "The document follows a recognizable structure (metadata \u2192 overview \u2192 mindset \u2192 pre\u2011flight \u2192 pillars \u2192 detailed implementation \u2192 output contract \u2192 anti\u2011patterns \u2192 heuristics). It is coherent but not a standard industry\u2011wide pattern, so it scores just below perfect."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides concrete CLI commands, step\u2011function definition, and strict output contract, enabling an agent to act. Some example outputs contain unrealistic values (e.g., Vault Lock 7\u20113650d) and minor inconsistencies (bucket Object Lock GOVERNANCE vs vault LOCK_MODE), which could mislead an agent."
+      "justification": "An agent could follow the decision tree, issue the exact CLI commands, and emit the required output block. However, the example outputs contain placeholders like `<Xd>` and `<unknown>` that would need runtime substitution, and the skill does not explicitly handle region\u2011unavailability of Backup Search or missing IAM permissions, which are real execution edge cases."
     }
   ],
-  "total_score": 103,
+  "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 42530,
-  "latency_ms": 7345,
+  "token_count": 47081,
+  "latency_ms": 15783,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

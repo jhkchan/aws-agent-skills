@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides many concrete numbers (e.g., batch_count\u202f=\u202f10000, $0.029/GB Firehose cost) and decision matrices, but omits region\u2011specific pricing variations, detailed cost impact of EMF beyond storage, and a clear decision tree for choosing S3 vs. retention. These gaps prevent it from delivering the full expert delta."
+      "justification": "The skill provides concrete cost formulas, exact AWS pricing numbers, and a detailed decision tree that a typical model would not generate on its own. However, most of the pricing data (e.g., $0.50/GB ingestion, $0.03/GB\u2011month storage) is publicly documented, so the added knowledge is largely a re\u2011presentation rather than novel insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The step\u2011by\u2011step process is AWS\u2011specific and includes CLI commands, yet some procedures are generic (e.g., \"pull metrics\" without ordering) and it lacks an explicit pre\u2011check for required IAM permissions before executing destructive CLI calls."
+      "justification": "Provides an AWS\u2011specific workflow: pre\u2011flight data gate, ordered step\u2011by\u2011step actions, exact CLI commands, safety\u2011confirmation gate, and a decision\u2011tree mindset. Minor generic phrasing like \u201cverify\u201d prevents a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with reasons, but the list is limited to five items and misses common pitfalls such as over\u2011tuning batch_count without monitoring data\u2011loss risk, and it does not explain why each anti\u2011pattern is harmful beyond a brief note."
+      "justification": "The skill lists five concrete NEVER anti\u2011patterns with clear reasoning and adds many gotchas in Step\u202f0. It still omits several common pitfalls (e.g., forgetting to update IAM policies after moving logs, ignoring cross\u2011region latency for Firehose) and could include a more exhaustive list."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter is comprehensive and includes description, keywords, activation triggers, and an invocation schema. However, the \"when to invoke\" description is spread across several fields (when_to_use, activation_triggers) and could be more concise, leading to a minor deduction."
+      "justification": "Front\u2011matter is complete, includes description, when_to_use, when_not_to_use, activation_triggers, invocation_schema and an example. The only shortfall is that the invocation_schema does not explicitly enumerate required fields (e.g., StoredBytes) in a machine\u2011readable schema, leaving a tiny ambiguity."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information (quick start, mindset, detailed steps) but the initial sections already contain a large amount of detail, causing potential cognitive overload before a user reaches the deeper references."
+      "justification": "Top\u2011level quick start and navigation give a high\u2011level view, with deeper sections on demand. However, some sections (e.g., full cost\u2011formula) are dense and could overload the initial read."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (retention changes, Firehose creation) are gated by explicit CONFIRM prompts and safety checks, yet there is no explicit rollback or undo guidance for accidental retention reductions."
+      "justification": "Destructive actions (retention changes, Firehose migration) are tightly gated with CONFIRM prompts and data\u2011loss warnings; creative estimations are left flexible. Slight deduction for occasional over\u2011constrained wording in the metric\u2011filter step."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The document follows a recognizable pattern (overview \u2192 mindset \u2192 stepwise process \u2192 output contract \u2192 anti\u2011patterns), but some sections (e.g., Quick reference matrix) feel ad\u2011hoc and break the otherwise clean hierarchy."
+      "justification": "The skill follows a recognizable structure (What it does, Quick navigation, Mindset, Process steps, Output contract, Anti\u2011patterns). The pattern is slightly ad\u2011hoc because sections like \u2018Recent AWS features\u2019 feel appended rather than integral to the core pattern."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 10,
       "max": 15,
-      "justification": "Provides concrete CLI commands, decision trees, and output format, but omits handling of common edge cases such as pagination of AWS API calls, IAM permission errors, multi\u2011region pricing variations, and bulk\u2011operation limits, which could cause an agent to fail in real deployments."
+      "justification": "Provides working CLI snippets, decision matrix, and full output contract. However several example blocks contain calculation errors (e.g., storage GB mismatch in the agent\u2011tuning example, inconsistent monthly savings) and some omit required fields like 'Assumptions' in all examples, reducing confidence that an agent could execute flawlessly."
     }
   ],
-  "total_score": 104,
+  "total_score": 103,
   "max_score": 120,
   "grade": "B",
-  "token_count": 51300,
-  "latency_ms": 6179,
+  "token_count": 55159,
+  "latency_ms": 13097,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

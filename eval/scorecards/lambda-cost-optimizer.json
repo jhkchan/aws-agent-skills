@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 14,
+      "score": 16,
       "max": 20,
-      "justification": "The skill aggregates many publicly\u2011available AWS facts (memory\u2011CPU ratio, pricing formula, SnapStart limits) but offers few truly novel decision thresholds or proprietary heuristics that a senior CloudOps engineer could not already infer."
+      "justification": "Provides many expert\u2011level specifics (CPU\u2011memory coupling 1769\u202fMB\u202f=\u202f1\u202fvCPU, 20\u202f% ARM64 discount, Power Tuning workflow, provisioned\u2011concurrency break\u2011even math, SnapStart limits, batch\u2011size tuning, exact cost formula). However some pricing numbers are inaccurate (e.g., provisioned\u2011concurrency idle cost, request fee) and regional price variations are only vaguely mentioned, preventing a perfect score."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific decision flow, ordered steps, precise CLI commands, pre\u2011flight data gate, and confirmation prompt. A few generic statements (e.g., \u201ccheck latency\u201d) prevent a perfect score."
+      "justification": "Encodes AWS\u2011specific reasoning (U\u2011curve memory tuning, latency\u2011sensitivity check before provisioned concurrency, ARM64 compatibility matrix, batch\u2011size decision tree) and supplies concrete CLI commands. Deductions for occasional generic phrasing (\"check latency\") and lack of a single consolidated decision\u2011tree diagram."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons, but the skill\u2019s own example outputs violate self\u2011check rules (arithmetic mismatches, missing cost\u2011balancing) showing the anti\u2011pattern safeguards are not enforced in practice."
+      "justification": "Contains a solid NEVER list with concrete reasons (e.g., never change memory without Power\u2011Tuning evidence, never enable provisioned concurrency without traffic consistency). The list is comprehensive but could include more nuanced pitfalls (e.g., partial\u2011batch failure handling for SQS) and deeper reasoning for each, so it falls short of a perfect 15."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter, description, keywords, activation triggers, and invocation schema are all present and well\u2011formed. The only minor gap is the lack of an explicit version field for the activation triggers, which is not fatal."
+      "justification": "Front\u2011matter, description, keywords, activation triggers, invocation schema, and a full example are present. Minor shortfall: the `entry_point` flag is false but no guidance on how an orchestrator should invoke the skill, leaving a tiny ambiguity."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Uses quick\u2011start, navigation table, and layered sections (mindset \u2192 detailed steps \u2192 anti\u2011patterns). Slight overload in the \u201cQuick reference\u201d table but overall well\u2011structured."
+      "justification": "Information is layered: quick start, mindset, detailed steps, safety checks, and references. However, the skill front\u2011loads a large amount of detail (e.g., extensive tables) which may overwhelm a first\u2011time user."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by CONFIRM, limits batch operations, and calibrates detail for fragile tasks (memory change, concurrency removal). Minor omission: no explicit safety limit for batch\u2011size increase beyond a recommended max."
+      "justification": "Destructive actions (CLI updates) are gated by a mandatory CONFIRM prompt and pre\u2011flight safety checks. Creative tasks (cost estimation) are given enough leeway. Slight deduction because the skill does not explicitly limit batch processing to the recommended max of 5 functions per run."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Process \u2192 Anti\u2011Patterns \u2192 Output contract). Section headings are a bit ad\u2011hoc (e.g., \u201cStep 0 non\u2011obvious behaviours\u201d) but the overall structure is coherent."
+      "justification": "Follows a clear, repeatable pattern (What it does \u2192 Navigation \u2192 Mindset \u2192 Stepwise process \u2192 Output contract \u2192 Anti\u2011patterns \u2192 Safety). The only minor inconsistency is the placement of the \u201cRecent AWS features\u201d section after references, which slightly breaks the flow."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 9,
+      "score": 5,
       "max": 15,
-      "justification": "Provides decision trees, CLI commands, and output format, but several example blocks contain arithmetic errors (e.g., mismatched compute + request totals, wrong monthly sums) that break the strict output contract, reducing real\u2011world usability."
+      "justification": "Model outputs show repeated arithmetic errors (e.g., compute cost for 128\u202fMB function calculated as $2,560 instead of ~$540, batch\u2011size example mis\u2011computes request fees). Missing guidance on unit handling and rounding leads to inconsistent savings figures, violating the strict output contract. Consequently an agent would likely produce incorrect recommendations."
     }
   ],
-  "total_score": 100,
+  "total_score": 97,
   "max_score": 120,
   "grade": "B",
-  "token_count": 43379,
-  "latency_ms": 7226,
+  "token_count": 46191,
+  "latency_ms": 12022,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

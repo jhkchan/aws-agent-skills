@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 18,
       "max": 20,
-      "justification": "Adds concrete expert heuristics not usually restated: cost\u2011crossover formula, mode\u2011switch throttling window, iterator\u2011age thresholds tied to retention, explicit KMS key\u2011policy requirement, and a decision\u2011tree for enhanced fan\u2011out. However, most of these facts are already known to senior CloudOps engineers, so not a full 20."
+      "justification": "Adds concrete expert details not usually known by a baseline model: exact mode\u2011switch throttling (15\u202fmin), shard\u2011count ignored in ON_DEMAND, cost\u2011crossover formula with $0.015/shard\u2011hour and $0.04/stream\u2011hour, KMS key\u2011policy requirement for kinesis.amazonaws.com, iterator\u2011age thresholds tied to retention period, and precise consumer\u2011count decision tree for enhanced fan\u2011out."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides AWS\u2011specific CLI procedures, decision trees, and a clear ordering (mode \u2192 shard sizing \u2192 creation \u2192 consumers \u2192 encryption \u2192 IAM \u2192 alarms). Missing a step\u2011by\u2011step procedure for switching an existing stream\u2019s mode and for incremental shard\u2011count updates, which are important AWS\u2011specific actions."
+      "justification": "Provides an AWS\u2011specific provisioning workflow (mode decision \u2192 shard sizing \u2192 stream creation \u2192 wait \u2192 consumer registration \u2192 encryption \u2192 IAM \u2192 CloudWatch \u2192 resource policy) with exact CLI commands and decision trees. Minor deduction for a few generic verification steps that are not uniquely AWS."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons (e.g., never specify shard count for on\u2011demand, never grant kinesis:* on *, never skip IteratorAge alarm). Missing some common pitfalls such as forgetting to set the KMS key trust policy for cross\u2011account use and not warning about the 20\u2011consumer soft limit in detail."
+      "justification": "Comprehensive NEVER list with concrete reasons (e.g., never specify shard count for on\u2011demand, never grant kinesis:* on *, never skip IteratorAge alarm). Lacks a warning about TLS\u202f1.2 enforcement, but overall very strong."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, description clearly states WHAT and WHEN to invoke, keywords and triggers are exhaustive, and the output contract is unambiguous. No missing metadata."
+      "justification": "Frontmatter includes all required fields (name, description, version, author, license, compatibility, keywords, tags, dependencies, metadata, verdict shape, when_to_use). Description clearly states WHAT it does, WHEN to invoke, and activation keywords. No missing or vague elements."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Information is layered: high\u2011level summary, quick\u2011navigation table, detailed mindset and heuristics, step\u2011by\u2011step process, NEVER list, output format, worked example, and error handling. Critical rules are not buried, and overload is avoided."
+      "justification": "Information is layered (quick navigation, mindset, step\u2011by\u2011step, heuristics, NEVER, output format, examples). However the skill is very long; some critical rules appear deep in the document, which could cause cognitive overload for a quick lookup."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive provisioning is tightly constrained by a prerequisite checklist and a literal output contract, matching the fragility of the operation. Minor over\u2011freedom remains for optional fields (tags, SNS topics) but overall calibration is appropriate."
+      "justification": "Calibrates freedom appropriately: tight constraints on destructive/fragile actions (e.g., never specify shard count for on\u2011demand, never over\u2011grant IAM, never switch modes more than once per 15\u202fmin). Could add an explicit guard for large shard\u2011count jumps, but overall well\u2011matched."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (metadata \u2192 mindset \u2192 heuristics \u2192 procedural steps \u2192 NEVER list \u2192 output format \u2192 example \u2192 error handling). The structure aids comprehension."
+      "justification": "Follows a recognizable structure (mindset \u2192 quick navigation \u2192 detailed steps \u2192 heuristics \u2192 NEVER \u2192 output contract \u2192 worked examples \u2192 error handling). Consistent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 10,
+      "score": 12,
       "max": 15,
-      "justification": "Provides working CLI snippets, decision trees, and a checklist template. However, the model output examples show the skill emitting READY_TO_DEPLOY even when obvious prerequisites (IAM roles, alarms, tags) are missing, violating the prerequisite\u2011validation rule. This indicates a gap in enforceability and error handling, reducing practical usability."
+      "justification": "Provides working examples, decision trees, and full command set. However, the model output deviates from the strict output contract (uses label \u201cEnhanced fan-out consumer\u201d instead of exact \u201cEnhanced fan-out\u201d, and omits the WriteProvisionedThroughputExceeded line for on\u2011demand streams, creating ambiguity). These violations reduce usability."
     }
   ],
-  "total_score": 104,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 47527,
-  "latency_ms": 15238,
+  "grade": "A",
+  "token_count": 55532,
+  "latency_ms": 10746,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

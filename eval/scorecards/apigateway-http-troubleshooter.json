@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill supplies concrete, expert\u2011level details not usually enumerated by a generic model: the hard 29\u2011second integration timeout, the exact route\u2011priority order (exact \u2192 greedy \u2192 $default), the base64 encoding behavior of PayloadFormatVersion 2.0, and the precise JWT authorizer fields (Issuer, Audience, IdentitySource). These facts constitute real delta, but many of them are already documented in AWS guides, so the added value is significant but not maximal."
+      "justification": "Adds concrete expert details such as the immutable 29\u2011second integration timeout, exact route\u2011matching precedence (exact \u2192 greedy \u2192 $default), and the payload\u2011format\u2011version 2.0 base64 encoding nuance. However, most of this information could be found in AWS docs and a capable model could already state it, so the delta is strong but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The skill encodes an AWS\u2011specific troubleshooting mindset and a step\u2011by\u2011step probe procedure for each layer, using exact CLI commands (e.g., get\u2011authorizer, get\u2011integration, describe\u2011target\u2011health). However, some procedures are described at a high level (e.g., \"run a probe\" without specifying pagination or error handling) and a few generic checks (\"verify deployment\") lack AWS\u2011specific nuance."
+      "justification": "Encodes AWS\u2011specific troubleshooting flow: pre\u2011flight gather\u2011info commands, step\u2011by\u2011step probe ordering, mandatory CONFIRM gate before any state\u2011changing CLI, and explicit distinction between HTTP (apigatewayv2) and REST (apigateway) tooling. Slight shortfall: no dedicated procedure for the \"parameter mapping\" category mentioned in the description."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "The NEVER list is extensive and includes concrete reasons (e.g., never declare ROOT_CAUSE_IDENTIFIED without a failing probe, never assume PayloadFormatVersion 1.0). It misses a few common pitfalls such as forgetting to set correct Content\u2011Type for binary payloads, but overall provides strong, experience\u2011driven warnings."
+      "justification": "Provides a thorough NEVER list with concrete reasons (e.g., never emit ROOT_CAUSE_IDENTIFIED without a failing probe, never mix HTTP vs REST tooling, never ignore PayloadFormatVersion). Missing a few common pitfalls such as IAM role mis\u2011configuration for CloudWatch logs and missing security\u2011group checks for VPC links."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 15,
       "max": 15,
-      "justification": "Front\u2011matter, description, activation triggers, invocation schema, and example are all present and well\u2011structured, enabling reliable activation. The only shortfall is that the \"when_to_use\" paragraph is long and could be ambiguous for an automated matcher, slightly reducing reliability."
+      "justification": "Complete frontmatter, clear description, explicit when\u2011to\u2011use / when\u2011not\u2011to\u2011use sections, comprehensive activation triggers, well\u2011formed invocation schema and example. An agent can reliably decide when to invoke the skill."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The document layers information (Quick start \u2192 detailed decision tree \u2192 anti\u2011patterns \u2192 heuristics). Yet the initial sections already contain a dense amount of detail (full tables, CLI snippets) which may overload an agent before it knows which part to use, indicating imperfect progressive disclosure."
+      "justification": "Top\u2011level Quick Navigation and Quick Start give concise entry points, with deeper sections (Mindset, Philosophy, Decision Tree, Heuristics) revealed later. However, the initial document is dense and some critical rules (e.g., NEVER patterns) are buried deep, causing mild cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Destructive actions (update\u2011authorizer, update\u2011integration, create\u2011deployment) are gated behind explicit CONFIRM prompts, matching the fragility of those operations. Creative tasks (symptom classification) are left open, showing appropriate calibration. No over\u2011constraining observed."
+      "justification": "Destructive actions are tightly gated by CONFIRM prompts; read\u2011only probes are default. The calibration matches task fragility perfectly."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable pattern (Quick Navigation, Mindset, Philosophy, Decision Tree, Output Format, Anti\u2011Patterns, Heuristics, Dependency Graph). The structure is consistent and aids comprehension, though the naming of sections varies slightly (e.g., \"Quick start\" vs \"Quick Navigation\"), preventing a perfect score."
+      "justification": "Follows a recognizable structure (navigation table, mindset, philosophy, decision tree, output contract, anti\u2011patterns, heuristics, graph). Minor ad\u2011hoc elements (e.g., heuristic list) prevent a flawless pattern score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides a clear decision tree, concrete CLI commands, output contract, and worked examples that an agent could follow. Missing are edge\u2011case branches for multi\u2011layer failures and handling of ambiguous symptoms where multiple layers could match; also the model output examples sometimes omit required fields (e.g., missing stage name) which indicates the skill could better enforce required inputs."
+      "justification": "Provides working decision tree, CLI commands, output template, and examples that an agent can execute. Gap: the \"integration parameter mapping errors\" category listed in the description is not represented in the decision tree, and intermittent error handling is only briefly mentioned, leaving edge\u2011case coverage incomplete."
     }
   ],
-  "total_score": 103,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 38346,
-  "latency_ms": 19988,
+  "token_count": 44654,
+  "latency_ms": 5764,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Provides many specific, non\u2011obvious details (forecast confidence intervals, exact SCP attach semantics, execution\u2011role trust policy, SSM action limitations, blast\u2011radius validation cycles, multi\u2011account StackSet pattern). However, a large portion restates standard AWS Budgets concepts that a senior CloudOps engineer would already know, so full 20 is not earned."
+      "justification": "Adds expert\u2011level specifics not commonly known: forecast models are 80% confidence intervals, Budgets evaluate only every 8\u201112\u202fh, SCP must be pre\u2011created and does not detach automatically, execution role must trust budgets.amazonaws.com, SSM Action only supports static instance IDs, budgets have no native rollover, recent API rename to APPLY_SCP_FAMILY, and detailed multi\u2011account deployment patterns. These details constitute genuine delta beyond a generic model."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes the expert 4\u2011stage pipeline, decision tree for threshold selection, pre\u2011flight safety gates, and step\u2011by\u2011step AWS\u2011specific CLI order. One point deducted because some procedures are generic (e.g., \u201crun a backup before change\u201d) and not uniquely tied to Budgets."
+      "justification": "Clearly defines the four\u2011stage pipeline and gives AWS\u2011specific ordering (budget \u2192 notification \u2192 action, SCP attach before IAM detach, etc.). The multi\u2011account StackSet procedure is mentioned but not fully broken into sub\u2011steps (parameters, permissions), leaving a small gap in procedural completeness."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., silent failure if SNS topic policy missing, SCP remains attached after recovery, forecast thresholds are probabilistic). Missing a few niche pitfalls such as the need for `organizations:DetachPolicy` permission on the execution role and the edge case of absolute\u2011value thresholds in multi\u2011account budgets, hence the deduction."
+      "justification": "Provides a comprehensive NEVER list with concrete reasoning: never use AUTOMATIC for SCP without manual validation, never forget SCP detach step, never rely on tag\u2011scoped budgets without activating cost allocation tags, never assume budgets are real\u2011time, never mix notification and action on the same budget, etc. The anti\u2011patterns are specific and experience\u2011driven."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 15,
       "max": 15,
-      "justification": "Front\u2011matter, clear description, when_to_use, activation_triggers, and invocation_schema are present. The activation triggers are free\u2011form strings and the invocation_schema is a prose description rather than a strict JSON schema, making reliable automated activation slightly ambiguous."
+      "justification": "Front\u2011matter is complete, description, when_to_use, activation_triggers, and invocation_schema are all present and unambiguous, enabling reliable skill activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The skill is very dense; most of the detailed CLI snippets, anti\u2011patterns, and validation steps appear up\u2011front, which can overload an agent before it knows whether it needs that depth. The navigation table helps, but the overall layering is not optimal."
+      "justification": "Top\u2011level sections (Critical rules, Quick navigation) give a concise overview before deep step\u2011by\u2011step details, but the document is long and some essential rules are buried in large tables, causing occasional cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (SCP deny) are guarded by manual\u2011approval defaults, validation cycles, and blast\u2011radius limits. Creative tasks are given flexibility. One point deducted because the default example for SCP deny uses AUTOMATIC approval without an explicit warning that the user must change it for production."
+      "justification": "Calibrates constraints to task fragility: destructive SCP actions default to MANUAL approval, require explicit confirmation prompts, and include detach\u2011on\u2011recovery wiring; creative Lambda actions are less constrained. Safety gates and blast\u2011radius warnings are provided."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (Mindset \u2192 Quick navigation \u2192 Critical rules \u2192 Pre\u2011flight \u2192 Process steps \u2192 Anti\u2011patterns \u2192 Output format). Minor ad\u2011hoc ordering of some sections (e.g., anti\u2011patterns placed after the full process) prevents a perfect score."
+      "justification": "Follows a recognizable structure (Mindset, Quick navigation, Critical rules, Process steps, Anti\u2011patterns, Decision tree) but the layout mixes ad\u2011hoc tables with narrative sections, slightly breaking a clean, repeatable pattern."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 11,
+      "score": 13,
       "max": 15,
-      "justification": "Provides working CLI snippets, output format, and examples, enabling an agent to act. Nonetheless, there are concrete errors: `--action-type NOTIFY` is not a valid Budgets API value, some JSON payloads miss required fields (e.g., missing `ExecutionRoleArn` in the second snippet), and placeholders like `<account-id>` are not consistently replaced, which would cause execution failures."
+      "justification": "Provides working CLI snippets, templates, and a deterministic output contract, enabling an agent to execute the design. However, it contains a few inaccuracies (e.g., using invalid action type `SNS_NOTIFY` in put\u2011budget\u2011action and mixing notification creation methods), which could cause execution failures."
     }
   ],
-  "total_score": 103,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 49780,
-  "latency_ms": 11762,
+  "grade": "A",
+  "token_count": 56060,
+  "latency_ms": 39170,
   "assertions_passed": false,
   "assertions_passed_count": 1,
   "assertions_failed_count": 4
