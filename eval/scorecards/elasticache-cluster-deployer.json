@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Adds several expert\u2011level specifics that many baseline models miss (e.g., encryption can only be set at creation, snapshot\u2011window vs maintenance\u2011window overlap rule, exact replica\u2011promotion\u2011priority semantics, and a detailed configuration dependency graph). However, most of the listed commands and high\u2011level concepts are already known to a capable model, so the delta is strong but not maximal."
+      "justification": "The skill repeats many well\u2011documented facts (e.g., encryption is creation\u2011time only, replica promotion priority) without adding truly novel thresholds or decision trees. It lacks concrete numeric guidelines (e.g., exact replica count for HA beyond \u201c>=1\u201d, precise CPU utilization targets for auto\u2011scaling) that a senior engineer would consider new."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Procedures are AWS\u2011specific (subnet\u2011group before cluster, encryption flags, replica\u2011per\u2011node\u2011group check). However the ordering for Global Datastore creation is only implied, not spelled out step\u2011by\u2011step, leaving a procedural gap."
+      "justification": "Procedures are AWS\u2011specific (order of subnet\u2011group \u2192 security\u2011group \u2192 replication\u2011group, encryption before AUTH token, use\u2011online\u2011resharding only for cluster mode). The skill still includes generic steps like \u201cverify prerequisites\u201d without tying them to concrete AWS calls, and the ordering of some steps (e.g., encryption decision before auth token) is only implied, not explicitly mandated."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., encryption cannot be toggled post\u2011creation, multi\u2011AZ failover needs replicas, snapshot\u2011window overlap). The only shortfall is the absence of a few additional pitfalls such as missing IAM permissions or version mismatches for Global Datastore."
+      "justification": "The NEVER list is extensive and each item includes a concrete why (e.g., multi\u2011AZ without replicas is a no\u2011op, snapshot\u2011window overlap skips backups). One minor omission: it does not explain why Memcached cannot use at\u2011rest encryption, leaving that anti\u2011pattern without a reason."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, keywords, and trigger list are present, satisfying basic compliance. The \"when to invoke\" section is embedded in free\u2011form prose rather than a crisp, machine\u2011readable condition, making activation slightly ambiguous."
+      "justification": "Frontmatter is complete, description explains WHAT, WHEN, and KEYWORDS, and activation triggers are enumerated. Minor gap: no explicit machine\u2011readable trigger schema beyond free\u2011form keywords."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information well (quick navigation, high\u2011level mindset, then detailed steps). However, some deep technical details (e.g., exact CLI flag differences) appear early, causing slight cognitive overload for a first\u2011time reader."
+      "justification": "The skill presents a large dependency\u2011graph table early, before the core step\u2011by\u2011step flow, which adds cognitive load. A more layered approach would hide that table until needed."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (cluster creation) are tightly constrained by explicit NEVER rules and required decisions (encryption, replica count). The only shortfall is the lack of validation constraints on placeholder values (e.g., node\u2011type must match region limits)."
+      "justification": "Destructive actions are gated by prerequisite checks, but the auto\u2011scaling section leaves cooldown values and metric thresholds loosely defined, allowing overly aggressive scaling in fragile environments."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable pattern (Mindset \u2192 Steps \u2192 Output contract \u2192 NEVER list). Structure is clear and aids comprehension."
+      "justification": "The overall structure follows a recognizable pattern (mindset, steps, anti\u2011patterns, output format) but mixes narrative prose with dense tables, making it slightly ad\u2011hoc rather than a strict template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "An agent could generate the checklist and verification commands, but the skill does not cover region handling, error\u2011code mapping, or a decision tree for selecting node types based on workload size. Missing edge\u2011case handling reduces reliability."
+      "justification": "Provides concrete CLI commands, checklist template, and error\u2011handling guidance, enabling an agent to act. Missing are region\u2011parameter handling for multi\u2011region verification commands and a Memcached\u2011specific checklist example, which could cause failures in those edge cases."
     }
   ],
-  "total_score": 104,
+  "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 36946,
-  "latency_ms": 12301,
+  "token_count": 37454,
+  "latency_ms": 21284,
   "assertions_passed": true,
   "assertions_passed_count": 0,
   "assertions_failed_count": 0

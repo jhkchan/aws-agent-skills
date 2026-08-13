@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds expert\u2011level specifics not usually known to a generic model: Config required\u2011tags limit of 5 keys, TagPolicy overriding vs merging behavior, mandatory use of `enforced_for` for enforcement, case\u2011sensitivity pitfalls, eventual\u2011consistency delay of Resource Groups Tagging API, cost\u2011allocation tag activation delay, need for separate allowed\u2011tag\u2011values rules per key, and the JSON\u2011string quirk of Config InputParameters. No major gaps, but omits deeper version\u2011control nuances of TagPolicies."
+      "justification": "The skill provides several non\u2011trivial specifics (e.g., Config required\u2011tags accepts at most 5 keys, allowed\u2011tag\u2011values accepts only one key per rule, TagPolicy case_sensitive defaults to true, the need to redeclare all parent keys when overriding in a child OU, and the 24\u2011hour propagation delay of Cost Explorer activation). However, a large portion restates well\u2011known AWS concepts (basic TagPolicy structure, EventBridge rule creation, Lambda create\u2011tags call) that a competent model already knows, so full credit is not warranted."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides a concrete AWS\u2011specific workflow: enable TAG_POLICY, create/attach policy, pre\u2011flight data collection, Config recorder verification, rule deployment, EventBridge + Lambda wiring, SSM automation creation, StackSet rollout, and confirmation gate. Slight omission: does not explicitly state to start/verify the Config recorder before rule creation, so a small deduction."
+      "justification": "The skill outlines an AWS\u2011specific end\u2011to\u2011end procedure with correct ordering (enable TAG_POLICY, create/attach policy, configure Config recorder, deploy EventBridge rule, Lambda, SSM document, StackSet). The only shortfall is a lack of concrete IAM role policy definitions for the Lambda and SSM automation, which leaves a gap in the procedure."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., missing `enforced_for` makes policy advisory, exceeding 5 keys in required\u2011tags silently drops extras, non\u2011idempotent Lambda causes duplicate tags, missing IAM permissions leads to silent AccessDenied). Lacks a few niche pitfalls (e.g., tag\u2011policy versioning), but overall strong."
+      "justification": "A solid NEVER list is present (e.g., never omit enforced_for, never assume required\u2011tags >5 keys, never forget idempotency, never skip DLQ). The reasoning is generally clear, but the list omits deeper pitfalls such as silent AccessDenied on child resource tagging due to missing resource\u2011level permissions and does not explain why idempotency failures cause silent compliance gaps."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete and activation triggers are listed, but the \"when to invoke\" description is verbose and lacks a crisp, unambiguous trigger condition; the entry_point flag is set to false without explanation."
+      "justification": "Front\u2011matter is complete, the description clearly states WHAT the skill does, WHEN to invoke it, and provides a rich keyword list and activation triggers. The only shortfall is that the activation_triggers list is long and contains some overlapping phrases, making reliable trigger matching slightly ambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered: Mindset \u2192 Quick navigation \u2192 Critical rules \u2192 Pre\u2011flight \u2192 Step\u2011by\u2011step process \u2192 Output format \u2192 Worked examples \u2192 Anti\u2011patterns \u2192 Dependency graph \u2192 Appendices. However, the early sections are dense and some critical rules are listed before the reader may understand the overall flow, causing slight cognitive overload."
+      "justification": "The skill uses layers (Mindset, Quick navigation, Critical rules, Pre\u2011flight, Step\u2011by\u2011step process, Output format, Appendices). Nonetheless, the initial sections contain a dense block of critical rules and anti\u2011patterns that may overload the agent before it knows whether it needs that depth, indicating sub\u2011optimal progressive disclosure."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (policy creation, StackSet deployment, cost\u2011tag activation) are gated by a mandatory confirmation prompt and pre\u2011flight safety checks. Creative steps (designing schema) are left open. Minor gap: no explicit rate\u2011limit guidance for bulk tagging loops."
+      "justification": "Destructive actions (policy creation, StackSet deployment, cost\u2011allocation activation) are gated by a mandatory confirmation prompt and backup steps, showing good calibration. The only minor issue is that the cost\u2011allocation activation step is treated the same as other API calls despite its higher fragility (billing\u2011console gating), so a tighter constraint would be ideal."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Navigation \u2192 Process steps \u2192 Output \u2192 Anti\u2011patterns \u2192 Appendices). Slightly ad\u2011hoc naming of sections (e.g., \"Critical rules at a glance\") prevents a perfect score."
+      "justification": "The skill follows a recognizable structure (Mindset \u2192 Navigation \u2192 Steps \u2192 Output \u2192 Anti\u2011Patterns \u2192 Dependency graph). The pattern is coherent but mixes procedural and reference sections in a slightly ad\u2011hoc way, preventing a perfectly clean pattern."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working CLI snippets, decision trees, error messages, and handling of common failures (AccessDenied, partial failures). Missing explicit pagination handling for bulk tagging beyond 100 resources and a detailed IAM role permission checklist for SSM automation, leading to a modest deduction."
+      "justification": "The skill supplies decision trees, CLI snippets, error\u2011handling notes, and pre\u2011flight safety checks, enabling an agent to execute the automation. Missing are concrete IAM policy examples for the Lambda role, explicit pagination handling for bulk tagging beyond the 100\u2011resource limit, and detailed guidance for handling partial failures in the Resource Groups Tagging API (e.g., retry logic for FailedResourcesMap)."
     }
   ],
   "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 42585,
-  "latency_ms": 14356,
+  "token_count": 44410,
+  "latency_ms": 12116,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

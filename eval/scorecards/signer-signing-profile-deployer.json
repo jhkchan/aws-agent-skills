@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "The skill repeats many documented facts (e.g., basic CLI syntax, standard AWS Signer workflow) that a competent model already knows. The only genuine delta are the heuristics about platform fixing the algorithm, CSC enforcement only at UPDATE, and signing\u2011job immutability. It lacks deeper expert insights such as quantitative rotation cadence thresholds, cost\u2011impact analysis, or detailed failure\u2011mode probabilities."
+      "justification": "Provides several expert\u2011level heuristics that a baseline model rarely knows (e.g., platform ID is the sole source of the hash/algorithm, CSC enforcement only on UPDATE, signing\u2011job immutability, revocation tracking, ABAC tag\u2011based access). However it does not include a concrete decision\u2011tree or threshold table for choosing between FreeRTOS vs IoT platforms, so the delta is strong but not perfect."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific procedural flow (platform selection \u2192 put\u2011signing\u2011profile \u2192 create CSC \u2192 associate \u2192 start signing job \u2192 verification). Some steps are generic (\"verify prerequisites\", \"check IAM\") and the ordering of IAM simulation commands is not fully detailed, leaving minor procedural gaps."
+      "justification": "Lists an AWS\u2011specific provisioning sequence (platform \u2192 profile \u2192 CSC \u2192 associate \u2192 signing job \u2192 verification \u2192 revocation \u2192 IAM \u2192 CloudTrail). The only shortfall is the generic \u201cverify prerequisites\u201d step, which is not a detailed AWS\u2011specific procedure."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons (e.g., never use non\u2011Lambda platform in a Lambda CSC, never assume runtime enforcement). Missing a few common pitfalls such as forgetting S3 bucket policies for Signer write access and neglecting to enable CloudTrail in all regions, so the anti\u2011pattern coverage is good but not exhaustive."
+      "justification": "Contains a detailed NEVER list with concrete reasons (wrong platform, assuming runtime enforcement, treating jobs as mutable, using Warn in prod, pinning certificates, leaving revoked profiles in CSCs, over\u2011broad IAM, confusing Signer with KMS, pointing to unsigned source, skipping CloudTrail). Only omission is a specific warning about missing S3 bucket policies that grant Signer write access."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter is rich and includes description, keywords, tags, metadata, and a clear when\u2011to\u2011use paragraph. The only shortfall is the absence of an explicit trigger field and a concise one\u2011sentence WHAT\u2011it\u2011does summary separate from the long description, which could affect reliable activation."
+      "justification": "Front\u2011matter, description, activation keywords, strict output contract, and when\u2011to\u2011use are all present. Lacks an explicit example of the PREREQUISITES_MISSING response, so an agent may not know how to format a failure case reliably."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The document is thorough but front\u2011loads a large amount of detail (full tables, heuristics, error handling) before the concise checklist, which can cause cognitive overload for an agent that only needs the high\u2011level flow. A more layered approach (summary \u2192 deep dive) would improve disclosure."
+      "justification": "The skill layers information: quick navigation table, high\u2011level mindset, then detailed step\u2011by\u2011step sections, followed by output format. However, the initial long narrative (expert heuristics, dependency graph) may overload the reader before they need those details."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructive actions (profile creation, signing job) are tightly constrained with explicit checks, while creative tasks (choosing platform) are left open. The only gap is the lack of an explicit \u201cnever\u2011allow\u2011arbitrary platform strings\u201d guard; the skill relies on the user to pick from the three listed platforms."
+      "justification": "Destructive actions (profile creation, signing\u2011job start) are allowed with only prerequisite checks; there is no explicit confirmation or safety\u2011net step, which would be advisable for irreversible operations."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Activation \u2192 Mindset \u2192 Configuration Graph \u2192 Steps \u2192 Anti\u2011Pattern \u2192 Output). The ordering of some sections (e.g., placing the full \u2018Never\u2019 list after the detailed steps) feels slightly ad\u2011hoc, preventing a perfectly clean pattern."
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Stepwise Process \u2192 Anti\u2011Pattern \u2192 Output Format \u2192 References. The structure is coherent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working CLI examples, a full checklist, error\u2011handling guidance, and a worked example that matches the output contract. Minor issues: a typo in the CSC update command (`--code-signing-config-arn-arn`), and the example does not show how to handle missing version suffix in AllowedPublishingProfiles, which could cause execution failures."
+      "justification": "Provides a ready\u2011to\u2011use checklist, concrete AWS CLI commands, error\u2011handling guidance, and a worked example that matches the output contract. Missing edge\u2011case handling for already\u2011existing signing profiles, bucket policy requirements, and placeholder substitution guidance reduces usability slightly."
     }
   ],
-  "total_score": 105,
+  "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 45432,
-  "latency_ms": 10916,
+  "token_count": 49036,
+  "latency_ms": 12827,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

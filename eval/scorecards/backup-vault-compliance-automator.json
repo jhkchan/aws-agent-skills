@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 14,
+      "score": 16,
       "max": 20,
-      "justification": "Adds several non\u2011obvious expert details (Vault Lock cool\u2011off period, governance vs compliance mode regulatory impact, recent 2024\u20112026 Backup Framework features, cross\u2011account policy condition, decision\u2011tree for mode selection). However, most of the content restates information a senior CloudOps engineer could already retrieve from AWS docs, so the delta is significant but not maximal."
+      "justification": "Introduces specific expert details not usually known by a generic model: the mandatory 3\u2011day Vault Lock cool\u2011off, the exact governance vs compliance mode matrix, the precise condition keys for denying unencrypted backups, and a decision\u2011tree for mode selection. However, large portions restate standard AWS Backup concepts that a capable model already knows, preventing a perfect score."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific procedural flow (inventory \u2192 policy \u2192 lock \u2192 encryption \u2192 coverage \u2192 replication \u2192 frequency \u2192 Config rules \u2192 reporting \u2192 multi\u2011account) with concrete CLI commands and JSON templates. Some steps are generic (\"run list\u2011backup\u2011vaults\") and lack explicit error\u2011handling procedures, preventing a perfect score."
+      "justification": "Provides an AWS\u2011specific five\u2011layer mindset and a concrete ordered procedure (policy \u2192 lock \u2192 coverage \u2192 encryption \u2192 replication \u2192 Config rules \u2192 multi\u2011account). The steps include exact CLI commands and policy JSON. A few generic phrases like \"check security\" dilute the otherwise precise AWS\u2011focused process."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., irreversible compliance\u2011mode lock, governance mode not meeting SEC 17a\u20114, missing cross\u2011account vault policy). Missing a few common pitfalls such as forgetting CloudTrail logging for audit trails, so not full credit."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., irreversible compliance lock, governance not meeting regulations, missing cross\u2011account trust). One point deducted because some pitfalls could include deeper why\u2011analysis (e.g., why tag\u2011based selections are safer than explicit IDs)."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are present and fairly precise. The \"when_to_use\" paragraph is verbose and some activation triggers overlap, making reliable invocation slightly less crisp."
+      "justification": "Front\u2011matter, description, activation triggers, and invocation schema are all present and clear. The only shortfall is the absence of an explicit \"when NOT to invoke\" clause, which would make the trigger set fully deterministic."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The skill layers information (Mindset \u2192 Quick navigation \u2192 Step\u2011by\u2011step \u2192 Anti\u2011patterns \u2192 Appendices). However, critical rules are repeated in multiple places and the initial sections are dense, causing some cognitive overload before reaching actionable details."
+      "justification": "The document is layered (Mindset, navigation table, step\u2011by\u2011step, anti\u2011patterns, appendices) which guides the reader. However, the full vault\u2011policy JSON appears early, adding cognitive load before the high\u2011level concepts are introduced."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (Vault Lock) are guarded by a mandatory confirmation gate and explicit cool\u2011off warnings. Creative tasks (report generation) are left flexible. Minor issue: placeholders like <vault> remain unbound, leaving a small amount of unrestricted freedom."
+      "justification": "Destructive actions are gated by an explicit CONFIRM prompt and the skill stresses testing in governance mode before committing to compliance mode, matching the fragility of Vault Lock. Slight under\u2011constraint in cross\u2011account policy examples (e.g., missing explicit account ID validation) prevents a perfect score."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset, Navigation table, numbered steps, anti\u2011patterns, appendices). The structure is coherent and aids comprehension, missing only a formalized header hierarchy that would make it perfectly aligned."
+      "justification": "The skill follows a recognizable pattern (Mindset, Navigation, Steps, Anti\u2011Patterns, Appendices). However, the mixture of tables, narrative, and code blocks makes the structure slightly ad\u2011hoc rather than a single, clean template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides working CLI snippets, output format, and decision trees, enabling an agent to execute the automation. Some commands lack region flags, placeholders (<vault>, <approved_kms_key_arn>) are not resolved, and error handling for API failures is absent, reducing practical reliability."
+      "justification": "Provides working CLI snippets, a Python verification script, output format, and templates, enabling an agent to execute the workflow. Missing explicit error handling, occasional lack of pagination in list commands, and some condition keys (e.g., aws:ResourceTag/x\u2011calculated\u2011integrity) may cause ambiguous failures, limiting flawless execution."
     }
   ],
-  "total_score": 100,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 41019,
-  "latency_ms": 9708,
+  "token_count": 42369,
+  "latency_ms": 11775,
   "assertions_passed": false,
-  "assertions_passed_count": 1,
-  "assertions_failed_count": 4
+  "assertions_passed_count": 0,
+  "assertions_failed_count": 5
 }

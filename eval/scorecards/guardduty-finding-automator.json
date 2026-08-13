@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "The skill contains many expert nuggets (numeric vs string severity serialization, DynamoDB dedup TTL, WAF IP\u2011set limits, region\u2011specific delegated admin, required Lambda timeout), but a large portion restates standard GuardDuty best\u2011practices that a senior CloudOps engineer would already know. No truly novel decision tree or threshold beyond the common 7.0 severity cut\u2011off is presented, so 4 points are deducted."
+      "justification": "Adds several non\u2011obvious expert details (EventBridge severity field can be string or number, DynamoDB dedup with 7\u2011day TTL, WAF IP\u2011set 10k limit, cross\u2011account EventBridge forwarding, Lambda timeout >=60s, region\u2011specific delegated admin) that a baseline model would not know, but also restates many standard GuardDuty concepts, so not a perfect 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The skill outlines a clear 5\u2011stage pipeline and AWS\u2011specific steps (EventBridge rule, Lambda, SNS, Security Hub, Organizations). However, some procedures are generic (e.g., \"test the remediation Lambda\" without a concrete test harness) and the multi\u2011account StackSet deployment order is not explicitly sequenced, costing 2 points."
+      "justification": "Encodes an AWS\u2011specific 5\u2011stage pipeline (detect \u2192 route \u2192 respond \u2192 notify \u2192 correlate) with concrete ordering and AWS\u2011native procedures (EventBridge rule creation, SG swap, IAM key revocation, WAF IP set update, Security Hub ASFF import). Minor generic phrasing remains, preventing full credit."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasons (no rollback, revoking keys without last\u2011used check, default Lambda timeout, etc.). Missing anti\u2011patterns around snapshot cost explosion and IAM role privilege escalation risks, so 2 points deducted."
+      "justification": "Contains a thorough \u201cNEVER\u201d list with concrete reasoning (rollback, key\u2011last\u2011used check, timeout, dedup, IP\u2011set caps, etc.). Missing anti\u2011patterns around cost explosion, API throttling beyond concurrency caps, and least\u2011privilege IAM role design, leading to a 2\u2011point deduction."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter, description, keywords, activation triggers and invocation schema are all present and well\u2011formed; however the activation triggers are somewhat generic and the 'when to invoke' description could be tighter for reliable activation."
+      "justification": "Frontmatter is complete and well\u2011formed; description, when_to_use, when_not_to_use, activation_triggers, and invocation_schema give an agent reliable activation criteria."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Uses sections (Mindset, Quick navigation, Critical rules, Process steps) to layer information, but the initial pages are dense with code and tables before a concise high\u2011level summary, creating cognitive overload. Deducted 3 points for front\u2011loading too much detail."
+      "justification": "Content is layered (Mindset \u2192 Quick navigation \u2192 Step\u2011by\u2011step \u2192 Anti\u2011patterns \u2192 Appendices). However, the early sections are dense, which can cause cognitive overload before the agent reaches the detailed procedural steps."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly guarded (rollback, dedup, confirmation gate, concurrency caps). Slight gap: multi\u2011account StackSet region handling is mentioned but not fully constrained (e.g., per\u2011region admin designation), so 1 point deducted."
+      "justification": "Destructive actions are tightly guarded: rollback paths, DynamoDB dedup, concurrency caps, confirmation gate. One point off because IAM\u2011key revocation guidance still lacks an explicit pre\u2011check for production\u2011critical services beyond the generic \u2018last\u2011used\u2019 check."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The document follows a recognizable pattern (Mindset \u2192 Navigation \u2192 Steps \u2192 Anti\u2011Patterns \u2192 Appendices). However, the pattern is not explicitly labeled or framed, making it slightly ad\u2011hoc. One point is deducted."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Navigation \u2192 Steps \u2192 Anti\u2011Patterns \u2192 Appendices) that aids comprehension. Slight deduction because the pattern is custom rather than a widely\u2011adopted template, making it marginally ad\u2011hoc."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working CLI snippets, Lambda code outlines, decision trees, and full examples that an agent could execute. Missing: explicit DynamoDB table creation commands and detailed Lambda error\u2011handling/retry logic, leading to a 2\u2011point deduction."
+      "justification": "Provides working CLI snippets, Lambda code fragments, decision trees, and full output templates, enabling an agent to execute the automation. Missing full StackSet YAML and complete Lambda code for auto\u2011enable GuardDuty in new accounts, and edge\u2011case handling for EventBridge numeric vs string severity remains partially addressed."
     }
   ],
-  "total_score": 104,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 45042,
-  "latency_ms": 12865,
+  "grade": "A",
+  "token_count": 44299,
+  "latency_ms": 8743,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds several concrete expert details (service\u2011network\u2011first ordering, health\u2011check parameter defaults, weight being relative, ACM cert must be in us\u2011east\u20111, service\u2011network limits) that go beyond a generic model, but most of these are documented facts and the skill largely restates them rather than providing novel decision trees or undocumented nuances."
+      "justification": "Provides concrete, expert\u2011level details not usually recalled by a generic model \u2013 e.g., health\u2011check parameter ranges, that Lattice weights are relative (not required to sum to 100), ACM cert must be in us-east-1 for custom domains, and the service\u2011network\u2011per\u2011account limit. However, many statements simply restate official docs without adding new decision logic, so full 20 is not earned."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Lists an AWS\u2011specific provisioning order (service network \u2192 VPC association \u2192 service \u2192 target groups \u2192 listener \u2192 rules \u2192 auth policy \u2192 service policy \u2192 custom domain \u2192 traffic split \u2192 access logs) with exact CLI snippets. Missing only minor procedural niceties such as idempotency checks or rollback steps."
+      "justification": "Encodes an AWS\u2011specific provisioning workflow with exact CLI commands and ordering (create service network, associate VPCs, create service, create target groups, listeners, rules, auth policy, service policy, cross\u2011account RAM share, custom domain, traffic splitting, access logs). The mindset section explains why each step matters, reflecting expert reasoning."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with concrete reasoning for each pitfall (auth policy scope, health\u2011check routing, VPC association, etc.). Missing a few additional common traps (IAM policy size limits, service\u2011network quota warnings) prevents a perfect score."
+      "justification": "Contains a detailed NEVER list (10 items) with specific reasons (e.g., auth policy scope, unhealthy target routing, missing VPC association). Each anti\u2011pattern is tied to a concrete failure mode, showing experience\u2011driven warnings."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Full front\u2011matter with name, description, version, author, license, compatibility, keywords, tags, dependencies, and rich metadata. Includes clear WHEN\u2011TO\u2011USE narrative and trigger list, satisfying activation requirements."
+      "justification": "Frontmatter is complete, description, when_to_use, triggers, keywords, and output contract are clearly defined. Slight weakness: the 'entry_point' flag is false but the skill still expects an invocation; a more explicit activation schema could avoid ambiguity."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered: quick navigation, high\u2011level mindset, then detailed steps, then examples and error handling. The document is long, which adds some cognitive load, but critical rules are not buried."
+      "justification": "Information is layered: high\u2011level overview, then detailed steps, then NEVER list, then output format, then worked examples. Some critical constraints (e.g., ACM cert region requirement) are buried in later heuristic sections rather than highlighted up front, causing potential cognitive overload for quick decisions."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Calibrates well for a destructive provisioning task: strict output contract, prerequisite checks, and NEVER list. Could improve by requiring an explicit confirmation step before issuing creation commands, so the freedom is a bit too open."
+      "justification": "Destructive actions (create service network, target groups, etc.) are gated by a prerequisite checklist and explicit verification commands. Yet the skill allows creation without explicit safety flags (e.g., dry\u2011run mode) and does not limit the number of resources, which could be risky in large\u2011scale pipelines."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern: Mindset \u2192 Expert heuristics \u2192 Stepwise process \u2192 NEVER list \u2192 Output contract \u2192 Worked example. Structure is coherent and aids comprehension."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Dependency graph \u2192 Step\u2011by\u2011step \u2192 NEVER \u2192 Output format). Minor inconsistency in section ordering (tables mixed with narrative) prevents a perfectly clean pattern."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides complete CLI command set, a ready\u2011to\u2011deploy checklist, verification commands, and error\u2011handling guidance. Missing only a few edge\u2011case branches (e.g., handling already\u2011existing service network) but an agent could execute the skill successfully."
+      "justification": "Provides a ready\u2011to\u2011use checklist, concrete CLI commands, and error\u2011handling guidance, enabling an agent to execute the deployment end\u2011to\u2011end. However, it lacks explicit guidance for partial configurations (e.g., only adding a custom domain to an existing service) and does not cover edge cases like idempotent re\u2011runs or rollback steps."
     }
   ],
-  "total_score": 106,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 45038,
-  "latency_ms": 14236,
+  "token_count": 47186,
+  "latency_ms": 5959,
   "assertions_passed": false,
-  "assertions_passed_count": 3,
-  "assertions_failed_count": 2
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
 }

@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill provides many concrete numbers (e.g., SnapStart restores to ~200\u202fms, hyperplane ENI <100\u202fms, memory\u2011vCPU breakpoint at 1769\u202fMB) and a full decision matrix, which a junior model would not know. However, most of the content restates official AWS documentation (memory\u2011CPU mapping, SnapStart availability, provisioned concurrency cost) without adding novel heuristics or unpublished thresholds, so the genuine delta is limited."
+      "justification": "Adds expert specifics (SnapStart versioned\u2011alias requirement, hyperplane ENI <100\u202fms, provisioned\u2011concurrency cost estimate) but re\u2011states many well\u2011known facts and leaves key numeric thresholds (e.g., exact latency per runtime) to external references, limiting the net new knowledge."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Defines a clear, AWS\u2011specific decision flow (SnapStart \u2192 init\u2011phase \u2192 provisioned concurrency \u2192 memory \u2192 runtime \u2192 package) and supplies exact CLI commands for each step. Some procedures are still generic (e.g., \u201ccheck cost envelope\u201d) and could be more detailed for sizing provisioned concurrency."
+      "justification": "Provides an AWS\u2011specific step\u2011by\u2011step process (Power Tuning latency mode, exact CLI for SnapStart, provisioned concurrency sizing, autoscaling registration). Some procedures are generic (e.g., \"check cost envelope\") and lack AWS\u2011specific nuance, preventing a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete reasoning (e.g., never recommend SnapStart for non\u2011Java, never enable PC for async workloads, never attribute VPC latency without ENI health). Missing a specific anti\u2011pattern for mis\u2011reporting SLO compliance, which caused an error in a sample output."
+      "justification": "Contains a solid NEVER list with reasons (e.g., SnapStart only for Java, avoid PC for async workloads) but omits other common pitfalls such as missing IAM permissions for SnapStart or forgetting to repoint aliases after publishing a version."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Full front\u2011matter, detailed description, clear when_to_use / when_not_to_use, activation triggers, invocation schema, and example. Only minor weakness: the description could more explicitly state the exact trigger conditions for the skill."
+      "justification": "Full front\u2011matter, clear description, exhaustive activation_triggers, invocation_schema, and example. The only shortfall is the absence of an explicit versioning field for the skill itself, which would aid automated activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses layered sections (quick start, mindset, step\u2011by\u2011step, deep references) so the agent gets just\u2011enough at each level. However, the Quick reference matrix is dense and could overload a first\u2011pass reader."
+      "justification": "Top\u2011level quick\u2011start, then layered deeper sections (Mindset, Process, Anti\u2011Patterns, References). The Quick reference table is dense and could overload the agent, so a small deduction."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (CLI changes) are gated by a CONFIRM step and safety checks; creative analysis steps are left open. Calibration is appropriate for the fragility of state\u2011changing operations."
+      "justification": "Destructive actions are gated by a CONFIRM step, safety checks, and batch\u2011size limits. Minor gap: no explicit constraint on updating function configuration without first publishing a version for SnapStart, though it is mentioned in the anti\u2011pattern."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Process steps \u2192 Output format \u2192 Anti\u2011Patterns). Structure is coherent, though some headings (e.g., \u201cStep 0 non\u2011obvious behaviours\u201d) feel ad\u2011hoc."
+      "justification": "Follows a recognizable structure (What it does \u2192 Mindset \u2192 Process \u2192 Anti\u2011Patterns \u2192 Output contract). Slight ad\u2011hoc naming of sections prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Agents can execute the skill: all CLI commands, decision matrix, and output format are provided. Weaknesses: Power Tuning invocation details are only referenced, not inlined, forcing the agent to locate external docs; the fallback when InitDuration metrics are missing is described but lacks a concrete alternative metric calculation, leaving edge\u2011case handling vague."
+      "justification": "Provides decision trees, exact CLI commands, output format, and worked examples. Lacks detailed handling for async functions (PC recommendation) and cost\u2011only optimization scenarios, and error handling for missing metrics is brief, leading to a modest deduction."
     }
   ],
   "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 47114,
-  "latency_ms": 17914,
+  "token_count": 46380,
+  "latency_ms": 9431,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 18,
+      "score": 17,
       "max": 20,
-      "justification": "Provides many expert details (etag concurrency, runtime requirement, size limits, dependency graph) that go beyond a baseline model, but some facts (1\u202fMB limit, key/value size constraints) are already widely known, so not a full 20."
+      "justification": "Adds specific expert details (1\u202fMB total limit, 512\u2011char key limit, 3\u202fKB value limit, etag concurrency, runtime requirement, linking KVS to function not distribution) that many models know, but lacks a novel decision tree for choosing KVS vs alternatives (e.g., WAF) and omits deeper troubleshooting heuristics, so not a full 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Offers a concrete AWS\u2011specific provisioning order (create store \u2192 fetch etag \u2192 put keys \u2192 create function with KVS association \u2192 publish \u2192 distribution update). One point deducted because the prerequisite\u2011verification step is generic rather than uniquely AWS\u2011oriented."
+      "justification": "Provides a precise AWS\u2011specific provisioning order (create KVS \u2192 fetch etag \u2192 put keys \u2192 create function with cloudfront-js-2.0 \u2192 link KVS \u2192 publish \u2192 associate distribution). Missing explicit rollback or cleanup steps for failed KVS creation, which would be expected from a senior CloudOps mindset."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never use cloudfront-js-1.0, never exceed 1\u202fMB, never write from a function, never reuse stale etag). Missing is an explicit warning about least\u2011privilege IAM policies for KVS access, so 2 points are deducted."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never use cloudfront-js-1.0, never exceed 1\u202fMB, never reuse stale etag). However, the model output reuses the same etag for multiple put\u2011key calls, violating the \u2018never reuse stale etag\u2019 rule, indicating the anti\u2011pattern guidance was not enforced."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter, description, when_to_use, activation keywords, and output contract are all present. The trigger description is slightly vague (e.g., \"create CloudFront KeyValueStore\" could be refined), so one point is deducted."
+      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS. Activation triggers and output contract are unambiguous, enabling reliable skill invocation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Information is layered: high\u2011level overview \u2192 quick\u2011navigation table \u2192 detailed sections \u2192 output format \u2192 examples. The quick\u2011navigation table lists many sections, which adds some cognitive load, so 2 points are deducted."
+      "justification": "Uses layered sections (quick navigation, mindset, dependency graph, step\u2011by\u2011step, anti\u2011patterns, output format). The initial quick\u2011navigation table is dense and could overload a reader, costing a point."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (store creation, key writes) are tightly constrained with size checks, etag handling, and prerequisite verification. No guidance is given for safe deletion/re\u2011creation of a KVS, so one point is deducted."
+      "justification": "Calibrates freedom well for fragile actions (size limits, etag handling, runtime checks). Lacks explicit safeguards for destructive delete\u2011KVS operations, leaving a small gap in constraint handling."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (metadata \u2192 activation \u2192 mindset \u2192 steps \u2192 anti\u2011pattern \u2192 output format). The pattern is not a formally named framework, making it slightly ad\u2011hoc."
+      "justification": "Follows a recognizable pattern (mindset \u2192 dependency graph \u2192 procedural steps \u2192 anti\u2011patterns \u2192 output format). Minor inconsistency in ordering of sections (e.g., \u2018Never do these things\u2019 appears after step\u2011by\u2011step) prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 10,
+      "score": 14,
       "max": 15,
-      "justification": "Provides a ready\u2011to\u2011deploy checklist, concrete CLI commands, and error\u2011handling guidance. The sample batch\u2011put sequence reuses the same etag for multiple puts, which would cause PreconditionFailed errors, and there is no guidance for pagination of list\u2011keys or IAM permission scopes, leading to a 5\u2011point deduction."
+      "justification": "The skill yields a ready\u2011to\u2011deploy checklist and complete step\u2011by\u2011step commands; the model output matches the required format. The distribution\u2011update JSON contains \"...\" placeholders, which prevents a copy\u2011pasteable execution without further editing, and the function\u2011publish step assumes FUNCTION_ETAG is known without showing how to retrieve it."
     }
   ],
-  "total_score": 105,
+  "total_score": 110,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 53813,
-  "latency_ms": 10036,
+  "grade": "A",
+  "token_count": 52332,
+  "latency_ms": 8663,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

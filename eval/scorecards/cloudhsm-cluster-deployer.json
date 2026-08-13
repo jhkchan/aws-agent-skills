@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "The skill introduces several expert\u2011level insights that many baseline models miss (e.g., activation is a ONE\u2011TIME operation, the CO password is unrecoverable, subnet\u2011list immutability after cluster creation, cross\u2011region copy creates a new cluster rather than a hot replica). However, most of these facts are documented in AWS guides and a capable model could already retrieve them, so the delta is strong but not maximal."
+      "justification": "Adds expert insights (one\u2011time activation, CO password irrecoverability, subnet list immutability, cross\u2011region copy semantics) that a baseline model would miss, but omits a concrete decision tree for selecting HSM type or backup\u2011retention thresholds, leaving a small knowledge gap."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides a concrete AWS\u2011specific procedure order (create\u2011cluster \u2192 create\u2011hsm \u2192 fetch CSR \u2192 sign \u2192 initialize\u2011cluster \u2192 CO/user setup). Some steps are generic (e.g., \"verify prerequisites\" without exact IAM simulation commands or polling loops) and lack explicit retry/back\u2011off guidance, preventing a perfect score."
+      "justification": "Offers a clear AWS\u2011specific procedural flow (create\u2011cluster \u2192 create\u2011HSM \u2192 fetch CSR \u2192 sign \u2192 initialize \u2192 CO management \u2192 backups \u2192 HA \u2192 client integration). One point deducted because the IAM/service\u2011linked\u2011role verification step is mentioned only briefly and could be more explicitly ordered before cluster creation."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with specific reasons (e.g., never deploy single\u2011AZ, never skip activation, never lose CO password). Missing a few additional pitfalls such as forgetting to rotate the customer CA or neglecting to set backup retention policies, so it falls short of full marks."
+      "justification": "Contains a detailed NEVER list with specific reasons (single\u2011AZ HA, skipping activation, losing CO password, etc.), yet omits a few common pitfalls such as forgetting to enable the service\u2011linked role or mis\u2011configuring backup retention, reducing completeness."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, description, triggers, and when_to_use are present. The output contract is explicit. The only minor issue is that the \"when_to_use\" paragraph is verbose and could be tighter for reliable activation, but overall the spec is solid."
+      "justification": "Frontmatter is complete and well\u2011formed; description, triggers, keywords, when_to_use, and verdict shape are all present, giving an agent reliable activation criteria."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information well (summary, quick navigation, detailed steps, NEVER list, output format). However, the checklist examples are repeated multiple times, which adds cognitive load and buries some critical rules deeper than necessary."
+      "justification": "Uses quick\u2011navigation tables and layers detail, but the initial sections (mindset, heuristics, full tables) are dense, causing some cognitive overload before the checklist is reached."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Calibration is good for destructive actions (activation is one\u2011time, CO password warnings). Yet the skill permits creating a single\u2011AZ cluster without a strong warning, which is a fragile configuration left too permissive."
+      "justification": "Destructive actions (cluster creation, HSM deletion) are described with concrete commands but lack explicit safety gates such as confirmation prompts or pre\u2011flight checks beyond prerequisite verification, which is risky for fragile operations."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (metadata, mindset, step\u2011by\u2011step, NEVER list, output format) that aligns with typical CloudOps skill templates."
+      "justification": "Follows a recognizable pattern (mindset, quick navigation, step\u2011by\u2011step, NEVER, output format), though some sections (error handling, multiple example outputs) feel ad\u2011hoc rather than fully integrated."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working command snippets, decision flow, and error\u2011handling sections. Lacks explicit branching for common failure modes (e.g., handling CloudHsmInvalidStateException during activation) and does not include automated prerequisite\u2011checking logic, limiting full practical execution."
+      "justification": "Provides working command snippets, decision trees, and error handling, enabling an agent to act. Missing some edge\u2011case guidance (e.g., handling AZ capacity errors, automatic IAM role creation, backup retention tuning) and the model output examples show minor inconsistencies (cross\u2011region backup marked \"not configured\" despite being a required step), leading to a modest deduction."
     }
   ],
-  "total_score": 104,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 53205,
-  "latency_ms": 26841,
+  "token_count": 53997,
+  "latency_ms": 10447,
   "assertions_passed": false,
-  "assertions_passed_count": 3,
-  "assertions_failed_count": 2
+  "assertions_passed_count": 2,
+  "assertions_failed_count": 3
 }

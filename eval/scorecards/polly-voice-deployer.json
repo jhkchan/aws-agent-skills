@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Provides many expert details (engine\u2011selection decision tree, exact SSML tag support per engine, pricing per million characters, lexicon constraints), but omits deeper delta such as region\u2011specific price variations, token limits for the generative engine, and concrete thresholds for when to switch from neural to long\u2011form based on text length or latency."
+      "justification": "Provides many expert details (engine\u2011specific SSML support, pricing tables, dependency graph, decision trees) that a baseline model would not know, but it still restates common knowledge (e.g., basic CLI syntax) and omits the very latest 2026 engine updates, so not a perfect 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Lists AWS\u2011specific CLI sequences and ordering (engine \u2192 voice \u2192 lexicon \u2192 synthesis mode) and includes verification steps, yet the async\u2011task procedure does not explicitly require checking the Polly service\u2011linked role or confirming the S3 bucket policy before starting the task."
+      "justification": "Includes AWS\u2011specific procedures (lexicon upload, async task lifecycle, IAM verification) and a clear decision\u2011tree mindset, yet some steps are generic (e.g., \"verify IAM policy\") without concrete AWS CLI commands or policy snippets, losing a few points."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a solid NEVER list with concrete pitfalls (break/emphasis on neural, missing lexicon, wrong sample rate, etc.) and reasons, but the entry about lexicon regionality lacks a deeper why (e.g., eventual DNS routing and IAM scoping) and does not warn about versioning conflicts that can cause silent failures."
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., break/emphasis on neural engines, speech marks separate request). Missing a specific warning about the 5\u2011lexicon limit and why exceeding it causes failures, so deduct one point."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description, keywords, and when_to_use are present, and the output contract is clearly defined. However, the skill does not include a dedicated \"activation\" field in the frontmatter; triggers are only embedded in the free\u2011form description, which could hinder automated skill discovery."
+      "justification": "Frontmatter, description, keywords, and output contract are present and well\u2011formed. The \"when to use\" section is good, but activation triggers rely only on a keyword list without a precise pattern or regex, making reliable automatic invocation slightly ambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The document layers high\u2011level sections (quick navigation, mindset, step\u2011by\u2011step) but the initial Mindset paragraph is dense and contains many heuristics before the quick\u2011navigation table, causing some cognitive overload for a first\u2011time reader."
+      "justification": "The skill layers information (summary, quick navigation, detailed steps) effectively, but the initial sections (engine table, voice table) are dense and could overload a model before it knows which part to read, so two points are deducted."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Calibrates constraints for fragile operations (sample\u2011rate validation, S3 permissions) but leaves the S3 bucket name completely free without any naming\u2011pattern check or guidance on bucket\u2011policy requirements, which could lead to avoidable async\u2011task failures."
+      "justification": "Calibrates specificity to task fragility: destructive actions (S3 bucket write) are gated by IAM checks; engine selection is forced by SSML compatibility; sample\u2011rate validation is enforced; async task status checks are required. Slight looseness around multi\u2011region lexicon upload (no explicit region parameter) prevents a perfect score."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Steps \u2192 Heuristics \u2192 NEVER \u2192 Output format), yet the Mindset section is not visually separated from the procedural steps, making the overall structure feel slightly ad\u2011hoc rather than a clean, repeatable template."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Steps \u2192 NEVER \u2192 Output format) that aids comprehension, but the pattern is not explicitly named or referenced, losing one point for maximal recognizability."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working CLI examples, a ready\u2011to\u2011deploy checklist, and error\u2011handling guidance, but lacks a combined workflow for generating audio\u202f+\u202fspeech\u2011marks in a single pipeline and does not address pagination when listing voices for large language sets, leaving edge cases unhandled."
+      "justification": "Provides decision trees, concrete AWS CLI examples, a ready\u2011to\u2011use checklist template, and error\u2011handling guidance, enabling an agent to execute deployments. Missing explicit handling of region selection for lexicons and a fallback for missing S3 bucket creation reduces usability slightly."
     }
   ],
-  "total_score": 105,
+  "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 45047,
-  "latency_ms": 21339,
-  "assertions_passed": true,
-  "assertions_passed_count": 5,
-  "assertions_failed_count": 0
+  "token_count": 44798,
+  "latency_ms": 9440,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
 }

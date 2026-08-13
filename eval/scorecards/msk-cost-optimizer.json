@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Introduces concrete expert thresholds and formulas not typically known to a generic model: break\u2011even ingress ~50\u202fMB/s for Serverless vs provisioned, ~20% cost reduction for Graviton brokers, <30% disk utilisation as over\u2011allocation signal, retention >168\u202fh as a cost driver, partition\u2011per\u2011broker <400 rule, and explicit cost equations for each dimension. Some statements merely restate known facts, hence a modest deduction."
+      "justification": "Adds concrete expert thresholds (e.g., disk utilisation <30% signals over\u2011provisioning, <400 partitions per broker, break\u2011even ~50\u202fMB/s for Serverless, ~20% Graviton cost saving) and detailed cost formulas that a generic model would not know. Deducted 3 points for omitting regional price variations and Savings\u2011Plans considerations."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Includes AWS\u2011specific step\u2011by\u2011step procedures (Cost Explorer query, blue/green migration, CLI commands) and a clear mindset, yet some steps are generic (e.g., \u201cValidate input\u201d, \u201cCheck health\u201d) and not tied to MSK\u2011specific failure modes, losing a couple of points."
+      "justification": "Provides an AWS\u2011specific workflow: data\u2011gate validation, Cost Explorer reconciliation, broker\u2011type right\u2011sizing, Graviton migration, blue/green cluster recreation, and precise CLI commands. Deducted 1 point because the initial \"validate input\" step is generic rather than AWS\u2011specific."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Provides an extensive NEVER list with concrete reasoning (e.g., cannot reduce broker count below 3, Graviton requires Kafka\u202f3.x, EBS size cannot be decreased in\u2011place). The only shortfall is a few generic warnings (e.g., \u201cnever batch a migration\u201d) that lack deeper rationale."
+      "justification": "Contains an extensive NEVER list with concrete reasoning (e.g., never reduce broker count below 3, never shrink EBS in\u2011place, never recommend Graviton on Kafka\u202f2.x). Only minor omission: no explicit warning about committing to 3\u2011year Reserved Instances when planning migrations."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter is complete, description, activation triggers, and invocation schema are present. The only shortfall is the lack of a formal JSON input schema field; the schema is described in prose, which could hinder automated parsing."
+      "justification": "Frontmatter is complete, description, activation triggers, invocation schema, and example are all present, enabling reliable activation. Lacks an explicit required AWS CLI version field, so 1 point is deducted."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "The skill is heavily layered with many sections, but the initial \u201cWhat this skill does\u201d and \u201cQuick start\u201d already expose a large amount of detail, causing cognitive overload. Deep references (e.g., pricing docs) are embedded rather than linked, making it harder to skim."
+      "justification": "Information is layered: high\u2011level purpose, strict output contract, quick\u2011start, detailed step\u2011by\u2011step process, and deep references. Some sections (e.g., full pricing tables) are embedded early, adding slight cognitive load, but overall the layering is effective."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are tightly constrained: mandatory CONFIRM gate, blue/green migration for broker count/EBS reduction, explicit prohibition of in\u2011place volume shrinkage, and clear guidance on when to apply each lever. Lacks an explicit fragility rating per dimension, hence a small deduction."
+      "justification": "Destructive actions are tightly constrained with CONFIRM gates, blue/green migration guidance, and explicit prohibitions. Slight gap: broker\u2011count reduction recommendation is not explicitly tied to the blue/green migration step in the main process (only mentioned in anti\u2011patterns), so 1 point is deducted."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (description \u2192 contract \u2192 quick start \u2192 mindset \u2192 stepwise process \u2192 anti\u2011patterns \u2192 navigation). Minor ad\u2011hoc ordering of some sections prevents a perfect score."
+      "justification": "Follows a recognizable structure (overview, contract, quick\u2011start, mindset, step\u2011by\u2011step process, anti\u2011patterns, navigation). Minor ad\u2011hoc ordering of some sections prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Supplies decision matrices, cost formulas, concrete CLI steps, and example optimisation blocks, enabling an agent to act. However, the example outputs occasionally omit required fields (e.g., missing monthly breakdown lines for some dimensions) and some savings calculations are left as placeholders, indicating usability gaps."
+      "justification": "Provides actionable CLI snippets, decision matrices, and a deterministic output block. Example outputs sometimes omit required monthly savings lines and lack handling for partial metric failures beyond a generic NEED_MORE_INFO, leading to a 2\u2011point deduction."
     }
   ],
-  "total_score": 105,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 50994,
-  "latency_ms": 12581,
+  "grade": "A",
+  "token_count": 51319,
+  "latency_ms": 28788,
   "assertions_passed": false,
   "assertions_passed_count": 0,
   "assertions_failed_count": 5

@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "The skill consolidates a detailed MSK troubleshooting decision tree, specific thresholds (e.g., DiskUsage > 90%, replica.lag.time.max.ms default 30000), and nuanced handling of Serverless, Express, and KRaft modes that a generic model would not enumerate. However, most of the individual facts (CLI commands, metric names) are already known to a capable model, so the net delta is moderate rather than maximal."
+      "justification": "The skill supplies concrete thresholds (e.g., replica.lag.time.max.ms default 30000\u202fms, DiskUsage >90\u202f%), a detailed symptom\u2011to\u2011cause decision tree, and recent 2024\u20112026 feature nuances (Cluster Tier, KRaft, Serverless). However, much of the content restates publicly documented AWS guidance rather than novel expert heuristics, so it falls short of a perfect 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "The skill defines a clear AWS\u2011specific diagnostic order (State \u2192 URP \u2192 metrics) and supplies exact CLI commands, yet some procedures (e.g., \"check security group\") are generic and not tied to a precise AWS\u2011centric sequence."
+      "justification": "Provides an AWS\u2011specific procedural flow: capture signal \u2192 map symptom \u2192 run targeted CLI commands in a prescribed order, with explicit per\u2011category probes. The only shortfall is a minor lack of a formal decision\u2011tree diagram; the textual table suffices but is slightly less rigorous."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with five specific pitfalls and clear reasoning (e.g., never infer root cause from cluster state alone). Missing broader anti\u2011patterns such as misreading CloudWatch metrics, ignoring pagination limits, or assuming IAM policies are sufficient, which would have earned full marks."
+      "justification": "Includes a solid NEVER list (5 items) with clear reasoning why each is dangerous. Missing are a few common pitfalls such as forgetting to enable enhanced monitoring before relying on CloudWatch metrics, and the risk of applying configuration revisions without version check, which would have earned full points."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, activation triggers, and a detailed description are present, but the \"invocation_schema\" section is vague about the exact JSON structure expected, which could hinder reliable activation."
+      "justification": "Frontmatter is complete, activation triggers, invocation schema, and when\u2011to\u2011use/when\u2011not\u2011to\u2011use sections are present, enabling reliable activation. The only minor gap is the absence of an explicit \u201crequired input fields\u201d list separate from the narrative, which keeps it from a perfect score."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered into sections, yet the initial Mindset and Quick Reference dump a large amount of detail before the agent knows the minimal required input, creating potential cognitive overload."
+      "justification": "Top\u2011level quick reference, then step\u2011by\u2011step detailed sections, then deep command examples. Slight overload in the quick\u2011reference table (many columns) forces the reader to parse a lot early, preventing perfect progressive layering."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Diagnostic operations are read\u2011only and tightly scoped; destructive commands are absent. The only minor shortfall is the lack of explicit constraints for Serverless throttling scenarios (e.g., per\u2011partition RCU limits) which could benefit from tighter guidance."
+      "justification": "Destructive actions (e.g., update\u2011cluster\u2011configuration) are gated behind explicit ARN and version requirements, and the skill warns to verify before applying. The only gap is the absence of a safety\u2011check flag (e.g., --dry-run) for the most risky commands."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (Activation, Mindset, Quick reference, Process, Output contract, Heuristics, NEVER, References), but the ordering of sections deviates slightly from the most common pattern, causing a minor inconsistency."
+      "justification": "Follows a clear, repeatable pattern: Activation \u2192 Mindset \u2192 Quick reference \u2192 Process steps \u2192 Output contract \u2192 Heuristics \u2192 NEVER list. The pattern is coherent and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides a usable decision tree, concrete CLI commands, and strict output format, yet lacks explicit handling for ambiguous cases where multiple failure categories overlap and does not specify fallback behavior when required tools are missing."
+      "justification": "Provides concrete AWS CLI and kafka\u2011tool commands, a strict output contract, and worked examples that an agent can follow. Some assumptions (availability of kafka\u2011tools, correct IAM permissions) are not explicitly guarded, and error\u2011handling for missing CLI tools is omitted, so the skill is highly usable but not perfect."
     }
   ],
-  "total_score": 105,
+  "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 39804,
-  "latency_ms": 21897,
+  "token_count": 39312,
+  "latency_ms": 4546,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

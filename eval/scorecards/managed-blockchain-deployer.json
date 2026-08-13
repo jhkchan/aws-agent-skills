@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert knowledge: immutable edition and instance\u2011type decisions, retirement of Starter edition, exact Fabric 1.4 vs 2.x lifecycle differences, detailed dependency graph, and specific instance\u2011type matrix. Most of this granularity is not present in a baseline model."
+      "justification": "Provides concrete expert heuristics not usually known to a baseline model: Starter edition retirement, immutable edition/framework/instance\u2011type, exact AWS CLI syntax for each resource, specific network IDs for Ethereum, detailed Fabric 1.4 vs 2.x lifecycle differences, and a recent\u2011features list (2023\u20112026). Missing some expert details such as required IAM permissions for each CLI call, cost\u2011impact guidance, and how to delete/re\u2011create immutable resources, which prevents a perfect score."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Provides AWS\u2011specific procedural flow: product\u2011line decision tree, exact CLI commands in correct order, voting\u2011policy JSON, CA enrollment steps, and node\u2011creation AZ checks. Some steps (e.g., VPC verification) are described generically without concrete CLI snippets."
+      "justification": "Encodes an AWS\u2011specific procedural flow: decision tree (Fabric vs Ethereum vs Query), ordered CLI commands, dependency graph, and polling hints. However, the procedure for status polling (e.g., waiting for CA or node to become AVAILABLE) is only mentioned briefly and lacks a concrete retry/back\u2011off algorithm, so it falls short of a flawless procedure."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Contains a thorough NEVER list (12 items) with explicit reasons (e.g., Starter edition retirement, non\u2011existent create\u2011channel API). Lacks a few additional pitfalls such as IAM policy edge cases for Query API."
+      "justification": "Provides a thorough NEVER list (12 items) with concrete reasons (e.g., Starter edition retirement, non\u2011existent create\u2011channel API, immutable instance type). Missing a specific NEVER about forgetting to attach the Query API IAM policy, so -1."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description clearly states WHAT and WHEN, activation keywords listed, and strict output contract defined. Missing a formal trigger pattern (e.g., regex) that an agent runtime could reliably parse."
+      "justification": "Complete frontmatter, clear description, activation keywords, when\u2011to\u2011use section, and strict output contract with literal labels. Slight ambiguity: the activation trigger list mixes natural language and keywords, which could cause unreliable activation, so -1."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered: quick navigation, high\u2011level mindset, step\u2011by\u2011step details, heuristics, NEVER list, and output format. Some sections (Recent features) add bulk but do not obscure critical rules."
+      "justification": "Information is layered into sections (mindset, dependency graph, step\u2011by\u2011step, anti\u2011patterns, output format, error handling). Critical rules are not buried, but the initial sections are dense, which could cause cognitive overload for a first\u2011time reader."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Calibrates freedom for fragile operations: prerequisites checklist, immutable\u2011resource warnings, and NEVER rules. However, destructive actions like create\u2011network are only gated by prerequisites, not by additional safety confirmations."
+      "justification": "Destructive actions (create\u2011network, create\u2011node) are guarded by prerequisite checks, NEVER list, and explicit polling. Creative read\u2011only tasks (Query API) are left unconstrained, which is appropriate. Minor missing explicit user confirmation step before irreversible calls, so -1."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Steps \u2192 Heuristics \u2192 NEVER \u2192 Output). Section naming is slightly ad\u2011hoc but overall structure is coherent."
+      "justification": "Follows a recognizable pattern (mindset \u2192 decision tree \u2192 detailed steps \u2192 anti\u2011patterns \u2192 output format \u2192 worked example). The structure is coherent, though the inclusion of multiple example outputs in a single document makes the pattern slightly less uniform."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides decision tree, concrete CLI commands, checklist, and verification commands enabling an agent to act. Missing explicit error\u2011handling branches, polling loops for async resources, and some formatting inconsistencies (e.g., missing space in 'admin-msp at./admin-msp')."
+      "justification": "Provides working CLI commands, a ready\u2011to\u2011use checklist, verification commands, and error\u2011handling guidance, enabling an agent to execute the skill cold. Missing handling for pagination in Query API calls, quota\u2011exhaustion errors, and explicit retry logic for asynchronous operations, which limits full usability."
     }
   ],
-  "total_score": 105,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 44395,
-  "latency_ms": 13992,
+  "token_count": 44724,
+  "latency_ms": 10909,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides many concrete, expert\u2011level details (partition\u2011projection TBLPROPERTIES, 1\u202fTB BytesScannedCutoff, CUR\u202f2.0 split\u2011cost\u2011allocation prerequisites, exact bucket\u2011policy conditions). However, a large portion restates publicly documented requirements without adding a novel decision tree or threshold beyond what a senior CloudOps engineer could already infer."
+      "justification": "The skill aggregates a lot of expert detail (bucket policy conditions, BytesScannedCutoffPerQuery, partition\u2011projection syntax, CUR\u202f2.0 SCAD prerequisites) that a generic model would not list in one place. However, several items are merely restatements of public documentation (e.g., \"hourly CUR has 24\u2011hour lag\", \"Parquet is faster than GZIP\") and no novel decision tree (e.g., when to prefer CUR\u202f2.0 vs. legacy CUR) is provided, so the knowledge delta is strong but not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Defines an AWS\u2011specific workflow: pre\u2011flight requirement gate, ordered design steps (CUR definition \u2192 bucket policy \u2192 Glue DB \u2192 Athena workgroup \u2192 queries \u2192 QuickSight \u2192 tags \u2192 Cost Categories). Missing a detailed procedure for cross\u2011account IAM role creation and for handling existing resources (e.g., update vs. create), which leaves a small procedural gap."
+      "justification": "The skill defines a clear AWS\u2011specific workflow: pre\u2011flight checks, ordered creation of CUR, S3 bucket, Glue DB/Table, Athena workgroup, named queries, then optional QuickSight. The procedure is concrete and uses exact CLI commands. The only shortfall is that the QuickSight integration steps are high\u2011level (\"create dataset\", \"create dashboard\") without a detailed, AWS\u2011specific sequence (e.g., data source creation, permission grant, SPICE refresh schedule), which prevents a perfect score."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list, five failure\u2011mode heuristics, and explicit reasons (e.g., MSCK REPAIR throttling, confused\u2011deputy bucket policy). Lacks a few niche pitfalls such as IAM trust\u2011policy misconfigurations for the Athena execution role, so the anti\u2011pattern coverage is strong but not exhaustive."
+      "justification": "Contains a thorough NEVER list with concrete reasoning (e.g., never use OVERWRITE, never grant \"*\" principal, never rely on MSCK REPAIR). The list is strong, but it could include additional pitfalls such as SCPs that block service\u2011linked role creation or missing Athena engine\u2011version checks, so it falls short of flawless."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Front\u2011matter is complete (name, description, version, author, license, keywords, tags, metadata, when_to_use, activation_triggers, invocation_schema). The description clearly states WHAT it does and WHEN to invoke. The only shortfall is the absence of a concrete example input in the invocation_schema, which would make activation marginally less reliable."
+      "justification": "Frontmatter is complete, description clearly states WHAT the skill does, WHEN to invoke, and provides a rich keyword list and activation triggers. The invocation schema is well defined, and the output contract is unambiguous. No defects found."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Layers information well: quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 strict output contract \u2192 heuristics \u2192 anti\u2011patterns. Some sections (e.g., the full requirement checklist) are dense, but critical rules are still surfaced early, so cognitive overload is limited."
+      "justification": "Information is layered: quick reference, mindset, pre\u2011flight, process, strict output contract, and detailed references. Critical rules (partition projection, workgroup DSL) appear early enough, though some repetitions and deep\u2011link references could cause minor overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (CUR creation, bucket\u2011policy changes) are gated by pre\u2011flight checks and manual\u2011gap reporting. Creative tasks (cost analysis, Q integration) are left open. The only minor issue is that the bucket\u2011policy remediation snippet is generic and could benefit from tighter parameter validation."
+      "justification": "Destructive actions are gated by an explicit CONFIRM step and missing requirements produce MANUAL_STEP_REQUIRED with exact remediation snippets. A few optional components (e.g., QuickSight) are not tightly constrained when not requested, but overall calibration matches task fragility."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (quick reference, mindset, pre\u2011flight, process, output contract, heuristics, anti\u2011patterns). The structure is consistent and aids comprehension."
+      "justification": "Follows a recognizable pattern (quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 output contract \u2192 anti\u2011patterns). Section headings are consistent, though some naming (e.g., \"\u00a7\" symbols) is ad\u2011hoc, preventing a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides decision trees, requirement checklist, exact CLI/IaC snippets, and a strict output contract that an agent can follow. However, the IAC templates are only referenced via external files (e.g., references/athena\u2011partition\u2011projection\u2011and\u2011queries.md) and not inlined, which hampers immediate execution. Also, no explicit error\u2011handling branches for API throttling are shown."
+      "justification": "Provides concrete decision trees, CLI snippets, error\u2011diagnostic flows, and full example outputs. Missing handling for cross\u2011region bucket mismatches and an explicit Athena engine\u2011version check, and some edge cases (e.g., SCP\u2011blocked service\u2011linked role) are not covered, so usability is strong but not flawless."
     }
   ],
-  "total_score": 104,
+  "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 42620,
-  "latency_ms": 8596,
+  "token_count": 43400,
+  "latency_ms": 11228,
   "assertions_passed": false,
   "assertions_passed_count": 2,
   "assertions_failed_count": 3
