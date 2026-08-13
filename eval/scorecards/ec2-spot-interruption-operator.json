@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert details such as exact threshold values (SQS ApproximateAgeOfOldestMessage <120\u202fs, Lambda timeout \u226560\u202fs, ELB deregistration_delay 30\u201160\u202fs), a decision\u2011tree of pre\u2011checks, and diversification math (3 families\u202f\u00d7\u202f3 AZs = 99.9\u202f% availability). These specifics go beyond a generic model's knowledge, but many of them are already documented in AWS best\u2011practice guides, so the skill does not achieve a perfect 20."
+      "justification": "Adds concrete expert details not usually memorized: diversification minimum (3 families \u00d7 3 AZs for 99.9% availability), exact cost premium (5\u20118%) of capacity\u2011optimized vs lowest\u2011price, placement\u2011score thresholds (\u22657 good, \u22643 avoid), 90\u2011second design window (2\u2011minute max), Spot Block deprecation timeline, Graviton4 pools, IMDSv2 requirement, and a full decision\u2011tree of pre\u2011checks. Most of this is beyond a generic model's baseline knowledge, though some points (e.g., use capacity\u2011optimized) are already common knowledge, so not a perfect 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific ordering of pre\u2011checks, exact EventBridge rule pattern, SQS attributes, Lambda concurrency, and ALB deregistration delay. Deducted 1 point because the high\u2011level \u201crun pre\u2011checks\u201d step is generic and not fully broken down into AWS\u2011specific sub\u2011procedures."
+      "justification": "Provides an AWS\u2011specific procedure order (EventBridge rule \u2192 SQS \u2192 Lambda \u2192 ELB deregistration \u2192 checkpoint \u2192 replacement) with exact CLI commands for each step and a mandatory CONFIRM gate. The only shortfall is a few generic statements like \"monitor\" without specifying the exact CloudWatch metric or alarm to use."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., avoid long deregistration delay, never use lowest\u2011price with a single pool). Missing are pitfalls around IAM permission mis\u2011configurations and DLQ handling, so 2 points are deducted."
+      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., never set ELB deregistration > 2\u202fmin, never rely on lowest\u2011price with a single pool). Missing a few niche pitfalls such as IAM permission gaps for EventBridge\u2011to\u2011Lambda invocation, which would have strengthened the list."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and invocation_schema are present. The invocation_schema is informal prose rather than a strict JSON schema, which could hinder reliable automated parsing, so a small deduction is applied."
+      "justification": "Frontmatter is complete, description, when_to_use, activation_triggers, and keywords are well defined. The invocation_schema is only a prose description, not a strict JSON schema, which could lead to ambiguous parsing by an agent."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses a navigation table, quick reference, mindset, pre\u2011flight, process, output format, examples, and anti\u2011patterns, providing layered information. However, the opening description is dense and some critical rules (e.g., CONFIRM gate) are repeated later, causing slight cognitive overload."
+      "justification": "The skill is organized into layers (quick reference, mindset, pre\u2011flight, process, output format, anti\u2011patterns) allowing agents to skim or dive deeper. However, the initial sections are dense and contain many details that could overload a first\u2011time reader."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by a mandatory CONFIRM prompt and extensive pre\u2011checks, matching the fragility of Spot interruption handling. One point is deducted because region/account scoping is not always enforced in the example CLI snippets."
+      "justification": "Destructive actions are tightly constrained by a mandatory CONFIRM gate and exhaustive pre\u2011checks. Creative tasks (e.g., audit\u2011diversification) are given more freedom. The only minor issue is the lack of explicit limits on batch\u2011size or rate\u2011limiting for large\u2011scale modifications."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (What it does, Quick navigation, Mindset, Pre\u2011flight, Process, Output format, Anti\u2011Patterns). The mix of markdown tables and free\u2011form text makes the pattern slightly ad\u2011hoc, costing 1 point."
+      "justification": "Follows a clear, repeatable pattern (What \u2192 Quick navigation \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Output \u2192 Anti\u2011Patterns \u2192 Safety). The structure is recognizable and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working CLI commands, decision trees, and verification steps that an agent could execute. However, error handling for CLI failures and fallback actions are not fully covered, and some examples omit region/account placeholders, leading to a 2\u2011point deduction."
+      "justification": "Provides working examples, decision trees, CLI snippets, and verification steps that an agent could execute. Deducted for missing handling of edge cases such as API pagination errors, rate\u2011limit retries, and explicit error\u2011handling branches for failed CLI calls."
     }
   ],
   "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 49682,
-  "latency_ms": 17320,
+  "token_count": 48758,
+  "latency_ms": 10692,
   "assertions_passed": false,
-  "assertions_passed_count": 4,
-  "assertions_failed_count": 1
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
 }

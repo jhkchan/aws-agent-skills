@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "The skill introduces several non\u2011trivial expert details not usually recalled by a generic model: exact service limits (150 rules, 25 packs), cost estimate for API calls, the full pre\u2011check priority order, proactive Config rules via CloudFormation hooks, and the nuance that MaximumExecutionFrequency applies to both periodic and config\u2011change rules. However, a large portion restates well\u2011known Config concepts (recorder must run, start\u2011config\u2011rules\u2011evaluation, IAM permissions), so the delta is strong but not perfect."
+      "justification": "Adds expert\u2011level specifics (exact limits, cost impact, proactive rule hook name, detailed pre\u2011check priority, anti\u2011pattern reasons) that a generic model would not know, but several items (e.g., 150\u2011rule limit, 1\u201130\u202fmin lag) are already documented in AWS docs, so full 20 is not earned."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific procedural flow: mindset explanation, ordered pre\u2011flight checks, mandatory CONFIRM gate, snapshot before modification, forced evaluation, and post\u2011verification steps. The steps are tightly tied to Config service behavior rather than generic security checklists."
+      "justification": "Provides a clear AWS\u2011specific workflow: recorder check, delivery channel, IAM, snapshot before change, confirm gate, forced evaluation, post\u2011verify steps. Missing an explicit procedure for rule updates or deletions, which leaves a gap in the end\u2011to\u2011end process."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Includes a concrete \"NEVER\" top\u20115 list with specific reasons (recorder must run, start\u2011evaluation required, remediation not automatic, Lambda permission needed, avoid periodic for security\u2011critical rules). The full 15\u2011item list is only referenced, not displayed, which slightly reduces completeness."
+      "justification": "Contains a concrete NEVER list with explicit reasons (recorder stopped, immediate evaluation, remediation auto\u2011enable, Lambda permission, periodic vs config\u2011change). The list is limited to five items in\u2011skill (full list external) and could include more edge\u2011cases (e.g., exceeding rule limits), thus a single point is taken."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 15,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete (name, description, version, author, license, compatibility, keywords, tags, dependencies, metadata, activation triggers, invocation schema). The description clearly states WHAT the skill does, WHEN to invoke, and provides exhaustive keywords for reliable activation."
+      "justification": "Front\u2011matter, description, keywords, activation triggers, and invocation schema are all present and well\u2011formed. The \"when to invoke\" narrative could be tighter; activation triggers contain some overlapping or overly generic phrases that might cause false positives."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The document layers information: quick reference first, then deeper Mindset, Pre\u2011flight, Process, Patterns, Output contract, NEVER, and references. Nonetheless, the quick reference and full process sections are dense, and some critical anti\u2011pattern details are hidden in the external \"references/\" folder, causing slight cognitive overload."
+      "justification": "Uses layered sections (quick reference, mindset, pre\u2011flight, process, patterns, output contract) but the initial sections are dense, exposing many details before the reader knows whether they need them, creating some cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive operations (put\u2011config\u2011rule, put\u2011conformance\u2011pack) are tightly constrained with pre\u2011checks, CONFIRM gate, and snapshot. Non\u2011destructive or informational tasks (e.g., compliance reporting) are left freer. Calibration matches task fragility well."
+      "justification": "Destructive actions are tightly gated with CONFIRM, pre\u2011checks, and snapshots; creative tasks have ample freedom. However, the proactive\u2011rule example mistakenly uses `put-organization-config-rule`, showing the calibration is not perfectly aligned for that edge case."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (Quick reference \u2192 Mindset \u2192 Pre\u2011flight \u2192 Process \u2192 Common patterns \u2192 Output contract \u2192 NEVER \u2192 References). The pattern is consistent throughout, aiding comprehension."
+      "justification": "Follows a recognizable pattern (What, Quick navigation, Mindset, Pre\u2011flight, Process, Boilerplate, Output contract, NEVER, References). A small deviation is the inclusion of a \"Recent AWS features\" free\u2011form list that feels ad\u2011hoc rather than part of the core pattern."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 12,
       "max": 15,
-      "justification": "Provides exact CLI commands, a strict output contract, and worked examples, enabling an agent to act. However, examples contain JSON that is not properly escaped for multi\u2011line template bodies, lack handling for update\u2011vs\u2011create scenarios, pagination of describe calls, and detailed error\u2011handling paths. Some edge cases (e.g., rule already exists, regional mismatches) are not covered."
+      "justification": "The skill yields fully\u2011formed CLI commands and a strict output contract, enabling an agent to act. Deductions stem from missing error\u2011handling branches (e.g., rule\u2011name length validation, IAM permission failures), and the proactive\u2011rule example uses the wrong API (put\u2011organization\u2011config\u2011rule instead of the proper proactive hook call), which could cause execution failure."
     }
   ],
   "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 36561,
-  "latency_ms": 36456,
+  "token_count": 36535,
+  "latency_ms": 13886,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0
