@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Introduces several expert heuristics not typically in baseline knowledge: the mandatory virtual\u2011router for weighted routing, the service\u2011discovery decision tree (DNS vs Cloud\u202fMap), nuanced egress\u2011filter implications, mTLS migration modes, and a recent\u2011features summary. However, much of the content restates official documentation without novel quantitative thresholds or decision trees, limiting the delta."
+      "justification": "Adds concrete expert knowledge: decision tree for service discovery, explicit rule that weighted routing requires a virtual router, detailed sidecar injection nuances per platform, mTLS migration advice (PERMISSIVE \u2192 STRICT), recent feature list (multi\u2011cluster mesh, SDS enhancements). Some sections merely restate AWS docs, so not a full 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides AWS\u2011specific procedural ordering (mesh \u2192 virtual nodes \u2192 routers \u2192 services, prerequisite checks, Helm install of App Mesh controller, namespace labeling). Some steps are generic (e.g., \"install helm repo\") and the procedure for error handling is absent, preventing a perfect score."
+      "justification": "Provides AWS\u2011specific step\u2011by\u2011step procedures with exact CLI JSON specs, Helm install of the App\u202fMesh controller, namespace labeling, and side\u2011car injection steps. A few generic verification prompts remain, costing one point."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a concrete \"NEVER\" list with specific pitfalls (e.g., backing a virtual service with a node for canary, assuming auto\u2011inject on all platforms, using STRICT mTLS during migration) and clear reasoning. Missing a few additional anti\u2011patterns such as IAM permission errors or idempotency conflicts, hence a slight deduction."
+      "justification": "Contains a thorough \u2018NEVER\u2019 list with concrete reasons (e.g., never back a virtual service with a node for canary, never use STRICT mTLS during migration). Missing an explicit warning about over\u2011permissive IAM permissions, so two points are deducted."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter, description, keywords, and activation triggers are well\u2011formed, yet the \"when to use\" narrative is verbose and the trigger list omits negative cases (e.g., delete or update operations), making activation slightly less reliable."
+      "justification": "Frontmatter is complete and well\u2011formed; description, when_to_use, activation keywords, and output contract are all present and unambiguous. No missing metadata that would prevent reliable activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Uses quick\u2011navigation tables and layered sections (mindset, heuristics, steps, never list). Nevertheless, the initial sections are dense and present many details before the core checklist, causing some cognitive overload for an agent that might only need the top\u2011level contract."
+      "justification": "Uses quick\u2011navigation table, layered sections (mindset, heuristics, step\u2011by\u2011step, NEVER, output format). However, the document is dense and some critical rules (e.g., prerequisite checks) are buried deep, causing potential cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Calibrates freedom by requiring prerequisite verification before emitting a READY_TO_DEPLOY verdict and by separating destructive provisioning commands from the checklist. However, it does not enforce safeguards against accidental re\u2011creation of existing resources or provide idempotency hints, leaving some freedom unchecked."
+      "justification": "Calibrates freedom by requiring prerequisite verification and a PREREQUISITES_MISSING verdict, preventing blind execution of destructive creates. Lacks explicit interactive confirmation prompts for irreversible actions, but overall well\u2011balanced."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable pattern (metadata \u2192 activation \u2192 mindset \u2192 heuristics \u2192 step\u2011by\u2011step \u2192 NEVER \u2192 output format). The pattern is coherent and aids comprehension; a minor deduction for occasional ad\u2011hoc formatting (mixed markdown tables and plain text) that slightly breaks uniformity."
+      "justification": "Follows the standard skill pattern (frontmatter, activation keywords, mindset, stepwise process, NEVER list, output format), making it instantly recognizable."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides complete AWS CLI commands, a ready\u2011to\u2011deploy checklist, and verification steps, enabling an agent to execute the provisioning. Lacks guidance on error handling, rollback, and idempotent checks (e.g., handling already\u2011existing mesh or node), which are critical for robust automation."
+      "justification": "Provides working CLI examples, verification commands, error\u2011handling guidance, and a ready\u2011to\u2011deploy checklist. Lacks detailed handling for partial failures (e.g., what to do if a route creation fails after node creation), so two points are deducted."
     }
   ],
-  "total_score": 102,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 50721,
-  "latency_ms": 13997,
-  "assertions_passed": true,
-  "assertions_passed_count": 5,
-  "assertions_failed_count": 0
+  "grade": "A",
+  "token_count": 46928,
+  "latency_ms": 13302,
+  "assertions_passed": false,
+  "assertions_passed_count": 3,
+  "assertions_failed_count": 2
 }

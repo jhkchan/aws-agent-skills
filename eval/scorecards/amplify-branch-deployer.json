@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds genuine expert knowledge such as the critical amplify.yml vs buildspec.yml distinction, the detailed dependency graph, monorepo appRoot handling, SSR Lambda cost implications, and recent feature timelines. However, a portion restates standard AWS documentation without novel decision trees, preventing a perfect score."
+      "justification": "Adds genuine expert insights not usually restated by a baseline model: the critical amplify.yml vs buildspec.yml distinction, the explicit configuration dependency graph, monorepo appRoot requirement, PR\u2011preview ephemerality, cost\u2011control via pullRequestEnvironmentName, and recent feature timelines. Deducted for lacking a concrete decision threshold (e.g., when to pick small vs medium build instance)."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides AWS\u2011specific procedures: exact CLI commands, ordering (app creation \u2192 branch \u2192 build spec \u2192 domain \u2192 PR preview), and concrete flag usage. Some steps (e.g., \"verify prerequisites\") are generic and not uniquely AWS\u2011oriented, so full marks are not awarded."
+      "justification": "Provides AWS\u2011specific step\u2011by\u2011step CLI procedures in the correct order (app creation \u2192 branch \u2192 build spec \u2192 redirects \u2192 auth \u2192 domain \u2192 PR preview). Includes a dependency\u2011graph mindset. Minor deduction because some checks (e.g., DNS verification) are described generically rather than as precise CLI validation steps."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a solid NEVER list with specific reasons (e.g., never use buildspec.yml, never treat PR preview as a stable URL). Missing a few common pitfalls such as IAM service\u2011role misconfiguration and detailed cost\u2011impact warnings for high\u2011volume PR previews, which keeps the score just below max."
+      "justification": "Contains a thorough \"NEVER\" list (10 items) with concrete reasons (e.g., buildspec.yml ignored, PR preview not stable, mis\u2011typed branch name). Lacks a few advanced pitfalls such as IAM role permission pitfalls and Lambda cost explosion for many branches, hence the deduction."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, description, triggers, keywords, and when_to_use are well defined. The activation keywords are present but somewhat overlapping, and the output contract lacks an explicit schema version, causing slight ambiguity."
+      "justification": "Complete frontmatter, clear description, explicit trigger keywords, precise output contract with required literal labels, and a well\u2011defined when_to_use section. No missing or vague elements."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Uses quick navigation, layered sections, and a concise checklist at the end, which aids incremental consumption. However, the extensive heuristic tables and long narrative blocks appear early, risking cognitive overload before the core checklist."
+      "justification": "Uses layered sections (quick navigation, mindset, heuristics, step\u2011by\u2011step, error handling). However, the early sections are dense and some critical rules (e.g., NEVER list) are buried after many pages, causing potential cognitive overload."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by a prerequisite checklist, and the skill calibrates freedom for cost\u2011sensitive tasks (e.g., PR preview reuse). It lacks explicit limits on branch count or automated cost\u2011control thresholds, leaving a small gap."
+      "justification": "Destructive actions (app/branch/domain creation) are tightly constrained with prerequisite checks; creative tasks (e.g., custom headers) are left flexible. Slight deduction because cost\u2011control advice (single PR env) is advisory, not enforced by the skill."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern: Mindset, Heuristics, Step\u2011by\u2011step guide, NEVER list, Output format. Minor ad\u2011hoc ordering of sections prevents a perfect score."
+      "justification": "Follows a recognizable structure (Mindset \u2192 Heuristics \u2192 Steps \u2192 NEVER \u2192 Output \u2192 Error handling). The mix of tables, narrative, and code blocks is slightly ad\u2011hoc, preventing a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides a ready\u2011to\u2011use checklist, concrete CLI commands, error\u2011handling guidance, and verification steps. Some edge cases (e.g., missing IAM role, DNS verification failures) are only briefly mentioned, and the examples sometimes omit branch\u2011level overrides, limiting full practical reliability."
+      "justification": "Provides working CLI examples, a ready\u2011to\u2011deploy checklist, error\u2011handling guidance, and multiple worked examples. Missing explicit handling for region selection, IAM service\u2011role creation validation, and amplify.yml syntax validation, which could cause execution gaps."
     }
   ],
-  "total_score": 102,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 48071,
-  "latency_ms": 7823,
+  "grade": "A",
+  "token_count": 44736,
+  "latency_ms": 12632,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1

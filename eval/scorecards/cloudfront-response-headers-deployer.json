@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 18,
       "max": 20,
-      "justification": "Provides several expert\u2011only details (fixed managed\u2011policy IDs, immutable ETag workflow, the fact that Server/Via cannot be removed, CSP baseline \u2018default-src \\\"self\\\"\u2019, HSTS irreversible impact, origin\u2011reflection limitation, versioned managed\u2011policy auto\u2011updates). These are beyond a generic model\u2019s knowledge, but a few points (e.g., basic header list) are restatements of public docs, so not a perfect 20."
+      "justification": "Adds concrete expert knowledge not in a baseline model: exact managed policy IDs, immutable versioning and ETag handling, the fact that CloudFront cannot remove Server/Via headers, irreversible HSTS includeSubDomains implications, CSP baseline recommendations, and a detailed decision tree for managed vs custom policies."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific procedures: pre\u2011flight CLI checks, ETag capture before update\u2011distribution, decision tree for managed vs custom policies, exact CLI snippets, and confirmation gate. Only minor generic wording (\u201ccheck security\u201d) appears in the quick reference, preventing a full 15."
+      "justification": "Provides AWS\u2011specific step\u2011by\u2011step pre\u2011flight (distribution existence, state check, ETag capture), exact CLI commands, and a clear attach\u2011to\u2011cache\u2011behavior procedure. Lacks an explicit rollback/recovery procedure for failed updates, costing one point."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a comprehensive NEVER list with concrete reasoning (e.g., wildcard CORS + credentials, Override:false, HSTS on non\u2011prod, removing Server/Via). One small omission: it does not explicitly warn against using `X-Frame-Options: ALLOW-FROM` in the main body (only in anti\u2011patterns later), so deduct one point."
+      "justification": "Contains a thorough NEVER list with concrete reasons and a top\u20115 failure\u2011mode section. Misses a few niche pitfalls (e.g., IAM permission gaps, region\u2011specific ARN nuances), so two points are deducted."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter, description, when_to_use, activation_triggers, and invocation_schema are well\u2011formed, yet the activation triggers are a long free\u2011text list that could be ambiguous, and the invocation schema lacks a concrete JSON example, reducing reliability of automatic activation."
+      "justification": "Full frontmatter, clear description, when_to_use, activation_triggers, and invocation_schema. The when_to_use paragraph is slightly verbose and could be tighter, resulting in a single point loss."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered: quick reference, mindset, pre\u2011flight, process, strict contract, decision tree, anti\u2011patterns. Yet the \u201cStrict output contract\u201d repeats many rules already stated, leading to some redundancy and slight cognitive overload."
+      "justification": "Uses layered sections (quick reference, mindset, pre\u2011flight, process, output contract) that gradually reveal detail. The quick reference table is dense, causing a modest cognitive overload; two points are deducted."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (create/update policies, attach to distribution) are tightly constrained with confirmation prompts, ETag checks, and state validation. Creative design steps are left open. No over\u2011constraining of flexible tasks, so only a minor point deducted for the duplicated output format which slightly over\u2011constrains the agent."
+      "justification": "Calibrates tightly for fragile operations (pre\u2011flight checks, ETag enforcement, NEVER list). Could better differentiate freedom for creative tasks such as generating CSP suggestions, so one point is taken off."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 output contract \u2192 decision tree \u2192 anti\u2011patterns). The pattern is clear, but the presence of two different output contract sections breaks the otherwise clean structure."
+      "justification": "Follows a recognizable pattern (quick reference \u2192 mindset \u2192 pre\u2011flight \u2192 process \u2192 output contract). Minor inconsistency in section naming (e.g., mixing \u2018\u00a7\u2019 headings with plain titles) prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides decision trees, CLI snippets, CloudFormation/Terraform templates, and a strict output contract, enabling execution. However, it omits handling of edge cases such as policy name collisions, region\u2011specific ARN nuances, IAM permission failures, and does not show fallback logic for CLI errors, which hampers real\u2011world reliability."
+      "justification": "Provides working CloudFormation/Terraform snippets, CLI commands, decision trees, and example output blocks that an agent can execute. Omits handling of stale ETag conflicts and region\u2011specific ARN edge cases, leading to two point deductions."
     }
   ],
   "total_score": 108,
   "max_score": 120,
   "grade": "A",
-  "token_count": 48332,
-  "latency_ms": 21763,
+  "token_count": 48177,
+  "latency_ms": 33722,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1
