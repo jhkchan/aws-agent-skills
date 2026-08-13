@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert heuristics (10\u201150\u202fGB per shard sizing table, immutable mapping warning, k\u2011NN settings immutability, explicit dependency graph, ILM rollover alias requirement). However it omits guidance on choosing data streams vs rollover alias, lacks version/region compatibility notes, and does not cover edge\u2011case handling for existing indices."
+      "justification": "Provides concrete expert heuristics not found in generic docs: shard\u2011size decision tree (10\u201150\u202fGB per shard), immutable\u2011mapping warning, ILM rollover\u2011alias dependency, k\u2011NN settings immutability, and a novel dependency\u2011graph table. These give a senior engineer actionable thresholds and gotchas beyond baseline knowledge."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides AWS\u2011specific step\u2011by\u2011step procedures (domain connectivity, IAM sigv4, ILM creation, alias swap, template creation, k\u2011NN index settings). Some steps are generic (curl commands) and the snapshot IAM\u2011role verification is only mentioned in prerequisites, not as a concrete procedure."
+      "justification": "Outlines AWS\u2011specific step order (verify connectivity \u2192 create ILM policy \u2192 create rollover alias \u2192 create index \u2192 attach template) and includes domain\u2011level auth guidance. Some procedures are generic (e.g., \u201cverify cluster health\u201d) and the IAM\u2011role verification for snapshots is only mentioned in prerequisites, not as a step, hence a small deduction."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 14,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with specific reasons (e.g., default shards, mutable mappings, missing write\u2011index flag, enabling k\u2011NN post\u2011creation). Misses a few niche pitfalls such as misuse of dynamic templates or shard allocation limits."
+      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., default 5 shards, immutable mappings, missing is_write_index, k\u2011NN immutability, force\u2011merge on write\u2011active index). Lacks a few less\u2011common pitfalls (e.g., using object type for arrays of objects without nesting), so one point is deducted."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter, description, activation keywords, output contract, and when\u2011to\u2011use section are all present. Activation triggers are free\u2011text rather than a strict pattern, and the when\u2011to\u2011use narrative is verbose, which could hinder reliable activation."
+      "justification": "Full front\u2011matter, clear description, explicit WHEN\u2011TO\u2011USE, comprehensive keyword list, and precise activation triggers. The skill meets all spec requirements for reliable invocation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Uses quick\u2011navigation and layered sections, but the initial document front\u2011loads a large amount of prose (dependency graph, heuristics, full tables) before the concise checklist, which can cause cognitive overload for an agent needing only the top\u2011level actions."
+      "justification": "Top\u2011level summary, quick\u2011navigation table, and deep\u2011dive sections keep initial cognitive load low. The only issue is that the \u201cMindset\u201d paragraph is dense, slightly breaking the ideal of minimal front\u2011load."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Calibrates well: destructive actions (index creation) are gated by prerequisite checks, and the output contract enforces a strict checklist. Minor deduction for not explicitly limiting extreme shard counts (e.g., >100) which could be risky in fragile environments."
+      "justification": "Destructive actions (index creation, force\u2011merge) are gated by prerequisite checks (cluster health, disk space, node count). Creative tasks (template design) are left open with guidance, showing appropriate constraint levels."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (mindset \u2192 dependency graph \u2192 heuristics \u2192 step list \u2192 NEVER \u2192 output format). Ordering of some sections (e.g., heuristics before mindset) is slightly ad\u2011hoc."
+      "justification": "Follows a recognizable pattern: Mindset \u2192 Dependency Graph \u2192 Heuristics \u2192 Step\u2011by\u2011step procedure \u2192 NEVER list \u2192 Output contract. Slight deviation in ordering of sections (e.g., \u201cQuick navigation\u201d before \u201cMindset\u201d) prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides working examples, provisioning JSON, verification curl commands, and error\u2011handling guidance. Lacks explicit handling of missing prerequisites in the checklist output and does not cover updating existing indices or re\u2011indexing edge cases comprehensively."
+      "justification": "Model output examples obey the literal checklist contract and include working JSON and curl commands. Error\u2011handling guidance is present but not exhaustive (e.g., missing guidance for IAM permission errors on snapshot repo). Hence a modest deduction."
     }
   ],
-  "total_score": 104,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 44147,
-  "latency_ms": 12330,
+  "grade": "A",
+  "token_count": 43240,
+  "latency_ms": 6865,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1
