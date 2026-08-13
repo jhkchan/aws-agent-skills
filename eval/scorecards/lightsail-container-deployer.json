@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 18,
       "max": 20,
-      "justification": "Adds novel expert heuristics not in a baseline model: power\u2011scale vs node\u2011count trade\u2011off with cost equivalence table, up\u2011to\u2011date 2025\u20112026 feature list (VPC peering, deployment version history, cross\u2011account ECR support) and detailed ECR auth flow. These specifics constitute genuine delta knowledge."
+      "justification": "Introduces novel expert heuristics not commonly known: detailed power\u2011scale vs node\u2011count trade\u2011off with cost comparison, VPC peering for Lightsail containers, deployment version history, and a timeline of recent feature releases. These specifics provide genuine delta beyond a baseline model."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Provides an AWS\u2011specific end\u2011to\u2011end procedure: dependency graph, exact CLI commands, order of operations (service \u2192 deployment \u2192 auth \u2192 endpoint), and decision tree. A few steps are generic (e.g., \"verify service status\") which prevents a perfect score."
+      "justification": "Defines an AWS\u2011specific procedural flow: create service \u2192 configure ECR auth \u2192 deploy containers \u2192 set public endpoint \u2192 scale \u2192 enable TLS \u2192 add custom domain \u2192 enable CloudWatch Logs. Includes exact CLI commands, required JSON payloads, and ordering that a CloudOps engineer would follow."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with detailed reasoning (confusing power scale, missing ECR auth, single\u2011node production, unmapped ports, plaintext secrets, rolling redeploy, TLS assumptions, over\u2011using Lightsail for complex orchestration, health\u2011check path, credential rotation). Missing some common pitfalls such as least\u2011privilege IAM policies and service quota limits."
+      "justification": "Provides a concrete NEVER list of 10 pitfalls with explicit reasoning (e.g., confusing power scale with node count, deploying with a single node in production, missing port mapping, using plaintext env vars for secrets, redeploy triggers, TLS assumptions, credential rotation). The warnings are specific and experience\u2011driven."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, description clearly states purpose, triggers, and when_to_use. Slight vagueness remains in trigger matching (e.g., overlapping keywords) and the skill does not define a strict schema for required input parameters, which could cause activation ambiguity."
+      "justification": "Frontmatter contains all required metadata (name, version, author, license, keywords, triggers, etc.). Description clearly states WHAT the skill does, WHEN to invoke, and includes a precise activation keyword list and strict output contract with literal labels."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Uses layered sections, quick\u2011navigation table, and deep references, keeping the top\u2011level overview concise. However full command blocks appear early in the document, adding cognitive load before the agent has decided to act."
+      "justification": "Content is layered: high\u2011level overview and quick\u2011navigation table, followed by detailed sections (Mindset, Configuration graph, heuristics, step\u2011by\u2011step guide, NEVER list, output format, decision tree). Critical rules are presented early; deep references are deferred."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive provisioning is gated by a prerequisite checklist; the skill forces verification before emitting commands, matching the fragility of Lightsail operations. No over\u2011constrained creative steps are present."
+      "justification": "Destructive actions (resource creation) are tightly gated by a prerequisite checklist and explicit power/scale decisions. Optional features (ECR auth, custom domain) are only enabled when needed, matching task fragility."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (mindset, heuristics, step\u2011by\u2011step process, NEVER list, output contract, decision tree, error handling). Section ordering is slightly ad\u2011hoc (e.g., decision tree appears after error handling), preventing a perfect score."
+      "justification": "Follows a coherent pattern used in many CloudOps skills: Mindset \u2192 Configuration dependency graph \u2192 Expert heuristics \u2192 Stepwise process \u2192 NEVER list \u2192 Output contract \u2192 Decision tree. Structure is recognizable and aids comprehension."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 10,
       "max": 15,
-      "justification": "Provides working examples, decision tree, error\u2011handling guidance, and complete CLI snippets. However, the output label set is inconsistent (FORBIDDEN/DECISION_TREE appear in spec but not always in examples) and some edge cases (cross\u2011account ECR, VPC peering steps) are only mentioned without actionable steps, limiting full usability."
+      "justification": "Provides working CLI snippets, decision tree, and checklist examples, but includes inaccurate CLI flags (`--ecr-image-puller-role`, `--ecr-image-puller-role-access-key`) that do not exist in the Lightsail CLI and contradictory statements about whether ECR credentials are per\u2011service or per\u2011deployment. These errors could cause execution failure."
     }
   ],
   "total_score": 107,
   "max_score": 120,
   "grade": "B",
-  "token_count": 45297,
-  "latency_ms": 14686,
-  "assertions_passed": true,
-  "assertions_passed_count": 5,
-  "assertions_failed_count": 0
+  "token_count": 44231,
+  "latency_ms": 24650,
+  "assertions_passed": false,
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
 }

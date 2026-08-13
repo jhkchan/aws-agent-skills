@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "The skill supplies expert-level details such as a decision tree, precise cost numbers, silent\u2011failure tables, and ordering constraints that a baseline model would not enumerate. However it omits deeper nuances like the impact of memory size on Express pricing, the exact max concurrency limits for Distributed Map on Express, and region\u2011specific availability notes, leaving a modest knowledge gap."
+      "justification": "Adds concrete expert knowledge not usually in a baseline model: a full Express\u2011vs\u2011Standard decision tree, explicit cost\u2011model numbers ($1/M vs $25/M), the 5\u2011minute execution cap, the 29\u2011second API\u202fGateway timeout for sync, incompatibility of .waitForTaskToken, required logging\u2011level choices, idempotency\u2011key pattern, and precise CLI syntax for IAM, logging, EventBridge, and X\u2011Ray. This depth provides genuine learning value."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "A concrete 9\u2011step AWS\u2011specific provisioning procedure is provided, including ordering constraints and verification commands. One step (duration verification) is described in generic terms rather than tying to a specific AWS CLI or SDK check, so a small deduction is applied."
+      "justification": "Provides a detailed 9\u2011step AWS\u2011specific provisioning procedure with correct ordering, CLI commands, and verification steps. Lacks a documented update\u2011state\u2011machine path (only create), which is a small procedural gap."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list of five high\u2011impact anti\u2011patterns with clear why\u2011it\u2011fails explanations (e.g., `.waitForTaskToken` on Express, async without logs, assuming exactly\u2011once, API\u202fGateway timeout mismatch, logging OFF/FATAL). Missing a few additional pitfalls (e.g., forgetting X\u2011Ray, retention\u2011policy omission) prevents a perfect score."
+      "justification": "Contains a solid NEVER list (5 items) with concrete reasoning for each anti\u2011pattern (e.g., .waitForTaskToken, missing logs, at\u2011least\u2011once semantics, API Gateway timeout, OFF/FATAL log levels). Could be stronger by adding more pitfalls (e.g., forgetting X\u2011Ray role permissions, retention policy omissions)."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Front\u2011matter is complete, description, keywords, activation triggers, and invocation schema are present. The \"when_to_use\" paragraph is verbose and the activation trigger list contains some redundant entries; also the output schema is only implied via \"verdict_shape\" rather than a dedicated field, so a single point is deducted."
+      "justification": "Frontmatter is complete and well\u2011formed; description clearly states WHAT the skill does, WHEN to invoke, and provides exhaustive keywords, activation triggers, and an invocation schema. Output contract is precisely defined."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 14,
       "max": 15,
-      "justification": "The document layers information well (summary, quick navigation, detailed sections, checklist). The Quick Reference table packs many details that could be deferred to later sections, causing slight cognitive overload, hence a minor deduction."
+      "justification": "The document layers information well (quick reference \u2192 detailed sections \u2192 heuristics). The Quick Reference table, however, packs many risk details into a single view, causing slight cognitive overload for a first\u2011time reader."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (state\u2011machine creation, IAM role changes) are guarded by prerequisite checks and verification steps. The only gap is that the optional EventBridge schedule is not explicitly marked as \u201coptional\u201d in the freedom\u2011calibration discussion, leaving a tiny risk of over\u2011constraining a non\u2011scheduled workflow."
+      "justification": "Calibrates freedom appropriately: destructive actions (IAM role creation, state\u2011machine creation) are tightly constrained with verification; optional features (EventBridge schedule) are clearly marked optional. No over\u2011constraining of creative tasks."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "The skill follows a recognizable pattern (description, navigation, reasoning, procedure, NEVER list, output contract). The placement of the \"Recent AWS features\" section at the very end deviates from the more common ordering, resulting in a small penalty."
+      "justification": "Follows a recognizable pattern (description, navigation table, detailed sections, checklist, output contract). It lacks an explicit \u201cPhilosophy\u201d heading that the rubric\u2019s canonical pattern expects."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Agents can follow the checklist, run the provided CLI commands, and emit the required output block. However the sample outputs contain inconsistencies: an extra \"Alarm\" line not defined in the contract, some examples omit the required cost\u2011model citation, optional items are not always marked, and edge cases such as missing SDK permissions are not covered. These issues reduce practical reliability."
+      "justification": "Provides working CLI snippets, verification commands, and a checklist that an agent can execute end\u2011to\u2011end. The invocation_schema is only loosely described (no concrete JSON schema) and there is no guidance for handling CLI errors, which limits full practical usability."
     }
   ],
-  "total_score": 107,
+  "total_score": 109,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 54344,
-  "latency_ms": 10167,
+  "grade": "A",
+  "token_count": 52383,
+  "latency_ms": 13925,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2
