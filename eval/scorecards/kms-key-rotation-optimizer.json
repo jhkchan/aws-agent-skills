@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides concrete cost numbers, rotation transparency details, multi\u2011region replica pricing, and a decision matrix that a generic model would not know, but many statements simply restate standard AWS documentation, limiting the expert delta."
+      "justification": "Adds concrete numbers ( $1/month per key, $0.03 per 10k calls ), a decision matrix with specific thresholds (0 calls, <100 calls, etc.) and a cost\u2011formula, which a generic model would not enumerate. However most of the content restates official AWS documentation; no truly novel heuristic or hidden exception is introduced."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Offers AWS\u2011specific step order (inventory \u2192 rotation \u2192 grants \u2192 alias \u2192 cross\u2011account \u2192 multi\u2011region \u2192 deletion) and precise CLI commands, yet some procedures (e.g., \"check resource associations\") are described generically without an explicit AWS\u2011ordered checklist."
+      "justification": "Provides an AWS\u2011specific procedural flow (pre\u2011flight data gate, step\u2011by\u2011step CLI commands, confirmation prompt) that reflects expert thinking. Some steps remain generic, e.g., \"check resource associations\" without enumerating the exact services to query, which dilutes the AWS\u2011specific rigor."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 12,
       "max": 15,
-      "justification": "Provides a solid NEVER list with detailed rationales (e.g., never delete a key without verifying no encrypted data, never consolidate across compliance domains). However, the skill\u2019s own example outputs violate the rule \u201cNEVER emit FURTHER_OPTIMIZATION_AVAILABLE with $0.00 saving,\u201d showing incomplete enforcement of its anti\u2011patterns."
+      "justification": "Provides a solid NEVER list with concrete reasoning (deletion safety, compliance\u2011domain consolidation, grant retirement, rotation disable, low\u2011volume keys). Missing the explicit anti\u2011pattern that forbids emitting FURTHER_OPTIMIZATION_AVAILABLE when monthly saving is $0.00."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Front\u2011matter, keywords, activation triggers, invocation schema, and example are all present and well\u2011formed; however the `when_to_use` description could be tighter, leading to a minor deduction."
+      "justification": "Frontmatter, keywords, activation triggers, invocation schema, and example are all present. Slight deduction because the description of activation conditions could be more precise (e.g., exact cost\u2011threshold triggers)."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered (quick start, mindset, step\u2011by\u2011step, deep references), but the quick\u2011reference verdict matrix and full decision tree are dense, adding some cognitive load early on."
+      "justification": "Information is layered: quick start, mindset, detailed steps, anti\u2011patterns, and references. The quick\u2011start section still packs many details, creating a modest cognitive load."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (deletion, replica removal) are gated by extensive safety checks and confirmation prompts; however the deletion\u2011window recommendation leaves a small amount of flexibility that could be tighter for cost\u2011critical scenarios."
+      "justification": "Destructive actions are tightly gated with confirmations, data\u2011quality short\u2011circuits, and verification steps. Slight over\u2011freedom in recommending rotation enablement before deletion, which is unnecessary but not harmful."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (quick navigation, mindset, process steps, output contract, anti\u2011patterns, heuristics). Minor ad\u2011hoc naming of sections prevents a perfect score."
+      "justification": "Follows a recognizable pattern (Mindset \u2192 Steps \u2192 Anti\u2011Patterns \u2192 Output contract). Section titles are a bit ad\u2011hoc, preventing a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 7,
+      "score": 10,
       "max": 15,
-      "justification": "Most examples are executable, but two outputs break core contract rules: one emits VERDICT FURTHER_OPTIMIZATION_AVAILABLE with $0.00 monthly saving, and another omits the required \u2018Assumptions\u2019 line. These errors would cause an agent to mis\u2011classify or produce invalid reports."
+      "justification": "Provides decision trees, CLI commands, and worked examples. However, the model output includes a violation: emitting VERDICT FURTHER_OPTIMIZATION_AVAILABLE with $0.00 monthly saving, breaking the strict output contract. This misclassification reduces practical usability."
     }
   ],
-  "total_score": 99,
+  "total_score": 101,
   "max_score": 120,
   "grade": "B",
-  "token_count": 49891,
-  "latency_ms": 11832,
+  "token_count": 49806,
+  "latency_ms": 13262,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

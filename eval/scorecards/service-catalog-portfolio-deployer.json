@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 14,
+      "score": 17,
       "max": 20,
-      "justification": "The skill supplies several expert\u2011level insights (region\u2011scoped portfolio shares, silent\u2011failure matrix, LAUNCH constraint pitfalls, TagOptions vs SCP distinction) that a generic model would not enumerate, but most of the content restates known AWS Service Catalog concepts rather than delivering a novel decision tree or exclusive threshold."
+      "justification": "Adds deep expert knowledge: silent\u2011failure matrix, exact ordering of portfolio \u2192 product \u2192 artifact \u2192 constraint \u2192 tagoption \u2192 share, region\u2011scoped share nuance, LAUNCH constraint types, and concrete mitigation heuristics. Missing only a few niche edge\u2011cases (e.g., StackSets replication details), so not a perfect 20."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Encodes an AWS\u2011specific 8\u2011step provisioning workflow with precise CLI commands and verification steps, reflecting senior CloudOps thinking. Deducted for occasional generic phrasing (e.g., \"verify prerequisites\") and lack of a formalized decision tree for branching on missing prerequisites."
+      "justification": "Provides an AWS\u2011specific 8\u2011step CLI procedure, prerequisite checks, and verification commands that reflect senior CloudOps thinking. Deducted one point because the `invocation_schema` is free\u2011text rather than a strict machine\u2011readable schema, leaving some ambiguity in required input fields."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list of five high\u2011impact anti\u2011patterns with clear \"why\" explanations, plus additional pitfalls in the dependency graph. Missing a few common pitfalls (e.g., forgetting to set the active provisioning artifact flag) prevents a perfect score."
+      "justification": "Contains a concrete \u2018NEVER\u2019 list of five high\u2011impact anti\u2011patterns with clear why\u2011statements (privilege escalation, template\u2011rule degradation, org\u2011root over\u2011share, region\u2011scoped share, TagOptions misuse). Could be stronger with additional pitfalls (e.g., IAM role trust\u2011policy pitfalls), hence a small deduction."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description, keywords, activation triggers, and invocation schema are present. The \"when_to_use\" field is verbose but clear. Minor weakness: the activation triggers list duplicates some terms and could be tighter for reliable routing."
+      "justification": "Front\u2011matter, description, keywords, activation triggers, and an explicit invocation schema are present, enabling reliable activation. The \"when to use\" section is verbose and could be tighter; no concrete JSON schema example is given, which slightly weakens strict compliance."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Uses a layered structure: quick navigation table, concise quick reference, then deeper sections (reasoning, heuristics, procedure). Critical rules are not buried, but the initial sections still contain a dense amount of detail, causing mild cognitive overload."
+      "justification": "Information is layered well: quick reference, activation keywords, reasoning, dependency graph, heuristics, prerequisites, then the full 8\u2011step procedure and contract. Minor overload occurs in the large tables, but critical rules remain accessible early."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Destructive actions (portfolio, product, constraints) are guarded by a prerequisite checklist and verification commands, showing good calibration. Creative tasks (e.g., naming conventions) are less constrained, which is appropriate, but the skill does not explicitly limit the number of products per portfolio, a potential fragility."
+      "justification": "Calibrates freedom appropriately: destructive actions are gated behind prerequisite verification and explicit checklist items. Slight deduction because there is no explicit \u2018confirm before execute\u2019 flag for the CLI commands, but overall safety is strong."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (intro \u2192 navigation \u2192 quick ref \u2192 activation \u2192 contract \u2192 reasoning \u2192 procedure \u2192 anti\u2011patterns \u2192 output contract). The pattern is coherent and aids comprehension; only a minor deviation is the mixed use of markdown tables and free\u2011form text."
+      "justification": "Follows a recognizable pattern (overview \u2192 procedure \u2192 contract \u2192 anti\u2011patterns) that aligns with the Mindset\u2011Navigation\u2011Philosophy\u2011Process template. No major structural issues."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 10,
       "max": 15,
-      "justification": "Includes decision trees, checklist, verification commands, and example outputs. Yet the sample model outputs violate the strict contract (e.g., using \"[\u2014]\" instead of required \"[\u2717]\" with a reason, missing region info in some SHARE rows). These inconsistencies indicate the skill may lead to non\u2011compliant agent responses."
+      "justification": "The skill supplies actionable CLI commands, verification steps, and a decision tree, enabling an agent to act. However, the example model outputs violate the strict output contract (use of '[\u2014]' marker, missing required region/recipient details in the SHARE row, and omission of a WARN note for TEMPLATE\u2011based constraints). These gaps show that an agent could produce non\u2011compliant output, so usability is penalized."
     }
   ],
-  "total_score": 98,
+  "total_score": 103,
   "max_score": 120,
   "grade": "B",
-  "token_count": 40668,
-  "latency_ms": 12684,
+  "token_count": 41210,
+  "latency_ms": 15257,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2

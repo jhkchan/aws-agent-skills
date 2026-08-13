@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert knowledge: a full decision tree for instance alias uniqueness, SAML metadata requirement, Lambda resource\u2011policy check, Lex alias publishing, skill\u2011proficiency thresholds, and exact CLI commands. This goes beyond what a baseline model already knows."
+      "justification": "Provides a concrete decision\u2011tree, explicit NEVER list with reasons, and a full\u2011blown JSON contact\u2011flow example \u2013 genuine expert knowledge. Misses deeper nuance such as why a proficiency threshold of 4 is chosen or how to size media concurrency for different workloads."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific procedural ordering (create instance \u2192 define flow \u2192 add Lambda permission \u2192 create queues \u2192 routing profile \u2192 phone number) with precise CLI flags and ARN formats. Procedures are not generic but Connect\u2011specific."
+      "justification": "Encodes the exact AWS\u2011specific provisioning order (instance \u2192 identity mode \u2192 flow authoring \u2192 Lambda permission \u2192 queues \u2192 routing profile \u2192 skill config \u2192 phone number \u2192 Lex/VoxID/Contact Lens \u2192 storage) and the reasoning behind each step, which goes beyond generic cloud\u2011ops checklists."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides a thorough NEVER list with concrete reasons (e.g., missing Lambda policy causes AccessDenied, Draft Lex alias breaks flow). However the skill does not enforce these rules strongly enough, allowing the model to emit prose before required lines and placeholders, showing a gap between guidance and enforcement."
+      "justification": "Provides a concrete NEVER list with specific reasons (e.g., missing Lambda resource policy, using a DRAFT Lex alias, omitting skill requirements) that reflect real\u2011world failure modes."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description, when_to_use, activation keywords, and exact output contract are defined. The checklist rows and required sections are all enumerated."
+      "justification": "Frontmatter, description, keywords, and a detailed \"when_to_use\" section are present, enabling reliable activation. Slight weakness: activation triggers rely on a long keyword list rather than a concise, unambiguous trigger phrase."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Content is layered (overview \u2192 mindset \u2192 heuristics \u2192 step\u2011by\u2011step \u2192 anti\u2011patterns \u2192 output contract), but large blocks (full JSON flow, full CLI scripts) are presented before the checklist, creating cognitive overload and burying critical rules."
+      "justification": "Information is layered (summary \u2192 strict output contract \u2192 decision tree \u2192 NEVER list \u2192 perfect example \u2192 step\u2011by\u2011step guide). However, the perfect example and full JSON flow are large and appear early, which can cause cognitive overload before the core checklist rules are understood."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive operations (instance creation, phone\u2011number claim) are tightly constrained by prerequisite checks; creative tasks (flow authoring) are left flexible. Calibration matches task fragility."
+      "justification": "Destructive operations (instance creation, phone\u2011number claim) are tightly constrained by required IDs and verification steps, while more creative tasks (e.g., flow authoring) are left appropriately open."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern: high\u2011level description, mindset, heuristics, stepwise procedure, anti\u2011pattern list, and output contract. Structure aids comprehension."
+      "justification": "Follows a recognizable structure (metadata \u2192 activation \u2192 mindset \u2192 decision tree \u2192 NEVER list \u2192 step\u2011by\u2011step guide), aiding comprehension, though the pattern is slightly ad\u2011hoc in places."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 5,
+      "score": 13,
       "max": 15,
-      "justification": "Model output violates the strict contract: extra bash code appears before required labels, multiple response blocks are emitted, the CONTACT_FLOW_SNIPPET omits the required CheckHoursOfOperation block, and a failure case lacks an instance ID. These gaps show the skill is ambiguous or insufficiently enforced for reliable agent execution."
+      "justification": "Provides a runnable JSON contact\u2011flow snippet, concrete CLI verification commands, and a checklist that an agent can execute. However, one example snippet omits the required CheckHoursOfOperation block and edge\u2011case checks (region mismatch, quota limits) are not fully covered, limiting flawless execution."
     }
   ],
-  "total_score": 99,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 52584,
-  "latency_ms": 9604,
+  "grade": "A",
+  "token_count": 53043,
+  "latency_ms": 13693,
   "assertions_passed": false,
   "assertions_passed_count": 2,
   "assertions_failed_count": 3

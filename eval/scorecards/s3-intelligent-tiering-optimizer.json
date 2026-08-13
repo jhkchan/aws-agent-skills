@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 16,
+      "score": 17,
       "max": 20,
-      "justification": "Provides many expert specifics (128\u202fKB size gate, $0.0025/1k\u2011object monitoring fee, configurable archive\u2011tier days, decision tree), but omits key expert details such as per\u2011request retrieval fees for Archive/Deep\u202fArchive tiers and that the monitoring fee is charged per Intelligent\u2011Tiering configuration (not per bucket) \u2013 gaps that a senior CloudOps engineer would expect."
+      "justification": "Provides concrete, expert\u2011level thresholds (128\u202fKB size gate, $0.0025/1\u202f000\u2011object monitoring fee), a full decision\u2011tree, region\u2011specific price multipliers, and precise archive\u2011tier timing rules that a generic model would not know. Deducted 3 points because much of the content restates official AWS documentation rather than novel insight."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Lists AWS\u2011specific CLI steps, pre\u2011flight checks, and verification flow, but a few steps (e.g., \"verify\") are described generically rather than with concrete AWS commands or IAM checks."
+      "justification": "Encodes AWS\u2011specific procedural flow: pre\u2011flight CLI calls, pagination limits, confirmation gate, rollback steps, and exact ordering of eligibility \u2192 monitoring\u2011fee \u2192 archive\u2011tier \u2192 lifecycle trade\u2011off. Deducted 1 point for occasional generic phrasing (e.g., \"run the tree\" without explicit AWS\u2011specific context)."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Contains a concrete top\u20115 NEVER list with reasons and many inline warnings, yet could add a few more edge\u2011case pitfalls (e.g., mis\u2011typed filter prefixes) for full coverage."
+      "justification": "Includes a concrete top\u20115 NEVER list with detailed why\u2011its\u2011wrong explanations (small\u2011object fee, double\u2011tiering, directory buckets, default timing, auto\u2011apply without confirm). Deducted 2 points because the list is limited to five items and omits other common pitfalls such as mis\u2011scoped filters causing silent no\u2011ops."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Frontmatter, description, when\u2011to\u2011use, activation triggers and invocation schema are present, but the schema lacks explicit validation rules and the malformed\u2011input handling is only mentioned in the process, not in the specification block."
+      "justification": "Front\u2011matter is complete, description, keywords, activation triggers, and invocation schema are present. However the activation_triggers list is overly broad (e.g., generic phrases like \"should I use Intelligent\u2011Tiering\") which could cause false positives. Deducted 2 points for this vagueness."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "The skill layers information (quick reference \u2192 decision tree \u2192 deep heuristics), yet critical non\u2011obvious rules (small\u2011object fee aggregation, exact blended\u2011savings math) are buried deep, causing potential cognitive overload for first\u2011time users."
+      "justification": "Content is layered: quick reference, decision tree, expert heuristic, pre\u2011flight, process steps, output contract, anti\u2011patterns, edge\u2011cases. The quick reference section still dumps many numbers up front, creating some cognitive overload. Deducted 2 points for that front\u2011loading."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions are gated by an explicit CONFIRM step and pre\u2011flight checks, but IAM role verification for Batch Operations is only mentioned later, leaving a slight freedom\u2011calibration gap for privileged actions."
+      "justification": "Destructive actions are tightly constrained by a mandatory CONFIRM gate, rollback procedure, and explicit safety checks (filter\u2011prefix reality, Object Lock compliance). Only a minor deduction for not explicitly limiting the skill to non\u2011production accounts in the description."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable structure (overview, navigation, process, output contract, anti\u2011patterns) but mixes sections (e.g., decision tree inside narrative) making the pattern mildly ad\u2011hoc."
+      "justification": "Follows a recognizable structure (quick reference \u2192 decision tree \u2192 heuristic \u2192 pre\u2011flight \u2192 process \u2192 output contract \u2192 anti\u2011patterns). The \u201cRecent AWS features\u201d block feels slightly ad\u2011hoc, breaking the otherwise clean pattern. Deducted 1 point."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 10,
+      "score": 13,
       "max": 15,
-      "justification": "Provides decision trees, concrete CLI commands, error\u2011handling tables, and rollback procedures, enabling an agent to act. However, the \u2018data\u2011lake\u2011curated\u2019 example violates the savings arithmetic rule (MONTHLY_SAVING does not equal CURRENT\u2011PROJECTED), showing inconsistency and reducing reliability. Some numeric examples are unrealistic, further lowering usability."
+      "justification": "Provides actionable CLI commands, deterministic output contract, and worked examples. However the data\u2011lake\u2011curated example contains a confusing \u201cadjusted for tiering lag\u201d figure that does not reconcile cleanly with the listed totals, indicating a potential arithmetic inconsistency. Deducted 2 points for that ambiguity."
     }
   ],
-  "total_score": 103,
+  "total_score": 106,
   "max_score": 120,
   "grade": "B",
-  "token_count": 48694,
-  "latency_ms": 16925,
+  "token_count": 48632,
+  "latency_ms": 40382,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

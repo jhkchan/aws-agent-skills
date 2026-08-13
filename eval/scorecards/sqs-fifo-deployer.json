@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 16,
       "max": 20,
-      "justification": "Provides several expert heuristics (message\u2011group partitioning, deduplication\u2011scope coupling, high\u2011throughput quota and cost) that are not obvious from generic docs, but much of the content restates AWS documentation verbatim without novel decision trees or quantitative thresholds beyond the standard 5\u2011minute dedup window."
+      "justification": "Provides many expert details (dependency graph, high\u2011throughput quota, cost impact, per\u2011group deduplication) that go beyond a baseline model, but omits some concrete numbers (exact default values for DeduplicationScope/ThroughputLimit, precise API error messages, cost per request, max number of message attributes)."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Lists an AWS\u2011specific step\u2011by\u2011step provisioning flow and exact attribute combinations (e.g., both DeduplicationScope and ThroughputLimit must be set together). However, the procedure is generic \"run CLI then verify\" and lacks a clear decision matrix for when to choose content\u2011based vs explicit deduplication."
+      "justification": "Lists AWS\u2011specific step order (create queue with attributes, attach DLQ, set encryption, apply policy) and decision points, yet the ordering of some steps (e.g., setting redrive policy before encryption) is not strictly justified and some procedures remain generic (\"verify prerequisites\") rather than AWS\u2011specific checks."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a concrete NEVER list with reasons (e.g., never use a Standard DLQ for FIFO, never omit .fifo suffix). Missing is a deeper explanation of why high\u2011throughput mode raises per\u2011account quota limits and cost implications beyond a single bullet."
+      "justification": "Contains a thorough NEVER list with concrete reasons, but misses a few common pitfalls such as misuse of long\u2011polling settings or forgetting to set `MessageDeduplicationId` when ContentBasedDeduplication is false."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 13,
       "max": 15,
-      "justification": "Frontmatter is complete, description, triggers, keywords, and output contract are well defined. The \"when_to_use\" section is present but could be tighter; activation keywords are listed but not formally tied to a regex pattern, leaving a slight ambiguity for automated matching."
+      "justification": "Frontmatter, description, keywords, and trigger list are present, and a clear \"when_to_use\" section exists. However, the activation triggers are embedded in free\u2011form text rather than a strict schema, and the output contract lacks an explicit version tag, making reliable activation slightly ambiguous."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Uses quick\u2011navigation table and separates core steps from heuristics, but the document is dense and forces the reader to parse long tables before reaching the checklist. Critical rules (e.g., the mandatory .fifo suffix) appear early but are repeated later, causing some cognitive overload."
+      "justification": "The document layers information (quick navigation, detailed steps, references) but front\u2011loads extensive tables and heuristics before the essential NEVER list, creating some cognitive overload for an agent that needs the most critical rules first."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 13,
       "max": 15,
-      "justification": "Destructively creates queues only after a prerequisite check and defines a PREREQUISITES_MISSING verdict. However, it does not enforce region selection or idempotent creation, leaving a small freedom gap for fragile operations."
+      "justification": "Destructive actions (queue creation) are gated by a prerequisite checklist, but the skill does not require an explicit confirmation step before issuing `aws sqs create-queue`, leaving a small risk of accidental execution."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable skill pattern (metadata \u2192 activation \u2192 mindset \u2192 heuristics \u2192 steps \u2192 anti\u2011patterns \u2192 output format). Minor ad\u2011hoc ordering of sections prevents a perfect score."
+      "justification": "Follows a recognizable structure (mindset \u2192 steps \u2192 NEVER list \u2192 output format) but mixes sections (heuristics, dependency graph) in an ad\u2011hoc way that deviates from a single canonical pattern."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Model output matches the required checklist format and includes working AWS CLI commands. Lacks an explicit decision tree for prerequisite verification and does not cover some edge cases (e.g., missing KMS key, invalid maxReceiveCount), leading to a small deduction."
+      "justification": "Provides working CLI commands, decision trees, and error\u2011handling guidance. The model output examples are mostly correct, but one example shows a mismatch between the described deduplication strategy and the checklist (ContentBasedDeduplication true vs false) and some fields (maxReceiveCount) are left unspecified, indicating incomplete handling of edge cases."
     }
   ],
   "total_score": 103,
   "max_score": 120,
   "grade": "B",
-  "token_count": 45226,
-  "latency_ms": 11368,
+  "token_count": 43178,
+  "latency_ms": 7631,
   "assertions_passed": false,
   "assertions_passed_count": 3,
   "assertions_failed_count": 2
