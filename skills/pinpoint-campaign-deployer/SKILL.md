@@ -148,34 +148,8 @@ REQUIRED:
 
 ### Step 0: Expert knowledge — non-obvious behaviors
 
-- **Channel enablement is silent.** A campaign on an unenabled channel
-  produces zero sends — no error, no warning. Status shows `COMPLETED` with
-  0 messages sent. Always verify channel before campaign creation.
-- **Segments are dynamic by default.** Dimension-based segments resolve at
-  send time. If attributes change between creation and send, different
-  endpoints may be included. For fixed targeting, use imported (CSV).
-- **Imported segments require S3.** The bucket MUST grant `s3:GetObject` to
-  the Pinpoint service principal. CSV: one endpoint per line.
-- **Quiet time blocks sends during a window.** Requires `StartTime`,
-  `EndTime`, and `TimeZone`. Without timezone, quiet time is ambiguous.
-- **Frequency caps are project-wide.** A cap of 3 = an endpoint receives at
-  most 3 messages across ALL campaigns per calendar day.
-- **Journeys use an activity graph model.** Each activity has a `Type`
-  (CONDITIONAL_SPLIT, MULTIVARIATE_SPLIT, RANDOM_SPLIT, WAIT, SEND, END) and
-  `NextActivity`. MUST be a DAG. Every path must reach END.
-- **Yes-no split evaluates an event or attribute.** CONDITIONAL_SPLIT with
-  `EvaluationDimension`. Branches: `TrueActivity` and `FalseActivity`.
-- **Multivariate split distributes by percentage.** Percentages MUST sum to
-  100. Each branch has a distinct treatment (template override).
-- **Wait activities: time-based or event-based.** Time: `WaitTime` (e.g.,
-  `"PT1H"`). Event: `WaitUntil` with optional timeout. Without timeout,
-  blocks indefinitely.
-- **In-app messaging (2024-2025):** campaigns/journeys send in-app messages
-  via SDK. Layouts: BOTTOM_BANNER, TOP_BANNER, OVERLAYS, MIDDLE_BANNER.
-- **ML-powered recommendations (2024-2025):** Pinpoint analyzes engagement
-  and recommends lookalike audiences. Via `get-recommended-metrics`.
-- **Event streams to Kinesis:** `put-event-stream` streams events. Stream
-  MUST exist; Pinpoint role MUST have `kinesis:PutRecord`.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-0-expert-knowledge--non-obvious-behaviors).
+> Non-obvious behaviors: silent channel enablement, dynamic vs imported segments, S3 import role, quiet time, frequency caps, journey graph rules, in-app messaging, ML recommendations, event streams.
 
 ### Step 1: Project creation
 
@@ -410,33 +384,6 @@ NOTES:
   - Frequency cap 5/day is project-wide — concurrent campaigns may reduce reach.
 ```
 
-## Verification commands (run after deployment)
-
-```bash
-# Verify campaign state
-aws pinpoint get-campaign --application-id <id> --campaign-id <campaign-id> --query 'CampaignDefinition.State'
-# Verify segment count
-aws pinpoint get-segment-estimate --application-id <id> --segment-id <seg> --query 'SegmentSize'
-# Verify email channel
-aws pinpoint get-email-channel --application-id <id> --query 'EmailChannelResponse.Enabled'
-# Verify journey state
-aws pinpoint get-journey --application-id <id> --journey-id <jid> --query 'JourneyResponse.State'
-# Verify event stream
-aws pinpoint get-event-stream --application-id <id> --query 'EventStream.DestinationStreamArn'
-```
-
-## Edge-case handling
-
-- **Email channel not enabled.** PREREQUISITES_MISSING. Verify SES identity.
-- **SMS origination missing.** PREREQUISITES_MISSING. Provision short/long code.
-- **Segment resolves to 0.** PREREQUISITES_MISSING. Adjust dimensions.
-- **Schedule in the past.** PREREQUISITES_MISSING. Use IMMEDIATE or future.
-- **Quiet time without timezone.** PREREQUISITES_MISSING. Set TimeZone.
-- **A/B percentages do not sum to 100.** PREREQUISITES_MISSING.
-- **Journey with cycle.** PREREQUISITES_MISSING. Graph must be a DAG.
-- **Journey activity with no NextActivity (non-END).** PREREQUISITES_MISSING.
-- **Frequency cap 0.** PREREQUISITES_MISSING. Blocks all sends.
-
 ## NEVER (top 5)
 
 1. **NEVER create a campaign before verifying the channel is enabled.**
@@ -496,21 +443,6 @@ Engagement pattern
 ALWAYS emit the cost estimate. Email is cheap; SMS at scale is expensive
 (128K messages = $826/US send). Recommend email-first, SMS for urgent.
 
-## Recent AWS features (2024-2026)
-
-- **In-app messaging (2024-2025):** campaigns/journeys send in-app messages
-  via SDK. Layouts: BOTTOM_BANNER, TOP_BANNER, OVERLAYS, CAROUSEL. Free.
-- **ML-powered segment recommendations (2024-2025):** analyzes engagement
-  and recommends lookalike audiences. Via `get-recommended-metrics`.
-- **Journeys with multivariate and random split (2024-2025):** journey
-  activities support MULTIVARIATE_SPLIT and RANDOM_SPLIT.
-- **Event-based wait activities (2024):** WAIT can wait for a specific event
-  (e.g., `app_open`) with optional timeout.
-- **SES integration improvements (2024-2025):** Pinpoint email uses SESv2.
-  Supports configuration sets, VDM, dedicated IP pools.
-- **Baidu push channel (2024-2025):** push to Android in China via Baidu.
-- **Journey versioning (2025):** version history and rollback support.
-
 ## AWS documentation
 
 - **Pinpoint Developer Guide** — https://docs.aws.amazon.com/pinpoint/latest/developerguide/welcome.html
@@ -525,6 +457,13 @@ ALWAYS emit the cost estimate. Email is cheap; SMS at scale is expensive
 - **Event streams** — https://docs.aws.amazon.com/pinpoint/latest/developerguide/event-streams.html
 - **API Reference** — https://docs.aws.amazon.com/pinpoint/latest/apireference/welcome.html
 - **CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/pinpoint/
+
+## References (load on demand)
+
+- [advanced-patterns](references/advanced-patterns.md) — Step 0 expert knowledge (non-obvious behaviors), edge-case catalog, recent AWS features (2024-2026)
+- [diagnostic-commands](references/diagnostic-commands.md) — post-deployment verification commands (campaign, segment, channel, journey, event stream)
+- [channels-and-segments-guide](references/channels-and-segments-guide.md) — channel and segment detail
+- [journeys-guide](references/journeys-guide.md) — journey activity graph detail
 
 ## Domain
 

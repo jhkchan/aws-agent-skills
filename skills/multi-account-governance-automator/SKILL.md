@@ -258,26 +258,12 @@ that vends new accounts with baseline auto-deployed), and IAM Identity
 Center (SSO across member accounts).
 
 ### Landing Zone v2 (2024-2025)
-```bash
-aws controltower create-landing-zone \
-  --manifest file://lz-manifest.yaml \
-  --tags Environment=prod ManagedBy=control-tower
-```
-v2 adds drift detection (Lambda monitors for manual SCP/Config changes;
-raises a Security Hub finding), customizable guardrails, and lifecycle
-controls on Account Factory.
+Landing Zone v2 creation command and capability notes (drift detection, customizable guardrails, Account Factory lifecycle controls): moved verbatim to [references/control-tower-landing-zone.md](references/control-tower-landing-zone.md).
+See that reference for the full LZ v2 architecture and failure modes.
 
 ### Create a new account via Account Factory
-```bash
-aws controltower create-account \
-  --account-name "workloads-prod-bu-a" \
-  --account-email "aws+bu-a-prod@example.com" \
-  --sso-user-email "bu-a-admin@example.com" \
-  --sso-user-first-name "BUA" --sso-user-last-name "Admin"
-```
-The new account inherits all root-level guardrails and gets a baseline
-stack (CloudTrail, Config, Security Hub, default VPC hardening) deployed
-automatically.
+Account Factory account-creation command and baseline-inheritance notes: moved verbatim to [references/control-tower-landing-zone.md](references/control-tower-landing-zone.md).
+What the landing zone provisions is summarised above; the full workflow lives in the reference.
 
 ## Delegated administration
 
@@ -285,19 +271,8 @@ Centralize security and logging services in the audit account. NEVER run
 GuardDuty / Security Hub / Config admin from the management account —
 the management account should hold no workload.
 
-```bash
-# GuardDuty delegated admin
-aws guardduty enable-organization-admin-account --admin-account-id <audit-id>
-
-# Security Hub delegated admin
-aws securityhub enable-organization-admin-account --admin-account-id <audit-id>
-
-# Config aggregator (org source auto-discovers new members)
-aws configservice put-configuration-aggregator \
-  --configuration-aggregator-name OrgAggregator \
-  --organization-aggregation-source \
-    RoleArn=arn:aws:iam::<audit>:role/service-role/ConfigAggregatorRole,AllRegions=true
-```
+Delegated-admin enablement commands (GuardDuty, Security Hub, Config aggregator): moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Always delegate to the audit account — see the NEVER list below.
 
 Detective / Macie / Access Analyzer follow the same
 `enable-organization-admin-account` pattern. Detective requires GuardDuty
@@ -314,24 +289,13 @@ manual add per account.
 is ON and delivering. A member without a recorder contributes zero
 compliance data to the aggregator — silent gap.
 
-```bash
-aws configservice describe-configuration-recorder-status \
-  --configuration-recorder-names default
-# IsRecording must be true; LastStatus must be SUCCESS
-```
+Config recorder coverage verification commands: moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+IsRecording must be true and LastStatus SUCCESS in every member account.
 
 ## CloudTrail organization trail
 
-```bash
-aws cloudtrail create-organization-trail \
-  --name org-trail \
-  --s3-bucket-name <log-archive-bucket> \
-  --is-organization-trail \
-  --include-global-service-events \
-  --is-multi-region-trail \
-  --enable-log-file-validation \
-  --kms-key-id arn:aws:kms:us-east-1:<log-archive>:key/<key-id>
-```
+Organization trail creation command: moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+The gotchas (org bucket policy, KMS) remain below.
 
 **Gotchas:** the log-archive S3 bucket needs an org-level bucket policy
 allowing `s3:PutObject` from every member account's
@@ -344,9 +308,8 @@ cost.
 
 ## Security Hub aggregator
 
-```bash
-aws securityhub create-finding-aggregator --region us-east-1
-```
+Security Hub aggregator creation command: moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Aggregation semantics (region linking, cross-region lag) remain below.
 
 Findings from member accounts in all linked regions aggregate to the
 audit account. The aggregator runs every 30 minutes by default. Verify
@@ -359,18 +322,8 @@ Identity Center (formerly AWS SSO) is the preferred cross-account access
 layer. NEVER use cross-account IAM role assumption as the primary access
 model at scale.
 
-```bash
-aws sso-admin create-permission-set \
-  --name AWSAdministratorAccess \
-  --instance-arn <identity-center-instance-arn> \
-  --session-duration PT1H
-
-aws sso-admin create-account-assignment \
-  --instance-arn <instance> --target-id <account-id> \
-  --target-type AWS_ACCOUNT \
-  --permission-set-arn <ps-arn> \
-  --principal-type GROUP --principal-id <group-id>
-```
+Identity Center permission-set creation and assignment commands: moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Keep the break-glass path noted below.
 
 **Break-glass path:** always have at least one permission set assigned to
 an emergency-only group that grants `AdministratorAccess` on the
@@ -391,13 +344,8 @@ Three patterns, in order of preference:
    waits for `AccountStatus=ACTIVE`, assumes the new account's
    `OrganizationAccountAccessRole`, deploys the baseline via StackSets.
 
-```bash
-aws organizations create-account \
-  --email "aws+new-bu@example.com" \
-  --account-name "bu-prod" \
-  --iam-user-access-to-billing DENY \
-  --role-name OrganizationAccountAccessRole
-```
+Account-vending commands (Account Factory and alternatives): moved verbatim to [references/control-tower-landing-zone.md](references/control-tower-landing-zone.md).
+Pattern preferences and the required new-account baseline remain below.
 
 **Required baseline in every new account:** CloudTrail (verify, do not
 re-create), Config recorder + delivery channel, Security Hub enabled,
@@ -407,18 +355,8 @@ account-level alerts, cross-account admin IAM role.
 ## Resource Explorer + RAM cross-account
 
 ### AWS Resource Explorer (2024-2025)
-Cross-account search index. Aggregator-type index in one account
-(typically audit) collects from local indexes in member accounts.
-
-```bash
-# Member account — local index
-aws resource-explorer-2 create-index --region us-east-1
-# Aggregator account — aggregator index + view
-aws resource-explorer-2 update-index-type --index-arn <arn> --type AGGREGATOR
-aws resource-explorer-2 create-view --view-name CrossAccountView
-```
-Use cases: "find all unencrypted S3 buckets across the org", "list every
-EC2 instance tagged CostCenter=1234".
+Resource Explorer setup commands (local + aggregator indexes) and use cases: moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Note the 36-hour cold-start caveat before relying on it.
 
 ### RAM cross-account resource sharing
 ```bash
@@ -496,34 +434,8 @@ REMEDIATION:
 ```
 
 ### Worked example — MANUAL_STEP_REQUIRED (SCP gap)
-```text
-STRUCTURE:
-  Org status: all-features
-  OU depth: 1 (flat — all accounts under root)
-  Foundational accounts: audit=none, log-archive=none
-CONTROLS:
-  - [FAIL] No root-level guardrail SCP
-  - [FAIL] No SCP denies organizations:LeaveOrganization
-  - [WARN] Sandbox account has same SCP scope as prod account
-DELEGATION:
-  - [FAIL] GuardDuty NOT delegated — running from management account
-  - [FAIL] No Config aggregator
-  - [PASS] CloudTrail org trail present
-SHARING:
-  - [FAIL] No IAM Identity Center
-  - [FAIL] No break-glass path documented
-VERDICT: MANUAL_STEP_REQUIRED
-FINDINGS:
-  - [CRITICAL] No deny-leave-org SCP: a compromised member can call
-    organizations:LeaveOrganization to escape SCP governance entirely.
-  - [CRITICAL] Flat OU: blast radius equals the management account for all 12 members.
-  - [HIGH] GuardDuty in management account: couples security to the most privileged account.
-REMEDIATION:
-  1. Attach deny-leave-org + deny-root-actions SCP at the root.
-  2. Create Security + Workloads-Prod + Workloads-NonProd + Sandbox OUs.
-  3. Delegate GuardDuty + Security Hub + Config to a new audit account.
-  4. Stand up IAM Identity Center; document a break-glass permission set.
-```
+Full MANUAL_STEP_REQUIRED worked example: moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+The AUTOMATED example above is the primary contract demonstration.
 
 ## NEVER (these things)
 
@@ -553,79 +465,23 @@ REMEDIATION:
 
 ## Expert heuristic callouts
 
-- **SCP `Condition` keys are scoped.** `aws:RequestedRegion` works for
-  most services but NOT for global services (IAM, Organizations, Route
-  53). Use a separate Deny on `iam:*` where applicable.
-- **The management account sees SCPs in the console but is NOT subject
-  to them.** Treat the management account as untrusted for any automation.
-- **Control Tower `CreateAccount` has 5-15 minute latency.** Pipelines
-  must poll (`get-account`), not block.
-- **Identity Center permission set ARNs differ across regions.** A
-  permission set created in us-east-1 has a different ARN than the same
-  set in eu-west-1 — `create-account-assignment` requires the
-  region-specific ARN.
-- **Config recorder delivery failures are silent.** Set a CloudWatch
-  alarm on `LastStatus != SUCCESS`.
-- **CloudTrail org trail + per-account KMS key = broken.** Each member
-  needs to use the log-archive account's KMS key.
-- **Security Hub finding aggregator is region-aware.** Cross-region
-  findings have a 30-min lag. Use region linking mode `ALL_REGIONS`.
-- **Resource Explorer v2 has a 36-hour cold-start.** Do not rely on it
-  for incident-time enumeration.
-- **Delegated admin rotation is destructive.** Disabling a delegated
-  admin deletes the member enrollment. Plan rotation carefully.
-- **Control Tower drift detection does NOT cover custom SCPs.** A custom
-  SCP you attach is invisible to drift detection — monitor with Config.
+Expert heuristic callouts (SCP condition scoping, management-account quirks, latencies, ARN regionality, silent failures, drift gaps): moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load before designing SCPs or account-creation automation.
 
 ## Pre-flight safety checks
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`organizations attach-policy`, `controltower create-landing-zone`,
-  `configservice put-configuration-aggregator`), emit:
-  `CONFIRM: About to <action> for <governance layer> in <account>.
-  Proceed? (yes/no)` and wait for explicit `yes`.
-- **Dry-run SCP attachment.** Test a new SCP by attaching to a single
-  sandbox account first. Verify via the IAM Policy Simulator before
-  attaching at the root.
-- **Verify the management account has MFA + no access keys.**
-- **Snapshot the current SCP tree before changes.**
-- **Verify Config aggregator coverage after every account creation.**
+Pre-flight safety checks (confirmation gate, dry-run SCP attachment, management-account hardening, SCP snapshots, aggregator verification): moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+The CONFIRM gate is mandatory before any state-changing operation.
 
 ## Edge-case handling
 
-- **Member account leaves the org.** Block with a deny-leave-org SCP at
-  root. Without it, a member calling `organizations:LeaveOrganization`
-  escapes SCP governance entirely.
-- **Compromised account.** Move to a `Suspended` OU with Deny-all SCP.
-  Revoke RAM shares. Do NOT delete the account — preserve forensics.
-- **New region launch.** SCPs scoped to specific regions do not auto-cover
-  the new region. Review the region-throttle SCP quarterly.
-- **IdP outage.** Without a break-glass path, the org is locked out.
-  Document and test a sealed-envelope emergency permission set.
-- **Landing Zone drift.** A manual change to a CT-managed SCP or Config
-  rule breaks drift detection. Re-baseline via the CT console or
-  `update-landing-zone`.
+Edge-case catalog (member leaves org, SCP conflicts, drift, aggregator coverage gaps): moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Consult when the design hits a non-standard org state.
 
 ## Recent AWS features (2024-2026)
 
-- **Control Tower Landing Zone v2 (2024-2025):** Customizable guardrails,
-  drift detection, lifecycle controls, configurable management region.
-  Upgrade via `aws controltower update-landing-zone`.
-- **AWS Resource Explorer v2 (2024-2025):** Cross-account aggregator
-  indexes. Local index in each member; aggregator in the audit account.
-  36-hour cold-start.
-- **IAM Identity Center Trusted Identity Propagation (2024-2025):**
-  Propagates corporate IdP user identity through to downstream services
-  (Redshift, Q Business) for human-attributed audit trails.
-- **Control Tower Customizations for Landing Zone (2024-2025):** Native
-  Lambda + CloudFormation templates that deploy custom resources alongside
-  CT's baseline.
-- **Organizations Policy Types (2024-2025):** Beyond SCP — BackupPolicy,
-  TagPolicy, AIServicesOptOutPolicy. Use `enable-policy-type`.
-- **Security Hub centralized configuration (2024-2025):** Push a single
-  Security Hub configuration to all members from the delegated admin.
-- **Config Conformance Packs (2024-2025):** Packaged Config rules +
-  remediation, deployable across the org via StackSets.
+Recent AWS features (2024-2026): moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Check before recommending Resource Explorer, RAM, or LZ v2 capabilities.
 
 ## Domain
 
@@ -642,3 +498,12 @@ AWS CloudOps / Multi-Account Governance Automation.
 - **AWS Resource Explorer v2** — https://docs.aws.amazon.com/resource-explorer-2/latest/userguide/
 - **AWS RAM** — https://docs.aws.amazon.com/ram/latest/userguide/
 - **AWS Multi-Account Strategy (WAF)** — https://docs.aws.amazon.com/wellarchitected/latest/framework/a-foundation-multiple-accounts.html
+
+## References (load on demand)
+
+- [references/scp-strategies.md](references/scp-strategies.md) — SCP pattern library (guardrail, throttle, deny-list, allow-list, deny-all) with JSON and debugging.
+- [references/control-tower-landing-zone.md](references/control-tower-landing-zone.md) — LZ v2 architecture, Account Factory workflow, drift detection, account vending commands.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Expert heuristic callouts, edge-case catalog, Resource Explorer setup, recent AWS features (2024-2026).
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — Delegated-admin, Config, CloudTrail, Security Hub, Identity Center commands and pre-flight safety checks.
+- [references/worked-examples.md](references/worked-examples.md) — Secondary worked example (MANUAL_STEP_REQUIRED SCP gap).
+

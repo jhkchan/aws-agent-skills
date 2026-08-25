@@ -153,54 +153,9 @@ by raising node count; they start with `_snapshot/<repo>/_status`,
 | None of the above; cluster red; multiple indices unassigned | INSUFFICIENT_DATA | `_cluster/health`, `describe-domain` (ClusterConfig) |
 
 ## Pre-flight: domain state and gather-info gate
+> Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
+> Read it only when this section applies.
 
-Gather the canonical configuration and short-circuit on domain
-states that mimic snapshot failures. Misclassifying these produces
-hours of snapshot debugging for a problem that is not a snapshot
-problem.
-
-```bash
-# 1. Domain configuration (EngineVersion, ClusterConfig, EBSOptions,
-#    SnapshotOptions, LogPublishingOptions, WarmEnabled,
-#    ColdStorageOptions, ChangeProgressDetails)
-aws opensearch describe-domain --domain-name <domain> --output json
-aws opensearch describe-domain-config --domain-name <domain> --output json
-
-ENDPOINT=$(aws opensearch describe-domain --domain-name <domain> \
-  --query 'Domain.Endpoint' --output text)
-
-# 2. Recent application logs (snapshot / restore / migration events)
-aws logs filter-log-events \
-  --log-group-name /aws/opensearch/domains/<domain>/application-logs \
-  --start-time $(date -d '-60 minutes' +%s)000 \
-  --filter-pattern '"repository_verification_exception" OR "SnapshotException" OR "ConcurrentSnapshotExecutionException" OR "migration_failed" OR "version_not_supported"' \
-  --output json
-
-# 3. Repository + snapshot status
-curl -sS "https://$ENDPOINT/_cat/repositories?v"
-curl -sS "https://$ENDPOINT/_snapshot/_status" | jq '.snapshots[] | {repository, snapshot, state}'
-
-# 4. S3 bucket policy + lifecycle for the snapshot bucket
-aws s3api get-bucket-policy --bucket <bucket> --output json 2>/dev/null || echo "No bucket policy"
-aws s3api get-bucket-lifecycle-configuration --bucket <bucket> --output json
-
-# 5. Snapshot role trust + simulated permissions
-aws iam get-role --role-name <role-name> --query 'Role.AssumeRolePolicyDocument' --output json
-aws iam simulate-principal-policy \
-  --policy-source-arn "arn:aws:iam::<account>:role/<role>" \
-  --action-names s3:PutObject s3:ListBucket s3:GetObject s3:DeleteObject s3:GetBucketLocation \
-  --resource-arns "arn:aws:s3:::<bucket>" "arn:aws:s3:::<bucket>/*" --output json
-
-# 6. CloudWatch automated-snapshot-failure metric
-aws cloudwatch get-metric-statistics --namespace AWS/ES \
-  --metric-name AutomatedSnapshotFailure \
-  --dimensions Name=DomainName,Value=<domain> Name=ClientId,Value=<account> \
-  --start-time $(date -d '-1 day' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Sum --output json
-
-# 7. AWS Health (regional OpenSearch events, scheduled maintenance)
-aws health describe-events --filter eventStatusCodes=OPEN,UPCOMING --region us-east-1 --output json
-```
 
 ### Domain-state short-circuit
 
@@ -239,64 +194,9 @@ ROOT_CAUSE_IDENTIFIED without a failing probe that matches the
 symptom.**
 
 ### Step 0: Non-obvious behaviours that change diagnosis
+> Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+> Read it only when this section applies.
 
-- **Automated snapshot bucket is read-only and service-managed.**
-  The `cs-automated` / `cs-automated-enc` repositories write to an
-  AWS-managed bucket you cannot list with `aws s3 ls` without an
-  explicit grant. Use `_snapshot/cs-automated/_all` against the
-  domain endpoint to enumerate automated snapshots.
-- **Manual snapshot IAM role uses a service-principal trust, not an
-  sts:ExternalId trust.** The trust policy lists
-  `"Service": "opensearchservice.amazonaws.com"` (legacy:
-  `es.amazonaws.com`). Cross-account additionally requires
-  `aws:SourceAccount` and `aws:SourceArn` conditions — without
-  them the confused-deputy check fails verification.
-- **The bucket policy grants the ROLE, not the service principal.**
-  Operators frequently write a bucket policy keyed to
-  `"Service": "opensearchservice.amazonaws.com"`. The role's
-  session ARN does not match the service principal and verification
-  fails. The service principal goes in the role trust, not the
-  bucket policy.
-- **Snapshot blobs are deduplicated across snapshots.** Each shard
-  is a tree of `index-N` segments referenced by per-snapshot
-  `snap-*.dat` manifests. Deleting "old" objects corrupts every
-  snapshot that shared the segment. An S3 lifecycle rule scoped to
-  the whole bucket will silently invalidate historical snapshots.
-- **OpenSearch runs one snapshot per repository at a time.** A
-  second snapshot returns `ConcurrentSnapshotExecutionException`.
-  Automated and manual snapshots into the SAME repository collide;
-  use distinct `base_path` prefixes for distinct schedules.
-- **Restore does NOT overwrite existing indices.** If an index or
-  alias with the snapshot's name already exists, restore skips or
-  fails with `resource_already_allocated_exception`. Use
-  `rename_pattern`/`rename_replacement` on restore, or delete the
-  conflicting index first.
-- **UltraWarm/Cold migration requires replicas and node count.**
-  Migration to warm requires the index to have at least one
-  assigned replica; migration fails on a primary-only index. Cold
-  storage requires the warm tier enabled (warm_count >= 3).
-- **Cross-Region async replication is index-level.** `_plugins/_replication`
-  replicates indices one at a time from leader to follower. Replication
-  stalls briefly when the leader takes a snapshot (expected), and
-  fails permanently if the follower is on a lower engine version.
-- **`_snapshot/<repo>/_status` is the source of truth.** `state`
-  (`SUCCESS`, `IN_PROGRESS`, `FAILED`, `PARTIAL`) plus per-shard
-  `stage` (`STARTED`, `TRANSLOCATING`, `FINALIZE`) tell you where
-  the snapshot is stuck. Operators who "watch S3" miss the
-  in-cluster state machine.
-- **PARTIAL is not FAILED.** A `PARTIAL` snapshot is one where some
-  primary shards failed (cluster red) but the rest succeeded. The
-  snapshot is usable for the successful shards. Operators who
-  "got a SUCCESS in S3" sometimes have a PARTIAL they did not notice.
-- **Audit logs to S3 require LogPublishingOptions.AuditLogs ENABLED
-  AND the S3 bucket policy granting the delivery principal.** The
-  bucket policy for CloudTrail must grant `cloudtrail.amazonaws.com`
-  with `aws:SourceArn` condition; for Firehose must grant
-  `firehose.amazonaws.com` with `aws:SourceAccount`.
-- **`repository_verification_exception` is the #1 misdiagnosed
-  snapshot error.** Operators reach for "snapshot is corrupt." The
-  actual cause is almost always IAM (role trust, role policy, or
-  bucket policy). Probe IAM before probing snapshot integrity.
 
 ### Step 1: Repository registration & verification layer
 
@@ -597,254 +497,30 @@ Field rules:
   (c) at least one passing probe ruling out a competing layer.
 
 ## Pre-flight safety checks (run before any state-changing CLI)
+> Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
+> Read it only when this section applies.
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing
-  operation (`PUT _snapshot`, `DELETE _snapshot/<repo>`,
-  `_snapshot/<repo>/<snap>/_restore`, `update-domain-config`,
-  `s3api put-bucket-lifecycle-configuration`), emit and await
-  operator approval. Do NOT execute the CLI or curl until confirmed.
-- **Read-only first.** Every probe in the diagnostic tree is
-  read-only. Do not perform state-changing operations as diagnostic
-  probes.
-- **`DELETE _snapshot/<repo>/<snap>`** removes the snapshot from the
-  repository; it does NOT delete S3 blobs (segments are deduplicated).
-  Confirm before deleting.
-- **`_restore`** opens snapshot indices on the target. If a same-named
-  index exists, restore skips or fails. Confirm target state first.
-- **`update-domain-config` to enable warm/cold** triggers a blue/green
-  deployment. Plan outside traffic peaks.
-- **`s3api put-bucket-lifecycle-configuration`** overwrites the
-  existing lifecycle. Always read current config first and merge.
-- **Re-registering a repository** overwrites prior settings. If the
-  prior repository had snapshots, the new registration must point at
-  the same bucket + prefix or those snapshots become orphaned.
-- **Bulk remediation batch limit.** Batch groups of at most 5
-  repositories, one CONFIRM per batch.
 
 ## Remediation guidance
+> Moved verbatim to [references/error-handling.md](references/error-handling.md) — load on demand.
+> Read it only when this section applies.
 
-### For REPOSITORY_REGISTRATION — repository not registered
-
-```bash
-curl -X PUT "https://$ENDPOINT/_snapshot/<repo>" -H 'Content-Type: application/json' -d '
-{"type": "s3", "settings": {
-  "bucket": "<bucket>", "region": "<bucket-region>",
-  "base_path": "<prefix>",
-  "iam_role_arn": "arn:aws:iam::<account>:role/<role>",
-  "compress": true}}'
-curl -sS "https://$ENDPOINT/_snapshot/<repo>" | jq '.'
-```
-
-### For REPOSITORY_VERIFICATION — verification failed
-
-1. Update the bucket policy (see IAM_ROLE_S3_ACCESS).
-2. Re-run verification:
-   ```bash
-   curl -X POST "https://$ENDPOINT/_snapshot/<repo>/_verify?verbose=true"
-   ```
-3. If verification still fails, delete and re-register (CONFIRM first).
-
-### For IAM_ROLE_S3_ACCESS — role or bucket policy missing
-
-```bash
-# Bucket policy granting the snapshot role
-aws s3api put-bucket-policy --bucket <bucket> --policy '{
-  "Version": "2012-10-17",
-  "Statement": [
-    {"Sid": "ListBucketForSnapshot", "Effect": "Allow",
-     "Principal": {"AWS": "arn:aws:iam::<account>:role/<role>"},
-     "Action": ["s3:ListBucket", "s3:GetBucketLocation"],
-     "Resource": "arn:aws:s3:::<bucket>"},
-    {"Sid": "ReadWriteSnapshotObjects", "Effect": "Allow",
-     "Principal": {"AWS": "arn:aws:iam::<account>:role/<role>"},
-     "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
-     "Resource": "arn:aws:s3:::<bucket>/<prefix>/*"}
-  ]}'
-# SSE-KMS: add kms:Decrypt and kms:GenerateDataKey to the role
-aws iam put-role-policy --role-name <role-name> --policy-name KmsAccess \
-  --policy-document '{"Version": "2012-10-17", "Statement": [
-    {"Effect": "Allow", "Action": ["kms:Decrypt", "kms:GenerateDataKey"],
-     "Resource": "<kms-key-arn>"}]}'
-```
-
-Verify with `simulate-principal-policy`.
-
-### For SNAPSHOT_TIMEOUT — snapshot stuck
-
-1. Resolve cluster health (red → yellow → green).
-2. Raise `thread_pool.snapshot.size` if saturated.
-3. Stop competing snapshots in the same repository.
-4. Cancel the snapshot if it cannot complete (CONFIRM first):
-   ```bash
-   curl -X DELETE "https://$ENDPOINT/_snapshot/<repo>/<snap>"
-   ```
-
-### For RESTORE_VERSION_CONFLICT — target version too low
-
-```bash
-aws opensearch update-domain-config --domain-name <domain> \
-  --engine-version OpenSearch_<target> --profile <p>
-# Wait for UpgradeStatus: Succeeded, then retry restore
-```
-
-### For RESTORE_ALIAS_CONFLICT — alias or index exists
-
-```bash
-curl -X POST "https://$ENDPOINT/_snapshot/<repo>/<snap>/_restore" \
-  -H 'Content-Type: application/json' -d \
-  '{"indices": "<pattern>", "rename_pattern": "<from>", "rename_replacement": "<to>"}'
-# Or delete the conflict (CONFIRM first):
-curl -X DELETE "https://$ENDPOINT/<index-or-alias>"
-```
-
-### For COLD_STORAGE_MIGRATION — warm/cold misconfig
-
-```bash
-aws opensearch update-domain-config --domain-name <domain> \
-  --cluster-config WarmEnabled=true,WarmCount=3,WarmType=ultrawarm1.medium.search --profile <p>
-curl -X PUT "https://$ENDPOINT/<index>/_settings" -H 'Content-Type: application/json' -d \
-  '{"index": {"number_of_replicas": 1}}'
-# Wait for green, then retry the migration via ISM
-```
-
-### For S3_LIFECYCLE_DELETION — lifecycle expires snapshots
-
-```bash
-aws s3api get-bucket-lifecycle-configuration --bucket <bucket> --output json > lifecycle.json
-# Edit to scope/expire the rule, then:
-aws s3api put-bucket-lifecycle-configuration --bucket <bucket> \
-  --lifecycle-configuration file://lifecycle-merged.json
-# Re-take snapshots that were lost
-```
-
-### For CROSS_REGION_REPLICATION — async replication stall
-
-1. Verify `index.plugins.replication.enabled: true` on leader.
-2. Verify follower write block is off and follower engine >= leader.
-3. Resume replication: `curl -X POST "https://$FOLLOWER/_plugins/_replication/<index>/_resume"`
-
-### For SHARD_ALLOCATION_RESTORE — recovery throttling
-
-Raise `cluster.routing.allocation.node_concurrent_recoveries` (default 2)
-and `indices.recovery.max_bytes_per_sec` (default 40mb). Watch
-`_cat/recovery` for 100%.
-
-### For MANIFEST_CORRUPTION — corrupt blob
-
-1. `DELETE _snapshot/<repo>/<snap>` (CONFIRM first).
-2. Re-take a fresh snapshot; new snapshot uses healthy segments.
-3. If repository metadata itself is corrupt, re-register against a
-   clean prefix and re-take all snapshots.
-
-### For CONCURRENT_SNAPSHOT_LIMIT — second snapshot blocked
-
-Wait for the in-flight snapshot, OR cancel it (CONFIRM first).
-Reschedule the manual cadence to avoid the automated snapshot hour,
-or use a different repository/prefix.
-
-### For CUR_AUDIT_LOG_CONFIG — audit logs missing
-
-```bash
-aws opensearch update-domain-config --domain-name <domain> \
-  --log-publishing-options AuditLogsEnabled=true,CloudWatchLogsLogGroupArn="<log-group-arn>" --profile <p>
-# Then configure CloudWatch Logs → S3 export (subscription filter to Firehose)
-```
 
 ## Deep reference
+> Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+> Read it only when this section applies.
 
-### Symptom → layer decision matrix
-
-```
-Error string                                        → Layer
-repository_verification_exception                    → REPOSITORY_VERIFICATION / IAM_ROLE_S3_ACCESS
-PUT _snapshot 4xx                                    → REPOSITORY_REGISTRATION
-ConcurrentSnapshotExecutionException                 → CONCURRENT_SNAPSHOT_LIMIT
-snapshot stuck IN_PROGRESS; unassigned shards        → SNAPSHOT_TIMEOUT
-restore 400 version_not_supported                    → RESTORE_VERSION_CONFLICT
-restore resource_already_allocated_exception         → RESTORE_ALIAS_CONFLICT
-migration_failed to warm/cold                        → COLD_STORAGE_MIGRATION
-SnapshotMissingException after N days                → S3_LIFECYCLE_DELETION
-plugins/replication status SYNCING lag rising        → CROSS_REGION_REPLICATION
-cat/recovery stuck at 5%                             → SHARD_ALLOCATION_RESTORE
-CorruptedIndexException index-N                      → MANIFEST_CORRUPTION
-audit bucket empty; AuditLogs DISABLED               → CUR_AUDIT_LOG_CONFIG
-```
-
-### Snapshot role trust policy template (same-account)
-
-```json
-{"Version": "2012-10-17", "Statement": [{
-  "Effect": "Allow",
-  "Principal": {"Service": "opensearchservice.amazonaws.com"},
-  "Action": "sts:AssumeRole",
-  "Condition": {
-    "StringEquals": {"aws:SourceAccount": "<account-id>"},
-    "ArnLike": {"aws:SourceArn": "arn:aws:es:<region>:<account-id>:domain/<domain-name>"}
-  }
-}]}
-```
-
-### Engine-version compatibility matrix
-
-| Source engine | Target engine | Direct restore? |
-|---|---|---|
-| ES 7.0–7.10 | OpenSearch 1.x | Yes |
-| ES 7.0–7.10 | OpenSearch 2.x | No — needs intermediate 1.x |
-| OpenSearch 1.x | OpenSearch 1.x same/higher | Yes |
-| OpenSearch 1.x | OpenSearch 2.x | Yes (one major up) |
-| OpenSearch 2.x | OpenSearch 2.y ≥ 2.x | Yes |
-| OpenSearch 2.x | OpenSearch 2.y < 2.x | No |
-
-### UltraWarm / Cold tier requirements
-
-| Tier | Minimum nodes | Notes |
-|---|---|---|
-| Hot (data) | 2 (HA) | Required always |
-| Warm (UltraWarm) | 3 | Added via `update-domain-config` |
-| Cold | 1 (with warm) | Requires warm tier enabled first |
-
-Migration to warm requires the index to have at least one assigned
-replica. Cold indices are searchable via `cold-search` plugin;
-queries are slower (disk-backed).
-
-### Snapshot state transitions
-
-| State | Meaning |
-|---|---|
-| `INIT` | Request accepted, shards not yet started |
-| `STARTED` | Shard snapshots in progress |
-| `TRANSLOCATING` | Lucene segments being moved to repository |
-| `FINALIZE` | Writing snapshot manifest (`snap-*.dat`) |
-| `SUCCESS` | Metadata written; usable for restore |
-| `FAILED` | One or more primary shards failed; NOT usable |
-| `PARTIAL` | Some shards failed; usable for successful shards |
-| `IN_PROGRESS` | Visible in `_snapshot/_status` while active |
-
-### Snapshot thread pool sizing
-
-| Setting | Default | Effect |
-|---|---|---|
-| `thread_pool.snapshot.size` | ~#CPUs/4 | Concurrent shard-snapshot operations per node |
-| `thread_pool.snapshot.queue_size` | 350 | Queue depth before rejects |
-| `indices.recovery.max_bytes_per_sec` | 40mb (managed) | Restore shard-recovery throttle |
 
 ## Recent AWS features (2024-2026)
+> Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+> Read it only when this section applies.
 
-- **OpenSearch cross-Region async replication (2024-2025):**
-  Index-level async replication via `_plugins/_replication`. Stalls
-  when the leader takes a snapshot (expected). Watch
-  `last_updated_lag_seconds` rather than `last_replication_completion`.
-- **Cold storage GA (2024):** Searchable cold tier via `cold-search`
-  plugin. Migration requires warm tier enabled and the index to
-  have a warm replica. Operators who "set the ISM policy to cold"
-  without enabling warm see `migration_failed`.
-- **Snapshot upgrade flow (2024):** OpenSearch 1.x intermediate
-  domains read 7.x snapshots and emit 1.x snapshots for 2.x targets.
-  Direct 7.x → 2.x restore returns `version_not_supported`.
-- **Managed OpenSearch 2.13+ (2025):** Snapshot repository supports
-  `server_side_encryption` setting explicitly. Bucket-side SSE-KMS
-  still requires the role to have `kms:GenerateDataKey`.
 
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 non-obvious behaviours, deep reference tables, recent AWS features
+- [references/error-handling.md](references/error-handling.md) — per-verdict remediation guidance
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight gather commands and safety checks
 ## Domain
 
 AWS CloudOps / OpenSearch Service, Snapshot and Restore Diagnostics,

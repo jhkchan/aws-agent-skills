@@ -156,26 +156,8 @@ Driven by four migration realities:
 
 Run before classification. Misclassifying these produces wrong plans.
 
-**Live-account pre-flight (skip if offline plan audit):**
-1. `aws opensearch describe-domain --domain-name <name>` — confirm
-   domain status, EngineVersion, ClusterConfig (instance type, node
-   count, dedicated masters), EBSOptions, EncryptionAtRestOptions,
-   VPCOptions, SnapshotOptions.
-2. `aws es describe-elasticsearch-domain --domain-name <name>` (for
-   legacy ES domains) — capture the ES version, cluster config, and
-   snapshot configuration.
-3. `curl -s https://<endpoint>/ _cluster/health` — cluster status
-   (green/yellow/red), number of nodes, active shards, relocating
-   shards.
-4. `curl -s https://<endpoint>/ _cat/indices?v` — index list, document
-   counts, store sizes.
-5. `curl -s https://<endpoint>/ _cat/plugins?v` — installed plugins.
-6. `curl -s https://<endpoint>/ _nodes/plugins` — detailed plugin info
-   per node.
-7. `curl -s https://<endpoint>/ _snapshot` — registered snapshot
-   repositories.
-8. `curl -s https://<endpoint>/ _mapping` — index mappings for
-   compatibility assessment.
+> Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
+> Read it only when this section applies.
 
 **Malformed input:** if the input is invalid or missing required fields,
 emit `VERDICT: BLOCKED` with `REASON: Domain/operation configuration is
@@ -197,65 +179,9 @@ not valid or is missing required fields — cannot plan.`
 ## Process — operation planning (apply in order)
 
 ### Step 0: Expert heuristic — non-obvious ES-to-OpenSearch migration behaviours
+> Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+> Read it only when this section applies.
 
-These behaviours are easy to misjudge without migration experience. Each
-changes a plan if ignored:
-
-- **OpenSearch 1.x is a direct fork of ES 7.10.2.** Index format, Lucene
-  version, and mappings are compatible. An in-place upgrade from ES 7.10
-  to OpenSearch 1.x is the lowest-risk path. OpenSearch 2.x introduces
-  breaking changes in some APIs and requires careful testing.
-
-- **Snapshot format compatibility is version-dependent.** Snapshots taken
-  on ES 7.x can be restored on OpenSearch 1.x. Snapshots from ES 6.x
-  cannot be restored on OpenSearch 2.x directly — they need an
-  intermediate restore on ES 7.x or OpenSearch 1.x first. Always verify
-  snapshot version compatibility before planning restore.
-
-- **AWS-managed domains upgrade via blue/green deployment.** When you
-  update the engine version on an AWS OpenSearch domain, AWS provisions
-  a new set of nodes with the target version, migrates data, and switches
-  traffic. The domain endpoint does NOT change. There is brief
-  degradation during the switch (increased latency, possible dropped
-  connections). Plan for 30-120 minutes of degraded performance.
-
-- **Reindex-from-remote requires the remote cluster to be network-
-  accessible.** The target OpenSearch cluster must reach the source ES
-  cluster's endpoint. For VPC-only domains, this requires VPC peering,
-  Transit Gateway, or a VPN. Reindex-from-remote does NOT preserve
-  index settings — you must create the target index with the correct
-  settings and mappings before reindexing.
-
-- **The `compatible=40` query parameter enables ES 7.x compatibility
-  mode.** Append `?compatible=40` to API requests, and OpenSearch responds
-  with ES 7.x-compatible JSON. This is a bridge for existing ES clients.
-  OpenSearch 2.11+ supports this. It does NOT enable ES-specific features
-  like `_xpack` APIs — it only adjusts response format.
-
-- **OpenSearch security plugin replaces X-Pack security.** If the ES
-  domain uses X-Pack security (roles, users, index-level permissions),
-  the OpenSearch security plugin provides equivalent features but uses
-  a different configuration format (config.yml, internal_users.yml,
-  roles.yml). Plan for security configuration migration.
-
-- **OpenSearch SQL plugin has a different API endpoint.** ES SQL uses
-  `_xpack/sql`; OpenSearch SQL uses `_plugins/_sql`. Applications that
-  call ES SQL endpoints must update their API paths.
-
-- **The OpenSearch Java high-level REST client is deprecated.** Use the
-  `opensearch-java` client (the new Java client) or the `opensearch-rest-client`.
-  The old `elasticsearch-rest-high-level-client` works with compatibility
-  mode but is no longer maintained.
-
-- **Index settings may need adjustment.** ES 7.x allows some index-level
-  settings that OpenSearch handles differently (e.g., `index.codec`).
-  When restoring snapshots across versions, OpenSearch may reject unknown
-  settings. Strip incompatible settings before restore.
-
-- **AWS OpenSearch Serverless is NOT a migration target for existing
-  provisioned clusters.** Serverless has different indexing and search
-  behavior (no `_all` field, different collection model). Migrate to
-  provisioned OpenSearch first, then evaluate Serverless separately.
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
@@ -510,90 +436,18 @@ CLIENT_NOTES:
   - Plan to migrate client libraries from elasticsearch-* to opensearch-* within 3-6 months.
 ```
 
-### Worked example — migration BLOCKED (ES-only plugin)
+> Secondary worked examples moved verbatim to [references/worked-examples.md](references/worked-examples.md) — load on demand.
+> Read them only when the primary example is not sufficient.
 
-```text
-OPERATION: assess
-VERDICT: BLOCKED
-TARGET: legacy-search-cluster (ES 6.8 -> OpenSearch 2.11)
-PRE_CHECKS:
-  - [PASS] Domain status is Active
-  - [PASS] Cluster health is green
-  - [FAIL] Source version Elasticsearch_6.8 is NOT eligible for direct in-place upgrade. Must upgrade to ES 7.10 first, or use new-cluster + reindex migration path.
-  - [FAIL] ES-only plugin x-pack-ml is installed. No direct OpenSearch equivalent (OpenSearch anomaly detection uses a different API). Must remove and reconfigure before migration.
-STEPS: (none — pre-checks failed)
-POST_VERIFY: (none)
-ENDPOINT: N/A — migration blocked
-CLIENT_NOTES:
-  - BLOCKED: Remediation required before migration can proceed.
-  - Option A: Upgrade ES 6.8 to 7.10 (if supported), remove x-pack-ml, then migrate to OpenSearch.
-  - Option B: Provision new OpenSearch 2.x cluster, reindex from remote, reconfigure ML jobs as OpenSearch anomaly detectors.
-  - Reindex-from-remote requires network connectivity between the ES 6.8 domain and the new OpenSearch domain.
-```
 
-### Worked example — COMPLETED (blue/green migration verified)
 
-```text
-OPERATION: blue-green
-VERDICT: COMPLETED
-TARGET: prod-search-cluster (ES 7.10 -> OpenSearch 2.11)
-PRE_CHECKS:
-  - [PASS] (all pre-checks passed before execution)
-STEPS:
-  1. Pre-upgrade snapshot taken at 2026-08-10T08:00:00Z
-  2. aws opensearch update-domain-config executed at 2026-08-10T08:15:00Z
-  3. Blue/green deployment completed at 2026-08-10T09:45:00Z (90 min)
-POST_VERIFY:
-  - [PASS] Cluster health is green
-  - [PASS] Document counts match (45 indices, 2.1B docs)
-  - [PASS] Index mappings preserved correctly
-  - [PASS] Application search queries return correct results (100% match)
-  - [PASS] compatible=40 mode works for elasticsearch-py 7.17 clients
-  - [PASS] Snapshot repository s3-migration-repo is registered
-  - [PASS] No red shards or unassigned replicas
-  - [PASS] OpenSearch plugins confirmed: analysis-icu, analysis-phonetic, ingest-attachment
-ENDPOINT: https://search-prod-search-cluster.us-east-1.es.amazonaws.com (unchanged)
-CLIENT_NOTES:
-  - Blue/green migration completed (90 min). compatible=40 is active for ES 7.x clients.
-  - Plan to migrate client libraries to opensearch-* within 3-6 months.
-  - Test neural search and vector DB features available in OpenSearch 2.11.
-```
 
-### Worked example — snapshot setup and migration (READY)
 
-```text
-OPERATION: snapshot-setup
-VERDICT: READY
-TARGET: staging-search-cluster (ES 7.10 -> OpenSearch 2.11)
-PRE_CHECKS:
-  - [PASS] Domain status is Active
-  - [PASS] Cluster health is green
-  - [PASS] S3 bucket migration-snapshots exists and is writable
-  - [PASS] IAM role OpenSearchSnapshotRole has s3:PutObject, s3:GetObject, s3:ListBucket
-  - [PASS] No existing repository named s3-migration-repo
-STEPS:
-  1. Register S3 repo: PUT _snapshot/s3-migration-repo {"type":"s3","settings":{"bucket":"migration-snapshots","region":"us-east-1","base_path":"staging-migration","role_arn":"arn:aws:iam::111111111111:role/OpenSearchSnapshotRole"}}
-  2. Verify: POST _snapshot/s3-migration-repo/_verify
-  3. Take full snapshot: PUT _snapshot/s3-migration-repo/staging-full-snapshot?wait_for_completion=true {"indices":"*","ignore_unavailable":true,"include_global_state":false}
-  4. Confirm: GET _snapshot/s3-migration-repo/staging-full-snapshot
-POST_VERIFY: (pending execution)
-ENDPOINT: N/A (snapshot setup — no client impact)
-CLIENT_NOTES: N/A (snapshot setup — no client impact)
-```
 
 ## Expert heuristic — non-obvious ES-to-OpenSearch migration behaviours
+> Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+> Read it only when this section applies.
 
-| Heuristic | Impact on plan |
-|---|---|
-| OpenSearch 1.x is a direct fork of ES 7.10.2 | In-place upgrade from ES 7.10 to OS 1.x is the lowest-risk path |
-| Snapshots from ES 6.x cannot restore on OpenSearch 2.x | Use intermediate restore or reindex-from-remote for ES 6.x sources |
-| AWS blue/green deployment preserves the domain endpoint | No connection-string change for in-place upgrades |
-| Reindex-from-remote requires network connectivity | VPC-only domains need VPC peering or Transit Gateway |
-| compatible=40 is a bridge, not permanent | Plan client library migration within 3-6 months |
-| OpenSearch SQL uses _plugins/_sql, not _xpack/sql | Update API paths in application code |
-| OpenSearch security plugin replaces X-Pack security | Migrate roles and users to config.yml format |
-| Index settings may need stripping before cross-version restore | Remove unknown settings that OpenSearch rejects |
-| Neural search, vector DB, flow frameworks are OS 2.x features | Evaluate post-migration for ML-powered search and automated pipelines |
 
 ## Anti-Patterns — NEVER (top 5)
 
@@ -627,68 +481,23 @@ CLIENT_NOTES: N/A (snapshot setup — no client impact)
    traffic.
 
 ## Pre-flight safety checks (run before any migration CLI)
+> Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
+> Read it only when this section applies.
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing migration
-  operation (`update-domain-config`, `_snapshot`, `_restore`, `_reindex`),
-  emit the CONFIRM prompt. Do NOT execute until the operator confirms.
-- **Snapshot before upgrade.** Take a full snapshot to the S3 repository
-  before any in-place upgrade. This is the rollback path.
-- **Verify snapshot repository.** `POST _snapshot/<repo>/_verify` must
-  show all data nodes reporting success.
-- **Check cluster health.** Cluster must be `green` (or `yellow` with
-  documented reason). `red` means data loss risk — BLOCK.
-- **Inventory plugins.** `_cat/plugins` must show no ES-only commercial
-  plugins for in-place upgrade path.
-- **Test network connectivity.** For reindex-from-remote, verify the
-  target can reach the source endpoint on port 443.
-- **Verify IAM permissions.** The migration role needs `es:ESHttp*` or
-  `opensearch:ESHttp*` plus `s3:*` on the snapshot bucket.
-- **Schedule during low-traffic windows.** Blue/green deployment causes
-  degraded performance (30-120 minutes). Plan for off-peak.
-- **One domain per CONFIRM gate.** Do NOT batch multiple domain
-  migrations — a systematic issue cascades across domains.
 
 ## Recent AWS features (2024-2026)
+> Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+> Read it only when this section applies.
 
-- **OpenSearch 2.11+ compatible mode (2024):** The `compatible=40` query
-  parameter makes OpenSearch respond with ES 7.x-compatible JSON. Bridges
-  existing ES clients without code changes. Does NOT replicate ES-specific
-  API endpoints — only adjusts response format.
-
-- **Neural search plugin (2024-2025):** ML-powered semantic search using
-  text embeddings. Available as a processor in search pipelines. Requires
-  an ML model deployed via the OpenSearch ML Commons plugin.
-
-- **Vector DB engine (2024-2025):** Native vector storage and approximate
-  nearest neighbor (ANN) search using the k-NN plugin. Supports FAISS,
-  NMSLIB, and Lucene engines. Enables LLM-powered RAG applications
-  directly on OpenSearch.
-
-- **Flow frameworks (2024-2025):** Automated ML pipeline creation for
-  ingestion and search. Templates for common workflows (neural search
-  setup, RAG pipeline, anomaly detection). Reduces setup complexity for
-  AI-powered search use cases.
-
-- **OpenSearch 2.13+ segment replication (2024):** Segment-level
-  replication instead of document-level. Reduces CPU on primary shards
-  during heavy write workloads. Available as an index-level setting.
-
-- **AWS OpenSearch Serverless (2024-2025):** Auto-scaling serverless
-  OpenSearch with simplified capacity management. NOT a direct migration
-  target for provisioned clusters — different indexing and search behavior.
-
-- **OpenSearch 2.15+ stored fields compression (2025):** Improved
-  compression for stored fields reduces storage costs by 10-30%.
-
-- **Cross-cluster replication (2024-2025):** Active-active and active-
-  passive replication between OpenSearch clusters. Useful for DR and
-  multi-region search.
 
 ## References
 
 - `references/migration-procedures.md` — detailed CLI/API scripts for
   snapshot setup, reindex-from-remote, plugin inventory, and
   post-migration verification
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples (BLOCKED, COMPLETED, snapshot READY)
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight gather commands and pre-flight safety checks
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 expert behaviours, expert heuristics, recent AWS features
 
 ## Domain
 

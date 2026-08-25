@@ -376,3 +376,97 @@ resource "aws_kms_alias" "graph" {
 | Delete cluster | `aws neptune delete-db-cluster` |
 | Bulk load (HTTP) | `curl -X POST https://<cluster>:8182/loader -d '{...}'` |
 | Streams poll (HTTP) | `curl https://<cluster>:8182/streams?limit=N` |
+
+## Step 4 — subnet group and security group CLI (moved from SKILL.md)
+
+**DB subnet group creation:**
+
+```bash
+aws neptune create-db-subnet-group \
+  --db-subnet-group-name prod-neptune-subnet \
+  --db-subnet-group-description "Multi-AZ subnet group for prod Neptune" \
+  --subnet-ids subnet-0aaa subnet-0bbb subnet-0ccc \
+  --tags Key=Environment,Value=production
+```
+
+Verify the subnets span >=2 AZs (3+ preferred):
+
+```bash
+aws ec2 describe-subnets --subnet-ids subnet-0aaa subnet-0bbb subnet-0ccc \
+  --query 'Subnets[*].AvailabilityZone' --output text
+# Expect at least 2 distinct AZs for Multi-AZ
+```
+
+**Security group rules:**
+
+```bash
+# Inbound: allow the application's SG to reach Neptune on port 8182
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-neptune123 \
+  --protocol tcp \
+  --port 8182 \
+  --source-security-group-id sg-app456
+```
+
+## Step 6 — parameter group creation and apply (moved from SKILL.md)
+
+**Applying a parameter group:**
+
+```bash
+aws neptune create-db-cluster-parameter-group \
+  --db-cluster-parameter-group-name prod-neptune-pg \
+  --db-parameter-group-family neptune1 \
+  --description "Production Neptune cluster parameter group"
+
+aws neptune modify-db-cluster-parameter-group \
+  --db-cluster-parameter-group-name prod-neptune-pg \
+  --parameters \
+    ParameterName=neptune_enforce_ssl,ParameterValue=1,ApplyMethod=immediate \
+    ParameterName=neptune_query_timeout,ParameterValue=30000,ApplyMethod=immediate
+```
+
+Attach the parameter group at `create-db-cluster` via
+`--db-cluster-parameter-group-name`.
+
+## Step 7 — IAM database auth (moved from SKILL.md)
+
+**Enable at creation:**
+
+```bash
+aws neptune create-db-cluster ... \
+  --enable-iam-database-authentication
+```
+
+**IAM policy for Neptune access:**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["neptune-db:Connect"],
+      "Resource": "arn:aws:neptune:<region>:<account>:cluster/<cluster-name>"
+    }
+  ]
+}
+```
+
+## Step 8 — Neptune Loader bulk load (moved from SKILL.md)
+
+**Load:**
+
+```bash
+curl -X POST \
+  -H 'Content-Type: application/json' \
+  https://<cluster-endpoint>:8182/loader \
+  -d '{
+    "source": "s3://prod-graph-bucket/initial-load/",
+    "format": "csv",
+    "iamRoleArn": "arn:aws:iam::<account>:role/NeptuneLoadRole",
+    "mode": "NEW",
+    "region": "us-east-1",
+    "failOnError": "TRUE",
+    "parallelism": "MEDIUM"
+  }'
+```

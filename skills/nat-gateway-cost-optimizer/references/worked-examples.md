@@ -126,3 +126,21 @@ IMPLEMENTATION:
   5. aws ec2 release-address --allocation-id eipalloc-bbb
   6. Verify: aws ec2 describe-nat-gateways --filter "Name=vpc-id,Values=vpc-0ghi789"
 ```
+
+## Worked-example index (moved from SKILL.md)
+
+Three full end-to-end worked examples live in
+`references/worked-examples.md`:
+
+- **OPPORTUNITY_FOUND — production VPC, no Gateway endpoints, high S3
+  traffic.** Creates S3 + DynamoDB Gateway endpoints (free); skips ECR
+  Interface endpoint (below break-even); keeps 3-AZ topology.
+- **ALREADY_OPTIMAL — production VPC with full endpoint posture.** S3
+  and DynamoDB Gateway endpoints in place; ECR Interface endpoint exists
+  in 3 AZs; topology correct.
+- **OPPORTUNITY_FOUND — non-prod VPC with redundant NAT Gateways.**
+  Creates S3 Gateway endpoint; consolidates 2 NAT Gateways to 1;
+  includes the `release-address` step for the deleted gateway's EIP.
+
+Each example demonstrates internally consistent arithmetic, the CONFIRM
+gate, and the exact CLI sequence for the verdict shape.

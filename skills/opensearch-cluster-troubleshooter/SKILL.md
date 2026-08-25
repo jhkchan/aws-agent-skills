@@ -100,24 +100,7 @@ files or query DSL — they start with `_cluster/health`,
 resource pressure is ruled out do they look at mapping design, slow
 queries, or upgrade state.
 
-Four behaviours separate a senior OpenSearch engineer from a
-generalist: (1) disk watermarks are a three-stage clutch (`low: 85%`
-stops allocation, `high: 90%` evacuates shards off the node,
-`flood_stage: 95%` enforces a read-only block) — the well-known
-write-block hits at flood, not at high; (2) JVM heap pressure is the
-inverse of GC headroom — `JVMHeapPressure > 75%` sustained for 5+
-minutes is the early warning, by 80% (the managed default alarm) the
-cluster is already in frequent old-gen GC, and the fix is almost
-never "raise the heap" (managed domains cap heap at 32 GB) but
-"reduce the working set" (close indices, reduce replicas, add data
-nodes, migrate to UltraWarm); (3) shard count is a load-bearing
-capacity dimension — each shard carries 50-200 MB overhead, AWS
-guidance targets ≤ 20 shards per GB of heap, and the working
-approximation `(primary × replica) ≈ data node count × 20` keeps the
-per-node shard ceiling near the safe overhead ceiling; (4) cluster
-red and cluster yellow mean different things — yellow means
-redundancy loss (reads and writes succeed), red means data
-unavailability (a primary shard is unallocated).
+→ Extended senior-engineer behaviours moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Quick reference — symptom triage table
 
@@ -147,22 +130,7 @@ Before running symptom-specific probes, gather the canonical cluster
 state and short-circuit on cluster-wide events that mimic per-index
 failures.
 
-```bash
-# Domain configuration (EngineVersion, ClusterConfig, EBSOptions,
-# VPCOptions, SnapshotOptions, ChangeProgressDetails)
-aws opensearch describe-domain --domain-name <domain> --output json
-
-# Domain config history (last change to cluster config)
-aws opensearch describe-domain-config --domain-name <domain> --output json
-
-# AWS Health (regional events, OpenSearch scheduled maintenance)
-aws health describe-events --filter eventStatusCodes=OPEN,UPCOMING \
-  --service OPENSEARCH_SERVICE --region us-east-1 --output json
-
-# OpenSearch _cluster/health (the single most informative endpoint)
-curl -sS "https://<domain-endpoint>/_cluster/health?pretty" \
-  -H "Content-Type: application/json"
-```
+→ Pre-flight gather-info CLI block moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### Cluster-state short-circuit
 
@@ -178,22 +146,7 @@ curl -sS "https://<domain-endpoint>/_cluster/health?pretty" \
 If the input is malformed (missing DomainName, absent symptom, no
 error string), emit:
 
-```text
-TARGET: <domain-name or unknown>
-VERDICT: INSUFFICIENT_DATA
-ROOT_CAUSE: UNKNOWN
-REASON: Input is missing required context — at minimum a symptom
-  description (the error string, observed cluster status, or an
-  alarm name) and the DomainName (with region for live diagnosis).
-LAYER: UNKNOWN
-EVIDENCE:
-  - Missing: <list specific missing fields>
-REMEDIATION: Re-prompt the operator for: (1) the exact error string
-  or observed symptom, (2) the DomainName and region, and (3) for
-  live diagnosis, the most recent `_cluster/health?pretty` output
-  and the CloudWatch `ClusterIndexWritesBlocked`, `JVMHeapPressure`,
-  and `ClusterStatus.red` metrics over the last 30 minutes.
-```
+→ Malformed-input INSUFFICIENT_DATA example moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 ## Process — Diagnostic decision tree (apply in symptom order)
 
@@ -206,52 +159,7 @@ probe that matches the symptom.**
 
 ### Step 0: Non-obvious behaviours that change diagnosis
 
-- **AWS managed OpenSearch runs with three disk watermarks tuned for
-  stability.** Defaults: `low: 85%`, `high: 90%`, `flood_stage: 95%`.
-  Flood sets `index.blocks.read_only_allow_delete` on every index;
-  writes return `ClusterBlockException` to every client. The high
-  watermark (90%) quietly starts SHARD EVACUATION off the node —
-  a cluster that "suddenly slows down" at 90% is paying the
-  relocation cost before flood hits.
-- **The flood-stage block auto-clears once disk falls below flood.**
-  Operators must free disk below flood AND the block auto-clears
-  once usage recovers. Force-clear via
-  `PUT _all/_settings {"index.blocks.read_only_allow_delete": null}`
-  only after disk is below flood.
-- **`JVMHeapPressure > 75%` is the early warning, not the alarm.**
-  The managed default CloudWatch alarm is 80%; by 80% the cluster
-  is already in frequent old-gen GC. Senior engineers alarm at 75%
-  sustained for 5 minutes. The actual OOM follows once a query
-  allocates faster than GC reclaims.
-- **Heap on managed OpenSearch is fixed at ~50% of instance RAM up
-  to the 32 GB ceiling** (compressed-oops threshold). Operators
-  cannot raise the heap beyond the instance-class ceiling — the fix
-  is to scale the instance class OR reduce the working set.
-- **Thread-pool queues are bounded per-node and DO NOT grow
-  dynamically on managed OpenSearch.** `search` queue defaults to
-  1000; `write` defaults to 10000 (varies by version). Operators who
-  raise the queue via `_cluster/settings` on a managed domain find
-  the setting is overridden — the fix is to scale out or throttle.
-- **Shard allocation deciders report `NO` reasons that are not the
-  root cause.** `_cluster/allocation/explain` returns deciders that
-  voted against allocation. The FIRST decider is the binding
-  constraint; the rest are cascading `NO` votes.
-- **Snapshots block index deletion by design.**
-  `SnapshotInProgressException` on `DELETE /index` is expected —
-  the snapshot repository holds a lock on the index until completion.
-  Force-deleting mid-snapshot risks repository corruption.
-- **UltraWarm migration failures are usually hot-node disk or
-  shard-count related.** If hot-node disk is near `high`, the
-  consolidation fails with `node does not have enough disk` — the
-  root cause is hot-node disk pressure, not the warm node.
-- **Version upgrades can rollback silently.** If validation fails
-  (incompatible mappings, deprecated API usage, cluster health red),
-  the domain enters `RollbackInProgress` and reverts to the prior
-  engine version. Check `ChangeProgressDetails` in `describe-domain`.
-- **Split-brain is rare on managed OpenSearch (3 dedicated masters
-  by default) but possible if quorum is lost.** With 3 masters,
-  quorum is 2; loss of 2 masters pauses the cluster. Diagnose via
-  `_cat/master` (only one master should appear) and `_cat/nodes?v`.
+→ Full Step-0 expert knowledge moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 1: Symptom entry — pick the diagnostic branch
 
@@ -278,18 +186,7 @@ Symptom: writes return
 admin api]`. CloudWatch `ClusterIndexWritesBlocked > 0` alarm fires.
 Reads still succeed until heap pressure cascades.
 
-```bash
-# Per-node disk usage
-curl -sS "https://<domain-endpoint>/_cat/allocation?v" \
-  -H "Content-Type: application/json"
-
-# CloudWatch FreeStorageSpace (managed-service source of truth)
-aws cloudwatch get-metric-statistics --namespace AWS/ES \
-  --metric-name FreeStorageSpace \
-  --dimensions Name=DomainName,Value=<domain> Name=ClientId,Value=<account> \
-  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Average,Minimum --output json
-```
+→ Disk-watermark probe commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 Any node with `disk.percent >= 95` is at flood stage. The read-only
 block applies cluster-wide as soon as ANY node hits flood.
@@ -302,20 +199,7 @@ block applies cluster-wide as soon as ANY node hits flood.
 
 #### Identify why disk filled
 
-- **Unbounded index growth, no ISM policy:** `_cat/indices?v&s=index`
-  shows old date-suffix indices (`logs-2024-01`) accumulating without
-  rollover or deletion. Fix: configure an ISM policy to roll over and
-  delete old indices.
-- **Replica count increase:** `_settings` shows
-  `number_of_replicas: 2` instead of 1 — disk usage doubles on the
-  replicated indices. Fix: revert via
-  `PUT /<index>/_settings {"number_of_replicas": 1}`.
-- **Force-merge in progress:** a recent `_forcemerge?max_num_segments=1`
-  call temporarily doubles segment file size during the merge. Fix:
-  wait; do not force-merge under disk pressure.
-- **Snapshot restore:** `_snapshot/_status` shows a restore in
-  progress; the restored indices consume disk. Fix: cancel the restore
-  or expand the cluster.
+→ Root-cause catalog for disk fill moved verbatim to [references/disk-watermark-and-jvm-heap-reference.md](references/disk-watermark-and-jvm-heap-reference.md).
 
 **Verdicts:**
 - Flood stage confirmed, root cause is unbounded growth:
@@ -332,24 +216,7 @@ Symptom: CloudWatch `JVMHeapPressure > 75%` sustained; `OldGenGCTime`
 rising; queries slow dramatically; eventual `OutOfMemoryError: Java
 heap space` if untreated.
 
-```bash
-aws cloudwatch get-metric-statistics --namespace AWS/ES \
-  --metric-name JVMHeapPressure \
-  --dimensions Name=DomainName,Value=<domain> Name=ClientId,Value=<account> \
-  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Average,Maximum --output json
-
-# Per-node heap breakdown
-curl -sS "https://<domain-endpoint>/_cat/nodes?v&h=name,heap.percent,ram.percent,node.role" \
-  -H "Content-Type: application/json"
-
-# Breaker trip evidence
-aws logs filter-log-events \
-  --log-group-name /aws/opensearch/domains/<domain>/application-logs \
-  --start-time $(date -d '-30 minutes' +%s)000 \
-  --filter-pattern '"OutOfMemoryError" OR "circuit_breaking_exception" OR "Old Gen"' \
-  --output json
-```
+→ JVM heap probe commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Decision matrix:**
 
@@ -375,13 +242,7 @@ Symptom: client receives 429 or
 org.opensearch.action.search.SearchTransportService` (search) or
 `org.opensearch.action.bulk.BulkShardRequest` (write).
 
-```bash
-curl -sS "https://<domain-endpoint>/_cat/thread_pool/search?v&h=node_name,name,active,queue,queue_size,rejected,largest" \
-  -H "Content-Type: application/json"
-
-curl -sS "https://<domain-endpoint>/_cat/thread_pool/write?v&h=node_name,name,active,queue,queue_size,rejected,largest" \
-  -H "Content-Type: application/json"
-```
+→ Thread-pool probe commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 The `rejected` column counts rejected tasks since node start. A
 non-zero, growing `rejected` count is the positive evidence.
@@ -400,14 +261,7 @@ non-zero, growing `rejected` count is the positive evidence.
 Symptom: `_cluster/health` returns `status: red`. At least one
 primary shard is unallocated; data is unavailable for that index.
 
-```bash
-curl -sS "https://<domain-endpoint>/_cluster/health?pretty" -H "Content-Type: application/json"
-curl -sS "https://<domain-endpoint>/_cat/shards?v&h=index,shard,prirep,state,unassigned.reason" \
-  -H "Content-Type: application/json" | grep UNASSIGNED
-curl -sS -X POST "https://<domain-endpoint>/_cluster/allocation/explain?pretty" \
-  -H "Content-Type: application/json" -d \
-  '{"index": "<index-name>", "shard": <shard-id>, "primary": true}'
-```
+→ Cluster-red probe commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 `allocate_explanation` returns a list of deciders. The FIRST decider
 is the binding constraint. Verdicts: disk-watermark-blocked primary
@@ -433,9 +287,7 @@ placement.
 Symptom: queries fail with `circuit_breaking_exception`. The error
 names the breaker: `[parent]`, `[fielddata]`, or `[request]`.
 
-```bash
-curl -sS "https://<domain-endpoint>/_nodes/stats/breaker?pretty" -H "Content-Type: application/json"
-```
+→ Circuit-breaker probe commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 | Breaker | Default limit | Triggers when |
 |---|---|---|
@@ -455,41 +307,16 @@ breaker that pushed parent over and fix it.
 
 ### Step 8: Shard allocation decider reference
 
-For both Step 5 (red) and Step 6 (yellow), read the FIRST decider in
-`_cluster/allocation/explain`; the rest cascade.
-
-| First decider | Fix |
-|---|---|
-| `disk_watermark.*` | Free disk (Step 2) |
-| `max_shards_per_node` | Raise cap OR add data nodes OR reduce shard count |
-| `same_shard` | Add data nodes; replica count too high for node count |
-| `filter` / `awareness` | Fix `_cluster/settings` allocation attributes / add nodes in missing awareness attribute |
-| `shard_size` | Shard too large to relocate — `_split` the index |
-| `recovery_after_time` | Recovery in progress; wait |
+→ Decider-to-fix table moved verbatim to [references/shard-allocation-and-threadpool-reference.md](references/shard-allocation-and-threadpool-reference.md).
 
 ### Step 9: Slow queries — slow log analysis
 
 Symptom: queries slow, `ThreadedSearchQueue` rises, slow logs record
 > 5s per query.
 
-```bash
-aws cloudwatch get-metric-statistics --namespace AWS/ES \
-  --metric-name SearchLatency \
-  --dimensions Name=DomainName,Value=<domain> Name=ClientId,Value=<account> \
-  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Average,p99 --output json
+→ Slow-log probe commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
-aws logs filter-log-events \
-  --log-group-name /aws/opensearch/domains/<domain>/index-search-slow-logs \
-  --start-time $(date -d '-30 minutes' +%s)000 \
-  --filter-pattern '"took[]" OR "query[]"' --output json
-```
-
-Heavy query shapes: `terms` aggregation on a high-cardinality field
-(`size: 0` with `terms: {field: <high-card>, size: 10000}`),
-`wildcard` or `regexp` query on a keyword field (O(n) scan),
-`script_score` with a heavy Painless script per document, deep
-pagination via `from / size` beyond 10000.
+→ Heavy query shape catalog moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 **Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: SLOW_QUERY`.
 
@@ -498,16 +325,9 @@ pagination via `from / size` beyond 10000.
 Symptom: write failures with
 `Limit of total fields [1000] has been exceeded`.
 
-```bash
-curl -sS "https://<domain-endpoint>/<index>/_mapping?pretty" -H "Content-Type: application/json"
-```
+→ Mapping probe command moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
-Mapping explosion happens when each document introduces new fields
-(dynamic mapping on a high-variability source). Fix: set
-`index.mapping.total_fields.limit` higher (defers the problem); set
-`dynamic: false` to reject unmapped fields or `dynamic: strict` to
-reject the document; flatten the offending subtree into a single
-`text` field with key-value extraction at query time.
+→ Mapping-explosion remediation detail moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 **Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: MAPPING_EXPLOSION`.
 
@@ -516,17 +336,9 @@ reject the document; flatten the offending subtree into a single
 Symptom: `DELETE /<index>` returns
 `SnapshotInProgressException: snapshot is in progress`.
 
-```bash
-curl -sS "https://<domain-endpoint>/_snapshot/_status?pretty" -H "Content-Type: application/json"
-```
+→ Snapshot status probe command moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
-Managed OpenSearch takes automated daily snapshots to a repository
-named `cs-automated`. Index deletion during the snapshot window
-(which can last hours) is blocked. Fix: wait for the snapshot to
-complete, then delete. Force-deleting mid-snapshot risks repository
-corruption. If immediate deletion is required (e.g., sensitive data),
-cancel the snapshot via
-`DELETE /_snapshot/<repository>/<snapshot>` and document it.
+→ Automated-snapshot behavior detail moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 **Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: SNAPSHOT_BLOCKING_DELETE`.
 
@@ -535,15 +347,9 @@ cancel the snapshot via
 Symptom: an in-place engine-version upgrade was initiated; the domain
 shows `UpgradeProcessing: false` and `RollbackInProgress: true`.
 
-```bash
-aws opensearch describe-domain --domain-name <domain> --output json | \
-  jq '.DomainStatus.{EngineVersion, UpgradeProcessing, ChangeProgressDetails}'
-```
+→ Upgrade-rollback probe command moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
-Common rollback triggers: deprecated API usage by clients
-(`_type`-qualified paths on OpenSearch 2.x), indices created on very
-old Elasticsearch versions, custom plugins incompatible with the new
-engine, cluster health red at validation time.
+→ Rollback trigger catalog moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 **Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: UPGRADE_ROLLBACK`.
 
@@ -652,22 +458,7 @@ CONFIRM: Before deleting indices or clearing the block, emit and await:
 
 ## Pre-flight safety checks (run before any state-changing CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`DELETE /<index>`, `POST /<index>/_close`, `PUT _cluster/settings`,
-  `PUT _all/_settings`, `DELETE /_snapshot/...`,
-  `POST /<index>/_forcemerge`), emit and await operator approval.
-- **Read-only first.** Every probe in the diagnostic tree is
-  read-only. Do not perform state-changing operations as diagnostic
-  probes.
-- **`DELETE /<index>`** is irreversible. Enumerate the index list
-  explicitly; never use wildcards in `DELETE /logs-*`.
-- **Force-clearing the flood-stage block** is safe ONLY after disk
-  is below 95%. Confirm disk usage first.
-- **Cluster scaling** triggers a blue/green deployment (30+ minutes).
-- **Version upgrade** triggers validation. Confirm cluster health is
-  green and heap < 75% first.
-- **Bulk remediation batch limit.** Batch state-changing operations
-  into groups of at most 5 indices; emit a single CONFIRM per batch.
+→ Pre-flight safety gates moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ## Remediation guidance
 
@@ -718,6 +509,14 @@ Read the validation failure from `describe-domain`
 `ChangeProgressDetails` and the application logs; fix the trigger
 (deprecated APIs, incompatible mappings, cluster health red);
 re-initiate after the cluster is green and heap < 75%.
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step-0 expert knowledge, extended senior-engineer behaviours, heavy query shapes, mapping/snapshot/rollback detail
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — all layer probe command blocks, pre-flight gather CLI, pre-flight safety gates
+- [references/worked-examples.md](references/worked-examples.md) — malformed-input INSUFFICIENT_DATA output example
+- [references/disk-watermark-and-jvm-heap-reference.md](references/disk-watermark-and-jvm-heap-reference.md) — disk watermark + JVM heap detail — extended with why-disk-fills root-cause catalog
+- [references/shard-allocation-and-threadpool-reference.md](references/shard-allocation-and-threadpool-reference.md) — shard allocation + thread pool detail — extended with decider-to-fix table
 
 ## Domain
 

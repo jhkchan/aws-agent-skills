@@ -486,3 +486,33 @@ Does the VPC have a NAT Gateway?
         ├── YES → FURTHER_OPTIMIZATION_AVAILABLE (Step 5, fix routing).
         └── NO → OPTIMIZED.
 ```
+
+## Output format template and example index (moved from SKILL.md)
+
+```text
+VPC: <vpc-id>
+VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
+REASON: <1-2 sentences naming the recommendation and the supporting data>
+RECOMMENDATION:
+  Current: <NAT Gateway count>, <total monthly GB>, <existing endpoints>, <environment>
+  Proposed: <NAT Gateway count>, <remaining GB>, <new endpoints>, <topology change>
+  Dimensions changed: <gateway-endpoint | interface-endpoint | topology | nat-instance | routing | cloudfront>
+  Dimensions checked: <list ALL, each ✓ (no finding) or → (finding)>
+  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
+ESTIMATED_SAVINGS:
+  Current monthly: $<amount>
+  Projected monthly: $<amount>
+  Monthly saving: $<amount>
+  Annual saving: $<amount>
+  Assumptions: <list (pricing region, traffic volumes, AZ count)>
+MIGRATION_STEPS:
+  1. <specific action with CLI command>
+  2. <verification step>
+CONFIRM: Before executing any state-changing CLI, emit and await operator
+  approval: "CONFIRM: About to <action> on <vpc-id> in <region>.
+  Proceed? (yes/no)"
+```
+
+Full worked examples (S3 Gateway Endpoint creation, multi-AZ
+consolidation, NAT Instance substitution, Interface Endpoint evaluation,
+already-optimized, NEED_MORE_INFO) are in `references/worked-examples.md`.

@@ -89,137 +89,6 @@ appear.
 | references/scp-inheritance-and-strategy.md | Inheritance + Allow/Deny detail |
 | references/policy-types-and-delegation.md | Tag/Backup/AI/opt-out + delegation detail |
 
-## Mindset
-
-**One-line takeaway:** An SCP is a permission boundary — it can
-only RESTRICT what IAM allows; it can never GRANT. Every account
-in an organization gets `FullAWSAccess` attached by default, and
-removing it without an explicit Allow-list replacement locks the
-account out. SCP inheritance is an INTERSECTION: the effective
-SCP at any account is the intersection of all SCPs attached to
-the root, every parent OU, and the account itself. The most
-restrictive SCP always wins; an explicit Deny anywhere in the
-hierarchy overrides every Allow.
-
-Four misconceptions dominate SCP misdesign at deployment time:
-
-- **"An SCP grants permissions."** It does NOT. An SCP is a
-  permission boundary that filters what IAM can do. An IAM
-  principal can call an API only if BOTH the IAM policy ALLOWS it
-  AND no SCP in the hierarchy DENIES it.
-
-- **"Removing FullAWSAccess is enough to lock down an account."**
-  Removing `FullAWSAccess` WITHOUT attaching a replacement
-  Allow-list SCP leaves the account in a deny-by-default state
-  where member-account IAM principals cannot call ANY AWS API —
-  including break-glass. Always attach an Allow-list SCP first.
-
-- **"SCP inheritance unions — the broadest SCP wins."** It does
-  NOT. Inheritance is an INTERSECTION. If the root SCP allows
-  `ec2:*` and a child OU SCP restricts to `ec2:Describe*`, the
-  child OU wins — only `ec2:Describe*` survives.
-
-- **"SCPs are IAM policies."** They are NOT IAM. SCPs live in
-  Organizations, apply to the whole account (including root), and
-  CANNOT grant anything. A `Resource: "*"` Allow in an SCP means
-  "passes the SCP filter"; it does NOT mean the principal can
-  call the API. (See Step 1 for the comparison table.)
-
-## Configuration dependency graph (novel heuristic)
-
-Organizations policy deployment is NOT a single attach call. The
-policy must be created before it can be attached;
-`FullAWSAccess` must remain attached (or be replaced by an
-Allow-list SCP) or the account locks out; tag and backup policies
-are separate policy types with their own enablement; AI services
-opt-out is organization-wide and one-shot.
-
-| Configuration | Hard dependencies (API error without) | Silent failure | Enables downstream |
-|---|---|---|---|
-| SCP creation (create-policy) | "All features" org; organizations:CreatePolicy | SCP created ENABLED but inert until attached | policy available to attach |
-| SCP attachment (attach-policy) | target exists; policy ENABLED | root attachment affects EVERY account (incl. break-glass) | policy takes effect |
-| FullAWSAccess | AWS-managed, attached by default | detaching WITHOUT a replacement Allow-list locks the account out | baseline Allow |
-| Allow-list strategy SCP | child SCP listing ONLY permitted services | if FullAWSAccess remains attached, Allow-list is redundant | least-privilege boundary |
-| Deny-list strategy SCP | child SCP with explicit Denies | explicit Deny wins regardless of other Allows | guardrail |
-| Tag policy (TAG_POLICIES) | `enable-policy-type --policy-type TAG_POLICIES` | non-blocking by default; add `enforced_for` to make it blocking | tag standardization |
-| Backup policy (BACKUP_POLICY) | `enable-policy-type --policy-type BACKUP_POLICIES` | applies to supported resource types only; tag-based selection | org-level backup plan |
-| AI services opt-out (AISERVICES_OPT_OUT_POLICY) | org "All features" | ALL-OR-NOTHING per service across ALL accounts — no per-account opt-in | data-usage governance |
-| Delegated administrator | account is a member account | delegated admin gets read/list only — CANNOT create/attach SCPs | cross-account read administration |
-
-**The FullAWSAccess-removal row is the one a baseline model
-misses.** An Allow-list SCP has zero effect while
-`FullAWSAccess` is still attached at the same entity, because
-the intersection still permits everything `FullAWSAccess`
-permits. The procedure below forces an explicit decision on
-whether to keep or remove `FullAWSAccess` at each entity.
-
-## Expert heuristic: SCP is a filter, not a grant
-
-A baseline model says "attach an SCP to allow these services."
-The correct heuristic recognizes that an SCP can only FILTER.
-
-```text
-For an API call to succeed at a member account, ALL must hold:
-  1. SOME SCP in the hierarchy ALLOWS the action (or no SCP at all)
-  2. NO SCP in the hierarchy has an explicit Deny for the action
-  3. An IAM policy (identity-based or resource-based) ALLOWS it
-  4. No IAM permission boundary DENIES it
-
-An SCP Allow alone NEVER makes an API call succeed.
-An SCP Deny alone ALWAYS makes the API call fail.
-```
-
-**Key implication:** SCP design has two jobs — (a) define the
-maximum blast radius (Allow list) and (b) carve out hard
-guardrails (Deny list). Everything else is IAM.
-
-## Expert heuristic: inheritance is intersection, not union
-
-```text
-Hierarchy:
-  Root  ── SCP_R (Allow: ec2:*, s3:*; Deny: iam:DeleteRole)
-   │
-   └── OU_Prod ── SCP_P (Allow: ec2:*, s3:GetObject)
-         │
-         └── Account 111122223311 ── SCP_A (Deny: ec2:TerminateInstances)
-
-Effective SCP at Account 111122223311:
-  ALLOWED = intersection of Allow lists along the chain
-          = s3:GetObject (the most restrictive s3 Allow)
-  DENIED  = union of all explicit Denies
-          = iam:DeleteRole ∪ ec2:TerminateInstances
-
-Net: account can call s3:GetObject (if IAM also permits);
-     CANNOT call iam:DeleteRole or ec2:TerminateInstances ever;
-     CANNOT call s3:PutObject (not in SCP_P's Allow set).
-```
-
-**Key implication:** to allow `s3:PutObject` at this account,
-the Allow must be present in EVERY SCP in the chain. The most-
-restrictive SCP anywhere in the chain becomes the ceiling.
-
-## Expert heuristic: Allow list vs Deny list strategy
-
-```text
-DENY-LIST (blocklist)                      ALLOW-LIST (allowlist)
-─────────────────────────────              ─────────────────────────────
-Keep FullAWSAccess attached                REMOVE FullAWSAccess
-Attach explicit Deny SCPs                  Attach Allow-list of ONLY permitted services
-
-Default: everything ALLOWED                Default: everything DENIED
-Posture: "block known bad"                 Posture: "permit known good"
-Use case: established org                  Use case: regulated org, new accounts
-Risk: new service auto-allowed (drift)     Risk: new service auto-denied (friction)
-
-NEVER mix at the same entity: keep FullAWSAccess AND attach an Allow-list
-SCP — the Allow-list is silently redundant because the intersection still
-permits everything FullAWSAccess permits.
-```
-
-**Key implication:** an Allow-list strategy is a two-step commit
-— attach the Allow-list SCP first, then detach
-`FullAWSAccess`. Reversing the order locks the account out.
-
 ## Prerequisites (verify before deployment)
 
 Before emitting deployment commands, verify these prerequisites.
@@ -476,25 +345,8 @@ Root
  └─ OU_BreakGlass  [FullAWSAccess kept, NO restrictive SCP]
 ```
 
-**Verify effective policy at any target:**
-
-```bash
-aws organizations list-policies-for-target --target-id 111122223311 \
-  --filter SERVICE_CONTROL_POLICY --query 'Policies[*].{Name:Name,Id:Id}' --output table
-aws organizations list-parents --child-id 111122223311   # trace OU chain
-```
-
-**Policy simulation:** the IAM `simulate-custom-policy` /
-`simulate-principal-policy` APIs simulate IAM, NOT SCPs. Use
-them as a pre-attach hint; the source of truth is post-attach
-CloudTrail observation.
-
-```bash
-aws iam simulate-principal-policy \
-  --policy-source-arn arn:aws:iam::111122223311:role/SCPTestRole \
-  --action-names organizations:LeaveOrganization cloudtrail:DeleteTrail \
-  --query 'EvaluationResults[*].{Action:EvalActionName,Decision:EvalDecision}' --output table
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-11--verify-effective-policy--policy-simulation).
+> Effective-policy verification (list-policies-for-target, list-parents) and simulate-principal-policy pre-flight hint.
 
 ## Step 12 — SCP exceptions (break-glass accounts)
 
@@ -520,26 +372,8 @@ attacker-controllable via HTTP headers.
 
 ## Step 13 — CloudTrail for SCP-denied actions
 
-SCP-denied API calls surface in CloudTrail as
-`eventType: AwsApiCall` with
-`errorCode: Client.UnauthorizedOperation` and a diagnostic in
-`additionalEventData` indicating the SCP match.
-
-```bash
-# CloudTrail Logs Insight query for SCP-blocked calls (last 24h)
-aws logs start-query \
-  --log-group-name <org-trail-log-group> \
-  --start-time $(($(date +%s) - 86400))000 \
-  --end-time   $(date +%s)000 \
-  --query-string 'fields @timestamp, eventName, awsAccountId, userIdentity.arn
-| filter errorCode = "UnauthorizedOperation"
-| filter organizationalAccessCheckDecision = "Denied"
-| sort @timestamp desc | limit 50'
-```
-
-Without an Organization-level CloudTrail trail, SCP denials are
-NOT centrally visible — each member account logs to its own
-trail.
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-13--cloudtrail-query-for-scp-denied-actions).
+> CloudTrail Logs Insight query for SCP-blocked calls (last 24h).
 
 ## Step 14 — Organizations delegated administrator
 
@@ -561,28 +395,8 @@ Firewall Manager, GuardDuty, Security Hub.
 
 ## Step 15 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Effective-SCP visualization (2023-2024):** Organizations
-  console renders the effective-SCP intersection at every
-  account. Scriptable via `list-policies-for-target` +
-  `list-parents`.
-- **Backup policy support for Aurora, FSx, stacked resources
-  (2023-2024):** Tag-based selection matches
-  `aws:ResourceTag/*` with `StringLike` for prefix matching.
-- **AI services opt-out expansion (2023-2025):** New AI services
-  auto-fall-under the `default` key when
-  `opt_out_enabled_at_level: account` is set.
-- **Tag policy enforcement for EC2 network interfaces and EBS
-  snapshots (2024-2025):** `enforced_for` accepts
-  `ec2:network-interface` and `ec2:snapshot`.
-- **CloudTrail `organizations:EffectiveApiName` (2024-2025):**
-  Deny events now include the SCP statement Sid that triggered
-  the Deny.
-- **Delegated administrator expansion (2024-2025):** New
-  delegable principals (Audit Manager, Resource Explorer 2,
-  Systems Manager QuickSetup). Each is service-scoped — none
-  grant SCP-write.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-15--recent-features).
+> Effective-SCP visualization, Backup Aurora/FSx, AI opt-out expansion, tag policy enforcement, CloudTrail Sid, delegated admin expansion.
 
 ## NEVER do these things
 
@@ -674,40 +488,13 @@ VERIFICATION_COMMANDS:
   aws iam simulate-principal-policy --policy-source-arn arn:aws:iam::111122223311:role/SCPTestRole --action-names organizations:LeaveOrganization
 ```
 
-## Error handling
+## References (load on demand)
 
-### Account locked out after FullAWSAccess detach
-
-- An Allow-list SCP was not attached BEFORE detaching
-  `FullAWSAccess`, OR the Allow-list did not include break-glass
-  actions. Recover from the management account: re-attach
-  `FullAWSAccess` (or attach the Allow-list), then retry.
-
-### AttachPolicy fails with quota error
-
-- The target already has 5 SCPs attached (inclusive of
-  `FullAWSAccess`). Detach an unused SCP or request a quota
-  increase via Support. The limit is per-entity.
-
-### SCP attached but no effect
-
-- Either (a) the SCP is `DISABLED` (enable with `update-policy`),
-  (b) for an Allow-list strategy `FullAWSAccess` is still
-  attached at the same entity (detach it), or (c) the action is
-  not permitted by IAM in the member account (SCPs only filter).
-
-### simulate-custom-policy shows Allowed but the call is blocked
-
-- `simulate-custom-policy` simulates IAM, NOT Organizations. The
-  actual SCP effect is invisible to it. Verify via
-  `list-policies-for-target` along the hierarchy and a post-
-  attach CloudTrail observation.
-
-### Tag policy not blocking non-compliant tags
-
-- The `enforced_for` list does not include the resource type.
-  Add the resource type (e.g., `ec2:instance`) and re-attach.
-  Without `enforced_for`, tag policies are audit-only.
+- [advanced-patterns](references/advanced-patterns.md) — mindset, configuration dependency graph, recent features (2023-2026)
+- [error-handling](references/error-handling.md) — lockout after FullAWSAccess detach, quota, no-effect, simulation mismatch, tag-policy failures
+- [diagnostic-commands](references/diagnostic-commands.md) — effective-policy verification, policy simulation pre-flight, CloudTrail SCP-deny query
+- [scp-inheritance-and-strategy](references/scp-inheritance-and-strategy.md) — inheritance + Allow/Deny strategy heuristics (filter-not-grant, intersection) 
+- [policy-types-and-delegation](references/policy-types-and-delegation.md) — tag/backup/AI-opt-out policy types + delegated administrator detail
 
 ## Domain
 

@@ -77,32 +77,8 @@ Always pairs the recommendation with exact CLI commands.
 
 ## Mindset
 
-NAT Gateway optimization is a traffic-routing decision, not an
-infrastructure provisioning exercise. The goal is to route traffic to
-AWS services via VPC endpoints (free or break-even-positive) rather
-than through NAT Gateway (always metered at $0.045/GB).
-
-Four principles guide every recommendation:
-
-- **Gateway Endpoints are free and should always be created if traffic
-  exists.** S3 and DynamoDB Gateway Endpoints have NO hourly charge and
-  NO per-GB charge. They add a persistent route in the subnet route
-  table. If any S3 or DynamoDB traffic flows through NAT, the Gateway
-  Endpoint is a pure saving with zero downside.
-- **Interface Endpoints have a break-even threshold.** Each Interface
-  Endpoint costs $0.010/hour per AZ (~$7.30/month per AZ). The break-
-  even is ~160 GB/month per AZ at $0.045/GB NAT data processing. Above
-  the threshold, the Interface Endpoint saves money. Below it, NAT is
-  cheaper.
-- **Cross-AZ data transfer compounds NAT cost.** Traffic from a
-  private subnet in AZ-1 to a NAT Gateway in AZ-2 incurs a cross-AZ
-  charge ($0.01/GB each direction). This means a single NAT Gateway
-  in one AZ can cost MORE than the per-GB NAT savings due to cross-AZ
-  transfer charges from other AZs.
-- **NAT Instance is a fixed-cost alternative for dev/test only.** A
-  t3.micro NAT Instance costs ~$7.60/month (vs $32.85/month for a NAT
-  Gateway). But it has no SLA, limited throughput (~5 Gbps), and is a
-  single point of failure. Reserve for non-production.
+> Mindset rationale and the four guiding principles moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+> Load on demand to understand why VPC endpoints are the #1 NAT cost lever.
 
 ## Quick reference — verdict thresholds
 
@@ -123,21 +99,8 @@ Optimization decisions are only as good as the underlying data. Pull
 these data sources before any recommendation. Full CLI sequences are
 in `references/nat-pricing-and-endpoint-matrix.md`.
 
-**Required data sources** (summarized — see reference for full CLI):
-1. NAT Gateway configuration: `aws ec2 describe-nat-gateways`
-2. VPC Endpoint inventory: `aws ec2 describe-vpc-endpoints`
-3. Route tables: `aws ec2 describe-route-tables` (to detect double-NAT
-   and confirm endpoint routes)
-4. NAT Gateway CloudWatch metrics (7-30 days):
-   `aws cloudwatch get-metric-statistics` for
-   `BytesOutToDestination`, `BytesInFromDestination`,
-   `BytesOutToSource`, `BytesInFromSource`
-5. VPC Flow Logs (7 days): `aws logs start-query` to break down
-   traffic by destination service
-6. Cost Explorer NAT spend (30 days): `aws ce get-cost-and-usage`
-   filtered by `Nat-Gateway` usage type
-7. Subnet-to-AZ mapping: `aws ec2 describe-subnets` (for cross-AZ
-   analysis)
+> Required data-source listing moved to [references/diagnostic-commands.md](references/diagnostic-commands.md); full CLI sequences already live in the pricing matrix reference.
+> Pull all seven sources before any recommendation — the data-quality short-circuits below govern the verdict.
 
 ### Data-quality short-circuits
 
@@ -154,75 +117,16 @@ in `references/nat-pricing-and-endpoint-matrix.md`.
 
 ### Step 0: Non-obvious behaviours that change the recommendation
 
-These operational gotchas route a recommendation away from the obvious
-choice:
-
-- **Gateway Endpoints are FREE and persistent.** Unlike Interface
-  Endpoints, S3 and DynamoDB Gateway Endpoints have no hourly charge and
-  no per-GB charge. They add a route in the subnet's route table that
-  persists. Always create them if any S3 or DynamoDB traffic exists.
-
-- **Interface Endpoints are per-AZ.** An Interface Endpoint in a 3-AZ
-  VPC costs $0.010/h × 3 AZs × 730h = $21.90/month. The break-even is
-  ~160 GB/month per AZ. If one AZ has high traffic and others don't,
-  create the Interface Endpoint in select AZs only.
-
-- **Cross-AZ transfer ($0.01/GB each direction) compounds NAT cost.**
-  When a private subnet in AZ-1 routes to a NAT Gateway in AZ-2, the
-  cross-AZ hop costs $0.01/GB each way ($0.02/GB round-trip). At 500
-  GB/month cross-AZ, that's $10/month on top of the NAT per-GB charge.
-  This is the hidden cost of single-NAT-Gateway topologies.
-
-- **NAT Gateway delete takes minutes but EIP release is immediate.**
-  After `delete-nat-gateway`, the gateway enters `deleting` state, then
-  `deleted`. The Elastic IP is disassociated but NOT released. Use
-  `release-address` to stop the EIP charge ($0.005/hour if unattached).
-
-- **Gateway Endpoint route is in the main route table.** When you
-  create a Gateway Endpoint, AWS adds a `pl-xxxxxxxx` prefix list route
-  to the specified route tables. If you use a main route table with
-  subnet-specific overrides, the endpoint route must be in EACH subnet's
-  route table, not just the main one.
-
-- **ECR traffic is often the #2 NAT cost after S3.** Docker image
-  pulls from ECR go through NAT by default. An ECR Interface Endpoint
-  eliminates this. At 100+ GB/month of ECR traffic, the Interface
-  Endpoint is break-even positive.
-
-- **CloudFront can front origin via VPC endpoint.** If your origin is
-  in a private subnet (ALB or EC2), CloudFront routes to the origin via
-  the public internet. If the origin is an S3 bucket, use a CloudFront
-  Origin Access Identity (OAI) or Origin Access Control (OAC) to keep
-  traffic within AWS — no NAT needed.
-
-- **PrivateLink (Interface Endpoint) works for SaaS APIs.** If your
-  workload calls a third-party SaaS API (e.g., Datadog, Splunk, GitHub)
-  through NAT, check if the SaaS offers a PrivateLink endpoint. The
-  Interface Endpoint cost may be less than the NAT per-GB charge for
-  high-volume API calls.
-
-- **NAT Instance throughput is limited.** A t3.micro-based NAT Instance
-  maxes out at ~1 Gbps. For dev/test this is fine; for production, it
-  is a bottleneck. NAT Gateway scales to 100 Gbps.
-
-- **S3 Gateway Endpoint requires a bucket policy adjustment.** If your
-  S3 bucket policy restricts access by VPC or source IP, the Gateway
-  Endpoint changes the source. Update bucket policies to include the
-  endpoint ID if needed.
+> Step-0 non-obvious behaviours moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+> Load on demand — each gotcha reroutes the recommendation away from the obvious choice.
 
 ### Step 1: Gateway endpoints (S3, DynamoDB) — FREE, always create
 
-S3 and DynamoDB Gateway Endpoints are the highest-leverage, zero-cost
-optimization. They eliminate the #1 NAT traffic source (S3 is typically
-30-50% of NAT data processing) at no charge.
+> Intro and positioning moved to [references/nat-pricing-and-endpoint-matrix.md](references/nat-pricing-and-endpoint-matrix.md).
+> The decision gate below is authoritative.
 
-**Gateway Endpoint pricing:**
-```
-Hourly charge:     $0.00/hour
-Per-GB charge:     $0.00/GB
-Per-AZ charge:     $0.00/AZ
-Total cost:        FREE
-```
+> Pricing block moved to [references/nat-pricing-and-endpoint-matrix.md](references/nat-pricing-and-endpoint-matrix.md) (Gateway endpoints are FREE).
+> Decision gate below.
 
 **Decision gate:**
 ```
@@ -234,69 +138,25 @@ Is there S3 or DynamoDB traffic through NAT?
     └── NO → CREATE the Gateway Endpoint. Pure saving, zero downside.
 ```
 
-**Create S3 Gateway Endpoint:**
-```bash
-aws ec2 create-vpc-endpoint \
-  --vpc-id vpc-0abc123 \
-  --service-name com.amazonaws.us-east-1.s3 \
-  --route-table-ids rtb-0aaa rtb-0bbb rtb-0ccc \
-  --vpc-endpoint-type Gateway \
-  --tag-specifications "ResourceType=vpc-endpoint,Tags=[{Key=Name,Value=s3-gateway-endpoint}]"
-```
+> Create-CLI patterns for S3 and DynamoDB Gateway endpoints moved to [references/nat-pricing-and-endpoint-matrix.md](references/nat-pricing-and-endpoint-matrix.md).
+> Load on demand at emit time for the IMPLEMENTATION block.
 
-**Create DynamoDB Gateway Endpoint:**
-```bash
-aws ec2 create-vpc-endpoint \
-  --vpc-id vpc-0abc123 \
-  --service-name com.amazonaws.us-east-1.dynamodb \
-  --route-table-ids rtb-0aaa rtb-0bbb rtb-0ccc \
-  --vpc-endpoint-type Gateway \
-  --tag-specifications "ResourceType=vpc-endpoint,Tags=[{Key=Name,Value=dynamodb-gateway-endpoint}]"
-```
-
-**Saving from S3 Gateway Endpoint:**
-```
-monthly_saving = s3_GB_through_NAT × $0.045
-
-Example: 180 GB S3 traffic/month through NAT
-  Saving: 180 × $0.045 = $8.10/month (100% of S3 NAT processing cost)
-  Annual: $97.20
-  Cost of Gateway Endpoint: $0.00
-```
+> Saving math walkthrough moved to [references/nat-pricing-and-endpoint-matrix.md](references/nat-pricing-and-endpoint-matrix.md).
+> monthly_saving = s3_GB_through_NAT × $0.045 — captured in full, endpoint is free.
 
 ### Step 2: Interface endpoints (per-service break-even)
 
-Interface Endpoints cost $0.010/hour per AZ (~$7.30/month per AZ). The
-break-even is ~160 GB/month per AZ at the NAT data processing rate of
-$0.045/GB.
+> Break-even framing moved to [references/nat-pricing-and-endpoint-matrix.md](references/nat-pricing-and-endpoint-matrix.md).
+> Threshold: ~160 GB/month per AZ.
 
-**Interface Endpoint pricing:**
-```
-Hourly charge:     $0.010/hour per AZ
-Monthly per AZ:    $0.010 × 730 = $7.30/AZ/month
-3-AZ monthly:      $7.30 × 3 = $21.90/month
+> Interface endpoint pricing block moved to [references/nat-pricing-and-endpoint-matrix.md](references/nat-pricing-and-endpoint-matrix.md).
+> Per-service decision gate below.
 
-Break-even per AZ: $7.30 / $0.045 = 162 GB/month
-```
+> Break-even-by-AZ-count table moved to [references/nat-pricing-and-endpoint-matrix.md](references/nat-pricing-and-endpoint-matrix.md).
+> 1 AZ = $7.30 / 162 GB; each extra AZ adds both.
 
-**Break-even by AZ count:**
-| AZs | Monthly endpoint cost | Break-even GB/month |
-|---|---|---|
-| 1 | $7.30 | 162 GB |
-| 2 | $14.60 | 324 GB (162 per AZ) |
-| 3 | $21.90 | 486 GB (162 per AZ) |
-
-**Common Interface Endpoints worth evaluating:**
-
-| Service | Endpoint name | Typical NAT traffic source | Break-even likelihood |
-|---|---|---|---|
-| ECR (api + dkr) | `com.amazonaws.<region>.ecr.api` + `ecr.dkr` | Docker image pulls | HIGH if CI/CD is in-VPC |
-| SSM | `com.amazonaws.<region>.ssm` | SSM Agent, Patch Manager, Session Manager | HIGH if SSM-managed |
-| STS | `com.amazonaws.<region>.sts` | AssumeRole calls from private subnets | MEDIUM |
-| SQS | `com.amazonaws.<region>.sqs` | Queue operations from private subnets | MEDIUM |
-| Secrets Manager | `com.amazonaws.<region>.secretsmanager` | Secret retrieval from private subnets | MEDIUM |
-| CloudWatch Logs | `com.amazonaws.<region>.logs` | Log ingestion from private subnets | HIGH for logging-heavy |
-| KMS | `com.amazonaws.<region>.kms` | Encryption API calls | LOW (small payloads) |
+> Common Interface endpoint candidates table moved to [references/nat-pricing-and-endpoint-matrix.md](references/nat-pricing-and-endpoint-matrix.md).
+> Evaluate each service against the decision gate below.
 
 **Decision gate per service:**
 ```
@@ -305,27 +165,8 @@ monthly_service_GB_through_NAT × $0.045  >  endpoint_cost_per_month?
 └── NO → Do NOT create. NAT is cheaper for this service's traffic volume.
 ```
 
-**Create ECR Interface Endpoint (api + dkr):**
-```bash
-aws ec2 create-vpc-endpoint \
-  --vpc-id vpc-0abc123 \
-  --vpc-endpoint-type Interface \
-  --service-name com.amazonaws.us-east-1.ecr.api \
-  --subnet-ids subnet-0aaa subnet-0bbb subnet-0ccc \
-  --security-group-ids sg-0endpoint \
-  --private-dns-enabled
-
-aws ec2 create-vpc-endpoint \
-  --vpc-id vpc-0abc123 \
-  --vpc-endpoint-type Interface \
-  --service-name com.amazonaws.us-east-1.ecr.dkr \
-  --subnet-ids subnet-0aaa subnet-0bbb subnet-0ccc \
-  --security-group-ids sg-0endpoint \
-  --private-dns-enabled
-```
-
-ECR requires BOTH the api and dkr endpoints for Docker pull/push to
-work without NAT.
+> ECR (api + dkr) creation CLI moved to [references/nat-pricing-and-endpoint-matrix.md](references/nat-pricing-and-endpoint-matrix.md).
+> Both endpoints are required for Docker pull/push without NAT.
 
 ### Step 3: NAT topology — single vs multi-AZ
 
@@ -333,20 +174,8 @@ In non-production environments (dev, test, staging), a single NAT
 Gateway is sufficient. Production environments typically need multi-AZ
 NAT for high availability.
 
-**Single NAT Gateway savings:**
-```
-Each NAT Gateway hourly: $0.045/h × 730h = $32.85/month
-
-3-AZ VPC with 3 NAT Gateways: 3 × $32.85 = $98.55/month (hourly only)
-Consolidated to 1 NAT Gateway: 1 × $32.85 = $32.85/month
-Saving: $65.70/month (2 AZs removed)
-
-Cross-AZ cost added: traffic from AZ-2 and AZ-3 subnets to the NAT
-Gateway in AZ-1 incurs $0.01/GB each direction. At 500 GB/month
-cross-AZ: 500 × $0.01 × 2 = $10/month.
-
-Net saving: $65.70 - $10.00 = $55.70/month (still strongly positive)
-```
+> Savings math and cross-AZ trade-off walkthrough moved to [references/nat-pricing-and-endpoint-matrix.md](references/nat-pricing-and-endpoint-matrix.md).
+> Decision tree below is authoritative.
 
 **Decision tree for topology:**
 ```
@@ -361,37 +190,16 @@ Is this a production VPC?
              0.0.0.0/0 at the single NAT Gateway.
 ```
 
-**Consolidation steps:**
-```bash
-# 1. Identify the NAT Gateway to keep (in the busiest AZ)
-aws ec2 describe-nat-gateways --filter Name=vpc-id,Values=vpc-0abc123 \
-  Name=state,Values=available
-
-# 2. Update route tables in other AZ subnets to point at the kept NAT GW
-aws ec2 replace-route --route-table-id rtb-0bbb \
-  --destination-cidr-block 0.0.0.0/0 \
-  --nat-gateway-id nat-0keep
-
-# 3. Delete the redundant NAT Gateways
-aws ec2 delete-nat-gateway --nat-gateway-id nat-0remove
-
-# 4. Release the Elastic IPs (after gateway is 'deleted')
-aws ec2 describe-nat-gateways --nat-gateway-ids nat-0remove \
-  --query 'NatGateways[0].NatGatewayAddresses[0].AllocationId'
-aws ec2 release-address --allocation-id eipalloc-0xxx
-```
+> Consolidation CLI sequence (identify, re-route, delete, release EIP) moved to [references/nat-pricing-and-endpoint-matrix.md](references/nat-pricing-and-endpoint-matrix.md).
+> Never skip the release-address step.
 
 ### Step 4: NAT Instance substitution (dev/test only)
 
 For low-traffic dev/test VPCs (< 50 GB/month), a NAT Instance is
 cheaper than a NAT Gateway.
 
-**Cost comparison:**
-| Option | Hourly | Monthly (730h) | Per-GB | 50 GB/month total |
-|---|---|---|---|---|
-| NAT Gateway | $0.045 | $32.85 | $0.045/GB | $32.85 + $2.25 = $35.10 |
-| NAT Instance (t3.micro) | $0.0104 | $7.59 | $0.00 (EC2 data transfer only) | $7.59 |
-| Saving | | $25.26/month | | $27.51/month |
+> NAT Gateway vs NAT Instance cost comparison moved to [references/nat-pricing-and-endpoint-matrix.md](references/nat-pricing-and-endpoint-matrix.md).
+> Limitations and decision gate below remain in-file.
 
 **NAT Instance limitations:**
 - No SLA (single instance, single AZ)
@@ -411,61 +219,16 @@ Is this a dev/test environment?
              cross-AZ. Evaluate on a case-by-case basis.
 ```
 
-**NAT Instance setup (fargate or EC2):**
-```bash
-# Launch a NAT Instance from the AWS-provided NAT AMI
-# Or use a standard AL2023 AMI with user-data:
-aws ec2 run-instances \
-  --image-id ami-0al2023 \
-  --instance-type t3.micro \
-  --subnet-id subnet-0public \
-  --key-name my-key \
-  --source-dest-check false \
-  --user-data '#!/bin/bash
-    sysctl -w net.ipv4.ip_forward=1
-    iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
-    iptables -A FORWARD -i eth0 -o eth0 -m state \
-      --state RELATED,ESTABLISHED -j ACCEPT
-    iptables -A FORWARD -i eth0 -o eth0 -j ACCEPT' \
-  --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=nat-instance-dev}]"
-
-# Disable source/destination check (required for NAT)
-aws ec2 modify-instance-attribute --instance-id i-0nat \
-  --source-dest-check "{\"Value\": false}"
-
-# Point the private subnet route table at the NAT Instance
-aws ec2 replace-route --route-table-id rtb-0private \
-  --destination-cidr-block 0.0.0.0/0 \
-  --instance-id i-0nat
-```
+> NAT Instance setup CLI (AL2023 user-data iptables NAT) moved to [references/nat-pricing-and-endpoint-matrix.md](references/nat-pricing-and-endpoint-matrix.md).
+> Dev/test only — see limitations above.
 
 ### Step 5: Routing optimization (double-NAT detection)
 
-Double-NAT occurs when traffic traverses TWO NAT devices before
-reaching the internet. This doubles the data processing charge.
+> Double-NAT scenario catalog (TGW, peering, chained AZs) moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+> Detection commands and fix below.
 
-**Common double-NAT scenarios:**
-```
-1. Transit Gateway → NAT Gateway → Internet
-   (TGW routes to a VPC with NAT, but the source VPC also has NAT)
-
-2. VPC Peering → NAT Gateway → Internet
-   (Peered VPC routes internet traffic through a VPC with NAT)
-
-3. Private subnet → NAT Gateway (AZ-1) → NAT Gateway (AZ-2)
-   (Misconfigured route tables chain two NAT Gateways)
-```
-
-**Detection via route table audit:**
-```bash
-# List all route tables in the VPC
-aws ec2 describe-route-tables --filter Name=vpc-id,Values=vpc-0abc123 \
-  --query 'RouteTables[].{RTB:RouteTableId,Routes:Routes[?DestinationCidrBlock==`0.0.0.0/0`]}' \
-  --output json
-
-# Check for chains: does any route table point 0.0.0.0/0 at an
-# instance or ENI that is itself behind another NAT?
-```
+> Route-table audit CLI for chain detection moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+> Fix rule: each private subnet's 0.0.0.0/0 must point at exactly ONE NAT device.
 
 **Fix:** Ensure each private subnet's `0.0.0.0/0` route points at
 exactly ONE NAT Gateway (or NAT Instance). No chains.
@@ -487,12 +250,8 @@ If your private-subnet workload calls a third-party SaaS API (e.g.,
 Datadog, Splunk, GitHub Enterprise) through NAT, check if the SaaS
 offers an AWS PrivateLink endpoint.
 
-```
-Monthly SaaS API traffic through NAT: 200 GB
-NAT data processing cost: 200 × $0.045 = $9.00/month
-PrivateLink Interface Endpoint cost: $7.30/month (1 AZ) or $21.90 (3 AZ)
-Break-even: if traffic > 162 GB/AZ/month, PrivateLink is cheaper
-```
+> PrivateLink break-even math moved to [references/nat-pricing-and-endpoint-matrix.md](references/nat-pricing-and-endpoint-matrix.md).
+> Same ~162 GB/AZ threshold as Step 2.
 
 ### Step 7: Impact estimation
 
@@ -529,33 +288,8 @@ every `NEED_MORE_INFO` gate.
 
 ## Output format
 
-```text
-VPC: <vpc-id>
-VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-REASON: <1-2 sentences naming the recommendation and the supporting data>
-RECOMMENDATION:
-  Current: <NAT Gateway count>, <total monthly GB>, <existing endpoints>, <environment>
-  Proposed: <NAT Gateway count>, <remaining GB>, <new endpoints>, <topology change>
-  Dimensions changed: <gateway-endpoint | interface-endpoint | topology | nat-instance | routing | cloudfront>
-  Dimensions checked: <list ALL, each ✓ (no finding) or → (finding)>
-  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
-ESTIMATED_SAVINGS:
-  Current monthly: $<amount>
-  Projected monthly: $<amount>
-  Monthly saving: $<amount>
-  Annual saving: $<amount>
-  Assumptions: <list (pricing region, traffic volumes, AZ count)>
-MIGRATION_STEPS:
-  1. <specific action with CLI command>
-  2. <verification step>
-CONFIRM: Before executing any state-changing CLI, emit and await operator
-  approval: "CONFIRM: About to <action> on <vpc-id> in <region>.
-  Proceed? (yes/no)"
-```
-
-Full worked examples (S3 Gateway Endpoint creation, multi-AZ
-consolidation, NAT Instance substitution, Interface Endpoint evaluation,
-already-optimized, NEED_MORE_INFO) are in `references/worked-examples.md`.
+> Verbatim output template and the worked-examples pointer moved to [references/worked-examples.md](references/worked-examples.md).
+> The STRICT output contract below carries the authoritative required structure; full worked examples live in the reference.
 
 ## STRICT output contract
 
@@ -746,50 +480,13 @@ Extended anti-patterns in `references/worked-examples.md`.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (create-vpc-endpoint, delete-nat-gateway, replace-route,
-  release-address), emit and await operator approval.
-- **Back up route tables before changes.** Capture the current route
-  table state: `aws ec2 describe-route-tables` and save the output. If
-  the optimization needs to be rolled back, the original routes must be
-  recoverable.
-- **Verify EIP allocation before NAT Gateway deletion.** Note the
-  `AllocationId` from `describe-nat-gateways` so the EIP can be released
-  after deletion.
-- **Test S3/DynamoDB access after Gateway Endpoint creation.** Verify
-  that bucket/table policies don't block the endpoint. If policies
-  restrict by source IP or VPC, update them to include the endpoint ID.
-- **Monitor NAT Gateway metrics for 7 days post-change.** Verify that
-  traffic shifted to endpoints and the NAT data processing charge
-  dropped accordingly.
-- **Bulk-operation limit:** Process at most 3 VPCs per batch. Verify
-  each batch before proceeding. Abort if any route table change breaks
-  connectivity.
+> Pre-flight safety checks (CONFIRM gate, route-table backup, EIP verification, post-change monitoring, batch limits) moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+> Run before any remediation CLI.
 
 ## Recent AWS features (2024-2026)
 
-- **Gateway Load Balancer Endpoint (2024-2025):** For inserting security
-  appliances (firewalls, IDS/IPS) into the traffic path. Relevant when
-  NAT traffic must be inspected — the GWLB Endpoint routes traffic
-  through a security VPC before NAT.
-- **VPC Endpoint policy enhancements (2024):** Endpoint policies now
-  support more granular IAM-style permissions. Use endpoint policies to
-  restrict which S3 buckets or DynamoDB tables are accessible through
-  the endpoint.
-- **CloudWatch NAT Gateway metrics expansion (2024-2025):** Added
-  `ErrorPortAllocation` and `ConnectionEstablishedCount` metrics for
-  better port-exhaustion diagnosis. Port exhaustion occurs when a NAT
-  Gateway runs out of ephemeral ports (55,000 per connection per
-  destination).
-- **PrivateLink for AWS services expansion (2024-2025):** Additional
-  AWS services now support Interface Endpoints, including some
-  bedrock, securityhub, and config APIs.
-- **NAT Gateway bandwidth monitoring (2024):** CloudWatch now provides
-  per-destination-IP flow metrics for NAT Gateways, enabling more
-  granular traffic analysis without VPC Flow Logs.
-- **ECR Interface Endpoint performance (2024):** Docker pull throughput
-  through ECR Interface Endpoints improved with connection reuse. Break-
-  even threshold effectively lower for CI/CD-heavy workloads.
+> Recent AWS features (2024-2026) moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+> Load on demand — GWLB inspection, endpoint policy granularity, new NAT metrics.
 
 ## References
 
@@ -804,6 +501,11 @@ Extended anti-patterns in `references/worked-examples.md`.
   end-to-end optimization walkthrough), plus error handling, edge cases,
   extended NEVER list, and the NAT optimization decision tree.
 
+## References (load on demand)
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight data sources, double-NAT detection audit, pre-flight safety checks.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — mindset principles, Step-0 non-obvious behaviours, double-NAT scenarios, recent AWS features.
+- [references/nat-pricing-and-endpoint-matrix.md](references/nat-pricing-and-endpoint-matrix.md) — pricing blocks, break-even tables, create/consolidate CLI sequences, saving math.
+- [references/worked-examples.md](references/worked-examples.md) — full worked examples per verdict shape and the verbatim output template.
 ## Domain
 
 AWS CloudOps / NAT Gateway Networking Cost Optimization & FinOps.

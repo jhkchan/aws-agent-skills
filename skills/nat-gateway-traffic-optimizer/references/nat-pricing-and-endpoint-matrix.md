@@ -466,3 +466,186 @@ aws ec2 authorize-security-group-ingress \
   --protocol tcp --port 443 \
   --cidr 10.0.0.0/16
 ```
+
+## Step 1 — Gateway endpoints (S3, DynamoDB): intro, pricing, CLI, saving math (moved from SKILL.md)
+
+S3 and DynamoDB Gateway Endpoints are the highest-leverage, zero-cost
+optimization. They eliminate the #1 NAT traffic source (S3 is typically
+30-50% of NAT data processing) at no charge.
+
+**Gateway Endpoint pricing:**
+```
+Hourly charge:     $0.00/hour
+Per-GB charge:     $0.00/GB
+Per-AZ charge:     $0.00/AZ
+Total cost:        FREE
+```
+
+**Create S3 Gateway Endpoint:**
+```bash
+aws ec2 create-vpc-endpoint \
+  --vpc-id vpc-0abc123 \
+  --service-name com.amazonaws.us-east-1.s3 \
+  --route-table-ids rtb-0aaa rtb-0bbb rtb-0ccc \
+  --vpc-endpoint-type Gateway \
+  --tag-specifications "ResourceType=vpc-endpoint,Tags=[{Key=Name,Value=s3-gateway-endpoint}]"
+```
+
+**Create DynamoDB Gateway Endpoint:**
+```bash
+aws ec2 create-vpc-endpoint \
+  --vpc-id vpc-0abc123 \
+  --service-name com.amazonaws.us-east-1.dynamodb \
+  --route-table-ids rtb-0aaa rtb-0bbb rtb-0ccc \
+  --vpc-endpoint-type Gateway \
+  --tag-specifications "ResourceType=vpc-endpoint,Tags=[{Key=Name,Value=dynamodb-gateway-endpoint}]"
+```
+
+**Saving from S3 Gateway Endpoint:**
+```
+monthly_saving = s3_GB_through_NAT × $0.045
+
+Example: 180 GB S3 traffic/month through NAT
+  Saving: 180 × $0.045 = $8.10/month (100% of S3 NAT processing cost)
+  Annual: $97.20
+  Cost of Gateway Endpoint: $0.00
+```
+
+## Step 2 — Interface endpoints: intro, pricing, break-even and service tables, ECR CLI (moved from SKILL.md)
+
+Interface Endpoints cost $0.010/hour per AZ (~$7.30/month per AZ). The
+break-even is ~160 GB/month per AZ at the NAT data processing rate of
+$0.045/GB.
+
+**Interface Endpoint pricing:**
+```
+Hourly charge:     $0.010/hour per AZ
+Monthly per AZ:    $0.010 × 730 = $7.30/AZ/month
+3-AZ monthly:      $7.30 × 3 = $21.90/month
+
+Break-even per AZ: $7.30 / $0.045 = 162 GB/month
+```
+
+**Break-even by AZ count:**
+| AZs | Monthly endpoint cost | Break-even GB/month |
+|---|---|---|
+| 1 | $7.30 | 162 GB |
+| 2 | $14.60 | 324 GB (162 per AZ) |
+| 3 | $21.90 | 486 GB (162 per AZ) |
+
+**Common Interface Endpoints worth evaluating:**
+
+| Service | Endpoint name | Typical NAT traffic source | Break-even likelihood |
+|---|---|---|---|
+| ECR (api + dkr) | `com.amazonaws.<region>.ecr.api` + `ecr.dkr` | Docker image pulls | HIGH if CI/CD is in-VPC |
+| SSM | `com.amazonaws.<region>.ssm` | SSM Agent, Patch Manager, Session Manager | HIGH if SSM-managed |
+| STS | `com.amazonaws.<region>.sts` | AssumeRole calls from private subnets | MEDIUM |
+| SQS | `com.amazonaws.<region>.sqs` | Queue operations from private subnets | MEDIUM |
+| Secrets Manager | `com.amazonaws.<region>.secretsmanager` | Secret retrieval from private subnets | MEDIUM |
+| CloudWatch Logs | `com.amazonaws.<region>.logs` | Log ingestion from private subnets | HIGH for logging-heavy |
+| KMS | `com.amazonaws.<region>.kms` | Encryption API calls | LOW (small payloads) |
+
+**Create ECR Interface Endpoint (api + dkr):**
+```bash
+aws ec2 create-vpc-endpoint \
+  --vpc-id vpc-0abc123 \
+  --vpc-endpoint-type Interface \
+  --service-name com.amazonaws.us-east-1.ecr.api \
+  --subnet-ids subnet-0aaa subnet-0bbb subnet-0ccc \
+  --security-group-ids sg-0endpoint \
+  --private-dns-enabled
+
+aws ec2 create-vpc-endpoint \
+  --vpc-id vpc-0abc123 \
+  --vpc-endpoint-type Interface \
+  --service-name com.amazonaws.us-east-1.ecr.dkr \
+  --subnet-ids subnet-0aaa subnet-0bbb subnet-0ccc \
+  --security-group-ids sg-0endpoint \
+  --private-dns-enabled
+```
+
+ECR requires BOTH the api and dkr endpoints for Docker pull/push to
+work without NAT.
+
+## Step 3 — NAT topology: savings math and consolidation CLI (moved from SKILL.md)
+
+**Single NAT Gateway savings:**
+```
+Each NAT Gateway hourly: $0.045/h × 730h = $32.85/month
+
+3-AZ VPC with 3 NAT Gateways: 3 × $32.85 = $98.55/month (hourly only)
+Consolidated to 1 NAT Gateway: 1 × $32.85 = $32.85/month
+Saving: $65.70/month (2 AZs removed)
+
+Cross-AZ cost added: traffic from AZ-2 and AZ-3 subnets to the NAT
+Gateway in AZ-1 incurs $0.01/GB each direction. At 500 GB/month
+cross-AZ: 500 × $0.01 × 2 = $10/month.
+
+Net saving: $65.70 - $10.00 = $55.70/month (still strongly positive)
+```
+
+**Consolidation steps:**
+```bash
+# 1. Identify the NAT Gateway to keep (in the busiest AZ)
+aws ec2 describe-nat-gateways --filter Name=vpc-id,Values=vpc-0abc123 \
+  Name=state,Values=available
+
+# 2. Update route tables in other AZ subnets to point at the kept NAT GW
+aws ec2 replace-route --route-table-id rtb-0bbb \
+  --destination-cidr-block 0.0.0.0/0 \
+  --nat-gateway-id nat-0keep
+
+# 3. Delete the redundant NAT Gateways
+aws ec2 delete-nat-gateway --nat-gateway-id nat-0remove
+
+# 4. Release the Elastic IPs (after gateway is 'deleted')
+aws ec2 describe-nat-gateways --nat-gateway-ids nat-0remove \
+  --query 'NatGateways[0].NatGatewayAddresses[0].AllocationId'
+aws ec2 release-address --allocation-id eipalloc-0xxx
+```
+
+## Step 4 — NAT Instance: cost comparison and setup CLI (moved from SKILL.md)
+
+**Cost comparison:**
+| Option | Hourly | Monthly (730h) | Per-GB | 50 GB/month total |
+|---|---|---|---|---|
+| NAT Gateway | $0.045 | $32.85 | $0.045/GB | $32.85 + $2.25 = $35.10 |
+| NAT Instance (t3.micro) | $0.0104 | $7.59 | $0.00 (EC2 data transfer only) | $7.59 |
+| Saving | | $25.26/month | | $27.51/month |
+
+**NAT Instance setup (fargate or EC2):**
+```bash
+# Launch a NAT Instance from the AWS-provided NAT AMI
+# Or use a standard AL2023 AMI with user-data:
+aws ec2 run-instances \
+  --image-id ami-0al2023 \
+  --instance-type t3.micro \
+  --subnet-id subnet-0public \
+  --key-name my-key \
+  --source-dest-check false \
+  --user-data '#!/bin/bash
+    sysctl -w net.ipv4.ip_forward=1
+    iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+    iptables -A FORWARD -i eth0 -o eth0 -m state \
+      --state RELATED,ESTABLISHED -j ACCEPT
+    iptables -A FORWARD -i eth0 -o eth0 -j ACCEPT' \
+  --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=nat-instance-dev}]"
+
+# Disable source/destination check (required for NAT)
+aws ec2 modify-instance-attribute --instance-id i-0nat \
+  --source-dest-check "{\"Value\": false}"
+
+# Point the private subnet route table at the NAT Instance
+aws ec2 replace-route --route-table-id rtb-0private \
+  --destination-cidr-block 0.0.0.0/0 \
+  --instance-id i-0nat
+```
+
+## Step 6 — PrivateLink for SaaS APIs: break-even math (moved from SKILL.md)
+
+```
+Monthly SaaS API traffic through NAT: 200 GB
+NAT data processing cost: 200 × $0.045 = $9.00/month
+PrivateLink Interface Endpoint cost: $7.30/month (1 AZ) or $21.90 (3 AZ)
+Break-even: if traffic > 162 GB/AZ/month, PrivateLink is cheaper
+```

@@ -108,3 +108,14 @@ optimisation *logic* cannot proceed safely.
 | `create-vpc-endpoint` (Interface) fails with `PrivateDnsOptionsIncompatible` | API error | The VPC already has a conflicting private DNS configuration. Retry with `--no-private-dns-enabled` and surface the DNS resolution impact. |
 | `delete-nat-gateway` fails with `NatGatewayNotFound` | API error | The gateway was already deleted or is in a different region. Re-query with the correct region. |
 | `release-address` fails with `AddressInUse` | API error | The EIP is still associated with the NAT Gateway (deletion not yet complete). Wait for the NAT Gateway state to reach `deleted`, then retry. |
+
+## Scope summary (moved from SKILL.md)
+
+CLI/data-source failure modes (e.g., `RouteConflict`,
+`PrivateDnsOptionsIncompatible`, `NatGatewayNotFound`, `AddressInUse`,
+empty Cost Explorer or Flow Logs results), remediation-procedure
+failures (ENI quota block, cross-partition S3 access, NAT replacement
+connection reset, EIP release stuck, cost/traffic reconciliation
+drift), and edge-case topologies (TGW hub-and-spoke egress,
+private-only VPCs, VPC peering) are documented in
+`references/troubleshooting.md`.

@@ -63,17 +63,8 @@ all that apply into a single recommendation):**
 4. **NAT Instance substitution** — dev/test workloads where HA is not
    required; fixed EC2 cost instead of per-GB processing.
 
-**Cost baseline (us-east-1, 2026):**
-
-| Component | Rate | Notes |
-|---|---|---|
-| NAT Gateway base | $0.045/hour (~$32.85/month) | Per gateway, billed regardless of traffic |
-| NAT Gateway data processing | $0.045/GB | The multiplier — 1 TB = $45/month on top of base |
-| Gateway VPC Endpoint (S3, DynamoDB) | **FREE** | No hourly, no per-GB, no AZ surcharge |
-| Interface VPC Endpoint base | $0.01/hour per AZ (~$7.30/month per AZ) | Billed per ENI across AZs where the endpoint exists |
-| Interface VPC Endpoint data | $0.01/GB | Inbound to the endpoint from the VPC |
-| Cross-AZ data transfer | $0.01/GB (each direction) | Applies when traffic crosses an AZ boundary |
-| NAT Instance (t3.micro) | ~$8.47/month (t3.micro, 730h × $0.0116) | Fixed cost, no per-GB; bandwidth ~1 Gbps, not HA |
+> Pricing detail moved to [references/vpc-endpoint-pricing-matrix.md](references/vpc-endpoint-pricing-matrix.md): full us-east-1 cost-baseline table.
+> Load on demand when break-even maths needs component rates; the rule of thumb below stays authoritative.
 
 **Break-even rule of thumb:** for an Interface endpoint, monthly savings =
 `(GB × $0.045) − (GB × $0.01 + $7.30 × num_AZs)`. The break-even point is
@@ -85,127 +76,20 @@ all that apply into a single recommendation):**
 exist on every VPC that has a NAT Gateway — their absence is a defect, not
 an optimisation opportunity. Four networking realities drive the verdict:
 
-- **Gateway endpoints are free and binary.** No break-even calculation
-  applies; the only reason not to have them is a route-table or endpoint-
-  policy constraint. Treat absence as a misconfiguration (like an open
-  security group). Recommendation is unconditional.
-
-- **Interface endpoints require traffic evidence, not assumptions.** An
-  Interface endpoint carries a fixed ~$7.30/month per AZ plus $0.01/GB. Pull
-  VPC Flow Logs or Cost Explorer service-level data to quantify GB/month
-  before recommending — on a low-traffic VPC, an Interface endpoint
-  INCREASES cost. The break-even threshold (~160 GB/month per AZ) is the
-  load-bearing gate.
-
-- **Cross-AZ data transfer is the hidden tax on single-NAT topology.**
-  Traffic from other AZs to a single NAT Gateway crosses the AZ boundary
-  twice ($0.01/GB each direction). For high-throughput workloads, cross-AZ
-  cost can EXCEED the base-cost saving of consolidating. Topology
-  recommendations must cite environment AND cross-AZ traffic volume.
-
-- **NAT Instance is not a drop-in replacement.** A t3.micro NAT Instance
-  costs ~$8/month flat but caps at ~1 Gbps, has no HA, and requires manual
-  failover. Appropriate ONLY for dev/test. Production traffic on a NAT
-  Instance is a reliability incident waiting to happen — always surface the
-  reliability warning (single point of failure, no SLA).
+> The four networking realities behind this mindset are expanded in [references/expert-knowledge.md](references/expert-knowledge.md).
+> Load on demand for the full treatment of each reality before issuing a verdict.
 
 ## Pre-flight: VPC metadata gate
 
-Run before classification. Misclassifying these produces false positives.
-
-**Live-account pre-flight (skip if offline audit):**
-
-```bash
-# 1. Enumerate NAT Gateways and their state
-aws ec2 describe-nat-gateways --filter "Name=vpc-id,Values=<vpc-id>" \
-  --output json | jq '.NatGateways[] | {
-    nat_gateway_id: .NatGatewayId,
-    state: .State,                        # "available" | "pending" | "deleting"
-    subnet_id: .SubnetId,                 # identifies the AZ
-    public_ip: .NatGatewayAddresses[0].PublicIp,
-    private_ip: .NatGatewayAddresses[0].PrivateIp
-  }'
-
-# 2. Enumerate existing VPC endpoints
-aws ec2 describe-vpc-endpoints --filter "Name=vpc-id,Values=<vpc-id>" \
-  --output json | jq '.VpcEndpoints[] | {
-    endpoint_id: .VpcEndpointId,
-    type: .VpcEndpointType,               # "Gateway" | "Interface" | "GatewayLoadBalancer"
-    service: .ServiceName,
-    state: .State,
-    subnet_ids: .SubnetIds,
-    route_table_ids: .RouteTableIds
-  }'
-
-# 3. Pull NAT Gateway data-processing cost from Cost Explorer (last 30 days)
-aws ce get-cost-and-usage \
-  --time-period Start=2026-07-01,End=2026-08-01 \
-  --granularity MONTHLY \
-  --filter '{"Dimensions":{"Key":"USAGE_TYPE_GROUP","Values":["EC2: NatGateway"]}}' \
-  --metrics "UsageQuantity" "AmortizedCost" \
-  --group-by Type=DIMENSION,Key=USAGE_TYPE \
-  --output json
-
-# 4. Pull per-service traffic breakdown via VPC Flow Logs (last 7 days)
-aws logs start-query \
-  --log-group-name <flow-logs-group> \
-  --start-time $(date -d '-7 days' +%s) \
-  --end-time $(date +%s) \
-  --query-string 'fields @timestamp, interface-id, srcaddr, dstaddr, bytes
-    | filter interface-id = "<eni-of-nat-gateway>"
-    | stats sum(bytes) as total_bytes by dstaddr
-    | sort total_bytes desc
-    | limit 20'
-
-# 5. Enumerate route tables to confirm which subnets route to which NAT
-aws ec2 describe-route-tables \
-  --filter "Name=vpc-id,Values=<vpc-id>" \
-  --output json | jq '.RouteTables[] | {
-    route_table_id: .RouteTableId,
-    subnet_id: (.Associations[0].SubnetId // "main"),
-    nat_gateway: ([.Routes[] | select(.NatGatewayId != null) | .NatGatewayId][0])
-  }'
-```
-
-### Data-quality short-circuits
-
-| Condition | Effect on optimisation |
-|---|---|
-| Cost Explorer returns $0 NAT Gateway cost | VPC has no NAT Gateway spend. Verdict ALREADY_OPTIMAL for this VPC. |
-| VPC Flow Logs not enabled on the VPC | Cannot quantify per-service traffic breakdown. Fall back to Cost Explorer service-level filter; flag Interface endpoint recommendations as MEDIUM confidence (traffic volume estimated, not measured). |
-| NAT Gateway state `pending` or `deleting` | Transient state. Re-query after 5 minutes; do not optimise against a gateway that is not yet serving traffic. |
-| Route table shows no route to the NAT Gateway for a private subnet | That subnet's traffic does not flow through NAT; its GB do not count toward NAT processing. Verify the route-table-to-subnet mapping before aggregating traffic. |
-| VPC has no private subnets (all public) | NAT Gateway is unused. Surface as a topology finding — the NAT Gateway can be deleted entirely. |
-| Cost Explorer shows NAT Gateway cost but Flow Logs show 0 bytes | Flow Logs are misconfigured or querying the wrong ENI. Trust Cost Explorer for the dollar amount; flag the traffic breakdown as unavailable. |
+> Full pre-flight command listing (NAT enumeration, endpoints, Cost Explorer, Flow Logs, route tables, data-quality short-circuits) moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+> Run every check there before classification — misclassifying these produces false positives.
 
 ## Process — optimisation logic (apply in order, aggregate all applicable)
 
 ### Step 0: Expert knowledge — non-obvious NAT Gateway and VPC endpoint behaviours
 
-These behaviours are easy to misjudge without operational networking
-experience. Each changes a recommendation if ignored. See
-`references/expert-knowledge.md` for the full treatment. Summary:
-
-- **Gateway endpoints are free and regional** — no per-GB or per-hour
-  charge; cover only same-region S3/DynamoDB; only affect VPC-to-service
-  (outbound) traffic.
-- **Interface endpoint break-even is per-service, not aggregate** —
-  ~160 GB/month per AZ; each AZ adds $7.30/month base; specify only the
-  AZs that originate traffic.
-- **Cross-AZ transfer ($0.01/GB each direction) taxes single-NAT
-  topology** — model both base cost and cross-AZ transfer before
-  consolidating.
-- **NAT Instance is fixed-cost but capped and not HA** — appropriate
-  only for dev/test; requires `--no-source-dest-check`; does not support
-  port forwarding.
-- **Deleting a NAT Gateway does NOT release its Elastic IP** — always
-  pair deletion with `aws ec2 release-address` (orphan EIP = $3.65/mo).
-- **Filter VPC Flow Logs by the NAT Gateway ENI** to isolate
-  processing-charge traffic; post-endpoint traffic will not appear on
-  the NAT ENI, confirming the endpoint works.
-- **Gateway and Interface endpoints for S3 are different constructs** —
-  always prefer the free Gateway endpoint; Interface (PrivateLink) is
-  only for cross-region or private-DNS requirements.
+> Step-0 expert-knowledge summary moved to [references/expert-knowledge.md](references/expert-knowledge.md) (non-obvious NAT Gateway and VPC endpoint behaviours).
+> Load on demand; each behaviour changes a recommendation if ignored.
 
 ### Step 1: Gateway endpoints for S3 and DynamoDB (FREE — always create)
 
@@ -400,21 +284,8 @@ IMPLEMENTATION:
 
 ### Worked examples (see references/worked-examples.md)
 
-Three full end-to-end worked examples live in
-`references/worked-examples.md`:
-
-- **OPPORTUNITY_FOUND — production VPC, no Gateway endpoints, high S3
-  traffic.** Creates S3 + DynamoDB Gateway endpoints (free); skips ECR
-  Interface endpoint (below break-even); keeps 3-AZ topology.
-- **ALREADY_OPTIMAL — production VPC with full endpoint posture.** S3
-  and DynamoDB Gateway endpoints in place; ECR Interface endpoint exists
-  in 3 AZs; topology correct.
-- **OPPORTUNITY_FOUND — non-prod VPC with redundant NAT Gateways.**
-  Creates S3 Gateway endpoint; consolidates 2 NAT Gateways to 1;
-  includes the `release-address` step for the deleted gateway's EIP.
-
-Each example demonstrates internally consistent arithmetic, the CONFIRM
-gate, and the exact CLI sequence for the verdict shape.
+> Secondary worked examples moved to [references/worked-examples.md](references/worked-examples.md) — three full end-to-end scenarios.
+> Load on demand; the primary example under the STRICT output contract below stays in this file.
 
 ## STRICT output contract
 
@@ -576,14 +447,8 @@ self-consistent:
 
 ## Error handling and edge cases (see references/troubleshooting.md)
 
-CLI/data-source failure modes (e.g., `RouteConflict`,
-`PrivateDnsOptionsIncompatible`, `NatGatewayNotFound`, `AddressInUse`,
-empty Cost Explorer or Flow Logs results), remediation-procedure
-failures (ENI quota block, cross-partition S3 access, NAT replacement
-connection reset, EIP release stuck, cost/traffic reconciliation
-drift), and edge-case topologies (TGW hub-and-spoke egress,
-private-only VPCs, VPC peering) are documented in
-`references/troubleshooting.md`.
+> Error-handling deep dives, API error tables, and edge-case topologies moved to [references/troubleshooting.md](references/troubleshooting.md).
+> Load on demand when a CLI/data-source call fails or the topology is unusual.
 
 ## Anti-Patterns — NEVER (top 5)
 
@@ -618,45 +483,13 @@ FORBIDDEN output patterns section above.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`create-vpc-endpoint`, `delete-nat-gateway`, `replace-route`,
-  `release-address`, `run-instances` for NAT Instance), emit:
-  `CONFIRM: About to <action> on VPC <vpc-id> in region <region>. This
-  affects <consequence>. Proceed? (yes/no)`. Do NOT execute until the
-  operator confirms. Do NOT batch VPC changes.
-- **Route-table backup before topology changes.** `aws ec2
-  describe-route-tables --route-table-ids <rtb-id> --output json >
-  /tmp/<rtb-id>-backup-$(date +%s).json`. Route changes are atomic and
-  non-versioned.
-- **Verify NAT Gateway state before relying on it.** Ensure the
-  remaining NAT Gateway is `available` before deleting others.
-- **Endpoint policy and private DNS review.** Default Gateway endpoint
-  policy is "full access"; `--private-dns-enabled` on Interface endpoints
-  overrides public DNS within the VPC. Verify no conflicts before creating.
+> Pre-flight safety check listing (CONFIRM gate, route-table backup, state verification, policy review) moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+> Run before any remediation CLI.
 
 ## Recent AWS features (2024-2026)
 
-- **Gateway Load Balancer endpoints (expanded 2024-2025):** For security
-  appliance insertion (firewalls, IDS/IPS). Not a cost-optimisation lever,
-  but relevant to VPC endpoint topology. Surface as a finding if the VPC
-  uses third-party security appliances.
-
-- **VPC endpoint policies for S3 (enhanced 2024):** Support for
-  condition-key-based policies (e.g., restricting to specific IAM roles).
-  Use for least-privilege Gateway endpoint configurations.
-
-- **CloudWatch Network Monitor (2024-2025):** Proactive monitoring of
-  network paths including NAT Gateway. Use to establish a baseline before
-  optimisation and to verify no latency regression post-change.
-
-- **Cost Explorer NAT Gateway granularity (2024):** Cost Explorer now
-  separates NAT Gateway base (hourly) from data-processing (per-GB) in the
-  usage-type dimension. Use this split to quantify the base-cost vs
-  data-processing contribution.
-
-- **Graviton-based NAT Instances (2024-2025):** t4g.micro NAT AMIs offer
-  better price-performance than t3.micro for NAT Instance workloads.
-  Consider t4g for new NAT Instance deployments.
+> Recent AWS features (2024-2026) moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+> Load on demand for newer capabilities that affect endpoint topology and sizing choices.
 
 ## Domain
 
@@ -673,3 +506,12 @@ AWS CloudOps / Networking Cost Optimisation & VPC Endpoint Design.
 - **AWS CLI Command Reference: ec2** — https://docs.aws.amazon.com/cli/latest/reference/ec2/
 - **VPC Flow Logs** — https://docs.aws.amazon.com/vpc/latest/userguide/flow-logs.html
 - **AWS Well-Architected Framework — Cost Optimization** — https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/welcome.html
+## References (load on demand)
+
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight VPC metadata gate commands and pre-flight safety checks.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — recent AWS features (2024-2026).
+- [references/expert-knowledge.md](references/expert-knowledge.md) — Step-0 non-obvious behaviours and the four networking realities.
+- [references/troubleshooting.md](references/troubleshooting.md) — error handling, API error tables, edge cases.
+- [references/worked-examples.md](references/worked-examples.md) — three full end-to-end worked examples.
+- [references/vpc-endpoint-pricing-matrix.md](references/vpc-endpoint-pricing-matrix.md) — detailed pricing matrix and cost baseline.
+

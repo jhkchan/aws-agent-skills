@@ -381,3 +381,47 @@ If metrics are low after training:
 - PutEvents is billed per-event (much cheaper than retraining).
 - Use PutEvents for incremental updates; reserve full retraining for
   major data refreshes.
+## Expert heuristic: minProvisionedTPS sets the cost floor
+
+`minProvisionedTPS` is the most impactful cost lever in Personalize.
+It sets the minimum throughput (transactions per second) the campaign
+will bill, 24/7, regardless of actual traffic.
+
+```text
+Cost math (illustrative, us-east-1):
+  minProvisionedTPS = 1  → ~$0.20/hour → ~$150/month
+  minProvisionedTPS = 5  → ~$1.00/hour → ~$730/month
+  minProvisionedTPS = 10 → ~$2.00/hour → ~$1460/month
+  minProvisionedTPS = 50 → ~$10.00/hour → ~$7300/month
+
+Strategy:
+  1. Start at minProvisionedTPS = 1 for dev/staging
+  2. For production, set to your p50 TPS (median load)
+  3. Auto-scaling handles spikes above minProvisionedTPS (billed per-transaction)
+  4. Update minProvisionedTPS via update-campaign (no deletion required)
+```
+
+**Key implication:** never set a high minProvisionedTPS without
+justification. The campaign auto-scales above the floor; you only pay
+the floor for idle capacity. Start low and tune up.
+
+## Expert heuristic: event tracker enables real-time updates
+
+Without an event tracker, recommendations are frozen at training
+time. With an event tracker, PutEvents feeds real-time interactions
+into the campaign, updating recommendations without full retraining.
+
+```text
+Real-time update flow:
+  User clicks an item
+    → Lambda or SDK calls personalize-events:PutEvents
+      → Event tracker writes to the dataset group
+        → Campaign blends real-time signal with trained model
+          → Next GetRecommendations reflects the recent click
+```
+
+**Key implication:** for any production recommendation system, an
+event tracker is essential. Without it, recommendations are static
+until the next full retraining. With it, the campaign adapts to user
+behavior in near-real-time.
+

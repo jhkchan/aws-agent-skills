@@ -181,3 +181,55 @@ Neptune Analytics for batch.
 5. **Single-AZ subnet group for Multi-AZ.** Multi-AZ cannot place the
    reader in a different AZ. Verify the subnet group spans >=2 AZs
    before `create-db-cluster`.
+
+## Expert heuristic: graph sizing (memory budget) — moved from SKILL.md
+
+Neptune is memory-bound for traversal performance. The graph must fit
+in the buffer cache for sub-second queries; cache misses fall through
+to the storage layer (10-100x slower). A baseline model quotes the
+instance spec-sheet memory; this heuristic gives the real budget.
+
+```text
+usable_buffer_cache = instance_memory_bytes × 0.60
+# ~60% of memory is the working buffer cache budget. Neptune reserves
+# the rest for OS, JVM internal state, connection state, and
+# copy-on-write during snapshot.
+
+# Working set rule (Gremlin/SPARQL property graph):
+required_memory = vertices_bytes + edges_bytes + (3 × indexes_bytes)
+# Neptune maintains property + edge indexes consuming ~3x the raw
+# edge data. Indexes are what make traversals fast; never size them out.
+
+# Example: 200M vertices (200 B avg) + 1B edges (80 B avg)
+# vertices=40 GB, edges=80 GB, indexes=240 GB -> 360 GB required
+# -> db.r6g.12xlarge (384 GB) is the floor;
+#    db.r6g.16xlarge (512 GB) for headroom
+```
+
+**Read-scaling note:** readers scale read traversals but NOT writes —
+Neptune has exactly one writer per cluster. For high write rates,
+scale up the writer instance class, not out.
+
+## Expert heuristic: failover promotion semantics — moved from SKILL.md
+
+A baseline model says "Multi-AZ gives you failover" without explaining
+what gets promoted and how long it takes. This is the load-bearing
+detail for production SLAs.
+
+- **Cluster endpoint is stable.** Neptune exposes a single cluster
+  endpoint that always points to the current writer. On failover, the
+  endpoint repoints automatically — clients reconnect via the cluster
+  endpoint without code changes.
+- **Promotion time: typically ~30 seconds** (instance detection +
+  reader promotion + endpoint DNS update).
+- **Data loss window: zero committed transactions.** Neptune storage
+  is cluster-shared (6-way storage replication); a promoted reader
+  sees all writes the old writer committed. In-flight client writes
+  during the ~30s window get errors and must be retried.
+- **Reader-only failover is per-cluster.** If the writer is in AZ-a
+  and all readers are also in AZ-a (anti-pattern), failover cannot
+  move the writer out of AZ-a. Spread readers across AZs.
+
+**Practical implication:** if the workload's SLA cannot tolerate a
+~30-second client reconnect, the application must handle retry/
+idempotency. Neptune itself recovers automatically.

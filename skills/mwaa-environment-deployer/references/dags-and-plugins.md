@@ -334,3 +334,83 @@ resource "aws_mwaa_environment" "main" {
   }
 }
 ```
+## Expert heuristic: requirements.txt version constraints
+
+A baseline model says "list the packages." The correct heuristic pins
+exact versions and verifies Python compatibility.
+
+```text
+requirements.txt best practices:
+  ├── Pin EXACT versions: pandas==1.5.3 (NOT pandas>=1.5 or pandas~=1.5)
+  │     Loose constraints cause non-reproducible builds when maintainers
+  │     release breaking changes between MWAA environment restarts.
+  │
+  ├── Verify Python compatibility:
+  │     MWAA Airflow 2.7+ uses Python 3.10
+  │     MWAA Airflow 2.9+ uses Python 3.11
+  │     Packages compiled for CPython 3.8/3.9 may fail on 3.10/3.11
+  │
+  ├── Avoid packages that require system-level dependencies:
+  │     Packages like 'psycopg2' need libpq-dev → use 'psycopg2-binary'
+  │     Packages like 'lxml' need libxml2 → pre-compiled wheel only
+  │
+  ├── MWAA-specific constraints:
+  │     Do NOT pin 'apache-airflow' itself — MWAA manages this
+  │     Do NOT pin 'boto3'/'botocore' below the MWAA-provided version
+  │     Constraint: total installed package size < 256 MB
+  │
+  └── Upload to S3:
+        s3://my-bucket/requirements.txt (root of bucket or configured path)
+```
+
+**Key implication:** a requirements.txt with unpinned packages will work
+today and break tomorrow when a package releases a new version. Always
+pin exact versions. The MWAA startup script runs `pip install -r
+requirements.txt` at every environment update — unpinned packages pull
+the latest version each time.
+
+## Step 4 — S3 bucket setup and upload commands
+
+```text
+S3 bucket structure:
+  s3://my-mwaa-bucket/
+  ├── dags/
+  │     ├── my_dag.py
+  │     ├── etl_pipeline.py
+  │     └── reporting_dag.py
+  ├── requirements.txt          (exact version-pinned packages)
+  ├── plugins/
+  │     └── plugins.zip         (custom Airflow plugins ZIP)
+  └── startup_script.sh         (optional: runs at worker startup)
+```
+
+**Upload DAGs:**
+
+```bash
+aws s3 cp my_dag.py s3://my-mwaa-bucket/dags/my_dag.py
+aws s3 cp etl_pipeline.py s3://my-mwaa-bucket/dags/etl_pipeline.py
+```
+
+**Upload requirements.txt:**
+
+```bash
+aws s3 cp requirements.txt s3://my-mwaa-bucket/requirements.txt
+```
+
+Example requirements.txt:
+
+```text
+pandas==1.5.3
+requests==2.31.0
+psycopg2-binary==2.9.7
+boto3==1.28.62
+snowflake-connector-python==3.2.0
+```
+
+**Upload plugins ZIP:**
+
+```bash
+cd plugins && zip -r plugins.zip . && cd ..
+aws s3 cp plugins.zip s3://my-mwaa-bucket/plugins/plugins.zip
+```
+

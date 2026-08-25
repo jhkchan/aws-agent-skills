@@ -326,3 +326,64 @@ resource "null_resource" "component_template" {
   }
 }
 ```
+
+## Expert heuristic: shard sizing (10-50 GB per shard)
+A baseline model says "use the default 5 shards." The correct heuristic
+sizes shards to the 10-50 GB range, adjusting primary count to data
+volume.
+
+```text
+Estimated index size (primary data, no replicas):
+  ├── < 10 GB  → 1 primary shard (1 shard at <10 GB is efficient)
+  ├── 10-50 GB → 1 primary shard (sweet spot)
+  ├── 50-100 GB → 2 primary shards (25-50 GB each)
+  ├── 100-250 GB → 5 primary shards (20-50 GB each)
+  ├── 250-500 GB → 10 primary shards (25-50 GB each)
+  ├── 500 GB-1 TB → 20 primary shards (25-50 GB each)
+  └── 1 TB+ → use data streams + ILM rollover (avoid single huge index)
+
+Replica count decision:
+  ├── HA requirement → minimum 1 replica (survives 1 node loss)
+  ├── Read QPS is high → 2-3 replicas (each replica serves search)
+  └── Cost-sensitive dev/staging → 0 replicas (cluster yellow, no HA)
+```
+
+**Key implication:** over-sharding is the #1 OpenSearch performance
+killer. Too many small shards create overhead in cluster state, merge
+scheduling, and memory. Target 10-50 GB per shard. When in doubt,
+fewer larger shards is better than many small shards.
+
+## Expert heuristic: replica count for read throughput
+Replicas serve two purposes: high availability AND read scaling. Each
+replica shard can independently serve search queries.
+
+```text
+1 primary + 0 replicas = 1x read capacity (no HA)
+1 primary + 1 replica  = 2x read capacity (survives 1 node loss)
+1 primary + 2 replicas = 3x read capacity (survives 2 node loss)
+1 primary + 3 replicas = 4x read capacity
+```
+
+**Key implication:** for read-heavy workloads (product search, log
+dashboards), adding replicas is cheaper than scaling instances. For
+write-heavy workloads (ingestion pipelines), invest in more primary
+shards or larger instances instead.
+
+## Expert heuristic: ILM rollover for storage tiering
+ILM automates the transition of indices through hot, warm, cold, and
+delete phases, reducing cost for time-series data.
+
+```text
+HOT:   active write index, SSD, high-compute nodes
+  → rollover when: max_age (1d) OR max_size (50gb)
+WARM:  read-only, force merge to 1 segment, fewer compute resources
+  → transition when: 7d after rollover
+COLD:  rarely searched, minimal compute, cheapest storage
+  → transition when: 30d after rollover
+DELETE: permanently remove
+  → delete when: 90d after rollover
+```
+
+**Key implication:** without ILM, indices accumulate on hot nodes
+forever, driving cost. ILM rollover + tiering can cut OpenSearch costs
+by 50-70% for time-series workloads.

@@ -103,3 +103,56 @@ that background.
   that incurs processing charges. Traffic to S3 (after the Gateway
   endpoint is created) will NOT appear on the NAT ENI — confirming
   the endpoint is working.
+
+## Mindset — the four networking realities (moved from SKILL.md)
+
+- **Gateway endpoints are free and binary.** No break-even calculation
+  applies; the only reason not to have them is a route-table or endpoint-
+  policy constraint. Treat absence as a misconfiguration (like an open
+  security group). Recommendation is unconditional.
+
+- **Interface endpoints require traffic evidence, not assumptions.** An
+  Interface endpoint carries a fixed ~$7.30/month per AZ plus $0.01/GB. Pull
+  VPC Flow Logs or Cost Explorer service-level data to quantify GB/month
+  before recommending — on a low-traffic VPC, an Interface endpoint
+  INCREASES cost. The break-even threshold (~160 GB/month per AZ) is the
+  load-bearing gate.
+
+- **Cross-AZ data transfer is the hidden tax on single-NAT topology.**
+  Traffic from other AZs to a single NAT Gateway crosses the AZ boundary
+  twice ($0.01/GB each direction). For high-throughput workloads, cross-AZ
+  cost can EXCEED the base-cost saving of consolidating. Topology
+  recommendations must cite environment AND cross-AZ traffic volume.
+
+- **NAT Instance is not a drop-in replacement.** A t3.micro NAT Instance
+  costs ~$8/month flat but caps at ~1 Gbps, has no HA, and requires manual
+  failover. Appropriate ONLY for dev/test. Production traffic on a NAT
+  Instance is a reliability incident waiting to happen — always surface the
+  reliability warning (single point of failure, no SLA).
+
+## Step 0 summary — non-obvious NAT Gateway and VPC endpoint behaviours (moved from SKILL.md)
+
+These behaviours are easy to misjudge without operational networking
+experience. Each changes a recommendation if ignored. See
+`references/expert-knowledge.md` for the full treatment. Summary:
+
+- **Gateway endpoints are free and regional** — no per-GB or per-hour
+  charge; cover only same-region S3/DynamoDB; only affect VPC-to-service
+  (outbound) traffic.
+- **Interface endpoint break-even is per-service, not aggregate** —
+  ~160 GB/month per AZ; each AZ adds $7.30/month base; specify only the
+  AZs that originate traffic.
+- **Cross-AZ transfer ($0.01/GB each direction) taxes single-NAT
+  topology** — model both base cost and cross-AZ transfer before
+  consolidating.
+- **NAT Instance is fixed-cost but capped and not HA** — appropriate
+  only for dev/test; requires `--no-source-dest-check`; does not support
+  port forwarding.
+- **Deleting a NAT Gateway does NOT release its Elastic IP** — always
+  pair deletion with `aws ec2 release-address` (orphan EIP = $3.65/mo).
+- **Filter VPC Flow Logs by the NAT Gateway ENI** to isolate
+  processing-charge traffic; post-endpoint traffic will not appear on
+  the NAT ENI, confirming the endpoint works.
+- **Gateway and Interface endpoints for S3 are different constructs** —
+  always prefer the free Gateway endpoint; Interface (PrivateLink) is
+  only for cross-region or private-DNS requirements.

@@ -356,3 +356,92 @@ curl "<endpoint>/.plugins-alerting-alerts/_search" \
 5. **Expecting acknowledgment to mute alerts.** Acknowledging marks
    the alert but does NOT prevent new alerts from the same trigger.
    To mute, disable the monitor or adjust the trigger condition.
+
+## Expert heuristic: destination must be configured before monitor
+
+A baseline model creates the monitor and destination in any order.
+The correct heuristic recognizes that the destination MUST exist
+before the monitor references it, because the monitor validates
+the destination ID at creation only for the API contract — but
+the actual delivery happens at trigger time.
+
+```text
+Provisioning order:
+  1. Configure notification plugin (notification.yaml) for SNS
+     → domain-level config; required before SNS destinations work
+  2. Create the destination (Slack webhook URL, SNS topic ARN,
+     Chime webhook URL, custom webhook URL)
+     → returns a destination ID
+  3. Create the monitor referencing the destination ID
+     → monitor creates successfully
+  4. Test the destination (optional but recommended)
+     → send a test notification to verify delivery
+  5. Create the trigger with action referencing the destination
+     → trigger fires the action when the condition is met
+```
+
+**Key implication:** if the destination does not exist or the
+notification plugin is not configured for SNS, the monitor creates
+successfully but the FIRST alert fails silently (logged in the
+alerting plugin error log, not surfaced to the user).
+
+## Expert heuristic: SNS action requires notification.yaml plugin
+
+SNS is the most common destination for production alerting (it
+fans out to email, SMS, Lambda, and other endpoints). But it
+requires the notification plugin to be configured at the domain
+level.
+
+```text
+SNS destination setup:
+  1. Create an SNS topic (aws sns create-topic)
+  2. Create an IAM role with sns:Publish permission for the topic
+  3. Configure notification.yaml on the OpenSearch domain:
+     plugin:
+       notification:
+         sns:
+           role_arn: arn:aws:iam::<acct>:role/os-alerting-sns
+           topic_arn: arn:aws:sns:<region>:<acct>:alert-topic
+  4. Create the destination in OpenSearch pointing to the SNS topic
+  5. Reference the destination in the monitor action
+
+Without step 3, the SNS action fails at trigger time with
+"notification plugin not configured."
+```
+
+**Key implication:** always verify the notification plugin is
+configured before relying on SNS actions. For Slack/Chime/webhook
+destinations, the plugin is not required (credentials are stored
+in the destination config directly).
+
+## Destination creation examples (curl — Slack and SNS)
+
+**Create a destination (Slack example):**
+
+```bash
+curl -X POST "<endpoint>/_plugins/_alerting/destinations" \
+  -H "Content-Type: application/json" \
+  -u "<user>:<pass>" \
+  -d '{
+    "type": "slack",
+    "name": "ops-alerts-slack",
+    "slack": {
+      "url": "https://hooks.slack.com/services/T000/B000/XXXXX"
+    }
+  }'
+```
+
+**Create a destination (SNS example):**
+
+```bash
+curl -X POST "<endpoint>/_plugins/_alerting/destinations" \
+  -H "Content-Type: application/json" \
+  -u "<user>:<pass>" \
+  -d '{
+    "type": "sns",
+    "name": "ops-alerts-sns",
+    "sns": {
+      "topic_arn": "arn:aws:sns:us-east-1:123456789012:alert-topic"
+    }
+  }'
+```

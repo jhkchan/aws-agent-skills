@@ -83,178 +83,6 @@ with a specific gap citation in the checklist (marked `[✗]`), and
 | references/datasets-and-recipes.md | Dataset + recipe detail |
 | references/campaigns-and-events.md | Campaign + event tracker detail |
 
-## Mindset
-
-**One-line takeaway:** Amazon Personalize takes interaction data
-(user-item interactions), trains a recommendation model (solution
-version) using a recipe (User-Personalization, SIMS, Popularity-
-Counting), and serves it via a campaign with a minProvisionedTPS
-that sets the cost floor. The User-Personalization recipe covers
-roughly 90% of recommendation use cases. An event tracker enables
-real-time recommendation updates via PutEvents without retraining.
-
-Three misconceptions dominate Personalize misdesign at provisioning
-time:
-
-- **"minProvisionedTPS is just a performance setting."** It is not.
-  `minProvisionedTPS` sets the COST FLOOR for the campaign. Personalize
-  bills per-TPS-hour; setting minProvisionedTPS=10 when you need 1
-  means you pay for 10 TPS 24/7. Start low (1) and scale up based on
-  observed traffic; you can update minProvisionedTPS without deleting
-  the campaign.
-
-- **"Use SIMS or Popularity-Counting by default."** Wrong default.
-  The User-Personalization recipe (aws-user-personalization) covers
-  ~90% of use cases — it handles cold-start, real-time updates via
-  event tracker, and produces personalized (not just popular)
-  recommendations. SIMS is for item-to-item similarity ("customers who
-  bought X also bought Y"). Popularity-Counting is a baseline, not a
-  production recommendation.
-
-- **"Retraining is automatic."** It is not, unless you configure
-  AutoTraining. By default, a solution version is trained once on the
-  snapshot of data at training time. To incorporate new interactions,
-  you must either retrain manually (create a new solution version and
-  update the campaign), enable AutoTraining (automatic retraining on
-  a schedule), or use the event tracker for real-time updates without
-  full retraining.
-
-## Configuration dependency graph (novel heuristic)
-
-Personalize configurations are NOT independent. The dataset group type
-determines whether you use campaigns or recommenders. The recipe
-determines the solution. The solution version creates the campaign.
-Use this graph to sequence provisioning.
-
-| Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| Dataset group (CUSTOM or DOMAIN) | None (top-level) | DOMAIN groups use recommenders; CUSTOM uses solutions + campaigns | container for datasets |
-| Dataset schema (Avro-like JSON) | Dataset group exists | IMMUTABLE after creation — cannot alter columns | typed columns for Interactions / Users / Items |
-| Dataset (Interactions required) | Schema defined; dataset group exists | Interactions REQUIRED; Users/Items optional but recommended | the data store |
-| Bulk import job | Dataset exists; S3 matches schema; IAM s3:GetObject | one-time; for updates use PutEvents or another import | trained model input |
-| Solution (recipe) | Dataset group + Interactions dataset | recipe selection determines algorithm; cannot change after creation | algorithm blueprint |
-| Solution version (training) | Solution exists; data imported | HPO takes longer but may improve metrics | trained model |
-| Campaign | Solution version ACTIVE | minProvisionedTPS sets cost floor; can UPDATE without recreating | real-time GetRecommendations |
-| Event tracker | Dataset group exists | ONE active tracker per group; recreating invalidates previous | real-time PutEvents updates |
-| Filter | Dataset group exists | references dataset columns; validated at creation | filtered recommendations |
-| Recommender (DOMAIN only) | DOMAIN dataset group exists | pre-built for ECOMMERCE / VIDEO / MUSIC | domain-optimized recs |
-| Batch inference job | Solution version OR campaign exists; S3 I/O | writes JSON to S3; no real-time serving | offline scoring |
-
-**The minProvisionedTPS row is the one a baseline model misses.** A
-naive deployment sets minProvisionedTPS to a high default or does not
-realize it sets the cost floor. The correct heuristic starts at 1 and
-scales based on observed traffic. The procedure below forces an
-explicit cost decision.
-
-**Cross-dependency gotchas:**
-- Schema is IMMUTABLE. To add columns, create a new schema + dataset
-  and re-import.
-- Event tracker is per dataset group. Only ONE active tracker per
-  group; recreating invalidates the previous tracking ID.
-- DOMAIN groups use recommenders; CUSTOM groups use the full solution
-  → solution version → campaign flow. The two are not interchangeable.
-- Campaign update (new solution version) takes effect within ~15
-  minutes; the campaign is briefly in UPDATE_PENDING.
-
-## Expert heuristic: choosing CUSTOM vs DOMAIN dataset groups
-
-A baseline model says "create a dataset group." The correct heuristic
-recognizes that the group type determines the entire downstream flow.
-
-```text
-Recommendation use case:
-  ├── E-commerce (product recommendations)
-  │     → DOMAIN (ECOMMERCE) — use pre-built recommenders
-  │       Recommenders: Recommended For You, Users Who Viewed X Also Viewed,
-  │                      Popular Items, Most Purchased, Frequently Bought Together
-  │
-  ├── Video / Media (content recommendations)
-  │     → DOMAIN (VIDEO) — use pre-built recommenders
-  │       Recommenders: Recommended For You, Because You Watched,
-  │                      Top Picks, Continue Watching
-  │
-  ├── Music / Audio
-  │     → DOMAIN (MUSIC) — use pre-built recommenders
-  │
-  └── Custom (non-standard domain, custom recipe)
-        → CUSTOM — full control
-          Solutions: User-Personalization, SIMS, Popularity-Counting,
-                      Item-Attribute-Affinity, Personalized-Ranking
-```
-
-**Key implication:** if your use case fits ECOMMERCE, VIDEO, or MUSIC
-domains, use a DOMAIN dataset group — it is faster to deploy and uses
-AWS-optimized recipes. Use CUSTOM only when you need a non-standard
-domain or custom recipe.
-
-## Expert heuristic: recipe selection
-
-Recipe selection is the core algorithmic decision for CUSTOM dataset
-groups.
-
-```text
-Goal                                          → Recipe
-────────────────────────────────────────────────────────────────────────────
-Personalized recommendations (90% of cases)   → aws-user-personalization
-  Handles cold-start, real-time events, HRNN
-"Customers who viewed X also viewed Y"         → aws-sims
-  Item-to-item similarity
-Baseline / most-popular fallback               → aws-popularity-counting
-Re-ranking a candidate list                    → aws-personalized-ranking
-Item affinity by attribute                     → aws-item-attribute-affinity
-```
-
-**The User-Personalization recipe (aws-user-personalization) covers
-~90% of use cases.** It combines HRNN (hierarchical recurrent neural
-network), handles cold-start items and users, supports real-time
-updates via event tracker, and produces personalized (not just
-popular) recommendations. Start here unless you have a specific
-reason to use another recipe.
-
-## Expert heuristic: minProvisionedTPS sets the cost floor
-
-`minProvisionedTPS` is the most impactful cost lever in Personalize.
-It sets the minimum throughput (transactions per second) the campaign
-will bill, 24/7, regardless of actual traffic.
-
-```text
-Cost math (illustrative, us-east-1):
-  minProvisionedTPS = 1  → ~$0.20/hour → ~$150/month
-  minProvisionedTPS = 5  → ~$1.00/hour → ~$730/month
-  minProvisionedTPS = 10 → ~$2.00/hour → ~$1460/month
-  minProvisionedTPS = 50 → ~$10.00/hour → ~$7300/month
-
-Strategy:
-  1. Start at minProvisionedTPS = 1 for dev/staging
-  2. For production, set to your p50 TPS (median load)
-  3. Auto-scaling handles spikes above minProvisionedTPS (billed per-transaction)
-  4. Update minProvisionedTPS via update-campaign (no deletion required)
-```
-
-**Key implication:** never set a high minProvisionedTPS without
-justification. The campaign auto-scales above the floor; you only pay
-the floor for idle capacity. Start low and tune up.
-
-## Expert heuristic: event tracker enables real-time updates
-
-Without an event tracker, recommendations are frozen at training
-time. With an event tracker, PutEvents feeds real-time interactions
-into the campaign, updating recommendations without full retraining.
-
-```text
-Real-time update flow:
-  User clicks an item
-    → Lambda or SDK calls personalize-events:PutEvents
-      → Event tracker writes to the dataset group
-        → Campaign blends real-time signal with trained model
-          → Next GetRecommendations reflects the recent click
-```
-
-**Key implication:** for any production recommendation system, an
-event tracker is essential. Without it, recommendations are static
-until the next full retraining. With it, the campaign adapts to user
-behavior in near-real-time.
-
 ## Prerequisites (verify before provisioning)
 
 Before emitting provisioning commands, verify these prerequisites. If
@@ -537,32 +365,8 @@ aws personalize update-solution \
 
 ## Step 12 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **AutoTraining GA (2023-2024):** Automatic retraining on a schedule
-  (e.g., every 7 days). Eliminates manual solution-version creation
-  for routine refreshes.
-
-- **Domain recommenders expanded (2023-2024):** MUSIC domain added;
-  ECOMMERCE and VIDEO recommenders enhanced with cold-start handling.
-
-- **Trending recipes (2023-2024):** New recipes for trending items
-  and time-decay popularity.
-
-- **Increased dataset limits (2024-2025):** Maximum interactions per
-  dataset raised; larger bulk import jobs supported.
-
-- **Cold-start improvements (2024-2025):** User-Personalization recipe
-  enhanced for better cold-start user and item handling.
-
-- **Filter improvements (2024-2025):** Filter expressions support
-  additional operators and contextual filtering.
-
-- **Regional expansion (2024-2025):** Personalize available in
-  additional regions (ap-southeast-3, eu-south-1).
-
-- **Real-time event throughput (2024-2025):** PutEvents throughput
-  increased; lower latency for real-time recommendation updates.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-12--recent-features).
+> AutoTraining GA, MUSIC domain recommenders, trending recipes, dataset limits, cold-start, filter operators, regions, PutEvents throughput.
 
 ## NEVER do these things
 
@@ -656,24 +460,12 @@ VERIFICATION_COMMANDS:
   aws personalize-runtime get-recommendations --campaign-arn arn:...:campaign/retail --user-id user-123 --region us-east-1
 ```
 
-## Error handling
+## References (load on demand)
 
-- **Solution version CREATE_FAILED:** insufficient training data (fewer
-  than ~1000 interactions). Add more data and re-import. Check the
-  error message for specifics.
-- **Campaign CREATE_PENDING:** the solution version is not yet ACTIVE.
-  Wait for training (`describe-solution-version`), then create.
-- **InvalidInputException on import job:** CSV headers do not match the
-  schema, or a column has the wrong type. Validate before importing.
-- **ResourceNotFoundException on PutEvents:** the tracking ID is wrong,
-  or the event tracker was recreated. Update the client.
-- **Filter InvalidFilterExpression:** the expression has a syntax error
-  or references a column not in the dataset.
-- **Campaign UPDATE_PENDING:** the campaign is updating to a new
-  solution version. Wait ~15 minutes; GetRecommendations continues
-  serving the previous version during the update.
-- **High bill:** minProvisionedTPS is set higher than needed. Reduce
-  via `update-campaign --min-provisioned-tps`.
+- [advanced-patterns](references/advanced-patterns.md) — mindset, configuration dependency graph, recent features (2023-2026)
+- [error-handling](references/error-handling.md) — CREATE_FAILED, CREATE_PENDING, import, PutEvents, filter, UPDATE_PENDING, high-bill fixes
+- [datasets-and-recipes](references/datasets-and-recipes.md) — dataset + recipe detail, CUSTOM vs DOMAIN and recipe-selection heuristics 
+- [campaigns-and-events](references/campaigns-and-events.md) — campaign + event tracker detail, minProvisionedTPS cost-floor and event-tracker heuristics
 
 ## Domain
 

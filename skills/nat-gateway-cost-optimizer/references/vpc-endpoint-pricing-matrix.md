@@ -145,3 +145,17 @@ regions — the break-even threshold is lower in GB terms.
 
 Always re-state the regional rate in the SAVINGS block when the VPC is not in
 us-east-1.
+
+## Cost baseline (us-east-1, 2026) — moved from SKILL.md
+
+**Cost baseline (us-east-1, 2026):**
+
+| Component | Rate | Notes |
+|---|---|---|
+| NAT Gateway base | $0.045/hour (~$32.85/month) | Per gateway, billed regardless of traffic |
+| NAT Gateway data processing | $0.045/GB | The multiplier — 1 TB = $45/month on top of base |
+| Gateway VPC Endpoint (S3, DynamoDB) | **FREE** | No hourly, no per-GB, no AZ surcharge |
+| Interface VPC Endpoint base | $0.01/hour per AZ (~$7.30/month per AZ) | Billed per ENI across AZs where the endpoint exists |
+| Interface VPC Endpoint data | $0.01/GB | Inbound to the endpoint from the VPC |
+| Cross-AZ data transfer | $0.01/GB (each direction) | Applies when traffic crosses an AZ boundary |
+| NAT Instance (t3.micro) | ~$8.47/month (t3.micro, 730h × $0.0116) | Fixed cost, no per-GB; bandwidth ~1 Gbps, not HA |

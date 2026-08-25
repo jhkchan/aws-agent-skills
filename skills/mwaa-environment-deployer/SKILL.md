@@ -166,107 +166,18 @@ Logs.
 
 ## Expert heuristic: VPC subnet requirements (2 private + security group)
 
-A baseline model says "select any 2 subnets." The correct heuristic
-verifies that the subnets are private, in different AZs, and have S3
-access.
-
-```text
-VPC readiness check for MWAA:
-  ├── 2 private subnets in DIFFERENT AZs?
-  │     ├── YES → proceed
-  │     └── NO (1 subnet, or 2 in same AZ) → BLOCK (PREREQUISITES_MISSING)
-  │
-  ├── Route to S3 (for DAG access)?
-  │     ├── NAT Gateway in public subnet → route table has 0.0.0.0/0 → nat-gw
-  │     ├── S3 VPC endpoint (Gateway type) → route table has S3 prefix list
-  │     └── NEITHER → BLOCK (workers cannot pull DAGs)
-  │
-  ├── Security group with correct rules?
-  │     ├── Inbound 443 (webserver — for PRIVATE_ONLY access from within VPC)
-  │     ├── Inbound 5432 (metadata DB — managed by AWS, SG-internal)
-  │     ├── Outbound 443 (S3, CloudWatch, MWAA APIs)
-  │     └── All from self (inter-component communication)
-  │
-  └── VPC has DNS resolution + DNS hostnames enabled?
-        ├── YES → proceed (MWAA needs DNS for internal resolution)
-        └── NO → BLOCK (enableDnsSupport + enableDnsHostnames)
-```
-
-**Key implication:** the 2-subnet-different-AZ requirement is non-
-negotiable. MWAA distributes workers across AZs for HA. If only 1 AZ is
-available, the environment cannot be created.
+VPC subnet heuristic detail (2 private subnets in different AZs, security group self-reference, DNS, verification): moved verbatim to [references/vpc-and-networking.md](references/vpc-and-networking.md).
+The dependency-graph row above is the condensed rule.
 
 ## Expert heuristic: execution class sizing by concurrent DAG count
 
-A baseline model says "use mw1.medium." The correct heuristic sizes
-based on concurrent DAG and task count.
-
-```text
-Execution class sizing:
-  ├── mw1.small (~$0.55/hour)
-  │     Suitable for: < 25 concurrent DAG runs, < 5 tasks per DAG
-  │     Max workers: 1-25
-  │     Use case: dev/test, small team, low DAG count
-  │     Cost: ~$400/month
-  │
-  ├── mw1.medium (~$1.10/hour)
-  │     Suitable for: 25-75 concurrent DAG runs, moderate task density
-  │     Max workers: 1-50
-  │     Use case: production, medium team, moderate DAG count
-  │     Cost: ~$800/month
-  │
-  ├── mw1.large (~$2.20/hour)
-  │     Suitable for: 75-200+ concurrent DAG runs, high task density
-  │     Max workers: 1-100
-  │     Use case: large-scale production, enterprise, mission-critical pipelines
-  │     Cost: ~$1600/month
-  │
-  └── Sizing rule: count peak concurrent DAG runs × avg tasks per DAG
-        < 100 concurrent tasks → mw1.small
-        100-500 concurrent tasks → mw1.medium
-        500+ concurrent tasks → mw1.large
-```
-
-**Key implication:** the execution class determines both cost AND the
-maximum number of workers. Under-sizing causes task queuing (DAGs run
-slowly). Over-sizing wastes money. Count peak concurrent tasks, not
-total DAGs — a DAG that runs once a day contributes 1 task at peak, not
-its total lifetime task count.
+Execution-class sizing heuristic (DAG-count sizing ladder): moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Step 1 below holds the condensed sizing table.
 
 ## Expert heuristic: requirements.txt version constraints
 
-A baseline model says "list the packages." The correct heuristic pins
-exact versions and verifies Python compatibility.
-
-```text
-requirements.txt best practices:
-  ├── Pin EXACT versions: pandas==1.5.3 (NOT pandas>=1.5 or pandas~=1.5)
-  │     Loose constraints cause non-reproducible builds when maintainers
-  │     release breaking changes between MWAA environment restarts.
-  │
-  ├── Verify Python compatibility:
-  │     MWAA Airflow 2.7+ uses Python 3.10
-  │     MWAA Airflow 2.9+ uses Python 3.11
-  │     Packages compiled for CPython 3.8/3.9 may fail on 3.10/3.11
-  │
-  ├── Avoid packages that require system-level dependencies:
-  │     Packages like 'psycopg2' need libpq-dev → use 'psycopg2-binary'
-  │     Packages like 'lxml' need libxml2 → pre-compiled wheel only
-  │
-  ├── MWAA-specific constraints:
-  │     Do NOT pin 'apache-airflow' itself — MWAA manages this
-  │     Do NOT pin 'boto3'/'botocore' below the MWAA-provided version
-  │     Constraint: total installed package size < 256 MB
-  │
-  └── Upload to S3:
-        s3://my-bucket/requirements.txt (root of bucket or configured path)
-```
-
-**Key implication:** a requirements.txt with unpinned packages will work
-today and break tomorrow when a package releases a new version. Always
-pin exact versions. The MWAA startup script runs `pip install -r
-requirements.txt` at every environment update — unpinned packages pull
-the latest version each time.
+requirements.txt version-constraint heuristic (pinning rules, compatibility, local-runner testing): moved verbatim to [references/dags-and-plugins.md](references/dags-and-plugins.md).
+NEVER pin apache-airflow; full rules live in the reference.
 
 ## Prerequisites (verify before provisioning)
 
@@ -310,44 +221,8 @@ DAGs. This wastes ~$1200/month. Start small and scale up.
 
 MWAA requires a specific VPC configuration:
 
-```text
-Required VPC topology:
-  VPC
-  ├── 2 private subnets (different AZs)
-  │     subnet-private-a (us-east-1a) → MWAA workers, scheduler
-  │     subnet-private-b (us-east-1b) → MWAA workers (HA)
-  ├── 1 public subnet (for NAT Gateway)
-  │     subnet-public-a → NAT Gateway → 0.0.0.0/0 route
-  ├── S3 VPC endpoint (Gateway type) OR NAT Gateway route
-  │     Without this, workers cannot pull DAGs from S3
-  └── Security group
-        Inbound: 443 (self), 5432 (self)
-        Outbound: 443 (S3, CloudWatch, MWAA APIs)
-```
-
-**Verify subnet AZs:**
-
-```bash
-aws ec2 describe-subnets \
-  --subnet-ids subnet-aaa subnet-bbb \
-  --query 'Subnets[*].{SubnetId:SubnetId,AZ:AvailabilityZone,Type:MapPublicIpOnLaunch}' \
-  --region us-east-1
-# Ensure the two subnets are in different AZs and are private
-```
-
-**Verify S3 access (NAT Gateway or VPC endpoint):**
-
-```bash
-# Check for S3 VPC endpoint
-aws ec2 describe-vpc-endpoints \
-  --filters Name=vpc-id,Values=vpc-aaa11122 Name=service-name,Values=com.amazonaws.us-east-1.s3 \
-  --region us-east-1
-
-# Or check for NAT Gateway
-aws ec2 describe-nat-gateways \
-  --filter Name=vpc-id,Values=vpc-aaa11122 \
-  --region us-east-1
-```
+Subnet/AZ, S3-endpoint, and NAT verification commands: moved verbatim to [references/vpc-and-networking.md](references/vpc-and-networking.md).
+Run all three checks before creating the environment.
 
 ## Step 3 — Webserver access mode
 
@@ -369,48 +244,8 @@ Required for compliance-sensitive environments (HIPAA, FedRAMP).
 The S3 bucket holds DAGs, requirements.txt, plugins, and the startup
 script.
 
-```text
-S3 bucket structure:
-  s3://my-mwaa-bucket/
-  ├── dags/
-  │     ├── my_dag.py
-  │     ├── etl_pipeline.py
-  │     └── reporting_dag.py
-  ├── requirements.txt          (exact version-pinned packages)
-  ├── plugins/
-  │     └── plugins.zip         (custom Airflow plugins ZIP)
-  └── startup_script.sh         (optional: runs at worker startup)
-```
-
-**Upload DAGs:**
-
-```bash
-aws s3 cp my_dag.py s3://my-mwaa-bucket/dags/my_dag.py
-aws s3 cp etl_pipeline.py s3://my-mwaa-bucket/dags/etl_pipeline.py
-```
-
-**Upload requirements.txt:**
-
-```bash
-aws s3 cp requirements.txt s3://my-mwaa-bucket/requirements.txt
-```
-
-Example requirements.txt:
-
-```text
-pandas==1.5.3
-requests==2.31.0
-psycopg2-binary==2.9.7
-boto3==1.28.62
-snowflake-connector-python==3.2.0
-```
-
-**Upload plugins ZIP:**
-
-```bash
-cd plugins && zip -r plugins.zip . && cd ..
-aws s3 cp plugins.zip s3://my-mwaa-bucket/plugins/plugins.zip
-```
+Bucket creation and DAG/requirements/plugins upload commands: moved verbatim to [references/dags-and-plugins.md](references/dags-and-plugins.md).
+Bucket structure and requirements.txt examples live in the same reference.
 
 ## Step 5 — Create the environment
 
@@ -439,15 +274,8 @@ ENV_ARN=$(aws mwaa create-environment \
   --query 'EnvironmentArn' --output text)
 ```
 
-**Monitor environment status:**
-
-```bash
-aws mwaa get-environment \
-  --name "production-airflow" \
-  --query 'Environment.Status' \
-  --region us-east-1
-# Expected: CREATING → CREATING_SNAPSHOT → AVAILABLE (or FAILED)
-```
+Environment status monitoring commands: moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Expected: CREATING → CREATING_SNAPSHOT → AVAILABLE (or FAILED).
 
 Environment creation takes 20-30 minutes. If it fails, check CloudWatch
 and the MWAA status message.
@@ -519,13 +347,8 @@ as a base and add S3 bucket-specific permissions.
 MWAA environments run 24/7 by default. For dev/test environments, you
 can configure a startup and stop time to reduce costs.
 
-```bash
-aws mwaa update-environment \
-  --name "dev-airflow" \
-  --startup-time "08:00" \
-  --shutdown-time "20:00" \
-  --region us-east-1
-```
+Startup/stop schedule CLI: moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Flag semantics and cost math remain below.
 
 - `--startup-time`: the environment starts at this time (CRON-based).
 - `--shutdown-time`: the environment stops at this time.
@@ -538,35 +361,8 @@ aws mwaa update-environment \
 
 ## Step 10 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **MWAA Airflow 2.9+ support (2024-2025):** MWAA now supports Airflow
-  2.9 and 2.10, including the new TaskFlow API improvements, dynamic
-  task mapping enhancements, and dataset-aware scheduling.
-
-- **Python 3.11 support (2024-2025):** MWAA environments on Airflow
-  2.9+ use Python 3.11. Older environments on Airflow 2.7 use Python
-  3.10. Verify package compatibility when upgrading.
-
-- **Startup script support (2024-2025):** The `--startup-script-s3-path`
-  parameter allows running a bash script at worker startup, useful for
-  installing system-level dependencies or running initialization code.
-
-- **Environment class auto-scaling improvements (2024-2025):** MWAA
-  improved auto-scaling heuristics for mw1.medium and mw1.large,
-  reducing task queue times for bursty workloads.
-
-- **Terraform provider maturity (2024-2025):** The Terraform
-  `aws_mwaa_environment` resource now supports startup/shutdown time,
-  KMS encryption, all 4 log types, and Airflow configuration overrides.
-
-- **PRIVATE_ONLY webserver mode (2023-2024):** PRIVATE_ONLY mode is now
-  GA, enabling compliance-sensitive deployments with no public webserver
-  endpoint.
-
-- **MWAA local runner (2024-2025):** The open-source MWAA local runner
-  Docker image allows testing DAGs and requirements.txt locally before
-  deploying to MWAA.
+Recent AWS features (2023-2026): moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Check before choosing Airflow version, Python 3.11, startup scripts, or PRIVATE_ONLY mode.
 
 ## NEVER do these things
 
@@ -675,29 +471,8 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Environment creation FAILED
-- Check status via `aws mwaa get-environment --query 'Environment.Status'`.
-- Common causes: subnets not in different AZs, IAM role missing
-  permissions, S3 bucket in wrong region, security group rules incorrect.
-
-### DAGs not executing
-- Check DagProcessingLogs for import errors. Verify the DAG file has a
-  valid `DAG` object. Verify `dag_id` is unique across all DAGs.
-
-### Tasks queued but not running
-- Check WorkerLogs for worker startup failures (often requirements.txt
-  package issues). Check `QueuedTasks` metric — if consistently > 0,
-  increase max workers or upgrade execution class.
-
-### requirements.txt packages failing to install
-- Check DagProcessingLogs for pip install errors. Verify version pins
-  are compatible with the Airflow and Python versions. Use
-  `psycopg2-binary` instead of `psycopg2`. Test locally with the MWAA
-  local runner Docker image.
-
-### Webserver inaccessible (PRIVATE_ONLY mode)
-- Verify VPN/Direct Connect to the VPC. Check security group inbound
-  443 from the VPN/DX subnet. Verify DNS resolution within the VPC.
+Error-handling deep dives (creation FAILED, DAGs not executing, tasks queued, requirements install failures, PRIVATE_ONLY webserver): moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on FAILED verdicts or post-deploy symptoms.
 
 ## Domain
 
@@ -716,3 +491,12 @@ Environment Provisioning and DAG Orchestration.
 - **Airflow configuration overrides** — https://docs.aws.amazon.com/mwaa/latest/userguide/configuring-env-variables.html
 - **MWAA startup/shutdown** — https://docs.aws.amazon.com/mwaa/latest/userguide/schedule-env.html
 - **MWAA webserver access mode** — https://docs.aws.amazon.com/mwaa/latest/userguide/access-airflow-ui.html
+
+## References (load on demand)
+
+- [references/vpc-and-networking.md](references/vpc-and-networking.md) — VPC topology, subnet/AZ verification, S3 access path, security groups, webserver access modes.
+- [references/dags-and-plugins.md](references/dags-and-plugins.md) — S3 DAG bucket structure, requirements.txt pinning, plugins ZIP, startup script.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Execution-class sizing heuristic, recent AWS features (2023-2026).
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — Environment status monitoring and startup/stop schedule commands.
+- [references/error-handling.md](references/error-handling.md) — Failure diagnosis (creation FAILED, DAG/task execution, requirements installs, webserver access).
+

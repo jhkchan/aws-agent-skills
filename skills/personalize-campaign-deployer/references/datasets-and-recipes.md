@@ -298,3 +298,58 @@ data volume and HPO.
 - SIMS used for user-personalization (it is item-to-item, not user).
 - Popularity-Counting used as production (it is a baseline, not
   personalized).
+## Expert heuristic: choosing CUSTOM vs DOMAIN dataset groups
+
+A baseline model says "create a dataset group." The correct heuristic
+recognizes that the group type determines the entire downstream flow.
+
+```text
+Recommendation use case:
+  ├── E-commerce (product recommendations)
+  │     → DOMAIN (ECOMMERCE) — use pre-built recommenders
+  │       Recommenders: Recommended For You, Users Who Viewed X Also Viewed,
+  │                      Popular Items, Most Purchased, Frequently Bought Together
+  │
+  ├── Video / Media (content recommendations)
+  │     → DOMAIN (VIDEO) — use pre-built recommenders
+  │       Recommenders: Recommended For You, Because You Watched,
+  │                      Top Picks, Continue Watching
+  │
+  ├── Music / Audio
+  │     → DOMAIN (MUSIC) — use pre-built recommenders
+  │
+  └── Custom (non-standard domain, custom recipe)
+        → CUSTOM — full control
+          Solutions: User-Personalization, SIMS, Popularity-Counting,
+                      Item-Attribute-Affinity, Personalized-Ranking
+```
+
+**Key implication:** if your use case fits ECOMMERCE, VIDEO, or MUSIC
+domains, use a DOMAIN dataset group — it is faster to deploy and uses
+AWS-optimized recipes. Use CUSTOM only when you need a non-standard
+domain or custom recipe.
+
+## Expert heuristic: recipe selection
+
+Recipe selection is the core algorithmic decision for CUSTOM dataset
+groups.
+
+```text
+Goal                                          → Recipe
+────────────────────────────────────────────────────────────────────────────
+Personalized recommendations (90% of cases)   → aws-user-personalization
+  Handles cold-start, real-time events, HRNN
+"Customers who viewed X also viewed Y"         → aws-sims
+  Item-to-item similarity
+Baseline / most-popular fallback               → aws-popularity-counting
+Re-ranking a candidate list                    → aws-personalized-ranking
+Item affinity by attribute                     → aws-item-attribute-affinity
+```
+
+**The User-Personalization recipe (aws-user-personalization) covers
+~90% of use cases.** It combines HRNN (hierarchical recurrent neural
+network), handles cold-start items and users, supports real-time
+updates via event tracker, and produces personalized (not just
+popular) recommendations. Start here unless you have a specific
+reason to use another recipe.
+

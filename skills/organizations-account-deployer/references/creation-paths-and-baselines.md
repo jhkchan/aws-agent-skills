@@ -198,3 +198,17 @@ output "role_arn" {
 - AWS Config aggregator — https://docs.aws.amazon.com/config/latest/developerguide/aggregate-data.html
 - Terraform aws_organizations_account — https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/organizations_account
 - AWS RAM — https://docs.aws.amazon.com/ram/latest/userguide/what-is.html
+## Step 1 — feature comparison (create-account vs Account Factory)
+
+**Feature comparison:**
+
+| Feature | Organizations `create-account` | Control Tower Account Factory |
+|---|---|---|
+| Time to ready | Minutes | Minutes (with baseline) |
+| SCP / tag policy | Manual attach | Inherited from OU + blueprint |
+| CloudTrail org trail | Inherits if org trail exists | Wired by landing zone |
+| IAM Identity Center | Manual account assignment | Auto-assigned per blueprint |
+| VPC | Not created | Created from blueprint |
+| Config aggregator | Manual | Wired by landing zone |
+| Cost | Free | Free (Control Tower) |
+| Programmatic vending | `aws organizations create-account` | `aws controltower create-landing-zone` / Account Factory |

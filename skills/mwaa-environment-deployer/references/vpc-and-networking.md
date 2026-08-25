@@ -269,3 +269,76 @@ resource "aws_vpc_endpoint" "s3" {
   route_table_ids = [aws_route_table.private.id]
 }
 ```
+## Expert heuristic: VPC subnet requirements (2 private + security group)
+
+A baseline model says "select any 2 subnets." The correct heuristic
+verifies that the subnets are private, in different AZs, and have S3
+access.
+
+```text
+VPC readiness check for MWAA:
+  ├── 2 private subnets in DIFFERENT AZs?
+  │     ├── YES → proceed
+  │     └── NO (1 subnet, or 2 in same AZ) → BLOCK (PREREQUISITES_MISSING)
+  │
+  ├── Route to S3 (for DAG access)?
+  │     ├── NAT Gateway in public subnet → route table has 0.0.0.0/0 → nat-gw
+  │     ├── S3 VPC endpoint (Gateway type) → route table has S3 prefix list
+  │     └── NEITHER → BLOCK (workers cannot pull DAGs)
+  │
+  ├── Security group with correct rules?
+  │     ├── Inbound 443 (webserver — for PRIVATE_ONLY access from within VPC)
+  │     ├── Inbound 5432 (metadata DB — managed by AWS, SG-internal)
+  │     ├── Outbound 443 (S3, CloudWatch, MWAA APIs)
+  │     └── All from self (inter-component communication)
+  │
+  └── VPC has DNS resolution + DNS hostnames enabled?
+        ├── YES → proceed (MWAA needs DNS for internal resolution)
+        └── NO → BLOCK (enableDnsSupport + enableDnsHostnames)
+```
+
+**Key implication:** the 2-subnet-different-AZ requirement is non-
+negotiable. MWAA distributes workers across AZs for HA. If only 1 AZ is
+available, the environment cannot be created.
+
+## Step 2 — VPC verification commands (subnets/AZ, S3 endpoint, NAT)
+
+```text
+Required VPC topology:
+  VPC
+  ├── 2 private subnets (different AZs)
+  │     subnet-private-a (us-east-1a) → MWAA workers, scheduler
+  │     subnet-private-b (us-east-1b) → MWAA workers (HA)
+  ├── 1 public subnet (for NAT Gateway)
+  │     subnet-public-a → NAT Gateway → 0.0.0.0/0 route
+  ├── S3 VPC endpoint (Gateway type) OR NAT Gateway route
+  │     Without this, workers cannot pull DAGs from S3
+  └── Security group
+        Inbound: 443 (self), 5432 (self)
+        Outbound: 443 (S3, CloudWatch, MWAA APIs)
+```
+
+**Verify subnet AZs:**
+
+```bash
+aws ec2 describe-subnets \
+  --subnet-ids subnet-aaa subnet-bbb \
+  --query 'Subnets[*].{SubnetId:SubnetId,AZ:AvailabilityZone,Type:MapPublicIpOnLaunch}' \
+  --region us-east-1
+# Ensure the two subnets are in different AZs and are private
+```
+
+**Verify S3 access (NAT Gateway or VPC endpoint):**
+
+```bash
+# Check for S3 VPC endpoint
+aws ec2 describe-vpc-endpoints \
+  --filters Name=vpc-id,Values=vpc-aaa11122 Name=service-name,Values=com.amazonaws.us-east-1.s3 \
+  --region us-east-1
+
+# Or check for NAT Gateway
+aws ec2 describe-nat-gateways \
+  --filter Name=vpc-id,Values=vpc-aaa11122 \
+  --region us-east-1
+```
+

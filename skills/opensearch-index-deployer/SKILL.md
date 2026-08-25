@@ -115,108 +115,24 @@ time:
   every field.
 
 ## Configuration dependency graph (novel heuristic)
+> Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+> Read it only when this section applies.
 
-OpenSearch index configurations are NOT independent. The ILM policy
-requires a rollover alias to exist. Index templates must be created
-before indices that match the pattern. k-NN indices require specific
-settings at creation time (method, space type). Use this graph to
-sequence provisioning.
-
-| Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| Index with mappings | Domain reachable; cluster health yellow+ | mapping is IMMUTABLE after creation (field types cannot change without reindex) | searchable data |
-| Replica count | Enough data nodes to host primaries + replicas | 0 replicas = no HA; cluster yellow | read throughput + HA |
-| ILM policy | Policy created (PUT _ilm/policy); rollover alias attached | rollover requires `"is_write_index": true` on the alias | automatic shard rollover + tier transition |
-| Rollover alias | Index created with `"aliases": {"<alias>": {"is_write_index": true}}` | alias without is_write_index — rollover fails | write endpoint abstraction |
-| Index template | Template created BEFORE matching indices | existing indices are NOT updated by template changes | consistent schema for new indices |
-| Component template | Component template referenced by index template | order determines merge priority when multiple components match | reusable mapping/settings blocks |
-| Data stream | Data stream template created; `"index_mode": "standard"` | cannot PUT mapping on a data stream directly | append-only time-series ingestion |
-| k-NN index | `"index.knn": true` at creation; knn_vector field type; method + space_type | k-NN settings are IMMUTABLE; cannot enable knn after creation | approximate nearest neighbor search |
-| Search pipeline | Pipeline created (PUT _search/pipeline); referenced in query or index settings | pipeline is optional per-query; default pipeline set via index setting | query-time normalization, filtering |
-| Snapshot repository | S3 bucket registered (PUT _snapshot/repo); domain IAM role has s3 access | repository registration is per-cluster; automated snapshots use a different repo | manual + automated backups |
-| Force merge | Index is READ-ONLY (writes blocked first) | force merge on a write-active index creates a single large segment that cannot be merged again | reduced segment count, faster reads |
-
-**The mapping-is-immutable row is the one a baseline model misses.**
-Field types, analyzer assignments, and dynamic settings are set at index
-creation and CANNOT be changed later without a full reindex. The
-rollover-alias-before-ILM dependency is the second most common gotcha.
-The procedure below forces an explicit decision on each.
-
-**Cross-dependency gotchas:**
-- ILM rollover requires the rollover alias to have `"is_write_index":
-  true`. Without it, the rollover action fails with
-  `illegal_argument_exception`.
-- Index templates only apply to NEWLY created indices. Changing a
-  template does NOT update existing indices.
-- k-NN `"index.knn": true` must be set at creation. You cannot enable
-  k-NN on an existing index.
-- Force merge to `max_num_segments=1` should only be done on read-only
-  indices. Merging on a write-active index creates a segment that
-  cannot be re-merged as new documents arrive.
 
 ## Expert heuristic: shard sizing (10-50 GB per shard)
+> Moved verbatim to [references/shard-sizing-and-ilm.md](references/shard-sizing-and-ilm.md) — load on demand.
+> Read it only when this section applies.
 
-A baseline model says "use the default 5 shards." The correct heuristic
-sizes shards to the 10-50 GB range, adjusting primary count to data
-volume.
-
-```text
-Estimated index size (primary data, no replicas):
-  ├── < 10 GB  → 1 primary shard (1 shard at <10 GB is efficient)
-  ├── 10-50 GB → 1 primary shard (sweet spot)
-  ├── 50-100 GB → 2 primary shards (25-50 GB each)
-  ├── 100-250 GB → 5 primary shards (20-50 GB each)
-  ├── 250-500 GB → 10 primary shards (25-50 GB each)
-  ├── 500 GB-1 TB → 20 primary shards (25-50 GB each)
-  └── 1 TB+ → use data streams + ILM rollover (avoid single huge index)
-
-Replica count decision:
-  ├── HA requirement → minimum 1 replica (survives 1 node loss)
-  ├── Read QPS is high → 2-3 replicas (each replica serves search)
-  └── Cost-sensitive dev/staging → 0 replicas (cluster yellow, no HA)
-```
-
-**Key implication:** over-sharding is the #1 OpenSearch performance
-killer. Too many small shards create overhead in cluster state, merge
-scheduling, and memory. Target 10-50 GB per shard. When in doubt,
-fewer larger shards is better than many small shards.
 
 ## Expert heuristic: replica count for read throughput
+> Moved verbatim to [references/shard-sizing-and-ilm.md](references/shard-sizing-and-ilm.md) — load on demand.
+> Read it only when this section applies.
 
-Replicas serve two purposes: high availability AND read scaling. Each
-replica shard can independently serve search queries.
-
-```text
-1 primary + 0 replicas = 1x read capacity (no HA)
-1 primary + 1 replica  = 2x read capacity (survives 1 node loss)
-1 primary + 2 replicas = 3x read capacity (survives 2 node loss)
-1 primary + 3 replicas = 4x read capacity
-```
-
-**Key implication:** for read-heavy workloads (product search, log
-dashboards), adding replicas is cheaper than scaling instances. For
-write-heavy workloads (ingestion pipelines), invest in more primary
-shards or larger instances instead.
 
 ## Expert heuristic: ILM rollover for storage tiering
+> Moved verbatim to [references/shard-sizing-and-ilm.md](references/shard-sizing-and-ilm.md) — load on demand.
+> Read it only when this section applies.
 
-ILM automates the transition of indices through hot, warm, cold, and
-delete phases, reducing cost for time-series data.
-
-```text
-HOT:   active write index, SSD, high-compute nodes
-  → rollover when: max_age (1d) OR max_size (50gb)
-WARM:  read-only, force merge to 1 segment, fewer compute resources
-  → transition when: 7d after rollover
-COLD:  rarely searched, minimal compute, cheapest storage
-  → transition when: 30d after rollover
-DELETE: permanently remove
-  → delete when: 90d after rollover
-```
-
-**Key implication:** without ILM, indices accumulate on hot nodes
-forever, driving cost. ILM rollover + tiering can cut OpenSearch costs
-by 50-70% for time-series workloads.
 
 ## Prerequisites (verify before provisioning)
 
@@ -473,24 +389,9 @@ large segment that cannot be re-merged as new documents arrive. Always
 block writes first.
 
 ## Step 12 — Recent features
+> Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+> Read it only when this section applies.
 
-**Recent AWS OpenSearch features (2023-2026):**
-
-- **k-NN FAISS engine with filtering (2023-2024):** Better recall when
-  combined with pre/post filters. Supports `l2`, `cosinesimil`, and
-  `innerproduct` space types.
-- **Searchable cold storage (2023-2024):** Ultra-low-cost cold tier for
-  rarely-searched data. Integrates with ILM cold phase.
-- **Data streams auto-roll and lifecycle (2023-2024):** Automatic
-  backing index rollover and ILM integration for time-series workloads.
-- **Search pipelines GA (2023-2024):** Request and response processors
-  for query-time normalization without client-side code.
-- **Vector search performance improvements (2024-2025):** HNSW
-  algorithm optimizations provide up to 3x latency improvement.
-- **Semantic search with ML models (2024-2025):** ML Commons
-  integration enables text-to-embedding at ingestion and query time.
-- **Index template priority resolution (2024-2025):** Enhanced template
-  matching with explicit `priority` and `version` fields.
 
 ## NEVER do these things
 
@@ -590,28 +491,16 @@ VERIFICATION_COMMANDS:
 ```
 
 ## Error handling
+> Moved verbatim to [references/error-handling.md](references/error-handling.md) — load on demand.
+> Read it only when this section applies.
 
-### Index creation fails with "mapper_parsing_exception"
-- The mapping JSON has a syntax error or invalid field type. Validate
-  the JSON and check field type names.
 
-### Rollover fails with "illegal_argument_exception"
-- The rollover alias does not have `"is_write_index": true`. Re-create
-  the alias with the write index flag.
+## References (load on demand)
 
-### k-NN search returns "index knn is disabled"
-- The index was created without `"index.knn": true`. k-NN must be set
-  at creation time. Create a new index and reindex.
-
-### Force merge hangs or fails
-- The index is still receiving writes. Block writes first
-  (`"blocks": {"write": true}`), then force merge.
-
-### Cluster goes red after creating a large index
-- Not enough data nodes to allocate shards, or disk exceeded flood-stage
-  watermark. Add nodes, increase disk, or reduce shard count. Check
-  `GET _cat/allocation?v`.
-
+- [references/advanced-patterns.md](references/advanced-patterns.md) — configuration dependency graph, recent features, expert deep dives
+- [references/error-handling.md](references/error-handling.md) — error-handling deep dives for index operations
+- [references/shard-sizing-and-ilm.md](references/shard-sizing-and-ilm.md) — shard sizing, replica count, ILM rollover heuristics
+- [references/templates-and-data-streams.md](references/templates-and-data-streams.md) — template and data stream detail
 ## Domain
 
 AWS CloudOps / Amazon OpenSearch Service Index Management & Analytics

@@ -198,3 +198,39 @@ directly.
 - `SessionTimeout` is in minutes (max 480 / 8 hours).
 - SAML and IAM data access policies are complementary — SAML controls
   dashboard access, IAM controls API access.
+
+## Expert heuristic: choosing collection type and OCU capacity
+```
+Workload pattern
+   ├─ Vector similarity / semantic search / RAG?
+   │    └─ VECTORSEARCH (faiss HNSW, cosinesimil)
+   │         Dimension: match embeddings model (1536 for Bedrock Titan)
+   │         OCU: 2 indexing + 2 search floor
+   │
+   ├─ Time-series logs / metrics with retention?
+   │    └─ TIMESERIES (time-partitioned, lifecycle REQUIRED)
+   │         OCU: 2 indexing + 2 search floor
+   │         ISM: managed indexes with rollover
+   │
+   ├─ Full-text search / catalog / documents?
+   │    └─ SEARCH (standard indexes, optional lifecycle)
+   │         OCU: 2 indexing + 2 search floor
+   │
+   └─ Hybrid (full-text + vector)?
+        └─ VECTORSEARCH with hybrid query
+             OCU: 4 indexing + 4 search floor
+```
+
+**OCU sizing rules:**
+- **Floor:** 2 indexing + 2 search = 4 OCU minimum. Handles ~1000 docs/sec
+  ingest, ~100 queries/sec.
+- **Search scaling:** +1 search OCU per ~50 additional queries/sec.
+- **Indexing scaling:** +1 indexing OCU per ~500 additional docs/sec.
+- **Standby:** doubles effective OCU count and cost.
+
+**Cost estimation (us-east-1):**
+- 4 OCU (no standby) = 4 x $0.204 x 720 = $588/month
+- 4 OCU (with standby) = 8 x $0.204 x 720 = $1175/month
+- Storage: $0.024/GB-month (included up to ~120 GB/OCU)
+
+ALWAYS emit the cost estimate in FINDINGS. OCU is the dominant cost.

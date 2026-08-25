@@ -200,3 +200,37 @@ creation without a full LZ rebuild.
   Security Hub (per-check pricing), GuardDuty (per-GB-analyzed).
 - For a 50-account org, budget $500-$2000/month in underlying service
   costs depending on workload volume.
+## Landing Zone v2 (2024-2025) — creation command and capabilities
+
+```bash
+aws controltower create-landing-zone \
+  --manifest file://lz-manifest.yaml \
+  --tags Environment=prod ManagedBy=control-tower
+```
+v2 adds drift detection (Lambda monitors for manual SCP/Config changes;
+raises a Security Hub finding), customizable guardrails, and lifecycle
+controls on Account Factory.
+
+## Create a new account via Account Factory (command and baseline inheritance)
+
+```bash
+aws controltower create-account \
+  --account-name "workloads-prod-bu-a" \
+  --account-email "aws+bu-a-prod@example.com" \
+  --sso-user-email "bu-a-admin@example.com" \
+  --sso-user-first-name "BUA" --sso-user-last-name "Admin"
+```
+The new account inherits all root-level guardrails and gets a baseline
+stack (CloudTrail, Config, Security Hub, default VPC hardening) deployed
+automatically.
+
+## Account vending machine commands
+
+```bash
+aws organizations create-account \
+  --email "aws+new-bu@example.com" \
+  --account-name "bu-prod" \
+  --iam-user-access-to-billing DENY \
+  --role-name OrganizationAccountAccessRole
+```
+

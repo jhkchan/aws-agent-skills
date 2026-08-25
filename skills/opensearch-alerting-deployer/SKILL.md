@@ -129,128 +129,19 @@ provisioning time:
 
 ## Configuration dependency graph (novel heuristic)
 
-OpenSearch alerting configurations are NOT independent. The monitor
-type determines the query/metrics interface. The destination MUST
-exist before the monitor references it. The notification plugin
-MUST be configured for SNS actions. Anomaly detection requires a
-detectors resource. Use this graph to sequence provisioning.
-
-| Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| Destination (Slack/SNS/Chime/webhook) | OpenSearch cluster reachable; SNS topic exists (for SNS); notification.yaml configured (for SNS) | destination credentials stored in OpenSearch keystore; cannot be read back after creation | action reference in monitors |
-| Per-query monitor | OpenSearch cluster reachable; target index exists; destination exists (if action configured) | query runs at scheduled interval; complex queries consume cluster resources | threshold-based alerting on search results |
-| Cluster metrics monitor | OpenSearch cluster reachable; destination exists | metrics polled from the cluster health API; no query overhead | cluster health alerting (JVM, CPU, disk) |
-| Per-document monitor | OpenSearch cluster reachable; target index exists; destination exists | extracts documents from results; triggers per-document (one action per matching doc) | per-row alerting |
-| Trigger condition (threshold) | Monitor exists; trigger expression valid | threshold evaluated after each monitor execution; invalid expressions fail silently at runtime | alert firing |
-| Trigger condition (anomaly detection) | Anomaly detector exists and is running; monitor references detector by ID | detector must be trained before anomalies are detected; cold start delay | ML-based alerting |
-| Action | Destination exists; message template valid (Mustache) | action fires when trigger condition is met; failed actions are retried up to 3 times | notification delivery |
-| Schedule (cron or interval) | Monitor exists; schedule expression valid | cron expressions use UTC; invalid cron fails at monitor creation | monitor execution timing |
-| Notification plugin (notification.yaml) | OpenSearch domain configuration; IAM role with SNS publish permission | plugin config is domain-level; affects ALL SNS actions on the domain | SNS action delivery |
-
-**The destination-before-monitor row is the one a baseline model
-misses.** A monitor that references a non-existent destination
-fails at trigger time (not at creation time — the monitor creates
-successfully, but the first alert delivery fails). The procedure
-below forces destination verification before monitor creation.
-
-**Cross-dependency gotchas:**
-- SNS actions require the notification plugin configured at the
-  domain level. A destination pointing to an SNS topic without the
-  plugin will fail silently.
-- Anomaly detection triggers require a trained detector. The
-  detector must be created and running before the monitor references
-  it. Cold start (training) can take 15+ minutes.
-- Per-query monitor cost scales with query complexity and frequency.
-  A complex aggregation running every minute on a large index can
-  consume significant CPU and memory.
-- Alert severity is a metadata field on the trigger, not an action
-  routing mechanism. To route alerts by severity (e.g., page on
-  severity 1, email on severity 5), use separate triggers with
-  different actions.
+→ Full configuration dependency graph and cross-dependency gotchas moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Expert heuristic: per-query monitor cost scales with query complexity
 
-A baseline model says "create a monitor with a query." The correct
-heuristic recognizes that the monitor runs the query at every
-scheduled interval, and the cost depends on the query complexity.
-
-```text
-Per-query monitor cost factors:
-  Query complexity:
-    - Simple count (match_all + count)   → low cost
-    - Aggregation (terms, avg, sum)      → medium cost
-    - Multi-index, nested aggregation    → high cost
-    - Large time range (24h window)      → high cost
-
-  Frequency:
-    - Every 1 min  → 1440 executions/day
-    - Every 5 min  → 288 executions/day
-    - Every 15 min → 96 executions/day
-
-  BAD:  Complex aggregation every 1 min on 500 GB index → 1440 heavy/day
-  GOOD: Rollup pre-aggregates; monitor queries rollup every 5 min → 288 light/day
-```
-
-**Key implication:** for expensive monitors, use OpenSearch rollups
-or transforms to pre-aggregate data into a smaller index, then
-monitor the rollup. This reduces query cost by 10-100x.
+→ Cost heuristic detail moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Expert heuristic: destination must be configured before monitor
 
-A baseline model creates the monitor and destination in any order.
-The correct heuristic recognizes that the destination MUST exist
-before the monitor references it, because the monitor validates
-the destination ID at creation only for the API contract — but
-the actual delivery happens at trigger time.
-
-```text
-Provisioning order:
-  1. Configure notification plugin (notification.yaml) for SNS
-     → domain-level config; required before SNS destinations work
-  2. Create the destination (Slack webhook URL, SNS topic ARN,
-     Chime webhook URL, custom webhook URL)
-     → returns a destination ID
-  3. Create the monitor referencing the destination ID
-     → monitor creates successfully
-  4. Test the destination (optional but recommended)
-     → send a test notification to verify delivery
-  5. Create the trigger with action referencing the destination
-     → trigger fires the action when the condition is met
-```
-
-**Key implication:** if the destination does not exist or the
-notification plugin is not configured for SNS, the monitor creates
-successfully but the FIRST alert fails silently (logged in the
-alerting plugin error log, not surfaced to the user).
+→ Destination-before-monitor heuristic moved verbatim to [references/destinations-and-actions.md](references/destinations-and-actions.md).
 
 ## Expert heuristic: SNS action requires notification.yaml plugin
 
-SNS is the most common destination for production alerting (it
-fans out to email, SMS, Lambda, and other endpoints). But it
-requires the notification plugin to be configured at the domain
-level.
-
-```text
-SNS destination setup:
-  1. Create an SNS topic (aws sns create-topic)
-  2. Create an IAM role with sns:Publish permission for the topic
-  3. Configure notification.yaml on the OpenSearch domain:
-     plugin:
-       notification:
-         sns:
-           role_arn: arn:aws:iam::<acct>:role/os-alerting-sns
-           topic_arn: arn:aws:sns:<region>:<acct>:alert-topic
-  4. Create the destination in OpenSearch pointing to the SNS topic
-  5. Reference the destination in the monitor action
-
-Without step 3, the SNS action fails at trigger time with
-"notification plugin not configured."
-```
-
-**Key implication:** always verify the notification plugin is
-configured before relying on SNS actions. For Slack/Chime/webhook
-destinations, the plugin is not required (credentials are stored
-in the destination config directly).
+→ SNS notification-plugin heuristic moved verbatim to [references/destinations-and-actions.md](references/destinations-and-actions.md).
 
 ## Prerequisites (verify before provisioning)
 
@@ -405,35 +296,7 @@ references a destination.
 | Amazon Chime | Webhook URL stored in destination | No |
 | Custom webhook | URL + auth headers stored in destination | No |
 
-**Create a destination (Slack example):**
-
-```bash
-curl -X POST "<endpoint>/_plugins/_alerting/destinations" \
-  -H "Content-Type: application/json" \
-  -u "<user>:<pass>" \
-  -d '{
-    "type": "slack",
-    "name": "ops-alerts-slack",
-    "slack": {
-      "url": "https://hooks.slack.com/services/T000/B000/XXXXX"
-    }
-  }'
-```
-
-**Create a destination (SNS example):**
-
-```bash
-curl -X POST "<endpoint>/_plugins/_alerting/destinations" \
-  -H "Content-Type: application/json" \
-  -u "<user>:<pass>" \
-  -d '{
-    "type": "sns",
-    "name": "ops-alerts-sns",
-    "sns": {
-      "topic_arn": "arn:aws:sns:us-east-1:123456789012:alert-topic"
-    }
-  }'
-```
+→ Destination creation curl examples (Slack and SNS) moved verbatim to [references/destinations-and-actions.md](references/destinations-and-actions.md).
 
 ## Step 7 — Notification message templating
 
@@ -520,30 +383,7 @@ Destinations.
 
 ## Step 12 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Per-document monitor (2023-2024):** extracts documents from
-  query results and triggers per-document. Useful for per-user or
-  per-transaction alerting where each matching document needs a
-  separate alert.
-
-- **Anomaly detection with RCF improvements (2023-2024):** faster
-  cold start (10 min) and improved multi-feature detector accuracy.
-
-- **Notification template improvements (2023-2024):** Mustache
-  templates now support conditional blocks and loops over
-  aggregation buckets.
-
-- **Composite monitors (2024-2025):** chains monitors together
-  (monitor A triggers monitor B if A's condition is met). Useful
-  for escalation workflows.
-
-- **Serverless alerting (2024-2025):** OpenSearch Serverless now
-  supports per-query monitors (cluster metrics monitors N/A since
-  Serverless manages the cluster).
-
-- **Terraform (2023-2024):** no native Terraform resources for
-  alerting monitors; use the `curl` provider or local-exec.
+→ Recent AWS features moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -640,34 +480,14 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Monitor creates but alerts never fire
-- The trigger condition may never be met. Test the query manually
-  in the OpenSearch DevTools console and verify it returns results
-  satisfying the condition.
+→ Failure-mode deep dives moved verbatim to [references/error-handling.md](references/error-handling.md).
 
-### Action fails at trigger time (SNS)
-- The notification plugin (notification.yaml) is not configured at
-  the domain level. Configure it with the SNS topic ARN and IAM
-  role. Restart the alerting plugin if needed.
+## References (load on demand)
 
-### Action fails at trigger time (webhook)
-- The webhook URL is invalid or unreachable from the cluster.
-  Verify network ACLs, security groups, and firewall rules.
-
-### Anomaly detection produces no anomalies
-- The detector may still be in cold start (training). Wait 15+
-  minutes for training. Verify the detector is ingesting data by
-  checking `last_update_time`.
-
-### Alert storm (fires too frequently)
-- Threshold too low or schedule too frequent. Increase threshold,
-  reduce frequency, or add a deduplication window. Acknowledge
-  active alerts via the `acks` API.
-
-### Monitor execution is slow (cluster impact)
-- Query too complex for schedule frequency. Use rollups or
-  transforms to pre-aggregate. Increase the interval. Reduce the
-  query time range.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — configuration dependency graph, per-query cost heuristic, recent AWS features 2023-2026
+- [references/error-handling.md](references/error-handling.md) — alerting failure modes (silent no-fire, SNS/webhook action failures, alert storms, slow monitors)
+- [references/destinations-and-actions.md](references/destinations-and-actions.md) — destination + action detail — extended with destination-before-monitor and SNS-plugin heuristics plus destination creation curl examples
+- [references/monitors-and-triggers.md](references/monitors-and-triggers.md) — monitor + trigger detail (pre-existing)
 
 ## Domain
 

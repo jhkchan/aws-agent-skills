@@ -177,111 +177,18 @@ setting. Neptune Streams captures every graph change for downstream
 processing. Read replica auto-scaling handles graph traversal concurrency
 spikes by adding replicas based on CPU utilization.
 
-Three misconceptions dominate Neptune misdesign at provisioning time:
-
-- **"Instance storage is just disk — IOPS don't matter for a graph
-  database."** They DO. Neptune uses instance storage for the graph
-  working set. Graph traversals (especially multi-hop Gremlin queries)
-  are I/O-intensive. Undersized instance storage or insufficient
-  provisioned IOPS cause query timeouts and high latency. Choose the
-  instance type based on BOTH memory (graph working set fit) AND IOPS
-  (traversal concurrency).
-
-- **"Read replicas scale writes too."** They do NOT. Neptune read
-  replicas serve only read queries (Gremlin traversals, SPARQL SELECT).
-  ALL writes go to the primary instance. If write throughput is the
-  bottleneck, a larger primary instance type is needed — not more
-  replicas. Read replicas solve read concurrency, not write throughput.
-
-- **"Gremlin and SPARQL require separate clusters."** They do NOT.
-  Neptune supports BOTH query languages on the same cluster. Gremlin
-  queries the property graph; SPARQL queries the RDF view of the same
-  data (if the RDF feature is enabled). Choose the query language based
-  on the use case, not the cluster.
+> The three provisioning misconceptions (storage/IOPS, replica write scaling, Gremlin-vs-SPARQL clusters) moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+> Load on demand; the one-line takeaway above is the operative summary.
 
 ## Configuration dependency graph (novel heuristic)
 
-Neptune configurations are NOT independent. Encryption must be enabled
-at creation. Parameter groups control SSL enforcement and query
-timeouts. Neptune Streams must be explicitly enabled. Global Database
-requires matching engine versions. Use this graph to sequence
-provisioning.
-
-| Configuration | Hard dependencies | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| Subnet group | >= 2 AZs (multi-AZ); same VPC | Cross-VPC subnets rejected | cluster creation |
-| Security group | Port 8182 (Neptune default) | No ingress = client timeout | client connectivity |
-| DB cluster parameter group | Created before cluster | neptune_enforce_ssl is static (requires instance reboot) | SSL enforcement |
-| Cluster (primary) | Subnet group + parameter group + SG | Encryption at rest CANNOT be toggled after creation | graph storage |
-| Read replicas | Cluster exists; replicas in different AZs | Replicas do NOT help write throughput | read scaling |
-| IAM database authentication | Must be enabled at cluster creation | Cannot toggle without recreating | IAM-based access |
-| Encryption at rest (KMS) | KMS key exists; set at creation | CANNOT enable on existing cluster | compliance |
-| Neptune Streams | Streams parameter set to TRUE in parameter group | Stream records exist only after enablement | change capture |
-| Neptune ML | S3 bucket for model artifacts; SageMaker IAM role | ML inference endpoint adds latency to queries | graph ML |
-| Global Database | Primary cluster in region A; same engine version | Secondary is read-only until failover | cross-region DR |
-| Auto-scaling read replicas | Cluster exists; scaling policy defined | Min/max must be within replica limits (0-15) | read elasticity |
-| Bulk loader | Cluster exists; S3 bucket with source data; IAM role | Loader is for initial/batch loads, not streaming | data ingestion |
-
-**The encryption-at-creation row is the one a baseline model misses.**
-Like RDS and ElastiCache, Neptune encryption at rest is creation-time-
-only. The procedure forces an explicit encryption decision before
-cluster creation.
-
-**Cross-dependency gotchas:**
-- IAM database authentication must be enabled at cluster creation. It
-  cannot be toggled on afterward.
-- `neptune_enforce_ssl` is a static parameter — changing it requires an
-  instance reboot to take effect.
-- Neptune Streams must be explicitly enabled in the parameter group
-  (`neptune_streams = 1`). Stream records only start flowing after
-  enablement — past changes are NOT captured.
-- Read replica auto-scaling adds replicas based on CPU utilization, but
-  replicas take minutes to become available. Spikes can still cause
-  timeouts during the scale-out period.
-- Global Database requires matching engine versions. The secondary
-  cluster is read-only until a planned failover.
-- Bulk loader is for batch ingestion, not continuous streaming. For
-  streaming, use Neptune Streams consumer pattern.
+> Full dependency graph table and cross-dependency gotchas moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+> Load on demand to sequence provisioning; encryption/IAM/Streams are creation-time decisions.
 
 ## Expert heuristic: instance storage vs IOPS provisioning + read replica scaling for graph traversal concurrency + Stream filter patterns
 
-A baseline model says "create a Neptune cluster with a few replicas."
-The correct heuristic matches instance storage type and IOPS to the
-graph working set size and traversal concurrency, scales read replicas
-based on Gremlin traversal patterns, and configures Neptune Streams
-with appropriate filter patterns.
-
-```text
-Instance type selection (IOPS + storage):
-
-  Graph working set:   50 GB    → r5.large (16 GB RAM, EBS-optimized)
-  Graph working set:  200 GB    → r5.4xlarge (128 GB RAM, 8,000 baseline IOPS)
-  Graph working set:  500 GB+   → r5.8xlarge (256 GB RAM, provisioned IOPS)
-  Traversal-heavy:     any      → x2g instance (extended memory, SSD)
-
-  Provisioned IOPS (io2 EBS): for high-concurrency multi-hop traversals
-    IOPS budget = concurrent_traversals x avg_IO_per_traversal
-    e.g., 100 concurrent 5-hop traversals x ~50 IO each = ~5000 IOPS minimum
-
-Read replica scaling:
-  Read replicas = ceil(max_concurrent_traversals / traversals_per_replica)
-  Each replica serves its own copy of the graph (independent I/O pool)
-  Auto-scaling target: EngineCPUUtilization 60% (scale-out threshold)
-
-Neptune Streams filter patterns:
-  Stream records contain: commitTimestamp, eventId, op, data
-  Filter patterns:
-    {"op": "ADD"}        → only insertions
-    {"op": "REMOVE"}     → only deletions
-    {"op": ["ADD","UPDATE"]} → insertions and updates
-  Empty filter → all changes (highest volume)
-```
-
-**Key implication:** instance type determines both memory (graph working
-set fit) and IOPS (traversal throughput). Read replica count scales
-traversal concurrency horizontally. Stream filter patterns control
-downstream processing volume — filter aggressively to reduce consumer
-load.
+> Sizing heuristic (storage vs IOPS, replica scaling formula, Stream filter patterns) moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+> Step 3 keeps the instance table and sizing rules.
 
 ## Prerequisites (verify before provisioning)
 
@@ -331,39 +238,8 @@ appropriate client library. No separate cluster is needed.
 A Neptune cluster has one primary instance (serves reads + writes) and
 0-15 read replicas (serve reads only). All writes go to the primary.
 
-```bash
-# Create the cluster (with parameter group, encryption, IAM auth)
-aws neptune create-db-cluster \
-  --db-cluster-identifier my-neptune-cluster \
-  --engine neptune \
-  --engine-version 1.3.2.1 \
-  --master-username neptuneadmin \
-  --master-user-password "SecureP@ssw0rd!2026" \
-  --db-subnet-group-name my-neptune-subnet-group \
-  --vpc-security-group-ids sg-aaa11122 \
-  --db-cluster-parameter-group-name my-neptune-params \
-  --storage-encrypted \
-  --kms-key-id arn:aws:kms:us-east-1:123456789012:key/aaa11122 \
-  --enable-iam-database-authentication \
-  --backup-retention-period 7 \
-  --preferred-backup-window "03:00-04:00" \
-  --preferred-maintenance-window "mon:05:00-mon:06:00"
-
-# Create the primary instance
-aws neptune create-db-instance \
-  --db-instance-identifier my-neptune-primary \
-  --db-instance-type db.r5.4xlarge \
-  --engine neptune \
-  --db-cluster-identifier my-neptune-cluster
-
-# Create a read replica in a different AZ
-aws neptune create-db-instance \
-  --db-instance-identifier my-neptune-replica-1 \
-  --db-instance-type db.r5.4xlarge \
-  --engine neptune \
-  --db-cluster-identifier my-neptune-cluster \
-  --availability-zone us-east-1b
-```
+> Cluster/primary/replica creation CLI moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+> Topology rule: one primary (reads+writes) + 0-15 read replicas (reads only), replicas in different AZs.
 
 **Common mistake:** using `aws rds` commands instead of `aws neptune`.
 Neptune uses its own API namespace (`aws neptune`) even though the
@@ -385,35 +261,13 @@ parameters mirror RDS.
 - Provisioned IOPS (io2) recommended for traversal-heavy workloads.
 - Read replicas scale read concurrency, NOT write throughput.
 
-```bash
-# List available instance options for Neptune
-aws neptune describe-orderable-db-instance-options \
-  --engine neptune \
-  --query 'OrderableDBInstanceOptions[*].DBInstanceClass' --output text | sort -u
-```
+> Instance-option enumeration CLI moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+> Sizing rules above remain authoritative.
 
 ## Step 4 — Subnet groups and security groups
 
-**Create a DB subnet group (requires >= 2 AZs):**
-
-```bash
-aws neptune create-db-subnet-group \
-  --db-subnet-group-name my-neptune-subnet-group \
-  --db-subnet-group-description "Neptune subnet group" \
-  --subnet-ids subnet-aaa11122 subnet-bbb22233 subnet-ccc33344
-```
-
-**Security group (Neptune port 8182):**
-
-```bash
-SG_ID=$(aws ec2 create-security-group \
-  --group-name neptune-cluster-sg --description "Neptune SG" \
-  --vpc-id vpc-aaa11122 --query 'GroupId' --output text)
-
-aws ec2 authorize-security-group-ingress \
-  --group-id "$SG_ID" --protocol tcp --port 8182 \
-  --source-security-group-id sg-app11122
-```
+> Subnet-group and security-group CLI moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+> Port 8182 inbound from the app SG is mandatory — see Critical note below.
 
 **Critical:** Neptune uses port 8182 for all client connections (both
 Gremlin and SPARQL). The security group must allow inbound from the
@@ -424,19 +278,8 @@ application SG on port 8182.
 Parameter groups control engine-level configuration including SSL
 enforcement, query timeouts, and Streams.
 
-```bash
-aws neptune create-db-cluster-parameter-group \
-  --db-cluster-parameter-group-name my-neptune-params \
-  --db-parameter-group-family neptune1.3 \
-  --description "Custom Neptune parameters"
-
-aws neptune modify-db-cluster-parameter-group \
-  --db-cluster-parameter-group-name my-neptune-params \
-  --parameters \
-    ParameterName=neptune_enforce_ssl,ParameterValue=1,ApplyMethod=pending-reboot \
-    ParameterName=neptune_query_timeout,ParameterValue=120000,ApplyMethod=immediate \
-    ParameterName=neptune_streams,ParameterValue=1,ApplyMethod=pending-reboot
-```
+> Parameter-group create/modify CLI moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+> Parameter table and the static-parameter reboot warning below remain in-file.
 
 | Parameter | Default | Effect |
 |---|---|---|
@@ -453,30 +296,8 @@ before the first write to avoid disruption.
 Neptune supports IAM database authentication using AWS SigV4. This
 eliminates the need for database passwords.
 
-```bash
-aws neptune create-db-cluster \
-  --db-cluster-identifier my-neptune-iam \
-  --engine neptune \
-  --enable-iam-database-authentication \
-  --db-subnet-group-name my-neptune-subnet-group \
-  --vpc-security-group-ids sg-aaa11122 \
-  --db-cluster-parameter-group-name my-neptune-params
-```
-
-**IAM policy for Neptune access:**
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": ["neptune-db:connect"],
-      "Resource": "arn:aws:neptune:us-east-1:123456789012:cluster/my-neptune-iam/*"
-    }
-  ]
-}
-```
+> IAM-auth creation snippet and the neptune-db:connect policy JSON moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+> IAM auth MUST be enabled at creation — see Critical note below.
 
 **Critical:** IAM database authentication MUST be enabled at cluster
 creation. It cannot be toggled on afterward. The application uses SigV4
@@ -487,15 +308,8 @@ signing instead of a static password.
 **Encryption is creation-time-only for Neptune clusters.** It CANNOT be
 toggled on after the cluster exists.
 
-```bash
-aws neptune create-db-cluster \
-  --db-cluster-identifier my-neptune-encrypted \
-  --engine neptune \
-  --storage-encrypted \
-  --kms-key-id arn:aws:kms:us-east-1:123456789012:key/aaa11122 \
-  --db-subnet-group-name my-neptune-subnet-group \
-  --vpc-security-group-ids sg-aaa11122
-```
+> Encrypted-cluster creation CLI moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+> Encryption is creation-time-only; existing clusters need a new cluster + reload.
 
 To encrypt an existing non-encrypted cluster, create a new encrypted
 cluster and load data via the bulk loader or Neptune Export/Import.
@@ -505,37 +319,8 @@ cluster and load data via the bulk loader or Neptune Export/Import.
 Neptune Streams captures every graph mutation (ADD, UPDATE, REMOVE) in
 a change log. Enable it in the parameter group.
 
-```bash
-# Enable Streams (static parameter — requires reboot)
-aws neptune modify-db-cluster-parameter-group \
-  --db-cluster-parameter-group-name my-neptune-params \
-  --parameters ParameterName=neptune_streams,ParameterValue=1,ApplyMethod=pending-reboot
-
-# Reboot the primary instance to apply
-aws neptune reboot-db-instance \
-  --db-instance-identifier my-neptune-primary
-```
-
-**Stream consumer pattern (polling the stream):**
-
-```bash
-# Query the stream for recent changes
-curl -s "https://my-neptune-cluster.cluster-aaa11122.us-east-1.neptune.amazonaws.com:8182/streams" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "lastEventId": {"commitNum": 1, "opNum": 1},
-    "limit": 100
-  }'
-```
-
-**Stream filter patterns:**
-
-```json
-{"op": "ADD"}              // only insertions
-{"op": "REMOVE"}           // only deletions
-{"op": ["ADD","UPDATE"]}   // insertions and updates
-{}                          // all changes (no filter)
-```
+> Streams enable/reboot CLI, stream-consumer curl, and filter-pattern JSON moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+> Streams capture only post-enablement changes — see Critical note below.
 
 **Critical:** Streams only capture changes AFTER enablement. Past
 mutations are NOT retroactively available. Filter aggressively to reduce
@@ -552,15 +337,8 @@ models (node classification, link prediction, edge regression).
 - The Neptune ML workflow: export data, train model, create inference
   endpoint.
 
-```bash
-# Export graph data for ML training
-aws neptune start-ml-model-training-job \
-  --job-id my-neptune-ml-job \
-  --s3-url s3://my-neptune-ml-bucket/training/ \
-  --role-arn arn:aws:iam::123456789012:role/NeptuneMLRole \
-  --model-type NODE_CLASSIFICATION \
-  --db-instance-identifier my-neptune-primary
-```
+> Neptune ML export/training CLI moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+> Prerequisites and the inference-latency implication remain in-file.
 
 **Key implication:** Neptune ML inference endpoints add latency to
 queries. Use them for batch inference, not real-time low-latency paths.
@@ -570,29 +348,8 @@ queries. Use them for batch inference, not real-time low-latency paths.
 Neptune Global Database provides cross-region read replicas for disaster
 recovery and low-latency multi-region reads.
 
-```bash
-# Create the global cluster
-aws neptune create-global-cluster \
-  --global-cluster-identifier my-neptune-global \
-  --source-db-cluster-identifier arn:aws:neptune:us-east-1:123456789012:cluster:my-neptune-cluster
-
-# Add a secondary cluster in another region
-aws neptune create-db-cluster \
-  --db-cluster-identifier my-neptune-secondary \
-  --global-cluster-identifier my-neptune-global \
-  --engine neptune \
-  --db-subnet-group-name my-neptune-subnet-euwest \
-  --vpc-security-group-ids sg-euwest111 \
-  --region eu-west-1
-
-# Create a read replica in the secondary region
-aws neptune create-db-instance \
-  --db-instance-identifier my-neptune-secondary-replica \
-  --db-instance-type db.r5.4xlarge \
-  --engine neptune \
-  --db-cluster-identifier my-neptune-secondary \
-  --region eu-west-1
-```
+> Global Database create/secondary/replica CLI moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+> Constraints (matching engine versions, read-only secondary) below.
 
 **Constraints:** same engine version across regions; secondary cluster
 is read-only until failover; replication lag depends on cross-region
@@ -603,22 +360,8 @@ network distance.
 Neptune supports Application Auto Scaling for read replicas based on
 CloudWatch metrics.
 
-```bash
-# Register scalable target
-aws application-autoscaling register-scalable-target \
-  --service-namespace neptune \
-  --resource-id cluster:my-neptune-cluster \
-  --scalable-dimension neptune:cluster:ReadReplicaCount \
-  --min-capacity 1 --max-capacity 15
-
-# Target tracking policy
-aws application-autoscaling put-scaling-policy \
-  --service-namespace neptune \
-  --resource-id cluster:my-neptune-cluster \
-  --scalable-dimension neptune:cluster:ReadReplicaCount \
-  --policy-name my-scaling-policy --policy-type TargetTrackingScaling \
-  --target-tracking-scaling-policy-configuration '{"PredefinedMetricSpecification":{"PredefinedMetricType":"NeptuneReadReplicaLag"},"TargetValue":60.0,"ScaleOutCooldown":300,"ScaleInCooldown":300}'
-```
+> Auto-scaling register-target and target-tracking policy CLI moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+> Replicas take minutes to become available — see Key implication below.
 
 **Key implication:** read replica auto-scaling adds replicas (0-15 max)
 based on CPU utilization or replica lag. Replicas take minutes to become
@@ -628,25 +371,8 @@ available — spikes can still cause timeouts during scale-out.
 
 The Neptune bulk loader is for initial or batch data ingestion from S3.
 
-```bash
-# Load data from S3 (Gremlin CSV format)
-curl -s -X POST \
-  "https://my-neptune-cluster.cluster-aaa11122.us-east-1.neptune.amazonaws.com:8182/loader" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source": "s3://my-neptune-data-bucket/nodes/",
-    "format": "csv",
-    "iamRoleArn": "arn:aws:iam::123456789012:role/NeptuneBulkLoadRole",
-    "mode": "NEW",
-    "region": "us-east-1",
-    "failOnError": true,
-    "parallelism": "HIGH"
-  }'
-```
-
-**Best practice:** use mode `NEW` for initial loads (fails if data
-exists), mode `RESUME` for retrying partial loads. Set `parallelism`
-to `HIGH` for large datasets.
+> Bulk-loader curl payload and mode/parallelism best practice moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+> Loader is for batch ingestion, not streaming — see Critical note below.
 
 **Critical:** the bulk loader is for batch ingestion, not continuous
 streaming. For streaming writes, use the application SDK or Neptune
@@ -666,32 +392,8 @@ Streams consumer pattern.
 | DbFreeableMemory | AWS/Neptune | Available memory |
 | BufferCacheHitRatio | AWS/Neptune | Cache effectiveness for traversals |
 
-```bash
-# Monitor CPU utilization
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/Neptune \
-  --metric-name EngineCPUUtilization \
-  --dimensions Name=DBInstanceIdentifier,Value=my-neptune-primary \
-  --start-time $(date -u -v-1H +%Y-%m-%dT%H:%M:%S) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
-  --period 300 --statistics Average
-
-# Monitor graph storage growth
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/Neptune \
-  --metric-name VolumeBytesUsed \
-  --dimensions Name=DBClusterIdentifier,Value=my-neptune-cluster \
-  --start-time $(date -u -v-1D +%Y-%m-%dT%H:%M:%S) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
-  --period 3600 --statistics Average
-```
-
-**Key metrics to alert on:**
-- EngineCPUUtilization > 80% sustained → scale up or add replicas.
-- BufferCacheHitRatio < 90% → graph working set exceeds memory; larger
-  instance needed.
-- VolumeBytesUsed approaching limit → storage scaling needed.
-- GremlinErrorsPerSec > 0 → query errors or timeouts.
+> CloudWatch monitoring CLI (CPU, storage growth) and alert thresholds moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+> Metric table above stays authoritative.
 
 ## Step 14 — Snapshot management
 
@@ -700,36 +402,13 @@ aws cloudwatch get-metric-statistics \
 | Automated | Within backup window | 1-35 days (backup-retention-period) |
 | Manual | On-demand via API | Until manually deleted |
 
-```bash
-# Create manual snapshot
-aws neptune create-db-cluster-snapshot \
-  --db-cluster-snapshot-identifier my-neptune-snapshot-20260805 \
-  --db-cluster-identifier my-neptune-cluster
-
-# Restore from snapshot
-aws neptune restore-db-cluster-from-snapshot \
-  --db-cluster-identifier my-neptune-restored \
-  --snapshot-identifier my-neptune-snapshot-20260805 \
-  --engine neptune \
-  --db-subnet-group-name my-neptune-subnet-group \
-  --vpc-security-group-ids sg-aaa11122
-```
+> Snapshot create/restore CLI moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+> Snapshot type/retention table above.
 
 ## Step 15 — Recent features
 
-- **Neptune Analytics (2023-2024):** Serverless graph analytics for
-  ad-hoc analysis without provisioning a cluster. Separate service from
-  Neptune Database.
-- **OpenCypher support (2023-2024):** Added OpenCypher query language
-  support alongside Gremlin and SPARQL on the same cluster.
-- **Improved bulk loader performance (2023-2024):** Higher throughput
-  and better error handling for large graph loads.
-- **Enhanced Streams (2024-2025):** Stream metrics in CloudWatch,
-  improved filtering capabilities.
-- **Global Database improvements (2024-2025):** Lower replication lag,
-  more regions, faster failover.
-- **Graviton-based instances (2024-2025):** r7g instance types for
-  improved price/performance.
+> Recent features (2023-2025) moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+> Load on demand — Neptune Analytics, OpenCypher, loader/Streams/Global DB improvements, r7g.
 
 ## NEVER do these things
 
@@ -805,68 +484,13 @@ VERIFICATION_COMMANDS:
 
 ### Worked example — Neptune cluster with Gremlin, encryption, IAM auth, Streams, and read replicas
 
-```text
-NEPTUNE: my-neptune-prod (db.r5.4xlarge, 1.3.2.1)
-VERDICT: READY_TO_DEPLOY
-CHECKLIST:
-  [✓] Query language: Gremlin (primary), SPARQL (available)
-  [✓] Topology: Primary + 2 read replicas (across 3 AZs)
-  [✓] Instance type: db.r5.4xlarge (128 GB, 8000 baseline IOPS)
-  [✓] Subnet group: my-neptune-subnet-group (3 AZs)
-  [✓] Security group: sg-aaa11122 (port 8182)
-  [✓] Parameter group: my-neptune-params (neptune_enforce_ssl=1, neptune_query_timeout=120000, neptune_streams=1)
-  [✓] IAM database authentication: Enabled
-  [✓] At-rest encryption (KMS): Enabled (key arn:aws:kms:us-east-1:...:key/aaa11122)
-  [✓] Neptune Streams: Enabled (filter: {"op": ["ADD","UPDATE","REMOVE"]})
-  [✓] Neptune ML: Not configured
-  [✓] Global Database: Not configured
-  [✓] Auto-scaling: Target tracking (EngineCPUUtilization, target 60%, min 1, max 5)
-  [✓] Backup: Automated (retention 7 days, window 03:00-04:00 UTC)
-  [✓] Snapshot window: 03:00-04:00 UTC (no overlap with maintenance mon:05:00-mon:06:00)
-  [✓] Bulk loader: Ready (S3 s3://my-neptune-data/, IAM role arn:aws:iam::...:role/NeptuneBulkLoadRole)
-  [✓] Tags: Environment=production, Application=fraud-detection
-VERIFICATION_COMMANDS:
-  aws neptune describe-db-clusters --db-cluster-identifier my-neptune-prod --region us-east-1
-  aws neptune describe-db-instances --db-instance-identifier my-neptune-primary --region us-east-1
-  aws cloudwatch get-metric-statistics --namespace AWS/Neptune --metric-name EngineCPUUtilization --dimensions Name=DBInstanceIdentifier,Value=my-neptune-primary --region us-east-1
-```
+> Secondary worked example (full READY_TO_DEPLOY block) moved to [references/worked-examples.md](references/worked-examples.md).
+> The Perfect example under the STRICT output contract above is the primary in-file example.
 
 ## Error handling
 
-### Cluster creation fails with "encryption not supported"
-
-- Verify the engine version and instance type support encryption. All
-  current Neptune instance types support storage encryption.
-
-### Clients cannot connect to the cluster
-
-- Check the security group allows inbound from the application SG on
-  port 8182. Verify `neptune_enforce_ssl=1` requires clients to use TLS
-  (wss:// for Gremlin, https:// for SPARQL).
-
-### Read replicas lagging behind primary
-
-- Check instance type — replicas should match the primary's type. Monitor
-  `NeptuneReadReplicaLag` in CloudWatch. If lag is persistent, upgrade
-  the replica instance type or reduce write throughput.
-
-### Neptune Streams returning no records
-
-- Verify `neptune_streams=1` in the parameter group and that the primary
-  instance has been rebooted since the change. Streams only capture
-  changes after enablement.
-
-### Global Database replication failing
-
-- Verify engine versions match across primary and secondary regions.
-  Check the secondary cluster's security group and subnet group are
-  correctly configured.
-
-### Bulk loader errors
-
-- Verify the S3 bucket is in the same region as the Neptune cluster.
-  Check the IAM role has `s3:GetObject` and `s3:ListBucket` permissions.
-  Use `mode: RESUME` to retry partial loads.
+> Error-handling deep dives (encryption unsupported, connectivity, replica lag, empty Streams, Global DB replication, loader errors) moved to [references/error-handling.md](references/error-handling.md).
+> Load on demand when provisioning or verification fails.
 
 ## Domain
 
@@ -886,3 +510,10 @@ Graph Data Management.
 - **Parameter groups** — https://docs.aws.amazon.com/neptune/latest/userguide/parameters.html
 - **Bulk loader** — https://docs.aws.amazon.com/neptune/latest/userguide/load-data.html
 - **CloudWatch metrics** — https://docs.aws.amazon.com/neptune/latest/userguide/cw-metrics.html
+## References (load on demand)
+- [references/error-handling.md](references/error-handling.md) — provisioning/connectivity/stream/loader error deep dives.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — misconceptions, dependency graph, sizing heuristic, recent features.
+- [references/worked-examples.md](references/worked-examples.md) — secondary full worked example.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — CloudWatch monitoring CLI and alert thresholds.
+- [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — all provisioning CLI blocks (Steps 2-12, 14).
+

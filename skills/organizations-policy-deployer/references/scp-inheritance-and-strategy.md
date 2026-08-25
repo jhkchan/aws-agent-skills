@@ -412,3 +412,70 @@ resource "aws_organizations_policy_attachment" "root_guardrails_to_root" {
   target_id = "r-xxxx"
 }
 ```
+## Expert heuristic: SCP is a filter, not a grant
+
+A baseline model says "attach an SCP to allow these services."
+The correct heuristic recognizes that an SCP can only FILTER.
+
+```text
+For an API call to succeed at a member account, ALL must hold:
+  1. SOME SCP in the hierarchy ALLOWS the action (or no SCP at all)
+  2. NO SCP in the hierarchy has an explicit Deny for the action
+  3. An IAM policy (identity-based or resource-based) ALLOWS it
+  4. No IAM permission boundary DENIES it
+
+An SCP Allow alone NEVER makes an API call succeed.
+An SCP Deny alone ALWAYS makes the API call fail.
+```
+
+**Key implication:** SCP design has two jobs — (a) define the
+maximum blast radius (Allow list) and (b) carve out hard
+guardrails (Deny list). Everything else is IAM.
+
+## Expert heuristic: inheritance is intersection, not union
+
+```text
+Hierarchy:
+  Root  ── SCP_R (Allow: ec2:*, s3:*; Deny: iam:DeleteRole)
+   │
+   └── OU_Prod ── SCP_P (Allow: ec2:*, s3:GetObject)
+         │
+         └── Account 111122223311 ── SCP_A (Deny: ec2:TerminateInstances)
+
+Effective SCP at Account 111122223311:
+  ALLOWED = intersection of Allow lists along the chain
+          = s3:GetObject (the most restrictive s3 Allow)
+  DENIED  = union of all explicit Denies
+          = iam:DeleteRole ∪ ec2:TerminateInstances
+
+Net: account can call s3:GetObject (if IAM also permits);
+     CANNOT call iam:DeleteRole or ec2:TerminateInstances ever;
+     CANNOT call s3:PutObject (not in SCP_P's Allow set).
+```
+
+**Key implication:** to allow `s3:PutObject` at this account,
+the Allow must be present in EVERY SCP in the chain. The most-
+restrictive SCP anywhere in the chain becomes the ceiling.
+
+## Expert heuristic: Allow list vs Deny list strategy
+
+```text
+DENY-LIST (blocklist)                      ALLOW-LIST (allowlist)
+─────────────────────────────              ─────────────────────────────
+Keep FullAWSAccess attached                REMOVE FullAWSAccess
+Attach explicit Deny SCPs                  Attach Allow-list of ONLY permitted services
+
+Default: everything ALLOWED                Default: everything DENIED
+Posture: "block known bad"                 Posture: "permit known good"
+Use case: established org                  Use case: regulated org, new accounts
+Risk: new service auto-allowed (drift)     Risk: new service auto-denied (friction)
+
+NEVER mix at the same entity: keep FullAWSAccess AND attach an Allow-list
+SCP — the Allow-list is silently redundant because the intersection still
+permits everything FullAWSAccess permits.
+```
+
+**Key implication:** an Allow-list strategy is a two-step commit
+— attach the Allow-list SCP first, then detach
+`FullAWSAccess`. Reversing the order locks the account out.
+

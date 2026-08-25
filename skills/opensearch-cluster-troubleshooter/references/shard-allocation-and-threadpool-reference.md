@@ -212,3 +212,17 @@ POST /_snapshot/<repository>/<snapshot_id>/_restore
 - UltraWarm and cold storage: https://docs.aws.amazon.com/opensearch-service/latest/developerguide/ultrawarm.html
 - Snapshots: https://docs.aws.amazon.com/opensearch-service/latest/developerguide/managedomains-snapshots.html
 - In-place upgrades: https://docs.aws.amazon.com/opensearch-service/latest/developerguide/version-maturity.html
+
+## Shard allocation decider — first-decider-to-fix table (from SKILL.md Step 8)
+
+For both Step 5 (red) and Step 6 (yellow), read the FIRST decider in
+`_cluster/allocation/explain`; the rest cascade.
+
+| First decider | Fix |
+|---|---|
+| `disk_watermark.*` | Free disk (Step 2) |
+| `max_shards_per_node` | Raise cap OR add data nodes OR reduce shard count |
+| `same_shard` | Add data nodes; replica count too high for node count |
+| `filter` / `awareness` | Fix `_cluster/settings` allocation attributes / add nodes in missing awareness attribute |
+| `shard_size` | Shard too large to relocate — `_split` the index |
+| `recovery_after_time` | Recovery in progress; wait |

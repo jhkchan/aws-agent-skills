@@ -175,3 +175,20 @@ that ends in OOM.
 - JVM heap pressure and OOM: https://docs.aws.amazon.com/opensearch-service/latest/developerguide/handling-errors.html
 - CloudWatch metrics: https://docs.aws.amazon.com/opensearch-service/latest/developerguide/managedomains-cloudwatch-metrics.html
 - Circuit breakers: https://docs.aws.amazon.com/opensearch-service/latest/developerguide/circuit-breaker.html
+
+## Why disk filled — root-cause catalog (from SKILL.md Step 2)
+
+- **Unbounded index growth, no ISM policy:** `_cat/indices?v&s=index`
+  shows old date-suffix indices (`logs-2024-01`) accumulating without
+  rollover or deletion. Fix: configure an ISM policy to roll over and
+  delete old indices.
+- **Replica count increase:** `_settings` shows
+  `number_of_replicas: 2` instead of 1 — disk usage doubles on the
+  replicated indices. Fix: revert via
+  `PUT /<index>/_settings {"number_of_replicas": 1}`.
+- **Force-merge in progress:** a recent `_forcemerge?max_num_segments=1`
+  call temporarily doubles segment file size during the merge. Fix:
+  wait; do not force-merge under disk pressure.
+- **Snapshot restore:** `_snapshot/_status` shows a restore in
+  progress; the restored indices consume disk. Fix: cancel the restore
+  or expand the cluster.

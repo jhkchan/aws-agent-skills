@@ -115,45 +115,13 @@ MIGRATION_STEPS is a contract violation — re-emit the full block.
 
 ## Quick start
 
-- **Graviton brokers (kafka.m7g) on Kafka 3.x are ~20% cheaper than the
-  equivalent kafka.m5 generation.** Same vCPU and memory, full Kafka 3.x
-  support. A cluster on `kafka.m5.large` ($0.276/h) migrates to
-  `kafka.m7g.large` ($0.22/h) for ~20% off. Requires Kafka 3.x or later;
-  Kafka 2.x does not support Graviton brokers.
-
-- **MSK Serverless vs provisioned break-even is ~50 MB/s of ingress
-  throughput.** Below 50 MB/s sustained, Serverless per-partition-hour +
-  per-GB data pricing is usually cheaper. Above 50 MB/s steady, provisioned
-  brokers are cheaper. Workloads with bursty traffic that idles for hours
-  are prime Serverless candidates regardless of peak throughput.
-
-- **Minimum 3 brokers for HA; more brokers are only justified by
-  throughput or partition count.** A 6-broker cluster doing 10 MB/s total
-  ingress is over-provisioned — 3 brokers can handle it with headroom.
-  Kafka partitions must be distributed across brokers; the partition-to-
-  broker ratio (aim < 400 partitions per broker) is the constraint.
-
-- **EBS storage is the second-largest MSK cost after broker compute.**
-  Each broker has an attached EBS volume. KafkaDataLogsDiskUsed below 30%
-  means the volume is over-allocated. Storage auto-scaling (MSK storage
-  auto-expand) or a manual right-size eliminates wasted EBS cost.
-
-- **Log retention is the primary EBS cost driver over time.** A 7-day
-  retention on a high-throughput topic consumes 7x the disk of a 1-day
-  retention. Compacted topics (retention by key, not time) can reduce
-  storage 10x for changelog or event-sourcing workloads.
+Core quick-start heuristics (Graviton ~20% cheaper on Kafka 3.x, Serverless break-even ~50 MB/s, minimum 3 brokers, EBS and retention cost drivers): moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+The decision tables in Steps 4-10 below encode the same thresholds.
 
 ## Mindset
 
-MSK cost structure differs from databases in three ways: the cost is
-dominated by broker compute + EBS storage (not per-request), partition
-count adds broker overhead (metadata, leader election, rebalancing), and
-data retention directly drives storage cost over time. The levers are
-broker generation, broker count, EBS volume size, retention policy, and
-Serverless fit. Most MSK waste comes from (a) legacy kafka.m5 brokers
-that should be Graviton, (b) over-provisioned broker count for low-
-throughput workloads, (c) oversized EBS volumes, or (d) long retention
-on high-throughput topics that don't need it.
+Cost-structure fundamentals (how MSK cost differs from databases): moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+The verdict thresholds below assume them.
 
 ## Quick reference — verdict thresholds
 
@@ -177,43 +145,8 @@ configuration.
 
 ### Required data sources
 
-```bash
-# 1. MSK cost breakdown (last 30 days)
-START=$(date -u -v-30d +%F 2>/dev/null || date -u -d '-30 days' +%F)
-END=$(date -u +%F)
-aws ce get-cost-and-usage \
-  --time-period Start=$START,End=$END \
-  --filter '{"Dimensions":{"Key":"SERVICE","Values":["Amazon Managed Streaming for Kafka"]}}' \
-  --granularity MONTHLY --metrics "BlendedCost" "UsageQuantity" \
-  --group-by Type=DIMENSION,Key=USAGE_TYPE --output json > msk-cost.json
-
-# 2. Cluster configuration
-aws kafka describe-cluster-v2 --cluster-arn $CLUSTER_ARN \
-  --output json > msk-cluster.json
-aws kafka describe-configuration \
-  --arn $(jq -r '.ClusterInfo.Provisioned.BrokerNodeGroupInfo \
-    .ConfigurationInfo.Arn' msk-cluster.json) \
-  --output json > msk-config.json
-
-# 3. CloudWatch metrics (per broker)
-START_CW=$(date -u -v-30d +%FT%TZ 2>/dev/null || date -u -d '-30 days' +%FT%TZ)
-END_CW=$(date -u +%FT%TZ)
-for broker in $(seq 1 $(jq -r '.ClusterInfo.Provisioned \
-  .CurrentBrokerSoftwareInfo.Version | length' msk-cluster.json)); do
-  for metric in BytesInPerSec BytesOutPerSec KafkaDataLogsDiskUsed \
-    CpuUser CpuSystem; do
-    aws cloudwatch get-metric-statistics --namespace AWS/Kafka \
-      --metric-name $metric \
-      --dimensions Name=Cluster_Name,Value=$CLUSTER_NAME \
-        Name=Broker_ID,Value=$broker \
-      --start-time $START_CW --end-time $END_CW \
-      --period 3600 --statistics Average Maximum --output json
-  done
-done > msk-cw.json
-
-# 4. Topic-level configuration (partition count, retention)
-aws kafka list-topics --cluster-arn $CLUSTER_ARN --output json > msk-topics.json
-```
+The four data-gathering command blocks (Cost Explorer breakdown, cluster configuration, CloudWatch metrics, topic configuration): moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Run them before any optimisation decision, then apply the data-quality short-circuits below.
 
 ### Data-quality short-circuits
 
@@ -230,105 +163,21 @@ aws kafka list-topics --cluster-arn $CLUSTER_ARN --output json > msk-topics.json
 
 ### Step 0: Non-obvious behaviours that change the recommendation
 
-- **Graviton brokers require Kafka 3.x or later.** Kafka 2.x does not
-  support Graviton (m7g/m6g) brokers. If the cluster is on Kafka 2.8 or
-  earlier, the Graviton migration is gated on a Kafka version upgrade
-  first. The upgrade itself is non-disruptive (rolling) but must be
-  staged before the broker type change.
-
-- **MSK broker count cannot be reduced without cluster recreation.**
-  Kafka partition leadership is distributed across brokers; removing a
-  broker requires reassigning its partitions first. MSK supports
-  broker count changes via update-cluster but reducing below the
-  original count requires creating a new cluster and migrating. Plan
-  broker-count reduction as a blue/green migration, not an in-place
-  change.
-
-- **EBS storage can be increased online but not decreased.** MSK
-  supports `update-broker-storage` to increase EBS volume size per
-  broker (online, no downtime). Decreasing EBS size requires cluster
-  recreation. If KafkaDataLogsDiskUsed < 30%, flag for the next
-  blue/green migration rather than immediate reduction. Storage auto-
-  scaling (MSK storage auto-expand) prevents over-allocation on new
-  clusters.
-
-- **MSK Serverless bills per partition-hour + per-GB data stored + per-
-  PUT-hour.** There is no broker cost. A Serverless cluster with 10
-  partitions, low throughput, and 5 GB data costs pennies per hour.
-  The same workload on provisioned kafka.m5.large x 3 brokers costs
-  $600+/month. The break-even is ~50 MB/s sustained ingress or ~1000
-  partitions.
-
-- **Partition count directly adds broker overhead.** Each partition has
-  a leader, followers, and metadata that consumes broker CPU and memory.
-  Kafka recommends < 4000 partitions per broker. Excessive partitions
-  (e.g., 1000 partitions on a 3-broker cluster doing 1 MB/s) waste
-  broker resources — the metadata overhead exceeds the data processing.
-  Reducing partition count is an operational change (no direct cost)
-  that can enable broker downsize.
-
-- **Compacted topics reduce storage 10x for key-based workloads.** A
-  compacted topic retains only the latest value per key, not all
-  history. For changelog, event-sourcing, or state-store workloads,
-  compaction can reduce disk usage from 500 GB to 50 GB, directly
-  reducing EBS cost. Switch via topic-level `cleanup.policy=compact`.
-
-- **MSK Express tier (2025+) provides high-throughput burstable brokers
-  with credit-based performance.** Express brokers have a baseline
-  throughput and burst credits for spikes. Cost is comparable to
-  Standard provisioned but with better burst handling. Evaluate Express
-  for workloads with variable throughput that don't justify more
-  brokers full-time.
-
-- **MSK with KRaft (2025+) eliminates ZooKeeper, reducing broker
-  overhead.** KRaft mode uses an in-protocol consensus instead of
-  separate ZooKeeper ensembles. This frees the broker CPU that was
-  spent on ZooKeeper health checks and metadata sync, potentially
-  enabling a broker downsize. KRaft is available on Kafka 3.5+ on MSK.
-
-- **Log retention is the single biggest EBS cost driver.** A topic
-  ingesting 10 MB/s with 7-day retention stores ~6 TB. With 1-day
-  retention, it stores ~860 GB. The EBS cost difference at $0.08/GB-
-  month is $400+/month for one topic. Always evaluate retention
-  duration against the actual data-replay requirements.
+Non-obvious behaviours that change the recommendation (Graviton/Kafka-version coupling, broker-count immutability, EBS one-way scaling, Serverless billing model, partition overhead, compaction, Express tier, KRaft, retention): moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load before emitting any recommendation; Steps 1-11 assume these constraints.
 
 ### Step 1: Validate input and data sufficiency
 
 If Cost Explorer access is unavailable AND the caller has not pasted
 billing line items, emit NEED_MORE_INFO:
 
-```text
-TARGET: <cluster-name>
-VERDICT: NEED_MORE_INFO
-REASON: Cost Explorer access is required to quantify per-dimension
-  savings. Without USAGE_TYPE granularity (MSK:BrokerUsage,
-  MSK:ServerlessUsage), the seven dimensions can be analysed
-  qualitatively but the dollar savings cannot be computed.
-RECOMMENDATION:
-  1. Grant the auditor role `ce:GetCostAndUsage`.
-  2. Or, paste the top 10 MSK USAGE_TYPE line items from the
-     last 30 days of CUR.
-ESTIMATED_SAVINGS: $0 (cannot quantify without CUR data)
-MIGRATION_STEPS:
-  - IAM policy addition:
-    {"Effect":"Allow",
-     "Action":["ce:GetCostAndUsage","ce:GetDimensionValues"],
-     "Resource":"*"}
-```
+Fallback data-gathering commands when Cost Explorer is unavailable: moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+If neither CE access nor pasted data exists, emit NEED_MORE_INFO.
 
 ### Step 2: Cost Explorer reconciliation
 
-```bash
-aws ce get-cost-and-usage \
-  --time-period Start=$START,End=$END \
-  --granularity MONTHLY \
-  --metrics "BlendedCost" "UsageQuantity" \
-  --group-by Type=DIMENSION,Key=USAGE_TYPE \
-  --filter '{"Dimensions":{"Key":"SERVICE","Values":["Amazon Managed Streaming for Kafka"]}}' \
-  --output json | \
-  jq '.ResultsByTime[].Groups[] | {usage: .Keys[0],
-    cost: (.Metrics.BlendedCost.Amount | tonumber)}'
-```
+Cost Explorer reconciliation command block: moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+The USAGE_TYPE classification table stays below.
 
 | USAGE_TYPE | Dimension | What it represents |
 |---|---|---|
@@ -365,17 +214,8 @@ retention/storage dimension has high leverage.
 | CpuUser + CpuSystem avg > 60% | CPU-bound; don't downsize | None |
 | Consumer lag (MaxOffsetLag) growing | Throughput-bound; don't downsize | None |
 
-**Worked example — broker right-sizing:**
-
-Cluster with 3 brokers on `kafka.m5.2xlarge` ($0.552/h each in us-east-1).
-BytesInPerSec/broker avg=4 MB/s, max=8 MB/s. CpuUser avg=15%.
-Downsize to `kafka.m5.large` ($0.276/h):
-- Current: 3 × $0.276 × 730h = $604/month (Note: m5.2xlarge is $0.552)
-  3 × $0.552 × 730h = $1,209/month
-- New: 3 × $0.276 × 730h = $604/month
-- Monthly savings: $605
-- Trade-off: less CPU headroom. Verify MaxOffsetLag doesn't grow and
-  CpuUser stays < 50% after the downsize.
+Worked example (m5.2xlarge right-sizing math): moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Apply the decision matrix above to reproduce it.
 
 ### Step 5: Graviton broker migration
 
@@ -389,16 +229,8 @@ and Kafka version is 3.x+.
 | kafka.m5.4xlarge ($1.104/h) | kafka.m7g.4xlarge ($0.88/h) | ~20% | Same 16 vCPU / 64 GB |
 | kafka.c5.large (legacy) | kafka.m7g.large | ~15% | c5 → m7g class change |
 
-**Worked example — Graviton migration:**
-
-Cluster with 3 brokers on `kafka.m5.large` ($0.276/h):
-- Current: 3 × $0.276 × 730h = $604/month
-- Migrate to kafka.m7g.large: 3 × $0.22 × 730h = $482/month
-- Monthly savings: $122 (20%)
-- Prerequisite: Kafka version must be 3.x or later. If on Kafka 2.8,
-  upgrade first (rolling, non-disruptive), then migrate broker type.
-- Migration: create a new MSK cluster on kafka.m7g, use MirrorMaker2
-  or Cluster Linking to sync topics, cut over consumers/producers.
+Worked example (Graviton migration savings math): moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Apply the migration matrix above to reproduce it.
 
 ### Step 6: MSK Serverless vs provisioned fit evaluation
 
@@ -408,14 +240,8 @@ provisioned cost against projected Serverless pricing.
 
 **Break-even logic:**
 
-```
-provisioned_monthly = broker_count × broker_hourly × 730 +
-                      ebs_total_GB × $0.08
-
-serverless_monthly  = (partition_count × $0.005 × 730) +
-                      (data_stored_GB × $0.10) +
-                      (put_requests_millions × $0.10)
-```
+Serverless break-even calculation block: moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Break-even heuristic: below ~50 MB/s sustained ingress Serverless is usually cheaper.
 
 A rough heuristic: if the provisioned cluster's total sustained ingress
 is below ~50 MB/s, or if the cluster idles for extended periods,
@@ -430,17 +256,8 @@ Graviton brokers is cheaper.
 | > 1000 partitions | Keep provisioned | Serverless per-partition-hour adds up |
 | Dev/test, idle nights/weekends | Migrate to Serverless | Near-zero cost when idle |
 
-**Worked example — Serverless migration:**
-
-A 3-broker `kafka.m5.large` cluster ($0.276/h each = $604/month
-compute) + 1 TB EBS ($80/month) = $684/month total. Total ingress
-avg=10 MB/s, 20 partitions, 5 GB data stored.
-- Provisioned: $684/month (billed 24/7 regardless of load)
-- Serverless: 20 partitions × $0.005 × 730h = $73 data + 5 GB × $0.10 =
-  $0.50 + PUT requests ~$5 = $78.50/month
-- Monthly savings: ~$606 (88%)
-- Trade-off: Serverless has a partition-per-cluster limit and a slight
-  per-request latency overhead. Verify consumer throughput requirements.
+Worked example (Serverless vs provisioned math): moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Apply the fit table above to reproduce it.
 
 ### Step 7: Broker count optimisation
 
@@ -451,20 +268,8 @@ avg=10 MB/s, 20 partitions, 5 GB data stored.
 | Broker count=3 (minimum for HA) | Keep; cannot reduce below 3 | None |
 | Broker count > 3 with replication factor=3 | Evaluate reducing to 3 if throughput allows | Per excess broker |
 
-**Worked example — broker count reduction:**
-
-Cluster with 6 brokers on `kafka.m5.large` ($0.276/h each). Total
-ingress avg=15 MB/s (2.5 MB/s per broker). Partitions: 60 total (10
-per broker, well under the 400/broker ceiling).
-- Current: 6 × $0.276 × 730h = $1,209/month
-- Reduce to 3 brokers: 3 × $0.276 × 730h = $604/month
-- Monthly savings: $605
-- Migration: create a 3-broker MSK cluster, use MirrorMaker2 or Cluster
-  Linking to replicate topics, cut over producers/consumers, decommission
-  the 6-broker cluster.
-- Trade-off: 3 brokers is the minimum for Kafka replication factor=3.
-  Confirm the reduced partition-per-broker ratio (20/broker) is within
-  the < 400 guideline.
+Worked example (6-to-3 broker reduction math): moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Apply the observation table above to reproduce it.
 
 ### Step 8: EBS storage optimisation
 
@@ -475,18 +280,8 @@ per broker, well under the 400/broker ceiling).
 | Fixed volume with predictable growth | Evaluate auto-expand vs manual right-size | Operational savings |
 | Volume per broker > 2x the data need | Right-size to 1.3x actual usage | ~35% of EBS cost |
 
-**Worked example — EBS right-sizing:**
-
-Cluster with 3 brokers, each with 1 TB gp3 EBS ($0.08/GB-month =
-$80/broker/month = $240/month total). KafkaDataLogsDiskUsed avg=25%
-(250 GB used per broker).
-- Current: 3 × 1,000 GB × $0.08 = $240/month
-- Right-size to 500 GB on next blue/green migration:
-  3 × 500 GB × $0.08 = $120/month
-- Monthly savings: $120
-- Note: EBS volume cannot be decreased in-place. Schedule for the next
-  blue/green migration alongside broker type or count changes. Enable
-  MSK storage auto-expand on the new cluster to auto-scale if data grows.
+Worked example (EBS volume right-sizing math): moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Apply the observation table above to reproduce it.
 
 ### Step 9: Data retention and compaction optimisation
 
@@ -497,17 +292,8 @@ $80/broker/month = $240/month total). KafkaDataLogsDiskUsed avg=25%
 | Mixed retention policy, some topics overly long | Audit topic-level configs; standardise | Variable |
 | Retention = -1 (infinite) on any topic | Set finite retention immediately | Prevents unbounded growth |
 
-**Worked example — retention optimisation:**
-
-Topic ingesting 10 MB/s with 7-day retention (168h). Stores ~6 TB
-across the cluster. Data-replay requirement is only 24 hours.
-- Current storage: ~6 TB → EBS cost contribution ~$480/month
-- Reduce to 24h retention: stores ~860 GB → EBS cost ~$69/month
-- Monthly savings: ~$411
-- Change: `kafka-configs --alter --topic <topic> \
-  --add-config retention.ms=86400000`
-- Trade-off: consumers can only replay the last 24h. Verify no batch
-  consumer depends on the full 7-day window.
+Worked example (retention and compaction math): moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Apply the observation table above to reproduce it.
 
 ### Step 10: Partition count right-sizing
 
@@ -608,28 +394,8 @@ CONFIRM: Before each state-changing CLI, emit and await operator
 
 ### Worked example — already optimal
 
-```text
-TARGET: analytics-msk-prod
-VERDICT: ALREADY_OPTIMAL
-REASON: All seven dimensions verified at cost-optimal config:
-  kafka.m7g.large brokers (Graviton, Kafka 3.5.1 with KRaft),
-  3 brokers (minimum HA), BytesInPerSec/broker avg 18 MB/s (healthy
-  utilisation), KafkaDataLogsDiskUsed avg 55%, compacted topics for
-  changelog workloads, 72h retention on event topics, partition count
-  90 total (30/broker).
-RECOMMENDATION:
-  Current: All dimensions optimal
-  Proposed: no change
-  Confidence: HIGH — CE confirms 30-day spending stable; CloudWatch
-    confirms healthy throughput and disk utilisation.
-ESTIMATED_SAVINGS:
-  Monthly (all dimensions): $0
-  Annual total: $0
-MIGRATION_STEPS:
-  - None required. Continue monthly CE review.
-  - Re-evaluate if total ingress exceeds 50 MB/s sustained — may need
-    to add a 4th broker or evaluate MSK Express tier for burst.
-```
+Full worked example for an ALREADY_OPTIMAL verdict: moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+The multi-dimension example above is the primary contract demonstration.
 
 ## Anti-Patterns — NEVER do these things
 
@@ -694,57 +460,13 @@ MIGRATION_STEPS:
 
 ## Expert heuristic — the 60-second triage
 
-When handed an MSK bill and asked "why is this so high?", run this
-60-second triage before deep-diving any single dimension:
-
-1. **Pull CE MSK USAGE_TYPE breakdown.** If brokers are on kafka.m5
-   generation, the Graviton migration (Step 5) is the first lever —
-   flat ~20% cut (requires Kafka 3.x+).
-2. **Pull broker count + total ingress.** Broker count > 3 with total
-   ingress < 50 MB/s = broker-count reduction opportunity (Step 7).
-3. **Pull KafkaDataLogsDiskUsed.** Disk used < 30% on 1 TB+ volumes =
-   EBS over-allocation (Step 8). Enable auto-expand on new clusters.
-4. **Pull retention per topic.** Retention > 168h on high-throughput
-   non-compacted topics = retention-driven storage waste (Step 9).
-5. **Pull partition count.** > 400 partitions/broker with low throughput
-   = excessive partitions enabling broker downsize (Step 10).
-6. **Pull Serverless vs provisioned split.** Provisioned clusters with
-   ingress < 50 MB/s and idle periods = Serverless candidate (Step 6).
-
-If any of the six checks hits, deep-dive the corresponding step. If all
-six pass, the cluster is likely ALREADY_OPTIMAL — verify with the full
-ordered process.
+The 60-second triage (six checks to run when handed an MSK bill): moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+If any check hits, deep-dive the corresponding Process step.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`create-cluster-v2`, `update-cluster-configuration`, `update-broker-
-  storage`, `delete-cluster`, `kafka-configs --alter`), emit and await
-  operator approval.
-- **Record current state before any change.** Capture topic configs and
-  consumer group offsets:
-  ```bash
-  aws kafka describe-cluster-v2 --cluster-arn $CLUSTER_ARN
-  # Record partition count, replication factor, retention per topic
-  # Record consumer group offsets for rollback
-  ```
-- **One dimension per migration window.** Broker type change, broker
-  count change, and retention change each alter cluster behaviour;
-  stacking them obscures which change produced any observed impact.
-- **Verify throughput after broker change.** Watch BytesInPerSec and
-  MaxOffsetLag for 7 days; if consumer lag grows, the new broker type
-  is underpowered — roll back via the blue/green migration path.
-- **Blue/green migration for broker count reduction.** Never remove
-  brokers from a running cluster — create a new cluster with the
-  target broker count, sync via MirrorMaker2 or Cluster Linking, cut
-  over, verify, decommission.
-- **Bulk-operation safety limit.** When optimising a fleet of clusters:
-  sort by estimated savings (largest first); slice into batches of at
-  most 3 clusters; emit per-cluster MIGRATION_STEPS with a single
-  CONFIRM per batch; verify each cluster is ACTIVE before emitting the
-  NEXT batch; abort the sweep if any cluster fails to stabilise within
-  30 min. The skill MUST NOT emit remediation CLI for more than 3
-  clusters in a single output block.
+Pre-flight safety checks (confirmation gate, state recording, one-dimension-per-window, post-change verification, blue/green migration, 3-cluster batch limit): moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+NEVER omit the CONFIRM gate — see FORBIDDEN output patterns above.
 
 ## Verdict semantics
 
@@ -757,28 +479,8 @@ ordered process.
 
 ## Recent AWS features (2024-2026)
 
-- **MSK Cluster Tier — Express (2025+):** High-throughput burstable
-  broker tier with credit-based performance. Express brokers have a
-  baseline throughput and burst credits for spikes. Evaluate for
-  variable-throughput workloads that don't justify additional brokers
-  full-time.
-- **MSK with KRaft (2025+):** Eliminates ZooKeeper, using an in-protocol
-  consensus (KRaft). Reduces broker overhead spent on ZooKeeper health
-  checks and metadata sync, potentially enabling a broker downsize.
-  Available on Kafka 3.5+ on MSK.
-- **Graviton brokers — kafka.m7g (2024-2025):** ARM-based brokers ~20%
-  cheaper than kafka.m5. Requires Kafka 3.x or later. Full Kafka feature
-  parity including KRaft mode.
-- **MSK Serverless (2022-2024 enhancements):** Auto-scaling partitions,
-  no broker management. Per-partition-hour + per-GB data + per-PUT-hour
-  pricing. Break-even against provisioned at ~50 MB/s sustained ingress.
-- **MSK Cluster Linking (2024-2025):** Cross-cluster topic replication
-  with offset preservation. Enables blue/green migrations for broker
-  type and count changes without MirrorMaker2 overhead.
-- **MSK storage auto-expand (2024):** Automatic EBS volume expansion
-  when KafkaDataLogsDiskUsed exceeds threshold. Prevents volume
-  exhaustion and enables starting with smaller volumes (right-sized
-  from day one).
+Recent AWS features (2024-2026): moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Check before recommending Express tier, KRaft, or the newest broker types.
 
 ## AWS documentation
 
@@ -793,3 +495,12 @@ Domain: AWS CloudOps / Analytics — Amazon MSK cost optimisation.
 - **MSK Cluster Linking** — https://docs.aws.amazon.com/msk/latest/developerguide/msk-cluster-linking.html
 - **AWS Cost Explorer** — https://docs.aws.amazon.com/cost-management/latest/userguide/ce-what-is.html
 - **Well-Architected — Cost Optimization** — https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/welcome.html
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 non-obvious behaviours, quick-start heuristics, cost-structure fundamentals, 60-second triage, recent AWS features (2024-2026).
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — Required data-source commands, Step 1/Step 2 command blocks, pre-flight safety checks.
+- [references/worked-examples.md](references/worked-examples.md) — Secondary worked examples (right-sizing, Graviton, Serverless break-even, broker count, EBS, retention, already-optimal).
+- [references/msk-pricing-reference.md](references/msk-pricing-reference.md) — Broker-type pricing, Graviton savings matrix, Serverless pricing, EBS and retention cost projections.
+
+
