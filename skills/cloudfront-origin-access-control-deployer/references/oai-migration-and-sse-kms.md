@@ -290,3 +290,106 @@ principal to the key policy.
 After removing the OAI, ensure the OAI canonical user ID grant is
 also removed from the bucket policy. Leaving it is a security risk if
 the OAI is later recreated by a different process.
+
+## Expert heuristic: sigv4 signing for SSE-KMS origins (moved from SKILL.md)
+
+A baseline model may not consider signing behavior. The correct
+heuristic recognizes that SSE-KMS-encrypted buckets require OAC to
+sign every request with SigV4, because S3 needs the signed request
+to authorize KMS decryption.
+
+```text
+Signing behavior options (OAC SigningBehavior):
+  ├── always-sign  → CloudFront ALWAYS signs origin requests (sigv4)
+  │     REQUIRED for: SSE-KMS buckets, POST/PUT requests
+  │     Recommended for: all new OAC configurations
+  ├── never-sign   → CloudFront NEVER signs (public S3 — rare)
+  └── no-override  → CloudFront signs ONLY if viewer request
+                    includes an Authorization header
+                    Does NOT work for SSE-KMS
+```
+
+**Key implication:** for SSE-KMS buckets, always use `always-sign`.
+Without sigv4-signed requests, S3 cannot authorize KMS decryption.
+The KMS key policy must also grant `cloudfront.amazonaws.com`
+`kms:Decrypt`.
+
+## Step 6 — SSE-KMS verification and KMS key policy (moved from SKILL.md)
+
+**Verify the bucket uses SSE-KMS:**
+
+```bash
+aws s3api get-bucket-encryption --bucket my-bucket \
+  --query 'ServerSideEncryptionConfiguration.Rules[0].ApplyServerSideEncryptionByDefault' \
+  --output table
+# Expected: SSEAlgorithm: aws:kms, KMSMasterKeyID: arn:aws:kms:...
+```
+
+**Update the KMS key policy:**
+
+```bash
+aws kms put-key-policy \
+  --key-id arn:aws:kms:us-east-1:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab \
+  --policy-name default \
+  --policy '{
+    "Version": "2012-10-17",
+    "Statement": [{
+      "Sid": "AllowCloudFrontServicePrincipalKMSDecrypt",
+      "Effect": "Allow",
+      "Principal": {"Service": "cloudfront.amazonaws.com"},
+      "Action": "kms:Decrypt",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "AWS:SourceArn": "arn:aws:cloudfront::111122223333:distribution/EDFDVBD6EXAMPLE"
+        }
+      }
+    }]
+  }'
+```
+
+**Critical:** the KMS key policy uses the SAME
+`cloudfront.amazonaws.com` principal and `AWS:SourceArn` condition
+pattern as the S3 bucket policy. Both must be present for SSE-KMS.
+
+## Step 8 — OAI to OAC migration (no downtime) (moved from SKILL.md)
+
+Migrating from OAI to OAC can be done with zero downtime by adding
+the OAC alongside the existing OAI before removing the OAI.
+
+```text
+Migration flow (zero downtime):
+  1. Create the OAC (create-origin-access-control)
+  2. Update the bucket policy to add cloudfront.amazonaws.com grant
+     (KEEP the existing OAI canonical user ID grant during transition)
+  3. Update the distribution origin to set OriginAccessControlId
+     (KEEP the existing S3OriginConfig.OriginAccessIdentity / OAI)
+     → Both OAC and OAI configured during transition
+     → Distribution deploys — traffic continues flowing
+  4. Verify CloudFront serves objects correctly (no 403)
+  5. Remove the OAI from the distribution origin (set to empty)
+  6. Remove the OAI canonical user ID from the bucket policy
+  7. Delete the OAI (delete-origin-access-identity)
+```
+
+**Step 2 — bucket policy with BOTH grants during transition:**
+
+```bash
+# ADD the cloudfront.amazonaws.com OAC grant (KEEP existing OAI grant)
+aws s3api put-bucket-policy --bucket my-bucket --policy '{
+  "Version": "2012-10-17",
+  "Statement": [
+    {"Sid":"AllowCloudFrontOAC","Effect":"Allow","Principal":{"Service":"cloudfront.amazonaws.com"},"Action":"s3:GetObject","Resource":"arn:aws:s3:::my-bucket/*","Condition":{"StringEquals":{"AWS:SourceArn":"arn:aws:cloudfront::111122223333:distribution/EDFDVBD6EXAMPLE"}}},
+    {"Sid":"AllowLegacyOAI","Effect":"Allow","Principal":{"CanonicalUser":"<oai-canonical-user-id>"},"Action":"s3:GetObject","Resource":"arn:aws:s3:::my-bucket/*"}
+  ]
+}'
+```
+
+**Step 5 — remove OAI from distribution** (set
+`S3OriginConfig.OriginAccessIdentity` to `""`, keep
+`OriginAccessControlId`). **Step 6** — remove the legacy OAI statement
+from the bucket policy. **Step 7** — delete the OAI:
+
+```bash
+aws cloudfront delete-origin-access-identity --id <oai-id> --if-match <etag>
+```

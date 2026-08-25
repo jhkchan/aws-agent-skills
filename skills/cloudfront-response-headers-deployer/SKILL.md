@@ -114,26 +114,7 @@ headers without writing Lambda@Edge or CloudFront Functions. It is a
 managed feature (no compute, no cost beyond the policy object storage).
 Driven by three realities:
 
-- **Response headers policies replaced the old "use Lambda@Edge to
-  inject headers" pattern.** Before this feature, the only way to add
-  `Content-Security-Policy` or `Strict-Transport-Security` was a
-  Lambda@Edge function on the `viewer-response` event. Lambda@Edge
-  costs money per invocation, has cold-start latency, and is a
-  JavaScript ops surface. Response headers policies are free, instant,
-  and declarative.
-
-- **`Access-Control-Allow-Origin: *` with `AllowCredentials: true` is
-  silently rejected by browsers.** CloudFront will happily emit the
-  headers — the browser console shows the CORS error. The fix is a
-  specific origin list when credentials are involved, OR an origin
-  reflection pattern (echo back the requesting `Origin` header). The
-  policy API does not validate this combination — the skill does.
-
-- **Managed policies have fixed IDs that do NOT change by region.**
-  `SecurityHeadersPolicy` is always `0857826db9cffff310d5ad62955c9c26`
-  in every account, every region. This is unusual for AWS — most
-  managed resources have account-specific ARNs. The implication: you
-  can hard-code the managed policy ID in templates safely.
+→ The three realities (Lambda@Edge replacement, wildcard+credentials silent rejection, fixed managed IDs) — `references/advanced-patterns.md`.
 
 ## Pre-flight: requirement gate
 
@@ -141,19 +122,7 @@ Run before emitting any template. Missing requirements produce
 PREREQUISITES_MISSING with the exact gap.
 
 **Live-account pre-flight (skip if offline plan audit):**
-1. `aws cloudfront get-distribution-config --id <id>` — confirm the
-   target distribution exists and is in `Deployed` state.
-2. `aws cloudfront list-response-headers-policies` — verify whether a
-   policy with the target name already exists (create vs. update).
-3. `aws cloudfront get-response-headers-policy --id <id>` — if updating,
-   snapshot the existing config.
-4. For CORS: verify the origin is reachable on HTTPS
-   (`curl -I https://origin.example.com`). HTTP origins cannot serve
-   credentialed CORS.
-5. `aws cloudfront list-cache-policies` — verify the cache policy on
-   the target behavior does not already inject conflicting headers.
-6. For managed policy references: verify the managed policy ID is
-   correct (`0857826db9cffff310d5ad62955c9c26` for `SecurityHeadersPolicy`).
+→ Full 6-check CLI listing (distribution Deployed state, policy inventory + snapshot, origin HTTPS, cache-policy conflict, managed ID) — `references/diagnostic-commands.md`.
 
 **Malformed input:** if the input scenario is missing required fields
 (distribution ID or "create new", target behavior, header requirements),
@@ -174,72 +143,7 @@ required field <field>. Provide <field> to proceed.`
 ## Process — response headers policy design (apply in order)
 
 ### Step 0: Expert knowledge — non-obvious CloudFront header behaviors
-
-- **Response headers policies are versioned and immutable.** Each
-  update creates a new `ETag`. The `get-response-headers-policy` returns
-  the current ETag; `update-response-headers-policy` requires the
-  current ETag to detect lost updates. Always snapshot via `get` before
-  `update`.
-
-- **The `Server` and `Via` headers CANNOT be removed.** CloudFront
-  injects these at the edge. The `RemoveHeadersConfig` list silently
-  ignores them. If you need to hide CloudFront, use a custom origin
-  (not S3) and accept the fingerprint — there is no workaround.
-
-- **CSP `default-src 'none'` is the most secure baseline.** Every
-  resource type the site needs must be explicitly allowed. If the site
-  loads images, add `img-src 'self'`. If it makes XHR, add
-  `connect-src 'self'`. Starting from `'none'` and adding what's needed
-  is the safest path.
-
-- **`X-Frame-Options: DENY` and `frame-ancestors 'none'` in CSP are
-  redundant.** Modern browsers that support CSP `frame-ancestors`
-  ignore `X-Frame-Options`. Keep both for defense-in-depth (old
-  browsers), but know that `frame-ancestors` wins in modern browsers.
-
-- **`Strict-Transport-Security: max-age=63072000; includeSubDomains;
-  preload` is the most aggressive HSTS config.** Once a browser sees
-  this, ALL subdomains are HTTPS-only for 2 years. If a subdomain is
-  served over HTTP (e.g., a legacy internal tool), it breaks. Use
-  `max-age=300` initially to test, then increase.
-
-- **CORS preflight (`OPTIONS`) requests are NOT cached by default.**
-  The `Access-Control-Max-Age` header tells the browser how long to
-  cache the preflight response. Set it to at least 86400 (1 day) to
-  avoid redundant preflight round-trips.
-
-- **`Access-Control-Allow-Credentials: true` requires a specific
-  origin.** `Access-Control-Allow-Origin: *` is rejected by browsers
-  when credentials are involved. Use a specific origin
-  (`https://app.example.com`) or implement origin reflection.
-
-- **Custom headers OVERRIDE origin headers.** If the origin emits
-  `Cache-Control: no-cache` and the policy sets
-  `Cache-Control: max-age=3600`, the policy value wins. Use this to
-  normalize heterogeneous origin behavior.
-
-- **Managed policies are versioned and updated by AWS.** AWS has
-  updated `SecurityHeadersPolicy` historically (e.g., to add
-  `Permissions-Policy` when the spec stabilized). Using a managed
-  policy means your security posture improves automatically — but
-  also means a change could break a site that relied on the old
-  headers. Test after AWS announcements.
-
-- **Response headers policies are NOT applied to error responses from
-  the cache.** If CloudFront returns a cached 403 or 404, the response
-  headers policy is NOT applied — only origin-sourced responses get
-  the headers. To add headers to cached errors, use a custom error
-  response with a managed error page.
-
-- **The policy attaches to a cache behavior, not the distribution.**
-  A distribution with multiple cache behaviors (e.g., `/api/*` vs
-  `/static/*`) can have different response headers policies on each.
-  The `DefaultCacheBehavior` is the catch-all.
-
-- **`Permissions-Policy` (formerly Feature-Policy) is the modern way
-  to disable browser features.** Use it to deny camera, microphone,
-  geolocation, payment APIs at the CDN layer. Syntax:
-  `camera=(), microphone=(), geolocation=()`.
+→ All 12 non-obvious behaviors (immutable+ETag, Server/Via, CSP baseline, XFO redundancy, HSTS preload, preflight cache, credentials, override, managed auto-update, cached errors, behavior attach, Permissions-Policy) — `references/advanced-patterns.md`.
 
 ### Step 1: Security headers design
 
@@ -333,101 +237,15 @@ specific gap and the exact CLI / IaC snippet to close it.
 Full CloudFormation and Terraform templates for both custom and managed
 policy paths live in `references/response-headers-policy-templates.md`.
 
-The non-negotiable security headers config block (custom policy):
-
-```text
-SecurityHeadersConfig:
-  ContentSecurityPolicy: { Content: "default-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'", Override: true }
-  StrictTransportSecurity: { AccessControlMaxAgeSec: 63072000, IncludeSubdomains: true, Preload: true, Override: true }
-  XFrameOptions: { FrameOption: DENY, Override: true }
-  XContentTypeOptions: { Override: true }
-  ReferrerPolicy: { ReferrerPolicy: "strict-origin-when-cross-origin", Override: true }
-  PermissionsPolicy: { Content: "camera=(), microphone=(), geolocation=(), payment=()", Override: true }
-```
-
-The non-negotiable CORS-with-credentials config block:
-
-```text
-CorsConfig:
-  AccessControlAllowOrigins: { Items: ["https://app.example.com"], Quantity: 1 }
-  AccessControlAllowMethods: { Items: ["GET", "POST", "OPTIONS"], Quantity: 3 }
-  AccessControlAllowHeaders: { Items: ["Authorization", "Content-Type"], Quantity: 2 }
-  AccessControlAllowCredentials: true   # REQUIRES specific origins, NOT "*"
-  AccessControlExposeHeaders: { Items: ["X-Total-Count"], Quantity: 1 }
-  AccessControlMaxAgeSec: 86400
-  OriginOverride: true
-```
+→ The two non-negotiable config blocks (SecurityHeadersConfig + credentialed CorsConfig) — `references/response-headers-policy-templates.md`.
 
 ## Diagnostic flows
 
-### Headers not appearing in browser response
-
-1. Verify the policy is attached to the correct cache behavior:
-   `aws cloudfront get-distribution-config --id <id>` and check
-   `ResponseHeadersPolicyId` on the target behavior.
-2. Verify the distribution is in `Deployed` state (not `InProgress`).
-3. Clear the browser cache and CloudFront edge cache
-   (`aws cloudfront create-invalidation --distribution-id <id> --paths "/*"`).
-4. Check that `Override: true` is set on each header — without it,
-   origin-emitted headers win.
-
-### CSP blocks legitimate site functionality
-
-1. Open browser DevTools → Console. CSP violations are logged with
-   the violating directive and resource.
-2. Add the specific source to the CSP directive (e.g.,
-   `script-src 'self' https://cdn.example.com`).
-3. Avoid `'unsafe-inline'` and `'unsafe-eval'` unless absolutely
-   necessary — they neuter CSP's XSS protection.
-
-### CORS preflight failing
-
-1. Verify `Access-Control-Allow-Methods` includes `OPTIONS`.
-2. Verify the origin in the request matches
-   `Access-Control-AllowOrigins` exactly (including scheme and port).
-3. Check `Access-Control-Allow-Headers` includes every header the
-   browser sends in the actual request (e.g., `Authorization`,
-   `Content-Type`, `X-Requested-With`).
-
-### HSTS breaking subdomains
-
-1. If `IncludeSubDomains: true` was set and a subdomain is
-   HTTP-only, browsers will refuse to load it.
-2. Short-term fix: wait for the `max-age` to expire (or use a
-   different browser).
-3. Long-term fix: serve all subdomains over HTTPS, OR set
-   `IncludeSubDomains: false`.
+→ All four flows (headers not appearing, CSP breakage, CORS preflight failure, HSTS breaking subdomains) — `references/error-handling.md`.
 
 ## Output format (per operation)
 
-Every operation MUST emit a single block using these literal labels, in this
-order. Do NOT substitute markdown headings or camelCase variants —
-assertion-based evals and downstream provisioning parse the literal labels
-`DISTRIBUTION_ID:`, `VERDICT:`, `CHECKLIST:`, `GAP:`, `IAC_TEMPLATE:`,
-`MANUAL_GAPS:`, `NOTES:`.
-
-```text
-DISTRIBUTION_ID: <id> | "(new — will be created)"
-VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
-CHECKLIST:
-  [x] Target distribution: exists + Deployed state (or greenfield)
-  [x] Target behavior: DefaultCacheBehavior | PathPattern <pattern>
-  [x] Response headers policy:
-        - Security headers: CSP <value>, HSTS <max-age + includeSubDomains + preload>, X-Frame-Options <DENY|SAMEORIGIN>, X-Content-Type-Options nosniff, Referrer-Policy <value>, Permissions-Policy <value>
-        - CORS: origins <list|*>, methods <list>, headers <list>, credentials <true|false>, max-age <sec>
-        - Custom headers: <name=value list>
-        - Removal headers: <list> (NEVER Server or Via)
-  [x] Policy origin: managed <ID + name> | custom
-  [x] Override: true on every security header (else origin values win)
-  [x] Attach plan: update-distribution with current ETag
-GAP: <if PREREQUISITES_MISSING, the specific gap and remediation>
-IAC_TEMPLATE: <inline CloudFormation / Terraform; "(held in draft)" if blocked>
-MANUAL_GAPS:
-  - GAP: <gap>
-    REMEDIATION: <exact CLI / IaC snippet>
-    REASON: <why this cannot be automated>
-NOTES: <managed policy version, attach-vs-embed, invalidation guidance, deploy state>
-```
+→ Full per-operation label contract — `references/worked-examples.md` (the STRICT output contract below remains authoritative).
 
 ### FORBIDDEN output patterns — NEVER
 
@@ -514,31 +332,7 @@ NOTES:
 ```
 
 ### Worked example — PREREQUISITES_MISSING (wildcard CORS + credentials)
-
-```text
-DISTRIBUTION_ID: E1BCDEFGHIJ2EXAMPLE
-VERDICT: PREREQUISITES_MISSING
-CHECKLIST:
-  [x] Target distribution: E1BCDEFGHIJ2EXAMPLE exists in Deployed state
-  [x] Target behavior: DefaultCacheBehavior
-  [ ] Response headers policy: CORS config uses Access-Control-Allow-Origin: "*" with AllowCredentials: true (BROWSERS REJECT THIS COMBINATION)
-  [x] Policy origin: custom
-  [x] Override: true on every header
-  [x] Attach plan: get-distribution-config → update-distribution with ETag
-GAP: CORS policy combines wildcard origin "*" with AllowCredentials: true. CloudFront will serve the headers; the browser rejects the response and logs a CORS error in the console. The CloudFront API does not validate this combination — the browser does.
-IAC_TEMPLATE: (held in draft — apply after closing the gap below)
-MANUAL_GAPS:
-  - GAP: CORS policy combines wildcard origin with credentials.
-    REMEDIATION:
-      Change AccessControlAllowOrigins from ["*"] to a specific origin list:
-      aws cloudfront update-response-headers-policy --id <policy-id> \
-        --response-headers-policy-config file://fixed-cors.json --if-match <etag>
-      where fixed-cors.json sets AccessControlAllowOrigins.Items to ["https://app.example.com"].
-    REASON: Browsers reject Access-Control-Allow-Origin: * with credentials. CloudFront API does not validate; the browser does.
-NOTES:
-  - Use specific origins for credentialed CORS, OR set AllowCredentials: false.
-  - For dynamic origin reflection (echo the requesting Origin header), use Lambda@Edge or CloudFront Functions — response headers policies do not support reflection.
-```
+→ Full example block — `references/worked-examples.md`.
 
 ### Decision tree — managed policy vs custom policy
 
@@ -628,40 +422,7 @@ NOTES: <managed policy version, attach-vs-embed, distribution deploy state>
 - [ ] `RemoveHeaders` excludes `Server` and `Via`?
 
 ## Expert heuristic — top 5 non-obvious failure modes
-
-The five failure modes below are the ones a naive header setup misses.
-Each is silently wrong (no error in CloudFront, error only in browser
-console).
-
-1. **`Override: false` on security headers means origin values win.**
-   If the origin emits no `Content-Security-Policy` and the policy
-   sets one with `Override: false`, the browser sees no CSP. The fix
-   is `Override: true` on every security header in the policy. The
-   CloudFront API accepts `Override: false` silently — no warning.
-
-2. **CSP `default-src 'self'` blocks inline event handlers.** Most
-   legacy sites use `onclick="..."` attributes, which are inline
-   scripts. CSP blocks them. The fix is CSP with `'unsafe-inline'`
-   in `script-src` (weaker but functional) or refactoring to
-   `addEventListener` (stronger but invasive).
-
-3. **HSTS `includeSubDomains` breaks HTTP-only subdomains.** Once a
-   browser sees HSTS with `includeSubDomains`, it refuses HTTP on ALL
-   subdomains for the `max-age` duration. If `staging.example.com` is
-   HTTP-only, it stops loading. The fix is to serve all subdomains
-   over HTTPS, OR set `includeSubDomains: false`.
-
-4. **CORS preflight (`OPTIONS`) requests hit the origin if not cached.**
-   CloudFront forwards `OPTIONS` requests to the origin by default.
-   If the origin does not handle `OPTIONS`, it returns 405 and the
-   browser's actual request never fires. Set
-   `AccessControl-MaxAgeSec: 86400` in the policy to cache preflight.
-
-5. **Cached error responses do NOT get response headers policy
-   applied.** If CloudFront serves a cached 403 or 404, the policy is
-   not applied — only origin-sourced responses get the headers. To
-   add security headers to error responses, configure custom error
-   responses in the distribution with managed error pages.
+→ All five failure modes (Override:false, CSP vs inline handlers, HSTS includeSubDomains, uncached preflight, cached-error bypass) — `references/advanced-patterns.md`.
 
 ## Anti-Patterns — NEVER do these things
 
@@ -717,62 +478,20 @@ console).
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`create-response-headers-policy`, `update-response-headers-policy`,
-  `delete-response-headers-policy`, `update-distribution` to attach),
-  emit: `CONFIRM: About to <operation> on policy <name> / distribution
-  <id>. This affects <consequence>. Proceed? (yes/no)`.
-
-- **Verify the distribution is in `Deployed` state.**
-  `aws cloudfront get-distribution --id <id> --query 'Distribution.Status'`.
-
-- **Snapshot the existing policy and distribution config.**
-  `aws cloudfront get-response-headers-policy --id <id> --output json > /tmp/policy-backup.json`
-  and `get-distribution-config --id <id> --output json > /tmp/dist-backup.json`.
-
-- **Capture the ETag for `update-distribution`.** The
-  `update-distribution` call requires `--if-match <etag>` from the
-  latest `get-distribution-config`.
-
-- **Before emitting CSP, verify the site's script inventory.** CSP
-  blocks unknown inline scripts and external CDNs. A CSP audit
-  (browser DevTools → Console with Report-Only mode) prevents
-  breakage.
-
-- **Before emitting HSTS with `includeSubDomains`, verify all
-  subdomains serve HTTPS.** HTTP-only subdomains will break.
-
-- Prefer additive changes (attach a policy to a new behavior) over
-  destructive changes (remove a policy from an existing behavior).
+→ Full checklist (confirmation gate, Deployed-state verify, snapshots, ETag capture, CSP inventory, HSTS subdomain check) — `references/diagnostic-commands.md`.
 
 ## Recent AWS features (2024-2026)
 
-- **Response headers policy managed updates (2024-2025):** AWS updated
-  `SecurityHeadersPolicy` to add `Permissions-Policy` and tighten
-  default CSP. Managed policies now auto-update on AWS schedule;
-  custom policies are immutable once created.
+→ All six updates (managed policy updates, CORS-with-preflight, OAC, Permissions-Policy GA, CloudFormation, KeyValueStore) — `references/advanced-patterns.md`.
 
-- **CORS-with-preflight-and-SecurityHeadersPolicy managed policy
-  (2024):** combines CORS with preflight handling and the security
-  headers baseline in one managed policy. Reduces the need for custom
-  policies when the operator needs both CORS + security.
+## References (load on demand)
 
-- **CloudFront OAC + response headers integration (2024):** OAC-signed
-  S3 origins now pass through the response headers policy unchanged.
-  Previously, OAC could strip `Cache-Control` from S3 origins.
-
-- **Permissions-Policy header support (2024):** the
-  `PermissionsPolicyConfig` block in `SecurityHeadersConfig` is GA.
-  Use to disable browser features (camera, microphone, geolocation).
-
-- **Response headers policy CloudFormation support (2024):**
-  `AWS::CloudFront::ResponseHeadersPolicy` is now fully supported in
-  CloudFormation (previously required custom resources or CLI).
-
-- **CloudFront KeyValueStore + response headers (2025):** for dynamic
-  header values (e.g., per-user CSP nonces), use KeyValueStore +
-  CloudFront Functions to read the nonce and inject it via the
-  response headers policy override pattern.
+- [`references/worked-examples.md`](references/worked-examples.md) — secondary worked example (PREREQUISITES_MISSING wildcard CORS) + per-operation output format spec
+- [`references/error-handling.md`](references/error-handling.md) — diagnostic flows: headers not appearing, CSP breakage, CORS preflight failure, HSTS breaking subdomains
+- [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — live-account pre-flight commands; pre-remediation safety checks
+- [`references/advanced-patterns.md`](references/advanced-patterns.md) — Step 0 non-obvious behaviors, expert-heuristic failure modes, mindset realities, recent AWS features (2024-2026)
+- [`references/response-headers-policy-templates.md`](references/response-headers-policy-templates.md) — full IaC templates (pre-existing) + non-negotiable config blocks
+- [`references/security-headers-and-managed-policies.md`](references/security-headers-and-managed-policies.md) — header semantics + managed policy matrix (pre-existing)
 
 ## Domain
 

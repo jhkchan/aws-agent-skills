@@ -289,3 +289,82 @@ resource "aws_cloudfront_distribution" "my_distribution" {
   # ... cache behavior, viewer certificate, etc.
 }
 ```
+
+## Expert heuristic: bucket policy uses cloudfront.amazonaws.com (moved from SKILL.md)
+
+A baseline model may use the OAC ID in the bucket policy. The correct
+heuristic recognizes that the bucket policy grants the
+`cloudfront.amazonaws.com` service principal — NOT the OAC ID — with
+a condition matching the distribution ARN.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": {
+    "Sid": "AllowCloudFrontServicePrincipalReadOnly",
+    "Effect": "Allow",
+    "Principal": {"Service": "cloudfront.amazonaws.com"},
+    "Action": "s3:GetObject",
+    "Resource": "arn:aws:s3:::my-bucket/*",
+    "Condition": {
+      "StringEquals": {
+        "AWS:SourceArn": "arn:aws:cloudfront::111122223333:distribution/EDFDVBD6EXAMPLE"
+      }
+    }
+  }
+}
+```
+
+**Key implication:** the principal is always `cloudfront.amazonaws.com`
+and the `AWS:SourceArn` condition restricts which distribution can
+access the bucket. Using the OAC ID as the principal does not work.
+
+## Step 3: Multi-distribution SourceArn list (moved from SKILL.md)
+
+**For multi-distribution to single bucket**, list all ARNs:
+
+```json
+"Condition": {
+  "StringEquals": {
+    "AWS:SourceArn": [
+      "arn:aws:cloudfront::111122223333:distribution/EDFDVBD6EXAMPLE",
+      "arn:aws:cloudfront::111122223333:distribution/E2QWRUEXAMPLE2"
+    ]
+  }
+}
+```
+
+## Step 7 — Multi-distribution to single bucket (moved from SKILL.md)
+
+When multiple CloudFront distributions serve from a single S3 bucket,
+each distribution has its own OAC, but the bucket policy must list
+ALL distribution ARNs in the `AWS:SourceArn` condition.
+
+```bash
+aws s3api put-bucket-policy --bucket shared-bucket --policy '{
+  "Version": "2012-10-17",
+  "Statement": {
+    "Sid": "AllowMultipleCloudFrontDistributions",
+    "Effect": "Allow",
+    "Principal": {"Service": "cloudfront.amazonaws.com"},
+    "Action": "s3:GetObject",
+    "Resource": "arn:aws:s3:::shared-bucket/*",
+    "Condition": {
+      "StringEquals": {
+        "AWS:SourceArn": [
+          "arn:aws:cloudfront::111122223333:distribution/EDFDVBD6EXAMPLE",
+          "arn:aws:cloudfront::111122223333:distribution/E2QWRUEXAMPLE2",
+          "arn:aws:cloudfront::111122223333:distribution/E3EXAMPLE3XXX"
+        ]
+      }
+    }
+  }
+}'
+```
+
+**Alternative: `AWS:SourceAccount`** grants ALL distributions in the
+account access. Simpler to manage but less restrictive. Prefer listing
+individual ARNs for production.
+
+**Each distribution should still have its own OAC** — the OAC is per-
+distribution, not per-bucket.

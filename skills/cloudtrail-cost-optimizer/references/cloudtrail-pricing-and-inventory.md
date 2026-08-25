@@ -364,3 +364,47 @@ Projected (org trail only):
 - CloudTrail event selectors — https://docs.aws.amazon.com/awscloudtrail/latest/userguide/logging-data-events-with-cloudtrail.html
 - S3 storage classes — https://aws.amazon.com/s3/storage-classes/
 - Athena partition projection — https://docs.aws.amazon.com/athena/latest/ug/partition-projection.html
+
+## Step 2 — data-event pricing comparison (moved from SKILL.md)
+
+Data events bill at $0.10 per 100,000 events regardless of how many
+trails capture them. Curation reduces event volume without losing audit
+coverage of high-value resources.
+
+**Pricing comparison:** Management events are FREE on the first trail
+per region. S3, Lambda, and DynamoDB data events all bill at $0.10 per
+100,000 events regardless of how many trails capture them.
+
+## Step 2 — curating S3 data events: selector forms + CLI (moved from SKILL.md)
+
+**Curating S3 data events** — two selector forms are supported. Full
+JSON syntax (basic + advanced with multi-resource-type and readOnly
+filtering) is in `references/cloudtrail-pricing-and-inventory.md`. The
+advanced form is recommended because it supports ARN prefix matching
+and `readOnly` field filtering (eliminates high-volume S3 GET noise).
+
+```bash
+aws cloudtrail put-event-selectors \
+  --trail-name aws-organizational-trail \
+  --advanced-event-selectors file://curated-selectors.json
+```
+
+## Step 3 — storage class cost comparison (moved from SKILL.md)
+
+**Storage class cost comparison (us-east-1, 2026):**
+```
+Standard:                   $0.023/GB-month
+Glacier Instant Retrieval:  $0.004/GB-month  (83% cheaper, ms latency)
+Glacier Flexible Retrieval: $0.0036/GB-month (1-5 min restore)
+Deep Archive:               $0.00099/GB-month (12 hour restore)
+```
+
+## Step 4 — CloudTrail Lake pricing model (moved from SKILL.md)
+
+CloudTrail Lake charges $0.75/GB-month ingestion (one-time) plus
+retention storage at S3 Standard rates. Use Lake only when interactive
+SQL queries on audit data are required.
+
+**Pricing model:** Ingestion is $0.75/GB-month (one-time at ingest);
+retention storage is $0.023/GB-month (Standard rate); queries are free
+(Athena-style federation to EDS).

@@ -71,33 +71,7 @@ metadata:
 
 ## Mindset
 
-A "CloudTrail is missing events" incident is almost always a
-configuration mismatch between what the operator expects the trail
-to capture and what the event selectors actually select. The trail
-is fine; the *selector scope* is wrong, the *bucket policy* is
-blocking delivery, or the *org trail* is shadowing a member trail.
-Senior CloudTrail engineers do not start by reading individual log
-files — they start with `describe-trails`, `get-trail-status`,
-`get-event-selectors`, and `get-bucket-policy`. Only once the trail
-configuration is proven correct do they pivot to `lookup-events`
-to verify specific events are landing.
-
-Four behaviours separate a senior CloudTrail engineer from a
-generalist: (1) management events are default-on but data events
-(S3 GetObject, Lambda InvokeFunction, DynamoDB GetItem) are
-**opt-in** — a trail with default event selectors captures ZERO
-data-plane API calls; data events require an explicit event
-selector and are billed at a higher rate; (2) organization trails
-**shadow** member trails — when an org trail is created, CloudTrail
-creates a read-only shadow trail in every member account, and any
-pre-existing member trail STOPS DELIVERING as soon as the shadow
-appears (events route to the org bucket); (3) the S3 bucket policy
-is the **silent failure mode** — `IsLogging: true` does NOT mean
-events are delivering, because CloudTrail retries silently on
-bucket-policy rejection, so always cross-reference
-`LatestDeliveryTime` against the wall clock; (4) CloudTrail Lake
-event data stores have **independent selectors** from S3 trails —
-configuring one does not configure the other.
+> Mindset deep-dive moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
 ## Quick reference — symptom triage table
 
@@ -121,28 +95,7 @@ Before running symptom-specific probes, gather the canonical trail
 state and short-circuit on trail-wide events that mimic per-API
 missing-events.
 
-```bash
-# Trail configuration (S3BucketName, S3KeyPrefix, IsMultiRegionTrail,
-# IsOrganizationTrail, KmsKeyId, CloudWatchLogsLogGroupArn)
-aws cloudtrail describe-trails --trail-name-list <trail> --output json
-
-# Trail delivery status (IsLogging, LatestDeliveryTime,
-# LatestCloudWatchLogsDeliveryTime, LatestDigestDeliveryTime)
-aws cloudtrail get-trail-status --name <trail> --output json
-
-# Event selectors (ManagementEvents, DataEvents, ReadWriteType,
-# ExcludeManagementEventSources, AdvancedEventSelectors)
-aws cloudtrail get-event-selectors --trail-name <trail> --output json
-
-# S3 bucket policy and KMS key state (if KmsKeyId is set)
-aws s3api get-bucket-policy --bucket <bucket> --output json
-aws kms describe-key --key-id <kms-key-id> --output json
-
-# Recent lookup-events to confirm the specific missing API
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventSource,AttributeValue=<service>.amazonaws.com \
-  --start-time $(date -d '-24 hours' +%s) --end-time $(date +%s) --output json
-```
+> Pre-flight gather-info command block moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
 
 ### Trail-state short-circuit
 
@@ -157,13 +110,7 @@ aws cloudtrail lookup-events \
 | `CloudWatchLogsLogGroupArn: null` | No CW Logs delivery configured. |
 | `IncludeGlobalServiceEvents: false` | IAM and STS global-service events excluded. |
 
-If the input is malformed (missing TrailName, absent symptom, no
-specific EventSource or EventName), emit `VERDICT: INSUFFICIENT_DATA`
-and re-prompt for: (1) the specific event they expect to see
-(EventSource and EventName, e.g., `s3.amazonaws.com:GetObject`),
-(2) the TrailName, (3) the caller account (especially if it is a
-member account of an organization), and (4) the approximate time
-window of the expected event.
+> Malformed-input re-prompt moved verbatim to [references/error-handling.md](references/error-handling.md) — load on demand.
 
 ## Process — Diagnostic decision tree (apply in symptom order)
 
@@ -176,48 +123,7 @@ without a failing probe that matches the symptom.**
 
 ### Step 0: Non-obvious behaviours that change diagnosis
 
-- **`IsLogging: true` does not mean events are delivering.** The
-  managed service does not fail the trail on bucket-policy rejection
-  — it retries silently. Cross-reference `LatestDeliveryTime` against
-  the wall clock. A trail with `IsLogging: true` and
-  `LatestDeliveryTime: 6 hours ago` is failing.
-- **Organization trails create shadow trails in every member
-  account.** The shadow trail appears in `describe-trails` with
-  `IsOrganizationTrail: true`; the member cannot modify it. Any
-  pre-existing member trail STOPS DELIVERING as soon as the shadow
-  appears — events route to the org bucket.
-- **Management events are default-on; data events are opt-in.** S3
-  GetObject, Lambda InvokeFunction, DynamoDB GetItem require an
-  event selector with `DataEvents` explicitly configured.
-- **Event selectors have `ReadWriteType: All` by default**, but the
-  field can be `ReadOnly` or `WriteOnly`. A trail with `ReadOnly`
-  will not capture `CreateBucket`, `PutObject`, `RunInstances`.
-- **`IncludeGlobalServiceEvents` controls IAM, STS, and
-  CloudFront.** Global services deliver events from us-east-1 only.
-  `IncludeGlobalServiceEvents: false` excludes them even on a
-  multi-region trail.
-- **KMS key disabled blocks log encryption silently.** If the trail
-  has `KmsKeyId: <arn>` and `KeyState: Disabled` or
-  `PendingDeletion`, CloudTrail cannot encrypt log files and stops
-  delivering. `IsLogging` reports `true`; `LatestDeliveryTime` is
-  stale.
-- **CloudTrail Lake EDS has independent selectors from S3 trails.**
-  An operator who "sees events in S3 but not in Lake" has the Lake
-  EDS configured with a narrower selector. They are two independent
-  ingestion paths.
-- **Not all AWS services log in all regions.** Some regional
-  services do not emit CloudTrail events in every region where they
-  operate. Cross-reference the AWS docs for the service-region
-  combination.
-- **S3 log file prefix errors are subtle.** The trail's `S3KeyPrefix`
-  field controls the prefix. An operator listing
-  `s3://bucket/cloudtrail/` when `S3KeyPrefix` is `logs/` will see
-  "no logs" even though delivery is healthy.
-- **CloudTrail log file validation digests deliver separately.**
-  `LatestDigestDeliveryTime` is independent of
-  `LatestDeliveryTime`. Stale digest delivery with healthy log
-  delivery is a separate issue (usually bucket policy missing
-  `s3:PutObject` for the digest prefix).
+> Step 0 expert knowledge moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
 ### Step 1: Symptom entry — pick the diagnostic branch
 
@@ -256,12 +162,7 @@ If `IsLogging: false`, **ROOT_CAUSE_IDENTIFIED** with
 `LAYER: TRAIL_DISABLED`. Remediate with
 `aws cloudtrail start-logging --name <trail>`.
 
-IaC pitfall: CloudFormation `AWS::CloudTrail::Trail` does NOT
-automatically start logging on creation. The IaC template must
-include the `IsLogging: true` property or invoke `start-logging`
-as a custom resource. Terraform's `aws_cloudtrail` resource starts
-logging by default but can be stopped by setting
-`enable_logging = false`.
+> IaC pitfall detail moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
 **Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: TRAIL_DISABLED`.
 
@@ -293,25 +194,7 @@ the next sequence number), and `s3:PutObject` with the condition
 `s3:x-amz-acl: bucket-owner-full-control` (ensures the log file is
 owned by the bucket owner, not the CloudTrail service).
 
-The canonical policy statement:
-
-```json
-{
-  "Sid": "AWSCloudTrailAclCheck20150319",
-  "Effect": "Allow",
-  "Principal": {"Service": "cloudtrail.amazonaws.com"},
-  "Action": "s3:GetBucketAcl",
-  "Resource": "arn:aws:s3:::<bucket>"
-},
-{
-  "Sid": "AWSCloudTrailWrite20150319",
-  "Effect": "Allow",
-  "Principal": {"Service": "cloudtrail.amazonaws.com"},
-  "Action": "s3:PutObject",
-  "Resource": "arn:aws:s3:::<bucket>/<prefix>/AWSLogs/<account>/CloudTrail/*",
-  "Condition": {"StringEquals": {"s3:x-amz-acl": "bucket-owner-full-control"}}
-}
-```
+> Canonical bucket policy JSON moved verbatim to [references/bucket-policy-and-org-trail-reference.md](references/bucket-policy-and-org-trail-reference.md) — load on demand.
 
 If the bucket policy is missing this statement, missing the
 condition, scoped to the wrong account, or has an explicit Deny
@@ -343,25 +226,7 @@ aws cloudtrail get-event-selectors --trail-name <trail> --output json
 # An empty DataEvents array means data events are NOT being captured
 ```
 
-Data events require an event selector with `DataResources`
-configured. The canonical configurations:
-
-| Data source | Required event selector |
-|---|---|
-| S3 GetObject / PutObject / DeleteObject | `DataResources: [{ Type: "AWS::S3::Object", Values: ["arn:aws:s3:::<bucket>/"] }]` (trailing slash matters) |
-| Lambda InvokeFunction | `DataResources: [{ Type: "AWS::Lambda::Function", Values: ["arn:aws:lambda"] }]` |
-| DynamoDB GetItem / PutItem / DeleteItem | `DataResources: [{ Type: "AWS::DynamoDB::Stream", Values: ["arn:aws:dynamodb"] }]` (advanced event selector recommended) |
-
-To enable S3 data events for a specific bucket:
-
-```bash
-aws cloudtrail put-event-selectors --trail-name <trail> \
-  --event-selectors '[{
-    "ReadWriteType": "All",
-    "IncludeManagementEvents": true,
-    "DataResources": [{ "Type": "AWS::S3::Object", "Values": ["arn:aws:s3:::<bucket>/"] }]
-  }]'
-```
+> Canonical data-event selector table + CLI moved verbatim to [references/event-selectors-and-data-events-reference.md](references/event-selectors-and-data-events-reference.md) — load on demand.
 
 If the trail's event selector has no `DataResources` for the
 expected data source, **ROOT_CAUSE_IDENTIFIED** with
@@ -400,13 +265,7 @@ trail's bucket**, not the member's bucket. Any pre-existing member
 trail that delivered to the member's own bucket stops delivering to
 that bucket — the events are now captured by the org trail.
 
-Common patterns: member account `describe-trails` shows a trail with
-`IsOrganizationTrail: true` that the member did not create (shadow
-trail; member events go to the org bucket); member's pre-existing
-trail stops delivering after the org trail was created (org trail
-shadows the member trail); org trail bucket policy scoped to the
-management account only (Resource ARN missing the org ID
-`o-<org-id>`); member left the org (shadow trail removed).
+> Org-trail shadow common patterns moved verbatim to [references/bucket-policy-and-org-trail-reference.md](references/bucket-policy-and-org-trail-reference.md) — load on demand.
 
 If the org trail shadows the member trail and the operator expects
 events in the member's own bucket, **ROOT_CAUSE_IDENTIFIED** with
@@ -427,11 +286,7 @@ aws cloudtrail describe-trails --trail-name-list <trail> --output json | \
   jq '.trailList[0].IsMultiRegionTrail'
 ```
 
-If `IsMultiRegionTrail: false`, the trail captures only its home
-region. A single-region trail in us-east-1 still captures global
-service events (IAM, STS, CloudFront) if
-`IncludeGlobalServiceEvents: true`. Convert to multi-region via
-`update-trail --name <trail> --is-multi-region-trail`.
+> Multi-region explanation moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
 **Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: MULTI_REGION_SCOPE_GAP`.
 
@@ -446,10 +301,7 @@ aws cloudtrail get-event-selectors --trail-name <trail> --output json | \
   jq '.EventSelectors[].ReadWriteType'
 ```
 
-If `ReadWriteType: ReadOnly`, write events are excluded. Convert to
-`All` via `put-event-selectors`. If `WriteOnly`, read events are
-excluded — operators debugging "where did this ListBuckets call come
-from" will not find it.
+> ReadWriteType explanation moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
 **Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: EVENT_SELECTOR_READONLY`.
 
@@ -467,12 +319,7 @@ aws logs describe-log-streams --log-group-name <cw-log-group> \
   --order-by LastEventTime --descending --limit 5 --output json
 ```
 
-`LatestCloudWatchLogsDeliveryTime` is independent of
-`LatestDeliveryTime`. If CW Logs delivery lags beyond 15 minutes
-while S3 delivery is healthy: verify `CloudWatchLogsRoleArn` on the
-trail trusts `cloudtrail.amazonaws.com` and has
-`logs:CreateLogStream`, `logs:PutLogEvents`; verify the log group
-exists and was not deleted.
+> CW Logs delivery checks moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
 **Verdict:** ROOT_CAUSE_IDENTIFIED,
 `LAYER: CW_LOGS_DELIVERY_DELAYED`.
@@ -508,11 +355,7 @@ aws cloudtrail lookup-events \
   --start-time $(date -d '-7 days' +%s) --end-time $(date +%s) --output json
 ```
 
-Not all AWS services emit CloudTrail events in every region. New
-services often log in us-east-1 first; some services log only at
-the regional endpoint; China regions and GovCloud have separate
-event sources. Cross-reference the AWS CloudTrail documentation for
-the service-region combination.
+> Service-region logging explanation moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
 **Verdict:** ROOT_CAUSE_IDENTIFIED,
 `LAYER: SERVICE_NOT_IN_REGION`.
@@ -645,80 +488,19 @@ CONFIRM: Before updating the event selector, emit and await:
 
 ## Pre-flight safety checks (run before any state-changing CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing
-  operation (`start-logging`, `stop-logging`, `update-trail`,
-  `put-event-selectors`, `put-insight-selectors`, `enable-kms-key`),
-  emit and await operator approval.
-- **Read-only first.** Every probe in the diagnostic tree is
-  read-only. Do not perform state-changing operations as probes.
-- **`start-logging`** is safe; trail resumes delivery within ~5 min.
-- **`stop-logging`** is disruptive; trail stops capturing immediately.
-- **`update-trail`** may break downstream consumers (Athena,
-  GuardDuty, SIEM). Confirm downstream impact.
-- **`put-event-selectors`** enabling data events incurs cost
-  ($0.10 per 100,000 events). Confirm cost impact.
-- **Bucket policy edits** affect every consumer of the bucket.
-  Tighten policy gradually; never deny-by-default without confirming
-  no other service depends on the bucket.
+> Pre-flight safety checks moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
 
 ## Remediation guidance
 
-### For TRAIL_DISABLED
-Identify who called StopLogging via `lookup-events`; restart via
-`aws cloudtrail start-logging --name <trail>`; if IaC-created, ensure
-the template includes `enable_logging = true` (Terraform) to prevent
-recurrence.
+> Per-layer remediation guidance moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
 
-### For BUCKET_POLICY_BLOCKING
-Add the canonical CloudTrail bucket policy statement
-(`cloudtrail.amazonaws.com` principal with `s3:GetBucketAcl`,
-`s3:ListBucket`, `s3:PutObject` and the `bucket-owner-full-control`
-condition). For org trails, ensure the Resource ARN covers the org
-ID (`o-<org-id>/*`). Verify with `aws s3 ls` within ~15 min.
+## References (load on demand)
 
-### For KMS_KEY_DISABLED
-Re-enable the key: `aws kms enable-key --key-id <id>`. If the key is
-`PendingDeletion` (within the deletion window), migrate the trail to
-a new key via `update-trail --kms-key-id <new-arn>`.
-
-### For DATA_EVENTS_NOT_ENABLED
-Add the data-event selector for the expected data source (S3, Lambda,
-DynamoDB). Confirm the cost impact with the operator before enabling.
-Verify with `lookup-events` 10-15 minutes after the change.
-
-### For ORG_TRAIL_SHADOWS_MEMBER
-Accept that events are in the org trail bucket (recommended for
-centralized audit). If member-local delivery is required, keep both
-trails — the org trail delivers to the org bucket and the member
-trail delivers to the member bucket.
-
-### For MULTI_REGION_SCOPE_GAP
-Convert via `aws cloudtrail update-trail --name <trail>
---is-multi-region-trail`. Verify with `lookup-events --region
-<other-region>`.
-
-### For EVENT_SELECTOR_READONLY
-Convert `ReadWriteType` to `All` via `put-event-selectors
---event-selectors '[{"ReadWriteType": "All",
-"IncludeManagementEvents": true}]'`.
-
-### For CW_LOGS_DELIVERY_DELAYED
-Verify `CloudWatchLogsRoleArn` on the trail; verify the role trusts
-`cloudtrail.amazonaws.com` and has `logs:CreateLogStream`,
-`logs:PutLogEvents`; verify the log group exists.
-
-### For LAKE_EDS_QUERY_ISSUE
-Verify the EDS event selectors match the events being queried;
-verify billing mode has query budget; verify EDS region matches.
-
-### For SERVICE_NOT_IN_REGION
-Cross-reference the AWS CloudTrail docs for the service-region
-combination. If the service logs in us-east-1 only, query
-`lookup-events --region us-east-1`.
-
-### For LOG_FILE_PREFIX_ERROR
-Read `S3KeyPrefix` from `describe-trails`; list the correct prefix:
-`aws s3 ls s3://<bucket>/<S3KeyPrefix>/AWSLogs/<account>/CloudTrail/`.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight gather-info command block, pre-flight safety checks, per-layer remediation guidance
+- [references/bucket-policy-and-org-trail-reference.md](references/bucket-policy-and-org-trail-reference.md) — canonical CloudTrail bucket policy, org trail topology, member shadow-trail patterns
+- [references/event-selectors-and-data-events-reference.md](references/event-selectors-and-data-events-reference.md) — event selector types, data-event opt-in rules, canonical data-event selector configurations
+- [references/error-handling.md](references/error-handling.md) — malformed-input / INSUFFICIENT_DATA re-prompt handling
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Mindset deep-dive, Step 0 non-obvious behaviours, per-step expert explanations
 
 ## Domain
 

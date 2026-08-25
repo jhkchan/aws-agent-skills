@@ -397,3 +397,91 @@ they don't depend on customer trails. Trail deletion is safe.
 For orgs using delegated administrator for CloudTrail Lake, EDS
 management is isolated from the org management account. Verify the
 delegated admin account before any EDS changes.
+
+## Output format (per operation) — full spec (moved from SKILL.md)
+
+```text
+TARGET: <trail-name>
+VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
+REASON: <1-2 sentences naming the recommendation and the supporting data>
+RECOMMENDATION:
+  Current: <trail inventory + data events + storage class + Lake + Logs>
+  Proposed: <consolidated inventory + curated events + Glacier + Lake scope>
+  Dimensions changed: <consolidation | data_events | lifecycle | lake | logs | kms_sns_insights | athena>
+  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
+ESTIMATED_SAVINGS:
+  Monthly: $<amount>
+  Annual: $<amount>
+  Assumptions: <list (event volumes, storage size, pricing region, etc.)>
+MIGRATION_STEPS:
+  1. <specific action with CLI command>
+  2. <verification step>
+CONFIRM: Before executing any state-changing CLI, emit and await operator
+  approval: "CONFIRM: About to <action> on <trail-name> in <region>.
+  Proceed? (yes/no)"
+```
+
+## Step 1 — the consolidation math (moved from SKILL.md)
+
+**The consolidation math:**
+```
+duplicate_management_event_cost =
+  (extra_trail_count × log_files_per_month × per_file_overhead)
+
+per_file_overhead =
+  S3 PUT ($0.005/1000) +
+  KMS GenerateDataKey ($0.03/10000) +
+  SNS publish ($0.50/1000000) ≈ $0.0000056/file
+
+Example: 10 member trails, 1.4M log files/month each:
+  duplicate cost = 9 × 1,400,000 × $0.0000056 = $70.56/month in overhead
+  + duplicate storage: 9 × 1.4M × 4KB avg = 50.4 GB × $0.023 = $1.16/month
+```
+
+## Step 2 — data-event saving from curation (moved from SKILL.md)
+
+**Data-event saving from curation:** Monthly saving equals
+`(old_volume − curated_volume) / 100000 × $0.10`. Example: 142M
+events/month with 80% low-value buckets; curating drops volume to 28M.
+Monthly saving: `((142M − 28M) / 100k) × $0.10 = $114/month` on data
+event fees plus ~600 GB/month saved S3 storage.
+
+## Step 3 — storage saving math (moved from SKILL.md)
+
+**Storage saving math (500 GB example):**
+```
+Standard only:        500 × $0.023 = $11.50/month steady-state
+With lifecycle:       ~$1.79/month steady-state (98.7% saving on archive tier)
+Note: Glacier IR retrieves cost $0.03/GB but reads are rare (audit queries).
+```
+
+## Step 4 — Lake cost math (moved from SKILL.md)
+
+**Lake cost math (100 GB/month ingest, 90-day retention):**
+```
+Before: ingestion 100 × $0.75 + retention 300 GB × $0.023 = $81.90/month
+After (mgmt-only, 90% cut): ingestion 10 × $0.75 + 30 GB × $0.023 = $8.19/month
+Saving: $73.71/month (90%)
+```
+
+## Step 5 — Logs delivery cost math (moved from SKILL.md)
+
+**Logs delivery cost math:**
+```
+monthly_logs_cost = monthly_ingested_GB × $0.50
+                 + monthly_storage_GB × $0.03 (Standard)
+
+Example: 100 GB/month ingest = $50/month in Logs alone
+         Equivalent S3 storage: 100 GB × $0.023 = $2.30/month
+         Saving from disabling Logs: $47.70/month (95%)
+```
+
+## Step 6 — KMS key consolidation math (moved from SKILL.md)
+
+**KMS key consolidation:**
+```
+Per-key monthly cost: $1.00 (CMK) + ~$0.50/request fees
+Per-trail-with-own-key overhead: $1.50/month × trail_count
+
+Recommendation: Share one CMK across all trails when key policy allows.
+```

@@ -157,80 +157,18 @@ condition matching the distribution ARN.
 
 ## Expert heuristic: OAC replaces OAI
 
-A baseline model may default to OAI because it is older. The correct
-heuristic recognizes that OAC is the successor for all new
-distributions.
-
-```text
-OAI vs OAC decision:
-  ├── New distribution with S3 origin → OAC (always)
-  ├── SSE-KMS-encrypted bucket → OAC with sigv4 (OAI does NOT support KMS)
-  ├── HTTP POST/PUT to S3 via CloudFront → OAC (OAI only signs GET/HEAD)
-  ├── Existing distribution with OAI → migrate to OAC (zero downtime)
-  ├── Legacy requirement (OAI only) → OAI (but plan migration)
-  └── Custom origin (ALB, EC2, on-prem) → neither (OAC is S3-only)
-```
-
-**Key implications:**
-- OAI does NOT support SSE-KMS (CloudFront cannot decrypt KMS-encrypted
-  objects via OAI). Use OAC with sigv4 signing.
-- OAI does NOT support POST/PUT requests (only GET/HEAD). OAC supports
-  all HTTP methods. Uploading via CloudFront to S3 requires OAC.
-- OAC is a global CloudFront resource (does not need to match the
-  bucket region). The S3 origin DomainName must include the region for
-  non-us-east-1 buckets.
+Expert heuristic — OAC replaces OAI (decision tree, SSE-KMS and POST/PUT support, global-resource note) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when deciding OAC vs OAI.
 
 ## Expert heuristic: bucket policy uses cloudfront.amazonaws.com
 
-A baseline model may use the OAC ID in the bucket policy. The correct
-heuristic recognizes that the bucket policy grants the
-`cloudfront.amazonaws.com` service principal — NOT the OAC ID — with
-a condition matching the distribution ARN.
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": {
-    "Sid": "AllowCloudFrontServicePrincipalReadOnly",
-    "Effect": "Allow",
-    "Principal": {"Service": "cloudfront.amazonaws.com"},
-    "Action": "s3:GetObject",
-    "Resource": "arn:aws:s3:::my-bucket/*",
-    "Condition": {
-      "StringEquals": {
-        "AWS:SourceArn": "arn:aws:cloudfront::111122223333:distribution/EDFDVBD6EXAMPLE"
-      }
-    }
-  }
-}
-```
-
-**Key implication:** the principal is always `cloudfront.amazonaws.com`
-and the `AWS:SourceArn` condition restricts which distribution can
-access the bucket. Using the OAC ID as the principal does not work.
+Expert heuristic — bucket policy principal (cloudfront.amazonaws.com with AWS:SourceArn, full JSON) moved verbatim to [references/oac-and-bucket-policy.md](references/oac-and-bucket-policy.md).
+Load it when writing the bucket policy.
 
 ## Expert heuristic: sigv4 signing for SSE-KMS origins
 
-A baseline model may not consider signing behavior. The correct
-heuristic recognizes that SSE-KMS-encrypted buckets require OAC to
-sign every request with SigV4, because S3 needs the signed request
-to authorize KMS decryption.
-
-```text
-Signing behavior options (OAC SigningBehavior):
-  ├── always-sign  → CloudFront ALWAYS signs origin requests (sigv4)
-  │     REQUIRED for: SSE-KMS buckets, POST/PUT requests
-  │     Recommended for: all new OAC configurations
-  ├── never-sign   → CloudFront NEVER signs (public S3 — rare)
-  └── no-override  → CloudFront signs ONLY if viewer request
-                    includes an Authorization header
-                    Does NOT work for SSE-KMS
-```
-
-**Key implication:** for SSE-KMS buckets, always use `always-sign`.
-Without sigv4-signed requests, S3 cannot authorize KMS decryption.
-The KMS key policy must also grant `cloudfront.amazonaws.com`
-`kms:Decrypt`.
+Expert heuristic — sigv4 signing for SSE-KMS origins (always-sign vs no-override vs never-sign) moved verbatim to [references/oai-migration-and-sse-kms.md](references/oai-migration-and-sse-kms.md).
+Load it when choosing SigningBehavior.
 
 ## Prerequisites (verify before provisioning)
 
@@ -327,18 +265,8 @@ aws s3api put-bucket-policy --bucket my-bucket --policy '{
 - The bucket must NOT be public. Remove any `Principal: "*"` grants —
   OAC replaces public access.
 
-**For multi-distribution to single bucket**, list all ARNs:
-
-```json
-"Condition": {
-  "StringEquals": {
-    "AWS:SourceArn": [
-      "arn:aws:cloudfront::111122223333:distribution/EDFDVBD6EXAMPLE",
-      "arn:aws:cloudfront::111122223333:distribution/E2QWRUEXAMPLE2"
-    ]
-  }
-}
-```
+Step 3 multi-distribution AWS:SourceArn list JSON moved verbatim to [references/oac-and-bucket-policy.md](references/oac-and-bucket-policy.md).
+Load it when several distributions share a bucket.
 
 ## Step 4 — CloudFront distribution with OAC origin
 
@@ -400,118 +328,18 @@ For SSE-KMS-encrypted S3 buckets, OAC with `always-sign` is required,
 AND the KMS key policy must grant `cloudfront.amazonaws.com` the
 `kms:Decrypt` permission.
 
-**Verify the bucket uses SSE-KMS:**
-
-```bash
-aws s3api get-bucket-encryption --bucket my-bucket \
-  --query 'ServerSideEncryptionConfiguration.Rules[0].ApplyServerSideEncryptionByDefault' \
-  --output table
-# Expected: SSEAlgorithm: aws:kms, KMSMasterKeyID: arn:aws:kms:...
-```
-
-**Update the KMS key policy:**
-
-```bash
-aws kms put-key-policy \
-  --key-id arn:aws:kms:us-east-1:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab \
-  --policy-name default \
-  --policy '{
-    "Version": "2012-10-17",
-    "Statement": [{
-      "Sid": "AllowCloudFrontServicePrincipalKMSDecrypt",
-      "Effect": "Allow",
-      "Principal": {"Service": "cloudfront.amazonaws.com"},
-      "Action": "kms:Decrypt",
-      "Resource": "*",
-      "Condition": {
-        "StringEquals": {
-          "AWS:SourceArn": "arn:aws:cloudfront::111122223333:distribution/EDFDVBD6EXAMPLE"
-        }
-      }
-    }]
-  }'
-```
-
-**Critical:** the KMS key policy uses the SAME
-`cloudfront.amazonaws.com` principal and `AWS:SourceArn` condition
-pattern as the S3 bucket policy. Both must be present for SSE-KMS.
+Step 6 SSE-KMS verification commands and KMS key policy CLI moved verbatim to [references/oai-migration-and-sse-kms.md](references/oai-migration-and-sse-kms.md).
+Load it when the bucket is SSE-KMS encrypted.
 
 ## Step 7 — Multi-distribution to single bucket
 
-When multiple CloudFront distributions serve from a single S3 bucket,
-each distribution has its own OAC, but the bucket policy must list
-ALL distribution ARNs in the `AWS:SourceArn` condition.
-
-```bash
-aws s3api put-bucket-policy --bucket shared-bucket --policy '{
-  "Version": "2012-10-17",
-  "Statement": {
-    "Sid": "AllowMultipleCloudFrontDistributions",
-    "Effect": "Allow",
-    "Principal": {"Service": "cloudfront.amazonaws.com"},
-    "Action": "s3:GetObject",
-    "Resource": "arn:aws:s3:::shared-bucket/*",
-    "Condition": {
-      "StringEquals": {
-        "AWS:SourceArn": [
-          "arn:aws:cloudfront::111122223333:distribution/EDFDVBD6EXAMPLE",
-          "arn:aws:cloudfront::111122223333:distribution/E2QWRUEXAMPLE2",
-          "arn:aws:cloudfront::111122223333:distribution/E3EXAMPLE3XXX"
-        ]
-      }
-    }
-  }
-}'
-```
-
-**Alternative: `AWS:SourceAccount`** grants ALL distributions in the
-account access. Simpler to manage but less restrictive. Prefer listing
-individual ARNs for production.
-
-**Each distribution should still have its own OAC** — the OAC is per-
-distribution, not per-bucket.
+Step 7 multi-distribution bucket policy (multi-ARN SourceArn list, AWS:SourceAccount alternative) moved verbatim to [references/oac-and-bucket-policy.md](references/oac-and-bucket-policy.md).
+Load it when sharing one bucket across distributions.
 
 ## Step 8 — OAI to OAC migration (no downtime)
 
-Migrating from OAI to OAC can be done with zero downtime by adding
-the OAC alongside the existing OAI before removing the OAI.
-
-```text
-Migration flow (zero downtime):
-  1. Create the OAC (create-origin-access-control)
-  2. Update the bucket policy to add cloudfront.amazonaws.com grant
-     (KEEP the existing OAI canonical user ID grant during transition)
-  3. Update the distribution origin to set OriginAccessControlId
-     (KEEP the existing S3OriginConfig.OriginAccessIdentity / OAI)
-     → Both OAC and OAI configured during transition
-     → Distribution deploys — traffic continues flowing
-  4. Verify CloudFront serves objects correctly (no 403)
-  5. Remove the OAI from the distribution origin (set to empty)
-  6. Remove the OAI canonical user ID from the bucket policy
-  7. Delete the OAI (delete-origin-access-identity)
-```
-
-**Step 2 — bucket policy with BOTH grants during transition:**
-
-```bash
-# ADD the cloudfront.amazonaws.com OAC grant (KEEP existing OAI grant)
-aws s3api put-bucket-policy --bucket my-bucket --policy '{
-  "Version": "2012-10-17",
-  "Statement": [
-    {"Sid":"AllowCloudFrontOAC","Effect":"Allow","Principal":{"Service":"cloudfront.amazonaws.com"},"Action":"s3:GetObject","Resource":"arn:aws:s3:::my-bucket/*","Condition":{"StringEquals":{"AWS:SourceArn":"arn:aws:cloudfront::111122223333:distribution/EDFDVBD6EXAMPLE"}}},
-    {"Sid":"AllowLegacyOAI","Effect":"Allow","Principal":{"CanonicalUser":"<oai-canonical-user-id>"},"Action":"s3:GetObject","Resource":"arn:aws:s3:::my-bucket/*"}
-  ]
-}'
-```
-
-**Step 5 — remove OAI from distribution** (set
-`S3OriginConfig.OriginAccessIdentity` to `""`, keep
-`OriginAccessControlId`). **Step 6** — remove the legacy OAI statement
-from the bucket policy. **Step 7** — delete the OAI:
-
-```bash
-aws cloudfront delete-origin-access-identity --id <oai-id> --if-match <etag>
-```
+Step 8 zero-downtime OAI-to-OAC migration flow (dual-grant bucket policy, distribution cutover, OAI cleanup) moved verbatim to [references/oai-migration-and-sse-kms.md](references/oai-migration-and-sse-kms.md).
+Load it when migrating a legacy OAI distribution.
 
 ## Step 9 — Origin type: S3 vs S3 bucket with Website Endpoint
 
@@ -568,26 +396,8 @@ S3 origin DomainName by region:
 
 ## Step 11 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **OAC general availability (2022-2023):** OAC launched as the
-  successor to OAI, adding SSE-KMS and POST/PUT support. AWS
-  recommends OAC for all new S3-origin distributions.
-
-- **OAC Terraform support (2023):** The
-  `aws_cloudfront_origin_access_control` resource and
-  `origin_access_control_id` field enable declarative OAC management.
-
-- **CloudFront continuous deployment (2023-2024):** Enables testing
-  distribution changes (including OAC) in staging before production.
-  Useful for OAI-to-OAC migration validation.
-
-- **SSE-KMS OAC clarification (2024-2025):** AWS clarified the KMS
-  key policy requirements (`cloudfront.amazonaws.com` principal with
-  `AWS:SourceArn` condition).
-
-- **CloudFront VPC origin support (2025-2026):** Added VPC origins
-  (private origins in a VPC). Separate from OAC (OAC is S3-only).
+Step 11 recent features (OAC GA, Terraform support, continuous deployment, SSE-KMS clarification, VPC origins) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when auditing or migrating.
 
 ## NEVER do these things
 
@@ -676,29 +486,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### CloudFront returns 403 AccessDenied from S3
-- The S3 bucket policy is missing or incorrect. Verify the policy
-  grants `cloudfront.amazonaws.com` `s3:GetObject` with the correct
-  `AWS:SourceArn` matching the distribution ARN.
+Error handling deep dives (S3 403, KMS 403, OAC not signing, migration downtime, multi-distribution 403) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load it when the distribution returns 403.
 
-### CloudFront returns 403 from KMS (SSE-KMS buckets)
-- The KMS key policy does not grant `cloudfront.amazonaws.com`
-  `kms:Decrypt`. Update with the same principal and condition pattern.
-- Verify OAC `SigningBehavior` is `always-sign` (sigv4).
+## References (load on demand)
 
-### OAC not signing requests (objects served without OAC)
-- Verify the distribution origin `OriginAccessControlId` is set. If
-  empty, OAC is not used.
-- Verify the origin type is S3 (not Website Endpoint).
-
-### OAI-to-OAC migration causes downtime
-- The OAI was removed before the OAC was fully functional. Keep both
-  active during migration, verify traffic, then remove the OAI.
-
-### Multi-distribution: some distributions get 403
-- The bucket policy `AWS:SourceArn` list is missing distribution ARNs.
-  Verify ALL ARNs are listed, or use `AWS:SourceAccount` for broader
-  access.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — OAC-replaces-OAI heuristic and recent features moved from SKILL.md
+- [references/error-handling.md](references/error-handling.md) — 403/migration failure deep dives moved from SKILL.md
+- [references/oac-and-bucket-policy.md](references/oac-and-bucket-policy.md) — OAC parameters, bucket policy patterns, signing deep dive (now also holds the bucket-policy-principal heuristic and the multi-distribution JSON)
+- [references/oai-migration-and-sse-kms.md](references/oai-migration-and-sse-kms.md) — migration and SSE-KMS detail (now also holds the sigv4 heuristic, KMS key policy CLI, and the Step 8 migration flow)
 
 ## Domain
 

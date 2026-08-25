@@ -173,104 +173,23 @@ scoping impossible.
 
 ### Lambda forwarder (Slack incoming webhook)
 
-```python
-import json, urllib.request, os, boto3
-
-WEBHOOK_PARAM = os.environ['SLACK_WEBHOOK_PARAM']  # Parameter Store name
-
-def lambda_handler(event, context):
-    ssm = boto3.client('ssm')
-    if ssm.get_parameter(Name='/notifications/kill-switch')['Parameter']['Value'] == 'disabled':
-        return {'status': 'killed'}
-    webhook = ssm.get_parameter(Name=WEBHOOK_PARAM, WithDecryption=True)['Parameter']['Value']
-    record = event['Records'][0]['Sns']
-    alarm = json.loads(record['Message'])
-    msg = {
-        'text': f":rotating_light: *{alarm.get('AlarmName', 'unknown')}* -> {alarm.get('NewStateValue', 'ALARM')}",
-        'blocks': [
-            {'type': 'header', 'text': {'type': 'plain_text', 'text': f"Alarm: {alarm.get('AlarmName')}"}},
-            {'type': 'section', 'fields': [
-                {'type': 'mrkdwn', 'text': f"*State:* {alarm.get('NewStateValue')} (was {alarm.get('OldStateValue')})"},
-                {'type': 'mrkdwn', 'text': f"*Reason:* {alarm.get('NewStateReason', 'N/A')[:300]}"},
-                {'type': 'mrkdwn', 'text': f"*Region:* {alarm.get('Region')}"}]},
-            {'type': 'section', 'text': {'type': 'mrkdwn', 'text': f"*Runbook:* {alarm.get('RunbookLink', 'https://runbooks.example.com/')}"}}
-        ]}
-    urllib.request.urlopen(urllib.request.Request(
-        webhook, json.dumps(msg).encode(), {'Content-Type': 'application/json'}))
-    return {'status': 'sent'}
-```
-
-**Secret storage:** Parameter Store for webhooks (free, encrypted by
-default); Secrets Manager for OAuth tokens (paid, rotation). NEVER
-hardcode in Lambda environment variables — they are visible in
-CloudTrail `GetFunctionConfiguration` and the console.
+Handler code moved verbatim to [references/notification-patterns-and-deployment.md](references/notification-patterns-and-deployment.md) — "Lambda forwarder handler": full Python handler (kill-switch check, SSM-fetched webhook, Slack blocks) + secret-storage rule (Parameter Store for webhooks, Secrets Manager for OAuth; never env vars).
+Load before writing or reviewing a forwarder.
 
 ### PagerDuty via Events API v2
 
-```python
-import json, urllib.request, boto3
-
-def lambda_handler(event, context):
-    ssm = boto3.client('ssm')
-    routing_key = ssm.get_parameter(Name='/pagerduty/integration-key', WithDecryption=True)['Parameter']['Value']
-    alarm = json.loads(event['Records'][0]['Sns']['Message'])
-    action = 'trigger' if alarm.get('NewStateValue') == 'ALARM' else 'resolve'
-    dedup = alarm.get('AlarmName', 'alarm') + ':' + alarm.get('Region', '')
-    payload = {
-        'routing_key': routing_key, 'event_action': action, 'dedup_key': dedup,
-        'payload': {
-            'summary': f"{alarm.get('AlarmName')} -> {alarm.get('NewStateValue')}",
-            'severity': 'critical' if 'critical' in alarm.get('AlarmName', '').lower() else 'error',
-            'source': f"aws:cloudwatch:{alarm.get('Region')}",
-            'custom_details': {'reason': alarm.get('NewStateReason', 'N/A')[:500]}}}
-    urllib.request.urlopen(urllib.request.Request(
-        'https://events.pagerduty.com/v2/enqueue',
-        json.dumps(payload).encode(), {'Content-Type': 'application/json'}))
-    return {'status': 'paged'}
-```
-
-**Dedup key:** PagerDuty correlates trigger/resolve by `dedup_key`. Use
-`AlarmName:Region` so a fire-then-clear auto-resolves the same incident.
-Without a stable dedup key, every state change creates a NEW incident —
-the #1 PagerDuty integration bug.
+Handler code moved verbatim to [references/notification-patterns-and-deployment.md](references/notification-patterns-and-deployment.md) — "PagerDuty Events API v2": trigger/resolve logic and the mandatory `dedup_key = AlarmName:Region` rule.
+Load before wiring PagerDuty; a missing stable dedup key is the #1 integration bug.
 
 ### Subscription + confirmation (MANDATORY verification)
 
-```bash
-aws sns subscribe \
-  --topic-arn arn:aws:sns:us-east-1:111111111111:alarm-notifications-prod \
-  --protocol lambda \
-  --notification-endpoint arn:aws:lambda:us-east-1:111111111111:function:alarm-slack-forwarder
-
-# GRANT SNS permission to invoke the Lambda (commonly missed!)
-aws lambda add-permission \
-  --function-name alarm-slack-forwarder \
-  --statement-id AllowSNSInvoke \
-  --action lambda:InvokeFunction \
-  --principal sns.amazonaws.com \
-  --source-arn arn:aws:sns:us-east-1:111111111111:alarm-notifications-prod
-
-# VERIFY (SubscriptionArn must NOT be "PendingConfirmation")
-aws sns list-subscriptions-by-topic \
-  --topic-arn arn:aws:sns:us-east-1:111111111111:alarm-notifications-prod
-```
-
-Lambda subscriptions auto-confirm but require `lambda:add-permission`.
-HTTPS/email/SMS subscriptions require explicit endpoint confirmation.
-Always verify `SubscriptionArn` is populated.
+Exact CLI sequence moved verbatim to [references/notification-patterns-and-deployment.md](references/notification-patterns-and-deployment.md) — subscribe, the commonly-missed `lambda add-permission`, and the `list-subscriptions-by-topic` verification.
+Lambda subscriptions auto-confirm but STILL need add-permission; HTTPS/email/SMS need endpoint confirmation.
 
 ### Test publish (run after every subscription change)
 
-```bash
-aws sns publish \
-  --topic-arn arn:aws:sns:us-east-1:111111111111:alarm-notifications-prod \
-  --subject "TEST alarm notification" \
-  --message '{"AlarmName":"test-alarm","NewStateValue":"ALARM","OldStateValue":"OK","NewStateReason":"Manual test publish","Region":"us-east-1"}'
-```
-
-If the test does not arrive in Slack/PagerDuty within 30 seconds, the
-subscription is unconfirmed OR the Lambda errored. Check CloudWatch Logs
-before relying on the workflow.
+Test-publish command and 30-second delivery rule moved verbatim to [references/notification-patterns-and-deployment.md](references/notification-patterns-and-deployment.md).
+If the test does not arrive, the subscription is unconfirmed OR the Lambda errored — check CloudWatch Logs.
 
 ## EventBridge on alarm state change
 
@@ -312,56 +231,8 @@ fan to multiple targets with different filters (`alarmName.prefix`).
 Auto-create a ticket when an alarm fires, auto-resolve when it clears.
 Pattern: EventBridge rule -> Lambda -> Jira/ServiceNow REST API.
 
-```python
-import json, urllib.request, os, boto3, base64
-
-def lambda_handler(event, context):
-    ssm = boto3.client('ssm')
-    token = ssm.get_parameter(Name='/jira/api-token', WithDecryption=True)['Parameter']['Value']
-    email = ssm.get_parameter(Name='/jira/email')['Parameter']['Value']
-    project = os.environ['JIRA_PROJECT']
-    detail = event['detail']
-    alarm_name, state = detail['alarmName'], detail['stateName']
-    auth = base64.b64encode(f"{email}:{token}".encode()).decode()
-    dynamo = boto3.client('dynamodb')
-
-    if state == 'ALARM':
-        # Idempotency: check for existing open ticket
-        existing = dynamo.get_item(TableName='alarm-ticket-map',
-            Key={'alarmName': {'S': alarm_name}}).get('Item')
-        if existing:
-            return {'status': 'duplicate-suppressed'}
-        body = {'fields': {
-            'project': {'key': project},
-            'summary': f"[ALARM] {alarm_name} -> ALARM",
-            'description': f"Reason: {detail.get('stateReason', 'N/A')}\nRunbook: https://runbooks.example.com/",
-            'issuetype': {'name': 'Incident'},
-            'labels': ['auto-created', 'cloudwatch-alarm']}}
-        req = urllib.request.Request(
-            f"https://your-domain.atlassian.net/rest/api/3/issue",
-            json.dumps(body).encode(),
-            {'Content-Type': 'application/json', 'Authorization': f'Basic {auth}'})
-        issue_key = json.loads(urllib.request.urlopen(req).read())['key']
-        dynamo.put_item(TableName='alarm-ticket-map',
-            Item={'alarmName': {'S': alarm_name}, 'issueKey': {'S': issue_key}})
-    elif state == 'OK':
-        item = dynamo.get_item(TableName='alarm-ticket-map',
-            Key={'alarmName': {'S': alarm_name}}).get('Item')
-        if item:
-            key = item['issueKey']['S']
-            # Transition to Resolved
-            urllib.request.urlopen(urllib.request.Request(
-                f"https://your-domain.atlassian.net/rest/api/3/issue/{key}/transitions",
-                json.dumps({'transition': {'id': '31'}}).encode(),
-                {'Content-Type': 'application/json', 'Authorization': f'Basic {auth}'}))
-    return {'status': state}
-```
-
-**Idempotency is MANDATORY.** Without the DynamoDB dedup check, alarm
-flapping (OK -> ALARM every 60s) creates dozens of tickets per hour.
-ServiceNow follows the same pattern: `POST /api/now/table/incident` with
-`short_description`, store `sys_id` in DynamoDB keyed by alarm name,
-auto-resolve via `PATCH` with `state=6` when alarm clears.
+Handler code moved verbatim to [references/notification-patterns-and-deployment.md](references/notification-patterns-and-deployment.md) — full Jira Lambda with the MANDATORY DynamoDB idempotency check, plus the ServiceNow equivalent.
+Without dedup, alarm flapping creates dozens of tickets per hour.
 
 ## Composite alarm correlation + fatigue reduction
 
@@ -396,121 +267,13 @@ N alarms within a 5-minute window for the same service, build a composite.
 For 2-tier or 3-tier escalation (primary -> secondary -> manager), use a
 Step Functions state machine with `Wait` + `Choice` + SNS targets.
 
-```json
-{
-  "StartAt": "PagePrimary",
-  "States": {
-    "PagePrimary": {
-      "Type": "Task",
-      "Resource": "arn:aws:sns:us-east-1:111111111111:on-call-primary",
-      "Next": "WaitForAck"
-    },
-    "WaitForAck": {"Type": "Wait", "Seconds": 300, "Next": "CheckAck"},
-    "CheckAck": {
-      "Type": "Choice",
-      "Choices": [{"Variable": "$.acknowledged", "BooleanEquals": true, "Next": "Done"}],
-      "Default": "PageSecondary"
-    },
-    "PageSecondary": {
-      "Type": "Task",
-      "Resource": "arn:aws:sns:us-east-1:111111111111:on-call-secondary",
-      "Next": "WaitForAck2"
-    },
-    "WaitForAck2": {"Type": "Wait", "Seconds": 300, "Next": "CheckAck2"},
-    "CheckAck2": {
-      "Type": "Choice",
-      "Choices": [{"Variable": "$.acknowledged", "BooleanEquals": true, "Next": "Done"}],
-      "Default": "PageManager"
-    },
-    "PageManager": {
-      "Type": "Task",
-      "Resource": "arn:aws:sns:us-east-1:111111111111:on-call-manager",
-      "Next": "Done"
-    },
-    "Done": {"Type": "Succeed"}
-  }
-}
-```
-
-**Ack mechanism:** the SNS message includes a one-click ack URL (API
-Gateway + Lambda writing to DynamoDB). After each `Wait`, the state
-machine reads the ack state. If acknowledged, exit; otherwise escalate.
-
-**Tier timing baseline (2026):**
-- Standard: Primary -> 5 min -> Secondary -> 5 min -> Manager.
-- Critical (SEV-1): Primary -> 2 min -> Secondary + Manager simultaneously.
-- Low-severity: Primary only, no escalation.
+State-machine JSON, ack URL mechanism, and tier timing baselines moved verbatim to [references/notification-patterns-and-deployment.md](references/notification-patterns-and-deployment.md).
+Standard: 5 min between tiers; SEV-1: 2 min then simultaneous secondary + manager.
 
 ## 2024-2026 native surfaces
 
-### AWS User Notifications (chat-based, no Lambda glue)
-
-AWS User Notifications (2024-2025) delivers CloudWatch alarm state
-changes natively to Slack, Amazon Chime, Microsoft Teams, email, and the
-AWS Console Notifications Center without any Lambda forwarder.
-
-```bash
-aws notifications create-notification-hub --region us-east-1
-
-aws chatbot create-slack-channel-configuration \
-  --configuration-name prod-alarm-slack \
-  --slack-workspace-id T0XXXXXXXX \
-  --slack-channel-id C0XXXXXXXX \
-  --sns-topic-arns arn:aws:sns:us-east-1:111111111111:aws-chatbot \
-  --iam-role-arn arn:aws:iam::111111111111:role/aws-chatbot-role
-```
-
-| Dimension | User Notifications (Chatbot) | Lambda forwarder |
-|---|---|---|
-| Setup time | Minutes (console) | Hours (code + deploy) |
-| Formatting | AWS-default (limited) | Full custom (Slack blocks, buttons) |
-| Interactive buttons | Limited (ack from Slack) | Full (custom actions) |
-| Maintenance | AWS-managed | You maintain Lambda runtime |
-| Use when | Standard alarm -> chat | Custom formatting / multi-step workflow |
-
-### SNS SMS + phone-number subscriptions (page-the-human)
-
-```bash
-aws sns subscribe \
-  --topic-arn arn:aws:sns:us-east-1:111111111111:on-call-critical \
-  --protocol sms \
-  --notification-endpoint +15551234567
-```
-
-**Caveats:**
-- SMS subscriptions require confirmation (reply YES).
-- SMS delivery is best-effort, NOT guaranteed. Use PagerDuty/Opsgenie
-  for guaranteed delivery; SNS SMS as backup.
-- SMS cost per message varies by country ($0.00645 in US). A flapping
-  alarm at 60s intervals = $9/day in SMS charges. Always pair with a
-  composite rollup to deduplicate.
-  via SNS + Amazon Pinpoint — verify regional availability.
-
-### Amazon Q operational analysis (alarm triage)
-
-Amazon Q (2024-2025) provides natural-language triage for CloudWatch
-alarms. When an alarm fires, Q analyzes related logs, metrics,
-deployments, and prior incidents, then produces a "what changed, what
-to check, what to do" summary.
-
-```bash
-aws application-signals update-application \
-  --application-identifier prod-checkout \
-  --operational-analysis-config '{"enabled": true}'
-```
-
-The SNS notification can include a deep link to the Q analysis:
-`https://console.aws.amazon.com/cloudwatch/home?region=us-east-1#amazonq:alarm=<alarm-name>`.
-
-**What Q adds (vs raw alarm notification):**
-- Correlates the alarm with recent deployments (CodeDeploy /
-  CodePipeline) — "alarm started 8 min after deploy v123."
-- Surfaces related log errors via Logs Insights query.
-- Compares current metric to the prior 7-day baseline.
-- Suggests a remediation runbook based on the alarm type.
-
-Use Q as the triage layer ON TOP of the notification surface: the
-notification wakes the human; Q tells the human what to do next.
+Implementation detail moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — User Notifications setup CLI + comparison matrix, SNS SMS/phone caveats (confirmation, best-effort delivery, cost), Amazon Q operational analysis setup and what Q adds.
+The decision tree above already encodes WHEN to pick each surface; load the reference for the HOW.
 
 ## Safety & kill-switch (MANDATORY)
 
@@ -669,47 +432,18 @@ relying on the workflow.
 
 ## Edge-case handling
 
-- **Alarm flapping (OK -> ALARM every 60s).** Without a composite
-  rollup, this generates 60 pages/hour. Fix: build a composite with
-  `DatapointsToAlarm=2, EvaluationPeriods=3`, OR add a dedup window in
-  the Lambda forwarder (track last-notified timestamp in DynamoDB;
-  suppress if within 5 min).
-- **Cross-region alarm notification.** SNS topics are regional. An alarm
-  in eu-west-1 cannot directly invoke an SNS topic in us-east-1. Use
-  EventBridge global endpoint bus or deploy the stack in every region.
-- **Lambda forwarder timeout.** The default 3s is too short for
-  PagerDuty API calls (2-5s under load). Set timeout to at least 10s
-  and provision concurrency headroom — 50 alarms in 10s will throttle.
-- **PagerDuty rate limiting.** Events API v2 rate-limits at
-  300 events/min per routing key. A composite rollup deduplicates to
-  one event; N child alarms without rollup can hit the limit.
-- **Slack rate limiting.** Incoming webhooks rate-limit at
-  1 msg/sec/channel with bursts. Composite rollup prevents this;
-  without it, alarms pile up in Slack's queue and arrive minutes late.
-- **AWS User Notifications + Lambda double-notify.** If both are wired
-  to the same SNS topic, every alarm produces two Slack messages.
-  Verify Chatbot subscribes to a separate topic.
+Edge-case catalog moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — flapping, cross-region topics, Lambda timeout, PagerDuty/Slack rate limits, Chatbot double-notify.
+Load when a deployed workflow misbehaves under load or across regions.
 
 ## Recent AWS features (2024-2026)
 
-- **AWS User Notifications (2024-2025):** Native chat-based delivery
-  (Slack, Chime, Teams) for CloudWatch alarm state changes without
-  Lambda glue. Configured via Console or `aws notifications` CLI.
-  Reduces setup time from hours to minutes; offers less formatting
-  control than a Lambda forwarder.
-- **Amazon Q operational analysis (2024-2025):** Natural-language
-  triage for CloudWatch alarms. Q correlates the alarm with deployments,
-  logs, metrics, and prior incidents; produces a "what changed, what to
-  check" summary. Layer on top of any notification surface.
-- **SNS SMS sandbox lift (2024):** Production SMS subscriptions no
-  longer require sandbox exit in most regions. Verify monthly spend via
-  AWS Budgets — flapping alarms can exhaust SMS budget.
-- **CloudWatch cross-account composite alarms (2024-2025):** Composite
-  rules can reference child alarms in other accounts via `AccountId` in
-  the Metrics array. Use for multi-account rollups.
-- **EventBridge global endpoints (2024-2025):** Multi-region event bus
-  failover for cross-region notification workflows. Primary bus in
-  us-east-1 with failover to us-west-2.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — User Notifications, Amazon Q triage, SNS SMS sandbox lift, cross-account composite alarms, EventBridge global endpoints.
+Load when adopting 2024-2026 surfaces.
+
+## References (load on demand)
+
+- [references/notification-patterns-and-deployment.md](references/notification-patterns-and-deployment.md) — deployment reference + moved inline code: Slack/PagerDuty forwarder handlers, subscription + confirmation commands, test publish, alarm-to-ticket Lambda (Jira/ServiceNow, idempotency), tiered-escalation Step Functions JSON with ack + timing.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — 2024-2026 native surfaces detail (User Notifications setup, SNS SMS/phone caveats, Amazon Q triage), the edge-case catalog (flapping, cross-region, rate limits, double-notify), and recent AWS features (2024-2026).
 
 ## Domain
 

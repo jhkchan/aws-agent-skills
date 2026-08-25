@@ -221,3 +221,30 @@ function handler(event) {
 
 Once the report endpoint shows zero violations over a week, switch to
 the enforced CSP in the response headers policy.
+
+## Non-negotiable config blocks (moved from SKILL.md)
+
+The non-negotiable security headers config block (custom policy):
+
+```text
+SecurityHeadersConfig:
+  ContentSecurityPolicy: { Content: "default-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'", Override: true }
+  StrictTransportSecurity: { AccessControlMaxAgeSec: 63072000, IncludeSubdomains: true, Preload: true, Override: true }
+  XFrameOptions: { FrameOption: DENY, Override: true }
+  XContentTypeOptions: { Override: true }
+  ReferrerPolicy: { ReferrerPolicy: "strict-origin-when-cross-origin", Override: true }
+  PermissionsPolicy: { Content: "camera=(), microphone=(), geolocation=(), payment=()", Override: true }
+```
+
+The non-negotiable CORS-with-credentials config block:
+
+```text
+CorsConfig:
+  AccessControlAllowOrigins: { Items: ["https://app.example.com"], Quantity: 1 }
+  AccessControlAllowMethods: { Items: ["GET", "POST", "OPTIONS"], Quantity: 3 }
+  AccessControlAllowHeaders: { Items: ["Authorization", "Content-Type"], Quantity: 2 }
+  AccessControlAllowCredentials: true   # REQUIRES specific origins, NOT "*"
+  AccessControlExposeHeaders: { Items: ["X-Total-Count"], Quantity: 1 }
+  AccessControlMaxAgeSec: 86400
+  OriginOverride: true
+```

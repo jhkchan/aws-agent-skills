@@ -191,3 +191,25 @@ under `ReadOnly`.
 - CloudTrail Insights: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/logging-insights-events-with-cloudtrail.html
 - CloudTrail Lake: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-lake.html
 - S3 data events: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/logging-data-events-with-cloudtrail.html
+
+## Canonical data-event selector configurations (Step 4)
+
+Data events require an event selector with `DataResources`
+configured. The canonical configurations:
+
+| Data source | Required event selector |
+|---|---|
+| S3 GetObject / PutObject / DeleteObject | `DataResources: [{ Type: "AWS::S3::Object", Values: ["arn:aws:s3:::<bucket>/"] }]` (trailing slash matters) |
+| Lambda InvokeFunction | `DataResources: [{ Type: "AWS::Lambda::Function", Values: ["arn:aws:lambda"] }]` |
+| DynamoDB GetItem / PutItem / DeleteItem | `DataResources: [{ Type: "AWS::DynamoDB::Stream", Values: ["arn:aws:dynamodb"] }]` (advanced event selector recommended) |
+
+To enable S3 data events for a specific bucket:
+
+```bash
+aws cloudtrail put-event-selectors --trail-name <trail> \
+  --event-selectors '[{
+    "ReadWriteType": "All",
+    "IncludeManagementEvents": true,
+    "DataResources": [{ "Type": "AWS::S3::Object", "Values": ["arn:aws:s3:::<bucket>/"] }]
+  }]'
+```

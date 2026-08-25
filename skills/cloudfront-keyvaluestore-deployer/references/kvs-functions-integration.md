@@ -230,3 +230,34 @@ is `arn:aws:cloudfront::<account-id>:function/<function-name>`.
    not the distribution. The distribution references the function only.
 7. **Exceeding 1 MB.** Monitor KvsSize. The function cannot write, so
    all data must fit within the limit via the write path.
+
+## Step 4: Function code for percentage-based A/B routing (moved from SKILL.md)
+
+**Function code for percentage-based A/B routing:**
+
+```javascript
+import cf from 'cloudfront';
+
+const kvs = cf.openKvs();
+
+function handler(event) {
+    const request = event.request;
+    if (kvs.get('ab-active') !== 'true') return request;
+
+    // Deterministic hash for stable assignment
+    const seed = request.headers['host'].value + request.querystring;
+    const hash = Math.abs(
+        seed.split('').reduce((h, c) => {
+            h = ((h << 5) - h) + c.charCodeAt(0); return h | 0;
+        }, 0)
+    );
+    const percentage = parseInt(kvs.get('ab-percentage') || '0', 10);
+    if (hash % 100 < percentage) {
+        request.headers['x-ab-variant'] = { value: 'variant-b' };
+        request.uri = request.uri.replace('/api/', '/api-v2/');
+    } else {
+        request.headers['x-ab-variant'] = { value: 'variant-a' };
+    }
+    return request;
+}
+```

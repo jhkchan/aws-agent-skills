@@ -516,3 +516,133 @@ aws xray get-trace-summaries \
   --start-time $(date -u +%s --date='10 min ago') \
   --end-time $(date -u +%s) --region us-east-1
 ```
+---
+
+## Step 2: sink policy payload (heredoc + put-sink-policy) (moved from SKILL.md)
+
+```bash
+cat > /tmp/sink-policy.json <<'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": { "AWS": "arn:aws:iam::444455556666:root" },
+      "Action": ["oam:CreateLink", "oam:UpdateLink", "oam:DeleteLink"],
+      "Resource": "*",
+      "Condition": {
+        "ForAllValues:StringEquals": {
+          "oam:ResourceTypes": ["AWS::CloudWatch::Metric", "AWS::Logs::LogGroup", "AWS::XRay::Trace", "AWS::ApplicationSignals::Service"]
+        }
+      }
+    },
+    {
+      "Effect": "Allow",
+      "Principal": { "AWS": "arn:aws:iam::777788889999:root" },
+      "Action": ["oam:CreateLink", "oam:UpdateLink", "oam:DeleteLink"],
+      "Resource": "*"
+    }
+  ]
+}
+EOF
+
+aws oam put-sink-policy \
+  --sink-identifier arn:aws:oam:us-east-1:111122223333:sink/ProdObservabilitySink \
+  --policy file:///tmp/sink-policy.json \
+  --region us-east-1
+```
+---
+
+## Step 3: source-account IAM role payloads (moved from SKILL.md)
+
+```bash
+# Run from each SOURCE account
+cat > /tmp/oam-link-trust.json <<'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": { "Service": "lambda.amazonaws.com" },
+    "Action": "sts:AssumeRole"
+  }]
+}
+EOF
+
+aws iam create-role \
+  --role-name OAMLinkRole \
+  --assume-role-policy-document file:///tmp/oam-link-trust.json
+
+cat > /tmp/oam-link-permission.json <<'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": [
+      "oam:CreateLink", "oam:UpdateLink", "oam:GetLink",
+      "oam:DeleteLink", "oam:GetSink", "oam:ListAttachedLinks"
+    ],
+    "Resource": "arn:aws:oam:us-east-1:111122223333:sink/ProdObservabilitySink"
+  }]
+}
+EOF
+
+aws iam put-role-policy \
+  --role-name OAMLinkRole \
+  --policy-name OAMLinkPermissions \
+  --policy-document file:///tmp/oam-link-permission.json
+```
+---
+
+## Step 4: OAM link payload (link-config heredoc + create-link) (moved from SKILL.md)
+
+```bash
+# Run from each SOURCE account (444455556666), assuming OAMLinkRole
+cat > /tmp/link-config.json <<'EOF'
+{
+  "ResourceTypes": [
+    "AWS::CloudWatch::Metric",
+    "AWS::Logs::LogGroup",
+    "AWS::XRay::Trace",
+    "AWS::ApplicationSignals::Service"
+  ],
+  "LinkConfiguration": {
+    "MetricConfiguration": {
+      "Filter": "Namespace IN (\"AWS/EC2\", \"AWS/ECS\", \"AWS/Lambda\", \"AWS/ApplicationSignals\")"
+    },
+    "LogGroupConfiguration": {
+      "Filter": "/aws/ecs/prod-app OR /aws/lambda/payments-api OR prefix(\"/aws/ecs/prod-\")"
+    },
+    "TraceConfiguration": {
+      "Filter": "Service(\"api-gateway\") OR Service(\"checkout\") OR Service(\"payments\")"
+    }
+  }
+}
+EOF
+
+aws oam create-link \
+  --sink-identifier arn:aws:oam:us-east-1:111122223333:sink/ProdObservabilitySink \
+  --label prod-app-link \
+  --link-configuration file:///tmp/link-config.json \
+  --tags Environment=prod,App=checkout \
+  --region us-east-1
+```
+---
+
+## Step 7: AMP cross-account query-rule payload (moved from SKILL.md)
+
+```bash
+# From the SOURCE account that owns the AMP workspace
+cat > /tmp/amp-query-rule.json <<'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": { "AWS": "arn:aws:iam::111122223333:root" },
+    "Action": "sts:AssumeRole",
+    "Condition": { "StringEquals": { "aws:PrincipalTag/Role": "GrafanaAMP" } }
+  }]
+}
+EOF
+
+aws amp create-workspace --alias prod-prometheus --region us-east-1
+```

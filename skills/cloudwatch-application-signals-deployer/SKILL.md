@@ -206,62 +206,8 @@ silent failure.**
 Language-specific injection. The AWS Distro for OpenTelemetry (ADOT) is
 the supported path.
 
-**Java (ECS Fargate — sidecar pattern):**
-
-Add the ADOT collector sidecar AND inject the auto-instrumentation Java
-agent into the application container:
-
-```yaml
-# ECS task definition excerpt
-containerDefinitions:
-  - name: payments-api
-    image: <image>
-    environment:
-      - name: AWS_SERVICE_NAME
-        value: payments-api
-      - name: AWS_APPLICATION_ENVIRONMENT
-        value: prod
-      - name: OTEL_EXPORTER_OTLP_ENDPOINT
-        value: http://localhost:4317
-      - name: OTEL_RESOURCE_ATTRIBUTES
-        value: service.name=payments-api,service.namespace=payments
-      - name: JAVA_TOOL_OPTIONS
-        value: -javaagent:/opt/aws-opentelemetry-agent/aws-opentelemetry-agent.jar
-    dependsOn:
-      - containerName: aws-otel-collector
-        condition: START
-
-  - name: aws-otel-collector
-    image: public.ecr.aws/aws-observability/aws-otel-collector:latest
-    command: ["--config=/etc/otel-collector-config.yaml"]
-    # config ships traces to X-Ray and metrics to CloudWatch Application Signals
-```
-
-**Java (EKS — mutating webhook):**
-
-Install the ADOT operator and the OpenTelemetry Agent Injector. The
-injector mutates pods that have the annotation
-`instrumentation.opentelemetry.io/inject-java: "true"`:
-
-```bash
-helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
-helm install opentelemetry-operator open-telemetry/opentelemetry-operator \
-  --namespace opentelemetry-operator-system --create-namespace
-
-# Annotate the workload
-kubectl annotate deploy payments-api \
-  instrumentation.opentelemetry.io/inject-java="true" \
-  instrumentation.opentelemetry.io/otel-exporter-otlp-endpoint="http://localhost:4317"
-```
-
-**Python (ECS / EKS — same pattern):**
-
-```bash
-# Python auto-instrumentation is via the opentelemetry-instrument package
-# Inject via the OTel Operator with:
-kubectl annotate deploy payments-api \
-  instrumentation.opentelemetry.io/inject-python="true"
-```
+Language-specific injection worked examples (Java ECS Fargate sidecar task definition, Java EKS mutating webhook, Python auto-instrumentation) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when writing the task definition or injection annotations; Lambda layers and EC2 paths live in `references/deployment-cli-commands.md` Steps 3c-3d.
 
 For Lambda, attach the `aws-otel-lambda-python` (or `aws-otel-lambda-java`)
 layer. Full sequences in `references/deployment-cli-commands.md`.
@@ -384,53 +330,8 @@ CLI) defines the SLO. Three required components:
 - **Target** — attainment goal (e.g., 99.9% available).
 - **Alarm** — burn-rate CloudWatch alarm tied to the SLO interval.
 
-**Availability SLO (CloudFormation):**
-
-```yaml
-Type: AWS::ApplicationSignals::ServiceLevelObjective
-Properties:
-  Name: payments-api-availability-slo
-  Description: 99.9% successful requests over 28 days rolling
-  EvaluationType: PeriodBased
-  Goal:
-    Interval:
-      RollingInterval:
-        DurationUnit: DAY
-        Duration: 28
-      BurnRates:
-        - RollupInterval: MINUTE
-        - RollupInterval: HOUR
-    AttainmentGoal: 0.999
-    WarningThreshold: 0.995
-  RequestBasedSliConfig:
-    MetricThreshold: 200  # HTTP 2xx/3xx/4xx are success, 5xx is fault
-    GoodRequestsMetric:
-      MetricStat:
-        Metric:
-          Namespace: AWS/ApplicationSignals
-          MetricName: CallCount
-          Dimensions:
-            - Name: ServiceName
-              Value: payments-api
-            - Name: Environment
-              Value: prod
-        Period: 60
-        Stat: Sum
-```
-
-**Latency SLO (target percentile):**
-
-```yaml
-RequestBasedSliConfig:
-  MetricThreshold: 0.25  # seconds — p95 must be under 250ms
-  TotalRequestsMetric:
-    MetricStat:
-      Metric:
-        Namespace: AWS/ApplicationSignals
-        MetricName: Latency
-        ...
-      Stat: "p95"
-```
+Availability and Latency SLO worked examples (CloudFormation YAML) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when authoring the ServiceLevelObjective resource; CLI and Terraform equivalents live in `references/slo-and-service-discovery-guide.md`.
 
 Full CLI / Terraform equivalents in
 `references/slo-and-service-discovery-guide.md`.
@@ -481,28 +382,8 @@ dependencies (databases, downstream services, external HTTP).
 
 ## Edge-case handling
 
-- **Service missing from service map after 15 min:** 90% of cases are
-  missing `CloudWatchApplicationSignalsReportServiceAccess` on the task
-  role. Check the CloudWatch Logs group
-  `/aws/application-signals/<service>` for `AccessDenied`.
-- **RED metrics blank but traces visible in X-Ray:** sampling rule is
-  set to 0%, or the Default rule was deleted. Recreate per Step 5.
-- **Multiple services collapse into one node:** `AWS_SERVICE_NAME` is
-  identical across services, or unset (defaults to image name). Set
-  unique `AWS_SERVICE_NAME` per workload.
-- **SLO creation fails with `ServiceNotFound`:** the SLO resource
-  references a service key that hasn't been discovered yet. Wait for
-  the service to appear in `ListServices` before creating the SLO.
-- **Lambda auto-instrumentation fails silently:** the ADOT Lambda layer
-  ARN must match the runtime architecture (`x86_64` vs `arm64`). Check
-  the layer version in the Lambda configuration.
-- **EKS mutating webhook does not inject:** the namespace must have the
-  `instrumentation.opentelemetry.io/inject-java: "true"` annotation
-  (or the pod template spec). The operator namespace must exist.
-- **Custom metric SLO:** custom metrics require a
-  `RequestBasedSliConfig` with both `GoodRequestsMetric` and
-  `TotalRequestsMetric` math expressions. Reference the
-  `AWS/ApplicationSignals` namespace, not custom namespaces.
+Edge-case catalog (service missing from map, blank RED metrics, collapsed nodes, ServiceNotFound rollback, Lambda layer arch, EKS webhook, custom-metric SLO) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when post-deployment verification fails.
 
 ## Workload matrix
 
@@ -518,38 +399,8 @@ dependencies (databases, downstream services, external HTTP).
 
 ## Recent AWS features (2024-2026)
 
-- **Application Signals for Lambda GA (2024-2025):** the
-  `aws-otel-lambda-python` and `aws-otel-lambda-java` layers expose
-  Lambda functions in the service map without manual OTel SDK code.
-  Layer ARN is Region-specific.
-
-- **Application Signals for ECS GA (2024-2025):** sidecar pattern
-  documented and supported. Previously EKS-only.
-
-- **`AWS::ApplicationSignals::ServiceLevelObjective` CloudFormation
-  GA (2024-2025):** native SLO resource with `PeriodBased` and
-  `RequestBased` SLI configs, rolling intervals, and built-in burn-rate
-  metrics. Replaces the prior CLI-only flow.
-
-- **Python auto-instrumentation GA (2024-2025):** the OTel Operator
-  Python injection annotation
-  (`instrumentation.opentelemetry.io/inject-python`) reached GA. Java
-  and Python are now the two supported auto-instrumentation languages.
-
-- **Burn-rate alarm automation (2024-2025):** `BurnRates` in the SLO
-  `Goal.Interval` automatically publishes derived `BurnRate` metrics —
-  no custom metric math needed.
-
-- **Service map cross-account (2025):** services discovered in accounts
-  sharing a CloudWatch cross-account observability link appear in the
-  monitoring account's service map.
-
-- **CloudWatch RUM client-side correlation (2025):** RUM web app
-  sessions can be joined to server-side Application Signals service
-  nodes via the `AWS/ApplicationSignalsClient` namespace.
-
-- **SLO warning threshold (2025):** `WarningThreshold` in the SLO `Goal`
-  emits a separate warning state before the SLO breaches.
+Recent AWS features (2024-2026) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when choosing between new and legacy mechanisms (Lambda/ECS GA, CloudFormation SLO, cross-account service map, RUM correlation).
 
 ## NEVER (top 5 — full list in references)
 
@@ -570,44 +421,13 @@ dependencies (databases, downstream services, external HTTP).
 
 ## Expert heuristic — enabling signals and choosing SLOs
 
-- **IAM policies first, instrumentation second.** The agent runs with
-  or without permissions; only the IAM policies enable output. Verify
-  with `list-services` within 10 minutes of deployment.
-- **Default to Java or Python auto-instrumentation.** Other runtimes
-  (Node, Go, .NET) require manual OTel SDK code — auto-instrumentation
-  is not GA for these.
-- **One SLO per service, two at most.** Availability and p95 latency
-  cover 90% of use cases. Adding more SLOs fragments attention and
-  alarm budget.
-- **Burn-rate thresholds are universal.** 14.4×/5m, 6×/1h, 3×/6h, 1×/1d
-  map to "page on 2% budget burn", "page on 10%", "ticket on 10%",
-  "ticket on drain". Apply consistently.
-- **Sampling rate vs. SLO accuracy.** A 5% sampling rate gives
-  sufficient resolution for p95 latency above 50 RPS. For
-  lower-traffic services, raise to 50-100% to avoid noisy RED
-  aggregates.
-- **Service name discipline.** Set `AWS_SERVICE_NAME` to the workload
-  name, not the team or the environment. Use
-  `AWS_APPLICATION_ENVIRONMENT` for environment separation.
-- **Cross-Region:** Application Signals does not merge across Regions.
-  Plan per-Region SLOs and per-Region burn-rate alarms.
+Expert heuristic — enabling signals and choosing SLOs (IAM-first ordering, language defaults, SLO count, burn-rate math, sampling vs accuracy, service-name discipline, cross-Region) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when planning instrumentation and SLO strategy.
 
 ## Pre-flight safety checks (run before any enablement CLI)
 
-- **Confirm opt-in:** `aws application-signals list-services --region <r>`
-  (200 = opted in).
-- **Confirm the workload IAM role:** `aws iam list-attached-role-policies
-  --role-name <role>` (must include
-  `CloudWatchApplicationSignalsReportServiceAccess` and
-  `AWSXrayWriteOnlyAccess`).
-- **Confirm X-Ray sampling default exists:** `aws xray get-sampling-rules`
-  (must list a `Default` rule with `FixedRate ≥ 0.05`).
-- **Confirm the runtime is supported:** Java (JDK 8+) or Python (3.8+)
-  for auto-instrumentation; other runtimes need manual OTel SDK code.
-- **Confirm the service name is unique:** `aws application-signals
-  list-services --query 'ServiceSummaries[?KeyAttributes.Name==\`<name>\`]'`.
-- **For CloudMap enrichment:** `aws servicediscovery list-namespaces`
-  to confirm the namespace exists.
+Pre-flight safety checks (opt-in, workload IAM policies, X-Ray sampling default, runtime support, service-name uniqueness, CloudMap namespace) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before running any enablement CLI.
 
 ## Output format — MANDATORY literal labels
 
@@ -653,6 +473,12 @@ VERIFICATION_COMMANDS:
 missing (workload role ARN, X-Ray sampling rule, supported runtime,
 opt-in), the verdict is `PREREQUISITES_MISSING` with each gap listed.
 
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) — Step 3 language-specific injection examples and Step 8 Availability/Latency SLO CloudFormation examples moved from SKILL.md
+- [references/advanced-patterns.md](references/advanced-patterns.md) — edge-case catalog, the enabling/SLO expert heuristic, and Recent AWS features (2024-2026) moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight safety checks moved from SKILL.md
+
 ## Domain
 
 AWS CloudOps / Application-Centric Observability Provisioning.
@@ -678,3 +504,4 @@ AWS CloudOps / Application-Centric Observability Provisioning.
 - `references/slo-and-service-discovery-guide.md` — deep reference on
   SLO internals (period-based vs request-based SLI), service discovery
   internals, burn-rate math, full NEVER list, and edge-case handling.
+

@@ -142,3 +142,22 @@ is a CloudFront-managed ENI in your VPC subnets.
 
 Verify that the VPC origin does not inadvertently expose resources that
 were previously private — VPC origins change the network topology.
+
+## Step 2: S3 bucket policy JSON for OAC (moved from SKILL.md)
+
+**Update the S3 bucket policy to grant CloudFront access via OAC:**
+```json
+{
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": {"Service": "cloudfront.amazonaws.com"},
+    "Action": "s3:GetObject",
+    "Resource": "arn:aws:s3:::prod-bucket/*",
+    "Condition": {
+      "StringEquals": {
+        "AWS:SourceArn": "arn:aws:cloudfront::<account>:distribution/<dist-id>"
+      }
+    }
+  }]
+}
+```

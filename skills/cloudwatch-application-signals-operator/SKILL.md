@@ -163,91 +163,18 @@ no SLOs can be created. The instrumentation layer must come first.
 
 ## Expert heuristic: fast burn vs slow burn (MWMBR)
 
-A baseline model says "set a burn rate threshold at 14.4x." The correct
-heuristic recognizes that multi-window multi-burn-rate (MWMBR) uses
-multiple windows simultaneously to balance sensitivity and noise.
-
-```text
-Burn rate concept:
-  An SLO has an error budget. For 99.9% availability over 30 days:
-    Error budget = 0.1% × 30 days = 43.2 minutes
-
-  Burn rate = actual error rate / allowed error rate
-    Burn rate 1.0 = consuming budget at exactly the planned rate
-    Burn rate 2.0 = consuming budget 2x faster than planned
-    Burn rate 14.4 = consuming budget 14.4x faster (will exhaust in ~2 hours)
-
-Multi-window multi-burn-rate (MWMBR):
-  ┌────────────────────────────────────────────────────────────┐
-  │ Alert type     │ Short window │ Long window │ Burn rate │ Action │
-  ├────────────────┼──────────────┼─────────────┼───────────┼────────┤
-  │ Fast burn PAGE │ 5 minutes    │ 1 hour      │ 14.4x     │ Page   │
-  │ Slow burn      │ 30 minutes   │ 6 hours     │ 6.0x      │ Ticket │
-  │ Slow burn      │ 2 hours      │ 1 day       │ 3.0x      │ Ticket │
-  │ Slow burn      │ 6 hours      │ 3 days      │ 1.0x      │ Ticket │
-  └────────────────────────────────────────────────────────────┘
-
-  BOTH windows must exceed the burn rate for the alert to fire.
-  This reduces false positives: a brief spike alone does not trigger
-  a page unless the long-window burn rate is also elevated.
-```
-
-**Key implication:** the fast-burn 5m/1h window at 14.4x is for acute
-incidents (page). The slow-burn windows at lower rates are for chronic
-degradation (ticket). Both are needed — fast burn catches outages; slow
-burn catches slow drifts that would eventually exhaust the error budget.
+Expert heuristic — fast burn vs slow burn (MWMBR) deep dive (error-budget math, window pairs, both-windows-must-fire) moved verbatim to [references/slo-and-burn-rate.md](references/slo-and-burn-rate.md).
+Load on demand when tuning burn-rate windows and thresholds.
 
 ## Expert heuristic: SLI auto-derivation from traces
 
-A baseline model says "create CloudWatch metrics for availability and
-latency." The correct heuristic recognizes that Application Signals
-DERIVES SLIs from OTel traces — you do NOT create them.
-
-```text
-How SLIs are derived from traces:
-
-  Availability SLI:
-    Traces contain span status (OK / ERROR).
-    Availability = (OK spans / total spans) for an operation.
-    Example: 9999 OK / 10000 total = 99.99% availability.
-
-  Latency SLI:
-    Traces contain span duration.
-    Latency SLI = percentage of requests under a threshold (e.g., P99 < 500ms).
-    Example: 9900 / 10000 requests under 500ms = 99.0% latency SLI.
-
-  These metrics are AUTOMATICALLY computed by Application Signals.
-  You do NOT create CloudWatch custom metrics or Metric Math expressions.
-  You define SLOs ON TOP of these auto-derived SLIs.
-```
-
-**Key implication:** if availability or latency SLIs are not appearing,
-the issue is upstream — OTel traces are not flowing or the service has
-not been discovered. Fix the instrumentation first; the SLIs follow.
+Expert heuristic — SLI auto-derivation from traces (availability and latency derivation, no manual metrics) moved verbatim to [references/slo-and-burn-rate.md](references/slo-and-burn-rate.md).
+Load on demand when SLI metrics are missing or when explaining what Application Signals computes for you.
 
 ## Expert heuristic: service hierarchy and operation-level SLOs
 
-Application Signals organizes telemetry hierarchically:
-
-```text
-Service hierarchy:
-  Service (e.g., "payments-api")
-    ├── Operation: POST /charge
-    ├── Operation: GET /status
-    ├── Operation: POST /refund
-    └── Operation: GET /health
-
-SLOs can be defined at TWO levels:
-  ├── Service-level SLO: covers ALL operations in the service
-  │     e.g., "payments-api availability > 99.9%"
-  └── Operation-level SLO: covers a SINGLE operation
-        e.g., "POST /charge latency P99 < 500ms"
-```
-
-**Key implication:** for critical operations (e.g., payment processing),
-define operation-level SLOs with tighter targets. For overall service
-health, use service-level SLOs. Both types consume the same auto-derived
-SLI metrics.
+Expert heuristic — service hierarchy and operation-level SLOs (service vs operation SLO binding) moved verbatim to [references/instrumentation-and-service-map.md](references/instrumentation-and-service-map.md).
+Load on demand when deciding service-level vs operation-level SLO targets.
 
 ## Prerequisites (verify before operation)
 
@@ -272,48 +199,13 @@ and cite the specific gap.
 
 ### Option A: OTel SDK instrumentation (application-level)
 
-Instrument your application with the OpenTelemetry SDK:
-
-```python
-# Python example — add OTel SDK to your application
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-
-trace.set_tracer_provider(TracerProvider())
-tracer = trace.get_tracer(__name__)
-
-# Export to CloudWatch (via OTLP collector / CloudWatch Agent)
-exporter = OTLPSpanExporter(endpoint="http://localhost:4317")
-span_processor = BatchSpanProcessor(exporter)
-trace.get_tracer_provider().add_span_processor(span_processor)
-
-# Instrument HTTP handlers
-@tracer.start_as_current_span("process_payment")
-def process_payment(request):
-    # Business logic
-    pass
-```
+Option A worked example — OTel SDK Python instrumentation code moved verbatim to [references/instrumentation-and-service-map.md](references/instrumentation-and-service-map.md).
+Load on demand when writing the SDK instrumentation boilerplate.
 
 ### Option B: CloudWatch Agent auto-instrumentation
 
-The CloudWatch Agent with OTel auto-instrumentation can inject tracing
-without code changes for supported runtimes:
-
-```bash
-# Install CloudWatch Agent with OTel on EC2/ECS/EKS
-aws ssm create-association \
-  --name AmazonCloudWatch-ManageAgent \
-  --targets Key=InstanceIds,Values=i-1234567890abcdef0 \
-  --parameters '{"action":["configure"],"mode":["ec2"],"configurationSource":["ssm"]}'
-
-# The agent configuration enables OTel auto-instrumentation
-```
-
-**Key implication:** auto-instrumentation is faster to deploy (no code
-changes) but provides less customization than SDK instrumentation. For
-production, SDK instrumentation is recommended for fine-grained control.
+Option B worked example — CloudWatch Agent SSM auto-instrumentation sequence moved verbatim to [references/instrumentation-and-service-map.md](references/instrumentation-and-service-map.md).
+Load on demand when choosing agent-based injection over SDK code.
 
 ## Step 2 — Service auto-discovery
 
@@ -458,44 +350,13 @@ trace data.
 
 ## Step 7 — CloudWatch RUM integration
 
-CloudWatch RUM (Real User Monitoring) provides client-side telemetry.
-Integrating RUM with Application Signals enables end-to-end
-observability.
-
-```bash
-# Create a RUM app monitor
-aws rum create-app-monitor \
-  --name payments-frontend \
-  --domain payments.example.com \
-  --app-monitor-configuration '{
-    "AllowCookies": true,
-    "EnableXRay": true,
-    "SessionSampleRate": 1.0,
-    "Telemetries": ["errors", "performance", "http"]
-  }'
-```
-
-**Key integration point:** `EnableXRay: true` correlates RUM client-side
-traces with server-side X-Ray/Application Signals traces via shared
-trace IDs. This provides end-to-end visibility from user click to
-database query.
+Step 7 — CloudWatch RUM integration (app-monitor creation CLI, EnableXRay correlation) moved verbatim to [references/instrumentation-and-service-map.md](references/instrumentation-and-service-map.md).
+Load on demand when wiring client-side RUM telemetry.
 
 ## Step 8 — X-Ray trace correlation
 
-Application Signals and X-Ray share trace data. Application Signals
-provides higher-level abstractions; X-Ray provides raw trace detail.
-
-```text
-Application Signals → X-Ray correlation:
-  1. Application Signals shows service-level SLI and SLO status
-  2. Click on a failing service → drill-down to individual traces
-  3. X-Ray trace view shows span-level detail (time, error, annotations)
-  4. Identify root cause from trace waterfall
-
-  The "Service Map" in Application Signals and the "Service Graph" in
-  X-Ray are derived from the SAME trace data, but at different
-  abstraction levels.
-```
+Step 8 — X-Ray trace correlation (drill-down flow, service map vs service graph) moved verbatim to [references/instrumentation-and-service-map.md](references/instrumentation-and-service-map.md).
+Load on demand when correlating Application Signals views with raw X-Ray traces.
 
 ## Step 9 — Service hierarchy (service → operation)
 
@@ -518,95 +379,18 @@ SLOs can be defined at either level. For critical operations (e.g., POST
 
 ## Step 10 — Canary alarms and anomaly detection
 
-### Canary alarms
-
-Canary alarms monitor synthetic checks against your service endpoints.
-They complement SLI-based alarms by testing from an external perspective.
-
-```bash
-# Create a CloudWatch Synthetics canary
-aws synthetics create-canary \
-  --name payments-api-canary \
-  --code '{"S3Bucket": "canary-scripts", "S3Key": "payments-canary.zip", "Handler": "index.handler"}' \
-  --schedule '{"Expression": "rate(1 minute)"}' \
-  --run-config '{"TimeoutInSeconds": 60}'
-```
-
-### Anomaly detection on SLI metrics
-
-CloudWatch Anomaly Detection learns the normal pattern of SLI metrics
-and alerts on deviations:
-
-```bash
-# Create an anomaly detection alarm on latency SLI
-aws cloudwatch put-metric-alarm \
-  --alarm-name "payments-api-latency-anomaly" \
-  --namespace AWS/ApplicationSignals \
-  --metric-name Latency \
-  --dimensions Name=ServiceName,Value=payments-api Name=Operation,Value=POST-/charge \
-  --statistic P99 \
-  --period 300 \
-  --threshold-metric-id ad1 \
-  --comparison-operator LessThanLowerOrGreaterThanUpperThreshold \
-  --evaluation-periods 1 \
-  --datapoints-to-alarm 1 \
-  --metrics '[{"Id":"m1","MetricStat":{"Metric":{"Namespace":"AWS/ApplicationSignals","MetricName":"Latency","Dimensions":[{"Name":"ServiceName","Value":"payments-api"},{"Name":"Operation","Value":"POST-/charge"}]},"Period":300,"Stat":"P99"},"ReturnData":true},{"Id":"ad1","Expression":"ANOMALY_DETECTION_BAND(m1, 2)"}]' \
-  --alarm-actions arn:aws:sns:us-east-1:123456789012:warning-tickets
-```
+Step 10 — canary and anomaly-detection alarm CLI payloads moved verbatim to [references/slo-and-burn-rate.md](references/slo-and-burn-rate.md).
+Load on demand when adding Synthetics canaries or ANOMALY_DETECTION_BAND alarms on SLI metrics.
 
 ## Step 11 — Multi-service SLO tracking
 
-For organizations with many services, track SLOs across the fleet:
-
-```bash
-# List all SLOs
-aws application-signals list-service-level-objectives \
-  --max-results 50 \
-  --output table
-
-# Get SLO status for a specific SLO
-aws application-signals get-service-level-objective \
-  --id <slo-id>
-```
-
-**Key implication:** create a CloudWatch dashboard aggregating SLO
-status across services for a fleet-level view. This enables proactive
-identification of services approaching SLO breaches.
+Step 11 — multi-service SLO tracking CLI payloads moved verbatim to [references/slo-and-burn-rate.md](references/slo-and-burn-rate.md).
+Load on demand when building fleet-level SLO dashboards.
 
 ## Step 12 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Application Signals General Availability (2023-2024):** Application
-  Signals reached GA with support for Java, Python, Node.js, and .NET
-  auto-instrumentation via CloudWatch Agent.
-
-- **SLO burn rate alarms (2023-2024):** Built-in burn rate metric
-  generation for SLOs, enabling direct CloudWatch alarm creation
-  without manual Metric Math.
-
-- **RUM-Application Signals correlation (2024-2025):** Enhanced
-  correlation between CloudWatch RUM client-side traces and
-  Application Signals server-side traces. End-to-end waterfall view
-  from user click to database.
-
-- **Multi-window multi-burn-rate (MWMBR) standardization (2024-2025):**
-  AWS standardized the MWMBR algorithm with recommended window/threshold
-  combinations, reducing false positives while catching both acute and
-  chronic SLO breaches.
-
-- **Operation-level SLOs (2024-2025):** SLOs can now be defined at the
-  operation level (e.g., POST /charge) in addition to the service
-  level, enabling tighter targets for critical operations.
-
-- **Anomaly detection on Application Signals metrics (2025-2026):**
-  CloudWatch Anomaly Detection now supports Application Signals SLI
-  metrics, enabling automatic anomaly alerts without manual threshold
-  tuning.
-
-- **Cross-account Application Signals (2025-2026):** Multi-account
-  observability via CloudWatch cross-account sharing, allowing
-  Application Signals data from linked accounts to be viewed centrally.
+Recent AWS features (2023-2026) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when deciding between GA mechanisms and older flows.
 
 ## NEVER do these things
 
@@ -686,63 +470,21 @@ VERIFICATION_COMMANDS:
 
 ### Worked example — SLO with MWMBR burn rate alerts
 
-```text
-APP_SIGNALS: payments-api (POST-/charge)
-VERDICT: OPERATION_COMPLETED
-CHECKLIST:
-  [✓] OTel instrumentation: enabled (SDK — Python opentelemetry)
-  [✓] Application Signals: enabled (us-east-1)
-  [✓] Service discovered: payments-api (traces flowing — last trace 30s ago)
-  [✓] SLI metrics: availability (99.97%) + latency P99 (287ms)
-  [✓] SLO: payments-api-charge-availability (target 99.9%, interval 30 days rolling)
-  [✓] Warning threshold: 99.95%
-  [✓] Burn rate alerts: fast burn (5m/1h, 14.4x → SNS critical-alerts → page) + slow burn (30m/6h, 6.0x → SNS warning-tickets → ticket)
-  [✓] SNS topic: arn:aws:sns:us-east-1:123456789012:critical-alerts (3 subscriptions)
-  [✓] Service map: auto-generated (4 services, 12 edges)
-  [✓] RUM integration: enabled (app monitor: payments-frontend, EnableXRay: true)
-  [✓] X-Ray correlation: enabled (drill-down from SLO to trace)
-  [✓] Anomaly detection: enabled on latency P99 (band: 2 stdev)
-  [✓] Canary alarm: payments-api-canary (1-min interval, 60s timeout)
-  [✓] Tags: Environment=production, Team=payments, Tier=critical
-VERIFICATION_COMMANDS:
-  aws application-signals list-service-level-objectives
-  aws application-signals get-service-level-objective --id payments-api-charge-availability
-  aws cloudwatch describe-alarms --alarm-name-prefix payments-api
-```
+Worked example — filled-in OPERATION_COMPLETED checklist for payments-api (POST-/charge) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when formatting a real OPERATION_COMPLETED response.
 
 ## Error handling
 
-### No services appearing in Application Signals
-- OTel traces are not flowing. Verify the application has OTel SDK
-  instrumentation or the CloudWatch Agent is configured for
-  auto-instrumentation. Check trace volume in CloudWatch Service Map.
+Error-handling deep dive (no services appearing, SLI metrics missing, burn-rate alarms not firing, InvalidRequest, incomplete topology, RUM correlation) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when an Application Signals operation does not behave as expected.
 
-### SLI metrics not appearing
-- Services may not be fully discovered yet (wait ~15 minutes). Verify
-  the service is listed in Application Signals. If the service exists
-  but no SLI metrics, the traces may lack the required span attributes
-  (operation name, status code).
+## References (load on demand)
 
-### Burn rate alarms not firing
-- The SNS topic may lack subscriptions, or the alarm threshold is too
-  high. Verify the SNS topic has active subscriptions. Check the burn
-  rate metric value — if it is below the threshold, the SLO is healthy
-  and the alarm correctly does not fire.
-
-### SLO creation fails with "InvalidRequest"
-- The interval must be 1-30 days. The target must be between 0 and 100.
-  The SLI metric type must be Availability or Latency. Verify all
-  parameters.
-
-### Service map shows incomplete topology
-- Trace context propagation may be missing between services. OTel
-  requires W3C trace context headers to propagate across service
-  boundaries. Verify the OTel propagator is configured correctly.
-
-### RUM traces not correlating with server traces
-- The RUM app monitor may not have EnableXRay set to true. Or the
-  backend service may not be emitting OTel traces. Both sides must
-  emit traces with matching trace IDs.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Recent AWS features (2023-2026) moved from SKILL.md
+- [references/error-handling.md](references/error-handling.md) — error-handling deep dive moved from SKILL.md
+- [references/worked-examples.md](references/worked-examples.md) — filled-in OPERATION_COMPLETED worked example moved from SKILL.md
+- [references/instrumentation-and-service-map.md](references/instrumentation-and-service-map.md) — OTel + service map detail; now also holds the service-hierarchy heuristic, Step 1 Options A/B, and Steps 7-8 moved from SKILL.md
+- [references/slo-and-burn-rate.md](references/slo-and-burn-rate.md) — SLO + burn rate detail; now also holds the MWMBR and SLI-derivation heuristics and Steps 10-11 moved from SKILL.md
 
 ## Domain
 
@@ -760,3 +502,4 @@ Management & Burn Rate Alert Operations.
 - **OTel instrumentation** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Application-Signals-Instrumentation.html
 - **X-Ray correlation** — https://docs.aws.amazon.com/xray/latest/devguide/aws-xray.html
 - **CloudWatch Anomaly Detection** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Anomaly_Detection.html
+

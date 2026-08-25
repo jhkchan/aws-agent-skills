@@ -106,20 +106,8 @@ Run before classification. `describe-alarms` returns max 100/page
 
 ### Step 0: Expert knowledge — non-obvious CloudWatch alarm behaviors
 
-- **TreatMissingData defaults to "missing" (NOT "notBreaching").** Unset = INSUFFICIENT_DATA on gaps. This is the #1 alarm blind spot.
-- **INSUFFICIENT_DATA triggers InsufficientDataActions, NOT AlarmActions.** If that list is empty (common), the transition is silent — a monitoring black hole.
-- **DatapointsToAlarm must be <= EvaluationPeriods.** If it exceeds, the condition can NEVER be satisfied. CloudWatch accepts without error.
-- **ActionsEnabled: false is a global kill switch.** Suppresses ALL actions (SNS, Lambda, AutoScaling, EC2 recover). Often set during testing and forgotten.
-- **PutMetricAlarm silently overwrites.** No version history, no diff, no rollback. Always snapshot first.
-- **Composite Rule <= 512 chars, max 100 alarm references.** Evaluates every 60s fixed. `AND` requires both children in ALARM simultaneously — if child-a clears before child-b fires, composite never enters ALARM. Use `OR` for escalation; use `AND` with time-window awareness.
-- **Composite actions ordering:** actions execute in order listed but are NOT deduplicated. Same SNS in child + composite = two notifications. Design composite actions as escalation (different on-call tier).
-- **AnomalyDetection requires ~15 min warm-up.** New detector on metric with no history returns empty bands. Do NOT classify as broken during warm-up.
-- **MetricMath FILL(m1, 0) masks missing data.** Prevents INSUFFICIENT_DATA but can cause false negatives (error-count filled with 0 looks healthy). Pair with a heartbeat alarm.
-- **Alarm actions capped at 5 per category.** The 6th ARN is silently rejected. Use one SNS topic with multiple subscriptions for fan-out.
-- **Period must be >= metric native resolution.** 5-min metric with Period=60 produces 4 empty windows out of 5.
-- **High-resolution alarms (10s/30s Period) cost more.** Reserve for critical metrics (payment fraud, security).
-- **Cross-account/cross-region alarms use AccountId in the Metrics array member**, not Dimensions. Wrong AccountId = silently monitors wrong account.
-- **PutMetricAlarm for ANOMALY_DETECTION_BAND:** the Metrics array uses `Expression: ANOMALY_DETECTION_BAND(m1, stdev)` and ComparisonOperator becomes `GreaterThanUpperThreshold` / `LessThanLowerThreshold`.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — "Step 0: Expert knowledge" holds all 14 non-obvious behaviors (TreatMissingData default, INSUFFICIENT_DATA actions, M-of-N, ActionsEnabled kill switch, PutMetricAlarm overwrite, composite Rule limits/AND-OR, action dedup, anomaly warm-up, MetricMath FILL, 5-action cap, Period/resolution, high-res cost, cross-account AccountId, ANOMALY_DETECTION_BAND shape).
+Load that reference before planning edge-case operations — each behavior changes a pre-check or verdict.
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
@@ -402,24 +390,8 @@ NOTES:
 
 ### Worked example — diagnose stuck alarm (BLOCKED)
 
-```text
-OPERATION: diagnose
-VERDICT: BLOCKED
-TARGET: api-error-rate-prod
-PRE_CHECKS:
-  - [PASS] describe-alarms returns the alarm
-  - [FAIL] Metric not publishing: get-metric-statistics on AWS/ApplicationELB,
-    HTTPCode_ELB_5XX_Count, dimensions LoadBalancer=app/prod-alb/WRONG-NAME
-    returns 0 datapoints over the last 1 hour. The LoadBalancer dimension
-    value appears to reference a deleted ALB.
-  - [PASS] describe-alarm-history shows INSUFFICIENT_DATA for 6 days
-STEPS: (none — pre-checks failed; this is a diagnosis)
-POST_VERIFY: (none)
-STATE: INSUFFICIENT_DATA (stuck 6 days)
-NOTES:
-  - Update the dimension value to the current ALB ARN. Snapshot before update:
-    aws cloudwatch describe-alarms --alarm-names api-error-rate-prod --output json > /tmp/api-error-rate-prod-backup-$(date +%s).json
-```
+Secondary example moved verbatim to [references/worked-examples.md](references/worked-examples.md) — full BLOCKED output block: metric not publishing (deleted-ALB dimension value), INSUFFICIENT_DATA stuck 6 days, snapshot-before-update note.
+The primary worked example (create CPU alarm, READY) stays below; more worked examples live in [references/alarm-patterns-and-diagnosis.md](references/alarm-patterns-and-diagnosis.md).
 
 ## STRICT output contract
 
@@ -515,13 +487,14 @@ gone, `delete-alarms`; if sensor broken, fix sensor; to force-clear, use
 
 ## Recent AWS features (2024-2026)
 
-- **CloudWatch Metric Explorer:** cross-account/region metric exploration without pre-configuring alarms.
-- **Contributor Insights:** top-N contributors to a metric (e.g., top IPs driving 5xx errors).
-- **Application Signals:** auto-discovered SLOs from CWAgent on EC2/ECS/EKS; alarms on burn rate instead of raw metrics.
-- **OpenTelemetry native metrics:** alarms on OTel metrics may have different namespace/dimension structures.
-- **Composite alarm improvements:** more complex boolean expressions, cross-region references.
-- **Metric Streams:** real-time streaming to S3/third-party (Datadog, New Relic) — complementary to alarms.
-- **Built-in anomaly detection:** some AWS consoles (RDS Performance Insights, Application Signals) ship pre-built anomaly detection.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — "Recent AWS features (2024-2026)": Metric Explorer, Contributor Insights, Application Signals/SLOs, OTel metrics, composite improvements, Metric Streams, built-in anomaly detection.
+Load when operating on 2024-2026 surfaces or choosing detection strategy.
+
+## References (load on demand)
+
+- [references/alarm-patterns-and-diagnosis.md](references/alarm-patterns-and-diagnosis.md) — full static/anomaly/composite creation procedures, action wiring matrix, TreatMissingData decision guide, M-of-N tuning, cost reference, INSUFFICIENT_DATA diagnostic procedure, edge cases.
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked example: diagnose stuck alarm (BLOCKED) with full PRE_CHECKS/STEPS/POST_VERIFY output.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 expert-knowledge deep dive (14 non-obvious alarm behaviors) and recent AWS features (2024-2026).
 
 ## Domain
 

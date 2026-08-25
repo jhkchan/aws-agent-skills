@@ -271,3 +271,35 @@ Common validation failures:
 - KMS-encrypted log files: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/encrypting-cloudtrail-log-files-with-aws-kms.html
 - Log file validation: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-log-file-validation-cli.html
 - Multi-region trails: https://docs.aws.amazon.com/awscloudtrail/latest/userguide/receive-cloudtrail-log-files-from-multiple-regions.html
+
+## Canonical bucket policy statement (Step 3a)
+
+The canonical policy statement:
+
+```json
+{
+  "Sid": "AWSCloudTrailAclCheck20150319",
+  "Effect": "Allow",
+  "Principal": {"Service": "cloudtrail.amazonaws.com"},
+  "Action": "s3:GetBucketAcl",
+  "Resource": "arn:aws:s3:::<bucket>"
+},
+{
+  "Sid": "AWSCloudTrailWrite20150319",
+  "Effect": "Allow",
+  "Principal": {"Service": "cloudtrail.amazonaws.com"},
+  "Action": "s3:PutObject",
+  "Resource": "arn:aws:s3:::<bucket>/<prefix>/AWSLogs/<account>/CloudTrail/*",
+  "Condition": {"StringEquals": {"s3:x-amz-acl": "bucket-owner-full-control"}}
+}
+```
+
+## Org trail shadow patterns (Step 5)
+
+Common patterns: member account `describe-trails` shows a trail with
+`IsOrganizationTrail: true` that the member did not create (shadow
+trail; member events go to the org bucket); member's pre-existing
+trail stops delivering after the org trail was created (org trail
+shadows the member trail); org trail bucket policy scoped to the
+management account only (Resource ARN missing the org ID
+`o-<org-id>`); member left the org (shadow trail removed).

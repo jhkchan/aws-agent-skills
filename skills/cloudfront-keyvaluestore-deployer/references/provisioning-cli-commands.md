@@ -306,3 +306,21 @@ resource "aws_cloudfront_function" "ab_router" {
 | Test function | `aws cloudfront test-function` |
 | Publish function | `aws cloudfront publish-function` |
 | Update function | `aws cloudfront update-function` |
+
+## Step 4: Changing the traffic split without redeployment (moved from SKILL.md)
+
+**Changing the traffic split (no code redeployment):**
+
+```bash
+ETAG=$(aws cloudfront-keyvaluestore describe-key-value-store \
+  --kvs-arn "$KVS_ARN" --query 'ETag' --output text)
+
+aws cloudfront-keyvaluestore put-key \
+  --kvs-arn "$KVS_ARN" \
+  --key "ab-percentage" \
+  --value "50" \
+  --if-match "$ETAG"
+```
+
+The change propagates to edge locations within seconds. No
+`update-function` or `publish-function` needed.

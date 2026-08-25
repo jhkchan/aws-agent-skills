@@ -396,3 +396,118 @@ aws cloudwatch put-account-policy \
 
 This allows the monitoring account to view Application Signals data
 from all linked accounts in a single console view.
+---
+
+## Expert heuristic: service hierarchy and operation-level SLOs (moved from SKILL.md)
+
+Application Signals organizes telemetry hierarchically:
+
+```text
+Service hierarchy:
+  Service (e.g., "payments-api")
+    ├── Operation: POST /charge
+    ├── Operation: GET /status
+    ├── Operation: POST /refund
+    └── Operation: GET /health
+
+SLOs can be defined at TWO levels:
+  ├── Service-level SLO: covers ALL operations in the service
+  │     e.g., "payments-api availability > 99.9%"
+  └── Operation-level SLO: covers a SINGLE operation
+        e.g., "POST /charge latency P99 < 500ms"
+```
+
+**Key implication:** for critical operations (e.g., payment processing),
+define operation-level SLOs with tighter targets. For overall service
+health, use service-level SLOs. Both types consume the same auto-derived
+SLI metrics.
+---
+
+## Step 1 Option A: OTel SDK instrumentation (application-level) (moved from SKILL.md)
+
+Instrument your application with the OpenTelemetry SDK:
+
+```python
+# Python example — add OTel SDK to your application
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+trace.set_tracer_provider(TracerProvider())
+tracer = trace.get_tracer(__name__)
+
+# Export to CloudWatch (via OTLP collector / CloudWatch Agent)
+exporter = OTLPSpanExporter(endpoint="http://localhost:4317")
+span_processor = BatchSpanProcessor(exporter)
+trace.get_tracer_provider().add_span_processor(span_processor)
+
+# Instrument HTTP handlers
+@tracer.start_as_current_span("process_payment")
+def process_payment(request):
+    # Business logic
+    pass
+```
+---
+
+## Step 1 Option B: CloudWatch Agent auto-instrumentation (moved from SKILL.md)
+
+The CloudWatch Agent with OTel auto-instrumentation can inject tracing
+without code changes for supported runtimes:
+
+```bash
+# Install CloudWatch Agent with OTel on EC2/ECS/EKS
+aws ssm create-association \
+  --name AmazonCloudWatch-ManageAgent \
+  --targets Key=InstanceIds,Values=i-1234567890abcdef0 \
+  --parameters '{"action":["configure"],"mode":["ec2"],"configurationSource":["ssm"]}'
+
+# The agent configuration enables OTel auto-instrumentation
+```
+
+**Key implication:** auto-instrumentation is faster to deploy (no code
+changes) but provides less customization than SDK instrumentation. For
+production, SDK instrumentation is recommended for fine-grained control.
+---
+
+## Step 7 — CloudWatch RUM integration (moved from SKILL.md)
+
+CloudWatch RUM (Real User Monitoring) provides client-side telemetry.
+Integrating RUM with Application Signals enables end-to-end
+observability.
+
+```bash
+# Create a RUM app monitor
+aws rum create-app-monitor \
+  --name payments-frontend \
+  --domain payments.example.com \
+  --app-monitor-configuration '{
+    "AllowCookies": true,
+    "EnableXRay": true,
+    "SessionSampleRate": 1.0,
+    "Telemetries": ["errors", "performance", "http"]
+  }'
+```
+
+**Key integration point:** `EnableXRay: true` correlates RUM client-side
+traces with server-side X-Ray/Application Signals traces via shared
+trace IDs. This provides end-to-end visibility from user click to
+database query.
+---
+
+## Step 8 — X-Ray trace correlation (moved from SKILL.md)
+
+Application Signals and X-Ray share trace data. Application Signals
+provides higher-level abstractions; X-Ray provides raw trace detail.
+
+```text
+Application Signals → X-Ray correlation:
+  1. Application Signals shows service-level SLI and SLO status
+  2. Click on a failing service → drill-down to individual traces
+  3. X-Ray trace view shows span-level detail (time, error, annotations)
+  4. Identify root cause from trace waterfall
+
+  The "Service Map" in Application Signals and the "Service Graph" in
+  X-Ray are derived from the SAME trace data, but at different
+  abstraction levels.
+```

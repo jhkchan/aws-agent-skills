@@ -161,85 +161,8 @@ https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/cloudwatch-dash
 
 ### Step 0: Expert knowledge — non-obvious CloudWatch dashboard behaviors
 
-These behaviors are easy to misjudge without operational dashboard
-experience. Each changes a plan if ignored:
-
-- **PutDashboard replaces the ENTIRE DashboardBody.** There is no
-  "add widget" API. To add a widget to an existing dashboard, you must
-  fetch the current body, parse the JSON, insert the new widget, and
-  PUT the entire modified body. Omitting existing widgets deletes them.
-
-- **Widget positions use a 24-column grid.** x ranges 0-23, width 1-24.
-  Overlapping widgets are accepted by the API but render incorrectly.
-  The y-axis is unbounded — widgets stack vertically based on y + height.
-
-- **Metric widget period defaults to auto.** If not specified, CloudWatch
-  auto-selects the period based on the dashboard time range (1m for
-  short ranges, 5m/1h for long ranges). For consistent dashboards, set
-  period explicitly in the widget properties.
-
-- **Log insights widgets require a literal query string.** The query
-  syntax uses CloudWatch Logs Insights commands: `fields`, `filter`,
-  `stats`, `sort`, `limit`. The query runs at dashboard render time —
-  expensive queries on large log groups slow dashboard load.
-
-- **Metric math expressions use a specific ID convention.** Each metric
-  in a metric math widget has an ID (e.g., `m1`, `m2`), and expressions
-  reference these IDs (e.g., `e1: m1 / m2`). The expression ID must
-  start with `e` and the metric ID must start with `m`.
-
-- **Cross-account dashboards require the AccountId field in each
-  metric.** Without `AccountId` in the metric object, the dashboard
-  queries the current (sharing) account only. The wrong AccountId
-  silently monitors the wrong account.
-
-- **Dashboard variables use ${VARIABLE_NAME} syntax.** Variables are
-  resolved at render time from the URL query string or the dashboard's
-  variable configuration. `$INSTANCE_ID` in a dimension value is
-  replaced when the operator selects a specific instance from the
-  dropdown.
-
-- **Shared dashboards are read-only for viewers.** Cross-account shared
-  dashboards can be viewed by principals in the sharing account, but
-  only the dashboard owner account can modify the dashboard body.
-
-- **Snapshot sharing creates a point-in-time copy.** A dashboard
-  snapshot is a static image of the dashboard at a specific time — it
-  does not auto-update. Snapshots are shareable via S3 presigned URLs.
-
-- **Application Signals auto-discovers services.** When enabled,
-  CloudWatch Application Signals automatically discovers EKS/ECS/EC2
-  services and creates default SLOs. Dashboard widgets can reference
-  these auto-discovered metrics via the `AWS/ApplicationSignals`
-  namespace.
-
-- **Metric Explorer is interactive, not a dashboard widget.** The
-  CloudWatch Metric Explorer is a separate UI tool for ad-hoc
-  cross-account metric exploration. It cannot be embedded as a
-  dashboard widget — but saved Metric Explorer views can be linked
-  from text widgets.
-
-- **Text widgets support Markdown.** The `markdown` field in a text
-  widget supports a subset of Markdown (headers, bold, links, lists).
-  Use text widgets for runbook links, dashboard descriptions, and
-  separator headers between sections.
-
-- **Dashboard auto-refresh maxes at 15 minutes.** The `start` and `end`
-  fields support relative time (e.g., `-PT1H` for last 1 hour).
-  Operators can set auto-refresh from 1m to 15m; beyond that, the
-  dashboard goes stale.
-
-- **Custom metrics from PutMetricData cost extra.** Each custom metric
-  costs $0.30/month (first 10,000 free). Dashboards referencing
-  thousands of custom metrics (e.g., per-instance memory) can incur
-  significant metric costs. Consider metric math to aggregate before
-  plotting.
-
-- **Embedded Metrics Format (EMF) is the cheapest custom metric path.**
-  EMF payloads are logged to CloudWatch Logs (one log event) and
-  auto-extracted as metrics — no separate PutMetricData API call.
-  Ideal for high-cardinality application metrics (request latency per
-  endpoint).
+Step 0 expert knowledge — non-obvious dashboard behaviors (atomic PutDashboard, 24-column grid, period auto, log query cost, m/e ID conventions, AccountId, variables, sharing semantics, snapshots, EMF) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before classifying an operation or planning widget layout.
 
 ### Step 1: Pre-check gate — PREREQUISITES_MISSING if any check fails
 
@@ -323,182 +246,43 @@ After the operation finishes, run post-verification:
 
 ### Operational dashboard — EC2 fleet (metric widgets)
 
-```bash
-aws cloudwatch put-dashboard \
-  --dashboard-name "prod-ec2-ops" \
-  --dashboard-body '{
-    "widgets": [
-      {
-        "type": "metric",
-        "x": 0, "y": 0, "width": 12, "height": 6,
-        "properties": {
-          "metrics": [
-            ["AWS/EC2", "CPUUtilization", "InstanceId", "${INSTANCE_ID}", {"label": "CPU %"}]
-          ],
-          "period": 300,
-          "stat": "Average",
-          "region": "us-east-1",
-          "title": "CPU Utilization",
-          "view": "timeSeries",
-          "stacked": false,
-          "liveData": true
-        }
-      },
-      {
-        "type": "metric",
-        "x": 12, "y": 0, "width": 12, "height": 6,
-        "properties": {
-          "metrics": [
-            ["CWAgent", "mem_used_percent", "InstanceId", "${INSTANCE_ID}", {"label": "Memory %"}]
-          ],
-          "period": 300,
-          "stat": "Average",
-          "title": "Memory Utilization (CWAgent)",
-          "view": "timeSeries"
-        }
-      },
-      {
-        "type": "metric",
-        "x": 0, "y": 6, "width": 24, "height": 3,
-        "properties": {
-          "metrics": [
-            ["AWS/EC2", "NetworkIn", "InstanceId", "${INSTANCE_ID}", {"label": "Network In (MB)", "id": "m1"}],
-            ["AWS/EC2", "NetworkOut", "InstanceId", "${INSTANCE_ID}", {"label": "Network Out (MB)", "id": "m2"}],
-            [{"expression": "m1/1048576", "label": "In MB/s", "id": "e1"}],
-            [{"expression": "m2/1048576", "label": "Out MB/s", "id": "e2"}]
-          ],
-          "period": 300,
-          "stat": "Sum",
-          "title": "Network Traffic",
-          "view": "timeSeries"
-        }
-      }
-    ]
-  }'
-```
+Operational EC2-fleet dashboard boilerplate (put-dashboard CLI with metric, CWAgent, and metric-math widgets) moved verbatim to [references/dashboard-widget-patterns.md](references/dashboard-widget-patterns.md).
+Load on demand when building the standard ops dashboard.
 
 ### Log insights widget — error analysis
 
-```json
-{
-  "type": "log",
-  "x": 0, "y": 0, "width": 24, "height": 6,
-  "properties": {
-    "query": "SOURCE '/aws/lambda/prod-checkout' | fields @timestamp, @message\n| filter @message like /ERROR/\n| stats count() by bin(5m)\n| sort @timestamp desc\n| limit 100",
-    "region": "us-east-1",
-    "stacked": false,
-    "title": "Lambda Errors (5-min buckets)",
-    "view": "timeSeries"
-  }
-}
-```
+Log insights widget boilerplate (error-analysis query JSON) moved verbatim to [references/dashboard-widget-patterns.md](references/dashboard-widget-patterns.md).
+Load on demand when adding a log query widget.
 
 ### Alarm widget
 
-```json
-{
-  "type": "alarm",
-  "x": 0, "y": 0, "width": 12, "height": 3,
-  "properties": {
-    "title": "Production Alarms",
-    "alarms": [
-      "arn:aws:cloudwatch:us-east-1:111111111111:alarm:ec2-cpu-high-prod-web-1",
-      "arn:aws:cloudwatch:us-east-1:111111111111:alarm:lambda-errors-high-prod-checkout"
-    ]
-  }
-}
-```
+Alarm widget boilerplate (alarm ARN list JSON) moved verbatim to [references/dashboard-widget-patterns.md](references/dashboard-widget-patterns.md).
+Load on demand when surfacing existing alarms.
 
 ### Text widget (Markdown runbook link)
 
-```json
-{
-  "type": "text",
-  "x": 0, "y": 0, "width": 24, "height": 2,
-  "properties": {
-    "markdown": "# Production Operations Dashboard\n**Runbook**: [Incident Response](https://runbooks.example.com/incident)\n**On-call rotation**: PagerDuty schedule `prod-oncall`\n**Escalation**: Slack `#prod-incidents`"
-  }
-}
-```
+Text widget boilerplate (Markdown runbook JSON) moved verbatim to [references/dashboard-widget-patterns.md](references/dashboard-widget-patterns.md).
+Load on demand when adding runbook links or section headers.
 
 ### Metric math — error rate (errors / total requests)
 
-```json
-{
-  "type": "metric",
-  "x": 0, "y": 0, "width": 12, "height": 6,
-  "properties": {
-    "metrics": [
-      ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", "app/prod-alb/1234567890", {"id": "m1"}],
-      ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", "app/prod-alb/1234567890", {"id": "m2"}],
-      [{"expression": "m1/m2*100", "label": "Error Rate %", "id": "e1"}]
-    ],
-    "period": 60,
-    "stat": "Sum",
-    "title": "ALB 5xx Error Rate (%)",
-    "view": "timeSeries",
-    "yAxis": {"left": {"min": 0, "max": 10}}
-  }
-}
-```
+Metric-math error-rate widget boilerplate (m1/m2 expression JSON) moved verbatim to [references/dashboard-widget-patterns.md](references/dashboard-widget-patterns.md).
+Load on demand when plotting ratio metrics.
 
 ### SLO dashboard — burn rate (Application Signals)
 
-```json
-{
-  "type": "metric",
-  "x": 0, "y": 0, "width": 24, "height": 6,
-  "properties": {
-    "metrics": [
-      ["AWS/ApplicationSignals", "ConsumedRAT", "ServiceName", "checkout-service", "SLO", "checkout-availability-slo", {"id": "m1"}],
-      ["AWS/ApplicationSignals", "RequestedRAT", "ServiceName", "checkout-service", "SLO", "checkout-availability-slo", {"id": "m2"}],
-      [{"expression": "m1/m2", "label": "Burn Rate", "id": "e1"}]
-    ],
-    "period": 300,
-    "stat": "Sum",
-    "title": "SLO Burn Rate — Checkout Availability",
-    "view": "timeSeries",
-    "annotations": {"horizontal": [{"label": "Fast burn (2h)", "value": 14.4}, {"label": "Slow burn (6h)", "value": 6}]}
-  }
-}
-```
+SLO burn-rate widget boilerplate (ConsumedRAT/RequestedRAT with burn annotations) moved verbatim to [references/dashboard-widget-patterns.md](references/dashboard-widget-patterns.md).
+Load on demand when building an Application Signals SLO view.
 
 ### Cross-account dashboard (shared)
 
-```json
-{
-  "type": "metric",
-  "x": 0, "y": 0, "width": 12, "height": 6,
-  "properties": {
-    "metrics": [
-      ["AWS/EC2", "CPUUtilization", "InstanceId", "i-0123456789abcdef0", {"AccountId": "222222222222", "label": "Dev Account CPU"}],
-      ["AWS/EC2", "CPUUtilization", "InstanceId", "i-0abcdef1234567890", {"AccountId": "333333333333", "label": "Staging Account CPU"}]
-    ],
-    "period": 300,
-    "stat": "Average",
-    "region": "us-east-1",
-    "title": "Cross-Account CPU Comparison",
-    "view": "timeSeries"
-  }
-}
-```
+Cross-account dashboard boilerplate (AccountId-tagged metric widgets) moved verbatim to [references/dashboard-widget-patterns.md](references/dashboard-widget-patterns.md).
+Load on demand when comparing metrics across source accounts.
 
 ### Executive dashboard — KPI summary (single-value widgets)
 
-```json
-{
-  "type": "metric",
-  "x": 0, "y": 0, "width": 6, "height": 3,
-  "properties": {
-    "metrics": [["AWS/ApplicationELB", "RequestCount", "LoadBalancer", "app/prod-alb/1234567890"]],
-    "period": 3600,
-    "stat": "Sum",
-    "title": "Total Requests (1h)",
-    "view": "singleValue",
-    "setPeriodToTimeRange": true
-  }
-}
-```
+Executive KPI boilerplate (singleValue widget JSON) moved verbatim to [references/dashboard-widget-patterns.md](references/dashboard-widget-patterns.md).
+Load on demand when building KPI summary views.
 
 ## STRICT output contract
 
@@ -641,34 +425,8 @@ NOTES:
 
 ## Pre-flight safety checks (run before any provisioning CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`put-dashboard`, `delete-dashboards`), the operator MUST emit:
-  `CONFIRM: About to <action> dashboard <name> in account <account>
-  region <region>. This affects <consequence>. Proceed? (yes/no)`. Do
-  NOT execute the CLI command until the operator confirms.
-
-- **PutDashboard overwrites the entire dashboard body.** Always snapshot
-  before modification:
-  `aws cloudwatch get-dashboard --dashboard-name <name> --output json >
-  /tmp/<name>-backup-$(date +%s).json`.
-
-- For cross-account dashboards, verify the sharing role exists in EACH
-  source account before deploying. A missing role is the #1 cause of
-  empty cross-account widgets.
-
-- For dashboards with log insights widgets, test the query in the
-  CloudWatch Logs Insights console first to estimate render time.
-  Queries on large log groups (>100 GB ingested) can take 30+ seconds
-  and cause dashboard load timeouts.
-
-- Prefer additive changes (add widgets, add dashboard variables) over
-  destructive changes (replace entire dashboard body) — additive
-  changes are reversible and do not risk removing existing operational
-  views.
-
-- For dashboards shared via snapshot, ensure the S3 bucket lifecycle
-  policy is configured — snapshots accumulate and incur storage costs
-  if not cleaned up.
+Pre-flight safety checks (CONFIRM gate, snapshot-before-overwrite, sharing role per source account, log query render time, additive-change preference, snapshot lifecycle) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before executing any provisioning CLI.
 
 ## Expert heuristic: empty widgets vs no data
 
@@ -721,32 +479,8 @@ after PutDashboard — the API confirms structure but not visual correctness.
 
 ## Recent AWS features (2024-2026)
 
-- **CloudWatch Metric Explorer (2024-2025):** interactive cross-account,
-  cross-region metric exploration without pre-configuring dashboards.
-  Use to discover the right metric/dimension set before building a
-  dashboard. Saved Metric Explorer views can be linked from dashboard
-  text widgets.
-- **CloudWatch Application Signals (2024-2025):** auto-discovered
-  services and SLOs from CloudWatch Agent on EC2/ECS/EKS. Dashboard
-  widgets can reference `AWS/ApplicationSignals` metrics for burn-rate,
-  latency, and availability monitoring without manual instrumentation.
-- **Cross-account dashboard sharing improvements (2024):** streamlined
-  role-based sharing model. Up to 200 source accounts per sharing
-  account. Shared dashboards are now editable from the sharing account
-  (previously read-only).
-- **Dashboard variables (2024-2025):** dynamic dashboard parameters
-  ($INSTANCE_ID, $AWS_REGION) that operators select from dropdowns.
-  Enables one dashboard to serve an entire fleet without duplication.
-- **Embedded Metrics Format v2 (2024):** enhanced EMF with multi-value
-  metrics and dimension filtering. Reduces PutMetricData API costs for
-  high-cardinality application metrics.
-- **CloudWatch snapshot sharing via S3 (2025):** point-in-time dashboard
-  snapshots shareable via presigned S3 URLs. Useful for executive
-  reporting and compliance evidence without granting live dashboard
-  access.
-- **Application Signals auto-remediation hooks (2025):** when Application
-  Signals detects an SLO breach, it can trigger a Lambda or SSM
-  Automation runbook. Dashboard widgets surface the remediation status.
+Recent AWS features (2024-2026) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when deciding between Metric Explorer, variables, EMF v2, or snapshot sharing.
 
 ## AWS documentation
 
@@ -759,6 +493,13 @@ after PutDashboard — the API confirms structure but not visual correctness.
 - **Embedded Metrics Format** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Embedded_Metric_Format.html
 - **CloudWatch Application Signals** — https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Application-Signals.html
 
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 expert knowledge and Recent AWS features (2024-2026) moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight safety checks moved from SKILL.md
+- [references/dashboard-widget-patterns.md](references/dashboard-widget-patterns.md) — widget patterns; now also holds all eight Common-patterns boilerplate blocks moved from SKILL.md
+
 ## Domain
 
 AWS CloudOps / CloudWatch Dashboard Provisioning & Observability Visualization.
+

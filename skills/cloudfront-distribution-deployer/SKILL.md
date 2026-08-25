@@ -89,20 +89,8 @@ Before producing the deployment plan, validate the input specification.
 Several requirements **block deployment** — proceeding with an invalid
 spec produces a non-functional or insecure distribution.
 
-**Live-account pre-flight checks (skip if doing offline architecture plan):**
-1. Verify IAM permissions for `cloudfront:CreateDistribution`,
-   `cloudfront:CreateOriginAccessControl`, `cloudfront:CreateCachePolicy`,
-   `cloudfront:CreateOriginRequestPolicy`, `cloudfront:CreateResponseHeadersPolicy`,
-   `cloudfront:CreateDistributionWithStagingConfig`, and
-   `wafv2:CreateWebACL`, `wafv2:AssociateWebACL`.
-2. Verify the ACM certificate exists and is ISSUED in us-east-1:
-   `aws acm list-certificates --region us-east-1 --output text`
-3. For S3 origins, verify the bucket exists and note its region
-   (cross-region S3 origins are supported but incur cross-region data
-   transfer to the CloudFront edge).
-4. For ALB/EC2 custom origins, verify HTTPS is reachable on 443 and the
-   origin certificate is trusted by CloudFront (public CA, not self-signed).
-5. For WAFv2, verify the Web ACL scope is `CLOUDFRONT` (not `REGIONAL`).
+Live-account pre-flight checks (IAM create permissions, ACM cert ISSUED in us-east-1, S3 bucket region, custom-origin HTTPS reachability, WAF CLOUDFRONT scope) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load them before emitting the architecture plan for a live account.
 
 | Attribute | Value | Effect on plan |
 |---|---|---|
@@ -136,73 +124,8 @@ REQUIRED:
 
 ### Step 0: Expert knowledge — non-obvious CloudFront behaviors that change the plan
 
-- **TLSv1.2_2021 vs TLSv1.2_2019 is a cipher-suite difference.** Both
-  negotiate TLS 1.2+, but `_2021` removes all CBC-mode ciphers (keeps AEAD
-  only). `_2019` still permits `ECDHE-RSA-AES128-SHA256` (CBC) which is
-  vulnerable to padding-oracle variants. Always set `MinimumProtocolVersion:
-  TLSv1.2_2021` for new distributions.
-
-- **OAC signing behavior `always` vs `no-override`.** `always` signs every
-  origin request (recommended for private S3). `no-override` signs only if
-  no `Authorization` header is present (use when the origin also accepts
-  its own auth). For S3 REST origins serving static content, use `always`.
-
-- **OAC does NOT replace the bucket policy.** OAC is the CloudFront-side
-  configuration. The S3 bucket must STILL grant `s3:GetObject` to
-  `Service: cloudfront.amazonaws.com` with the
-  `AWS:SourceArn` condition matching the distribution ARN. Without the
-  bucket policy update, every object GET returns 403.
-
-- **WAFv2 Web ACL for CloudFront MUST be in us-east-1 with CLOUDFRONT scope.**
-  `aws wafv2 list-web-acls --scope CLOUDFRONT --region us-east-1` is the
-  only way to enumerate them. A Web ACL in eu-west-1, even with CLOUDFRONT
-  scope, cannot be associated.
-
-- **Lambda@Edge functions MUST be in us-east-1 (and replicated).** You
-  create the Lambda function in us-east-1; CloudFront replicates it to
-  regional edge caches worldwide. A function created in any other region
-  cannot be attached to a distribution.
-
-- **CloudFront Functions are region-less (global).** They are deployed
-  directly to all edge locations. No region constraint.
-
-- **Cache policy and origin request policy are SEPARATE.** Cache policy
-  controls which headers/cookies/query strings CloudFront caches
-  (determines cache key). Origin request policy controls which
-  headers/cookies/query strings CloudFront forwards to the origin
-  (determines what the origin sees). Use managed policies as starting
-  points; do not blindly forward everything (kills cache hit ratio).
-
-- **Default cache behavior applies to unmatched paths.** Path-specific
-  cache behaviors override for matched patterns (`/api/*`, `*.jpg`). Always
-  configure the default behavior with the broadest applicable policy.
-
-- **Origin group failover triggers on HTTP status codes.** Configure the
-  failover criteria (e.g., 403, 404, 500, 502, 503, 504). The primary is
-  tried first; on a matching status code, CloudFront switches to the
-  secondary. Active-active requires a different setup (weighted routing at
-  Route 53).
-
-- **Price class controls cost but also latency.** `PriceClass_100` uses
-  only North America + Europe edges — Asian users see higher latency.
-  `PriceClass_All` includes all 600+ edge locations but has a higher
-  per-GB rate in some regions.
-
-- **Standard logging uses ACLs (not bucket policies).** The logging S3
-  bucket must grant WRITE and READ_ACP to the `awslogsdelivery` account
-  canonical ID (`c4c1ede66af53448b93ce283fc5b7c73`). A bucket with ACLs
-  disabled (BucketOwnerEnforced) silently rejects logs. For new deployments,
-  prefer real-time logging (`RealtimeLogConfigArn`) over standard logging.
-
-- **Continuous deployment (staging distributions) requires a primary.**
-  You create a staging distribution that mirrors the primary and shifts a
-  percentage of traffic. After validation, you promote the staging config
-  to the primary. The primary must exist first.
-
-- **Response headers policy is REQUIRED for security headers.** Without an
-  explicit policy, CloudFront passes through whatever the origin sends. If
-  the origin does not send HSTS, CSP, or X-Frame-Options, the edge does
-  not add them.
+Step 0 expert knowledge (TLSv1.2_2021 cipher policy, OAC signing behavior always vs no-override, bucket-policy pairing, us-east-1 WAF scope, Lambda@Edge replication, cache vs origin request policies, default behavior precedence, origin-group failover codes, price class vs latency, logging ACLs, staging distributions, response headers) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before finalizing the architecture plan.
 
 ### Step 1: Origin selection
 
@@ -231,22 +154,8 @@ aws cloudfront create-origin-access-control \
 **Attach the OAC ID to the distribution's S3 origin:**
 `OriginAccessControlId: <id-from-create>`
 
-**Update the S3 bucket policy to grant CloudFront access via OAC:**
-```json
-{
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": {"Service": "cloudfront.amazonaws.com"},
-    "Action": "s3:GetObject",
-    "Resource": "arn:aws:s3:::prod-bucket/*",
-    "Condition": {
-      "StringEquals": {
-        "AWS:SourceArn": "arn:aws:cloudfront::<account>:distribution/<dist-id>"
-      }
-    }
-  }]
-}
-```
+Step 2 OAC bucket-policy JSON (cloudfront.amazonaws.com principal with AWS:SourceArn) moved verbatim to [references/origin-access-control-guide.md](references/origin-access-control-guide.md).
+Load on demand when writing the S3 bucket policy for the origin.
 
 The bucket policy + OAC ID are deployed TOGETHER. OAC without the bucket
 policy = 403. Bucket policy without OAC = inert (CloudFront has no signing).
@@ -296,32 +205,13 @@ Do not include TLSv1 or TLSv1.1.
 }
 ```
 
-**SNI vs VIP:** `sni-only` is the modern default (requires SNI-capable
-client — all modern browsers). `vip` is legacy, costs $600/month, reserved
-for ancient clients (Java 6, Windows XP). Use SNI unless you have a
-specific SNI-incompatible client.
+SNI vs VIP guidance (legacy dedicated-IP viewers, $600/month) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when a viewer cannot use SNI.
 
 ### Step 6: WAFv2 Web ACL association
 
-**Create the Web ACL (CLOUDFRONT scope, us-east-1):**
-```bash
-aws wafv2 create-web-acl \
-  --name prod-cdn-waf --scope CLOUDFRONT --region us-east-1 \
-  --default-action Allow={} \
-  --visibility-config SampledRequestsEnabled=true,CloudWatchMetricsEnabled=true,MetricName=prod-cdn-waf \
-  --rules file://waf-rules.json
-```
-
-**Recommended rule groups:**
-- `AWSManagedRulesCommonRuleSet` — OWASP Top 10 baseline.
-- `AWSManagedRulesSQLiRuleSet` — SQL injection patterns.
-- `AWSManagedRulesAmazonIpReputationList` — known malicious IPs.
-- `AWSManagedRulesBotControlRuleSet` — bot/scraper detection.
-- Rate-based rule — e.g., 2000 requests per 5 minutes per IP.
-
-**Associate with the distribution:**
-Set `WebACLId` in the distribution config to the Web ACL ARN
-(`arn:aws:wafv2:us-east-1:<account>:global/webacl/<name>/<id>`).
+Step 6 WAFv2 Web ACL CLI (create-web-acl, managed rule groups, association ARN) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when attaching the Web ACL (CLOUDFRONT scope, us-east-1).
 
 ### Step 7: Cache and origin request policies
 
@@ -346,23 +236,8 @@ headers as needed.
 
 ### Step 8: Response headers policy (security headers)
 
-**Required security headers:**
-```json
-"ResponseHeadersPolicy": {
-  "SecurityHeadersConfig": {
-    "StrictTransportSecurity": {"AccessControlMaxAgeSec": 63072000, "IncludeSubdomains": true, "Override": true, "Preload": true},
-    "FrameOptions": {"FrameOption": "DENY", "Override": true},
-    "ContentTypeOptions": {"Override": true},
-    "XSSProtection": {"Protection": true, "ModeBlock": true, "Override": true},
-    "ReferrerPolicy": {"ReferrerPolicy": "strict-origin-when-cross-origin", "Override": true},
-    "ContentSecurityPolicy": {"ContentSecurityPolicy": "default-src 'self'; object-src 'none'", "Override": true}
-  }
-}
-```
-
-HSTS at max-age 63072000 (2 years) with preload signals to browsers: never
-connect to this site over HTTP. This is the strongest transport-security
-posture available at the edge.
+Step 8 security-headers policy JSON (HSTS, X-Frame-Options, CSP, X-Content-Type-Options) and HSTS rationale moved verbatim to [references/edge-compute-and-headers-guide.md](references/edge-compute-and-headers-guide.md).
+Load on demand when building the response headers policy.
 
 ### Step 9: Origin group (multi-origin failover)
 
@@ -439,36 +314,13 @@ allowlists. Updates propagate in minutes — no function redeploy needed.
 }
 ```
 
-**Logging bucket ACL grant (REQUIRED):**
-```bash
-aws s3api put-object-acl --bucket prod-cf-logs --key cdn-logs/ \
-  --grant-write 'id="c4c1ede66af53448b93ce283fc5b7c73"' \
-  --grant-read-acp 'id="c4c1ede66af53448b93ce283fc5b7c73"'
-```
-(The canonical ID `c4c1ede66af53448b93ce283fc5b7c73` is the
-`awslogsdelivery` account.)
-
-**Real-time logging (newer, recommended for production):**
-```json
-"RealtimeLogConfigArn": "arn:aws:cloudfront::<account>:realtime-log-config/prod-cf-rt"
-```
-Real-time logs stream to Kinesis Data Firehose (S3, OpenSearch, etc.)
-within seconds. Better for anomaly detection than the 5-60 minute delay
-of standard logging.
+Step 13 logging-bucket ACL grant (awslogsdelivery canonical ID) and real-time logging config moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when enabling access logging.
 
 ### Step 14: Continuous deployment (staging distributions)
 
-```bash
-aws cloudfront create-distribution-with-staging-config \
-  --staging-config-comment "staging for prod-cdn" \
-  --default-cache-behavior ...
-# After validation:
-aws cloudfront copy-distribution --if-match <etag> --staging-distribution-id <id> --primary-distribution-id <id>
-```
-
-Use staging distributions to test config changes (new origins, new WAF
-rules, new cache policies) with a small percentage of traffic before
-promoting to the primary. Eliminates "deploy and pray" CDN releases.
+Step 14 continuous-deployment CLI (create-distribution-with-staging-config, copy-distribution) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when planning a staging distribution.
 
 ## Output format (per distribution deployment plan)
 
@@ -560,52 +412,13 @@ DEPLOY_COMMANDS:
 
 ## Verification commands (run after deployment)
 
-```bash
-# Verify distribution is Deployed
-aws cloudfront get-distribution --id <id> \
-  --query 'Distribution.Status'
-
-# Verify OAC exists
-aws cloudfront get-origin-access-control --id <oac-id>
-
-# Verify WAF is associated
-aws cloudfront get-distribution-config --id <id> \
-  --query 'DistributionConfig.WebACLId'
-
-# Verify ACM cert is in us-east-1 and ISSUED
-aws acm describe-certificate --certificate-arn <arn> --region us-east-1 \
-  --query 'Certificate.Status'
-
-# Verify logging bucket ACL grant
-aws s3api get-object-acl --bucket prod-cf-logs --key cdn-logs/
-
-# Test distribution
-curl -I https://<distribution-domain>.cloudfront.net/
-# Expect: HTTP/2 200, strict-transport-security header present
-```
+Post-deployment verification commands (distribution status, OAC, WAF association, ACM status, logging ACL, curl) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand after the distribution reaches Deployed.
 
 ## Edge-case handling
 
-- **ACM certificate in wrong region.** PREREQUISITES_MISSING. CloudFront
-  can only read ACM certificates from us-east-1. Re-issue the cert in
-  us-east-1 or use the default `*.cloudfront.net` domain.
-
-- **S3 website endpoint origin.** PREREQUISITES_MISSING. Switch to REST
-  endpoint + OAC. The website endpoint forces a public bucket and bypasses
-  S3 access policies.
-
-- **Self-signed origin certificate.** PREREQUECISITES_MISSING. CloudFront
-  does not trust self-signed certs. Use ACM (for ALB) or a public CA cert.
-
-- **Lambda@Edge function in non-us-east-1.** PREREQUISITES_MISSING. Move
-  the function to us-east-1.
-
-- **WAFv2 Web ACL with REGIONAL scope.** PREREQUISITES_MISSING. Re-create
-  with `--scope CLOUDFRONT` in us-east-1.
-
-- **Geo restriction with regulatory overlap.** If the workload is subject
-  to multiple regimes (GDPR + OFAC), use a whitelist of explicitly-allowed
-  countries. A blacklist of disallowed countries is harder to maintain.
+Edge-case catalog (ACM cert in wrong region, S3 website endpoint origin, self-signed origin cert, Lambda@Edge region, REGIONAL WAF scope, regulatory geo overlap) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when the spec hits a non-standard case.
 
 ## Anti-Patterns — NEVER
 
@@ -665,62 +478,21 @@ curl -I https://<distribution-domain>.cloudfront.net/
 
 ## Pre-flight safety checks (run before any deployment CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`create-distribution`, `update-distribution`, `create-origin-access-control`),
-  the deployer MUST emit:
-  `CONFIRM: About to deploy distribution <name> in account <account>.
-  Estimated monthly cost: <$X>. Distribution changes propagate globally
-  (5-60 min). Proceed? (yes/no)`
-
-- **ACM cert region check.** `aws acm describe-certificate --certificate-arn
-  <arn> --region us-east-1 --query 'Certificate.Status'` MUST return
-  `ISSUED`. A cert in any other region or in `PENDING_VALIDATION` fails.
-
-- **WAF scope check.** `aws wafv2 list-web-acls --scope CLOUDFRONT --region
-  us-east-1` MUST list the intended ACL. REGIONAL-scope ACLs cannot be
-  associated.
-
-- **S3 bucket policy dry-run.** Before attaching OAC, verify the bucket
-  policy has the service-principal statement. Without it, all object GETs
-  fail immediately on distribution deployment.
-
-- **Cost estimate.** Emit before deployment:
-  - CloudFront data transfer to origin: $0.085/GB (varies by price class)
-  - CloudFront data transfer to internet: $0.02/GB (varies by region)
-  - Lambda@Edge invocations: $0.60 per million + GB-second
-  - CloudFront Functions: $0.10 per million
-  - WAF: $5/ACL/month + $0.60 per million requests
-  - Real-time logging: Kinesis cost
-
-- **Distribution update is global.** Changes take 5-60 minutes to propagate
-  to all edge locations. Verify via `get-distribution Status: Deployed`
-  before declaring deployment complete.
+Pre-flight safety checks (CONFIRMATION GATE, ACM region check, WAF scope check, bucket-policy dry-run, cost estimate, global propagation) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load them before emitting any deployment CLI.
 
 ## Remediation guidance
 
-**Ordering principle:** origin access model first (active exposure if wrong),
-then TLS posture (data-in-transit), then WAF (defense-in-depth), then
-optimizations (caching, headers).
+Remediation guidance for PREREQUISITES_MISSING verdicts (ACM cert region, S3 website endpoint origin, Lambda@Edge region) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when writing the remediation steps.
 
-### For PREREQUISITES_MISSING — ACM cert in wrong region
+## References (load on demand)
 
-1. Re-issue or import the cert in us-east-1:
-   `aws acm request-certificate --domain-name app.example.com --validation-method DNS --region us-east-1`
-2. Wait for `ISSUED` status.
-3. Update distribution config with the new ARN.
-
-### For PREREQUISITES_MISSING — S3 website endpoint origin
-
-1. Switch origin to REST endpoint: `bucket.s3.<region>.amazonaws.com`.
-2. Create OAC and attach to the origin.
-3. Update bucket policy to service-principal with `AWS:SourceArn`.
-4. Remove public read access from the bucket.
-
-### For PREREQUISITES_MISSING — Lambda@Edge in wrong region
-
-1. Recreate the function in us-east-1.
-2. Publish version: `aws lambda publish-version --function-name <name> --region us-east-1`.
-3. Update distribution to reference the new function ARN with version suffix.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 expert knowledge, Step 5 SNI/VIP, Step 6 WAF CLI, Step 13 logging grants, Step 14 staging CLI, edge-case catalog, and recent AWS features moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — live-account pre-flight checks, post-deployment verification commands, and pre-flight safety checks moved from SKILL.md
+- [references/error-handling.md](references/error-handling.md) — remediation guidance for PREREQUISITES_MISSING moved from SKILL.md
+- [references/origin-access-control-guide.md](references/origin-access-control-guide.md) — OAC vs OAI, signing behaviors, bucket policy patterns (now also holds the Step 2 bucket-policy JSON)
+- [references/edge-compute-and-headers-guide.md](references/edge-compute-and-headers-guide.md) — Functions vs Lambda@Edge, KeyValueStore, response headers policies (now also holds the Step 8 security-headers JSON)
 
 ## Domain
 
@@ -728,28 +500,8 @@ AWS CloudOps / CloudFront Edge Security & Content Delivery Provisioning.
 
 ## Recent AWS features (2024-2026)
 
-- **KeyValueStore (2024):** serverless key-value data for CloudFront
-  Functions. Use for feature flags, lightweight config, IP allowlists.
-  Updates propagate in minutes without function redeploy.
-
-- **Continuous deployment (2024):** staging distributions with
-  percentage-based traffic shifting. Promote staging config to primary
-  after validation. Eliminates risky CDN releases.
-
-- **VPC origins (2024-2025):** CloudFront can origin from private VPC
-  resources (ALB, NLB, EC2, ECS) without internet exposure. Useful for
-  internal-only applications needing edge delivery.
-
-- **TLS 1.3 viewer support (2024):** CloudFront supports TLS 1.3 for
-  viewer connections. Set `MinimumProtocolVersion: TLSv1.2_2021` as the
-  floor; clients negotiate 1.3 if capable.
-
-- **Origin Access Control for Lambda Function URLs and MediaStore
-  (2024-2025):** OAC now covers more than S3. Verify OAC on all origin
-  types when auditing.
-
-- **CloudFront Metrics (2025):** Enhanced real-time metrics in CloudWatch
-  plus additional edge-side dimensions for debugging cache hit ratios.
+Recent AWS features 2024-2026 (KeyValueStore, continuous deployment, VPC origins, TLS 1.3, OAC for Lambda URLs/MediaStore, CloudFront Metrics) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when the spec mentions KVS, VPC origins, or staging workflows.
 
 ## AWS documentation
 

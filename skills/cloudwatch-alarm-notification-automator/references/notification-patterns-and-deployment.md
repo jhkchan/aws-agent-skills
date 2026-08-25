@@ -345,3 +345,207 @@ REMEDIATION:
   2. aws sns publish --topic-arn arn:aws:sns:us-east-1:111111111111:critical-notifications-checkout --message '{"test": true}' --subject "TEST after fix"
   3. Verify the test message appears in Slack within 30s.
 ```
+
+<!-- Appended from SKILL.md (progressive-disclosure restructure); content above is unchanged. -->
+
+## Lambda forwarder handler (Slack incoming webhook) — inline code
+
+```python
+import json, urllib.request, os, boto3
+
+WEBHOOK_PARAM = os.environ['SLACK_WEBHOOK_PARAM']  # Parameter Store name
+
+def lambda_handler(event, context):
+    ssm = boto3.client('ssm')
+    if ssm.get_parameter(Name='/notifications/kill-switch')['Parameter']['Value'] == 'disabled':
+        return {'status': 'killed'}
+    webhook = ssm.get_parameter(Name=WEBHOOK_PARAM, WithDecryption=True)['Parameter']['Value']
+    record = event['Records'][0]['Sns']
+    alarm = json.loads(record['Message'])
+    msg = {
+        'text': f":rotating_light: *{alarm.get('AlarmName', 'unknown')}* -> {alarm.get('NewStateValue', 'ALARM')}",
+        'blocks': [
+            {'type': 'header', 'text': {'type': 'plain_text', 'text': f"Alarm: {alarm.get('AlarmName')}"}},
+            {'type': 'section', 'fields': [
+                {'type': 'mrkdwn', 'text': f"*State:* {alarm.get('NewStateValue')} (was {alarm.get('OldStateValue')})"},
+                {'type': 'mrkdwn', 'text': f"*Reason:* {alarm.get('NewStateReason', 'N/A')[:300]}"},
+                {'type': 'mrkdwn', 'text': f"*Region:* {alarm.get('Region')}"}]},
+            {'type': 'section', 'text': {'type': 'mrkdwn', 'text': f"*Runbook:* {alarm.get('RunbookLink', 'https://runbooks.example.com/')}"}}
+        ]}
+    urllib.request.urlopen(urllib.request.Request(
+        webhook, json.dumps(msg).encode(), {'Content-Type': 'application/json'}))
+    return {'status': 'sent'}
+```
+
+**Secret storage:** Parameter Store for webhooks (free, encrypted by
+default); Secrets Manager for OAuth tokens (paid, rotation). NEVER
+hardcode in Lambda environment variables — they are visible in
+CloudTrail `GetFunctionConfiguration` and the console.
+
+## PagerDuty Events API v2 forwarder — inline code
+
+```python
+import json, urllib.request, boto3
+
+def lambda_handler(event, context):
+    ssm = boto3.client('ssm')
+    routing_key = ssm.get_parameter(Name='/pagerduty/integration-key', WithDecryption=True)['Parameter']['Value']
+    alarm = json.loads(event['Records'][0]['Sns']['Message'])
+    action = 'trigger' if alarm.get('NewStateValue') == 'ALARM' else 'resolve'
+    dedup = alarm.get('AlarmName', 'alarm') + ':' + alarm.get('Region', '')
+    payload = {
+        'routing_key': routing_key, 'event_action': action, 'dedup_key': dedup,
+        'payload': {
+            'summary': f"{alarm.get('AlarmName')} -> {alarm.get('NewStateValue')}",
+            'severity': 'critical' if 'critical' in alarm.get('AlarmName', '').lower() else 'error',
+            'source': f"aws:cloudwatch:{alarm.get('Region')}",
+            'custom_details': {'reason': alarm.get('NewStateReason', 'N/A')[:500]}}}
+    urllib.request.urlopen(urllib.request.Request(
+        'https://events.pagerduty.com/v2/enqueue',
+        json.dumps(payload).encode(), {'Content-Type': 'application/json'}))
+    return {'status': 'paged'}
+```
+
+**Dedup key:** PagerDuty correlates trigger/resolve by `dedup_key`. Use
+`AlarmName:Region` so a fire-then-clear auto-resolves the same incident.
+Without a stable dedup key, every state change creates a NEW incident —
+the #1 PagerDuty integration bug.
+
+## Subscription + confirmation commands (MANDATORY verification)
+
+```bash
+aws sns subscribe \
+  --topic-arn arn:aws:sns:us-east-1:111111111111:alarm-notifications-prod \
+  --protocol lambda \
+  --notification-endpoint arn:aws:lambda:us-east-1:111111111111:function:alarm-slack-forwarder
+
+# GRANT SNS permission to invoke the Lambda (commonly missed!)
+aws lambda add-permission \
+  --function-name alarm-slack-forwarder \
+  --statement-id AllowSNSInvoke \
+  --action lambda:InvokeFunction \
+  --principal sns.amazonaws.com \
+  --source-arn arn:aws:sns:us-east-1:111111111111:alarm-notifications-prod
+
+# VERIFY (SubscriptionArn must NOT be "PendingConfirmation")
+aws sns list-subscriptions-by-topic \
+  --topic-arn arn:aws:sns:us-east-1:111111111111:alarm-notifications-prod
+```
+
+Lambda subscriptions auto-confirm but require `lambda:add-permission`.
+HTTPS/email/SMS subscriptions require explicit endpoint confirmation.
+Always verify `SubscriptionArn` is populated.
+
+## Test publish (run after every subscription change)
+
+```bash
+aws sns publish \
+  --topic-arn arn:aws:sns:us-east-1:111111111111:alarm-notifications-prod \
+  --subject "TEST alarm notification" \
+  --message '{"AlarmName":"test-alarm","NewStateValue":"ALARM","OldStateValue":"OK","NewStateReason":"Manual test publish","Region":"us-east-1"}'
+```
+
+If the test does not arrive in Slack/PagerDuty within 30 seconds, the
+subscription is unconfirmed OR the Lambda errored. Check CloudWatch Logs
+before relying on the workflow.
+
+## Alarm-to-ticket Lambda (Jira auto-create / auto-resolve) — inline code
+
+```python
+import json, urllib.request, os, boto3, base64
+
+def lambda_handler(event, context):
+    ssm = boto3.client('ssm')
+    token = ssm.get_parameter(Name='/jira/api-token', WithDecryption=True)['Parameter']['Value']
+    email = ssm.get_parameter(Name='/jira/email')['Parameter']['Value']
+    project = os.environ['JIRA_PROJECT']
+    detail = event['detail']
+    alarm_name, state = detail['alarmName'], detail['stateName']
+    auth = base64.b64encode(f"{email}:{token}".encode()).decode()
+    dynamo = boto3.client('dynamodb')
+
+    if state == 'ALARM':
+        # Idempotency: check for existing open ticket
+        existing = dynamo.get_item(TableName='alarm-ticket-map',
+            Key={'alarmName': {'S': alarm_name}}).get('Item')
+        if existing:
+            return {'status': 'duplicate-suppressed'}
+        body = {'fields': {
+            'project': {'key': project},
+            'summary': f"[ALARM] {alarm_name} -> ALARM",
+            'description': f"Reason: {detail.get('stateReason', 'N/A')}\nRunbook: https://runbooks.example.com/",
+            'issuetype': {'name': 'Incident'},
+            'labels': ['auto-created', 'cloudwatch-alarm']}}
+        req = urllib.request.Request(
+            f"https://your-domain.atlassian.net/rest/api/3/issue",
+            json.dumps(body).encode(),
+            {'Content-Type': 'application/json', 'Authorization': f'Basic {auth}'})
+        issue_key = json.loads(urllib.request.urlopen(req).read())['key']
+        dynamo.put_item(TableName='alarm-ticket-map',
+            Item={'alarmName': {'S': alarm_name}, 'issueKey': {'S': issue_key}})
+    elif state == 'OK':
+        item = dynamo.get_item(TableName='alarm-ticket-map',
+            Key={'alarmName': {'S': alarm_name}}).get('Item')
+        if item:
+            key = item['issueKey']['S']
+            # Transition to Resolved
+            urllib.request.urlopen(urllib.request.Request(
+                f"https://your-domain.atlassian.net/rest/api/3/issue/{key}/transitions",
+                json.dumps({'transition': {'id': '31'}}).encode(),
+                {'Content-Type': 'application/json', 'Authorization': f'Basic {auth}'}))
+    return {'status': state}
+```
+
+**Idempotency is MANDATORY.** Without the DynamoDB dedup check, alarm
+flapping (OK -> ALARM every 60s) creates dozens of tickets per hour.
+ServiceNow follows the same pattern: `POST /api/now/table/incident` with
+`short_description`, store `sys_id` in DynamoDB keyed by alarm name,
+auto-resolve via `PATCH` with `state=6` when alarm clears.
+
+## Tiered escalation state machine (Step Functions JSON, ack mechanism, timing)
+
+```json
+{
+  "StartAt": "PagePrimary",
+  "States": {
+    "PagePrimary": {
+      "Type": "Task",
+      "Resource": "arn:aws:sns:us-east-1:111111111111:on-call-primary",
+      "Next": "WaitForAck"
+    },
+    "WaitForAck": {"Type": "Wait", "Seconds": 300, "Next": "CheckAck"},
+    "CheckAck": {
+      "Type": "Choice",
+      "Choices": [{"Variable": "$.acknowledged", "BooleanEquals": true, "Next": "Done"}],
+      "Default": "PageSecondary"
+    },
+    "PageSecondary": {
+      "Type": "Task",
+      "Resource": "arn:aws:sns:us-east-1:111111111111:on-call-secondary",
+      "Next": "WaitForAck2"
+    },
+    "WaitForAck2": {"Type": "Wait", "Seconds": 300, "Next": "CheckAck2"},
+    "CheckAck2": {
+      "Type": "Choice",
+      "Choices": [{"Variable": "$.acknowledged", "BooleanEquals": true, "Next": "Done"}],
+      "Default": "PageManager"
+    },
+    "PageManager": {
+      "Type": "Task",
+      "Resource": "arn:aws:sns:us-east-1:111111111111:on-call-manager",
+      "Next": "Done"
+    },
+    "Done": {"Type": "Succeed"}
+  }
+}
+```
+
+**Ack mechanism:** the SNS message includes a one-click ack URL (API
+Gateway + Lambda writing to DynamoDB). After each `Wait`, the state
+machine reads the ack state. If acknowledged, exit; otherwise escalate.
+
+**Tier timing baseline (2026):**
+- Standard: Primary -> 5 min -> Secondary -> 5 min -> Manager.
+- Critical (SEV-1): Primary -> 2 min -> Secondary + Manager simultaneously.
+- Low-severity: Primary only, no escalation.
+

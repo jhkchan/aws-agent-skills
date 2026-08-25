@@ -271,3 +271,49 @@ resource "aws_cloudtrail_event_data_store" "s3_data" {
   }
 }
 ```
+
+## Step 6 — Forensic query patterns
+
+### Who deleted a specific resource?
+
+```sql
+SELECT userIdentity.arn, eventName, eventTime, sourceIPAddress, userAgent
+FROM <eds-id>
+WHERE eventTime > '2026-08-10T00:00:00Z'
+  AND eventTime < '2026-08-11T00:00:00Z'
+  AND eventName IN ('DeleteBucket', 'DeleteTrail', 'DeleteVpc', 'DeleteDBInstance')
+ORDER BY eventTime DESC
+```
+
+### What did a specific user do?
+
+```sql
+SELECT eventName, eventSource, eventTime, resourceName, sourceIPAddress
+FROM <eds-id>
+WHERE eventTime > '2026-08-10T00:00:00Z'
+  AND eventTime < '2026-08-11T00:00:00Z'
+  AND userIdentity.arn = 'arn:aws:iam::123456789012:user/suspicious-user'
+ORDER BY eventTime DESC
+```
+
+### Console login from unusual IP?
+
+```sql
+SELECT userIdentity.arn, sourceIPAddress, eventTime, responseElements
+FROM <eds-id>
+WHERE eventTime > '2026-08-10T00:00:00Z'
+  AND eventName = 'ConsoleLogin'
+  AND sourceIPAddress NOT LIKE '10.%'
+  AND sourceIPAddress NOT LIKE '172.16.%'
+ORDER BY eventTime DESC
+```
+
+### Root account activity?
+
+```sql
+SELECT eventName, eventTime, sourceIPAddress, userIdentity.type
+FROM <eds-id>
+WHERE eventTime > '2026-08-10T00:00:00Z'
+  AND userIdentity.type = 'Root'
+ORDER BY eventTime DESC
+```

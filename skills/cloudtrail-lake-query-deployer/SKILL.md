@@ -115,111 +115,19 @@ time:
 
 ## Configuration dependency graph (novel heuristic)
 
-CloudTrail Lake configurations are NOT independent. The EDS must exist
-before events are ingested. Ingestion type must be decided before
-creating the EDS (cannot be changed after creation for some types).
-Data protection must be configured before queries return results. Use
-this graph to sequence provisioning.
-
-| Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| Event data store (EDS) | None (creates an empty store) | EDS type (management, data, insight, network) CANNOT be changed after creation | event ingestion, querying |
-| Event ingestion | EDS exists; CloudTrail enabled in account | ingestion starts automatically for management events; data events need advanced selectors | queryable events |
-| Advanced event selectors | EDS exists; data event ingestion enabled | selectors filter which data events are stored; overly broad selectors increase ingestion cost | filtered data events |
-| SQL query | EDS exists; events ingested | query scans raw JSON; cost proportional to data scanned; time filter reduces cost | query results |
-| Multi-account EDS | Organizations enabled; management account | EDS in management account ingests from all member accounts | org-wide querying |
-| Retention | EDS exists | retention period 7-3653 days; set at creation, can be updated; shorter retention = less storage cost | data lifecycle |
-| Data protection | EDS exists | policy masks PII fields before query results; original values inaccessible via queries | compliance |
-| Athena federation | EDS exists; Athena workgroup configured | Athena queries the EDS via a Lake Formation integration | Athena-based analysis |
-
-**The EDS-type-immutability row is the one a baseline model misses.**
-When creating an EDS, you choose what type of events to ingest
-(management, data, Insights, network). This type CANNOT be changed
-after creation. If you need to add data events to a management-only
-EDS, you must create a new EDS. The procedure below forces an explicit
-event-type decision.
-
-**Cross-dependency gotchas:**
-- Management events are ingested automatically once the EDS is created.
-  Data events require advanced event selectors to specify which
-  resources generate data events.
-- The billing model is per-GB ingested PLUS per-GB scanned by queries.
-  Broad data event ingestion (e.g., all S3 GetObject) generates
-  enormous volume. Use advanced selectors to limit to specific buckets
-  or event types.
-- Multi-account EDS ingests from ALL member accounts automatically once
-  Organizations integration is configured. There is no per-account
-  selector at ingestion time.
-- Data protection policies operate on the EDS. Once applied, ALL queries
-  against that EDS have PII masked. There is no per-query bypass.
+> Configuration dependency graph moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
 ## Expert heuristic: per-GB billing model
 
-A baseline model may not understand the CloudTrail Lake billing model.
-The correct heuristic recognizes two separate charges: ingestion and
-query scanning.
-
-```text
-EDS billing:
-  1. Ingestion: $X per GB ingested (events written to the EDS)
-     → Management events: ~0.008 GB per million events
-     → Data events: varies (S3, Lambda, DynamoDB)
-     → Network events: large volume (VPC Flow Log style)
-
-  2. Query scan: $Y per GB scanned by queries
-     → Each query scans the raw JSON events in the time range
-     → Narrowing time range reduces scanned data
-     → No indexes = full scan within the time range
-
-Cost optimization:
-  → Use advanced selectors to limit data events (don't ingest all S3)
-  → Always specify time range in queries (don't scan all history)
-  → Use partitioning hints where available
-```
-
-**Key implication:** the dominant cost for data-event EDS is ingestion.
-The dominant cost for management-event EDS is query scanning (if queries
-are frequent). Both costs must be considered.
+> Per-GB billing heuristic moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
 ## Expert heuristic: queries scan raw JSON, not indexes
 
-A baseline model may assume CloudTrail Lake uses a search index. The
-correct heuristic recognizes that queries perform full scans of raw
-JSON events within the specified time range.
-
-```text
-Query: SELECT * FROM eds-id WHERE eventName = 'DeleteBucket'
-  → Scans ALL events in the time range
-  → No index on eventName
-  → Time range = primary cost lever
-
-Optimal query:
-  SELECT userIdentity.arn, eventName, eventTime, sourceIPAddress
-  FROM <eds-id>
-  WHERE eventTime > '2026-08-10T00:00:00Z'
-    AND eventTime < '2026-08-11T00:00:00Z'
-    AND eventName = 'DeleteBucket'
-  → Scans only events in the 24-hour window
-  → Much cheaper than scanning 90 days
-```
+> Raw-JSON scan heuristic moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
 ## Expert heuristic: data protection masks PII before results
 
-A baseline model may treat data protection as a display filter. The
-correct heuristic recognizes that masking happens at the EDS level,
-before query results are returned.
-
-```text
-Without data protection policy:
-  Query: SELECT * FROM eds-id WHERE eventName = 'AssumeRole'
-  Result: {"userIdentity": {"arn": "arn:aws:iam::123:user/dev@corp.com", ...}}
-  → Full email visible
-
-With data protection policy (mask emailAddress):
-  Query: SELECT * FROM eds-id WHERE eventName = 'AssumeRole'
-  Result: {"userIdentity": {"arn": "arn:aws:iam::123:user:****", ...}}
-  → Email masked in ALL queries, permanently
-```
+> PII masking heuristic moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
 ## Prerequisites (verify before provisioning)
 
@@ -406,77 +314,11 @@ aws cloudtrail-data describe-query \
 
 ## Step 6 — Forensic query patterns
 
-### Who deleted a specific resource?
-
-```sql
-SELECT userIdentity.arn, eventName, eventTime, sourceIPAddress, userAgent
-FROM <eds-id>
-WHERE eventTime > '2026-08-10T00:00:00Z'
-  AND eventTime < '2026-08-11T00:00:00Z'
-  AND eventName IN ('DeleteBucket', 'DeleteTrail', 'DeleteVpc', 'DeleteDBInstance')
-ORDER BY eventTime DESC
-```
-
-### What did a specific user do?
-
-```sql
-SELECT eventName, eventSource, eventTime, resourceName, sourceIPAddress
-FROM <eds-id>
-WHERE eventTime > '2026-08-10T00:00:00Z'
-  AND eventTime < '2026-08-11T00:00:00Z'
-  AND userIdentity.arn = 'arn:aws:iam::123456789012:user/suspicious-user'
-ORDER BY eventTime DESC
-```
-
-### Console login from unusual IP?
-
-```sql
-SELECT userIdentity.arn, sourceIPAddress, eventTime, responseElements
-FROM <eds-id>
-WHERE eventTime > '2026-08-10T00:00:00Z'
-  AND eventName = 'ConsoleLogin'
-  AND sourceIPAddress NOT LIKE '10.%'
-  AND sourceIPAddress NOT LIKE '172.16.%'
-ORDER BY eventTime DESC
-```
-
-### Root account activity?
-
-```sql
-SELECT eventName, eventTime, sourceIPAddress, userIdentity.type
-FROM <eds-id>
-WHERE eventTime > '2026-08-10T00:00:00Z'
-  AND userIdentity.type = 'Root'
-ORDER BY eventTime DESC
-```
+> The four forensic query patterns moved verbatim to [references/querying-and-forensics.md](references/querying-and-forensics.md) — load on demand.
 
 ## Step 7 — Multi-account EDS via Organizations
 
-Create an Organization-level EDS that ingests from all member accounts:
-
-```bash
-ORG_EDS_ID=$(aws cloudtrail create-event-data-store \
-  --name "org-mgmt-events" \
-  --include-management-events \
-  --organization-enabled \
-  --query 'EventDataStoreArn' --output text)
-```
-
-The `--organization-enabled` flag makes the EDS ingest from ALL member
-accounts in the Organization automatically. No per-account setup is
-needed.
-
-**Query across accounts:**
-
-```sql
-SELECT awsAccountId, userIdentity.arn, eventName, eventTime
-FROM <org-eds-id>
-WHERE eventTime > '2026-08-10T00:00:00Z'
-  AND eventName = 'DeleteBucket'
-ORDER BY eventTime DESC
-```
-
-The `awsAccountId` field shows which account generated the event.
+> Multi-account EDS detail moved verbatim to [references/eds-and-multi-account.md](references/eds-and-multi-account.md) — load on demand.
 
 ## Step 8 — Retention and billing
 
@@ -499,24 +341,7 @@ Retention range: 7 to 3653 days (10 years).
 
 ### Billing model
 
-| Charge | Rate (approximate) | Notes |
-|---|---|---|
-| Ingestion | ~$0.75/GB ingested | Management events: low volume; Data events: varies |
-| Query scan | ~$0.005/GB scanned | Proportional to time range queried |
-
-**Cost estimation:**
-
-```text
-Management events:
-  ~0.008 GB per million events
-  1M events/day → 0.24 GB/month → ~$0.18/month ingestion
-  Query scanning 30 days: ~7.2 GB → ~$0.04 per full-scan query
-
-Data events (S3 GetObject on all buckets):
-  ~0.001 KB per event → 1B events = 1 GB
-  Heavy S3 usage → 10 GB/day → ~$225/month ingestion
-  → Use advanced selectors to reduce!
-```
+> Billing rate table and cost estimation moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
 ## Step 9 — Data protection (PII masking)
 
@@ -555,38 +380,7 @@ accessible via the query API.
 
 ## Step 10 — Athena federation and CloudWatch
 
-### Athena federation
-
-CloudTrail Lake EDS can be queried via Athena using a Lake Formation
-integration:
-
-```bash
-# Enable Lake Formation on the EDS
-aws lakeformation register-resource \
-  --resource-arn "$EDS_ID"
-
-# Create Athena database
-aws athena start-query-execution \
-  --query-string "CREATE DATABASE cloudtrail_lake" \
-  --work-group "primary"
-```
-
-### CloudWatch query alerts
-
-Create a CloudWatch alarm for query failures:
-
-```bash
-aws cloudwatch put-metric-alarm \
-  --alarm-name "cloudtrail-lake-query-failures" \
-  --namespace AWS/CloudTrailLake \
-  --metric-name QueryFailureCount \
-  --statistic Sum \
-  --period 300 \
-  --evaluation-periods 1 \
-  --threshold 5 \
-  --comparison-operator GreaterThanThreshold \
-  --alarm-actions "arn:aws:sns:us-east-1:123456789012:ct-lake-alerts"
-```
+> Athena federation and CloudWatch alert setup moved verbatim to [references/eds-and-multi-account.md](references/eds-and-multi-account.md) — load on demand.
 
 ## NEVER do these things
 
@@ -682,27 +476,14 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Query returns no results
-- The time range may not overlap with ingested events. Check EDS
-  ingestion status. Verify the event type (management vs data events
-  are in different EDS).
+> Error-handling deep dives moved verbatim to [references/error-handling.md](references/error-handling.md) — load on demand.
 
-### Query cost is unexpectedly high
-- The time range is too broad. Narrow it. Check the bytes scanned
-  metric via `describe-query`.
+## References (load on demand)
 
-### Data protection not masking PII
-- The data protection policy may not include the correct identifier.
-  Check the identifiers list. Some fields may not match the expected
-  pattern.
-
-### Multi-account EDS not ingesting from member accounts
-- Organizations integration may not be enabled. Verify the management
-  account has the correct delegated administrator configuration.
-
-### EDS creation fails
-- IAM permissions for `cloudtrail:CreateEventDataStore` may be
-  missing. Verify the service-linked role exists.
+- [references/querying-and-forensics.md](references/querying-and-forensics.md) — StartQuery/GetQueryResults mechanics, time-window filtering, and the forensic query patterns (Step 6)
+- [references/eds-and-multi-account.md](references/eds-and-multi-account.md) — EDS types and immutability, advanced selectors, multi-account org EDS (Step 7), retention, Athena federation + CloudWatch alerts (Step 10)
+- [references/advanced-patterns.md](references/advanced-patterns.md) — configuration dependency graph, per-GB billing / raw-JSON scan / PII masking heuristics, billing cost model
+- [references/error-handling.md](references/error-handling.md) — error-handling deep dives: empty queries, high query cost, masking, multi-account ingestion, EDS creation failures
 
 ## Domain
 

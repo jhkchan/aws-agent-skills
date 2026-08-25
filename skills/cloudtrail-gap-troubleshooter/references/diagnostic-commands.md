@@ -388,3 +388,59 @@ aws s3 ls s3://<org-bucket>/AWSLogs/<member-account-id>/CloudTrail/ \
 
 # For Insights fixes: wait 7 days, then check the CloudTrail-Insight prefix.
 aws s3 ls s3://<bucket>/CloudTrail-Insight/ --recursive | tail -5
+
+## Step 2 — MISSING_DATA_EVENTS diagnostic commands (moved from SKILL.md)
+
+```bash
+# Read the trail's event selectors:
+aws cloudtrail get-event-selectors --trail-name <trail>
+
+# Search S3 log delivery directly for the expected event:
+aws s3 cp s3://<bucket>/<key> - | gzip -d | jq '.Records[] | select(.eventName=="GetObject")'
+
+# Or use CloudTrail Lake to query across all regions/accounts:
+aws cloudtrail query --query-statement "SELECT eventName, eventTime, userIdentity.arn FROM <eds-id> WHERE eventName='GetObject' AND eventTime > '2026-08-09T00:00:00Z'"
+```
+
+## Step 3 — TRAIL_NOT_LOGGING diagnostic commands (moved from SKILL.md)
+
+```bash
+# Trail status (canonical health signal):
+aws cloudtrail get-trail-status --name <trail> \
+  --query '{isLogging:IsLogging,latestDelivery:LatestDeliveryTime,latestDigest:LatestDigestDeliveryTime,started:StartLoggingTime,stopped:StopLoggingTime}'
+
+# If trail is missing, look for shadow (deleted) trails:
+aws cloudtrail describe-trails --show-shadow-trails \
+  --query 'trailList[*].{name:Name,shadow:IsShadowTrail,logging:IsLogging,region:HomeRegion}'
+
+# Verify KMS key policy (if KMSKeyId is set):
+aws kms get-key-policy --key-id <key-id> --policy-name default \
+  --query Policy --output text | jq '.Statement[] | select(.Principal.Service=="cloudtrail.amazonaws.com")'
+
+# Restart logging if stopped:
+aws cloudtrail start-logging --name <trail>
+```
+
+## Step 6 — ORG_TRAIL_GAP diagnostic commands (moved from SKILL.md)
+
+```bash
+# Management account:
+aws cloudtrail describe-trails --query 'trailList[?IsOrganizationTrail].{name:Name,isLogging:IsLogging,s3:S3BucketName,homeRegion:HomeRegion}'
+aws cloudtrail get-trail-status --name <org-trail>
+
+# Delegated admin check:
+aws organizations list-delegated-administrators \
+  --service-principal cloudtrail.amazonaws.com \
+  --query 'DelegatedAdministrators[*].{id:Id,name:AccountName,email:EmailAddress}'
+
+# Member account (use member-account profile):
+aws cloudtrail describe-trails --show-shadow-trails \
+  --query 'trailList[*].{name:Name,shadow:IsShadowTrail,logging:IsLogging,isOrg:IsOrganizationTrail}'
+
+# Verify member is in the org and ACTIVE:
+aws organizations list-accounts --query 'Accounts[?Id==`<member-acct-id>`].{id:Id,status:Status,name:Name}'
+
+# Check SCPs applied to the member account's OU:
+aws organizations list-policies-for-target --target-id <member-or-ou-id> \
+  --filter SERVICE_CONTROL_POLICY
+```

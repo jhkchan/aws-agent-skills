@@ -328,3 +328,128 @@ Burn rate alerts fire but notifications are silently dropped.
 
 **Fix:** verify SNS topic has active subscriptions before relying on
 alerts.
+---
+
+## Expert heuristic: fast burn vs slow burn (MWMBR) (moved from SKILL.md)
+
+A baseline model says "set a burn rate threshold at 14.4x." The correct
+heuristic recognizes that multi-window multi-burn-rate (MWMBR) uses
+multiple windows simultaneously to balance sensitivity and noise.
+
+```text
+Burn rate concept:
+  An SLO has an error budget. For 99.9% availability over 30 days:
+    Error budget = 0.1% × 30 days = 43.2 minutes
+
+  Burn rate = actual error rate / allowed error rate
+    Burn rate 1.0 = consuming budget at exactly the planned rate
+    Burn rate 2.0 = consuming budget 2x faster than planned
+    Burn rate 14.4 = consuming budget 14.4x faster (will exhaust in ~2 hours)
+
+Multi-window multi-burn-rate (MWMBR):
+  ┌────────────────────────────────────────────────────────────┐
+  │ Alert type     │ Short window │ Long window │ Burn rate │ Action │
+  ├────────────────┼──────────────┼─────────────┼───────────┼────────┤
+  │ Fast burn PAGE │ 5 minutes    │ 1 hour      │ 14.4x     │ Page   │
+  │ Slow burn      │ 30 minutes   │ 6 hours     │ 6.0x      │ Ticket │
+  │ Slow burn      │ 2 hours      │ 1 day       │ 3.0x      │ Ticket │
+  │ Slow burn      │ 6 hours      │ 3 days      │ 1.0x      │ Ticket │
+  └────────────────────────────────────────────────────────────┘
+
+  BOTH windows must exceed the burn rate for the alert to fire.
+  This reduces false positives: a brief spike alone does not trigger
+  a page unless the long-window burn rate is also elevated.
+```
+
+**Key implication:** the fast-burn 5m/1h window at 14.4x is for acute
+incidents (page). The slow-burn windows at lower rates are for chronic
+degradation (ticket). Both are needed — fast burn catches outages; slow
+burn catches slow drifts that would eventually exhaust the error budget.
+---
+
+## Expert heuristic: SLI auto-derivation from traces (moved from SKILL.md)
+
+A baseline model says "create CloudWatch metrics for availability and
+latency." The correct heuristic recognizes that Application Signals
+DERIVES SLIs from OTel traces — you do NOT create them.
+
+```text
+How SLIs are derived from traces:
+
+  Availability SLI:
+    Traces contain span status (OK / ERROR).
+    Availability = (OK spans / total spans) for an operation.
+    Example: 9999 OK / 10000 total = 99.99% availability.
+
+  Latency SLI:
+    Traces contain span duration.
+    Latency SLI = percentage of requests under a threshold (e.g., P99 < 500ms).
+    Example: 9900 / 10000 requests under 500ms = 99.0% latency SLI.
+
+  These metrics are AUTOMATICALLY computed by Application Signals.
+  You do NOT create CloudWatch custom metrics or Metric Math expressions.
+  You define SLOs ON TOP of these auto-derived SLIs.
+```
+
+**Key implication:** if availability or latency SLIs are not appearing,
+the issue is upstream — OTel traces are not flowing or the service has
+not been discovered. Fix the instrumentation first; the SLIs follow.
+---
+
+## Step 10 — Canary alarms and anomaly detection (moved from SKILL.md)
+
+### Canary alarms
+
+Canary alarms monitor synthetic checks against your service endpoints.
+They complement SLI-based alarms by testing from an external perspective.
+
+```bash
+# Create a CloudWatch Synthetics canary
+aws synthetics create-canary \
+  --name payments-api-canary \
+  --code '{"S3Bucket": "canary-scripts", "S3Key": "payments-canary.zip", "Handler": "index.handler"}' \
+  --schedule '{"Expression": "rate(1 minute)"}' \
+  --run-config '{"TimeoutInSeconds": 60}'
+```
+
+### Anomaly detection on SLI metrics
+
+CloudWatch Anomaly Detection learns the normal pattern of SLI metrics
+and alerts on deviations:
+
+```bash
+# Create an anomaly detection alarm on latency SLI
+aws cloudwatch put-metric-alarm \
+  --alarm-name "payments-api-latency-anomaly" \
+  --namespace AWS/ApplicationSignals \
+  --metric-name Latency \
+  --dimensions Name=ServiceName,Value=payments-api Name=Operation,Value=POST-/charge \
+  --statistic P99 \
+  --period 300 \
+  --threshold-metric-id ad1 \
+  --comparison-operator LessThanLowerOrGreaterThanUpperThreshold \
+  --evaluation-periods 1 \
+  --datapoints-to-alarm 1 \
+  --metrics '[{"Id":"m1","MetricStat":{"Metric":{"Namespace":"AWS/ApplicationSignals","MetricName":"Latency","Dimensions":[{"Name":"ServiceName","Value":"payments-api"},{"Name":"Operation","Value":"POST-/charge"}]},"Period":300,"Stat":"P99"},"ReturnData":true},{"Id":"ad1","Expression":"ANOMALY_DETECTION_BAND(m1, 2)"}]' \
+  --alarm-actions arn:aws:sns:us-east-1:123456789012:warning-tickets
+```
+---
+
+## Step 11 — Multi-service SLO tracking (moved from SKILL.md)
+
+For organizations with many services, track SLOs across the fleet:
+
+```bash
+# List all SLOs
+aws application-signals list-service-level-objectives \
+  --max-results 50 \
+  --output table
+
+# Get SLO status for a specific SLO
+aws application-signals get-service-level-objective \
+  --id <slo-id>
+```
+
+**Key implication:** create a CloudWatch dashboard aggregating SLO
+status across services for a fleet-level view. This enables proactive
+identification of services approaching SLO breaches.

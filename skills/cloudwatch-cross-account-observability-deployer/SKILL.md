@@ -199,37 +199,8 @@ account principal. Use the `aws:PrincipalAccount` condition to
 scope to specific accounts, or `aws:PrincipalOrgID` for an
 org-wide policy.
 
-```bash
-cat > /tmp/sink-policy.json <<'EOF'
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": { "AWS": "arn:aws:iam::444455556666:root" },
-      "Action": ["oam:CreateLink", "oam:UpdateLink", "oam:DeleteLink"],
-      "Resource": "*",
-      "Condition": {
-        "ForAllValues:StringEquals": {
-          "oam:ResourceTypes": ["AWS::CloudWatch::Metric", "AWS::Logs::LogGroup", "AWS::XRay::Trace", "AWS::ApplicationSignals::Service"]
-        }
-      }
-    },
-    {
-      "Effect": "Allow",
-      "Principal": { "AWS": "arn:aws:iam::777788889999:root" },
-      "Action": ["oam:CreateLink", "oam:UpdateLink", "oam:DeleteLink"],
-      "Resource": "*"
-    }
-  ]
-}
-EOF
-
-aws oam put-sink-policy \
-  --sink-identifier arn:aws:oam:us-east-1:111122223333:sink/ProdObservabilitySink \
-  --policy file:///tmp/sink-policy.json \
-  --region us-east-1
-```
+Step 2 sink-policy CLI payload (sink-policy.json heredoc + put-sink-policy) moved verbatim to [references/deployment-cli-commands.md](references/deployment-cli-commands.md).
+Load on demand when authoring the resource-based sink policy; the Organizations `aws:PrincipalOrgID` variant stays below.
 
 For an Organizations-managed fleet, prefer
 `aws:PrincipalOrgID` over enumerating accounts:
@@ -249,42 +220,8 @@ Each source account needs an IAM principal with permissions to
 call `oam:CreateLink` on the sink ARN. Use a dedicated role; do
 not attach to a broad administrative role.
 
-```bash
-# Run from each SOURCE account
-cat > /tmp/oam-link-trust.json <<'EOF'
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": { "Service": "lambda.amazonaws.com" },
-    "Action": "sts:AssumeRole"
-  }]
-}
-EOF
-
-aws iam create-role \
-  --role-name OAMLinkRole \
-  --assume-role-policy-document file:///tmp/oam-link-trust.json
-
-cat > /tmp/oam-link-permission.json <<'EOF'
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Action": [
-      "oam:CreateLink", "oam:UpdateLink", "oam:GetLink",
-      "oam:DeleteLink", "oam:GetSink", "oam:ListAttachedLinks"
-    ],
-    "Resource": "arn:aws:oam:us-east-1:111122223333:sink/ProdObservabilitySink"
-  }]
-}
-EOF
-
-aws iam put-role-policy \
-  --role-name OAMLinkRole \
-  --policy-name OAMLinkPermissions \
-  --policy-document file:///tmp/oam-link-permission.json
-```
+Step 3 source-account IAM role CLI payload (trust + permission documents + create-role + put-role-policy) moved verbatim to [references/deployment-cli-commands.md](references/deployment-cli-commands.md).
+Load on demand when creating the sink-scoped OAMLinkRole; keep the policy resource-locked to the sink ARN.
 
 Resource-lock the policy to the specific sink ARN. A wildcard
 (`oam:CreateLink: *`) lets the source attach to any sink in any
@@ -297,37 +234,8 @@ resource types (metrics, log groups, traces, Application Signals)
 to share and the scope (which namespaces, which log group names,
 which X-Ray services).
 
-```bash
-# Run from each SOURCE account (444455556666), assuming OAMLinkRole
-cat > /tmp/link-config.json <<'EOF'
-{
-  "ResourceTypes": [
-    "AWS::CloudWatch::Metric",
-    "AWS::Logs::LogGroup",
-    "AWS::XRay::Trace",
-    "AWS::ApplicationSignals::Service"
-  ],
-  "LinkConfiguration": {
-    "MetricConfiguration": {
-      "Filter": "Namespace IN (\"AWS/EC2\", \"AWS/ECS\", \"AWS/Lambda\", \"AWS/ApplicationSignals\")"
-    },
-    "LogGroupConfiguration": {
-      "Filter": "/aws/ecs/prod-app OR /aws/lambda/payments-api OR prefix(\"/aws/ecs/prod-\")"
-    },
-    "TraceConfiguration": {
-      "Filter": "Service(\"api-gateway\") OR Service(\"checkout\") OR Service(\"payments\")"
-    }
-  }
-}
-EOF
-
-aws oam create-link \
-  --sink-identifier arn:aws:oam:us-east-1:111122223333:sink/ProdObservabilitySink \
-  --label prod-app-link \
-  --link-configuration file:///tmp/link-config.json \
-  --tags Environment=prod,App=checkout \
-  --region us-east-1
-```
+Step 4 OAM link CLI payload (link-config.json heredoc + create-link) moved verbatim to [references/deployment-cli-commands.md](references/deployment-cli-commands.md).
+Load on demand when authoring Metric/LogGroup/Trace filters; the Filter-language notes stay below.
 
 The `Filter` language supports: `Namespace IN (...)`,
 `Service("...")`, `prefix("...")`, `OR`, `AND`. The filter is
@@ -392,22 +300,8 @@ AMP (Managed Prometheus) cross-account query uses workspace
 query-rule IAM roles, NOT OAM. To let the monitoring account or
 Grafana query an AMP workspace in a source account:
 
-```bash
-# From the SOURCE account that owns the AMP workspace
-cat > /tmp/amp-query-rule.json <<'EOF'
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": { "AWS": "arn:aws:iam::111122223333:root" },
-    "Action": "sts:AssumeRole",
-    "Condition": { "StringEquals": { "aws:PrincipalTag/Role": "GrafanaAMP" } }
-  }]
-}
-EOF
-
-aws amp create-workspace --alias prod-prometheus --region us-east-1
-```
+Step 7 AMP cross-account query-rule CLI payload (amp-query-rule.json trust policy + create-workspace) moved verbatim to [references/deployment-cli-commands.md](references/deployment-cli-commands.md).
+Load on demand when wiring AMP workspace cross-account queries; remember OAM does NOT proxy AMP.
 
 Then in Grafana, add a Prometheus data source pointing at the AMP
 workspace endpoint with the cross-account role ARN. Grafana
@@ -501,71 +395,13 @@ source account is represented.
 
 ## Edge-case handling
 
-- **Link stuck in CREATED not ATTACHED:** the sink policy rejected
-  one of the `ResourceTypes`. Check the policy's
-  `ForAllValues:StringEquals oam:ResourceTypes` condition.
-- **Cross-account metrics missing specific namespace:** the
-  `MetricConfiguration.Filter` does not include the namespace.
-  Filter syntax is case-sensitive; `AWS/ECS` ≠ `aws/ecs`.
-- **Cross-account log groups empty:** the
-  `LogGroupConfiguration.Filter` does not match actual log group
-  names. Use `prefix("...")`; do not use wildcards.
-- **X-Ray service map shows source services disconnected:** the
-  `TraceConfiguration.Filter` excludes the downstream service.
-  Re-include and `update-link`.
-- **Application Signals metrics missing in monitoring account:**
-  Application Signals is not enabled in the source account. OAM
-  transports but does not enable Application Signals.
-- **Managed Grafana queries return empty:** the Grafana data
-  source role lacks read permissions on CloudWatch / X-Ray / OAM
-  sink, OR the workspace Region differs from the sink Region.
-- **AMP cross-account queries 403:** the workspace role trust
-  policy does not include the monitoring account principal, or
-  the tag condition is mismatched.
-- **Sink policy change drops existing links:** removing a source
-  account from the sink policy does NOT delete existing links but
-  does block updates. Delete the link in the source first.
-- **Cross-Region observability:** OAM sinks are Region-scoped.
-  Create a sink per Region or use CloudWatch cross-Region metrics
-  (separate feature).
+Edge-case catalog (CREATED-not-ATTACHED links, case-sensitive filters, empty log groups, disconnected service maps, missing Application Signals, empty Grafana queries, AMP 403, policy-change effects, cross-Region) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when a linked account's data does not appear in the monitoring account.
 
 ## Recent AWS features (2024-2026)
 
-- **CloudWatch cross-account with AMP (2025):** AMP workspace
-  cross-account query rules are now configurable via the workspace
-  API. OAM does not proxy AMP; the workspace role trust policy is
-  the integration point.
-
-- **Cross-account Application Signals (2024-2025):** the
-  `AWS::ApplicationSignals::Service` resource type in OAM links
-  transports service-level metrics (Latency, Error, Availability,
-  Traffic) and service map topology across accounts. Each service
-  includes a derived `SourceAccount` dimension for filtering.
-
-- **OAM link filter language enhancements (2024-2025):** the
-  filter language supports `prefix("...")` for log group patterns
-  and richer `Namespace IN (...)` semantics. Case-sensitivity is
-  enforced; previously some namespaces were case-insensitive.
-
-- **AWS Organizations managed sink policies (2024-2025):**
-  `aws:PrincipalOrgID` condition on the sink policy auto-includes
-  new accounts joining the org. Replaces manual per-account
-  principal entries for fleets > 50 accounts.
-
-- **CloudWatch Logs account-level data protection (2024-2025):**
-  data-protection masking on log groups propagates through OAM
-  links — masked fields stay masked when viewed from the
-  monitoring account.
-
-- **Managed Grafana cross-account via OAM (2025):** Grafana
-  CloudWatch data source now natively understands the OAM sink;
-  the role assumption is transparent. Previously required
-  per-account data source entries.
-
-- **Sink-level tagging + OAM StackSets (2024-2025):** sinks
-  support `tag-resource` for cost allocation. Link deployment via
-  CloudFormation StackSets to fleets of accounts from a single
-  template in the monitoring account.
+Recent AWS features (2024-2026) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when choosing between new and legacy OAM mechanisms.
 
 ## NEVER (top 5 — full list in references)
 
@@ -589,46 +425,13 @@ source account is represented.
 
 ## Expert heuristic — designing cross-account observability topology
 
-- **One monitoring account per organizational boundary.** Do not
-  pile every account into a single sink. Group by business unit,
-  environment, or compliance boundary. A sink with > 100 source
-  accounts is operationally fragile.
-- **Sink Region = observability Region.** Pick the Region where
-  your dashboarding lives. Cross-Region aggregation requires
-  separate sinks per Region.
-- **Org-wide policy for fleets > 50 accounts.** Use
-  `aws:PrincipalOrgID` instead of manual per-account entries.
-- **Scope link filters narrowly first, broaden on demand.**
-  Start with `Namespace IN ("AWS/EC2")` and add namespaces as
-  needed. Over-scoping floods the monitoring account.
-- **Application Signals cross-account is a two-step enable.**
-  Application Signals must be enabled in EACH source account
-  before OAM can transport the metrics.
-- **AMP cross-account bypasses OAM.** Use workspace role trust
-  for AMP. Do not attach an AMP workspace as an OAM resource type.
-- **Decommissioning an account.** Delete the link in the source
-  account BEFORE removing the source account from the sink policy.
+Expert heuristic — designing cross-account observability topology moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when planning multi-account / multi-Region observability layouts.
 
 ## Pre-flight safety checks (run before any OAM CLI)
 
-- **Confirm OAM is available in the Region:** `aws oam list-sinks
-  --region <r>` (no error = available).
-- **Confirm the monitoring account principal:** the IAM role must
-  include a policy with `oam:CreateSink`, `oam:PutSinkPolicy`.
-- **Confirm each source account principal:** in each source
-  account, the IAM role must include `oam:CreateLink` on the sink
-  ARN.
-- **Confirm the sink policy resource principals:** `aws oam
-  get-sink-policy --sink-identifier <arn>` MUST list each source
-  account principal OR the org ID.
-- **Confirm Application Signals is enabled in each source** (if
-  cross-account Application Signals desired): `aws
-  application-signals list-services` returns the workload.
-- **Confirm Managed Grafana / AMP workspaces exist** (if
-  integration desired): `aws grafana list-workspaces`,
-  `aws amp list-workspaces`.
-- **Confirm CloudWatch Logs groups exist before referencing in
-  the link filter:** `aws logs describe-log-groups`.
+Pre-flight safety checks (sink existence, sink policy principals, source IAM scoping, Region pinning, resource-type inventory) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before running any OAM CLI.
 
 ## Output format — MANDATORY literal labels
 
@@ -682,6 +485,12 @@ ARN, Application Signals enabled in monitoring but not in source),
 the verdict is `PREREQUISITES_MISSING` with each gap listed and
 a `REMEDIATION:` line per gap.
 
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — edge-case catalog, topology-design expert heuristic, and Recent AWS features (2024-2026) moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight safety checks moved from SKILL.md
+- [references/deployment-cli-commands.md](references/deployment-cli-commands.md) — deep CLI sequences; now also holds the Step 2/3/4 and Step 7 payload blocks moved from SKILL.md
+
 ## Domain
 
 AWS CloudOps / Cross-Account Observability Provisioning.
@@ -707,3 +516,4 @@ AWS CloudOps / Cross-Account Observability Provisioning.
   sink policy templates (single, multi-account, org-wide), source
   account IAM role patterns, AMP cross-account workspace roles,
   full NEVER list, and edge-case handling.
+

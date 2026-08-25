@@ -145,3 +145,23 @@ to the origin. They do NOT appear in the viewer request.
 Custom headers with secrets are visible to anyone with read access to the
 distribution config. Prefer IAM-based origin auth (ALB listener rule with
 Cognito, Lambda authorizer) over static header secrets.
+
+## Step 8: Security headers policy JSON (moved from SKILL.md)
+
+**Required security headers:**
+```json
+"ResponseHeadersPolicy": {
+  "SecurityHeadersConfig": {
+    "StrictTransportSecurity": {"AccessControlMaxAgeSec": 63072000, "IncludeSubdomains": true, "Override": true, "Preload": true},
+    "FrameOptions": {"FrameOption": "DENY", "Override": true},
+    "ContentTypeOptions": {"Override": true},
+    "XSSProtection": {"Protection": true, "ModeBlock": true, "Override": true},
+    "ReferrerPolicy": {"ReferrerPolicy": "strict-origin-when-cross-origin", "Override": true},
+    "ContentSecurityPolicy": {"ContentSecurityPolicy": "default-src 'self'; object-src 'none'", "Override": true}
+  }
+}
+```
+
+HSTS at max-age 63072000 (2 years) with preload signals to browsers: never
+connect to this site over HTTP. This is the strongest transport-security
+posture available at the edge.

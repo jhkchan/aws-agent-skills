@@ -138,21 +138,8 @@ Run before classification. Misclassifying these produces wrong plans.
 `--marker`/`--next-marker` to completion. `list-invalidations`
 paginates at 100/page.
 
-**Live-account pre-flight (skip if offline plan audit):**
-1. `aws cloudfront get-distribution --id <id>` — capture `Status`,
-   `DomainName`, `LastModifiedTime`, `DistributionConfig.Enabled`,
-   `DistributionConfig.Origins`, `ContinuousDeploymentPolicyId`
-   (if present).
-2. `aws cloudfront list-invalidations --distribution-id <id>
-   --max-items 20` — capture recent invalidation history, including
-   `Status`, `CreateTime`, `InvalidationBatch.Paths.Quantity`.
-3. For continuous deployment: `aws cloudfront
-   get-continuous-deployment-policy --id <policy-id>` — capture
-   `StagingDistributionDnsName`, traffic percentage, and type
-   (`TrafficConfig`).
-4. For cost analysis: count the total paths invalidated this month
-   across all distributions (`list-invalidations` per distribution,
-   sum `Paths.Quantity`, subtract 1,000).
+Live-account pre-flight (get-distribution capture, list-invalidations history, continuous-deployment policy, monthly path-count tally) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load them before classifying an operation on a live account.
 
 **Malformed input:** if the input is invalid or missing required
 fields, emit `VERDICT: ERROR` with `REASON: Distribution
@@ -176,81 +163,8 @@ plan.` and `REMEDIATION: Re-fetch with aws cloudfront get-distribution
 
 ### Step 0: Expert heuristic — non-obvious CloudFront behaviors
 
-These behaviors are easy to misjudge without operational invalidation
-experience. Each changes a plan if ignored:
-
-- **`/*` counts as ONE path, not N paths.** The single most
-  misunderstood invalidation cost fact. `/*` invalidates every object
-  in the distribution but the billing system counts it as one path.
-  This is always cheaper than listing more than one individual object
-  path — and it is free for the first 1,000 `/*` invalidations per
-  month.
-
-- **Versioned filenames eliminate the need for invalidation.** If
-  your build process appends a hash to asset names
-  (`main.a1b2c3.js`), the new version is a different URL. CloudFront
-  fetches it from the origin on first request. No invalidation
-  needed. This is the AWS-recommended cache-busting strategy for
-  routine deploys. Reserve invalidation for emergencies, hotfixes to
-  unversioned HTML, or removal of sensitive content.
-
-- **`CallerReference` is a deduplication key, not a description.**
-  CloudFront uses `CallerReference` to ensure idempotency. If you
-  reuse a CallerReference, CloudFront returns the PREVIOUS
-  invalidation (if it exists) without creating a new one. This is a
-  silent failure — the invalidation appears to succeed but does
-  nothing new. Always use a unique value (UUID or timestamp).
-
-- **Wildcard `*` matches only within a single path segment.**
-  `/images/*.jpg` matches `/images/photo.jpg` but NOT
-  `/images/thumbnails/photo.jpg`. There is no recursive wildcard.
-  To invalidate a directory tree, use `/images/*` (matches
-  everything under `/images/`).
-
-- **Invalidation does NOT purge the browser cache.** CloudFront
-  invalidation clears edge cache. End-user browsers still have their
-  local cache. To force browser refresh, use versioned filenames or
-  short `Cache-Control: max-age` values. Invalidation + long
-  browser cache TTLs = stale content for users.
-
-- **Continuous deployment requires invalidating BOTH distributions.**
-  With a continuous deployment policy, traffic is split between
-  primary and staging. An invalidation on the primary does not
-  affect staging's edge cache (and vice versa). When testing a
-  deployment, invalidate staging first; when promoting, invalidate
-  the primary.
-
-- **Invalidation does not roll back the origin.** If you deployed a
-  broken build and invalidate `/*`, CloudFront will re-fetch the
-  broken content from the origin. You must fix the origin (redeploy,
-  rollback) BEFORE or SIMULTANEOUSLY with the invalidation. The
-  invalidation only clears the cache — it does not change what the
-  origin serves.
-
-- **`list-invalidations` does not show per-edge-location status.**
-  The `InvalidationStatus` is a global aggregate. `Completed` means
-  all edge locations have processed the invalidation. There is no
-  per-region or per-edge status. For debugging "some users still see
-  old content," check browser cache, DNS TTL, and origin health —
-  not per-edge invalidation status.
-
-- **Multipart invalidation batches have a 3,000-path hard limit per
-  request.** `create-invalidation` accepts up to 3,000 paths per API
-  call (including wildcards). For more than 3,000 paths, use
-  multiple `create-invalidation` calls, or replace with a single
-  `/*` invalidation.
-
-- **Lambda@Edge and CloudFront Functions are not invalidated.**
-  Function code updates propagate independently of cache
-  invalidation. If you updated a Lambda@Edge function, the function
-  update can take up to 5 minutes (CloudFront Functions) or up to
-  15 minutes (Lambda@Edge) to propagate to all edge locations.
-  Invalidation does not speed this up.
-
-- **S3 origin vs custom origin invalidation behavior is identical.**
-  The origin type does not affect invalidation. CloudFront tracks
-  cached objects by URL regardless of origin type. The invalidation
-  path pattern matches the URL path as seen by the viewer.
+Step 0 expert heuristics (/* path counting, versioned filenames, CallerReference dedup, wildcard scope, browser cache, continuous-deployment targets, origin rollback, per-edge status, 3,000-path limit, function propagation, origin-type invariance) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before producing the operation plan.
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
@@ -293,20 +207,8 @@ is BLOCKED with the failed checks in PRE_CHECKS. Do NOT execute.
    and the failure-mode table to identify why an invalidation is
    stuck, not working, or unexpectedly expensive.
 
-**Invalidation failure-mode table (use during diagnose-invalidation):**
-
-| Symptom | Root cause | Fix |
-|---|---|---|
-| `create-invalidation` returns `AccessDenied` | Caller lacks `cloudfront:CreateInvalidation` on the distribution ARN | Add the permission to the caller's IAM policy |
-| `create-invalidation` returns `InvalidArgument: Your request has a path that contains an invalid character` | Path contains characters not allowed (spaces, `?`, `#`, or wildcard mid-segment) | Fix the path syntax: start with `/`, URL-encode special chars, wildcard only at segment end |
-| `create-invalidation` returns `TooManyInvalidationsInProgress` | More than 15 concurrent InProgress invalidations for the distribution | Wait for existing invalidations to Complete, or consolidate into fewer batches with wildcards |
-| `create-invalidation` returns `CNAMEAlreadyExists` | Unrelated to invalidation — distribution config conflict | This is a distribution-update error, not an invalidation error |
-| Invalid path count exceeds 3,000 | Hard limit per API call | Split into multiple `create-invalidation` calls, or use `/*` |
-| `InvalidationStatus: InProgress` for > 15 minutes | Large wildcard invalidation or edge propagation delay | Wait; if > 30 minutes, check CloudFront service health |
-| Invalidation Completed but users still see old content | Browser cache, DNS TTL, or CDN in front of CloudFront | Check `Cache-Control` headers, DNS resolution, intermediate CDN caches |
-| Invalidation returns existing invalidation (no new one created) | `CallerReference` collision with a previous invalidation | Generate a new unique `CallerReference` (UUID or timestamp) |
-| `create-invalidation` on staging distribution fails | Staging distribution ID is different from the primary; caller may lack permissions on the staging distribution | Use the staging distribution ID from `get-continuous-deployment-policy`; ensure IAM policy covers both |
-| Cost is higher than expected | Individual paths counted instead of wildcards; monthly cumulative exceeds 1,000 | Use `/*` or directory wildcards; monitor monthly path count |
+Invalidation failure-mode table (AccessDenied, InvalidArgument, TooManyInvalidationsInProgress, CallerReference collisions, staging failures, cost surprises) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load it during diagnose-invalidation operations.
 
 ### Step 2: READY — emit operation plan
 
@@ -426,102 +328,18 @@ NOTES:
 
 ### Worked example — create-invalidation specific paths (cost advisory)
 
-```text
-OPERATION: create-invalidation
-VERDICT: READY
-TARGET: E1ABC2DEF3GHI4 (domain: d111111abcdef8.cloudfront.net,
-        account 111111111111)
-PRE_CHECKS:
-  - [PASS] Distribution exists, Status: Deployed
-  - [PASS] Calling role has cloudfront:CreateInvalidation
-  - [PASS] CallerReference: inv-20260810-002 (unique)
-  - [WARN] Path count: 1,247 individual paths. Monthly cumulative:
-    1,247 (247 paths beyond the 1,000 free-tier limit).
-  - [WARN] Estimated cost: $0.005 x 247 = $1.24
-  - [INFO] Consider replacing with /* (1 path, free) or
-    /images/* + /css/* + /js/* (3 paths, free) if the majority of
-    paths share common directory prefixes.
-STEPS:
-  1. CONFIRM: About to create a CloudFront invalidation on
-     distribution E1ABC2DEF3GHI4 with 1,247 paths. Estimated cost:
-     $1.24 (247 paths at $0.005 each beyond the free tier).
-     Proceed? (yes/no)
-  2. aws cloudfront create-invalidation \
-       --distribution-id E1ABC2DEF3GHI4 \
-       --invalidation-batch file://invalidation-batch.json
-POST_VERIFY:
-  - (pending execution)
-COST: $1.24 (247 paths beyond free tier at $0.005/path)
-NOTES:
-  - Replacing the 1,247 individual paths with /* would cost $0.00
-    (1 path, free tier). Consider this if all paths need clearing.
-  - Replacing with /images/* + /css/* + /js/* (3 wildcard paths)
-    would also be free. Consider if only these directories changed.
-```
+Worked example — specific-paths invalidation with cost advisory moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load it when planning per-path invalidations beyond the free tier.
 
 ### Worked example — wait-invalidation (COMPLETED)
 
-```text
-OPERATION: wait-invalidation
-VERDICT: COMPLETED
-TARGET: E1ABC2DEF3GHI4 (domain: d111111abcdef8.cloudfront.net)
-PRE_CHECKS:
-  - [PASS] Invalidation I2XYZ5678UVW90 exists
-  - [PASS] InvalidationStatus: Completed
-POST_VERIFY:
-  - [PASS] InvalidationStatus: Completed (confirmed via
-    get-invalidation)
-  - [PASS] Invalidation appears in list-invalidations with Completed
-  - [PASS] Spot-check: curl -I returns X-Cache: Miss from CloudFront
-    (content re-fetched from origin)
-COST: N/A (no new invalidation created)
-NOTES:
-  - Invalidation I2XYZ5678UVW90 completed in 47 seconds.
-  - All edge locations have purged the specified paths.
-  - Next viewer requests for these paths will fetch fresh content
-    from the origin.
-```
+Worked example — wait-invalidation (COMPLETED) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load it when polling an invalidation to Completed.
 
 ### Worked example — continuous deployment staging invalidation
 
-```text
-OPERATION: create-invalidation
-VERDICT: READY
-TARGET: E1ABC2DEF3GHI4 (primary) + E5STAGING123 (staging, via
-        continuous deployment policy CDP1XYZ)
-PRE_CHECKS:
-  - [PASS] Primary distribution exists, Status: Deployed
-  - [PASS] ContinuousDeploymentPolicyId: CDP1XYZ (active)
-  - [PASS] Staging distribution E5STAGING123 identified
-  - [PASS] Calling role has cloudfront:CreateInvalidation on BOTH
-    distribution ARNs
-  - [PASS] Path pattern: /api/v2/* (valid wildcard)
-  - [INFO] Plan: invalidate STAGING first, verify, then promote.
-    After promotion, invalidate PRIMARY if needed.
-STEPS:
-  1. CONFIRM: About to create an invalidation on the STAGING
-     distribution E5STAGING123 for /api/v2/*. This is a continuous
-     deployment test. Proceed? (yes/no)
-  2. aws cloudfront create-invalidation \
-       --distribution-id E5STAGING123 \
-       --invalidation-batch '{"CallerReference":"stg-20260810-001",
-         "Paths":{"Quantity":1,"Items":["/api/v2/*"]}}'
-  3. Verify staging serves fresh content via the staging DNS:
-     curl -I https://<staging-dns>.cloudfront.net/api/v2/health
-  4. If staging is correct, promote (update-distribution with the
-     continuous deployment policy). Primary will serve the new
-     content after promotion.
-POST_VERIFY:
-  - (pending execution)
-COST: Free tier (1 path on staging, 1,000 monthly budget)
-NOTES:
-  - Continuous deployment staging invalidation is independent from
-    the primary distribution's edge cache.
-  - After promotion, the primary may need its own invalidation if
-    the traffic shift causes cache misses.
-  - Do NOT invalidate the primary before promoting — the primary
-    still serves the old (stable) version until promotion.
-```
+Worked example — continuous deployment staging invalidation moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load it when invalidating a staging distribution.
 
 ## Anti-Patterns — NEVER (top mistakes)
 
@@ -586,74 +404,22 @@ NOTES:
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any `create-invalidation`
-  call, emit: `CONFIRM: About to create a CloudFront invalidation on
-  distribution <id> (domain <domain>). Paths: <pattern>. Estimated
-  cost: <$X or "free tier">. Proceed? (yes/no)`. Do NOT execute until
-  the operator confirms.
-
-- **Capture pre-state for audit.** Before any invalidation:
-  `aws cloudfront list-invalidations --distribution-id <id>
-  --max-items 10 --output json > /tmp/<id>-inv-pre-$(date +%s).json`.
-
-- **Verify distribution status.** `get-distribution --id <id>` —
-  confirm `Status: Deployed` and `Enabled: true`. An invalidation on
-  a Suspended or InProgress distribution may silently fail.
-
-- **Verify origin health before invalidation.** If the origin is S3,
-  verify the S3 bucket has the updated content. If the origin is a
-  custom HTTP server, verify the server serves the correct response.
-  Invalidating against a broken origin re-caches broken content.
-
-- **Verify CallerReference uniqueness.** Check the last 20
-  invalidations via `list-invalidations` to ensure the CallerReference
-  has not been used before.
-
-- **Prefer additive changes over destructive ones.** Versioned
-  filenames (additive) are always safer than invalidation
-  (destructive — clears cache). Only invalidate when versioned
-  filenames are not possible (unversioned HTML, sensitive data
-  removal, emergency content changes).
+Pre-flight safety checks (CONFIRMATION GATE, pre-state capture, distribution status, origin health, CallerReference uniqueness, additive-first) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load them before emitting any remediation CLI.
 
 ## Recent AWS features (2024-2026)
 
-- **CloudFront continuous deployment (2022 GA, 2024-2026 hardening):**
-  Traffic-splitting between a primary and staging distribution.
-  Invalidation on the primary does NOT affect staging. Staging has
-  its own distribution ID and edge cache. Test changes on staging,
-  then promote to primary via `update-distribution`.
+Recent AWS features 2024-2026 (continuous deployment hardening, KeyValueStore, response headers policies, OAC, Metrics, function propagation, S3 Object Lambda) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when an operation involves staging distributions or KVS.
 
-- **CloudFront KeyValueStore (2024):** Edge key-value store for
-  CloudFront Functions. Updates to KeyValueStore propagate
-  independently of cache invalidation. Do not use invalidation to
-  force KeyValueStore updates — use `update-key-value-store` directly.
+## References (load on demand)
 
-- **CloudFront response headers policies (2024-2025):** Managed
-  response headers policies now include `Cache-Control` overrides.
-  These are applied at the edge independently of origin headers.
-  Verify the response headers policy before assuming the origin's
-  `Cache-Control` is being respected.
-
-- **CloudFront origin access control (OAC, 2023-2024):** Replaces
-  origin access identity (OAI). Does not affect invalidation
-  behavior — invalidation operates on edge cache, not origin access.
-
-- **CloudFront Metrics (2025):** Enhanced real-time metrics now
-  include per-status-code cache hit/miss rates. Use these to verify
-  that an invalidation had the expected effect (cache miss rate
-  spikes after invalidation, then normalizes as the new content is
-  cached).
-
-- **CloudFront Functions vs Lambda@Edge propagation (2024-2026):**
-  CloudFront Functions updates propagate in ~5 minutes; Lambda@Edge
-  updates propagate in ~15 minutes. These are independent of cache
-  invalidation. If a function change is not reflected, check
-  function propagation status, not invalidation status.
-
-- **S3 Object Lambda with CloudFront (2024):** When using S3 Object
-  Lambda as a CloudFront origin, invalidation clears the edge cache
-  but the Object Lambda transformation is applied on each origin
-  fetch. Verify the transformation is correct before invalidating.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 invalidation heuristics and recent AWS features moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — live-account pre-flight capture and pre-flight safety checks moved from SKILL.md
+- [references/error-handling.md](references/error-handling.md) — invalidation failure-mode table moved from SKILL.md
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples (specific paths, wait-invalidation, staging invalidation) moved from SKILL.md; the primary /* example stays in SKILL.md
+- [references/cache-busting-strategy.md](references/cache-busting-strategy.md) — invalidation vs versioned-filenames decision matrix
+- [references/path-patterns-and-cost.md](references/path-patterns-and-cost.md) — path pattern syntax, cost tables, wildcard optimization, diagnostic quick-reference
 
 ## Domain
 

@@ -255,3 +255,66 @@ ORDER BY eventTime DESC
 ```
 
 Athena federation uses the same per-GB scanned billing model.
+
+## Step 7 — Multi-account EDS via Organizations
+
+Create an Organization-level EDS that ingests from all member accounts:
+
+```bash
+ORG_EDS_ID=$(aws cloudtrail create-event-data-store \
+  --name "org-mgmt-events" \
+  --include-management-events \
+  --organization-enabled \
+  --query 'EventDataStoreArn' --output text)
+```
+
+The `--organization-enabled` flag makes the EDS ingest from ALL member
+accounts in the Organization automatically. No per-account setup is
+needed.
+
+**Query across accounts:**
+
+```sql
+SELECT awsAccountId, userIdentity.arn, eventName, eventTime
+FROM <org-eds-id>
+WHERE eventTime > '2026-08-10T00:00:00Z'
+  AND eventName = 'DeleteBucket'
+ORDER BY eventTime DESC
+```
+
+The `awsAccountId` field shows which account generated the event.
+
+## Step 10 — Athena federation and CloudWatch
+
+### Athena federation
+
+CloudTrail Lake EDS can be queried via Athena using a Lake Formation
+integration:
+
+```bash
+# Enable Lake Formation on the EDS
+aws lakeformation register-resource \
+  --resource-arn "$EDS_ID"
+
+# Create Athena database
+aws athena start-query-execution \
+  --query-string "CREATE DATABASE cloudtrail_lake" \
+  --work-group "primary"
+```
+
+### CloudWatch query alerts
+
+Create a CloudWatch alarm for query failures:
+
+```bash
+aws cloudwatch put-metric-alarm \
+  --alarm-name "cloudtrail-lake-query-failures" \
+  --namespace AWS/CloudTrailLake \
+  --metric-name QueryFailureCount \
+  --statistic Sum \
+  --period 300 \
+  --evaluation-periods 1 \
+  --threshold 5 \
+  --comparison-operator GreaterThanThreshold \
+  --alarm-actions "arn:aws:sns:us-east-1:123456789012:ct-lake-alerts"
+```

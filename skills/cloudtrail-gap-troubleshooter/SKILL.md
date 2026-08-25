@@ -154,16 +154,7 @@ is absent. The trail is logging management events correctly.
 
 **Diagnostic commands:**
 
-```bash
-# Read the trail's event selectors:
-aws cloudtrail get-event-selectors --trail-name <trail>
-
-# Search S3 log delivery directly for the expected event:
-aws s3 cp s3://<bucket>/<key> - | gzip -d | jq '.Records[] | select(.eventName=="GetObject")'
-
-# Or use CloudTrail Lake to query across all regions/accounts:
-aws cloudtrail query --query-statement "SELECT eventName, eventTime, userIdentity.arn FROM <eds-id> WHERE eventName='GetObject' AND eventTime > '2026-08-09T00:00:00Z'"
-```
+Canonical CLI for this step (get-event-selectors, S3 log grep, CloudTrail Lake query) — `references/diagnostic-commands.md`.
 
 **Cost warning.** Data events are 10-100x more voluminous than management
 events. Always scope `DataResources.Values` to specific ARN prefixes.
@@ -193,22 +184,7 @@ The trail is not delivering any events. Either `isLogging: false`, or
 
 **Diagnostic commands:**
 
-```bash
-# Trail status (canonical health signal):
-aws cloudtrail get-trail-status --name <trail> \
-  --query '{isLogging:IsLogging,latestDelivery:LatestDeliveryTime,latestDigest:LatestDigestDeliveryTime,started:StartLoggingTime,stopped:StopLoggingTime}'
-
-# If trail is missing, look for shadow (deleted) trails:
-aws cloudtrail describe-trails --show-shadow-trails \
-  --query 'trailList[*].{name:Name,shadow:IsShadowTrail,logging:IsLogging,region:HomeRegion}'
-
-# Verify KMS key policy (if KMSKeyId is set):
-aws kms get-key-policy --key-id <key-id> --policy-name default \
-  --query Policy --output text | jq '.Statement[] | select(.Principal.Service=="cloudtrail.amazonaws.com")'
-
-# Restart logging if stopped:
-aws cloudtrail start-logging --name <trail>
-```
+Canonical CLI for this step (get-trail-status, shadow trails, KMS key policy check, start-logging) — `references/diagnostic-commands.md`.
 
 **Common fixes:**
 - Trail stopped: `start-logging`; add CloudWatch alarm on
@@ -288,27 +264,7 @@ Org trail logs management account and most members. Specific member missing.
 
 **Diagnostic commands:**
 
-```bash
-# Management account:
-aws cloudtrail describe-trails --query 'trailList[?IsOrganizationTrail].{name:Name,isLogging:IsLogging,s3:S3BucketName,homeRegion:HomeRegion}'
-aws cloudtrail get-trail-status --name <org-trail>
-
-# Delegated admin check:
-aws organizations list-delegated-administrators \
-  --service-principal cloudtrail.amazonaws.com \
-  --query 'DelegatedAdministrators[*].{id:Id,name:AccountName,email:EmailAddress}'
-
-# Member account (use member-account profile):
-aws cloudtrail describe-trails --show-shadow-trails \
-  --query 'trailList[*].{name:Name,shadow:IsShadowTrail,logging:IsLogging,isOrg:IsOrganizationTrail}'
-
-# Verify member is in the org and ACTIVE:
-aws organizations list-accounts --query 'Accounts[?Id==`<member-acct-id>`].{id:Id,status:Status,name:Name}'
-
-# Check SCPs applied to the member account's OU:
-aws organizations list-policies-for-target --target-id <member-or-ou-id> \
-  --filter SERVICE_CONTROL_POLICY
-```
+Canonical CLI for this step (org trail status, delegated admins, member shadow trails, org membership, SCPs) — `references/diagnostic-commands.md`.
 
 **Common fixes:**
 - Member shadow stopped: `start-logging --name <org-trail>` from the member
@@ -498,26 +454,7 @@ Lake vs S3, Insights limitations).
 
 ## Recent AWS features (2024-2026)
 
-- **CloudTrail Lake (2022 GA, widely adopted 2024-2026):** Managed event
-  data store with SQL queries and near-real-time ingestion. Troubleshoot
-  Lake gaps by checking the event data store's selector
-  (`list-event-data-stores` + `get-event-data-store`).
-- **CloudTrail Lake federation (2024):** Federation to Athena/OpenSearch.
-  Failures present as "events in Lake but not in Athena" — check federation
-  role and Athena workgroup.
-- **Enhanced Insights selectors (2024):** `list-insights-selectors` /
-  `put-insights-selectors` APIs for per-event-source Insights configuration.
-  Legacy `get-insight-selectors` / `put-insight-selectors` still work but
-  only toggle global on/off.
-- **CloudTrail Organizations auto-enable (2024-2025):** New member accounts
-  can auto-receive the org trail without manual `start-logging`.
-- **CloudTrail Lake integration with Amazon Q (2025):** Q can query Lake in
-  natural language. Verify Q service role has `cloudtrail:StartQuery`.
-- **S3 managed bucket policies for CloudTrail (2024):** Console-created
-  trails auto-apply the canonical bucket policy. IaC does NOT — include
-  the policy explicitly.
-- **CloudTrail delete-trail retention (2024):** Deleted trails remain as
-  shadow trails for 30 days. `describe-trails --show-shadow-trails`.
+→ All seven updates (Lake adoption, Lake federation, enhanced Insights selectors, org auto-enable, Amazon Q integration, S3 managed bucket policies, delete-trail shadow retention) — `references/advanced-patterns.md`.
 
 ## References
 
@@ -526,6 +463,12 @@ Lake vs S3, Insights limitations).
   additional anti-patterns
 - `references/diagnostic-commands.md` — canonical command script for each
   failure category
+
+## References (load on demand)
+
+- [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — canonical per-category CLI script (pre-existing) + the Step 2 / Step 3 / Step 6 command blocks moved from SKILL.md
+- [`references/advanced-patterns.md`](references/advanced-patterns.md) — recent AWS features affecting gap diagnosis (2024-2026)
+- [`references/failure-decision-tree.md`](references/failure-decision-tree.md) — full symptom-to-cause walk, worked examples per category, S3/KMS policy examples, anti-patterns (pre-existing)
 
 ## Domain
 

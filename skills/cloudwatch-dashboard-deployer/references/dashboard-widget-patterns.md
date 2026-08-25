@@ -300,3 +300,190 @@ Variables enable dynamic dimension selection from the dashboard UI.
 
 For a fleet of 50 dashboards + 500 custom metrics, monthly cost is
 ~$300 — dominated by custom metric volume.
+---
+
+## Operational dashboard — EC2 fleet (metric widgets) (boilerplate) (moved from SKILL.md)
+
+```bash
+aws cloudwatch put-dashboard \
+  --dashboard-name "prod-ec2-ops" \
+  --dashboard-body '{
+    "widgets": [
+      {
+        "type": "metric",
+        "x": 0, "y": 0, "width": 12, "height": 6,
+        "properties": {
+          "metrics": [
+            ["AWS/EC2", "CPUUtilization", "InstanceId", "${INSTANCE_ID}", {"label": "CPU %"}]
+          ],
+          "period": 300,
+          "stat": "Average",
+          "region": "us-east-1",
+          "title": "CPU Utilization",
+          "view": "timeSeries",
+          "stacked": false,
+          "liveData": true
+        }
+      },
+      {
+        "type": "metric",
+        "x": 12, "y": 0, "width": 12, "height": 6,
+        "properties": {
+          "metrics": [
+            ["CWAgent", "mem_used_percent", "InstanceId", "${INSTANCE_ID}", {"label": "Memory %"}]
+          ],
+          "period": 300,
+          "stat": "Average",
+          "title": "Memory Utilization (CWAgent)",
+          "view": "timeSeries"
+        }
+      },
+      {
+        "type": "metric",
+        "x": 0, "y": 6, "width": 24, "height": 3,
+        "properties": {
+          "metrics": [
+            ["AWS/EC2", "NetworkIn", "InstanceId", "${INSTANCE_ID}", {"label": "Network In (MB)", "id": "m1"}],
+            ["AWS/EC2", "NetworkOut", "InstanceId", "${INSTANCE_ID}", {"label": "Network Out (MB)", "id": "m2"}],
+            [{"expression": "m1/1048576", "label": "In MB/s", "id": "e1"}],
+            [{"expression": "m2/1048576", "label": "Out MB/s", "id": "e2"}]
+          ],
+          "period": 300,
+          "stat": "Sum",
+          "title": "Network Traffic",
+          "view": "timeSeries"
+        }
+      }
+    ]
+  }'
+```
+---
+
+## Log insights widget — error analysis (boilerplate) (moved from SKILL.md)
+
+```json
+{
+  "type": "log",
+  "x": 0, "y": 0, "width": 24, "height": 6,
+  "properties": {
+    "query": "SOURCE '/aws/lambda/prod-checkout' | fields @timestamp, @message\n| filter @message like /ERROR/\n| stats count() by bin(5m)\n| sort @timestamp desc\n| limit 100",
+    "region": "us-east-1",
+    "stacked": false,
+    "title": "Lambda Errors (5-min buckets)",
+    "view": "timeSeries"
+  }
+}
+```
+---
+
+## Alarm widget (boilerplate) (moved from SKILL.md)
+
+```json
+{
+  "type": "alarm",
+  "x": 0, "y": 0, "width": 12, "height": 3,
+  "properties": {
+    "title": "Production Alarms",
+    "alarms": [
+      "arn:aws:cloudwatch:us-east-1:111111111111:alarm:ec2-cpu-high-prod-web-1",
+      "arn:aws:cloudwatch:us-east-1:111111111111:alarm:lambda-errors-high-prod-checkout"
+    ]
+  }
+}
+```
+---
+
+## Text widget (Markdown runbook link) (boilerplate) (moved from SKILL.md)
+
+```json
+{
+  "type": "text",
+  "x": 0, "y": 0, "width": 24, "height": 2,
+  "properties": {
+    "markdown": "# Production Operations Dashboard\n**Runbook**: [Incident Response](https://runbooks.example.com/incident)\n**On-call rotation**: PagerDuty schedule `prod-oncall`\n**Escalation**: Slack `#prod-incidents`"
+  }
+}
+```
+---
+
+## Metric math — error rate (errors / total requests) (boilerplate) (moved from SKILL.md)
+
+```json
+{
+  "type": "metric",
+  "x": 0, "y": 0, "width": 12, "height": 6,
+  "properties": {
+    "metrics": [
+      ["AWS/ApplicationELB", "HTTPCode_ELB_5XX_Count", "LoadBalancer", "app/prod-alb/1234567890", {"id": "m1"}],
+      ["AWS/ApplicationELB", "RequestCount", "LoadBalancer", "app/prod-alb/1234567890", {"id": "m2"}],
+      [{"expression": "m1/m2*100", "label": "Error Rate %", "id": "e1"}]
+    ],
+    "period": 60,
+    "stat": "Sum",
+    "title": "ALB 5xx Error Rate (%)",
+    "view": "timeSeries",
+    "yAxis": {"left": {"min": 0, "max": 10}}
+  }
+}
+```
+---
+
+## SLO dashboard — burn rate (Application Signals) (boilerplate) (moved from SKILL.md)
+
+```json
+{
+  "type": "metric",
+  "x": 0, "y": 0, "width": 24, "height": 6,
+  "properties": {
+    "metrics": [
+      ["AWS/ApplicationSignals", "ConsumedRAT", "ServiceName", "checkout-service", "SLO", "checkout-availability-slo", {"id": "m1"}],
+      ["AWS/ApplicationSignals", "RequestedRAT", "ServiceName", "checkout-service", "SLO", "checkout-availability-slo", {"id": "m2"}],
+      [{"expression": "m1/m2", "label": "Burn Rate", "id": "e1"}]
+    ],
+    "period": 300,
+    "stat": "Sum",
+    "title": "SLO Burn Rate — Checkout Availability",
+    "view": "timeSeries",
+    "annotations": {"horizontal": [{"label": "Fast burn (2h)", "value": 14.4}, {"label": "Slow burn (6h)", "value": 6}]}
+  }
+}
+```
+---
+
+## Cross-account dashboard (shared) (boilerplate) (moved from SKILL.md)
+
+```json
+{
+  "type": "metric",
+  "x": 0, "y": 0, "width": 12, "height": 6,
+  "properties": {
+    "metrics": [
+      ["AWS/EC2", "CPUUtilization", "InstanceId", "i-0123456789abcdef0", {"AccountId": "222222222222", "label": "Dev Account CPU"}],
+      ["AWS/EC2", "CPUUtilization", "InstanceId", "i-0abcdef1234567890", {"AccountId": "333333333333", "label": "Staging Account CPU"}]
+    ],
+    "period": 300,
+    "stat": "Average",
+    "region": "us-east-1",
+    "title": "Cross-Account CPU Comparison",
+    "view": "timeSeries"
+  }
+}
+```
+---
+
+## Executive dashboard — KPI summary (single-value widgets) (boilerplate) (moved from SKILL.md)
+
+```json
+{
+  "type": "metric",
+  "x": 0, "y": 0, "width": 6, "height": 3,
+  "properties": {
+    "metrics": [["AWS/ApplicationELB", "RequestCount", "LoadBalancer", "app/prod-alb/1234567890"]],
+    "period": 3600,
+    "stat": "Sum",
+    "title": "Total Requests (1h)",
+    "view": "singleValue",
+    "setPeriodToTimeRange": true
+  }
+}
+```

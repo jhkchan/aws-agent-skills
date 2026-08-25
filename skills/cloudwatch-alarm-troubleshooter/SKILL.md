@@ -124,112 +124,13 @@ third verdict value.
 
 ## Expert heuristic
 
-A senior CloudOps engineer applies three quick checks before any deep
-diagnosis. Each is non-obvious and routes the diagnosis away from the
-obvious layer:
-
-1. **Dimension values are case-sensitive exact strings.** CloudWatch
-   does no normalisation. `FunctionName=Fn-Orders-API` does NOT match
-   `FunctionName=fn-orders-api`. The alarm silently falls into
-   INSUFFICIENT_DATA. First probe: `list-metrics --namespace <ns>
-   --metric-name <m>` and compare character-by-character.
-2. **Period must match metric resolution (or be a multiple).**
-   High-resolution metrics (1-second storage) accept any multiple of 1.
-   Standard metrics (60-second storage) queried with `Period: 1` return
-   no points — the alarm goes INSUFFICIENT_DATA. The metric exists; the
-   alarm query is wrong.
-3. **INSUFFICIENT_DATA means missing data points, NOT zero.** Either
-   the source stopped emitting, or the alarm's namespace / dimension /
-   period is wrong. `TreatMissingData: breaching` masks the symptom by
-   treating absent data as a breach — useful for silent-failure
-   detection, but the underlying missing-data issue remains.
-
-4. **The evaluation window is `Period * EvaluationPeriods`, but
-   `DatapointsToAlarm` can be less than `EvaluationPeriods`.** An
-   alarm with `Period: 300, EvaluationPeriods: 5, DatapointsToAlarm: 3`
-   evaluates the last 25 minutes (5 * 300s) and transitions to ALARM
-   if ANY 3 of the 5 data points breach the threshold. The remaining
-   2 data points can be non-breaching or missing. This "M-of-N" logic
-   is the #1 cause of "alarm fired but the dashboard looks fine" —
-   the operator sees 3 green periods and 2 red periods and expects
-   the alarm to stay OK, but M=3 is sufficient. Always check
-   `DatapointsToAlarm` alongside `EvaluationPeriods`.
-
-5. **Composite alarm Rule evaluation short-circuits on the first
-   false child under AND, and the first true child under OR.**
-   `ALARM(c1) AND ALARM(c2) AND ALARM(c3)` — if c1 is OK, CloudWatch
-   does not evaluate c2 or c3. This is unobservable in the console
-   (all children show their current state) but means a recently-fixed
-   child (c1 transitions to OK) instantly de-escalates the composite
-   even if c2 and c3 are still ALARM. Under OR, the first ALARM child
-   short-circuits to true. This matters for incident routing: a
-   composite alarm may resolve faster than the individual child
-   alarms suggest.
-
-6. **The anomaly detection band is computed as `mean(history) +/-
-   (stddev(history) * StandardDeviations)`, but the history window
-   is a rolling ~15 days, not the alarm's evaluation period.** The
-   band updates continuously as new data arrives. A sudden but
-   sustained shift (e.g., traffic doubles and stays elevated for 5
-   days) causes the band to widen over time until the new baseline
-   is "normal" — the alarm stops firing even though the metric is
-   still elevated vs. the original baseline. The band is also
-   per-period: a metric with daily seasonality will have a wider
-   band during peak hours and a narrower band off-peak, causing
-   inconsistent alerting behavior across the day.
-
-7. **New custom metrics cause INSUFFICIENT_DATA for the first
-   `EvaluationPeriods * Period` seconds, not a fixed 15 minutes.**
-   A freshly-created alarm on a new metric stays in
-   INSUFFICIENT_DATA until enough data points exist to fill the
-   evaluation window. For `Period: 300, EvaluationPeriods: 1`, that
-   is 5 minutes. For `Period: 300, EvaluationPeriods: 5`, that is
-   25 minutes. The 15-minute figure in AWS docs refers to the
-   anomaly detector training window, not the alarm evaluation
-   window. Operators who "just deployed the alarm" and see
-   INSUFFICIENT_DATA for 25 minutes think the metric pipeline is
-   broken; it is just the evaluation window filling up.
-
-8. **Cross-account alarm actions require the SNS topic policy to
-   trust the CloudWatch service principal in the ALARM's account,
-   not the SNS topic's account.** When an alarm in account A
-   publishes to an SNS topic in account B, the topic policy in B
-   must allow `Principal: {Service: cloudwatch.amazonaws.com}` with
-   a condition `aws:SourceAccount: <account-A>`. Without the
-   `SourceAccount` condition, the publish may succeed but be
-   rejected by some downstream subscriptions. Cross-account Lambda
-   actions require `--source-arn <alarm-arn-in-account-A>` on the
-   `lambda:add-permission` call in account B. This IAM gotcha is
-   not surfaced in the alarm setup wizard.
+The eight expert-heuristic deep dives moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — dimension case-sensitivity, Period/resolution, INSUFFICIENT_DATA != zero, M-of-N evaluation window, composite short-circuit, anomaly band math (rolling ~15-day window), new-metric INSUFFICIENT duration, cross-account SourceAccount conditions.
+The first three checks are summarized in the NEVER section and Step 2 probes below; load the reference when the quick probes pass but the symptom persists.
 
 ## Configuration dependency graph
 
-```
-[metric source]                [CloudWatch metric]
- application / Agent ──emit──►  (namespace, metric name,
- put-metric-data / EMF  ──────►   dimensions, native resolution)
-                                       │ alarm query
-                                       ▼
-                              [CloudWatch alarm]
-                               (period, statistic, threshold,
-                                comparison, evaluation periods,
-                                treat-missing-data)
-                                       │ state: OK / ALARM / INSUFFICIENT_DATA
-                                       ▼
-                              [Alarm action targets]
-                               SNS topic    (needs sns:Publish
-                                              from cloudwatch.amazonaws.com)
-                               Lambda fn    (needs lambda:InvokeFunction
-                                              from cloudwatch.amazonaws.com)
-                               ASG policy   (AlarmActions = policy ARN, not ASG ARN)
-                               SSM OpsItem / composite Rule
-```
-
-A mis-behaving alarm has exactly three layers to investigate: the
-metric source (does the data exist?), the alarm query (does the
-configuration match the data?), and the action target (does the target
-accept CloudWatch's invocation?). The diagnostic tree walks each in
-order based on the symptom.
+The dependency diagram (metric source -> CloudWatch metric -> alarm -> action targets with required permissions) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Key model: exactly three layers to investigate — metric source (does the data exist?), alarm query (does config match the data?), action target (does the target accept CloudWatch invocation?).
 
 ## Quick reference — symptom triage table
 
@@ -252,31 +153,8 @@ failures.
 
 ### Account-wide pre-flight commands
 
-```bash
-# 1. Alarm configuration (Namespace, MetricName, Dimensions, Period,
-#    Statistic, Threshold, ComparisonOperator, TreatMissingData,
-#    AlarmActions, EvaluationPeriods, DatapointsToAlarm, Metrics)
-aws cloudwatch describe-alarms --alarm-names <alarm-name> --output json
-
-# 2. State history (transitions, config updates, action invocations)
-aws cloudwatch describe-alarm-history --alarm-name <alarm-name> \
-  --history-type StateHistory \
-  --start-time $(date -d '-24 hours' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --output json
-
-# 3. Raw metric points for the alarm's exact query
-aws cloudwatch get-metric-data \
-  --metric-data-queries '[{"Id":"q1","MetricStat":{"Metric":{"Namespace":"<ns>","MetricName":"<m>","Dimensions":<dims>},"Period":<p>,"Stat":"<s>"}}]' \
-  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --output json
-
-# 4. Metric-filter alarms: the filter pattern + log group
-aws logs describe-metric-filters --metric-name <m> --namespace <ns> --output json
-
-# 5. Anomaly-detection alarms: the detector configuration
-aws cloudwatch describe-anomaly-detectors --namespace <ns> \
-  --metric-name <m> --output json
-```
+The five gather-info commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) — describe-alarms, describe-alarm-history (StateHistory), get-metric-data, describe-metric-filters, describe-anomaly-detectors.
+Run these before any layer-specific probe.
 
 ### Alarm-state short-circuit
 
@@ -303,31 +181,8 @@ without a failing probe that matches the symptom.**
 
 ### Step 0: Non-obvious behaviours that change diagnosis
 
-- **Dimension values are case-sensitive exact strings; the dimension
-  SET must match exactly.** No normalisation. Partial sets query a
-  different (usually empty) metric.
-- **The alarm Period controls aggregation, not native resolution.**
-  `Period: 1` on a standard 60s metric returns no points. Period must
-  be a multiple of native resolution.
-- **INSUFFICIENT_DATA is the default for new alarms until first
-  evaluation completes** (`EvaluationPeriods * Period` seconds). Normal;
-  not a bug. If still INSUFFICIENT after that window, the query returns
-  no points.
-- **`TreatMissingData: breaching` turns a missing-metric alarm into a
-  permanently ALARM alarm.** Masks the underlying pipeline issue.
-- **Composite Rule is a boolean over child alarm STATE, NOT over the
-  underlying metrics.** INSUFFICIENT children propagate as false-ish
-  under AND / OR.
-- **Math expression alarms: if ANY referenced metric is missing, the
-  expression evaluates to INSUFFICIENT_DATA.** Probe each referenced
-  metric independently.
-- **Anomaly-detection alarms need a training window.** A freshly-created
-  detector returns no band for several hours; the alarm sits in
-  INSUFFICIENT_DATA until the band is established.
-- **SNS / Lambda alarm actions require the target policy to grant
-  `cloudwatch.amazonaws.com` invoke permission.** Console auto-adds;
-  CLI / Terraform / CloudFormation do NOT. ASG actions require the
-  scaling-policy ARN, not the ASG ARN; mis-wired actions fail silently.
+The eight non-obvious behaviours moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — dimension SET exact-match, Period vs native resolution, INSUFFICIENT_DATA warm-up window, TreatMissingData masking, composite state boolean, math-expression missing-metric propagation, anomaly training window, action-target policy requirements.
+Load the reference when a diagnosis contradicts the operator expectation.
 
 ### Step 1: Symptom entry
 
@@ -589,42 +444,8 @@ CONFIRM: Before updating the alarm, emit and await:
 
 ### Worked example — ALARM fires, SNS topic policy missing
 
-```text
-TARGET: ProductionDiskSpaceAlarm
-VERDICT: ROOT_CAUSE_IDENTIFIED
-REASON: Alarm has transitioned to ALARM 4 times in 24 hours (visible
-  in describe-alarm-history StateHistory), but the SNS topic policy
-  on the AlarmActions target does not grant cloudwatch.amazonaws.com
-  permission to call sns:Publish. No notifications were delivered
-  (Step 4a).
-LAYER: ACTION_SNS_POLICY
-EVIDENCE:
-  - Symptom: alarm fires (visible on dashboard, ALARM confirmed), but
-    the on-call Slack channel received nothing.
-  - Probe: aws cloudwatch describe-alarms returns AlarmActions:
-    [arn:aws:sns:us-east-1:111111111111:OpsNotifications].
-  - Probe: aws cloudwatch describe-alarm-history --history-type Action
-    returns no Action entries in the last 24 hours despite 4 ALARM
-    transitions in StateHistory.
-  - Probe: aws sns get-topic-attributes on OpsNotifications returns
-    a Policy with NO statement granting cloudwatch.amazonaws.com
-    sns:Publish.
-  - Passing: the SNS topic works (CLI test publish delivers to the
-    Slack subscription); the Lambda subscription is Confirmed.
-REMEDIATION:
-  1. Add the CloudWatch service principal to the SNS topic policy:
-     aws sns add-permission --topic-arn \
-       arn:aws:sns:us-east-1:111111111111:OpsNotifications \
-       --label AllowCloudWatchAlarmPublish \
-       --aws-account-id 111111111111 \
-       --action-name Publish --profile <p>
-  2. Verify by triggering a test alarm transition (set threshold to 0
-     momentarily) and confirm Slack receives the notification within
-     60 seconds. Then restore the original threshold.
-CONFIRM: Before updating the topic policy, emit and await:
-  "CONFIRM: About to add cloudwatch.amazonaws.com sns:Publish to
-   OpsNotifications topic. Proceed? (yes/no)"
-```
+Secondary example moved verbatim to [references/worked-examples.md](references/worked-examples.md) — ACTION_SNS_POLICY: 4 ALARM transitions, zero Action history entries, topic policy missing cloudwatch.amazonaws.com sns:Publish.
+The primary example (INSUFFICIENT_DATA dimension case mismatch) stays above.
 
 ## Pre-flight safety checks (run before any state-changing CLI)
 
@@ -654,167 +475,26 @@ CONFIRM: Before updating the topic policy, emit and await:
 
 ## Remediation guidance
 
-Every remediation uses `put-metric-alarm` (or `put-composite-alarm` for
-composite) to overwrite the existing alarm configuration, OR a target-
-side policy command for action-layer fixes. Always emit CONFIRM before
-executing; include the diff (old vs new value) in the prompt.
-
-### Metric-side fixes (METRIC_DIMENSION_MISMATCH, NAMESPACE_TYPO, PERIOD_MISALIGNMENT, STATISTIC_MISMATCH, THRESHOLD_STATIC, RESOLUTION_MISMATCH)
-
-```bash
-aws cloudwatch put-metric-alarm --alarm-name <name> \
-  --namespace <corrected-ns> --metric-name <m> \
-  --dimensions Name=<d1>,Value=<corrected-value> \
-  --period <corrected-p> --statistic <corrected-s> \
-  --threshold <t> --comparison-operator <op> \
-  --evaluation-periods <n> --alarm-actions <actions> --profile <p>
-```
-- Dimension / namespace values must match `list-metrics` output
-  character-for-character (case, hyphen, underscore).
-- Period must be a multiple of the metric's native resolution (60s for
-  standard, 1s for high-resolution).
-- Statistic must match the dashboard view (Sum / Average / Maximum /
-  SampleCount / extended-statistic p99).
-- Comparison-operator boundary: use `GreaterThanOrEqualToThreshold` when
-  the metric value equals the threshold at the boundary.
-
-### THRESHOLD_ANOMALY
-
-Re-create the detector via `put-anomaly-detector` on a calmer window,
-OR raise / lower `--standard-deviations` to widen / narrow the band.
-
-### MATH_EXPRESSION
-
-Restructure `--metrics` JSON: add `FILL(metricId, 0)` guards, align
-periods across referenced metrics, remove SEARCH, fix the threshold's
-target `Id`.
-
-### COMPOSITE_RULE
-
-```bash
-aws cloudwatch put-composite-alarm --alarm-name <name> \
-  --alarm-rule 'ALARM(child1) OR ALARM(child2)' \
-  --alarm-actions <actions> --profile <p>
-```
-Rewrite the rule to express the intended boolean semantics; verify
-child alarm names against `describe-alarms` output (names are not
-auto-updated on child rename).
-
-### TREAT_MISSING_DATA
-
-```bash
-aws cloudwatch put-metric-alarm --alarm-name <name> \
-  ... --treat-missing-data notBreaching --profile <p>
-```
-Options: `breaching` (silent-failure detection — pair with pipeline
-investigation), `notBreaching` (missing is benign), `ignore` (hold
-state), `missing` (default; alarm goes INSUFFICIENT_DATA).
-
-### Action-side fixes (ACTION_SNS_POLICY, ACTION_LAMBDA_POLICY, ACTION_AUTOSCALING_POLICY, ACTION_MISSING)
-
-```bash
-# SNS topic: grant cloudwatch.amazonaws.com permission to Publish
-aws sns add-permission --topic-arn <topic-arn> \
-  --label AllowCloudWatchAlarmPublish \
-  --aws-account-id <topic-owner-account-id> \
-  --action-name Publish --profile <p>
-
-# Lambda: grant cloudwatch.amazonaws.com permission to InvokeFunction
-aws lambda add-permission --function-name <fn> \
-  --statement-id AllowCloudWatchAlarm \
-  --action lambda:InvokeFunction \
-  --principal cloudwatch.amazonaws.com \
-  --source-arn arn:aws:cloudwatch:<region>:<account-id>:alarm:<alarm-name> \
-  --profile <p>
-
-# ASG: create the scaling policy, then reference its ARN in AlarmActions
-aws autoscaling put-scaling-policy --auto-scaling-group-name <asg> \
-  --policy-name ScaleUpOnAlarm --adjustment-type ChangeInCapacity \
-  --scaling-adjustment 1 --profile <p>
-# Then update the alarm's AlarmActions with the returned PolicyARN.
-```
-For ACTION_MISSING: add an action target ARN to AlarmActions in the
-next `put-metric-alarm` call; verify the target accepts the CloudWatch
-service principal.
+Per-layer fix commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) — metric-side put-metric-alarm rewrite, THRESHOLD_ANOMALY retrain/stdev, MATH_EXPRESSION restructure, COMPOSITE_RULE rewrite, TREAT_MISSING_DATA options, and action-side SNS/Lambda/ASG permission fixes.
+Rule of thumb: put-metric-alarm (or put-composite-alarm) overwrite for config layers; target-side policy command for action layers; always CONFIRM with the old-vs-new diff.
 
 ## Deep reference — quick lookup matrices
 
-### TreatMissingData values
-
-`missing` (default; alarm goes INSUFFICIENT_DATA), `breaching` (treat
-missing as breach — silent-failure detection), `notBreaching` (missing
-is benign), `ignore` (hold current state).
-
-### Native metric resolution
-
-AWS service metrics, CloudWatch Agent default, `put-metric-data`
-default: 60 seconds. CloudWatch Agent high-resolution,
-`put-metric-data --storage-resolution 1`, Embedded Metric Format:
-1 second. Alarm Period must be a multiple of native resolution.
-
-### Statistic semantics
-
-`Sum` (counts), `Average` (latency, CPU), `Maximum` (peak), `Minimum`
-(lowest), `SampleCount` (throughput), `p99`/`p95`/`TM99` via
-`--extended-statistic` (tail latency). Switching statistic without
-re-checking the dashboard view is the #1 source of "dashboard
-breaches, alarm stays OK."
-
-### Composite rule grammar
-
-`ALARM(name)` / `OK(name)` / `INSUFFICIENT(name)` predicates with
-`AND` / `OR` / `NOT` and parentheses; `TRUE` / `FALSE` literals.
-INSUFFICIENT children evaluate as false under AND / OR. Child names
-are NOT auto-updated on rename.
-
-### Math expression support
-
-Each entry in `Metrics` has an `Id` (`m1`, `e1`); expressions
-reference other `Id`s. Supported: `AVG`, `SUM`, `MIN`, `MAX`,
-`STDDEV`, `FILL`, `ABS`, `CEIL`, `FLOOR`, `TIME_SERIES`,
-`DATAPOINT_COUNT`. SEARCH is dashboard-only. Divide-by-zero returns
-no value; guard with `FILL(divisorId, 0)`.
-
-### Action target permission matrix
-
-| Target | Required permission | Principal |
-|---|---|---|
-| SNS topic | `sns:Publish` | `cloudwatch.amazonaws.com` |
-| Lambda function | `lambda:InvokeFunction` | `cloudwatch.amazonaws.com` |
-| Auto Scaling policy | AlarmActions = policy ARN, not ASG ARN | n/a |
-| SSM OpsItem | Automatic for the account's OpsCenter | n/a |
-
-Console-created alarms auto-add SNS / Lambda permission; CLI /
-Terraform / CloudFormation alarms do NOT.
+The quick lookup matrices moved verbatim to [references/alarm-configuration-reference.md](references/alarm-configuration-reference.md) — TreatMissingData values, native metric resolution, statistic semantics, composite rule grammar, math expression support, action-target permission matrix.
+Load when interpreting an alarm field during diagnosis.
 
 ## Recent AWS features (2024-2026)
 
-- **DatapointsToAlarm M-of-N evaluation (2024-2025):** Alarms now
-  support `DatapointsToAlarm` < `EvaluationPeriods`, enabling
-  "breach M out of N periods" logic. A common source of "alarm fired
-  but dashboard looks fine" — 3 of 5 periods breaching is sufficient.
-- **Cross-account alarm actions with SourceAccount condition (2025):**
-  SNS topic policies for cross-account alarm publishing now support
-  `aws:SourceAccount` condition to scope the CloudWatch principal to
-  the alarm's owning account. Required for secure cross-account
-  alarm-to-SNS routing.
-- **Composite alarm rule expressions (2024):** GA of the full boolean
-  grammar; INSUFFICIENT predicate now enables detection of children in
-  INSUFFICIENT_DATA state.
-- **Built-in anomaly-detection alarms (2024-2025):** CloudWatch auto-
-  creates the detector when the alarm references a band. Detector still
-  needs a training window; freshly-created anomaly alarms sit in
-  INSUFFICIENT_DATA for 15 min to several hours.
-- **DSP (Data Protection) on logs affecting metric filters (2025):**
-  Masked sensitive fields change metric-filter match patterns. A
-  metric-filter alarm that worked yesterday may stop matching today if a
-  new data-protection policy masks the anchored field.
-- **Metric Streams high-resolution passthrough (2024-2025):** Streams
-  forward 1-second metrics at 1-second granularity; alarms at
-  `Period: 1` are now meaningful for streamed sources.
-- **Cross-account observability (2024-2025):** Alarms can reference
-  metrics in a monitoring account; source-account dimension values are
-  preserved and case-sensitivity still applies across aggregation.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — DatapointsToAlarm M-of-N, cross-account SourceAccount conditions, composite INSUFFICIENT predicate, built-in anomaly alarms, DSP on metric filters, Metric Streams 1s passthrough, cross-account observability.
+Load when the alarm was created or migrated after 2024.
+
+## References (load on demand)
+
+- [references/alarm-configuration-reference.md](references/alarm-configuration-reference.md) — configuration lookup matrices: TreatMissingData values, native resolution, statistic semantics, comparison operators, EvaluationPeriods vs DatapointsToAlarm, composite grammar, math expressions, action permission matrix, state model.
+- [references/dimension-period-statistic-quick-reference.md](references/dimension-period-statistic-quick-reference.md) — dimension/period/statistic worked examples and the put-metric-alarm quick template.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — account-wide pre-flight command block and the full per-layer remediation command listings.
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked example: ALARM fires but SNS topic policy missing (ACTION_SNS_POLICY).
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert-heuristic deep dives (M-of-N window, composite short-circuit, anomaly band math, cross-account actions), Step 0 non-obvious behaviours, configuration dependency graph, recent AWS features (2024-2026).
 
 ## Domain
 

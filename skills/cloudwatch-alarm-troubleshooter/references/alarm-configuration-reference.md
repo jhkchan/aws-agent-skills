@@ -180,3 +180,56 @@ INSUFFICIENT_DATA → ALARM : points return AND breach,
 
 Always probe `aws health describe-events` for regional issues before
 declaring a customer-side root cause during a wide-impact incident.
+
+<!-- Appended from SKILL.md (progressive-disclosure restructure); content above is unchanged. -->
+
+## Quick lookup matrices (moved from SKILL.md)
+
+### TreatMissingData values
+
+`missing` (default; alarm goes INSUFFICIENT_DATA), `breaching` (treat
+missing as breach — silent-failure detection), `notBreaching` (missing
+is benign), `ignore` (hold current state).
+
+### Native metric resolution
+
+AWS service metrics, CloudWatch Agent default, `put-metric-data`
+default: 60 seconds. CloudWatch Agent high-resolution,
+`put-metric-data --storage-resolution 1`, Embedded Metric Format:
+1 second. Alarm Period must be a multiple of native resolution.
+
+### Statistic semantics
+
+`Sum` (counts), `Average` (latency, CPU), `Maximum` (peak), `Minimum`
+(lowest), `SampleCount` (throughput), `p99`/`p95`/`TM99` via
+`--extended-statistic` (tail latency). Switching statistic without
+re-checking the dashboard view is the #1 source of "dashboard
+breaches, alarm stays OK."
+
+### Composite rule grammar
+
+`ALARM(name)` / `OK(name)` / `INSUFFICIENT(name)` predicates with
+`AND` / `OR` / `NOT` and parentheses; `TRUE` / `FALSE` literals.
+INSUFFICIENT children evaluate as false under AND / OR. Child names
+are NOT auto-updated on rename.
+
+### Math expression support
+
+Each entry in `Metrics` has an `Id` (`m1`, `e1`); expressions
+reference other `Id`s. Supported: `AVG`, `SUM`, `MIN`, `MAX`,
+`STDDEV`, `FILL`, `ABS`, `CEIL`, `FLOOR`, `TIME_SERIES`,
+`DATAPOINT_COUNT`. SEARCH is dashboard-only. Divide-by-zero returns
+no value; guard with `FILL(divisorId, 0)`.
+
+### Action target permission matrix
+
+| Target | Required permission | Principal |
+|---|---|---|
+| SNS topic | `sns:Publish` | `cloudwatch.amazonaws.com` |
+| Lambda function | `lambda:InvokeFunction` | `cloudwatch.amazonaws.com` |
+| Auto Scaling policy | AlarmActions = policy ARN, not ASG ARN | n/a |
+| SSM OpsItem | Automatic for the account's OpsCenter | n/a |
+
+Console-created alarms auto-add SNS / Lambda permission; CLI /
+Terraform / CloudFormation alarms do NOT.
+
