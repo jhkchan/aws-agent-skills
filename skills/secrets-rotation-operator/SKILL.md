@@ -92,27 +92,8 @@ READY):**
 
 ## Mindset
 
-**One-line takeaway:** `RotationEnabled: true` is a claim, not proof. The
-credential is only rotating if `LastRotatedDate` advances on schedule and
-no version is stranded in AWSPENDING. Driven by three Secrets Manager
-realities:
-
-- **Rotation is a four-link chain.** Config points to a Lambda; the Lambda
-  runs with an execution role; the role needs KMS + network + service
-  permissions; the target resource must accept the new credential. A single
-  broken link makes the entire chain fail silently — the secret appears
-  "managed" on dashboards while the credential is static in production.
-- **A stuck AWSPENDING version is a live incident, not a transient state.**
-  If `setSecret` completed before the failure, the target already has the
-  new password but the secret's `AWSCURRENT` stage still points to the old
-  version. Applications read the old password, the database rejects them —
-  authentication failures cascade across the workload.
-- **Cross-account rotation Lambdas require a resource-based policy grant.**
-  Secrets Manager invokes the Lambda as the `secretsmanager.amazonaws.com`
-  service principal. The Lambda's resource-based policy must explicitly
-  allow that principal to `lambda:InvokeFunction`, and (for cross-account)
-  the secret's resource-based policy must allow the Lambda's account to
-  `secretsmanager:GetSecretValue` / `PutSecretValue`.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#mindset).
+> Why rotation is a four-link chain, the false-sense-of-security trap, cross-account policy pair.
 
 ## Pre-flight: secret metadata gate
 
@@ -124,29 +105,9 @@ versions per page; most secrets have <10 versions, but long-lived secrets
 with many failed rotations can accumulate hundreds of AWSPENDING versions.
 
 **Live-account pre-flight (skip if offline plan audit):**
-1. `aws secretsmanager describe-secret --secret-id <id>` — confirm secret
-   exists; capture `RotationEnabled`, `RotationLambdaARN`,
-   `RotationRules`, `LastRotatedDate`, `LastChangedDate`, `KmsKeyId`,
-   `VersionIdsToStages`, `DeletedDate`, `PrimaryRegion`, `OwningService`.
-2. `aws secretsmanager get-resource-policy --secret-id <id>` — capture
-   the cross-account resource-based policy (if any).
-3. `aws lambda get-function-configuration --function-name <lambda>` —
-   confirm `State: Active`; capture `Runtime`, `Timeout`, `MemorySize`,
-   `VpcConfig`, `Role`, `ReservedConcurrentExecutions`.
-4. `aws lambda get-policy --function-name <lambda>` — confirm the
-   resource-based policy allows `lambda:InvokeFunction` from
-   `secretsmanager.amazonaws.com` (and the secret's account, if cross-
-   account).
-5. `aws lambda get-function-concurrency --function-name <lambda>` —
-   confirm reserved concurrency is not 0.
-6. `aws iam list-attached-role-policies --role-name <role>` and
-   `aws iam list-role-policies --role-name <role>` — verify the execution-
-   role permission chain.
-7. `aws kms describe-key --key-id <kms-id>` — confirm key `Enabled` and
-   the policy grants the Lambda role `kms:Decrypt` (customer-managed keys
-   only; default `aws/secretsmanager` is account-scoped).
-8. `aws logs filter-log-events --log-group-name /aws/lambda/<lambda>
-   --filter-pattern ERROR --limit 20` — capture the last rotation errors.
+
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#live-account-pre-flight-secret-metadata-gate).
+> Eight pre-flight CLI probes: describe-secret, resource policy, Lambda state/policy/concurrency, IAM role, KMS, CloudWatch errors.
 
 **Malformed input:** if the input JSON is invalid or missing required
 fields, emit `VERDICT: ERROR` with `REASON: Secret/operation configuration
@@ -171,110 +132,8 @@ is not valid JSON or is missing required fields — cannot plan.` and
 
 ### Step 0: Expert knowledge — non-obvious Secrets Manager behaviors
 
-These behaviors are easy to misjudge without operational rotation
-experience. Each changes a plan if ignored:
-
-- **The rotation cycle is four Lambda steps, not one.** Secrets Manager
-  invokes the rotation Lambda four times per rotation: `createSecret`
-  (generate a new value, store it as `AWSPENDING`), `setSecret` (apply the
-  `AWSPENDING` credential to the target service), `testSecret` (log in
-  with the new credential to verify), and `finishSecret` (move
-  `AWSCURRENT` to the new version). A failure at any step leaves a
-  different footprint — see the failure-mode table in Step 1.
-
-- **`AWSCURRENT` moves atomically in `finishSecret`, not before.** Until
-  `finishSecret` succeeds, applications read the OLD credential even if
-  `setSecret` already changed the database password. This is why a stuck
-  `AWSPENDING` causes authentication storms: the DB has the new password,
-  the secret still serves the old one.
-
-- **`RotationRules.ScheduleExpression` overrides `AutomaticallyAfterDays`.**
-  When both are set, the cron expression wins. When auditing freshness or
-  planning a schedule change, always check `ScheduleExpression` first;
-  computing the interval off `AutomaticallyAfterDays` alone produces wrong
-  STALE classifications.
-
-- **Lambda timeout default (3s) is too short for database rotation.** The
-  `setSecret` step must open a TCP connection, authenticate with the
-  `AWSCURRENT` credential, and run `ALTER USER` / `ALTER ROLE SET
-  PASSWORD` — on a slow or busy DB this takes 5-15 seconds. Set timeout to
-  minimum 30 seconds; 60 seconds for Aurora clusters with many instances.
-
-- **The Lambda's VPC subnets must route to the DB.** A common
-  misconfiguration is attaching the Lambda to private subnets with a NAT
-  gateway — the DB's security group only accepts connections from the
-  app's SG, so the Lambda's ENI is denied. Either attach the Lambda to the
-  same subnets as the application, or add an ingress rule on the DB SG for
-  the Lambda's security group on the DB port.
-
-- **Cross-account rotation requires BOTH the Lambda resource-based policy
-  AND the secret resource-based policy.** Secrets Manager invokes the
-  Lambda in the Lambda's account; the Lambda then calls `GetSecretValue`
-  on the secret in the secret-owning account. The Lambda's resource policy
-  must allow `secretsmanager.amazonaws.com` (or the secret's account) to
-  invoke it; the secret's resource policy must allow the Lambda's role ARN
-  to `secretsmanager:GetSecretValue`, `PutSecretValue`,
-  `UpdateSecretVersionStage`.
-
-- **RDS managed secrets (created by RDS) use `AWS::RDS::DBInstance`
-  templates.** When `OwningService: rds`, the secret is bound to an RDS
-  instance. Use the AWS-managed rotation template for the engine (MySQL,
-  PostgreSQL, etc.); a custom Lambda will conflict with RDS's secret-
-  binding lifecycle.
-
-- **Master vs. rotating-user rotation.** RDS MySQL/PostgreSQL templates
-  support two modes: "single user" (rotates the master credential by
-  connecting as the master and running `ALTER USER ... PASSWORD`),
-  "multi user" (creates a new user and appends it to the secret, avoiding
-  the master-only single-writer limitation). Choose multi-user if
-  applications tolerate a username change; otherwise single-user.
-
-- **`HostedRotationLambda` (2024+) is AWS-managed.** When the rotation
-  Lambda's ARN matches the hosted pattern (or the secret was created via
-  the console's "rotate using AWS-managed Lambda" option), skip the
-  execution-role checks — AWS owns the function and its permissions. The
-  failure surface narrows to: scheduling, target reachability, and
-  credential match.
-
-- **Reserved concurrency = 0 is a stealth kill switch.** The Lambda
-  appears `Active` in every status check, but every invocation is
-  throttled. CloudWatch shows a `Throttles` metric spike, not an error
-  log. Always check `get-function-concurrency` separately.
-
-- **`kms:Decrypt` is required even for `GetSecretValue`.** The Lambda
-  calls `GetSecretValue` to read `AWSCURRENT` before `setSecret`. If the
-  key policy denies the Lambda role, the API call succeeds (the ARN is
-  readable) but the ciphertext is undecryptable — the error surfaces as
-  `DecryptionFailureException` in the Lambda logs, not in the Secrets
-  Manager API response.
-
-- **Manual `ALTER USER` outside rotation breaks the next rotation.** If a
-  human changes the DB password directly, the Lambda's `setSecret` step
-  authenticates with the `AWSCURRENT` credential and fails — the stored
-  password no longer matches. The fix is to update the secret value to
-  match the manual password, then trigger a rotation to re-sync.
-
-- **Replica secrets are read-only.** Secrets Manager returns
-  `InvalidParameterException` when you try to enable rotation on a
-  replica. Rotation runs against the primary in the primary region; the
-  rotated value syncs to replicas in 1-5 seconds.
-
-- **ScheduleExpression uses EventBridge cron/rate syntax.** `"rate(30 days)"`
-  or `"cron(0 9 ? * MON *)"` (every Monday 09:00). The `?` in the day-of-
-  month field is required when day-of-week is specified. Cron expressions
-  use UTC.
-
-- **ForceOverwriteReplicaSecret is for regional-failover DR only.** When
-  the primary region is down, you can promote a replica and force-overwrite
-  it. This breaks the normal primary/replica sync and requires manual
-  reconciliation when the primary returns. Treat as a DR procedure, not a
-  routine rotation.
-
-- **`SecretsManagerRotation` managed policy is over-broad.** It grants
-  `secretsmanager:*` on `*` — the Lambda can read or modify any secret in
-  the account. For least-privilege, scope a custom policy to the specific
-  secret ARN with the `-??????` suffix (Secrets Manager auto-appends a
-  random 6-char string).
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-0-expert-knowledge--non-obvious-secrets-manager-behaviors).
+> Sixteen non-obvious behaviors: four-step cycle, AWSCURRENT atomicity, ScheduleExpression override, timeout, VPC routing, cross-account pair, RDS templates, hosted Lambda, reserved concurrency, KMS, manual ALTER, replicas, cron syntax, DR overwrite, managed-policy scope.
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
@@ -347,18 +206,8 @@ BLOCKED with the failed checks in PRE_CHECKS. Do NOT execute.
 
 **Rotation failure-mode table (use during diagnose-rotation):**
 
-| Symptom in CloudWatch Logs | Root cause | Fix |
-|---|---|---|
-| `AccessDeniedException` on `secretsmanager:GetSecretValue` | Lambda role lacks Secrets Manager permissions or resource-based policy on the secret denies the role | Attach `SecretsManagerRotation` or scoped custom policy; add the role to the secret resource policy |
-| `AccessDeniedException` on `kms:Decrypt` / `DecryptionFailureException` | KMS key policy denies the Lambda role | Add `kms:Decrypt` grant for the Lambda role to the key policy |
-| `ResourceNotFoundException` on the target (RDS/Redshift/DocDB) | Target instance deleted or wrong endpoint in the secret | Update the secret's `host`/`port` fields, or delete the orphaned secret |
-| `Task timed out after X seconds` | Lambda timeout too short | `update-function-configuration --timeout 30` (or 60 for Aurora) |
-| `OperationError` / `ConnectionRefused` / `ETIMEDOUT` | VPC misconfiguration | Add the Lambda SG to the DB SG ingress; verify subnet route table |
-| `InvalidParameterException` on `createSecret` | Secret value template produces invalid chars (e.g., `/` in MySQL password) | Adjust the password generator in the Lambda; use `string.printable - special_chars` |
-| `AccessDeniedException` on `rds-db:connect` | Lambda role missing `rds-db:connect` on the DB ARN | Attach a policy granting `rds-db:connect` on `arn:aws:rds-db:<region>:<account>:dbuser:<db-resource-id>/<db-user>` |
-| `Throttles` metric spike, no error logs | Reserved concurrency = 0 | `put-function-concurrency --reserved-concurrent-executions 1` |
-| No invocations at all | Resource-based policy missing `secretsmanager.amazonaws.com` principal | Add the principal to the Lambda resource-based policy |
-| `InvalidParameterException` enabling rotation on replica | Secret is a replica | Enable rotation on the primary in `PrimaryRegion` |
+> Moved to [references/error-handling.md](references/error-handling.md#rotation-failure-mode-table-use-during-diagnose-rotation).
+> Symptom → root cause → fix for 10 CloudWatch error signatures (AccessDenied, KMS, timeouts, VPC, throttles, replica errors).
 
 ### Step 2: READY — emit operation plan
 
@@ -487,75 +336,13 @@ NOTES:
 
 ### Worked example — recover-pending (stuck AWSPENDING)
 
-```text
-OPERATION: recover-pending
-VERDICT: COMPLETED
-TARGET: prod/api-gateway-token
-PRE_CHECKS:
-  - [PASS] Single version in AWSPENDING: a1b2c3d4...
-  - [PASS] AWSCURRENT version: e5f6g7h8...
-  - [INFO] Connection test with AWSPENDING value: SUCCESS (new credential
-    is live on the target)
-  - [INFO] Connection test with AWSCURRENT value: FAILED (old credential
-    already replaced on the target)
-  - [PASS] Operator has access to confirm
-STEPS:
-  1. CONFIRM: About to promote AWSPENDING version a1b2c3d4... to
-     AWSCURRENT and move the old AWSCURRENT e5f6g7h8... to AWSPREVIOUS
-     on secret prod/api-gateway-token. This aligns the secret with the
-     live target credential. Proceed? (yes/no)
-  2. aws secretsmanager update-secret-version-stage \
-       --secret-id prod/api-gateway-token \
-       --version-stage AWSCURRENT \
-       --move-to-version-id a1b2c3d4-... \
-       --remove-from-version-id e5f6g7h8-...
-POST_VERIFY:
-  - [PASS] list-secret-version-ids: a1b2c3d4... is AWSCURRENT,
-    e5f6g7h8... is AWSPREVIOUS, no version in AWSPENDING
-  - [PASS] Application authentication metrics: no error spike (5-min
-    sample post-fix)
-NOTES:
-  - Root cause: the rotation Lambda's finishSecret step failed with
-    AccessDeniedException on UpdateSecretVersionStage. The execution
-    role was missing that action. The role has been updated.
-  - After this manual recovery, trigger a fresh rotation to confirm the
-    schedule works end-to-end:
-    aws secretsmanager rotate-secret --secret-id prod/api-gateway-token
-  - Clean up old AWSPENDING versions (older failed rotations) if any:
-    aws secretsmanager update-secret-version-stage \
-      --secret-id prod/api-gateway-token \
-      --version-stage AWSPENDING \
-      --remove-from-version-id <old-pending-version>
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#worked-example--recover-pending-stuck-awspending).
+> Full COMPLETED block: promote a live AWSPENDING version to AWSCURRENT with CONFIRM gate and post-verify.
 
 ### Worked example — diagnose-rotation (BLOCKED with remediation)
 
-```text
-OPERATION: diagnose-rotation
-VERDICT: BLOCKED
-TARGET: prod/payments-db-credentials (rotation Lambda:
-        arn:aws:lambda:us-east-1:111111111111:function:SecretsManagerRDSPostgreSQLRotation)
-PRE_CHECKS:
-  - [PASS] Secret exists, RotationEnabled: true
-  - [PASS] Lambda State: Active
-  - [FAIL] Lambda last invocation errored with:
-    "Task timed out after 3.00 seconds" (CloudWatch Logs, last 24h)
-  - [PASS] No version stuck in AWSPENDING
-STEPS: (none — root cause is Lambda timeout)
-POST_VERIFY: (none)
-NOTES:
-  - Root cause: Lambda timeout is 3 seconds (default). RDS PostgreSQL
-    rotation requires connect + authenticate + ALTER USER, which takes
-    5-15 seconds on this DB.
-  - Fix: increase the timeout, then trigger a manual rotation:
-    aws lambda update-function-configuration \
-      --function-name SecretsManagerRDSPostgreSQLRotation \
-      --timeout 30
-    aws secretsmanager rotate-secret --secret-id prod/payments-db-credentials
-  - Verify LastRotatedDate advances:
-    aws secretsmanager describe-secret --secret-id prod/payments-db-credentials \
-      --query 'LastRotatedDate'
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#worked-example--diagnose-rotation-blocked-with-remediation).
+> BLOCKED block for a Lambda-timeout root cause with the update-function-configuration fix.
 
 ## Anti-Patterns — NEVER
 
@@ -700,50 +487,15 @@ NOTES:
 
 ## Recent AWS features (2024-2026)
 
-- **HostedRotationLambda (2024-2025):** Secrets Manager can create and
-  manage the rotation Lambda for you (no customer-owned function). The
-  rotation Lambda ARN points to an AWS-managed function; the execution
-  role and permissions are maintained by AWS. When the ARN matches the
-  hosted pattern, skip the execution-role pre-checks — the failure
-  surface narrows to scheduling, target reachability, and credential
-  match.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#recent-aws-features-2024-2026).
+> HostedRotationLambda, cross-region replication GA, partial wildcards, ScheduleExpression GA, new engine templates, multi-user strategy, VPC endpoint, CloudTrail data events.
 
-- **Cross-region secret replication GA (2024):** Secrets can be replicated
-  across regions for DR. The primary holds the rotation config; replicas
-  are read-only and inherit rotated values in 1-5 seconds. Use
-  `ForceOverwriteReplicaSecret` only during regional-failover DR.
+## References (load on demand)
 
-- **Partial wildcard for resource-based policies (2024-2025):** Secrets
-  Manager now supports partial wildcard matching in resource-based
-  policy `Resource` elements (e.g.,
-  `arn:aws:secretsmanager:us-east-1:111111111111:secret:prod/*`). This
-  simplifies cross-account access grants for fleets of related secrets.
-  Verify the wildcard does not inadvertently grant access to unrelated
-  secrets in the same prefix.
-
-- **ScheduleExpression (2023-2024) GA:** Cron-style rotation schedules
-  (`"rate(7 days)"`, `"cron(0 9 ? * MON *)"`). When present, overrides
-  `AutomaticallyAfterDays`. Use cron for day-of-week or time-of-day
-  requirements; use `AutomaticallyAfterDays` for simple intervals.
-
-- **Rotation templates for additional engines (2024-2025):** New managed
-  rotation Lambda templates for Amazon MQ, DocumentDB, Neptune, and
-  Redshift. Verify the template matches the engine before deploying.
-
-- **Rotation strategy: multi-user for RDS (2024):** The RDS templates
-  support single-user (rotates the master) and multi-user (creates a new
-  rotating user, avoiding single-writer limitations). Choose multi-user
-  for workloads that tolerate username changes.
-
-- **Secrets Manager VPC endpoint policy (2024):** For Lambda-in-VPC
-  rotation, a VPC endpoint for Secrets Manager avoids NAT gateway charges
-  and improves security. Verify the endpoint policy allows the Lambda
-  role to call the required Secrets Manager APIs.
-
-- **CloudTrail data event logging for Secrets Manager (2025):**
-  CloudTrail now supports data-event logging for `GetSecretValue` and
-  `PutSecretValue`. Enable for compliance audits — management events
-  alone do not capture credential reads/writes.
+- [advanced-patterns](references/advanced-patterns.md) — Mindset principles, Step 0 expert behaviors, recent AWS features
+- [diagnostic-commands](references/diagnostic-commands.md) — live-account pre-flight probe listing
+- [error-handling](references/error-handling.md) — rotation failure-mode error table
+- [worked-examples](references/worked-examples.md) — recover-pending and diagnose-rotation worked examples
 
 ## Domain
 

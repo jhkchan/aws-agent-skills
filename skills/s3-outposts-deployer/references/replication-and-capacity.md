@@ -215,3 +215,56 @@ resource "aws_cloudwatch_metric_alarm" "capacity" {
   alarm_actions       = [aws_sns_topic.alerts.arn]
 }
 ```
+
+## Step 8: replication configuration and role trust policy (moved from SKILL.md)
+
+**Configure replication:**
+
+```bash
+aws s3control put-bucket-replication \
+  --account-id 123456789012 \
+  --bucket "arn:aws:s3-outposts:us-east-1:123456789012:outpost/op-xxx/bucket/my-outpost-bucket" \
+  --replication-configuration '{
+    "Role": "arn:aws:iam::123456789012:role/S3OutpostsReplicationRole",
+    "Rules": [{
+      "Status": "Enabled",
+      "Priority": 1,
+      "Destination": {
+        "Bucket": "arn:aws:s3:::cloud-destination-bucket"
+      },
+      "Filter": {}
+    }]
+  }'
+```
+
+**Replication role trust policy:**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": {"Service": "s3-outposts.amazonaws.com"},
+    "Action": "sts:AssumeRole"
+  }]
+}
+```
+
+## Step 10: capacity alarm (moved from SKILL.md)
+
+**Create a capacity alarm:**
+
+```bash
+aws cloudwatch put-metric-alarm \
+  --alarm-name "outpost-s3-capacity-80pct" \
+  --namespace AWS/S3Outposts \
+  --metric-name BucketSizeBytes \
+  --dimensions Name=BucketName,Value=my-outpost-bucket \
+  --statistic Sum \
+  --period 300 \
+  --evaluation-periods 1 \
+  --threshold 800000000000 \
+  --comparison-operator GreaterThanThreshold \
+  --alarm-actions "arn:aws:sns:us-east-1:123456789012:outpost-alerts"
+```
+

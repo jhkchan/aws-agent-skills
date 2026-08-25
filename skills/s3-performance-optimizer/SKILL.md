@@ -87,26 +87,8 @@ that matches, and only then tune metrics.
 
 ## Philosophy
 
-Four behaviours separate a senior S3 engineer from a generalist:
-
-- **Multipart upload is not optional above 100 MB.** A single PUT of a
-  1 GB object uses one TCP stream and one TLS handshake; the throughput
-  ceiling is the bandwidth-delay product of one stream. Multipart with
-  10 parallel parts uses 10 streams and approaches link bandwidth.
-- **Byte-range fetches turn one slow GET into many fast GETs.** Many
-  workloads only need the first/last few KB (file trailers, headers,
-  manifests). `Range: bytes=0-1023` returns in single-digit ms
-  regardless of object size; a full GET of a 5 GB object returns in
-  seconds.
-- **S3 Express One Zone is a different storage class with different
-  request semantics.** It is a directory bucket
-  (`<bucket>--xaz-<az>--x-s3`) with single-digit-ms latency for both
-  reads and writes, but it is single-AZ. Operators who enable it
-  without flagging the availability trade-off risk data loss on an AZ
-  failure.
-- **Pre-signed URL expiry is a performance + security trade-off.**
-  Short expiry forces re-signing (latency). Long expiry eliminates the
-  round-trip but creates a window where a leaked URL is valid.
+Moved to [references/advanced-patterns.md](references/advanced-patterns.md#philosophy-four-behaviours-of-a-senior-s3-engineer) — multipart above 100 MB, byte-range partial reads, Express One Zone trade-off, pre-signed expiry trade-off.
+Load that reference on demand before executing this section.
 
 ## Quick reference — workload triage table
 
@@ -127,43 +109,8 @@ Four behaviours separate a senior S3 engineer from a generalist:
 
 ## Pre-flight: workload state and gather-info gate
 
-```bash
-# 1. Bucket location and key features
-aws s3api get-bucket-location --bucket <bucket> --output json
-aws s3api get-bucket-accelerate-configuration --bucket <bucket> --output json
-aws s3api list-objects-v2 --bucket <bucket> --prefix <prefix> --max-items 10 \
-  --query 'Contents[].{Key: Key, Size: Size}'
-
-# 2. CloudWatch request metrics (must be enabled on the bucket)
-aws cloudwatch get-metric-statistics --namespace AWS/S3 \
-  --metric-name FirstByteLatency \
-  --dimensions Name=BucketName,Value=<bucket> Name=FilterId,Value=EntireBucket \
-  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Average,p99 --output json
-
-aws cloudwatch get-metric-statistics --namespace AWS/S3 \
-  --metric-name 4xxErrors \
-  --dimensions Name=BucketName,Value=<bucket> \
-  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Sum --output json
-
-# 3. Storage Lens (if configured)
-aws s3control get-storage-lens-configuration --config-id <id> \
-  --account-id <account-id> --output json
-
-# 4. S3 Select probe (for CSV/JSON/Parquet workloads)
-aws s3api select-object-content \
-  --bucket <bucket> --key <key> \
-  --expression "SELECT * FROM s3object s LIMIT 10" \
-  --expression-type SQL \
-  --input-serialization '{"CSV": {"FileHeaderInfo": "USE"}}' \
-  --output-serialization '{"CSV": {}}' /dev/stdout
-
-# 5. Byte-range fetch probe (measure latency of partial read)
-curl -sv -H 'Range: bytes=0-1023' \
-  "https://<bucket>.s3.<region>.amazonaws.com/<key>" \
-  -o /dev/null -w '%{time_total}s %{size_download}b\n'
-```
+Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#pre-flight-workload-state-and-gather-info-gate-commands) — bucket/feature discovery, CloudWatch request metrics, Storage Lens, S3 Select probe, byte-range probe.
+Load that reference on demand before executing this section.
 
 If CloudWatch request metrics are NOT enabled, recommend
 `put-bucket-metrics-configuration` before diagnosing; without metrics,
@@ -172,22 +119,8 @@ optimisation is guesswork.
 If the input is malformed (no BucketName, no workload description, no
 access pattern context), emit:
 
-```text
-TARGET: <bucket or unknown>
-VERDICT: FURTHER_OPTIMIZATION_AVAILABLE
-REASON: Input is missing required context — at minimum a BucketName
-  and a workload description (PUT vs GET, object size profile, request
-  rate, client geography, target latency/throughput). CloudWatch S3
-  metrics and Storage Lens excerpts are required for high-confidence
-  layer identification.
-LAYER: UNKNOWN
-EVIDENCE:
-  - Missing: <list specific missing fields>
-REMEDIATION: Re-prompt for: (1) BucketName and region; (2) workload
-  type (PUT-heavy, GET-heavy, mixed); (3) object size profile;
-  (4) request rate; (5) client geography; (6) target latency or
-  throughput; (7) CloudWatch request metrics for the last hour.
-```
+Moved to [references/worked-examples.md](references/worked-examples.md#worked-example-malformed-input-verdict-unknown) — the full FURTHER_OPTIMIZATION_AVAILABLE / LAYER: UNKNOWN block for missing context.
+Load that reference on demand before executing this section.
 
 ## Process — Optimisation decision tree
 
@@ -198,48 +131,8 @@ target is met by current config.**
 
 ### Step 0: Non-obvious behaviours that change diagnosis
 
-- **S3 auto-scales partitions per prefix since 2018, and removed the
-  3,500 PUT / 5,500 GET per-second per-prefix cap in July 2023 for most
-  workloads.** Operators who still pre-shard prefixes are usually doing
-  unnecessary work. Only rates above ~10,000 per second on a single
-  prefix benefit from sharding.
-
-- **Multipart upload parts are parallel by default in the AWS SDK.**
-  The CLI and SDK auto-select multipart above 8 MB; the part size is
-  tunable. Operators who manually configure multipart often set the
-  part count too low (default 10), leaving parallelism on the table.
-
-- **Byte-range GET uses the same `Range` header as HTTP.** S3 supports
-  `Range: bytes=START-END` and returns `206 Partial Content`. Multiple
-  ranges in one request are supported but counted as multiple GETs.
-
-- **S3 Select does NOT support encrypted Parquet with SSE-KMS until
-  the SDK provides the key context.** Without it the request fails with
-  AccessDenied.
-
-- **S3 Express One Zone uses a different bucket ARN syntax.** Directory
-  buckets are named `<bucket>--xaz-<az-id>--x-s3` and live in a single
-  AZ. Existing application code that hardcodes the standard bucket ARN
-  breaks when the bucket moves to Express One Zone.
-
-- **Transfer Acceleration only helps when the client is far from the
-  bucket region.** For same-region traffic it adds an S3 edge hop and
-  can be slower than a direct PUT. Always measure with and without.
-
-- **Pre-signed URL expiry caps at 7 days for IAM-user credentials and
-  36 hours for IAM-role (STS) credentials.** Long-expiry URLs require
-  IAM-user credentials or a custom signing proxy.
-
-- **S3 Object Lambda transforms on read; it does not store the
-  transformed object.** Each GET through the Object Lambda Access Point
-  incurs the transform compute (Lambda) plus the S3 GET cost.
-
-- **S3 Batch Operations are billed per-object-invocation (~$0.25 per
-  million).** Use the manifest from S3 Inventory to avoid listing
-  millions of objects.
-
-- **HTTP/2 is supported on S3 endpoints but requires the SDK to opt
-  in** (most default to HTTP/1.1). Confirm with `curl --http2`.
+Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-0-non-obvious-behaviours-that-change-diagnosis) — partition auto-scaling, SDK multipart defaults, Range semantics, SSE-KMS Select, Express ARN syntax, TA distance, presign caps, Object Lambda cost, Batch pricing, HTTP/2 opt-in.
+Load that reference on demand before executing this section.
 
 ### Step 1: Workload entry — pick the optimisation branch
 
@@ -286,27 +179,11 @@ sharding is in place, FURTHER_OPTIMIZATION_AVAILABLE with
 
 Symptom: PUT of large objects (> 100 MB) is slow or stalls.
 
-```bash
-# Verify current upload method
-aws s3api head-object --bucket <bucket> --key <key> --output json | \
-  jq '.ContentLength'
+Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-3-probe-current-upload-method-and-multipart-timing) — head-object size check and single vs multipart upload timing.
+Load that reference on demand before executing this section.
 
-# Time the current upload
-time aws s3 cp <large-file> s3://<bucket>/<key> --expected-size <size>
-
-# Multipart upload with explicit part size and parallelism
-time aws s3 cp <large-file> s3://<bucket>/<key> \
-  --expected-size <size> \
-  --multipart-chunksize 100MB \
-  --max-concurrent-requests 10
-```
-
-| Object size | Recommended part size | Recommended parallelism |
-|---|---|---|
-| 100 MB - 500 MB | 25 MB | 5 |
-| 500 MB - 5 GB | 100 MB | 10 |
-| 5 GB - 50 GB | 500 MB | 10 |
-| 50 GB - 5 TB (max) | 1 GB | 10 (cap; S3 limits 10,000 parts) |
+Moved to [references/s3-performance-reference.md](references/s3-performance-reference.md#step-3-multipart-upload-part-sizing-table-moved-from-skillmd) — part size and parallelism by object size band.
+Load that reference on demand before executing this section.
 
 **Verdict:** If the current upload uses single PUT above 100 MB,
 FURTHER_OPTIMIZATION_AVAILABLE with `LAYER: MULTIPART_UPLOAD`.
@@ -346,13 +223,8 @@ aws s3api select-object-content \
 S3 Select typically reduces bytes transferred 5-50x depending on
 selectivity.
 
-| Format | S3 Select supported | Notes |
-|---|---|---|
-| CSV / TSV | Yes | With or without header |
-| JSON | Yes | Lines (newline-delimited) or document |
-| Parquet | Yes | Column pruning + predicate pushdown |
-| ORC, Avro | No | Use Athena / Glue |
-| Excel, PDF | No | Use other tools |
+Moved to [references/s3-performance-reference.md](references/s3-performance-reference.md#step-5-s3-select-format-support-table-moved-from-skillmd) — CSV/JSON/Parquet supported; ORC/Avro/Excel/PDF not.
+Load that reference on demand before executing this section.
 
 **Verdict:** If the workload is a full-scan of CSV/JSON/Parquet and S3
 Select is not in use, FURTHER_OPTIMIZATION_AVAILABLE with
@@ -393,12 +265,8 @@ S3 Express One Zone uses directory buckets, provides ~10x lower latency
 (single-digit ms p99), costs more per GB and per request, and is
 single-AZ. Always flag the availability trade-off before recommending.
 
-| Workload | Standard S3 | Express One Zone |
-|---|---|---|
-| Backup / archival | OK | No (cost) |
-| ML training data | OK (large reads) | OK if latency-critical |
-| Real-time personalisation | Marginal | Strong fit |
-| Hot cache layer | Marginal | Strong fit (with replication elsewhere) |
+Moved to [references/s3-performance-reference.md](references/s3-performance-reference.md#step-7-express-one-zone-workload-fit-table-moved-from-skillmd) — backup/ML/personalisation/hot-cache fit vs standard S3.
+Load that reference on demand before executing this section.
 
 **Verdict:** Latency target < 10 ms and bucket on standard S3 ->
 FURTHER_OPTIMIZATION_AVAILABLE with `LAYER: EXPRESS_ONE_ZONE` (with
@@ -428,13 +296,8 @@ Symptom: Clients report 403 from a previously working URL.
 aws s3 presign s3://<bucket>/<key> --expires-in 3600
 ```
 
-| Expiry | Use case |
-|---|---|
-| 60 seconds | High-security / per-request signing |
-| 1 hour (default) | General |
-| 12 hours | Long upload (multipart resume) |
-| 7 days (max, IAM user) | Long-lived sharing |
-| 36 hours (max, IAM role/STS) | Default for STS-derived credentials |
+Moved to [references/s3-performance-reference.md](references/s3-performance-reference.md#step-9-pre-signed-url-expiry-table-moved-from-skillmd) — expiry choice per use case incl. IAM-user vs STS caps.
+Load that reference on demand before executing this section.
 
 **Verdict:** Clients re-request URLs frequently because of short expiry
 -> FURTHER_OPTIMIZATION_AVAILABLE with `LAYER: PRESIGNED_URL`.
@@ -475,12 +338,8 @@ aws s3control create-job \
 S3 Batch Operations uses a manifest (typically from S3 Inventory). Avoid
 listing millions of objects via `list-objects-v2`.
 
-| Operation | Billed as |
-|---|---|
-| Copy | Per object |
-| Replace tags / ACL | Per object |
-| Restore from Glacier | Per object + Glacier restore |
-| Invoke Lambda | Per object + Lambda invocation |
+Moved to [references/s3-performance-reference.md](references/s3-performance-reference.md#step-11-batch-operations-billing-table-moved-from-skillmd) — per-object billing for copy/tags/restore/Lambda invoke.
+Load that reference on demand before executing this section.
 
 **Verdict:** Bulk operation scripted client-side via `list-objects-v2`
 + loop -> FURTHER_OPTIMIZATION_AVAILABLE with
@@ -518,11 +377,8 @@ reduces S3 GET time proportionally. S3 does not compress on read;
 clients must accept the encoding. CloudFront decompresses on the fly
 when configured.
 
-| Content-Type | Typical gzip ratio |
-|---|---|
-| JSON / CSV / HTML | 5-10x |
-| Logs (text) | 8-15x |
-| Already-compressed (PNG, JPEG, MP4) | No gain |
+Moved to [references/s3-performance-reference.md](references/s3-performance-reference.md#step-13-content-encoding-compression-ratios-moved-from-skillmd) — gzip ratios for textual payloads; no gain for already-compressed.
+Load that reference on demand before executing this section.
 
 **Verdict:** Textual payloads stored uncompressed, clients support
 gzip/br -> FURTHER_OPTIMIZATION_AVAILABLE with
@@ -631,65 +487,21 @@ CONFIRM: Before executing any state-changing CLI, emit and await
 
 ## Configuration dependency graph
 
-```
-Workload description (read shape, write shape, object size, request rate,
-client geography, target latency / throughput)
-    |
-    v
-+----------------------------------------------+
-| Classification                               |
-|   - Latency-bound? -> Step 7 (Express One Z) |
-|   - Throughput-bound? -> Step 3 (Multipart)  |
-|   - Request-rate-bound? -> Step 2 (Prefix)   |
-|   - Partial read? -> Step 4 (Byte range)     |
-|   - Filter pushdown? -> Step 5 (S3 Select)   |
-+----------------------------------------------+
-    |
-    v
-+----------------------------------------------+
-| Bucket features (current state)              |
-|   - Region, AZ topology                       |
-|   - Transfer Acceleration on/off              |
-|   - Storage class distribution                |
-|   - CloudWatch request metrics on/off         |
-|   - S3 Inventory configured                   |
-+----------------------------------------------+
-    |
-    v
-+----------------------------------------------+
-| Client features                              |
-|   - SDK HTTP version (1.1 vs 2)               |  Step 8
-|   - Connection pool / keep-alive              |
-|   - Multipart parallelism                     |  Step 3
-|   - Pre-signed URL expiry                     |  Step 9
-|   - Compression (gzip/br on/off)              |  Step 13
-+----------------------------------------------+
-    |
-    v
-+----------------------------------------------+
-| Optimisation verdict                         |
-|   - OPTIMIZED: target met                    |
-|   - FURTHER_OPTIMIZATION_AVAILABLE: gap + fix|
-+----------------------------------------------+
-```
+Moved to [references/advanced-patterns.md](references/advanced-patterns.md#configuration-dependency-graph-ascii-flow) — classification -> bucket features -> client features -> verdict flow diagram.
+Load that reference on demand before executing this section.
 
 ## Expert heuristic
 
-The single highest-signal heuristic: **multipart upload parallelism with
-10 parallel parts at 100 MB each is the right default for almost every
-object > 100 MB.** S3 scales per TCP connection only up to the
-bandwidth-delay product of one stream; multipart with parallel parts
-opens multiple streams and approaches link bandwidth. A 1 GB single PUT
-takes ~80 seconds on a 100 Mbps link; with 10 parallel parts it takes
-~8 seconds. Second heuristic: **byte-range fetches turn a slow full GET
-into a fast partial GET.** Many workloads only need the first/last few
-KB. A `Range: bytes=0-1023` returns in single-digit ms regardless of
-object size; a full GET of a 5 GB object returns in seconds. Third
-heuristic: **S3 Express One Zone is the only S3 storage class that
-delivers single-digit-ms p99 latency for both reads and writes** — but
-it is single-AZ, so always pair it with cross-region replication for
-non-recoverable data.
+Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic) — multipart parallelism default, byte-range partial GETs, Express One Zone single-digit-ms trade-off.
+Load that reference on demand before executing this section.
 
+
+## References (load on demand)
+
+- [references/s3-performance-reference.md](references/s3-performance-reference.md) — sizing/format/expiry/metric matrices backing each optimisation layer, plus AWS Health event categories.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight workload-state commands and per-layer probe commands.
+- [references/worked-examples.md](references/worked-examples.md) — full output-block examples incl. the malformed-input (UNKNOWN) verdict.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — philosophy deep dive, Step 0 non-obvious behaviours, configuration dependency graph, expert heuristics.
 ## Domain
 
 AWS CloudOps / S3 Object Storage Performance, Multipart Upload, S3

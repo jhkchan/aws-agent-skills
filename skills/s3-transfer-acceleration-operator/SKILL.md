@@ -193,86 +193,8 @@ is not valid or is missing required fields — cannot plan.` and
 
 ### Step 0: Expert heuristic — non-obvious S3 acceleration behaviors
 
-These behaviors are easy to misjudge without operational experience.
-Each changes a plan if ignored:
-
-- **The accelerate endpoint is a different DNS name.** When
-  acceleration is enabled, you MUST use
-  `<bucket>.s3-accelerate.amazonaws.com` (or
-  `<bucket>.s3-accelerate.dualstack.amazonaws.com` for IPv6).
-  Using the standard endpoint (`<bucket>.s3.<region>.amazonaws.com`)
-  bypasses acceleration entirely — you pay for the feature but get
-  no benefit. The SDK auto-detects acceleration when configured with
-  `use_accelerate_endpoint: true`.
-
-- **Enabling acceleration does not change the standard endpoint.**
-  The bucket remains accessible via the standard S3 endpoint after
-  acceleration is enabled. Acceleration is an ADDITIONAL endpoint,
-  not a replacement. Existing applications using the standard
-  endpoint continue to work unchanged.
-
-- **Directory buckets (S3 Express One Zone) do not support
-  acceleration.** S3 Express One Zone (directory buckets with
-  `--xaz-` suffix) have their own low-latency architecture and do
-  not support Transfer Acceleration. `put-bucket-accelerate-
-  configuration` returns an error for directory buckets.
-
-- **Acceleration cost is per-GB data IN, not per-request.** You are
-  charged for the data volume transferred through the accelerate
-  endpoint, not the number of requests. A 1 GB file uploaded as 1
-  part costs the same as a 1 GB file uploaded as 128 parts — the
-  acceleration fee is for 1 GB either way. Request costs (PUT
-  requests) are billed separately at standard S3 rates.
-
-- **The speed comparison tool is non-destructive.** The S3 Transfer
-  Acceleration speed comparison tool uploads and downloads small
-  test files through both the accelerated and direct endpoints,
-  measuring latency and throughput. It does not affect your data
-  or bucket configuration. Always run it before enabling acceleration
-  for production workloads.
-
-- **Checksums protect against accelerated transfer corruption.**
-  Accelerated uploads traverse the edge network and backbone. While
-  TCP provides integrity per-hop, specifying a checksum
-  (`x-amz-sdk-checksum-algorithm: CRC32C`) on the upload ensures
-  end-to-end verification. S3 validates the checksum on the
-  complete object and returns it in the response. For multipart
-  uploads, each part has its own checksum; the complete-multipart-
-  upload call aggregates them.
-
-- **Disabling acceleration mid-multipart-upload causes failures.**
-  If multipart uploads are in-flight via the accelerate endpoint and
-  you disable acceleration, subsequent `upload-part` calls to the
-  accelerate endpoint will fail. Always complete or abort in-flight
-  multipart uploads before disabling acceleration.
-
-- **Direct Connect and Transfer Acceleration serve different use
-  cases.** Direct Connect is a dedicated network connection from
-  your data center to AWS (fixed port cost + per-GB data transfer).
-  Transfer Acceleration uses the public internet to reach the
-  nearest edge, then the AWS backbone. Direct Connect is cheaper
-  for sustained high-volume transfers from a fixed location
-  (>50 TB/month). Transfer Acceleration is better for distributed
-  uploaders (many locations uploading to one bucket) or one-time
-  migrations.
-
-- **Dual-stack (IPv6) accelerate endpoints are available.** Use
-  `<bucket>.s3-accelerate.dualstack.amazonaws.com` for IPv6 support.
-  This is transparent to the application — the endpoint resolves to
-  both IPv4 and IPv6 addresses. Required for IPv6-only networks
-  (some mobile carriers and enterprise networks).
-
-- **Acceleration does not support Amazon S3 Object Lambda.** S3
-  Object Lambda Access Points do not work with the accelerate
-  endpoint. If your bucket has Object Lambda transformations, they
-  are not applied to accelerated uploads.
-
-- **KMS-encrypted buckets work with acceleration.** SSE-KMS
-  encryption is transparent to Transfer Acceleration — the edge
-  location receives the already-encrypted object and forwards it.
-  No additional KMS configuration is needed. However, KMS API
-  calls (GenerateDataKey) are NOT accelerated — they go directly
-  to KMS in the bucket's region.
+Non-obvious acceleration behaviors — accelerate endpoint DNS vs standard endpoint, directory buckets, per-GB (not per-request) pricing, non-destructive speed test, checksum end-to-end protection, mid-upload disable failures, Direct Connect crossover, dual-stack IPv6, Object Lambda, KMS — live in [references/advanced-patterns.md](references/advanced-patterns.md).
+Load that reference before planning enable/disable, speed-comparison, or diagnose operations.
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
@@ -326,20 +248,8 @@ is BLOCKED with the failed checks in PRE_CHECKS. Do NOT execute.
    and the failure-mode table to identify why acceleration is slow
    or not working.
 
-**Transfer failure-mode table (use during diagnose-transfer):**
-
-| Symptom | Root cause | Fix |
-|---|---|---|
-| Accelerated upload is slower than direct | Source and bucket are in the same region (no benefit) or source is near the bucket region | Disable acceleration for same-region transfers; use direct endpoint |
-| `put-bucket-accelerate-configuration` returns `UnsupportedArgument` | Bucket is a directory bucket (S3 Express One Zone) | Directory buckets do not support acceleration; use the Express One Zone endpoint directly |
-| Accelerated upload returns `PermanentRedirect` | Using the wrong endpoint format; accelerate endpoint requires virtual-hosted-style | Use `<bucket>.s3-accelerate.amazonaws.com`; ensure SDK has `use_accelerate_endpoint: true` |
-| `upload-part` to accelerate endpoint fails after disable | Acceleration was disabled while multipart upload was in-flight | Re-enable acceleration, complete or abort the multipart upload, then disable |
-| Acceleration enabled but no speed improvement | Client is using the standard endpoint, not the accelerate endpoint | Update the SDK configuration: `use_accelerate_endpoint: true` or use `<bucket>.s3-accelerate.amazonaws.com` |
-| Checksum mismatch on accelerated multipart upload | Parts uploaded out of order or part-size mismatch | Use consistent part size (except last part); upload all parts before calling complete-multipart-upload |
-| `AccessDenied` on accelerate endpoint | Bucket policy restricts access to specific endpoints or VPC endpoints | Add the accelerate endpoint to the bucket policy's allowed sources |
-| Cost higher than expected | Downloads are also billed via accelerate endpoint; large data OUT | Use accelerate for uploads only; serve downloads via CloudFront or standard endpoint |
-| IPv6 connection fails on accelerate endpoint | Not using dualstack endpoint | Use `<bucket>.s3-accelerate.dualstack.amazonaws.com` for IPv6 |
-| KMS throttling during accelerated multipart upload | Each part triggers a KMS GenerateDataKey call; many parallel parts overwhelm KMS | Request a KMS quota increase, or use a KMS key data key reuse period of 5+ minutes |
+The full symptom / root cause / fix table — same-region slowness, UnsupportedArgument on directory buckets, PermanentRedirect, upload-part failure after disable, checksum mismatch, AccessDenied, IPv6 dual-stack, KMS throttling — lives in [references/error-handling.md](references/error-handling.md).
+Consult it during diagnose-transfer before emitting a verdict.
 
 ### Step 2: READY — emit operation plan
 
@@ -457,122 +367,8 @@ NOTES:
     confirm acceleration provides a meaningful speedup.
 ```
 
-### Worked example — disable-acceleration (with in-flight check)
-
-```text
-OPERATION: disable-acceleration
-VERDICT: READY
-TARGET: prod-data-lake (region us-east-1, account 111111111111)
-PRE_CHECKS:
-  - [PASS] Bucket exists
-  - [PASS] Calling role has s3:PutAccelerateConfiguration
-  - [PASS] No in-flight multipart uploads via accelerate endpoint
-    (list-multipart-uploads returned 0 uploads)
-  - [INFO] Current Status: Enabled
-STEPS:
-  1. CONFIRM: About to disable Transfer Acceleration on bucket
-     prod-data-lake (us-east-1). The accelerate endpoint will stop
-     accepting uploads. SDK clients configured with
-     use_accelerate_endpoint: true will fail. Proceed? (yes/no)
-  2. aws s3api put-bucket-accelerate-configuration \
-       --bucket prod-data-lake \
-       --accelerate-configuration Status=Suspended
-  3. Verify:
-     aws s3api get-bucket-accelerate-configuration \
-       --bucket prod-data-lake
-POST_VERIFY:
-  - (pending execution)
-COST: $0.00 (acceleration disabled — no further accelerate charges)
-NOTES:
-  - The standard endpoint (prod-data-lake.s3.us-east-1.amazonaws.com)
-    remains fully functional. Existing applications using the standard
-    endpoint are unaffected.
-  - The accelerate endpoint DNS may continue to resolve for several
-    hours after disabling, but uploads will be rejected. Update SDK
-    client configurations to remove use_accelerate_endpoint: true.
-  - If re-enabling later, DNS propagation will again take 20-30
-    minutes.
-```
-
-### Worked example — plan-multipart-upload with acceleration
-
-```text
-OPERATION: plan-multipart-upload
-VERDICT: READY
-TARGET: prod-data-lake (region us-east-1, accelerated endpoint)
-PRE_CHECKS:
-  - [PASS] Bucket exists, acceleration Enabled
-  - [PASS] Object size: 50 GB (multipart upload required)
-  - [PASS] Checksum algorithm: CRC32C (recommended for performance)
-  - [INFO] Part size: 128 MB (390 parts for 50 GB)
-  - [INFO] Estimated cost: $0.025/GB x 50 GB = $1.25 (acceleration)
-    + $0.005/1000 PUT x 390 = $0.002 (PUT requests)
-STEPS:
-  1. Configure SDK with accelerate endpoint:
-     endpoint_url = https://prod-data-lake.s3-accelerate.amazonaws.com
-  2. Initiate multipart upload with checksum:
-     aws s3api create-multipart-upload \
-       --bucket prod-data-lake \
-       --key large-dataset-2026-08.bin \
-       --checksum-algorithm CRC32C
-  3. Upload parts in parallel (recommended: 10-20 concurrent parts):
-     aws s3api upload-part \
-       --bucket prod-data-lake \
-       --key large-dataset-2026-08.bin \
-       --part-number <N> \
-       --body part-<N>.bin \
-       --upload-id <upload-id> \
-       --checksum-algorithm CRC32C \
-       --endpoint-url https://prod-data-lake.s3-accelerate.amazonaws.com
-  4. Complete multipart upload:
-     aws s3api complete-multipart-upload \
-       --bucket prod-data-lake \
-       --key large-dataset-2026-08.bin \
-       --upload-id <upload-id> \
-       --multipart-upload file://parts.json
-  5. Verify checksum:
-     aws s3api head-object \
-       --bucket prod-data-lake \
-       --key large-dataset-2026-08.bin \
-       --query 'ChecksumCRC32C'
-POST_VERIFY:
-  - (pending execution)
-COST: $1.25 (acceleration) + $0.002 (PUT requests) = ~$1.25
-NOTES:
-  - Use 10-20 concurrent part uploads to maximize throughput.
-  - Each part has its own CRC32C checksum; the complete-multipart-
-    upload aggregates them into a single checksum on the final object.
-  - If any part fails, retry that part only — do not restart the
-    entire upload. The upload-id remains valid for aborted parts.
-  - Set part size to 128 MB or larger for optimal performance with
-    acceleration. Smaller parts increase per-part overhead; larger
-    parts reduce parallelism.
-```
-
-### Worked example — directory bucket BLOCKED
-
-```text
-OPERATION: enable-acceleration
-VERDICT: BLOCKED
-TARGET: my-express-bucket--xaz-use1-az1 (region us-east-1,
-        S3 Express One Zone)
-PRE_CHECKS:
-  - [PASS] Bucket exists
-  - [FAIL] Directory bucket detected (--xaz- suffix). S3 Express One
-    Zone directory buckets do NOT support Transfer Acceleration.
-    Transfer Acceleration requires a standard S3 bucket.
-STEPS: (none — bucket type not supported)
-POST_VERIFY: (none)
-COST: N/A (acceleration not available)
-NOTES:
-  - Root cause: S3 Express One Zone (directory buckets) have their
-    own low-latency architecture and do not support Transfer
-    Acceleration. The put-bucket-accelerate-configuration API returns
-    UnsupportedArgument for directory buckets.
-  - Fix: use a standard S3 bucket in the target region if
-    acceleration is required. S3 Express One Zone is designed for
-    ultra-low-latency single-AZ access from within the same AZ.
-```
+Additional worked examples — disable-acceleration (with in-flight check), plan-multipart-upload with acceleration, and directory-bucket BLOCKED — live in [references/worked-examples.md](references/worked-examples.md).
+Load that reference when formatting a verdict block for those operations.
 
 ## Anti-Patterns — NEVER (top mistakes)
 
@@ -640,73 +436,22 @@ NOTES:
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any
-  `put-bucket-accelerate-configuration` call, emit:
-  `CONFIRM: About to <enable/disable> Transfer Acceleration on
-  bucket <name> (region <region>). <Impact>. Proceed? (yes/no)`. Do
-  NOT execute until the operator confirms.
-
-- **Capture pre-state for audit.** Before any acceleration change:
-  `aws s3api get-bucket-accelerate-configuration --bucket <name>
-  --output json > /tmp/<name>-accel-pre-$(date +%s).json`.
-
-- **Verify no in-flight multipart uploads (for disable).**
-  `list-multipart-uploads --bucket <name>` must return 0 active
-  uploads using the accelerate endpoint before disabling.
-
-- **Verify DNS compatibility.** The bucket name must be
-  DNS-compatible for the accelerate endpoint to work. Check for
-  underscores, uppercase letters, or consecutive dots.
-
-- **Verify cost acceptance.** Surface the estimated acceleration
-  cost (per-GB rate x estimated volume) before enabling. Track
-  actual cost via CloudWatch BytesUploaded and Cost Explorer.
-
-- **Prefer multipart upload for large objects.** When acceleration
-  is enabled, always use multipart upload for files > 100 MB.
-  Parallel parts over accelerated connections maximize throughput.
-  Use CRC32C checksums for end-to-end integrity.
+The full pre-flight safety checklist — confirm gate, pre-state capture, in-flight multipart check, DNS compatibility, cost acceptance, multipart preference — lives in [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Run these before any remediation CLI.
 
 ## Recent AWS features (2024-2026)
 
-- **S3 Express One Zone (2024 GA):** Single-AZ, ultra-low-latency
-  storage class with directory buckets. Does NOT support Transfer
-  Acceleration. Designed for ML training data, analytics
-  workloads, and local caching — not for long-distance transfers.
+Recent AWS features 2024-2026 — S3 Express One Zone, CRC32C multipart checksums, accelerated multipart copy, dual-stack IPv6, Direct Connect S3 endpoints, Batch Operations with acceleration, per-endpoint CloudWatch metrics — live in [references/advanced-patterns.md](references/advanced-patterns.md).
+Load when a plan depends on recent service behavior.
 
-- **S3 checksums with multipart upload (2024-2025):** CRC32C
-  checksum support for individual parts and aggregated object-level
-  checksums on complete-multipart-upload. The `x-amz-checksum-crc32c`
-  header is verified by S3 on upload completion. CRC32C is faster
-  than CRC32 or SHA-256 for hardware-accelerated computation.
+## References (load on demand)
 
-- **S3 multipart copy between accelerated buckets (2024-2025):**
-  Server-side copy between S3 buckets using multipart upload
-  (`create-multipart-upload` + `upload-part-copy`). When both
-  buckets have acceleration enabled, the copy is routed through
-  the edge network. Useful for cross-region data migration.
-
-- **S3 Transfer Acceleration dual-stack IPv6 (2024):** The
-  accelerate endpoint supports IPv6 via
-  `<bucket>.s3-accelerate.dualstack.amazonaws.com`. Required for
-  IPv6-only networks and some mobile carriers.
-
-- **AWS Direct Connect + S3 integration (2024-2026):** Direct
-  Connect now supports S3 VPC gateway endpoints over private VIFs.
-  This provides a private, dedicated path to S3 without traversing
-  the public internet. For sustained high-volume transfers from a
-  fixed data center, Direct Connect is cheaper and more reliable
-  than Transfer Acceleration.
-
-- **S3 Batch Operations with acceleration (2025):** S3 Batch
-  Operations now supports copy operations through the accelerate
-  endpoint for cross-region batch transfers. Useful for large-scale
-  data migration jobs.
-
-- **CloudWatch S3 metrics enhancement (2025):** CloudWatch now
-  provides per-endpoint S3 metrics (accelerate vs standard). The
-  `BytesUploaded` metric can be filtered by endpoint type to
-  monitor acceleration usage and cost.
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples: disable-acceleration (in-flight check), plan-multipart-upload with acceleration, directory-bucket BLOCKED
+- [references/error-handling.md](references/error-handling.md) — transfer failure-mode table (symptom / root cause / fix) for diagnose-transfer
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight safety checks and pre-state capture commands
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step-0 expert heuristics and recent AWS features (2024-2026)
+- [references/cost-and-speed-comparison.md](references/cost-and-speed-comparison.md) — acceleration pricing by edge location, speed comparison, Direct Connect crossover
+- [references/multipart-upload-and-checksum.md](references/multipart-upload-and-checksum.md) — part-size selection, multipart lifecycle, checksum verification
 
 ## Domain
 

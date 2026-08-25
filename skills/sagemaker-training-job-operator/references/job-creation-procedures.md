@@ -330,3 +330,144 @@ aws ec2 describe-vpc-endpoints --filters Name=vpc-id,Values=<vpc-id>
 aws sagemaker list-warm-pools \
   --query 'WarmPoolResources[?ResourceConfig.InstanceType==`<instance-type>`]'
 ```
+
+## Launch CLI scripts (moved from SKILL.md Steps 2 and 5)
+
+### 2a. Single-instance training
+
+```bash
+aws sagemaker create-training-job \
+  --training-job-name <name> \
+  --algorithm-specification '{
+    "TrainingImage": "<ecr-image-uri>",
+    "TrainingInputMode": "File",
+    "FrameworkVersion": "<version>"
+  }' \
+  --input-data-config '[
+    {"ChannelName":"train","DataSource":{"S3DataSource":{"S3DataType":"S3Prefix","S3Uri":"s3://<bucket>/train/","S3DataDistributionType":"FullyReplicated"}}},
+    {"ChannelName":"test","DataSource":{"S3DataSource":{"S3DataType":"S3Prefix","S3Uri":"s3://<bucket>/test/","S3DataDistributionType":"FullyReplicated"}}}
+  ]' \
+  --output-data-config '{"S3OutputPath":"s3://<output-bucket>/models/"}' \
+  --resource-config '{"InstanceType":"ml.p5.48xlarge","InstanceCount":1,"VolumeSizeInGB":1024,"VolumeKmsKeyId":"arn:aws:kms:<region>:<account>:key/<id>"}' \
+  --hyper-parameters '{
+    "sagemaker_program":"train.py",
+    "sagemaker_submit_directory":"s3://<bucket>/code/train.tar.gz",
+    "epochs":50,
+    "batch_size":64,
+    "learning_rate":0.001
+  }' \
+  --role-arn <execution-role-arn> \
+  --stop-condition '{"MaxRuntimeInSeconds":86400}' \
+  --vpc-config '{"Subnets":["subnet-xxx"],"SecurityGroupIds":["sg-xxx"]}' \
+  --enable-network-isolation
+```
+
+### 2b. Spot training with checkpointing
+
+```bash
+aws sagemaker create-training-job \
+  --training-job-name <name> \
+  --algorithm-specification '...' \
+  --input-data-config '...' \
+  --output-data-config '...' \
+  --resource-config '{"InstanceType":"ml.p4de.24xlarge","InstanceCount":1,"VolumeSizeInGB":1024}' \
+  --hyper-parameters '...' \
+  --role-arn <execution-role-arn> \
+  --checkpoint-config '{
+    "S3Uri":"s3://<checkpoint-bucket>/checkpoints/",
+    "LocalPath":"/opt/ml/checkpoints"
+  }' \
+  --enable-managed-spot-training \
+  --checkpoint-local-path /opt/ml/checkpoints \
+  --spot-timeout-in-seconds 300 \
+  --max-wait-time-in-seconds 86400 \
+  --max-runtime-in-seconds 7200
+```
+
+The training entry point must save and load checkpoints at
+`/opt/ml/checkpoints` (the `LocalPath`). On interruption, SageMaker
+restores from the S3 checkpoint on the next launch. Set
+`MaxWaitTimeInSeconds` >= `MaxRuntimeInSeconds` — `MaxWaitTime` is
+the wall-clock budget (includes interruptions + retries), not just
+training time.
+
+### 2c. Distributed training (SMDDP)
+
+```bash
+aws sagemaker create-training-job \
+  --training-job-name <name> \
+  --algorithm-specification '{
+    "TrainingImage": "<pytorch-gpu-image>",
+    "TrainingInputMode": "FastFile",
+    "EnableSageMakerTrainingCompiler": true
+  }' \
+  --resource-config '{"InstanceType":"ml.p5.48xlarge","InstanceCount":4,"VolumeSizeInGB":2048}' \
+  --hyper-parameters '{
+    "sagemaker_program":"train_ddp.py",
+    "sagemaker_submit_directory":"s3://<bucket>/code/train.tar.gz",
+    "sagemaker_distributed_dataparallel_enabled":true,
+    "sagemaker_distributed_dataparallel_num_processes":32,
+    "batch_size":256
+  }' \
+  --role-arn <execution-role-arn> \
+  --input-data-config '...' \
+  --output-data-config '...' \
+  --enable-managed-spot-training \
+  --checkpoint-config '...'
+```
+
+SMDDP uses `sagemaker_distributed_dataparallel_enabled` and
+`num_processes` (= total GPUs across all instances). On
+`ml.p5.48xlarge` (8 GPUs each) × 4 instances, `num_processes=32`.
+The entry point must use `smdistributed.dataparallel` PyTorch /
+TensorFlow primitives.
+
+For SMDMP (model parallel), use:
+`"sagemaker_distributed_model_parallel_enabled":true` with
+`pipeline_parallel_degree`, `tensor_parallel_degree`, and
+`microbatches`.
+
+### 2d. Warm pool (reuse across sequential jobs)
+
+```bash
+# First (source) job — establishes the warm pool:
+aws sagemaker create-training-job \
+  --training-job-name <name>-source \
+  ... \
+  --resource-config '{"InstanceType":"ml.p5.48xlarge","InstanceCount":1,"VolumeSizeInGB":1024,"KeepAlivePeriodInSeconds":1800}'
+
+# Subsequent (target) job — reuses the warm pool:
+aws sagemaker create-training-job \
+  --training-job-name <name>-followup \
+  ... \
+  --resource-config '{"InstanceType":"ml.p5.48xlarge","InstanceCount":1,"VolumeSizeInGB":1024,"KeepAlivePeriodInSeconds":1800}' \
+  --warm-pool-config '{"PoolName":"<source-job-name>"}'
+```
+
+`KeepAlivePeriodInSeconds` (max 3600) sets the idle lifetime after
+the source job completes. The target job must match the source's
+instance type, instance count, and image — otherwise it cold-starts.
+
+### Step 5: Launch HPO — create-hyper-parameter-tuning-job CLI
+
+```bash
+aws sagemaker create-hyper-parameter-tuning-job \
+  --hyper-parameter-tuning-job-name <name> \
+  --hyper-parameter-tuning-job-config '{
+    "Strategy":"Bayesian",
+    "HyperParameterTuningJobObjective":{"Type":"Maximize","MetricName":"validation:accuracy"},
+    "ResourceLimits":{"MaxNumberOfTrainingJobs":50,"MaxParallelTrainingJobs":4},
+    "ParameterRanges":{
+      "ContinuousParameterRanges":[{"Name":"learning_rate","MinValue":"0.0001","MaxValue":"0.1","ScalingType":"Logarithmic"}],
+      "IntegerParameterRanges":[{"Name":"batch_size","MinValue":"32","MaxValue":"256","ScalingType":"Auto"}]
+    },
+    "TrainingJobEarlyStoppingType":"Auto"
+  }' \
+  --training-job-definition '{...}'  # AlgorithmSpecification, RoleArn, InputDataConfig, OutputDataConfig, ResourceConfig, StaticHyperParameters, StoppingCondition
+
+# Warm start (carry learnings from a previous tuning job):
+aws sagemaker create-hyper-parameter-tuning-job \
+  --hyper-parameter-tuning-job-name <name>-warm \
+  --warm-start-config '{"ParentHyperParameterTuningJobs":[{"HyperParameterTuningJobName":"<previous>"}],"WarmStartType":"IdenticalDataAndAlgorithm"}' \
+  --hyper-parameter-tuning-job-config '...' --training-job-definition '...'
+```

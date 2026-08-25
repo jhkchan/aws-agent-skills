@@ -82,36 +82,8 @@ with a specific gap citation in the checklist (marked `[✗]`), and
 
 ## Mindset
 
-**One-line takeaway:** An S3 table bucket is a purpose-built container
-for Apache Iceberg tables — NOT a general-purpose S3 bucket. You cannot
-store arbitrary objects in it. Namespaces must exist before tables.
-Table bucket policy is a SEPARATE policy type from the regular S3 bucket
-policy. Athena reads S3 Tables via the Iceberg REST catalog endpoint,
-not via direct S3 paths. Maintenance (compaction, snapshot management,
-unreferenced file cleanup) is enabled by default and configurable.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — the three misconceptions behind every S3 Tables decision.
 
-Three misconceptions dominate S3 Tables misdesign at provisioning time:
-
-- **"A table bucket is just a regular S3 bucket with a different name."**
-  It is NOT. A table bucket is a distinct resource type optimized for
-  tabular data. You cannot use standard S3 APIs (PutObject, GetObject,
-  ListObjects) on it. Table buckets use the `s3tables` API namespace,
-  not the `s3` namespace. Regular S3 bucket policies do NOT apply —
-  table buckets have their own policy type via
-  `put-table-bucket-policy`.
-
-- **"I can create a table directly in a table bucket without a
-  namespace."** You CANNOT. The hierarchy is: table bucket → namespace
-  → table. A namespace must exist before any table can be created in
-  it. This is a hard API dependency — `create-table` fails if the
-  namespace does not exist.
-
-- **"Athena can query S3 Tables by pointing at the S3 bucket path."**
-  It CANNOT. Athena accesses S3 Tables through the Apache Iceberg REST
-  catalog endpoint, not by specifying an S3 path. The REST catalog
-  provides the table metadata that Athena needs to read Iceberg data
-  files. Lake Formation governs access to these tables for fine-grained
-  permission control.
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -162,24 +134,13 @@ permissions.
 
 ## Expert heuristic: maintenance automation is on by default
 
-S3 Tables provides three automatic maintenance types for every Iceberg
-table, all ENABLED by default: **compaction** (merges small files into
-larger ones, ~512 MB target), **snapshot management** (expires old
-snapshots, controls metadata growth), and **unreferenced file cleanup**
-(removes orphaned data files, reclaims storage). All are per-table
-configurable. Unlike self-managed Iceberg on S3, you do NOT need to
-build or operate separate compaction jobs. The decision is whether to
-keep defaults or tune settings per workload. Disabling is possible but
-almost always wrong for production.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — why maintenance defaults are on and when to tune.
+
 
 ## Expert heuristic: Athena reads via REST catalog, not S3 paths
 
-A baseline model points Athena at the S3 bucket path. Athena actually
-accesses S3 Tables through the Apache Iceberg REST catalog endpoint:
-S3 Table Bucket provisions the REST catalog, the Athena workgroup
-references it, Lake Formation grants permissions to the query role,
-and queries use `namespace.table` notation. Without the REST catalog,
-Athena returns "table not found." The S3 path is irrelevant.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — how Athena really reaches S3 Tables.
+
 
 ## Prerequisites (verify before provisioning)
 
@@ -357,46 +318,8 @@ aws s3tables get-table-maintenance-configuration \
   --region us-east-1
 ```
 
-### Configure compaction
+→ The three maintenance-tuning command blocks moved to [references/maintenance-and-iceberg.md](references/maintenance-and-iceberg.md); the view-configuration command above is the diagnostic.
 
-Compaction merges small data files into larger ones, reducing metadata
-overhead and improving query performance.
-
-```bash
-aws s3tables update-table-maintenance-configuration \
-  --table-bucket-arn "$TABLE_BUCKET_ARN" \
-  --namespace sales_analytics --name orders \
-  --type compaction \
-  --value '{"status":"ENABLED","settings":{"targetFileSize":"536870912","minInputFiles":5,"maxInputFiles":100}}' \
-  --region us-east-1
-```
-
-### Configure snapshot management
-
-Expires old Iceberg snapshots to control metadata growth.
-
-```bash
-aws s3tables update-table-maintenance-configuration \
-  --table-bucket-arn "$TABLE_BUCKET_ARN" \
-  --namespace sales_analytics --name orders \
-  --type snapshot-management \
-  --value '{"status":"ENABLED","settings":{"maxSnapshotAge":"604800","minSnapshots":5}}' \
-  --region us-east-1
-```
-
-### Configure unreferenced file cleanup
-
-Removes data files no longer referenced by any snapshot, reclaiming
-storage.
-
-```bash
-aws s3tables update-table-maintenance-configuration \
-  --table-bucket-arn "$TABLE_BUCKET_ARN" \
-  --namespace sales_analytics --name orders \
-  --type unreferenced-file-removal \
-  --value '{"status":"ENABLED","settings":{"maxFileAge":"2592000"}}' \
-  --region us-east-1
-```
 
 **Critical:** disabling maintenance is almost always the wrong choice
 for production. S3 Tables automates this — keep it enabled.
@@ -406,41 +329,8 @@ for production. S3 Tables automates this — keep it enabled.
 Table bucket policy is a DISTINCT policy type from regular S3 bucket
 policy. Use `put-table-bucket-policy`, NOT `s3api put-bucket-policy`.
 
-```bash
-# Put a table bucket policy
-aws s3tables put-table-bucket-policy \
-  --table-bucket-arn "$TABLE_BUCKET_ARN" \
-  --resource-policy '
-  {
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Effect": "Allow",
-        "Principal": {
-          "AWS": "arn:aws:iam::999999999999:root"
-        },
-        "Action": [
-          "s3tables:GetTableBucket",
-          "s3tables:ListNamespaces",
-          "s3tables:ListTables",
-          "s3tables:GetTable",
-          "s3tables:GetNamespace"
-        ],
-        "Resource": "arn:aws:s3tables:us-east-1:123456789012:bucket/analytics-tables/*"
-      }
-    ]
-  }
-  ' \
-  --region us-east-1
-```
+→ Table bucket policy JSON and verify commands moved to [references/table-bucket-policy-and-integrations.md](references/table-bucket-policy-and-integrations.md).
 
-**Verify the policy:**
-
-```bash
-aws s3tables get-table-bucket-policy \
-  --table-bucket-arn "$TABLE_BUCKET_ARN" \
-  --region us-east-1
-```
 
 **Key distinction:** regular S3 uses `s3:PutBucketPolicy` /
 `aws s3api put-bucket-policy` with `s3:*` actions. Table buckets use
@@ -457,40 +347,8 @@ Athena accesses S3 Tables via the Apache Iceberg REST catalog
 endpoint, NOT by specifying an S3 path. The REST catalog provides the
 Iceberg table metadata that Athena needs to plan and execute queries.
 
-### How the REST catalog works
+→ REST catalog mechanics, Athena configuration, and Iceberg query examples moved to [references/table-bucket-policy-and-integrations.md](references/table-bucket-policy-and-integrations.md).
 
-```text
-S3 Table Bucket → provisions Iceberg REST catalog
-  → Athena workgroup references REST catalog
-  → Query: SELECT * FROM ns.table
-  → Athena calls REST catalog for metadata → reads data files
-```
-
-### Configuring Athena
-
-```bash
-# Verify Athena can see the table via the REST catalog
-aws athena start-query-execution \
-  --query-string "SHOW TABLES IN sales_analytics" \
-  --work-group primary \
-  --query-execution-context Database=sales_analytics \
-  --result-configuration OutputLocation=s3://query-results-bucket/athena/ \
-  --region us-east-1
-```
-
-### Querying Iceberg features via Athena
-
-```sql
--- Time travel: query a previous snapshot
-SELECT * FROM sales_analytics.orders
-FOR SYSTEM_TIME AS OF TIMESTAMP '2026-08-01 00:00:00';
-
--- Schema evolution (metadata-only, no rewrite)
-ALTER TABLE sales_analytics.orders ADD COLUMNS (discount double);
-
--- ACID UPDATE (requires Iceberg v2)
-UPDATE sales_analytics.orders SET status = 'shipped' WHERE order_id = 12345;
-```
 
 Without the REST catalog, Athena returns "table not found." The S3
 path is NOT used for Athena access to S3 Tables.
@@ -501,27 +359,8 @@ Lake Formation provides fine-grained access control (table-level and
 column-level) for S3 Tables resources. Without Lake Formation grants,
 Athena queries fail with access denied.
 
-```bash
-# Grant table-level access via Lake Formation
-aws lakeformation grant-permissions \
-  --principal DataLakePrincipalIdentifier=arn:aws:iam::123456789012:role/AthenaUserRole \
-  --permissions SELECT DESCRIBE \
-  --resource '{"Table": {"DatabaseName": "sales_analytics", "Name": "orders"}}' \
-  --region us-east-1
+→ Lake Formation grant commands moved to [references/table-bucket-policy-and-integrations.md](references/table-bucket-policy-and-integrations.md); the requirements note below is the gate.
 
-# Grant column-level access (fine-grained)
-aws lakeformation grant-permissions \
-  --principal DataLakePrincipalIdentifier=arn:aws:iam::123456789012:role/AthenaUserRole \
-  --permissions SELECT \
-  --resource '{
-    "TableWithColumns": {
-      "DatabaseName": "sales_analytics",
-      "Name": "orders",
-      "ColumnWildcard": {}
-    }
-  }' \
-  --region us-east-1
-```
 
 **Lake Formation requirements:** LF must be enabled, the S3 Tables
 catalog registered as a data source, and the Athena query role must
@@ -543,43 +382,13 @@ append-only.
 
 ### Partitioning strategy
 
-```text
-Good: day(timestamp), month(timestamp), bucket[16](id), day(date)+truncate(region)
-Bad:  identity on >10K values, no partition on large tables, partition on never-filtered column
-```
+→ Partitioning good/bad examples moved to [references/maintenance-and-iceberg.md](references/maintenance-and-iceberg.md).
 
-Target at least 100 MB per partition. Too small = small file problem.
-Too few = full scans.
 
 ## Step 10 — Recent features
 
-**Recent AWS features (2024-2026):**
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — recent AWS features (2024-2026).
 
-- **S3 Tables general availability (2024-2025):** Amazon S3 Tables
-  launched as purpose-built storage for tabular data using Apache
-  Iceberg, with built-in maintenance and REST catalog integration.
-
-- **Iceberg REST catalog for Athena (2024-2025):** Athena integration
-  via the REST catalog endpoint, enabling SQL queries with time travel,
-  schema evolution, and ACID support.
-
-- **Lake Formation fine-grained access for S3 Tables (2024-2025):**
-  Lake Formation integration for table-level and column-level
-  permissions on S3 Tables resources, enabling centralized access
-  governance.
-
-- **Iceberg v2 row-level operations (2024-2025):** S3 Tables supports
-  Iceberg v2 format with UPDATE, DELETE, and MERGE INTO operations
-  for row-level mutations.
-
-- **Cross-account table bucket policy (2024-2025):** Table bucket
-  policies support cross-account access for sharing tables with other
-  AWS accounts.
-
-- **Terraform provider support (2024-2025):** The Terraform AWS
-  provider added `aws_s3tables_table_bucket`,
-  `aws_s3tables_namespace`, and `aws_s3tables_table` resources for
-  infrastructure-as-code provisioning of S3 Tables.
 
 ## NEVER do these things
 
@@ -667,31 +476,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### create-table fails with namespace not found
-- The namespace does not exist. Create it first with
-  `create-namespace`, then retry.
+→ Error-handling deep dive moved to [references/error-handling.md](references/error-handling.md) — six failure signatures with fixes.
 
-### put-table-bucket-policy fails
-- Policy uses `s3:*` actions instead of `s3tables:*`. Rewrite with
-  `s3tables:GetTable`, `s3tables:ListTables`, etc.
 
-### Athena returns "table not found"
-- Athena is not configured with the Iceberg REST catalog. Verify the
-  workgroup references the REST catalog endpoint. Also verify Lake
-  Formation grants exist.
+## References (load on demand)
 
-### Athena returns "Insufficient Lake Formation permissions"
-- Use `grant-permissions` to grant SELECT on the table to the query
-  role.
-
-### Table maintenance not running
-- Check `get-table-maintenance-configuration`. May be DISABLED, or
-  the table may not have enough data to trigger compaction (below
-  minInputFiles threshold).
-
-### Iceberg v1 table cannot do UPDATE/DELETE
-- v1 does not support row-level operations. Create a new table with
-  format-version 2 and migrate data.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — mindset deep dive, expert heuristics, recent AWS features (2024-2026).
+- [references/error-handling.md](references/error-handling.md) — six failure signatures (create-table, policy, Athena, Lake Formation, maintenance, Iceberg v1) with fixes.
+- [references/maintenance-and-iceberg.md](references/maintenance-and-iceberg.md) — pre-existing; maintenance tuning + Iceberg features; extended with the Step 5 config commands and Step 9 partitioning rules.
+- [references/table-bucket-policy-and-integrations.md](references/table-bucket-policy-and-integrations.md) — pre-existing; policy + Athena/Lake Formation integration; extended with the Step 6/7/8 command listings.
 
 ## Domain
 

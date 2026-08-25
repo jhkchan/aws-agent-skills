@@ -88,3 +88,21 @@ dominates.
 - AWS S3 BPA reference: https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html
 - AWS global condition keys: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-keys.html
 - S3-specific condition keys: https://docs.aws.amazon.com/AmazonS3/latest/userguide/amazon-s3-policy-keys.html
+
+## CIDR nuance table for aws:sourceIp (moved from SKILL.md)
+
+| CIDR in condition                       | Verdict               | Reasoning                                                        |
+|-----------------------------------------|-----------------------|------------------------------------------------------------------|
+| `0.0.0.0/0` (or missing)                | PUBLIC (Rule 2)       | Covers entire IPv4 internet; equivalent to no restriction.       |
+| `::/0`                                  | PUBLIC (Rule 2)       | Same for IPv6.                                                   |
+| `10.0.0.0/8` / `172.16.0.0/12` / `192.168.0.0/16` | AMBIGUOUS (Rule 4) | RFC1918 private; only reachable from inside a VPC or corp VPN.   |
+| `100.64.0.0/10` (CGNAT)                 | AMBIGUOUS (Rule 4)    | Shared carrier-grade NAT; large ISP surface but not "internet".  |
+| `203.0.113.0/24` (TEST-NET-3)           | AMBIGUOUS (Rule 4)    | Documentation range; treat as private.                           |
+| A specific public /24 or smaller        | AMBIGUOUS (Rule 4)    | Corporate egress range; narrow enough to be a real boundary.     |
+| `0.0.0.0/1` + `128.0.0.0/1` pair        | PUBLIC (Rule 2)       | Common bypass — two halves that together cover all IPv4.         |
+| Multi-value list including any `/0`     | PUBLIC (Rule 2)       | AWS unions the list; one `/0` entry nullifies the restriction.   |
+
+For `aws:SourceIp` lists containing MIXED strong + weak entries, the
+weak entry dominates (PUBLIC) — AWS evaluates the condition as an OR
+within the list, so any permissive CIDR widens access.
+

@@ -372,3 +372,60 @@ resource "aws_s3tables_table" "orders" {
 5. **Forgetting that maintenance is per-table.** Each table has its own
    maintenance configuration. Configuring maintenance on one table does
    NOT apply to others. Review each table's settings.
+
+---
+
+## Step 5 — configuring maintenance (moved from SKILL.md)
+
+### Configure compaction
+
+Compaction merges small data files into larger ones, reducing metadata
+overhead and improving query performance.
+
+```bash
+aws s3tables update-table-maintenance-configuration \
+  --table-bucket-arn "$TABLE_BUCKET_ARN" \
+  --namespace sales_analytics --name orders \
+  --type compaction \
+  --value '{"status":"ENABLED","settings":{"targetFileSize":"536870912","minInputFiles":5,"maxInputFiles":100}}' \
+  --region us-east-1
+```
+
+### Configure snapshot management
+
+Expires old Iceberg snapshots to control metadata growth.
+
+```bash
+aws s3tables update-table-maintenance-configuration \
+  --table-bucket-arn "$TABLE_BUCKET_ARN" \
+  --namespace sales_analytics --name orders \
+  --type snapshot-management \
+  --value '{"status":"ENABLED","settings":{"maxSnapshotAge":"604800","minSnapshots":5}}' \
+  --region us-east-1
+```
+
+### Configure unreferenced file cleanup
+
+Removes data files no longer referenced by any snapshot, reclaiming
+storage.
+
+```bash
+aws s3tables update-table-maintenance-configuration \
+  --table-bucket-arn "$TABLE_BUCKET_ARN" \
+  --namespace sales_analytics --name orders \
+  --type unreferenced-file-removal \
+  --value '{"status":"ENABLED","settings":{"maxFileAge":"2592000"}}' \
+  --region us-east-1
+```
+
+---
+
+## Step 9 — partitioning strategy rules of thumb (moved from SKILL.md)
+
+```text
+Good: day(timestamp), month(timestamp), bucket[16](id), day(date)+truncate(region)
+Bad:  identity on >10K values, no partition on large tables, partition on never-filtered column
+```
+
+Target at least 100 MB per partition. Too small = small file problem.
+Too few = full scans.

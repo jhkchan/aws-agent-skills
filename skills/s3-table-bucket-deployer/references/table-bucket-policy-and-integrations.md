@@ -413,3 +413,108 @@ resource "aws_lakeformation_permissions" "athena_access" {
   }
 }
 ```
+
+---
+
+## Step 6 — table bucket policy example (moved from SKILL.md)
+
+```bash
+# Put a table bucket policy
+aws s3tables put-table-bucket-policy \
+  --table-bucket-arn "$TABLE_BUCKET_ARN" \
+  --resource-policy '
+  {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Principal": {
+          "AWS": "arn:aws:iam::999999999999:root"
+        },
+        "Action": [
+          "s3tables:GetTableBucket",
+          "s3tables:ListNamespaces",
+          "s3tables:ListTables",
+          "s3tables:GetTable",
+          "s3tables:GetNamespace"
+        ],
+        "Resource": "arn:aws:s3tables:us-east-1:123456789012:bucket/analytics-tables/*"
+      }
+    ]
+  }
+  ' \
+  --region us-east-1
+```
+
+**Verify the policy:**
+
+```bash
+aws s3tables get-table-bucket-policy \
+  --table-bucket-arn "$TABLE_BUCKET_ARN" \
+  --region us-east-1
+```
+
+---
+
+## Step 7 — REST catalog, Athena configuration, Iceberg queries (moved from SKILL.md)
+
+### How the REST catalog works
+
+```text
+S3 Table Bucket → provisions Iceberg REST catalog
+  → Athena workgroup references REST catalog
+  → Query: SELECT * FROM ns.table
+  → Athena calls REST catalog for metadata → reads data files
+```
+
+### Configuring Athena
+
+```bash
+# Verify Athena can see the table via the REST catalog
+aws athena start-query-execution \
+  --query-string "SHOW TABLES IN sales_analytics" \
+  --work-group primary \
+  --query-execution-context Database=sales_analytics \
+  --result-configuration OutputLocation=s3://query-results-bucket/athena/ \
+  --region us-east-1
+```
+
+### Querying Iceberg features via Athena
+
+```sql
+-- Time travel: query a previous snapshot
+SELECT * FROM sales_analytics.orders
+FOR SYSTEM_TIME AS OF TIMESTAMP '2026-08-01 00:00:00';
+
+-- Schema evolution (metadata-only, no rewrite)
+ALTER TABLE sales_analytics.orders ADD COLUMNS (discount double);
+
+-- ACID UPDATE (requires Iceberg v2)
+UPDATE sales_analytics.orders SET status = 'shipped' WHERE order_id = 12345;
+```
+
+---
+
+## Step 8 — Lake Formation grants (moved from SKILL.md)
+
+```bash
+# Grant table-level access via Lake Formation
+aws lakeformation grant-permissions \
+  --principal DataLakePrincipalIdentifier=arn:aws:iam::123456789012:role/AthenaUserRole \
+  --permissions SELECT DESCRIBE \
+  --resource '{"Table": {"DatabaseName": "sales_analytics", "Name": "orders"}}' \
+  --region us-east-1
+
+# Grant column-level access (fine-grained)
+aws lakeformation grant-permissions \
+  --principal DataLakePrincipalIdentifier=arn:aws:iam::123456789012:role/AthenaUserRole \
+  --permissions SELECT \
+  --resource '{
+    "TableWithColumns": {
+      "DatabaseName": "sales_analytics",
+      "Name": "orders",
+      "ColumnWildcard": {}
+    }
+  }' \
+  --region us-east-1
+```

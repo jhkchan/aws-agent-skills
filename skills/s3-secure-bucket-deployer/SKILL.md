@@ -82,57 +82,8 @@ labels breaks automation silently.
 
 ## Reasoning framework (why the provisioning order matters)
 
-S3 configuration items have **dependency and timing semantics** that make
-the provisioning order non-trivial. Applying configurations in the wrong
-order creates windows of exposure or silently fails:
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — the reasoning framework behind the 10-step order.
 
-1. **Block Public Access FIRST** — BPA is the foundation. It prevents
-   accidental public exposure during the rest of the setup. If you
-   create a bucket, upload objects, and THEN enable BPA, there is a
-   window where a misconfigured ACL or policy (or a race with a
-   concurrent policy attach) exposes data. Enabling BPA at creation
-   time closes this window before any data lands.
-
-2. **Default encryption BEFORE any object upload** — server-side
-   encryption is applied at write time. Objects written before default
-   encryption is configured are NOT retroactively encrypted by the
-   bucket-level setting. You would need S3 Batch Operations to encrypt
-   existing objects after the fact.
-
-3. **Object Ownership = BucketOwnerEnforced BEFORE granting cross-account
-   write access** — this setting disables ALL ACLs on the bucket. If a
-   cross-account writer has been using ACLs to share objects, setting
-   BucketOwnerEnforced silently breaks that workflow. Set it early so
-   all access flows through bucket policies from the start.
-
-4. **Versioning BEFORE lifecycle rules and replication** — both lifecycle
-   rules for non-current versions and S3 replication REQUIRE versioning
-   to be enabled. Configuring either without versioning is a silent
-   no-op (lifecycle) or an API error (replication).
-
-5. **Bucket policy AFTER BPA** — the bucket policy enforces HTTPS-only
-   and SSE-KMS on uploads. It is the enforcement layer; BPA is the
-   prevention layer. Both are needed for defense-in-depth.
-
-6. **Access logging EARLY** — logging captures all access events. The
-   sooner it is enabled, the more audit trail you have. Log delivery
-   requires a log-delivery ACL or bucket policy grant on the target
-   logging bucket — set this up before the data bucket receives
-   production traffic.
-
-7. **Lifecycle AFTER versioning** — lifecycle rules that transition or
-   expire non-current versions require versioning. Rules also have
-   minimum-storage-duration constraints (STANDARD_IA: 30 days, GLACIER:
-   90 days via STANDARD_IA transition). Configure lifecycle after
-   versioning is confirmed enabled.
-
-8. **Replication LAST** — replication requires versioning, a destination
-   bucket with its OWN security baseline, and an IAM role with
-   `s3:ReplicateObject` + KMS decrypt permissions. It is the most
-   complex configuration and depends on all prior steps being correct.
-
-The order matters because each layer DEPENDS ON or is STRENGTHENED BY
-the prior layer. The provisioning procedure below follows this order.
 
 ## S3 configuration dependency graph (novel heuristic)
 
@@ -163,129 +114,18 @@ on apply — only post-config verification (Step 9) catches the gap. This
 is why the procedure verifies every configuration item against the
 bucket's actual state rather than trusting the API response.
 
-**Cross-dependency gotchas** (not visible in the table):
-- Setting `BucketOwnerEnforced` on the LOG TARGET silently breaks log
-  delivery if the log-delivery ACL was the only grant — must switch to
-  a bucket policy grant (see `references/bucket-policy-examples.md`).
-- Enabling SSE-KMS on a bucket with cross-account readers requires the
-  KMS key policy to grant them `kms:Decrypt`; the bucket policy alone
-  is not enough.
-- Removing the last KMS key referenced by a bucket policy is
-  irreversible — encrypted objects become cryptographically unreadable.
+→ Cross-dependency gotchas moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+
 
 ## Expert heuristic: BPA timing window
 
-The most dangerous period in an S3 bucket's lifecycle is the gap between
-bucket creation and BPA enablement. This is when most real-world data
-leaks occur — not from persistent misconfiguration, but from a race
-condition during initial setup.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — the BPA race window, CloudFormation/Terraform ordering, and the account-level-BPA fix.
 
-**The window:**
-
-```text
-T0: Bucket created (no public-access protection yet)
-T1: Default encryption set
-T2: Bucket policy attached
-T3: BPA enabled at bucket level
-
-Gap: T0 → T3 — bucket exists with NO public-access protection
-```
-
-**Why this matters in practice:**
-- Internet scanners (GrayhatWarfare, Censys, Shodan) enumerate new S3
-  buckets within **2-5 minutes** of creation. If any object is uploaded
-  during T0 to T3, it is discoverable.
-- A concurrent process (CI/CD pipeline, Lambda function) may upload
-  objects to the bucket before BPA is enabled, creating a window even
-  when the provisioning script is sequential.
-- A bucket policy with `Principal: "*"` attached BEFORE BPA is enabled
-  creates a public-access window even if the policy is later corrected.
-
-**CloudFormation race condition:** when using CloudFormation, BPA is
-applied as a SEPARATE resource (`AWS::S3::BucketPublicAccessBlock`) that
-is created AFTER the `AWS::S3::Bucket` resource reaches
-`CREATE_COMPLETE`. There is a real window where the bucket exists but
-BPA is not yet enforced. To eliminate it:
-
-```yaml
-BucketPublicAccessBlock:
-  Type: AWS::S3::BucketPublicAccessBlock
-  Properties:
-    Bucket: !Ref MyBucket
-    BlockPublicAcls: true
-    IgnorePublicAcls: true
-    BlockPublicPolicy: true
-    RestrictPublicBuckets: true
-
-BucketPolicy:
-  Type: AWS::S3::BucketPolicy
-  Properties:
-    Bucket: !Ref MyBucket
-    PolicyDocument: ...
-  DependsOn: BucketPublicAccessBlock   # enforce order
-```
-
-**Terraform:** use `aws_s3_bucket_public_access_block` as a separate
-resource and add `depends_on = [aws_s3_bucket_public_access_block.my]`
-on any resource that uploads objects.
-
-**Account-level BPA is the real fix:** if account-level BPA is enabled
-BEFORE any bucket is created in the account, the window is zero — all
-new buckets inherit the account-level setting at creation time. Make
-account-level BPA a one-time account bootstrap step, not a per-bucket
-step. This eliminates the race entirely.
 
 ## Expert heuristic: SSE-KMS Bucket Keys cost model
 
-When using SSE-KMS with cross-account or high-throughput access, Bucket
-Keys are not a "nice to have" — they are the difference between a $1K/year
-and a $1M/year KMS bill.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — the $1K vs $1M/year KMS cost model.
 
-**Without Bucket Keys:**
-
-```text
-Every GET  → 1x kms:Decrypt call         ($0.03 / 10k)
-Every PUT  → 1x kms:GenerateDataKey call ($0.03 / 10k)
-Every HEAD → 1x kms:Decrypt call (if SSE-KMS object)
-
-At 10M GETs/day without Bucket Keys:
-  KMS cost = 10,000,000 / 10,000 * $0.03 = $3,000/day = $1,095,000/year
-```
-
-**With Bucket Keys enabled:**
-
-```text
-S3 negotiates ONE data key per bucket (time-limited, reused ~3 min).
-KMS calls drop by ~99% — only 1x kms:GenerateDataKey every ~3 min.
-
-At 10M GETs/day with Bucket Keys:
-  KMS calls = ~480/day (1 every 3 min)
-  KMS cost  = 480 / 10,000 * $0.03 = $0.0014/day = ~$0.52/year
-```
-
-The 99% reduction is real and documented. The nuance a baseline model
-misses is the **cross-account amplification**: when a bucket is accessed
-by principals in OTHER AWS accounts (cross-account replication, shared
-data lake, analytics pipeline), each cross-account access without Bucket
-Keys requires a KMS call in the KEY-OWNING account. This means:
-
-1. The KMS quota (5,500-10,000 req/s region default) is shared across ALL
-   cross-account readers — a single hot bucket can throttle KMS for the
-   entire account.
-2. The KMS cost is billed to the key owner, not the accessor. A data lake
-   bucket accessed by 50 downstream accounts generates 50x the KMS calls
-   with no way to charge back.
-
-**Enable Bucket Keys on:**
-- Any SSE-KMS bucket with more than 1,000 reads/day
-- ANY bucket with cross-account access (no exceptions)
-- Replication source and destination buckets (replication doubles KMS calls)
-
-**Do NOT enable Bucket Keys on:**
-- Buckets where you need per-request KMS audit in CloudTrail (Bucket Keys
-  reduce the audit granularity to per-bucket, not per-request).
-- Buckets with per-object KMS keys (different CMK per object) — Bucket
-  Keys require a bucket-level default key.
 
 ## Prerequisites (verify before provisioning)
 
@@ -310,76 +150,19 @@ If any prerequisite is missing, output `VERDICT: PREREQUISITES_MISSING` and cite
 Enable BPA at BOTH account and bucket level. Account-level BPA is the
 authoritative prevention layer.
 
-```bash
-# Account-level (do once per account)
-aws s3control put-public-access-block \
-  --account-id <ACCOUNT_ID> \
-  --public-access-block-configuration \
-    BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+→ Command listing moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md); rationale and common mistakes to [references/advanced-patterns.md](references/advanced-patterns.md); failure triage to [references/error-handling.md](references/error-handling.md).
 
-# Bucket-level (do per bucket)
-aws s3api put-public-access-block \
-  --bucket <BUCKET> \
-  --public-access-block-configuration \
-    BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
-```
 
-**Why all 4 settings**: Each blocks a different vector — `BlockPublicAcls`
-prevents PUT with public ACL, `IgnorePublicAcls` ignores existing public
-ACLs, `BlockPublicPolicy` prevents attaching a public bucket policy,
-`RestrictPublicBuckets` restricts access to public buckets to only known
-principals. All 4 together = full BPA.
 
-**Common mistake**: Enabling only bucket-level BPA without account-level.
-Account-level BPA overrides any bucket-level relaxation. Always set both.
-
-**If it fails**: `AccessDenied` means the caller lacks
-`s3:PutBucketPublicAccessBlock` (bucket-level) or
-`s3:PutAccountPublicAccessBlock` (account-level) — these are separate
-IAM permissions and both must be in the caller's policy. `NoSuchBucket`
-on the bucket-level call means the bucket does not exist yet; create
-it first (and apply bucket-level BPA in the same CloudFormation stack
-or Terraform run as the create, so the public-exposure window is zero).
 
 ### Step 2 — Default encryption
 
 Choose SSE-S3 (free, AWS-managed) or SSE-KMS (customer-controlled key).
 
-```bash
-# SSE-S3 (recommended default — zero cost, zero key management)
-aws s3api put-bucket-encryption \
-  --bucket <BUCKET> \
-  --server-side-encryption-configuration \
-    '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+→ Command listing moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md); rationale and common mistakes to [references/advanced-patterns.md](references/advanced-patterns.md); failure triage to [references/error-handling.md](references/error-handling.md).
 
-# SSE-KMS (when compliance requires customer-managed keys)
-aws s3api put-bucket-encryption \
-  --bucket <BUCKET> \
-  --server-side-encryption-configuration \
-    '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"aws:kms","KMSMasterKeyID":"arn:aws:kms:<region>:<account>:key/<key-id>"}}]}'
-```
 
-**Why before upload**: Encryption applies at write time. Objects written
-before this setting are NOT retroactively encrypted.
 
-**KMS cost warning**: SSE-KMS incurs $0.03 per 10,000 requests. For
-high-throughput buckets (logs, CDN), SSE-S3 is the better default. Use
-SSE-KMS only when compliance or audit requirements mandate it.
-
-**Common mistake**: Forgetting to set `BucketKeyEnabled: true` on
-SSE-KMS buckets. Without Bucket Keys, every PutObject triggers a
-`kms:GenerateDataKey` call ($0.03/10k + ~50-100ms latency) and you
-risk hitting KMS throttle limits (5,500-10,000 req/s region default)
-on high-throughput workloads.
-
-**If it fails**: `KMSNotFoundException` or `AccessDenied` on the
-SSE-KMS call almost always means ONE of: (a) the KMS key ARN region
-or account ID is wrong, (b) the key is in `PendingDeletion` state,
-(c) the key policy does not grant the S3 service principal
-`kms:Encrypt` + `kms:GenerateDataKey` — verify with
-`aws kms describe-key --key-id <ARN>` and inspect the policy with
-`aws kms get-key-policy`. `MalformedJSON` usually means shell escaping
-ate the inner double-quotes — wrap the JSON in single quotes.
 
 ### Step 3 — Object Ownership = BucketOwnerEnforced
 
@@ -391,21 +174,9 @@ aws s3api put-bucket-ownership-controls \
   --ownership-controls Rules=[{ObjectOwnership=BucketOwnerEnforced}]
 ```
 
-**Why**: ACLs are a legacy access-control mechanism that's easy to
-misconfigure. BucketOwnerEnforced eliminates ACL-based exposure vectors.
-Cross-account access must flow through bucket policies (more auditable).
+→ Rationale and common mistakes moved to [references/advanced-patterns.md](references/advanced-patterns.md); failure triage to [references/error-handling.md](references/error-handling.md).
 
-**Common mistake**: Flipping BucketOwnerEnforced on a bucket that has
-existing cross-account writers using ACL-granted object ownership. The
-switch is immediate and silent — those writers' next PutObject will
-succeed but lose their per-object ownership, breaking any downstream
-ACL-based read workflow. Audit `s3:GetObjectAcl` across writers first;
-migrate grants to the bucket policy before flipping.
 
-**If it fails**: `AccessDenied` means the caller lacks
-`s3:PutBucketOwnershipControls` (separate from `s3:PutBucketPolicy`).
-`OwnershipControlsNotFoundError` is benign on a brand-new bucket —
-re-issue the call once.
 
 ### Step 4 — Versioning
 
@@ -415,32 +186,10 @@ This is the foundation for lifecycle rules on non-current versions
 MFA Delete is optional but recommended for production buckets holding
 irreplaceable data.
 
-```bash
-aws s3api put-bucket-versioning \
-  --bucket <BUCKET> \
-  --versioning-configuration Status=Enabled
+→ Command listing moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md); rationale and common mistakes to [references/advanced-patterns.md](references/advanced-patterns.md); failure triage to [references/error-handling.md](references/error-handling.md).
 
-# Optional: MFA delete (requires a hardware/virtual MFA device)
-aws s3api put-bucket-versioning \
-  --bucket <BUCKET> \
-  --versioning-configuration Status=Enabled,MFADelete=Enabled \
-  --mfa "<device-arn> <code>"
-```
 
-**Why**: Versioning protects against accidental deletion and overwrites.
-Required for lifecycle rules on non-current versions and for replication.
 
-**Common mistake**: Setting `MFADelete=Enabled` from an IAM user or
-role. MFA Delete can ONLY be configured by the root account credentials
-— an IAM principal issuing the call gets a silent success with no MFA
-enforcement. Verify the actual MFADelete state with
-`aws s3api get-bucket-versioning --bucket <BUCKET>` after the call.
-
-**If it fails**: `AccessDenied` on the MFA Delete call almost always
-means the caller is an IAM principal rather than root — re-run with
-root account credentials (and rotate them after). `InvalidArgument` on
-the `--mfa` flag means the device ARN or code is wrong, or the device
-is not yet attached to the root account.
 
 ### Step 5 — Bucket policy (HTTPS-only + SSE enforcement)
 
@@ -465,17 +214,9 @@ grant, and cross-account templates live in
 aws s3api put-bucket-policy --bucket <BUCKET> --policy file://policy.json
 ```
 
-**Common mistake**: Using `Principal: "*"` with `Effect: "Allow"`.
-The deny-style policies above are safe with `*` because the condition
-gates the call. An ALLOW with `Principal: "*"` is genuine public access
-and will be blocked by BPA — but if BPA is ever relaxed, the bucket
-becomes public. Always use deny-style for enforcement policies.
+→ Common mistakes moved to [references/advanced-patterns.md](references/advanced-patterns.md); failure triage to [references/error-handling.md](references/error-handling.md).
 
-**If it fails**: `AccessDenied` usually means BPA's
-`BlockPublicPolicy=true` is blocking a policy containing `Principal: "*"`
-with `Allow` (our deny policies should pass). `MalformedPolicy` means
-JSON syntax error — validate with `python -m json.tool policy.json` or
-`jq . policy.json`. `NoSuchBucket` means the bucket doesn't exist yet.
+
 
 ### Step 6 — Access logging
 
@@ -486,43 +227,10 @@ bucket must exist in the SAME region and must grant
 `logging.s3.amazonaws.com` write access via bucket policy (ACL grants
 do not work with `BucketOwnerEnforced`).
 
-```bash
-aws s3api put-bucket-logging \
-  --bucket <BUCKET> \
-  --bucket-logging-status '{
-    "LoggingEnabled": {
-      "TargetBucket": "<LOG-BUCKET>",
-      "TargetPrefix": "s3/<BUCKET>/"
-    }
-  }'
-```
+→ Command listing moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md); common mistakes to [references/advanced-patterns.md](references/advanced-patterns.md); failure triage to [references/error-handling.md](references/error-handling.md).
 
-For CloudTrail data events (API-level audit trail):
 
-```bash
-aws cloudtrail put-event-selectors \
-  --trail-name <TRAIL> \
-  --event-selectors '[{"ReadWriteType":"All","IncludeManagementEvents":true,
-    "DataResources":[{"Type":"AWS::S3::Object",
-    "Values":["arn:aws:s3:::<BUCKET>/"]}]}]'
-```
 
-**Common mistake**: Setting the log target to a bucket with
-`BucketOwnerEnforced` enabled but granting log delivery via the legacy
-`log-delivery` ACL. BucketOwnerEnforced disables ALL ACLs, so S3 log
-delivery silently stops with no error. Grant `s3:PutObject` to
-`logging.s3.amazonaws.com` via a bucket policy on the log target —
-see `references/bucket-policy-examples.md` "Log-delivery grant".
-
-**If it fails**: `put-bucket-logging` returns 200 even when the log
-target is misconfigured — the only signal is that no logs appear after
-1+ hours. Diagnostic order: (1) `aws s3api get-bucket-logging --bucket
-<LOG-BUCKET>` to confirm S3 log delivery is the configured target;
-(2) verify log target exists in the SAME region as the source bucket
-(cross-region log delivery is unsupported for S3 server access logs);
-(3) check the log target's bucket policy for the
-`logging.s3.amazonaws.com` grant. CloudTrail `TrailNotFoundException`
-means the trail name is wrong or the trail is in a different region.
 
 ### Step 7 — Lifecycle rules
 
@@ -534,23 +242,8 @@ no-op. Mind the minimum-storage-duration constraints per class
 (STANDARD_IA: 30d, GLACIER: 90d, DEEP_ARCHIVE: 180d) or you will pay
 early-deletion fees.
 
-```bash
-aws s3api put-bucket-lifecycle-configuration \
-  --bucket <BUCKET> \
-  --lifecycle-configuration '{
-    "Rules": [
-      {
-        "ID": "transition-to-ia",
-        "Status": "Enabled",
-        "Filter": { "Prefix": "" },
-        "Transitions": [{ "Days": 30, "StorageClass": "STANDARD_IA" }],
-        "NoncurrentVersionTransitions": [{ "NoncurrentDays": 30, "StorageClass": "STANDARD_IA" }],
-        "NoncurrentVersionExpiration": { "NoncurrentDays": 90 },
-        "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
-      }
-    ]
-  }'
-```
+→ Lifecycle JSON template moved to [references/encryption-and-lifecycle-guide.md](references/encryption-and-lifecycle-guide.md); common mistakes to [references/advanced-patterns.md](references/advanced-patterns.md); failure triage to [references/error-handling.md](references/error-handling.md).
+
 
 **Storage class guidance**:
 - **Intelligent-Tiering**: unknown access patterns (auto-moves between tiers)
@@ -559,86 +252,25 @@ aws s3api put-bucket-lifecycle-configuration \
 - **GLACIER**: archival, minutes-to-hours retrieval (90+ days)
 - **DEEP_ARCHIVE**: long-term retention, 12h retrieval (180+ days)
 
-**Common mistake**: Writing `NoncurrentVersion*` rules before checking
-that versioning is enabled. Without versioning the rule applies
-silently as a no-op — the API returns success, no objects transition,
-and you only discover the cost leak weeks later via Storage Lens. Also:
-transitioning objects smaller than 128 KB to STANDARD_IA / ONEZONE_IA /
-GLACIER_IR costs MORE than leaving them in STANDARD due to the
-minimum-size fee — use `ObjectSizeGreaterThan: 131072` in the filter.
 
-**If it fails**: `MalformedXML` almost always means the `Filter` element
-is missing — every modern rule requires `"Filter": {"Prefix": ""}` even
-when matching all objects. If rules apply but objects do not transition,
-verify (a) versioning is `Enabled`, (b) the object has been in its
-current storage class for at least the minimum duration (30 / 60 / 90 /
-180 days), and (c) for `NoncurrentVersion*` rules, the object has at
-least one non-current version (a bucket with no overwrites has none).
 
 ### Step 8 — Replication (optional, if CRR/SRR required)
 
 Prerequisites: versioning enabled (Step 4), destination bucket with its
 own security baseline, IAM role with replication permissions.
 
-```bash
-aws s3api put-bucket-replication \
-  --bucket <BUCKET> \
-  --replication-configuration '{
-    "Role": "arn:aws:iam::<ACCOUNT>:role/<REPLICATION-ROLE>",
-    "Rules": [{
-      "Status": "Enabled",
-      "Priority": 1,
-      "Filter": {},
-      "Destination": { "Bucket": "arn:aws:s3:::<DEST-BUCKET>" }
-    }]
-  }'
-```
+→ Command listing moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md); common mistakes to [references/advanced-patterns.md](references/advanced-patterns.md); failure triage to [references/error-handling.md](references/error-handling.md).
 
-**Common mistake**: Forgetting that replication does NOT backfill
-objects written before the rule was added. Only new PutObject calls
-after the rule is active are replicated. For pre-existing objects, run
-an S3 Batch Operations Copy job or restart replication with
-`ExistingObjectReplication: Enabled` (v2 config only).
 
-**If it fails**: `InvalidRequest` typically means versioning is not
-enabled on the SOURCE or the DESTINATION bucket (both are required).
-`AccessDenied` on the role assume means the trust policy doesn't list
-`s3.amazonaws.com` as principal, or the role doesn't exist in this
-account. If the call succeeds but replicas do not appear, check the
-replication role's permissions: it needs `s3:ReplicateObject` AND
-`s3:GetObjectVersionForReplication` on source + `kms:Decrypt` on the
-source KMS key + `kms:Encrypt` / `kms:GenerateDataKey` on the
-destination KMS key. Use S3 replication metrics (`S3:ReplicationLatency`,
-`S3:BytesPendingReplication`) to detect silent stalls.
+
 
 ### Step 9 — Verification
 
 Run every verification command and confirm each output matches the
 expected state.
 
-```bash
-# BPA verification
-aws s3api get-public-access-block --bucket <BUCKET>
-# Expected: all 4 True
+→ Verification command listing moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
-# Encryption verification
-aws s3api get-bucket-encryption --bucket <BUCKET>
-# Expected: SSEAlgorithm = AES256 or aws:kms
-
-# Ownership verification
-aws s3api get-bucket-ownership-controls --bucket <BUCKET>
-# Expected: ObjectOwnership = BucketOwnerEnforced
-
-# Versioning verification
-aws s3api get-bucket-versioning --bucket <BUCKET>
-# Expected: Status = Enabled
-
-# Policy verification
-aws s3api get-bucket-policy --bucket <BUCKET>
-
-# Lifecycle verification
-aws s3api get-bucket-lifecycle-configuration --bucket <BUCKET>
-```
 
 ### Step 10 — Emit checklist
 
@@ -729,23 +361,8 @@ hypothetical. Treat each as a hard rule.
 
 ## Output format
 
-```
-BUCKET: <bucket-name>
-VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
-CHECKLIST:
-  [✓|✗] Block Public Access (account-level): all 4 settings True
-  [✓|✗] Block Public Access (bucket-level): all 4 settings True
-  [✓|✗] Default encryption: SSE-S3 | SSE-KMS (<key-arn>)
-  [✓|✗] Object Ownership: BucketOwnerEnforced
-  [✓|✗] Versioning: Enabled (MFA Delete: Enabled|Disabled)
-  [✓|✗] Bucket policy: HTTPS-enforce + SSE-enforce
-  [✓|✗] Access logging: Enabled (target: <log-bucket>)
-  [✓|✗] CloudTrail data events: Enabled
-  [✓|✗] Lifecycle rules: <rule-summary> | None (optional)
-  [✓|✗] Replication: CRR→<dest> | SRR→<dest> | None
-VERIFICATION_COMMANDS:
-  <copy-pasteable verification commands>
-```
+→ Compact template moved to [references/worked-examples.md](references/worked-examples.md); the STRICT output contract below is authoritative.
+
 
 ## STRICT output contract
 
@@ -858,26 +475,8 @@ VERIFICATION_COMMANDS:
 
 ### Perfect example output — PREREQUISITES_MISSING
 
-```text
-BUCKET: prod-order-data
-VERDICT: PREREQUISITES_MISSING
-CHECKLIST:
-  [✓] Block Public Access (account-level): all 4 settings True
-  [✓] Block Public Access (bucket-level): all 4 settings True
-  [✗] Default encryption: SSE-KMS selected but KMS key ARN not provided — operator must supply CMK ARN
-  [✓] Object Ownership: BucketOwnerEnforced
-  [✓] Versioning: Enabled (MFA Delete: Disabled)
-  [✓] Bucket policy: HTTPS-enforce + SSE-enforce
-  [✗] Access logging: log target bucket s3-access-logs-prod does not exist — create target bucket first
-  [✗] CloudTrail data events: trail management-events not found — verify trail name and region
-  [OPTIONAL] Lifecycle rules: None (not requested for this workload)
-  [✗] Replication: replication IAM role not provided — create role with s3:ReplicateObject + kms:Decrypt
-VERIFICATION_COMMANDS:
-  aws kms list-aliases --query 'Aliases[?AliasName==`alias/prod-s3-key`]'
-  aws s3api head-bucket --bucket s3-access-logs-prod
-  aws cloudtrail describe-trails --query 'trailList[?Name==`management-events`]'
-  aws iam get-role --role-name s3-replication-role
-```
+→ Secondary worked example moved to [references/worked-examples.md](references/worked-examples.md).
+
 
 **Self-check before emit:**
 - [ ] All 10 checklist rows present (no omitted items)?
@@ -888,15 +487,15 @@ VERIFICATION_COMMANDS:
 
 ## Recent AWS features
 
-- **S3 Express One Zone (directory buckets)**: Single-AZ, lowest latency
-  for ML/AI and analytics. $0.16/GB. Use for hot data requiring <10ms
-  latency. Does NOT support all lifecycle/replication features.
-- **S3 Tables**: Managed Apache Iceberg tables stored in S3. Requires
-  different provisioning (catalog database + table bucket).
-- **S3 Object Versioning + BPA interaction**: As of 2024, BPA at account
-  level overrides bucket-level BPA relaxations for ALL versions.
-- **Intelligent-Tiering Archive configurations**: Can now specify Instant
-  Access vs Deep Archive access tiers within Intelligent-Tiering.
-- **S3 Storage Lens**: Organization-level dashboard for storage
-  visibility. Enable to get metrics on noncurrent bytes, storage class
-  distribution, and object age — critical for lifecycle planning.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — recent AWS features.
+
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — reasoning framework, dependency gotchas, BPA timing window, Bucket Keys cost model, per-step rationale, recent AWS features.
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked example (PREREQUISITES_MISSING) and the compact output template.
+- [references/error-handling.md](references/error-handling.md) — per-step failure triage (Steps 1-8).
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 9 verification commands.
+- [references/bucket-policy-examples.md](references/bucket-policy-examples.md) — pre-existing; full bucket-policy JSON templates.
+- [references/encryption-and-lifecycle-guide.md](references/encryption-and-lifecycle-guide.md) — pre-existing; SSE decision matrix, Bucket Keys internals, lifecycle reference; extended with the Step 7 lifecycle template.
+- [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — pre-existing; full 10-step CLI walkthrough; extended with command listings moved from SKILL.md.

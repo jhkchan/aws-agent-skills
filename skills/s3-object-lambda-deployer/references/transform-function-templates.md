@@ -202,3 +202,29 @@ route to a different Lambda function:
 
 **Verify the actions list** before applying — operations not listed
 bypass the transform silently.
+
+## Step 4 transform: PII redaction handler (moved from SKILL.md)
+
+```python
+# transform.py — PII redaction example
+import boto3, urllib.request, re
+
+s3 = boto3.client("s3")
+
+def handler(event, context):
+    # Fetch the original object via the presigned URL
+    presigned_url = event["getObjectContext"]["inputS3Url"]
+    with urllib.request.urlopen(presigned_url) as resp:
+        body = resp.read().decode("utf-8")
+
+    # Transform: redact SSN pattern
+    transformed = re.sub(r"\d{3}-\d{2}-\d{4}", "***-**-****", body)
+
+    # Write back via WriteGetObjectResponse (NOT return)
+    s3.write_get_object_response(
+        RequestRoute=event["getObjectContext"]["outputRoute"],
+        RequestToken=event["getObjectContext"]["outputToken"],
+        Body=transformed
+    )
+```
+

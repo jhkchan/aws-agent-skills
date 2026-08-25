@@ -340,174 +340,28 @@ Use 10-50% for production monitoring; 100% for pre-production validation.
 
 ### Step 7 — Model monitoring (data quality, model quality, bias drift)
 
-Model monitoring runs scheduled analysis on captured data using baseline
-constraints. Three monitor types:
-
-**Data quality monitor:** detects feature drift and schema violations.
-```bash
-aws sagemaker create-monitoring-schedule \
-  --monitoring-schedule-name <endpoint-name>-data-quality \
-  --endpoint-name <endpoint-name> \
-  --monitoring-type DataQuality \
-  --monitoring-job-definition-name <baseline-job-definition> \
-  --schedule-config 'ScheduleExpression=polling/1h'
-```
-
-**Model quality monitor:** tracks prediction quality (accuracy, F1, MSE)
-against ground-truth labels.
-
-**Bias drift monitor:** detects fairness metric changes over time using
-the captured data.
-
-**Baseline constraints:** before enabling monitoring, generate baseline
-statistics and constraints from a representative dataset using
-`suggest_baseline`. The monitor compares live traffic against this baseline.
-
-```bash
-# Generate baseline from training data
-aws sagemaker processing start \
-  --app-specification Image=156402425085.dkr.ecr.us-west-2.amazonaws.com/sagemaker-model-monitor-analyzer, ... \
-  --processing-input SourceS3Uri=s3://<bucket>/baseline-data/,Destination=/opt/ml/processing/input/baseline ...
-```
+Model Monitor runs scheduled analysis on captured data: data quality (drift/schema), model quality (accuracy vs ground truth), bias drift — all require data capture enabled first and a baseline generated from training data.
+Full schedule and baseline CLI live in [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 8 — A/B testing (multiple weighted variants)
 
-A/B testing deploys multiple models behind a single endpoint with traffic
-weights. The EndpointConfig defines multiple `ProductionVariants`, each
-with an `InitialVariantWeight`.
-
-```bash
-aws sagemaker create-endpoint-config \
-  --endpoint-config-name <config-name>-ab \
-  --production-variants \
-    '[{"VariantName":"variantA","ModelName":"model-a","InstanceType":"ml.c5.xlarge","InitialInstanceCount":2,"InitialVariantWeight":9},
-      {"VariantName":"variantB","ModelName":"model-b","InstanceType":"ml.c5.xlarge","InitialInstanceCount":2,"InitialVariantWeight":1}]'
-```
-
-Traffic distribution: weights are relative. `9:1` sends 90% to variantA,
-10% to variantB. Shift weights via `update-endpoint-weights-and-capacities`:
-
-```bash
-aws sagemaker update-endpoint-weights-and-capacities \
-  --endpoint-name <endpoint-name> \
-  --desired-weights-and-capacities \
-    variantA=5,variantB=5
-```
-
-**Common mistake:** using different instance types for A/B variants.
-Differing instance types confound the comparison — latency differences
-may come from the hardware, not the model. Use the same instance type
-for both variants.
+A/B testing deploys multiple ProductionVariants with relative InitialVariantWeight (9:1 = 90%/10%); shift weights via update-endpoint-weights-and-capacities; use the SAME instance type for all variants.
+Full config CLI live in [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 9 — Shadow testing (shadow variant)
 
-Shadow testing deploys a candidate model that receives a copy of live
-traffic but its responses are NOT returned to the caller. This allows
-comparing candidate performance against production without risk.
-
-```bash
-# Create a shadow variant config
-aws sagemaker create-endpoint-config \
-  --endpoint-config-name <config-name>-shadow \
-  --production-variants \
-    '[{"VariantName":"prod","ModelName":"model-prod","InstanceType":"ml.c5.xlarge","InitialInstanceCount":2,"InitialVariantWeight":1}]' \
-  --shadow-production-variants \
-    '[{"VariantName":"shadow","ModelName":"model-candidate","InstanceType":"ml.c5.xlarge","InitialInstanceCount":1}]'
-```
-
-The shadow variant receives the same requests as the prod variant. Enable
-data capture on both variants to compare predictions offline. Shadow
-variant responses are discarded — callers only see the prod variant
-response.
+Shadow testing deploys a shadow-production-variants copy of live traffic; responses are discarded; enable data capture on both variants to compare offline.
+Full config CLI live in [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 10 — Latest features: Serverless, Async, JumpStart foundation models
 
-**SageMaker Serverless Inference** (GA 2024-2025):
-- Scales automatically including scale-to-zero when idle
-- Billed by request count and compute duration (no idle cost)
-- `MemorySizeInMB` (1024-6144), `MaxConcurrency` (1-200),
-  optional `ProvisionedConcurrency` for warm capacity
-- Best for intermittent or unpredictable workloads
-
-**SageMaker Asynchronous Inference** (GA 2024):
-- Queues inference requests via S3; supports payloads up to 256 MB
-- Scale-to-zero when queue drains (`InstanceCount: 0` minimum)
-- SNS notification on completion or error
-- Best for large payloads, long inference times (LLM generation, video
-  processing, batch scoring)
-
-**SageMaker JumpStart foundation models** (2024-2025):
-- Pre-trained models (Llama, Mistral, Qwen, Stable Diffusion, etc.)
-- One-command deploy via `create-model` with JumpStart-provided
-  artifact and container
-- Use `list-models --query 'Models[?contains(ModelName, `foundation`)]'`
-  to discover available models
-
-```bash
-# Deploy a JumpStart foundation model
-aws sagemaker create-model \
-  --model-name jumpstart-llama-7b \
-  --primary-container \
-    Image=763104351884.dkr.ecr.us-west-2.amazonaws.com/djl-inference:0.23.0-deepspeed0.9.5-cu118,ModelDataUrl=s3://jumpstart-cache-prod-us-west-2/meta-llama/models/meta-llama-7b/ \
-  --execution-role-arn arn:aws:iam::<account-id>:role/SageMakerExecutionRole
-```
-
-JumpStart models use optimized inference containers (DJL, vLLM, TGI) with
-quantization support (bitsandbytes, AWQ, GPTQ) for cost-efficient LLM
-deployment on `ml.g5` or `ml.inf2` instances.
+Latest hosting options — Serverless (scale-to-zero, MemorySizeInMB/MaxConcurrency), Asynchronous (S3 queue, 256 MB payloads, scale-to-zero), JumpStart foundation models (one-command deploy on DJL/vLLM/TGI containers).
+Details and deploy commands live in [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Common patterns (boilerplate)
 
-### Real-time endpoint with auto-scaling and data capture (production)
-
-```bash
-aws sagemaker create-model \
-  --model-name prod-rec-model \
-  --primary-container Image=<image-uri>,ModelDataUrl=s3://<bucket>/rec/model.tar.gz \
-  --execution-role-arn arn:aws:iam::<acct>:role/SageMakerExecutionRole
-
-aws sagemaker create-endpoint-config \
-  --endpoint-config-name prod-rec-config \
-  --production-variants VariantName=AllTraffic,ModelName=prod-rec-model,InstanceType=ml.c5.xlarge,InitialInstanceCount=2 \
-  --data-capture-config EnableCapture=true,InitialSamplingPercentage=20,DestinationS3Uri=s3://<capture-bucket>/rec/ \
-  --kms-key-id arn:aws:kms:<region>:<acct>:key/<key-id>
-
-aws sagemaker create-endpoint --endpoint-name prod-rec --endpoint-config-name prod-rec-config
-
-aws application-autoscaling register-scalable-target \
-  --service-namespace sagemaker --resource-id endpoint/prod-rec/variant/AllTraffic \
-  --scalable-dimension sagemaker:variant:DesiredInstanceCount --min-capacity 2 --max-capacity 8
-
-aws application-autoscaling put-scaling-policy \
-  --policy-name prod-rec-scaling --service-namespace sagemaker \
-  --resource-id endpoint/prod-rec/variant/AllTraffic \
-  --scalable-dimension sagemaker:variant:DesiredInstanceCount \
-  --policy-type TargetTrackingScaling \
-  --target-tracking-scaling-policy-configuration TargetValue=14,PredefinedMetricSpecification={PredefinedMetricType=SageMakerVariantInvocationsPerInstance},ScaleInCooldown=300,ScaleOutCooldown=60
-```
-
-### Serverless inference endpoint
-
-```bash
-aws sagemaker create-endpoint-config \
-  --endpoint-config-name serverless-config \
-  --serverless-config ServerlessInferenceConfigName=AllTraffic,MaxConcurrency=10,MemorySizeInMB=2048,ProvisionedConcurrency=2
-
-aws sagemaker create-endpoint --endpoint-name serverless-ep --endpoint-config-name serverless-config
-```
-
-### A/B testing with two variants
-
-```bash
-aws sagemaker create-endpoint-config \
-  --endpoint-config-name ab-config \
-  --production-variants \
-    '[{"VariantName":"variantA","ModelName":"model-v1","InstanceType":"ml.c5.xlarge","InitialInstanceCount":2,"InitialVariantWeight":9},
-      {"VariantName":"variantB","ModelName":"model-v2","InstanceType":"ml.c5.xlarge","InitialInstanceCount":2,"InitialVariantWeight":1}]'
-
-aws sagemaker update-endpoint-weights-and-capacities \
-  --endpoint-name ab-ep --desired-weights-and-capacities variantA=5,variantB=5
-```
+Boilerplate CLI bundles — production real-time endpoint (auto-scaling + 20% capture + KMS), serverless endpoint, A/B testing with two variants — live in [references/worked-examples.md](references/worked-examples.md).
+Load that reference when assembling a copy-pasteable deploy sequence.
 
 ## NEVER do these things (top 5)
 
@@ -541,42 +395,8 @@ aws sagemaker update-endpoint-weights-and-capacities \
 
 ## Expert heuristic: instance selection and auto-scaling target
 
-```
-INSTANCE SELECTION
-   ├─ CPU-only model (XGBoost, sklearn, light NLP)
-   │    └─ ml.c5.xlarge (2 vCPU) — ml.c5.2xlarge (8 vCPU)
-   │         • Start at c5.xlarge for dev; c5.2xlarge for prod
-   │         • 2 GB RAM per vCPU — enough for most tabular models
-   │
-   ├─ GPU model (transformers, computer vision)
-   │    ├─ Single-GPU: ml.g4dn.xlarge (1x T4) — ml.g5.xlarge (1x A10G)
-   │    │    └─ BERT-base, ResNet, small image generation
-   │    ├─ Multi-GPU: ml.g5.12xlarge (4x A10G) — ml.g5.48xlarge (8x A10G)
-   │    │    └─ Large transformers, batch image processing
-   │    └─ Inferentia2: ml.inf2.xlarge — ml.inf2.48xlarge
-   │         └─ LLM inference (Llama, Mistral) — lowest cost/token
-   │
-   └─ LLM (7B-70B parameters)
-        ├─ 7B-13B: ml.g5.2xlarge (1x A10G, 24GB) — quantized
-        ├─ 30B-70B: ml.g5.48xlarge (8x A10G) or ml.inf2.48xlarge (12x Inferentia2)
-        └─ Use DJL/vLLM containers with quantization (AWQ, GPTQ)
-
-AUTO-SCALING TARGET (InvocationsPerInstance)
-   ├─ Target = (instance_per_second_capacity) × (target_utilization)
-   ├─ c5.xlarge serving a 50ms model:
-   │    └─ 1000ms / 50ms = 20 req/s capacity
-   │         • Target at 70% utilization = 14 InvocationsPerInstance
-   │         • Set TargetValue=14, min=2, max=8
-   ├─ g5.xlarge serving a 200ms LLM:
-   │    └─ 1000ms / 200ms = 5 req/s capacity
-   │         • Target at 60% utilization = 3 InvocationsPerInstance
-   │         • Set TargetValue=3 (conservative for GPU memory)
-   └─ ScaleInCooldown=300s (avoid flapping); ScaleOutCooldown=60s (react fast)
-```
-
-**Async inference scaling:** target `ApproximateBacklogSizePerInstance`
-instead. This metric tracks the queue depth per instance. A target of 5
-means each instance should have at most 5 pending requests in the queue.
+Instance-selection and auto-scaling TargetValue decision trees — CPU/GPU/LLM sizing, TargetValue = capacity x utilization (50 ms model on c5.xlarge -> TargetValue=14), cooldown guidance.
+Full trees live in [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Output format
 
@@ -670,40 +490,15 @@ VERIFICATION_COMMANDS:
 
 ## Recent AWS features (2024-2026)
 
-- **SageMaker Serverless Inference GA (2024):** automatic scaling
-  including scale-to-zero. Provisioning tip: use `ProvisionedConcurrency`
-  to eliminate cold-start latency for production workloads with
-  latency requirements.
+Recent AWS features 2024-2026 — Serverless/Async GA tips, JumpStart containers, ml.inf2 + Neuron, 15-minute monitoring schedules, shadow variants, AWQ/GPTQ quantization — live in [references/advanced-patterns.md](references/advanced-patterns.md).
+Load when choosing instances or containers for new deployments.
 
-- **SageMaker Asynchronous Inference GA (2024):** S3-queued inference
-  for large payloads (up to 256 MB) and long inference times. Scale-to-
-  zero when queue drains. Provisioning tip: pair with SNS notification
-  for completion callbacks.
+## References (load on demand)
 
-- **SageMaker JumpStart foundation models (2024-2025):** pre-trained
-  Llama, Mistral, Qwen, Stable Diffusion models with optimized inference
-  containers (DJL, vLLM, TGI). One-command deployment. Provisioning tip:
-  use `ml.inf2` instances with Neuron for lowest cost per token on LLMs.
-
-- **Inferentia2 instances (ml.inf2) (2024):** purpose-built for
-  transformer inference. Up to 12x Inferentia2 chips on ml.inf2.48xlarge.
-  Provisioning tip: requires Neuron SDK compilation; not all frameworks
-  supported out of the box.
-
-- **SageMaker model monitoring enhancements (2024-2025):** near-real-
-  time monitoring (15-minute schedules), model quality monitoring with
-  ground-truth merge, bias drift detection. Provisioning tip: data
-  capture must be enabled first; monitoring analyzes captured data.
-
-- **Shadow testing enhancements (2024):** `shadow-production-variants`
-  in EndpointConfig for zero-risk model validation. Provisioning tip:
-  shadow responses are discarded; enable data capture on both variants
-  to compare offline.
-
-- **Quantization support (AWQ, GPTQ) (2024-2025):** DJL and vLLM
-  containers support 4-bit and 8-bit quantization for LLM inference,
-  reducing GPU memory by 2-4x. Provisioning tip: quantize before
-  deployment; verify accuracy retention on a held-out set.
+- [references/worked-examples.md](references/worked-examples.md) — boilerplate patterns: production real-time endpoint, serverless endpoint, A/B testing
+- [references/advanced-patterns.md](references/advanced-patterns.md) — model monitoring, A/B and shadow procedures, serverless/async/JumpStart, instance-selection and auto-scaling heuristics, recent AWS features
+- [references/instance-types-and-hosting-modes.md](references/instance-types-and-hosting-modes.md) — hosting mode matrix, CPU/GPU/Inferentia instance tables
+- [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — full copy-pasteable CLI sequence for all 10 provisioning steps
 
 ## Domain
 

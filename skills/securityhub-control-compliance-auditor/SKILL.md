@@ -42,21 +42,8 @@ Process steps. Fix actions: see Control-to-fix-action mapping.
 
 ## Activation
 
-Invoke when the input contains a Security Hub finding in ASFF format —
-detected by ANY of these signals:
-
-1. JSON with `Compliance.Status`, `Workflow.Status`, or `RecordState` keys.
-2. `GeneratorId` matching the ARN regex
-   `arn:aws:securityhub:::ruleset/(foundational-security-best-practices|cis-aws-foundations|pci-dss|nist)/(v/[\d.]+/)?[A-Z]+\d+\.\d+`
-   (case-insensitive).
-3. `ProductArn` containing `product/aws/securityhub`.
-4. Explicit user mention of "Security Hub", "FSBP", "CIS Benchmark",
-   "control compliance", or "compliance gap report".
-
-Do NOT invoke for: raw CloudTrail events, generic IAM policy JSON without a
-Security Hub wrapper, AWS Audit Manager findings, or Config rule
-compliance JSON (those lack the ASFF `Compliance` block — use Config-specific
-skills instead).
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#activation).
+> Four ASFF detection signals and the do-NOT-invoke exclusions (CloudTrail events, bare IAM policy JSON, Audit Manager, Config compliance JSON).
 
 ## Output Contract (CRITICAL — read before any classification)
 
@@ -95,20 +82,8 @@ Rules for filling the template:
 
 ## Mindset
 
-Classify each AWS Security Hub control finding against a four-state compliance
-verdict, then map every actionable verdict to a concrete fix action. The core
-insight that separates this skill from naive pass-through of
-`Compliance.Status` is that **Security Hub stores multiple overlapping states
-on every finding** — `Compliance.Status`, `Workflow.Status`, `RecordState`,
-and `Compliance.StatusReasons` — and each combination tells a different
-operational story. A `FAILED` finding that is `ARCHIVED` is not a current
-failure. A `FAILED` finding that is `SUPPRESSED` is not a pass. A `RESOLVED`
-finding that is still `FAILED` is a WARNING, not a success.
-
-The auditor must read all four fields in the correct order — the same order
-that a Security Hub engineer triages the findings dashboard — and produce a
-verdict that reflects the **current, real-world compliance posture**, not just
-the raw status string.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#mindset).
+> Four overlapping finding states, read in dashboard-triage order, reflect current real-world posture rather than the raw status string.
 
 ## Decision Tree (classification flow)
 
@@ -156,61 +131,31 @@ Verify the input is an ASFF record. Edge cases to handle before
 classification:
 
 **Malformed JSON:** If the finding JSON cannot be parsed, output:
-```text
-CONTROL: <unknown>
-VERDICT: WARNING
-REASON: Input JSON is malformed — cannot extract Compliance block. Triage manually.
-SEVERITY: MEDIUM
-REMEDIATION: Re-fetch the finding via GetFindings by finding ID. If the source
-integration is sending malformed ASFF, open a support case.
-```
+
+> Moved to [references/error-handling.md](references/error-handling.md#step-0--malformed-json-error-emit-block).
+> WARNING emit template for unparseable finding JSON (GetFindings re-fetch, support case for the source integration).
 
 **Missing Compliance block:** If the `Compliance` key is absent entirely,
 the finding is an **integration finding** (GuardDuty, Inspector, Macie,
 Detective, Firewall Manager) or a custom product finding. It is a security
 event, not a control compliance evaluation:
-```text
-CONTROL: <ProductFields.ControlId or GeneratorId>
-VERDICT: NOT_APPLICABLE
-REASON: Finding has no Compliance block — this is an integration or custom
-product finding, not a Security Hub control evaluation.
-SEVERITY: <from Severity.Label, or INFORMATIONAL if missing>
-REMEDIATION: Route to the appropriate detector skill (GuardDuty, Inspector).
-```
 
-**Schema version check:** Verify `SchemaVersion = 2018-10-08` (the only ASFF
-version). If older or missing, flag it — `Compliance.StatusReasons` was added
-to the schema in late 2020, so findings created before that may lack
-StatusReasons even on NOT_AVAILABLE. Append a note: "Pre-2020 schema —
-StatusReasons may be absent."
+> Moved to [references/error-handling.md](references/error-handling.md#step-0--missing-compliance-block-emit).
+> NOT_APPLICABLE emit template for integration findings (GuardDuty, Inspector, Macie, Detective, Firewall Manager) and custom products.
+
 
 **Malformed ARN fields:** If the finding `Id` or `Resources[].Id` does not
 match the AWS ARN pattern
 `arn:aws:[a-z0-9-]+:[a-z]{2}-[a-z]+-\d:\d{12}:.*`, append:
-```
-DATA_QUALITY: Finding Id / Resource Id does not match expected ARN format.
-Verify the source integration is producing valid ASFF.
-```
-This does not change the verdict — it is a data-quality flag.
 
-**Unexpected enum values:** If `Compliance.Status` is not one of
-`PASSED | WARNING | FAILED | NOT_AVAILABLE`, emit WARNING with:
-"Unrecognized Compliance.Status `<value>` — not a valid ASFF enum. Triage
-manually." Do NOT guess the intent.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-0--malformed-arn-data_quality-flag).
+> DATA_QUALITY flag for finding Id / Resources[].Id not matching the AWS ARN pattern (does not change the verdict).
+
 
 **Field-defaulting rules (apply when a field is absent but non-fatal):**
-- `Compliance.StatusReasons` missing on NOT_AVAILABLE → WARNING with
-  "NOT_AVAILABLE with no StatusReasons — cannot determine whether the control
-  is inapplicable or failed to evaluate." Do NOT default to NOT_APPLICABLE —
-  the absence of a reason code is ambiguous, not a signal of non-applicability.
-  This is the most common false-positive source: treating "I don't know why"
-  as "it doesn't apply."
-- `RecordState` missing → treat as ACTIVE (Security Hub default).
-- `Workflow.Status` missing → treat as NEW (default).
-- `UpdatedAt` missing → cannot compute staleness. Emit the verdict from other
-  fields but append STALE_FLAG: "UpdatedAt absent — cannot verify freshness."
-- `Severity.Label` missing → default to MEDIUM (conservative midpoint), note:
-  "MEDIUM (assumed — label absent)".
+
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-0--field-defaulting-rules).
+> Defaults: StatusReasons-missing-on-NOT_AVAILABLE → WARNING (never NOT_APPLICABLE), RecordState → ACTIVE, Workflow → NEW, UpdatedAt-absent → STALE_FLAG, Severity → MEDIUM.
 
 ### Step 1 — RecordState = ARCHIVED → NOT_APPLICABLE (stale)
 
@@ -221,20 +166,10 @@ represents a **historical** state. If `RecordState = ARCHIVED`, emit
 
 Cite "Rule 1: archived — resource deleted or control superseded".
 
-**Freshness guard:** even if `RecordState = ACTIVE`, check `UpdatedAt`. If the
-finding has not been updated in > 30 days, the Security Hub service may have
-stopped refreshing (account removed from delegated admin, control disabled
-and re-enabled). Append:
-```
-STALE_FLAG: Finding last updated <date> (>30 days ago). Verify the control is
-still enabled and Security Hub is refreshing in this region.
-```
 
-**Deprecated-standard edge case (expert):** When a standard version is
-deprecated (e.g., CIS v1.2.0 → v2.0.0 migration in Q4 2024), existing
-findings for the old standard's controls show as ARCHIVED but may persist in
-the datastore for 90 days. These are NOT current failures — classify as
-NOT_APPLICABLE with note "control belongs to deprecated standard version."
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-1--freshness-guard).
+> STALE_FLAG when UpdatedAt is >30 days old even on ACTIVE findings (delegated-admin removal, control re-enable).
+
 
 ### Step 2 — Suppressed failure → WARNING (governance flag)
 
@@ -255,21 +190,9 @@ REASON whether the suppression has a `Note`:
 - Security Hub does not natively expire suppressions. A suppression created
   months ago for a temporary exception may still be hiding a failing control.
 
-**Suppression lifecycle heuristic (expert):** Security Hub has **no
-suppression TTL** — unlike GuardDuty which auto-archives, suppressions persist
-indefinitely until manually cleared. In large organizations, 40-60% of
-suppressed findings are stale exceptions that no longer apply. The validity
-heuristic:
 
-- **< 30 days + has Note + resource unchanged** → likely valid. Do not
-  unsuppress.
-- **30-90 days + has Note** → review. Check whether the compensating control
-  (WAF rule, SCP, permissions boundary) still exists. If removed, the
-  suppression is invalid.
-- **> 90 days + has Note** → stale. Recommend re-evaluation: unsuppress, let
-  Security Hub re-run the check, re-suppress only if still justified.
-- **Any age + no Note** → immediately suspect. An undocumented suppression is
-  indistinguishable from hiding a finding. Unsuppress and re-evaluate.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-2--suppression-lifecycle-heuristic).
+> No suppression TTL — validity heuristic by age and Note presence (<30d valid, 30-90d review, >90d stale, no-Note suspect).
 
 ### Step 3 — Resolved but still FAILED → WARNING (pending re-evaluation)
 
@@ -284,12 +207,6 @@ ago and is still `FAILED`, the remediation likely **failed** — escalate to
 **FAILED** and note: "Resolution marked >48h ago but control still FAILED —
 remediation likely incomplete. Re-investigate the resource directly."
 
-**Config-change vs periodic controls (expert distinction):** The 48h
-threshold is conservative. Config-change-triggered controls re-evaluate within
-5-30 minutes of a resource change. If a config-change control is still FAILED
-1 hour after RESOLVED was marked, the fix already failed — do not wait 48h.
-For periodic controls (CloudTrail, Config, IAM password policy), the full 24h
-window is needed. The 48h global threshold covers the worst case.
 
 ### Step 4 — NOT_AVAILABLE → split by StatusReasons
 
@@ -319,21 +236,9 @@ definitive PASSED/FAILED**. The reason matters — it splits into two verdicts:
 - StatusReasons empty or absent → WARNING: "NOT_AVAILABLE with no
   StatusReasons — investigate manually."
 
-**Full StatusReason code reference:**
 
-| Code | Verdict | Meaning |
-|---|---|---|
-| `NO_RESOURCES` | NOT_APPLICABLE | Zero resources in scope |
-| `DISABLED_CONTROL` | NOT_APPLICABLE | Control disabled by admin / SHCC |
-| `UNSUPPORTED_INSTANCE_TYPE` | NOT_APPLICABLE | Resource variant not evaluated |
-| `SUPPORTED_SERVICE_NOT_ENABLED` | WARNING | AWS Config not enabled |
-| `CONFIG_RETURNS_UNKNOWN` | WARNING | Config rule returned UNKNOWN |
-| `ASSESSMENT_FAILED` | WARNING | Assessment threw an error |
-| `ASSUME_ROLE_ERROR` | WARNING | Service-linked role cannot assume |
-| `PERMISSION_DENIED` | WARNING | Insufficient IAM permissions |
-| `SECURITY_HUB_NOT_ENABLED_IN_REGION` | WARNING | Hub disabled in region |
-| `CANNOT_ENABLE_RECORDS` | WARNING | Cannot enable Config recording |
-| `UNKNOWN_CONTROL_STATUS` | WARNING | Undetermined — investigate |
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-4--full-statusreason-code-reference).
+> Complete StatusReason code → verdict → meaning table (NO_RESOURCES through UNKNOWN_CONTROL_STATUS).
 
 Cite "Rule 4: NOT_AVAILABLE — <code>".
 
@@ -379,296 +284,43 @@ BREAKDOWN: 3 FAILED, 1 WARNING, 12 PASSED, 2 NOT_APPLICABLE (across 18 resources
 
 ## Severity escalation matrix
 
-The `Severity.Label` determines remediation priority when combined with the
-verdict:
-
-| Verdict | Severity | Priority | SLA Guidance |
-|---|---|---|---|
-| FAILED | CRITICAL | P0 | Immediate (within 24h) — active exploit risk |
-| FAILED | HIGH | P1 | Urgent (within 72h) — significant exposure |
-| FAILED | MEDIUM | P2 | This sprint — compliance gap |
-| FAILED | LOW | P3 | Next sprint — hardening |
-| WARNING | CRITICAL/HIGH | P2 | This sprint — suppressed or pending |
-| WARNING | MEDIUM/LOW | P3 | Next sprint — informational |
-| PASSED | * | — | No action |
-
-**Expert note on control severity vs finding severity:** The same control may
-carry different severity labels across standards. EC2.15 (SSH 0.0.0.0/0) is
-HIGH in FSBP but CRITICAL in PCI-DSS (`PCI.EC2.1`). When a resource is
-flagged by multiple standards, use the **highest severity** across all
-standards for prioritization.
-
-**Blast-radius escalation rules:**
-
-1. **Aggregate escalation:** A single `FAILED` control on N > 10 resources
-   is a systemic configuration issue — escalate priority by one level (P3 →
-   P2, P2 → P1) regardless of individual severity.
-2. **Time-decay escalation:** A `FAILED` finding with `FirstObservedAt` older
-   than 90 days has been ignored for a quarter — escalate by one level.
-3. **Critical-inheritance escalation:** If a `FAILED` control is on a
-   **trust-boundary resource** (IAM role with cross-account trust, KMS key
-   with wildcard policy, S3 bucket with public write), escalate to P0
-   regardless of the control's own severity.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#severity-escalation-matrix).
+> Verdict × severity priority/SLA table, cross-standard severity rule, and blast-radius escalation (aggregate N>10, time-decay >90d, trust-boundary → P0).
 
 ## Config-rule evaluation triggers (expert reference)
 
-Every Security Hub control is backed by an AWS Config managed rule. The
-rule's evaluation trigger determines how quickly a fix is reflected:
-
-**Configuration-change-triggered** (re-evaluate within minutes of a resource
-change):
-- S3.1-S3.8 (bucket settings — BPA, versioning, encryption, ACLs)
-- EC2.2, EC2.15 (security groups)
-- IAM.1-IAM.8 (IAM resources)
-- KMS.1-KMS.2 (key policy / rotation)
-- Lambda.1-Lambda.2 (function configuration)
-
-**Periodic-triggered** (re-evaluate every 6-24 hours regardless of changes):
-- CloudTrail.1-CloudTrail.9 (trail status)
-- Config.1-Config.2 (recorder status)
-- IAM.7 (password policy)
-- CloudWatch.1-CloudWatch.14 (metric filters + alarms)
-- EC2.4 (SSM managed-instance compliance)
-
-**Operational implication:** When you mark a finding `RESOLVED` after a fix:
-- Config-change controls: finding should flip to `PASSED` within **5-30
-  minutes**. If still `FAILED` after 1 hour, the fix failed.
-- Periodic controls: may take **up to 24 hours** to re-evaluate. Do not
-  escalate until 24h for periodic (vs. 1h for config-change).
-
-You can verify a control's evaluation mode via
-`aws configservice describe-config-rules --config-rule-names <rule-name>`
-and checking the `Source.Owner` + `MaximumExecutionFrequency`.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#config-rule-evaluation-triggers-expert-reference).
+> Config-change vs periodic trigger families per control, 5-30 min vs 6-24h re-evaluation windows, describe-config-rules verification.
 
 ## Security Hub internals (non-obvious operational knowledge)
 
-These behaviors are not in the public AWS documentation but cause real
-production incidents. Internalize them before running a large-scale audit.
-
-**Finding deduplication:** Security Hub deduplicates findings by a composite
-key: `ProductArn` + `AwsAccountId` + `Region` + resource ARN + generator ID.
-This means two findings for the **same resource** from the **same standard**
-in the **same region** are always deduplicated — only the most recent
-update survives. If you see a finding disappear after applying a fix, it was
-not deleted; the re-evaluation replaced it. When auditing, deduplicate by
-this composite key before counting to avoid double-counting the same
-control-resource pair.
-
-**BatchUpdateFindings race condition:** When you set `Workflow.Status =
-RESOLVED` and the Config rule re-evaluates within the same second, the Config
-evaluation can overwrite your workflow status back to `NEW`. This is a known
-Security Hub behavior — Config-driven updates take precedence over manual
-`BatchUpdateFindings` calls when they arrive within the evaluation window.
-Mitigation: wait 60 seconds after the Config rule evaluation completes
-(check `describe-config-rule-evaluation-status`) before marking RESOLVED.
-
-**Config evaluation backlog:** After a large infrastructure change (Terraform
-apply, CloudFormation stack update), Config rule evaluations queue up. The
-backlog can delay finding updates by **2-6 hours** in accounts with >1000
-resources. Check backlog via
-`aws configservice describe-config-rule-evaluation-status` — if
-`LastSuccessfulInvocationTime` is hours behind `LastErrorCode`, the rule is
-backlogged. Do not interpret stale findings as failures during a backlog;
-append a STALE_FLAG instead.
-
-**Ingestion pipeline latency:** The path from Config rule evaluation to
-Security Hub finding update has 3 stages with measurable latency:
-1. Config rule evaluation: 1-30 min (config-change) or 6-24h (periodic).
-2. Security Hub ingestion: ~30 seconds after Config publishes the result.
-3. Finding aggregation (cross-region): ~5 minutes if `FindingAggregator`
-   is configured.
-Total worst-case: 24h + 30s + 5min ≈ 24h06m. This is why the Step 3
-threshold is 48h — it provides a 2x safety margin over the theoretical
-worst case.
-
-**Automation rules silent suppression:** Security Hub automation rules
-(formerly ingestion filters) can auto-suppress or auto-archive findings on
-arrival, before they appear in `GetFindings`. A finding that arrives as
-`SUPPRESSED` with no `Note` may have been suppressed by an automation rule,
-not a human operator. Check
-`aws securityhub list-automation-rules --region <region>` to audit active
-rules. If an automation rule is suppressing a FAILED control, the
-suppression is still a WARNING — automation does not change the verdict
-logic, only the initial Workflow.Status.
-
-**Control enablement cost model (budgeting insight):** Security Hub charges
-$0.0010 per control check per region per month for FSBP. An account with all
-~300 FSBP controls enabled across 16 regions generates ~$58/month in
-Security Hub charges alone (300 × 16 × $0.0010 × 30 days). CIS, PCI, and
-NIST each add their own per-check charges. For Organizations with 100+
-member accounts, selective control enablement (enabled in active regions
-only) reduces cost by 60-80% versus blanket enable-all.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#security-hub-internals-non-obvious-operational-knowledge).
+> Dedup composite key, BatchUpdateFindings race, Config backlog delays, ingestion latency stages, automation-rule silent suppression, control enablement cost model.
 
 ## Finding correlation and root-cause grouping
 
-When auditing multiple findings, group by **root cause** rather than control
-ID. A single misconfiguration often triggers multiple controls:
-
-**Example: S3 bucket without BPA**
-- S3.1 (account BPA) → FAILED
-- S3.2 (bucket BPA) → FAILED
-- S3.6 (public ACL) → FAILED
-- S3.8 (SSL policy) → FAILED
-
-All four trace to one root cause: **BPA not enabled**. Enabling BPA fixes
-all four on the next evaluation cycle.
-
-**Root-cause grouping rules:**
-1. Same `Resources[].Id` → single resource misconfiguration.
-2. Same `AwsAccountId` + same control family (e.g., all S3.*) → check for
-   account-level policy gap (account BPA, password policy).
-3. `NOT_AVAILABLE` with `SUPPORTED_SERVICE_NOT_ENABLED` across multiple
-   controls → root cause is Config being disabled. Fix Config once.
-4. Cross-standard duplicates (FSBP + CIS + PCI flag same resource + issue)
-   → one fix, independent re-evaluation per standard.
-
-Correlation does NOT change individual verdicts — each finding still gets its
-own verdict. Correlation only affects remediation batching.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#finding-correlation-and-root-cause-grouping).
+> Root-cause grouping rules (S3 BPA fan-in, account-policy gaps, Config-disabled clusters, cross-standard duplicates).
 
 ## Coverage assessment heuristic
 
-```
-coverage_score = PASSED / (PASSED + FAILED + WARNING)
-```
-
-Exclude `NOT_APPLICABLE` from the denominator. Operational benchmarks:
-- **>= 90%** → healthy. Focus on remaining FAILED / WARNING.
-- **70-89%** → moderate gap. Apply root-cause grouping to find top 2-3
-  drivers.
-- **< 70%** → systemic failure. Prioritize enabling foundational controls
-  (Config, CloudTrail, IAM password policy, S3 BPA) before chasing individual
-  findings.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#coverage-assessment-heuristic).
+> coverage_score formula and 90% / 70% operational benchmarks.
 
 ## Control-to-fix-action mapping
 
-For every FAILED or WARNING control, map to the specific remediation action.
-
-### FSBP (Foundational Security Best Practices)
-
-| Control ID | Title | Fix Action | CLI Command |
-|---|---|---|---|
-| S3.1 | Account-level BPA | Enable all 4 BPA settings | `aws s3control put-public-access-block --account-id <id> --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true` |
-| S3.2 | Bucket-level BPA | Enable all 4 BPA settings on bucket | `aws s3api put-public-access-block --bucket <name> --public-access-block-configuration BlockPublicAcls=true,...` |
-| S3.4 | Bucket versioning | Enable versioning | `aws s3api put-bucket-versioning --bucket <name> --versioning-configuration Status=Enabled` |
-| S3.5 | Default encryption | Enable SSE-KMS | `aws s3api put-bucket-encryption --bucket <name> --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"aws:kms","KMSMasterKeyID":"<key-id>"}}]}'` |
-| S3.6 | Public read ACL | Remove public ACL + enable BPA | `aws s3api put-bucket-acl --bucket <name> --acl private` + BPA |
-| S3.8 | SSL requests only | Deny non-SSL in bucket policy | Deny with `aws:SecureTransport: false` |
-| IAM.1 | Admin policy attached | Replace with scoped policy | Scope down via CloudTrail-derived least-privilege |
-| IAM.3 | Access Analyzer | Enable IAM Access Analyzer | `aws accessanalyzer create-analyzer --analyzer-name org-analyzer --type ORGANIZATION` |
-| IAM.4 | Access key age < 90d | Rotate or deactivate old keys | `aws iam update-access-key --access-key-id <key> --status Inactive` |
-| IAM.5 | MFA for IAM users | Enable MFA for all console users | `aws iam create-virtual-mfa-device --virtual-mfa-device-name <name>` |
-| IAM.7 | Password policy | Set account password policy | `aws iam update-account-password-policy --minimum-password-length 14 --require-symbols --require-numbers --require-uppercase-characters --require-lowercase-characters --max-password-age 90 --password-reuse-prevention 24` |
-| IAM.8 | Unused credentials < 45d | Deactivate unused keys | `aws iam update-access-key --status Inactive` |
-| CloudTrail.1 | Trail enabled | Create org-level trail | `aws cloudtrail create-trail --name org-trail --s3-bucket-name <bucket> --is-organization-trail` |
-| CloudTrail.2 | Log file validation | Enable validation | `aws cloudtrail update-trail --name <trail> --enable-log-file-validation` |
-| CloudTrail.4 | Log encryption (KMS) | Apply KMS CMK to trail | `aws cloudtrail update-trail --name <trail> --kms-key-id <key-arn>` |
-| Config.1 | Config enabled all regions | Enable Config recorder | `aws configservice put-configuration-recorder ...` |
-| EC2.2 | Default SG restricts traffic | Remove all rules from default SG | `aws ec2 revoke-security-group-ingress --group-id <sg> ...` |
-| EC2.4 | EBS snapshot encryption | Enable EBS default encryption | `aws ec2 enable-ebs-encryption-by-default` |
-| EC2.6 | VPC flow logs | Enable flow logs for all VPCs | `aws ec2 create-flow-logs --resource-type VPC --resource-ids <vpc-id> --traffic-type ALL --log-group-name <lg>` |
-| EC2.15 | SG 0.0.0.0/0 admin port | Restrict SSH/RDP to known CIDR | `aws ec2 revoke-security-group-ingress --group-id <sg> --ip-permissions ...` |
-| KMS.1 | KMS key rotation | Enable annual key rotation | `aws kms enable-key-rotation --key-id <key-id>` |
-| KMS.2 | KMS key policy not wildcard | Restrict key policy principals | Edit key policy JSON |
-| RDS.1 | RDS encryption | Enable encryption at rest | Snapshot → copy with encryption → restore |
-| RDS.6 | Enhanced Monitoring | Enable Enhanced Monitoring | `aws rds modify-db-instance --db-instance-identifier <id> --monitoring-interval 60 --monitoring-role-arn <arn>` |
-| Lambda.1 | Lambda IAM role check | Ensure dedicated scoped role | `aws lambda update-function-configuration --function-name <name> --role <role-arn>` |
-| Lambda.2 | Lambda in VPC | Connect Lambda to VPC | `aws lambda update-function-configuration --vpc-config SubnetIds=...,SecurityGroupIds=...` |
-
-### CIS AWS Foundations Benchmark (v1.2.0 / v1.4.0 / v2.0.0)
-
-| CIS Control | Title | Fix Action |
-|---|---|---|
-| 1.1 | Avoid root account use | Create IAM admin user; do not use root for daily ops |
-| 1.2 | MFA on root | Enable hardware MFA on root (virtual is insufficient for CIS) |
-| 1.3 | Credentials unused >90d removed | Deactivate keys; delete inactive users |
-| 1.4 | Access keys <90 days | Rotate access keys |
-| 1.5 | Password policy | `aws iam update-account-password-policy` (min 14 chars) |
-| 1.6 | Hardware MFA for root | Same as CIS 1.2 |
-| 1.7 | Password expiry <90d | `--max-password-age 90` |
-| 1.8 | Password reuse prevention | `--password-reuse-prevention 24` |
-| 1.9 | No password policy | Create one (combines 1.5-1.8) |
-| 1.10-1.12 | MFA for all IAM users | Enable MFA for every console user |
-| 1.13-1.16 | No excessive access keys | Max 1 key per user; rotate inactive |
-| 1.20 | IAM Access Analyzer | Enable (maps to FSBP IAM.3) |
-| 1.21 | IAM credential report | `aws iam get-credential-report` monthly |
-| 2.1 | CloudTrail enabled | Multi-region trail (maps to FSBP CloudTrail.1) |
-| 2.2 | Log validation | Enable (maps to FSBP CloudTrail.2) |
-| 2.3 | S3 bucket access logging | Enable server access logging on CloudTrail bucket |
-| 2.4 | CloudTrail to CW Logs | `aws cloudtrail update-trail` + subscription filter |
-| 2.5 | Config enabled | Maps to FSBP Config.1 |
-| 2.6 | S3 bucket MFA delete | `aws s3api put-bucket-versioning --file mfa.json` (requires root) |
-| 2.7-2.9 | CloudTrail logs encrypted | KMS encryption on trail |
-| 3.1-3.4 | Security Hub alerts on root/MFA/unauthorized | CW metric filter + alarm + SNS |
-| 3.5-3.14 | Network security / SG | Restrict 0.0.0.0/0 (maps to FSBP EC2.15) |
-| 4.1 | No SG 0.0.0.0/0 on port 22 | Restrict SSH |
-| 4.2 | No SG 0.0.0.0/0 on port 3389 | Restrict RDP |
-
-### PCI-DSS v3.2.1 and NIST SP 800-53 Rev. 5
-
-PCI controls (`PCI.EC2.1`, `PCI.IAM.1`, `PCI.S3.1`) and NIST controls
-(`NIST.800-53.r5.*`) share the same underlying Config rules as FSBP. Map by
-resource type + issue, not by the control ID prefix. The fix actions are
-identical.
-
-**Cross-standard deduplication:** The same resource may have 3-4 findings for
-the same underlying issue. The fix is the same — apply once, all findings
-re-evaluate independently.
+> Moved to [references/remediation-guidance.md](references/remediation-guidance.md#control-to-fix-action-mapping).
+> FSBP (S3, IAM, CloudTrail, Config, EC2, KMS, RDS, Lambda), CIS v1.2-v2.0, and PCI/NIST control → fix action → CLI tables.
 
 ## Multi-account aggregation (Organizations)
 
-In an Organizations deployment with a delegated Security Hub administrator:
-
-- Findings from **all member accounts** aggregate to the administrator
-  account. `AwsAccountId` identifies the owning member account.
-- A finding in a member account may be invisible if the member has not enabled
-  Security Hub or accepted the administrator invitation.
-- **Enrolled-but-not-enabled:** If a member account is enrolled but has
-  Security Hub disabled, its controls show `NOT_AVAILABLE` with
-  `SECURITY_HUB_NOT_ENABLED_IN_REGION`. This is a **WARNING** — the account
-  SHOULD be monitored but is not.
-- **Cross-region aggregation:** Security Hub supports cross-region aggregation
-  via `FindingAggregator`. Findings from member regions appear with their
-  original `Region` field but are visible in the aggregation region (~5 minute
-  propagation delay).
-
-When producing an aggregate report, group by `AwsAccountId` and report the
-worst verdict per account.
-
-**Cross-account role assumption failures (expert edge case):** When the
-delegated administrator account cannot assume the service-linked role in a
-member account (due to SCP, permissions boundary, or a broken trust policy),
-controls for that member show `NOT_AVAILABLE` with `ASSUME_ROLE_ERROR`. This
-is a WARNING, not NOT_APPLICABLE. The root cause is a role-trust
-misconfiguration: verify the member account's
-`AWSServiceRoleForSecurityHub` role exists and its trust policy allows
-`securityhub.amazonaws.com`. In Organizations, this role is auto-created on
-Security Hub enablement — if it is missing, the account was enrolled without
-enabling Hub. Fix: enable Security Hub in the member account, which recreates
-the role.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#multi-account-aggregation-organizations).
+> Delegated-admin aggregation, enrolled-but-not-enabled WARNING, FindingAggregator cross-region propagation, ASSUME_ROLE_ERROR root cause and fix.
 
 ## Custom controls and non-standard findings
 
-Security Hub supports **custom standards** and **custom controls** via
-`CreateStandardsControl` or Config-backed custom rules. These appear with a
-customer-defined `GeneratorId` that does not match FSBP / CIS / PCI / NIST ARN
-patterns. The verdict logic is identical (Steps 0-8), but the fix action
-requires a different lookup:
-
-1. Check `Description` and `RemediationUrl` — set by the control author.
-2. If absent, check `Remediation.Recommendation.Text` and `.Url` (ASFF
-   per-finding remediation fields).
-3. If neither present, map by `Resources[].Type`: identify the service, check
-   the control title for keywords ("encryption", "public", "MFA"), and derive
-   the fix from best practice. Cite "Custom control — derived remediation"
-   and flag for human validation.
-
-**Automation rules (formerly ingestion filters):** Security Hub supports
-automation rules that can auto-update workflow status or even archive findings
-on ingest. A finding that arrives as `SUPPRESSED` or `ARCHIVED` may have been
-modified by an automation rule before you see it. Check
-`UpdatedAt` vs `CreatedAt` — if `UpdatedAt` is seconds after `CreatedAt`, an
-automation rule touched it. Use `aws securityhub list-automation-rules` to
-audit active rules.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#custom-controls-and-non-standard-findings).
+> Custom control remediation lookup chain (Description/RemediationUrl → ASFF Remediation fields → resource-type derivation) and automation-rule detection.
 
 ## Output format — worked examples
 
@@ -802,129 +454,30 @@ aws configservice put-configuration-recorder
 
 ## API and CLI constraints
 
-**Security Hub API limits:**
-- `GetFindings` returns **max 100 findings per page**. Use `--next-token` for
-  pagination. Large accounts require multiple paginated calls.
-- `BatchUpdateFindings` accepts **max 100 finding identifiers per call**.
-  The `Note` field has a **4 KB limit** — truncate verbose justifications.
-- `GetEnabledStandards` and `BatchGetStandardsControlAssociations` have lower
-  throughput limits — cache the standards list.
-- Updates via `BatchUpdateFindings` are **eventually consistent** (~30 seconds
-  to reflect in `GetFindings`). Do not re-query immediately after an update
-  expecting instant visibility.
-
-**Throttling and retry:**
-- Security Hub API calls are subject to **rate limiting** (token bucket).
-  On `ThrottlingException`, use exponential backoff (`--retry-mode adaptive`
-  on the CLI, or boto3 `botocore.config.Config` with `retry_mode='adaptive'`).
-- Config rule evaluations also throttle under heavy load.
-
-**CLI failure recovery:**
-- `batch-update-findings` fails with `InvalidInputException` → finding
-  identifier is malformed or the finding no longer exists. Skip and continue.
-- Remediation fails with `AccessDenied` → verify caller has service-level
-  permission AND no SCP or permissions boundary is blocking. Security Hub
-  findings do not check SCPs — a finding can report a state the caller cannot
-  modify.
-- `aws s3api put-public-access-block` fails with `NoSuchBucket` → bucket was
-  deleted between finding and remediation. Mark finding ARCHIVED.
+> Moved to [references/error-handling.md](references/error-handling.md#api-and-cli-constraints).
+> Pagination and batch limits (100 findings, 4 KB Note), throttling/backoff, eventual consistency, CLI failure recovery (InvalidInputException, AccessDenied, NoSuchBucket).
 
 ## Pre-flight safety checks (run before any remediation)
 
-**Dry-run mode (REQUIRED for batch remediation of >5 resources):** Before
-applying any fix in bulk, run an audit-only pass:
-1. For CLI commands with native `--dry-run` support (e.g., `aws iam
-   simulate-principal-policy`, `aws s3api put-bucket-policy --dry-run`):
-   run with `--dry-run` and inspect the output for side-effects.
-2. For commands without native dry-run (e.g., `put-public-access-block`,
-   `enable-key-rotation`): emit the exact command to stdout prefixed with
-   `# DRY-RUN:` and HALT. Require explicit user confirmation
-   (`--confirm-execute` flag or interactive "yes") before re-running without
-   the prefix.
-3. For BatchUpdateFindings: first run with `--note "DRY-RUN: would set
-   RESOLVED"` but WITHOUT `--workflow Status=RESOLVED`. Verify the note
-   appears, then run the real update.
-4. Batch dry-run output must include: the command, the target resource ARN,
-   the current state (from pre-flight capture), and the expected post-fix
-   state. This allows rollback planning before any state change.
-
-- **Confirm the resource still exists** before applying a fix. A finding may
-  reference a deleted resource (Security Hub can lag by up to 24h):
-  - S3: `aws s3api head-bucket --bucket <name>`
-  - IAM: `aws iam get-role --role-name <name>`
-  - EC2: `aws ec2 describe-security-groups --group-ids <sg-id>`
-  - CloudTrail: `aws cloudtrail describe-trails --trail-name-list <name>`
-  If the resource does not exist, update the finding to ARCHIVED.
-
-- **Capture current state for rollback** before modifying any resource:
-  - S3 bucket policy: `aws s3api get-bucket-policy --bucket <name> > backup.json`
-  - IAM policy: `aws iam get-policy-version --policy-arn <arn> > backup.json`
-  - Security group: `aws ec2 describe-security-groups --group-ids <sg> > backup.json`
-  Prefer additive changes (enable BPA) over destructive changes (delete
-  policy).
-
-- **Confirm the finding is for the current account/region.** Security Hub
-  findings are region-scoped. Verify `--region` matches the finding's `Region`
-  field.
-
-- **Verify the delegated administrator scope.** If operating from a member
-  account, you may not have permissions to modify resources in another member.
-  Check `AwsAccountId`.
-
-- **For CRITICAL findings on trust-boundary resources** (cross-account IAM
-  roles, public S3 buckets, KMS keys with wildcard policies), treat as
-  incident response — contain first (enable BPA, restrict trust policy), then
-  investigate CloudTrail for evidence of exploitation during the exposure
-  window.
-
-- **Permission fallback:** if the caller receives `AccessDenied` on the
-  remediation command, do NOT silently fail. Check for: (1) an SCP denying
-  the action at the OU or account level, (2) a permissions boundary capping
-  the role, (3) a service control policy from the management account. Document
-  the blocker and escalate to the cloud governance team.
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#pre-flight-safety-checks-run-before-any-remediation).
+> Dry-run mode for batch remediation, resource-existence probes per service, rollback state capture, region/delegated-admin verification, trust-boundary incident handling, permission-fallback escalation.
 
 ## Remediation guidance
 
-### For FAILED findings
-
-1. Identify the control ID and look up the fix action in the mapping table.
-2. Run the pre-flight safety checks (confirm resource exists, capture state,
-   dry-run if batch).
-3. Apply the fix via the CLI command in the mapping table.
-4. Update the finding workflow status to RESOLVED:
-   `aws securityhub batch-update-findings --finding-identifiers
-   Id=<id>,ProductArn=<arn> --workflow Status=RESOLVED --note "Applied
-   <fix-action>, awaiting re-evaluation."`
-5. Wait for the next evaluation cycle (12-24h for periodic, 5-30 min for
-   config-change). If the finding auto-updates to `PASSED`, remediation is
-   confirmed. If still `FAILED` after 48h, re-investigate the resource.
-6. For cross-standard duplicates, apply the fix once — all findings
-   re-evaluate independently.
-
-### For WARNING findings
-
-- **Suppressed FAILED:** Review the suppression justification. If the
-  compensating control is still valid, document it in a compliance exception
-  register. If stale (no note, > 90 days), unsuppress:
-  `aws securityhub batch-update-findings --workflow Status NEW`. If the
-  control now passes, auto-close; if still failing, proceed to the FAILED
-  remediation path.
-- **Resolved-pending:** If > 48h since resolution and still FAILED,
-  re-investigate the resource. If < 48h, wait for the next cycle.
-- **NOT_AVAILABLE (Config gap):** Enable AWS Config in the affected region.
-
-### For NOT_APPLICABLE findings
-
-- **NO_RESOURCES / DISABLED_CONTROL:** No action. Document that the control
-  does not apply to this account's resource profile.
-- **Integration findings:** Route to the appropriate detector skill.
+> Moved to [references/remediation-guidance.md](references/remediation-guidance.md#remediation-guidance).
+> FAILED playbook (map → pre-flight → fix → RESOLVED → await re-evaluation), WARNING playbook (suppression review/unsuppress, resolved-pending, Config gap), NOT_APPLICABLE disposition.
 
 ## Recent AWS features (2024-2026)
 
-- **Security Hub central configuration (2024-2025):** Security Hub now supports central configuration management across an Organization, enabling consistent standard enablement and control configuration from the delegated administrator account. Auditors should verify that the central configuration policy is deployed and that member accounts have not locally overridden critical controls.
-- **Automated Security Response on AWS (2024):** The ASR solution provides pre-built EventBridge-to-SSM remediation playbooks for Security Hub findings. Auditors should verify that ASR playbooks are deployed for critical controls and that the SSM automation documents have scoped IAM roles.
-- **Control lifecycle updates (2024-2025):** Security Hub periodically updates control specifications and adds new controls. Auditors should verify that newly released controls are evaluated and that disabled controls are documented with justification.
-- **Security Hub integration with Audit Manager (2024):** Enhanced integration allowing Security Hub findings to feed Audit Manager evidence collection. Auditors should verify that the integration is configured for compliance frameworks that require evidence of continuous monitoring.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#recent-aws-features-2024-2026).
+> Central configuration, Automated Security Response on AWS, control lifecycle updates, Audit Manager integration.
+
+## References (load on demand)
+
+- [advanced-patterns](references/advanced-patterns.md) — Activation triggers, Mindset, Step 0-4 detail prose, severity escalation matrix, Config-rule triggers, Security Hub internals, correlation, coverage heuristic, multi-account aggregation, custom controls, recent AWS features
+- [diagnostic-commands](references/diagnostic-commands.md) — pre-flight safety checks (dry-run, existence probes, rollback capture)
+- [error-handling](references/error-handling.md) — malformed-input emit blocks and API/CLI constraints with failure recovery
+- [remediation-guidance](references/remediation-guidance.md) — control-to-fix-action mapping tables and per-verdict remediation playbooks
 
 ## Domain
 

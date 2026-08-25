@@ -174,3 +174,17 @@ be unacceptable. Consider Glacier IR for latency reasons, not cost.
   prior versions.
 - NEVER trust Storage Lens data older than 7 days. Object distribution
   changes as lifecycle policies execute.
+
+---
+
+## Archive tier comparison (moved from SKILL.md Step 5)
+
+**Archive tier comparison:**
+
+| Tier | Storage $/TB-mo | Retrieval $/GB | Retrieval latency | Min storage duration | Use case |
+|---|---|---|---|---|---|
+| Standard-IA | $12.50 | $0.01 | ms | 30 days | Infrequent access, ms latency needed |
+| One Zone-IA | $10.10 | $0.01 | ms | 30 days | Infrequent, reproducible data |
+| Glacier IR | $4.00 | $0.03 | ms | 90 days | Quarterly access, ms latency |
+| Glacier Flexible | $3.60 | $0.03 (std), $0.025 (bulk), $0.10 (exp) | 1-5 min (std), 5-12h (bulk) | 90 days | Annual access, minutes ok |
+| Deep Archive | $0.99 | $0.02 (std), $0.0025 (bulk) | 12h (std), 48h (bulk) | 180 days | Compliance archive, hours ok |

@@ -488,3 +488,98 @@ resource "aws_s3_bucket_lifecycle_configuration" "secure" {
   }
 }
 ```
+
+---
+
+### Step 1 — Block Public Access commands (moved from SKILL.md)
+
+```bash
+# Account-level (do once per account)
+aws s3control put-public-access-block \
+  --account-id <ACCOUNT_ID> \
+  --public-access-block-configuration \
+    BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+
+# Bucket-level (do per bucket)
+aws s3api put-public-access-block \
+  --bucket <BUCKET> \
+  --public-access-block-configuration \
+    BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+```
+
+---
+
+### Step 2 — Default encryption commands (moved from SKILL.md)
+
+```bash
+# SSE-S3 (recommended default — zero cost, zero key management)
+aws s3api put-bucket-encryption \
+  --bucket <BUCKET> \
+  --server-side-encryption-configuration \
+    '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+
+# SSE-KMS (when compliance requires customer-managed keys)
+aws s3api put-bucket-encryption \
+  --bucket <BUCKET> \
+  --server-side-encryption-configuration \
+    '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"aws:kms","KMSMasterKeyID":"arn:aws:kms:<region>:<account>:key/<key-id>"}}]}'
+```
+
+---
+
+### Step 4 — Versioning + optional MFA delete commands (moved from SKILL.md)
+
+```bash
+aws s3api put-bucket-versioning \
+  --bucket <BUCKET> \
+  --versioning-configuration Status=Enabled
+
+# Optional: MFA delete (requires a hardware/virtual MFA device)
+aws s3api put-bucket-versioning \
+  --bucket <BUCKET> \
+  --versioning-configuration Status=Enabled,MFADelete=Enabled \
+  --mfa "<device-arn> <code>"
+```
+
+---
+
+### Step 6 — Access logging + CloudTrail data events commands (moved from SKILL.md)
+
+```bash
+aws s3api put-bucket-logging \
+  --bucket <BUCKET> \
+  --bucket-logging-status '{
+    "LoggingEnabled": {
+      "TargetBucket": "<LOG-BUCKET>",
+      "TargetPrefix": "s3/<BUCKET>/"
+    }
+  }'
+```
+
+For CloudTrail data events (API-level audit trail):
+
+```bash
+aws cloudtrail put-event-selectors \
+  --trail-name <TRAIL> \
+  --event-selectors '[{"ReadWriteType":"All","IncludeManagementEvents":true,
+    "DataResources":[{"Type":"AWS::S3::Object",
+    "Values":["arn:aws:s3:::<BUCKET>/"]}]}]'
+```
+
+---
+
+### Step 8 — Replication commands (moved from SKILL.md)
+
+```bash
+aws s3api put-bucket-replication \
+  --bucket <BUCKET> \
+  --replication-configuration '{
+    "Role": "arn:aws:iam::<ACCOUNT>:role/<REPLICATION-ROLE>",
+    "Rules": [{
+      "Status": "Enabled",
+      "Priority": 1,
+      "Filter": {},
+      "Destination": { "Bucket": "arn:aws:s3:::<DEST-BUCKET>" }
+    }]
+  }'
+```

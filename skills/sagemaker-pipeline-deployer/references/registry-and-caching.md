@@ -351,3 +351,46 @@ resource "aws_sagemaker_model_package_group" "xgb" {
 
 **Warning:** do NOT mix Terraform-managed pipelines with SDK-upserted
 pipelines. Pick one tool to own the pipeline definition.
+
+## Expert heuristic: caching reduces cost for unchanged steps
+
+Caching is opt-in (`enable_caching=True` on `Pipeline`). The cache key
+per step is derived from:
+
+```text
+cache_key = hash(
+    step_type, arguments, instance_type, instance_count,
+    image_uri,           # for image-by-tag: tag string only (NOT digest!)
+    algorithm_spec,
+    input_s3_etags,      # ETag of each S3 input object
+)
+```
+
+**Gotcha:** when an image is referenced by tag (`my-image:latest`), the
+tag string is part of the key — not the underlying digest. A push of a
+new image to the same tag does NOT invalidate the cache. Pin to
+*digests* (`my-image@sha256:...`) or bump the tag on every code change.
+Changing a hyperparameter value also invalidates; use pipeline
+Parameters for values you expect to sweep.
+
+## Expert heuristic: model registry gates production deployment
+
+The Model Registry is the gate between experimentation and production.
+`RegisterModel` adds a version to a Model Package Group in
+`PendingManualApproval` status. Production deployment pipelines query
+for `Approved` versions and deploy only those.
+
+```text
+Registry-driven deployment flow:
+
+  1. Pipeline runs RegisterModel → creates version N (PendingManualApproval)
+  2. Model reviewer evaluates version N (offline metrics, bias, drift)
+     ├── approve → UpdateModelPackage(ApprovalStatus=Approved)
+     └── reject  → UpdateModelPackage(ApprovalStatus=Rejected)
+  3. CI/CD polls for Approved versions, or EventBridge fires on approval
+  4. CI/CD calls describe-model-package → create-model → create-endpoint
+```
+
+**Key implication:** registering a model is NOT deploying it. The
+approval workflow is the safety gate. Auto-approving defeats it — only
+do this for non-production stages.

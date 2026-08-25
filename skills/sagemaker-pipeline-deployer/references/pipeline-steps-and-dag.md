@@ -443,3 +443,210 @@ silently.
 
 **Fix:** verify quotas with `service-quotas` before raising
 parallelism. Request quota increases for production pipelines.
+
+## Configuration dependency graph (novel heuristic)
+
+Pipeline configurations are NOT independent. A step consuming a property
+from an upstream step depends on that step. The Model Registry depends
+on a model artifact from Training/Tuning. EventBridge triggers operate
+at the pipeline level, not per-step.
+
+| Configuration | Hard dependencies | Silent failure / immutability | Enables downstream |
+|---|---|---|---|
+| Pipeline execution role | Role exists; trusts `sagemaker.amazonaws.com`; has `iam:PassRole` for child-job roles | Without `iam:PassRole`, underlying TrainingJob/ProcessingJob fail to launch | All steps that create child jobs |
+| Pipeline name | Globally unique within account+region; 1-256 chars | Cannot be renamed; must delete + re-create | The pipeline itself |
+| Parameters | Pipeline-scoped; default must satisfy type | Cannot be re-typed; defaults are immutable | Override at StartPipelineExecution |
+| ProcessingStep | Execution role; container image; S3 inputs/outputs | Without `Properties` reference, downstream can't read outputs | Preprocessing output feeds Training |
+| TrainingStep | Algorithm spec (built-in or custom ECR URI); channels | `S3ModelArtifacts` is the property downstream steps consume | Model artifact feeds CreateModel / RegisterModel |
+| TuningStep | Tuner config (objective, ranges, max jobs) | `BestTrainingJob` available only after tuning completes; runs N child jobs (cost) | Best model feeds CreateModel |
+| CreateModelStep | Model artifacts from Training/Tuning | Image URI must match training image or be re-packaged | Model object for Transform / Endpoint |
+| ConditionStep | Conditions reference `JsonGet` from a prior step's output | Branch selection at execution time, not creation time | Sub-branches run only if condition holds |
+| TransformStep | Model object; batch input S3 URI; instance type | Without batch input the step runs but scores nothing | Batch predictions to S3 |
+| RegisterModelStep | Model artifact; model package group (or auto-created) | New versions default to `PendingManualApproval` | Approval gate; downstream CI/CD deploys Approved |
+| Caching (enable_caching) | Set on Pipeline creation | Cache key per step; arg changes invalidate only that step | Cost reduction on re-runs |
+| ParallelismConfiguration | Integer ≥1; quota-aware | Default is 1 (sequential at top level even with independent steps) | Multiple branches run concurrently |
+| EventBridge rule | Pipeline ARN; rule target = `sagemaker` StartPipelineExecution | Without the rule, manual invoke only | Automated triggers (S3 PUT, schedule, CodeCommit) |
+
+**The execution-role-PassRole row is the one a baseline model misses.**
+A pipeline that defines a TrainingStep needs the pipeline's execution
+role to call `iam:PassRole` on the TrainingJob's role. Without that,
+creation succeeds but execution fails on the first job-launching step.
+
+**Cross-dependency gotchas:**
+- A property reference is the ONLY way to chain an upstream output into
+  a downstream input without an explicit `DependsOn`. Without either,
+  steps run in undeclared order.
+- TuningStep's `BestTrainingJob` is available only AFTER tuning
+  completes; downstream CreateModel must reference it via
+  `tuning_step.get_top_model_s3_uri()`, NOT a hardcoded S3 path.
+- `ParallelismConfiguration` caps concurrency PER pipeline execution.
+  Account-level quotas cap concurrency ACROSS all executions — hitting
+  the account quota serializes steps even with parallelism=5.
+
+## Expert heuristic: steps are a DAG, not a sequence
+
+A baseline model strings steps into a list and assumes the list order is
+the execution order. The correct heuristic: SageMaker builds a DAG from
+declared dependencies.
+
+```text
+Pipeline execution plan (DAG):
+
+  ProcessingStep (preprocess)
+        │  properties: ProcessingOutputConfig → S3 train/val URIs
+        ▼
+  TrainingStep (train)         ← depends on ProcessingStep via property ref
+        │  properties: S3ModelArtifacts
+        ▼
+  ConditionStep (check metric) ← depends on TrainingStep via JsonGet(metric)
+      ├── if accuracy ≥ threshold:
+      │     ├── CreateModelStep → TransformStep (batch)
+      │     └── RegisterModelStep (registry, PendingManualApproval)
+      └── else: FailStep (re-tune or alert)
+```
+
+**Key implication:** the `steps=[...]` list is NOT a script. It's a node
+collection. Edges are added by property references and `DependsOn`. Two
+nodes with no path between them are eligible to run in parallel.
+
+## Step recipes (Steps 4-9, moved from SKILL.md)
+
+### Step 4 — ProcessingStep (sklearn / Spark container)
+
+```python
+from sagemaker.sklearn.processing import SKLearnProcessor
+from sagemaker.processing import ProcessingInput, ProcessingOutput
+from sagemaker.workflow.steps import ProcessingStep
+
+processor = SKLearnProcessor(
+    framework_version="1.2-1", role=execution_role,
+    instance_type=processing_instance_type, instance_count=1,
+)
+preprocess = ProcessingStep(
+    name="Preprocess", processor=processor, code="pipelines/preprocess.py",
+    inputs=[ProcessingInput(source=f"s3://{bucket}/raw", destination="/opt/ml/processing/input")],
+    outputs=[
+        ProcessingOutput(output_name="train", source="/opt/ml/processing/output/train"),
+        ProcessingOutput(output_name="validation", source="/opt/ml/processing/output/validation"),
+    ],
+)
+```
+
+**Spark variant:** `PySparkProcessor` / `SparkProcessor`. Set
+`instance_count>1` for a Spark cluster. For very large Spark workloads,
+consider the newer `EMRStep` in Pipelines.
+
+### Step 5 — TrainingStep (built-in or custom algorithm)
+
+```python
+from sagemaker.estimator import Estimator
+from sagemaker.inputs import TrainingInput
+from sagemaker.workflow.steps import TrainingStep
+from sagemaker.image_uris import retrieve
+
+xgb_image = retrieve(framework="xgboost", region=region, version="1.7-1")
+estimator = Estimator(
+    image_uri=xgb_image, role=execution_role,
+    instance_count=training_instance_count,
+    instance_type=training_instance_type,
+    output_path=f"s3://{bucket}/models",
+    hyperparameters={"max_depth": 6, "eta": 0.2, "objective": "binary:logistic"},
+)
+train = TrainingStep(
+    name="Train", estimator=estimator,
+    inputs={
+        "train":      TrainingInput(s3_data=preprocess.properties.ProcessingOutputConfig.Outputs["train"].S3Output.S3Uri),
+        "validation": TrainingInput(s3_data=preprocess.properties.ProcessingOutputConfig.Outputs["validation"].S3Output.S3Uri),
+    },
+)
+```
+
+**Custom algorithm:** push to ECR; image must conform to the SageMaker
+training container contract (reads `/opt/ml/input/data/<channel>`,
+writes `/opt/ml/model`).
+
+### Step 6 — TuningStep (hyperparameter optimization)
+
+```python
+from sagemaker.tuner import HyperparameterTuner, ContinuousParameter, IntegerParameter
+from sagemaker.workflow.steps import TuningStep
+
+tuner = HyperparameterTuner(
+    estimator=estimator,
+    objective_metric_name="validation:auc",
+    objective_type="Maximize",
+    metric_definitions=[{"Name": "validation:auc", "Regex": "auc: ([0-9\\.]+)"}],
+    hyperparameter_ranges={
+        "max_depth": IntegerParameter(3, 10),
+        "eta":       ContinuousParameter(0.05, 0.4),
+    },
+    max_jobs=20,
+    max_parallel_jobs=4,
+)
+tuning = TuningStep(name="Tune", tuner=tuner, inputs={...})
+
+# Downstream: best model via get_top_model_s3_uri (NOT a hardcoded S3 path)
+best_model_uri = tuning.get_top_model_s3_uri(top_k=0, s3_bucket=bucket, prefix="tuning")
+```
+
+**Cost warning:** `max_jobs=20` spawns up to 20 TrainingJobs. Account
+quotas cap concurrency across all pipelines.
+
+### Step 7 — CreateModelStep (model artifact)
+
+```python
+from sagemaker.model import Model
+from sagemaker.workflow.step_collections import CreateModelStep
+
+model = Model(image_uri=xgb_image,
+              model_data=train.properties.ModelArtifacts.S3ModelArtifacts,
+              role=execution_role)
+create_model = CreateModelStep(
+    name="CreateModel", model=model,
+    inputs=sagemaker.model.ModelInputs(instance_type="ml.m5.large"),
+)
+```
+
+**Note:** the model image URI must match the training image (built-ins)
+or be a compatible serving image (custom) — a mismatch is a runtime
+failure at first inference.
+
+### Step 8 — ConditionStep (branching based on metrics)
+
+```python
+from sagemaker.workflow.conditions import ConditionGreaterThanOrEqualTo
+from sagemaker.workflow.condition_step import ConditionStep
+from sagemaker.workflow.fail_step import FailStep
+
+cond = ConditionGreaterThanOrEqualTo(left=accuracy, right=approval_threshold)
+condition_step = ConditionStep(
+    name="CheckAUC", conditions=[cond],
+    if_steps=[create_model, transform, register],
+    else_steps=[FailStep(name="MetricMiss", error_message="AUC below threshold")],
+)
+```
+
+**Important:** conditions evaluate at EXECUTION time using `JsonGet`
+values resolved from the prior step's property file. They are NOT Python
+`if` statements — the DAG itself branches at runtime.
+
+### Step 9 — TransformStep (batch inference)
+
+```python
+from sagemaker.transformer import Transformer
+from sagemaker.workflow.steps import TransformStep
+
+transformer = Transformer(
+    model_name=create_model.properties.ModelName,
+    instance_type="ml.m5.large", instance_count=1,
+    output_path=f"s3://{bucket}/batch-output",
+)
+transform = TransformStep(
+    name="BatchScore", transformer=transformer,
+    inputs=sagemaker.inputs.TransformInput(data=f"s3://{bucket}/batch-input"),
+)
+```
+
+**Gotcha:** `model_name` references the CreateModelStep property. If
+CreateModelStep is in a ConditionStep's `if_steps`, TransformStep must
+also be there — referencing a skipped step is a DAG error.

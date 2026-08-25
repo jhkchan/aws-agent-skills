@@ -83,29 +83,8 @@ commands.
 
 ## Mindset
 
-S3 cost optimization is a data-placement decision, not a throughput
-exercise. The goal is the storage-class distribution that minimizes
-total cost while preserving retrieval SLAs — not the absolute cheapest
-tier regardless of access needs.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — the four principles behind every recommendation.
 
-Four principles guide every recommendation:
-
-- **Object age is the primary signal.** S3 access patterns are
-  overwhelmingly write-once-read-rarely. The age of an object is the
-  strongest predictor of future access. Lifecycle policies formalize
-  this.
-- **Retrieval cost can negate storage savings.** Moving 10 TB to Deep
-  Archive saves $220/month in storage but a single full-restore costs
-  $25 (bulk). If the business does monthly full restores, the retrieval
-  cost ($300/year) may approach the storage savings ($2,640/year) —
-  still net positive, but the operator must know.
-- **Versioning multiplies cost invisibly.** Every PUT creates a new
-  version in a versioned bucket. Without lifecycle rules on noncurrent
-  versions, storage grows unbounded. Noncurrent transitions and
-  expirations are the fix.
-- **Intelligent-Tiering vs lifecycle is not either/or.** Use lifecycle
-  for predictable patterns (logs, backups) and Intelligent-Tiering for
-  unpredictable ones (user uploads, shared documents). Mixing is valid.
 
 ## Quick reference — verdict thresholds
 
@@ -126,14 +105,8 @@ Optimization decisions require object-age distribution and cost
 breakdown. Pull these before any recommendation. Full CLI sequences
 are in `references/s3-pricing-and-storage-classes.md`.
 
-**Required data sources** (summarized — see reference for full CLI):
-1. Bucket inventory: `aws s3api list-buckets --query 'Buckets[].Name'`
-2. Lifecycle config: `aws s3api get-bucket-lifecycle-configuration`
-3. Versioning status: `aws s3api get-bucket-versioning`
-4. Intelligent-Tiering config: `aws s3api get-bucket-intelligent-tiering-configuration`
-5. Storage Lens: `aws s3control get-storage-lens-configuration`
-6. Cost Explorer S3 breakdown: `aws ce get-cost-and-usage --service S3`
-7. Object-age sampling: `aws s3api list-objects-v2 --query 'Contents[?LastModified<...]'`
+→ Data-source CLI listing moved to [references/diagnostic-commands.md](references/diagnostic-commands.md); the short-circuit table below is the gate itself.
+
 
 ### Data-quality short-circuits
 
@@ -154,38 +127,8 @@ usage types.
 
 ## Configuration dependency graph
 
-```
-                    ┌──────────────────────┐
-                    │  Storage Lens (data) │
-                    │  Cost Explorer ($$)  │
-                    └──────────┬───────────┘
-                               │
-              ┌────────────────┼────────────────┐
-              ▼                ▼                ▼
-    ┌─────────────────┐ ┌────────────┐ ┌──────────────┐
-    │ Lifecycle Policy│ │ Intelligent│ │ Versioning   │
-    │ (Step 1)        │ │ -Tiering   │ │ Lifecycle    │
-    │                 │ │ (Step 2)   │ │ (Step 4)     │
-    └───────┬─────────┘ └─────┬──────┘ └──────┬───────┘
-            │                 │               │
-            ▼                 ▼               ▼
-    ┌──────────────────────────────────────────────┐
-    │          Retrieval-Pattern Gate (Step 5)      │
-    │  Verify archive retrieval won't exceed budget │
-    └──────────────────────┬───────────────────────┘
-                           │
-                           ▼
-    ┌──────────────────────────────────────────────┐
-    │       S3 Batch Operations (Step 6)            │
-    │       Bulk class migration execution          │
-    └──────────────────────┬───────────────────────┘
-                           │
-                           ▼
-    ┌──────────────────────────────────────────────┐
-    │          Impact Estimation (Step 7)           │
-    │          Verdict + savings block               │
-    └──────────────────────────────────────────────┘
-```
+→ Dependency-graph diagram moved to [references/advanced-patterns.md](references/advanced-patterns.md); the dependency rule below is the gate.
+
 
 **Dependency rule:** Never recommend a lifecycle transition without
 first verifying the retrieval pattern (Step 5 gate). A bucket with
@@ -195,83 +138,16 @@ high archive retrieval should NOT be pushed deeper into archive tiers.
 
 ### Step 0: Non-obvious behaviours that change the recommendation
 
-These operational gotchas route a recommendation away from the obvious
-choice:
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — non-obvious behaviours deep dive.
 
-- **Minimum-days constraints are mandatory.** Standard→Standard-IA
-  requires objects to be at least 30 days old. Standard-IA→Glacier
-  Instant Retrieval requires 30 days in IA first. You cannot create
-  a lifecycle rule that transitions to IA at 1 day.
-- **Transition costs money.** Each lifecycle transition charges a
-  per-request fee ($0.01/1,000 requests for Standard→IA). For buckets
-  with millions of tiny objects, the transition request cost can
-  exceed the first month's storage savings.
-- **Intelligent-Tiering monitoring fee is flat.** $2.50/TB-month
-  regardless of how many objects. For buckets < 1 TB, the monitoring
-  fee may exceed the savings. Break-even: Intelligent-Tiering pays off
-  when the storage savings from auto-tiering exceed $2.50/TB-month.
-- **Glacier Instant Retrieval is NOT the same as Standard-IA.** GIR
-  costs $4/TB-month (vs IA's $12.50) and provides millisecond access.
-  It is ideal for long-lived data accessed once a quarter. Standard-IA
-  costs $12.50/TB-month with a per-GB retrieval fee.
-- **Deep Archive minimum storage duration is 180 days.** Moving an
-  object to Deep Archive and deleting it before 180 days incurs an
-  early-delete charge equal to the remaining storage cost.
-- **Versioning creates invisible storage.** Every overwrite in a
-  versioned bucket retains the prior version. Without noncurrent-
-  version lifecycle rules, storage grows linearly with writes.
-- **Delete markers count as objects.** In a versioned bucket, a DELETE
-  operation creates a delete marker (0-byte). Millions of delete
-  markers have negligible storage cost but bloat LIST operations.
-- **MFA Delete blocks lifecycle expirations.** If MFA Delete is enabled
-  on a versioned bucket, lifecycle expiration of current versions
-  requires MFA approval. Plan accordingly.
-- **S3 Batch Operations COPY changes class.** To migrate existing
-  objects to a new storage class without waiting for lifecycle timing,
-  use Batch Operations with a COPY job and `StorageClass` override.
-- **One-zone IA is 20% cheaper but has no redundancy.** One Zone-IA
-  costs $10.10/TB-month (vs Standard-IA $12.50). Data loss risk if
-  the AZ fails. Use only for reproducible data.
 
 ### Step 1: Lifecycle policy configuration (the #1 lever)
 
 Lifecycle policies automate object transitions between storage classes
 based on age. This is the highest-impact S3 cost optimization.
 
-**Standard lifecycle template (data-lake / log archive pattern):**
+→ Lifecycle JSON template and minimum-days matrix moved to [references/advanced-patterns.md](references/advanced-patterns.md); the decision gate below carries every branch.
 
-```json
-{
-  "Rules": [
-    {
-      "ID": "data-lake-tiering",
-      "Status": "Enabled",
-      "Filter": { "Prefix": "" },
-      "Transitions": [
-        { "Days": 30,  "StorageClass": "STANDARD_IA" },
-        { "Days": 90,  "StorageClass": "GLACIER_IR" },
-        { "Days": 180, "StorageClass": "GLACIER" },
-        { "Days": 365, "StorageClass": "DEEP_ARCHIVE" }
-      ],
-      "Expiration": { "Days": 2555 }
-    }
-  ]
-}
-```
-
-**Transition timing — minimum-days matrix:**
-
-| Transition | Min days in current tier | Min days in Standard (cumulative) | Storage rate delta |
-|---|---|---|---|
-| Standard → Standard-IA | 30 | 30 | $23 → $12.50 (saves $10.50/TB-mo) |
-| Standard → One Zone-IA | 30 | 30 | $23 → $10.10 (saves $12.90/TB-mo) |
-| Standard → Glacier IR | 0 | 0 | $23 → $4.00 (saves $19.00/TB-mo) |
-| Standard-IA → Glacier IR | 30 | 60 | $12.50 → $4.00 (saves $8.50/TB-mo) |
-| Standard-IA → Glacier Flexible | 30 | 60 | $12.50 → $3.60 (saves $8.90/TB-mo) |
-| Glacier IR → Glacier Flexible | 0 | 90 | $4.00 → $3.60 (saves $0.40/TB-mo) |
-| Standard → Glacier Flexible | 1 | 1 | $23 → $3.60 (saves $19.40/TB-mo) |
-| Standard → Deep Archive | 1 | 1 | $23 → $0.99 (saves $22.01/TB-mo) |
-| Glacier Flexible → Deep Archive | 90 | 90 | $3.60 → $0.99 (saves $2.61/TB-mo) |
 
 **Decision gate:**
 
@@ -282,12 +158,8 @@ based on age. This is the highest-impact S3 cost optimization.
 | >10% of objects aged >180 days with <1% retrieval | Transition to Deep Archive at 180d |
 | Objects aged >2555 days (7+ years) | Expiration if compliance permits |
 
-**Per-TB savings calculation:**
-```
-savings_per_TB = affected_TB × (current_rate − new_rate)
-transition_cost = (affected_TB / avg_object_size_GB) × $0.01/1000
-net_monthly_savings = savings_per_TB − (transition_cost / months_to_amortize)
-```
+→ Savings formulas moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+
 
 ### Step 2: Intelligent-Tiering configuration
 
@@ -312,28 +184,8 @@ frequency.
 | Bucket < 1 TB | Monitoring fee exceeds savings |
 | Regulatory retention with known expiry | Explicit expiration rule required |
 
-**Intelligent-Tiering tier configuration:**
+→ Intelligent-Tiering CLI, tier configuration, and the 50 TB cost comparison moved to [references/advanced-patterns.md](references/advanced-patterns.md).
 
-```bash
-aws s3api put-bucket-intelligent-tiering-configuration \
-  --bucket my-bucket \
-  --id ConfigID \
-  --intelligent-tiering-configuration '{
-    "Status": "Enabled",
-    "Tierings": [
-      {"Days": 90, "AccessTier": "ARCHIVE_ACCESS"},
-      {"Days": 180, "AccessTier": "DEEP_ARCHIVE_ACCESS"}
-    ]
-  }'
-```
-
-**Cost comparison: Intelligent-Tiering vs lifecycle for 50 TB:**
-```
-Intelligent-Tiering: $125/mo monitoring + $483.25 storage = $608.25/mo
-Lifecycle:           $0 monitoring + $429.85 storage = $429.85/mo
-Lifecycle is $178.40/mo cheaper for predictable patterns.
-But IT avoids misclassification risk for unpredictable access.
-```
 
 ### Step 3: Storage Lens analysis and prefix-based grouping
 
@@ -353,14 +205,8 @@ to drive data-driven tiering decisions.
 | IncompleteMultipartUploadStorageBytes | Aborted multipart uploads | Add abort rule to reclaim storage |
 | BytesDownloaded by class | Retrieval volume by class | Glacier/DA downloads reveal retrieval cost risk |
 
-**Prefix-based grouping for cost allocation:**
-```
-Bucket: data-lake-prod
-  /raw/logs/          — 20 TB, 95% >180d, <0.1% retrieval → DA at 180d (saves $380/mo)
-  /raw/events/        — 10 TB, 60% >90d, <1% retrieval → GIR at 90d (saves $114/mo)
-  /curated/reports/   — 8 TB, 80% <30d, 15% retrieval → keep Standard
-  /archive/snapshots/ — 7 TB, 100% >365d, 0% retrieval → Batch Ops to DA (saves $154/mo)
-```
+→ Prefix-grouping example moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+
 
 ### Step 4: Versioning cost impact
 
@@ -375,60 +221,25 @@ noncurrent_pct = NoncurrentVersionStorageBytes /
 If noncurrent_pct > 10% → versioning bloat finding
 ```
 
-**Noncurrent-version lifecycle template:**
-```json
-{
-  "ID": "noncurrent-version-tiering",
-  "Status": "Enabled",
-  "NoncurrentVersionTransitions": [
-    { "NoncurrentDays": 30,  "NewerNoncurrentVersions": 3, "NewStorageClass": "STANDARD_IA" },
-    { "NoncurrentDays": 90,  "NewerNoncurrentVersions": 3, "NewStorageClass": "GLACIER_IR" },
-    { "NoncurrentDays": 180, "NewerNoncurrentVersions": 3, "NewStorageClass": "DEEP_ARCHIVE" }
-  ],
-  "NoncurrentVersionExpiration": { "NoncurrentDays": 365, "NewerNoncurrentVersions": 3 }
-}
-```
+→ Noncurrent-version lifecycle template moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+
 
 Keeps the 3 most recent noncurrent versions; transitions older ones to
 cheaper tiers; expires after 365 days.
 
-**Delete marker cleanup:**
-```bash
-# Schedule a Batch Operations job to remove delete markers
-# on objects where the delete marker is the only version
-aws s3control create-job \
-  --account-id <acct> \
-  --operation '{"S3DeleteObjectTagging": {}}' \
-  --manifest '{"Spec": {"Format": "S3BatchOperations_CSV_20180820",
-               "Location": {"Bucket": "...","Key": "..."}}}'
-```
+→ Delete-marker cleanup command moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+
 
 ### Step 5: Retrieval-pattern matching
 
 Choosing the right archive tier depends on retrieval frequency and
 latency tolerance.
 
-**Archive tier comparison:**
+→ Archive tier comparison table moved to [references/s3-pricing-and-storage-classes.md](references/s3-pricing-and-storage-classes.md); the detection gate below carries the decisions.
 
-| Tier | Storage $/TB-mo | Retrieval $/GB | Retrieval latency | Min storage duration | Use case |
-|---|---|---|---|---|---|
-| Standard-IA | $12.50 | $0.01 | ms | 30 days | Infrequent access, ms latency needed |
-| One Zone-IA | $10.10 | $0.01 | ms | 30 days | Infrequent, reproducible data |
-| Glacier IR | $4.00 | $0.03 | ms | 90 days | Quarterly access, ms latency |
-| Glacier Flexible | $3.60 | $0.03 (std), $0.025 (bulk), $0.10 (exp) | 1-5 min (std), 5-12h (bulk) | 90 days | Annual access, minutes ok |
-| Deep Archive | $0.99 | $0.02 (std), $0.0025 (bulk) | 12h (std), 48h (bulk) | 180 days | Compliance archive, hours ok |
 
-**Retrieval cost surprise prevention:**
-```
-monthly_retrieval_cost = retrieved_GB × retrieval_rate
+→ Retrieval cost surprise math moved to [references/advanced-patterns.md](references/advanced-patterns.md).
 
-Example: 5 TB retrieved from Glacier Flexible per month (standard):
-  5,120 GB × $0.03 = $153.60/month retrieval
-  vs storage savings: 5 TB × ($12.50 - $3.60) = $44.50/month saved
-
-  NET: the retrieval cost EXCEEDS the storage savings.
-  This bucket should use Standard-IA, not Glacier Flexible.
-```
 
 **Retrieval-mismatch detection gate:**
 | Observed monthly retrieval rate | Recommendation |
@@ -443,21 +254,8 @@ Example: 5 TB retrieved from Glacier Flexible per month (standard):
 Lifecycle policies only affect objects prospectively. To migrate
 existing objects to a cheaper tier immediately, use S3 Batch Operations.
 
-**Batch Operations COPY with class override:**
-```bash
-# Generate manifest of Standard-class objects
-aws s3api list-objects-v2 --bucket my-bucket \
-  --query 'Contents[?StorageClass==`STANDARD`].[Key]' \
-  --output text | awk '{print "my-bucket,"$1}' > manifest.csv
-aws s3 cp manifest.csv s3://manifest-bucket/manifest.csv
+→ Batch Operations COPY commands moved to [references/advanced-patterns.md](references/advanced-patterns.md).
 
-# Create Batch Operations job
-aws s3control create-job --account-id <acct> \
-  --operation '{"S3ReplicateObject": {}}' \
-  --report '{"Bucket":"s3://report-bucket","Enabled":true}' \
-  --manifest '{"Spec":{"Format":"S3BatchOperations_CSV_20180820","Location":{"Bucket":"manifest-bucket","Key":"manifest.csv"}}}' \
-  --role-arn arn:aws:iam::<acct>:role/S3BatchOperationsRole
-```
 
 **Cost:** $0.25 per million objects. For 10M objects: $2.50 — negligible
 vs monthly savings. Use Batch Ops for immediate migration of existing
@@ -467,18 +265,8 @@ objects; use lifecycle for future objects.
 
 Compute the monthly savings for each recommendation:
 
-```
-current_monthly_cost =
-  standard_TB × $23 + standard_ia_TB × $12.50 + one_zone_ia_TB × $10.10 +
-  glacier_ir_TB × $4.00 + glacier_TB × $3.60 + deep_archive_TB × $0.99
+→ Impact-estimation formulas moved to [references/advanced-patterns.md](references/advanced-patterns.md).
 
-projected_monthly_cost =
-  projected_standard_TB × $23 + projected_ia_TB × $12.50 +
-  projected_gir_TB × $4.00 + projected_glacier_TB × $3.60 +
-  projected_deep_archive_TB × $0.99 + intelligent_tiering_monitoring_fee
-
-monthly_saving = current_monthly_cost - projected_monthly_cost
-```
 
 Always state assumptions: TB per class, transition timing, retrieval
 rate, pricing region, Intelligent-Tiering monitoring fee.
@@ -675,55 +463,13 @@ Extended anti-patterns in `references/s3-pricing-and-storage-classes.md`.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation,
-  emit and await operator approval. Do NOT execute until confirmed.
-- **Test lifecycle on a prefix filter first.** Deploy the policy with
-  a `Filter.Prefix` on a non-critical prefix; verify transitions; then
-  widen to the whole bucket.
-- **Verify MFA Delete status before lifecycle expiration.** If MFA
-  Delete is enabled, lifecycle expiration of current versions will be
-  blocked. Inform the operator.
-- **Check Object Lock before recommending expiration.** Objects under
-  Object Lock retention cannot be expired or overwritten until the lock
-  expires.
-- **Estimate transition request cost for small-object buckets.**
-  Millions of tiny objects transitioning in one day can incur thousands
-  of dollars in per-request fees.
-- **Batch Operations jobs are irreversible.** A COPY job that overwrites
-  objects in place with the wrong storage class is destructive. Always
-  test on a manifest subset first.
-- **Glacier/Deep Archive transitions are not instant.** S3 processes
-  transitions asynchronously (typically within 12 hours). Do not expect
-  immediate class change.
-- **Noncurrent-version expiration is permanent.** Once expired, prior
-  versions cannot be recovered. Verify the `NewerNoncurrentVersions`
-  count before deploying.
-- **Bulk-operation limit:** Process at most 5 buckets per batch. Sort
-  by estimated savings, verify each batch before proceeding. Abort if
-  any bucket shows unexpected retrieval cost spikes.
+→ Pre-flight safety checklist moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+
 
 ## Recent AWS features (2024-2026)
 
-- **S3 Intelligent-Tiering Archive Access (2024-2025):** Configurable
-  Archive Access at 90 days and Deep Archive Access at 180 days. No
-  retrieval fees for moving between tiers within IT.
-- **S3 Glacier Instant Retrieval (GIR) maturity:** Millisecond-latency
-  archive at $4/TB-month. Increasingly the default choice for quarterly-
-  access data that needs fast retrieval.
-- **S3 Storage Lens prefix-level metrics (2024):** Object-age and
-  activity breakdown by prefix. Requires Storage Lens Advanced (paid).
-  Free tier provides bucket-level only.
-- **S3 Batch Operations COPY with storage class (2024):** COPY job can
-  override the storage class, enabling immediate bulk migration without
-  waiting for lifecycle timing.
-- **S3 Object Lambda cost (2024-2025):** Not directly a storage-class
-  concern but affects total S3 bill. Flag if Object Lambda is in use.
-- **Directory Buckets (S3 Express One Zone, 2024-2025):** Ultra-low-
-  latency bucket type for ML/AI training data. Different pricing model
-  ($0.16/GB-month + request fees). Out of scope for this skill but
-  flag if detected.
-- **S3 Tables (2025):** Managed Apache Iceberg tables on S3. Separate
-  pricing from standard storage. Flag if detected.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — recent AWS features (2024-2026).
+
 
 ## References
 
@@ -733,6 +479,13 @@ Extended anti-patterns in `references/s3-pricing-and-storage-classes.md`.
 - `references/worked-examples.md` — full worked examples (lifecycle
   deployment, Intelligent-Tiering activation, versioning bloat, already-
   optimal, NEED_MORE_INFO, end-to-end walkthrough).
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — mindset deep dive, dependency-graph diagram, Step 0 gotchas, step templates/formulas, recent AWS features.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — data-gate CLI sources and pre-remediation safety checks.
+- [references/s3-pricing-and-storage-classes.md](references/s3-pricing-and-storage-classes.md) — pre-existing; pricing tables and minimum-days matrix; extended with the archive tier comparison.
+- [references/worked-examples.md](references/worked-examples.md) — pre-existing; full worked examples and the end-to-end walkthrough.
 
 ## Domain
 

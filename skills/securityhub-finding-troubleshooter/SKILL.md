@@ -39,14 +39,8 @@ race, NOT_AVAILABLE with StatusReasons, and aggregator gaps.
 
 ## Mindset
 
-A Security Hub finding is a **control evaluation result**, not a threat.
-Where GuardDuty signals an active attack, Security Hub signals a config
-drift — the resource is non-compliant with a standard. Senior Security
-Hub engineers read the finding's `Compliance.Status` and
-`Compliance.StatusReasons` before probing the resource: a finding marked
-`PASSED` that the operator is debugging is likely a stale cache; a
-finding marked `FAILED` with `StatusReasons` describing a Config rule
-error is an AWS-side gap, not a resource failure.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#mindset).
+> A finding is a control-evaluation result, not a threat; read Compliance.Status and StatusReasons before probing the resource.
 
 ## STRICT output contract
 
@@ -112,29 +106,8 @@ layer.
 
 ### Account-wide pre-flight commands
 
-```bash
-# Hub, enabled standards, aggregator, administrator
-aws securityhub describe-hub --output json
-aws securityhub describe-standards --output json
-aws securityhub list-enabled-products-for-import --output json
-aws securityhub get-finding-aggregator --output json 2>/dev/null || echo "no aggregator"
-aws securityhub get-administrator-account --output json 2>/dev/null || echo "no admin"
-
-# The finding itself (preferred path)
-aws securityhub get-findings \
-  --filters '{"Id":[{"Value":"<finding-id>","Comparison":"EQUALS"}]}' \
-  --output json
-
-# Finding statistics by severity and control
-aws securityhub get-findings-statistics \
-  --filters '{"AwsAccountId":[{"Value":"<acct>","Comparison":"EQUALS"}]}' \
-  --statistics-types SEVERITY_COUNT RECORD_STATE_COUNT --output json
-
-# Config rule backing the Security Hub control
-aws configservice describe-config-rules \
-  --config-rule-names "<rule-name>" --output json
-aws configservice describe-configuration-recorders --output json
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#account-wide-pre-flight-commands).
+> Hub/standards/aggregator/administrator discovery, get-findings by ID, finding statistics, and Config rule probes.
 
 ### Finding-shape short-circuit
 
@@ -167,44 +140,8 @@ CLI or Config.**
 
 ### Step 0: Non-obvious behaviours that change the diagnosis
 
-- **A `RESOLVED` finding that keeps reappearing is a re-evaluation
-  race.** Security Hub re-evaluates on Config change or periodic
-  schedule. If the resource is fixed but the rule re-runs before the
-  cached state propagates, the finding flips back to FAILED. Wait one
-  full eval cycle (5-30 min) before escalating. If still flapping
-  after 30 min, the rule is mis-attributing the resource.
-
-- **`NOT_AVAILABLE` does NOT mean the resource is compliant.** It
-  means the Config rule could not evaluate — typically because the
-  resource is out of scope (Lambda control, no Lambda in account), the
-  rule errored, or the source bucket is unavailable. Read
-  `Compliance.StatusReasons` for the specific code.
-
-- **Security Hub severity ≠ Config rule severity.** Security Hub
-  assigns `Severity.Label` based on the standard's scoring. A CIS Low
-  (severity 1.x) maps to Security Hub `INFORMATIONAL`; an FSBP
-  Critical can map to either `CRITICAL` or `HIGH`.
-
-- **Cross-account aggregation has up to 5 min latency.** A finding
-  fixed in a member account may still appear FAILED in the aggregator
-  for up to 5 minutes. Verify by querying the member account directly.
-
-- **Custom controls (custom ASFF) fire from Config or EventBridge.**
-  A custom Security Hub control is a Config rule (custom Lambda-backed)
-  that emits ASFF via `BatchImportFindings`. If the rule exists but
-  findings stop, the Lambda's `securityhub:BatchImportFindings` IAM
-  permission is the usual culprit.
-
-- **FSBP control IDs (e.g., `S3.1`, `EC2.8`) are stable; standard
-  control IDs (e.g., `CIS.1.5`) change with version.** CIS 1.2 →
-  CIS 1.4 added new controls; the numeric suffix may not match the
-  prior runbook. Cross-reference `GeneratorId` against the current
-  standard's ARN before remediating.
-
-- **Disabling a standard mid-audit does NOT clear existing findings.**
-  Findings already in the system stay ACTIVE until the next eval cycle
-  (or 3-5 days). Explicitly suppress or update the workflow status to
-  clear immediately.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-0-non-obvious-behaviours-that-change-the-diagnosis).
+> Seven diagnosis-changing behaviours: RESOLVED re-eval race, NOT_AVAILABLE semantics, severity mapping, aggregation latency, custom-control wiring, control-ID versioning, standard-disable staleness.
 
 ### Step 1: Symptom entry — pick the diagnostic branch
 
@@ -230,15 +167,8 @@ ambiguous, first fetch the finding JSON and inspect `GeneratorId` and
 
 #### 2a: Public access block (S3.1 / PCI.S3.1-5)
 
-```bash
-# Public Access Block on the account and bucket
-aws s3control get-public-access-block --account-id <acct> --output json
-aws s3api get-public-access-block --bucket <bucket> --output json
-
-# Bucket policy and ACL for cross-check
-aws s3api get-bucket-policy --bucket <bucket> --output json
-aws s3api get-bucket-acl --bucket <bucket> --output json
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-2a--public-access-block-s31--pcis31-5).
+> Account+bucket BPA and bucket policy/ACL cross-check probes.
 
 **Verdict signals:**
 - `BlockPublicAcls`, `IgnorePublicAcls`, `BlockPublicPolicy`, and
@@ -251,9 +181,8 @@ aws s3api get-bucket-acl --bucket <bucket> --output json
 
 #### 2b: Bucket encryption (S3.4 / S3.6)
 
-```bash
-aws s3api get-bucket-encryption --bucket <bucket> --output json
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-2b--bucket-encryption-s34--s36).
+> get-bucket-encryption probe.
 
 **Verdict signals:**
 - `ServerSideEncryptionConfiguration` is empty or absent →
@@ -262,9 +191,8 @@ aws s3api get-bucket-encryption --bucket <bucket> --output json
 
 #### 2c: Versioning / MFA delete (S3.9 / S3.10)
 
-```bash
-aws s3api get-bucket-versioning --bucket <bucket> --output json
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-2c--versioning--mfa-delete-s39--s310).
+> get-bucket-versioning probe.
 
 **Verdict signals:**
 - `Status` absent or `Suspended` → **ROOT_CAUSE_FOUND**,
@@ -275,9 +203,8 @@ aws s3api get-bucket-versioning --bucket <bucket> --output json
 
 #### 3a: Password policy (CIS.1.5-1.11 / PCI.IAM.1)
 
-```bash
-aws iam get-account-password-policy --output json
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-3a--password-policy-cis15-111--pciiam1).
+> get-account-password-policy probe.
 
 **Verdict signals:**
 - `MinimumPasswordLength < 14`, `RequireSymbols=false`, etc. →
@@ -286,10 +213,8 @@ aws iam get-account-password-policy --output json
 
 #### 3b: MFA on root / IAM users (CIS.1.4 / FSBP.IAM.7)
 
-```bash
-aws iam get-account-summary --output json | \
-  jq '.SummaryMap | {AccountMFAEnabled, UsersQuota, MFADevicesInUse}'
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-3b--mfa-on-root--iam-users-cis14--fsbpiam7).
+> get-account-summary MFA probe (jq filter on AccountMFAEnabled).
 
 **Verdict signals:**
 - `AccountMFAEnabled = 0` → root has no MFA. **ROOT_CAUSE_FOUND**,
@@ -301,10 +226,8 @@ aws iam get-account-summary --output json | \
 
 #### 3c: Aged access keys (CIS.1.3 / FSBP.IAM.6)
 
-```bash
-aws iam get-credential-report --output text --query 'Content' | \
-  base64 --decode | awk -F',' 'NR==1 || ($5!="N/A" && $5<"2025-08-10T00:00:00Z") {print}'
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-3c--aged-access-keys-cis13--fsbpiam6).
+> get-credential-report base64/awk aged-key extraction pipeline.
 
 **Verdict signals:**
 - Any active key with `access_key_1_last_rotated` older than 90 days
@@ -316,11 +239,8 @@ aws iam get-credential-report --output text --query 'Content' | \
 
 #### 4a: IMDSv2 required (EC2.8 / FSBP.EC2.8)
 
-```bash
-aws ec2 describe-instances --instance-ids <i-id> --output json | \
-  jq '.Reservations[0].Instances[0].MetadataOptions'
-# HttpTokens: optional (bad) / required (good)
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-4a--imdsv2-required-ec28--fsbpec28).
+> describe-instances MetadataOptions probe (HttpTokens optional vs required).
 
 **Verdict signals:**
 - `HttpTokens=optional` → **ROOT_CAUSE_FOUND**, `LAYER: EC2_IMDSV2`.
@@ -329,10 +249,8 @@ aws ec2 describe-instances --instance-ids <i-id> --output json | \
 
 #### 4b: Security group 0.0.0.0/0 (EC2.2 / EC2.4 / PCI.EC2.2-4)
 
-```bash
-aws ec2 describe-security-groups --group-ids <sg-id> --output json | \
-  jq '.SecurityGroups[].IpPermissions[] | select(.IpRanges[]?.CidrIp=="0.0.0.0/0")'
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-4b--security-group-00000-ec22--ec24--pciec22-4).
+> describe-security-groups 0.0.0.0/0 ingress probe.
 
 **Verdict signals:**
 - SG rule allows `0.0.0.0/0` on ports 22, 3389, 3306, etc. →
@@ -341,10 +259,8 @@ aws ec2 describe-security-groups --group-ids <sg-id> --output json | \
 
 ### Step 5: KMS key rotation (KMS.3 / PCI.KMS.1)
 
-```bash
-aws kms describe-keys --key-ids <key-id> --output json | \
-  jq '.Keys[0] | {KeyId, KeyState, EnableKeyRotation, KeyUsage}'
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-5--kms-key-rotation-kms3--pcikms1).
+> kms describe-keys EnableKeyRotation probe.
 
 **Verdict signals:**
 - `EnableKeyRotation=false` on a customer-managed CMK →
@@ -353,10 +269,8 @@ aws kms describe-keys --key-ids <key-id> --output json | \
 
 ### Step 6: CloudTrail data events (CloudTrail.4 / CIS.2.7)
 
-```bash
-aws cloudtrail describe-trails --output json
-aws cloudtrail get-event-selectors --trail-name <trail> --output json
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-6--cloudtrail-data-events-cloudtrail4--cis27).
+> describe-trails + get-event-selectors probes.
 
 **Verdict signals:**
 - No event selector with `IncludeManagementEvents=true` AND
@@ -367,10 +281,8 @@ aws cloudtrail get-event-selectors --trail-name <trail> --output json
 
 ### Step 7: Config recorder coverage (Config.1)
 
-```bash
-aws configservice describe-configuration-recorders --output json
-aws configservice describe-delivery-channels --output json
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-7--config-recorder-coverage-config1).
+> describe-configuration-recorders + describe-delivery-channels probes.
 
 **Verdict signals:**
 - Recorder `status` is not recording, or `recordingGroup.allSupported=false`
@@ -380,11 +292,8 @@ aws configservice describe-delivery-channels --output json
 
 ### Step 8: `NOT_AVAILABLE` with StatusReasons
 
-```bash
-# Read StatusReasons from the finding
-jq '.Compliance.StatusReasons' finding.json
-# Each entry: {ReasonCode: <code>, Description: <text>}
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-8--not_available-statusreasons-read).
+> jq extraction of Compliance.StatusReasons from the finding JSON.
 
 **Common ReasonCodes:**
 
@@ -404,14 +313,8 @@ jq '.Compliance.StatusReasons' finding.json
 
 ### Step 9: Stuck `RESOLVED`-but-still-appearing
 
-```bash
-# Compare Security Hub state vs Config state
-aws securityhub get-findings \
-  --filters '{"Id":[{"Value":"<id>","Comparison":"EQUALS"}]}' \
-  --output json | jq '.Findings[0].Workflow.Status, .Findings[0].Compliance.Status'
-aws configservice get-resource-config-history \
-  --resource-type <type> --resource-id <id> --output json
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-9--stuck-resolved-but-still-appearing).
+> Security Hub workflow/compliance state vs Config resource-history comparison probes.
 
 **Verdict signals:**
 - Security Hub `Workflow.Status=RESOLVED`, `Compliance.Status=PASSED`,
@@ -425,13 +328,8 @@ aws configservice get-resource-config-history \
 
 ### Step 10: Cross-account aggregation gap
 
-```bash
-# From the aggregator (administration) account
-aws securityhub get-finding-aggregator --output json
-aws securityhub list-members --output json
-# From the member account
-aws securityhub get-administrator-account --output json
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-10--cross-account-aggregation-gap).
+> Aggregator-side get-finding-aggregator/list-members and member-side get-administrator-account probes.
 
 **Verdict signals:**
 - Aggregator exists but member account not in `list-members` →
@@ -444,14 +342,8 @@ aws securityhub get-administrator-account --output json
 
 ### Step 11: Custom action wired but not firing
 
-```bash
-# EventBridge rule + target + Lambda permission
-aws events describe-rule --name <rule> --output json
-aws events list-targets-by-rule --rule <rule> --output json
-aws lambda get-policy --function-name <fn> --output json
-# Test invocation
-aws events test-event-pattern --event <json> --event-pattern <json>
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-11--custom-action-wired-but-not-firing).
+> EventBridge rule/target, Lambda resource policy, and test-event-pattern probes.
 
 **Verdict signals:**
 - EventBridge rule exists, target set, but `test-event-pattern` returns
@@ -463,12 +355,8 @@ aws events test-event-pattern --event <json> --event-pattern <json>
 
 ### Step 12: Automation Rules not applying
 
-```bash
-# List and inspect Automation Rules (2024 GA feature)
-aws securityhub list-automation-rules --output json
-aws securityhub get-automation-rules \
-  --automation-rules-arn-list '["<arn>"]' --output json
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-12--automation-rules-not-applying).
+> list-automation-rules and get-automation-rules probes.
 
 **Verdict signals:**
 - Rule exists with `Criteria.SeverityLabel` not matching the finding's
@@ -488,44 +376,13 @@ Apply suppression (lower severity or archive) only after a finding is
 confirmed FALSE_POSITIVE or out of permanent scope. Use Automation
 Rules (preferred 2024+) over manual `update-findings`.
 
-```bash
-aws securityhub create-automation-rule \
-  --rule-name "archive-cis-1-3-known-ci-keys" --rule-order 1 \
-  --description "Archive CIS.1.3 findings on the CI deployment role" \
-  --criteria '<json-criteria>' \
-  --actions '[{"Type":"FINDING_FIELDS_UPDATE","FindingFieldsUpdate":{"Workflow":{"Status":"SUPPRESSED"}}}]'
-```
-
-**Suppression patterns by FP class** (full criteria JSON in
-`references/control-catalogue-and-remediation.md`):
-
-- **CI deployment role keys (CIS.1.3)** — filter on
-  `Resources[0].Details.AwsIamAccessKey.PrincipalName` containing
-  `<ci-role-name>` AND GeneratorId containing `CIS.1.3`.
-- **Documented public S3 bucket (S3.2)** — filter on
-  `Resources[0].Id` containing `<bucket-arn>` AND GeneratorId
-  containing `S3.2`.
-- **Test instance in sandbox account (EC2.8)** — filter on
-  `AwsAccountId=<sandbox>` AND `Resources[0].Type=AwsEc2Instance`.
+> Moved to [references/control-catalogue-and-remediation.md](references/control-catalogue-and-remediation.md#step-13--suppression-cli-and-fp-class-patterns).
+> create-automation-rule suppression CLI plus per-FP-class criteria (CI keys CIS.1.3, documented public bucket S3.2, sandbox EC2.8).
 
 ### Step 14: Custom actions via EventBridge → Lambda
 
-For auto-remediation, recommend an EventBridge rule that triggers
-Lambda on finding import:
-
-```text
-EventBridge source: aws.securityhub
-Event pattern: { "source": ["aws.securityhub"],
-  "detail-type": ["Security Hub Findings - Imported"],
-  "detail": { "findings": { "Severity": { "Label": ["CRITICAL","HIGH"] },
-    "Compliance": { "Status": ["FAILED"] } } } }
-Target Lambda:
-  - S3 public access: aws s3control put-public-access-block
-  - IAM access key: aws iam update-access-key (deactivate)
-  - EC2 IMDSv2: aws ec2 modify-instance-metadata-options --http-tokens required
-  - KMS rotation: aws kms enable-key-rotation
-Always: post to SOC chat, NEVER auto-delete a resource.
-```
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-14-custom-actions-via-eventbridge--lambda).
+> Auto-remediation wiring: CRITICAL/HIGH FAILED import event pattern, per-layer Lambda targets, SOC-chat posting rule.
 
 ### Step 15: Escalate or NEED_MORE_INFO
 
@@ -572,18 +429,8 @@ outage), emit:
 
 ## Expert heuristic
 
-When triaging a Security Hub finding, ask three questions in order.
-(1) Does the finding's `Compliance.Status` match the resource's actual
-state? A `FAILED` finding with no corroborating service CLI failure is
-a stale cache or Config rule error — check `StatusReasons`. (2) Is the
-resource in the same account and region as the finding? Cross-account
-aggregation has up to 5 min latency; the member account's local view is
-more current than the aggregator's. (3) Is the rule backing the control
-running correctly? Config rule Lambda errors, missing IAM permissions,
-and out-of-scope resource types produce `NOT_AVAILABLE` findings that
-look like control failures but are evaluation gaps. A finding matching
-all three (true FAILED, same region, healthy rule) is almost certainly
-a real control failure — proceed to remediation.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic).
+> Three triage questions: status-vs-actual-state, account/region locality, rule health — all three true means real control failure.
 
 ## Output format
 
@@ -629,38 +476,15 @@ CONFIRM: "CONFIRM: About to put-public-access-block on account 111 and
 
 ### Worked example — CIS.1.3 NOT_AVAILABLE StatusReason
 
-```text
-FINDING: arn:aws:securityhub:us-east-1:111:finding/def (CIS.1.3 access-key age)
-VERDICT: ROOT_CAUSE_FOUND
-REASON: The CIS.1.3 finding is NOT_AVAILABLE because the Config rule
-  Lambda errored on a missing iam:GetCredentialReport permission. The
-  keys themselves are compliant; the failure is in the evaluation layer
-  (Step 8).
-LAYER: AWS_SIDE
-SEVERITY: MEDIUM
-STANDARD: CIS
-EVIDENCE:
-  - Security Hub finding: Compliance.Status = NOT_AVAILABLE,
-    Compliance.StatusReasons[0].ReasonCode = CONFIG_EVALUATION_ERROR.
-  - Probe: describe-config-rules on securityhub-cis-1-3 shows
-    LastEvaluationTime 26 hours ago.
-  - Probe: filter-log-events on the rule's log group shows
-    "AccessDenied: iam:GetCredentialReport".
-  - FP ruled out: get-credential-report shows all active keys rotated
-    within 60 days — the resource state is compliant.
-SUPPRESSION: Not applicable — fix the rule Lambda IAM policy.
-REMEDIATION:
-  1. Attach iam:GetCredentialReport to the rule's IAM role:
-     aws iam put-role-policy --role-name <rule-role>
-       --policy-document file://iam-getcredential-allow.json
-  2. Trigger re-evaluation:
-     aws configservice start-config-rules-evaluation
-       --config-rule-names securityhub-cis-1-3
-  3. Verify: get-findings on CIS.1.3 returns Compliance.Status=PASSED
-     within 5-15 minutes.
-CONFIRM: "CONFIRM: About to attach iam:GetCredentialReport and trigger
-  re-evaluation. Proceed? (yes/no)"
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#worked-example--cis13-not_available-statusreason).
+> ROOT_CAUSE_FOUND / LAYER AWS_SIDE block: rule-Lambda missing iam:GetCredentialReport, fix plus re-evaluation.
+
+## References (load on demand)
+
+- [advanced-patterns](references/advanced-patterns.md) — Mindset, Step 0 non-obvious behaviours, Step 14 auto-remediation wiring, expert heuristic, recent AWS features
+- [control-catalogue-and-remediation](references/control-catalogue-and-remediation.md) — control catalogue, severity mapping, Automation Rule criteria, Step 13 suppression CLI and FP-class patterns
+- [diagnostic-commands](references/diagnostic-commands.md) — account-wide pre-flight plus every per-step corroborating probe (Steps 2-12)
+- [worked-examples](references/worked-examples.md) — CIS.1.3 NOT_AVAILABLE worked example
 
 ## Domain
 
@@ -670,40 +494,8 @@ and Custom Action / Automation Rule Configuration.
 
 ## Recent AWS features (2024-2026)
 
-- **Security Hub Automation Rules (2024-2025):** GA feature that lets
-  customers define serverless rules to update finding fields
-  automatically — severity, workflow status, notes, related findings.
-  Supersedes manual `update-findings` for FP suppression. Rules are
-  ordered; first match wins. Verify with `list-automation-rules` and
-  `get-automation-rules`.
-
-- **Security Hub Custom Controls (2024-2025):** Customers author
-  controls in ASFF, emit findings via Config rule Lambda +
-  `BatchImportFindings`. Useful for organization-specific policies
-  (tag compliance, internal naming).
-
-- **Security Hub central configuration (2024-2025):** In Organizations
-  with delegated admin, the admin can push a configuration policy to
-  member accounts mandating standards, custom controls, and
-  Automation Rules.
-
-- **FSBP expansion (2024-2025):** New FSBP controls for Amazon
-  Bedrock (model access, guardrails), Amazon Q (data residency), and
-  SageMaker (model monitoring). Control IDs are stable; check
-  `describe-standards` for the latest count.
-
-- **Security Hub cross-Region aggregation GA (2024):** A single
-  aggregator account collects findings from all member accounts and
-  regions. Latency up to 5 min — verify with `get-finding-aggregator`
-  and `list-members`.
-
-- **AWS Resilience Hub integration (2024):** Security Hub can receive
-  findings from AWS Resilience Hub (RTO/RPO policy violations) via
-  ASFF. Treat as a separate `ProductFields.ProviderName` for filtering.
-
-- **Security Hub Inspector V2 finding deduplication (2024-2025):**
-  Inspector findings now deduplicate on the same `GeneratorId` +
-  resource — earlier versions produced duplicates on re-scan.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#recent-aws-features-2024-2026).
+> Automation Rules GA, custom controls, central configuration, FSBP expansion (Bedrock/Q/SageMaker), cross-region aggregation, Resilience Hub, Inspector dedup.
 
 ## AWS documentation
 

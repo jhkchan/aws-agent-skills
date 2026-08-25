@@ -217,3 +217,25 @@ pair versioning with:
 - `NoncurrentVersionTransitions` — move old versions to cheaper storage
   before expiring.
 - `ExpiredObjectDeleteMarker: true` — clean up orphaned delete markers.
+
+---
+
+## Standard lifecycle configuration template (moved from SKILL.md Step 7)
+
+```bash
+aws s3api put-bucket-lifecycle-configuration \
+  --bucket <BUCKET> \
+  --lifecycle-configuration '{
+    "Rules": [
+      {
+        "ID": "transition-to-ia",
+        "Status": "Enabled",
+        "Filter": { "Prefix": "" },
+        "Transitions": [{ "Days": 30, "StorageClass": "STANDARD_IA" }],
+        "NoncurrentVersionTransitions": [{ "NoncurrentDays": 30, "StorageClass": "STANDARD_IA" }],
+        "NoncurrentVersionExpiration": { "NoncurrentDays": 90 },
+        "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
+      }
+    ]
+  }'
+```

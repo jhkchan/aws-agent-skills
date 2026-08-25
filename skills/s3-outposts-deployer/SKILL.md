@@ -88,29 +88,8 @@ is supported (no IA, no Glacier). Encryption is SSE-S3 only (no KMS).
 Replication from Outpost to cloud S3 is one-way. Outpost storage is
 finite — capacity must be monitored.
 
-Three misconceptions dominate S3 on Outposts misdesign at provisioning
-time:
-
-- **"S3 on Outposts works like cloud S3."** It does NOT. S3 on Outposts
-  has significant constraints: no public access (endpoint required),
-  only STANDARD storage class (no IA, no Glacier), SSE-S3 encryption
-  only (no SSE-KMS), lifecycle rules can only transition within the
-  Outpost (no cloud tier transitions), and replication is one-way
-  (Outpost to cloud, not cloud to Outpost). Treating it like cloud S3
-  leads to failed API calls and broken workflows.
-
-- **"You can access S3 on Outposts from the public internet."** You
-  CANNOT. S3 on Outposts requires a VPC endpoint (S3 Outposts endpoint)
-  to route traffic from the VPC to the Outpost. There is no public API
-  endpoint. Without the endpoint, all S3 API calls to the outpost bucket
-  fail with connection errors. This is the #1 cause of "can't access my
-  outpost S3 bucket" issues.
-
-- **"KMS encryption works on Outposts S3."** It does NOT. S3 on
-  Outposts supports SSE-S3 (Amazon S3 managed keys) only. SSE-KMS is
-  NOT supported on Outpost S3 buckets. If compliance requires KMS, data
-  must be replicated to cloud S3 where SSE-KMS is available. This is
-  a hard limitation of the Outpost S3 implementation.
+Moved to [references/advanced-patterns.md](references/advanced-patterns.md#mindset-three-misconceptions-that-dominate-s3-on-outposts-misdesign) — cloud-S3 equivalence, public-internet access, KMS-on-Outposts.
+Load that reference on demand before executing this section.
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -138,77 +117,23 @@ S3 Outposts endpoint in a VPC, no client can access the bucket. The
 endpoint is the networking bridge. The procedure below forces explicit
 endpoint creation before bucket access is tested.
 
-**Cross-dependency gotchas:**
-- The endpoint ties the Outpost to a specific VPC and subnet. All S3
-  API calls must route through this endpoint. EC2 instances on the
-  Outpost access the bucket via the endpoint.
-- Access points create simplified names for bucket access. Outpost
-  access points are different from cloud S3 access points — they
-  require the endpoint to resolve.
-- Object lock must be enabled at bucket CREATION time. It cannot be
-  enabled later. If you need WORM and did not enable it at creation,
-  you must create a new bucket.
-- Replication is one-way only. The Outpost bucket replicates TO a cloud
-  bucket. The cloud bucket cannot replicate back to the Outpost.
+Moved to [references/advanced-patterns.md](references/advanced-patterns.md#configuration-dependency-graph-cross-dependency-gotchas) — endpoint-VPC binding, AP resolution, object-lock-at-creation, one-way replication.
+Load that reference on demand before executing this section.
 
 ## Expert heuristic: endpoint is the mandatory networking bridge
 
-A baseline model creates the bucket and assumes it is accessible. The
-correct heuristic recognizes that S3 on Outposts has NO public endpoint
-— ALL access goes through a VPC endpoint.
-
-```text
-Cloud S3:
-  Client → public S3 API endpoint → AWS cloud → bucket
-
-S3 on Outposts:
-  Client → VPC endpoint (on Outpost) → Outpost S3 → bucket
-              ↑ REQUIRED — no public API for Outpost S3
-
-Without endpoint:
-  aws s3 ls s3://my-outpost-bucket → connection timeout / access denied
-```
-
-**Key implication:** the endpoint must exist in a VPC that has
-connectivity to the Outpost. Typically this is a VPC with subnets on
-the Outpost. EC2 instances on the Outpost access the bucket via the
-endpoint.
+Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-endpoint-is-the-mandatory-networking-bridge) — no-public-endpoint flow diagram and the VPC-connectivity implication.
+Load that reference on demand before executing this section.
 
 ## Expert heuristic: one-way replication and capacity
 
-A baseline model may assume replication is bidirectional. The correct
-heuristic recognizes that S3 on Outposts replication is one-way
-(Outpost to cloud only), driven by the finite physical storage of the
-Outpost rack.
-
-```text
-Replication direction:
-  Outpost bucket → Cloud bucket  ✓ (supported, one-way)
-  Cloud bucket → Outpost bucket  ✗ (not supported)
-
-Capacity management:
-  Outpost storage is FINITE (physical disks on the rack)
-  → Monitor used capacity via CloudWatch
-  → Use replication to cloud as a drain mechanism
-  → Use lifecycle rules to manage object retention on Outpost
-  → When capacity is full, writes FAIL (no elastic expansion)
-```
+Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-one-way-replication-and-capacity) — replication direction matrix and finite-capacity management ladder.
+Load that reference on demand before executing this section.
 
 ## Expert heuristic: object lock at creation only
 
-A baseline model may think object lock can be enabled after bucket
-creation. The correct heuristic recognizes that object lock MUST be
-enabled at bucket creation time and CANNOT be added later.
-
-```text
-Bucket creation with object lock:
-  aws s3control create-bucket --outpost-id op-xxx --object-lock-enabled
-
-If you forgot:
-  Cannot enable after creation.
-  Must create a new bucket with --object-lock-enabled.
-  Must migrate objects to the new bucket.
-```
+Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-object-lock-at-creation-only) — creation-time requirement and the recovery path if you forgot.
+Load that reference on demand before executing this section.
 
 ## Prerequisites (verify before provisioning)
 
@@ -251,60 +176,15 @@ where data originates on-prem.
 The S3 Outposts endpoint is a VPC endpoint that routes S3 API traffic
 from the VPC to the Outpost. Without it, the bucket is inaccessible.
 
-**Create the endpoint:**
-
-```bash
-ENDPOINT_ID=$(aws s3outposts create-endpoint \
-  --outpost-id op-0abc123def456 \
-  --subnet-id subnet-abc123def \
-  --security-group-id sg-abc123def \
-  --query 'EndpointArn' --output text)
-
-echo "Endpoint ARN: $ENDPOINT_ID"
-```
-
-**Verify the endpoint:**
-
-```bash
-aws s3outposts list-endpoints \
-  --query 'Endpoints[?EndpointArn==`'"$ENDPOINT_ID"'`]'
-```
-
-The endpoint must be in the `Available` state before bucket access
-works. The endpoint is tied to a specific subnet and security group
-on the Outpost.
-
-**Security group requirements:** the security group must allow inbound
-HTTPS (port 443) from the clients that need to access the Outpost S3.
+Moved to [references/endpoints-and-networking.md](references/endpoints-and-networking.md#step-2-endpoint-creation-and-verification-moved-from-skillmd) — create-endpoint + list-endpoints CLI, Available-state requirement, security-group rules.
+Load that reference on demand before executing this section.
 
 ## Step 3 — Bucket creation
 
 Create the bucket on the Outpost:
 
-```bash
-BUCKET_ARN=$(aws s3control create-bucket \
-  --bucket "my-outpost-bucket" \
-  --outpost-id op-0abc123def456 \
-  --query 'BucketArn' --output text)
-
-echo "Bucket ARN: $BUCKET_ARN"
-```
-
-**With object lock enabled at creation:**
-
-```bash
-BUCKET_ARN=$(aws s3control create-bucket \
-  --bucket "my-worm-bucket" \
-  --outpost-id op-0abc123def456 \
-  --object-lock-enabled-for-bucket \
-  --query 'BucketArn' --output text)
-```
-
-**Bucket ARN format for Outposts:**
-
-```text
-arn:aws:s3-outposts:<region>:<account>:outpost/op-xxx/bucket/my-outpost-bucket
-```
+Moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md#step-3-bucket-creation-moved-from-skillmd) — create-bucket (with/without object lock) and the Outposts ARN format.
+Load that reference on demand before executing this section.
 
 This ARN format is different from cloud S3 (`arn:aws:s3:::bucket-name`).
 Outpost buckets use the `s3-outposts` service prefix and include the
@@ -315,22 +195,8 @@ outpost ID in the ARN.
 Access points simplify access management for Outpost buckets. They
 create a unique DNS name for the bucket.
 
-**Create an outpost access point:**
-
-```bash
-AP_ARN=$(aws s3control create-access-point \
-  --name "my-ap" \
-  --bucket "arn:aws:s3-outposts:us-east-1:123456789012:outpost/op-xxx/bucket/my-outpost-bucket" \
-  --vpc-configuration VpcId=vpc-abc123 \
-  --query 'AccessPointArn' --output text)
-```
-
-**Access point types:**
-
-| Type | Description |
-|---|---|
-| Outpost access point | Resolves to the Outpost endpoint; used for on-prem access |
-| Regional access point | Regional endpoint that routes to the Outpost bucket |
+Moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md#step-4-outpost-access-point-moved-from-skillmd) — create-access-point CLI and the outpost vs regional AP type table.
+Load that reference on demand before executing this section.
 
 Outpost access points are tied to the VPC where the endpoint exists.
 
@@ -402,37 +268,8 @@ bucket. This is ONE-WAY only — the cloud bucket cannot replicate back.
 - Destination: cloud S3 bucket (in any region)
 - Replication IAM role with read on source and write on destination
 
-**Configure replication:**
-
-```bash
-aws s3control put-bucket-replication \
-  --account-id 123456789012 \
-  --bucket "arn:aws:s3-outposts:us-east-1:123456789012:outpost/op-xxx/bucket/my-outpost-bucket" \
-  --replication-configuration '{
-    "Role": "arn:aws:iam::123456789012:role/S3OutpostsReplicationRole",
-    "Rules": [{
-      "Status": "Enabled",
-      "Priority": 1,
-      "Destination": {
-        "Bucket": "arn:aws:s3:::cloud-destination-bucket"
-      },
-      "Filter": {}
-    }]
-  }'
-```
-
-**Replication role trust policy:**
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": {"Service": "s3-outposts.amazonaws.com"},
-    "Action": "sts:AssumeRole"
-  }]
-}
-```
+Moved to [references/replication-and-capacity.md](references/replication-and-capacity.md#step-8-replication-configuration-and-role-trust-policy-moved-from-skillmd) — put-bucket-replication JSON and the s3-outposts.amazonaws.com trust policy.
+Load that reference on demand before executing this section.
 
 **Key implication:** replication is the primary DR mechanism for
 Outpost S3 data. The cloud bucket can have KMS encryption, lifecycle
@@ -466,21 +303,8 @@ Outpost storage is finite. Monitor capacity to avoid write failures.
 | BytesUploaded | Bytes uploaded in the period |
 | BytesDownloaded | Bytes downloaded in the period |
 
-**Create a capacity alarm:**
-
-```bash
-aws cloudwatch put-metric-alarm \
-  --alarm-name "outpost-s3-capacity-80pct" \
-  --namespace AWS/S3Outposts \
-  --metric-name BucketSizeBytes \
-  --dimensions Name=BucketName,Value=my-outpost-bucket \
-  --statistic Sum \
-  --period 300 \
-  --evaluation-periods 1 \
-  --threshold 800000000000 \
-  --comparison-operator GreaterThanThreshold \
-  --alarm-actions "arn:aws:sns:us-east-1:123456789012:outpost-alerts"
-```
+Moved to [references/replication-and-capacity.md](references/replication-and-capacity.md#step-10-capacity-alarm-moved-from-skillmd) — CloudWatch put-metric-alarm on BucketSizeBytes at 80% threshold.
+Load that reference on demand before executing this section.
 
 **When capacity is full:**
 - New PUT requests fail with `InsufficientStorageCapacity`
@@ -577,30 +401,17 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Cannot access Outpost S3 bucket (connection timeout)
-- Missing or unavailable endpoint. Verify the endpoint exists and is
-  in `Available` state. Verify the security group allows port 443
-  from the client.
+Moved to [references/error-handling.md](references/error-handling.md#error-handling) — deep dives: connection timeout, InsufficientStorageCapacity, KMS failure, object lock, replication.
+Load that reference on demand before executing this section.
 
-### InsufficientStorageCapacity
-- Outpost storage is full. Free space by deleting objects (via
-  lifecycle expiration) or replicating to cloud and deleting local
-  copies. Outpost storage cannot be elastically expanded.
 
-### KMS encryption fails
-- SSE-KMS is NOT supported on Outposts. Use SSE-S3 (default). For KMS,
-  replicate to cloud S3.
+## References (load on demand)
 
-### Object lock cannot be enabled
-- Object lock must be enabled at bucket creation. If the bucket
-  already exists without it, create a new bucket with
-  `--object-lock-enabled-for-bucket` and migrate objects.
-
-### Replication not working
-- Verify the replication IAM role has permissions on both source
-  (Outpost bucket) and destination (cloud bucket). Verify the role
-  trust policy allows `s3-outposts.amazonaws.com` to assume it.
-
+- [references/endpoints-and-networking.md](references/endpoints-and-networking.md) — endpoint architecture, subnet/security-group requirements, VPC-vs-Outpost networking bridge, lifecycle, pitfalls, Terraform.
+- [references/replication-and-capacity.md](references/replication-and-capacity.md) — one-way replication design, IAM roles, capacity monitoring/alarms, lifecycle constraints, Terraform.
+- [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — copy-pasteable CLI for bucket creation, access points, versioning, replication config, capacity alarm.
+- [references/error-handling.md](references/error-handling.md) — error-handling deep dives (endpoint timeouts, InsufficientStorageCapacity, KMS, object lock, replication failures).
+- [references/advanced-patterns.md](references/advanced-patterns.md) — mindset misconceptions, cross-dependency gotchas, expert heuristics (endpoint bridge, one-way replication, object lock).
 ## Domain
 
 AWS CloudOps / Amazon S3 on Outposts Provisioning & On-Premises Object

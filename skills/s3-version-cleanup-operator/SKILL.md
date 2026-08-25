@@ -179,58 +179,8 @@ plan.` and `REMEDIATION: Re-fetch with aws s3api get-bucket-versioning
 
 ### Step 0: Expert knowledge — non-obvious S3 versioning behaviors
 
-These behaviors are easy to misjudge without operational S3 experience.
-Each changes a plan if ignored. See `references/lifecycle-rule-patterns.md`
-for full lifecycle JSON anatomy and the
-NoncurrentVersionExpiration-vs-NewerNoncurrentVersions heuristic. Summary:
-
-- **Noncurrent versions bill at Standard rate by default** — they are
-  NOT auto-tiered; version cleanup is the #1 S3 cost optimization.
-- **`put-bucket-lifecycle-configuration` REPLACES, not merges** — the
-  single most common lifecycle mistake. Always read-merge-write.
-- **`NoncurrentVersionExpiration` deletes permanently** — no recovery,
-  no Glacier archive. Use `NoncurrentVersionTransition` first for a
-  softer path. Default is "no expiration" (indefinite billing).
-- **`NewerNoncurrentVersions` keeps only N recent noncurrent versions**
-  — pair with `NoncurrentVersionTransition` for full savings. Combine
-  with `NoncurrentVersionExpiration` for defense in depth (caps count
-  AND age).
-- **`AbortIncompleteMultipartUpload` cleans orphaned uploads** —
-  orphans bill at Standard rate indefinitely; 7-day abort window is
-  standard.
-- **`NoncurrentDays` counts from when the version BECAME noncurrent**,
-  not from object creation.
-- **Lifecycle rules apply asynchronously within 24 hours** of
-  eligibility, not in real time.
-- **Batch Operations for immediate cleanup** — ~$1.00/million objects;
-  see `references/lifecycle-rule-patterns.md` for cost-comparison table.
-- **Object Lock Compliance mode is irrevocable** — no one (including
-  root) can delete in-retention versions. Governance mode allows bypass
-  with `s3:BypassGovernanceRetention`.
-- **Legal hold is per-object, not bucket-wide** — bulk cleanup must
-  check each object or use a manifest-based Batch Operations job.
-- **Versioning `Suspended` ≠ never enabled** — suspended buckets have
-  pre-suspension versions (preserved) and null-version-id objects;
-  re-enable versioning before cleanup.
-- **Delete markers are themselves versions** — deleting a versioned
-  object creates a delete marker but does NOT remove prior versions.
-- **Storage Lens is the canonical impact estimator** — use
-  `NoncurrentVersionCount` and `NoncurrentVersionStorageBytes`.
-- **GIR vs Glacier Flexible Retrieval** — GIR (~$0.004/GB, ms latency)
-  for quarterly access; Flexible (~$0.0036/GB, 1-5 min restore) for
-  annual. Choose by access pattern, not just cost.
-- **Bucket Key reduces KMS cost ~99%** — always recommend enabling on
-  SSE-KMS buckets alongside lifecycle changes.
-- **CRR/SRR preserves versions independently** — apply lifecycle rules
-  to BOTH source and replica; cleaning source does NOT clean replica.
-- **Intelligent-Tiering auto-archives noncurrent versions at 90 days**
-  — alternative to manual rules for unknown access patterns.
-- **`put-bucket-lifecycle-configuration` validates XML, not business
-  logic** — does not warn about rule conflicts or impossible
-  transitions; verify via `get-bucket-lifecycle-configuration` after PUT.
-- **`Expiration` (current) ≠ `NoncurrentVersionExpiration`** —
-  `Expiration` creates a delete marker on versioned buckets and does
-  NOT remove old versions.
+Non-obvious versioning behaviors — REPLACES-not-merges lifecycle PUT, NoncurrentVersionExpiration vs NewerNoncurrentVersions, NoncurrentDays semantics, 24-hour async rule apply, delete markers, Object Lock modes, legal holds, Storage Lens, GIR vs Flexible, Bucket Key, CRR/SRR replicas, Intelligent-Tiering — live in [references/advanced-patterns.md](references/advanced-patterns.md).
+Load that reference before planning configure-lifecycle or batch-delete-versions.
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
@@ -519,82 +469,20 @@ patterns section above and in `references/lifecycle-rule-patterns.md`.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`put-bucket-lifecycle-configuration`, `delete-objects`,
-  `aws s3control create-job`, `put-bucket-versioning`), emit:
-  `CONFIRM: About to <operation> on bucket <name> in account <account>
-  region <region>. This will <consequence>. Estimated monthly savings:
-  $<amount>. Proceed? (yes/no)`. Do NOT execute until the operator
-  confirms.
-
-- **Capture pre-state for rollback.** Before any lifecycle change:
-  `aws s3api get-bucket-lifecycle-configuration --bucket <name>
-  --output json > /tmp/<name>-lifecycle-pre-$(date +%s).json`.
-  Lifecycle state is not versioned — a wrong PUT silently replaces.
-
-- **Verify versioning BEFORE cleanup.** `Status: Enabled` is the
-  expected state. `Suspended` and never-enabled have different
-  cleanup semantics.
-
-- **Verify Object Lock BEFORE any delete.** `ObjectLockEnabled:
-  Enabled` with `DefaultRetention.Mode: COMPLIANCE` blocks in-retention
-  deletion irrevocably. Governance mode allows bypass with
-  `s3:BypassGovernanceRetention`.
-
-- **Verify legal holds BEFORE Batch Operations.** Sample the manifest
-  with `get-object-legal-hold` to ensure no `LegalHold: ON` objects
-  are in scope.
-
-- **Verify existing lifecycle rules BEFORE PUT.** Read via
-  `get-bucket-lifecycle-configuration`. Merge new rules into the
-  existing config; never PUT new rules alone.
-
-- **Plan the cleanup timeline BEFORE promising savings.** Lifecycle
-  rules apply within 24 hours of eligibility. For immediate cleanup,
-  use Batch Operations (separate operation, separate cost).
-
-- **Verify the rule prefix BEFORE PUT.** A rule with `prefix: ""`
-  applies to ALL objects in the bucket. A rule with `prefix: logs/`
-  applies only to objects under `logs/`. Verify the prefix matches
-  intent — too narrow misses versions, too broad affects unintended
-  objects.
+The full pre-flight safety checklist — confirm gate, pre-state capture, versioning/Object Lock/legal-hold verification, read-merge-write lifecycle, cleanup timeline, prefix verification — lives in [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Run these before any remediation CLI.
 
 ## Recent AWS features (2024-2026)
 
-- **S3 Intelligent-Tiering Archive Access default (2024-2025):** New
-  buckets with Intelligent-Tiering now default to moving noncurrent
-  versions to Archive Access after 90 days automatically. Operators
-  should verify whether Intelligent-Tiering is in use before adding
-  manual lifecycle rules — duplicate rules can conflict.
+Recent AWS features 2024-2026 — Intelligent-Tiering 90-day archive default, GIR lifecycle GA, S3DeleteObjectVersion in Batch Operations, Governance bypass logging, Storage Lens dimensions, Bucket Key defaults, lifecycle conflict warnings — live in [references/advanced-patterns.md](references/advanced-patterns.md).
+Load when planning rules on buckets that use these features.
 
-- **S3 Glacier Instant Retrieval lifecycle rule GA (2024):**
-  NoncurrentVersionTransition to GIR is fully supported as a lifecycle
-  target. GIR provides ms-latency GETs at ~$0.004/GB-month — the
-  recommended first transition for noncurrent versions.
+## References (load on demand)
 
-- **S3 Batch Operations expanded operations (2024-2025):** Batch
-  Operations now supports `S3DeleteObjectVersion` natively (previously
-  required a custom Lambda). Cost remains ~$1.00 per million objects.
-
-- **S3 Object Lock Governance mode enhancements (2024):** Governance
-  mode now logs bypass attempts to CloudTrail by default. Operators
-  should verify CloudTrail S3 data event logging is enabled for audit.
-
-- **S3 Storage Lens dashboard improvements (2024-2025):** Storage Lens
-  now includes `NoncurrentVersionCount` and
-  `NoncurrentVersionStorageBytes` as top-level dimensions. Operators
-  should enable Storage Lens at the account level (free tier) before
-  planning version cleanup.
-
-- **Bucket Key default for new SSE-KMS buckets (2024-2025):** New
-  SSE-KMS buckets default to `BucketKeyEnabled: true`. Older buckets
-  may still have it disabled — verify and enable to reduce KMS
-  request charges ~99%.
-
-- **S3 Lifecycle rule priority warnings (2025):** The S3 console now
-  warns about conflicting lifecycle rules (same prefix, overlapping
-  NoncurrentDays). The CLI/API still does not warn — verify rules
-  manually after PUT.
+- [references/worked-examples.md](references/worked-examples.md) — full end-to-end worked examples (READY lifecycle, BLOCKED Object Lock, READY Batch Operations)
+- [references/lifecycle-rule-patterns.md](references/lifecycle-rule-patterns.md) — lifecycle JSON anatomy, expiration-vs-keep heuristic, Batch Operations cost table
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step-0 non-obvious versioning behaviors and recent AWS features (2024-2026)
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight safety checks and pre-state capture commands
 
 ## Domain
 

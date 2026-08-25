@@ -211,3 +211,103 @@ aws s3control delete-access-point --account-id <ACCOUNT> --name <STANDARD_AP_NAM
 # Remove reserved concurrency
 aws lambda delete-function-concurrency --function-name <FUNC_NAME>
 ```
+
+## Step 2: supporting standard Access Point (moved from SKILL.md)
+
+```bash
+# Create standard AP (Internet origin is typical for OLAP)
+aws s3control create-access-point \
+  --account-id <ACCOUNT_ID> --name <STANDARD_AP_NAME> --bucket <BUCKET>
+
+# Attach a policy allowing the Lambda's role to GetObject
+aws s3control put-access-point-policy \
+  --account-id <ACCOUNT_ID> --name <STANDARD_AP_NAME> \
+  --policy file://ap-policy.json
+```
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": {"AWS": "arn:aws:iam::<ACCOUNT>:role/<LAMBDA_ROLE>"},
+    "Action": ["s3:GetObject", "s3:GetObjectVersion"],
+    "Resource": "arn:aws:s3:<REGION>:<ACCOUNT>:accesspoint/<STANDARD_AP_NAME>/*"
+  }]
+}
+```
+
+## Step 3: IAM role trust policy (moved from SKILL.md)
+
+```bash
+aws iam create-role \
+  --role-name <LAMBDA_ROLE> \
+  --assume-role-policy-document file://trust-policy.json
+```
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": {"Service": "s3-object-lambda.amazonaws.com"},
+    "Action": "sts:AssumeRole"
+  }]
+}
+```
+
+## Step 3: execution permission policy (moved from SKILL.md)
+
+```bash
+aws iam put-role-policy \
+  --role-name <LAMBDA_ROLE> \
+  --policy-name ObjectLambdaExec \
+  --policy-document file://exec-policy.json
+```
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {"Effect": "Allow", "Action": "s3-object-lambda:WriteGetObjectResponse", "Resource": "*"},
+    {"Effect": "Allow", "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"], "Resource": "arn:aws:logs:<REGION>:<ACCOUNT>:*"},
+    {"Effect": "Allow", "Action": ["s3:GetObject", "s3:GetObjectVersion"], "Resource": "arn:aws:s3:<REGION>:<ACCOUNT>:accesspoint/<STANDARD_AP_NAME>/*"}
+  ]
+}
+```
+
+## Step 4: create the transform Lambda function (moved from SKILL.md)
+
+```bash
+aws lambda create-function \
+  --function-name <FUNC_NAME> \
+  --runtime python3.12 \
+  --role arn:aws:iam::<ACCOUNT>:role/<LAMBDA_ROLE> \
+  --handler index.handler \
+  --zip-file fileb://transform.zip \
+  --timeout 30 --memory-size 512
+```
+
+## Step 7: attach the TransformationConfiguration (moved from SKILL.md)
+
+```bash
+aws s3control put-access-point-configuration-for-object-lambda \
+  --account-id <ACCOUNT_ID> --name <OLAP_NAME> \
+  --configuration '{
+    "SupportingAccessPoint": "arn:aws:s3:<REGION>:<ACCOUNT>:accesspoint/<STANDARD_AP_NAME>",
+    "TransformationConfigurations": [{
+      "Actions": ["GetObject"],
+      "ContentTransformation": {"AwsLambda": {"FunctionArn": "arn:aws:lambda:<REGION>:<ACCOUNT>:function:<FUNC_NAME>"}}
+    }]
+  }'
+```
+
+## Step 7: multi-operation TransformationConfiguration JSON (moved from SKILL.md)
+
+```json
+"TransformationConfigurations": [
+  {"Actions": ["GetObject"], "ContentTransformation": {"AwsLambda": {"FunctionArn": "arn:aws:lambda:<REGION>:<ACCOUNT>:function:<FUNC_NAME>"}}},
+  {"Actions": ["HeadObject"], "ContentTransformation": {"AwsLambda": {"FunctionArn": "arn:aws:lambda:<REGION>:<ACCOUNT>:function:<FUNC_HEAD>"}}}
+]
+```
+

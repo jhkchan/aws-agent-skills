@@ -159,3 +159,32 @@ resource "aws_security_group" "endpoint" {
   }
 }
 ```
+
+## Step 2: endpoint creation and verification (moved from SKILL.md)
+
+**Create the endpoint:**
+
+```bash
+ENDPOINT_ID=$(aws s3outposts create-endpoint \
+  --outpost-id op-0abc123def456 \
+  --subnet-id subnet-abc123def \
+  --security-group-id sg-abc123def \
+  --query 'EndpointArn' --output text)
+
+echo "Endpoint ARN: $ENDPOINT_ID"
+```
+
+**Verify the endpoint:**
+
+```bash
+aws s3outposts list-endpoints \
+  --query 'Endpoints[?EndpointArn==`'"$ENDPOINT_ID"'`]'
+```
+
+The endpoint must be in the `Available` state before bucket access
+works. The endpoint is tied to a specific subnet and security group
+on the Outpost.
+
+**Security group requirements:** the security group must allow inbound
+HTTPS (port 443) from the clients that need to access the Outpost S3.
+

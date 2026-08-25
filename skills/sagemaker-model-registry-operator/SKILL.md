@@ -107,13 +107,8 @@ Run before classification. `list-model-packages` returns max
 100/page (`--max-results 100`, paginate with `--next-token`).
 
 **Live-account pre-flight (skip if offline plan):**
-1. `sagemaker describe-model-package-group --model-package-group-name <group>` — confirm group exists; capture `ModelPackageGroupArn`, `ModelPackageGroupStatus`.
-2. `sagemaker list-model-packages --model-package-group-name <group>` — surface existing versions; the next version number is `max(versions) + 1`.
-3. `s3api head-object --bucket <bucket> --key <key>/model.tar.gz` — confirm model artifact exists.
-4. `ecr describe-images --repository-name <repo> --image-ids imageTag=<tag>` — confirm each inference image exists.
-5. `s3api head-object` on each `ModelMetrics` S3 URI — confirm metrics files exist.
-6. `iam simulate-principal-policy` — confirm caller holds the required `sagemaker:*` and resource-access permissions.
-7. `kms describe-key --key-id <id>` — confirm KMS key (if configured) is enabled and the caller can use it.
+Live-account pre-flight commands 1-7 (describe-model-package-group, list-model-packages, s3api head-object on the artifact and every metrics URI, ecr describe-images, iam simulate-principal-policy, kms describe-key): [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before executing any live-account CLI.
 
 **Malformed input:** emit `VERDICT: ERROR` with reason and remediation.
 
@@ -128,89 +123,8 @@ Run before classification. `list-model-packages` returns max
 ## Process — operation planning (apply in order)
 
 ### Step 0: Expert knowledge — non-obvious Model Registry behaviors
-
-- **Group-registered vs standalone packages are fundamentally different.**
-  A group-registered package (`ModelPackageGroupName` set on
-  `create-model-package`) gets an auto-incremented
-  `ModelPackageVersion` and appears in
-  `list-model-packages --model-package-group-name <group>`. A
-  standalone package (no group) is one-off — it has a unique
-  name but no version lineage. Production registries always use
-  groups.
-
-- **Approval status is set at registration time, not auto-defaulted.**
-  `create-model-package` accepts `--approval-status`. If omitted
-  on a group-registered package, the default is
-  `PendingManualApproval`. Setting `Approved` at registration
-  bypasses review — use only for dev / sandbox or auto-approval
-  groups.
-
-- **`update-model-package` is the only way to change approval status post-registration.**
-  `update-model-package --model-package-arn <arn>
-  --model-approval-status Approved` transitions the package.
-  There is no `approve-model-package` API — the same call
-  handles approve, reject, and rollback.
-
-- **A registered package is immutable.** Once
-  `create-model-package` returns success, the package's
-  `InferenceSpecification`, `ModelArtifact`, and `SourceAlgorithm`
-  cannot be modified. To change any of these, register a new
-  version. Only `ModelApprovalStatus`, `Description`, `Tags`,
-  `CustomerMetadataProperties`, and (in 2024-2026) some
-  `AdditionalInferenceSpecifications` are mutable.
-
-- **Model Cards can auto-populate from a registered package.**
-  `create-model-card --source-uri <model-package-arn>` (with
-  `--source-uri-type ModelPackage`) pulls the inference spec,
-  metrics, and approval status into the card automatically.
-  Without a registered package source, the card must be
-  authored manually.
-
-- **SageMaker Projects wires Model Registry to CI/CD.** A
-  SageMaker Project (created from the
-  `MLOps template for model deployment` or
-  `MLOps template for model building, training, and deployment`)
-  provisions a CodePipeline that auto-deploys approved model
-  packages from a designated group to a SageMaker endpoint.
-  EventBridge fires on `Approved` transitions; the pipeline
-  consumes the event and runs the deploy stage.
-
-- **`AdditionalInferenceSpecifications` enables multi-image packages.**
-  A package can declare multiple inference specs (e.g., GPU and
-  CPU variants, or TensorFlow and PyTorch serving images). The
-  primary `InferenceSpecification` is used by default;
-  `AdditionalInferenceSpecifications` are selectable at deploy
-  time via the `InferenceSpecificationName` parameter.
-
-- **`SourceAlgorithmSpecification` is required for algorithm-marketplace packages.**
-  Packages derived from an AWS Marketplace algorithm must set
-  `SourceAlgorithms[].AlgorithmName` to the Marketplace
-  algorithm ARN. Without this, the package cannot be listed or
-  deployed via Marketplace.
-
-- **`ModelPackageArn` is the canonical identifier.** The
-  `ModelPackageName` is unique within the account-region, but
-  downstream services (SageMaker Projects, Model Cards,
-  EventBridge) reference the package by ARN. Always capture and
-  propagate the ARN.
-
-- **`ValidationSpecification` runs pre-registration checks.**
-  `create-model-package` accepts a `ValidationSpecification`
-  with validation profiles (instance type, instance count,
-  batch transform input). SageMaker runs the validation jobs
-  before registering the package; failures leave the package
-  un-registered. Use for automated quality gates.
-
-- **KMS encryption on the registry does not re-encrypt model artifacts.**
-  `ModelPackageGroup.KmsKeyId` encrypts the registry metadata.
-  The model artifacts (`model.tar.gz` in S3) remain encrypted
-  with whatever key was used at training time. The deployer
-  role must have `kms:Decrypt` on both keys.
-
-- **A rejected package is not deleted.** `ModelApprovalStatus:
-  Rejected` blocks deployment but the package version remains
-  in the registry for audit. To remove a package entirely, use
-  `delete-model-package`. The version number is not reused.
+The 13 non-obvious behaviors (group-registered vs standalone, approval set at registration, update-model-package as the only transition path, package immutability, Model Card auto-populate, Projects CI/CD wiring, AdditionalInferenceSpecifications, Marketplace SourceAlgorithms, ARN as canonical ID, ValidationSpecification, KMS scope, rejected-not-deleted): [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when a pre-check fails or a transition looks illegal.
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
@@ -441,45 +355,8 @@ triggers within seconds.
 
 ## Diagnostic flows
 
-### Package stuck in `PendingManualApproval`
-
-1. `describe-model-package --model-package-arn <arn>` — capture
-   `ModelApprovalStatus`, `ApprovalDescription`, `InferenceSpecification`.
-2. If no `InferenceSpecification`: the package is non-deployable;
-   approving it is allowed but downstream deploy will fail. Warn
-   the operator.
-3. If `ValidationSpecification` is set: check whether validation
-   jobs completed. If validation failed, the package is
-   effectively un-registered — re-register.
-4. If the package has been in `PendingManualApproval` for an
-   extended period, surface the model metrics (AUC, precision,
-   drift) to the approver.
-
-### Projects pipeline did not trigger on approval
-
-1. `describe-model-package` — confirm `ModelApprovalStatus:
-   Approved`.
-2. `events list-rules` — find the rule targeting the project's
-   CodePipeline; verify its `EventPattern` matches the model
-   package group ARN.
-3. `codepipeline list-pipeline-executions` — check whether the
-   pipeline has a recent execution.
-4. If the rule is missing or mis-patterned, recreate it:
-   `events put-rule` with
-   `EventPattern: {"source": ["aws.sagemaker"], "detail-type": ["SageMaker Model Package State Change"], "detail": {"ModelPackageGroupName": ["<group>"], "ModelApprovalStatus": ["Approved"]}}`.
-5. If the pipeline exists but the deploy stage fails, check
-   CodeBuild logs for IAM or resource conflicts.
-
-### Model Card content mismatch
-
-1. `describe-model-card --model-card-name <name>` — compare
-   `Content` with the source package's `describe-model-package`.
-2. If the card was created with `--source-uri-type ModelPackage`,
-   it inherits at creation time only. Subsequent package updates
-   do NOT refresh the card — re-create the card or use
-   `update-model-card` with new content.
-3. If the card content is hand-authored and out of sync, run
-   `update-model-card` with the corrected JSON.
+The three diagnostic flows (package stuck in PendingManualApproval, Projects pipeline did not trigger on approval, Model Card content mismatch): [references/error-handling.md](references/error-handling.md).
+Load on demand when diagnosing a stalled approval or a silent CI/CD trigger.
 
 ## Output format (per operation)
 
@@ -532,23 +409,8 @@ NOTES:
 ```
 
 ### Worked example — approve blocked (BLOCKED)
-
-```text
-OPERATION: approve
-VERDICT: BLOCKED
-TARGET: fraud-detection-classifier / version 5, us-east-1
-PRE_CHECKS:
-  - [PASS] describe-model-package returns ModelApprovalStatus PendingManualApproval (transition to Approved is legal)
-  - [FAIL] No InferenceSpecification on package version 5. The package was registered as a documentation-only package (model card source). Approving it will not enable deployment because there is no inference spec.
-  - [PASS] Caller holds sagemaker:UpdateModelPackage
-STEPS: (none — pre-checks failed)
-POST_VERIFY: (none)
-STATE: PendingManualApproval (cannot usefully approve)
-VERSION: 5
-NOTES:
-  - Re-register the package with an InferenceSpecification before approving for deployment. The current package can still be used as a Model Card source.
-  - Transition PendingManualApproval → Approved is technically legal without an InferenceSpecification, but the approved package cannot be deployed to a SageMaker endpoint.
-```
+Full BLOCKED worked example (approve blocked — no InferenceSpecification): [references/worked-examples.md](references/worked-examples.md).
+The READY example above is the primary worked example; this one loads on demand.
 
 ## STRICT output contract
 
@@ -600,95 +462,21 @@ NOTES: <approval rationale — must state PendingManualApproval | Approved | Rej
 - **Prefer group-registered packages** over standalone for any production lineage.
 
 ## Expert heuristic: "Approval is a deployment gate, not a label"
-
-`ModelApprovalStatus` is the gate that downstream CI/CD
-(SageMaker Projects, EventBridge) checks before deploying a model
-package to a SageMaker endpoint.
-
-```
-Registration lifecycle
-   ├─ create-model-package (InferenceSpecification + ModelMetrics + PendingManualApproval)
-   │    └─ Model package version N in group
-   │         ├─ Reviewer evaluates metrics (AUC, precision, bias, drift)
-   │         ├─ update-model-package --model-approval-status Approved
-   │         │    └─ EventBridge fires "SageMaker Model Package State Change"
-   │         │         └─ SageMaker Projects pipeline triggers deploy stage
-   │         │              └─ Endpoint updated to version N
-   │         └─ update-model-package --model-approval-status Rejected
-   │              └─ Package version N blocked; deployment not triggered
-   │                   └─ Re-train, register version N+1
-```
-
-**Approval-state transition matrix:**
-
-| From | To | Effect |
-|---|---|---|
-| `PendingManualApproval` | `Approved` | Triggers downstream deploy |
-| `PendingManualApproval` | `Rejected` | Blocks deploy; package retained for audit |
-| `Approved` | `Rejected` | Does NOT auto-rollback deployed endpoint — pipeline must re-deploy prior version |
-| `Rejected` | `Approved` | Unusual; ensure the metrics support the reversal |
-
-**Group vs standalone decision:**
-
-| Pattern | Versioning | Use case |
-|---|---|---|
-| Group-registered (`ModelPackageGroupName` set) | Auto-incremented `ModelPackageVersion` | Production lineage — always use |
-| Standalone (no group) | No versioning | Experimentation, one-off, throw-away |
-
-**Per-operation pre-checks:**
-
-| Operation | What to verify |
-|---|---|
-| `create-group` | Name uniqueness, KMS key enabled |
-| `register-package` (group) | Group exists and Completed; artifact, image, metrics reachable |
-| `register-package` (standalone) | Warn no versioning; otherwise same as group |
-| `approve` | Current state allows transition; package has InferenceSpecification |
-| `reject` | Current state allows transition |
-| `model-card` | Source package exists (if `--source-uri-type ModelPackage`) |
-| `projects-integration` | Project exists; pipeline role has deploy permissions; group has at least one Approved version |
+The full heuristic — registration lifecycle diagram, approval-state transition matrix, group vs standalone decision table, per-operation pre-check table: [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when planning approvals or CI/CD wiring.
 
 ## Recent AWS features (2024-2026)
+Recent AWS features 2024-2026 (Model Cards, Model Dashboard, Registry+Projects auto-deploy, Additional Inference Specifications, registry KMS, ValidationSpecification, Customer Metadata Properties, MLflow lineage, EventBridge state change, cross-account dashboard): [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when a feature question arises.
 
-- **SageMaker Model Cards (2024-2026):**
-  `create-model-card --source-uri <arn> --source-uri-type
-  ModelPackage` auto-populates the card from the registered
-  package (inference spec, metrics, approval status). Cards
-  support `Draft`, `PendingReview`, `Approved` states and are
-  visible in SageMaker Studio and the Model Dashboard.
-- **SageMaker Model Dashboard (2024-2026):**
-  unified console view across Model Registry packages, Model
-  Cards, endpoints, and training jobs. Cross-registry filtering
-  by approval status, group, tags. Integrates with MLflow
-  Tracking via `list-mlflow-models`.
-- **Model Registry with SageMaker Projects (2024-2026):**
-  Projects created from the `MLOps template for model
-  deployment` provision a CodePipeline that auto-deploys
-  `Approved` packages from a designated group to a SageMaker
-  endpoint. EventBridge fires on the approval transition.
-- **Additional Inference Specifications (2024-2026):**
-  enables multi-image packages (GPU and CPU variants). The
-  primary spec is default; additional specs are selectable at
-  deploy time via `InferenceSpecificationName`.
-- **Model Registry KMS encryption (2024-2025):** `KmsKeyId`
-  on the group encrypts registry metadata; artifacts in S3
-  keep the training KMS key. Deployer roles need
-  `kms:Decrypt` on both.
-- **Model package validation (2024-2025):**
-  `ValidationSpecification` runs batch-transform validation
-  jobs before registering the package — automated quality gate.
-- **Customer Metadata Properties (2024-2025):** mutable
-  key-value metadata on registered packages (e.g., link to
-  the JIRA approval ticket).
-- **Model Registry + MLflow (2024-2026):** integrated lineage
-  view linking MLflow runs to package versions via
-  `CustomerMetadataProperties`.
-- **EventBridge model package state change (2024-2026):**
-  events fire on approval transitions, registration, deletion.
-  Downstream consumers (Projects pipelines, Lambda, SNS)
-  subscribe.
-- **Model Dashboard cross-account / cross-region (2025-2026):**
-  aggregates packages across accounts and regions via
-  SageMaker Studio cross-account configurations.
+## References (load on demand)
+
+- [Advanced patterns](references/advanced-patterns.md) — Step 0 expert-knowledge deep dive, the approval-as-deployment-gate heuristic (lifecycle diagram, transition matrix, per-operation pre-checks), recent AWS features (2024-2026)
+- [Diagnostic commands](references/diagnostic-commands.md) — live-account pre-flight command listing (group, versions, artifact, ECR image, metrics, IAM, KMS)
+- [Error handling](references/error-handling.md) — diagnostic flows: package stuck in PendingManualApproval, Projects pipeline not triggering, Model Card content mismatch
+- [Worked examples](references/worked-examples.md) — secondary worked example (approve blocked without InferenceSpecification)
+- [Approval workflow and CI/CD pipeline](references/approval-workflow-and-cicd-pipeline.md) — approval workflow and SageMaker Projects CI/CD detail
+- [Model cards, dashboard, and packages](references/model-cards-dashboard-and-packages.md) — Model Cards, Model Dashboard, and model package detail
 
 ## Domain
 

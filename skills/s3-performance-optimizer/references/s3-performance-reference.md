@@ -200,3 +200,59 @@ configured with a response-cache policy that includes the
 Always probe `aws health describe-events` for regional issues before
 declaring a customer-side performance issue during a wide-impact
 incident.
+
+## Step 3: multipart upload part sizing table (moved from SKILL.md)
+
+| Object size | Recommended part size | Recommended parallelism |
+|---|---|---|
+| 100 MB - 500 MB | 25 MB | 5 |
+| 500 MB - 5 GB | 100 MB | 10 |
+| 5 GB - 50 GB | 500 MB | 10 |
+| 50 GB - 5 TB (max) | 1 GB | 10 (cap; S3 limits 10,000 parts) |
+
+## Step 5: S3 Select format support table (moved from SKILL.md)
+
+| Format | S3 Select supported | Notes |
+|---|---|---|
+| CSV / TSV | Yes | With or without header |
+| JSON | Yes | Lines (newline-delimited) or document |
+| Parquet | Yes | Column pruning + predicate pushdown |
+| ORC, Avro | No | Use Athena / Glue |
+| Excel, PDF | No | Use other tools |
+
+## Step 7: Express One Zone workload fit table (moved from SKILL.md)
+
+| Workload | Standard S3 | Express One Zone |
+|---|---|---|
+| Backup / archival | OK | No (cost) |
+| ML training data | OK (large reads) | OK if latency-critical |
+| Real-time personalisation | Marginal | Strong fit |
+| Hot cache layer | Marginal | Strong fit (with replication elsewhere) |
+
+## Step 9: pre-signed URL expiry table (moved from SKILL.md)
+
+| Expiry | Use case |
+|---|---|
+| 60 seconds | High-security / per-request signing |
+| 1 hour (default) | General |
+| 12 hours | Long upload (multipart resume) |
+| 7 days (max, IAM user) | Long-lived sharing |
+| 36 hours (max, IAM role/STS) | Default for STS-derived credentials |
+
+## Step 11: Batch Operations billing table (moved from SKILL.md)
+
+| Operation | Billed as |
+|---|---|
+| Copy | Per object |
+| Replace tags / ACL | Per object |
+| Restore from Glacier | Per object + Glacier restore |
+| Invoke Lambda | Per object + Lambda invocation |
+
+## Step 13: content-encoding compression ratios (moved from SKILL.md)
+
+| Content-Type | Typical gzip ratio |
+|---|---|
+| JSON / CSV / HTML | 5-10x |
+| Logs (text) | 8-15x |
+| Already-compressed (PNG, JPEG, MP4) | No gain |
+

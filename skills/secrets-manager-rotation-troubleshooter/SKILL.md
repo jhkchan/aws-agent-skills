@@ -65,58 +65,12 @@ metadata:
   event ARN.
 
 ## Mindset
-
-A failing secret rotation is usually a rotation Lambda configuration,
-schedule, or database-permission incident wearing a "Secrets Manager is
-broken" costume. The rotation template is fine in the majority of
-cases; the broken thing is the rotation Lambda's VPC attachment, its
-execution role, the EventBridge rule that triggers it, the Master
-Secret ARN it reads, or the database privileges of the credential it is
-rotating. Senior security engineers do not start by re-deploying the
-rotation template; they start with `describe-secret` and the rotation
-Lambda's most recent CloudWatch log stream.
+Full diagnostic mindset (rotation incidents are Lambda config, schedule, or DB-permission incidents, not template bugs): [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for the senior-engineer framing.
 
 ## Philosophy
-
-Four behaviours separate a senior security engineer from a generalist
-when diagnosing Secrets Manager rotation:
-
-- **The rotation step name drives the diagnostic order.** A failure
-  logged in `createSecret` indicates the Lambda could not even stage
-  the new secret value (usually a KMS or permissions issue). A failure
-  in `setSecret` indicates the Lambda could not apply the new
-  credential to the database (usually VPC, database endpoint, or
-  database privilege). A failure in `testSecret` indicates the
-  credential was set but could not be verified (usually the wrong
-  connection string). A failure in `finishSecret` indicates the Lambda
-  could not mark the new version as `AWSCURRENT` (rare; usually a
-  Secrets Manager API failure or stale `ClientRequestToken`). Routing
-  by step name is the #1 accelerator in rotation incidents.
-- **`LastRotatedDate` is the canonical health signal, not the
-  EventBridge metric.** A rotation may invoke successfully and still
-  not advance `LastRotatedDate` if the Lambda throws after `setSecret`
-  but before `finishSecret`. Operators who watch the EventBridge
-  invocation count assume "rotations are firing, so we're fine" while
-  the secret value is stale. Always read `describe-secret.LastRotatedDate`
-  and compare against `RotationRules.ScheduleExpression`.
-- **The rotation Lambda's execution role is NOT the same as the
-  database credential it rotates.** The execution role is the IAM
-  identity the Lambda runs as; it needs `secretsmanager:GetSecretValue`
-  on the secret AND on the Master Secret, plus `kms:Decrypt` on the CMK
-  that encrypts them. The database credential is the value the Lambda
-  reads from the Master Secret to authenticate to the database as a
-  superuser. A rotation that fails with "permission denied for table
-  mysql.user" is a database-privilege issue (the Master Secret's user
-  is not a superuser), not an IAM issue. Confusing the two is the most
-  common misdiagnosis.
-- **EventBridge `rate(1d)` is the schedule, not a guarantee.**
-  EventBridge schedules are best-effort: a deleted rule produces zero
-  invocations; a disabled rule produces zero invocations; a rule with
-  the wrong target ARN produces zero invocations on the correct Lambda.
-  `describe-secret.RotationRules.ScheduleExpression` is the desired
-  schedule, but the actual trigger is the EventBridge rule whose target
-  is the rotation Lambda. Always verify both the secret's rotation
-  config AND the EventBridge rule.
+The four senior-engineer behaviours (rotation step name drives diagnostic order, LastRotatedDate is the canonical health signal, execution role vs DB credential, rate(1d) is a schedule not a guarantee): [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when routing by rotation step name.
 
 ## Quick reference — symptom triage table
 
@@ -146,69 +100,18 @@ configuration and short-circuit on secret states that mimic rotation
 failures.
 
 ### Account-wide pre-flight commands
-
-```bash
-# 1. Secret description (RotationEnabled, RotationLambdaARN,
-#    RotationRules, LastRotatedDate, LastAccessedDate, KmsKeyId,
-#    OwningService, VersionIdsToStages, DeletedDate)
-aws secretsmanager describe-secret \
-  --secret-id <arn-or-name> --output json
-
-# 2. Recent rotation Lambda log events
-aws logs filter-log-events \
-  --log-group-name /aws/lambda/<rotation-lambda-name> \
-  --start-time $(date -u -v-24H +%s)000 \
-  --filter-pattern '"setSecret" OR "createSecret" OR "testSecret" OR "finishSecret" OR "timed out" OR "AccessDenied" OR "permission denied" OR "Could not connect"' \
-  --output json
-
-# 3. Secret resource-based policy (cross-account grants)
-aws secretsmanager get-resource-policy \
-  --secret-id <arn-or-name> --output json 2>/dev/null || \
-  echo "No resource-based policy"
-
-# 4. Rotation Lambda configuration (Timeout, VpcConfig, Role, Environment)
-aws lambda get-function-configuration \
-  --function-name <rotation-lambda-arn> --output json
-
-# 5. EventBridge rules targeting the rotation Lambda
-aws events list-rules --output json | \
-  jq '.Rules[] | select(.Name | test("Rotation|<secret-keyword>"))'
-
-# 6. AWS Health (regional events)
-aws health describe-events --filter eventStatusCodes=OPEN,UPCOMING \
-  --region us-east-1 --output json
-```
+Account-wide pre-flight commands 1-6 (describe-secret, rotation Lambda log filter, get-resource-policy, get-function-configuration, EventBridge rules, AWS Health): [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Run these before any symptom-specific probe.
 
 ### Secret-state short-circuit
-
-| `describe-secret` field | Effect on diagnosis |
-|---|---|
-| `RotationEnabled: true`, `LastRotatedDate` within `RotationRules.ScheduleExpression` | Rotation is healthy; the reported symptom is not a rotation failure. Investigate application-side secret retrieval. |
-| `RotationEnabled: true`, `LastRotatedDate` stale by > 1 schedule interval | Rotation is configured but not advancing. Proceed with the diagnostic tree. |
-| `RotationEnabled: false` | Rotation is explicitly disabled. Either re-enable (`rotate-secret` is a no-op; use `update-secret` or the console) or note in REMEDIATION. This is the root cause if the operator expected rotation. |
-| `DeletedDate` populated | The secret is scheduled for deletion. Rotation does not run on deleted secrets. Restore via `restore-secret`. |
-| `VersionIdsToStages` lacks `AWSCURRENT` | The secret has no current version. Rotation will fail; this is rare but indicates a prior failed `finishSecret`. |
-| `VersionIdsToStages` has `AWSPENDING` stuck | A prior rotation invocation did not finish. The next rotation will attempt to recover; if it persists, the Lambda is failing in `setSecret` or `testSecret`. |
-| `OwningService` (e.g., `rds`, `redshift`, `docdb`) | The secret was created by a managed service. Some services (RDS) manage rotation automatically; verify the OwningService rotation is the one failing before diagnosing. |
+The secret-state short-circuit table (healthy vs stale vs RotationEnabled:false vs DeletedDate vs missing AWSCURRENT vs AWSPENDING stuck vs OwningService): [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Consult it right after describe-secret to short-circuit mimics.
 
 If the input is malformed (missing SecretId, absent symptom
 description, no caller context for live diagnosis), emit:
 
-```text
-TARGET: <secret-id or unknown>
-VERDICT: INSUFFICIENT_DATA
-REASON: Input is missing required context — at minimum a symptom
-  description (the rotation Lambda error or observed behaviour such
-  as "LastRotatedDate is 7 days old") and the SecretId.
-LAYER: UNKNOWN
-EVIDENCE:
-  - Missing: <list specific missing fields>
-REMEDIATION: Re-prompt the operator for: (1) the exact SecretId or
-  ARN, (2) the observed symptom (rotation Lambda error log line,
-  stale LastRotatedDate, or application connection failures after
-  rotation), and (3) for live diagnosis, the rotation Lambda name
-  and recent CloudWatch log stream.
-```
+The INSUFFICIENT_DATA re-prompt template for malformed/missing input: [references/worked-examples.md](references/worked-examples.md).
+Emit it whenever required context is missing.
 
 ## Process — Diagnostic decision tree (apply in symptom order)
 
@@ -218,72 +121,8 @@ emit `ROOT_CAUSE_IDENTIFIED` without a failing probe that matches the
 symptom.**
 
 ### Step 0: Rotation protocol and non-obvious behaviours
-
-These are the operational gotchas a senior security engineer knows from
-rotation-incident experience:
-
-- **The rotation Lambda implements a four-step protocol.** Secrets
-  Manager invokes the Lambda with a `ClientRequestToken` and an
-  `ExecutionId`. The Lambda's handler switches on the `step` parameter
-  passed in the event payload: `createSecret` (stage the new value
-  under `AWSPENDING`), `setSecret` (apply the credential to the
-  database), `testSecret` (verify the new credential connects), and
-  `finishSecret` (move `AWSCURRENT` to the new version, demote the
-  prior to `AWSPREVIOUS`). The first failing step names the layer.
-- **The rotation Lambda's default timeout is 3 seconds.** This is far
-  too low for any database rotation that includes a connection round
-  trip. The AWS-managed rotation templates set the timeout to 30s at
-  deploy time, but a custom Lambda or a manually created function often
-  inherits the 3s default. Rotation timeouts at exactly 3.00s almost
-  always mean the timeout config was never raised from the default.
-- **`rate(1d)` is the schedule expression, not a deadline.** EventBridge
-  fires the rule approximately every 24 hours, but the firing window
-  has up to a 1-hour jitter. Operators who report "rotation was
-  supposed to fire at 03:17 but fired at 04:02" are observing the
-  jitter, not a bug.
-- **The Master Secret and the rotating secret are two different
-  secrets.** The Master Secret contains the superuser credential the
-  Lambda uses to log in to the database and rotate the rotating
-  secret's user. If the Master Secret's user lacks `SUPERUSER` or
-  `CREATEROLE`, the `setSecret` step fails with a database-level
-  permission error — independent of any IAM permission.
-- **Cross-account rotation requires BOTH the rotation role's
-  identity-based policy AND the secret's resource-based policy.** Same
-  account requires only the identity-based policy. A rotation role in
-  account A reading a secret in account B must have
-  `secretsmanager:GetSecretValue` on the secret ARN in its identity
-  policy AND the secret's resource policy must list the rotation role
-  ARN in account A as an allowed principal.
-- **KMS decryption for the secret requires `kms:Decrypt` on the
-  encryption CMK.** If the secret uses a customer-managed CMK (not the
-  default `aws/secretsmanager`), the rotation role needs `kms:Decrypt`
-  on that CMK to read the secret value. Rotating from the default CMK
-  to a customer-managed one without updating the rotation role breaks
-  every rotation. The default CMK decrypts transparently.
-- **The rotation Lambda must be in the same VPC as the database OR
-  have a route to it.** A Lambda that is not VPC-attached cannot reach
-  a private RDS instance. A Lambda in a different VPC cannot reach the
-  database without peering or a PrivateLink endpoint. This is the same
-  Lambda-VPC gotcha as application Lambdas, but operators often forget
-  it applies to the rotation Lambda because "rotation is managed."
-- **The `AWSPENDING` staging label indicates an incomplete rotation.**
-  If a rotation invocation fails mid-protocol, the new version is left
-  in `AWSPENDING`. The next invocation will attempt to recover from
-  the failed step. A version stuck in `AWSPENDING` for > 1 schedule
-  interval indicates the Lambda is failing repeatedly; read the logs
-  to find the failing step.
-- **Alternating Users strategy requires the database engine to support
-  user cloning.** MySQL, PostgreSQL, and Aurora support `CREATE USER`
-  with `GRANT`. SQL Server uses `CREATE LOGIN` + `CREATE USER`. Oracle
-  uses `CREATE USER`. Redshift rotation uses a custom template that
-  creates a `staging_<user>` shadow user and re-grants permissions.
-  Using the generic MySQL rotation Lambda on a Redshift cluster, or
-  vice versa, fails with a SQL syntax error in `setSecret`.
-- **`AWSPREVIOUS` is populated only after the first successful
-  rotation.** A brand-new secret that has never rotated has only
-  `AWSCURRENT`. A rotation Lambda that expects to "rotate back" to the
-  previous credential on test failure will fail on the first rotation
-  because there is no previous. This is rare but worth noting.
+The ten non-obvious behaviours (four-step protocol, 3s default timeout, schedule jitter, Master Secret vs rotating secret, cross-account dual policy, CMK decrypt, Lambda-VPC attachment, AWSPENDING recovery, Alternating engine support, AWSPREVIOUS on first rotation): [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when the failing step is unclear.
 
 ### Step 1: Symptom entry — pick the diagnostic branch
 
@@ -310,38 +149,16 @@ is 3s; the AWS-managed rotation templates override this to 30s at
 deploy time, but a manually created rotation Lambda may inherit the
 default.
 
-```bash
-aws lambda get-function-configuration \
-  --function-name <rotation-lambda-arn> --output json | \
-  jq '{Timeout, MemorySize, Runtime, LastModified}'
-```
-
-Cross-reference against CloudWatch Duration:
-
-```bash
-aws cloudwatch get-metric-statistics --namespace AWS/Lambda \
-  --metric-name Duration \
-  --dimensions Name=FunctionName,Value=<rotation-lambda-name> \
-  --start-time $(date -u -v-24H +%FT%TZ) --end-time $(date -u +%FT%TZ) \
-  --period 300 --statistics Average,Maximum --output json
-```
+Probes (lambda get-function-configuration Timeout/Memory/Runtime, CloudWatch Duration statistics vs configured Timeout): [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand to run the timeout probes.
 
 If `Maximum` Duration is at or just above the configured `Timeout`, the
 function is being killed before completing the four-step protocol. If
 the configured Timeout is 3, **ROOT_CAUSE_IDENTIFIED** with
 `LAYER: ROTATION_LAMBDA_TIMEOUT`.
 
-```bash
-# Fix:
-aws lambda update-function-configuration \
-  --function-name <rotation-lambda-arn> --timeout 30 --profile <p>
-```
-
-**Note:** If the timeout is already 30s and the Lambda still times out,
-the rotation Lambda is blocking on the database (VPC, slow query) or on
-Secrets Manager API (rare). Jump to Step 3 (VPC) or Step 4 (DB
-endpoint) before raising the timeout further. Raising the timeout to
-900s when the database is unreachable just delays the failure.
+Fix command (lambda update-function-configuration --timeout 30) plus the do-not-just-raise-the-timeout note: [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when applying the ROTATION_LAMBDA_TIMEOUT fix.
 
 ### Step 3: VPC connectivity — rotation Lambda cannot reach database
 
@@ -350,11 +167,8 @@ Symptom: rotation Lambda logs `Could not connect to database at host
 endpoint. The Lambda's Timeout is ≥ 15s but the connection never
 establishes.
 
-```bash
-aws lambda get-function-configuration \
-  --function-name <rotation-lambda-arn> --output json | \
-  jq '.VpcConfig'
-```
+Probes (lambda get-function-configuration VpcConfig, subnet route tables, Lambda/DB security groups): [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand to run the VPC probes.
 
 `VpcConfig` empty or null → the Lambda is NOT in a VPC and cannot
 reach a private database. **ROOT_CAUSE_IDENTIFIED** with
@@ -363,31 +177,8 @@ subnets (`update-function-configuration --vpc-config ...`).
 
 If `VpcConfig` is populated, verify the subnet route table:
 
-```bash
-aws ec2 describe-route-tables \
-  --filters Name=association.subnet-id,Values=<subnet-from-vpc-config> \
-  --output json | jq '.RouteTables[].Routes'
-```
-
-- For a database in the same VPC: the route table must have a local
-  route to the database's CIDR.
-- For a database in a peered VPC: the route table must have a route to
-  the peered VPC's CIDR via the peering connection.
-- For a database reached via PrivateLink: the route table must have a
-  route to the endpoint ENI.
-
-Also verify the Lambda's Security Group allows outbound to the
-database port (3306 for MySQL/Aurora-MySQL, 5432 for PostgreSQL/Aurora-
-PostgreSQL, 1433 for SQL Server, 1521 for Oracle, 5439 for Redshift),
-and the database's Security Group allows inbound from the Lambda's SG.
-
-```bash
-aws ec2 describe-security-groups --group-ids <lambda-sg> --output json | \
-  jq '.SecurityGroups[].IpPermissionsEgress'
-
-aws ec2 describe-security-groups --group-ids <db-sg> --output json | \
-  jq '.SecurityGroups[].IpPermissions'
-```
+Route-table reading guide (local route, peered VPC, PrivateLink ENI) and security-group checks per DB port: [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when VpcConfig is populated but the DB is unreachable.
 
 **Verdicts:**
 - Lambda not VPC-attached, DB is private: ROOT_CAUSE_IDENTIFIED,
@@ -403,35 +194,8 @@ Symptom: rotation Lambda logs `Could not connect to database at host
 <host> port <port>` or `unknown database "<dbname>"`. The connection
 establishes (no VPC issue) but authentication or routing fails.
 
-The connection string lives in either the rotation Lambda's environment
-variables OR in the secret value itself (the rotating secret's
-`host`/`port`/`dbname` keys). The AWS-managed rotation templates read
-these keys from the secret value; custom templates may use env vars.
-
-```bash
-# Inspect the rotation Lambda env vars (look for host/port/dbname)
-aws lambda get-function-configuration \
-  --function-name <rotation-lambda-arn> --output json | \
-  jq '.Environment.Variables'
-
-# Verify the secret value's connection keys (requires GetSecretValue
-# permission; only the host/port/dbname are non-sensitive)
-aws secretsmanager get-secret-value \
-  --secret-id <arn-or-name> --query SecretString --output text | \
-  jq '{host, port, dbname, engine, username}'
-```
-
-Cross-reference against the actual database:
-
-```bash
-aws rds describe-db-instances \
-  --db-instance-identifier <id> --output json | \
-  jq '.DBInstances[0] | {Endpoint: .Endpoint, DBInstanceStatus, Engine, DBName}'
-
-aws redshift describe-clusters \
-  --cluster-identifier <id> --output json | \
-  jq '.Clusters[0] | {Endpoint: .Endpoint, NodeType, DBName}'
-```
+Connection-string probes (Lambda env vars, secret value host/port/dbname, rds describe-db-instances, redshift describe-clusters): [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand to cross-reference the database endpoint.
 
 Common mismatches:
 
@@ -453,40 +217,8 @@ Symptom: rotation Lambda logs `AccessDenied` calling
 `kms:Decrypt`. The Lambda runs but fails at the first Secrets Manager
 API call.
 
-```bash
-# Get the rotation role ARN
-aws lambda get-function-configuration \
-  --function-name <rotation-lambda-arn> --output json | jq '.Role'
-
-# Simulate the role against the secret and Master Secret
-aws iam simulate-principal-policy \
-  --policy-source-arn <rotation-role-arn> \
-  --action-names secretsmanager:GetSecretValue secretsmanager:PutSecretValue secretsmanager:DescribeSecret \
-  --resource-arns <secret-arn> <master-secret-arn> \
-  --output json --profile <p>
-
-# If the secret uses a customer-managed CMK:
-aws iam simulate-principal-policy \
-  --policy-source-arn <rotation-role-arn> \
-  --action-names kms:Decrypt \
-  --resource-arns <cmk-arn> \
-  --output json --profile <p>
-```
-
-`implicitDeny` = the role's identity policy lacks the action.
-`explicitDeny` = a Deny statement in SCP, permissions boundary, or
-session policy matches.
-
-For the Secrets Manager API:
-
-```bash
-# CloudTrail lookup for the exact denied API
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventName,AttributeValue=GetSecretValue \
-  --start-time $(date -u -v-1H +%s) --end-time $(date -u +%s) \
-  --output json | \
-  jq '.Events[] | select(.CloudTrailEvent | contains("<rotation-role-name>"))'
-```
+IAM probes (rotation role ARN, simulate-principal-policy for GetSecretValue/PutSecretValue/DescribeSecret and kms:Decrypt, CloudTrail lookup for the denied API) plus implicitDeny vs explicitDeny reading: [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand on any AccessDenied symptom.
 
 **Verdicts:**
 - Rotation role lacks `secretsmanager:GetSecretValue` on the secret or
@@ -503,20 +235,8 @@ Symptom: rotation Lambda logs `ResourceNotFoundException: Master
 Secret ARN ... does not exist` or `AccessDenied` reading a Master
 Secret that the secret actually points to.
 
-The Master Secret ARN is configured in the rotation Lambda's
-environment variable (typically `SECRETS_MANAGER_MASTER_ID` or
-`MASTER_ARN`, depending on the template version). It can also be
-passed in the rotation event payload.
-
-```bash
-aws lambda get-function-configuration \
-  --function-name <rotation-lambda-arn> --output json | \
-  jq '.Environment.Variables'
-
-# Verify the Master Secret exists
-aws secretsmanager describe-secret \
-  --secret-id <master-secret-arn-from-env> --output json
-```
+Master Secret probes (Lambda env vars SECRETS_MANAGER_MASTER_ID / MASTER_ARN, describe-secret on the Master ARN): [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when the Master Secret is suspect.
 
 Common patterns:
 
@@ -539,19 +259,8 @@ has no recent CloudWatch log streams. The secret's
 `RotationRules.ScheduleExpression` is correct (e.g., `rate(1d)`), but
 nothing fires.
 
-```bash
-# List rules whose target is the rotation Lambda
-aws events list-targets-by-rule \
-  --rule <rule-name> --output json 2>/dev/null
-
-# Find the rule by listing all rules and searching for the rotation Lambda
-aws events list-rules --output json | \
-  jq --arg arn "<rotation-lambda-arn>" \
-    '.Rules[] | select(.Name | test("SecretsManager|Rotation|<secret-keyword>"; "i")) | {Name, State, ScheduleExpression, Arn}'
-
-# For each candidate rule, verify the target
-aws events list-targets-by-rule --rule <rule-name> --output json
-```
+Schedule probes (list-targets-by-rule, list-rules filtered for the rotation Lambda, per-rule target verification): [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when LastRotatedDate is stale.
 
 For each candidate rule:
 
@@ -570,255 +279,28 @@ For each candidate rule:
   `LAYER: SCHEDULE_MISSING`.
 
 ### Step 8: Database superuser privileges insufficient
-
-Symptom: rotation Lambda logs `permission denied for table mysql.user`
-(MySQL), `must be superuser to create role` (PostgreSQL), or
-`ALTER LOGIN failed; user does not have permission` (SQL Server). The
-connection establishes but the `ALTER USER` / `CREATE USER` statement
-fails.
-
-The Master Secret's database user must have sufficient privileges to
-rotate the rotating secret's user:
-
-- MySQL / Aurora-MySQL: `SUPER` or the specific `CREATE USER` +
-  `UPDATE on mysql.user` privilege. Aurora also recognises the
-  `rds_superuser` role.
-- PostgreSQL / Aurora-PostgreSQL: `CREATEROLE` + membership in the
-  target user's parent role. RDS uses `rds_superuser` for the
-  bootstrap user.
-- SQL Server: `sysadmin` server role (or `ALTER ANY LOGIN`).
-- Oracle: `ALTER USER` system privilege (typically the master account).
-- Redshift: `superuser` flag on the user (Redshift rotation uses
-  `CREATE USER staging_<x>` and `GRANT`).
-
-```bash
-# Read the Master Secret's username
-aws secretsmanager get-secret-value \
-  --secret-id <master-secret-arn> --query SecretString --output text | \
-  jq '.username'
-
-# Verify the user's privileges (run on the database directly, or via
-# an audit session):
-# MySQL:
-#   SELECT user, host, Super_priv FROM mysql.user WHERE user='<master-user>';
-# PostgreSQL:
-#   SELECT rolname, rolcreaterole, rolsuper FROM pg_roles WHERE rolname='<master-user>';
-# SQL Server:
-#   SELECT name, type_desc FROM master.sys.server_principals WHERE name='<master-user>';
-```
-
-**Verdict:** ROOT_CAUSE_IDENTIFIED,
-`LAYER: SUPERUSER_INSUFFICIENT`. Fix: grant the Master Secret's user
-the required privilege on the database, then trigger a manual rotation
-to verify.
+Step 8 deep dive (engine-by-engine privilege requirements, Master Secret username read, SUPERUSER_INSUFFICIENT verdict and fix): [references/diagnostic-commands.md](references/diagnostic-commands.md) and [references/error-handling.md](references/error-handling.md).
+Branch when the Lambda logs `permission denied for table mysql.user` or `must be superuser`.
 
 ### Step 9: Rotation strategy conflict (Alternating vs Single User)
-
-Symptom: rotation Lambda logs `CREATE USER failed ... already exists`
-(Alternating, on the second rotation), `ALTER USER failed; cannot
-modify own password` (Single User, when the Lambda authenticates as the
-rotating user instead of the Master), or `Rotating back to previous
-credential` on every attempt.
-
-The rotation strategy is baked into the rotation Lambda's code, not
-into the secret's metadata. The AWS-managed templates come in two
-families per engine:
-
-- **Single User** (`MySQLSingleUserRotation`, `PostgreSQLSingleUserRotation`):
-  the Lambda authenticates as the Master, runs `ALTER USER <rotating>
-  IDENTIFIED BY '<new-password>'`. Atomic; one connection drop during
-  the rotation step. No `AWSPREVIOUS` is meaningful because the user
-  is the same.
-- **Alternating Users** (`MySQLMultiUserRotation`, `PostgreSQLMultiUserRotation`):
-  the Lambda clones the rotating user to `<user>_clone`, sets the new
-  password on the clone, swaps the application's connection string,
-  and disables the old user. Safer for active connections; requires
-  `CREATE USER` + `GRANT`.
-
-```bash
-# Identify the rotation Lambda's template family
-aws lambda get-function-configuration \
-  --function-name <rotation-lambda-arn> --output json | \
-  jq '.Environment.Variables | .SECRETS_MANAGER_ROTATION_TYPE
-      // .ROTATION_STRATEGY // .FUNCTION_TYPE // "unknown"'
-
-# Inspect the Lambda's description for the template hint
-aws lambda get-function-configuration \
-  --function-name <rotation-lambda-arn> --output json | \
-  jq '.Description'
-```
-
-Common patterns:
-
-| Symptom | Cause |
-|---|---|
-| Lambda is Single-User template but the secret has `username=app_user` and the application expects `app_user_clone` | The application was wired for Alternating; the Lambda was deployed as Single. Re-deploy the rotation Lambda with the Alternating template. |
-| Lambda is Alternating template, DB engine does not support user cloning (e.g., Redshift with the MySQL template) | Cross-engine template confusion; use the engine-specific template. |
-| Rotation succeeds but the application breaks because the clone user's grants differ from the original | `GRANT` step in the Alternating template missed a privilege; the clone has fewer permissions than the original. Compare `SHOW GRANTS FOR <user>` and `<user>_clone`. |
-| "Rotating back to previous credential" on every attempt | The `testSecret` step fails (new credential does not connect), triggering the rollback path. The rollback requires `AWSPREVIOUS` to exist; on the first rotation, there is no previous, so the rollback itself fails. Investigate the `testSecret` failure first. |
-
-**Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: STRATEGY_CONFLICT`. Fix:
-re-deploy the rotation Lambda with the template family matching the
-secret's strategy, OR reconfigure the secret's strategy to match the
-Lambda.
+Step 9 deep dive (Single vs Alternating template families, ROTATION_STRATEGY env probes, STRATEGY_CONFLICT patterns and verdict): [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Branch when the Lambda logs `CREATE USER failed ... already exists` or `Rotating back`.
 
 ### Step 10: Cross-account secret access denied
-
-Symptom: rotation Lambda in account A reads a secret in account B
-(or vice versa). Lambda logs `AccessDenied` calling
-`secretsmanager:GetSecretValue` even though the role's identity policy
-includes the action.
-
-Cross-account requires BOTH sides:
-
-```bash
-# Side 1: rotation role identity policy (in account A)
-aws iam simulate-principal-policy \
-  --policy-source-arn <rotation-role-arn-in-account-A> \
-  --action-names secretsmanager:GetSecretValue secretsmanager:DescribeSecret \
-  --resource-arns <secret-arn-in-account-B> \
-  --output json --profile <account-A-profile>
-
-# Side 2: secret resource-based policy (in account B)
-aws secretsmanager get-resource-policy \
-  --secret-id <secret-arn-in-account-B> --output json \
-  --profile <account-B-profile>
-```
-
-The resource policy must include a statement allowing the rotation
-role's ARN in account A:
-
-```json
-{
-  "Effect": "Allow",
-  "Principal": { "AWS": "arn:aws:iam::<account-A>:role/<rotation-role>" },
-  "Action": ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"],
-  "Resource": "<secret-arn-in-account-B>"
-}
-```
-
-If the KMS key is also in account B, the rotation role needs
-`kms:Decrypt` on the CMK AND the CMK's key policy must grant the
-rotation role.
-
-**Verdict:** ROOT_CAUSE_IDENTIFIED,
-`LAYER: PERMISSION_CROSS_ACCOUNT`. Fix: add the missing principal to
-the secret's resource-based policy (and the KMS key policy if a
-customer-managed CMK is in use).
+Step 10 deep dive (cross-account simulate + get-resource-policy probes, required resource-policy statement, KMS key policy, PERMISSION_CROSS_ACCOUNT verdict): [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Branch when a rotation Lambda in account A cannot read a secret in account B.
 
 ### Step 11: Rotation token missing or recovery failure
-
-Symptom: rotation Lambda was invoked manually (via `lambda invoke` or
-the console's "Test" button) without a `ClientRequestToken`. Lambda
-logs `Rotation request missing ClientRequestToken` or `ExecutionId
-not provided`. Alternatively, a `AWSPENDING` version is stuck and the
-recovery invocation also fails.
-
-Secrets Manager invokes the rotation Lambda with both a
-`ClientRequestToken` (the version ID that will become `AWSCURRENT`) and
-an `ExecutionId` (a per-rotation UUID). A manual invocation omits both;
-the Lambda cannot proceed.
-
-```bash
-# Verify the most recent RotateSecret invocation
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventName,AttributeValue=RotateSecret \
-  --start-time $(date -u -v-24H +%s) --end-time $(date -u +%s) \
-  --output json | \
-  jq '.Events[] | select(.CloudTrailEvent | contains("<secret-arn>"))'
-
-# Check the secret's staging labels for a stuck AWSPENDING
-aws secretsmanager describe-secret \
-  --secret-id <arn-or-name> --output json | \
-  jq '.VersionIdsToStages'
-```
-
-If a version is stuck in `AWSPENDING`, trigger a fresh rotation; the
-Lambda will attempt to recover from the failed step:
-
-```bash
-aws secretsmanager rotate-secret \
-  --secret-id <arn-or-name> --rotation-rule AutomaticallyAfterDays=1 \
-  --profile <p>
-```
-
-**Verdicts:**
-- Manual invocation without token: ROOT_CAUSE_IDENTIFIED,
-  `LAYER: ROTATION_TOKEN_MISSING`. Fix: trigger rotation via
-  `rotate-secret` (not via direct Lambda invoke).
-- Recovery fails repeatedly: investigate the failing step (Step 1 of
-  this tree) — the recovery is not the root cause, the underlying
-  step failure is.
+Step 11 deep dive (CloudTrail RotateSecret lookup, AWSPENDING staging-label check, recovery rotation, ROTATION_TOKEN_MISSING verdict): [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Branch on manual invocation without a ClientRequestToken or a stuck AWSPENDING.
 
 ### Step 12: Twin secrets not synced across regions
-
-Symptom: the primary-region secret rotates (`LastRotatedDate` is fresh)
-but a region-paired twin in another region does not. The application
-in the second region reads stale credentials and fails.
-
-Twin secrets are typically maintained via Secrets Manager replication
-(`replicate-secret-to-regions`) or via an application-level sync
-process. Verify both:
-
-```bash
-# Primary region
-aws secretsmanager describe-secret \
-  --secret-id <primary-arn> --region <primary-region> --output json | \
-  jq '{LastRotatedDate, VersionIdsToStages}'
-
-# Secondary region
-aws secretsmanager describe-secret \
-  --secret-id <secondary-arn> --region <secondary-region> --output json | \
-  jq '{LastRotatedDate, VersionIdsToStages, PrimaryRegion: .PrimaryRegion}'
-```
-
-If `PrimaryRegion` is populated, the secondary is a read-replica that
-should auto-sync within minutes of the primary's rotation. If
-`LastRotatedDate` differs by more than 1 hour, the replication is
-failing — investigate the replication status:
-
-```bash
-aws secretsmanager describe-secret \
-  --secret-id <primary-arn> --region <primary-region> --output json | \
-  jq '.ReplicationStatus'
-```
-
-If `PrimaryRegion` is empty (the twin is not a managed replica), the
-twin is a separate secret with its own rotation config. Verify the
-twin's `RotationEnabled` and `RotationLambdaARN` independently.
-
-**Verdict:** ROOT_CAUSE_IDENTIFIED,
-`LAYER: TWIN_SECRETS_NOT_SYNCED`. Fix: re-establish replication
-(`replicate-secret-to-regions` with `ForceOverwriteReplicaSecret=true`)
-or re-enable the twin's rotation config.
+Step 12 deep dive (primary/secondary describe-secret comparison, ReplicationStatus, TWIN_SECRETS_NOT_SYNCED verdict and fix): [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Branch when a region-paired twin did not rotate with the primary.
 
 ### Step 12b: Redshift rotation function (engine-specific template)
-
-Symptom: rotation Lambda for a Redshift secret fails in `setSecret`
-with a SQL syntax error or `relation "pg_user" does not exist`.
-
-Redshift uses a different rotation template than PostgreSQL despite
-sharing the port (5439 vs 5432). The Redshift template creates a
-`staging_<user>` shadow user, rotates its password, and re-grants
-permissions. Using the PostgreSQL template on a Redshift cluster fails
-because Redshift does not support all PostgreSQL system catalog tables.
-
-```bash
-# Verify the rotation Lambda's handler/description identifies it as Redshift
-aws lambda get-function-configuration \
-  --function-name <rotation-lambda-arn> --output json | \
-  jq '{Description, Handler, Environment: .Environment.Variables}'
-
-# Verify the secret's engine
-aws secretsmanager get-secret-value \
-  --secret-id <arn-or-name> --query SecretString --output text | \
-  jq '.engine'
-```
-
-If the Lambda is a generic PostgreSQL template and the secret's engine
-is `redshift`, **ROOT_CAUSE_IDENTIFIED** with
-`LAYER: REDSHIFT_ROTATION_FUNCTION`. Fix: re-deploy the rotation
-Lambda with the Redshift-specific rotation template.
+Step 12b deep dive (Redshift-specific handler and engine probes, REDSHIFT_ROTATION_FUNCTION verdict): [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Branch when a Redshift secret fails in setSecret with a SQL syntax error.
 
 ### Step 13: Escalate or INSUFFICIENT_DATA
 
@@ -904,68 +386,12 @@ CONFIRM: Before updating the Lambda timeout, emit and await:
 ```
 
 ### Worked example — SCHEDULE_MISSING (EventBridge rule deleted)
-
-```text
-TARGET: prod/api/github-webhook-token
-VERDICT: ROOT_CAUSE_IDENTIFIED
-REASON: RotationRules.ScheduleExpression is rate(1d) and
-  RotationEnabled is true, but the EventBridge rule
-  SecretsManager-prod-api-github-webhook-token does not exist.
-  No rotation has fired in 14 days; LastRotatedDate is 2026-07-21.
-LAYER: SCHEDULE_MISSING
-EVIDENCE:
-  - Symptom: LastRotatedDate is 2026-07-21; today is 2026-08-05.
-  - Probe: aws events list-rules returns no rule matching the
-    rotation Lambda's ARN as target.
-  - Probe: aws logs filter-log-events on the rotation Lambda's log
-    group returns zero events in the last 14 days.
-  - Passing: rotation Lambda configuration is intact (Timeout=30,
-    VpcConfig correct, role has GetSecretValue); the rotation role
-    has not been modified since 2026-06-15.
-REMEDIATION:
-  1. Recreate the EventBridge rule with the rotation Lambda as
-     target:
-     aws events put-rule --name SecretsManager-prod-api-github-webhook-token \
-       --schedule-expression "rate(1d)" --state ENABLED --profile <p>
-     aws events put-targets --rule SecretsManager-prod-api-github-webhook-token \
-       --targets '{"Id":"1","Arn":"<rotation-lambda-arn>"}' --profile <p>
-  2. Add the resource-based permission for EventBridge to invoke the
-     Lambda:
-     aws lambda add-permission --function-name <rotation-lambda-name> \
-       --statement-id EventBridgeInvoke --action lambda:InvokeFunction \
-       --principal events.amazonaws.com \
-       --source-arn arn:aws:events:<region>:<account>:rule/SecretsManager-prod-api-github-webhook-token \
-       --profile <p>
-  3. Trigger a manual rotation to verify the end-to-end path:
-     aws secretsmanager rotate-secret --secret-id prod/api/github-webhook-token \
-       --profile <p>
-CONFIRM: Before recreating the rule, emit and await:
-  "CONFIRM: About to recreate EventBridge rule
-   SecretsManager-prod-api-github-webhook-token targeting
-   <rotation-lambda>. Proceed? (yes/no)"
-```
+Full worked example (recreate deleted EventBridge rule + add-permission + verify rotation): [references/worked-examples.md](references/worked-examples.md).
+The ROTATION_LAMBDA_TIMEOUT example above is the primary worked example.
 
 ### Worked example — INSUFFICIENT_DATA
-
-```text
-TARGET: prod/auth/oauth-signing-key
-VERDICT: INSUFFICIENT_DATA
-REASON: The rotation Lambda's recent logs show a database connection
-  error, but the secret's connection string (host, port, dbname) was
-  not provided and the rotation Lambda's environment variables cannot
-  be read without its name.
-LAYER: UNKNOWN
-EVIDENCE:
-  - Observed: "LastRotatedDate is 2026-07-30; rotation Lambda logs
-    'Could not connect to database'."
-  - Missing: rotation Lambda name or ARN, secret value's connection
-    keys (host/port/dbname), RDS instance identifier.
-REMEDIATION: Re-prompt the operator for: (1) the rotation Lambda name
-  or ARN (visible in describe-secret.RotationLambdaARN), (2) the
-  database instance identifier (to cross-reference host/port), and
-  (3) the rotation Lambda's recent CloudWatch log stream around the
-  failing setSecret step.
-```
+Full INSUFFICIENT_DATA worked example (missing Lambda name, connection keys, RDS identifier, re-prompt): [references/worked-examples.md](references/worked-examples.md).
+Load on demand when required context is missing.
 
 ## Anti-Patterns — NEVER
 
@@ -1041,352 +467,29 @@ REMEDIATION: Re-prompt the operator for: (1) the rotation Lambda name
   event subscription).
 
 ## Pre-flight safety checks (run before any state-changing CLI)
-
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`update-function-configuration`, `rotate-secret`, `put-rule`,
-  `put-targets`, `enable-rule`, `add-permission`, `update-secret`,
-  `put-resource-policy`), emit and await operator approval. Do NOT
-  execute the CLI until the operator confirms.
-
-- **Read-only first.** Every probe in the diagnostic tree is
-  read-only (`describe-secret`, `get-resource-policy`,
-  `get-function-configuration`, `filter-log-events`, `describe-rule`,
-  `list-targets-by-rule`, `describe-route-tables`,
-  `describe-security-groups`, `describe-key`,
-  `simulate-principal-policy`, `lookup-events`,
-  `describe-db-instances`, `describe-clusters`). Do not perform
-  state-changing operations as diagnostic probes.
-
-- **`rotate-secret` triggers an immediate rotation.** It does not
-  block waiting for completion. Verify success by polling
-  `LastRotatedDate` (should advance within 5 minutes) and the Lambda's
-  CloudWatch log stream.
-
-- **`update-function-configuration --timeout`** is safe; raising the
-  timeout does not cause disruption. The next rotation invocation uses
-  the new timeout.
-
-- **`update-function-configuration --vpc-config`** triggers an ENI
-  re-creation. Plan outside traffic peaks; the rotation Lambda may be
-  unavailable for 30-60 seconds.
-
-- **`events put-rule` / `put-targets`** is non-disruptive if the rule
-  did not exist; if the rule exists and is being updated, the change
-  applies at the next schedule window.
-
-- **`events enable-rule`** immediately resumes the schedule; the next
-  firing happens at the next schedule window, not immediately. Trigger
-  a manual rotation to validate before the window.
-
-- **`lambda add-permission`** is additive; it does not affect existing
-  permissions. Safe to call without a confirmation if the operator
-  has approved the broader remediation.
-
-- **Secret value updates (`update-secret`)** change the `AWSCURRENT`
-  version immediately. Applications reading the secret will see the
-  new value on the next `GetSecretValue` call. Confirm the application
-  is prepared to consume the new value before updating.
-
-- **Resource-based policy changes (`put-resource-policy`)** affect
-  every consumer of the secret. Tighten policy gradually; never
-  deny-by-default without confirming no application depends on the
-  secret.
-
-- **Bulk remediation batch limit.** If the diagnosis identifies the
-  same root cause across multiple secrets (e.g., a deleted EventBridge
-  rule affecting every secret in a rotation schedule group), batch
-  remediation into groups of at most 5 secrets, emit a single CONFIRM
-  per batch, and verify between batches.
+Full safety guidance (confirm gate, read-only-first, rotate-secret non-blocking, vpc-config ENI recreation, batch limit of 5): [references/error-handling.md](references/error-handling.md).
+Load on demand before any state-changing CLI.
 
 ## Remediation guidance
-
-### For ROTATION_LAMBDA_TIMEOUT
-
-```bash
-aws lambda update-function-configuration \
-  --function-name <rotation-lambda-arn> --timeout 30 --profile <p>
-aws secretsmanager rotate-secret --secret-id <arn-or-name> --profile <p>
-```
-
-Target: 30s for routine rotations. 60s only if the database genuinely
-takes that long (large `GRANT` operations, slow Aurora writer
-failover). Avoid 900s — investigate the underlying latency instead.
-
-### For ROTATION_LAMBDA_VPC
-
-```bash
-# Attach the Lambda to the database's subnets and SG
-aws lambda update-function-configuration \
-  --function-name <rotation-lambda-arn> \
-  --vpc-config SubnetIds=<db-subnet-1>,<db-subnet-2>,SecurityGroupIds=<lambda-sg> \
-  --profile <p>
-```
-
-Confirm the SG rules: Lambda SG egress to DB port; DB SG ingress from
-Lambda SG on the DB port.
-
-### For ROTATION_LAMBDA_DB_ENDPOINT
-
-Update the secret value (preferred — the application and rotation
-Lambda both read from the same source of truth):
-
-```bash
-aws secretsmanager put-secret-value \
-  --secret-id <arn-or-name> \
-  --secret-string '{"engine":"mysql","host":"<correct-host>","port":3306,"dbname":"<correct-db>","username":"app_user","password":"<current-password>"}' \
-  --profile <p>
-```
-
-For Aurora, prefer the cluster writer endpoint over the instance
-endpoint to survive failover.
-
-### For SCHEDULE_MISSING
-
-```bash
-aws events put-rule --name SecretsManager-<secret-keyword> \
-  --schedule-expression "rate(1d)" --state ENABLED --profile <p>
-aws events put-targets --rule SecretsManager-<secret-keyword> \
-  --targets file://targets.json --profile <p>
-aws lambda add-permission --function-name <rotation-lambda-name> \
-  --statement-id <unique-sid> --action lambda:InvokeFunction \
-  --principal events.amazonaws.com \
-  --source-arn arn:aws:events:<region>:<account>:rule/SecretsManager-<secret-keyword> \
-  --profile <p>
-```
-
-### For SCHEDULE_DISABLED
-
-```bash
-aws events enable-rule --name SecretsManager-<secret-keyword> --profile <p>
-```
-
-### For MASTER_SECRET_MISCONFIGURED
-
-```bash
-aws lambda update-function-configuration \
-  --function-name <rotation-lambda-arn> \
-  --environment Variables={SECRETS_MANAGER_MASTER_ID=<correct-master-arn>} \
-  --profile <p>
-aws lambda publish-version --function-name <rotation-lambda-arn> --profile <p>
-aws lambda update-alias --name <rotation-alias> \
-  --function-version <new> --profile <p>
-```
-
-### For PERMISSION_ROTATION_ROLE
-
-```bash
-aws iam put-role-policy --role-name <rotation-role-name> \
-  --policy-name SecretsManagerRotationAccess \
-  --policy-document '<JSON with secretsmanager:GetSecretValue,
-    PutSecretValue, DescribeSecret on the secret ARN and Master Secret
-    ARN>' --profile <p>
-aws secretsmanager rotate-secret --secret-id <arn-or-name> --profile <p>
-```
-
-### For KMS_DECRYPT_ROLE
-
-```bash
-aws iam put-role-policy --role-name <rotation-role-name> \
-  --policy-name KMSDecryptForSecretsManager \
-  --policy-document '<JSON with kms:Decrypt on the CMK ARN>' \
-  --profile <p>
-```
-
-### For PERMISSION_CROSS_ACCOUNT
-
-```bash
-# In the secret's owning account:
-aws secretsmanager put-resource-policy \
-  --secret-id <secret-arn-in-account-B> \
-  --policy file://cross-account-policy.json --profile <account-B>
-```
-
-If a customer-managed CMK is in use, also update the CMK key policy in
-account B to grant the rotation role in account A.
-
-### For ROTATION_TOKEN_MISSING
-
-Always trigger rotation via `secretsmanager rotate-secret`, not via
-`lambda invoke`:
-
-```bash
-aws secretsmanager rotate-secret --secret-id <arn-or-name> --profile <p>
-```
-
-### For SUPERUSER_INSUFFICIENT
-
-On the database directly:
-
-```sql
--- MySQL / Aurora-MySQL:
-GRANT CREATE USER, UPDATE ON mysql.user TO '<master-user>'@'%';
--- or for full superuser (RDS only — no root@localhost):
-GRANT SELECT, INSERT, UPDATE, DELETE ON mysql.* TO '<master-user>'@'%';
-
--- PostgreSQL / Aurora-PostgreSQL:
-ALTER ROLE "<master-user>" CREATEROLE;
--- Aurora-PostgreSQL: grant the rds_superuser role if appropriate.
-
--- SQL Server:
-ALTER SERVER ROLE sysadmin ADD MEMBER <master-user>;
-
--- Oracle:
-GRANT ALTER USER TO <master-user>;
-```
-
-### For STRATEGY_CONFLICT
-
-Re-deploy the rotation Lambda with the correct template family. The
-template families are listed in the AWS-managed serverless rotation
-templates (Serverless Application Repository):
-
-- `SecretsManagerRDSMySQLRotation` / `SecretsManagerRDSPostgreSQLRotation`
-  (Single User)
-- `SecretsManagerRDSMySQLRotationMultiUser` /
-  `SecretsManagerRDSPostgreSQLRotationMultiUser` (Alternating Users)
-- `SecretsManagerRedshiftRotationSingleUser` /
-  `SecretsManagerRedshiftRotationMultiUser` (Redshift-specific)
-- `SecretsManagerRDSSQLServerRotationSingleUser` /
-  `SecretsManagerRDSSQLServerRotationMultiUser` (SQL Server)
-- `SecretsManagerRDSOracleRotationSingleUser` /
-  `SecretsManagerRDSOracleRotationMultiUser` (Oracle)
-- `SecretsManagerMongoDBRotationSingleUser` /
-  `SecretsManagerMongoDBRotationMultiUser` (DocumentDB-compatible)
-- `SecretsManagerRotationGeneric` (custom engine — implement the
-  four-step protocol)
-
-### For TWIN_SECRETS_NOT_SYNCED
-
-```bash
-# If the twin is a managed replica:
-aws secretsmanager replicate-secret-to-regions \
-  --secret-id <primary-arn> \
-  --add-replica-regions Region=<secondary-region> \
-  --force-overwrite-replica-secret --profile <p>
-
-# If the twin is an independent secret, re-enable its rotation:
-aws secretsmanager rotate-secret --secret-id <twin-arn> \
-  --rotation-rule AutomaticallyAfterDays=1 --profile <p>
-```
+Per-layer fix and verify commands (ROTATION_LAMBDA_TIMEOUT, VPC, DB_ENDPOINT, SCHEDULE_MISSING/DISABLED, MASTER_SECRET, PERMISSION_ROTATION_ROLE, KMS_DECRYPT_ROLE, CROSS_ACCOUNT, TOKEN, SUPERUSER, STRATEGY_CONFLICT, TWIN_SECRETS): [references/error-handling.md](references/error-handling.md).
+Load on demand after a ROOT_CAUSE_IDENTIFIED verdict.
 
 ## Deep reference: Secrets Manager rotation layer model
-
-### Symptom → layer decision matrix (offline classification)
-
-```
-Log line / symptom                              → Layer
-Task timed out after 3.00 seconds               → ROTATION_LAMBDA_TIMEOUT
-Task timed out at > 3s; DB unreachable          → ROTATION_LAMBDA_VPC
-Could not connect to database at host ...       → ROTATION_LAMBDA_DB_ENDPOINT
-AccessDenied: secretsmanager:GetSecretValue     → PERMISSION_ROTATION_ROLE
-AccessDenied: kms:Decrypt                       → KMS_DECRYPT_ROLE
-Master Secret ARN ... does not exist            → MASTER_SECRET_MISCONFIGURED
-LastRotatedDate stale; rule missing/disabled    → SCHEDULE_MISSING / SCHEDULE_DISABLED
-permission denied for table mysql.user          → SUPERUSER_INSUFFICIENT
-CREATE USER failed; already exists              → STRATEGY_CONFLICT
-Rotating back to previous credential            → PREVIOUS_CREDENTIAL_NOT_STORED
-Rotation request missing ClientRequestToken     → ROTATION_TOKEN_MISSING
-Cross-account AccessDenied on GetSecretValue    → PERMISSION_CROSS_ACCOUNT
-Twin secret LastRotatedDate drift               → TWIN_SECRETS_NOT_SYNCED
-Redshift secret: pg_user does not exist         → REDSHIFT_ROTATION_FUNCTION
-```
-
-### Rotation step → layer routing
-
-```
-createSecret fails  → KMS_DECRYPT_ROLE, PERMISSION_ROTATION_ROLE,
-                      MASTER_SECRET_MISCONFIGURED
-setSecret fails     → ROTATION_LAMBDA_VPC, ROTATION_LAMBDA_DB_ENDPOINT,
-                      ROTATION_LAMBDA_DB_CREDENTIAL, SUPERUSER_INSUFFICIENT,
-                      STRATEGY_CONFLICT
-testSecret fails    → ROTATION_LAMBDA_DB_ENDPOINT (wrong connection string),
-                      PREVIOUS_CREDENTIAL_NOT_STORED (rollback fails)
-finishSecret fails  → ROTATION_TOKEN_MISSING, AWS-side (ESCALATE)
-```
-
-### Rotation Lambda execution role minimum policy
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "secretsmanager:DescribeSecret",
-        "secretsmanager:GetSecretValue",
-        "secretsmanager:PutSecretValue",
-        "secretsmanager:UpdateSecretVersionStage"
-      ],
-      "Resource": [
-        "<rotating-secret-arn>",
-        "<master-secret-arn>"
-      ]
-    },
-    {
-      "Effect": "Allow",
-      "Action": ["kms:Decrypt"],
-      "Resource": ["<cmk-arn-if-customer-managed>"]
-    },
-    {
-      "Effect": "Allow",
-      "Action": ["logs:CreateLogGroup", "logs:CreateLogStream",
-                  "logs:PutLogEvents"],
-      "Resource": "arn:aws:logs:*:*:log-group:/aws/lambda/<rotation-lambda>*"
-    }
-  ]
-}
-```
-
-### EventBridge rule template for rotation
-
-```json
-{
-  "Name": "SecretsManager-<secret-keyword>",
-  "ScheduleExpression": "rate(1d)",
-  "State": "ENABLED",
-  "Targets": [{
-    "Id": "1",
-    "Arn": "<rotation-lambda-arn>",
-    "Input": "{\"SecretId\":\"<secret-arn>\"}"
-  }]
-}
-```
-
-### Rotation strategy matrix
-
-| Strategy | Template family | DB privileges required | Connection-drop risk | AWSPREVIOUS used |
-|---|---|---|---|---|
-| Single User | `*SingleUserRotation` | `ALTER USER` on the rotating user | Yes (brief, during ALTER) | No (same user) |
-| Alternating Users | `*MultiUserRotation` | `CREATE USER`, `GRANT`, `DROP USER` | No (clone is rotated; original stays until swap) | Yes (rollback target) |
-| Redshift Single | `SecretsManagerRedshiftRotationSingleUser` | `ALTER USER` | Yes | No |
-| Redshift Alternating | `SecretsManagerRedshiftRotationMultiUser` | `CREATE USER`, `GRANT`, transfer ownership | No | Yes |
-| Generic | `SecretsManagerRotationGeneric` | Custom (template's responsibility) | Custom | Custom |
+The full layer model (symptom-to-layer decision matrix, rotation-step-to-layer routing, execution-role minimum policy, EventBridge rule template, rotation strategy matrix): [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for offline classification or template details.
 
 ## Recent AWS features (2024-2026)
+Recent AWS features 2024-2026 (cross-account rotation, 30s default on managed templates, Redshift multi-user GA, EventBridge Scheduler, RotationFailed events): [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when a trigger mechanism looks new.
 
-- **Cross-account secret rotation (2024):** Secrets Manager added
-  first-class support for cross-account rotation Lambda invocation,
-  removing the need for a resource-based policy on the Lambda when
-  the secret's resource policy already grants the rotation role.
-  Diagnostically, still verify BOTH the secret resource policy AND
-  the Lambda resource-based policy for older setups.
-- **Rotation Lambda timeout default 30s on managed templates (2024):**
-  New AWS-managed rotation templates set Timeout=30 at deploy time.
-  Older deployments and custom Lambdas may still have the 3s default.
-- **Redshift rotation multi-user template GA (2024-2025):** The
-  `SecretsManagerRedshiftRotationMultiUser` template reached GA after
-  a long preview; previously Redshift rotation was single-user only.
-- **EventBridge scheduler vs EventBridge rules for rotation (2025):**
-  Secrets Manager can now use EventBridge Scheduler (not just
-  EventBridge rules) to trigger rotation. Scheduler provides
-  one-time schedules and finer-grained timing. Older setups still use
-  rules; both are valid. Verify which one is in use before diagnosing
-  a missing trigger.
-- **Secrets Manager automatic rotation conflict detection (2025):**
-  Secrets Manager surfaces a `RotationRules.Attempts` field and
-  emits a `RotationFailed` EventBridge event when a rotation step
-  fails repeatedly. Subscribe to this event for proactive alerting.
+## References (load on demand)
+
+- [Diagnostic commands](references/diagnostic-commands.md) — account-wide pre-flight gather-info commands, the secret-state short-circuit table, and every step's probe commands (Steps 2-12b)
+- [Worked examples](references/worked-examples.md) — SCHEDULE_MISSING and INSUFFICIENT_DATA worked examples plus the malformed-input re-prompt template
+- [Error handling](references/error-handling.md) — pre-flight safety checks before state-changing CLIs and per-layer remediation guidance with fix and verify commands
+- [Advanced patterns](references/advanced-patterns.md) — mindset, philosophy, Step 0 non-obvious behaviours, the rotation layer model, recent AWS features (2024-2026)
+- [Rotation Lambda reference](references/rotation-lambda-reference.md) — rotation Lambda internals, four-step protocol contract, configuration defaults
+- [Rotation strategy reference](references/rotation-strategy-reference.md) — Alternating vs Single User strategy and rotation template family detail
 
 ## Domain
 

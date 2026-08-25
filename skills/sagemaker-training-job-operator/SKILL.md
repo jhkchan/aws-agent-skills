@@ -242,119 +242,20 @@ the references folder.
 ### Step 2: Launch training job
 
 #### 2a. Single-instance training
-
-```bash
-aws sagemaker create-training-job \
-  --training-job-name <name> \
-  --algorithm-specification '{
-    "TrainingImage": "<ecr-image-uri>",
-    "TrainingInputMode": "File",
-    "FrameworkVersion": "<version>"
-  }' \
-  --input-data-config '[
-    {"ChannelName":"train","DataSource":{"S3DataSource":{"S3DataType":"S3Prefix","S3Uri":"s3://<bucket>/train/","S3DataDistributionType":"FullyReplicated"}}},
-    {"ChannelName":"test","DataSource":{"S3DataSource":{"S3DataType":"S3Prefix","S3Uri":"s3://<bucket>/test/","S3DataDistributionType":"FullyReplicated"}}}
-  ]' \
-  --output-data-config '{"S3OutputPath":"s3://<output-bucket>/models/"}' \
-  --resource-config '{"InstanceType":"ml.p5.48xlarge","InstanceCount":1,"VolumeSizeInGB":1024,"VolumeKmsKeyId":"arn:aws:kms:<region>:<account>:key/<id>"}' \
-  --hyper-parameters '{
-    "sagemaker_program":"train.py",
-    "sagemaker_submit_directory":"s3://<bucket>/code/train.tar.gz",
-    "epochs":50,
-    "batch_size":64,
-    "learning_rate":0.001
-  }' \
-  --role-arn <execution-role-arn> \
-  --stop-condition '{"MaxRuntimeInSeconds":86400}' \
-  --vpc-config '{"Subnets":["subnet-xxx"],"SecurityGroupIds":["sg-xxx"]}' \
-  --enable-network-isolation
-```
+Full single-instance create-training-job CLI (algorithm spec, input channels, resource config, hyperparameters, VPC config, network isolation): [references/job-creation-procedures.md](references/job-creation-procedures.md).
+Load on demand when emitting the launch command.
 
 #### 2b. Spot training with checkpointing
-
-```bash
-aws sagemaker create-training-job \
-  --training-job-name <name> \
-  --algorithm-specification '...' \
-  --input-data-config '...' \
-  --output-data-config '...' \
-  --resource-config '{"InstanceType":"ml.p4de.24xlarge","InstanceCount":1,"VolumeSizeInGB":1024}' \
-  --hyper-parameters '...' \
-  --role-arn <execution-role-arn> \
-  --checkpoint-config '{
-    "S3Uri":"s3://<checkpoint-bucket>/checkpoints/",
-    "LocalPath":"/opt/ml/checkpoints"
-  }' \
-  --enable-managed-spot-training \
-  --checkpoint-local-path /opt/ml/checkpoints \
-  --spot-timeout-in-seconds 300 \
-  --max-wait-time-in-seconds 86400 \
-  --max-runtime-in-seconds 7200
-```
-
-The training entry point must save and load checkpoints at
-`/opt/ml/checkpoints` (the `LocalPath`). On interruption, SageMaker
-restores from the S3 checkpoint on the next launch. Set
-`MaxWaitTimeInSeconds` >= `MaxRuntimeInSeconds` — `MaxWaitTime` is
-the wall-clock budget (includes interruptions + retries), not just
-training time.
+Full spot-training CLI (CheckpointConfig S3Uri + LocalPath, managed spot, MaxWaitTime vs MaxRuntime budget): [references/job-creation-procedures.md](references/job-creation-procedures.md).
+Load on demand when configuring spot training.
 
 #### 2c. Distributed training (SMDDP)
-
-```bash
-aws sagemaker create-training-job \
-  --training-job-name <name> \
-  --algorithm-specification '{
-    "TrainingImage": "<pytorch-gpu-image>",
-    "TrainingInputMode": "FastFile",
-    "EnableSageMakerTrainingCompiler": true
-  }' \
-  --resource-config '{"InstanceType":"ml.p5.48xlarge","InstanceCount":4,"VolumeSizeInGB":2048}' \
-  --hyper-parameters '{
-    "sagemaker_program":"train_ddp.py",
-    "sagemaker_submit_directory":"s3://<bucket>/code/train.tar.gz",
-    "sagemaker_distributed_dataparallel_enabled":true,
-    "sagemaker_distributed_dataparallel_num_processes":32,
-    "batch_size":256
-  }' \
-  --role-arn <execution-role-arn> \
-  --input-data-config '...' \
-  --output-data-config '...' \
-  --enable-managed-spot-training \
-  --checkpoint-config '...'
-```
-
-SMDDP uses `sagemaker_distributed_dataparallel_enabled` and
-`num_processes` (= total GPUs across all instances). On
-`ml.p5.48xlarge` (8 GPUs each) × 4 instances, `num_processes=32`.
-The entry point must use `smdistributed.dataparallel` PyTorch /
-TensorFlow primitives.
-
-For SMDMP (model parallel), use:
-`"sagemaker_distributed_model_parallel_enabled":true` with
-`pipeline_parallel_degree`, `tensor_parallel_degree`, and
-`microbatches`.
+Full SMDDP distributed CLI (sagemaker_distributed_dataparallel_enabled, num_processes, Training Compiler flag, SMDMP degrees): [references/job-creation-procedures.md](references/job-creation-procedures.md).
+Load on demand when launching distributed training.
 
 #### 2d. Warm pool (reuse across sequential jobs)
-
-```bash
-# First (source) job — establishes the warm pool:
-aws sagemaker create-training-job \
-  --training-job-name <name>-source \
-  ... \
-  --resource-config '{"InstanceType":"ml.p5.48xlarge","InstanceCount":1,"VolumeSizeInGB":1024,"KeepAlivePeriodInSeconds":1800}'
-
-# Subsequent (target) job — reuses the warm pool:
-aws sagemaker create-training-job \
-  --training-job-name <name>-followup \
-  ... \
-  --resource-config '{"InstanceType":"ml.p5.48xlarge","InstanceCount":1,"VolumeSizeInGB":1024,"KeepAlivePeriodInSeconds":1800}' \
-  --warm-pool-config '{"PoolName":"<source-job-name>"}'
-```
-
-`KeepAlivePeriodInSeconds` (max 3600) sets the idle lifetime after
-the source job completes. The target job must match the source's
-instance type, instance count, and image — otherwise it cold-starts.
+Full warm-pool source/target job pair CLI (KeepAlivePeriodInSeconds, WarmPoolConfig PoolName): [references/job-creation-procedures.md](references/job-creation-procedures.md).
+Load on demand when reusing clusters across jobs.
 
 ### Step 3: Monitor job status
 
@@ -397,28 +298,8 @@ aws sagemaker wait training-job-completed-or-stopped \
 | `Failed`, `FailureReason: ... training compiler error` | Framework / image version not supported by Training Compiler | Check the supported versions matrix; fall back to non-compiler image |
 
 ### Step 5: Launch HPO (hyperparameter tuning)
-
-```bash
-aws sagemaker create-hyper-parameter-tuning-job \
-  --hyper-parameter-tuning-job-name <name> \
-  --hyper-parameter-tuning-job-config '{
-    "Strategy":"Bayesian",
-    "HyperParameterTuningJobObjective":{"Type":"Maximize","MetricName":"validation:accuracy"},
-    "ResourceLimits":{"MaxNumberOfTrainingJobs":50,"MaxParallelTrainingJobs":4},
-    "ParameterRanges":{
-      "ContinuousParameterRanges":[{"Name":"learning_rate","MinValue":"0.0001","MaxValue":"0.1","ScalingType":"Logarithmic"}],
-      "IntegerParameterRanges":[{"Name":"batch_size","MinValue":"32","MaxValue":"256","ScalingType":"Auto"}]
-    },
-    "TrainingJobEarlyStoppingType":"Auto"
-  }' \
-  --training-job-definition '{...}'  # AlgorithmSpecification, RoleArn, InputDataConfig, OutputDataConfig, ResourceConfig, StaticHyperParameters, StoppingCondition
-
-# Warm start (carry learnings from a previous tuning job):
-aws sagemaker create-hyper-parameter-tuning-job \
-  --hyper-parameter-tuning-job-name <name>-warm \
-  --warm-start-config '{"ParentHyperParameterTuningJobs":[{"HyperParameterTuningJobName":"<previous>"}],"WarmStartType":"IdenticalDataAndAlgorithm"}' \
-  --hyper-parameter-tuning-job-config '...' --training-job-definition '...'
-```
+Full create-hyper-parameter-tuning-job CLI (tuning job config, parameter ranges, early stopping, warm start): [references/job-creation-procedures.md](references/job-creation-procedures.md).
+Load on demand when launching HPO.
 
 Monitor via `describe-hyper-parameter-tuning-job`; the best training
 job is reported in `BestTrainingJob`. The full HPO CLI script is in
@@ -485,117 +366,12 @@ See `examples/README.md` for a full worked example: a 4 ×
 isolation, and warm-pool handoff. The contract below applies.
 
 ## Expert edge cases
-
-These patterns represent genuine, non-obvious SageMaker training job
-behaviours that a senior operator would catch but a generalist would
-miss.
-
-### P5 and Trn1 default to zero quota
-
-`ml.p5.48xlarge` (8 × H100) and `ml.trn1.32xlarge` (32 × Trainium)
-default to a Service Quota of zero. Launching one without a prior
-quota request produces `Failed` with `ClientError: ... instances
-could not be provisioned`. Always run
-`aws service-quotas get-service-quota` for the instance type; if the
-quota is zero, request an increase via the Service Quotas console
-before launching. P5 and Trn1 increases may require AWS account-team
-approval — plan weeks ahead.
-
-### Spot interruption without checkpoint = full restart
-
-`EnableManagedSpotTraining: true` without `CheckpointConfig` works
-technically but is practically useless — each interruption restarts
-from epoch 0. The entry point must save/load checkpoints at the
-configured `LocalPath`; SageMaker handles the S3 sync automatically.
-Set `MaxWaitTimeInSeconds` >> `MaxRuntimeInSeconds` to budget for
-multiple interruptions.
-
-### SMDDP `num_processes` is total GPUs, not instance count
-
-For 4 × `ml.p5.48xlarge` (8 GPUs each), `num_processes` = 32, not 4.
-Setting it to 4 underutilizes 7 of 8 GPUs per instance — the job
-appears to run but trains 8x slower than expected. Cross-reference
-CloudWatch logs for "World size" to confirm.
-
-### Training Compiler requires specific framework versions
-
-`EnableSageMakerTrainingCompiler: true` works only on supported
-PyTorch / TensorFlow / HuggingFace images. An unsupported image
-launches without compilation (silent), or fails with
-`ClientError: ... training compiler error`. Always check the
-[Training Compiler supported versions matrix](https://docs.aws.amazon.com/sagemaker/latest/dg/training-compiler-support.html).
-Training Compiler is most beneficial on GPU instances (P4d, P4de, P5)
-for transformer models.
-
-### Warm pools bill while idle
-
-A `WarmPoolConfig` with `KeepAlivePeriodInSeconds: 3600` keeps the
-cluster alive for an hour after the source job completes — billed at
-the full instance rate. For P5 (H100), this is significant. Always
-clean up warm pools with `delete-warm-pool` when the work sequence
-ends. Use warm pools only when sequential jobs share the same
-instance type and image; otherwise the warm pool is wasted.
-
-### `EnableNetworkIsolation` requires VPC endpoints for S3 and ECR
-
-`--enable-network-isolation` blocks outbound internet. The job can
-still reach S3 (input/output) and ECR (image pull) only via VPC
-endpoints (S3 Gateway or Interface, ECR Interface, plus the ECR DKR
-endpoint). Without these endpoints, an isolated job cannot pull the
-image or read inputs — the failure is misleading
-("image not found"). For private model registries (HuggingFace,
-internal), without isolation + NAT, you also need a NAT gateway or
-VPC endpoint to the registry.
-
-### `VolumeKmsKeyId` and `OutputDataConfig.KmsKeyId` are separate
-
-The volume KMS key (EBS attached to the instance) and the output KMS
-key (model artifacts in S3) are separate. A role with `kms:Decrypt`
-on the volume key but not the output key produces a failure during
-the upload phase (`InProgress` / `Uploading` → `Failed`). The role
-needs `kms:Decrypt` and `kms:GenerateDataKey` on both keys.
-
-### `AlgorithmSpecification` `TrainingInputMode` choice matters
-
-`File` mode downloads the dataset to EBS before training — fine for
-small datasets, slow for large. `FastFile` streams via FUSE without
-downloading — better for large datasets with small per-object
-overhead. `Pipe` mode streams from Kinesis or augmented manifest.
-
-### Training plan management (capacity reservation, 2025-2026)
-
-For P5 / Trn1 capacity-constrained launches, a **training plan**
-reserves instance capacity in advance. Create a plan via
-`aws sagemaker create-training-plan`, then reference it from
-`create-training-job` via `--training-plan-config`. The plan
-guarantees capacity at the scheduled time — eliminating
-`insufficient capacity` failures. Plans are billed at the reserved
-rate regardless of whether the job runs.
+The nine expert edge cases (P5/Trn1 zero quota, spot without checkpoint, num_processes semantics, Training Compiler versions, warm-pool idle billing, network-isolation endpoints, dual KMS keys, TrainingInputMode choice, training plans): [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when a job fails for a non-obvious reason.
 
 ## Expert heuristic — "Pre-check the execution role and the quota before anything else"
-
-The single most common SageMaker training job failure is an
-execution role missing a permission (S3, KMS, ECR) or an instance
-quota being zero (P5, Trn1). These failures surface within seconds
-of launch as `Failed` with a terse `FailureReason`. Always run
-`iam simulate-principal-policy` and `service-quotas get-service-quota`
-before launching.
-
-Quick lookup table for common failure reasons:
-
-| `FailureReason` substring | Root cause | Pre-check that catches it |
-|---|---|---|
-| `unauthorized S3 access` | Role missing S3 permission | `iam simulate-principal-policy` for `s3:GetObject` / `s3:PutObject` |
-| `image not found` | Wrong ECR URI or role lacks `ecr:BatchGetImage` | `ecr describe-images` + `iam simulate-principal-policy` for `ecr:BatchGetImage` |
-| `instances could not be provisioned` | Quota exhausted or AWS capacity | `service-quotas get-service-quota` |
-| `CUDA error` or `out of memory` | Image/instance mismatch or batch too large | Cross-reference image to instance type; reduce batch size |
-| `connection timed out` | VPC missing endpoint or NAT | `ec2 describe-vpc-endpoints` |
-| `KMS access denied` | Role lacks KMS permission | `iam simulate-principal-policy` for `kms:Decrypt` |
-| `training compiler error` | Unsupported framework/image version | Check Training Compiler supported versions matrix |
-
-When in doubt, run `aws sagemaker describe-training-job` and read
-the `FailureReason` verbatim — it usually names the specific
-permission or capacity issue.
+The full heuristic with the FailureReason lookup table (unauthorized S3, image not found, capacity, CUDA/OOM, connection timeout, KMS, compiler error): [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when triaging a Failed job.
 
 ## Anti-Patterns — NEVER
 
@@ -640,37 +416,8 @@ permission or capacity issue.
   `MaxRuntimeInSeconds`, wasting budget.
 
 ## Recent AWS features (2024-2026)
-
-- **SageMaker P5 and P5e instances (H100, 2024-2025):**
-  `ml.p5.48xlarge` (8 × H100 80GB) and `ml.p5e.48xlarge` (8 × H100
-  141GB). Default quota is zero — request via Service Quotas.
-- **SageMaker Training Compiler (GA, 2024-2025):** automatic GPU
-  kernel optimization for transformer training. Enable via
-  `EnableSageMakerTrainingCompiler: true` on supported PyTorch /
-  TensorFlow / HuggingFace images. Most beneficial on P4d / P4de / P5.
-- **Training plan management (2025-2026):** capacity reservations
-  for P5 / Trn1. Create via `create-training-plan`, reference from
-  `create-training-job` via `--training-plan-config`. Eliminates
-  `insufficient capacity` failures for a reservation fee.
-- **Warm pools GA (2024-2025):** `WarmPoolConfig` with
-  `KeepAlivePeriodInSeconds` (max 3600). Reuses the cluster across
-  sequential jobs with matching instance type and image.
-- **SageMaker Distributed Data Parallel v2 (2024-2025):** improved
-  all-reduce on P5 (H100 NVLink). Set via
-  `sagemaker_distributed_dataparallel_enabled: true` and
-  `num_processes` = total GPU count.
-- **SageMaker Distributed Model Parallel (2024-2025):** pipeline +
-  tensor parallel for models exceeding single-GPU memory. Configure
-  via `sagemaker_distributed_modelparallel_enabled: true` with
-  `pipeline_parallel_degree`, `tensor_parallel_degree`, `microbatches`.
-- **Model registry approval workflows (enhanced 2024-2025):**
-  `ModelApprovalStatus` gates deployment; integrates with
-  EventBridge for auto-deployment on approval.
-- **Automatic model tuning warm starts (enhanced 2024-2025):**
-  `WarmStartType: IdenticalDataAndAlgorithm` (strict) and
-  `TransferLearning` (permissive) carry tuning learnings.
-- **`FastFile` mode GA (2024):** streams S3 objects via FUSE without
-  downloading — useful for large datasets where `File` mode is slow.
+Recent AWS features 2024-2026 (P5/P5e, Training Compiler GA, training plans, warm pools GA, SMDDP v2, SMDMP, registry approval workflows, warm starts, FastFile): [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when selecting instances or input modes.
 
 ## References
 
@@ -680,6 +427,12 @@ warm pool, HPO, model registration) with worked examples, and
 `references/spot-and-distributed-training.md` for the spot training
 interruption model, SMDDP/SMDMP configuration, checkpoint patterns,
 and Training Compiler integration.
+
+## References (load on demand)
+
+- [Advanced patterns](references/advanced-patterns.md) — expert edge cases, the pre-check-role-and-quota heuristic with the FailureReason lookup table, recent AWS features (2024-2026)
+- [Job creation procedures](references/job-creation-procedures.md) — full per-operation CLI playbook: single-instance, spot, distributed (SMDDP), warm pool, HPO, model registration
+- [Spot and distributed training](references/spot-and-distributed-training.md) — spot interruption model, SMDDP/SMDMP configuration, checkpoint patterns, Training Compiler integration
 
 ## Domain
 

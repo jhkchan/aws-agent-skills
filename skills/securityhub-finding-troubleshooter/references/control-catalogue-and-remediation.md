@@ -165,3 +165,26 @@ Common failure modes:
   was re-invited by a different administration account (org reshuffle).
 - Aggregator's `Regions` list excludes the member's region → findings
   in unsupported regions never aggregate.
+
+## Step 13 — Suppression CLI and FP-class patterns
+
+```bash
+aws securityhub create-automation-rule \
+  --rule-name "archive-cis-1-3-known-ci-keys" --rule-order 1 \
+  --description "Archive CIS.1.3 findings on the CI deployment role" \
+  --criteria '<json-criteria>' \
+  --actions '[{"Type":"FINDING_FIELDS_UPDATE","FindingFieldsUpdate":{"Workflow":{"Status":"SUPPRESSED"}}}]'
+```
+
+**Suppression patterns by FP class** (full criteria JSON in
+`references/control-catalogue-and-remediation.md`):
+
+- **CI deployment role keys (CIS.1.3)** — filter on
+  `Resources[0].Details.AwsIamAccessKey.PrincipalName` containing
+  `<ci-role-name>` AND GeneratorId containing `CIS.1.3`.
+- **Documented public S3 bucket (S3.2)** — filter on
+  `Resources[0].Id` containing `<bucket-arn>` AND GeneratorId
+  containing `S3.2`.
+- **Test instance in sandbox account (EC2.8)** — filter on
+  `AwsAccountId=<sandbox>` AND `Resources[0].Type=AwsEc2Instance`.
+
