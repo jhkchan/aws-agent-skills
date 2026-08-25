@@ -94,39 +94,13 @@ limits cap total and per-participant participation.
 Three misconceptions dominate Pinpoint journey misdesign at provisioning
 time:
 
-- **"Journey entry is always segment-based."** It is NOT. Entry can be
-  event-based (real-time trigger when a participant performs an event)
-  or segment-based (bulk add of all segment members at the scheduled
-  start time). A baseline model defaults to segment-based and misses
-  real-time behavioral triggers. The correct model explicitly chooses
-  based on whether the journey is reactive (event) or proactive
-  (segment).
-
-- **"Conditional split and multivariate split are the same."** They are
-  NOT. A conditional split evaluates an EVENT ATTRIBUTE or dimension
-  against the journey participant (yes/no branch — did the user perform
-  the event?). A multivariate split assigns participants RANDOMLY by
-  percentage (no condition — purely for A/B testing). Confusing them
-  leads to journeys that either never branch (random instead of
-  conditional) or bias results (conditional instead of random).
-
-- **"Quiet time cancels pending messages."** It does NOT. Quiet time
-  HOLDS message sends during the configured hours/days. When the quiet
-  window ends, held messages are delivered. This means a participant
-  may receive a message outside the intended journey cadence. A
-  baseline model assumes quiet time drops the message; the correct
-  model knows it merely delays it and designs wait activities
-  accordingly.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#common-misconceptions-from-mindset).
+> Three journey-entry, split, and quiet-time misconceptions with correct models.
 
 ## Configuration dependency graph (novel heuristic)
 
-Pinpoint journey configurations are NOT independent. The entry
-strategy determines what activities are valid. Conditional splits need
-event definitions. Multivariate splits need percentages summing to 100.
-Send message activities need configured channels (email/SMS/push).
-Quiet time needs timezone alignment with the schedule. Journey limits
-need to respect downstream channel throughput. Use this graph to
-sequence provisioning.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#configuration-dependency-graph-sequencing-notes).
+> Why the dependency graph matters and how to sequence provisioning.
 
 | Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
 |---|---|---|---|
@@ -145,89 +119,23 @@ sequence provisioning.
 | Journey limits | total participant count; per-participant message cap | limits are SOFT caps — exceeded participants are queued, not rejected | throughput control |
 | Custom channel | Lambda function ARN; Lambda resource-based permission granting Pinpoint | Lambda timeout must handle the webhook within 15 seconds | non-native destinations |
 
-**The entry-strategy and quiet-time rows are the ones a baseline model
-misses.** Entry strategy determines the entire journey semantics
-(real-time vs bulk). Quiet time holds but does not cancel — a baseline
-assumes cancellation and designs wait activities incorrectly. The
-procedure below forces explicit decisions on each.
-
-**Cross-dependency gotchas:**
-- A conditional split evaluates an event attribute. The event must be
-  recorded by the participant DURING the journey (not before entry).
-  If the event has no attributes, the yes branch never fires.
-- Multivariate split percentages must sum to exactly 100. A
-  misconfigured split (e.g., 50/40) will cause an API error or
-  undefined behavior.
-- Quiet time interacts with wait activities: if a wait ends during a
-  quiet period, the subsequent send is held until the quiet window
-  closes. This shifts the effective journey cadence.
-- Journey limits are evaluated at entry. Once a participant is IN the
-  journey, they traverse all activities regardless of the total cap.
-- A holdout suppresses participants at entry — they never start the
-  journey at all. This is different from a multivariate split branch
-  that sends no message (the participant still enters the journey).
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#cross-dependency-gotchas).
+> Baseline-miss rows and cross-dependency gotchas (entry strategy, splits, quiet time, limits, holdout).
 
 ## Expert heuristic: event-based vs segment-based entry
 
-A baseline model defaults to segment-based entry. The correct heuristic
-recognizes the two modes serve fundamentally different use cases.
-
-```text
-Event-based (real-time): participant enters IMMEDIATELY when an event fires.
-  Use case: reactive/behavioral (abandoned cart, post-purchase, signup).
-  Example: "When user abandons cart, wait 1h, send email reminder"
-
-Segment-based (bulk): all segment members enter at scheduled start time.
-  Use case: proactive/broadcast (weekly newsletter, seasonal promo).
-  Example: "Monday 9am, send digest to 'active_users' segment"
-
-Key difference: event-based is 1:1 real-time; segment-based is 1:many scheduled.
-```
-
-**Key implication:** event-based is for behavioral triggers where timing
-matters (the user just did something). Segment-based is for broadcasts
-where the journey is time-scheduled.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-event-based-vs-segment-based-entry).
+> Event-based = real-time behavioral trigger; segment-based = scheduled bulk.
 
 ## Expert heuristic: conditional split evaluates event attributes
 
-A baseline model treats conditional split as a random branch. The
-correct heuristic recognizes it evaluates an EVENT ATTRIBUTE against the
-journey participant.
-
-```text
-Conditional split (abandoned cart recovery):
-  Participant enters (event: cart_abandoned) → Wait 1 hour
-  → Conditional split: Did participant perform "purchase_completed"?
-      YES → Exit (converted — no reminder needed)
-      NO  → Send email → Wait 24h → Send SMS
-
-The split evaluates events recorded DURING the journey window, not before.
-```
-
-**Key implication:** the conditional split requires a defined event
-with attributes. If the event is not recorded during the journey, the
-NO branch always fires. This is the most common cause of "my journey
-never branches yes."
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-conditional-split-evaluates-event-attributes).
+> Conditional split evaluates an event attribute recorded during the journey (yes/no).
 
 ## Expert heuristic: quiet time holds, does not cancel
 
-A baseline model assumes quiet time drops messages. The correct
-heuristic recognizes that quiet time DELAYS delivery.
-
-```text
-Journey: Send email → Wait 24h → Send SMS
-Quiet time: 22:00–08:00 UTC, Mon–Fri
-
-Scenario A: email at 10:00 → delivered ✓; wait ends next day 10:00 → SMS ✓
-Scenario B: email at 23:00 → HELD; delivered 08:00 next day (9h late)
-  → wait starts from delivery; SMS shifted by 9 hours
-
-Messages are NOT cancelled — they are held until the quiet window closes.
-```
-
-**Key implication:** if precise timing matters (e.g., a 7-day onboarding
-cadence), quiet time causes cumulative drift. Use absolute-time waits
-rather than duration-based to anchor to specific times.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-quiet-time-holds-does-not-cancel).
+> Quiet time delays delivery; use absolute-time waits for precise cadence.
 
 ## Prerequisites (verify before provisioning)
 
@@ -302,19 +210,8 @@ channels:
 | Push | APNs cert + FCM API key; endpoint device token | High (APNs/FCM limits) |
 | In-app | Mobile SDK integrated | Via SDK push |
 
-```json
-{
-  "SendEmail": {
-    "MessageType": "PROMOTIONAL",
-    "TemplateConfiguration": {
-      "EmailTemplate": {
-        "Name": "cart-reminder-template"
-      }
-    },
-    "NextActivity": "Wait24Hours"
-  }
-}
-```
+> Moved to [references/activities-and-splits.md](references/activities-and-splits.md#step-2-send-message-activity-json-example).
+> SendEmail activity JSON referencing a message template.
 
 **Message templates:** reference a pre-created Pinpoint message template
 by name. Templates support Liquid personalization (`{{User.UserAttributes.FirstName}}`).
@@ -324,22 +221,8 @@ by name. Templates support Liquid personalization (`{{User.UserAttributes.FirstN
 A conditional split evaluates whether a participant performed an event
 during the journey. It branches into YES and NO paths.
 
-```json
-{
-  "ConditionalSplit": {
-    "Condition": {
-      "Conditions": [{
-        "EventCondition": {
-          "Dimensions": {"EventType": {"Values": ["purchase_completed"], "ComparisonOperator": "IN"}}
-        }
-      }],
-      "Operator": "ALL"
-    },
-    "TrueActivity": "ExitConverted",
-    "FalseActivity": "SendReminderSMS"
-  }
-}
-```
+> Moved to [references/activities-and-splits.md](references/activities-and-splits.md#step-3-conditional-split-yesno-json-example).
+> ConditionalSplit activity JSON with EventCondition and True/False activities.
 
 **Critical:** the conditional split evaluates events recorded DURING the
 journey window. If the event was recorded before entry, it does not
@@ -350,18 +233,8 @@ count.
 A multivariate split assigns participants randomly to branches by
 percentage. Percentages MUST sum to 100.
 
-```json
-{
-  "MultivariateSplit": {
-    "Tests": [{
-      "Branches": [
-        {"Percentage": 50, "NextActivity": "SendVariantA"},
-        {"Percentage": 50, "NextActivity": "SendVariantB"}
-      ]
-    }]
-  }
-}
-```
+> Moved to [references/activities-and-splits.md](references/activities-and-splits.md#step-4-multivariate-split-random-percentage-json-example).
+> MultivariateSplit activity JSON with percentage branches summing to 100.
 
 **For A/B testing:** pair with a holdout (Step 6) to measure lift
 against a control group. **Common mistake:** confusing multivariate
@@ -373,13 +246,8 @@ for behavioral branching; multivariate for random A/B assignment.
 A wait activity holds the participant for a duration or until an
 absolute time.
 
-```json
-// Duration-based
-{"Wait": {"WaitTime": {"WaitDuration": "24", "WaitDurationUnit": "HOURS"}, "NextActivity": "SendFollowUp"}}
-
-// Absolute-time
-{"Wait": {"WaitTime": {"Until": "2026-08-15T09:00:00Z"}, "NextActivity": "SendMorningEmail"}}
-```
+> Moved to [references/activities-and-splits.md](references/activities-and-splits.md#step-5-wait-activity-json-examples).
+> Duration-based and absolute-time Wait activity JSON.
 
 **Critical:** wait interacts with quiet time. If a wait ends during a
 quiet period, the subsequent send is held. Use absolute-time waits for
@@ -403,15 +271,8 @@ receives no message on that branch. For true A/B lift, use holdout.
 The journey schedule defines when the journey starts and ends, and in
 what timezone.
 
-```json
-{
-  "Schedule": {
-    "StartTime": "2026-08-15T09:00:00Z",
-    "EndTime": "2026-09-15T09:00:00Z",
-    "Timezone": "UTC"
-  }
-}
-```
+> Moved to [references/schedule-and-limits.md](references/schedule-and-limits.md#step-7-journey-schedule-json-example).
+> Schedule JSON with StartTime, EndTime, and Timezone.
 
 **Critical for segment-based journeys:** the StartTime is when all
 segment members are added to the journey. For event-based journeys, the
@@ -422,15 +283,8 @@ enter as they perform the event after StartTime).
 
 Quiet time holds message sends during configured hours and days.
 
-```json
-{
-  "QuietTime": {
-    "Start": "22:00",
-    "End": "08:00",
-    "DaysOfWeek": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"]
-  }
-}
-```
+> Moved to [references/schedule-and-limits.md](references/schedule-and-limits.md#step-8-quiet-time-json-example).
+> QuietTime JSON with start/end hours and days of week.
 
 **Critical:** quiet time HOLDS messages, it does NOT cancel them. When
 the quiet window ends, held messages are delivered. This can shift the
@@ -446,9 +300,8 @@ precise control.
 
 Journey limits cap total participation and per-participant messaging.
 
-```json
-{"Limits": {"DailyCap": 100000, "MaximumEndpointSend": 5, "TotalParticipantCap": 500000}}
-```
+> Moved to [references/schedule-and-limits.md](references/schedule-and-limits.md#step-9-journey-limits-json-example).
+> Limits JSON with DailyCap, MaximumEndpointSend, TotalParticipantCap.
 
 | Limit | Purpose |
 |---|---|
@@ -512,48 +365,13 @@ or Step Functions).
 
 ## Step 12 — Journey analytics
 
-Pinpoint provides journey-level analytics including participant count,
-message delivery rates, open/click rates (email), and conversion
-tracking (via event attribution).
-
-```bash
-aws pinpoint get-journey-date-range-kpi \
-  --application-id "$APP_ID" \
-  --journey-id "$JOURNEY_ID" \
-  --start-time 2026-08-15T00:00:00Z \
-  --end-time 2026-08-22T00:00:00Z \
-  --kpi-name "UniqueEndpoints"
-```
-
-**Key metrics:**
-
-| Metric | What it measures |
-|---|---|
-| `UniqueEndpoints` | Distinct participants in the journey |
-| `TargetedEndpointCount` | Endpoints that received at least one message |
-| `DeliveryRate` | Percentage of sent messages successfully delivered |
-| `OpenRate` | Email open rate (requires open tracking) |
-| `ClickRate` | Email click-through rate (requires click tracking) |
-| `JourneyConversionRate` | Percentage of participants who converted |
-
-**Conversion tracking:** define a conversion event (e.g.,
-"purchase_completed") and Pinpoint attributes conversions back to the
-journey. Use this to measure lift against the holdout group.
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-12-journey-analytics-kpi-commands-and-metrics).
+> get-journey-date-range-kpi command, KPI metric table, conversion tracking.
 
 ## Step 13 — Recent features
 
-- **Journey-run API (2023-2024):** `create-journey-run` triggers a
-  segment-based run on-demand without modifying the schedule.
-- **In-app message channel in journeys (2024):** Send activity supports
-  in-app messages via Mobile SDK, enabling multi-channel paths.
-- **Cross-channel journey analytics (2024-2025):** Unified dashboard
-  aggregating email, SMS, push, and in-app metrics per journey.
-- **Journey state management (2024-2025):** Enhanced pause/resume/restart
-  APIs allow modifying activities without losing participant state.
-- **ML-powered send-time optimization (2025):** Optimizes send times per
-  participant based on engagement patterns, replacing fixed waits.
-- **Amazon Q Business integration (2025):** Pre-built journey templates
-  for Q Business-powered customer service workflows.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-13-recent-features).
+> Recent AWS features (2023-2026): journey-run API, in-app messages, cross-channel analytics, state management, ML send-time optimization, Q Business.
 
 ## NEVER do these things
 
@@ -653,31 +471,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Journey participants not entering (event-based)
-- The triggering event is not being recorded. Verify endpoints are
-  calling `put-events` with the correct event type and that the event
-  name in StartCondition matches exactly.
+> Moved to [references/error-handling.md](references/error-handling.md#error-handling).
+> Symptom-by-symptom fixes: participants not entering, split never YES, quiet-time holds, custom channel Lambda, percentages.
+## References (load on demand)
 
-### Journey participants not entering (segment-based)
-- The segment is empty at start time. Verify segment membership with
-  `get-segment`. Segments are evaluated at StartTime.
-
-### Conditional split never branches YES
-- The event is not being recorded DURING the journey, or event
-  attributes do not match the condition. Events before entry do not
-  count.
-
-### Messages held too long (quiet time)
-- The quiet time window is too broad or the timezone is wrong. Verify
-  quiet time hours and journey timezone.
-
-### Custom channel Lambda fails
-- The Lambda resource-based permission is missing or scoped to the
-  wrong journey ARN. Verify with `aws lambda get-policy`. Check Lambda
-  timeout (must complete within 15 seconds).
-
-### Multivariate split percentages error
-- Percentages do not sum to 100. Reconfigure branches to sum to 100.
+- [advanced-patterns](references/advanced-patterns.md) — expert-heuristic deep dives, misconceptions, dependency-graph notes, recent AWS features (2023-2026)
+- [diagnostic-commands](references/diagnostic-commands.md) — journey analytics KPI commands and metrics
+- [error-handling](references/error-handling.md) — symptom-by-symptom troubleshooting
+- [activities-and-splits](references/activities-and-splits.md) — activity and split detail, plus JSON examples per activity type (existing)
+- [schedule-and-limits](references/schedule-and-limits.md) — schedule, quiet time, limits detail, plus JSON examples (existing)
 
 ## Domain
 

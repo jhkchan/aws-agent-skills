@@ -273,3 +273,36 @@ Variant B outperforms Variant A AND both outperform the holdout.
 
 Without the holdout, you can only compare Variant A vs Variant B
 (relative), not measure absolute lift over no intervention.
+
+
+## Step 7 — Journey schedule: JSON example
+
+```json
+{
+  "Schedule": {
+    "StartTime": "2026-08-15T09:00:00Z",
+    "EndTime": "2026-09-15T09:00:00Z",
+    "Timezone": "UTC"
+  }
+}
+```
+
+
+## Step 8 — Quiet time: JSON example
+
+```json
+{
+  "QuietTime": {
+    "Start": "22:00",
+    "End": "08:00",
+    "DaysOfWeek": ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"]
+  }
+}
+```
+
+
+## Step 9 — Journey limits: JSON example
+
+```json
+{"Limits": {"DailyCap": 100000, "MaximumEndpointSend": 5, "TotalParticipantCap": 500000}}
+```

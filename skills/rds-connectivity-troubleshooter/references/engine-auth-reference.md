@@ -270,3 +270,52 @@ After an Aurora failover:
 4. On-prem DNS resolvers connecting over DX / VPN may cache for
    minutes — coordinate with the network team to flush or lower the
    TTL.
+
+---
+
+### Step 8: RDS Proxy connectivity (moved from SKILL.md)
+
+Symptom: `could not connect to proxy`, or the application hits the
+instance directly despite a proxy being configured.
+
+```bash
+aws rds describe-db-proxies --proxy-name <proxy-name> --output json | \
+  jq('.DBProxies[0] | {Status, EngineFamily,
+    TargetRole, RequireTLS, VpcSubnetIds, VpcSecurityGroupIds}')
+
+aws rds describe-db-proxy-target-groups --proxy-name <proxy-name> \
+  --output json | jq('.TargetGroups[0]')
+```
+
+Common patterns:
+
+| Pattern | ROOT_CAUSE |
+|---|---|
+| Proxy SG does not allow the client SG | `CAPACITY_PROXY` — fix the proxy SG |
+| Proxy's target SG does not allow the proxy SG | `CAPACITY_PROXY` — fix the instance SG to allow the proxy |
+| Proxy's secrets ARN points at a deleted / rotated secret | `CAPACITY_PROXY` — update the secret |
+| Application connects to the instance endpoint, not the proxy endpoint | `CAPACITY_PROXY` — update the application's connection string |
+
+#### 9a: Parameter group override (moved from SKILL.md)
+
+If a recent parameter group change preceded the failure, a parameter
+override may be the cause. Common culprits:
+
+| Parameter | Effect |
+|---|---|
+| `max_connections` (MySQL/Postgres) | Set too low → `too many connections` |
+| `rds.force_ssl` / `require_secure_transport` | Set to 1 → non-TLS clients rejected |
+| `shared_buffers` (Postgres) | Set too high → instance fails to start after reboot |
+| `character_set_server` (MySQL) | Changed → collation errors on existing tables |
+
+**ROOT_CAUSE_IDENTIFIED** with `ROOT_CAUSE: PARAM_GROUP_OVERRIDE`.
+
+#### 9b: Option group conflict (moved from SKILL.md)
+
+If a recent option group change preceded the failure, an option may
+conflict. Common patterns: SQL Server native auth, Oracle Advanced
+Security, or a TLS option that requires a specific port. Confirm the
+instance status is `incompatible-option-group` or check the events
+for the option group apply failure. **ROOT_CAUSE_IDENTIFIED** with
+`ROOT_CAUSE: OPTION_GROUP_CONFLICT`.
+

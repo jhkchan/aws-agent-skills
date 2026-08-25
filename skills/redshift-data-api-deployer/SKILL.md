@@ -91,36 +91,8 @@ FINISHED you call GetStatementResult to retrieve rows. Results expire
 24 hours after completion. There is NO additional cost — standard
 Redshift charges apply.
 
-Three misconceptions dominate Redshift Data API misdesign at deployment
-time:
-
-- **"The Data API is a replacement for a connection pool."** It is not
-  a pool — it is a connection-FREE query submission model. You do NOT
-  maintain connections. Each ExecuteStatement is an independent HTTP
-  API call that runs asynchronously. You never manage connection
-  lifecycle, timeouts, or pooling. The trade-off: you poll for results
-  (DescribeStatement) instead of receiving them synchronously over a
-  connection. For sub-second interactive queries, the overhead of
-  polling may be unacceptable. For batch, scheduled, and serverless
-  workloads, the Data API eliminates all connection management.
-
-- **"Results are available indefinitely."** They are NOT. Query results
-  from GetStatementResult are available for 24 hours AFTER the
-  statement completes (FINISHED). After 24 hours, the results are
-  permanently deleted. If you need results longer than 24 hours, you
-  MUST persist them (write to S3, DynamoDB, or another store) before
-  expiry. A common failure is a workflow that runs a query, waits more
-  than 24 hours, then tries to retrieve results — the call fails with
-  "Statement result expired."
-
-- **"Secrets Manager is the only authentication option."** It is not.
-  The Data API supports two authentication methods: (1) Secrets Manager
-  (store database credentials as a secret, reference by ARN — no
-  password in code), and (2) temporary credentials (GetClusterCredentials
-  generates short-lived IAM-based credentials). Secrets Manager is
-  recommended for production because it centralizes credential rotation.
-  Temporary credentials are useful for IAM-federated access without
-  a secret store.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Mindset — the three misconceptions".
+> Load when: deciding between connection pools, result-persistence windows, or auth methods — the three misconceptions behind most Data API misdesign.
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -225,32 +197,8 @@ EventBridge notification.
 
 ## Expert heuristic: result persistence before 24-hour expiry
 
-Results expire 24 hours after FINISHED. If your downstream processing
-may be delayed, persist results immediately.
-
-```text
-Unsafe pattern:
-  1. Submit query (ExecuteStatement)
-  2. Query finishes (FINISHED)
-  3. ... 25 hours pass ...
-  4. Call GetStatementResult → FAILS ("result expired")
-
-Safe pattern:
-  1. Submit query (ExecuteStatement)
-  2. Query finishes (FINISHED)
-  3. Immediately call GetStatementResult
-  4. Write results to S3/DynamoDB
-  5. Downstream reads from S3/DynamoDB (no expiry)
-
-Safe pattern with UNLOAD:
-  1. Submit UNLOAD query: UNLOAD ('SELECT ...') TO 's3://bucket/path/'
-  2. Data lands directly in S3 (bypasses GetStatementResult entirely)
-  3. No 24-hour expiry concern
-```
-
-**Key implication:** for large result sets, use UNLOAD to write directly
-to S3 instead of GetStatementResult. This avoids the 24-hour expiry and
-the 100 MB GetStatementResult payload limit.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Result persistence before 24-hour expiry".
+> Load when: a downstream consumer may read results later than 24 hours after FINISHED — unsafe vs safe vs UNLOAD patterns.
 
 ## Prerequisites (verify before provisioning)
 
@@ -275,19 +223,8 @@ and cite the specific gap.
 
 The Data API eliminates persistent connections. Instead of:
 
-```text
-Traditional JDBC/ODBC:
-  1. Open connection (TCP handshake, auth, session setup)
-  2. Execute query (synchronous, blocks until results)
-  3. Read results (stream over the connection)
-  4. Close connection
-
-Data API (HTTP-based, async):
-  1. ExecuteStatement (HTTP POST → returns StatementId immediately)
-  2. Poll DescribeStatement (HTTP GET → returns status)
-  3. GetStatementResult (HTTP GET → returns rows when FINISHED)
-  → No connection to close. No session to manage.
-```
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Traditional vs Data API model".
+> Load when: explaining the connection-free model or choosing Data API over JDBC/ODBC.
 
 **Key implication:** the Data API is stateless. Each API call is an
 independent HTTP request. There is no connection pool, no idle
@@ -306,65 +243,15 @@ deployments (Lambda, Fargate, Step Functions).
 | Cost | Secrets Manager storage ($0.40/secret/month) | No additional cost |
 | Recommended for | Production with centralized credential management | IAM-federated, per-user access |
 
-**Secrets Manager auth:**
-
-```bash
-aws redshift-data execute-statement \
-  --cluster-identifier my-redshift-cluster \
-  --secret-arn arn:aws:secretsmanager:us-east-1:123456789012:secret:redshift-creds-xxx \
-  --database dev \
-  --sql "SELECT * FROM sales LIMIT 10" \
-  --statement-name "query-sales"
-```
-
-**Temp credentials auth:**
-
-```bash
-# Step 1: Get temp credentials
-CREDS=$(aws redshift get-cluster-credentials \
-  --cluster-identifier my-redshift-cluster \
-  --db-user my_iam_user \
-  --db-name dev \
-  --duration-seconds 3600)
-
-DB_USER=$(echo "$CREDS" | jq -r '.DbUser')
-DB_PASSWORD=$(echo "$CREDS" | jq -r '.DbPassword')
-
-# Step 2: Use temp creds with Data API (via DbUser parameter)
-aws redshift-data execute-statement \
-  --cluster-identifier my-redshift-cluster \
-  --db-user "$DB_USER" \
-  --database dev \
-  --sql "SELECT * FROM sales LIMIT 10"
-```
+> **Moved verbatim** → [references/authentication-and-secrets.md](references/authentication-and-secrets.md) § "Step 2 — auth code samples".
+> Load when: writing the actual execute-statement commands for either auth method.
 
 ## Step 3 — ExecuteStatement
 
 ExecuteStatement submits a single SQL statement asynchronously.
 
-```bash
-STATEMENT_ID=$(aws redshift-data execute-statement \
-  --cluster-identifier my-redshift-cluster \
-  --secret-arn arn:aws:secretsmanager:us-east-1:123456789012:secret:redshift-creds-xxx \
-  --database dev \
-  --sql "SELECT COUNT(*) FROM sales WHERE sale_date >= '2026-01-01'" \
-  --query 'Id' --output text)
-
-echo "StatementId: $STATEMENT_ID"
-```
-
-**Parameters:**
-
-| Parameter | Required | Description |
-|---|---|---|
-| `ClusterIdentifier` or `WorkgroupName` | Yes | Target cluster or Serverless workgroup |
-| `Database` | Yes | Database name |
-| `Sql` | Yes | SQL text |
-| `SecretArn` | One of (auth) | Secrets Manager secret ARN |
-| `DbUser` | One of (auth) | Temp credentials DB user |
-| `StatementName` | No | Human-readable name |
-| `WithEvent` | No | If true, sends EventBridge event on completion |
-| `Parameters` | No | Parameterized query values |
+> **Moved verbatim** → [references/statement-lifecycle-and-results.md](references/statement-lifecycle-and-results.md) § "Step 3 — ExecuteStatement example and parameters".
+> Load when: composing ExecuteStatement calls or choosing WithEvent / Parameters.
 
 **WithEvent:** setting `--with-event` causes the Data API to emit an
 EventBridge event when the statement status changes. This enables the
@@ -393,75 +280,18 @@ aws redshift-data batch-execute-statement \
 - Returns a single StatementId for the entire batch.
 - Each statement's status can be checked via DescribeStatement.
 
-**Common mistake:** assuming BatchExecuteStatement is transactional.
-It is NOT. For transactional batches, wrap in BEGIN/COMMIT:
-
-```sql
-BEGIN;
-CREATE TEMP TABLE temp_sales AS SELECT * FROM sales;
-SELECT COUNT(*) FROM temp_sales;
-COMMIT;
-```
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Batch transactionality".
+> Load when: batching SQL and needing transactional semantics — BatchExecuteStatement is NOT transactional.
 
 ## Step 5 — Statement lifecycle
 
-Each statement goes through a lifecycle:
-
-```text
-SUBMITTED → STARTED → FINISHED (success)
-                  ↘ FAILED (error)
-                  ↘ ABORTED (cancelled)
-
-Time:
-  SUBMITTED:  API accepted the request, query is queued
-  STARTED:    Redshift began executing the query
-  FINISHED:   Query completed successfully, results available
-  FAILED:     Query failed (SQL error, timeout, resource)
-  ABORTED:    Query was cancelled (AbortStatement or cluster shutdown)
-```
-
-**DescribeStatement:**
-
-```bash
-aws redshift-data describe-statement \
-  --id "$STATEMENT_ID" \
-  --query '{Status:Status, ResultRows:ResultRows, HasResultSet:HasResultSet, Error:Error}' \
-  --output table
-```
-
-**Lifecycle transitions:**
-
-| Transition | Trigger | Duration |
-|---|---|---|
-| SUBMITTED → STARTED | Redshift scheduler picks up the query | Depends on WLM queue |
-| STARTED → FINISHED | Query execution completes | Depends on query complexity (max 24 hours) |
-| STARTED → FAILED | SQL error or resource limit | Immediate |
-| STARTED → ABORTED | AbortStatement or cluster event | Immediate |
-
-**Timeout:** a statement automatically fails after 24 hours (query
-timeout). Use AbortStatement to cancel sooner.
+> **Moved verbatim** → [references/statement-lifecycle-and-results.md](references/statement-lifecycle-and-results.md) § "Step 5 — lifecycle states and transitions".
+> Load when: polling lifecycle states or reading the transition table.
 
 ## Step 6 — DescribeStatement and GetStatementResult
 
-**DescribeStatement** checks status and metadata (no rows):
-
-```bash
-aws redshift-data describe-statement --id "$STATEMENT_ID"
-```
-
-Returns: Status, ResultRows (count), HasResultSet, Error (if failed),
-Duration, RedshiftPid, RedshiftQueryId.
-
-**GetStatementResult** retrieves the actual data rows (when FINISHED):
-
-```bash
-aws redshift-data get-statement-result \
-  --id "$STATEMENT_ID" \
-  --output json
-```
-
-Returns: ColumnMetadata (schema) and Records (rows as arrays of typed
-values).
+> **Moved verbatim** → [references/statement-lifecycle-and-results.md](references/statement-lifecycle-and-results.md) § "Step 6 — describe/result code samples".
+> Load when: retrieving status vs data rows.
 
 **Key distinction:** DescribeStatement gives you STATUS;
 GetStatementResult gives you DATA. You must call DescribeStatement first
@@ -469,93 +299,20 @@ to confirm FINISHED before calling GetStatementResult.
 
 ## Step 7 — Result pagination and 24-hour expiry
 
-**Pagination:** GetStatementResult returns up to 100 MB per call. For
-larger result sets, use NextToken to paginate.
-
-```bash
-NEXT_TOKEN=""
-while true; do
-  if [ -z "$NEXT_TOKEN" ]; then
-    RESULT=$(aws redshift-data get-statement-result --id "$STATEMENT_ID" --output json)
-  else
-    RESULT=$(aws redshift-data get-statement-result --id "$STATEMENT_ID" --next-token "$NEXT_TOKEN" --output json)
-  fi
-  
-  echo "$RESULT" | jq '.Records'
-  
-  NEXT_TOKEN=$(echo "$RESULT" | jq -r '.NextToken // empty')
-  [ -z "$NEXT_TOKEN" ] && break
-done
-```
-
-**24-hour expiry:** results are available for 24 hours after FINISHED.
-After that, GetStatementResult returns an error. For results needed
-beyond 24 hours:
-
-1. **UNLOAD to S3:** `UNLOAD ('SELECT ...') TO 's3://bucket/path/'`
-   writes results directly to S3, bypassing GetStatementResult entirely.
-2. **Immediate persistence:** call GetStatementResult immediately and
-   write rows to S3/DynamoDB.
-3. **Materialized view:** create a materialized view from the query
-   results for persistent access.
+> **Moved verbatim** → [references/statement-lifecycle-and-results.md](references/statement-lifecycle-and-results.md) § "Step 7 — pagination loop and expiry".
+> Load when: paginating large result sets or persisting results before expiry.
 
 ## Step 8 — Lambda integration (poll vs EventBridge)
 
 ### Pattern 1: Lambda polling
 
-```python
-import boto3
-import time
-
-redshift_data = boto3.client('redshift-data')
-
-def lambda_handler(event, context):
-    # Submit the query
-    response = redshift_data.execute_statement(
-        ClusterIdentifier='my-redshift-cluster',
-        SecretArn='arn:aws:secretsmanager:us-east-1:123456789012:secret:redshift-creds-xxx',
-        Database='dev',
-        Sql='SELECT COUNT(*) FROM sales'
-    )
-    statement_id = response['Id']
-    
-    # Poll for completion
-    while True:
-        desc = redshift_data.describe_statement(Id=statement_id)
-        status = desc['Status']
-        
-        if status == 'FINISHED':
-            result = redshift_data.get_statement_result(Id=statement_id)
-            return { 'rows': result['Records'] }
-        elif status in ('FAILED', 'ABORTED'):
-            raise Exception(f"Query {status}: {desc.get('Error', 'Unknown')}")
-        
-        time.sleep(1)  # Poll interval
-```
+> **Moved verbatim** → [references/worked-examples.md](references/worked-examples.md) § "Pattern 1 — Lambda polling".
+> Load when: implementing the synchronous Lambda polling pattern.
 
 ### Pattern 2: EventBridge notification
 
-```python
-# Step 1: Submit query with WithEvent=True
-response = redshift_data.execute_statement(
-    ClusterIdentifier='my-redshift-cluster',
-    SecretArn='arn:aws:secretsmanager:us-east-1:123456789012:secret:redshift-creds-xxx',
-    Database='dev',
-    Sql='SELECT COUNT(*) FROM sales',
-    WithEvent=True  # Emit EventBridge on completion
-)
-return { 'statementId': response['Id'] }
-
-# Step 2: EventBridge rule triggers target Lambda
-# Event pattern: { "source": ["aws.redshift-data"], "detail-type": ["Redshift Data Statement Status Change"] }
-def result_handler(event, context):
-    statement_id = event['detail']['statementId']
-    status = event['detail']['status']
-    
-    if status == 'FINISHED':
-        result = redshift_data.get_statement_result(Id=statement_id)
-        return { 'rows': result['Records'] }
-```
+> **Moved verbatim** → [references/worked-examples.md](references/worked-examples.md) § "Pattern 2 — EventBridge notification".
+> Load when: implementing the async EventBridge pattern (WithEvent=True + target Lambda).
 
 ## Step 9 — Abort statement (cancel by StatementId)
 
@@ -576,82 +333,18 @@ aws redshift-data abort-statement \
 
 ## Step 10 — ListStatements and CloudTrail audit
 
-**ListStatements** lists recent statements (for governance):
-
-```bash
-aws redshift-data list-statements \
-  --status ALL \
-  --max-results 50 \
-  --output table
-```
-
-Filters: by status (SUBMITTED, STARTED, FINISHED, FAILED, ABORTED),
-by statement name, by role-level.
-
-**CloudTrail** logs all Data API calls for audit:
-
-```text
-CloudTrail events for Redshift Data API:
-  ExecuteStatement    → logged with SQL text, cluster, database, auth
-  BatchExecuteStatement → logged with SQL list
-  DescribeStatement   → logged (status check)
-  GetStatementResult  → logged (data retrieval)
-  AbortStatement      → logged (cancel)
-  ListStatements      → logged (governance query)
-```
-
-**Key implication:** all SQL text is visible in CloudTrail. This is
-valuable for audit but means sensitive SQL should not contain hardcoded
-secrets (use parameterized queries instead).
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "ListStatements and CloudTrail audit".
+> Load when: listing statements for governance or reasoning about CloudTrail SQL-text logging.
 
 ## Step 11 — Cost model and quotas
 
-**Cost:** the Data API is FREE. There is NO additional charge beyond
-standard Redshift pricing. You pay for:
-- Redshift cluster compute (already running) — or Redshift Serverless
-  RPU-hours
-- Standard API request costs (free tier covers most use cases)
-- Secrets Manager storage (if using SecretArn: $0.40/secret/month)
-
-**Quotas:**
-
-| Quota | Value | Adjustable |
-|---|---|---|
-| Statement timeout | 24 hours | No |
-| Result availability after FINISHED | 24 hours | No |
-| GetStatementResult max payload per call | 100 MB | No |
-| Concurrent statements per cluster | 50 | Yes (Service Quotas) |
-| BatchExecuteStatement max SQLs per batch | 1 (single SQL per call for Serverless; multiple for provisioned) | No |
-| DescribeStatement rate | 1 per second per statement | No |
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Cost model and quotas".
+> Load when: budgeting or checking statement timeout, result expiry, payload, concurrency, and rate quotas.
 
 ## Step 12 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Redshift Serverless Data API (2023-2024):** Full Data API support
-  for Redshift Serverless workgroups. Use `WorkgroupName` instead of
-  `ClusterIdentifier`.
-
-- **Parameterized queries (2023-2024):** The `Parameters` field on
-  ExecuteStatement enables parameterized SQL (prevents SQL injection).
-  Parameters are passed as name-value pairs.
-
-- **ListStatements filtering (2023-2024):** Enhanced filtering on
-  ListStatements by status, statement name, and role-level. Useful for
-  governance dashboards.
-
-- **EventBridge status change events (2023-2024):** The `WithEvent`
-  parameter on ExecuteStatement emits an EventBridge event when the
-  statement status changes. Enables async Lambda patterns without
-  polling.
-
-- **UNLOAD via Data API (2024-2025):** UNLOAD queries can be submitted
-  via the Data API, enabling serverless data export to S3 without a
-  persistent connection.
-
-- **Improved CloudTrail logging (2024-2025):** CloudTrail now includes
-  the full SQL text and parameter values for all Data API calls,
-  enhancing audit capabilities.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Recent features (2023-2026)".
+> Load when: using Serverless Data API, parameterized queries, ListStatements filtering, WithEvent, UNLOAD, or CloudTrail logging.
 
 ## NEVER do these things
 
@@ -750,30 +443,16 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### ExecuteStatement returns "Cluster not found"
-- The cluster identifier is wrong or the cluster does not exist. Verify
-  with `aws redshift describe-clusters`.
+> **Moved verbatim** → [references/error-handling.md](references/error-handling.md) § "Error handling — API failures".
+> Load when: a Data API call fails or a statement misbehaves — cluster not found, AccessDenied, expired results, stuck SUBMITTED, partial batch, Lambda poll timeout.
 
-### DescribeStatement returns "AccessDenied"
-- The IAM role lacks `redshift-data:DescribeStatement`. Add the
-  permission to the Lambda execution role.
+## References (load on demand)
 
-### GetStatementResult returns "Statement result expired"
-- More than 24 hours have passed since FINISHED. Results are gone.
-  Re-run the query or use UNLOAD to persist to S3.
-
-### Statement stays in SUBMITTED indefinitely
-- The cluster may be paused or the WLM queue is full. Check cluster
-  status with `aws redshift describe-clusters`. For Serverless, the
-  workgroup may be scaling up.
-
-### BatchExecuteStatement partially succeeds
-- The batch is NOT transactional. Earlier statements may have committed
-  before a later statement failed. Wrap in BEGIN/COMMIT for atomicity.
-
-### Lambda timeout during polling
-- The query takes longer than Lambda's 15-minute timeout. Switch to the
-  EventBridge async pattern (WithEvent=True + EventBridge rule).
+- [references/authentication-and-secrets.md](references/authentication-and-secrets.md) — auth decision detail; now also holds the Step 2 Secrets Manager and temp-credential code samples moved from SKILL.md
+- [references/statement-lifecycle-and-results.md](references/statement-lifecycle-and-results.md) — lifecycle and results detail; now also holds the Step 3 parameter table, Step 5 lifecycle detail, Step 6 code samples, and Step 7 pagination loop moved from SKILL.md
+- [references/worked-examples.md](references/worked-examples.md) — Lambda polling and EventBridge notification full code patterns
+- [references/error-handling.md](references/error-handling.md) — API error deep dives (cluster not found, AccessDenied, expired results, stuck SUBMITTED, partial batch, Lambda timeout)
+- [references/advanced-patterns.md](references/advanced-patterns.md) — three misconceptions, result persistence, batch transactionality, CloudTrail audit, cost model and quotas, recent features
 
 ## Domain
 

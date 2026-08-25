@@ -355,3 +355,67 @@ resource "aws_pinpoint_journey" "cart_recovery" {
   }
 }
 ```
+
+
+## Step 2 — Send message activity: JSON example
+
+```json
+{
+  "SendEmail": {
+    "MessageType": "PROMOTIONAL",
+    "TemplateConfiguration": {
+      "EmailTemplate": {
+        "Name": "cart-reminder-template"
+      }
+    },
+    "NextActivity": "Wait24Hours"
+  }
+}
+```
+
+
+## Step 3 — Conditional split (yes/no): JSON example
+
+```json
+{
+  "ConditionalSplit": {
+    "Condition": {
+      "Conditions": [{
+        "EventCondition": {
+          "Dimensions": {"EventType": {"Values": ["purchase_completed"], "ComparisonOperator": "IN"}}
+        }
+      }],
+      "Operator": "ALL"
+    },
+    "TrueActivity": "ExitConverted",
+    "FalseActivity": "SendReminderSMS"
+  }
+}
+```
+
+
+## Step 4 — Multivariate split (random percentage): JSON example
+
+```json
+{
+  "MultivariateSplit": {
+    "Tests": [{
+      "Branches": [
+        {"Percentage": 50, "NextActivity": "SendVariantA"},
+        {"Percentage": 50, "NextActivity": "SendVariantB"}
+      ]
+    }]
+  }
+}
+```
+
+
+## Step 5 — Wait activity: JSON examples
+
+```json
+// Duration-based
+{"Wait": {"WaitTime": {"WaitDuration": "24", "WaitDurationUnit": "HOURS"}, "NextActivity": "SendFollowUp"}}
+
+// Absolute-time
+{"Wait": {"WaitTime": {"Until": "2026-08-15T09:00:00Z"}, "NextActivity": "SendMorningEmail"}}
+```

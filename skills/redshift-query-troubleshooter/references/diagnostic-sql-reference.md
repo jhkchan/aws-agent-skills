@@ -292,3 +292,273 @@ aws redshift-data describe-statement \
 | 53400 | Configuration limit exceeded | CONNECTION_LIMIT |
 | 28000 | Authentication failed | SSL_TLS_ERROR / config |
 | XX000 | Internal error | Escalate to AWS Support |
+
+## Account-wide pre-flight commands (from SKILL.md)
+
+```sql
+-- 1. Cluster-level info (via CLI)
+-- aws redshift describe-clusters --cluster-identifier <id> --output json
+
+-- 2. Recent queries and their status
+SELECT userid, query, pid, starttime, endtime, elapsed,
+       aborted, label
+FROM stl_query
+WHERE starttime >= CURRENT_DATE - INTERVAL '1 hour'
+ORDER BY starttime DESC
+LIMIT 20;
+
+-- 3. WLM query state (which queue, wait time)
+SELECT query, service_class, service_class_name,
+       queue_time, exec_time, state
+FROM stl_wlm_query
+WHERE query IN (
+  SELECT query FROM stl_query
+  WHERE starttime >= CURRENT_DATE - INTERVAL '1 hour'
+)
+ORDER BY query DESC;
+
+-- 4. Active locks
+SELECT t.owner, t.relation, t.pid, t.txn_owner, t.xid,
+       c.relname, t.granted, t.lock_mode, t.lock_owner_pid
+FROM stv_locks t
+JOIN pg_class c ON c.oid = t.relation
+ORDER BY t.granted, t.relation;
+
+-- 5. Table info (distribution, sort keys, size, skew)
+SELECT schemaname, tablename, diststyle, sortkey1, size,
+       pct_used, max_skew, unsorted
+FROM svv_table_info
+WHERE schemaname NOT IN ('pg_catalog', 'pg_internal')
+ORDER BY size DESC
+LIMIT 20;
+
+-- 6. Load errors (COPY failures)
+SELECT userid, slice, tbl, starttime, errcode, errmsg,
+       colname, coltype, raw_line, raw_field_value
+FROM stl_load_errors
+WHERE starttime >= CURRENT_DATE - INTERVAL '1 day'
+ORDER BY starttime DESC
+LIMIT 10;
+```
+
+
+## Query-state short-circuit (from SKILL.md)
+
+| `stl_query` status | Effect on diagnosis |
+|---|---|
+| `aborted = 0`, `endtime` populated | Query completed. If slow, investigate query plan. |
+| `aborted = 1`, `starttime` + `endtime` present | Query was cancelled. Check `stl_wlm_query` for WLM timeout, or `stl_eventlog` for user-initiated cancel. |
+| `endtime` is NULL, `starttime` is recent | Query is currently running. Check `stv_inflight` for the current step and `stv_locks` for blocking locks. |
+| `elapsed` is very large | Query ran to completion but took a long time. Investigate EXPLAIN plan, distribution, and sort keys. |
+
+
+## Step 2 — WLM queue probes and key distinctions (from SKILL.md)
+
+```sql
+-- Check WLM queue assignment and timing
+SELECT q.query, q.service_class, q.service_class_name,
+       q.queue_time / 1000000 AS queue_time_secs,
+       q.exec_time / 1000000 AS exec_time_secs,
+       q.total_queue_time / 1000000 AS total_queue_secs,
+       q.total_exec_time / 1000000 AS total_exec_secs,
+       q.state
+FROM stl_wlm_query q
+WHERE q.query = <query_id>;
+
+-- Check the WLM configuration
+SELECT service_class, name, num_query_tasks, max_execution_time,
+       query_queue_time_threshold
+FROM stv_wlm_service_class_config
+WHERE service_class >= 6;
+```
+
+Key distinctions:
+- **`queue_time` >> `exec_time`**: The query spent most of its time
+  waiting in the queue. The queue was overloaded. Fix: add slots,
+  route the query to a different queue, or reduce concurrent query
+  volume.
+- **`exec_time` >> `queue_time`**: The query was slow during execution
+  and hit the execution timeout. Fix: optimize the query plan
+  (distribution, sort keys).
+- **`total_queue_time` is large with multiple `service_class` values**:
+  The query hopped between queues (WLM Query Queue Hopping). It timed
+  out in one queue and was moved to the next.
+
+## Step 3 — lock probes (from SKILL.md)
+
+```sql
+-- Active locks
+SELECT t.owner AS owner_pid,
+       c.relname AS table_name,
+       t.pid AS locked_pid,
+       t.txn_owner,
+       t.xid,
+       t.granted,
+       t.lock_mode,
+       t.lock_owner_pid AS blocking_pid
+FROM stv_locks t
+JOIN pg_class c ON c.oid = t.relation
+ORDER BY t.granted, t.relation;
+
+-- What is each holding/ blocked PID executing?
+SELECT pid, query, starttime, elapsed/1000000 AS elapsed_secs
+FROM stv_inflight
+WHERE pid IN (
+  SELECT pid FROM stv_locks WHERE granted = true
+  UNION
+  SELECT lock_owner_pid FROM stv_locks WHERE granted = false
+);
+```
+
+## Step 4a — STL_LOAD_ERRORS probe (from SKILL.md)
+
+```sql
+SELECT userid, slice, tbl, starttime, errcode, errmsg,
+       filename, line_number, colname, coltype,
+       raw_line, raw_field_value
+FROM stl_load_errors
+WHERE starttime >= CURRENT_DATE - INTERVAL '1 day'
+ORDER BY starttime DESC
+LIMIT 20;
+```
+
+## Step 4b — IAM role verification (from SKILL.md)
+
+```sql
+-- Verify the cluster's IAM roles
+-- Via CLI:
+-- aws redshift describe-clusters --cluster-identifier <id> \
+--   --query 'Clusters[0].IamRoles' --output json
+```
+
+## Step 4d — manifest verification (from SKILL.md)
+
+```sql
+-- Verify the manifest file exists and is valid JSON
+-- The manifest must have entries like:
+-- {"entries": [{"url": "s3://bucket/path/file.csv", "mandatory": true}]}
+```
+
+## Step 5 — distribution/skew probes (from SKILL.md)
+
+```sql
+-- Check distribution styles of joined tables
+SELECT schemaname, tablename, diststyle
+FROM svv_table_info
+WHERE tablename IN ('<table1>', '<table2>');
+
+-- Check skew per slice
+SELECT slice, num_values, MIN(num_values) OVER () AS min_vals,
+       MAX(num_values) OVER () AS max_vals
+FROM (
+  SELECT slice, COUNT(*) AS num_values
+  FROM <table_name>
+  GROUP BY slice
+) t;
+```
+
+## Step 6 — sort key probes (from SKILL.md)
+
+```sql
+-- Check sort keys
+SELECT schemaname, tablename, sortkey1, sortkey1_enc,
+       size, unsorted
+FROM svv_table_info
+WHERE tablename IN ('<table1>', '<table2>');
+
+-- Check the actual sort key columns
+SELECT tablename, "column", type, encoding, distkey, sortkey
+FROM pg_table_def
+WHERE schemaname = '<schema>' AND tablename = '<table>'
+ORDER BY sortkey;
+```
+
+## Step 6 — sort key change SQL (from SKILL.md)
+
+```sql
+-- Change sort key (requires table rewrite)
+ALTER TABLE <table> ALTER SORTKEY (sale_date);
+-- Or create a new table with the right sort key and copy data
+```
+
+## Step 7 — EXPLAIN probe (from SKILL.md)
+
+```sql
+-- Get the EXPLAIN output
+EXPLAIN
+SELECT ... <the query> ...;
+```
+
+## Step 8 — connection probes (from SKILL.md)
+
+```sql
+-- Total active connections
+SELECT COUNT(*) FROM stv_sessions;
+
+-- Connections per database
+SELECT db_name, COUNT(*) AS num_connections
+FROM stv_sessions
+GROUP BY db_name;
+
+-- Connections per user
+SELECT user_name, COUNT(*) AS num_connections
+FROM stv_sessions
+GROUP BY user_name;
+```
+
+## Step 9 — SSL parameter probe (from SKILL.md)
+
+```sql
+-- Check cluster parameter group for SSL requirement
+-- Via CLI:
+-- aws redshift describe-cluster-parameters
+--   --parameter-group-name <pg-name> --output json
+--   --query 'Parameters[?ParameterName==`require_ssl`]'
+```
+
+## Step 10 — vacuum probes (from SKILL.md)
+
+```sql
+-- Check vacuum progress
+SELECT * FROM svv_vacuum_progress;
+
+-- Check table statistics (unsorted percentage)
+SELECT schemaname, tablename, unsorted, size
+FROM svv_table_info
+WHERE unsorted > 5
+ORDER BY unsorted DESC;
+
+-- Check for concurrent writes blocking the vacuum
+SELECT t.relation, c.relname, t.pid, t.lock_mode, t.granted
+FROM stv_locks t
+JOIN pg_class c ON c.oid = t.relation
+WHERE t.granted = true;
+```
+
+## Step 11 — encoding probes (from SKILL.md)
+
+```sql
+-- Check server encoding
+SHOW server_encoding;
+
+-- Check client encoding
+SHOW client_encoding;
+```
+
+## System table quick reference (from SKILL.md)
+
+### System table quick reference
+
+| Table | Purpose |
+|---|---|
+| `STL_QUERY` | Query history (text, start/end time, status) |
+| `STL_WLM_QUERY` | WLM queue assignment and timing per query |
+| `STV_LOCKS` | Active table locks |
+| `STV_INFLIGHT` | Currently executing queries |
+| `STL_LOAD_ERRORS` | COPY error details |
+| `STL_ERROR` | General error log |
+| `SVV_TABLE_INFO` | Table metadata (diststyle, sortkey, size, skew) |
+| `SVV_QUERY_SUMMARY` | Per-query step execution summary |
+| `PG_TABLE_DEF` | Column-level metadata (distkey, sortkey, encoding) |
+| `SVV_VACUUM_PROGRESS` | Active vacuum progress |
+| `STV_WLM_SERVICE_CLASS_CONFIG` | WLM queue configuration |

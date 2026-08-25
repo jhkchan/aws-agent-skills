@@ -142,46 +142,13 @@ if the application continues using the cluster endpoint.
 
 ## Expert heuristic: Secrets Manager rotation pairing
 
-The secret used by the proxy should be the SAME secret managed by
-Secrets Manager rotation. When the secret rotates, the proxy
-automatically picks up new credentials without dropping connections.
-
-```text
-Secrets Manager rotation lifecycle:
-  1. Secret stored (JSON: username, password, engine, host, port, dbClusterIdentifier)
-  2. RDS Proxy references secret ARN → assumes IAM role → reads secret
-  3. Rotation Lambda fires → new password in DB → updates secret
-  4. RDS Proxy detects secret version change → picks up new credentials
-     → no connection drops, no application downtime
-```
-
-**Key implication:** pairing rotation with RDS Proxy eliminates the
-"credential rotation causes downtime" problem. The proxy handles
-rotation transparently.
+Secrets Manager rotation pairing deep-dive (rotation lifecycle, credential pickup without connection drops): moved verbatim to [references/secrets-and-iam-auth.md](references/secrets-and-iam-auth.md).
+The Step 2 rotation command below enables this lifecycle.
 
 ## Expert heuristic: max connections based on ACU sizing
 
-For Aurora Serverless v2, `max_connections` depends on ACU allocation.
-The proxy's `MaxConnectionsPercent` should be sized relative to this.
-
-```text
-Aurora Serverless v2 ACU → max_connections (approximate):
-  2 ACU → ~90 connections (minimum)
-  8 ACU → ~375 connections
-  16 ACU → ~750 connections
-  64 ACU → ~3,000 connections
-
-RDS Proxy MaxConnectionsPercent:
-  ├── Conservative: 90% (leaves 10% for admin/superuser)
-  ├── Moderate: 60-75% (good for mixed workloads)
-  └── Default: 90%
-
-  Example: 8 ACU (~375 max_connections)
-    MaxConnectionsPercent = 75 → proxy manages ~281 connections
-
-  WARNING: setting too high starves admin/monitoring connections.
-  Always leave at least 10% headroom.
-```
+ACU-to-max_connections mapping and MaxConnectionsPercent guidance with a worked sizing example: moved verbatim to [references/subnet-and-sizing.md](references/subnet-and-sizing.md).
+Step 7's parameter table below applies these defaults.
 
 ## Prerequisites (verify before provisioning)
 
@@ -517,24 +484,14 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Proxy status is Unavailable
-- Secret format is wrong or IAM role cannot read the secret. Verify JSON
-  keys and role permissions.
+Five failure diagnoses (proxy Unavailable, connection timeouts, no pooling benefit, IAM auth failures, connection exhaustion during spikes): moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on Unavailable status or connectivity symptoms.
 
-### Connections time out
-- Database SG does not allow ingress from proxy SG. Add the ingress rule
-  on the database port.
+## References (load on demand)
 
-### Application gets no connection pooling benefit
-- Application is connecting to the cluster endpoint. Update the
-  connection string to the proxy endpoint.
-
-### IAM auth fails
-- TLS not enforced. IAM auth REQUIRES `--require-tls`.
-
-### Proxy connections exhausted during spikes
-- MaxConnectionsPercent too low. Increase it, or scale up the Aurora
-  instance class/ACU.
+- [references/secrets-and-iam-auth.md](references/secrets-and-iam-auth.md) — Secret JSON format, proxy IAM role policies, rotation pairing deep-dive, IAM database authentication detail.
+- [references/subnet-and-sizing.md](references/subnet-and-sizing.md) — DB subnet group multi-AZ placement, security group rules, MaxConnectionsPercent sizing, CloudWatch alarms, Terraform examples.
+- [references/error-handling.md](references/error-handling.md) — Proxy failure diagnoses (Unavailable status, timeouts, pooling benefit, IAM auth, exhaustion).
 
 ## Domain
 

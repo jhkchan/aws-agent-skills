@@ -263,3 +263,47 @@ resource "aws_ram_resource_share" "custom_perm" {
 - No native CloudFormation resource for permission association —
   use `AWS::RAM::ResourceShare` with `Principals` and `Resources`
   embedded, or manage permissions via CLI/Terraform.
+
+---
+
+### Step 6: Associate additional resources (moved from SKILL.md)
+
+```bash
+# Add more resources to an existing resource share
+aws ram associate-resource-share \
+  --resource-share-arn arn:aws:ram:us-east-1:123456789012:resource-share/shared-subnets-prod \
+  --resource-arns \
+    arn:aws:ec2:us-east-1:123456789012:subnet/subnet-ghi789 \
+  --region us-east-1
+```
+
+### Step 7: Associate additional principals (moved from SKILL.md)
+
+```bash
+# Add more principals to an existing resource share
+aws ram associate-resource-share \
+  --resource-share-arn arn:aws:ram:us-east-1:123456789012:resource-share/shared-subnets-prod \
+  --principals 333333333333 \
+  --region us-east-1
+```
+
+### Step 8: Accept resource share invitations (external only) (moved from SKILL.md)
+
+External principals (outside the Organization) must accept the
+invitation:
+
+```bash
+# On the principal account — list pending invitations
+aws ram get-resource-share-invitations \
+  --resource-owner OTHER-ACCOUNTS \
+  --region us-east-1
+
+# Accept the invitation
+aws ram accept-resource-share \
+  --resource-share-invitation-arn arn:aws:ram:us-east-1:123456789012:resource-share-invitation/abc123 \
+  --region us-east-1
+```
+
+Within an Organization with all features, invitations are
+auto-accepted — no action needed.
+

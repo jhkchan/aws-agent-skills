@@ -211,3 +211,14 @@ CROSS APPLY sys.dm_exec_sql_text(sql_handle);
 
 Always probe `aws health describe-events` for regional issues before
 declaring a customer-side root cause during a wide-impact incident.
+
+---
+
+#### 6b: Stale DNS after failover (moved from SKILL.md)
+
+After a Multi-AZ failover, the cluster endpoint updates to the new
+writer, but DNS resolvers may serve the stale record for the TTL
+window. Flush the resolver cache (`dig +trace`, restart the JVM, or
+reduce the application's DNS TTL). If the application is on-prem
+connecting over DX / VPN, the on-prem DNS resolver may cache longer.
+

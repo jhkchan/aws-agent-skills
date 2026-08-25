@@ -307,3 +307,113 @@ aws rds describe-db-parameters --db-parameter-group-name default.postgres15 \
 aws rds describe-db-parameters --db-parameter-group-name <name> \
   --query 'Parameters[?ApplyType==`dynamic` && Source!=`engine-default`].{Name:ParameterName,Value:ParameterValue}'
 ```
+
+## Step 3 — common static and dynamic parameters
+
+**Common static parameters (require reboot):**
+
+| Parameter | Engine | What it controls |
+|---|---|---|
+| `shared_buffers` | PostgreSQL | Shared memory pool for data pages |
+| `max_connections` | PostgreSQL (some versions) | Maximum concurrent connections |
+| `log_directory` | PostgreSQL | Log file directory |
+| `timezone` | PostgreSQL | Server timezone |
+| `innodb_buffer_pool_size` | MySQL (some versions) | InnoDB buffer pool size |
+| `max_connections` | MySQL | Maximum concurrent connections |
+| `character_set_server` | MySQL | Default character set |
+
+**Common dynamic parameters (no reboot):**
+
+| Parameter | Engine | What it controls |
+|---|---|---|
+| `work_mem` | PostgreSQL | Per-query sort/hash memory |
+| `wal_buffers` | PostgreSQL | WAL write-ahead log buffer |
+| `checkpoint_completion_target` | PostgreSQL | Checkpoint spreading |
+| `maintenance_work_mem` | PostgreSQL | Maintenance operation memory |
+| `random_page_cost` | PostgreSQL | Planner cost for random I/O |
+| `slow_query_log` | MySQL | Enable slow query logging |
+| `long_query_time` | MySQL | Slow query threshold (seconds) |
+| `general_log` | MySQL | Enable general query log |
+
+## Step 5 — Common PostgreSQL tuning parameters
+
+| Parameter | Default | Recommended (production) | Type | Notes |
+|---|---|---|---|---|
+| `max_connections` | `{AWSTemplate` or engine default | 100-200 (scale with instance class) | static | Each connection consumes memory. Use a connection pooler (PgBouncer/RDS Proxy) for high connection counts. |
+| `shared_buffers` | `{DBInstanceClassMemory/4}` | 25% of instance RAM | static | PostgreSQL's main cache. Use curly-brace formula or absolute value (`{6GB}`). |
+| `work_mem` | `4MB` | 8-16MB | dynamic | Per-sort/hash memory. Too high with many connections = OOM. Formula: `(RAM - shared_buffers) / max_connections / 2`. |
+| `maintenance_work_mem` | `64MB` | 256MB-1GB | dynamic | VACUUM, CREATE INDEX, ALTER TABLE memory. |
+| `wal_buffers` | `-1` (auto) | 16MB | dynamic | WAL write buffer. `-1` = auto-tuned to 1/32 of shared_buffers. |
+| `checkpoint_completion_target` | `0.9` | `0.9` | dynamic | Spreads checkpoint I/O over 90% of checkpoint_timeout. |
+| `effective_cache_size` | `4GB` (default) | 50-75% of instance RAM | dynamic | Planner hint for total OS+PG cache. Does NOT allocate memory. |
+| `random_page_cost` | `4` | `1.1` (SSD storage) | dynamic | Cost of random page fetch. Lower for EBS/SSD. |
+| `log_min_duration_statement` | `-1` (disabled) | `1000` (log queries > 1s) | dynamic | Slow query logging in milliseconds. |
+| `autovacuum` | `1` | `1` | dynamic | Enable autovacuum. Never disable in production. |
+| `autovacuum_naptime` | `1min` | `30s` for write-heavy | dynamic | Time between autovacuum runs per table. |
+
+**Memory formula syntax:** RDS supports `{DBInstanceClassMemory/N}` to
+set values as a fraction of instance RAM. Use this instead of
+absolute values for portability across instance classes.
+
+## Step 6 — Common MySQL tuning parameters
+
+| Parameter | Default | Recommended (production) | Type | Notes |
+|---|---|---|---|---|
+| `innodb_buffer_pool_size` | `{DBInstanceClassMemory*3/4}` | 75% of instance RAM | dynamic (8.0+) | Main InnoDB cache. Largest consumer of MySQL memory. |
+| `max_connections` | `{AWSTemplate}` or 150 | 200-500 (scale with instance class) | static | Each connection consumes thread stack + sort buffer. |
+| `slow_query_log` | `0` | `1` | dynamic | Enable slow query logging. |
+| `long_query_time` | `10` | `1` (log queries > 1s) | dynamic | Slow query threshold in seconds. |
+| `innodb_log_file_size` | engine default | 1-4GB | dynamic (8.0+) | Redo log file size. Larger = fewer checkpoint flushes. |
+| `innodb_flush_log_at_trx_commit` | `1` | `1` (durability) or `2` (performance) | dynamic | `1` = ACID (fsync every commit). `2` = fsync once per second (risk of 1s data loss on crash). |
+| `sync_binlog` | `1` | `1` (durability) or `0` (performance) | dynamic | `1` = fsync binlog every transaction. |
+| `character_set_server` | `latin1` | `utf8mb4` | dynamic | Default character set. |
+| `collation_server` | `latin1_swedish_ci` | `utf8mb4_unicode_ci` | dynamic | Default collation. |
+| `binlog_format` | `MIXED` (Aurora) / `ROW` | `ROW` | dynamic | Binary log format. `ROW` for replication reliability. |
+| `table_definition_cache` | engine default | 2000+ for many tables | dynamic | Table definition (.frm) cache. |
+
+## Step 7 — Aurora-specific parameters
+
+Aurora has cluster-level parameters not available in regular RDS:
+
+| Parameter | Engine | What it controls |
+|---|---|---|
+| `aurora_enable_repl_bin_log_filter` | Aurora MySQL | Binary log filtering on replicas |
+| `aurora_enable_hash_join` | Aurora MySQL | Hash join for large analytical queries |
+| `aurora_enable_parallel_query` | Aurora MySQL | Parallel query processing |
+| `aurora_pq` | Aurora MySQL (older) | Parallel query toggle |
+| `max_connections` | Aurora PostgreSQL | Connection limit (scales with instance class) |
+
+**Aurora max_connections scaling:** in Aurora, `max_connections` is
+derived from the instance class by default (using
+`LEAST({DBInstanceClassMemory/9531392}, 5000)`). Override only if
+you need fewer connections, never more — exceeding the formula can
+cause OOM.
+
+## Step 8 — Aurora Serverless v2 capacity
+
+Aurora Serverless v2 manages capacity in ACUs (Aurora Capacity
+Units, 0.5-128 ACU per instance). Capacity scaling is configured on
+the cluster via `ServerlessV2ScalingConfiguration`, NOT in the
+parameter group:
+
+```bash
+aws rds modify-db-cluster \
+  --db-cluster-identifier <cluster-id> \
+  --serverless-v2-scaling-configuration MinCapacity=2,MaxCapacity=16 \
+  --apply-immediately
+```
+
+**Parameter group tuning for Serverless v2:**
+
+| Parameter | Recommendation | Why |
+|---|---|---|
+| `max_connections` | Set based on MAX ACU | At scale-up, more connections are needed. Tune for the peak, not the minimum. |
+| `shared_buffers` | Use `{DBInstanceClassMemory/4}` formula | The formula adapts to the dynamic instance class. Avoid absolute values. |
+| `work_mem` | Conservative (4-8MB) | At minimum ACU, memory is tight. High work_mem × many connections = OOM. |
+| `effective_cache_size` | Use `{DBInstanceClassMemory*3/4}` formula | Adapts to dynamic capacity. |
+
+**NEVER set absolute memory values** for Aurora Serverless v2.
+The instance class changes dynamically — an absolute `shared_buffers`
+value tuned for 16 ACU will cause OOM at 2 ACU. Always use the
+`{DBInstanceClassMemory/N}` formula syntax.
+

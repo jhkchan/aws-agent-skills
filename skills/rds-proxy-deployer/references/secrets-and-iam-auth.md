@@ -270,3 +270,22 @@ resource "aws_secretsmanager_secret_rotation" "db_credentials" {
   }
 }
 ```
+
+## Expert heuristic: Secrets Manager rotation pairing
+
+The secret used by the proxy should be the SAME secret managed by
+Secrets Manager rotation. When the secret rotates, the proxy
+automatically picks up new credentials without dropping connections.
+
+```text
+Secrets Manager rotation lifecycle:
+  1. Secret stored (JSON: username, password, engine, host, port, dbClusterIdentifier)
+  2. RDS Proxy references secret ARN → assumes IAM role → reads secret
+  3. Rotation Lambda fires → new password in DB → updates secret
+  4. RDS Proxy detects secret version change → picks up new credentials
+     → no connection drops, no application downtime
+```
+
+**Key implication:** pairing rotation with RDS Proxy eliminates the
+"credential rotation causes downtime" problem. The proxy handles
+rotation transparently.

@@ -223,3 +223,23 @@ aws ram promote-resource-share-created-from-policy \
 
 This enables full management via RAM APIs (add/remove principals,
 associate permissions, set tags).
+
+---
+
+## Resource share vs VPC peering (moved from SKILL.md)
+
+| Aspect | RAM resource share (subnet) | VPC peering |
+|---|---|---|
+| **What is shared** | The subnet itself — other accounts create resources IN it | A network route between two VPCs |
+| **Direction** | One-way (owner shares, consumers use) | Bi-directional (both VPCs route to each other) |
+| **Transitivity** | Shared subnets are accessible by all principals | Non-transitive (A↔B, B↔C does not mean A↔C) |
+| **Scalability** | One share per resource, many principals | One peering per pair (N^2 connections) |
+| **Bandwidth** | No bandwidth limit (direct VPC resource) | Limited by peering connection aggregate |
+| **Use case** | Centralized networking, shared services VPC | Simple point-to-point VPC connectivity |
+| **Cost** | No data transfer cost for in-VPC traffic | Cross-region peering incurs data transfer |
+
+**Rule:** use RAM subnet sharing for centralized architectures
+(shared services VPC, centralized egress, Network Firewall).
+Use VPC peering for simple point-to-point connectivity between
+a small number of VPCs.
+

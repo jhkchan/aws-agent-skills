@@ -156,23 +156,8 @@ For production, use a customer-managed key. The AWS-owned key cannot
 be audited, rotated, or shared cross-account. Create the CMK BEFORE
 the namespace.
 
-```bash
-aws kms create-key --description "Redshift Serverless production key" \
-  --policy '{
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Effect": "Allow",
-        "Principal": {"Service": "redshift-serverless.amazonaws.com"},
-        "Action": ["kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:CreateGrant", "kms:DescribeKey"],
-        "Resource": "*"
-      }
-    ]
-  }'
-
-aws kms create-alias --alias-name alias/redshift-prod \
-  --target-key-id <key-id>
-```
+> **Moved verbatim** → [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md) § "Step 1 — KMS key creation".
+> Load when: creating the customer-managed KMS key and alias before create-namespace.
 
 Rules:
 - **Key policy MUST allow `redshift-serverless.amazonaws.com`** to use
@@ -203,42 +188,8 @@ The namespace IAM role is assumed by Redshift Serverless for
 data-plane AWS API calls (COPY from S3, UNLOAD to S3, Glue catalog
 integration). Without it, COPY from S3 fails with `S3ServiceException`.
 
-```bash
-aws iam create-role \
-  --role-name RedshiftNSRole \
-  --assume-role-policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [{
-      "Effect": "Allow",
-      "Principal": {"Service": "redshift.amazonaws.com"},
-      "Action": "sts:AssumeRole"
-    }]
-  }'
-
-aws iam put-role-policy \
-  --role-name RedshiftNSRole \
-  --policy-name redshift-data-access \
-  --policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Effect": "Allow",
-        "Action": ["s3:GetObject", "s3:ListBucket"],
-        "Resource": ["arn:aws:s3:::ingest-bucket", "arn:aws:s3:::ingest-bucket/*"]
-      },
-      {
-        "Effect": "Allow",
-        "Action": ["s3:PutObject"],
-        "Resource": "arn:aws:s3:::unload-bucket/*"
-      },
-      {
-        "Effect": "Allow",
-        "Action": ["glue:GetTable", "glue:GetDatabase", "glue:GetPartitions"],
-        "Resource": "*"
-      }
-    ]
-  }'
-```
+> **Moved verbatim** → [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md) § "Step 3 — IAM namespace role".
+> Load when: creating the namespace IAM role and its inline data-access policy.
 
 ### Step 4: Secrets Manager admin credential (recommended)
 
@@ -261,19 +212,8 @@ create-namespace and rotate it within 90 days.
 
 ### Step 5: Namespace
 
-```bash
-aws redshift-serverless create-namespace \
-  --namespace-name analytics-ns-prod \
-  --admin-username admin \
-  --admin-user-password '<password-from-secrets>' \
-  --db-name dev \
-  --kms-key-id arn:aws:kms:us-east-1:123456789012:key/abc123 \
-  --default-iam-role-arn arn:aws:iam::123456789012:role/RedshiftNSRole \
-  --iam-roles arn:aws:iam::123456789012:role/RedshiftNSRole \
-  --security-group-ids sg-redshift-prod \
-  --log-exports userlog connectionlog useractivitylog \
-  --tags Environment=production Application=analytics
-```
+> **Moved verbatim** → [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md) § "Step 5 — create-namespace".
+> Load when: running create-namespace with KMS, IAM roles, security groups, and log exports.
 
 Rules:
 - **db-name MUST be lowercase**, 1-64 alphanumeric/underscore. NOT a
@@ -367,50 +307,16 @@ Query editor v2 is a managed web UI. It requires an IAM policy allowing
 `redshift-serverless:*` and `redshift-data:*` for the IAM principal
 running it.
 
-```bash
-aws iam create-policy \
-  --policy-name RedshiftQueryEditorV2Access \
-  --policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Effect": "Allow",
-        "Action": [
-          "redshift-serverless:DescribeWorkgroup",
-          "redshift-serverless:ListWorkgroups",
-          "redshift-serverless:ListNamespaces",
-          "redshift-data:ExecuteStatement",
-          "redshift-data:DescribeStatement",
-          "redshift-data:GetStatementResult",
-          "redshift-data:ListStatements"
-        ],
-        "Resource": "*"
-      }
-    ]
-  }'
-```
+> **Moved verbatim** → [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md) § "Step 9 — query editor v2 policy".
+> Load when: creating the query editor v2 IAM policy.
 
 Attach the policy to the IAM user/role that runs the query editor v2.
 The query editor auto-discovers workgroups and namespaces.
 
 ### Step 10: Snapshots and cross-Region copy
 
-```bash
-# Scheduled snapshot
-aws redshift-serverless create-scheduled-action \
-  --scheduled-action-name analytics-snapshot-schedule \
-  --namespace-name analytics-ns-prod \
-  --schedule "rate(8 hours)" \
-  --target-action '{"CreateSnapshot":{"NamespaceName":"analytics-ns-prod","SnapshotName":"analytics-wg-prod-snapshot"}}' \
-  --iam-role arn:aws:iam::123456789012:role/RedshiftNSRole
-
-# Cross-Region snapshot copy
-aws redshift-serverless create-namespace \
-  --namespace-name analytics-ns-dr \
-  ... \
-  --no-admin-username \
-  --snapshot-copy-grants '[{"DestinationRegion":"us-west-2","KmsKeyId":"arn:aws:kms:us-west-2:123456789012:key/def456"}]'
-```
+> **Moved verbatim** → [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md) § "Step 10 — snapshots and cross-Region copy".
+> Load when: creating the scheduled action and cross-Region snapshot copy grant.
 
 Rules:
 - **Cross-Region copy requires a SEPARATE CMK** in the destination
@@ -422,41 +328,13 @@ Rules:
 
 ### Step 11: Verification
 
-```bash
-aws redshift-serverless describe-workgroup --workgroup-name analytics-wg-prod
-aws redshift-serverless describe-namespace --namespace-name analytics-ns-prod
-aws redshift-serverless list-usage-limits
-aws redshift-serverless describe-scheduled-actions
-aws secretsmanager describe-secret --secret-id redshift/admin
-aws kms describe-key --key-id alias/redshift-prod
-aws logs describe-log-groups --log-group-name-prefix /aws/redshift/analytics-ns-prod
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Step 11 — verification commands".
+> Load when: verifying the deployment after apply — workgroup, namespace, usage limits, snapshots, secret, KMS, log groups.
 
 ## Latest Redshift Serverless features (2024-2026)
 
-- **Cross-Region snapshot copy (2024-2025):** automated snapshot copy
-  to a secondary Region for disaster recovery. Requires a separate
-  destination-Region KMS key and a snapshot copy grant. RPO is the
-  snapshot interval (default 8 hours).
-- **Cost controls with usage thresholds (2024-2025):** usage limits
-  with `breach-action` of `log`, `emit-metric`, or `disable`. Pair
-  with CloudWatch alarms on `ServerlessComputeCapacity` for proactive
-  budget alerts.
-- **AWS Secrets Manager integration (2024-2025):** admin password
-  stored and rotated in Secrets Manager via managed rotation Lambda.
-  Removes the need for manual rotation scripts.
-- **Zero-ETL integrations (2024-2026):** near-real-time replication
-  from Aurora PostgreSQL, RDS for PostgreSQL, and DynamoDB into
-  Redshift Serverless without COPY/UNLOAD pipelines. Configured at
-  the source database, not the namespace.
-- **Concurrent scaling (2024-2025):** auto-scaling beyond base RPU for
-  bursty workloads. Billed separately; pair with usage limits.
-- **Query editor v2 enhancements (2024-2025):** schema visualizer,
-  query history, saved queries, and chart exports.
-- **ML-driven workload management (2024-2025):** automatic WLM queue
-  tuning based on query patterns. No manual queue configuration.
-- **Row-level security (2024-2026):** policy-based row filtering
-  without view rewriting. Useful for multi-tenant analytics.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Latest features (2024-2026)".
+> Load when: deciding cross-Region copy, usage-limit cost controls, Secrets Manager rotation, zero-ETL, concurrent scaling, ML-driven WLM, or row-level security.
 
 ## Workload matrix
 
@@ -569,6 +447,13 @@ with port 5439 inbound, namespace IAM role for COPY/UNLOAD, Secrets
 Manager secret for admin password), the verdict is
 `PREREQUISITES_MISSING`.
 
+## References (load on demand)
+
+- [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md) — full CLI sequences and Terraform/CloudFormation equivalents; now also holds the KMS, IAM role, namespace, query-editor policy, and snapshot CLI moved from SKILL.md
+- [references/configuration-and-cost-guide.md](references/configuration-and-cost-guide.md) — encryption, networking, usage limits, DR strategy, full NEVER list; now also holds the SKILL.md edge-case catalog
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 11 post-deployment verification commands
+- [references/advanced-patterns.md](references/advanced-patterns.md) — 2024-2026 feature changes (cross-Region copy, cost controls, Secrets Manager rotation, zero-ETL, concurrent scaling, ML-driven WLM, RLS)
+
 ## Domain
 
 AWS CloudOps / Redshift Serverless Analytics Data Warehouse
@@ -576,31 +461,8 @@ Provisioning.
 
 ## Edge-case handling
 
-- **Migrating from provisioned Redshift to Serverless:** use the
-  `restore-from-cluster-snapshot` flow. The snapshot is restored into
-  a new Serverless namespace. Database objects and data transfer;
-  cluster parameter groups do NOT transfer (Serverless uses
-  config-parameters on the workgroup).
-- **Cross-account data sharing:** use datashares. The producer account
-  creates a datashare; the consumer account creates a namespace and
-  references the datashare. NEVER share the namespace IAM role across
-  accounts.
-- **Multi-AZ requirement:** Redshift Serverless is multi-AZ by default
-  (subnet group must span 3+ AZs). There is no "single-AZ" mode.
-- **Zero-ETL from Aurora:** configured at the Aurora cluster, not the
-  Redshift namespace. The Aurora cluster needs a `redshift.amazonaws.com`
-  role to push data. Replication lag is typically seconds.
-- **Secrets Manager rotation:** the managed rotation Lambda runs every
-  30 days by default. Override with a custom rotation schedule via
-  Secrets Manager. The rotation updates BOTH the secret AND the
-  namespace admin password atomically.
-- **Usage limit reset:** when `breach-action=disable` triggers, the
-  workgroup stays disabled until the next billing period OR until you
-  manually delete the usage limit. NEVER use `disable` for production
-  without an on-call runbook.
-- **Cross-Region snapshot CMK deletion:** if you delete the
-  destination-Region CMK, snapshot copies fail silently. CloudWatch
-  metric `SnapshotCopyFailure` is the only signal. Set an alarm.
+> **Moved verbatim** → [references/configuration-and-cost-guide.md](references/configuration-and-cost-guide.md) § "Edge-case handling".
+> Load when: migrating from provisioned, cross-account datashares, multi-AZ, zero-ETL from Aurora, rotation, usage-limit reset, or CMK deletion edge cases.
 
 ## AWS documentation
 

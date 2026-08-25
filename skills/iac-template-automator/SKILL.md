@@ -24,7 +24,6 @@ metadata:
   keywords: Infrastructure as Code, IaC, CloudFormation, CDK, Cloud Development Kit, Terraform, HCL, nested stacks, cross-stack references, drift detection, change sets, cfn-lint, cfn-nag, tflint, checkov, serverless, VPC, ECS Fargate, RDS Aurora, Secrets Manager, CloudFront, WAF, least-privilege IAM, template validation
   tags: cloudformation, cdk, terraform, iac, devtools, automation, security, validate, cfn-lint, checkov
 ---
----
 
 # IaC Template Automator
 

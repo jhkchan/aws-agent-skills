@@ -18,7 +18,6 @@ metadata:
   keywords: IAM, least privilege, policy analysis, wildcard permissions, privilege escalation, over-permissive, IAM audit, PassRole, AssumeRole, NotAction, NotResource, condition bypass, policy remediation
   tags: iam, security, least-privilege, policy-analysis, privilege-escalation
 ---
----
 
 # IAM Least-Privilege Advisor
 

@@ -178,3 +178,55 @@ Key fields:
 System tables with `STL_` prefix are log tables (historical). Tables
 with `STV_` prefix are view tables (current state). `SVV_` tables are
 system views.
+
+## Symptom→layer matrix and distribution/sort decision guides (from SKILL.md)
+
+### Symptom -> layer decision matrix (offline classification)
+
+```
+Error string / EXPLAIN signal                     -> Layer
+"cancelled due to queue timeout"                  -> WLM_QUEUE_TIMEOUT
+Query hangs; STV_LOCKS shows granted=false         -> TABLE_LOCK
+stl_load_errors                                    -> COPY_IAM_ROLE / COPY_DATA_FORMAT
+DS_DIST_ALL_INNER / DS_BCAST_INNER in EXPLAIN      -> DIST_KEY_SKEW
+Seq Scan on large table in EXPLAIN                 -> SORT_KEY_MISALIGNMENT
+Nested Loop in EXPLAIN                             -> NESTED_LOOP_JOIN
+"too many connections"                             -> CONNECTION_LIMIT
+"SSL certificate verification failed"              -> SSL_TLS_ERROR
+"character ... has no equivalent in encoding"      -> ENCODING_CONVERSION
+VACUUM running for hours                           -> VACUUM_BLOCKED
+```
+
+### Distribution style decision guide
+
+| Table profile | Recommended DISTSTYLE | Why |
+|---|---|---|
+| Large fact table (> 5M rows), joins on a specific column | KEY on the join column | Co-locates matching rows for DS_DIST_NONE joins |
+| Small dimension table (< 2-5M rows) | ALL | Replicates to all nodes; all joins are local |
+| Staging table (loaded and queried independently) | EVEN | Even distribution for parallel scan; no join co-location needed |
+| Table with no joins (used standalone) | EVEN | Balanced parallel scan |
+
+### Sort key decision guide
+
+| Query pattern | Recommended sort key | Why |
+|---|---|---|
+| Range filter on a single date column | Compound (date_column) | Zone maps skip blocks outside the date range |
+| Range filter on date + equality on dimension | Compound (date_column, dim_column) | Date is primary filter; dim is secondary |
+| Equality filters on 2-3 independent columns | Interleaved (col1, col2, col3) | Equal-weight zone maps for any filter combination |
+| No range filters, full scans only | (no sort key) | No zone map benefit; save sort maintenance cost |
+
+## EXPLAIN scan type reference (from SKILL.md)
+
+### EXPLAIN scan type reference
+
+| EXPLAIN signal | Meaning | Performance impact |
+|---|---|---|
+| `Seq Scan` | Full table scan, no sort key elimination | Slow on large tables |
+| `Sort` | Sort key leveraged; zone maps skip blocks | Fast -- blocks eliminated |
+| `DS_DIST_NONE` | Join is co-located; no redistribution | Optimal |
+| `DS_DIST_ALL_INNER` | Inner table broadcast to all nodes | Costly on large tables |
+| `DS_BCAST_INNER` | Inner table broadcast (same as ALL_INNER) | Costly |
+| `DS_DIST_ALL_NONE` | Outer table broadcast; inner stays | OK for small outer tables |
+| `XN Hash Join` | Hash-based join (normal) | Good |
+| `XN Merge Join` | Merge-based join (requires sorted inputs) | Good if inputs are sorted |
+| `XN Nested Loop` | Cartesian product | Almost always a bug |

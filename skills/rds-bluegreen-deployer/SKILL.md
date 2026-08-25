@@ -115,84 +115,23 @@ time:
 
 ## Configuration dependency graph (novel heuristic)
 
-Blue/Green deployment configurations are NOT independent. The green
-environment must be created before changes can be made. Changes must
-be validated before switchover. Switchover must complete before green
-deletion. Use this graph to sequence deployment.
-
-| Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| Blue/Green creation | source DB exists; engine supports Blue/Green; no unsupported features (e.g., RDS Custom) | green is provisioned silently; creation takes minutes to hours depending on DB size | the green staging environment |
-| Replication (blue to green) | green created successfully | logical replication runs continuously; DDL on blue can break it | green stays in sync with blue |
-| Database changes in green | green is AVAILABLE; replication healthy | major version upgrade in green does NOT affect blue; schema changes in green are isolated | validated changes ready for production |
-| Green validation | changes applied to green; green is AVAILABLE | validation queries run against green without affecting blue | confidence that green is production-ready |
-| Switchover | green validated; no replication lag; switchover timeout set | switchover takes ~1 min; DNS CNAME updated; connections briefly dropped | traffic rerouted to green (new production) |
-| Application connection update | switchover completed; DNS propagated | apps using the endpoint CNAME auto-follow; apps with hardcoded IPs do NOT | applications connect to new production |
-| Delete green | switchover completed successfully | old blue becomes the new green (can be deleted or kept as fallback); deleting stops 2x billing | cost optimization |
-
-**The green-validation-before-switchover row is the one a baseline
-model misses.** A naive model creates blue/green, makes changes, and
-immediately switches. The correct heuristic validates green
-thoroughly (run application tests, check replication lag, verify
-query performance) before switchover. The procedure below forces an
-explicit validation step.
-
-**Cross-dependency gotchas:**
-- Green replicates from blue via logical replication. DDL in blue
-  during the lifecycle breaks replication. Make changes ONLY in green.
-- Switchover swaps endpoints: the blue CNAME → green (new production),
-  the green CNAME → blue. Apps using the CNAME auto-follow.
-- After switchover, the former blue (new green) keeps running (2x
-  billing) until explicitly deleted.
-- Major version upgrades must follow a supported path. Skipping two
-  major versions fails at green creation.
+The configuration dependency graph and cross-dependency gotchas moved verbatim to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Expert heuristic: the 2x cost window
 
-The cost window is the entire Blue/Green lifecycle — from creation to
-green deletion. Green is a FULL clone; you pay 2x during this window.
-
-```text
-T0: Blue/Green created → 2x billing starts
-T1: Changes made to green (version upgrade, params, schema)
-T2: Green validation (tests, performance checks)
-T3: Switchover (~1 min downtime, DNS switch)
-T4: Delete former blue → 2x billing ends
-```
-
-**Key implication:** plan the entire lifecycle before starting. Do
-not leave green running for days without a switchover plan.
+The 2x cost window timeline and key implication moved verbatim to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Expert heuristic: what changes go in green vs blue
 
-```text
-In GREEN (before switchover):          NEVER in blue (breaks replication):
-  Major version upgrade                  DDL on blue
-  Parameter group changes                Modifying blue's param group
-  Schema changes (DDL)                   Changing blue's option group
-  Option group changes
-At SWITCHOVER (automatic):              NEVER in green:
-  Endpoint DNS switch                      (green is staging only)
-  Connection rerouting via CNAME
-```
-
-Green is the change environment. Blue is frozen. Changes to blue
-during the lifecycle break logical replication.
+The green-vs-blue change matrix moved verbatim to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Expert heuristic: switchover downtime characteristics
 
-```text
-Phase 1: Stop replication (~1-5s) — no app impact
-Phase 2: Rename endpoints (DNS CNAME swap, ~1-10s)
-Phase 3: Apps reconnect — long-lived connections break
-
-Observed downtime:
-  With retry + pooling: < 1 second (often unnoticeable)
-  Without retry:        1-60 seconds (DNS propagation)
-  Worst case:           minutes (DNS cache, no retry)
-```
-
-Ensure applications have connection retry logic BEFORE switchover.
+Switchover downtime phase breakdown and retry guidance moved verbatim to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Prerequisites (verify before deploying)
 
@@ -308,36 +247,13 @@ aws rds describe-db-instances \
 
 ### Parameter group changes in green
 
-Apply a different parameter group to green (specified at creation via
-`--target-db-parameter-group-name`). To change parameters in green
-after creation:
-
-```bash
-# Modify green's parameter group (green DB only)
-aws rds modify-db-instance \
-  --db-instance-identifier "green-prod-mysql-db" \
-  --db-parameter-group-name "prod-mysql80-tuned-params" \
-  --apply-immediately \
-  --region us-east-1
-```
+Parameter-group change CLI for green moved verbatim to
+[references/green-validation-and-changes.md](references/green-validation-and-changes.md).
 
 ### Schema changes (DDL) in green
 
-Schema changes (ALTER TABLE, CREATE INDEX, etc.) are executed in
-green ONLY. These changes do NOT affect blue and are replicated to
-green via the logical replication stream from blue.
-
-```bash
-# Connect to green and run DDL (example: add a column)
-# Use the green endpoint — NEVER the blue endpoint
-mysql -h green-prod-mysql-db.cluster-xxx.us-east-1.rds.amazonaws.com \
-  -u admin -p \
-  -e "ALTER TABLE orders ADD COLUMN status_code INT DEFAULT 0;"
-```
-
-**Critical:** Run DDL ONLY against the green endpoint. Running DDL
-against blue during the Blue/Green lifecycle breaks logical
-replication and can corrupt the switchover.
+Green-only DDL execution example and the never-run-DDL-on-blue warning moved verbatim to
+[references/green-validation-and-changes.md](references/green-validation-and-changes.md).
 
 ## Step 5 — Green environment validation
 
@@ -412,47 +328,13 @@ aws rds describe-blue-green-deployments \
 
 ## Step 7 — Switchover timeout configuration
 
-The switchover timeout controls how long the switchover operation can
-run before it is rolled back. Default is 300 seconds (5 minutes).
-
-```bash
-# Set switchover timeout (e.g., 600 seconds for large databases)
-aws rds switchover-blue-green-deployment \
-  --blue-green-deployment-identifier "$BG_ID" \
-  --switchover-timeout 600 \
-  --region us-east-1
-```
-
-**Timeout guidance:**
-- Small databases (< 100 GB): 300 seconds (default) is sufficient.
-- Medium databases (100 GB – 1 TB): 600 seconds.
-- Large databases (> 1 TB): 1800 seconds (30 minutes).
-- If switchover times out, it rolls back — blue remains production.
+Switchover timeout CLI and size-based timeout guidance moved verbatim to
+[references/switchover-and-dns.md](references/switchover-and-dns.md).
 
 ## Step 8 — Application connection string update
 
-**The key benefit of Blue/Green:** applications using the RDS
-endpoint CNAME do NOT need connection string changes. The DNS switch
-is transparent.
-
-```text
-Before switchover:
-  prod-mysql-db.cluster-xxx.us-east-1.rds.amazonaws.com → BLUE (production)
-  green-prod-mysql-db.cluster-xxx.us-east-1.rds.amazonaws.com → GREEN (staging)
-
-After switchover:
-  prod-mysql-db.cluster-xxx.us-east-1.rds.amazonaws.com → GREEN (now production!)
-  green-prod-mysql-db.cluster-xxx.us-east-1.rds.amazonaws.com → BLUE (now staging)
-
-Application using prod-mysql-db endpoint: NO CHANGE NEEDED
-```
-
-**Applications that need attention:**
-- Applications with hardcoded IP addresses (not using the DNS
-  endpoint): MUST update the IP after DNS propagation.
-- Applications with long-lived connections: MUST reconnect after
-  switchover (connection retry logic handles this).
-- Applications with DNS caching: flush DNS cache after switchover.
+The endpoint/CNAME swap walkthrough and app-attention list moved verbatim to
+[references/switchover-and-dns.md](references/switchover-and-dns.md).
 
 ## Step 9 — Delete green after successful switch
 
@@ -483,88 +365,18 @@ aws rds describe-blue-green-deployments \
 
 ## Step 10 — Blue/Green limitations
 
-Blue/Green Deployments have hard limitations. A baseline model may
-not surface these; they are critical for deployment planning.
-
-| Limitation | Description | Workaround |
-|---|---|---|
-| Engine support | Only Aurora MySQL/PostgreSQL, RDS MySQL/PostgreSQL | Use standard modify for unsupported engines |
-| RDS Custom | NOT supported | Use standard modify-db-instance |
-| Storage type | Must be gp2, gp3, or io1 (not magnetic) | Migrate storage type first |
-| Read replica topology | Complex topologies (cascading replicas) may not clone correctly | Simplify topology before Blue/Green |
-| Cross-Region read replicas | NOT included in green clone | Recreate cross-Region replicas after switchover |
-| Major version skip | Cannot skip more than one major version | Upgrade incrementally (12→13→14, not 12→14 directly if unsupported) |
-| DDL on blue | Breaks logical replication | Make changes ONLY in green |
-| Cost | 2x during entire lifecycle | Delete green promptly after switchover |
-
-**The engine support limitation is the most impactful.** Many
-operators assume Blue/Green works for all RDS engines. It does NOT.
-SQL Server, Oracle, MariaDB, and Db2 do NOT support Blue/Green.
+The Blue/Green limitations table and engine-support caveat moved verbatim to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Step 11 — Monitoring during green validation
 
-During green validation, monitor key CloudWatch metrics to ensure
-green is healthy and replication is lag-free.
-
-| Metric | What it tells you | Target |
-|---|---|---|
-| `DatabaseConnections` (green) | Green accepts connections | > 0 during validation |
-| `ReplicaLag` | Replication lag from blue to green | < 1 second (near-zero) |
-| `CPUUtilization` (green) | Green CPU after changes | Within normal range |
-| `FreeableMemory` (green) | Green memory after changes | Within normal range |
-| `ReadLatency` / `WriteLatency` (green) | Green query performance | No regression vs blue |
-| `FreeStorageSpace` (green) | Green has enough storage | > 20% free |
-
-**Monitor via CLI:**
-
-```bash
-# Check replication status
-aws rds describe-blue-green-deployments \
-  --blue-green-deployment-identifier "$BG_ID" \
-  --query 'BlueGreenDeployments[0].{Status:Status,Source:Source,Target:Target}' \
-  --region us-east-1 --output table
-
-# Check green DB health
-aws rds describe-db-instances \
-  --db-instance-identifier "green-prod-mysql-db" \
-  --query 'DBInstances[0].{Status:DBInstanceStatus,Engine:Engine,EngineVersion:EngineVersion,Class:DBInstanceClass}' \
-  --region us-east-1 --output table
-```
+Green-validation CloudWatch metrics table and monitoring CLI moved verbatim to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ## Step 12 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Blue/Green for Aurora PostgreSQL major version upgrades (2023-
-  2024):** Enhanced support for PostgreSQL major version upgrades via
-  Blue/Green, including version 14, 15, and 16 upgrade paths. Validation
-  includes extension compatibility checks.
-
-- **Blue/Green switchover timeout customization (2023-2024):**
-  Customizable switchover timeout allows operators to control how long
-  a switchover can run before rollback, accommodating large databases
-  that need more time for replication drain.
-
-- **Blue/Green for RDS PostgreSQL (2023-2024):** Extended Blue/Green
-  support to RDS for PostgreSQL (in addition to Aurora PostgreSQL),
-  enabling zero-downtime major version upgrades for self-managed
-  PostgreSQL instances.
-
-- **Blue/Green status API improvements (2023-2024):** Enhanced
-  `describe-blue-green-deployments` API with detailed status
-  transitions (PROVISIONING, AVAILABLE, SWITCHOVER_IN_PROGRESS,
-  SWITCHOVER_COMPLETED, SWITCHOVER_FAILED), enabling better lifecycle
-  monitoring.
-
-- **Terraform provider support (2023-2024):** The Terraform
-  `aws_rds_blue_green_deployment` resource now supports the full
-  Blue/Green lifecycle including creation, switchover, and deletion
-  via infrastructure-as-code.
-
-- **Blue/Green cost visibility (2024-2025):** AWS Cost Explorer now
-  tags green environment resources separately from blue, making it
-  easier to track the 2x cost window and identify forgotten green
-  environments left running.
+Recent AWS feature notes (2023-2026) moved verbatim to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -666,34 +478,16 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Green creation fails (unsupported upgrade path)
-- The major version upgrade path is not supported (e.g., skipping two
-  major versions). Check AWS docs for supported upgrade paths. Upgrade
-  incrementally.
+Failure modes and their fixes (green creation, replication lag, switchover
+timeout, post-switchover app errors, 2x billing) moved verbatim to [references/error-handling.md](references/error-handling.md).
 
-### Green creation fails (RDS Custom)
-- RDS Custom does NOT support Blue/Green. Use standard
-  `modify-db-instance` for RDS Custom databases.
+## References (load on demand)
 
-### Replication lag is high
-- Large transactions or heavy write load on blue can cause lag. Wait
-  for lag to decrease before switchover. If lag persists, reduce write
-  load on blue temporarily.
-
-### Switchover fails (timeout)
-- The switchover exceeded the timeout. It rolls back — blue remains
-  production. Increase the switchover timeout and retry. Check for
-  long-running transactions blocking the switchover.
-
-### Application errors after switchover
-- Applications without retry logic see connection errors. Implement
-  connection retry logic. For DNS caching issues, flush the DNS cache
-  on application servers.
-
-### Blue/Green left running (2x billing)
-- After switchover, the former blue (new green) continues running.
-  Delete it with `delete-blue-green-deployment --delete-target` to
-  stop the 2x cost.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — configuration dependency graph, 2x cost window, green-vs-blue change matrix, switchover downtime characteristics, limitations table, recent AWS features (moved from this file)
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 11 green-validation CloudWatch metrics and monitoring CLI (moved from this file)
+- [references/error-handling.md](references/error-handling.md) — failure modes: green creation fails, replication lag, switchover timeout, application errors after switchover, green left running (moved from this file)
+- [references/switchover-and-dns.md](references/switchover-and-dns.md) — switchover + DNS detail; extended with Step 7 timeout configuration and Step 8 connection-string update
+- [references/green-validation-and-changes.md](references/green-validation-and-changes.md) — green validation and database-changes detail; extended with the Step 4 parameter-group and schema-change (DDL) procedures
 
 ## Domain
 

@@ -170,3 +170,16 @@ resource "aws_quicksight_data_set" "sales" {
   }
 }
 ```
+
+
+## Step 4 — Trigger SPICE ingestion
+
+**Trigger SPICE ingestion:**
+
+```bash
+aws quicksight create-ingestion \
+  --aws-account-id 123456789012 \
+  --data-set-id ds-sales-metrics \
+  --ingestion-id "ingestion-$(date +%s)" \
+  --region us-east-1
+```

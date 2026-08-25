@@ -22,7 +22,6 @@ metadata:
   keywords: IAM access key, key rotation, credential report, get-access-key-last-used, EventBridge scheduled rule, Lambda rotation, access advisor, break-glass exception, overlap window, STS temporary credentials, assume role, cross-account key sync
   tags: aws-iam, key-rotation, security, access-keys, eventbridge, lambda, automate
 ---
----
 
 # IAM Key Rotation Automator
 

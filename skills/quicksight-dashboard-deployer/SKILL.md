@@ -91,33 +91,13 @@ QuickSight to private data stores.
 Three misconceptions dominate QuickSight dashboard misdesign at
 provisioning time:
 
-- **"Direct Query gives real-time data, so always use it."** It does
-  give fresh data, but at the cost of query latency and source-store
-  load. SPICE caches data in-memory and serves sub-second queries
-  without hitting the source. For dashboards with many concurrent
-  viewers or complex joins, Direct Query overwhelms the source
-  database. The default for most dashboards should be SPICE with a
-  scheduled refresh.
-
-- **"Sharing a dashboard grants data access."** It does not. Sharing a
-  dashboard lets a reader view the published version. Row-level
-  security is a SEPARATE configuration that controls which rows each
-  reader sees. Without RLS, every reader sees all data in the dataset.
-
-- **"Templates are just for reuse."** Templates are the primary
-  mechanism for multi-tenant dashboard deployment. A single template
-  encodes the analysis definition; each tenant gets a dashboard created
-  from that template pointing at its own dataset. This is far more
-  scalable than manually rebuilding dashboards per tenant.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#common-misconceptions-from-mindset).
+> Three QuickSight misconceptions: Direct Query vs SPICE, sharing vs data access, templates for multi-tenancy.
 
 ## Configuration dependency graph (novel heuristic)
 
-QuickSight dashboard configurations are NOT independent. The data source
-must exist before the dataset. The dataset must exist before the
-analysis. The analysis must exist before the dashboard. SPICE ingestion
-must be configured before the refresh schedule. The VPC connection must
-be authorized before private data sources can be used. Use this graph to
-sequence provisioning.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#configuration-dependency-graph-sequencing-notes).
+> How to sequence provisioning using the dependency graph.
 
 | Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
 |---|---|---|---|
@@ -142,79 +122,23 @@ load and latency issues. Choosing SPICE for near-real-time data needs
 stale data. The procedure below forces an explicit ingestion-mode
 decision per dataset.
 
-**Cross-dependency gotchas:**
-- The VPC connection requires Enterprise edition. Standard edition
-  cannot connect to private data stores.
-- RLS is defined on the DATASET, not the dashboard. All dashboards
-  using that dataset inherit the same RLS. For per-dashboard RLS, use
-  separate datasets.
-- Template deployment across accounts requires the target account to
-  have its own QuickSight account and matching dataset schema.
-- SPICE capacity is shared across ALL datasets in the account. Adding
-  a large dataset may exhaust capacity for existing datasets.
-- Dashboard sharing requires the reader's email to be registered as a
-  QuickSight user. Unregistered emails cannot receive shares.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#cross-dependency-gotchas).
+> Gotchas: VPC/edition, RLS on dataset, template schemas, SPICE capacity, registered users.
 
 ## Expert heuristic: SPICE vs Direct Query
 
-A baseline model says "use Direct Query for real-time." The correct
-heuristic evaluates cost, latency, concurrency, and freshness together.
-
-```text
-Dataset query mode decision:
-  ├── Dashboard audience > 20 concurrent viewers → SPICE (avoid source overload)
-  ├── Source DB is Aurora/RDS (limited connections) → SPICE (offload queries)
-  ├── Data freshness requirement < 15 minutes → Direct Query (SPICE refresh min is 15 min)
-  ├── Data volume > SPICE capacity (500GB Enterprise) → Direct Query (SPICE can't fit)
-  ├── Complex joins / calculated fields across large tables → SPICE (pre-computed)
-  ├── Redshift / Athena source (designed for analytical load) → Direct Query OK
-  └── Cost-sensitive, low-traffic internal dashboard → Direct Query (no SPICE cost)
-```
-
-**Key implication:** the #1 cause of QuickSight dashboard performance
-issues is Direct Query on an OLTP database (RDS/Aurora) with many
-concurrent viewers. Switching to SPICE with a 15-minute refresh
-eliminates source-store load and serves sub-second queries.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-spice-vs-direct-query).
+> Decision tree balancing latency, concurrency, freshness, volume, and cost.
 
 ## Expert heuristic: RLS via dataset permissions and session identity
 
-Row-level security is enforced at the dataset level. Two mechanisms:
-
-```text
-RLS mechanisms:
-  1. Dataset permissions (Grant):
-     - Define which rows a user/group can see based on a column value
-     - QuickSight matches the user's identity against the RLS rules
-     - Applied BEFORE data reaches the visual
-
-  2. Session policy (generate-embedding-url-for-registered-user):
-     - Used with embedded dashboards
-     - Session identity passed via QuickSight reader session
-     - RLS rules filter rows based on the session identity
-```
-
-**Multi-tenant pattern:** create one dataset per tenant with RLS rules
-that filter by tenant ID. All tenants share the same template-based
-dashboard definition but see only their own data.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-rls-via-dataset-permissions-and-session-identity).
+> Dataset permission grants vs session-policy RLS; multi-tenant pattern.
 
 ## Expert heuristic: template-driven multi-tenant deployment
 
-```text
-Template deployment flow:
-  1. Build the analysis + dashboard in a source account
-  2. Create a template from the source analysis/dashboard
-  3. For each tenant:
-     a. Create a dataset in the tenant's namespace pointing at tenant data
-     b. Create a dashboard FROM the template, referencing the tenant dataset
-     c. Apply RLS rules on the tenant dataset
-     d. Share the dashboard with tenant users
-  4. Template updates: create new template version, then update all
-     tenant dashboards from the new version
-```
-
-**Key implication:** a single template update propagates to all tenant
-dashboards. This is the only scalable way to manage 10+ tenant
-dashboards. Manual per-tenant rebuilds are error-prone.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-template-driven-multi-tenant-deployment).
+> Template deployment flow for per-tenant dashboards and update propagation.
 
 ## Prerequisites (verify before provisioning)
 
@@ -280,19 +204,8 @@ aws quicksight create-data-source \
   --region us-east-1
 ```
 
-**Create RDS PostgreSQL data source (via VPC connection):**
-
-```bash
-aws quicksight create-data-source \
-  --aws-account-id 123456789012 \
-  --data-source-id ds-rds-prod \
-  --name "RDS PostgreSQL Production" \
-  --type POSTGRESQL \
-  --data-source-parameters '{"PostgreSqlParameters":{"Host":"prod-db.cluster-abc123.us-east-1.rds.amazonaws.com","Port":5432,"Database":"analytics"}}' \
-  --credentials '{"CredentialPair":{"Username":"quicksight_reader","Password":"<password>"}}' \
-  --vpc-connection-arn "arn:aws:quicksight:us-east-1:123456789012:vpcConnection/vpc-conn-123" \
-  --region us-east-1
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#step-2-data-source-connection-rds-postgresql-example).
+> create-data-source for PostgreSQL via VPC connection with credentials.
 
 ## Step 3 — Dataset (SQL, join, calculated field)
 
@@ -323,15 +236,8 @@ aws quicksight create-data-set \
 | Capacity | Per-account limit (Enterprise 500GB+) | No limit (source DB is limit) |
 | Cost | SPICE capacity per session | Source DB compute cost |
 
-**Trigger SPICE ingestion:**
-
-```bash
-aws quicksight create-ingestion \
-  --aws-account-id 123456789012 \
-  --data-set-id ds-sales-metrics \
-  --ingestion-id "ingestion-$(date +%s)" \
-  --region us-east-1
-```
+> Moved to [references/spice-and-ingestion.md](references/spice-and-ingestion.md#step-4-trigger-spice-ingestion).
+> create-ingestion command for an on-demand SPICE refresh.
 
 ## Step 5 — Analysis and dashboard creation
 
@@ -355,139 +261,32 @@ funnel chart, sankey diagram, word cloud, tree map, and insight
 (ML-powered anomaly detection). Sheet layout controls how visuals are
 arranged on the canvas via a defined grid layout.
 
-**Create dashboard from analysis:**
-
-```bash
-aws quicksight create-dashboard \
-  --aws-account-id 123456789012 \
-  --dashboard-id "sales-dashboard" \
-  --name "Sales Performance Dashboard" \
-  --source-entity '{"SourceAnalysis":{"Arn":"arn:aws:quicksight:us-east-1:123456789012:analysis/sales-analysis","DataSetReferences":[{"DataSetPlaceholder":"sales-metrics","DataSetArn":"arn:aws:quicksight:us-east-1:123456789012:dataset/ds-sales-metrics"}]}}' \
-  --dashboard-publish-options '{"AdHocFilteringOption":{"AvailabilityStatus":"ENABLED"},"ExportToCSVOption":{"AvailabilityStatus":"ENABLED"}}' \
-  --version-description "Initial version" \
-  --region us-east-1
-```
-
-**Share dashboard with a user:**
-
-```bash
-aws quicksight create-dashboard-permission \
-  --aws-account-id 123456789012 \
-  --dashboard-id "sales-dashboard" \
-  --grant-permissions '{"Principal":"arn:aws:quicksight:us-east-1:123456789012:user/default/reader@example.com","Actions":["quicksight:DescribeDashboard","quicksight:ListDashboardVersions","quicksight:QueryDashboard"]}' \
-  --region us-east-1
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#step-5-dashboard-creation-and-sharing-commands).
+> create-dashboard from analysis with publish options; create-dashboard-permission for readers.
 
 ## Step 6 — Template-based deployment
 
 Templates capture the analysis/dashboard definition for reuse across
 accounts or tenants.
 
-**Create template from analysis:**
-
-```bash
-aws quicksight create-template \
-  --aws-account-id 123456789012 \
-  --template-id "sales-template" \
-  --name "Sales Dashboard Template" \
-  --source-entity '{"SourceAnalysis":{"Arn":"arn:aws:quicksight:us-east-1:123456789012:analysis/sales-analysis","DataSetReferences":[{"DataSetPlaceholder":"sales-data","DataSetArn":"arn:aws:quicksight:us-east-1:123456789012:dataset/ds-sales-metrics"}]}}' \
-  --version-description "v1.0" \
-  --region us-east-1
-```
-
-**Create dashboard from template (per tenant):**
-
-```bash
-aws quicksight create-dashboard \
-  --aws-account-id 123456789012 \
-  --dashboard-id "tenant-a-sales" \
-  --name "Tenant A Sales Dashboard" \
-  --source-entity '{"SourceTemplate":{"Arn":"arn:aws:quicksight:us-east-1:123456789012:template/sales-template","DataSetReferences":[{"DataSetPlaceholder":"sales-data","DataSetArn":"arn:aws:quicksight:us-east-1:123456789012:dataset/ds-tenant-a-sales"}]}}' \
-  --version-description "Tenant A v1" \
-  --region us-east-1
-```
-
-**Propagate template update to tenant dashboards:**
-
-```bash
-aws quicksight update-template \
-  --aws-account-id 123456789012 \
-  --template-id "sales-template" \
-  --source-entity '{"SourceAnalysis":{"Arn":"arn:aws:quicksight:us-east-1:123456789012:analysis/sales-analysis","DataSetReferences":[{"DataSetPlaceholder":"sales-data","DataSetArn":"arn:aws:quicksight:us-east-1:123456789012:dataset/ds-sales-metrics"}]}}' \
-  --region us-east-1
-
-aws quicksight update-dashboard \
-  --aws-account-id 123456789012 \
-  --dashboard-id "tenant-a-sales" \
-  --source-entity '{"SourceTemplate":{"Arn":"arn:aws:quicksight:us-east-1:123456789012:template/sales-template","DataSetReferences":[{"DataSetPlaceholder":"sales-data","DataSetArn":"arn:aws:quicksight:us-east-1:123456789012:dataset/ds-tenant-a-sales"}]}}' \
-  --version-description "Updated from template v2" \
-  --region us-east-1
-```
+> Moved to [references/templates-and-rls.md](references/templates-and-rls.md#step-6-template-based-deployment-commands).
+> create-template from analysis, create-dashboard from template per tenant, update-template/update-dashboard propagation.
 
 ## Step 7 — Row-level security (RLS)
 
 RLS filters rows per user or group. It is defined on the DATASET, not
 the dashboard. All dashboards using the dataset inherit the same RLS.
 
-**Create RLS rules dataset (maps users to allowed column values):**
-
-```bash
-aws quicksight create-data-set \
-  --aws-account-id 123456789012 \
-  --data-set-id "ds-sales-rls" \
-  --name "Sales RLS Rules" \
-  --import-mode SPICE \
-  --physical-table-map '{"rls-table":{"RelationalTable":{"DataSourceArn":"arn:aws:quicksight:us-east-1:123456789012:datasource/ds-athena-prod","Schema":"rls","Name":"sales_rls_rules","InputColumns":[{"Name":"UserName","Type":"STRING"},{"Name":"Region","Type":"STRING"}]}}}' \
-  --region us-east-1
-```
-
-**Enable RLS on the dataset using the RLS rules dataset:**
-
-```bash
-aws quicksight update-data-set \
-  --aws-account-id 123456789012 \
-  --data-set-id "ds-sales-metrics" \
-  --row-level-permission-data-set '{"Arn":"arn:aws:quicksight:us-east-1:123456789012:dataset/ds-sales-rls","PermissionPolicy":"GRANT_ACCESS","FormatVersion":"VERSION_1","Namespace":"default","Status":"ENABLED"}' \
-  --region us-east-1
-```
+> Moved to [references/templates-and-rls.md](references/templates-and-rls.md#step-7-row-level-security-commands).
+> RLS rules dataset creation and update-data-set row-level-permission wiring.
 
 ## Step 8 — VPC connection and IAM role
 
 Enterprise edition only. Connects QuickSight to private RDS/Redshift/
 Aurora via specified security groups and subnets.
 
-**Create VPC connection:**
-
-```bash
-aws quicksight create-vpc-connection \
-  --aws-account-id 123456789012 \
-  --vpc-connection-id "vpc-conn-prod" \
-  --name "Production VPC Connection" \
-  --subnet-ids "subnet-aaa111" "subnet-bbb222" \
-  --security-group-ids "sg-quicksight-access" \
-  --dns-resolvers "10.0.0.2" \
-  --role-arn "arn:aws:iam::123456789012:role/QuickSightVpcRole" \
-  --region us-east-1
-```
-
-The IAM role must trust `quicksight.amazonaws.com` and have
-`ec2:CreateNetworkInterface`, `ec2:DeleteNetworkInterface`, and
-`ec2:DescribeNetworkInterfaces` permissions for the specified subnets
-and security groups. Wait for status `AVAILABLE` before using in a
-data source.
-
-**QuickSight service role trust policy:**
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": {"Service": "quicksight.amazonaws.com"},
-    "Action": "sts:AssumeRole"
-  }]
-}
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#step-8-vpc-connection-and-iam-role-examples).
+> create-vpc-connection command, ENI permission notes, service role trust policy.
 
 ## Step 9 — User provisioning, namespaces, groups
 
@@ -506,26 +305,8 @@ aws quicksight register-user \
 User roles: READER (view dashboards), AUTHOR (create analyses/
 dashboards), ADMIN (manage account).
 
-**Create a namespace (for multi-tenant isolation):**
-
-```bash
-aws quicksight create-namespace \
-  --aws-account-id 123456789012 \
-  --namespace "tenant-a" \
-  --identity-store QUICKSIGHT \
-  --region us-east-1
-```
-
-**Create a group (for group-based RLS):**
-
-```bash
-aws quicksight create-group \
-  --aws-account-id 123456789012 \
-  --namespace default \
-  --group-name "east-region-readers" \
-  --description "Readers with access to East region data" \
-  --region us-east-1
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#step-9-namespace-and-group-commands).
+> create-namespace for tenant isolation; create-group for group-based RLS.
 
 ## Step 10 — Refresh schedule and parameters
 
@@ -658,31 +439,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Data source creation fails with connectivity error
-- For private data stores, verify the VPC connection is AVAILABLE and
-  the security group allows inbound from QuickSight. For public
-  sources, verify the endpoint is reachable.
+> Moved to [references/error-handling.md](references/error-handling.md#error-handling).
+> Symptom-by-symptom fixes: connectivity, SPICE ingestion, schema mismatch, RLS, VPC stuck, sharing.
+## References (load on demand)
 
-### SPICE ingestion fails
-- Check SPICE capacity: `describe-account-settings`. Verify the SQL
-  query is valid and the source is accessible. Check ingestion status
-  with `list-ingestions`.
-
-### Dashboard creation fails with schema mismatch
-- If creating from a template, the target dataset schema must match
-  the source schema. Verify column names and types match.
-
-### RLS not filtering correctly
-- Verify the RLS rules dataset maps the correct user ARN/email to the
-  correct column values. Check that RLS is ENABLED on the dataset.
-
-### VPC connection stuck in CREATING
-- The IAM role must have permissions to create network interfaces.
-  Check the role's permissions for `ec2:CreateNetworkInterface`.
-
-### User cannot view shared dashboard
-- Verify the user is registered: `describe-user`. Verify the
-  dashboard permission grants the reader's principal ARN.
+- [advanced-patterns](references/advanced-patterns.md) — expert-heuristic deep dives, misconceptions, dependency-graph notes
+- [worked-examples](references/worked-examples.md) — filled-in CLI examples (data source, dashboard, VPC, namespace)
+- [error-handling](references/error-handling.md) — symptom-by-symptom troubleshooting
+- [spice-and-ingestion](references/spice-and-ingestion.md) — SPICE and ingestion detail and commands (existing)
+- [templates-and-rls](references/templates-and-rls.md) — template and RLS detail and commands (existing)
 
 ## Domain
 

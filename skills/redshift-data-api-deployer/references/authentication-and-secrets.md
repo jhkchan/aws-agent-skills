@@ -277,3 +277,37 @@ The secret must have `"engine": "redshift"`. If the engine field is
 missing or wrong, the Data API may fail to parse the secret.
 
 **Fix:** verify the secret structure matches the Redshift secret format.
+
+## Step 2 — auth code samples (Secrets Manager + temp credentials) (from SKILL.md)
+
+**Secrets Manager auth:**
+
+```bash
+aws redshift-data execute-statement \
+  --cluster-identifier my-redshift-cluster \
+  --secret-arn arn:aws:secretsmanager:us-east-1:123456789012:secret:redshift-creds-xxx \
+  --database dev \
+  --sql "SELECT * FROM sales LIMIT 10" \
+  --statement-name "query-sales"
+```
+
+**Temp credentials auth:**
+
+```bash
+# Step 1: Get temp credentials
+CREDS=$(aws redshift get-cluster-credentials \
+  --cluster-identifier my-redshift-cluster \
+  --db-user my_iam_user \
+  --db-name dev \
+  --duration-seconds 3600)
+
+DB_USER=$(echo "$CREDS" | jq -r '.DbUser')
+DB_PASSWORD=$(echo "$CREDS" | jq -r '.DbPassword')
+
+# Step 2: Use temp creds with Data API (via DbUser parameter)
+aws redshift-data execute-statement \
+  --cluster-identifier my-redshift-cluster \
+  --db-user "$DB_USER" \
+  --database dev \
+  --sql "SELECT * FROM sales LIMIT 10"
+```

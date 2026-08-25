@@ -455,3 +455,61 @@ resource "aws_iam_role_policy" "qldb_stream_kinesis" {
   })
 }
 ```
+
+
+## Step 8 — Journal export to S3: commands
+
+```bash
+# Create IAM role that QLDB assumes to write to S3
+aws iam create-role \
+  --role-name QLDBExportRole \
+  --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"qldb.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
+
+aws iam put-role-policy \
+  --role-name QLDBExportRole \
+  --policy-name QLDBExportS3Policy \
+  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:PutObject","s3:GetObject","s3:ListBucket"],"Resource":["arn:aws:s3:::qldb-audit-export","arn:aws:s3:::qldb-audit-export/*"]}]}'
+
+# Export the journal to S3
+aws qldb export-journal-to-s3 \
+  --name audit-ledger \
+  --export-name audit-export-2026-08 \
+  --role-arn arn:aws:iam::123456789012:role/QLDBExportRole \
+  --output-s3-prefix s3://qldb-audit-export/audit-ledger/2026-08/ \
+  --start-time 2026-08-01T00:00:00Z \
+  --end-time 2026-08-31T23:59:59Z \
+  --region us-east-1
+```
+
+**Export output:** S3 objects in Ion-formatted journal blocks. Each
+block includes the block hash, transaction metadata, and document
+revisions.
+
+
+## Step 9 — Stream to Kinesis: commands
+
+```bash
+# Prerequisite: create the Kinesis stream
+aws kinesis create-stream --stream-name qldb-audit-stream --shard-count 1 --region us-east-1
+aws kinesis wait stream-active --stream-name qldb-audit-stream --region us-east-1
+
+# Create IAM role for QLDB to write to Kinesis
+aws iam create-role \
+  --role-name QLDBStreamRole \
+  --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"qldb.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
+
+aws iam put-role-policy \
+  --role-name QLDBStreamRole \
+  --policy-name QLDBStreamKinesisPolicy \
+  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["kinesis:PutRecord","kinesis:PutRecords"],"Resource":"arn:aws:kinesis:us-east-1:123456789012:stream/qldb-audit-stream"}]}'
+
+# Start streaming journal data to Kinesis
+aws qldb stream-journal-to-kinesis \
+  --ledger-name audit-ledger \
+  --role-arn arn:aws:iam::123456789012:role/QLDBStreamRole \
+  --inclusive-start-time 2026-08-05T00:00:00Z \
+  --exclusive-end-time 2026-12-31T23:59:59Z \
+  --kinesis-configuration StreamName=qldb-audit-stream,AggregationEnabled=true \
+  --stream-name audit-ledger-cdc-stream \
+  --region us-east-1
+```

@@ -339,3 +339,99 @@ lexicon in each region where synthesis runs. Verify with
 The `--text-type ssml` flag was omitted. Polly treats the input as
 plain text and reads the SSML tags literally. **Fix:** always
 specify `--text-type ssml` when using SSML markup.
+
+
+## Step 3 — SSML examples (standard vs neural)
+
+**Example SSML for standard engine (full tag support):**
+
+```xml
+<speak>
+  Welcome to the service.
+  <break time="500ms"/>
+  Please listen <emphasis level="strong">carefully</emphasis>.
+  <prosody rate="90%" pitch="+5%">This is the important part.</prosody>
+  The word <phoneme alphabet="ipa" ph="ˈtɒmɑtəʊ">tomato</phoneme>
+  is pronounced differently in British English.
+</speak>
+```
+
+**Example SSML for neural engine (no break/emphasis):**
+
+```xml
+<speak>
+  Welcome to the service.
+  Please listen carefully.
+  <prosody rate="90%" pitch="+5%">This is the important part.</prosody>
+  The word <phoneme alphabet="ipa" ph="ˈtɒmɑtəʊ">tomato</phoneme>
+  is pronounced differently in British English.
+</speak>
+```
+
+
+## Step 4 — Lexicon management commands
+
+**Upload a lexicon:**
+
+```bash
+# Create a PLS lexicon file
+cat > company-terms.pls << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<lexicon version="1.0"
+      xmlns="http://www.w3.org/2005/01/pronunciation-lexicon"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.w3.org/2005/01/pronunciation-lexicon
+        http://www.w3.org/TR/2007/CR-pronunciation-lexicon-20071212/pls.xsd"
+      alphabet="ipa"
+      xml:lang="en-US">
+  <lexeme>
+    <grapheme>AWS</grapheme>
+    <alias>A W S</alias>
+  </lexeme>
+  <lexeme>
+    <grapheme>EC2</grapheme>
+    <alias>E C two</alias>
+  </lexeme>
+  <lexeme>
+    <grapheme>S3</grapheme>
+    <phoneme>ɛs θriː</phoneme>
+  </lexeme>
+</lexicon>
+EOF
+
+# Upload the lexicon to Polly
+aws polly put-lexicon \
+  --name company-terms \
+  --content fileb://company-terms.pls
+```
+
+**Use a lexicon in synthesis:**
+
+```bash
+aws polly synthesize-speech \
+  --engine standard \
+  --voice-id Joanna \
+  --output-format mp3 \
+  --sample-rate 24000 \
+  --lexicon-names company-terms \
+  --text "Welcome to AWS. Your EC2 instance on S3 is ready." \
+  output.mp3
+```
+
+**List and verify lexicons:**
+
+```bash
+# List all lexicons in the account+region
+aws polly list-lexicons \
+  --query 'Lexicons[*].Name' --output table
+
+# Get details of a specific lexicon
+aws polly get-lexicon --name company-terms
+```
+
+**Lexicon constraints:**
+- Lexicons are per-region. Upload to each region where they are
+  needed.
+- Lexicon names must be unique within an account and region.
+- A synthesis request can reference up to 5 lexicons.
+- Lexicons apply to all engines (standard, neural, long-form).

@@ -263,3 +263,180 @@ aws cloudwatch get-metric-statistics \
   --end-time $(date -u +%FT%TZ) \
   --period 3600 --statistics Average,Maximum --output json
 ```
+
+## Pre-flight data gate — required data sources (from SKILL.md)
+
+**Required data sources** (summarized — see reference for full CLI):
+1. Cluster configuration: `aws redshift describe-clusters` and
+   `aws redshift describe-cluster-configuration`
+2. WLM config JSON: from `describe-cluster-configuration` ResponseMetadata
+3. Queue state: `SELECT * FROM STV_WLM_QUERY_STATE` (per-query queue
+   placement)
+4. Query history: `SELECT * FROM SYS_QUERY_HISTORY WHERE start_time > ...`
+5. Query metrics: `SELECT * FROM STL_QUERY_METRICS WHERE query > ...`
+6. Top queries: `SELECT * FROM STL_QUERY ORDER BY elapsed DESC LIMIT 50`
+7. Materialized view inventory:
+   `SELECT * FROM pg_catalog.pg_views WHERE schemaname = 'pg_catalog'`
+8. CloudWatch: CPUUtilization, QueryDuration, QueryThroughput,
+   WLMQueueLength, ConcurrencyScalingClustersActive
+
+## Step 1 — auto vs manual WLM behaviour detail (from SKILL.md)
+
+Auto WLM is the 2026 default and the right choice for 95% of clusters.
+Manual WLM remains justified only for strict workload isolation
+requirements.
+
+**Auto WLM behavior:** Redshift observes the live query mix and
+reallocates memory across queues in real time. Queries are classified
+into Short / Medium / Long buckets; each bucket gets dynamic
+concurrency. No slot count tuning required. Pair with concurrency
+scaling for elastic throughput.
+
+**Manual WLM behavior:** Each queue has a fixed slot count and memory
+%. Slots map to memory and concurrency: more slots = more parallelism
+but less memory per slot. Requires periodic retuning as workload
+changes.
+
+## Step 1 — switch-to-auto-WLM CLI (from SKILL.md)
+
+**Switch to auto WLM:**
+```bash
+aws redshift modify-cluster-parameter-groups \
+  --parameter-group-name <param-group> \
+  --parameters \
+    ParameterName=auto_wlm,ParameterValue=true \
+    ParameterName=wlm_json_configuration,ParameterValue='[{"auto_wlm":true}]'
+
+aws redshift modify-cluster \
+  --cluster-identifier <cluster-id> \
+  --cluster-parameter-group-name <param-group>
+```
+
+## Step 2 — concurrency scaling behaviour and pricing (from SKILL.md)
+
+Concurrency scaling adds transient clusters that share the primary
+cluster's load when queue length grows. Each added cluster bills per
+second of active use.
+
+**Pricing:** Same $/hour as primary node type; billed per second of
+active time (60 second minimum). Typical workload: <5% of primary
+cluster monthly cost.
+
+## Step 2 — enable concurrency scaling WLM JSON (from SKILL.md)
+
+**Enable concurrency scaling (per-queue in WLM JSON):**
+```json
+[
+  {
+    "queue_name": "priority-queries",
+    "auto_wlm": true,
+    "concurrency_scaling": "auto",
+    "priority": "highest"
+  }
+]
+```
+
+Apply via `modify-cluster-parameter-groups` as in Step 1.
+
+## Step 3 — SQA isolation detail (from SKILL.md)
+
+SQA isolates short queries from long ones. Queries estimated to finish
+within the SQA threshold bypass the queue entirely.
+
+## Step 3 — enable SQA WLM JSON (from SKILL.md)
+
+**Enable SQA in the WLM JSON:**
+```json
+[
+  {
+    "queue_name": "main",
+    "auto_wlm": true,
+    "concurrency_scaling": "auto",
+    "short_query_queue_enable": true,
+    "max_execution_time": 120
+  }
+]
+```
+
+`max_execution_time` ranges 0-300 seconds. Default 120 s. Tune to the
+workload's p95 short-query duration × 2.
+
+## Step 4 — queue assignment rule examples (from SKILL.md)
+
+**Queue assignment rule examples:**
+```sql
+-- Route by user group
+CREATE GROUP dashboard_users;
+-- WLM JSON: {"queue_name":"dashboard","user_group":["dashboard_users"],"priority":"highest"}
+
+-- Route by query label
+-- In SQL: SET QUERY_GROUP TO 'batch_etl';
+-- WLM JSON: {"queue_name":"batch","query_group":["batch_etl"],"priority":"normal"}
+```
+
+## Step 5 — manual WLM queue JSON (from SKILL.md)
+
+For manual WLM clusters, slot count and memory % per queue determine
+throughput and per-query memory.
+
+```json
+[
+  {"queue_name": "priority-queries", "max_concurrency_slots": 15, "memory_percent": 40, "priority": "highest", "concurrency_scaling": "auto"},
+  {"queue_name": "etl", "max_concurrency_slots": 10, "memory_percent": 35, "priority": "normal"},
+  {"queue_name": "ad-hoc", "max_concurrency_slots": 5, "memory_percent": 25, "priority": "low"}
+]
+```
+
+## Step 6 — QMR metric reference and rule example (from SKILL.md)
+
+**QMR metric reference:**
+
+| Metric | Description | Source column |
+|---|---|---|
+| `cpu_time` | Total CPU microseconds | `stl_query_metrics.cpu_time` |
+| `scan_row_count` | Rows scanned | `stl_query_metrics.scan_row_count` |
+| `query_queue_time` | Time spent queued (microseconds) | `stl_query_metrics.queue_time` |
+| `query_execution_time` | Wall-clock execution (microseconds) | `stl_query_metrics.elapsed_time` |
+| `memory_to_percent` | Memory usage vs. allocation | computed |
+
+**Example QMR rule (log first, then promote to abort):**
+```json
+{
+  "rule_name": "runaway-abort",
+  "predicate": "query_execution_time > 600000000",
+  "action": "abort"
+}
+```
+
+Threshold tuning: start with `action: log` and a 10x median threshold.
+Review STL_QUERY_METRICS_HISTORY for false positives over 7 days.
+Promote to `action: abort` only when threshold is validated.
+
+## Step 7 — enable AQUA CLI (from SKILL.md)
+
+**Enable AQUA:**
+```bash
+aws redshift modify-cluster \
+  --cluster-identifier <cluster-id> \
+  --aqua-configuration-status enabled
+```
+
+## Step 8 — materialized view example and refresh cost (from SKILL.md)
+
+**Example materialized view with auto-refresh:**
+```sql
+CREATE MATERIALIZED VIEW dashboard_daily_revenue AS
+  SELECT
+    DATE_TRUNC('day', order_date) AS day,
+    region,
+    SUM(revenue) AS revenue
+  FROM orders
+  GROUP BY 1, 2;
+
+ALTER MATERIALIZED VIEW dashboard_daily_revenue
+  AUTO REFRESH YES;
+```
+
+Auto-refresh issues an incremental refresh on a Redshift-managed
+schedule (default ~5-15 minutes). Cost is the incremental compute of
+the refresh; for most dashboard workloads, sub-1% of cluster compute.

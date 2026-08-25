@@ -347,3 +347,52 @@ resource "aws_db_parameter_group" "orders_mysql" {
 - `AWS::RDS::DBInstance` — `DBParameterGroupName` for association.
 - `AWS::RDS::DBCluster` — `DBClusterParameterGroupName` for
   association. `ServerlessV2ScalingConfiguration` for capacity.
+
+## Step 3 — check which parameters are static vs dynamic
+
+```bash
+# Check which parameters are static vs dynamic
+aws rds describe-db-parameters --db-parameter-group-name default.postgres15 \
+  --query 'Parameters[?ApplyType==`static`].{Name:ParameterName,Value:ParameterValue,Type:DataType}' \
+  --output table
+```
+
+## Step 4 — ApplyMethod payload
+
+```json
+{
+  "ParameterName": "max_connections",
+  "ParameterValue": "200",
+  "ApplyMethod": "immediate"
+}
+```
+
+## Step 9 — create + modify + associate + reboot CLI sequence
+
+```bash
+# 1. Create the parameter group
+aws rds create-db-parameter-group \
+  --db-parameter-group-name payments-pg15-params \
+  --db-parameter-group-family postgres15 \
+  --description "PostgreSQL 15 parameters for payments service"
+
+# 2. Modify parameters
+aws rds modify-db-parameter-group \
+  --db-parameter-group-name payments-pg15-params \
+  --parameters '[{"ParameterName":"max_connections","ParameterValue":"200","ApplyMethod":"pending-reboot"},
+                 {"ParameterName":"shared_buffers","ParameterValue":"{6GB}","ApplyMethod":"pending-reboot"},
+                 {"ParameterName":"work_mem","ParameterValue":"8MB","ApplyMethod":"immediate"},
+                 {"ParameterName":"checkpoint_completion_target","ParameterValue":"0.9","ApplyMethod":"immediate"},
+                 {"ParameterName":"log_min_duration_statement","ParameterValue":"1000","ApplyMethod":"immediate"}]'
+
+# 3. Associate with the DB instance
+aws rds modify-db-instance \
+  --db-instance-identifier payments-db-pg15 \
+  --db-parameter-group-name payments-pg15-params \
+  --apply-immediately
+
+# 4. Reboot if static parameters were changed
+aws rds reboot-db-instance \
+  --db-instance-identifier payments-db-pg15
+```
+

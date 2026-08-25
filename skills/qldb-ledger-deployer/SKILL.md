@@ -117,31 +117,13 @@ belongs to that digest.
 
 Three misconceptions dominate QLDB misdesign at provisioning time:
 
-- **"QLDB is just another NoSQL database."** It is NOT. QLDB is a
-  cryptographically verified ledger. Every transaction produces journal
-  entries that are chained by SHA-256 hashes. You can mathematically
-  prove that a document has not been tampered with by requesting a
-  digest and verifying a proof. If you do not need this guarantee, use
-  DynamoDB instead.
-
-- **"ALLOW_ALL permissions mode is fine for simplicity."** It is NOT.
-  ALLOW_ALL grants full CRUD to any IAM principal with access to QLDB.
-  For a ledger whose entire purpose is immutability and auditability,
-  ALWAYS use STANDARD permissions mode for production, which enforces
-  table-level and field-level IAM controls.
-
-- **"I can export or stream the journal later when I need it."** You
-  can, but the export/stream should be planned at provisioning time.
-  Journal export to S3 is for compliance audit (point-in-time snapshots).
-  Streaming to Kinesis is for real-time CDC (continuous). Set up the
-  export pipeline and/or stream at creation time.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#common-misconceptions-from-mindset).
+> Three QLDB misconceptions: not a generic NoSQL DB, ALLOW_ALL is unsafe, export/stream must be planned at creation.
 
 ## Configuration dependency graph (novel heuristic)
 
-QLDB configurations are NOT independent. The ledger must exist before
-tables. Tables must exist before indexes. The permissions mode and
-deletion protection are set at creation. Use this graph to sequence
-provisioning.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#configuration-dependency-graph-sequencing-notes).
+> How to sequence provisioning using the dependency graph.
 
 | Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
 |---|---|---|---|
@@ -162,65 +144,18 @@ hole. Missing deletion protection risks catastrophic data loss.
 
 ## Expert heuristic: immutable journal hash chain verification
 
-A baseline model says "QLDB stores data immutably." The correct
-heuristic recognizes that immutability is only valuable if you can
-PROVE it — and the proof mechanism (digest + proof) must be integrated
-into your verification workflow.
-
-```text
-QLDB cryptographic verification flow:
-  1. DIGEST: a Merkle-like hash of the entire journal at time T
-     digest = qldb.get_digest(ledger_name)
-  2. REVISION: the current state of a document
-     revision = qldb.get_revision(ledger_name, document_id, block_address)
-  3. PROOF: the hash chain from the revision to the digest
-     proof = qldb.get_revision(ledger_name, document_id, block_address, digest)
-  4. VERIFY: hash the revision, walk the proof chain, compare to digest:
-     computed = sha256(revision)
-     for node in proof: computed = sha256(computed + node)
-     assert computed == digest
-
-  Expert rule:
-    Request digests periodically (e.g., daily).
-    Store digests in a separate, secure store (S3 with Object Lock).
-    Use proofs to verify any document on-demand.
-```
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-immutable-journal-hash-chain-verification).
+> Digest + proof verification workflow and expert rules.
 
 ## Expert heuristic: stream for real-time CDC vs export for compliance audit
 
-```text
-Journal export to S3:
-  Purpose: compliance audit, point-in-time snapshot, data lake ingestion
-  Trigger: on-demand or scheduled (e.g., nightly)
-  Latency: hours (for large journals)
-
-Stream to Kinesis Data Streams:
-  Purpose: real-time change data capture (CDC)
-  Trigger: continuous (started with a start time)
-  Latency: near real-time (seconds)
-
-Expert rule:
-  Export to S3 = compliance audit (batch, periodic, full journal)
-  Stream to Kinesis = real-time CDC (continuous, incremental, event-driven)
-  Use BOTH for a complete data pipeline.
-```
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-stream-for-real-time-cdc-vs-export-for-compliance-audit).
+> Export to S3 vs stream to Kinesis decision guide.
 
 ## Expert heuristic: STANDARD permissions mode enforcement
 
-```text
-ALLOW_ALL (NOT recommended):
-  Every IAM principal with qldb:SendCommand has FULL CRUD on ALL tables.
-  No table-level or field-level control. Risk: any compromised credential
-  can modify or delete ledger data.
-
-STANDARD (recommended for ALL production ledgers):
-  IAM policies control access at the TABLE and FIELD level.
-  Example policy allows INSERT on 'transactions' but not DELETE.
-
-Expert rule:
-  ALWAYS use STANDARD permissions mode.
-  Define IAM policies per table and per operation BEFORE switching.
-```
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-standard-permissions-mode-enforcement).
+> ALLOW_ALL vs STANDARD comparison and enforcement rule.
 
 ## Prerequisites (verify before provisioning)
 
@@ -275,25 +210,8 @@ aws qldb update-ledger \
   --region us-east-1
 ```
 
-**STANDARD mode IAM policy example:**
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": "qldb:SendCommand",
-      "Resource": "arn:aws:qldb:us-east-1:123456789012:ledger/audit-ledger"
-    },
-    {
-      "Effect": "Allow",
-      "Action": ["qldb:PartiQLInsert", "qldb:PartiQLSelect"],
-      "Resource": "arn:aws:qldb:us-east-1:123456789012:ledger/audit-ledger/table/*"
-    }
-  ]
-}
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#step-2-standard-mode-iam-policy-example).
+> IAM policy allowing SendCommand plus PartiQLInsert/Select at table scope.
 
 ## Step 3 — Deletion protection
 
@@ -334,50 +252,16 @@ the encryption key, you must create a new ledger and migrate data.
 QLDB stores data in Amazon Ion format — a rich, self-describing data
 format that is a superset of JSON. Tables are schemaless.
 
-```sql
--- Create tables
-CREATE TABLE transactions;
-CREATE TABLE accounts;
-CREATE TABLE audit_log;
-
--- Insert a document (Ion format)
-INSERT INTO transactions
-{
-    transactionId: 'txn-001',
-    amount: 1500.00,
-    currency: 'USD',
-    fromAccount: 'acc-aaa',
-    toAccount: 'acc-bbb',
-    timestamp: `2026-08-05T12:00:00Z`,
-    metadata: { source: 'mobile-app', notes: 'Transfer for invoice #12345' }
-};
-
--- Query documents
-SELECT * FROM transactions WHERE transactionId = 'txn-001';
-
--- Update a document (creates a new revision, old revision preserved)
-UPDATE transactions SET status = 'confirmed' WHERE transactionId = 'txn-001';
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#step-5-table-creation-and-document-model-ion-sql-examples).
+> CREATE TABLE, Ion INSERT, SELECT, and UPDATE (revision) statements.
 
 ## Step 6 — PartiQL query language
 
 QLDB uses PartiQL — a SQL-compatible query language that handles
 semi-structured data.
 
-```sql
--- Basic SELECT
-SELECT * FROM transactions WHERE amount > 1000;
--- Project specific fields
-SELECT transactionId, amount, status FROM transactions;
--- Query nested data (Ion)
-SELECT t.transactionId, t.metadata.source
-FROM transactions t WHERE t.metadata.source = 'mobile-app';
--- JOIN tables
-SELECT t.transactionId, a.accountName
-FROM transactions t, accounts a WHERE t.fromAccount = a.accountId;
--- History query (see all revisions of a document)
-SELECT * FROM history(transactions) AS h WHERE h.data.transactionId = 'txn-001';
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#step-6-partiql-query-examples).
+> SELECT, projection, nested Ion paths, JOIN, and history() queries.
 
 **History queries** are unique to QLDB — they return ALL revisions of a
 document, showing the complete mutation history. This is the audit trail.
@@ -406,61 +290,15 @@ Journal export writes the entire journal (or a time range) to S3 in Ion
 format. This is for compliance audit, regulatory snapshots, and data
 lake ingestion.
 
-```bash
-# Create IAM role that QLDB assumes to write to S3
-aws iam create-role \
-  --role-name QLDBExportRole \
-  --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"qldb.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
-
-aws iam put-role-policy \
-  --role-name QLDBExportRole \
-  --policy-name QLDBExportS3Policy \
-  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:PutObject","s3:GetObject","s3:ListBucket"],"Resource":["arn:aws:s3:::qldb-audit-export","arn:aws:s3:::qldb-audit-export/*"]}]}'
-
-# Export the journal to S3
-aws qldb export-journal-to-s3 \
-  --name audit-ledger \
-  --export-name audit-export-2026-08 \
-  --role-arn arn:aws:iam::123456789012:role/QLDBExportRole \
-  --output-s3-prefix s3://qldb-audit-export/audit-ledger/2026-08/ \
-  --start-time 2026-08-01T00:00:00Z \
-  --end-time 2026-08-31T23:59:59Z \
-  --region us-east-1
-```
-
-**Export output:** S3 objects in Ion-formatted journal blocks. Each
-block includes the block hash, transaction metadata, and document
-revisions.
+> Moved to [references/export-and-streaming.md](references/export-and-streaming.md#step-8-journal-export-to-s3-commands).
+> IAM role setup, put-role-policy, and export-journal-to-s3 commands plus export output notes.
 
 ## Step 9 — Stream to Kinesis (real-time CDC)
 
 QLDB streams journal data to Kinesis Data Streams for real-time CDC.
 
-```bash
-# Prerequisite: create the Kinesis stream
-aws kinesis create-stream --stream-name qldb-audit-stream --shard-count 1 --region us-east-1
-aws kinesis wait stream-active --stream-name qldb-audit-stream --region us-east-1
-
-# Create IAM role for QLDB to write to Kinesis
-aws iam create-role \
-  --role-name QLDBStreamRole \
-  --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"qldb.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
-
-aws iam put-role-policy \
-  --role-name QLDBStreamRole \
-  --policy-name QLDBStreamKinesisPolicy \
-  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["kinesis:PutRecord","kinesis:PutRecords"],"Resource":"arn:aws:kinesis:us-east-1:123456789012:stream/qldb-audit-stream"}]}'
-
-# Start streaming journal data to Kinesis
-aws qldb stream-journal-to-kinesis \
-  --ledger-name audit-ledger \
-  --role-arn arn:aws:iam::123456789012:role/QLDBStreamRole \
-  --inclusive-start-time 2026-08-05T00:00:00Z \
-  --exclusive-end-time 2026-12-31T23:59:59Z \
-  --kinesis-configuration StreamName=qldb-audit-stream,AggregationEnabled=true \
-  --stream-name audit-ledger-cdc-stream \
-  --region us-east-1
-```
+> Moved to [references/export-and-streaming.md](references/export-and-streaming.md#step-9-stream-to-kinesis-commands).
+> Kinesis stream creation, QLDBStreamRole IAM setup, and stream-journal-to-kinesis command.
 
 **Expert rule:** use streaming for real-time CDC and export for
 compliance audit. They serve different purposes and can run in parallel.
@@ -470,62 +308,18 @@ compliance audit. They serve different purposes and can run in parallel.
 Cryptographic verification proves that a document has not been tampered
 with since a given point in time. This is QLDB's killer feature.
 
-```bash
-# Request a digest (point-in-time hash of the entire journal)
-aws qldb get-digest --name audit-ledger --region us-east-1
-
-# Get a document revision with proof against the digest
-aws qldb get-revision \
-  --name audit-ledger \
-  --block-address '{"IonText":"{strandId:\"abc\",sequenceNo:42}"}' \
-  --document-id "abc-document-id" \
-  --digest-tip-address '{"IonText":"{strandId:\"abc\",sequenceNo:100}"}' \
-  --region us-east-1
-```
-
-**Verify the proof (Python):**
-
-```python
-import hashlib
-
-def verify_proof(revision_hash, proof_hashes, digest):
-    computed = revision_hash
-    for sibling in proof_hashes:
-        computed = hashlib.sha256(computed + sibling).digest()
-    return computed == digest
-# True = document is VERIFIED (untampered)
-# False = tampering detected (should never happen in QLDB)
-```
-
-**Expert rule:** request digests periodically (daily or weekly). Store
-them externally (S3 with Object Lock). Use proofs to verify any document
-on-demand.
+> Moved to [references/verification-and-cryptography.md](references/verification-and-cryptography.md#step-10-cryptographic-verification-digest-and-proof-commands).
+> get-digest, get-revision with digest tip, Python proof verification, expert rules.
 
 ## Step 11 — Revision hash chains
 
-Every revision in QLDB is part of a cryptographic hash chain:
-
-```text
-Block N:   Block Hash = SHA-256(Block N contents + Block N-1 hash)
-Block N+1: Block Hash = SHA-256(Block N+1 contents + Block N hash)
-
-The chain: each block's hash includes the previous block's hash.
-Modifying any revision changes its hash → changes its block hash →
-breaks every subsequent block hash → detected by digest verification.
-```
+> Moved to [references/verification-and-cryptography.md](references/verification-and-cryptography.md#step-11-revision-hash-chains).
+> How block hashes chain and why tampering breaks the chain.
 
 ## Step 12 — CloudWatch metrics
 
-| Metric | What it measures | Alert threshold |
-|---|---|---|
-| CommandExecutionLatency | PartiQL execution time | > 1000ms sustained |
-| JournalStorage | Journal size (bytes) | Trending up rapidly |
-| ReadIOs | Read I/O count | Spike = unindexed queries |
-| WriteIOs | Write I/O count | Monitor write throughput |
-| OccConflictExceptions | Optimistic concurrency conflicts | > 5% of commits |
-
-**Key alert:** `OccConflictExceptions` > 5% of commits indicates
-concurrent writes to the same document. Redesign the workload.
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-12-cloudwatch-metrics).
+> Metric table with alert thresholds (latency, journal storage, IOs, OccConflictExceptions).
 
 ## NEVER do these things
 
@@ -661,28 +455,16 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Ledger creation fails with "permissions mode not supported"
-- Ensure the permissions mode is `STANDARD` or `ALLOW_ALL`.
+> Moved to [references/error-handling.md](references/error-handling.md#error-handling).
+> Symptom-by-symptom fixes: permissions mode, deletion, slow queries, export, stream, Occ conflicts.
+## References (load on demand)
 
-### Cannot delete a ledger
-- Deletion protection is enabled. Disable it first with
-  `update-ledger --no-deletion-protection`, then call `delete-ledger`.
-
-### PartiQL queries are slow
-- Missing indexes. Create indexes on fields used in WHERE clauses.
-
-### Journal export fails
-- Check the IAM role has `s3:PutObject` on the target bucket. Verify the
-  S3 bucket policy allows the QLDB service principal.
-
-### Kinesis stream not receiving data
-- Verify the stream is active. Check the IAM role has
-  `kinesis:PutRecord` on the stream. Verify the stream's start time is
-  within the journal's history.
-
-### OccConflictExceptions spike
-- Concurrent transactions are writing to the same document. Redesign
-  the workload: batch writes, avoid concurrent updates.
+- [advanced-patterns](references/advanced-patterns.md) — expert-heuristic deep dives, misconceptions, dependency-graph notes
+- [worked-examples](references/worked-examples.md) — IAM policy, Ion/PartiQL SQL examples
+- [diagnostic-commands](references/diagnostic-commands.md) — CloudWatch metrics and alert thresholds
+- [error-handling](references/error-handling.md) — symptom-by-symptom troubleshooting
+- [export-and-streaming](references/export-and-streaming.md) — S3 export and Kinesis stream detail and commands (existing)
+- [verification-and-cryptography](references/verification-and-cryptography.md) — digest/proof and hash-chain detail and commands (existing)
 
 ## Domain
 

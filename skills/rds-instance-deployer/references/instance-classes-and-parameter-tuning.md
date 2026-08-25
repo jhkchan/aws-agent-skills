@@ -219,3 +219,36 @@ upgrades may require option group upgrades first.
   https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-serverless-v2.html
 - Aurora Global Database —
   https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database.html
+
+## Instance class families, Graviton preference, sizing rules (moved from Step 1)
+
+**Instance class families:**
+
+| Family | Class prefix | Characteristics | Use when |
+|---|---|---|---|
+| Burstable | `db.t4g`, `db.t3` | Baseline CPU + burst credits (CloudWatch `CPUCreditBalance`); cheapest | Dev/test, low-traffic apps, microservices with bursty load |
+| General-purpose | `db.m7g`, `db.m6i`, `db.m5` | Balanced CPU/memory; balanced network | Most OLTP workloads, web app backends |
+| Memory-optimized | `db.r7g`, `db.r6i`, `db.r6g` | High memory-to-CPU ratio | In-memory sorts, large working set, analytics, Aurora (storage is shared, but buffer cache matters) |
+| Compute-optimized | `db.c7g`, `db.c6i` | High CPU-to-memory ratio | Compute-heavy workloads (some analytics, batch) |
+| Storage-optimized | `db.x2g`, `db.x2iedn` | Very high memory + direct-attached NVMe | Large in-memory databases, Oracle/SAP |
+
+**Graviton (g-series) preference**: Graviton (g) instances typically offer
+~20% price/perf improvement over Intel (i) for the same workload. Prefer
+`db.m7g`, `db.r7g`, `db.t4g` unless you have a specific Intel/AMD
+compatibility requirement.
+
+**Sizing rule of thumb**:
+- Buffer cache ~70-80% of total memory for OLTP (PostgreSQL `shared_buffers`
+  ~25% is the conservative default; MySQL `innodb_buffer_pool_size` ~75%).
+- Plan for `max_connections` based on `(available_memory_MB / per_connection_memory)`.
+  Each PostgreSQL connection forks a process (~5-10MB); each MySQL thread
+  is lighter (~256KB-2MB).
+- For Aurora, the buffer cache is per-instance — Reader instances each
+  have their own cache. Size each Reader independently.
+
+**Common mistake**: picking `db.t3.micro` for a "small production workload."
+Burstable classes burn CPU credits under sustained load and throttle to
+a low baseline once credits are exhausted. Use `db.t*` only for dev/test
+or workloads with measurable idle time; use `db.m*` or `db.r*` for
+production OLTP.
+

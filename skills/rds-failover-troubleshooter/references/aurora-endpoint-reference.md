@@ -124,3 +124,15 @@ to honour the Aurora 1-second DNS TTL.
 
 Use this pattern to trigger Lambda or SNS notifications on failover
 events for proactive application connection refresh.
+
+## Aurora cluster endpoint types (moved from SKILL.md deep reference)
+
+### Aurora cluster endpoint types
+
+| Endpoint type | ARN pattern | Behaviour after failover |
+|---|---|---|
+| Writer (cluster) endpoint | `<cluster>.cluster-<id>.<region>.rds.amazonaws.com` | Resolves to the new writer (dynamic) |
+| Reader endpoint | `<cluster>.cluster-ro-<id>.<region>.rds.amazonaws.com` | Load-balances across reader instances (dynamic) |
+| Custom endpoint | `<cluster>.custom-<id>.<region>.rds.amazonaws.com` | Routes to specified instances (static membership if type=INSTANCE) |
+| Instance endpoint | `<instance>.<id>.<region>.rds.amazonaws.com` | Resolves to a specific instance (does NOT follow failover) |
+

@@ -466,3 +466,122 @@ Properties:
       Value: analytics
 DependsOn: Namespace
 ```
+
+## Step 1 — KMS key creation CLI (from SKILL.md)
+
+```bash
+aws kms create-key --description "Redshift Serverless production key" \
+  --policy '{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Principal": {"Service": "redshift-serverless.amazonaws.com"},
+        "Action": ["kms:Encrypt", "kms:Decrypt", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:CreateGrant", "kms:DescribeKey"],
+        "Resource": "*"
+      }
+    ]
+  }'
+
+aws kms create-alias --alias-name alias/redshift-prod \
+  --target-key-id <key-id>
+```
+
+## Step 3 — IAM namespace role CLI (from SKILL.md)
+
+```bash
+aws iam create-role \
+  --role-name RedshiftNSRole \
+  --assume-role-policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [{
+      "Effect": "Allow",
+      "Principal": {"Service": "redshift.amazonaws.com"},
+      "Action": "sts:AssumeRole"
+    }]
+  }'
+
+aws iam put-role-policy \
+  --role-name RedshiftNSRole \
+  --policy-name redshift-data-access \
+  --policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Action": ["s3:GetObject", "s3:ListBucket"],
+        "Resource": ["arn:aws:s3:::ingest-bucket", "arn:aws:s3:::ingest-bucket/*"]
+      },
+      {
+        "Effect": "Allow",
+        "Action": ["s3:PutObject"],
+        "Resource": "arn:aws:s3:::unload-bucket/*"
+      },
+      {
+        "Effect": "Allow",
+        "Action": ["glue:GetTable", "glue:GetDatabase", "glue:GetPartitions"],
+        "Resource": "*"
+      }
+    ]
+  }'
+```
+
+## Step 5 — create-namespace CLI (from SKILL.md)
+
+```bash
+aws redshift-serverless create-namespace \
+  --namespace-name analytics-ns-prod \
+  --admin-username admin \
+  --admin-user-password '<password-from-secrets>' \
+  --db-name dev \
+  --kms-key-id arn:aws:kms:us-east-1:123456789012:key/abc123 \
+  --default-iam-role-arn arn:aws:iam::123456789012:role/RedshiftNSRole \
+  --iam-roles arn:aws:iam::123456789012:role/RedshiftNSRole \
+  --security-group-ids sg-redshift-prod \
+  --log-exports userlog connectionlog useractivitylog \
+  --tags Environment=production Application=analytics
+```
+
+## Step 9 — query editor v2 IAM policy CLI (from SKILL.md)
+
+```bash
+aws iam create-policy \
+  --policy-name RedshiftQueryEditorV2Access \
+  --policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Action": [
+          "redshift-serverless:DescribeWorkgroup",
+          "redshift-serverless:ListWorkgroups",
+          "redshift-serverless:ListNamespaces",
+          "redshift-data:ExecuteStatement",
+          "redshift-data:DescribeStatement",
+          "redshift-data:GetStatementResult",
+          "redshift-data:ListStatements"
+        ],
+        "Resource": "*"
+      }
+    ]
+  }'
+```
+
+## Step 10 — snapshots and cross-Region copy CLI (from SKILL.md)
+
+```bash
+# Scheduled snapshot
+aws redshift-serverless create-scheduled-action \
+  --scheduled-action-name analytics-snapshot-schedule \
+  --namespace-name analytics-ns-prod \
+  --schedule "rate(8 hours)" \
+  --target-action '{"CreateSnapshot":{"NamespaceName":"analytics-ns-prod","SnapshotName":"analytics-wg-prod-snapshot"}}' \
+  --iam-role arn:aws:iam::123456789012:role/RedshiftNSRole
+
+# Cross-Region snapshot copy
+aws redshift-serverless create-namespace \
+  --namespace-name analytics-ns-dr \
+  ... \
+  --no-admin-username \
+  --snapshot-copy-grants '[{"DestinationRegion":"us-west-2","KmsKeyId":"arn:aws:kms:us-west-2:123456789012:key/def456"}]'
+```

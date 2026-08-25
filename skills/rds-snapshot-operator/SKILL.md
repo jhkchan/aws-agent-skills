@@ -128,28 +128,8 @@ Run before classification. Misclassifying these produces wrong plans.
 `--starting-token` to completion. `describe-db-instances` paginates at
 100/page.
 
-**Live-account pre-flight (skip if offline plan audit):**
-1. `aws rds describe-db-instances --db-instance-identifier <id>` — confirm
-   instance exists; capture `DBInstanceStatus`, `StorageType`, `AllocatedStorage`,
-   `Encrypted`, `KmsKeyId`, `OptionGroupMemberships`, `DBSubnetGroup`,
-   `VpcSecurityGroups`, `Engine`, `EngineVersion`, `MultiAZ`,
-   `BackupRetentionPeriod`, `LatestRestorableTime`, `DeletionProtection`.
-2. `aws rds describe-db-snapshots --db-instance-identifier <id>` — list
-   existing manual snapshots for the instance.
-3. `aws rds describe-db-engine-versions --engine <engine>` — confirm target
-   engine version for restore compatibility (major version upgrades on
-   restore are supported but option group changes may be required).
-4. `aws kms describe-key --key-id <kms-id>` — confirm key `Enabled` and
-   the policy allows the RDS service to `kms:CreateGrant` (for encrypted
-   snapshot creation) and the target account has `kms:Decrypt` (for
-   cross-account shared snapshots).
-5. `aws rds describe-option-groups --option-group-name <og>` — confirm the
-   option group is compatible with the target engine version and has the
-   required options (TDE, SSL, etc.).
-6. `aws iam get-role --role-name <export-role>` — for S3 export tasks,
-   confirm the IAM role has the required trust policy
-   (`service: export.rds.amazonaws.com`) and permissions
-   (`s3:PutObject`, `kms:Decrypt` on the source snapshot key).
+Six live-account pre-flight commands (instance metadata, existing manual snapshots, engine versions, KMS key state, option groups, export IAM role): moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+The attribute table below maps the captured fields to plan effects.
 
 **Malformed input:** if the input JSON is invalid or missing required
 fields, emit `VERDICT: ERROR` with `REASON: Instance/cluster configuration
@@ -174,112 +154,8 @@ identifier <id> --output json and re-plan.`
 
 ### Step 0: Expert knowledge — non-obvious RDS snapshot behaviors
 
-These behaviors are easy to misjudge without operational RDS experience.
-Each changes a plan if ignored:
-
-- **Automated backup retention defines the PITR window.** Setting
-  `BackupRetentionPeriod: 7` means RDS retains 7 days of transaction logs
-  (5-minute snapshots + continuous logs). PITR can restore to any point
-  within that window. Setting retention to 0 disables automated backups
-  entirely and deletes all existing automated backups — PITR is lost. When
-  increasing retention from 1 to 35, RDS does NOT backfill logs for the
-  new period; the extended window starts from the change time forward.
-
-- **Manual snapshots persist beyond instance deletion.** This is the most
-  important RDS backup behavior. Deleting an RDS instance with
-  `--skip-final-snapshot` also deletes automated backups. Manual snapshots
-  (`create-db-snapshot`) are independent objects that survive instance
-  deletion. For DR and compliance, always create a manual snapshot before
-  deleting an instance, even if `DeletionProtection: true` is set.
-
-- **Aurora clone from snapshot is instant (copy-on-write).** Aurora's
-  distributed storage layer supports clone-on-write: a new cluster from a
-  snapshot takes seconds regardless of data size. The clone shares storage
-  with the source snapshot at the page level; writes allocate new pages.
-  This is fundamentally different from RDS (non-Aurora) restore, which
-  copies the entire backup to new EBS volumes.
-
-- **PITR granularity is 5 minutes for RDS, sub-second for Aurora.** RDS
-  records transaction logs every 5 minutes; `LatestRestorableTime` shows
-  the most recent restorable point. Aurora's continuous backup stream
-  supports second-level granularity. When a user requests "restore to
-  2:47:32 PM," Aurora can honor the exact second; RDS rounds to the
-  nearest 5-minute boundary.
-
-- **Cross-region snapshot copy re-encrypts with a target-region KMS key.**
-  You cannot copy an encrypted snapshot to another region using the same
-  KMS key — KMS keys are region-scoped. The copy operation must specify a
-  KMS key in the target region. The source key must allow the target
-  account to `kms:Decrypt` (for cross-account source snapshots).
-
-- **Cross-account snapshot sharing requires `share-db-snapshot`.** Use
-  `modify-db-snapshot-attribute --attribute-name restore --values-to-add
-  <target-account-id>` to share a snapshot. The target account can then
-  `copy-db-snapshot` or `restore-db-instance-from-db-snapshot`. For
-  encrypted snapshots, the KMS key must also be shared via a key policy
-  grant.
-
-- **Restore always creates a NEW instance/cluster.** RDS restore does NOT
-  overwrite the original instance. PITR restore creates a new instance
-  with a new endpoint. The operator must update connection strings,
-  security groups, and parameter groups. This is why the verdict is
-  REVIEW_REQUIRED for restore operations — the post-restore cutover needs
-  human attention.
-
-- **Option groups do not carry over on restore.** The restored instance
-  uses the DEFAULT option group unless `--option-group-name` is specified.
-  If the source used TDE, SSL, or other options, the restored data is
-  unreadable or inaccessible without the correct option group. Always
-  specify the option group explicitly on restore.
-
-- **Snapshot is incremental at the storage layer but billed at full
-  allocated storage.** RDS snapshots are incremental (only changed blocks
-  are stored), but manual snapshot billing is based on the FULL allocated
-  storage of the source instance at snapshot time, NOT the incremental
-  delta. A 1 TB instance costs $95/month for each manual snapshot
-  regardless of how much data changed.
-
-- **Aurora backtrack is NOT a snapshot restore.** Aurora backtrack rewinds
-  the cluster in-place to a target time within the backtrack window (up to
-  72 hours). It does NOT create a new cluster and does NOT require a
-  snapshot. Use backtrack for rapid rollback of logical errors (e.g.,
-  accidental DELETE). Use snapshot restore for DR or cross-region recovery.
-
-- **Blue/Green deploy uses snapshots as safety net.** Before a Blue/Green
-  deploy switch, create a manual snapshot of the source instance. If the
-  green environment has issues post-switch, the snapshot enables a
-  rollback path. The snapshot is the pre-deploy recovery point.
-
-- **Snapshot export to S3 uses an async ExportTask.** `start-export-task`
-  exports a snapshot to S3 in Parquet format. The task runs asynchronously
-  (30-60 minutes for 100 GB). The IAM role needs `s3:PutObject` on the
-  target bucket and `kms:Decrypt` on the source snapshot's KMS key. The
-  export preserves table structure as Parquet columns.
-
-- **Delete-old-snapshot lifecycle automation uses EventBridge + Lambda.**
-  Create a Lambda function that lists manual snapshots older than N days
-  and deletes them via `delete-db-snapshot`. Trigger via EventBridge
-  schedule (e.g., `rate(1 day)`). Tag compliance-hold snapshots with
-  `DoNotDelete: true` and have the Lambda skip them.
-
-- **`--final-db-snapshot-identifier` on instance deletion is mandatory
-  unless `--skip-final-snapshot`.** Deleting an instance without a final
-  snapshot is irreversible — all data is lost. Always use
-  `--final-db-snapshot-identifier` for production instances. The final
-  snapshot is a manual snapshot that persists indefinitely.
-
-- **Snapshot copy can be automated via AWS Backup or DLM.** For
-  cross-region DR, Data Lifecycle Manager (DLM) or AWS Backup can automate
-  snapshot creation and cross-region copy on a schedule. DLM policies
-  target EBS-backed RDS instances; AWS Backup supports both RDS and
-  Aurora.
-
-- **`DeletionProtection` blocks instance deletion, NOT snapshot
-  deletion.** You can delete a manual snapshot of a
-  `DeletionProtection: true` instance. The protection prevents the
-  INSTANCE from being deleted (and thus losing automated backups). Always
-  set DeletionProtection on production instances to prevent accidental
-  data loss.
+Sixteen non-obvious RDS snapshot behaviors (retention defines the PITR window, manual snapshot persistence, instant Aurora clones, PITR granularity, KMS region-scoping, option-group reset, allocated-storage billing, backtrack vs restore, Blue/Green safety net, S3 ExportTask, lifecycle automation, final snapshots, DLM/AWS Backup, DeletionProtection scope): moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load before planning any operation; Steps 1-4 assume these constraints.
 
 ### Step 1: Pre-check gate — REVIEW_REQUIRED if any check needs human attention
 
@@ -472,172 +348,23 @@ NOTES:
 
 ### Worked example — Aurora clone from snapshot
 
-```text
-OPERATION: clone-from-snapshot
-VERDICT: OPERATION_COMPLETED
-TARGET: prod-aurora-cluster (snapshot:
-        prod-aurora-cluster-snapshot-20260805)
-PRE_CHECKS:
-  - [PASS] Source snapshot is a DBClusterSnapshot (Aurora)
-  - [PASS] Engine: aurora-mysql, Version: 8.0.mysql_aurora.3.05.2
-  - [PASS] Snapshot Status: available
-  - [PASS] KMS key Enabled for encrypted clone
-STEPS:
-  1. CONFIRM: About to create Aurora cluster prod-aurora-clone from
-     snapshot prod-aurora-cluster-snapshot-20260805 in account
-     111111111111 region us-east-1. Clone is near-instant
-     (copy-on-write). Proceed? (yes/no)
-  2. aws rds restore-db-cluster-from-snapshot \
-       --db-cluster-identifier prod-aurora-clone \
-       --snapshot-identifier prod-aurora-cluster-snapshot-20260805 \
-       --engine aurora-mysql \
-       --db-subnet-group-name prod-db-subnet-group \
-       --vpc-security-group-ids sg-prod-aurora
-  3. (Aurora clusters require instance creation after cluster restore)
-     aws rds create-db-instance \
-       --db-instance-identifier prod-aurora-clone-instance-1 \
-       --db-instance-class db.r6g.xlarge \
-       --engine aurora-mysql \
-       --db-cluster-identifier prod-aurora-clone
-POST_VERIFY:
-  - [PASS] DBCluster prod-aurora-clone Status: available
-  - [PASS] DBInstance prod-aurora-clone-instance-1 Status: available
-  - [PASS] Clone completed in <30 seconds (copy-on-write)
-NOTES:
-  - Aurora clones share storage with the source snapshot at the page
-    level. Writes to the clone allocate new pages; reads of unmodified
-    pages are served from shared storage. No data copy overhead.
-  - The clone is a full independent cluster — changes to the clone do
-    NOT affect the source cluster.
-  - To clean up: delete the clone cluster, then optionally delete the
-    source snapshot if no longer needed.
-```
+Full worked example (Aurora clone: cluster restore plus instance creation, copy-on-write notes): moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Apply the Output format template above to reproduce it.
 
 ### Worked example — PITR restore (REVIEW_REQUIRED)
 
-```text
-OPERATION: restore-pitr
-VERDICT: REVIEW_REQUIRED
-TARGET: prod-orders-db (restore-to: 2026-08-05T14:35:00Z)
-PRE_CHECKS:
-  - [PASS] BackupRetentionPeriod: 7 (>= 1, automated backups enabled)
-  - [PASS] LatestRestorableTime: 2026-08-05T14:40:12Z
-  - [PASS] EarliestRestorableTime: 2026-07-29T03:00:00Z
-  - [PASS] Target time 2026-08-05T14:35:00Z is within restorable window
-  - [REVIEW] Restore creates a NEW instance (prod-orders-db-pitr) with a
-    new endpoint. Connection strings must be updated post-restore.
-  - [REVIEW] Option group prod-orders-options includes TDE (Transparent
-    Data Encryption). Must specify the SAME option group on restore or
-    data will be unreadable.
-  - [REVIEW] Security group sg-prod-rds must be specified explicitly.
-    The restore defaults to the DEFAULT security group.
-  - [REVIEW] PITR granularity is 5 minutes for RDS. Actual restore time
-    may be rounded to 2026-08-05T14:35:00Z (nearest 5-min boundary).
-STEPS:
-  1. CONFIRM: About to restore prod-orders-db to 2026-08-05T14:35:00Z
-     as new instance prod-orders-db-pitr in account 111111111111 region
-     us-east-1. Estimated time: 20-45 minutes. Proceed? (yes/no)
-  2. aws rds restore-db-instance-to-point-in-time \
-       --source-db-instance-identifier prod-orders-db \
-       --target-db-instance-identifier prod-orders-db-pitr \
-       --restore-time 2026-08-05T14:35:00Z \
-       --db-instance-class db.r6g.xlarge \
-       --option-group-name prod-orders-options \
-       --vpc-security-group-ids sg-prod-rds \
-       --db-subnet-group-name prod-db-subnet-group
-  3. aws rds describe-db-instances \
-       --db-instance-identifier prod-orders-db-pitr \
-       --query 'DBInstances[0].DBInstanceStatus'
-POST_VERIFY:
-  - (pending execution)
-NOTES:
-  - After the restore completes, verify application connectivity to the
-    NEW endpoint. Then cut over DNS/routing from the original to the
-    restored instance.
-  - The original instance (prod-orders-db) is UNCHANGED. You must
-    delete it manually after the cutover if no longer needed.
-  - Create a manual snapshot of the original before deletion:
-    aws rds delete-db-instance \
-      --db-instance-identifier prod-orders-db \
-      --final-db-snapshot-identifier prod-orders-db-final-20260805
-```
+Full worked example (PITR restore with REVIEW_REQUIRED items and cutover notes): moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Apply the Output format template above to reproduce it.
 
 ### Worked example — cross-region copy (DR)
 
-```text
-OPERATION: copy-snapshot
-VERDICT: OPERATION_COMPLETED
-TARGET: prod-orders-db (snapshot: prod-orders-db-pre-upgrade-20260805
-        → copy to us-west-2 as prod-orders-db-dr-20260805)
-PRE_CHECKS:
-  - [PASS] Source snapshot Status: available in us-east-1
-  - [PASS] Source snapshot Encrypted: true
-  - [PASS] Target KMS key arn:aws:kms:us-west-2:111111111111:key/dr-cmk
-    Enabled in us-west-2
-  - [PASS] Source KMS key policy allows cross-region copy
-STEPS:
-  1. CONFIRM: About to copy encrypted snapshot
-     prod-orders-db-pre-upgrade-20260805 from us-east-1 to us-west-2
-     as prod-orders-db-dr-20260805, re-encrypting with DR KMS key.
-     Estimated time: 30-60 minutes (500 GB). Proceed? (yes/no)
-  2. aws rds copy-db-snapshot \
-       --source-db-snapshot-identifier arn:aws:rds:us-east-1:111111111111:snapshot:prod-orders-db-pre-upgrade-20260805 \
-       --target-db-snapshot-identifier prod-orders-db-dr-20260805 \
-       --kms-key-id arn:aws:kms:us-west-2:111111111111:key/dr-cmk \
-       --region us-west-2
-  3. aws rds describe-db-snapshots \
-       --db-snapshot-identifier prod-orders-db-dr-20260805 \
-       --region us-west-2 \
-       --query 'DBSnapshots[0].Status'
-POST_VERIFY:
-  - [PASS] Snapshot prod-orders-db-dr-20260805 Status: available in
-    us-west-2
-  - [PASS] Encrypted: true, KMS key:
-    arn:aws:kms:us-west-2:111111111111:key/dr-cmk
-NOTES:
-  - Cross-region snapshot copy re-encrypts with the target-region key.
-    The original KMS key cannot be used (KMS keys are region-scoped).
-  - To automate DR snapshots, use AWS Backup with a cross-region copy
-    rule, or DLM with a cross-region copy policy.
-  - Cost: $0.02/GB for cross-region data transfer + $0.095/GB-month
-    for snapshot storage in the DR region.
-```
+Full worked example (encrypted cross-region copy with DR KMS re-encryption): moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Apply the Output format template above to reproduce it.
 
 ### Worked example — snapshot lifecycle cleanup
 
-```text
-OPERATION: delete-snapshot
-VERDICT: REVIEW_REQUIRED
-TARGET: snapshots older than 30 days (lifecycle cleanup)
-PRE_CHECKS:
-  - [PASS] Lambda function rds-snapshot-lifecycle-cleanup exists
-  - [PASS] EventBridge rule rds-snapshot-cleanup-daily schedule: rate(1 day)
-  - [REVIEW] 3 snapshots older than 30 days found:
-    - dev-test-db-snap-20260701 (35 days old, tagged Environment: dev)
-    - staging-db-snap-20260710 (26 days old, tagged Environment: staging)
-    - prod-orders-db-snap-20260705 (31 days old, tagged DoNotDelete: true)
-  - [REVIEW] prod-orders-db-snap-20260705 has compliance hold tag
-    (DoNotDelete: true). Lambda will SKIP this snapshot.
-STEPS:
-  1. CONFIRM: About to delete 2 snapshots (skipping 1 compliance-hold
-     snapshot) via the lifecycle Lambda. This is irreversible. Proceed?
-     (yes/no)
-  2. aws lambda invoke \
-       --function-name rds-snapshot-lifecycle-cleanup \
-       --payload '{"dryRun": false, "retentionDays": 30}' \
-       /tmp/snapshot-cleanup-result.json
-  3. cat /tmp/snapshot-cleanup-result.json
-POST_VERIFY:
-  - [PASS] dev-test-db-snap-20260701: deleted
-  - [PASS] staging-db-snap-20260710: deleted
-  - [PASS] prod-orders-db-snap-20260705: skipped (DoNotDelete tag)
-NOTES:
-  - The Lambda function uses describe-db-snapshots to list manual
-    snapshots, filters by SnapshotCreateTime < (now - retentionDays),
-    checks for the DoNotDelete tag, and calls delete-db-snapshot.
-  - EventBridge triggers the Lambda daily at 02:00 UTC.
-  - Add CloudWatch alarm on Lambda Errors to detect cleanup failures.
-```
+Full worked example (lifecycle cleanup skipping compliance-hold snapshots): moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Apply the Output format template above to reproduce it.
 
 ## Anti-Patterns — NEVER
 
@@ -721,88 +448,21 @@ NOTES:
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`create-db-snapshot`, `copy-db-snapshot`, `delete-db-snapshot`,
-  `restore-db-instance-to-point-in-time`, `restore-db-cluster-from-snapshot`,
-  `start-export-task`, `modify-db-snapshot-attribute`, `modify-db-instance`,
-  `delete-db-instance`), emit: `CONFIRM: About to <operation> on <target>
-  in account <account> region <region>. This will <consequence>. Proceed?
-  (yes/no)`. Do NOT execute until the operator confirms.
-
-- **Capture pre-state for rollback.** Before any restore or deletion:
-  `aws rds describe-db-instances --db-instance-identifier <id> --output
-  json > /tmp/<id>-pre-$(date +%s).json`. For snapshot deletions, capture
-  `describe-db-snapshots` output including ARN and tags.
-
-- **Verify KMS key for encrypted operations.** Cross-region copy requires
-  a target-region key. Cross-account sharing requires a key policy grant.
-  `aws kms describe-key --key-id <id>` to confirm `Enabled`.
-
-- **Verify option group for restore.** Restored instances default to the
-  DEFAULT option group. If the source used TDE, SSL, or custom options,
-  specify the correct option group on the restore CLI.
-
-- **Verify network topology for restore.** Restored instances default to
-  the DEFAULT security group. Specify VPC security groups explicitly to
-  ensure the restored instance is reachable from the application.
-
-- **Prefer additive operations over destructive ones.** Creating a
-  snapshot, copying, and restoring are additive. Deleting a snapshot is
-  irreversible. Always confirm the snapshot is not compliance-hold before
-  deletion.
+Six pre-flight safety checks (CONFIRM gate, pre-state capture, KMS verification, option group on restore, network topology, additive-over-destructive): moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Defense-in-depth before any remediation CLI.
 
 ## Recent AWS features (2024-2026)
 
-- **Aurora clone from snapshot optimization (2024-2025):** Aurora's
-  copy-on-write clone mechanism now supports cross-account clones within
-  the same region. The source account shares the snapshot; the target
-  account clones. Storage is shared at the page level.
+Ten recent AWS features 2024-2026 (cross-account clones, Blue/Green GA, ExportOnly filtering, 35-day retention, 72-hour backtrack, AWS Backup integration, Parquet compression, storage auto-scaling, DLM KMS re-encryption, CloudWatch RUM): moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Consult before citing feature limits or recency.
 
-- **Blue/Green Deployments GA (2024):** RDS Blue/Green Deployments create
-  a staging environment that mirrors production. The switch is near-zero-
-  downtime. Always create a pre-deploy snapshot as the rollback recovery
-  point. The Blue/Green switch itself does not create snapshots.
+## References (load on demand)
 
-- **RDS Snapshot Export to S3 with column-level filtering (2024-2025):**
-  The `start-export-task` API now supports exporting specific tables or
-  columns via the `ExportOnly` parameter (list of
-  `database.schema.table` patterns). Useful for compliance exports that
-  only need specific tables.
-
-- **Automated backup retention up to 35 days (2024):** RDS
-  `BackupRetentionPeriod` supports up to 35 days (previously 35 was the
-  max for Aurora; RDS was 35). Aurora supports up to 35 days of PITR with
-  continuous backup.
-
-- **Aurora backtrack window up to 72 hours (2024-2025):** Aurora MySQL
-  and PostgreSQL support backtrack windows up to 72 hours. Backtrack
-  rewinds the cluster in-place without creating a new cluster. Use for
-  rapid logical rollback (e.g., accidental DELETE/DROP).
-
-- **AWS Backup integration with RDS (2024-2025):** AWS Backup now
-  supports RDS cross-region copy and cross-account backup vaults. Use
-  AWS Backup for centralized backup governance across RDS, Aurora, and
-  other AWS services.
-
-- **Snapshot export in columnar Parquet with compression (2025):** The
-  export task now supports Snappy and ZSTD compression for Parquet
-  output. ZSTD reduces output size by 30-50% compared to uncompressed
-  Parquet.
-
-- **RDS Storage Auto Scaling (2024-2025):** When Storage Auto Scaling is
-  enabled, snapshots capture the current allocated storage (which may
-  have auto-scaled beyond the original provisioning). Restores allocate
-  the snapshot's storage size, not the original.
-
-- **DLM cross-region copy with KMS re-encryption (2024):** Data Lifecycle
-  Manager policies now support cross-region snapshot copy with automatic
-  KMS re-encryption. Use DLM for automated DR snapshot pipelines without
-  custom Lambda.
-
-- **CloudWatch RUM for database performance monitoring (2025):** CloudWatch
-  RUM integrates with RDS Performance Insights to correlate application
-  requests with database query performance. Useful for post-restore
-  validation to confirm the restored instance performs as expected.
+- [references/worked-examples.md](references/worked-examples.md) — Secondary worked examples (Aurora clone, PITR restore, cross-region DR copy, lifecycle cleanup).
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 non-obvious snapshot behaviors, recent AWS features (2024-2026).
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — Live-account pre-flight commands, pre-flight safety checks.
+- [references/snapshot-restore-procedures.md](references/snapshot-restore-procedures.md) — Per-operation CLI procedures (create, copy, restore, clone, share, export, delete, retention).
+- [references/snapshot-lifecycle-automation.md](references/snapshot-lifecycle-automation.md) — Lambda/EventBridge cleanup, DLM and AWS Backup DR pipelines.
 
 ## Domain
 

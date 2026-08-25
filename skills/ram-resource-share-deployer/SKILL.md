@@ -324,70 +324,23 @@ aws ram associate-resource-share-permission \
 
 ### Step 6: Associate additional resources
 
-```bash
-# Add more resources to an existing resource share
-aws ram associate-resource-share \
-  --resource-share-arn arn:aws:ram:us-east-1:123456789012:resource-share/shared-subnets-prod \
-  --resource-arns \
-    arn:aws:ec2:us-east-1:123456789012:subnet/subnet-ghi789 \
-  --region us-east-1
-```
+Step 6 CLI sequence (associate additional resources) moved verbatim to
+[references/deployment-cli-commands.md](references/deployment-cli-commands.md).
 
 ### Step 7: Associate additional principals
 
-```bash
-# Add more principals to an existing resource share
-aws ram associate-resource-share \
-  --resource-share-arn arn:aws:ram:us-east-1:123456789012:resource-share/shared-subnets-prod \
-  --principals 333333333333 \
-  --region us-east-1
-```
+Step 7 CLI sequence (associate additional principals) moved verbatim to
+[references/deployment-cli-commands.md](references/deployment-cli-commands.md).
 
 ### Step 8: Accept resource share invitations (external only)
 
-External principals (outside the Organization) must accept the
-invitation:
-
-```bash
-# On the principal account — list pending invitations
-aws ram get-resource-share-invitations \
-  --resource-owner OTHER-ACCOUNTS \
-  --region us-east-1
-
-# Accept the invitation
-aws ram accept-resource-share \
-  --resource-share-invitation-arn arn:aws:ram:us-east-1:123456789012:resource-share-invitation/abc123 \
-  --region us-east-1
-```
-
-Within an Organization with all features, invitations are
-auto-accepted — no action needed.
+Step 8 invitation-acceptance flow and CLI moved verbatim to
+[references/deployment-cli-commands.md](references/deployment-cli-commands.md).
 
 ### Step 9: Verification and post-deployment checks
 
-```bash
-# Verify the resource share
-aws ram get-resource-shares \
-  --resource-share-arns arn:aws:ram:us-east-1:123456789012:resource-share/shared-subnets-prod \
-  --region us-east-1
-
-# List principals in the share
-aws ram list-principals \
-  --resource-owner SELF \
-  --resource-share-arn arn:aws:ram:us-east-1:123456789012:resource-share/shared-subnets-prod \
-  --region us-east-1
-
-# List resources in the share
-aws ram list-resources \
-  --resource-owner SELF \
-  --resource-share-arn arn:aws:ram:us-east-1:123456789012:resource-share/shared-subnets-prod \
-  --region us-east-1
-
-# List permission associations
-aws ram list-resource-share-permissions \
-  --resource-share-arn arn:aws:ram:us-east-1:123456789012:resource-share/shared-subnets-prod \
-  --region us-east-1
-```
+Step 9 verification and post-deployment check commands moved verbatim to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ## Pattern matrix
 
@@ -405,52 +358,13 @@ aws ram list-resource-share-permissions \
 
 ## Resource share vs VPC peering
 
-| Aspect | RAM resource share (subnet) | VPC peering |
-|---|---|---|
-| **What is shared** | The subnet itself — other accounts create resources IN it | A network route between two VPCs |
-| **Direction** | One-way (owner shares, consumers use) | Bi-directional (both VPCs route to each other) |
-| **Transitivity** | Shared subnets are accessible by all principals | Non-transitive (A↔B, B↔C does not mean A↔C) |
-| **Scalability** | One share per resource, many principals | One peering per pair (N^2 connections) |
-| **Bandwidth** | No bandwidth limit (direct VPC resource) | Limited by peering connection aggregate |
-| **Use case** | Centralized networking, shared services VPC | Simple point-to-point VPC connectivity |
-| **Cost** | No data transfer cost for in-VPC traffic | Cross-region peering incurs data transfer |
-
-**Rule:** use RAM subnet sharing for centralized architectures
-(shared services VPC, centralized egress, Network Firewall).
-Use VPC peering for simple point-to-point connectivity between
-a small number of VPCs.
+The RAM-share-vs-peering comparison table and decision rule moved verbatim to
+[references/permissions-and-resource-types.md](references/permissions-and-resource-types.md).
 
 ## Recent AWS features (2024-2026)
 
-- **Principals as Organization (2024-2025):** RAM now supports
-  specifying the Organization ARN as a principal, automatically
-  sharing with all current and future accounts. New accounts
-  created in the Organization auto-receive the share.
-
-- **Customer-managed permissions GA (2024-2025):** create custom
-  permissions with fine-grained IAM policy templates per resource
-  type. Associate with resource shares to control exactly what
-  principals can do with shared resources (e.g., allow Create
-  NetworkInterface but not Delete on shared subnets).
-
-- **RAM Permission versioning (2025):** customer-managed
-  permissions support versioning. Update a permission and all
-  associated resource shares inherit the new version. Roll back
-  by reverting to a previous version.
-
-- **Resource share promotion (2024):** `PromoteResourceShareCreatedFromPolicy`
-  converts a resource share implicitly created from a resource-based
-  policy to a standard RAM resource share, enabling full management
-  via RAM APIs.
-
-- **Enhanced resource type support (2024-2025):** new shareable
-  resource types including EC2 Image Builder pipelines, Route53
-  Resolver Firewall rule groups, and Systems Manager documents.
-
-- **RAM integration with AWS Organizations (2025):** deeper
-  integration with Organizations trust policies — RAM validates
-  principal ARNs against the Organization structure and
-  auto-resolves OU membership changes.
+Recent AWS feature notes (2024-2026) moved verbatim to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## NEVER (anti-patterns)
 
@@ -497,57 +411,13 @@ a small number of VPCs.
 
 ## Expert heuristic — choosing resource type and principals
 
-**Resource type — determined by what you are sharing.** Each
-resource type has its own managed permission. For subnets, the
-default permission allows consumers to create network interfaces,
-describe subnets, and create routes. For Transit Gateways, the
-default allows consumers to create TGW attachments and routes.
-
-**Principals — prefer Organization/OU ARNs for fleet-wide
-sharing.** Use the Organization ARN to share with all accounts.
-Use OU ARNs to share with specific organizational units. Use
-account IDs for selective sharing or cross-Organization sharing.
-Organization and OU ARN shares auto-apply to new accounts —
-account ID shares do not.
-
-**Allow external principals — false by default.** Set to true
-only when sharing with accounts outside the Organization. Audit
-this flag regularly — it is a security-sensitive setting.
-
-**Permission association — start with AWS-managed defaults.**
-The default managed permission covers most use cases. Create
-customer-managed permissions only when you need to restrict
-specific actions (e.g., prevent consumers from deleting shared
-resources).
-
-**Resource share status — verify ACTIVE.** After creating a
-resource share, verify the status is ACTIVE. For Organization
-shares, this is immediate. For external shares, the principal
-must accept the invitation first.
+The expert heuristic for choosing resource type and principals moved verbatim to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Pre-flight safety checks (run before any provisioning CLI)
 
-- **Confirm Organizations all features enabled (for org/OU sharing):**
-  ```bash
-  aws organizations describe-organization --query 'Organization.FeatureSet' --output text
-  aws organizations list-organizational-units-for-parent --parent-id r-root
-  ```
-
-- **Confirm the resource exists:**
-  ```bash
-  aws ram list-resources --resource-owner SELF
-  aws ram list-resource-types
-  ```
-
-- **Confirm principal account IDs or ARNs are valid:**
-  ```bash
-  aws organizations list-accounts
-  ```
-
-- **Confirm available permissions for the resource type:**
-  ```bash
-  aws ram list-permissions --resource-type <type> --resource-owner SELF
-  ```
+Pre-flight safety check commands moved verbatim to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ## Output format — MANDATORY literal labels
 
@@ -596,32 +466,15 @@ is `PREREQUISITES_MISSING` with each gap listed.
 
 ## Edge-case handling
 
-- **Resource share status stays PENDING.** The principal has
-  not accepted the invitation. For Organization shares, verify
-  all features is enabled. For external accounts, the principal
-  must call `AcceptResourceShare`.
+The edge-case handling catalog moved verbatim to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
-- **Consumer cannot use shared subnet.** Verify the permission
-  association is correct. The default permission for subnets
-  allows `CreateNetworkInterface`. If using a customer-managed
-  permission, verify the policy template includes the required
-  actions.
+## References (load on demand)
 
-- **OU ARN principal not accepted.** Verify the OU ARN is
-  correct and the Organization has all features enabled. RAM
-  validates OU ARNs against the Organization structure in real
-  time.
-
-- **Transit Gateway share fails on attachment creation.** The
-  consumer account may not have accepted the TGW share, or the
-  TGW may have reached its attachment limit. Verify the share
-  status is ACTIVE on the consumer side.
-
-- **Customer-managed permission not inheriting updates.**
-  Customer-managed permissions support versioning. When you
-  update a permission, verify all associated resource shares
-  reference the latest version. Use `list-resource-share-permissions`
-  to check the applied version.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — recent AWS features (2024-2026), expert heuristic for resource type and principal selection, edge-case handling catalog (moved from this file)
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight safety checks and Step 9 post-deployment verification commands (moved from this file)
+- [references/deployment-cli-commands.md](references/deployment-cli-commands.md) — full copy-pasteable CLI sequence for all 9 steps; extended with the Step 6-8 associate and invitation-acceptance commands
+- [references/permissions-and-resource-types.md](references/permissions-and-resource-types.md) — shareable resource types, managed and customer-managed permissions, vs-VPC-peering decision matrix; extended with the comparison table and decision rule
 
 ## Domain
 

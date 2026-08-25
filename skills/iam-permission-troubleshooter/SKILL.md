@@ -22,7 +22,6 @@ metadata:
   keywords: IAM, AccessDenied, ExplicitDeny, Client.UnauthorizedOperation, NotAuthorized, sts:AssumeRole, trust policy, SCP, permissions boundary, session policy, policy evaluation, cross-account, KMS key policy, PassRole, simulate-principal-policy, CloudTrail, implicit deny
   tags: iam, security, troubleshoot, access-denied, policy-evaluation, scp, permissions-boundary
 ---
----
 
 # IAM Permission Troubleshooter
 

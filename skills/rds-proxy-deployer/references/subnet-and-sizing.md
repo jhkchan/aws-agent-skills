@@ -267,3 +267,27 @@ resource "aws_db_proxy_target" "main" {
   db_cluster_identifier = aws_rds_cluster.aurora.cluster_identifier
 }
 ```
+
+## Expert heuristic: max connections based on ACU sizing
+
+For Aurora Serverless v2, `max_connections` depends on ACU allocation.
+The proxy's `MaxConnectionsPercent` should be sized relative to this.
+
+```text
+Aurora Serverless v2 ACU → max_connections (approximate):
+  2 ACU → ~90 connections (minimum)
+  8 ACU → ~375 connections
+  16 ACU → ~750 connections
+  64 ACU → ~3,000 connections
+
+RDS Proxy MaxConnectionsPercent:
+  ├── Conservative: 90% (leaves 10% for admin/superuser)
+  ├── Moderate: 60-75% (good for mixed workloads)
+  └── Default: 90%
+
+  Example: 8 ACU (~375 max_connections)
+    MaxConnectionsPercent = 75 → proxy manages ~281 connections
+
+  WARNING: setting too high starves admin/monitoring connections.
+  Always leave at least 10% headroom.
+```

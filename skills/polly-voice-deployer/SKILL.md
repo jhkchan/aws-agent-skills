@@ -95,34 +95,13 @@ returned as JSON line-delimited timestamps aligned to the audio.
 Three misconceptions dominate Polly misdeployment at provisioning
 time:
 
-- **"Neural voices support all SSML tags."** They do not. The
-  `<break>` and `<emphasis>` tags only work with the standard engine.
-  Neural, long-form, and generative engines ignore these tags
-  silently. If the use case requires precise pause control or
-  emphasis modulation, use the standard engine or use `<prosody>`
-  (which works across engines) for rate and pitch adjustments.
-
-- **"Synthesize-speech can handle any text length."** It cannot.
-  The real-time `synthesize-speech` API has a payload limit (~3000
-  characters for most configurations). For longer text (articles,
-  books, scripts), use the asynchronous `start-speech-synthesis-task`
-  API which writes the output to S3 and handles arbitrarily long
-  input within the service's maximum.
-
-- **"Speech marks are returned with the audio."** They are not.
-  Speech marks (word-level, sentence-level, viseme-level, SSML-tag
-  timestamps) are generated as a SEPARATE `synthesize-speech` request
-  with `OutputFormat=json` and `SpeechMarkTypes` specified. The
-  marks are line-delimited JSON, each with `time`, `type`, `start`,
-  and `end` fields, aligned to the corresponding audio file.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#common-misconceptions-from-mindset).
+> Three Polly misconceptions: neural SSML support, text-length limits, speech-mark delivery.
 
 ## Configuration dependency graph (novel heuristic)
 
-Polly configurations are NOT independent. Engine choice constrains
-available voices AND SSML tag support. Voice choice constrains
-language. Output format constrains sample rate. Lexicons must be
-uploaded before synthesis references them. Speech marks require a
-separate request. Use this graph to sequence deployment.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#configuration-dependency-graph-sequencing-notes).
+> How to sequence deployment using the dependency graph.
 
 | Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
 |---|---|---|---|
@@ -135,104 +114,23 @@ separate request. Use this graph to sequence deployment.
 | Speech marks | separate synthesize-speech call with OutputFormat=json | requesting speech marks with OutputFormat=mp3 returns no marks | lip-sync / captioning |
 | Async task (S3) | S3 bucket exists and Polly has WriteS3 access | task fails if S3 permissions missing; check task status | batch synthesis |
 
-**The SSML-break-on-neural row is the one a baseline model misses.**
-The SSML `<break>` and `<emphasis>` tags are widely documented but
-only work with the standard engine. A naive deployment specifies
-neural for quality and includes `<break time="500ms"/>` in the
-SSML — the synthesis succeeds but the pause is silently omitted.
-The procedure below forces an explicit engine-vs-SSML compatibility
-check.
-
-**Cross-dependency gotchas:**
-- Engine determines available voices. Neural, long-form, and
-  generative each have a SUBSET of the standard voice catalog. Not
-  all standard voices have neural equivalents.
-- Engine determines SSML support. `<break>` and `<emphasis>` are
-  standard-engine-only. `<prosody>` works on all engines.
-- Output format and sample rate are coupled. PCM supports only
-  8000 and 16000 Hz. MP3 and OGG support 22050 and 24000 Hz.
-- Speech marks use `OutputFormat=json` — this is a DIFFERENT call
-  from the audio synthesis. The marks align to the audio by
-  timestamp.
-- Lexicons are per-region. A lexicon uploaded in us-east-1 is not
-  available in eu-west-1.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#cross-dependency-gotchas).
+> Baseline-miss rows and gotchas: engine/voice subsets, engine SSML support, format-rate coupling, separate marks call, per-region lexicons.
 
 ## Expert heuristic: engine selection decision tree
 
-A baseline model says "use neural for better quality." The correct
-heuristic considers SSML requirements, voice availability, and cost.
-
-```text
-Engine selection:
-  ├── Need <break> or <emphasis> SSML tags?
-  │     → MUST use standard engine (these tags ignored by neural/long-form/generative)
-  ├── Need highest conversational quality for long-form content (audiobooks, podcasts)?
-  │     → long-form engine (supports select voices, higher quality prosody)
-  ├── Need newest generative voices (conversational, expressive)?
-  │     → generative engine (limited voice set, highest quality)
-  ├── Need broad language/voice coverage at lower cost?
-  │     → standard engine (all languages, all voices, lowest cost)
-  ├── Need neural quality with <prosody> for rate/pitch?
-  │     → neural engine (<prosody> works; <break>/<emphasis> do NOT)
-  └── Cost-sensitive, high-volume?
-        → standard engine (4x cheaper than neural per character)
-```
-
-**Key implication:** if the use case requires precise pause control
-via `<break>`, the operator MUST choose standard engine. There is
-no workaround for neural. For rate/pitch modulation, `<prosody>`
-works across engines and is the cross-engine alternative.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-engine-selection-decision-tree).
+> Engine selection balancing SSML needs, voice availability, and cost.
 
 ## Expert heuristic: real-time vs async synthesis
 
-The choice between `synthesize-speech` and `start-speech-synthesis-
-task` depends on text length and latency requirements.
-
-```text
-Synthesis path:
-  ├── Text < 3000 chars AND need real-time response?
-  │     → synthesize-speech API (returns audio stream directly in the response)
-  ├── Text > 3000 chars OR batch processing acceptable?
-  │     → start-speech-synthesis-task (async, writes to S3)
-  │        Task status: queued → inProgress → completed | failed
-  │        Check: get-speech-synthesis-task --task-id <id>
-  ├── Need speech marks (lip-sync)?
-  │     → SEPARATE synthesize-speech call with OutputFormat=json
-  │        Audio and marks are two different requests
-  └── Need both audio AND marks for the same text?
-        → Two calls: one for audio (OutputFormat=mp3), one for marks (OutputFormat=json)
-```
-
-**Key implication:** speech marks are NEVER returned with the audio
-stream. They are a separate request. The timestamps in the marks
-file align to the audio file's timeline.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-real-time-vs-async-synthesis).
+> Real-time vs async path by text length and latency needs; marks are a separate request.
 
 ## Expert heuristic: pricing per character across engines
 
-Polly pricing is per-character of INPUT text (not per second of
-output audio). Engine and region affect the rate.
-
-```text
-Pricing (us-east-1, approximate):
-  Standard engine:  $4.00 per 1 million characters
-  Neural engine:    $16.00 per 1 million characters (4x standard)
-  Long-form engine: $100.00 per 1 million characters
-  Generative engine:$120.00 per 1 million characters
-
-  Cost estimation:
-    10,000 chars × standard  = $0.04
-    10,000 chars × neural    = $0.16
-    10,000 chars × long-form = $1.00
-
-  SSML tags are NOT counted in character pricing — only the text
-  content between tags is billed. Lexicon names and speech mark
-  requests are billed at the same per-character rate.
-```
-
-**Key implication:** the 4x cost difference between standard and
-neural is the dominant budget factor. For high-volume workloads,
-standard may be sufficient. For user-facing conversational quality,
-neural or long-form is worth the premium.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-pricing-per-character-across-engines).
+> Per-character pricing by engine with cost estimation and billing rules.
 
 ## Prerequisites (verify before deployment)
 
@@ -272,15 +170,8 @@ are ONLY processed by the standard engine. Neural, long-form, and
 generative engines silently ignore these tags. If the use case
 requires precise pause control, the standard engine is mandatory.
 
-```bash
-# List voices available for a specific engine
-aws polly describe-voices --engine neural --language-code en-US \
-  --query 'Voices[*].{Id:Id,Name:Name,Gender:Gender}' --output table
-
-# List voices for standard engine (all voices)
-aws polly describe-voices --engine standard --language-code en-US \
-  --query 'Voices[*].{Id:Id,Name:Name,Gender:Gender}' --output table
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-1-engine-and-voice-discovery-commands).
+> describe-voices listings per engine for voice discovery.
 
 ## Step 2 — Voice selection by language
 
@@ -300,16 +191,8 @@ are available for all engines.
 | ko-KR | Seoyeon | Yes |
 | zh-CN | Zhiyu | Yes |
 
-```bash
-# Discover voices for a language
-aws polly describe-voices --language-code en-US \
-  --query 'Voices[*].{Id:Id,Gender:Gender,Engine:[SupportsNeural,SupportsStandard]}' \
-  --output table
-
-# Check if a specific voice supports neural
-aws polly describe-voices --engine neural \
-  --query 'Voices[?Id==`Joanna`].{Id:Id,LanguageCode:LanguageCode}' --output table
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-2-voice-discovery-by-language-commands).
+> describe-voices by language-code and per-voice neural support check.
 
 **Select a voice that:**
 1. Matches the input text language (language-code).
@@ -334,30 +217,8 @@ subset of SSML tags.
 | `<w>` | Part-of-speech override | Standard + Neural |
 | `<amazon:effect>` | Whisper, dynamical range compression | Standard + Neural |
 
-**Example SSML for standard engine (full tag support):**
-
-```xml
-<speak>
-  Welcome to the service.
-  <break time="500ms"/>
-  Please listen <emphasis level="strong">carefully</emphasis>.
-  <prosody rate="90%" pitch="+5%">This is the important part.</prosody>
-  The word <phoneme alphabet="ipa" ph="ˈtɒmɑtəʊ">tomato</phoneme>
-  is pronounced differently in British English.
-</speak>
-```
-
-**Example SSML for neural engine (no break/emphasis):**
-
-```xml
-<speak>
-  Welcome to the service.
-  Please listen carefully.
-  <prosody rate="90%" pitch="+5%">This is the important part.</prosody>
-  The word <phoneme alphabet="ipa" ph="ˈtɒmɑtəʊ">tomato</phoneme>
-  is pronounced differently in British English.
-</speak>
-```
+> Moved to [references/ssml-and-lexicons.md](references/ssml-and-lexicons.md#step-3-ssml-examples-standard-vs-neural).
+> Full-tag SSML for standard engine; prosody/phoneme-only SSML for neural.
 
 **Critical:** if the SSML uses `<break>` or `<emphasis>` and the
 engine is neural/long-form/generative, the tags are silently ignored.
@@ -375,70 +236,8 @@ equivalent so that Polly pronounces it correctly every time.
 - Domain-specific terminology (medical, legal, technical).
 - Regional pronunciation variants.
 
-**Upload a lexicon:**
-
-```bash
-# Create a PLS lexicon file
-cat > company-terms.pls << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<lexicon version="1.0"
-      xmlns="http://www.w3.org/2005/01/pronunciation-lexicon"
-      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-      xsi:schemaLocation="http://www.w3.org/2005/01/pronunciation-lexicon
-        http://www.w3.org/TR/2007/CR-pronunciation-lexicon-20071212/pls.xsd"
-      alphabet="ipa"
-      xml:lang="en-US">
-  <lexeme>
-    <grapheme>AWS</grapheme>
-    <alias>A W S</alias>
-  </lexeme>
-  <lexeme>
-    <grapheme>EC2</grapheme>
-    <alias>E C two</alias>
-  </lexeme>
-  <lexeme>
-    <grapheme>S3</grapheme>
-    <phoneme>ɛs θriː</phoneme>
-  </lexeme>
-</lexicon>
-EOF
-
-# Upload the lexicon to Polly
-aws polly put-lexicon \
-  --name company-terms \
-  --content fileb://company-terms.pls
-```
-
-**Use a lexicon in synthesis:**
-
-```bash
-aws polly synthesize-speech \
-  --engine standard \
-  --voice-id Joanna \
-  --output-format mp3 \
-  --sample-rate 24000 \
-  --lexicon-names company-terms \
-  --text "Welcome to AWS. Your EC2 instance on S3 is ready." \
-  output.mp3
-```
-
-**List and verify lexicons:**
-
-```bash
-# List all lexicons in the account+region
-aws polly list-lexicons \
-  --query 'Lexicons[*].Name' --output table
-
-# Get details of a specific lexicon
-aws polly get-lexicon --name company-terms
-```
-
-**Lexicon constraints:**
-- Lexicons are per-region. Upload to each region where they are
-  needed.
-- Lexicon names must be unique within an account and region.
-- A synthesis request can reference up to 5 lexicons.
-- Lexicons apply to all engines (standard, neural, long-form).
+> Moved to [references/ssml-and-lexicons.md](references/ssml-and-lexicons.md#step-4-lexicon-management-commands).
+> PLS lexicon file, put-lexicon upload, lexicon use in synthesis, list/get verification, constraints.
 
 ## Step 5 — Speech marks (lip-sync alignment)
 
@@ -455,35 +254,8 @@ captioning, and highlighting text as audio plays.
 | `sentence` | Sentence boundaries | Caption segmentation |
 | `ssml` | SSML tag timestamps | SSML mark navigation |
 
-**Generate speech marks (separate request from audio):**
-
-```bash
-# Generate word and sentence marks
-aws polly synthesize-speech \
-  --engine standard \
-  --voice-id Joanna \
-  --output-format json \
-  --sample-rate 22050 \
-  --speech-mark-types '["word","sentence"]' \
-  --text "Hello world. This is a test." \
-  marks.json
-```
-
-**Output format (line-delimited JSON):**
-
-```json
-{"time":6,"type":"sentence","start":0,"end":26}
-{"time":0,"type":"word","start":0,"end":5}
-{"time":57,"type":"word","start":6,"end":11}
-{"time":120,"type":"sentence","start":0,"end":26}
-{"time":120,"type":"word","start":13,"end":17}
-{"time":205,"type":"word","start":18,"end":20}
-{"time":300,"type":"word","start":21,"end":25}
-```
-
-- `time`: offset in milliseconds from the start of the audio.
-- `start`/`end`: character positions in the input text.
-- `type`: the mark type (viseme, word, sentence, ssml).
+> Moved to [references/worked-examples.md](references/worked-examples.md#step-5-speech-marks-generation-and-output).
+> Speech-mark synthesis command, line-delimited JSON output, and field semantics.
 
 **Critical:** speech marks are generated as a SEPARATE call from the
 audio. The audio synthesis (OutputFormat=mp3) and the marks
@@ -496,36 +268,8 @@ The `synthesize-speech` API is the real-time synthesis endpoint. It
 returns the audio stream directly in the HTTP response. Use for
 short text (under ~3000 characters) where low latency is required.
 
-```bash
-# Real-time synthesis (plain text)
-aws polly synthesize-speech \
-  --engine neural \
-  --voice-id Joanna \
-  --output-format mp3 \
-  --sample-rate 24000 \
-  --text "Hello, this is a test of Amazon Polly neural voices." \
-  output.mp3
-
-# Real-time synthesis (SSML)
-aws polly synthesize-speech \
-  --engine standard \
-  --voice-id Matthew \
-  --output-format mp3 \
-  --sample-rate 24000 \
-  --text-type ssml \
-  --text '<speak>Hello <break time="500ms"/> world.</speak>' \
-  output.mp3
-
-# Real-time synthesis with lexicon
-aws polly synthesize-speech \
-  --engine standard \
-  --voice-id Joanna \
-  --output-format mp3 \
-  --sample-rate 24000 \
-  --lexicon-names company-terms \
-  --text "Welcome to AWS EC2." \
-  output.mp3
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#step-6-synthesize-speech-real-time-examples).
+> Plain-text, SSML, and lexicon real-time synthesis invocations.
 
 **API constraints:**
 - Maximum input text length: ~3000 characters (varies by configuration).
@@ -540,28 +284,8 @@ endpoint for long text. It writes the output audio file to a
 specified S3 bucket. Use for batch processing, long-form content
 (articles, books), and pre-generation of audio assets.
 
-```bash
-# Start an async synthesis task
-TASK_ID=$(aws polly start-speech-synthesis-task \
-  --engine neural \
-  --voice-id Joanna \
-  --output-format mp3 \
-  --sample-rate 24000 \
-  --output-s3-bucket-name my-polly-output \
-  --output-s3-key-prefix audio/articles/ \
-  --text "This is a very long text that exceeds the synthesize-speech limit..." \
-  --query 'SynthesisTask.TaskId' --output text)
-
-echo "Task ID: $TASK_ID"
-
-# Check task status
-aws polly get-speech-synthesis-task --task-id "$TASK_ID"
-
-# List all synthesis tasks
-aws polly list-speech-synthesis-tasks \
-  --query 'SynthesisTasks[*].{TaskId:TaskId,Status:TaskStatus,OutputUri:OutputUri}' \
-  --output table
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#step-7-async-synthesis-task-commands).
+> start-speech-synthesis-task with S3 output, status check, and task listing.
 
 **Task lifecycle:**
 - `scheduled` → `queued` → `inProgress` → `completed` | `failed`
@@ -572,10 +296,8 @@ aws polly list-speech-synthesis-tasks \
 Polly needs `s3:PutObject` on the output bucket. The service-linked
 role `PollySynthesisTaskServiceRole` is typically auto-managed.
 
-```bash
-# Verify the S3 output
-aws s3 ls s3://my-polly-output/audio/articles/$TASK_ID.mp3
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-7-verify-async-task-s3-output).
+> S3 listing check for the completed async synthesis output.
 
 ## Step 8 — Output format and sample rate
 
@@ -589,25 +311,8 @@ valid.
 | pcm | 8000, 16000 | Telephony, raw audio processing |
 | json | N/A (speech marks only) | Speech marks / lip-sync |
 
-```bash
-# Telephony-quality output (PCM, 8000 Hz)
-aws polly synthesize-speech \
-  --engine standard \
-  --voice-id Joanna \
-  --output-format pcm \
-  --sample-rate 8000 \
-  --text "Press 1 for sales." \
-  output.pcm
-
-# High-quality MP3 output
-aws polly synthesize-speech \
-  --engine neural \
-  --voice-id Joanna \
-  --output-format mp3 \
-  --sample-rate 24000 \
-  --text "Welcome to the service." \
-  output.mp3
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#step-8-output-format-and-sample-rate-examples).
+> Telephony PCM 8000 Hz and high-quality MP3 24000 Hz synthesis.
 
 **Mismatching format and sample rate** (e.g., PCM at 24000 Hz) will
 produce an error or silently coerce the output.
@@ -624,28 +329,8 @@ volume, errors, and latency.
 | `2XXCount` / `4XXCount` / `5XXCount` | HTTP response code counts |
 | `ThrottledCount` | Throttled request count (if exceeding limits) |
 
-```bash
-# Monitor character usage (for cost tracking)
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/Polly \
-  --metric-name RequestCharacters \
-  --start-time 2026-08-01T00:00:00Z \
-  --end-time 2026-08-05T00:00:00Z \
-  --period 86400 \
-  --statistics Sum \
-  --dimensions Name=Operation,Value=SynthesizeSpeech
-
-# Set a billing alarm for character usage
-aws cloudwatch put-metric-alarm \
-  --alarm-name polly-character-budget \
-  --namespace AWS/Polly \
-  --metric-name RequestCharacters \
-  --statistic Sum \
-  --period 86400 \
-  --threshold 1000000 \
-  --comparison-operator GreaterThanThreshold \
-  --evaluation-periods 1
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-9-cloudwatch-metrics-commands).
+> get-metric-statistics for RequestCharacters and a character-budget billing alarm.
 
 ## Step 10 — Pricing per character
 
@@ -659,13 +344,8 @@ counted — only the text content between tags.
 | long-form | $100.00 | Audiobook-quality narration |
 | generative | $120.00 | Most expressive conversational voices |
 
-```bash
-# Estimate character count of input text
-echo -n "Your input text here" | wc -c
-
-# Monthly cost estimate (neural, 500K chars/month)
-python3 -c "print(f'${500000 * 16 / 1000000:.2f}/month')"
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-10-pricing-estimation-commands).
+> Character-count and monthly cost estimation one-liners.
 
 **Free tier:** 5 million characters per month for standard voices,
 1 million characters per month for neural voices (for the first 12
@@ -673,32 +353,8 @@ months).
 
 ## Step 11 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Generative engine (2024-2025):** New engine type using
-  diffusion-based models for the most natural, expressive, and
-  conversational voices. Limited voice set (expanding). Highest cost
-  per character but highest quality.
-
-- **Long-form engine enhancements (2023-2024):** Improved prosody
-  for narrated content (audiobooks, podcasts). The long-form engine
-  produces more natural pacing and intonation for paragraph-length
-  text compared to neural.
-
-- **Neural voice expansion (2023-2024):** Additional neural voices
-  added across multiple languages, including new conversational
-  styles for customer service and gaming.
-
-- **CloudWatch enhanced metrics (2023-2024):** Per-engine and per-
-  voice metric dimensions for granular cost attribution.
-
-- **S3 output SSE-KMS support (2023-2024):** Async synthesis tasks
-  now support server-side encryption with KMS-managed keys
-  (SSE-KMS) on the output S3 bucket.
-
-- **Speech mark viseme improvements (2024-2025):** Additional
-  viseme codes for improved 3D avatar lip-sync accuracy, including
-  support for more languages.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-11-recent-features).
+> Recent AWS features (2023-2026): generative engine, long-form enhancements, neural expansion, enhanced metrics, SSE-KMS, viseme improvements.
 
 ## NEVER do these things
 
@@ -795,36 +451,16 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Synthesis returns no pause despite `<break>` tag
-- The engine is neural, long-form, or generative. `<break>` only
-  works with the standard engine. Switch to standard engine, or
-  remove `<break>` and use `<prosody rate="slow">` for timing
-  adjustment on neural.
+> Moved to [references/error-handling.md](references/error-handling.md#error-handling).
+> Symptom-by-symptom fixes: missing pauses, S3 access denied, voice/lexicon not found, empty marks, garbled PCM.
+## References (load on demand)
 
-### Async task fails with S3 access denied
-- Polly does not have `s3:PutObject` permission on the output
-  bucket. Add a bucket policy granting Polly write access, or use
-  the Polly service-linked role.
-
-### Voice not found error
-- The voice ID is not valid for the selected engine. Check
-  `describe-voices --engine <engine>` to find supported voices.
-  Some voices are standard-only.
-
-### Lexicon not found error
-- The lexicon was not uploaded in the current region, or the name
-  is misspelled. Upload with `put-lexicon` and verify with
-  `list-lexicons`.
-
-### Speech marks are empty
-- The `OutputFormat` was not set to `json`, or `SpeechMarkTypes`
-  was not specified. Speech marks require a separate call with
-  `OutputFormat=json` and at least one mark type.
-
-### PCM output is garbled
-- The sample rate may be incompatible with PCM. PCM only supports
-  8000 and 16000 Hz. Switch to a supported rate or change the
-  output format to mp3.
+- [advanced-patterns](references/advanced-patterns.md) — expert-heuristic deep dives, misconceptions, dependency-graph notes, recent AWS features (2023-2026)
+- [worked-examples](references/worked-examples.md) — filled-in synthesis examples (speech marks, real-time, async, output formats)
+- [diagnostic-commands](references/diagnostic-commands.md) — voice discovery, task verification, CloudWatch, and pricing commands
+- [error-handling](references/error-handling.md) — symptom-by-symptom troubleshooting
+- [engine-and-voice-selection](references/engine-and-voice-selection.md) — engine and voice selection detail (existing)
+- [ssml-and-lexicons](references/ssml-and-lexicons.md) — SSML and lexicon detail plus examples (existing)
 
 ## Domain
 

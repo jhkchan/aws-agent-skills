@@ -434,3 +434,159 @@ resource "aws_rds_cluster_instance" "serverless" {
   engine             = "aurora-postgresql"
 }
 ```
+
+## Step 2 — DB subnet group
+
+```bash
+aws rds create-db-subnet-group \
+  --db-subnet-group-name <name>-subnet-group \
+  --db-subnet-group-description "Subnet group for <name>" \
+  --subnet-ids subnet-aaa subnet-bbb subnet-ccc
+```
+
+## Step 2 — Security group ingress
+
+```bash
+aws ec2 authorize-security-group-ingress \
+  --group-id <db-sg-id> \
+  --protocol tcp \
+  --port 5432 \
+  --source-security-group-id <app-sg-id>
+```
+
+## Step 3 — Encryption at creation (instance)
+
+```bash
+aws rds create-db-instance ... \
+  --storage-encrypted \
+  --kms-key-id arn:aws:kms:<region>:<account-id>:key/<cmk-id>
+```
+
+## Step 3 — Encryption at creation (cluster)
+
+```bash
+aws rds create-db-cluster ... \
+  --storage-encrypted \
+  --kms-key-id arn:aws:kms:<region>:<account-id>:key/<cmk-id>
+```
+
+## Step 4 — Multi-AZ enable
+
+```bash
+aws rds create-db-instance ... --multi-az
+# Or enable later (causes 1-3 minute I/O suspension):
+aws rds modify-db-instance --db-instance-identifier <id> --multi-az
+```
+
+## Step 4 — Aurora reader instance
+
+```bash
+aws rds create-db-instance \
+  --db-instance-class db.r7g.large \
+  --engine aurora-postgresql \
+  --db-cluster-identifier <cluster> \
+  --db-instance-identifier <cluster>-reader-1 \
+  --availability-zone us-east-1b
+```
+
+## Step 5 — Backup retention
+
+```bash
+aws rds create-db-instance ... --backup-retention-period 14
+# Or modify:
+aws rds modify-db-instance --db-instance-identifier <id> --backup-retention-period 14
+```
+
+## Step 6 — Enhanced Monitoring
+
+```bash
+aws rds create-db-instance ... \
+  --monitoring-interval 30 \
+  --monitoring-role-arn arn:aws:iam::<account-id>:role/rds-monitoring-role
+```
+
+## Step 6 — Performance Insights
+
+```bash
+aws rds create-db-instance ... \
+  --enable-performance-insights \
+  --performance-insights-retention-period 7  # or 731
+```
+
+## Step 7 — Parameter group create + modify
+
+```bash
+aws rds create-db-parameter-group \
+  --db-parameter-group-name <name>-params \
+  --db-parameter-group-family postgres14 \
+  --description "Custom params for <name>"
+
+aws rds modify-db-parameter-group \
+  --db-parameter-group-name <name>-params \
+  --parameters "ParameterName=shared_buffers,ParameterValue={DBInstanceClassMemory/4},ApplyMethod=pending-reboot" \
+               "ParameterName=rds.force_ssl,ParameterValue=1,ApplyMethod=immediate"
+```
+
+## Step 7 — Option group create + modify
+
+```bash
+aws rds create-option-group \
+  --option-group-name <name>-options \
+  --engine-name postgres \
+  --major-engine-version 14 \
+  --option-group-description "Options for <name>"
+
+aws rds modify-option-group \
+  --option-group-name <name>-options \
+  --options OptionName=pgaudit,OptionSettings=[{Name=pgaudit.log,Value=write,ddl}]
+```
+
+## Step 8 — Aurora Serverless v2 scaling
+
+```bash
+aws rds create-db-cluster ... \
+  --serverless-v2-scaling-configuration MinCapacity=0.5,MaxCapacity=16,SecondsUntilAutoPause=0
+```
+
+## Step 8 — Aurora Global Database
+
+```bash
+aws rds create-global-cluster \
+  --global-cluster-identifier <global-name> \
+  --source-cluster-identifier <primary-cluster-id> \
+  --engine aurora-mysql
+```
+
+## Step 8 — Backtrack window
+
+```bash
+aws rds create-db-cluster ... \
+  --backtrack-window 72   # 0-72 hours; default is 0 (disabled)
+```
+
+## Step 9 — Deletion protection
+
+```bash
+aws rds modify-db-instance --db-instance-identifier <id> --deletion-protection
+# For Aurora, on the cluster:
+aws rds modify-db-cluster --db-cluster-identifier <cluster> --deletion-protection
+```
+
+## Step 9 — Tags
+
+```bash
+aws rds add-tags-to-resource \
+  --resource-name arn:aws:rds:<region>:<account-id>:db:<id> \
+  --tags "[{Key=Environment,Value=production},{Key=Workload,Value=orders}]"
+```
+
+## Step 10 — Blue/Green deployment
+
+```bash
+aws rds create-blue-green-deployment \
+  --blue-green-deployment-name <name>-bg \
+  --source arn:aws:rds:<region>:<account-id>:cluster:<current-cluster> \
+  --target-engine-version 8.0 \
+  --target-db-parameter-group-name <new-params>
+```
+

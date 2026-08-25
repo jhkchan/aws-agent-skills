@@ -332,3 +332,51 @@ resource "aws_s3_bucket_object_lock_configuration" "qldb_export" {
   }
 }
 ```
+
+
+## Step 10 — Cryptographic verification: digest and proof commands
+
+```bash
+# Request a digest (point-in-time hash of the entire journal)
+aws qldb get-digest --name audit-ledger --region us-east-1
+
+# Get a document revision with proof against the digest
+aws qldb get-revision \
+  --name audit-ledger \
+  --block-address '{"IonText":"{strandId:\"abc\",sequenceNo:42}"}' \
+  --document-id "abc-document-id" \
+  --digest-tip-address '{"IonText":"{strandId:\"abc\",sequenceNo:100}"}' \
+  --region us-east-1
+```
+
+**Verify the proof (Python):**
+
+```python
+import hashlib
+
+def verify_proof(revision_hash, proof_hashes, digest):
+    computed = revision_hash
+    for sibling in proof_hashes:
+        computed = hashlib.sha256(computed + sibling).digest()
+    return computed == digest
+# True = document is VERIFIED (untampered)
+# False = tampering detected (should never happen in QLDB)
+```
+
+**Expert rule:** request digests periodically (daily or weekly). Store
+them externally (S3 with Object Lock). Use proofs to verify any document
+on-demand.
+
+
+## Step 11 — Revision hash chains
+
+Every revision in QLDB is part of a cryptographic hash chain:
+
+```text
+Block N:   Block Hash = SHA-256(Block N contents + Block N-1 hash)
+Block N+1: Block Hash = SHA-256(Block N+1 contents + Block N hash)
+
+The chain: each block's hash includes the previous block's hash.
+Modifying any revision changes its hash → changes its block hash →
+breaks every subsequent block hash → detected by digest verification.
+```

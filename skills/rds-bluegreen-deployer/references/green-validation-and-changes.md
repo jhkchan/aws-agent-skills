@@ -325,3 +325,39 @@ lag increases downtime (the switchover must drain lag first).
 **Fix:** always check the Blue/Green status is `AVAILABLE` (not
 `UPGRADING` or `PROVISIONING`) and replication lag is near-zero
 before initiating switchover.
+
+---
+
+### Parameter group changes in green (moved from SKILL.md)
+
+Apply a different parameter group to green (specified at creation via
+`--target-db-parameter-group-name`). To change parameters in green
+after creation:
+
+```bash
+# Modify green's parameter group (green DB only)
+aws rds modify-db-instance \
+  --db-instance-identifier "green-prod-mysql-db" \
+  --db-parameter-group-name "prod-mysql80-tuned-params" \
+  --apply-immediately \
+  --region us-east-1
+```
+
+### Schema changes (DDL) in green (moved from SKILL.md)
+
+Schema changes (ALTER TABLE, CREATE INDEX, etc.) are executed in
+green ONLY. These changes do NOT affect blue and are replicated to
+green via the logical replication stream from blue.
+
+```bash
+# Connect to green and run DDL (example: add a column)
+# Use the green endpoint — NEVER the blue endpoint
+mysql -h green-prod-mysql-db.cluster-xxx.us-east-1.rds.amazonaws.com \
+  -u admin -p \
+  -e "ALTER TABLE orders ADD COLUMN status_code INT DEFAULT 0;"
+```
+
+**Critical:** Run DDL ONLY against the green endpoint. Running DDL
+against blue during the Blue/Green lifecycle breaks logical
+replication and can corrupt the switchover.
+

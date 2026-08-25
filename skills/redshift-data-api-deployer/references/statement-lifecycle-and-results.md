@@ -370,3 +370,121 @@ resource "aws_secretsmanager_secret_version" "redshift_creds" {
   })
 }
 ```
+
+## Step 3 — ExecuteStatement example and parameter table (from SKILL.md)
+
+```bash
+STATEMENT_ID=$(aws redshift-data execute-statement \
+  --cluster-identifier my-redshift-cluster \
+  --secret-arn arn:aws:secretsmanager:us-east-1:123456789012:secret:redshift-creds-xxx \
+  --database dev \
+  --sql "SELECT COUNT(*) FROM sales WHERE sale_date >= '2026-01-01'" \
+  --query 'Id' --output text)
+
+echo "StatementId: $STATEMENT_ID"
+```
+
+**Parameters:**
+
+| Parameter | Required | Description |
+|---|---|---|
+| `ClusterIdentifier` or `WorkgroupName` | Yes | Target cluster or Serverless workgroup |
+| `Database` | Yes | Database name |
+| `Sql` | Yes | SQL text |
+| `SecretArn` | One of (auth) | Secrets Manager secret ARN |
+| `DbUser` | One of (auth) | Temp credentials DB user |
+| `StatementName` | No | Human-readable name |
+| `WithEvent` | No | If true, sends EventBridge event on completion |
+| `Parameters` | No | Parameterized query values |
+
+## Step 5 — statement lifecycle states and transitions (from SKILL.md)
+
+Each statement goes through a lifecycle:
+
+```text
+SUBMITTED → STARTED → FINISHED (success)
+                  ↘ FAILED (error)
+                  ↘ ABORTED (cancelled)
+
+Time:
+  SUBMITTED:  API accepted the request, query is queued
+  STARTED:    Redshift began executing the query
+  FINISHED:   Query completed successfully, results available
+  FAILED:     Query failed (SQL error, timeout, resource)
+  ABORTED:    Query was cancelled (AbortStatement or cluster shutdown)
+```
+
+**DescribeStatement:**
+
+```bash
+aws redshift-data describe-statement \
+  --id "$STATEMENT_ID" \
+  --query '{Status:Status, ResultRows:ResultRows, HasResultSet:HasResultSet, Error:Error}' \
+  --output table
+```
+
+**Lifecycle transitions:**
+
+| Transition | Trigger | Duration |
+|---|---|---|
+| SUBMITTED → STARTED | Redshift scheduler picks up the query | Depends on WLM queue |
+| STARTED → FINISHED | Query execution completes | Depends on query complexity (max 24 hours) |
+| STARTED → FAILED | SQL error or resource limit | Immediate |
+| STARTED → ABORTED | AbortStatement or cluster event | Immediate |
+
+**Timeout:** a statement automatically fails after 24 hours (query
+timeout). Use AbortStatement to cancel sooner.
+
+## Step 6 — DescribeStatement / GetStatementResult code samples (from SKILL.md)
+
+**DescribeStatement** checks status and metadata (no rows):
+
+```bash
+aws redshift-data describe-statement --id "$STATEMENT_ID"
+```
+
+Returns: Status, ResultRows (count), HasResultSet, Error (if failed),
+Duration, RedshiftPid, RedshiftQueryId.
+
+**GetStatementResult** retrieves the actual data rows (when FINISHED):
+
+```bash
+aws redshift-data get-statement-result \
+  --id "$STATEMENT_ID" \
+  --output json
+```
+
+Returns: ColumnMetadata (schema) and Records (rows as arrays of typed
+values).
+
+## Step 7 — pagination loop and 24-hour expiry handling (from SKILL.md)
+
+**Pagination:** GetStatementResult returns up to 100 MB per call. For
+larger result sets, use NextToken to paginate.
+
+```bash
+NEXT_TOKEN=""
+while true; do
+  if [ -z "$NEXT_TOKEN" ]; then
+    RESULT=$(aws redshift-data get-statement-result --id "$STATEMENT_ID" --output json)
+  else
+    RESULT=$(aws redshift-data get-statement-result --id "$STATEMENT_ID" --next-token "$NEXT_TOKEN" --output json)
+  fi
+  
+  echo "$RESULT" | jq '.Records'
+  
+  NEXT_TOKEN=$(echo "$RESULT" | jq -r '.NextToken // empty')
+  [ -z "$NEXT_TOKEN" ] && break
+done
+```
+
+**24-hour expiry:** results are available for 24 hours after FINISHED.
+After that, GetStatementResult returns an error. For results needed
+beyond 24 hours:
+
+1. **UNLOAD to S3:** `UNLOAD ('SELECT ...') TO 's3://bucket/path/'`
+   writes results directly to S3, bypassing GetStatementResult entirely.
+2. **Immediate persistence:** call GetStatementResult immediately and
+   write rows to S3/DynamoDB.
+3. **Materialized view:** create a materialized view from the query
+   results for persistent access.

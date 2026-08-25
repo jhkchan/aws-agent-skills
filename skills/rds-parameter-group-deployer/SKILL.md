@@ -147,45 +147,8 @@ disconnects:
    defaults, and each instance can override via its own
    DBParameterGroup.
 
-3. **Static vs dynamic parameters — static requires reboot.**
-   Dynamic parameters apply immediately (or at the next connection,
-   depending on the parameter). Static parameters require a DB
-   instance reboot to take effect. The `ApplyMethod` field controls
-   this: `immediate` for dynamic, `pending-reboot` for static.
-   Setting `ApplyMethod: immediate` on a static parameter does NOT
-   force immediate application — RDS silently treats it as
-   `pending-reboot`.
+> Moved verbatim to [`references/advanced-patterns.md`](references/advanced-patterns.md) — load on demand.
 
-4. **Parameter value types — string, integer, boolean.** RDS
-   enforces the parameter's data type at `ModifyDBParameterGroup`
-   time. An integer parameter rejects string values. Some
-   parameters accept PostgreSQL memory units (`{6GB}`, `{128MB}`)
-   with the curly-brace syntax. Check the parameter's
-   `DataType` and `AllowedValues` via `DescribeDBParameters`
-   before setting.
-
-5. **Association — DB instance or cluster must be modified.**
-   Creating a parameter group does NOT apply it to any instance.
-   You must call `ModifyDBInstance` (or `ModifyDBCluster` for
-   Aurora) with the new parameter group name. For static
-   parameters, the instance must be rebooted after the
-   modification. Use `ApplyImmediately: true` for fast application,
-   or `false` for the next maintenance window.
-
-6. **Aurora-specific — cluster vs instance parameter groups.**
-   Aurora clusters require a `DBClusterParameterGroup` for
-   cluster-level parameters (e.g., `aurora_enable_repl_bin_log_filter`).
-   Individual instances can have a DBParameterGroup for instance-
-   level overrides. Some parameters like `max_connections` in
-   Aurora scale based on the instance class and are managed
-   differently than in regular RDS.
-
-7. **Aurora Serverless v2 — capacity parameters.** Aurora
-   Serverless v2 uses `ServerlessV2ScalingConfiguration` (min/max
-   ACU) on the cluster, not parameter group values. However, some
-   parameters (like `max_connections`) interact with the capacity
-   range. The parameter group should be tuned for the maximum
-   capacity to avoid connection exhaustion at scale-up.
 
 ## Prerequisites (verify before deployment)
 
@@ -206,39 +169,8 @@ disconnects:
 The parameter group family is determined by the DB engine and
 version. It is immutable after creation.
 
-**PostgreSQL families:**
+> Moved verbatim to [`references/advanced-patterns.md`](references/advanced-patterns.md) — load on demand.
 
-| Engine version | Family | Cluster family (Aurora) |
-|---|---|---|
-| PostgreSQL 17 | `postgres17` | `aurora-postgresql17` |
-| PostgreSQL 16 | `postgres16` | `aurora-postgresql16` |
-| PostgreSQL 15 | `postgres15` | `aurora-postgresql15` |
-| PostgreSQL 14 | `postgres14` | `aurora-postgresql14` |
-| PostgreSQL 13 | `postgres13` | `aurora-postgresql13` |
-
-**MySQL families:**
-
-| Engine version | Family | Cluster family (Aurora) |
-|---|---|---|
-| MySQL 8.0 | `mysql8.0` | `aurora-mysql8.0` |
-| MySQL 5.7 | `mysql5.7` | `aurora-mysql5.7` |
-
-**Other engines:**
-
-| Engine | Family pattern |
-|---|---|
-| SQL Server | `sqlserver-se-15.00`, `sqlserver-ex-15.00`, `sqlserver-web-15.00` |
-| Oracle | `oracle-ee-19`, `oracle-se2-19` |
-| MariaDB | `mariadb10.6`, `mariadb10.11` |
-
-**Find the correct family for a DB instance:**
-
-```bash
-aws rds describe-db-instances --db-instance-identifier <id> \
-  --query 'DBInstances[].{Engine:Engine,EngineVersion:EngineVersion}'
-aws rds describe-db-engine-versions --engine postgres \
-  --query 'DBEngineVersions[].DBParameterGroupFamily'
-```
 
 ### Step 2: DBParameterGroup vs DBClusterParameterGroup
 
@@ -264,49 +196,18 @@ Every RDS parameter has an `ApplyType` of either `static` or
   effect. `ApplyMethod` is always `pending-reboot` regardless of
   what you specify.
 
-```bash
-# Check which parameters are static vs dynamic
-aws rds describe-db-parameters --db-parameter-group-name default.postgres15 \
-  --query 'Parameters[?ApplyType==`static`].{Name:ParameterName,Value:ParameterValue,Type:DataType}' \
-  --output table
-```
+> Moved verbatim to [`references/deployment-cli-commands.md`](references/deployment-cli-commands.md) — load on demand.
 
-**Common static parameters (require reboot):**
 
-| Parameter | Engine | What it controls |
-|---|---|---|
-| `shared_buffers` | PostgreSQL | Shared memory pool for data pages |
-| `max_connections` | PostgreSQL (some versions) | Maximum concurrent connections |
-| `log_directory` | PostgreSQL | Log file directory |
-| `timezone` | PostgreSQL | Server timezone |
-| `innodb_buffer_pool_size` | MySQL (some versions) | InnoDB buffer pool size |
-| `max_connections` | MySQL | Maximum concurrent connections |
-| `character_set_server` | MySQL | Default character set |
+> Moved verbatim to [`references/database-tuning-guide.md`](references/database-tuning-guide.md) — load on demand.
 
-**Common dynamic parameters (no reboot):**
-
-| Parameter | Engine | What it controls |
-|---|---|---|
-| `work_mem` | PostgreSQL | Per-query sort/hash memory |
-| `wal_buffers` | PostgreSQL | WAL write-ahead log buffer |
-| `checkpoint_completion_target` | PostgreSQL | Checkpoint spreading |
-| `maintenance_work_mem` | PostgreSQL | Maintenance operation memory |
-| `random_page_cost` | PostgreSQL | Planner cost for random I/O |
-| `slow_query_log` | MySQL | Enable slow query logging |
-| `long_query_time` | MySQL | Slow query threshold (seconds) |
-| `general_log` | MySQL | Enable general query log |
 
 ### Step 4: ApplyMethod (immediate vs pending-reboot)
 
 The `ApplyMethod` controls when a parameter change takes effect:
 
-```json
-{
-  "ParameterName": "max_connections",
-  "ParameterValue": "200",
-  "ApplyMethod": "immediate"
-}
-```
+> Moved verbatim to [`references/deployment-cli-commands.md`](references/deployment-cli-commands.md) — load on demand.
+
 
 | ApplyMethod | Effect | Works for |
 |---|---|---|
@@ -324,114 +225,28 @@ force immediate application. RDS silently treats it as
 
 ### Step 5: Common PostgreSQL tuning parameters
 
-| Parameter | Default | Recommended (production) | Type | Notes |
-|---|---|---|---|---|
-| `max_connections` | `{AWSTemplate` or engine default | 100-200 (scale with instance class) | static | Each connection consumes memory. Use a connection pooler (PgBouncer/RDS Proxy) for high connection counts. |
-| `shared_buffers` | `{DBInstanceClassMemory/4}` | 25% of instance RAM | static | PostgreSQL's main cache. Use curly-brace formula or absolute value (`{6GB}`). |
-| `work_mem` | `4MB` | 8-16MB | dynamic | Per-sort/hash memory. Too high with many connections = OOM. Formula: `(RAM - shared_buffers) / max_connections / 2`. |
-| `maintenance_work_mem` | `64MB` | 256MB-1GB | dynamic | VACUUM, CREATE INDEX, ALTER TABLE memory. |
-| `wal_buffers` | `-1` (auto) | 16MB | dynamic | WAL write buffer. `-1` = auto-tuned to 1/32 of shared_buffers. |
-| `checkpoint_completion_target` | `0.9` | `0.9` | dynamic | Spreads checkpoint I/O over 90% of checkpoint_timeout. |
-| `effective_cache_size` | `4GB` (default) | 50-75% of instance RAM | dynamic | Planner hint for total OS+PG cache. Does NOT allocate memory. |
-| `random_page_cost` | `4` | `1.1` (SSD storage) | dynamic | Cost of random page fetch. Lower for EBS/SSD. |
-| `log_min_duration_statement` | `-1` (disabled) | `1000` (log queries > 1s) | dynamic | Slow query logging in milliseconds. |
-| `autovacuum` | `1` | `1` | dynamic | Enable autovacuum. Never disable in production. |
-| `autovacuum_naptime` | `1min` | `30s` for write-heavy | dynamic | Time between autovacuum runs per table. |
+> Moved verbatim to [`references/database-tuning-guide.md`](references/database-tuning-guide.md) — load on demand.
 
-**Memory formula syntax:** RDS supports `{DBInstanceClassMemory/N}` to
-set values as a fraction of instance RAM. Use this instead of
-absolute values for portability across instance classes.
 
 ### Step 6: Common MySQL tuning parameters
 
-| Parameter | Default | Recommended (production) | Type | Notes |
-|---|---|---|---|---|
-| `innodb_buffer_pool_size` | `{DBInstanceClassMemory*3/4}` | 75% of instance RAM | dynamic (8.0+) | Main InnoDB cache. Largest consumer of MySQL memory. |
-| `max_connections` | `{AWSTemplate}` or 150 | 200-500 (scale with instance class) | static | Each connection consumes thread stack + sort buffer. |
-| `slow_query_log` | `0` | `1` | dynamic | Enable slow query logging. |
-| `long_query_time` | `10` | `1` (log queries > 1s) | dynamic | Slow query threshold in seconds. |
-| `innodb_log_file_size` | engine default | 1-4GB | dynamic (8.0+) | Redo log file size. Larger = fewer checkpoint flushes. |
-| `innodb_flush_log_at_trx_commit` | `1` | `1` (durability) or `2` (performance) | dynamic | `1` = ACID (fsync every commit). `2` = fsync once per second (risk of 1s data loss on crash). |
-| `sync_binlog` | `1` | `1` (durability) or `0` (performance) | dynamic | `1` = fsync binlog every transaction. |
-| `character_set_server` | `latin1` | `utf8mb4` | dynamic | Default character set. |
-| `collation_server` | `latin1_swedish_ci` | `utf8mb4_unicode_ci` | dynamic | Default collation. |
-| `binlog_format` | `MIXED` (Aurora) / `ROW` | `ROW` | dynamic | Binary log format. `ROW` for replication reliability. |
-| `table_definition_cache` | engine default | 2000+ for many tables | dynamic | Table definition (.frm) cache. |
+> Moved verbatim to [`references/database-tuning-guide.md`](references/database-tuning-guide.md) — load on demand.
+
 
 ### Step 7: Aurora-specific parameters
 
-Aurora has cluster-level parameters not available in regular RDS:
+> Moved verbatim to [`references/database-tuning-guide.md`](references/database-tuning-guide.md) — load on demand.
 
-| Parameter | Engine | What it controls |
-|---|---|---|
-| `aurora_enable_repl_bin_log_filter` | Aurora MySQL | Binary log filtering on replicas |
-| `aurora_enable_hash_join` | Aurora MySQL | Hash join for large analytical queries |
-| `aurora_enable_parallel_query` | Aurora MySQL | Parallel query processing |
-| `aurora_pq` | Aurora MySQL (older) | Parallel query toggle |
-| `max_connections` | Aurora PostgreSQL | Connection limit (scales with instance class) |
-
-**Aurora max_connections scaling:** in Aurora, `max_connections` is
-derived from the instance class by default (using
-`LEAST({DBInstanceClassMemory/9531392}, 5000)`). Override only if
-you need fewer connections, never more — exceeding the formula can
-cause OOM.
 
 ### Step 8: Aurora Serverless v2 capacity
 
-Aurora Serverless v2 manages capacity in ACUs (Aurora Capacity
-Units, 0.5-128 ACU per instance). Capacity scaling is configured on
-the cluster via `ServerlessV2ScalingConfiguration`, NOT in the
-parameter group:
+> Moved verbatim to [`references/database-tuning-guide.md`](references/database-tuning-guide.md) — load on demand.
 
-```bash
-aws rds modify-db-cluster \
-  --db-cluster-identifier <cluster-id> \
-  --serverless-v2-scaling-configuration MinCapacity=2,MaxCapacity=16 \
-  --apply-immediately
-```
-
-**Parameter group tuning for Serverless v2:**
-
-| Parameter | Recommendation | Why |
-|---|---|---|
-| `max_connections` | Set based on MAX ACU | At scale-up, more connections are needed. Tune for the peak, not the minimum. |
-| `shared_buffers` | Use `{DBInstanceClassMemory/4}` formula | The formula adapts to the dynamic instance class. Avoid absolute values. |
-| `work_mem` | Conservative (4-8MB) | At minimum ACU, memory is tight. High work_mem × many connections = OOM. |
-| `effective_cache_size` | Use `{DBInstanceClassMemory*3/4}` formula | Adapts to dynamic capacity. |
-
-**NEVER set absolute memory values** for Aurora Serverless v2.
-The instance class changes dynamically — an absolute `shared_buffers`
-value tuned for 16 ACU will cause OOM at 2 ACU. Always use the
-`{DBInstanceClassMemory/N}` formula syntax.
 
 ### Step 9: Create + associate + apply
 
-```bash
-# 1. Create the parameter group
-aws rds create-db-parameter-group \
-  --db-parameter-group-name payments-pg15-params \
-  --db-parameter-group-family postgres15 \
-  --description "PostgreSQL 15 parameters for payments service"
+> Moved verbatim to [`references/deployment-cli-commands.md`](references/deployment-cli-commands.md) — load on demand.
 
-# 2. Modify parameters
-aws rds modify-db-parameter-group \
-  --db-parameter-group-name payments-pg15-params \
-  --parameters '[{"ParameterName":"max_connections","ParameterValue":"200","ApplyMethod":"pending-reboot"},
-                 {"ParameterName":"shared_buffers","ParameterValue":"{6GB}","ApplyMethod":"pending-reboot"},
-                 {"ParameterName":"work_mem","ParameterValue":"8MB","ApplyMethod":"immediate"},
-                 {"ParameterName":"checkpoint_completion_target","ParameterValue":"0.9","ApplyMethod":"immediate"},
-                 {"ParameterName":"log_min_duration_statement","ParameterValue":"1000","ApplyMethod":"immediate"}]'
-
-# 3. Associate with the DB instance
-aws rds modify-db-instance \
-  --db-instance-identifier payments-db-pg15 \
-  --db-parameter-group-name payments-pg15-params \
-  --apply-immediately
-
-# 4. Reboot if static parameters were changed
-aws rds reboot-db-instance \
-  --db-instance-identifier payments-db-pg15
-```
 
 For Aurora clusters, use `create-db-cluster-parameter-group` /
 `modify-db-cluster-parameter-group` / `modify-db-cluster`.
@@ -449,37 +264,8 @@ For Aurora clusters, use `create-db-cluster-parameter-group` /
 
 ## Recent AWS features (2024-2026)
 
-- **Aurora Serverless v2 capacity up to 128 ACU (2024-2025):**
-  MaxCapacity increased to 128 ACU per instance. Parameter groups
-  for Serverless v2 clusters should use formula values
-  (`{DBInstanceClassMemory/N}`) to adapt to the dynamic capacity
-  range.
+> Moved verbatim to [`references/advanced-patterns.md`](references/advanced-patterns.md) — load on demand.
 
-- **PostgreSQL 17 support (2024-2025):** new parameter group family
-  `postgres17` / `aurora-postgresql17`. Includes new parameters for
-  logical replication, JSON improvements, and improved vacuum
-  balancing.
-
-- **MySQL 8.4 support (2025):** new family `mysql8.4`. Includes
-  expanded `innodb_buffer_pool_size` dynamic tuning and new
-  optimization parameters.
-
-- **Dynamic innodb_buffer_pool_size (MySQL 8.0+, 2024):** the
-  buffer pool size can now be changed dynamically (no reboot
-  required) on MySQL 8.0+. Previously static.
-
-- **RDS Optimized Writes (2024-2025):** transaction commit
-  optimization for write-heavy MySQL workloads. Enabled via
-  `innodb_flush_log_at_trx_commit=1` with optimized writes on
-  the instance configuration.
-
-- **RDS Optimized Reads (2024-2025):** uses local NVMe SSD for
-  temporary tables and sort buffers. Configure `work_mem` and
-  `temp_buffers` to take advantage of faster temp storage.
-
-- **Parameter group formula expansion (2024):** more parameters
-  support the `{DBInstanceClassMemory/N}` formula syntax, enabling
-  portable tuning across instance classes.
 
 ## NEVER (anti-patterns)
 
@@ -654,36 +440,14 @@ prerequisites.
 
 ## Edge-case handling
 
-- **Wrong family discovered after creation.** The family is
-  immutable. You must create a new parameter group with the correct
-  family, re-apply all parameter values, and associate the new
-  group with the DB instance. The old group can be deleted after
-  the new one is verified.
+> Moved verbatim to [`references/advanced-patterns.md`](references/advanced-patterns.md) — load on demand.
 
-- **Static parameter does not take effect.** The parameter requires
-  a reboot. Call `RebootDBInstance` or `RebootDBCluster`. Check
-  `DescribePendingMaintenanceActions` for pending parameter changes.
 
-- **Parameter value rejected.** Check the parameter's `DataType`
-  and `AllowedValues` via `DescribeDBParameters`. Integer parameters
-  reject strings. Some PostgreSQL parameters require memory units
-  in curly braces (`{6GB}`). MySQL parameters use plain integers
-  (bytes) or string enums.
+## References (load on demand)
 
-- **Aurora instance vs cluster parameter conflict.** An instance
-  DBParameterGroup overrides the DBClusterParameterGroup. If a
-  parameter is set in both, the instance value wins. Remove the
-  instance-level override to inherit the cluster value.
-
-- **Serverless v2 OOM after scale-down.** Absolute memory values
-  (e.g., `shared_buffers = 6GB`) cause OOM when ACU scales below
-  the memory needed. Always use formula syntax
-  (`{DBInstanceClassMemory/4}`) for memory parameters.
-
-- **Parameter group change causes failover.** On Aurora clusters,
-  modifying the DBClusterParameterGroup triggers a rolling
-  instance reboot. The writer reboots first, then readers. Plan
-  for a brief connection drop during failover.
+- [references/deployment-cli-commands.md](references/deployment-cli-commands.md) — static/dynamic parameter check, ApplyMethod payload, and the full create + modify + associate + reboot CLI sequence.
+- [references/database-tuning-guide.md](references/database-tuning-guide.md) — static/dynamic parameter tables, PostgreSQL/MySQL/Aurora tuning tables, and Aurora Serverless v2 capacity interactions.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — reasoning-framework constraints, family selection tables, recent AWS features, edge-case handling.
 
 ## Domain
 

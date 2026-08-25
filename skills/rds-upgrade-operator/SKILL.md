@@ -148,24 +148,8 @@ Run before classification. Misclassifying these produces wrong plans.
 **Pagination:** `describe-db-instances` paginates at 100/page — drain
 `--starting-token` to completion.
 
-**Live-account pre-flight (skip if offline plan audit):**
-1. `aws rds describe-db-instances --db-instance-identifier <id>` —
-   capture `DBInstanceStatus`, `Engine`, `EngineVersion`,
-   `DBInstanceClass`, `MultiAZ`, `PendingModifiedValues`,
-   `AutoMinorVersionUpgrade`, `DBParameterGroups`,
-   `OptionGroupMemberships`, `StorageType`.
-2. `aws rds describe-db-clusters --db-cluster-identifier <id>` — for
-   Aurora; capture `Status`, `EngineVersion`, `DBClusterMembers`,
-   `GlobalClusterIdentifier`, `DBClusterParameterGroup`.
-3. `aws rds describe-db-engine-versions --engine <engine>
-   --db-instance-class <class>` — confirm the target is a valid
-   upgrade target. Check `SupportsGlobalDatabases` for global clusters.
-4. `aws rds describe-db-snapshots --db-instance-identifier <id>
-   --snapshot-type manual` — confirm pre-upgrade snapshot is `available`.
-5. `aws rds describe-pending-maintenance-actions` — confirm no
-   conflicting pending action.
-6. `aws rds describe-global-clusters --global-cluster-identifier <id>`
-   — if a global cluster member, capture primary and secondaries.
+Six live-account pre-flight commands (instance and cluster metadata, valid upgrade targets, pre-upgrade snapshots, pending maintenance, global topology): moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+The attribute table below maps the captured fields to plan effects.
 
 **Malformed input:** if the input JSON is invalid or missing required
 fields, emit `VERDICT: ERROR` with `REASON: DB/cluster configuration
@@ -190,63 +174,8 @@ is not valid JSON or is missing required fields — cannot plan.` and
 
 ### Step 0: Expert knowledge — non-obvious RDS/Aurora upgrade behaviors
 
-These behaviors are easy to misjudge without operational upgrade
-experience. Each changes a plan if ignored:
-
-- **Major upgrades are NEVER automatic.** `AutoMinorVersionUpgrade`
-  only schedules patches within the same major version. A major version
-  bump requires explicit `modify-db-instance --engine-version <target>`.
-  You cannot skip major versions (PostgreSQL 13 to 15 requires 14
-  first; Aurora MySQL 5.6 to 8.0 requires 5.7 first). Use
-  `describe-db-engine-versions` to enumerate valid upgrade targets.
-
-- **Parameter group families are engine-version-specific.** Aurora
-  MySQL 5.7 uses `aurora-mysql5.7`; upgrading to 8.0 requires an
-  `aurora-mysql8.0` group. The upgrade does NOT auto-migrate parameters
-  — pre-create the target group, diff, apply custom values, attach
-  during upgrade. Same for option groups (e.g., MEMCACHED removed in
-  Aurora MySQL 8.0).
-
-- **Blue/green deploy is the zero-downtime path.** RDS provisions a
-  staging environment (green) at the target version, syncs via logical
-  replication, and switches via DNS shift (under 60 seconds). The green
-  is retained as a rollback safety net. Use for production major
-  upgrades instead of in-place.
-
-- **Multi-AZ upgrades roll through a failover.** Standby upgraded
-  first, then failover, then old primary upgraded — TWO brief
-  connection drops. Read replicas must match or trail the source
-  version; upgrade source first. Global database upgrades are Region-
-  sequential (primary first, secondaries rebuilt; secondaries
-  unavailable during rebuild).
-
-- **`--apply-immediately` vs maintenance window.** Without
-  `--apply-immediately`, the upgrade is deferred to the next
-  `PreferredMaintenanceWindow`. The upgrade reboots the database — all
-  connections dropped, in-flight transactions rolled back. Pending
-  parameter/option group changes (`pending-reboot`) are applied.
-
-- **MySQL 8.0 `caching_sha2_password`.** The default auth plugin
-  changed. Applications using `mysql_native_password` need a driver
-  upgrade OR the parameter group override
-  `default_authentication_plugin = mysql_native_password`.
-
-- **PostgreSQL 14+ default changes.** `default_statistics_target`
-  increased to 1000; `shared_preload_libraries` handling tightened.
-  `pg_upgrade` rebuilds planner statistics — run `ANALYZE` on all
-  tables post-upgrade to prevent query plan regressions.
-
-- **Aurora Serverless v1 does NOT support in-place major upgrades.**
-  Restore a snapshot to a Serverless v2 cluster instead.
-
-- **`SupportsGlobalDatabases` flag.** Verify the target engine version
-  supports global databases before planning a global cluster upgrade.
-
-- **`upgrade-failed` is a terminal state if auto-rollback is unclean.**
-  Recovery is PITR restore to the pre-upgrade snapshot — which is why
-  a named manual snapshot (taken when the DB is `available` and
-  quiesced) is mandatory. Enable `PerformanceInsightsEnabled` before
-  the upgrade to capture the pre-upgrade query-latency baseline.
+Ten non-obvious upgrade behaviors (explicit major opt-in, parameter-family migration, blue/green zero-downtime path, multi-AZ rolling failover, apply-immediately semantics, caching_sha2_password, PostgreSQL 14+ statistics, Serverless v1 restore-only, SupportsGlobalDatabases, upgrade-failed recovery): moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load before planning any upgrade; Steps 1-4 assume these constraints.
 
 ### Step 1: Pre-check gate — REVIEW_REQUIRED if any check needs human attention
 
@@ -336,19 +265,8 @@ items listed. Do NOT execute until the operator reviews.
    cluster — the endpoint changes. Application connection strings
    must be updated.
 
-**Upgrade failure-mode table (use during diagnosis):**
-
-| Symptom | Root cause | Fix |
-|---|---|---|
-| Upgrade fails immediately with `InvalidParameterCombination` | Target engine version not valid for the instance class or storage type | Check `describe-db-engine-versions --engine <engine> --db-instance-class <class>` for valid targets |
-| Upgrade fails with `ParameterGroupNotFound` | No parameter group for the target engine family attached | Create a target-family param group and attach via `--db-parameter-group-name` |
-| Upgrade fails with `OptionGroupNotFound` | No option group for the target engine family attached | Create a target-family option group and attach via `--option-group-name` |
-| Instance stuck in `upgrade-failed` | Incompatible parameter or option, or insufficient storage | Review CloudWatch Logs and RDS events; the instance attempts auto-rollback. If stuck, PITR restore. |
-| Application cannot connect after MySQL 8.0 upgrade | `caching_sha2_password` default not supported by old driver | Update driver, OR set `default_authentication_plugin = mysql_native_password` in the target param group |
-| Application cannot connect after PostgreSQL upgrade | `pg_hba.conf` changes in the new version (stricter defaults) | Update the target param group `pg_hba.conf` entries; verify application IP ranges |
-| Query performance regression after PostgreSQL upgrade | Planner statistics stale after `pg_upgrade` | Run `ANALYZE` on all tables; consider `VACUUM ANALYZE` for heavily updated tables |
-| Aurora replicas lag after cluster upgrade | Replicas rebuilding from the upgraded writer | Monitor `AuroraReplicaLag`; wait for it to return to baseline |
-| Global cluster secondary unreachable during upgrade | Secondary is being rebuilt from the upgraded primary | Plan for secondary Region downtime; consider a read traffic cutover before the upgrade |
+Upgrade failure-mode table (InvalidParameterCombination, parameter/option group gaps, stuck upgrade-failed, MySQL 8.0 auth plugin, pg_hba.conf, planner-statistics regressions, replica lag, global secondary rebuild): moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load when a pre-check fails or an upgrade misbehaves.
 
 ### Step 2: OPERATION_COMPLETED or REVIEW_REQUIRED — emit operation plan
 
@@ -497,120 +415,18 @@ NOTES:
 
 ### Worked example — major-upgrade via blue/green (REVIEW_REQUIRED)
 
-```text
-OPERATION: blue-green-upgrade
-VERDICT: REVIEW_REQUIRED
-TARGET: prod-payments-cluster (engine: aurora-mysql 5.7.mysql_aurora.2.11.4 -> 8.0.mysql_aurora.3.04.0)
-PRE_CHECKS:
-  - [PASS] DBClusterStatus: available
-  - [PASS] describe-db-engine-versions confirms 8.0 target is valid
-  - [PASS] Target parameter group aurora-mysql8.0-payments-custom
-    exists (diffed against source, 12 custom params reproduced)
-  - [PASS] Target option group aurora-mysql8.0-payments-opts exists
-    (MEMCACHED option removed — not supported in 8.0)
-  - [PASS] Pre-upgrade snapshot prod-payments-pre-8-0 available
-  - [REVIEW] Application driver: MySQL Connector/J 5.1.49 — does NOT
-    support caching_sha2_password. Review: upgrade driver to 8.0.x OR
-    set default_authentication_plugin=mysql_native_password in the
-    target param group.
-  - [REVIEW] Blue/green provisioning window: 45-90 minutes. The green
-    cluster will be created and kept in sync via logical replication.
-    Confirm the switchover window (03:00 UTC Sunday).
-  - [REVIEW] Rollback plan: after switchover, the blue (old 5.7)
-    environment is kept for 72 hours as a rollback safety net. Confirm
-    the deletion schedule.
-STEPS:
-  1. CONFIRM: About to create a blue/green deployment for
-     prod-payments-cluster, upgrading Aurora MySQL 5.7 to 8.0. The
-     green environment will be provisioned over 45-90 minutes, then
-     held for a scheduled switchover. Proceed? (yes/no)
-  2. aws rds create-blue-green-deployment \
-       --blue-green-deployment-name prod-payments-bg-8-0 \
-       --source arn:aws:rds:us-east-1:111111111111:cluster:prod-payments-cluster \
-       --target-engine-version 8.0.mysql_aurora.3.04.0 \
-       --delete-automated-backups false
-  3. aws rds wait blue-green-deployment-provisioning-complete \
-       --blue-green-deployment-id <bg-id>
-  4. (Scheduled switchover at 03:00 UTC Sunday)
-     aws rds switchover-blue-green-deployment \
-       --blue-green-deployment-id <bg-id>
-  5. aws rds wait blue-green-deployment-switchover-complete \
-       --blue-green-deployment-id <bg-id>
-POST_VERIFY:
-  - (pending switchover)
-  - [PASS] EngineVersion: 8.0.mysql_aurora.3.04.0 (post-switchover)
-  - [PASS] All cluster members report 8.0
-  - [PASS] Application connectivity with Connector/J 8.0.x: OK
-  - [PASS] Performance Insights: AAS and top-query latency within
-    +/- 15% of baseline
-NOTES:
-  - Blue/green switchover is under 60 seconds (DNS shift). The green
-    (8.0) becomes the new production; the blue (5.7) is retained for
-    72 hours as rollback.
-  - Rollback: switchover back to blue if any issue is detected within
-    72 hours. After 72 hours, the blue is deleted and rollback requires
-    a PITR restore.
-  - MEMCACHED option was removed (not supported in Aurora MySQL 8.0).
-    Confirm no application dependency on Memcached via the RDS endpoint.
-```
+Full worked example (Aurora MySQL 5.7 to 8.0 blue/green with driver and switchover review items): moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Apply the Output format template above to reproduce it.
 
 ### Worked example — global database upgrade (condensed)
 
-```text
-OPERATION: global-upgrade
-VERDICT: REVIEW_REQUIRED
-TARGET: global-payments-cluster (aurora-mysql 5.7 -> 8.0,
-        primary: us-east-1, secondaries: eu-west-1, ap-southeast-1)
-PRE_CHECKS:
-  - [PASS] Global topology: primary us-east-1, 2 secondaries
-  - [PASS] All clusters Status: available; SupportsGlobalDatabases: true
-  - [PASS] Target param group exists in all 3 Regions
-  - [REVIEW] Sequencing: primary first, secondaries rebuilt sequentially.
-    Each secondary rebuild: 2-6h. Total window: up to 18h. Confirm.
-  - [REVIEW] Secondary downtime during rebuild — plan read failover.
-  - [REVIEW] Rollback = PITR primary + re-create secondaries (multi-hour).
-STEPS:
-  1. CONFIRM: upgrade global-payments-cluster primary (us-east-1),
-     secondaries rebuilt after. Total up to 18h. Proceed? (yes/no)
-  2. aws rds modify-db-cluster --db-cluster-identifier prod-payments-cluster \
-       --engine-version 8.0.mysql_aurora.3.04.0 \
-       --db-cluster-parameter-group-name aurora-mysql8.0-global-payments \
-       --apply-immediately --region us-east-1
-  3. aws rds wait db-cluster-available --db-cluster-identifier \
-       prod-payments-cluster --region us-east-1
-  4. RDS auto-rebuilds secondaries. Monitor via describe-global-clusters.
-POST_VERIFY: (pending) — all clusters EngineVersion 8.0, lag < 1s.
-NOTES: Secondaries unavailable during rebuild. Rollback = multi-hour PITR.
-```
+Condensed worked example (global database upgrade with Region sequencing): moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Apply the Output format template above to reproduce it.
 
 ### Worked example — rollback via PITR (condensed)
 
-```text
-OPERATION: rollback
-VERDICT: REVIEW_REQUIRED
-TARGET: prod-orders-db (rollback from PG 15.4 to pre-upgrade 14.11)
-PRE_CHECKS:
-  - [PASS] Pre-upgrade snapshot prod-orders-db-pre-15-4 available
-  - [PASS] PITR window 2026-08-04 02:50 UTC within 35-day retention
-  - [REVIEW] Rollback creates NEW instance — endpoint changes.
-    Application connection strings must be updated. Confirm plan.
-  - [REVIEW] Data loss: writes between PITR timestamp and now are lost.
-    Confirm timestamp is correct.
-  - [REVIEW] Restore time ~45min for 500 GB. Confirm downtime tolerance.
-STEPS:
-  1. CONFIRM: restore prod-orders-db to 2026-08-04T02:50:00Z. Creates
-     NEW instance prod-orders-db-rollback. Proceed? (yes/no)
-  2. aws rds restore-db-instance-to-point-in-time \
-       --source-db-instance-identifier prod-orders-db \
-       --target-db-instance-identifier prod-orders-db-rollback \
-       --restore-time 2026-08-04T02:50:00Z \
-       --db-parameter-group-name aurora-postgresql14-payments-custom
-  3. aws rds wait db-instance-available \
-       --db-instance-identifier prod-orders-db-rollback
-  4. Cutover: update application connection strings.
-POST_VERIFY: (pending) — EngineVersion 14.11, connectivity OK, data verified.
-NOTES: Original upgraded instance still running — delete after rollback stable.
-```
+Condensed worked example (rollback via PITR with data-loss review items): moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Apply the Output format template above to reproduce it.
 
 ## Anti-Patterns — NEVER
 
@@ -669,63 +485,22 @@ NOTES: Original upgraded instance still running — delete after rollback stable
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`modify-db-instance`, `modify-db-cluster`,
-  `create-blue-green-deployment`, `switchover-blue-green-deployment`,
-  `restore-db-instance-to-point-in-time`, `promote-read-replica`,
-  `delete-db-instance`), emit: `CONFIRM: About to <operation> on
-  <target> in account <account> region <region>. This will
-  <consequence>. Proceed? (yes/no)`.
-
-- **Capture pre-state for rollback.** Before any upgrade:
-  `aws rds describe-db-instances --db-instance-identifier <id>
-  --output json > /tmp/<id>-pre-$(date +%s).json` AND take a manual
-  snapshot. Wait for `available` before starting.
-
-- **Verify engine version validity.** `describe-db-engine-versions`
-  confirms the target is a valid upgrade target. Verify parameter and
-  option group compatibility (target-family groups exist). Verify
-  application driver support (MySQL 8.0 `caching_sha2_password`,
-  PostgreSQL 14+ `pg_hba.conf`).
-
-- **Prefer blue/green over in-place for production major upgrades.**
-  Blue/green provides a sub-60-second switchover with a rollback
-  safety net. In-place upgrades have a 20-min to 4-hour window with
-  no rollback path short of PITR restore. Verify replication topology
-  (source/primary first, then replicas/secondaries).
+Four pre-flight safety checks (CONFIRM gate, pre-state capture with snapshot, engine/param/option/driver validation, blue/green preference): moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Defense-in-depth before any remediation CLI.
 
 ## Recent AWS features (2024-2026)
 
-- **Blue/Green Deployments GA (2023-2024):** Creates a full staging
-  environment (green) at the target engine version, kept in sync via
-  logical replication. Switchover via DNS shift (under 60 seconds).
-  The recommended path for production major upgrades.
+Eight recent AWS features 2024-2026 (Blue/Green GA, Aurora MySQL 3.x auth, PostgreSQL 15, gp3, Serverless v2, global sequencing, RDS Extended Support, Performance Insights retention): moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Consult before citing feature limits or recency.
 
-- **Aurora MySQL 3.x (MySQL 8.0):** Default auth plugin changed to
-  `caching_sha2_password`. MEMCACHED option removed. Applications
-  using `mysql_native_password` need a driver upgrade or parameter
-  override.
+## References (load on demand)
 
-- **PostgreSQL 15 on RDS/Aurora:** `MERGE` statement, improved
-  `VACUUM`, `default_statistics_target` increased to 1000.
-
-- **gp3 storage:** Recommended over gp2 — higher IOPS at lower cost.
-  Consider migrating before upgrading (independent of engine upgrade).
-
-- **Aurora Serverless v2:** Supports MySQL 8.0 and PostgreSQL 14+.
-  Serverless v1 does NOT support in-place major upgrades — restore
-  snapshot to v2.
-
-- **Global Database sequencing:** Region-sequential (primary first,
-  secondaries rebuilt). `SupportsGlobalDatabases` flag on
-  `describe-db-engine-versions` validates target version.
-
-- **RDS Extended Support (2024-2025):** Run a major version past
-  community EOL for a premium — a bridge, not a substitute for
-  upgrading.
-
-- **Performance Insights long-term retention (730 days):** Enable
-  before upgrade to preserve the pre-upgrade baseline for comparison.
+- [references/worked-examples.md](references/worked-examples.md) — Secondary worked examples (blue/green major upgrade, global database upgrade, rollback via PITR).
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 non-obvious upgrade behaviors, recent AWS features (2024-2026).
+- [references/error-handling.md](references/error-handling.md) — Upgrade failure-mode table for diagnosis.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — Live-account pre-flight commands, pre-flight safety checks.
+- [references/diagnostic-procedures.md](references/diagnostic-procedures.md) — Failure-diagnosis procedures per archetype.
+- [references/upgrade-paths-and-compatibility.md](references/upgrade-paths-and-compatibility.md) — Version paths, parameter/option group families, driver compatibility.
 
 ## Domain
 

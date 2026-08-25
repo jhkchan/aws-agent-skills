@@ -128,73 +128,13 @@ Rules:
 
 ## Expert heuristic
 
-> **Security group rules are bidirectional.** Every RDS connection
-> timeout is a packet dropped somewhere. The drop is either: (a) the
-> RDS SG lacks an inbound rule allowing the client's SG / CIDR on the
-> DB port; (b) the client SG lacks an outbound rule allowing the RDS
-> endpoint on the DB port; (c) a NACL on either subnet; or (d) a route
-> table missing the VPC peering / TGW route. The order is
-> deterministic: check the RDS SG inbound FIRST (most common), then
-> the client SG egress, then NACLs, then route tables. Operators who
-> skip the client-side egress check waste hours.
->
-> **Aurora writer vs reader endpoint routing matters.** Aurora exposes
-> a `writer` endpoint (always points at the writer), a `reader`
-> endpoint (round-robins across readers), and per-instance endpoints.
-> The legacy "cluster endpoint" follows the writer after failover but
-> has DNS-update lag. A write that hits a reader throws
-> `cannot execute INSERT in a read-only transaction`. Route writes to
-> the writer endpoint; route reads to the reader endpoint. Mixing the
-> two is the most common Aurora application error.
->
-> **`storage-full` means storage auto-scaling was not enabled (or the
-> maximum storage threshold was hit).** When an RDS instance exhausts
-> its allocated storage, it stops accepting writes — the application
-> sees connection errors and query timeouts. The status shows
-> `StorageStatus: storage-full`. The fix is enabling storage
-> auto-scaling (`--storage-auto-scaling --max-allocated-storage <N>`)
-> or manually allocating more storage. Raising `max_connections` or
-> upsizing the instance class does nothing — the bottleneck is disk,
-> not compute.
+The three expert-heuristic deep dives (bidirectional SG check order, Aurora
+writer/reader routing, storage-full) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Configuration dependency graph
 
-```
-                   RDS / Aurora instance
-                          │
-        ┌─────────────────┼──────────────────┐
-        ▼                 ▼                  ▼
-   VPC security     DB subnet group     parameter group
-   groups           (subnets in AZs,    (max_connections,
-   (RDS SG            each in VPC)       force_ssl, etc.)
-   inbound +                                   │
-   client SG                                    ▼
-   egress)                                  option group
-                          │                 (engine options,
-                          ▼                  TLS, native auth)
-                   instance status
-                   (available /                  │
-                    storage-full /               ▼
-                    modifying /              IAM DB auth
-                    failing-over)            (rds-db:connect
-                          │                  policy + DB user
-                          ▼                  with AWSAuthentication
-                   endpoint                  Plugin)
-                   (writer /                        │
-                    reader /                        ▼
-                    custom /                    Aurora global
-                    instance)                   database primary
-                          │                          │
-                          ▼                          ▼
-                   DNS resolution              secondary cluster
-                   (Route 53 CNAME,            (replication lag,
-                    on-prem DNS,               cross-region)
-                    cross-region)
-```
-
-Read top-down: a connectivity failure is a broken edge or broken node
-in this graph. The diagnostic tree walks the graph from the symptom
-down.
+The connectivity configuration dependency graph (ASCII) and its
+read-top-down guidance moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Mindset
 
@@ -213,32 +153,8 @@ BEFORE the query reached the engine.
 
 ### Step 0: Pre-flight — gather instance and client state
 
-```bash
-# 1. Instance / cluster metadata
-aws rds describe-db-instances --db-instance-identifier <id> \
-  --output json | jq('.DBInstances[0] | {DBInstanceStatus,
-    StorageStatus, Endpoint, DBSubnetGroup: .DBSubnetGroup.SubnetGroupStatus,
-    SGs: [.VpcSecurityGroups[] | .VpcSecurityGroupId],
-    Engine, EngineVersion, DBInstanceClass, AllocatedStorage,
-    MaxAllocatedStorage, StorageAutoScalingEnabled, MultiAZ,
-    IAMAuth: .IAMDatabaseAuthenticationEnabled}')
-
-# 2. Recent events (failover, maintenance, storage-full)
-aws rds describe-events --source-type db-instance \
-  --source-identifier <id> --duration 360 --output json | \
-  jq('.Events[:20] | [.[] | {Date: .Date, Message: .Message}]')
-
-# 3. Aurora cluster (if applicable) — endpoints, writer, readers
-aws rds describe-db-clusters --db-cluster-identifier <cluster> \
-  --output json | jq('.DBClusters[0] | {Status, Endpoint,
-    ReaderEndpoint, MultiAZ, Engine, Members: [.DBClusterMembers[] |
-    {DBInstanceIdentifier, IsClusterWriter, DBClusterParameterGroupStatus}]}')
-
-# 4. Client-side network context (run from the client host or its VPC)
-#    - Subnet, AZ, security group of the EC2 / ECS / Lambda caller
-#    - Route table, NACL for the client subnet
-#    - DNS resolver (Route 53 Resolver, on-prem DNS, cross-region)
-```
+Instance/cluster/events/client-state gathering commands (probes 1-4) moved verbatim to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 Short-circuit cases that mimic connectivity failure:
 
@@ -452,11 +368,8 @@ with `ROOT_CAUSE: DNS_CUSTOM_ENDPOINT` or `DNS_CLUSTER_ENDPOINT`.
 
 #### 6b: Stale DNS after failover
 
-After a Multi-AZ failover, the cluster endpoint updates to the new
-writer, but DNS resolvers may serve the stale record for the TTL
-window. Flush the resolver cache (`dig +trace`, restart the JVM, or
-reduce the application's DNS TTL). If the application is on-prem
-connecting over DX / VPN, the on-prem DNS resolver may cache longer.
+Stale-DNS-after-failover guidance moved verbatim to
+[references/connectivity-layer-reference.md](references/connectivity-layer-reference.md).
 
 ### Step 7: Replication lag — read replica and global database
 
@@ -486,51 +399,20 @@ status and the AWS Health dashboard for cross-region issues.
 
 ### Step 8: RDS Proxy connectivity
 
-Symptom: `could not connect to proxy`, or the application hits the
-instance directly despite a proxy being configured.
-
-```bash
-aws rds describe-db-proxies --proxy-name <proxy-name> --output json | \
-  jq('.DBProxies[0] | {Status, EngineFamily,
-    TargetRole, RequireTLS, VpcSubnetIds, VpcSecurityGroupIds}')
-
-aws rds describe-db-proxy-target-groups --proxy-name <proxy-name> \
-  --output json | jq('.TargetGroups[0]')
-```
-
-Common patterns:
-
-| Pattern | ROOT_CAUSE |
-|---|---|
-| Proxy SG does not allow the client SG | `CAPACITY_PROXY` — fix the proxy SG |
-| Proxy's target SG does not allow the proxy SG | `CAPACITY_PROXY` — fix the instance SG to allow the proxy |
-| Proxy's secrets ARN points at a deleted / rotated secret | `CAPACITY_PROXY` — update the secret |
-| Application connects to the instance endpoint, not the proxy endpoint | `CAPACITY_PROXY` — update the application's connection string |
+RDS Proxy probe commands and the common proxy failure pattern table moved verbatim to
+[references/engine-auth-reference.md](references/engine-auth-reference.md).
 
 ### Step 9: Parameter group and option group misconfiguration
 
 #### 9a: Parameter group override
 
-If a recent parameter group change preceded the failure, a parameter
-override may be the cause. Common culprits:
-
-| Parameter | Effect |
-|---|---|
-| `max_connections` (MySQL/Postgres) | Set too low → `too many connections` |
-| `rds.force_ssl` / `require_secure_transport` | Set to 1 → non-TLS clients rejected |
-| `shared_buffers` (Postgres) | Set too high → instance fails to start after reboot |
-| `character_set_server` (MySQL) | Changed → collation errors on existing tables |
-
-**ROOT_CAUSE_IDENTIFIED** with `ROOT_CAUSE: PARAM_GROUP_OVERRIDE`.
+The parameter-override culprit table moved verbatim to
+[references/engine-auth-reference.md](references/engine-auth-reference.md).
 
 #### 9b: Option group conflict
 
-If a recent option group change preceded the failure, an option may
-conflict. Common patterns: SQL Server native auth, Oracle Advanced
-Security, or a TLS option that requires a specific port. Confirm the
-instance status is `incompatible-option-group` or check the events
-for the option group apply failure. **ROOT_CAUSE_IDENTIFIED** with
-`ROOT_CAUSE: OPTION_GROUP_CONFLICT`.
+Option-group conflict patterns moved verbatim to
+[references/engine-auth-reference.md](references/engine-auth-reference.md).
 
 ### Step 10: INSUFFICIENT_DATA — when to bail
 
@@ -583,43 +465,13 @@ CONFIRM: Before adding the rule, emit and await:
 
 ### Worked example — INSUFFICIENT_DATA
 
-```text
-TARGET: unknown
-VERDICT: INSUFFICIENT_DATA
-ROOT_CAUSE: UNKNOWN
-REASON: Input is "RDS is down" with no instance identifier, no
-  endpoint, and no specific error string; the category cannot be
-  determined.
-EVIDENCE:
-  - Missing: DB instance or cluster identifier
-  - Missing: specific error string (timeout vs refused vs auth)
-  - Missing: client context (EC2 / ECS / Lambda, subnet, SG)
-REMEDIATION:
-  1. Run aws rds describe-db-instances --output json and share the
-     instance identifier.
-  2. Share the exact error string the application logs.
-  3. Share the client's VPC, subnet, and security group.
-```
+The INSUFFICIENT_DATA worked example moved verbatim to
+[references/worked-examples.md](references/worked-examples.md).
 
 ## Pre-flight safety checks
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`modify-db-instance`, `authorize-security-group-ingress`,
-  `modify-db-cluster`, `reboot-db-instance`), emit and await operator
-  approval.
-- **Read-only first.** Every probe in the diagnostic tree is read-only.
-- **Modifying an instance** triggers a brief connection drop in some
-  cases (especially for parameter group changes that require a reboot).
-  Confirm during a maintenance window.
-- **Enabling storage auto-scaling** is non-disruptive; the storage
-  expands in the background.
-- **Failover** (`reboot-db-instance --force-failover`) is disruptive —
-  the writer changes and the application must reconnect via the
-  cluster endpoint.
-- **Security group changes** propagate within seconds but can briefly
-  drop in-flight connections.
-- **Bulk remediation batch limit.** When the same root cause affects
-  multiple instances, batch into groups of at most 5 and verify.
+Pre-flight safety checks (confirm gate, read-only-first, disruption notes,
+batch limit) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ## Remediation guidance
 
@@ -642,6 +494,14 @@ REMEDIATION:
 | `DNS_CUSTOM_ENDPOINT` / `DNS_CLUSTER_ENDPOINT` | Add the writer to the custom endpoint; flush DNS; use the writer endpoint for writes. |
 | `PARAM_GROUP_OVERRIDE` | Revert or correct the parameter; reboot if required. |
 | `OPTION_GROUP_CONFLICT` | Resolve the option conflict; re-apply the option group. |
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert-heuristic deep dives (bidirectional SG check order, Aurora writer/reader routing, storage-full) and the configuration dependency graph (moved from this file)
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 0 pre-flight gathering commands (probes 1-4) and the pre-flight safety checks (moved from this file)
+- [references/worked-examples.md](references/worked-examples.md) — the INSUFFICIENT_DATA worked example; the primary connection-timeout example stays in this file
+- [references/engine-auth-reference.md](references/engine-auth-reference.md) — IAM DB auth, TLS/CA rotation, parameter and option group, storage-full, proxy, DNS detail; extended with Step 8 proxy probes, the 9a parameter-override table, and 9b option-group conflicts
+- [references/connectivity-layer-reference.md](references/connectivity-layer-reference.md) — engine port registry, SG/NACL evaluation rules, Aurora endpoint behaviour, cross-VPC matrix, AWS Health event categories; extended with the 6b stale-DNS-after-failover guidance
 
 ## Domain
 

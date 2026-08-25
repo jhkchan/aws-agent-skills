@@ -52,94 +52,18 @@ metadata:
 
 ## Quick start
 
-- **Symptom → root-cause map (first plausible match drives the first probe):**
-  Failover did not trigger → MULTI_AZ_HEALTH_THRESHOLD (health check
-  threshold too conservative); failover triggered but application still
-  hits old instance → APP_NOT_CLUSTER_ENDPOINT (using instance endpoint
-  instead of cluster endpoint) or DNS_PROPAGATION_DELAY (DNS TTL not
-  1s for Aurora) or CONNECTION_POOL_CACHING (connection pool cached the
-  old IP); failover took too long → RECOVERY_MODE_FULL (recovery mode
-  set to full instead of optimized); new writer not promoted as expected
-  → FAILOVER_PRIORITY_TIER (tier 0 not on the intended instance);
-  read replica promotion failed → READ_REPLICA_PROMOTION_FAILURE
-  (network or storage issue); storage-full error → STORAGE_FULL;
-  standby cannot take over → PARAMETER_GROUP_MISMATCH or
-  OPTION_GROUP_CONFLICT; Aurora Global DB failover →
-  AURORA_GLOBAL_FAILOVER_MODE (managed vs unmanaged).
-- **Always verify with a probe, never guess.** Each root cause has a
-  single command that proves or disproves it. A ROOT_CAUSE_IDENTIFIED
-  verdict requires positive evidence — a failing probe that matches
-  the symptom — not a process of elimination.
-- **Application MUST use the cluster endpoint for transparent
-  failover.** The Aurora cluster endpoint (writer endpoint)
-  automatically resolves to the current writer instance after
-  failover. DNS TTL is 1 second for Aurora endpoints. Applications
-  using the instance endpoint will hit the old (now reader or
-  terminated) instance after failover. This is the #1 source of
-  "failover didn't work" incidents.
-- **Aurora failover tier 0 is promoted first.** When multiple
-  instances have tier 0, the largest instance class is chosen. If no
-  instance has tier 0, tier 1 instances are considered. An instance
-  with tier 15 (default) is promoted last. Operators who expect a
-  specific instance to become the writer must set it to tier 0.
-- **DNS TTL is 1 second for Aurora endpoints, but application
-  connection pool caching can cause delays.** The OS DNS resolver,
-  JVM DNS cache, and database driver connection pool can each cache
-  the resolved IP longer than 1 second. The application must honour
-  the DNS TTL or proactively refresh connections after a failover
-  event.
+> Moved verbatim to [`references/advanced-patterns.md`](references/advanced-patterns.md) — load on demand.
+
 
 ## Mindset
 
-An RDS or Aurora failover failure is almost never about the database
-engine or the failover mechanism itself. AWS's Multi-AZ and Aurora
-failover automation works correctly in the vast majority of cases.
-The root cause is usually in the application layer (wrong endpoint,
-stale connection pool), the configuration layer (health threshold,
-failover tier, parameter group), or the resource layer (storage-full,
-network). Senior database engineers start with the cluster endpoint
-and the application connection string; they do not start by inspecting
-the database engine logs.
+> Moved verbatim to [`references/advanced-patterns.md`](references/advanced-patterns.md) — load on demand.
+
 
 ## Philosophy
 
-Four behaviours separate a senior RDS/Aurora engineer from a generalist:
+> Moved verbatim to [`references/advanced-patterns.md`](references/advanced-patterns.md) — load on demand.
 
-- **The cluster endpoint is the linchpin of transparent failover.**
-  Aurora provides a writer endpoint
-  (`<cluster>.cluster-<id>.<region>.rds.amazonaws.com`) that
-  automatically resolves to the current writer. Applications using
-  this endpoint experience a brief interruption (typically 10-30
-  seconds for Aurora, 60-120 seconds for Multi-AZ) during failover,
-  then reconnect transparently. Applications using the instance
-  endpoint (`<cluster>-instance-1.<id>.<region>.rds.amazonaws.com`)
-  will fail after failover because that endpoint either resolves to
-  the old writer (now a reader or terminated) or stops resolving.
-
-- **Failover duration is determined by the detection time plus the
-  promotion time.** Detection time depends on the health check
-  interval and threshold (Multi-AZ: typically 30-60 seconds). Promotion
-  time depends on the recovery mode (Aurora: 10-30 seconds with
-  parallel recovery; Multi-AZ: 60-120 seconds with full recovery).
-  Operators who report "failover took 5 minutes" are usually measuring
-  the application recovery time, not the database failover time — the
-  application's connection pool cached the old IP for several minutes.
-
-- **Failover priority tiers determine which instance becomes the new
-  writer.** Aurora assigns a tier (0-15) to each instance. Tier 0
-  instances are promoted first. Within the same tier, the largest
-  instance class is chosen. If the intended promotion target is tier
-  15 (default), it will be promoted only after all tier 0-14 instances
-  are considered — which may never happen if a tier 0 instance exists.
-  Operators who "just added a replica and it became the writer instead
-  of my intended instance" forgot to check the tier.
-
-- **Storage-full blocks failover.** If the primary or standby instance
-  has exhausted its allocated storage, the failover cannot complete
-  because the new writer cannot write the recovery log. The error is
-  not "failover failed" but `InsufficientStorage` or a generic
-  `FailoverFailed`. Always check `StorageFull` CloudWatch alarms
-  before concluding the failover mechanism is broken.
 
 ## Quick reference — symptom triage table
 
@@ -166,44 +90,8 @@ failover failures.
 
 ### Account-wide pre-flight commands
 
-```bash
-# 1. Cluster configuration (Aurora)
-aws rds describe-db-clusters \
-  --db-cluster-identifier <cluster-id> --output json | \
-  jq '.DBClusters[] | {DBClusterIdentifier, Engine, EngineVersion, Status,
-    MultiAZ, DBClusterMembers, Endpoint, ReaderEndpoint,
-    DBClusterParameterGroup, AllocatedStorage, StorageEncrypted}'
+> Moved verbatim to [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — load on demand.
 
-# 2. Instance details (primary and replicas)
-aws rds describe-db-instances \
-  --db-instance-identifier <instance-id> --output json | \
-  jq '.DBInstances[] | {DBInstanceIdentifier, DBInstanceClass, DBInstanceStatus,
-    MultiAZ, PromotionTier, DBParameterGroups, OptionGroupMemberships,
-    AllocatedStorage, StorageType, Engine, Endpoint}'
-
-# 3. Cluster endpoints (Aurora)
-aws rds describe-db-cluster-endpoints \
-  --db-cluster-identifier <cluster-id> --output json
-
-# 4. Recent RDS events
-aws rds describe-events \
-  --source-identifier <cluster-id> --source-type db-cluster \
-  --start-time $(date -d '-2 hours' +%FT%TZ) --output json
-
-# 5. CloudWatch failover-related metrics
-aws cloudwatch get-metric-statistics --namespace AWS/RDS \
-  --metric-name DatabaseConnections \
-  --dimensions Name=DBClusterIdentifier,Value=<cluster-id> \
-  --start-time $(date -d '-2 hours' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Sum,Average --output json
-
-# 6. Free storage space
-aws cloudwatch get-metric-statistics --namespace AWS/RDS \
-  --metric-name FreeStorageSpace \
-  --dimensions Name=DBInstanceIdentifier,Value=<instance-id> \
-  --start-time $(date -d '-2 hours' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Minimum --output json
-```
 
 ### Cluster-state short-circuit
 
@@ -217,23 +105,8 @@ aws cloudwatch get-metric-statistics --namespace AWS/RDS \
 | Parameter group `status: applying` or `pending-reboot` | A parameter change is pending. The standby may have a different effective configuration. |
 | Aurora Global cluster with `GlobalClusterIdentifier` set | The cluster is part of a Global DB. Failover semantics differ (managed vs unmanaged). |
 
-If the input is malformed (missing cluster identifier, absent symptom
-description, no application context), emit:
+> Moved verbatim to [`references/error-handling.md`](references/error-handling.md) — load on demand.
 
-```text
-TARGET: <cluster-id or unknown>
-VERDICT: INSUFFICIENT_DATA
-REASON: Input is missing required context — at minimum the
-  DBClusterIdentifier (or DBInstanceIdentifier for Multi-AZ) and a
-  description of the observed failover symptom.
-ROOT_CAUSE: UNKNOWN
-EVIDENCE:
-  - Missing: <list specific missing fields>
-REMEDIATION: Re-prompt the operator for: (1) the cluster or instance
-  identifier, (2) the observed symptom (failover did not trigger,
-  took too long, app still errors), and (3) the application
-  connection string (to check for instance vs cluster endpoint).
-```
 
 ## Process — Diagnostic decision tree (apply in symptom order)
 
@@ -243,112 +116,16 @@ order.
 
 ### Step 0: Non-obvious behaviours that change diagnosis
 
-These are the operational gotchas a senior RDS/Aurora engineer knows
-from incident experience:
+> Moved verbatim to [`references/advanced-patterns.md`](references/advanced-patterns.md) — load on demand.
 
-- **The Aurora cluster endpoint DNS TTL is 1 second, but the
-  application may not honour it.** The OS DNS resolver, JVM DNS cache
-  (`networkaddress.cache.ttl`, default 60 seconds in many JVMs), and
-  database driver connection pool can each cache the resolved IP
-  longer than 1 second. The failover completes at the DB layer in
-  10-30 seconds, but the application does not recover for 60-120
-  seconds because the connection pool holds stale connections. This is
-  the #1 cause of "failover took 5 minutes."
-
-- **Multi-AZ failover takes 60-120 seconds; Aurora failover takes
-  10-30 seconds.** Multi-AZ creates a standby in a different AZ with
-  synchronous block-level replication. On failover, the standby is
-  promoted and the DNS record is updated. Aurora uses a distributed
-  storage volume shared across AZs; failover promotes a reader
-  instance without storage copy. The difference in failover time is
-  architectural, not a configuration issue.
-
-- **Failover priority tier 0 does not guarantee promotion order when
-  multiple instances have tier 0.** When two or more instances have
-  tier 0, Aurora chooses the largest instance class. If they are the
-  same size, the instance with the longest uptime is chosen. Operators
-  who set two instances to tier 0 and expect a specific one to be
-  promoted must ensure it is also the largest.
-
-- **An Aurora reader instance promoted to writer during failover
-  inherits the cluster parameter group, not its own.** If the reader
-  had a different DB parameter group than the primary (common for
-  read-optimised tuning), the promoted instance uses the primary's
-  parameter group after promotion. This can cause unexpected behaviour
-  if the parameter groups differ significantly.
-
-- **RDS Proxy does not eliminate failover downtime, but it reduces
-  connection errors.** During failover, the Proxy queues requests and
-  reconnects to the new writer transparently. However, active
-  transactions on the old writer are rolled back. The Proxy's
-  connection pool drains over 5-30 seconds; during this window, the
-  application sees elevated latency but not connection errors.
-
-- **Recovery mode affects failover duration.** Aurora PostgreSQL with
-  parallel recovery (Aurora PostgreSQL 13+) uses parallel WAL replay,
-  reducing failover time from 30 seconds to 10-15 seconds. Aurora
-  MySQL uses a different recovery mechanism. Multi-AZ instances with
-  `recovery_mode` parameter set to `full` (instead of `optimized`)
-  take longer to recover the transaction log.
-
-- **A storage-full instance cannot complete failover.** The new writer
-  needs to write the recovery log. If the allocated storage is
-  exhausted, the write fails. The error is `InsufficientStorage` or
-  a generic `FailoverFailed` — not "storage full." Always check
-  `FreeStorageSpace` CloudWatch metric before concluding the failover
-  mechanism is broken.
-
-- **Parameter group mismatches between primary and standby can prevent
-  the standby from taking over.** If the primary's parameter group has
-  settings that the standby's does not (e.g., different `max_connections`,
-  `shared_buffers`, or engine-specific parameters), the standby may
-  fail health checks during promotion. The error appears in RDS events
-  as a promotion failure.
-
-- **Option group conflicts prevent Multi-AZ failover.** If the primary
-  has an option group with options that require specific binaries
-  (e.g., Oracle Transparent Data Encryption, SQL Server .NET
-  framework), the standby must have a compatible option group. A
-  mismatch prevents the standby from starting the engine after
-  promotion.
-
-- **Aurora Global DB managed failover is a control-plane operation
-  that takes 1-5 minutes.** The managed failover (`failover-global-
-  cluster`) promotes a secondary cluster in another region. It is
-  slower than a single-region failover because it involves cross-
-  region DNS propagation and the secondary cluster must catch up on
-  the replication lag. Unmanaged failover (detach + promote manually)
-  is faster but requires application-level coordination.
-
-- **Application health checks may not detect a failover.** If the
-  application pings the database on a schedule (e.g., every 60
-  seconds), it may not notice the failover for up to 60 seconds. A
-  failover event should trigger an immediate connection refresh, not
-  wait for the next health check.
-
-- **The Aurora custom endpoint can route to the wrong instance after
-  failover.** A custom endpoint with static membership (listing
-  specific instance identifiers) does not update after failover.
-  Only the writer endpoint and reader endpoint are dynamic. Operators
-  who use custom endpoints for read/write separation must ensure the
-  custom endpoint uses the `ANY` or `READER` type, not `INSTANCE`.
 
 ### Step 1: Application connection string check
 
 Symptom: failover completed (new writer is active, cluster endpoint
 resolves correctly), but the application still cannot connect.
 
-```bash
-# Check what endpoint the application is using
-# Look for the connection string in the application configuration
-grep -r "rds.amazonaws.com" /path/to/app/config/
+> Moved verbatim to [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — load on demand.
 
-# Verify the cluster endpoint resolves to the new writer
-dig +short <cluster-endpoint>
-
-# Compare with the instance endpoint
-dig +short <instance-endpoint>
-```
 
 If the application uses the instance endpoint
 (`<cluster>-instance-1.<id>.<region>.rds.amazonaws.com`) instead of
@@ -365,22 +142,13 @@ endpoint) for transparent failover.
 Symptom: application uses the cluster endpoint but still hits the old
 instance for 30+ seconds after failover.
 
-```bash
-# Check DNS TTL for the Aurora cluster endpoint
-dig <cluster-endpoint> | grep "ANSWER SECTION" -A 5
+> Moved verbatim to [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — load on demand.
 
-# Aurora cluster endpoints have a 1-second TTL by default
-# If the application's DNS resolver ignores the TTL, the old IP persists
-```
 
 Check the application's DNS caching layers:
 
-| Layer | Default TTL | Fix |
-|---|---|---|
-| OS DNS resolver (systemd-resolved, dnsmasq) | 30-60 seconds | Set `cache-max-ttl` to 1 second, or disable caching |
-| JVM DNS cache (`networkaddress.cache.ttl`) | 60 seconds (Java 8+); some frameworks override | Set `-Dnetworkaddress.cache.ttl=1` |
-| Database driver connection pool (HikariCP, c3p0, pgxpool) | Varies; pools hold connections until closed | Set `maxLifetime` < 30s, or implement `onFailover` callback |
-| Application-level DNS cache | Varies | Disable or set TTL to 1 second |
+> Moved verbatim to [`references/error-handling.md`](references/error-handling.md) — load on demand.
+
 
 If a caching layer is holding the old IP,
 **ROOT_CAUSE_IDENTIFIED** with `ROOT_CAUSE: DNS_PROPAGATION_DELAY`
@@ -392,17 +160,8 @@ If a caching layer is holding the old IP,
 Symptom: primary instance is unhealthy (high CPU, stuck queries) but
 failover does not trigger.
 
-```bash
-aws rds describe-db-instances \
-  --db-instance-identifier <instance-id> --output json | \
-  jq '.DBInstances[] | {MultiAZ, DBInstanceStatus, AutomatedBackupRetentionPeriod}'
+> Moved verbatim to [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — load on demand.
 
-aws cloudwatch get-metric-statistics --namespace AWS/RDS \
-  --metric-name CPUUtilization \
-  --dimensions Name=DBInstanceIdentifier,Value=<instance-id> \
-  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Average,Maximum --output json
-```
 
 Multi-AZ failover triggers when:
 - The primary instance becomes unreachable (network partition).
@@ -424,17 +183,8 @@ on unreachability, not performance degradation.
 Symptom: Aurora failover completed, but the "wrong" instance became
 the new writer.
 
-```bash
-aws rds describe-db-clusters \
-  --db-cluster-identifier <cluster-id> --output json | \
-  jq '.DBClusters[].DBClusterMembers[] | {DBInstanceIdentifier,
-    IsClusterWriter, PromotionTier}'
+> Moved verbatim to [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — load on demand.
 
-# Check each instance's tier
-aws rds describe-db-instances --output json | \
-  jq '.DBInstances[] | select(.DBClusterIdentifier == "<cluster-id>") |
-    {DBInstanceIdentifier, DBInstanceClass, PromotionTier}'
-```
 
 Aurora failover promotion order:
 1. Lowest `PromotionTier` (tier 0 first).
@@ -447,11 +197,8 @@ instance has tier 0, the tier 0 instance is promoted.
 
 Fix: set the intended target to tier 0:
 
-```bash
-aws rds modify-db-instance \
-  --db-instance-identifier <target-instance> \
-  --promotion-tier 0 --apply-immediately
-```
+> Moved verbatim to [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — load on demand.
+
 
 ### Step 5: Storage-full check
 
@@ -459,17 +206,8 @@ Symptom: failover event appears in RDS events but the new writer does
 not become available. Error: `InsufficientStorage` or
 `FailoverFailed`.
 
-```bash
-aws rds describe-db-instances \
-  --db-instance-identifier <instance-id> --output json | \
-  jq '.DBInstances[] | {DBInstanceStatus, AllocatedStorage, StorageType}'
+> Moved verbatim to [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — load on demand.
 
-aws cloudwatch get-metric-statistics --namespace AWS/RDS \
-  --metric-name FreeStorageSpace \
-  --dimensions Name=DBInstanceIdentifier,Value=<instance-id> \
-  --start-time $(date -d '-2 hours' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Minimum --output json
-```
 
 If `FreeStorageSpace` is near zero (< 5 GB) or `DBInstanceStatus` is
 `storage-full`, **ROOT_CAUSE_IDENTIFIED** with
@@ -477,29 +215,16 @@ If `FreeStorageSpace` is near zero (< 5 GB) or `DBInstanceStatus` is
 
 Fix: increase allocated storage:
 
-```bash
-aws rds modify-db-instance \
-  --db-instance-identifier <instance-id> \
-  --allocated-storage <new-size> --apply-immediately
-```
+> Moved verbatim to [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — load on demand.
+
 
 ### Step 6: Parameter group mismatch
 
 Symptom: standby instance fails health checks during promotion. RDS
 events show a promotion failure with parameter-related errors.
 
-```bash
-# Compare parameter groups on primary and standby
-aws rds describe-db-instances --output json | \
-  jq '.DBInstances[] | select(.DBClusterIdentifier == "<cluster-id>") |
-    {DBInstanceIdentifier, DBParameterGroups, OptionGroupMemberships}'
+> Moved verbatim to [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — load on demand.
 
-# Check for pending parameter changes
-aws rds describe-db-instances \
-  --db-instance-identifier <instance-id> --output json | \
-  jq '.DBInstances[].DBParameterGroups[] | {DBParameterGroupName,
-    ParameterApplyStatus}'
-```
 
 If the primary and standby have different DB parameter groups with
 incompatible settings, the standby may fail during promotion.
@@ -507,30 +232,16 @@ incompatible settings, the standby may fail during promotion.
 
 Fix: align the parameter groups:
 
-```bash
-aws rds modify-db-instance \
-  --db-instance-identifier <standby-id> \
-  --db-parameter-group-name <primary-param-group> \
-  --apply-immediately
-```
+> Moved verbatim to [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — load on demand.
+
 
 ### Step 7: Option group conflict
 
 Symptom: standby cannot start the engine after promotion. RDS events
 show an option-group-related error.
 
-```bash
-# Compare option groups
-aws rds describe-db-instances --output json | \
-  jq '.DBInstances[] | select(.DBClusterIdentifier == "<cluster-id>") |
-    {DBInstanceIdentifier, OptionGroupMemberships}'
+> Moved verbatim to [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — load on demand.
 
-# Check for pending option group changes
-aws rds describe-db-instances \
-  --db-instance-identifier <instance-id> --output json | \
-  jq '.DBInstances[].OptionGroupMemberships[] | {OptionGroupName,
-    Status}'
-```
 
 If the option groups are incompatible (e.g., primary has TDE, standby
 does not), **ROOT_CAUSE_IDENTIFIED** with
@@ -538,31 +249,16 @@ does not), **ROOT_CAUSE_IDENTIFIED** with
 
 Fix: align the option groups:
 
-```bash
-aws rds modify-db-instance \
-  --db-instance-identifier <standby-id> \
-  --option-group-name <primary-option-group> \
-  --apply-immediately
-```
+> Moved verbatim to [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — load on demand.
+
 
 ### Step 8: Read replica promotion failure
 
 Symptom: a read replica (Aurora or cross-region) cannot be promoted
 to a standalone cluster/instance.
 
-```bash
-aws rds describe-db-instances \
-  --db-instance-identifier <replica-id> --output json | \
-  jq '.DBInstances[] | {DBInstanceStatus, ReadReplicaSourceDBInstanceIdentifier,
-    DBInstanceClass, AllocatedStorage}'
+> Moved verbatim to [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — load on demand.
 
-# Check replication lag
-aws cloudwatch get-metric-statistics --namespace AWS/RDS \
-  --metric-name AuroraReplicaLag \
-  --dimensions Name=DBInstanceIdentifier,Value=<replica-id> \
-  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Maximum --output json
-```
 
 Common promotion failures:
 - High replication lag (the replica has not caught up).
@@ -577,16 +273,8 @@ If any of these apply, **ROOT_CAUSE_IDENTIFIED** with
 
 Symptom: Aurora Global DB failover did not work or took too long.
 
-```bash
-aws rds describe-global-clusters \
-  --global-cluster-identifier <global-cluster-id> --output json | \
-  jq '.GlobalClusters[] | {GlobalClusterIdentifier, GlobalClusterMembers,
-    FailoverConfig}'
+> Moved verbatim to [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — load on demand.
 
-# Check the failover mode
-aws rds describe-global-clusters --output json | \
-  jq '.GlobalClusters[] | .FailoverConfig'
-```
 
 Managed failover (`failover-global-cluster`) is a control-plane
 operation that takes 1-5 minutes. Unmanaged failover (detach secondary
@@ -601,18 +289,8 @@ high replication lag, **ROOT_CAUSE_IDENTIFIED** with
 Symptom: RDS Proxy does not transparently handle failover; application
 sees connection errors.
 
-```bash
-aws rds describe-db-proxies \
-  --db-proxy-name <proxy-name> --output json | \
-  jq '.DBProxies[] | {DBProxyName, Status, EngineFamily,
-    TargetRole, RequireTLS}'
+> Moved verbatim to [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — load on demand.
 
-aws cloudwatch get-metric-statistics --namespace AWS/RDS \
-  --metric-name DatabaseConnections \
-  --dimensions Name=DBProxyIdentifier,Value=<proxy-id> \
-  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Average --output json
-```
 
 RDS Proxy should queue and reconnect during failover. If connections
 are being dropped instead of queued, check:
@@ -631,22 +309,16 @@ failover takes 120+ seconds.
 For Aurora, check if parallel recovery is enabled (engine-version
 dependent):
 
-```bash
-aws rds describe-db-clusters \
-  --db-cluster-identifier <cluster-id> --output json | \
-  jq '.DBClusters[] | {EngineVersion, DBClusterParameterGroup}'
-```
+> Moved verbatim to [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — load on demand.
+
 
 Aurora PostgreSQL 13+ supports parallel WAL replay. Aurora MySQL 8.0
 has optimised crash recovery. Older versions use serial recovery.
 
 For Multi-AZ, check the `recovery_mode` parameter:
 
-```bash
-aws rds describe-db-parameters \
-  --db-parameter-group-name <param-group> --output json | \
-  jq '.Parameters[] | select(.ParameterName == "recovery_mode")'
-```
+> Moved verbatim to [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — load on demand.
+
 
 If recovery mode is set to `full` instead of `optimized`,
 **ROOT_CAUSE_IDENTIFIED** with `ROOT_CAUSE: RECOVERY_MODE_FULL`.
@@ -656,22 +328,11 @@ If recovery mode is set to `full` instead of `optimized`,
 Symptom: failover occurred but no CloudWatch alarm or EventBridge rule
 fired.
 
-```bash
-# Check RDS events
-aws rds describe-events \
-  --source-identifier <cluster-id> --source-type db-cluster \
-  --start-time $(date -d '-2 hours' +%FT%TZ) --output json
+> Moved verbatim to [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — load on demand.
 
-# Check EventBridge rules for RDS
-aws events list-rules --output json | \
-  jq '.Rules[] | select(.EventPattern | contains("rds"))'
-```
 
-RDS failover events are emitted as:
-- `RDS-EVENT-0049`: A Multi-AZ failover has started.
-- `RDS-EVENT-0050`: A Multi-AZ failover has completed.
-- `RDS-EVENT-0088`: Aurora failover started.
-- `RDS-EVENT-0089`: Aurora failover completed.
+> Moved verbatim to [`references/error-handling.md`](references/error-handling.md) — load on demand.
+
 
 If no events appear in `describe-events`, the failover may not have
 triggered at the RDS service level. If events appear but no alarm
@@ -745,56 +406,13 @@ CONFIRM: Before updating the application configuration, confirm:
 
 ### Worked example — Connection pool caching
 
-```text
-TARGET: prod-db-cluster, application orders-api (Java/Spring Boot)
-VERDICT: ROOT_CAUSE_IDENTIFIED
-REASON: The Aurora failover completed at 14:23 UTC (10 seconds). The
-  application uses the correct cluster endpoint. DNS TTL is 1 second.
-  However, the application did not recover until 14:26 UTC (3 minutes
-  later). The JVM DNS cache (networkaddress.cache.ttl) is set to 60
-  seconds (Java default), and the HikariCP connection pool has
-  maxLifetime=300 (5 minutes). The connection pool held stale
-  connections to the old writer IP for up to 5 minutes.
-ROOT_CAUSE: CONNECTION_POOL_CACHING
-EVIDENCE:
-  - Symptom: application errors cleared at 14:26 UTC — 3 minutes
-    after the failover completed at 14:23 UTC.
-  - Probe: aws rds describe-events shows failover completed at
-    14:23:12 UTC.
-  - Probe: dig prod-db-cluster.cluster-xxxx shows TTL 1 (correct).
-  - Probe: JVM startup flags show -Dnetworkaddress.cache.ttl=60
-    (not overridden; Java default).
-  - Probe: HikariCP config shows maxLifetime=300000 (5 minutes).
-  - Passing: application uses the cluster endpoint (not the instance
-    endpoint); OS DNS resolver TTL is 1 second.
-REMEDIATION:
-  1. Set JVM DNS cache TTL to 1 second:
-     -Dnetworkaddress.cache.ttl=1
-  2. Reduce HikariCP maxLifetime to 30 seconds or implement an
-     onFailover callback that evicts stale connections:
-     spring.datasource.hikari.max-lifetime=30000
-  3. Alternatively, use the AWS Advanced JDBC Driver (Wrapper) which
-     handles failover transparently without connection pool changes.
-  4. Verify by triggering a test failover and confirming recovery
-     within 30 seconds.
-```
+> Moved verbatim to [`references/worked-examples.md`](references/worked-examples.md) — load on demand.
+
 
 ### Worked example — INSUFFICIENT_DATA
 
-```text
-TARGET: unknown (cluster identifier not provided)
-VERDICT: INSUFFICIENT_DATA
-REASON: The operator reported "Aurora failover did not work" but
-  did not provide the cluster identifier, the observed symptom, or
-  the application connection string.
-ROOT_CAUSE: UNKNOWN
-EVIDENCE:
-  - Missing: cluster identifier, symptom description, application
-    connection string
-REMEDIATION: Re-prompt for: (1) the DBClusterIdentifier, (2) the
-  observed symptom (did not trigger, took too long, app errors), and
-  (3) the application connection string.
-```
+> Moved verbatim to [`references/worked-examples.md`](references/worked-examples.md) — load on demand.
+
 
 ## Anti-Patterns — NEVER
 
@@ -885,199 +503,33 @@ REMEDIATION: Re-prompt for: (1) the DBClusterIdentifier, (2) the
 
 ## Remediation guidance
 
-### For APP_NOT_CLUSTER_ENDPOINT
+> Moved verbatim to [`references/error-handling.md`](references/error-handling.md) — load on demand.
 
-Update the application connection string to use the cluster endpoint:
-
-```text
-# Writer endpoint (for read/write workloads):
-<cluster>.cluster-<id>.<region>.rds.amazonaws.com
-
-# Reader endpoint (for read-only workloads):
-<cluster>.cluster-ro-<id>.<region>.rds.amazonaws.com
-```
-
-### For DNS_PROPAGATION_DELAY
-
-Set JVM DNS cache TTL:
-```
--Dnetworkaddress.cache.ttl=1
-```
-
-Set OS DNS resolver max TTL (systemd-resolved):
-```bash
-# /etc/systemd/resolved.conf
-[Resolve]
-Cache=no
-```
-
-### For CONNECTION_POOL_CACHING
-
-Reduce connection pool `maxLifetime` to 30 seconds or implement
-failover-aware connection eviction. Use the AWS Advanced JDBC Driver
-or AWS Advanced Python Driver for transparent failover handling.
-
-### For MULTI_AZ_HEALTH_THRESHOLD
-
-Multi-AZ failover only triggers on unreachability, not performance
-degradation. If the primary is degraded but responsive, consider:
-- Adding a performance-based failover trigger via EventBridge + Lambda.
-- Using Aurora (which has faster failover than Multi-AZ).
-
-### For FAILOVER_PRIORITY_TIER
-
-```bash
-aws rds modify-db-instance \
-  --db-instance-identifier <target-instance> \
-  --promotion-tier 0 --apply-immediately
-```
-
-### For STORAGE_FULL
-
-```bash
-aws rds modify-db-instance \
-  --db-instance-identifier <instance-id> \
-  --allocated-storage <new-size> --apply-immediately
-```
-
-Set up a CloudWatch alarm on `FreeStorageSpace` < 10% to catch this
-before the next failover.
-
-### For PARAMETER_GROUP_MISMATCH
-
-```bash
-aws rds modify-db-instance \
-  --db-instance-identifier <standby-id> \
-  --db-parameter-group-name <primary-param-group> \
-  --apply-immediately
-```
-
-### For OPTION_GROUP_CONFLICT
-
-```bash
-aws rds modify-db-instance \
-  --db-instance-identifier <standby-id> \
-  --option-group-name <primary-option-group> \
-  --apply-immediately
-```
-
-### For AURORA_GLOBAL_FAILOVER_MODE
-
-Managed failover:
-```bash
-aws rds failover-global-cluster \
-  --global-cluster-identifier <global-cluster-id> \
-  --target-db-cluster-identifier <secondary-cluster-arn>
-```
-
-Unmanaged failover (faster, requires manual coordination):
-```bash
-aws rds remove-from-global-cluster \
-  --db-cluster-identifier <secondary-cluster-arn>
-aws rds promote-read-replica-db-cluster \
-  --db-cluster-identifier <secondary-cluster-id>
-```
-
-### For RDS_PROXY_POOL_DRAIN
-
-Check and update proxy target group settings. Ensure
-`ConnectionBorrowTimeout` is set to a value that tolerates the
-failover drain window (5-30 seconds).
-
-### For RECOVERY_MODE_FULL
-
-Update the parameter group to use optimised recovery:
-
-```bash
-aws rds modify-db-cluster \
-  --db-cluster-identifier <cluster-id> \
-  --db-cluster-parameter-group-name <param-group-with-optimized-recovery>
-```
-
-### For READ_REPLICA_PROMOTION_FAILURE
-
-Address the underlying issue (replication lag, storage, network):
-- Wait for replication lag to drop to zero.
-- Increase storage if storage-full.
-- Check cross-region network connectivity.
-
-Then retry promotion:
-```bash
-aws rds promote-read-replica-db-cluster \
-  --db-cluster-identifier <replica-cluster-id>
-```
 
 ## Deep reference: Aurora and Multi-AZ failover model
 
-### Aurora cluster endpoint types
+> Moved verbatim to [`references/aurora-endpoint-reference.md`](references/aurora-endpoint-reference.md) — load on demand.
 
-| Endpoint type | ARN pattern | Behaviour after failover |
-|---|---|---|
-| Writer (cluster) endpoint | `<cluster>.cluster-<id>.<region>.rds.amazonaws.com` | Resolves to the new writer (dynamic) |
-| Reader endpoint | `<cluster>.cluster-ro-<id>.<region>.rds.amazonaws.com` | Load-balances across reader instances (dynamic) |
-| Custom endpoint | `<cluster>.custom-<id>.<region>.rds.amazonaws.com` | Routes to specified instances (static membership if type=INSTANCE) |
-| Instance endpoint | `<instance>.<id>.<region>.rds.amazonaws.com` | Resolves to a specific instance (does NOT follow failover) |
 
-### Failover timeline comparison
+> Moved verbatim to [`references/failover-priority-reference.md`](references/failover-priority-reference.md) — load on demand.
 
-| Phase | Aurora | Multi-AZ |
-|---|---|---|
-| Detection | 5-10 seconds | 30-60 seconds |
-| Promotion | 5-15 seconds (parallel recovery) | 60-120 seconds (full recovery) |
-| DNS update | < 1 second (TTL 1s) | < 30 seconds (TTL varies) |
-| Total | 10-30 seconds | 60-120 seconds |
 
-### Failover priority tier matrix
+> Moved verbatim to [`references/advanced-patterns.md`](references/advanced-patterns.md) — load on demand.
 
-| Tier | Promotion order | Typical use |
-|---|---|---|
-| 0 | First | Intended failover target (largest instance) |
-| 1 | Second | Secondary failover target |
-| 2-14 | By tier | Lower-priority instances |
-| 15 (default) | Last | Replicas not intended for promotion |
-
-### Aurora Global DB failover modes
-
-| Mode | Command | Duration | Application impact |
-|---|---|---|---|
-| Managed | `failover-global-cluster` | 1-5 minutes | DNS update across regions; application must reconnect |
-| Unmanaged | `remove-from-global-cluster` + `promote-read-replica-db-cluster` | 30-60 seconds | Manual DNS update required; application must point to new region |
-
-### RDS event codes for failover
-
-| Event code | Meaning |
-|---|---|
-| RDS-EVENT-0049 | Multi-AZ failover started |
-| RDS-EVENT-0050 | Multi-AZ failover completed |
-| RDS-EVENT-0088 | Aurora failover started |
-| RDS-EVENT-0089 | Aurora failover completed |
-| RDS-EVENT-0065 | DB instance has insufficient storage |
-| RDS-EVENT-0006 | DB instance failover failed |
 
 ## Recent AWS features (2024-2026)
 
-- **Aurora PostgreSQL 16+ parallel query recovery (2024-2025):**
-  Further reduces failover time from 15 seconds to 8-10 seconds for
-  large clusters. Enabled automatically; no configuration needed.
-- **Aurora Global DB managed planned failover (2024):** New
-  `planned-failover` mode for scheduled regional migrations with zero
-  data loss. Different from the emergency managed failover.
-- **RDS Proxy multi-AZ awareness (2024-2025):** Proxy automatically
-  routes to the new writer after Multi-AZ failover, reducing
-  connection errors to near zero. Previously, Proxy required manual
-  target group updates.
-- **AWS Advanced JDBC Driver failover mode (2024-2025):** Open-source
-  driver wrapper that monitors Aurora cluster topology and redirects
-  connections transparently after failover. Eliminates the JVM DNS
-  cache and connection pool caching issues.
-- **Aurora Serverless v2 failover (2024-2026):** Serverless v2
-  clusters support failover priority tiers identical to provisioned
-  Aurora. The ACU capacity of the promoted instance may start low and
-  scale up during the post-failover window.
-- **RDS Automated Multi-AZ failover for storage issues (2025):** RDS
-  now triggers Multi-AZ failover on storage subsystem failures (not
-  just instance unreachability). Reduces the window for
-  storage-related outages.
+> Moved verbatim to [`references/advanced-patterns.md`](references/advanced-patterns.md) — load on demand.
+
+
+## References (load on demand)
+
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — account-wide pre-flight sweep and every Step 1-12 probe/fix CLI listing.
+- [references/error-handling.md](references/error-handling.md) — malformed-input INSUFFICIENT_DATA contract, DNS caching fix table, failover event codes, full per-root-cause remediation guidance.
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples (connection pool caching, INSUFFICIENT_DATA).
+- [references/advanced-patterns.md](references/advanced-patterns.md) — quick-start bullets, mindset, philosophy, Step 0 non-obvious behaviours, Global DB failover modes, recent AWS features, AWS documentation links.
+- [references/aurora-endpoint-reference.md](references/aurora-endpoint-reference.md) — Aurora cluster endpoint types and post-failover behaviour.
+- [references/failover-priority-reference.md](references/failover-priority-reference.md) — failover timeline comparison and promotion tier matrix.
 
 ## Domain
 
@@ -1087,13 +539,5 @@ and RDS Proxy.
 
 ## AWS documentation
 
-- **Amazon Aurora User Guide — Managing Aurora cluster endpoints** — https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.Overview.Endpoints.html
-- **Aurora high availability and failover** — https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Concepts.AuroraHighAvailability.html
-- **Multi-AZ deployments** — https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.MultiAZ.html
-- **Aurora Global Database** — https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database.html
-- **RDS Proxy** — https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-proxy.html
-- **Aurora failover priority** — https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-mysql-cluster.html#aurora-mysql-cluster-failover
-- **RDS events** — https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_Events.html
-- **AWS Advanced JDBC Driver** — https://github.com/aws/aws-advanced-jdbc-wrapper
-- **Managing DB parameter groups** — https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithParamGroups.html
-- **Promoting a read replica** — https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ReadRepl.html
+> Moved verbatim to [`references/advanced-patterns.md`](references/advanced-patterns.md) — load on demand.
+

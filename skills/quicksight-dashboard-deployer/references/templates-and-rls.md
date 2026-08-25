@@ -196,3 +196,72 @@ resource "aws_quicksight_data_set" "sales" {
   }
 }
 ```
+
+
+## Step 6 — Template-based deployment commands
+
+**Create template from analysis:**
+
+```bash
+aws quicksight create-template \
+  --aws-account-id 123456789012 \
+  --template-id "sales-template" \
+  --name "Sales Dashboard Template" \
+  --source-entity '{"SourceAnalysis":{"Arn":"arn:aws:quicksight:us-east-1:123456789012:analysis/sales-analysis","DataSetReferences":[{"DataSetPlaceholder":"sales-data","DataSetArn":"arn:aws:quicksight:us-east-1:123456789012:dataset/ds-sales-metrics"}]}}' \
+  --version-description "v1.0" \
+  --region us-east-1
+```
+
+**Create dashboard from template (per tenant):**
+
+```bash
+aws quicksight create-dashboard \
+  --aws-account-id 123456789012 \
+  --dashboard-id "tenant-a-sales" \
+  --name "Tenant A Sales Dashboard" \
+  --source-entity '{"SourceTemplate":{"Arn":"arn:aws:quicksight:us-east-1:123456789012:template/sales-template","DataSetReferences":[{"DataSetPlaceholder":"sales-data","DataSetArn":"arn:aws:quicksight:us-east-1:123456789012:dataset/ds-tenant-a-sales"}]}}' \
+  --version-description "Tenant A v1" \
+  --region us-east-1
+```
+
+**Propagate template update to tenant dashboards:**
+
+```bash
+aws quicksight update-template \
+  --aws-account-id 123456789012 \
+  --template-id "sales-template" \
+  --source-entity '{"SourceAnalysis":{"Arn":"arn:aws:quicksight:us-east-1:123456789012:analysis/sales-analysis","DataSetReferences":[{"DataSetPlaceholder":"sales-data","DataSetArn":"arn:aws:quicksight:us-east-1:123456789012:dataset/ds-sales-metrics"}]}}' \
+  --region us-east-1
+
+aws quicksight update-dashboard \
+  --aws-account-id 123456789012 \
+  --dashboard-id "tenant-a-sales" \
+  --source-entity '{"SourceTemplate":{"Arn":"arn:aws:quicksight:us-east-1:123456789012:template/sales-template","DataSetReferences":[{"DataSetPlaceholder":"sales-data","DataSetArn":"arn:aws:quicksight:us-east-1:123456789012:dataset/ds-tenant-a-sales"}]}}' \
+  --version-description "Updated from template v2" \
+  --region us-east-1
+```
+
+
+## Step 7 — Row-level security commands
+
+**Create RLS rules dataset (maps users to allowed column values):**
+
+```bash
+aws quicksight create-data-set \
+  --aws-account-id 123456789012 \
+  --data-set-id "ds-sales-rls" \
+  --name "Sales RLS Rules" \
+  --import-mode SPICE \
+  --physical-table-map '{"rls-table":{"RelationalTable":{"DataSourceArn":"arn:aws:quicksight:us-east-1:123456789012:datasource/ds-athena-prod","Schema":"rls","Name":"sales_rls_rules","InputColumns":[{"Name":"UserName","Type":"STRING"},{"Name":"Region","Type":"STRING"}]}}}' \
+  --region us-east-1
+```
+
+**Enable RLS on the dataset using the RLS rules dataset:**
+
+```bash
+aws quicksight update-data-set \
+  --aws-account-id 123456789012 \
+  --data-set-id "ds-sales-metrics" \
+  --row-level-permission-data-set '{"Arn":"arn:aws:quicksight:us-east-1:123456789012:dataset/ds-sales-rls","PermissionPolicy":"GRANT_ACCESS","FormatVersion":"VERSION_1","Namespace":"default","Status":"ENABLED"}' \
+  --region us-east-1
+```

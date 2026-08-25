@@ -125,116 +125,8 @@ REMEDIATION: Re-fetch with `aws redshift describe-clusters --cluster-identifier 
 
 ### Step 0: Expert knowledge — non-obvious Redshift behaviours that change classification
 
-These behaviours are easy to misjudge without operational Redshift experience.
-Each changes a verdict if ignored:
-
-- **`PubliclyAccessible: false` does NOT mean "no internet exposure" if a
-  NAT Gateway + routing path exists.** Redshift with
-  `PubliclyAccessible: false` is unreachable from the public internet
-  (no public IP assigned). However, `COPY` from / `UNLOAD` to public S3
-  endpoints still traverses the internet unless `EnhancedVPCRouting:
-  true` is set. The two flags are independent — privacy of the *cluster
-  endpoint* and privacy of the *data-path for bulk transfers* are
-  separate concerns.
-
-- **`require_ssl` parameter applies to client connections, not intra-
-  cluster traffic.** Setting `require_ssl: true` forces SQL clients to
-  connect over TLS. It does NOT encrypt the wire between compute nodes
-  (which is always TLS-protected internally on RA3 / Serverless) and
-  does NOT encrypt `COPY`/`UNLOAD` traffic (which is HTTPS to S3
-  regardless). The compliance question "is TLS enforced?" is answered
-  by this parameter for client connections.
-
-- **The default parameter group is read-only.** `default.redshift-1.0`
-  cannot be modified. A cluster using the default PG with
-  `require_ssl: false` and `Source: engine-default` is reporting the
-  Redshift engine default — the operator may not have actively decided.
-  Remediation requires creating a custom PG, setting `require_ssl: true`,
-  associating it with the cluster, AND rebooting. Treat the
-  `Source: engine-default` signal as "operator has not hardened this"
-  rather than "operator chose plaintext".
-
-- **`Encrypted: true` + `KmsKeyId: null` uses the AWS-managed key
-  `aws/redshift`.** The AWS-managed key rotates annually on AWS's
-  schedule, has a policy controlled by AWS, and cannot be cross-account
-  shared. Compliance frameworks (PCI-DSS, HIPAA, SOC 2) generally accept
-  AWS-managed keys, but high-assurance audits require customer-managed
-  keys for rotation control. Note the distinction in FINDINGS; do NOT
-  flag the AWS-managed key as a security gap.
-
-- **Encryption is immutable per cluster.** Unlike RDS (snapshot + copy
-  toggles encryption) or EBS (online modify), Redshift encryption is
-  fixed at cluster creation. To "enable" encryption on an unencrypted
-  cluster you must: (1) provision a new encrypted cluster, (2) `UNLOAD`
-  data to S3 (prefer Parquet with columnar compression), (3) `COPY`
-  into the new cluster, (4) redirect downstream BI / ETL tools, (5)
-  decommission the old cluster once queries validated. This is a
-  multi-day migration, not a CLI toggle. State this explicitly in
-  remediation — operators asking "can I just flip encryption on?" must
-  be corrected.
-
-- **`AutomatedSnapshotRetentionPeriod: 0` deletes existing automated
-  snapshots within hours.** Setting retention to zero does NOT just stop
-  future snapshots — Redshift begins expiring existing automated
-  snapshots immediately (typically within the next snapshot window,
-  ~1 hour). Manual snapshots are NOT affected. If an operator sets
-  retention to 0 to "save cost" without first converting critical
-  automated snapshots to manual, they lose PITR irreversibly.
-
-- **`AutomatedSnapshotRetentionPeriod` range is 0 to 35.** Values above
-  35 are rejected by the API. The default is 1 day (effectively
-  overnight-only recovery). Compliance postures typically require 7+;
-  35 is the maximum. Manual snapshots have no retention cap and persist
-  until explicitly deleted.
-
-- **`enable_user_activity_logging` is a parameter-group setting distinct
-  from `aws redshift enable-logging`.** The `enable-logging` API
-  exports audit events (connections, DDL, DML authorisation checks) to
-  S3 in near-real-time. The `enable_user_activity_logging` parameter
-  logs every SQL statement to the STL_QUERY system table at high
-  volume. Both are needed for full forensic coverage: enable-logging
-  gives you a tamper-evident S3 trail; user_activity_logging gives you
-  the full query text. Treat `enable-logging` off as NO_AUDIT_LOG; treat
-  `enable_user_activity_logging` off as an additive CONFIG_GAP finding.
-
-- **`EnhancedVPCRouting: false` is the engine default.** With it off,
-  `COPY` and `UNLOAD` traffic leaves the cluster over the public AWS
-  network path to S3 (HTTPS, still encrypted, but not subject to your
-  VPC's security groups, network ACLs, or VPC endpoints). With it on,
-  that traffic flows through your VPC, enabling S3 Gateway VPC endpoint
-  enforcement. Many compliance frameworks require EnhancedVPCRouting on
-  because it closes the "data-path bypasses network controls" gap.
-
-- **The Redshift cluster port defaults to 5439, not 5432.** A common
-  misconfiguration copies RDS-style SG rules permitting TCP 5432 from
-  app CIDRs, which silently fail to permit any traffic. Conversely,
-  `0.0.0.0/0` on TCP 5439 is the canonical "cluster open to the world"
-  SG rule. The port is configurable at cluster creation
-  (`ClusterPort`, range 1150-65535); JK SecureListen deployments use
-  5440. Always read the actual port from `Endpoint.Port`, not assume.
-
-- **Snapshot copy grants cross-region DR but is configured separately.**
-  `ClusterSnapshotCopyStatus` (present on the cluster) reports whether
-  automated snapshots are copied to a DR region. Absent
-  `DestinationRegion` is a DR gap (not a security verdict driver, but
-  noted in FINDINGS as resilience).
-
-- **A paused cluster still incurs storage charges and still has its
-  encryption + SG posture.** Pause is a cost-optimisation action, not a
-  security control. Do not treat paused clusters as safer; their
-  configuration dimensions audit identically to available clusters.
-
-- **`PubliclyAccessible: true` on a single-node cluster is the worst-
-  case Redshift exposure.** Single-node clusters have no replication
-  and no HA — an attacker with the credentials (or a CVE) has access to
-  the entire dataset with no redundancy to recover from destructive
-  queries. Treat as PUBLIC with an additional operational risk note.
-
-- **CloudTrail logs Redshift *control-plane* events (CreateCluster,
-  ModifyCluster, DeleteCluster) by default.** It does NOT log data-
-  plane SQL queries — that is what `enable-logging` (S3 audit logs) is
-  for. "We have CloudTrail, so we have audit coverage" is a false
-  belief for Redshift data-plane activity.
+Fourteen non-obvious Redshift behaviours (PubliclyAccessible vs EnhancedVPCRouting, require_ssl scope, read-only default parameter group, AWS-managed key, encryption immutability, snapshot retention expiry and range, enable-logging vs enable_user_activity_logging, port 5439, cross-region snapshot copy, paused clusters, single-node exposure, CloudTrail control-plane only): moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load before classification; Steps 1-6 below assume these constraints.
 
 ### Step 1: Public accessibility (highest priority — internet-exposed data warehouse)
 
@@ -413,52 +305,8 @@ REMEDIATION:
 
 ## Edge-case handling
 
-- **Cluster in `modifying` / `rebooting` state.** Audit normally. Note
-  in FINDINGS that parameter-group changes may be pending; the verdict
-  reflects the *current effective* state, not the pending one.
-
-- **Cluster using `default.redshift-1.0` parameter group.** Default PGs
-  are read-only — `require_ssl` and `enable_user_activity_logging`
-  cannot be modified in place. Remediation requires creating a custom
-  PG, associating, and rebooting. Surface this explicitly so operators
-  do not attempt `modify-cluster-parameter-group` on the default PG
-  (which fails).
-
-- **Multi-AZ deployment.** `MultiAZ: true` (on supported node types) is
-  an availability dimension, not a security dimension. Note its presence
-  or absence as an operational finding; do not let it drive the verdict.
-
-- **RA3 vs DC2 / DS2 node types.** DS2 (dense storage) is end-of-life
-  and being forcibly retired. DC2 (dense compute) is current for
-  compute-bound workloads. RA3 (managed storage) is the recommended
-  current generation with separated compute + storage. Flag DS2 in
-  FINDINGS as a deprecation risk (operational, not a verdict driver).
-
-- **HSM-encrypted legacy cluster.** `HsmClientCertificateIdentifier` set
-  + `Encrypted: true` indicates pre-2017 HSM-managed encryption. Treat
-  as Encrypted OK for Step 2; flag in FINDINGS that HSM integration is
-  deprecated and the cluster should be migrated to KMS-managed
-  encryption.
-
-- **ClusterSnapshotCopyStatus present.** Cross-region snapshot copy is
-  configured. Note in FINDINGS as a positive resilience signal. Absent
-  on a production cluster is a CONFIG_GAP (resilience, not security).
-
-- **Redshift Serverless input.** Serverless workgroups do not have
-  `PubliclyAccessible` or `ClusterParameterGroupName`. They have a
-  `config-parameters` list including `require_ssl` and the base network
-  is always VPC-only. Do NOT attempt to apply this skill to Serverless —
-  emit ERROR with a routing note.
-
-- **Cluster with `KmsKeyId: null` AND `Encrypted: true`.** AWS-managed
-  key in use. Treat as Encrypted OK; note the AWS-managed vs
-  customer-managed distinction in FINDINGS. Recommend CMK for
-  high-assurance compliance postures.
-
-- **`Endpoint.Port` is non-default.** Always read the cluster port from
-  `Endpoint.Port` (range 1150-65535). SG rules matching TCP 5439 are
-  the canonical check, but if the cluster uses 5440 (JK SecureListen)
-  or any custom port, evaluate SG ingress on the actual port.
+Nine edge cases (modifying/rebooting states, default parameter group, Multi-AZ, RA3/DC2/DS2 node types, HSM legacy, snapshot copy status, Serverless deferral, AWS-managed key, non-default port): moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Consult after the ordered steps when the cluster metadata is unusual.
 
 ## Anti-Patterns — NEVER
 
@@ -547,49 +395,8 @@ REMEDIATION:
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any destructive or
-  state-changing operation (`modify-cluster`, `reboot-cluster`,
-  `enable-logging`, `disable-logging`, `delete-cluster`,
-  `modify-cluster-snapshot-schedule`), the auditor MUST emit:
-  `CONFIRM: About to <action> on cluster <id> in account <account>.
-  This affects <consequence>. Proceed? (yes/no)`
-  Do NOT execute the CLI command until the operator confirms. This
-  gate prevents automated pipelines from silently modifying data
-  warehouses.
-- **Reboot warnings.** `modify-cluster` changes to
-  `ClusterParameterGroupName`, `EnhancedVPCRouting`, `PubliclyAccessible`,
-  or `Encrypted` (not supported — see Step 2) require a cluster reboot.
-  Reboots terminate in-flight queries, fail over leader-node connections,
-  and may take 10-30 minutes on large clusters. Surface this BEFORE the
-  operator approves.
-- **Encryption migration is irreversible and multi-day.** A NO_ENCRYPTION
-  remediation involves provisioning a new cluster, UNLOAD/COPY migration,
-  application cutover, and decommissioning. Do NOT represent this as a
-  one-step CLI command. Provide the full migration workflow and warn
-  that downstream BI tools must be repointed.
-- **Snapshot before parameter-group or routing changes.** Capture the
-  current state with a manual snapshot before modifying the parameter
-  group or enhanced VPC routing:
-  `aws redshift create-snapshot-cluster-schedule` or
-  `aws redshift create-cluster-snapshot --cluster-identifier <id>
-  --snapshot-identifier pre-audit-<id>-$(date +%s)`.
-  This is the rollback path if the new PG breaks query patterns.
-- **Confirm audit-log bucket ownership.** Before
-  `aws redshift enable-logging`, verify the S3 bucket exists, is in the
-  expected account, has object-lock or appropriate retention, and the
-  Redshift service principal can write to it. Misconfigured buckets
-  silently fail logging with no error surfaced in `describe-logging-status`
-  beyond `LoggingEnabled: false` and `LogFileLastWritten` stalling.
-- **Cross-region snapshot copy has cost implications.** Enabling
-  `modify-snapshot-copy-destination` incurs cross-region data transfer
-  + snapshot storage in the DR region. Surface the cost estimate before
-  recommending.
-- **Pre-flight for SG changes.** Before
-  `aws ec2 revoke-security-group-ingress`, verify no other cluster or
-  service shares the SG. Shared SGs are common in legacy Redshift
-  deployments — revoking a rule may break adjacent workloads. Use
-  `aws ec2 describe-network-interfaces --groups <sg-id>` to check
-  associations first.
+Seven pre-flight safety checks (CONFIRM gate, reboot warnings, encryption migration scope, pre-change snapshot, audit bucket ownership, cross-region cost, shared-SG verification): moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Defense-in-depth before any remediation CLI.
 
 ## Remediation guidance
 
@@ -599,148 +406,13 @@ logging, associate a new PG), destructive / state-changing changes last
 two findings that cannot be silently fixed in place — plan migrations,
 not toggles.
 
-### For PUBLIC — public accessibility (Step 1)
-
-1. **If public access is NOT intentional:** set
-   `PubliclyAccessible: false` and reboot. CLI:
-   ```bash
-   aws redshift modify-cluster --cluster-identifier <id> \
-     --no-publicly-accessible --profile <p>
-   aws redshift reboot-cluster --cluster-identifier <id> --profile <p>
-   ```
-   This requires a maintenance window; queries in flight are terminated.
-2. **If public access IS intentional** (rare — partner-data workload
-   with no VPC peering): restrict the SG to the specific partner
-   CIDRs. Do NOT leave `0.0.0.0/0` on the cluster port. Require SSL.
-3. **Verify** with `aws redshift describe-clusters --cluster-identifier
-   <id>` that `PubliclyAccessible: false` is effective.
-4. **Assume breach.** Audit CloudTrail for `ModifyCluster` calls
-   during the exposure window. Check S3 audit logs (if enabled) for
-   unexpected source IPs in STL_CONNECTION_LOG.
-
-### For NO_ENCRYPTION — encryption-at-rest (Step 2)
-
-There is NO in-place remediation. The migration workflow:
-
-1. Provision a new encrypted cluster (preferably RA3 with a CMK):
-   ```bash
-   aws redshift create-cluster --cluster-identifier <id>-encrypted \
-     --node-type ra3.xlplus --number-of-nodes <n> \
-     --master-username <u> --master-user-password <pwd> \
-     --encrypted --kms-key-id <cmk-arn> \
-     --cluster-subnet-group-name <sg> --vpc-security-group-ids <sg-id> \
-     --cluster-parameter-group-name <custom-pg-with-require-ssl> \
-     --publicly-accessible false --enhanced-vpc-routing --profile <p>
-   ```
-2. `UNLOAD` from the old cluster to S3 (Parquet recommended):
-   ```sql
-   UNLOAD ('SELECT * FROM schema.table')
-   TO 's3://migration-bucket/<id>/'
-   IAM_ROLE '<role-arn>' FORMAT PARQUET ENCRYPTED;
-   ```
-3. `COPY` into the new cluster:
-   ```sql
-   COPY schema.table FROM 's3://migration-bucket/<id>/'
-   IAM_ROLE '<role-arn>' FORMAT PARQUET;
-   ```
-4. Validate row counts, validate downstream BI dashboards, redirect
-   DNS / connection strings.
-5. Decommission the old cluster only after validation:
-   ```bash
-   aws redshift delete-cluster --cluster-identifier <id> \
-     --final-cluster-snapshot-identifier final-<id>-$(date +%s)
-   ```
-   Always take a final manual snapshot before deletion.
-
-### For NO_SSL — require_ssl enforcement (Step 3)
-
-1. Create a custom parameter group:
-   ```bash
-   aws redshift create-cluster-parameter-group \
-     --parameter-group-name require-ssl-pg \
-     --parameter-group-family redshift-1.0 \
-     --description "Custom PG with require_ssl" --profile <p>
-   aws redshift modify-cluster-parameter-group \
-     --parameter-group-name require-ssl-pg \
-     --parameters ParameterName=require_ssl,ParameterValue=true \
-     --profile <p>
-   ```
-2. Associate with the cluster (requires reboot):
-   ```bash
-   aws redshift modify-cluster --cluster-identifier <id> \
-     --cluster-parameter-group-name require-ssl-pg --profile <p>
-   aws redshift reboot-cluster --cluster-identifier <id> --profile <p>
-   ```
-3. Verify: `aws redshift describe-cluster-parameters
-   --parameter-group-name require-ssl-pg` shows `require_ssl: true`.
-
-### For NO_AUDIT_LOG — S3 audit logging (Step 4)
-
-1. Enable logging:
-   ```bash
-   aws redshift enable-logging --cluster-identifier <id> \
-     --log-destination-name S3 --bucket-name <audit-bucket> \
-     --s3-key-prefix redshift/<id>/ --profile <p>
-   ```
-2. Verify: `aws redshift describe-logging-status --cluster-identifier
-   <id>` shows `LoggingEnabled: true`.
-3. Verify bucket ownership and retention policy separately — S3 audit
-   logs are only useful if the bucket is tamper-evident (object-lock
-   recommended).
-4. For full forensic coverage, also set
-   `enable_user_activity_logging: true` in the parameter group.
-
-### For CONFIG_GAP — sub-finding remediation
-
-**Automated snapshots disabled (retention 0):**
-```bash
-aws redshift modify-cluster --cluster-identifier <id> \
-  --automated-snapshot-retention-period 7 --profile <p>
-```
-Re-enable within the snapshot window to recover PITR. Compliance
-postures typically require 7-35 days.
-
-**Enhanced VPC routing off:**
-```bash
-aws redshift modify-cluster --cluster-identifier <id> \
-  --enhanced-vpc-routing --profile <p>
-aws redshift reboot-cluster --cluster-identifier <id> --profile <p>
-```
-After enabling, COPY/UNLOAD traffic flows through your VPC — verify S3
-Gateway VPC endpoint exists or COPY/UNLOAD may fail.
-
-**SG with 0.0.0.0/0 on cluster port:**
-```bash
-aws ec2 revoke-security-group-ingress --group-id <sg-id> \
-  --ip-permissions IpProtocol=tcp,FromPort=<cluster-port>,ToPort=<cluster-port>,IpRanges=[{CidrIp=0.0.0.0/0}] \
-  --profile <p>
-aws ec2 authorize-security-group-ingress --group-id <sg-id> \
-  --ip-permissions IpProtocol=tcp,FromPort=<cluster-port>,ToPort=<cluster-port>,IpRanges=[{CidrIp=10.0.0.0/16}] \
-  --profile <p>
-```
-Verify no other resource shares this SG before revoking.
-
-**User-activity logging off:** set `enable_user_activity_logging: true`
-in the custom parameter group (same workflow as require_ssl).
-
-### For OK
-
-1. No remediation required.
-2. Recommend periodic re-audit (configuration drift is common on
-   long-running clusters).
-3. Recommend cross-referencing the KMS key policy via the
-   kms-key-policy-auditor skill when a CMK is in use.
-4. Recommend verifying the audit-log S3 bucket's object-lock / retention
-   policy separately.
-5. For multi-AZ clusters, verify the `MultiAZ` deployment status is
-   still in sync across AZs.
+Per-verdict remediation playbooks with full CLI blocks (PUBLIC, NO_ENCRYPTION UNLOAD/COPY migration, NO_SSL custom parameter group, NO_AUDIT_LOG enable-logging, CONFIG_GAP sub-findings, OK follow-ups): moved verbatim to [references/remediation-procedures.md](references/remediation-procedures.md).
+Emit per-finding remediation from that reference.
 
 ## Recent AWS features (2024-2026)
 
-- **Redshift Serverless GA and enhanced (2024-2025):** Redshift Serverless auto-scales compute based on workload. Auditors should note that Serverless workgroups have a different audit surface than provisioned clusters — verify encryption, VPC security groups, and `maxRPU` (base capacity) settings at the workgroup level.
-- **Zero-ETL integration with Aurora (2024-2025):** Redshift now supports Zero-ETL integration that replicates Aurora data to Redshift automatically. Auditors should verify that the Zero-ETL integration IAM role is scoped appropriately and that data replication does not bypass encryption requirements.
-- **Data sharing enhancements (2024):** Improved cross-namespace and cross-account data sharing. Auditors should verify that data share consumers have appropriate Lake Formation or Redshift-scoped permissions and that consumer namespaces are documented.
-- **Redshift ML improvements (2024):** Enhanced SageMaker integration for ML model creation from Redshift. Auditors should verify that the Redshift-SageMaker IAM role does not have wildcard permissions.
+Four recent AWS features 2024-2026 (Serverless enhancements, Aurora Zero-ETL, data sharing, Redshift ML): moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Consult before citing feature limits or recency.
 
 ## Related skills
 
@@ -754,6 +426,12 @@ in the custom parameter group (same workflow as require_ssl).
 - **s3-public-access-auditor:** audit the S3 bucket receiving UNLOAD
   exports or audit logs — a private cluster with a public UNLOAD bucket
   silently exfiltrates data.
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 non-obvious behaviours, edge-case handling, recent AWS features (2024-2026).
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — Pre-flight safety checks before any remediation CLI.
+- [references/remediation-procedures.md](references/remediation-procedures.md) — Per-verdict remediation playbooks with CLI blocks.
 
 ## Domain
 

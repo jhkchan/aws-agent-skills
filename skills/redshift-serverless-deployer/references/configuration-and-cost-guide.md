@@ -355,3 +355,31 @@ aws kms describe-key --key-id alias/redshift-dr --region <dest-region>
 aws redshift-serverless get-namespace --namespace-name <namespace> > /tmp/ns-backup.json
 aws redshift-serverless get-workgroup --workgroup-name <workgroup> > /tmp/wg-backup.json
 ```
+
+## Edge-case handling (from SKILL.md)
+
+- **Migrating from provisioned Redshift to Serverless:** use the
+  `restore-from-cluster-snapshot` flow. The snapshot is restored into
+  a new Serverless namespace. Database objects and data transfer;
+  cluster parameter groups do NOT transfer (Serverless uses
+  config-parameters on the workgroup).
+- **Cross-account data sharing:** use datashares. The producer account
+  creates a datashare; the consumer account creates a namespace and
+  references the datashare. NEVER share the namespace IAM role across
+  accounts.
+- **Multi-AZ requirement:** Redshift Serverless is multi-AZ by default
+  (subnet group must span 3+ AZs). There is no "single-AZ" mode.
+- **Zero-ETL from Aurora:** configured at the Aurora cluster, not the
+  Redshift namespace. The Aurora cluster needs a `redshift.amazonaws.com`
+  role to push data. Replication lag is typically seconds.
+- **Secrets Manager rotation:** the managed rotation Lambda runs every
+  30 days by default. Override with a custom rotation schedule via
+  Secrets Manager. The rotation updates BOTH the secret AND the
+  namespace admin password atomically.
+- **Usage limit reset:** when `breach-action=disable` triggers, the
+  workgroup stays disabled until the next billing period OR until you
+  manually delete the usage limit. NEVER use `disable` for production
+  without an on-call runbook.
+- **Cross-Region snapshot CMK deletion:** if you delete the
+  destination-Region CMK, snapshot copies fail silently. CloudWatch
+  metric `SnapshotCopyFailure` is the only signal. Set an alarm.

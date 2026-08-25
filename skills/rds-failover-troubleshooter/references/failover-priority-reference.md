@@ -188,3 +188,24 @@ group and option group. A mismatch prevents failover.
 
 Always verify option group alignment after modifying the primary's
 option group.
+
+## Failover timeline and priority tier matrix (moved from SKILL.md deep reference)
+
+### Failover timeline comparison
+
+| Phase | Aurora | Multi-AZ |
+|---|---|---|
+| Detection | 5-10 seconds | 30-60 seconds |
+| Promotion | 5-15 seconds (parallel recovery) | 60-120 seconds (full recovery) |
+| DNS update | < 1 second (TTL 1s) | < 30 seconds (TTL varies) |
+| Total | 10-30 seconds | 60-120 seconds |
+
+### Failover priority tier matrix
+
+| Tier | Promotion order | Typical use |
+|---|---|---|
+| 0 | First | Intended failover target (largest instance) |
+| 1 | Second | Secondary failover target |
+| 2-14 | By tier | Lower-priority instances |
+| 15 (default) | Last | Replicas not intended for promotion |
+

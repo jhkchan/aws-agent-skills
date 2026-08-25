@@ -258,3 +258,50 @@ resource "null_resource" "switchover" {
   depends_on = [aws_rds_blue_green_deployment.upgrade]
 }
 ```
+
+---
+
+## Step 7 — Switchover timeout configuration (moved from SKILL.md)
+
+The switchover timeout controls how long the switchover operation can
+run before it is rolled back. Default is 300 seconds (5 minutes).
+
+```bash
+# Set switchover timeout (e.g., 600 seconds for large databases)
+aws rds switchover-blue-green-deployment \
+  --blue-green-deployment-identifier "$BG_ID" \
+  --switchover-timeout 600 \
+  --region us-east-1
+```
+
+**Timeout guidance:**
+- Small databases (< 100 GB): 300 seconds (default) is sufficient.
+- Medium databases (100 GB – 1 TB): 600 seconds.
+- Large databases (> 1 TB): 1800 seconds (30 minutes).
+- If switchover times out, it rolls back — blue remains production.
+
+## Step 8 — Application connection string update (moved from SKILL.md)
+
+**The key benefit of Blue/Green:** applications using the RDS
+endpoint CNAME do NOT need connection string changes. The DNS switch
+is transparent.
+
+```text
+Before switchover:
+  prod-mysql-db.cluster-xxx.us-east-1.rds.amazonaws.com → BLUE (production)
+  green-prod-mysql-db.cluster-xxx.us-east-1.rds.amazonaws.com → GREEN (staging)
+
+After switchover:
+  prod-mysql-db.cluster-xxx.us-east-1.rds.amazonaws.com → GREEN (now production!)
+  green-prod-mysql-db.cluster-xxx.us-east-1.rds.amazonaws.com → BLUE (now staging)
+
+Application using prod-mysql-db endpoint: NO CHANGE NEEDED
+```
+
+**Applications that need attention:**
+- Applications with hardcoded IP addresses (not using the DNS
+  endpoint): MUST update the IP after DNS propagation.
+- Applications with long-lived connections: MUST reconnect after
+  switchover (connection retry logic handles this).
+- Applications with DNS caching: flush DNS cache after switchover.
+
