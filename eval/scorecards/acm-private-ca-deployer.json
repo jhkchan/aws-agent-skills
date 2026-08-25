@@ -7,63 +7,63 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds concrete expert knowledge not usually restated: a detailed configuration dependency graph, explicit parent\u2011CA create\u2011permission requirement, exact S3 bucket policy JSON, mandatory 7\u201130\u202fday deletion waiting period, and a decision\u2011tree style hierarchy selector. However, many sections (e.g., basic CLI steps, list of key algorithms) merely restate official documentation, so it falls short of a perfect 20."
+      "justification": "Introduces genuine expert insights not typically in baseline models: the mandatory parent CA create\u2011permission for subordinate CAs, the silent\u2011failure risk of missing CRL bucket policy, the 7\u201130\u202fday mandatory deletion waiting period, and a detailed decision\u2011tree hierarchy. However, large portions restate AWS documentation verbatim, limiting the delta to a high but not perfect level."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Provides AWS\u2011specific procedural flow (create\u2011CA \u2192 get\u2011CSR \u2192 issue\u2011certificate \u2192 import) and separate subordinate\u2011CA sequence, plus CRL bucket\u2011policy steps. Some checklist items are generic \"verify\" actions without AWS\u2011specific checks, preventing a full score."
+      "justification": "Encodes AWS\u2011specific procedural order (create\u2011CA \u2192 get\u2011CSR \u2192 issue\u2011cert \u2192 import \u2192 activate) and permission steps for both root and subordinate CAs. Some steps are described generically (e.g., \u201cverify prerequisites\u201d) without concrete CLI checks, losing a few points."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a thorough NEVER list with concrete reasons (e.g., missing bucket policy silently fails, parent\u2011CA permission required, CA deletion waiting period). Lacks a few common pitfalls such as quota exhaustion, cross\u2011region ARN mismatches, and IAM role misconfigurations, so it is not perfect."
+      "justification": "Contains a thorough NEVER list with specific reasons (e.g., silent CRL failure, missing parent permission). Missing a few common pitfalls such as forgetting public\u2011read ACL on CRL objects, so deduct slightly."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, description clearly states WHAT and WHEN, and keywords/triggers are provided. The \"when not to invoke\" clause is vague (only mentions public certs) and could list more exclusion scenarios, thus a small deduction."
+      "justification": "Frontmatter is complete, description, when_to_use, triggers, and strict output contract are well defined. Minor issue: entry_point set to 'false' is ambiguous but does not break activation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Uses quick\u2011navigation table, top\u2011level summary, and deep reference sections, which aids layered consumption. Nevertheless, the skill front\u2011loads a large amount of detailed CLI code and tables before the core checklist, creating some cognitive overload."
+      "justification": "Uses quick navigation, on\u2011demand reference files, and layered sections to avoid overload. The main body still contains many dense tables, which could be trimmed further."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Calibrates tightly for destructive actions (deletion waiting period, mandatory verification) and enforces strict checklist for CRL and ACM permissions. Creative choices like selecting key algorithm or template remain loosely constrained, leaving room for over\u2011freedom."
+      "justification": "Destructive actions (CA deletion) are tightly constrained with mandatory waiting period and restore guidance. Creation steps allow many algorithm choices without clear guidance on when to prefer one over another, leaving a small freedom\u2011calibration gap."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern: Mindset, Decision tree, Output contract, NEVER list, and step\u2011by\u2011step sections. Minor ad\u2011hoc elements (Recent features, References) slightly break the uniformity."
+      "justification": "Follows the recognized skill pattern (frontmatter, mindset, decision tree, output format, references). Slight inconsistency in section ordering (e.g., error handling appears after references) prevents a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working AWS CLI commands, a ready\u2011to\u2011deploy checklist, verification commands, and error\u2011handling guidance. Missing handling for region parameterization, cross\u2011account IAM role setup, and pagination for list\u2011permissions limits completeness."
+      "justification": "Provides a ready\u2011to\u2011deploy checklist, verification commands, and worked examples that an agent can execute. Lacks explicit example of handling a PREREQUISITES_MISSING case for a subordinate CA with a non\u2011active parent, which is a minor usability gap."
     }
   ],
-  "total_score": 103,
+  "total_score": 105,
   "max_score": 120,
   "grade": "B",
-  "token_count": 49145,
-  "latency_ms": 9488,
+  "token_count": 68320,
+  "latency_ms": 14226,
   "assertions_passed": true,
   "assertions_passed_count": 5,
   "assertions_failed_count": 0

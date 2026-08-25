@@ -5,65 +5,65 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 13,
+      "score": 14,
       "max": 20,
-      "justification": "Provides specific heuristics (growth\u2011factor + bake\u2011time safety envelope, immutable profile\u2011type rule, concrete default values) that a baseline model would not enumerate, but most of the content restates standard AppConfig documentation rather than novel expert insight."
+      "justification": "Provides concrete expert heuristics (growth factor + bake time safety envelope, specific NEVER warnings, detailed dependency graph) that go beyond generic docs, but omits several advanced nuances such as replicate options, deletion protection, and exact IAM policy requirements, limiting the delta."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 13,
       "max": 15,
-      "justification": "Encodes the correct AWS\u2011specific provisioning order (application \u2192 environment \u2192 profile \u2192 strategy \u2192 version \u2192 deployment) and includes CLI\u2011based procedures, but some steps are generic \"run a command\" without deeper decision\u2011making (e.g., when to choose linear vs exponential)."
+      "justification": "Provides a solid AWS\u2011specific ordering (application \u2192 environment \u2192 profile \u2192 version \u2192 strategy \u2192 deployment) and CLI steps, but includes generic advice like \"verify prerequisites\" without AWS\u2011specific checklists, leaving a small gap."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., all\u2011at\u2011once with bake\u2011time\u202f0, skipping validators), yet the list could be expanded with more nuanced pitfalls (IAM scope, cross\u2011region limits) and lacks explicit failure\u2011mode explanations for each anti\u2011pattern."
+      "justification": "Contains a concrete NEVER list with reasons (e.g., all\u2011at\u2011once in prod, skipping validators), yet it omits other common pitfalls such as least\u2011privilege IAM policy design or forgetting deletion protection, so the anti\u2011pattern coverage is not exhaustive."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Frontmatter is complete, activation keywords, triggers, and a precise output contract are defined, enabling reliable invocation. Minor weakness: the \"when_to_use\" paragraph repeats earlier text instead of adding a crisp trigger rule."
+      "justification": "Frontmatter, description, triggers, and output contract are well\u2011formed, but the \"when to invoke\" wording could be tighter; the trigger list is long and may cause false positives in ambiguous phrasing."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Information is layered into sections and a quick\u2011navigation table, but the initial description is dense and forces the reader to parse many heuristics before reaching the actionable checklist, causing some cognitive overload."
+      "justification": "Uses sections, quick navigation, and on\u2011demand references, yet the main body still front\u2011loads many detailed CLI snippets, creating some cognitive overload before the agent knows which layer to request."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 13,
       "max": 15,
-      "justification": "Destructive provisioning is guarded by prerequisite checks and a strict output contract, matching fragility. However, the skill leaves room for ambiguous handling of existing resources (e.g., duplicate application names) without explicit constraints."
+      "justification": "Calibrates freedom for fragile operations by enforcing constraints (growth factor 1\u2011100, bake time >0 for prod, NEVER rules). However, optional aspects like KMS encryption, tagging, and IAM permissions are left relatively open, reducing strictness for destructive tasks."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
       "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (mindset \u2192 heuristics \u2192 step\u2011by\u2011step CLI \u2192 NEVER list \u2192 output format). The structure is consistent with other CloudOps skills, though a few sections (e.g., recent features) feel tacked on."
+      "justification": "Follows a recognizable structure (mindset, steps, NEVER list, output format) but mixes ad\u2011hoc sections (e.g., \"Expert heuristic\" blocks) that slightly break a strict pattern template."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
-      "score": 12,
+      "score": 13,
       "max": 15,
-      "justification": "Provides working examples and error\u2011handling guidance, yet lacks coverage of edge cases such as duplicate resource names, region mismatches, or missing IAM policies, and the model output sometimes repeats checklists without validation."
+      "justification": "Provides actionable CLI commands, checklist, and examples, enabling an agent to act. However, error\u2011handling examples are limited, and edge cases like missing KMS keys, tag requirements, or IAM permission failures are not fully covered."
     }
   ],
-  "total_score": 99,
+  "total_score": 102,
   "max_score": 120,
   "grade": "B",
-  "token_count": 40587,
-  "latency_ms": 8158,
+  "token_count": 57752,
+  "latency_ms": 15491,
   "assertions_passed": false,
   "assertions_passed_count": 4,
   "assertions_failed_count": 1
