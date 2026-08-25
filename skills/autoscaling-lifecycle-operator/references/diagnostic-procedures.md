@@ -283,3 +283,25 @@ aws lambda add-permission \
 | Warm pool not growing | configure-warm-pool | Check subnet IPs, vCPU quota, AMI validity |
 | Scale-out too slow | modify-hook | Reduce HeartbeatTimeout or optimize Lambda |
 | Multiple hooks stacking | modify-hook | Consolidate or reduce HeartbeatTimeouts |
+
+## Live-account pre-flight (moved from SKILL.md § Pre-flight)
+
+**Live-account pre-flight (skip if offline plan audit):**
+1. `describe-auto-scaling-groups --auto-scaling-group-names <asg>` —
+   capture `MinSize`, `MaxSize`, `DesiredCapacity`, `LaunchTemplate`,
+   `LoadBalancerNames`, `TargetGroupARNs`, `HealthCheckType`,
+   `HealthCheckGracePeriod`, `ServiceLinkedRoleARN`, `MixedInstancesPolicy`.
+2. `describe-lifecycle-hooks --auto-scaling-group-name <asg>` — capture
+   existing hooks: `LifecycleHookName`, `LifecycleTransition`,
+   `HeartbeatTimeout`, `DefaultResult`, `NotificationTargetARN`, `RoleARN`.
+3. `describe-warm-pool --auto-scaling-group-name <asg>` — capture
+   `PoolMinSize`, `MaxGroupPreparedCapacity`, `WarmPoolState`, instances.
+4. `describe-notification-configurations` and `describe-scaling-policies`
+   and `describe-scheduled-actions` — capture existing configs.
+5. For lifecycle Lambdas: `get-function-configuration` and `get-policy` —
+   confirm the Lambda exists and its role has
+   `autoscaling:CompleteLifecycleAction`.
+6. `describe-instance-status` — check for instances stuck in
+   `Pending:Wait` or `Terminating:Wait`.
+7. `logs filter-log-events` on the lifecycle Lambda log group — capture
+   recent lifecycle action errors.

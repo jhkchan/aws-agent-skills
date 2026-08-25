@@ -121,172 +121,33 @@ Three AWS Backup realities drive every operation:
   destination region's KMS key, and the destination IAM permissions.
 
 ## Pre-flight: vault/KMS/IAM metadata gate
+> Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
 
-Run before classification. `describe-backup-vault` returns the full
-vault metadata including `VaultLock`, `EncryptionKeyArn`, `NumberOfRecoveryPoints`.
-`list-backup-vaults` returns up to 100/page (use `--next-token`).
-
-**Live-account pre-flight (skip if offline plan):**
-1. `backup describe-backup-vault --backup-vault-name <name>` — confirm
-   vault exists, capture `EncryptionKeyArn`, `VaultLock`, `CreationDate`,
-   `NumberOfRecoveryPoints`.
-2. `kms describe-key --key-id <key-arn>` — capture `KeyState` and
-   `KeyManager` (must be `Enabled` and `AWS` or `CUSTOMER`).
-3. `backup list-backup-vaults` — cross-reference vault list.
-4. `backup list-recovery-points-by-backup-vault --backup-vault-name <name>`
-   — capture recovery points for restore operations; verify the target
-   recovery point is `Status: COMPLETED`.
-5. `backup list-backup-plans` + `list-backup-selections` — capture
-   current plans and selections, check for overlap.
-6. `backup describe-backup-job --backup-job-id <id>` — for diagnose
-   operations on a specific job.
-
-**Malformed input:** emit `VERDICT: ERROR` with reason and remediation.
-
-| Attribute | Effect on operation |
-|---|---|
-| `VaultLock.LockState: LOCKED` (compliance) | Retention cannot be shortened; vault cannot be deleted. Plan must respect the existing `MaxRetentionDays`. |
-| `VaultLock.LockState: LOCKED` (governance) | Lock can be removed by privileged principal — treat as soft but warn in NOTES. |
-| `VaultLock.ChangeableForDays > 0` | Vault is in the grace window — lock can still be modified or removed. Surface explicitly. |
-| `KeyState: Disabled` / `PendingDeletion` | KMS key unusable for new backups. BLOCKED. |
-| `EncryptionKeyArn` unset | Default AWS-managed key (`aws/backup`) used. Surface as finding for compliance requirements. |
-| `NumberOfRecoveryPoints: 0` | Restore not possible. BLOCKED. |
-| Overlapping tag-based selections | Allowed but generates duplicate recovery points (and cost). Surface as INFO. |
 
 ## Process — operation planning (apply in order)
 
 ### Step 0: Expert knowledge — non-obvious AWS Backup behaviors
+> Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
-- **Compliance mode is irreversible after `ChangeableForDays` expires.**
-  The grace window is set when the lock is applied (max 3 days). During
-  grace, the lock can be removed by the principal that created it;
-  after grace, no one (including root) can remove the lock or shorten
-  retention.
-- **Governance mode is soft-bypassable.** Any principal with
-  `backup:DeleteBackupVaultLockConfiguration` and
-  `iam:CreatePolicy`/`AttachRolePolicy` can remove the lock. For
-  regulatory compliance (CIS Benchmark 3.6, NIST 800-53 CP-9), use
-  compliance mode.
-- **Retention window applies to ALL recovery points in the vault.**
-  The vault lock's `MinRetentionDays` and `MaxRetentionDays` constrain
-  every recovery point in the vault. The backup plan's lifecycle moves
-  recovery points to cold storage or deletes them; the vault lock sets
-  the floor (MinRetentionDays) and ceiling (MaxRetentionDays).
-- **Tag-based selections apply to future resources.** A selection with
-  `Conditions: {"StringEquals": {"aws:ResourceTag/backup": "daily"}}`
-  picks up any new resource tagged `backup=daily`. Resource-tag-based
-  selection is the recommended pattern; resource-ARN lists are static.
-- **Cross-region copy needs a destination vault + KMS.** The copy
-  rule in the backup plan references a destination region; AWS Backup
-  creates the recovery point in the destination region's default vault
-  unless a `BackupVaultName` is specified.
-- **Continuous backup (PITR) requires the underlying service to support
-  it.** EC2 PITR requires `aws:ec2:enable-point-in-time-recovery` on
-  the instance. RDS PITR requires `BackupPlan.AdvancedBackupSettings`
-  with `BackupOptions: {"WindowsVSS": "enabled"}` for Windows instances.
-- **Backup selection with no `Conditions` and no `ListOfTags` selects
-  nothing.** The selection MUST include at least one of `ListOfTags`,
-  `Resources`, or `Conditions`. Empty selection silently matches no
-  resources.
-- **Restore creates a new resource by default.** The original resource
-  is NOT overwritten. For RDS, the restore creates a new DB instance
-  with a new endpoint; for EC2, a new instance with a new IP (unless
-  the restore specifies the original private IP and that IP is
-  available).
-- **`StartRestoreJob` requires `Metadata` for resource-type-specific
-  parameters.** EC2 restore needs `InstanceId`, `SubnetId`,
-  `SecurityGroupIds`, `InstanceType`. RDS restore needs
-  `NewDBInstanceIdentifier`. Wrong metadata = validation error or
-  silent wrong configuration.
-- **Backup Vault Lock applies to the vault, NOT to the plan.** Two
-  plans writing to the same locked vault share the retention window.
-  Cannot have one plan with 30-day retention and another with 7-day
-  retention to the same locked vault — MinRetentionDays wins.
-- **`Backup Search` (2025) searches across recovery points without
-  restoring.** Use `backup search:SearchResource` (or the console
-  Backup Search) to find files/items within EBS snapshots, S3 backups,
-  and EFS backups without launching a restore job.
-- **FSx backups are volume-level.** AWS Backup supports FSx for
-  Windows File Server, Lustre, OpenZFS, and NetApp ONTAP. Each
-  filesystem type has different restore semantics (volume-level vs
-  file-level).
-- **Cold storage transition (GLACIER / DEEP_ARCHIVE) is one-way for
-  recovery speed.** Restore from GLACIER is 3-5 hours; from DEEP
-  ARCHIVE is 12+ hours. Plan the lifecycle transition carefully —
-  regulatory archives go to DEEP ARCHIVE, operational recovery stays
-  in WARM.
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
 Run ALL pre-checks. If ANY fails, verdict is BLOCKED with failures in
 PRE_CHECKS. Do NOT execute.
 
-**For ALL operations:**
-1. Vault name spelled correctly (case-sensitive).
-2. Vault exists in the same account+region as the operation
-   (`describe-backup-vault` returns it).
-3. IAM role holds the required `backup:*` permission.
+> Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
 
-**For create-vault:**
-4. KMS key ARN exists and is `Enabled`.
-5. KMS key policy grants
-   `kms:GenerateDataKey`, `kms:Decrypt` to
-   `backup.<region>.amazonaws.com`.
-6. Vault name not already in use.
+Condensed per-operation gate — every branch, one line each (full verbatim listing:
+[references/diagnostic-commands.md](references/diagnostic-commands.md)):
 
-**For vault lock (compliance mode):**
-4. Vault is not already in compliance mode (`VaultLock.LockState !=
-   LOCKED` with `Mode: COMPLIANCE`) unless the operation is to
-   lengthen `MaxRetentionDays`.
-5. `MaxRetentionDays` is greater than or equal to the longest
-   retention in any plan writing to the vault.
-6. `MinRetentionDays` is greater than or equal to the longest current
-   recovery point age in the vault (else existing points cannot be
-   deleted on the existing schedule).
-7. `ChangeableForDays` <= 3 (max grace window).
-
-**For create-plan:**
-4. At least one rule has `StartWindowMinutes` and `CompletionWindowMinutes`
-   within service limits.
-5. Cross-region copy destination region has a vault with KMS key.
-6. Lifecycle `MoveToColdStorageAfterDays` < `DeleteAfterDays` (cannot
-   delete before moving to cold).
-7. Schedule uses CRON or simple `rate()`. Verify timezone is UTC.
-
-**For create-selection:**
-4. Plan exists (`list-backup-plans` returns the plan ID).
-5. At least one of `ListOfTags`, `Resources`, `Conditions` is
-   populated (empty selection matches nothing).
-6. IAM role `RoleArn` exists and has
-   `backup:StartBackupJob` / `backup:PutBackupVaultNotifications`
-   trust.
-7. No overlapping tag-based selections (INFO-level warning, not
-   BLOCKED).
-
-**For start-backup (manual):**
-4. Resource ARN exists.
-5. Backup vault exists and is reachable.
-6. IAM role for the selection exists.
-
-**For start-restore:**
-4. Recovery point exists in the target vault and `Status: COMPLETED`.
-5. Recovery point is not expired (within retention window).
-6. `Metadata` includes resource-type-specific fields (InstanceId for
-   EC2, NewDBInstanceIdentifier for RDS).
-7. For cross-region restore: destination region IAM permissions
-   verified.
-8. For PITR: continuous backup is enabled on the resource
-   (`describe-recovery-point --backup-vault-name <vault>
-   --recovery-point-arn <arn>` shows `IsEncrypted: true` and
-   `ResourceType` continuous-capable, plus `CalculatedLifecycle`
-   reflects continuous backup window).
-
-**For diagnose operations:**
-5. `describe-backup-job --backup-job-id <id>` returns the job.
-6. `describe-backup-vault --backup-vault-name <name>` reflects current
-   state.
-7. CloudTrail `StartBackupJob`, `StartCopyJob`, `StartRestoreJob`
-   events within last 7 days for the resource.
+- ALL operations: vault name spelled correctly (case-sensitive); vault exists in the same account+region; IAM role holds the required `backup:*` permission.
+- create-vault: KMS key ARN exists and `Enabled`; key policy grants `kms:GenerateDataKey` + `kms:Decrypt` to `backup.<region>.amazonaws.com`; vault name not already in use.
+- vault lock (COMPLIANCE): not already COMPLIANCE-locked (unless lengthening `MaxRetentionDays`); `MaxRetentionDays` >= longest retention of any plan writing to the vault; `MinRetentionDays` >= oldest recovery point age; `ChangeableForDays` <= 3.
+- create-plan: `StartWindowMinutes`/`CompletionWindowMinutes` within service limits; cross-region destination region has a vault with KMS key; `MoveToColdStorageAfterDays` < `DeleteAfterDays`; CRON or `rate()` schedule, timezone UTC.
+- create-selection: plan exists; at least one of `ListOfTags`/`Resources`/`Conditions` populated; `RoleArn` exists and is trusted; overlapping tag-based selections = INFO warning, not BLOCKED.
+- start-backup (manual): resource ARN exists; backup vault exists and is reachable; IAM role for the selection exists.
+- start-restore: recovery point `Status: COMPLETED` and not expired; `Metadata` includes type-specific fields (EC2 `InstanceId`, RDS `NewDBInstanceIdentifier`); cross-region destination IAM verified; PITR continuous backup enabled.
+- diagnose: `describe-backup-job` returns the job; `describe-backup-vault` reflects current state; CloudTrail `StartBackupJob`/`StartCopyJob`/`StartRestoreJob` events within last 7 days.
 
 ### Step 2: READY — emit operation plan
 
@@ -341,198 +202,40 @@ If ANY verification fails, emit `VERDICT: ERROR` — do not claim COMPLETED.
 ## Common patterns (boilerplate)
 
 ### Create a backup vault with KMS encryption and tags
+> Moved verbatim to [references/common-patterns.md](references/common-patterns.md) — load on demand.
 
-```bash
-aws backup create-backup-vault \
-  --backup-vault-name "prod-daily-vault" \
-  --encryption-key-arn arn:aws:kms:us-east-1:111111111111:key/abcd1234-5678-90ef-1234-567890abcdef \
-  --creator-request-id "$(date +%s)" \
-  --tags Environment=prod,Owner=platform-team
-```
-
-Use `--creator-request-id` for idempotency — re-running with the same
-ID returns the existing vault without error.
 
 ### Apply vault lock in COMPLIANCE mode (WORM, immutable)
+> Moved verbatim to [references/vault-lock-and-compliance-guide.md](references/vault-lock-and-compliance-guide.md) — load on demand.
 
-```bash
-aws backup put-backup-vault-lock-configuration \
-  --backup-vault-name "prod-compliance-vault" \
-  --changeable-for-days 3 \
-  --min-retention-days 30 \
-  --max-retention-days 3650
-```
-
-The `--changeable-for-days 3` grace window allows reversing for 72
-hours. After that, the lock is permanent. COMPLIANCE mode is the
-default; `--mode` flag exists for explicit governance mode.
 
 ### Apply vault lock in GOVERNANCE mode (soft, mutable by privileged)
+> Moved verbatim to [references/vault-lock-and-compliance-guide.md](references/vault-lock-and-compliance-guide.md) — load on demand.
 
-```bash
-aws backup put-backup-vault-lock-configuration \
-  --backup-vault-name "prod-governance-vault" \
-  --mode GOVERNANCE \
-  --min-retention-days 30 \
-  --max-retention-days 365
-```
-
-Governance mode can be removed by a principal with
-`backup:DeleteBackupVaultLockConfiguration`. Not suitable for
-regulatory compliance.
 
 ### Create a backup plan with schedule, lifecycle, cross-region copy
+> Moved verbatim to [references/common-patterns.md](references/common-patterns.md) — load on demand.
 
-```bash
-aws backup create-backup-plan \
-  --backup-plan '{
-    "BackupPlanName": "prod-daily-with-dr",
-    "Rules": [
-      {
-        "RuleName": "DailyBackup",
-        "TargetBackupVaultName": "prod-daily-vault",
-        "ScheduleExpression": "cron(0 5 ? * * *)",
-        "StartWindowMinutes": 480,
-        "CompletionWindowMinutes": 1440,
-        "Lifecycle": {"MoveToColdStorageAfterDays": 30, "DeleteAfterDays": 365},
-        "CopyActions": [
-          {
-            "DestinationBackupVaultArn": "arn:aws:backup:us-west-2:111111111111:backup-vault:dr-vault",
-            "Lifecycle": {"DeleteAfterDays": 90}
-          }
-        ]
-      }
-    ]
-  }'
-```
-
-`ScheduleExpression` is in UTC. `StartWindowMinutes` must be less than
-`CompletionWindowMinutes`. The `CopyActions` array defines the
-cross-region copy with a separate lifecycle in the destination region.
 
 ### Create a backup selection by tag
+> Moved verbatim to [references/common-patterns.md](references/common-patterns.md) — load on demand.
 
-```bash
-aws backup create-backup-selection \
-  --backup-plan-id "$(aws backup list-backup-plans --query 'BackupPlansList[?BackupPlanName==`prod-daily-with-dr`].BackupPlanId' --output text)" \
-  --backup-selection '{
-    "SelectionName": "prod-tagged-daily",
-    "IamRoleArn": "arn:aws:iam::111111111111:role/AWSBackupDefaultServiceRole",
-    "ListOfTags": [{"ConditionType": "STRINGEQUALS", "ConditionKey": "backup", "ConditionValue": "daily"}],
-    "Conditions": {
-      "StringEquals": {"aws:ResourceTag/environment": "prod"},
-      "StringNotEquals": {"aws:ResourceTag/criticality": "dev"}
-    }
-  }'
-```
-
-Use `ListOfTags` for forward-compatible selections (new resources
-tagged `backup=daily` automatically enroll). Use `Resources` for
-static ARN lists. `Conditions` supports `StringEquals`,
-`StringLike`, `StringNotEquals` on `aws:ResourceTag/*`.
 
 ### Start a manual backup job
+> Moved verbatim to [references/common-patterns.md](references/common-patterns.md) — load on demand.
 
-```bash
-aws backup start-backup-job \
-  --backup-vault-name "prod-daily-vault" \
-  --resource-arn arn:aws:ec2:us-east-1:111111111111:instance/i-0123456789abcdef0 \
-  --iam-role-arn "arn:aws:iam::111111111111:role/AWSBackupDefaultServiceRole" \
-  --idempotency-token "$(date +%s)" \
-  --start-window-minutes 60 \
-  --complete-window-minutes 1440 \
-  --lifecycle '{"MoveToColdStorageAfterDays": 30, "DeleteAfterDays": 365}'
-```
 
 ### Start a point-in-time restore (PITR)
+> Moved verbatim to [references/restore-and-pitr-guide.md](references/restore-and-pitr-guide.md) — load on demand.
 
-```bash
-aws backup start-restore-job \
-  --recovery-point-arn arn:aws:backup:us-east-1:111111111111:recovery-point:1-2-3-4 \
-  --metadata '{"InstanceId": "i-0 restored", "SubnetId": "subnet-abc123", "SecurityGroupIds": "sg-abc123", "InstanceType": "t3.medium"}' \
-  --iam-role-arn "arn:aws:iam::111111111111:role/AWSBackupDefaultServiceRole" \
-  --resource-type EC2
-```
-
-The `--metadata` fields vary by `--resource-type`. For RDS, use
-`{"NewDBInstanceIdentifier": "restored-db"}`. For EBS, use
-`{"VolumeId": "vol-..."}`. Use
-`aws backup get-recovery-point-restore-metadata --recovery-point-arn
-<arn>` to get the template metadata for the recovery point.
 
 ### Enable continuous backup for EC2 PITR
+> Moved verbatim to [references/restore-and-pitr-guide.md](references/restore-and-pitr-guide.md) — load on demand.
 
-Continuous backup is set in the backup plan rule via
-`advanced backup settings` and the rule's continuous flag:
-
-```bash
-aws backup create-backup-plan \
-  --backup-plan '{
-    "BackupPlanName": "prod-ec2-pitr",
-    "Rules": [
-      {
-        "RuleName": "ContinuousBackup",
-        "TargetBackupVaultName": "prod-daily-vault",
-        "ScheduleExpression": "cron(0 5 ? * * *)",
-        "StartWindowMinutes": 60,
-        "CompletionWindowMinutes": 1440,
-        "ContinuousBackup": true
-      }
-    ],
-    "AdvancedBackupSettings": [
-      {"ResourceType": "EC2", "BackupOptions": {"WindowsVSS": "enabled"}}
-    ]
-  }'
-```
-
-EC2 PITR allows restoring to any 1-minute point within the past 35
-days. Verify via `describe-recovery-point` that `ContinuousBackup:
-true`.
 
 ## Diagnostic flows
+> Moved verbatim to [references/error-handling.md](references/error-handling.md) — load on demand.
 
-### Backup job failed or stuck
-
-1. `describe-backup-job --backup-job-id <id>` — capture `State`,
-   `StatusMessage`, `PercentDone`, `CreatedBy`, `BackupType`.
-2. Common failures:
-   - `FAILED: IAM role not authorized` — the
-     `AWSBackupDefaultServiceRole` lacks
-     `ec2:CreateTags`, `ec2:DescribeVolumes`,
-     `kms:GenerateDataKey`, or service-specific permissions.
-   - `FAILED: Resource not found` — the resource was deleted between
-     the schedule trigger and execution.
-   - `ABORTED: Completion window exceeded` — large resource; increase
-     `CompletionWindowMinutes` or use parallel backup.
-   - `EXPIRED: Recovery point expired` — retention window passed
-     before the backup completed.
-3. CloudTrail: `StartBackupJob`, `BackupJobCompleted` events to
-   correlate with the IAM role snapshot.
-4. Remediation: fix the IAM role / increase windows / snapshot
-   offline; re-run `start-backup-job` with `--idempotency-token`.
-
-### Restore job failed
-
-1. `describe-restore-job --restore-job-id <id>` — capture `Status`,
-   `StatusMessage`, `CreatedResourceArn`.
-2. Common failures:
-   - `FAILED: Invalid metadata` — `--metadata` missing required
-     fields (SubnetId for EC2, NewDBInstanceIdentifier for RDS).
-   - `FAILED: Insufficient capacity` — destination subnet/AZ lacks
-     capacity for the restore.
-   - `FAILED: KMS key inaccessible` — destination region KMS key
-     policy blocks `backup:Decrypt`.
-3. Re-attempt with corrected metadata via `start-restore-job` with a
-   new `--idempotency-token`.
-
-### Vault lock cannot be removed
-
-1. `describe-backup-vault --backup-vault-name <vault>` — capture
-   `VaultLock.LockState`, `Mode`, `ChangeableForDays`.
-2. If `Mode: COMPLIANCE` and `ChangeableForDays: 0`, the lock is
-   permanent. Surface to operator; cannot be removed.
-3. If `Mode: GOVERNANCE`, the lock can be removed by a principal with
-   `backup:DeleteBackupVaultLockConfiguration`.
 
 ## Output format (per operation)
 
@@ -652,84 +355,12 @@ NOTES:
 ```
 
 ### Worked example — create vault with KMS encryption (READY)
+> Moved verbatim to [references/worked-examples.md](references/worked-examples.md) — load on demand.
 
-```text
-OPERATION: create-vault
-VAULT: prod-daily-vault
-VERDICT: READY
-PRE_CHECKS:
-  - [PASS] Vault name prod-daily-vault not already in use
-  - [PASS] KMS key arn:aws:kms:us-east-1:111111111111:key/abcd1234
-    KeyState Enabled, KeyManager CUSTOMER
-  - [PASS] KMS key policy grants kms:GenerateDataKey, kms:Decrypt to
-    backup.us-east-1.amazonaws.com
-  - [PASS] Caller IAM role holds backup:CreateBackupVault
-CHECKLIST:
-  [✓]  Vault lock mode        current: UNLOCKED (new vault)                       recommended: apply COMPLIANCE lock separately (CIS 3.6) if regulatory
-  [✗]  Backup plan rule       current: none (vault newly created)                 recommended: create plan with daily cron(0 5 ? * * *)
-  [✗]  Lifecycle              current: none                                       recommended: MoveToColdStorageAfterDays 30, DeleteAfterDays 365 (adjust to mandate)
-  [✗]  Cross-region copy      current: none                                       recommended: add CopyAction to dr-vault in us-west-2 if DR required
-  [✓]  KMS encryption         current: arn:aws:kms:us-east-1:111111111111:key/abcd1234, KeyState Enabled   recommended: keep
-  [✗]  Recovery points        current: 0 (new vault)                              recommended: confirm first recovery point COMPLETED within 24h of first plan run
-  [✗]  Selection scope        current: none                                       recommended: tag-based selection backup=daily (auto-enrolls future resources)
-STEPS:
-  1. CONFIRM: About to create-backup-vault prod-daily-vault in account
-     111111111111 region us-east-1. This will CREATE a new vault
-     encrypted with KMS key abcd1234. The vault has no lock initially —
-     apply lock-vault separately for WORM compliance. Proceed? (yes/no)
-  2. aws backup create-backup-vault --backup-vault-name prod-daily-vault \
-       --encryption-key-arn arn:aws:kms:us-east-1:111111111111:key/abcd1234-5678-90ef-1234-567890abcdef \
-       --creator-request-id 1723305600 \
-       --tags Environment=prod,Owner=platform-team
-POST_VERIFY:
-  - (pending execution)
-  - aws backup describe-backup-vault --backup-vault-name prod-daily-vault returns EncryptionKeyArn set, NumberOfRecoveryPoints 0
-STATE: pending — vault will be CREATED within ~30s
-NOTES:
-  - No vault lock applied. For compliance (CIS Benchmark 3.6), apply
-    COMPLIANCE mode lock separately with MinRetentionDays >= 30.
-  - KMS key is customer-managed — verify rotation is enabled via
-    aws kms get-key-rotation-status --key-id abcd1234.
-  - Tags Environment=prod, Owner=platform-team propagate to the vault
-    for cost allocation and access control.
-```
 
 ### Worked example — diagnose failed backup job (BLOCKED)
+> Moved verbatim to [references/worked-examples.md](references/worked-examples.md) — load on demand.
 
-```text
-OPERATION: diagnose
-VAULT: prod-daily-vault
-VERDICT: BLOCKED
-PRE_CHECKS:
-  - [PASS] describe-backup-job returns the job (State FAILED,
-    ResourceType EC2, BackupSizeInBytes 0)
-  - [FAIL] IAM role AWSBackupDefaultServiceRole lacks ec2:CreateTags:
-    CloudTrail shows AWSBackupServiceRole assumed at 2026-08-09T05:00:12Z
-    attempting ec2:CreateTags on i-0123456789abcdef0 and receiving
-    AccessDenied. The role policy includes ec2:CreateVolume,
-    ec2:DescribeVolumes but not ec2:CreateTags. AWS Backup requires
-    ec2:CreateTags on the snapshot.
-  - [PASS] KMS key abcd1234 KeyState Enabled
-CHECKLIST:
-  [✓]  Vault lock mode        current: GOVERNANCE (soft lock)                     recommended: keep (operational policy, not regulatory)
-  [✓]  Backup plan rule       current: DailyBackup, cron(0 5 ? * * *)              recommended: keep
-  [✓]  Lifecycle              current: MoveToColdStorageAfterDays 30, DeleteAfterDays 365   recommended: keep
-  [✗]  Cross-region copy      current: none                                       recommended: add CopyAction to dr-vault (single-region vault is a DR gap)
-  [✓]  KMS encryption         current: arn:aws:kms:us-east-1:111111111111:key/abcd1234, KeyState Enabled   recommended: keep
-  [✗]  Recovery points        current: 14 points, latest FAILED (job abc123)      recommended: remediate IAM, re-run with idempotency token
-  [✓]  Selection scope        current: tag-based backup=daily, env=prod           recommended: keep
-STEPS: (none — pre-checks failed; this is a diagnosis)
-POST_VERIFY: (none)
-STATE: FAILED — IAM role missing ec2:CreateTags permission
-NOTES:
-  - Remediation: add ec2:CreateTags, ec2:DeleteTags, ec2:DescribeTags to
-    the AWSBackupDefaultServiceRole policy.
-  - Re-run the backup with idempotency:
-    aws backup start-backup-job --backup-vault-name prod-daily-vault \
-      --resource-arn arn:aws:ec2:us-east-1:111111111111:instance/i-0123456789abcdef0 \
-      --iam-role-arn arn:aws:iam::111111111111:role/AWSBackupDefaultServiceRole \
-      --idempotency-token "$(date +%s)"
-```
 
 ## STRICT output contract
 
@@ -830,66 +461,23 @@ NOTES: <compliance-vs-governance rationale, retention window rationale, recovery
   not reliable. Use a non-production vault for restore drills.
 
 ## Expert heuristic: COMPLIANCE vs GOVERNANCE vault lock
+> Moved verbatim to [references/vault-lock-and-compliance-guide.md](references/vault-lock-and-compliance-guide.md) — load on demand.
 
-```
-COMPLIANCE MODE
-   ├─ Regulatory requirement (CIS, NIST, FedRAMP, SOX, HIPAA)?
-   │    └─ YES → COMPLIANCE mode
-   │         • MinRetentionDays set to regulatory minimum (>= 90 for HIPAA)
-   │         • MaxRetentionDays set to data-retention policy ceiling
-   │         • ChangeableForDays 3 (max grace for rollback window)
-   │         • Lock cannot be removed by root after grace
-   ├─ Operational policy (no regulatory mandate)?
-   │    └─ GOVERNANCE mode
-   │         • MinRetentionDays set to operational minimum
-   │         • Lock can be removed by privileged principal
-   │         • Suitable for internal controls, NOT for audit
-```
-
-**Per-service backup semantic differences:**
-
-| Service / ResourceType | What to check |
-|---|---|
-| `EC2` instance | Continuous backup enabled for PITR; WindowsVSS for Windows instances; restore creates new instance (new IP) |
-| `RDS` DB instance | PITR requires `AdvancedBackupSettings.BackupOptions.WindowsVSS=enabled` for Windows; restore creates new DB instance (new endpoint) |
-| `EBS` volume | Snapshot-only; restore creates new volume (must detach/attach original) |
-| `S3` bucket | Versioning must be enabled; restore overwrites by version, not by replace |
-| `DynamoDB` table | Continuous backup (PITR) is the native option; AWS Backup adds cross-region copy |
-| `EFS` file system | Incremental; restore to new file system or item-level via Backup Search |
-| `FSx` Windows / Lustre / OpenZFS / ONTAP | Volume-level restore; filesystem-level differs by type |
-| `Aurora` cluster | Cluster-level PITR via `aws:backup:request-continuous-backup`; restore to new cluster |
-
-**Cold-storage transition policy:**
-- WARM (default): immediate restore, no extra cost. Use for
-  operational recovery.
-- COLD (GLACIER): 3-5 hour restore. Use for archives accessed monthly.
-- ARCHIVE (DEEP_ARCHIVE): 12+ hour restore. Use for multi-year
-  compliance archives.
-
-ALWAYS pair cold storage with a documented RTO/RPO matrix — operators
-frequently assume cold-storage recovery points restore as fast as
-warm, then discover 3+ hour waits during incidents.
 
 ## Recent AWS features (2024-2026)
+> Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
-- **AWS Backup for Amazon FSx** (2025): backup and restore for FSx
-  for Lustre, OpenZFS, and NetApp ONTAP with volume-level granularity.
-- **AWS Backup Search** (2025): search across recovery points for
-  files (EFS, S3) and items (DynamoDB, RDS) without launching a
-  restore job; supports item-level restore from search results.
-- **Continuous backups for EC2** (2024): point-in-time recovery for
-  EC2 instances within a 35-day window; the backup plan rule must set
-  `ContinuousBackup: true`.
-- **AWS Backup support for Amazon S3** (2024): continuous backup with
-  PITR for S3 objects; versioning and Object Lock requirements.
-- **Backup Vault Lock grace window refinement**: max 3 days
-  `ChangeableForDays`; clarified that governance mode does NOT meet
-  regulatory compliance.
-- **Cross-account backup** (2023, refined 2025): backup and restore
-  across AWS accounts via AWS Organizations; requires
-  `backup:CrossAccountBackupRole` delegation.
-- **AWS Backup for Amazon Timestream, Amazon Neptune, and Amazon
-  MQ** (2024): expanded service coverage.
+
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert-heuristic deep dives, Step-0 expert knowledge, recent AWS features
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples
+- [references/error-handling.md](references/error-handling.md) — diagnostic flows and failure remediation
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight metadata gate and per-operation pre-check listings
+- [references/common-patterns.md](references/common-patterns.md) — boilerplate CLI patterns (vault create, plan, selection, manual backup)
+- [references/restore-and-pitr-guide.md](references/restore-and-pitr-guide.md) — restore and PITR operations (now includes PITR patterns)
+- [references/vault-lock-and-compliance-guide.md](references/vault-lock-and-compliance-guide.md) — vault lock and compliance (now includes lock patterns and heuristic)
 
 ## Domain
 

@@ -96,31 +96,8 @@ operator knows what is reversible.
 
 Three cross-region AWS Backup realities drive every operation:
 
-- **A backup vault is region-bound.** A vault exists in exactly one
-  region. Cross-region copy creates a separate recovery point in
-  the destination region's vault; it does NOT replicate the vault
-  itself. The destination vault's name, KMS key, and lock
-  configuration are independent of the source. Operators often
-  assume the source vault's lock applies to the destination — it
-  does not.
-
-- **KMS key ownership matters for cross-account.** In same-account
-  cross-region copy, the destination region KMS key is owned by
-  the same account. In cross-account copy, the destination KMS key
-  is owned by the destination account; the source account's
-  `backup:StartCopyJob` role must be granted `kms:Decrypt` on the
-  source KMS AND the destination account's KMS key policy must
-  grant `kms:GenerateDataKey` and `kms:Decrypt` to
-  `backup.<destination-region>.amazonaws.com` (and to the source
-  account principal for cross-account re-encryption).
-
-- **Cross-account copy requires AWS Organizations.** AWS Backup
-  cross-account backup works ONLY when the source and destination
-  accounts are in the same AWS Organization, and the Organizations
-  backup policy (`backup-policy`) explicitly enables the
-  cross-account relationship. Standalone cross-account copy via
-  IAM alone is NOT supported — the operation returns
-  `InvalidParameterValueException`.
+The three realities (region binding, KMS ownership, Organizations requirement) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when explaining why an operation is BLOCKED.
 
 ## Pre-flight: destination vault + KMS + IAM metadata gate
 
@@ -128,24 +105,8 @@ Three cross-region AWS Backup realities drive every operation:
 destination vault metadata. `describe-organization-configuration`
 returns the org-mode state.
 
-**Live-account pre-flight (skip if offline plan):**
-1. `backup describe-backup-vault --backup-vault-name
-   <destination-vault> --region <destination-region>` — confirm
-   vault exists; capture `EncryptionKeyArn`, `VaultLock`.
-2. `kms describe-key --key-id <destination-key-arn> --region
-   <destination-region>` — capture `KeyState`, `KeyManager`.
-3. `backup describe-backup-vault --backup-vault-name <source-vault>
-   --region <source-region>` — source vault lock state.
-4. `backup describe-recovery-point --backup-vault-name <source-vault>
-   --recovery-point-arn <arn> --region <source-region>` — capture
-   recovery point `Status`.
-5. `backup list-copy-jobs --region <source-region>` — active jobs.
-6. `organizations describe-organization` +
-   `describe-effective-policy --policy-type BACKUP_POLICY` —
-   org-mode state and cross-account policy.
-7. `iam get-role-policy` for the source backup role — verify
-   `backup:StartCopyJob`, `backup:CopyIntoBackupVault`,
-   `kms:Decrypt` on source key.
+Live-account pre-flight command listing moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Run these before any state-changing CLI.
 
 **Malformed input:** emit `VERDICT: ERROR` with reason and remediation.
 
@@ -163,55 +124,8 @@ returns the org-mode state.
 ## Process — operation planning (apply in order)
 
 ### Step 0: Expert knowledge — non-obvious cross-region behaviors
-
-- **Cross-region copy in a backup plan uses `CopyActions`.** The
-  plan's `Rules[].CopyActions[]` array defines destination region,
-  vault ARN, and lifecycle in destination. Each rule can have
-  multiple `CopyActions` (multi-region DR).
-- **`start-copy-job` is the manual alternative to a plan rule.**
-  Use for one-off copies (DR drill, audit export). Returns a
-  `CopyJobId`.
-- **Cross-account copy requires Organizations.** Source and
-  destination accounts must be in the same org, with an
-  Organizations `BACKUP_POLICY` enabling the relationship. The
-  destination vault's access policy must grant
-  `backup:CopyIntoBackupVault` to the source account.
-- **The destination vault access policy is the gate.** Without
-  `backup:CopyIntoBackupVault` for the source account's role, the
-  copy job fails with `AccessDeniedException`.
-- **Cross-account KMS re-encryption is implicit.** Backup decrypts
-  source with source key, re-encrypts with destination key. Both
-  key policies must allow `backup.<region>.amazonaws.com` and (for
-  cross-account) the source account principal.
-- **Continuous backup (PITR) does NOT replicate point-in-time
-  across regions.** Source region continuous backup is 1-second
-  RPO within region. Cross-region copy is a point-in-time snapshot,
-  NOT a continuous stream. Cross-region PITR requires
-  application-level replication (Aurora Global, DynamoDB global
-  tables).
-- **Cross-region restore runs in the destination region.** Invoke
-  `start-restore-job` in the destination region where the recovery
-  point lives. IAM role and metadata are destination-region-specific.
-- **Vault lock in source region does NOT prevent copy-out.**
-  `MinRetentionDays` only blocks deletion; copy-out is allowed.
-  Destination `MaxRetentionDays` caps the copy rule's
-  `DeleteAfterDays`.
-- **Copy duration depends on size and bandwidth.** EBS minutes;
-  RDS 15-60 min; large EFS hours. Verify via `describe-copy-job`
-  before launching restore.
-- **Cross-account restore requires external key sharing.** When
-  destination owns the recovery point and KMS key, the source
-  account needs `kms:Decrypt` on the destination KMS key — via
-  policy grant or `kms CreateGrant`.
-- **Organizations backup policy is the source of truth for
-  cross-account.** Tag-based selection in the org policy applies
-  to ALL member accounts.
-- **Backup Vault Lock cross-region is per-vault.** Locking the
-  source vault does NOT lock the destination. Each region's vault
-  must be locked separately.
-- **Cross-region copy cost is per-GB-transferred + per-GB-stored.**
-  For large frequent copies, consider async replication at the
-  application layer (Aurora Global, S3 Cross-Region Replication).
+Step 0 deep-dive moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when an operation fails for a non-obvious reason.
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
@@ -368,120 +282,20 @@ Returns a `CopyJobId`. Poll via `describe-copy-job --copy-job-id
 appears in the destination region's vault.
 
 ### Configure cross-account backup via Organizations policy
-
-```bash
-# From the Organizations management account
-aws organizations create-policy \
-  --name "cross-account-backup" \
-  --type BACKUP_POLICY \
-  --content '{
-    "plans": [{
-      "rules": [{
-        "rule-name": "rule1",
-        "target-backup-vault-name": "central-vault",
-        "schedule-expression": "cron(0 5 ? * * *)",
-        "start-window-minutes": 480,
-        "completion-window-minutes": 1440,
-        "copy-actions": [{
-          "destination-backup-vault-arn": "arn:aws:backup:us-east-1:222222222222:backup-vault:central-vault",
-          "lifecycle": {"delete-after-days": 90}
-        }]
-      }],
-      "selection-list": [{
-        "selection-name": "tag-based",
-        "iam-role-arn": "arn:aws:iam::111111111111:role/AWSBackupDefaultServiceRole",
-        "list-of-tags": [{"condition-type": "STRINGEQUALS", "condition-key": "backup", "condition-value": "central"}]
-      }]
-    }]
-  }'
-```
-
-Destination account's vault access policy must grant
-`backup:CopyIntoBackupVault` to the source account:
-
-```bash
-aws backup put-backup-vault-access-policy \
-  --backup-vault-name central-vault \
-  --policy '{
-    "Version": "2012-10-17",
-    "Statement": [{
-      "Effect": "Allow",
-      "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
-      "Action": "backup:CopyIntoBackupVault",
-      "Resource": "*"
-    }]
-  }' --region us-east-1
-```
+Org policy + destination vault access policy CLI moved to [references/cross-account-and-org-policy-guide.md](references/cross-account-and-org-policy-guide.md).
+Load it when enabling cross-account backup.
 
 ### Start a cross-region restore
-
-```bash
-aws backup start-restore-job \
-  --recovery-point-arn arn:aws:backup:us-west-2:111111111111:recovery-point:5-6-7-8 \
-  --metadata '{"InstanceId":"i-restored-xregion","SubnetId":"subnet-xyz","SecurityGroupIds":"sg-xyz","InstanceType":"t3.medium"}' \
-  --iam-role-arn arn:aws:iam::111111111111:role/AWSBackupDefaultServiceRole \
-  --resource-type EC2 \
-  --region us-west-2
-```
-
-Run the CLI in the destination region (`--region us-west-2`). The
-`--metadata` fields are destination-region-specific.
+Restore CLI moved to [references/cross-region-restore-and-dr-vault-lock-guide.md](references/cross-region-restore-and-dr-vault-lock-guide.md).
+Load it before running start-restore-job in the destination region.
 
 ### Apply vault lock on the DR vault (COMPLIANCE mode)
-
-```bash
-aws backup put-backup-vault-lock-configuration \
-  --backup-vault-name dr-vault \
-  --changeable-for-days 3 \
-  --min-retention-days 30 \
-  --max-retention-days 3650 \
-  --region us-west-2
-```
-
-The lock is independent of the source region's vault lock. After
-the 3-day grace, the lock is irreversible.
+DR vault lock CLI moved to [references/cross-region-restore-and-dr-vault-lock-guide.md](references/cross-region-restore-and-dr-vault-lock-guide.md).
+Load it before any COMPLIANCE-mode lock change.
 
 ## Diagnostic flows
-
-### Cross-region copy job stuck or failed
-
-1. `describe-copy-job --copy-job-id <id>` — capture `State`,
-   `StatusMessage`, `BackupSizeInBytes`, `SourceRecoveryPointArn`.
-2. Common failures:
-   - `FAILED: IAM role not authorized` — source role lacks
-     `backup:StartCopyJob` or `backup:CopyIntoBackupVault`.
-   - `FAILED: Destination vault not found` — vault deleted or
-     wrong region.
-   - `FAILED: KMS key access denied` — source KMS lacks
-     `kms:Decrypt`, or destination KMS lacks `kms:GenerateDataKey`.
-   - `RUNNING > 6h` — large snapshot; check EC2 copy bandwidth.
-3. CloudTrail: `StartCopyJob`, `CopyJobCompleted` events.
-4. Remediation: fix IAM/KMS, re-run with `--idempotency-token`.
-
-### Cross-region restore failed
-
-1. `describe-restore-job --restore-job-id <id>` — capture `Status`,
-   `StatusMessage`, `CreatedResourceArn`.
-2. Common failures:
-   - `FAILED: Invalid metadata` — `--metadata` missing
-     destination-region-specific fields (SubnetId, SecurityGroupIds
-     in destination region).
-   - `FAILED: Insufficient capacity` — destination subnet lacks
-     capacity.
-   - `FAILED: KMS key inaccessible` — destination-region KMS policy
-     blocks `backup:Decrypt`.
-3. Re-attempt with corrected metadata in the destination region.
-
-### Cross-account copy returns `InvalidParameterValueException`
-
-1. `organizations describe-effective-policy --policy-type
-   BACKUP_POLICY` — verify cross-account enabled.
-2. `describe-backup-vault --backup-vault-name <destination>` —
-   verify vault exists and access policy grants
-   `backup:CopyIntoBackupVault` to source.
-3. If accounts NOT in same org, cross-account is unsupported. Use
-   same-org accounts or re-archive to a same-account destination
-   region.
+All three diagnostic flows (copy stuck/failed, restore failed, cross-account InvalidParameterValueException) moved to [references/error-handling.md](references/error-handling.md).
+Load it when a copy or restore job fails.
 
 ## Output format (per operation)
 
@@ -536,61 +350,12 @@ NOTES:
 ```
 
 ### Worked example — start cross-region copy (READY)
-
-```text
-OPERATION: start-copy
-VERDICT: READY
-TARGET: recovery-point 1-2-3-4 (us-east-1) -> dr-vault (us-west-2)
-PRE_CHECKS:
-  - [PASS] Source recovery point 1-2-3-4 Status COMPLETED
-  - [PASS] Destination vault dr-vault exists in us-west-2
-  - [PASS] Source IAM role AWSBackupDefaultServiceRole holds
-    backup:StartCopyJob
-  - [PASS] Source KMS key grants kms:Decrypt to backup.us-east-1
-  - [PASS] Destination KMS key grants kms:GenerateDataKey to
-    backup.us-west-2
-STEPS:
-  1. CONFIRM: About to start-copy-job for recovery point 1-2-3-4
-     from prod-daily-vault (us-east-1) to dr-vault (us-west-2).
-     Duration: minutes to hours depending on size. Proceed? (yes/no)
-  2. aws backup start-copy-job --recovery-point-arn arn:aws:backup:us-east-1:111111111111:recovery-point:1-2-3-4 \
-       --source-backup-vault-name prod-daily-vault \
-       --destination-backup-vault-arn arn:aws:backup:us-west-2:111111111111:backup-vault:dr-vault \
-       --iam-role-arn arn:aws:iam::111111111111:role/AWSBackupDefaultServiceRole \
-       --idempotency-token 1723305600 --region us-east-1
-POST_VERIFY:
-  - (pending execution)
-  - describe-copy-job returns State COMPLETED and
-    DestinationRecoveryPointArn within minutes to hours
-  - list-recovery-points-by-backup-vault --backup-vault-name dr-vault
-    --region us-west-2 shows the new recovery point
-STATE: pending — copy job COMPLETED within minutes to hours
-NOTES:
-  - Same-account cross-region copy. KMS re-encryption is implicit.
-  - Destination recovery point uses destination KMS key (xyz).
-  - Cost: per-GB-transferred + per-GB-stored in us-west-2.
-```
+Full example moved to [references/worked-examples.md](references/worked-examples.md).
+Load it before emitting a start-copy READY plan.
 
 ### Worked example — cross-account copy BLOCKED
-
-```text
-OPERATION: cross-account-enable
-VERDICT: BLOCKED
-TARGET: account 111111111111 -> account 222222222222 (cross-account)
-PRE_CHECKS:
-  - [FAIL] Source 111111111111 is NOT in the same AWS Organization
-    as destination 222222222222. describe-organization returns
-    ManagementAccountId 999999999999; 222222222222 is NOT a member.
-  - [PASS] Caller holds organizations:DescribeEffectivePolicy
-STEPS: (none — pre-checks failed)
-POST_VERIFY: (none)
-STATE: FAILED — cross-account requires same AWS Organization
-NOTES:
-  - Remediation: invite 222222222222 to the org, then attach a
-    BACKUP_POLICY enabling cross-account. Standalone cross-account
-    copy is NOT supported.
-  - Alternative: copy to a same-account destination region.
-```
+Full example moved to [references/worked-examples.md](references/worked-examples.md).
+Load it when cross-account pre-checks fail.
 
 ## STRICT output contract
 
@@ -643,69 +408,21 @@ NOTES: <region-binding caveat, KMS ownership rationale, org-mode requirement, in
 - **Estimate cost** for large cross-region copies.
 
 ## Expert heuristic: cross-region vs cross-account
-
-```
-CROSS-REGION (same account, different region)
-   ├─ Use create-backup-plan with CopyActions[]
-   ├─ Destination vault + KMS in destination region
-   ├─ Same AWS account owns both regions
-   └─ KMS re-encryption is implicit
-
-CROSS-ACCOUNT (different accounts)
-   ├─ Same AWS Organization required
-   ├─ Organizations BACKUP_POLICY enables cross-account
-   ├─ Destination vault access policy grants
-   │   backup:CopyIntoBackupVault to source account
-   ├─ Source role holds kms:Decrypt on source key
-   ├─ Destination KMS policy grants kms:GenerateDataKey,
-   │   kms:Decrypt to backup.<destination-region>.amazonaws.com
-   │   AND to source account principal
-   └─ IAM alone is NOT sufficient
-```
-
-**Per-resource-type cross-region caveats:**
-
-| ResourceType | Cross-region behavior |
-|---|---|
-| `EC2` | Snapshot copied; restore creates new instance in destination |
-| `RDS` | Snapshot copied; restore creates new DB instance |
-| `EBS` | Snapshot copied; restore creates new volume |
-| `S3` | Versioning backup copied; restore overwrites by version |
-| `DynamoDB` | Backup copied; restore replaces table |
-| `EFS` | File system copied; restore to new file system |
-| `Aurora` | Cluster snapshot copied; restore to new cluster |
-| `FSx` | Volume-level copy; filesystem-type-specific restore |
-
-**Copy duration baselines:** EBS minutes; RDS 15-60 min; EFS hours;
-FSx 30-120 min; S3 minutes-hours by object count.
-
-ALWAYS pair cross-region copy with a quarterly DR drill — operators
-often skip test-restore and discover permission gaps during an incident.
+Full heuristic (decision tree, per-resource-type caveats, duration baselines, DR-drill rule) moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when choosing between cross-region and cross-account patterns.
 
 ## Recent AWS features (2024-2026)
+Feature detail moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when scoping continuous cross-region, external key sharing, or FSx copies.
 
-- **AWS Backup continuous backups cross-region (2025)**: continuous
-  backup (PITR) for EC2 supports cross-region copy of the
-  continuous recovery point; cross-region PITR still requires
-  application-level replication.
-- **Backup Vault Lock cross-region (2024)**: each region's vault
-  lock is independent; the source region's lock does NOT apply to
-  the destination region's vault. Locking the DR vault requires
-  explicit `put-backup-vault-lock-configuration` in the
-  destination region.
-- **Cross-account backup via AWS Organizations (2023, refined
-  2025)**: Organizations `BACKUP_POLICY` enables cross-account
-  backup and restore; supports tag-based selection across member
-  accounts; requires `backup:CopyIntoBackupVault` grant on the
-  destination vault.
-- **AWS Backup external key sharing (2024)**: cross-account
-  restore with destination-owned KMS keys via KMS key policy or
-  `kms CreateGrant`; supports air-gapped recovery patterns.
-- **AWS Backup for Amazon FSx cross-region (2024)**: cross-region
-  copy for FSx for Windows File Server, Lustre, OpenZFS, and
-  NetApp ONTAP.
-- **AWS Backup Audit Manager cross-region (2025)**: cross-region
-  audit reporting and compliance frameworks.
+## References (load on demand)
+
+- [Cross-account and Organizations policy guide](references/cross-account-and-org-policy-guide.md) — org backup policy structure, destination vault access policy, cross-account KMS sharing, common failures
+- [Cross-region restore and DR vault lock guide](references/cross-region-restore-and-dr-vault-lock-guide.md) — restore flow, per-resource-type metadata, DR vault lock semantics, continuous backup
+- [Worked examples](references/worked-examples.md) — start-copy READY and cross-account BLOCKED worked examples
+- [Error handling](references/error-handling.md) — copy-job stuck/failed, restore failed, cross-account InvalidParameterValueException flows
+- [Diagnostic commands](references/diagnostic-commands.md) — live-account pre-flight command listing
+- [Advanced patterns](references/advanced-patterns.md) — mindset realities, Step 0 expert knowledge, cross-region vs cross-account heuristic, recent AWS features
 
 ## Domain
 
@@ -723,3 +440,4 @@ AWS CloudOps / AWS Backup Cross-Region and Cross-Account Operations.
 - **AWS Backup API Reference** — https://docs.aws.amazon.com/aws-backup/latest/devguide/api-reference.html
 - **AWS CLI backup reference** — https://docs.aws.amazon.com/cli/latest/reference/backup/
 - **AWS Backup Pricing** — https://aws.amazon.com/backup/pricing/
+

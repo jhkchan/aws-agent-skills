@@ -417,3 +417,214 @@ Envoy access logs can be directed to stdout for log aggregation:
    taking effect, check Envoy's admin interface
    (`curl localhost:9901/config_dump`) to see what configuration it
    actually received.
+
+---
+
+## Expert heuristic: Envoy sidecar auto-inject via webhook (moved from SKILL.md)
+
+A baseline model assumes Envoy is always present. The correct
+heuristic recognizes that auto-injection works ONLY on EKS with the
+App Mesh Controller and namespace labeling. On ECS and EC2, manual
+sidecar configuration is required.
+
+```text
+Envoy sidecar injection by platform:
+  ├── EKS (auto-inject via mutating webhook)
+  │     → Install App Mesh Controller (Helm chart)
+  │     → Controller installs a MutatingWebhookConfiguration
+  │     → Label namespace: kubectl label namespace app mesh=appmesh
+  │     → Annotate pod: appmesh.k8s.aws/virtualNode: <node-name>
+  │     → Webhook injects Envoy container into pods at creation
+  │     → Envoy config pushed via xDS from App Mesh control plane
+  │     → Pod restart NOT needed for route changes (xDS streaming)
+  │
+  ├── ECS (manual sidecar in task definition)
+  │     → Add Envoy container to the task definition
+  │     → Configure App Mesh proxy configuration (type=APPMESH)
+  │     → Set ENVOY_LOG_LEVEL, APPMESH_VIRTUAL_NODE_NAME env vars
+  │     → No webhook — must add to every task definition
+  │
+  └── EC2 (manual Envoy process)
+        → Download and run Envoy binary
+        → Configure with App Mesh bootstrap config
+        → Point to the virtual node
+        → No auto-inject — fully manual
+```
+
+**Key implication:** without the Envoy sidecar, NO mesh policies are
+enforced. Traffic flows directly between services, bypassing routing
+rules, retries, timeouts, circuit breakers, and mTLS. The sidecar is
+the data plane — the control plane (App Mesh) configures it but does
+not enforce policies directly.
+
+---
+
+## Step 8 — Envoy sidecar injection (moved from SKILL.md)
+
+### EKS (auto-inject via mutating webhook)
+
+**Install the App Mesh Controller (Helm):**
+
+```bash
+helm repo add eks https://aws.github.io/eks-charts
+helm upgrade --install appmesh-controller eks/appmesh-controller \
+  --namespace appmesh-system \
+  --create-namespace \
+  --set region=us-east-1 \
+  --set serviceAccount.create=true \
+  --set serviceAccount.name=appmesh-controller
+```
+
+**Label the namespace for injection:**
+
+```bash
+kubectl label namespace default mesh=production-mesh appmesh=enabled
+```
+
+**Annotate the pod's deployment:**
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout-v1
+spec:
+  template:
+    metadata:
+      annotations:
+        appmesh.k8s.aws/virtualNode: checkout-v1
+    spec:
+      containers:
+        - name: checkout
+          image: checkout:1.0
+```
+
+The mutating webhook injects the Envoy sidecar automatically when
+pods are created in the labeled namespace.
+
+### ECS (manual sidecar)
+
+Add the Envoy container to the ECS task definition:
+
+```json
+{
+  "name": "envoy",
+  "image": "840364872350.dkr.ecr.us-east-1.amazonaws.com/aws-appmesh-envoy:v1.29.5.0-prod",
+  "essential": true,
+  "environment": [
+    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/production-mesh/virtualNode/checkout-v1"},
+    {"name": "ENVOY_LOG_LEVEL", "value": "info"}
+  ],
+  "portMappings": [{"containerPort": 9901}]
+}
+```
+
+**Critical:** without the Envoy sidecar, mesh policies are NOT
+enforced. On ECS, forgetting the Envoy container is the #1 cause of
+"mesh policies don't work."
+
+---
+
+## Step 9 — mTLS via ACM Private CA (moved from SKILL.md)
+
+mTLS encrypts east-west traffic between mesh services.
+
+**Prerequisites:**
+- ACM Private CA in ACTIVE state.
+- Certificates issued for each virtual node.
+- SDS (Secret Discovery Service) backend configured for Envoy to
+  fetch certificates.
+
+**Configure listener TLS (inbound mTLS):**
+
+```json
+"listeners": [{
+  "portMapping": {"port": 8080, "protocol": "http"},
+  "tls": {
+    "mode": "STRICT",
+    "certificate": {
+      "sds": {
+        "secretName": "checkout-cert"
+      }
+    }
+  }
+}]
+```
+
+**Configure backend peer TLS (outbound mTLS):**
+
+```json
+"backends": [{
+  "virtualService": {
+    "virtualServiceName": "inventory.mesh.local",
+    "clientPolicy": {
+      "tls": {
+        "mode": "STRICT",
+        "certificate": {
+          "sds": {"secretName": "checkout-client-cert"}
+        },
+        "validation": {
+          "trust": {
+            "sds": {"secretName": "mesh-ca-bundle"}
+          }
+        }
+      }
+    }
+  }
+}]
+```
+
+**mTLS modes:**
+- STRICT — rejects connections without valid certificates
+- PERMISSIVE — accepts both mTLS and non-mTLS (for migration)
+
+**Critical:** start with PERMISSIVE during migration (mixing mTLS and
+non-mTLS services), then switch to STRICT once all services have
+certificates. STRICT without valid certs = all connections rejected.
+
+---
+
+## Step 11 — Mesh scope (namespace vs cluster) (moved from SKILL.md)
+
+On EKS, the App Mesh Controller can scope mesh injection to specific
+namespaces.
+
+| Scope | Behavior | Use case |
+|---|---|---|
+| Namespace-level | Only labeled namespaces get injection | Mixed mesh/non-mesh workloads |
+| Cluster-wide | All namespaces get injection | Full mesh adoption |
+
+**Namespace scoping:**
+
+```bash
+# Enable injection for specific namespace
+kubectl label namespace app-team mesh=production-mesh appmesh=enabled
+
+# Disable for other namespaces (default: no injection)
+kubectl label namespace monitoring appmesh=disabled --overwrite
+```
+
+---
+
+## Step 12 — xDS protocol (moved from SKILL.md)
+
+Envoy communicates with the App Mesh control plane via the xDS
+(Discovery Service) protocol. This is a streaming gRPC connection
+that pushes configuration changes in near-real-time.
+
+```text
+xDS flow:
+  1. Envoy starts and connects to App Mesh control plane via xDS
+  2. App Mesh sends cluster, listener, route, endpoint configurations
+  3. Envoy applies the configuration (no restart needed)
+  4. Route weight change (e.g., canary 10% → 50%) is pushed via xDS
+  5. Envoy updates its routing table within seconds
+  6. New traffic follows the updated weights immediately
+
+  Key: xDS is streaming (not polling). Config changes propagate fast.
+```
+
+**Key implication:** route weight changes do NOT require pod restarts.
+The xDS streaming protocol pushes updates to all Envoy instances
+within seconds. This is what makes canary traffic shifting near-
+instantaneous.

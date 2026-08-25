@@ -103,36 +103,8 @@ labels breaks automation silently.
 
 ## Reasoning framework (why the provisioning order matters)
 
-Auto Scaling policies look like "a rule that adds or removes capacity"
-but the underlying model has four traps:
-
-1. **Multiple scaling policies on the same metric fight each other.**
-   Target tracking on CPU and step scaling on CPU both emit scale
-   activities against the same capacity dimension. The ASG honors
-   whichever alarm fires first; alarms enter conflicting states
-   (target tracking ALARM while step scaling OK), producing
-   oscillation. Use ONE policy type per metric dimension.
-
-2. **Target tracking creates its own CloudWatch alarms.** Operators
-   sometimes hand-author an alarm for the same metric the target
-   tracking policy already manages. The two alarms double-fire on the
-   same threshold breach. Target tracking's internal alarms are visible
-   via `describe-alarms` and prefixed with the policy name — never
-   hand-author a duplicate.
-
-3. **Step scaling with a missing datapoint never fires.** A step
-   scaling alarm with insufficient data points enters
-   `INSUFFICIENT_DATA` and produces no scaling activity. Operators
-   assume "no alarm = healthy" when in fact the metric isn't being
-   emitted. Always set `TreatMissingData` explicitly.
-
-4. **Predictive scaling, warm pool, capacity rebalance, and Mixed
-   Instances Policy have their own silent-failure modes.** Predictive
-   scaling needs 24h+ of CloudWatch data or forecasts are empty; warm
-   pool instances that fail launch-template health checks silently fall
-   back to cold start; capacity rebalance is a no-op on an On-Demand-only
-   ASG; Mixed Instances Policy with the wrong allocation strategy
-   produces unexpected instance-type selection.
+Full reasoning-framework deep dive (the four traps with complete explanations) moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when diagnosing why a policy oscillates or silently no-ops.
 
 ## Dependency graph (silent-failure table)
 
@@ -158,63 +130,18 @@ procedure verifies every item rather than trusting the API response.
 
 ## Expert heuristic: the dual-policy trap
 
-The most dangerous scaling misconfiguration: two scaling policies on
-the SAME metric dimension.
-
-```text
-Operator thinks:               What actually happens:
-CPU target tracking 50% +      Both policies' alarms evaluate the same
-CPU step scaling alarm 70%  →  metric; target tracking scales out at 50%,
-                               step alarm fires at 70%, both activities
-                               land on the same ASG; on cooldown, target
-                               tracking scales back in while step alarm
-                               is still ALARM; ASG oscillates.
-```
-
-The correct model: ONE reactive policy per metric dimension. If you
-need both proactive and reactive scaling on CPU, use predictive
-scaling (proactive) + target tracking (reactive), NOT two reactive
-policies. The tell-tale signal in CloudWatch: two `ScalingPolicies`
-for the same ASG both keyed on the same metric name.
+Full heuristic moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it before attaching more than one policy to the same ASG.
 
 ## Expert heuristic: predictive scaling's history requirement
 
-Predictive scaling looks like "ML forecasts your traffic." Two
-operational truths are routinely missed:
-
-1. **Predictive scaling needs >= 24h of CloudWatch data.** A fresh ASG
-   or one with sparse traffic has empty forecasts. The `LoadMetric`
-   (typically `CPUUtilization`) must have at least one full day of
-   datapoints. Operators enable predictive scaling on day 1, see no
-   forecasts, and assume the feature is broken. Remedy: check
-   `describe-scaling-policies` for empty `LoadForecast` datapoints;
-   wait 24h before validating.
-
-2. **`Mode` controls whether capacity is pre-provisioned.** The default
-   `ForecastOnly` emits forecasts but does NOT provision capacity —
-   operators read "predictive scaling enabled" as "scaling is
-   happening." `ForecastAndScale` is required for actual
-   pre-provisioning. Verify the mode with `describe-scaling-policies`.
+Full heuristic moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when predictive forecasts come back empty.
 
 ## Expert heuristic: warm pool drain race and capacity rebalance
 
-The warm pool holds pre-initialized instances to speed scale-out. Two
-race conditions are routinely missed:
-
-1. **Capacity rebalance can drain the warm pool prematurely.** When a
-   Spot Instance interruption is signaled, capacity rebalance launches
-   a replacement from the warm pool — but the warm pool's `MinSize` is
-   the buffer for scale-out, not for Spot replacement. Operators set
-   `WarmPoolMinSize=0`, a Spot interruption drains the pool, and the
-   next scale-out falls back to cold start. Remedy: set
-   `WarmPoolMinSize >= 1` on Spot-backed ASGs.
-
-2. **Instance refresh consumes the warm pool's instances.** A rolling
-   refresh pulls instances from the warm pool to satisfy
-   `MinHealthyPercentage`. Without a warm pool checkpoint, the refresh
-   depletes the buffer. Remedy: enable warm pool BEFORE triggering
-   instance refresh, and set `InstanceWarmup` >= the application's
-   health-check grace period.
+Full heuristic moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when pairing warm pools with Spot interruptions or instance refresh.
 
 ## Prerequisites (verify before provisioning)
 
@@ -247,15 +174,9 @@ multi-AZ `VPCZoneIdentifier`, valid launch template version, health
 check type matching the metric (ELB health checks for ALB-based
 metrics), and Min <= Desired <= Max.
 
-```bash
-aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names <ASG> \
-  --query 'AutoScalingGroups[].[AutoScalingGroupName,MinSize,MaxSize,DesiredCapacity,HealthCheckType,VPCZoneIdentifier,LaunchTemplate.LaunchTemplateId]'
-```
+CLI moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
-**Common mistake:** skipping this step because "the policy will adjust
-capacity." A policy cannot scale beyond MaxSize; an ASG with MaxSize=1
-and a CPU target tracking policy silently caps at 1 instance regardless
-of load.
+Common-mistake detail moved to [references/error-handling.md](references/error-handling.md).
 
 ### Step 2 — Choose scaling policy type(s)
 
@@ -272,260 +193,87 @@ Pick ONE policy per metric dimension:
   pre-provisions capacity ahead of predicted demand. Use for workloads
   with a predictable diurnal pattern.
 
-**Common mistake:** layering target tracking and step scaling on the
-SAME metric. This is the dual-policy trap (see Expert heuristic). Use
-different metric dimensions or predictive + target tracking.
+Common-mistake detail moved to [references/error-handling.md](references/error-handling.md).
 
 ### Step 3 — Configure target tracking
 
-```bash
-# Predefined CPU metric (recommended default)
-aws autoscaling put-scaling-policy \
-  --auto-scaling-group-name <ASG> --policy-name cpu-target-50 \
-  --policy-type TargetTrackingScaling \
-  --target-tracking-configuration '{
-    "PredefinedMetricSpecification": {"PredefinedMetricType": "ASGAverageCPUUtilization"},
-    "TargetValue": 50.0, "ScaleOutCooldown": 60, "ScaleInCooldown": 300
-  }'
+CLI moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
-# ALB RequestCountPerTarget (include ResourceLabel from Target Group)
-#   "PredefinedMetricType": "ALBRequestCountPerTarget",
-#   "ResourceLabel": "app/<ALB>/<TG>", "TargetValue": 1000.0
+Common-mistake detail moved to [references/error-handling.md](references/error-handling.md).
 
-# Custom metric (e.g., SQS queue depth — verify Dimensions match emitted metric)
-#   "CustomizedMetricSpecification": {
-#     "MetricName": "ApproximateNumberOfMessagesVisible",
-#     "Namespace": "AWS/SQS",
-#     "Dimensions": [{"Name": "QueueName", "Value": "my-queue"}],
-#     "Statistic": "Average"
-#   }, "TargetValue": 100.0
-```
-
-**Common mistake:** using a `Dimensions` value that doesn't match the
-metric actually emitted. Target tracking silently sees no datapoints
-and never scales — no error is surfaced. Verify the metric emits data
-with `get-metric-statistics` BEFORE attaching the policy.
-
-**Common mistake:** `TargetValue` for ALB RequestCountPerTarget is
-per-instance-per-minute. Setting 1000 means 1000 requests per instance
-per minute (~16 RPS per instance). Operators conflate this with RPS and
-under-provision.
+Common-mistake detail moved to [references/error-handling.md](references/error-handling.md).
 
 ### Step 4 — Configure step scaling (different metric only)
 
 Step scaling requires a CloudWatch alarm FIRST, then the policy:
 
-```bash
-aws cloudwatch put-metric-alarm \
-  --alarm-name <ASG>-sqs-depth-high \
-  --metric-name ApproximateNumberOfMessagesVisible --namespace AWS/SQS \
-  --statistic Average --period 60 --evaluation-periods 2 --threshold 500 \
-  --comparison-operator GreaterThanThreshold \
-  --dimensions Name=QueueName,Value=my-queue \
-  --treat-missing-data breaching --alarm-actions <POLICY_ARN>
+CLI moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
-aws autoscaling put-scaling-policy \
-  --auto-scaling-group-name <ASG> --policy-name sqs-step-scaling-out \
-  --policy-type StepScaling --adjustment-type PercentChangeInCapacity \
-  --metric-aggregation-type Average \
-  --step-adjustments \
-    MetricIntervalLowerBound=0,MetricIntervalUpperBound=100,ScalingAdjustment=20 \
-    MetricIntervalLowerBound=100,MetricIntervalUpperBound=500,ScalingAdjustment=50 \
-    MetricIntervalLowerBound=500,ScalingAdjustment=100
-```
+Common-mistake detail moved to [references/error-handling.md](references/error-handling.md).
 
-**Common mistake:** omitting `--treat-missing-data`. The default
-behavior is `missing` (alarm stays in its prior state), which means a
-metric that stops emitting never triggers a scale-in. Use `breaching`
-for scale-out alarms (missing data = treat as breaching) or
-`notBreaching` for scale-in alarms.
-
-**Common mistake:** creating the policy BEFORE the alarm, then
-forgetting to attach the policy ARN as an `--alarm-actions`. The
-policy exists but never fires.
+Common-mistake detail moved to [references/error-handling.md](references/error-handling.md).
 
 ### Step 5 — Configure scheduled scaling
 
-```bash
-aws autoscaling put-scheduled-update-group-action \
-  --auto-scaling-group-name <ASG> \
-  --scheduled-action-name business-hours-scale-up \
-  --recurrence "0 9 * * Mon-Fri" \
-  --min-size 3 --desired-capacity 5 --max-size 10 \
-  --time-zone "America/New_York"
-```
+CLI moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
-**Common mistake:** omitting `--time-zone`. The default is UTC; an
-operator who writes `0 9 * * 1-5` expecting 9 AM local gets 9 AM UTC
-(5 AM Eastern). Always specify `--time-zone` and verify with
-`describe-scheduled-actions`.
+Common-mistake detail moved to [references/error-handling.md](references/error-handling.md).
 
-**Common mistake:** setting `MinSize > MaxSize` across overlapping
-scheduled actions. Two scheduled actions at the same time with
-conflicting bounds produce unpredictable capacity. Verify the schedule
-chain: each action's bounds must be consistent with the next.
+Common-mistake detail moved to [references/error-handling.md](references/error-handling.md).
 
 ### Step 6 — Configure warm pool
 
-```bash
-aws autoscaling put-warm-pool \
-  --auto-scaling-group-name <ASG> \
-  --pool-state Stopped \
-  --min-size 2 \
-  --instance-reuse-policy '{"ReuseOnScaleIn": true}'
-```
+CLI moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
-**Common mistake:** setting `pool-state Running` for cost-sensitive
-workloads — Running warm pool instances bill at full On-Demand/Spot
-rate. Use `Stopped` (default) for the cost/performance tradeoff;
-instances are pre-initialized (EBS volumes persist) but not billing
-compute.
+Common-mistake detail moved to [references/error-handling.md](references/error-handling.md).
 
-**Common mistake:** a launch template change that breaks the warm
-pool's AMI. The warm pool continues to hold instances from the OLD
-template version; new scale-out pulls instances from the warm pool
-that don't match the new template. Always trigger an instance refresh
-(Step 7) after a launch template change to cycle the warm pool.
+Common-mistake detail moved to [references/error-handling.md](references/error-handling.md).
 
 ### Step 7 — Trigger instance refresh
 
-```bash
-aws autoscaling start-instance-refresh \
-  --auto-scaling-group-name <ASG> \
-  --strategy Rolling \
-  --preferences '{
-    "MinHealthyPercentage": 50,
-    "InstanceWarmup": 300,
-    "CheckpointPercentages": [50, 100],
-    "CheckpointDelay": 300
-  }'
-```
+CLI moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
-**Common mistake:** omitting `CheckpointPercentages`. Without
-checkpoints, the refresh runs to completion with no pause point — a
-bad template version rolls through all instances before you can stop.
-Set checkpoints at 50% and 100% to allow a pause-and-evaluate gate.
+Common-mistake detail moved to [references/error-handling.md](references/error-handling.md).
 
-**Common mistake:** triggering instance refresh on an ASG with no
-warm pool and aggressive `MinHealthyPercentage=100`. The refresh
-cannot replace any instance because doing so drops below 100% healthy.
-Either set `MinHealthyPercentage <= 90` or provision a warm pool
-first.
+Common-mistake detail moved to [references/error-handling.md](references/error-handling.md).
 
 ### Step 8 — Configure advanced features
 
 #### 8a. Capacity rebalance (Spot-backed ASGs)
 
-```bash
-aws autoscaling update-auto-scaling-group \
-  --auto-scaling-group-name <ASG> \
-  --capacity-rebalance
-```
+CLI moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
 Capacity rebalance proactively launches a replacement when a Spot
 Instance interruption notice is received, then terminates the
 interrupted instance after the replacement passes health checks. Pair
 with `Mixed Instances Policy` (8c) for diversification.
 
-**Common mistake:** enabling capacity rebalance on an On-Demand-only
-ASG. The setting is accepted but no-ops silently because there are no
-Spot interruptions to respond to. Verify with
-`describe-auto-scaling-groups --query ...MixedInstancesPolicy`.
+Common-mistake detail moved to [references/error-handling.md](references/error-handling.md).
 
 #### 8b. Predictive scaling
 
-```bash
-aws autoscaling put-scaling-policy \
-  --auto-scaling-group-name <ASG> \
-  --policy-name predictive-cpu-forecast \
-  --policy-type PredictiveScaling \
-  --predictive-scaling-configuration '{
-    "MetricSpecifications": [{
-      "TargetValue": 40.0,
-      "PredefinedMetricPairSpecification": {
-        "PredefinedMetricType": "ASGCPUUtilization",
-        "ResourceLabel": ""
-      }
-    }],
-    "Mode": "ForecastAndScale",
-    "SchedulingBufferTime": 300,
-    "MaxCapacityBreachBehavior": "IncreaseMaxCapacity",
-    "MaxCapacityBuffer": 10
-  }'
-```
+CLI moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
-**Common mistake:** using `Mode: ForecastOnly` and reading "predictive
-scaling enabled" as "scaling is happening." `ForecastOnly` only emits
-forecasts; `ForecastAndScale` is required for actual pre-provisioning.
+Common-mistake detail moved to [references/error-handling.md](references/error-handling.md).
 
-**Common mistake:** insufficient CloudWatch history. Predictive
-scaling needs >= 24h of `LoadMetric` data. On a fresh ASG, forecasts
-are empty with no error surfaced. Verify with
-`describe-scaling-policies` and check the `LoadForecast` datapoints.
+Common-mistake detail moved to [references/error-handling.md](references/error-handling.md).
 
 #### 8c. Mixed Instances Policy
 
-```bash
-aws autoscaling create-auto-scaling-group \
-  --auto-scaling-group-name <ASG> \
-  --mixed-instances-policy '{
-    "LaunchTemplate": {
-      "LaunchTemplateSpecification": {
-        "LaunchTemplateName": "my-template",
-        "Version": "$Default"
-      },
-      "Overrides": [
-        {"InstanceType": "m5.large"},
-        {"InstanceType": "m5a.large"},
-        {"InstanceType": "m4.large"}
-      ]
-    },
-    "InstancesDistribution": {
-      "OnDemandPercentageAboveBaseCapacity": 50,
-      "SpotAllocationStrategy": "capacity-optimized",
-      "SpotInstancePools": 3
-    }
-  }' \
-  --min-size 2 --max-size 10 --desired-capacity 4 \
-  --vpc-zone-identifier "subnet-abc,subnet-def,subnet-ghi"
-```
+CLI moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
-**Common mistake:** using `SpotAllocationStrategy: lowest-price` with
-`SpotInstancePools: 1`. This is the legacy strategy and picks the
-single cheapest pool — it has the highest interruption rate. Use
-`capacity-optimized` (recommended) or `price-capacity-optimized` for
-production.
+Common-mistake detail moved to [references/error-handling.md](references/error-handling.md).
 
-**Common mistake:** `prioritized` strategy with only one instance type
-override. The strategy silently falls back to single-type behavior;
-the allocation strategy is ignored. Provide >= 2 overrides for any
-diversification strategy to take effect.
+Common-mistake detail moved to [references/error-handling.md](references/error-handling.md).
 
 ### Step 9 — Verification
 
 Run every verification command and confirm each output matches the
 expected state.
 
-```bash
-aws autoscaling describe-policies --auto-scaling-group-name <ASG>
-aws autoscaling describe-scheduled-actions --auto-scaling-group-name <ASG>
-aws autoscaling describe-warm-pool --auto-scaling-group-name <ASG>
-aws autoscaling describe-instance-refreshes --auto-scaling-group-name <ASG>
-aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names <ASG> \
-  --query 'AutoScalingGroups[].{CapacityRebalance:CapacityRebalance,MIP:MixedInstancesPolicy}'
-aws cloudwatch describe-alarms --alarm-name-prefix <ASG>
-aws cloudwatch get-metric-statistics --namespace AWS/EC2 --metric-name CPUUtilization \
-  --start-time $(date -u -v-1H +%Y-%m-%dT%H:%M:%SZ) --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 300 --statistics Average
-```
 
-For predictive scaling, additionally verify the forecast is non-empty:
-
-```bash
-aws autoscaling describe-scaling-policies --auto-scaling-group-name <ASG> \
-  --policy-names predictive-cpu-forecast \
-  --query 'ScalingPolicies[].PredictiveScalingConfiguration'
-```
+Full verification command listing moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load it at Step 9 to verify every configuration item against actual state.
 
 ## NEVER do these things
 
@@ -710,21 +458,8 @@ VERIFICATION_COMMANDS:
 
 ### Worked example — PREREQUISITES_MISSING (dual-policy trap)
 
-```text
-POLICY_SPEC: prod-web-asg
-VERDICT: PREREQUISITES_MISSING
-CHECKLIST:
-  [✓] ASG baseline: multi-AZ (3 AZs), EC2 health checks, Min=2 Desired=4 Max=10
-  [✗] Scaling policy type(s): dual-policy conflict — target tracking on CPU AND step scaling on CPU; both reactive on same metric dimension
-  [✓] Target tracking: ASGAverageCPUUtilization target 50.0 ScaleOutCooldown 60 ScaleInCooldown 300
-  [✗] Step scaling: SAME metric (CPU) as target tracking — this is the dual-policy trap; alarms conflict, ASG oscillates. Choose a different metric or remove.
-  [OPTIONAL] Scheduled scaling: not configured
-  [OPTIONAL] Warm pool: not configured
-  [OPTIONAL] Instance refresh: not configured
-  [OPTIONAL] Advanced: capacity rebalance off | predictive off | MIP none
-VERIFICATION_COMMANDS:
-  aws autoscaling describe-policies --auto-scaling-group-names prod-web-asg
-```
+Full example moved to [references/worked-examples.md](references/worked-examples.md).
+Load it when the verdict is PREREQUISITES_MISSING.
 
 **Self-check before emit:**
 - [ ] All 8 checklist rows present (no omitted items)?
@@ -737,25 +472,15 @@ VERIFICATION_COMMANDS:
 
 ## Recent AWS features
 
-- **Predictive scaling (ML-based forecast)**: `policy-type
-  PredictiveScaling` with `MetricSpecifications`, `Mode`
-  (ForecastOnly | ForecastAndScale), and `MaxCapacityBreachBehavior`
-  to allow bursting above MaxSize. Requires >= 24h of `LoadMetric`
-  history; verify forecast non-empty via `describe-scaling-policies`.
-- **Capacity rebalance**: `--capacity-rebalance` on ASG update/create.
-  Proactively launches replacement on Spot Instance interruption
-  notice. No-ops silently on On-Demand-only ASGs — verify MIP presence.
-- **Warm pool `InstanceReusePolicy`**: `ReuseOnScaleIn: true` returns
-  terminating instances to the warm pool on scale-in events. Pair with
-  `MinSize` to maintain buffer for capacity rebalance.
-- **Instance refresh checkpoints**: `CheckpointPercentages` (e.g.,
-  [50, 100]) with `CheckpointDelay` pause the refresh at each threshold.
-  Without checkpoints, refresh runs to completion with no pause point.
-- **Mixed Instances Policy allocation strategies**: `capacity-optimized`
-  (recommended for Spot), `price-capacity-optimized` (cost + availability
-  balance), `lowest-price` (legacy, highest interruption rate),
-  `prioritized` (On-Demand fallback ordering). `capacity-optimized` with
-  >= 3 overrides is the AWS-recommended production default.
-- **On-Demand / Spot blend via `InstancesDistribution`**:
-  `OnDemandPercentageAboveBaseCapacity` controls the On-Demand fraction
-  above base; `OnDemandBaseCapacity` sets the absolute floor.
+Feature detail moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when choosing a Spot allocation strategy or enabling predictive scaling.
+
+## References (load on demand)
+
+- [Provisioning CLI commands](references/provisioning-cli-commands.md) — per-step CLI for the 9-step procedure (baseline, target tracking, step scaling, scheduled, warm pool, instance refresh, advanced features)
+- [Scaling policy templates](references/scaling-policy-templates.md) — full per-policy-type CLI/JSON templates
+- [Worked examples](references/worked-examples.md) — PREREQUISITES_MISSING worked example (dual-policy trap)
+- [Error handling](references/error-handling.md) — common-mistake catalog for Steps 1-8 (Dimensions mismatch, timezone, ForecastOnly, lowest-price, and more)
+- [Diagnostic commands](references/diagnostic-commands.md) — Step 9 post-deploy verification command listing
+- [Advanced patterns](references/advanced-patterns.md) — reasoning-framework deep dive, expert heuristics (dual-policy trap, predictive history, warm-pool drain race), recent AWS features
+

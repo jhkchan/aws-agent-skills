@@ -75,19 +75,8 @@ required retention, and the legal hold chain of custody is intact**. A
 backup plan that runs but produces no auditable evidence is, for
 compliance purposes, no backup at all.
 
-- **Audit Manager turns "trust me, backups work" into "here is the
-  evidence."** A compliance report exported by Audit Manager is the
-  artifact you hand to an auditor. A backup job success in the console is
-  not.
-- **Legal hold and Vault Lock are different mechanisms.** Vault Lock
-  enforces retention policy immutability at the vault level. Legal hold
-  (BackupLegalHold resource) freezes specific recovery points (e.g., the
-  state of every EBS volume the day litigation was filed). They are
-  complementary, not interchangeable.
-- **Cross-account centralization is the only way to audit at org scale.**
-  A per-account backup plan with no central view means an auditor has to
-  log into 50 accounts to see evidence. The Organizations backup vault +
-  delegated admin is the canonical pattern.
+Mindset deep dives (Audit Manager evidence, legal hold vs Vault Lock, cross-account centralization) moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when designing the compliance evidence chain.
 
 ## Pre-flight: Backup compliance spec gate (run before generation)
 
@@ -123,12 +112,8 @@ resources_in_scope=[EC2, RDS], accounts_scope=org, retention_policy=35d
 daily immutable, legal_hold_required=yes.
 ```
 
-**Live-account pre-flight checks (skip for offline authoring):**
-1. Verify AWS Backup is enabled: `aws backup list-backup-plans`.
-2. Verify Audit Manager is enabled: `aws backup audit-manager list-frameworks`.
-3. For org: verify backup delegated admin: `aws organizations list-delegated-administrators --service-principal backup.amazonaws.com`.
-4. Verify backup vault: `aws backup list-backup-vaults`.
-5. Verify Backup Search (if applicable): `aws backup search list-backup-plans` (available in supported regions).
+Live-account pre-flight command listing moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Run these before generating any compliance playbook.
 
 ## Backup compliance pillars
 
@@ -169,22 +154,12 @@ aws backup audit-manager create-framework \
 | `BACKUP_RECOVERY_POINT_ENCRYPTED` | Recovery points are encrypted |
 | `BACKUP_VARIANT_WITH_REGION_ISOLATION` | Cross-region copy exists for DR |
 
-**Gotchas:** Controls are evaluated against actual AWS Backup state, not
-against the plan. A control `BACKUP_RESOURCES_PROTECTED_BY_BACKUP_PLAN`
-fails if a resource is tagged for a plan but the plan never produced a
-recovery point. The control library is fixed by AWS — custom controls
-require Lambda-backed manual controls.
+Gotcha detail (controls evaluate actual state; fixed control library) moved to [references/audit-manager-controls.md](references/audit-manager-controls.md).
+Load it when a control fails despite a configured plan.
 
 ### Audit template
-
-```bash
-aws backup audit-manager create-report-plan \
-  --report-plan-name soc2-monthly-compliance \
-  --report-plan-description "Monthly SOC2 backup compliance report" \
-  --report-setting '{"ReportTemplate":"COMPLIANCE","Frameworks":["arn:aws:backup:us-east-1:111111111111:framework:soc2-backup-compliance"]}' \
-  --reportDeliveryConfig={"S3BucketName":"backup-compliance-reports","S3KeyPrefix":"soc2/2026/"} \
-  --idempotencyToken "$(uuidgen)"
-```
+Audit template report-plan CLI moved to [references/audit-manager-controls.md](references/audit-manager-controls.md).
+Load it when scheduling the framework compliance report.
 
 ## Backup reporting
 
@@ -203,20 +178,8 @@ aws backup audit-manager create-report-plan \
   --idempotencyToken "$(uuidgen)"
 ```
 
-**Backup Report Stream (2024-2025):** Streams backup job state changes to
-EventBridge in real time, enabling near-real-time compliance detection
-instead of waiting for the next report run.
-
-```bash
-# EventBridge rule for Backup Report Stream
-aws events put-rule --name backup-report-stream \
-  --event-pattern '{"source":["aws.backup"],"detail-type":["Backup Job State Change"]}' \
-  --state ENABLED
-```
-
-**Gotchas:** Reports land in S3 as JSON; downstream tooling (Lambda +
-QuickSight / Athena) is needed for human-readable dashboards. Report runs
-incur Audit Manager costs per evaluation.
+Backup Report Stream detail and reporting gotchas moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when near-real-time compliance detection is required.
 
 ## Legal hold automation
 
@@ -250,44 +213,8 @@ recovery points for the duration of the hold. Use Vault Lock for policy
 immutability; use Legal Hold for litigation-driven freezes.
 
 ### EventBridge-triggered litigation hold
-
-```bash
-# Trigger legal hold on a custom event (e.g., from the legal team)
-aws events put-rule --name trigger-litigation-hold \
-  --event-pattern '{"source":["custom.legal"],"detail-type":["Litigation Hold Request"]}' \
-  --state ENABLED
-
-aws events put-targets --rule trigger-litigation-hold \
-  --targets '[{"Id":"HoldResponder","Arn":"arn:aws:lambda:us-east-1:111111111111:function:create-legal-hold"}]'
-```
-
-**Lambda responder (excerpt):**
-
-```python
-import boto3, os
-backup = boto3.client('backup')
-
-def lambda_handler(event, context):
-    detail = event['detail']
-    backup.create_legal_hold(
-        Title=detail['caseName'],
-        Description=detail['caseDescription'],
-        LegalHoldStatus='ACTIVE',
-        RecoveryPointSelection={
-            'ResourceIdentifiers': detail['resourceArns'],
-            'DateRange': {
-                'FromDate': detail['incidentDateStart'],
-                'ToDate': detail['incidentDateEnd']
-            }
-        }
-    )
-    return {'statusCode': 200, 'hold': 'created'}
-```
-
-**Gotchas:** Legal holds cannot be bypassed — even the root account
-cannot delete a held recovery point. Always include the case ID in the
-hold title for traceability. Test release (status -> INACTIVE) before
-needing it under court deadline pressure.
+EventBridge rule + Lambda responder moved to [references/legal-hold-and-vault-lock.md](references/legal-hold-and-vault-lock.md).
+Load it when automating litigation hold from a legal-team event.
 
 ## Cross-account / cross-region audit
 
@@ -315,23 +242,8 @@ aws backup create-backup-vault \
   --profile delegated-admin-profile
 ```
 
-Member accounts add a `COPY_ACTION` to their backup plan targeting the
-org vault:
-
-```bash
-aws backup create-backup-plan --backup-plan '{
-  "BackupPlanName":"cross-account-daily",
-  "Rules":[{
-    "RuleName":"DailyToOrgVault",
-    "TargetBackupVaultName":"Default",
-    "ScheduleExpression":"cron(0 5 ? * * *)",
-    "CopyActions":[{
-      "DestinationBackupVaultArn":"arn:aws:backup:us-east-1:222222222222:backup-vault:org-compliance-vault",
-      "Lifecycle":{"DeleteAfterDays":35}
-    }]
-  }]
-}'
-```
+Member-account COPY_ACTION plan moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when wiring member accounts to the org vault.
 
 **Gotchas:** The org vault account must grant member accounts
 `backup:CopyIntoBackupVault` via a vault access policy. Cross-region copy
@@ -339,127 +251,20 @@ adds to the per-job cost. The delegated admin can audit but cannot
 restore from member-account recovery points without a role assumption.
 
 ## AWS Backup Search
-
-AWS Backup Search (2024-2025) enables searching across backups without
-restoring each one first — useful for eDiscovery and incident response.
-
-```bash
-# Initiate a search across all backups in scope
-aws backup search start-search-job \
-  --search-scope '{
-    "BackupVaultNames":["production-vault","org-compliance-vault"],
-    "ResourceTypes":["EBS","S3","DynamoDB"]
-  }' \
-  --search-term "confidential" \
-  --filters '{"LastRestoreDateBefore":"2026-08-01"}'
-```
-
-**Gotchas:** Search incurs cost per GB scanned; scope searches tightly.
-Search results are exported to S3 (not returned inline). Pair with legal
-hold for eDiscovery workflows (search -> hold matching recovery points).
+Backup Search CLI and gotchas moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it for eDiscovery or incident-response search.
 
 ## Cost allocation tags
-
-```bash
-# Tag a backup vault for cost allocation
-aws backup tag-resource \
-  --resource-arn arn:aws:backup:us-east-1:111111111111:backup-vault:production-vault \
-  --tags '{"Project":"acme-platform","Environment":"production","Compliance":"SOC2"}'
-
-# Tag a backup job (cost flows to the resource)
-aws backup tag-resource \
-  --resource-arn arn:aws:backup:us-east-1:111111111111:recovery-point:1-xxx \
-  --tags '{"Project":"acme-platform","Workload":"orders-api"}'
-```
-
-After activation in Billing, tags flow to AWS Cost Explorer for per-project
-backup spend allocation.
-
-**Gotchas:** Tags on backup jobs propagate from the source resource if
-`BackupPlan` includes copy-backup-tags; otherwise tag explicitly. Vault
-tags do not propagate to recovery points — tag both.
+Cost-tag CLI and gotchas moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when allocating backup spend per project.
 
 ## EventBridge Scheduler for periodic audits
-
-Schedule Audit Manager evaluations to run on a cadence (e.g., daily at
-2am UTC):
-
-```bash
-aws scheduler create-schedule \
-  --name backup-audit-daily \
-  --schedule-expression "cron(0 2 * * ? *)" \
-  --flexible-time-window '{"Mode": "OFF"}' \
-  --target '{"Arn":"arn:aws:lambda:us-east-1:111111111111:function:run-audit-manager","RoleArn":"arn:aws:iam::111111111111:role/SchedulerInvokeRole"}'
-```
-
-**Lambda target:**
-
-```python
-import boto3
-backup = boto3.client('backup')
-
-def lambda_handler(event, context):
-    # Trigger the report plan run, which also re-evaluates controls
-    backup.start-report-job(report_plan_name='monthly-compliance-report')
-    return {'statusCode': 200}
-```
+Scheduler + Lambda CLI moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when scheduling periodic Audit Manager runs.
 
 ## Step Functions compliance orchestration
-
-For multi-step compliance (e.g., daily audit -> evaluate findings ->
-auto-remediate or escalate -> export report -> notify Slack):
-
-```json
-{
-  "StartAt": "RunAudit",
-  "States": {
-    "RunAudit": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:<region>:<account>:function:run-audit-manager",
-      "Next": "GetFindings"
-    },
-    "GetFindings": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::lambda:invoke",
-      "Parameters": {"FunctionName": "get-audit-findings"},
-      "Next": "FindingsChoice"
-    },
-    "FindingsChoice": {
-      "Type": "Choice",
-      "Choices": [
-        {"Variable": "$.criticalCount", "NumericGreaterThan": 0, "Next": "PageOnCall"},
-        {"Variable": "$.nonCompliantCount", "NumericGreaterThan": 0, "Next": "AutoRemediate"}
-      ],
-      "Default": "ExportReport"
-    },
-    "AutoRemediate": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:<region>:<account>:function:auto-remediate-backup-gap",
-      "Retry": [{"ErrorEquals": ["States.TaskFailed"], "IntervalSeconds": 60, "MaxAttempts": 3}],
-      "Next": "ExportReport"
-    },
-    "PageOnCall": {
-      "Type": "Task",
-      "Resource": "arn:aws:sns:<region>:<account>:backup-critical-alerts",
-      "Next": "ExportReport"
-    },
-    "ExportReport": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::backup:startReportJob",
-      "Next": "NotifySlack"
-    },
-    "NotifySlack": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:<region>:<account>:function:notify-slack-backup",
-      "End": true
-    }
-  }
-}
-```
-
-**Gotchas:** Auto-remediation should be conservative — backing up a
-forgotten resource is fine; deleting a stale recovery point is not. Gate
-destructive actions behind a human approval (task token).
+Full Step Functions state machine moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when orchestrating multi-step compliance automation.
 
 ## Output format (STRICT output contract)
 
@@ -606,38 +411,12 @@ REMEDIATION:
      aws backup start-report-job --report-plan-name nist-monthly-compliance
 ```
 
-**Key details in this example:**
-
-- **3 non-compliant resources** identified by resource ARN with last
-  backup date for each.
-- **Vault Lock GOVERNANCE vs LOCK_MODE** is the critical finding — NIST
-  requires immutability that GOVERNANCE mode does not provide.
-- **Restore drill overdue** by 28 days (118 days since last drill vs
-  90-day policy). This is a separate finding from the stale backups.
-- **FINDINGS severity** drives remediation priority: CRITICAL before
-  HIGH, with specific CLI commands for each.
+Key-details annotation moved to [references/worked-examples.md](references/worked-examples.md).
+Load it to see why each NIST finding maps to its remediation.
 
 ### Worked example — AUTOMATED (all gates passing)
-
-```text
-VAULT: soc2-production-vault (us-east-1)
-VERDICT: AUTOMATED
-CHECKLIST:
-  [PASS] Compliance framework: SOC2 — 5 controls mapped, last evaluation 2026-08-11 02:00 UTC
-  [PASS] Backup frequency audit: all 62 resources have last backup age <= 24h
-  [PASS] Encryption verification: 62/62 recovery points encrypted
-  [PASS] Retention compliance: Vault Lock LOCK_MODE, min 7d max 365d
-  [PASS] Cross-region replication: configured, destination us-west-2
-  [PASS] Legal hold: tested 2026-07-15 (create + release cycle documented)
-  [PASS] Restore drill: last 2026-07-20, RTO 35min for EBS 1TB (within 90-day window)
-  [PASS] Reporting: compliance report 2026-08-11 (within 24h SLA), coverage + job summary weekly
-  [PASS] Cost allocation tags: active (Project, Environment, Compliance)
-FINDINGS:
-  - [INFO] Cross-region copy adds ~12% to per-job cost
-  - [WARN] One member account (333333333333) missing cost tag: Project
-REMEDIATION:
-  1. Add Project tag to backup jobs in account 333333333333
-```
+Full example moved to [references/worked-examples.md](references/worked-examples.md).
+Load it when all gates pass and the verdict is AUTOMATED.
 
 **Self-check before emit:**
 - [ ] VAULT name and region present?
@@ -679,39 +458,8 @@ REMEDIATION:
   resource) — destructive actions need human approval.
 
 ## Expert heuristic callouts
-
-- **Vault Lock GOVERNANCE vs COMPLIANCE is the most-confused distinction.**
-  GOVERNANCE mode lets root override (with `s3:PutBucketObjectLock`
-  privileges). COMPLIANCE mode (LOCK_MODE) blocks everyone, including
-  root. For regulated workloads, LOCK_MODE is the only acceptable answer.
-- **Audit Manager controls are read-only against actual state.** A control
-  does not modify the backup plan — it reports whether the plan is in
-  compliance. Remediation is a separate step (Lambda or human).
-- **Cross-account backup requires `backup:CopyIntoBackupVault` on the
-  destination vault.** Member accounts cannot copy into the org vault
-  without it. The vault access policy is the linchpin.
-- **Backup Report Stream events are best-effort.** For compliance evidence,
-  rely on the scheduled Audit Manager report; the stream is for real-time
-  alerting, not for audit-grade evidence.
-- **Legal hold release does not delete the recovery point.** Setting
-  `LegalHoldStatus=INACTIVE` frees the recovery point to age out per the
-  vault retention — it does not immediately delete. Test this to avoid
-  confusion during litigation.
-- **Cost allocation tags need activation in Billing.** Tagging a vault is
-  not enough — the tag must be activated as a cost allocation tag in the
-  Billing console before it appears in Cost Explorer.
-- **Backup Search cost is per GB scanned.** A broad search across years of
-  backups can be expensive. Scope tightly (vault, resource type, date
-  range).
-- **The `BACKUP_REPORT_LAST_RESTORE_AGE` control validates restore drills.**
-  It checks that a restore was actually performed within the configured
-  window. A backup plan that never tested restores fails this control.
-- **Org vault account is region-specific.** A vault in us-east-1 does not
-  cover member resources in eu-west-1 unless member plans add a
-  cross-region copy action.
-- **Audit Manager has a per-evaluation cost.** Daily evaluations across
-  hundreds of resources add up. Balance cadence against cost; daily for
-  critical, weekly for the rest.
+All ten expert-heuristic callouts moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it for the non-obvious behaviors that change a design.
 
 ## Pre-flight safety checks
 
@@ -731,41 +479,20 @@ REMEDIATION:
   the tag as a dimension.
 
 ## Edge-case handling
-
-- **GOVERNANCE to LOCK_MODE migration.** Switch from governance to
-  compliance mode during a maintenance window — once LOCK_MODE passes the
-  `changeable-for-days` cool-down, retention is forever. Test with a
-  non-production vault first.
-- **Control gap for resource types not in the library.** AWS does not
-  provide a control for every resource type (e.g., custom applications on
-  EC2). Use a Lambda-backed manual control to fill the gap.
-- **Report freshness drift.** A scheduled report may silently fail if the
-  S3 bucket policy changes. Alarm on report job failure.
-- **Member account drift.** A member account's backup plan may be modified
-  out-of-band. Use Audit Manager controls to detect drift; do not assume
-  the plan is current.
-- **Legal hold conflict with lifecycle.** A held recovery point does not
-  age out per the vault lifecycle. Holds override retention; release
-  explicitly when litigation closes.
-- **Backup Search region availability.** Search is not available in all
-  regions; verify before scoping eDiscovery workflows.
+Edge-case catalog moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it on GOVERNANCE-to-LOCK_MODE migration, control gaps, or report drift.
 
 ## Recent AWS features (2024-2026)
+Feature detail moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when scoping Backup Search, cost tags, or Report Stream.
 
-- **AWS Backup Search (2024-2025):** Search across backups without
-  restoring each one. Pairs with legal hold for eDiscovery.
-- **Backup cost allocation tags (2024-2025):** Tag vaults and jobs for per-project cost allocation in Cost Explorer.
-- **Backup Report Stream (2024-2025):** Real-time job state changes via
-  EventBridge; enables near-real-time compliance detection.
-- **Backup Audit Manager control library expansion (2024-2025):** New
-  controls for cross-region isolation, restore drill age, and encryption.
-- **Cross-account backup with AWS Organizations (2024-2025):** Delegated
-  administrator pattern centralizes backup auditing across all member
-  accounts.
-- **Legal hold improvements (2024-2025):** Programmatic create / release
-  via API + EventBridge; case-ID field in the hold title.
-- **EventBridge Scheduler integration (2024-2025):** Serverless cron for periodic Audit Manager evaluations.
-- **Backup continuous backup (Point-in-Time Recovery) (2024-2025):** PITR for supported resources; the `BACKUP_REPORT_LAST_BACKUP_AGE` control validates PITR freshness.
+## References (load on demand)
+
+- [Audit Manager controls](references/audit-manager-controls.md) — control library detail, audit-template report-plan CLI, controls-evaluate-actual-state gotcha
+- [Legal hold and Vault Lock](references/legal-hold-and-vault-lock.md) — BackupLegalHold lifecycle, LOCK_MODE configuration, end-to-end litigation hold incl. EventBridge rule + Lambda responder
+- [Worked examples](references/worked-examples.md) — AUTOMATED (all gates passing) example + key-details annotation of the NIST example
+- [Diagnostic commands](references/diagnostic-commands.md) — live-account pre-flight checks
+- [Advanced patterns](references/advanced-patterns.md) — mindset deep dives, Report Stream, member-account copy plan, Backup Search, cost tags, EventBridge Scheduler, Step Functions orchestration, expert heuristics, edge cases, recent AWS features
 
 ## Domain
 
@@ -782,3 +509,4 @@ AWS CloudOps / Backup Compliance Automation.
 - **AWS Backup reporting** — https://docs.aws.amazon.com/aws-backup/latest/devguide/backup-reporting.html
 - **AWS Organizations delegated administrator** — https://docs.aws.amazon.com/organizations/latest/userguide/orgs_integrate_services.html
 - **AWS Backup cost allocation tags** — https://docs.aws.amazon.com/aws-backup/latest/devguide/tagging.html
+

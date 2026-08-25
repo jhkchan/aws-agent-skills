@@ -195,3 +195,31 @@ resource "aws_backup_report_plan" "recovery_points" {
   }
 }
 ```
+
+## Expert heuristic: report plan types and when to use each
+
+A baseline model may not know the three report template types. The
+correct heuristic recognizes that each template serves a different
+compliance question.
+
+```text
+BACKUP_JOB_REPORT:
+  Question: "Are my backup jobs succeeding?"
+  Content: job status (succeeded/failed/abandoned), job duration,
+           resource type, backup vault
+
+COMPLIANCE_REPORT:
+  Question: "Are all resources covered by backup plans?"
+  Content: resources WITH backup coverage, resources WITHOUT coverage,
+           backup plan mapping per resource
+
+RECOVERY_POINT_REPORT:
+  Question: "Are my recovery points encrypted and within retention?"
+  Content: recovery point ARN, encryption status (KMS key),
+           vault name, creation date, expiry date, deletion status
+```
+
+**Key implication:** the COMPLIANCE_REPORT is the most important for
+audit. It identifies the coverage gap — resources that are NOT in any
+backup plan. This is the report that auditors and compliance teams
+request.

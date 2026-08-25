@@ -145,3 +145,84 @@ For custom runbooks:
   in place.
 - Mark the tested version as default via
   `update-document-default-version --document-version <n>`.
+
+## Custom runbook: revoke open security-group ingress (moved from SKILL.md Step 6)
+
+Custom runbook template (YAML shorthand):
+
+```yaml
+---
+schemaVersion: '0.3'
+assumeRole: '{{ AutomationAssumeRole }}'
+description: 'Revoke ingress rule on a security group open to 0.0.0.0/0'
+parameters:
+  GroupId:
+    type: String
+    description: 'The security group ID (Config injects via RESOURCE_ID)'
+  AutomationAssumeRole:
+    type: String
+    description: 'The SSM execution role ARN'
+mainSteps:
+  - name: GetOpenRules
+    action: aws:executeAwsApi
+    inputs:
+      Service: ec2
+      Api: DescribeSecurityGroupRules
+      Filters:
+        - Name: group-id
+          Values: ['{{ GroupId }}']
+        - Name: cidr
+          Values: ['0.0.0.0/0']
+    outputs:
+      - Name: RuleIds
+        Selector: '$.SecurityGroupRules[].SecurityGroupRuleId'
+        Type: StringList
+  - name: VerifyFinding
+    action: aws:branch
+    inputs:
+      Choices:
+        - NextStep: RevokeRules
+          Variable: '{{ GetOpenRules.RuleIds }}'
+          Operation: NotEquals
+          Value: '[]'
+      Default: CompleteNoOp
+  - name: RevokeRules
+    action: aws:executeAwsApi
+    inputs:
+      Service: ec2
+      Api: RevokeSecurityGroupIngress
+      GroupId: '{{ GroupId }}'
+      IpPermissions: '[{"IpProtocol":"-1","IpRanges":[{"CidrIp":"0.0.0.0/0"}]}]'
+    isCritical: true
+    onFailure: abort
+  - name: CompleteNoOp
+    action: aws:sleep
+    inputs:
+      Duration: PT0S
+```
+
+Create the document:
+
+```bash
+aws ssm create-document \
+  --name Custom-RevokeOpenSecurityGroupIngress \
+  --document-type Automation \
+  --document-format YAML \
+  --content file://custom-runbook.yaml \
+  --target-type '/AWS::EC2::SecurityGroup'
+```
+
+Test before wiring remediation:
+
+```bash
+aws ssm start-automation-execution \
+  --document-name Custom-RevokeOpenSecurityGroupIngress \
+  --parameters '{"GroupId":["sg-0abc123"],"AutomationAssumeRole":["arn:aws:iam::111111111111:role/aws-service-role/AmazonSSMAutomationRole/AWS-SSM-AutomationExecutionRole"]}'
+
+aws ssm get-automation-execution \
+  --automation-execution-id <execution-id> \
+  --query 'AutomationExecution.AutomationExecutionStatus'
+```
+
+A custom runbook without a tested execution is the most common cause
+of a "remediation wired but doesn't actually fix" failure.

@@ -191,78 +191,16 @@ jobs — they sit in RUNNABLE indefinitely.
   permissions.
 
 ## Expert heuristic: BEST_FIT_PROGRESSIVE for heterogeneous pools
+> Moved verbatim to [references/allocation-strategies-and-instance-selection.md](references/allocation-strategies-and-instance-selection.md) — load on demand.
 
-A baseline model says "use BEST_FIT." The correct heuristic recognizes
-that BEST_FIT causes capacity starvation when the primary type is scarce.
-
-```text
-Instance pool: m5.large, m5.xlarge, m5.2xlarge, c5.large, c5.xlarge
-
-BEST_FIT:
-  → Packs onto fewest instances (lowest cost)
-  → If m5.large unavailable, jobs WAIT (RUNNABLE stuck)
-  → Good for: single instance type, predictable capacity
-
-BEST_FIT_PROGRESSIVE:
-  → Tries m5.large first; falls back to m5.xlarge, c5.large, etc.
-  → Scales across MULTIPLE types simultaneously
-  → Good for: heterogeneous pools, production workloads
-
-SPOT_CAPACITY_OPTIMIZED:
-  → Selects spot pools with most spare capacity
-  → Minimizes interruption risk (not cost)
-  → Good for: spot-based environments
-```
-
-**Key implication:** BEST_FIT_PROGRESSIVE is almost always the right
-choice for EC2 environments with multiple instance types. Use
-SPOT_CAPACITY_OPTIMIZED only for spot-based environments.
 
 ## Expert heuristic: job dependency DAG and queue priority weighting
+> Moved verbatim to [references/job-definitions-and-dependencies.md](references/job-definitions-and-dependencies.md) — load on demand.
 
-A baseline model submits jobs individually. The correct heuristic uses
-dependency graphs (DAGs) and queue priority for workload tiering.
-
-```text
-Job dependency DAG:
-
-  [Stage 1: Ingest]  ingest-001, ingest-002 (no deps)
-         │
-         ▼ (dependsOn: [ingest-001, ingest-002])
-  [Stage 2: Transform]  transform-001
-         │
-         ▼ (dependsOn: [transform-001])
-  [Stage 3: Load]  load-001
-
-Dependency types:
-  SEQUENTIAL → waits for ALL children of previous job
-  N_TO_N     → waits for N specified children
-  ARRAY      → waits for all array children of a parent
-
-Queue priority weighting (1-1000, higher = first):
-  Queue "critical"  priority: 1000 → On-Demand env (guaranteed)
-  Queue "default"   priority: 500  → Spot env (cost-efficient)
-  Queue "batch"     priority: 1    → Spot env (best-effort)
-```
-
-**Key implication:** use SEQUENTIAL for pipeline stages, N_TO_N for
-fan-in, and queue priority for workload tiering.
 
 ## Expert heuristic: spot capacity optimization fallback
+> Moved verbatim to [references/allocation-strategies-and-instance-selection.md](references/allocation-strategies-and-instance-selection.md) — load on demand.
 
-A baseline model uses spot without a fallback. The correct heuristic
-pairs Spot + On-Demand compute environments in the same queue.
-
-```text
-Job Queue: production-queue (priority: 500)
-  ├── CE 1 (order 1): spot-env — SPOT_CAPACITY_OPTIMIZED, max 1000 vCPUs
-  └── CE 2 (order 2): ondemand-env — BEST_FIT_PROGRESSIVE, max 200 vCPUs
-
-Behavior:
-  → Batch tries spot-env first
-  → If spot exhausted, jobs fall through to ondemand-env
-  → On-Demand guarantees minimum throughput during spot disruption
-```
 
 ## Prerequisites (verify before provisioning)
 
@@ -378,28 +316,7 @@ vCPUs, jobs fall through to order 2. Production pattern: Spot (order 1)
 
 ## Step 7 — Job definition (container, vCPU, memory, resources)
 
-```bash
-aws batch register-job-definition \
-  --job-definition-name data-pipeline-v1 \
-  --type container \
-  --container-properties '{
-    "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/data-pipeline:latest",
-    "vcpus": 4,
-    "memory": 8192,
-    "command": ["python", "/app/process.py", "--batch-size", "1000"],
-    "jobRoleArn": "arn:aws:iam::123456789012:role/BatchJobRole",
-    "executionRoleArn": "arn:aws:iam::123456789012:role/BatchExecutionRole",
-    "environment": [
-      {"name": "S3_BUCKET", "value": "my-data-bucket"},
-      {"name": "LOG_LEVEL", "value": "INFO"}
-    ],
-    "mountPoints": [{"containerPath": "/mnt/data", "sourceVolume": "efs-data"}],
-    "volumes": [{"name": "efs-data", "efsVolumeConfiguration": {"fileSystemId": "fs-abc12345", "rootDirectory": "/data"}}],
-    "logConfiguration": {"logDriver": "awslogs", "options": {"awslogs-group": "/aws/batch/data-pipeline", "awslogs-stream-prefix": "batch"}},
-    "fargatePlatformConfiguration": {"platformVersion": "LATEST"}
-  }' \
-  --platform-capabilities EC2 FARGATE
-```
+> Moved verbatim to [references/job-definitions-and-dependencies.md](references/job-definitions-and-dependencies.md) — load on demand.
 
 **Critical resource matching:**
 - vCPUs and memory must be satisfiable by the compute environment's
@@ -462,37 +379,11 @@ warning).
 | `MemoryUtilization` (MemoryPct) | Avg memory | Investigate if > 90% (OOM) |
 | `RUNNABLE` count | Jobs waiting for capacity | Alert if > 0 for > 15 min |
 
-**Detecting capacity starvation** (the #1 Batch issue):
-
-```bash
-# Check for RUNNABLE jobs
-aws batch list-jobs --job-queue production-queue --job-status RUNNABLE
-
-# Check compute environment status
-aws batch describe-compute-environments --compute-environments batch-ec2-env
-```
-
-Common causes of RUNNABLE stuck: job requests more vCPUs than any
-instance type provides, instance role trust policy broken, security
-group blocks outbound 443, subnet has no available IPs, or maxvCpus too
-low.
+> Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
 
 ## Step 11 — Recent features
+> Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
-**Recent AWS features (2023-2026):**
-
-- **Batch on EKS (2023-2024):** Batch jobs as Kubernetes pods on
-  existing EKS clusters. Requires EKS compute environment type.
-- **Fargate platform LATEST (2023-2024):** Auto-uses newest Fargate
-  platform without pinning versions.
-- **SPOT_CAPACITY_OPTIMIZED enhancements (2023-2024):** Improved pool
-  selection reducing interruption rates up to 30%.
-- **Step Functions orchestration (2024-2025):** Native Batch integration
-  with Dynamic ItemProcessor for large-scale parallel workflows.
-- **EFS access points (2024-2025):** Fine-grained access control for
-  shared file systems in job definitions.
-- **Cost allocation tags (2024-2025):** Per-workload cost tracking via
-  tags on compute environments and job queues.
 
 ## NEVER do these things
 
@@ -589,62 +480,22 @@ VERIFICATION_COMMANDS:
 ```
 
 ### Worked example — Spot CE with SPOT_CAPACITY_OPTIMIZED + On-Demand fallback
+> Moved verbatim to [references/worked-examples.md](references/worked-examples.md) — load on demand.
 
-```text
-BATCH_COMPUTE: batch-spot-env (EC2, SPOT_CAPACITY_OPTIMIZED)
-VERDICT: READY_TO_DEPLOY
-CHECKLIST:
-  [✓] Compute environment type: EC2 (SPOT)
-  [✓] Compute environment name: batch-spot-env
-  [✓] State: ENABLED
-  [✓] Allocation strategy: SPOT_CAPACITY_OPTIMIZED
-  [✓] Instance types: m5.large, m5.xlarge, c5.large, c5.xlarge, r5.large
-  [✓] Instance role: arn:aws:iam::123456789012:instance-profile/batch-instance-profile
-  [✓] Launch template: N/A (spot does not require LT)
-  [✓] Min vCPUs: 0, Max vCPUs: 1000, Desired vCPUs: 0
-  [✓] Subnets: subnet-aaa11122, subnet-bbb22233
-  [✓] Security groups: sg-batch111
-  [✓] Spot fleet role: arn:aws:iam::123456789012:role/aws-service-role/spotfleet.amazonaws.com/AWSServiceRoleForEC2SpotFleet
-  [✓] Job queue: production-queue (priority: 500, compute environments:
-        order 1: batch-spot-env, order 2: batch-ondemand-env)
-  [✓] Job definition: ml-training-v3:7 (image:
-        123456789012.dkr.ecr.us-east-1.amazonaws.com/ml-training:3.7,
-        vCPUs: 8, memory: 16384 MB, GPU: N/A)
-  [✓] Job dependencies: array (size: 100, N_TO_N on completion)
-  [✓] CloudWatch metrics: CPUPct, MemoryPct, RUNNABLE count, SpotInterruption
-  [✓] Tags: Environment=production, Workload=ml-training, SpotOptimized=true
-VERIFICATION_COMMANDS:
-  aws batch describe-compute-environments --compute-environments batch-spot-env batch-ondemand-env
-  aws batch describe-job-queues --job-queues production-queue
-  aws batch describe-job-definitions --job-definition-name ml-training-v3
-  aws batch list-jobs --job-queue production-queue --job-status RUNNABLE
-```
-
-The spot example above demonstrates the production pattern: spot CE at
-order 1 (cost-efficient burst) + On-Demand CE at order 2 (guaranteed
-floor). If spot capacity is exhausted, jobs fall through to On-Demand
-automatically. Jobs MUST be idempotent because spot instances receive
-a 2-minute interruption warning.
 
 ## Error handling
+> Moved verbatim to [references/error-handling.md](references/error-handling.md) — load on demand.
 
-### Jobs stuck in RUNNABLE
-- Capacity starvation. Verify the job's vCPU/memory request fits the
-  instance types. Check state=ENABLED, status=VALID. Check instance role
-  trust policy, subnet IPs, and security group outbound 443.
 
-### Compute environment INVALID
-- Check `statusReason` in `describe-compute-environments`. Common causes:
-  invalid instance role, missing subnets, insufficient permissions.
 
-### Spot instances continuously interrupted
-- Pool too narrow. Add more instance types. Verify
-  SPOT_CAPACITY_OPTIMIZED. Consider an On-Demand fallback environment.
+## References (load on demand)
 
-### Fargate jobs fail to start
-- Verify subnets are in the same VPC as security groups. Ensure
-  execution role has `ecs-tasks.amazonaws.com` trust and
-  `AmazonECSTaskExecutionRolePolicy`.
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples
+- [references/error-handling.md](references/error-handling.md) — error-handling deep dives (RUNNABLE stuck, INVALID CE, spot interruption, Fargate)
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — diagnostic command listings
+- [references/advanced-patterns.md](references/advanced-patterns.md) — recent AWS features and expert-knowledge deep dives
+- [references/allocation-strategies-and-instance-selection.md](references/allocation-strategies-and-instance-selection.md) — allocation strategies and instance selection (now includes expert heuristics)
+- [references/job-definitions-and-dependencies.md](references/job-definitions-and-dependencies.md) — job definitions and dependencies (now includes DAG heuristic and Step 7 CLI)
 
 ## Domain
 

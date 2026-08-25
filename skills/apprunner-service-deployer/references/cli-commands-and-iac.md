@@ -366,3 +366,281 @@ aws iam get-role --role-name <instance-role>
 - `AWS::AppRunner::ObservabilityConfiguration` — `TraceConfiguration`.
 - `AWS::AppRunner::VpcIngressConnection` — `IngressVpcConfiguration`.
 - `AWS::IAM::Role` (two) — access role and instance role.
+
+---
+
+## Step 1: ECR access role (for ECR source — separate from instance role) (moved from SKILL.md)
+
+**Two distinct roles. Never combine them.**
+
+The ECR access role is assumed by the App Runner service to pull the
+container image. The instance role is assumed by the application at
+runtime. They are NEVER the same role.
+
+```bash
+aws iam create-role \
+  --role-name AppRunnerECRAccess \
+  --assume-role-policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [{
+      "Effect": "Allow",
+      "Principal": {"Service": "tasks.apprunner.amazonaws.com"},
+      "Action": "sts:AssumeRole"
+    }]
+  }'
+
+aws iam attach-role-policy \
+  --role-name AppRunnerECRAccess \
+  --policy-arn arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess
+```
+
+`AWSAppRunnerServicePolicyForECRAccess` grants `ecr:GetDownloadUrlForLayer`,
+`ecr:BatchGetImage`, `ecr:GetAuthorizationToken`. It is the managed policy
+purpose-built for this role. Do NOT write a custom inline policy for ECR
+pull — the managed policy is scoped and maintained by AWS.
+
+---
+
+## Step 2: Instance role (application runtime identity) (moved from SKILL.md)
+
+The instance role is assumed by the application at runtime for AWS SDK
+calls (DynamoDB, S3, Secrets Manager, etc.).
+
+```bash
+aws iam create-role \
+  --role-name <service>-instance \
+  --assume-role-policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [{
+      "Effect": "Allow",
+      "Principal": {"Service": "tasks.apprunner.amazonaws.com"},
+      "Action": "sts:AssumeRole"
+    }]
+  }'
+
+aws iam put-role-policy \
+  --role-name <service>-instance \
+  --policy-name <service>-app-access \
+  --policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Action": ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query"],
+        "Resource": "arn:aws:dynamodb:<region>:<acct>:table/<table>"
+      },
+      {
+        "Effect": "Allow",
+        "Action": ["secretsmanager:GetSecretValue"],
+        "Resource": "arn:aws:secretsmanager:<region>:<acct>:secret:<service>/*"
+      }
+    ]
+  }'
+```
+
+| Workload | Instance role permissions |
+|---|---|
+| API backend (DynamoDB) | `dynamodb:GetItem`, `PutItem`, `Query` on table ARN |
+| API backend (RDS via VPC connector) | No IAM — RDS auth is via secrets. Instance role fetches the secret. |
+| S3 processor | `s3:GetObject`, `PutObject` on bucket ARN |
+| SQS consumer | `sqs:ReceiveMessage`, `DeleteMessage` on queue ARN |
+
+**NEVER use `AdministratorAccess` on either role.**
+
+---
+
+## Step 4: VPC connector (private resources) (moved from SKILL.md)
+
+**This is the #1 App Runner networking pitfall.** If your app connects
+to RDS, ElastiCache, internal ALBs, or any VPC-only resource, you MUST
+attach a VPC connector. Without it, DNS resolves but the TCP connection
+hangs silently until timeout.
+
+```bash
+aws apprunner create-vpc-connector \
+  --vpc-connector-name <service>-vpc \
+  --subnets subnet-aaa subnet-bbb subnet-ccc \
+  --security-groups sg-priv-app
+```
+
+Rules:
+- **Use PRIVATE subnets.** App Runner instances do not need public IPs.
+- **Span >= 2 AZs** (3 for production HA).
+- **Security group outbound** must allow the database port (e.g., 5432
+  for Postgres, 3306 for MySQL, 6379 for Redis).
+- **NAT Gateway NOT required** — the VPC connector uses AWS PrivateLink
+  internally. The connector itself does not need internet access.
+- **VPC connector is a separate resource** — create it before the service.
+
+---
+
+## Step 5: Health check policy (moved from SKILL.md)
+
+App Runner probes the service on the configured path and port. A
+mismatched path or port causes the service to stay in `CreateFailed`.
+
+```json
+{
+  "Type": "APP",
+  "Protocol": "HTTP",
+  "Path": "/healthz",
+  "IntervalInSeconds": 10,
+  "TimeoutInSeconds": 5,
+  "HealthyThreshold": 3,
+  "UnhealthyThreshold": 5
+}
+```
+
+- **Path MUST return HTTP 200** for the service to be considered healthy.
+- **Interval 10s, healthy threshold 3** means a service is marked healthy
+  after ~30s of successful probes.
+- **Unhealthy threshold 5** means a service is marked unhealthy after
+  ~50s of consecutive failures. NEVER set below 3 — transient blips
+  cause spurious rollbacks.
+- **If no health check is configured**, App Runner uses TCP probe on the
+  service port. This catches the port being closed but NOT app-level
+  unhealthiness (e.g., DB pool exhausted).
+
+---
+
+## Step 6: Auto-scaling configuration (moved from SKILL.md)
+
+```bash
+aws apprunner update-service \
+  --service-arn <arn> \
+  --auto-scaling-configuration-arn arn:aws:apprunner:<region>:<acct>:autoscalingconfiguration/DefaultConfiguration/1
+```
+
+Custom auto-scaling:
+
+```bash
+aws apprunner create-auto-scaling-configuration \
+  --auto-scaling-configuration-name <service>-autoscale \
+  --min-size 2 \
+  --max-size 10 \
+  --max-concurrency 100
+```
+
+| Parameter | Default | Production | Why |
+|---|---|---|---|
+| `min-size` | 1 | 2 (HA) | 1 = single point of failure during AZ outage |
+| `max-size` | 25 | 10-20 | Cap cost; tune to traffic profile |
+| `max-concurrency` | 100 | 50-200 | Requests per instance. Lower for CPU-heavy. |
+
+- **Scale-to-zero**: `min-size=0` saves cost but adds cold-start latency
+  (30-60s). ONLY for dev/staging or non-user-facing batch endpoints.
+- **Provisioned concurrency** = `min-size >= 1`. This is the ONLY latency
+  guarantee. At least one instance is always warm.
+- **Scaling metric**: App Runner uses concurrent requests per instance
+  (not CPU). An instance scales when `max-concurrency` is exceeded.
+
+---
+
+## Step 7: Secrets (Secrets Manager / SSM Parameter Store) (moved from SKILL.md)
+
+Secrets are injected as environment variables at runtime via ARN
+reference in `ConfigurationSources`. NOT visible in plaintext.
+
+```json
+{
+  "RuntimeEnvironmentSecrets": [
+    {"DB_PASSWORD": "arn:aws:secretsmanager:us-east-1:123456789012:secret:checkout/db-XXXXXX"},
+    {"STRIPE_KEY": "arn:aws:ssm:us-east-1:123456789012:parameter/checkout/stripe-key"}
+  ]
+}
+```
+
+Instance role needs `secretsmanager:GetSecretValue` or
+`ssm:GetParameters` plus `kms:Decrypt` if a customer-managed KMS key is
+used.
+
+---
+
+## Step 8: Observability (CloudWatch Logs, X-Ray, Application Signals) (moved from SKILL.md)
+
+**CloudWatch Logs:** App Runner streams to
+`/aws/apprunner/<service-name>/<service-id>`. The log group name is NOT
+configurable — it is derived from the service name. Pre-create a log
+group with the right retention BEFORE creating the service, or App Runner
+creates one with `Never Expire`.
+
+```bash
+aws logs create-log-group --log-group-name /aws/apprunner/<service-name>
+aws logs put-retention-policy \
+  --log-group-name /aws/apprunner/<service-name> \
+  --retention-in-days 30
+```
+
+**X-Ray tracing:** set `TracingConfiguration Vendor=AWSXRay`. The instance
+role needs `xray:PutTraceSegments` and `xray:PutTelemetryRecords`.
+
+**Application Signals:** auto-instrumented for Java, Python, Node.js when
+tracing is enabled. No code changes required.
+
+---
+
+## Step 9: Custom domain (optional) (moved from SKILL.md)
+
+```bash
+aws apprunner associate-custom-domain \
+  --service-arn <arn> \
+  --domain-name checkout.example.com \
+  --enable-www-subdomain
+```
+
+App Runner provisions and manages the TLS certificate via AWS Certificate
+Manager. For non-Route 53 domains, you must add CNAME records manually
+to verify ownership.
+
+---
+
+## Step 10: Create the service (moved from SKILL.md)
+
+```bash
+aws apprunner create-service \
+  --service-name checkout-api-prod \
+  --source-configuration '{
+    "ImageRepository": {
+      "ImageIdentifier": "123456789012.dkr.ecr.us-east-1.amazonaws.com/checkout-api:2.1.0",
+      "ImageRepositoryType": "ECR",
+      "ImageConfiguration": {
+        "Port": "8080",
+        "RuntimeEnvironmentVariables": [
+          {"LOG_LEVEL": "info"},
+          {"ENV": "production"}
+        ],
+        "RuntimeEnvironmentSecrets": [
+          {"DB_PASSWORD": "arn:aws:secretsmanager:us-east-1:123456789012:secret:checkout/db-XXXXXX"}
+        ],
+        "StartCommand": "node server.js"
+      }
+    },
+    "AuthenticationConfiguration": {
+      "AccessRoleArn": "arn:aws:iam::123456789012:role/AppRunnerECRAccess"
+    },
+    "AutoDeploymentsEnabled": true
+  }' \
+  --instance-configuration '{
+    "Cpu": "2048",
+    "Memory": "4096",
+    "InstanceRoleArn": "arn:aws:iam::123456789012:role/checkout-instance"
+  }' \
+  --health-check-configuration '{
+    "Type": "APP",
+    "Protocol": "HTTP",
+    "Path": "/healthz",
+    "IntervalInSeconds": 10,
+    "TimeoutInSeconds": 5,
+    "HealthyThreshold": 3,
+    "UnhealthyThreshold": 5
+  }' \
+  --network-configuration '{
+    "EgressConfiguration": {
+      "EgressType": "VPC",
+      "VpcConnectorArn": "arn:aws:apprunner:us-east-1:123456789012:vpcconnector/checkout-vpc/abc"
+    }
+  }' \
+  --observability-enabled \
+  --observability-configuration-configuration-source AWS_XRAY \
+  --tags Environment=production Application=checkout-api
+```

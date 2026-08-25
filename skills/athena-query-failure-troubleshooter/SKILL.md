@@ -81,48 +81,8 @@ re-examine the SQL after all three are confirmed.
 
 ## Philosophy
 
-Four behaviours separate a senior Athena engineer from a generalist:
-
-- **The SerDe choice determines the parsing rules for every row.**
-  `OpenCSVSerDe` treats every column as STRING, respects
-  `quoteChar` and `escapeChar`, and handles embedded commas inside
-  quoted fields. `LazySimpleSerDe` is a delimited SerDe with
-  `field.delim`, `line.delim`, and `collection.delim` — it does NOT
-  handle quoted fields. `ParquetHiveSerDe` reads columnar Parquet
-  files and ignores SerDe properties. Using `LazySimpleSerDe` for a
-  CSV with quoted fields produces NULL on fields containing commas.
-  Using `OpenCSVSerDe` for Parquet files fails entirely. The SerDe
-  MUST match the file format on S3.
-
-- **Partition projection replaces MSCK REPAIR permanently.** MSCK
-  REPAIR TABLE enumerates S3 prefixes and creates Glue partition
-  entries one by one — it is O(n) in the number of partitions and
-  slow for tables with thousands of partitions. Partition projection
-  configures the partition key range on the table itself (`projection.dt.type
-  = date`, `projection.dt.range = '2024-01-01,2026-12-31'`,
-  `projection.dt.format = 'yyyy-MM-dd'`), and Athena computes the
-  partition list at query time without S3 listing. The fix for "new
-  partitions not visible" is to configure partition projection, not to
-  run MSCK REPAIR every day.
-
-- **CTAS output goes to the workgroup result location, not the source
-  table location.** When you run `CREATE TABLE new_table AS SELECT
-  ...`, Athena writes the result data to the workgroup's configured
-  output location (`s3://<result-bucket>/Unsaved-or-query-id/`), NOT
-  to the `LOCATION` specified in the CTAS `WITH` clause if any. The
-  new table's `LOCATION` in Glue is set to the actual output path
-  AFTER the write. Permission failures on CTAS are almost always on
-  the workgroup result bucket, not the table location bucket.
-
-- **Athena has TWO permission layers: Glue Data Catalog and S3 data
-  bucket.** The IAM principal running the query needs `glue:GetTable`,
-  `glue:GetPartitions`, `glue:GetDatabase` on the catalog AND
-  `s3:GetObject`, `s3:ListBucket` on the data bucket. A query that
-  fails with "Insufficient permissions to execute the query ...
- .amazonaws.com is not authorized to perform: glue:GetTable" is a
-  Glue permission issue. A query that fails with "QUERY_FAILED:
-  Access Denied s3://bucket/path" is an S3 permission issue. The two
-  are separate and must both pass.
+Senior-engineer philosophy moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for the reasoning behind SerDe choice, partition projection, CTAS output, and the two permission layers.
 
 ## Quick reference — symptom triage table
 
@@ -149,38 +109,8 @@ details and short-circuit on query states that mimic failures.
 
 ### Account-wide pre-flight commands
 
-```bash
-# 1. Query execution details (state, error, bytes scanned, timing)
-aws athena get-query-execution \
-  --query-execution-id <id> --output json
-
-# 2. Workgroup configuration (result location, enforcement, limits)
-aws athena get-work-group \
-  --work-group <name> --output json
-
-# 3. Glue table definition (SerDe, columns, location, properties)
-aws glue get-table \
-  --database-name <db> --name <table> --output json
-
-# 4. Glue partitions (check for stale / missing partition metadata)
-aws glue get-partitions \
-  --database-name <db> --table-name <table> --output json | \
-  jq '.Partitions | length'
-
-# 5. S3 data bucket verification (does the data exist and what format?)
-aws s3 ls s3://<bucket>/<prefix>/ --recursive --summarize \
-  --profile <p> | head -20
-
-aws s3api head-object \
-  --bucket <bucket> --key <key-of-a-data-file> --output json
-
-# 6. CloudWatch: Athena query metrics (bytes scanned, query count)
-aws cloudwatch get-metric-statistics --namespace AWS/Athena \
-  --metric-name TotalExecutionTime \
-  --dimensions Name=WorkGroup,Value=<wg> \
-  --start-time $(date -u -d '-1 hour' +%FT%TZ) --end-time $(date -u +%FT%TZ) \
-  --period 300 --statistics Average,Maximum --output json
-```
+Account-wide pre-flight command listing moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand for live-account diagnosis before running symptom-specific probes.
 
 ### Query-state short-circuit
 
@@ -217,78 +147,8 @@ failing probe that matches the symptom.**
 
 ### Step 0: Non-obvious behaviours that change diagnosis
 
-These are the operational gotchas a senior Athena engineer knows from
-incident experience. Each one routes a diagnosis away from the obvious
-layer to a less obvious one:
-
-- **OpenCSVSerDe treats ALL columns as STRING regardless of the DDL
-  column type.** If the DDL declares `amount INT` but uses
-  `OpenCSVSerDe`, the value is read as STRING internally and cast to
-  INT. If the data contains "N/A" or empty strings in that column,
-  the cast fails silently (returns NULL) or throws a
-  `HIVE_CURSOR_ERROR`. Operators who "know the column is INT" miss
-  that OpenCSVSerDe reads it as STRING first.
-
-- **LazySimpleSerDe does NOT handle quoted CSV fields.** A CSV file
-  with `"Smith, John",35,100.0` parsed by LazySimpleSerDe with
-  `field.delim=','` produces 4 fields: `Smith`, ` John"`, `35`,
-  `100.0`. The embedded comma splits the quoted name. Only
-  OpenCSVSerDe handles quoted CSV fields correctly.
-
-- **Athena engine version matters.** Athena engine v2 (2020) and v3
-  (2022, Trino-based) have different function support, different
-  error messages, and different type coercion rules. v3 is stricter
-  on implicit casts; a query that worked on v2 may fail on v3 with
-  `TYPE_MISMATCH`. Check the workgroup's
-  `EngineVersion.SelectedEngineVersion` before debugging a "worked
-  yesterday, broke today" failure.
-
-- **Partition projection is configured on the TABLE, not the
-  workgroup.** The projection properties (`projection.*`) are table
-  properties in Glue. A workgroup change does not affect projection.
-  Operators who "enabled partition projection on the workgroup" have
-  not actually enabled it — it must be on the table's TBLPROPERTIES.
-
-- **MSCK REPAIR TABLE does not scale beyond a few hundred
-  partitions.** For a table with 10,000 partitions, MSCK REPAIR lists
-  every S3 prefix and creates one partition entry per prefix — it can
-  take hours and may time out. Partition projection or
-  `ALTER TABLE ADD PARTITION` for specific ranges is the scalable
-  alternative.
-
-- **CTAS output location is determined by the workgroup, not the
-  query.** Even if the CTAS has `WITH (external_location =
-  's3://...')`, when `EnforceWorkGroupConfiguration: true`, Athena
-  writes to the workgroup result location. The
-  `external_location` is silently ignored. Operators who debug the
-  `external_location` bucket permission while the output goes to the
-  workgroup bucket debug the wrong bucket.
-
-- **Parquet and ORC ignore SerDeProperties.** Columnar formats are
-  self-describing; the SerDe reads the embedded schema. Setting
-  `separatorChar` on a Parquet table is a no-op. Operators who "set
-  SerDe properties" on a Parquet table and see no effect are
-  configuring a format that does not use those properties.
-
-- **Athena's `DATE` type is a calendar date (no time); `TIMESTAMP`
-  has time but no zone.** Athena does not have a `TIMESTAMP WITH TIME
-  ZONE` type. A Parquet file written with an instant timezone will
-  appear shifted in Athena. Use `TIMESTAMP` for UTC instants; use
-  `from_iso8601_timestamp()` for parsing.
-
-- **`SELECT *` on a table with a wrong SerDe may SUCCEED but return
-  NULL columns.** A query that returns no error but has NULL values
-  in some columns is a SerDe mismatch, not a query failure. The
-  query status is SUCCEEDED; the data is wrong. Always read actual
-  row values, not just query status.
-
-- **Glue Data Catalog permissions are on the catalog resource
-  (account-level) and database/table (resource-level).** The IAM role
-  needs `glue:GetTable`, `glue:GetPartitions`, `glue:GetDatabase`
-  minimum. A Lake Formation-enabled catalog adds LF-Tags and
-  database-level grants on top of IAM. Operators who "added the IAM
-  policy" but still see Glue AccessDenied may have Lake Formation
-  blocking at the LF-Tag level.
+Step 0 non-obvious behaviours moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when the obvious layer does not match the symptom.
 
 ### Step 1: Symptom entry — pick the diagnostic branch
 
@@ -308,350 +168,53 @@ layer to a less obvious one:
 
 ### Step 2: SerDe mismatch and SerDe property error
 
-Symptom: query succeeds but columns return NULL or wrong values. OR
-`HIVE_CURSOR_ERROR` on specific rows.
-
-```bash
-aws glue get-table \
-  --database-name <db> --name <table> --output json | \
-  jq '.Table.{StorageDescriptor: .StorageDescriptor.SerdeInfo, Columns: .StorageDescriptor.Columns}'
-```
-
-Check the SerDe info:
-
-| SerDe | Handles | Does NOT handle |
-|---|---|---|
-| `OpenCSVSerDe` | CSV with quoted fields; configurable `separatorChar`, `quoteChar`, `escapeChar` | Non-STRING column types (reads as STRING, casts); custom delimiters other than separator/quote/escape |
-| `LazySimpleSerDe` | Delimited text (tab, pipe, comma); configurable `field.delim`, `line.delim`, `collection.delim`, `mapkey.delim` | Quoted fields; CSV with embedded delimiters inside quotes |
-| `ParquetHiveSerDe` | Parquet columnar | Text/CSV; ignores SerDeProperties |
-| `OrcSerde` | ORC columnar | Text/CSV; ignores SerDeProperties |
-| `JsonSerDe` (`org.openx.data.jsonserde.JsonSerDe`) | JSON (one JSON object per line) | Multi-line JSON; CSV |
-| `AvroSerDe` | Avro | Text/CSV |
-
-Common SerDe property errors:
-
-| Property | Error | Fix |
-|---|---|---|
-| `separatorChar` set to `,` but data is tab-delimited | Fields not split correctly; NULL columns | Set `separatorChar = '\t'` or switch to LazySimpleSerDe with `field.delim = '\t'` |
-| `quoteChar` set to `"` but data uses `'` | Quoted fields not stripped properly | Set `quoteChar = "'"` |
-| `escapeChar` set to `\` but data uses `""` (CSV-style escaping) | Escaped quotes not parsed | Set `escapeChar = '"'` or use default OpenCSVSerDe (handles `""`) |
-| OpenCSVSerDe with `serialization.null.format` not set | Empty strings returned as `""` instead of NULL | Set `serialization.null.format = ''` |
-
-**Verdicts:**
-- SerDe does not match file format (e.g., OpenCSVSerDe on Parquet):
-  ROOT_CAUSE_IDENTIFIED, `LAYER: SERDE_MISMATCH`. Fix: change SerDe to
-  ParquetHiveSerDe.
-- SerDe is correct but SerDeProperties are wrong (e.g.,
-  separatorChar mismatch): ROOT_CAUSE_IDENTIFIED,
-  `LAYER: SERDE_PROPERTY`. Fix: update SerDeProperties.
-
-#### To update the SerDe
-
-```sql
--- Drop and recreate the table with the correct SerDe
--- (Athena does not support ALTER TABLE SET SERDEPROPERTIES directly)
-DROP TABLE analytics.orders_csv;
-
-CREATE EXTERNAL TABLE analytics.orders_csv (
-  order_id STRING, customer_id STRING, amount STRING
-)
-ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.OpenCSVSerDe'
-WITH SERDEPROPERTIES (
-  'separatorChar' = '\t',
-  'quoteChar' = '"',
-  'escapeChar' = '\\'
-)
-STORED AS TEXTFILE
-LOCATION 's3://prod-analytics/orders/';
-```
+Probes, SerDe capability table, SerDe-property error table, and the DROP/CREATE fix moved verbatim to [references/serde-and-partition-reference.md](references/serde-and-partition-reference.md).
+Verdict: ROOT_CAUSE_IDENTIFIED with LAYER: SERDE_MISMATCH (wrong SerDe for the file format) or SERDE_PROPERTY (wrong SerDeProperties).
 
 ### Step 3: Stale partitions and partition projection
 
-Symptom: query returns zero rows on data that exists on S3. Partition
-keys are non-null in the query predicate.
-
-```bash
-aws glue get-partitions \
-  --database-name <db> --table-name <table> --output json | \
-  jq '.Partitions | {count: length, values: [.[].Values]}'
-```
-
-If `count: 0` but S3 has partition directories, the partition metadata
-is not loaded.
-
-#### 3a: MSCK REPAIR (immediate fix, does not scale)
-
-```sql
-MSCK REPAIR TABLE analytics.orders_csv;
-```
-
-This loads partition metadata by listing S3 prefixes. For tables with
-few partitions (< 100), this is the quickest fix. For large tables,
-use `ALTER TABLE ADD PARTITION` for specific ranges.
-
-#### 3b: Partition projection (permanent fix)
-
-Configure partition projection on the table's TBLPROPERTIES:
-
-```sql
--- For a table partitioned by dt (date) with daily partitions
-ALTER TABLE analytics.orders_csv SET TBLPROPERTIES (
-  'projection.enabled' = 'true',
-  'projection.dt.type' = 'date',
-  'projection.dt.range' = '2024-01-01,2026-12-31',
-  'projection.dt.format' = 'yyyy-MM-dd',
-  'storage.location.template' = 's3://prod-analytics/orders/dt=${dt}'
-);
-```
-
-Partition projection auto-loads partitions based on the pattern;
-no MSCK REPAIR needed for new partitions.
-
-| Projection property | Effect |
-|---|---|
-| `projection.enabled = true` | Enables partition projection for the table |
-| `projection.<col>.type` | `enum`, `integer`, `date`, `injection` |
-| `projection.<col>.range` | Valid range (for `integer` / `date`) |
-| `projection.<col>.values` | Enumerated values (for `enum`) |
-| `projection.<col>.format` | Date or integer format (e.g., `yyyy-MM-dd`) |
-| `storage.location.template` | S3 path template with `${col}` substitution |
-
-**Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: STALE_PARTITIONS` (if MSCK
-REPAIR fixes it) or `LAYER: PARTITION_PROJECTION` (if projection is
-not configured and should be).
+get-partitions probe, MSCK REPAIR, and partition-projection TBLPROPERTIES moved verbatim to [references/serde-and-partition-reference.md](references/serde-and-partition-reference.md).
+Verdict: ROOT_CAUSE_IDENTIFIED with LAYER: STALE_PARTITIONS (MSCK REPAIR fixes it) or PARTITION_PROJECTION (not configured, should be).
 
 ### Step 4: S3 and Glue permission
 
-Symptom: `Access Denied s3://...` or `glue:GetTable is not authorized`.
-
-#### 4a: S3 permission
-
-```bash
-# Check if the IAM role can list and get objects on the data bucket
-aws iam simulate-principal-policy \
-  --policy-source-arn <role-arn> \
-  --action-names s3:GetObject s3:ListBucket \
-  --resource-arns arn:aws:s3:::<bucket> arn:aws:s3:::<bucket>/* \
-  --output json --profile <p>
-```
-
-The role needs:
-- `s3:ListBucket` on `arn:aws:s3:::<bucket>`
-- `s3:GetObject` on `arn:aws:s3:::<bucket>/*`
-
-Also check the bucket policy (it can deny even when IAM allows):
-
-```bash
-aws s3api get-bucket-policy --bucket <bucket> --output json --profile <p>
-```
-
-If the role lacks S3 permissions, ROOT_CAUSE_IDENTIFIED,
-`LAYER: S3_PERMISSION`.
-
-#### 4b: Glue Data Catalog permission
-
-```bash
-aws iam simulate-principal-policy \
-  --policy-source-arn <role-arn> \
-  --action-names glue:GetTable glue:GetPartitions glue:GetDatabase \
-  --resource-arns arn:aws:glue:<region>:<acct>:catalog \
-    arn:aws:glue:<region>:<acct>:database/<db> \
-    arn:aws:glue:<region>:<acct>:table/<db>/<table> \
-  --output json --profile <p>
-```
-
-If the role lacks Glue permissions, ROOT_CAUSE_IDENTIFIED,
-`LAYER: GLUE_PERMISSION`.
-
-If the catalog has Lake Formation enabled, also check LF-Tags:
-
-```bash
-aws lakeformation list-permissions \
-  --principal DataLakePrincipalIdentifier=<role-arn> --output json
-```
-
-Lake Formation grants override IAM; an IAM allow does not help if Lake
-Formation does not grant access.
+simulate-principal-policy probes (S3, Glue, Lake Formation) moved verbatim to [references/permission-and-ctas-reference.md](references/permission-and-ctas-reference.md).
+Verdict: ROOT_CAUSE_IDENTIFIED with LAYER: S3_PERMISSION or GLUE_PERMISSION — both layers must pass.
 
 ### Step 5: CTAS output location
 
-Symptom: `CREATE TABLE AS SELECT` fails with Access Denied.
-
-```bash
-aws athena get-work-group --work-group <wg> --output json | \
-  jq '.WorkGroup.Configuration.ResultConfiguration.OutputLocation'
-
-aws athena get-work-group --work-group <wg> --output json | \
-  jq '.WorkGroup.Configuration.EnforceWorkGroupConfiguration'
-```
-
-The CTAS output goes to:
-1. The workgroup result location (if
-   `EnforceWorkGroupConfiguration: true`) — overrides everything.
-2. The `external_location` in the CTAS (if
-   `EnforceWorkGroupConfiguration: false`).
-3. The client-side output location (if neither is set).
-
-Check the IAM role's permission on the RESULT bucket:
-
-```bash
-aws iam simulate-principal-policy \
-  --policy-source-arn <role-arn> \
-  --action-names s3:PutObject s3:AbortMultipartUpload \
-  --resource-arns arn:aws:s3:::<result-bucket>/* \
-  --output json --profile <p>
-```
-
-The role needs `s3:PutObject` on the result bucket. If missing,
-ROOT_CAUSE_IDENTIFIED, `LAYER: CTAS_OUTPUT_LOCATION`.
-
-| CTAS failure pattern | Cause |
-|---|---|
-| Access Denied on workgroup result bucket | Role lacks `s3:PutObject` on the result bucket |
-| CTAS writes to unexpected bucket | `EnforceWorkGroupConfiguration: true` overrides `external_location` |
-| CTAS table's LOCATION is wrong in Glue | The table LOCATION is set to the actual output path after the write; it will be under the result bucket, not the source table bucket |
-| CTAS fails with "Query output location is not set" | Workgroup has no result location configured AND no client-side location provided |
+Workgroup output-location probes and CTAS failure-pattern table moved verbatim to [references/permission-and-ctas-reference.md](references/permission-and-ctas-reference.md).
+Verdict: ROOT_CAUSE_IDENTIFIED with LAYER: CTAS_OUTPUT_LOCATION — check the RESULT bucket, not the source bucket.
 
 ### Step 6: Query timeout
 
-Symptom: query killed near 30 minutes. `EngineExecutionTimeInMillis`
-approaches 1,800,000.
-
-```bash
-aws athena get-query-execution \
-  --query-execution-id <id> --output json | \
-  jq '.QueryExecution.Statistics.{EngineExecutionTimeInMillis, DataScannedInBytes}'
-```
-
-Athena's DML query timeout is 30 minutes (1,800,000 ms). There is no
-per-query override beyond this. The fix is data reduction:
-
-| Pattern | Fix |
-|---|---|
-| Query scans too many partitions | Add partition predicates (`WHERE dt BETWEEN '...' AND '...'`) |
-| Query scans too many columns | Use columnar format (Parquet, ORC) to avoid full scans; `SELECT` only needed columns |
-| Complex JOIN on large tables | Pre-aggregate with materialized views; use CTAS to pre-join |
-| Non-partitioned table with full scan | Partition the table; convert to columnar format |
-| Workgroup `BytesScannedCutoffPerQuery` exceeded | Raise the cutoff (if policy allows) or reduce scan via partitioning |
-
-**Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: QUERY_TIMEOUT`. Fix:
-reduce data scanned (partition pruning, columnar format, materialized
-views).
+EngineExecutionTime probe and data-reduction fix table moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Verdict: ROOT_CAUSE_IDENTIFIED with LAYER: QUERY_TIMEOUT — 30 minutes is a hard limit; the fix is data reduction.
 
 ### Step 7: Format inference error
 
-Symptom: `HIVE_BAD_DATA: Error parsing field value for field X` or
-`Error opening Hive split s3://...`.
-
-```bash
-aws s3api head-object \
-  --bucket <bucket> --key <data-file-key> --output json --profile <p>
-
-# Download a sample to inspect the actual format
-aws s3 cp s3://<bucket>/<key> /tmp/sample --profile <p>
-head -5 /tmp/sample
-```
-
-Check the actual file format against the table's `STORED AS` and SerDe:
-
-| Table `STORED AS` / SerDe | Actual file | Result |
-|---|---|---|
-| `TEXTFILE` + OpenCSVSerDe | Parquet file | `HIVE_BAD_DATA` — binary Parquet bytes parsed as text |
-| `PARQUET` + ParquetHiveSerDe | CSV text | `HIVE_BAD_DATA` — text bytes parsed as Parquet |
-| `ORC` + OrcSerde | JSON | `HIVE_BAD_DATA` |
-| `TEXTFILE` + JsonSerDe | CSV | `HIVE_BAD_DATA` — CSV is not valid JSON |
-| `INPUTFORMAT` mismatch | Any | Error reading the input format |
-
-If the file format does not match, ROOT_CAUSE_IDENTIFIED,
-`LAYER: FORMAT_INFERENCE` (or `LAYER: SERDE_MISMATCH` if the SerDe is
-wrong but the format is consistent).
+head-object probe and format-mismatch table moved verbatim to [references/serde-and-partition-reference.md](references/serde-and-partition-reference.md).
+Verdict: ROOT_CAUSE_IDENTIFIED with LAYER: FORMAT_INFERENCE or SERDE_MISMATCH.
 
 ### Step 8: Nested type error (ARRAY / STRUCT)
 
-Symptom: `cannot resolve field` on a nested column, or `SYNTAX_ERROR:
-Expected column, but found array`.
-
-```bash
-aws glue get-table \
-  --database-name <db> --name <table> --output json | \
-  jq '.Table.StorageDescriptor.Columns[] | select(.Type | test("array|struct|map"))'
-```
-
-Common nested type issues:
-
-| Issue | Cause | Fix |
-|---|---|---|
-| `col[0]` returns NULL on `ARRAY<STRING>` | Empty array or out-of-bounds index | Check array length with `cardinality(col)`; use `col[1]` (Athena arrays are 1-indexed in Trino v3) |
-| `SELECT col.field` fails on `STRUCT<field: ...>` | Wrong field name or case | Use `col.field` (case-insensitive in v3) or `col["field"]`; verify field name in DDL |
-| `UNNEST(col)` fails | `col` is not an array | Check the column type; wrap in `ARRAY[col]` if it is a scalar |
-| Nested JSON column parsed as STRING | Table uses OpenCSVSerDe instead of JsonSerDe | Change SerDe to JsonSerDe for JSON data |
-| `MAP<STRING,STRING>` field returns NULL | Map key does not exist | Use `element_at(col, 'key')` or `col['key']`; check `map_keys(col)` |
-
-**Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: NESTED_TYPE_ERROR`.
+Nested-column probe and ARRAY/STRUCT/MAP issue table moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Verdict: ROOT_CAUSE_IDENTIFIED with LAYER: NESTED_TYPE_ERROR.
 
 ### Step 9: Date parse error
 
-Symptom: date column returns NULL, or `INVALID_FORMAT` error, or date
-is shifted by a day.
-
-Check the DDL column type and the data format:
-
-```bash
-aws glue get-table \
-  --database-name <db> --name <table> --output json | \
-  jq '.Table.StorageDescriptor.Columns[] | select(.Type | test("date|timestamp"))'
-```
-
-| Issue | Cause | Fix |
-|---|---|---|
-| Column declared `DATE` but data has timestamp strings | Athena cannot parse "2024-01-15 10:30:00" as DATE | Change column type to `TIMESTAMP`; or use `date_trunc('day', parse_datetime(...))` |
-| Column declared `TIMESTAMP` but data has epoch integers | Athena cannot parse epoch as TIMESTAMP | Use `from_unixtime(col)` in the query; or change column to `BIGINT` |
-| Parquet column written with a timezone | Athena `TIMESTAMP` is zoneless; values appear shifted | Use `AT TIME ZONE 'UTC'` in the query; or re-write Parquet without timezone |
-| `date_format(col, 'yyyy-MM-dd')` fails | Wrong function for Athena engine v3 | Use `format_datetime(col, 'yyyy-MM-dd')` (Trino syntax) |
-| `from_iso8601_date(col)` fails | Column is already `DATE`, not STRING | `from_iso8601_date` expects STRING input; remove the function if column is already DATE |
-
-**Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: DATE_PARSE_ERROR`.
+Date-column probe and DATE/TIMESTAMP issue table moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Verdict: ROOT_CAUSE_IDENTIFIED with LAYER: DATE_PARSE_ERROR.
 
 ### Step 10: Column type mismatch
 
-Symptom: column declared as INT but data contains "N/A" or empty
-strings. `HIVE_CURSOR_ERROR` on specific rows.
-
-```bash
-# Download a sample to inspect actual values
-aws s3 cp s3://<bucket>/<key> /tmp/sample --profile <p>
-# Check for non-numeric values in the column
-cut -d',' -f<col-index> /tmp/sample | sort | uniq -c | sort -rn | head
-```
-
-| Pattern | Cause | Fix |
-|---|---|---|
-| Column declared INT; data has "N/A", empty strings, or "null" | OpenCSVSerDe reads as STRING then casts; cast fails → NULL or error | Declare as STRING; use `TRY(CAST(col AS INT))` in queries; or clean the data |
-| Column declared DOUBLE; data has "inf", "nan" | Parquet may handle; CSV SerDe does not | Use STRING + `TRY(CAST(...))`; or clean data |
-| Column declared BOOLEAN; data has "1"/"0" or "yes"/"no" | Athena BOOLEAN expects "true"/"false" | Use STRING + conditional cast |
-
-**Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: COLUMN_TYPE_MISMATCH`.
+Sample-data probe and type-mismatch pattern table moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Verdict: ROOT_CAUSE_IDENTIFIED with LAYER: COLUMN_TYPE_MISMATCH.
 
 ### Step 11: Table location wrong
 
-Symptom: `COLUMN_NOT_FOUND`, or query on a table returns data from the
-wrong S3 prefix.
-
-```bash
-aws glue get-table \
-  --database-name <db> --name <table> --output json | \
-  jq '.Table.StorageDescriptor.Location'
-```
-
-Check the `LOCATION`:
-
-| Issue | Cause | Fix |
-|---|---|---|
-| `LOCATION` points to `s3://bucket/path/` (with trailing slash) but data is at `s3://bucket/path` | Athena reads from the exact prefix; trailing slash may double up | Match the trailing slash to the S3 key prefix |
-| `LOCATION` points to a different bucket or prefix than where the data lives | Wrong table definition; data moved | Update `LOCATION` via `ALTER TABLE SET LOCATION 's3://...'` |
-| `LOCATION` points to the bucket root (`s3://bucket/`) | Athena scans all objects in the bucket; may pick up unrelated files | Set `LOCATION` to the specific prefix (`s3://bucket/data/orders/`) |
-
-**Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: TABLE_LOCATION`.
+LOCATION probe and table-location issue table moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Verdict: ROOT_CAUSE_IDENTIFIED with LAYER: TABLE_LOCATION.
 
 ### Step 12: INSUFFICIENT_DATA
 
@@ -728,80 +291,13 @@ CONFIRM: Before dropping and recreating the table, emit and await:
 
 ### Worked example — Stale partitions, partition projection fix
 
-```text
-TARGET: analytics.events_daily / QueryExecutionId: (offline)
-VERDICT: ROOT_CAUSE_IDENTIFIED
-REASON: Query returns zero rows for dt='2026-08-05' even though S3
-  has s3://prod-analytics/events/dt=2026-08-05/. glue get-partitions
-  returns count=0; the partition metadata was never loaded for the
-  new date. The table has no partition projection configured, so new
-  partitions require MSCK REPAIR (Step 3).
-LAYER: STALE_PARTITIONS
-EVIDENCE:
-  - Symptom: SELECT count(*) FROM analytics.events_daily WHERE
-    dt='2026-08-05' returns 0; data exists on S3.
-  - Probe: aws glue get-partitions returns count=0.
-  - Probe: aws s3 ls s3://prod-analytics/events/dt=2026-08-05/
-    returns data files.
-  - Passing: SerDe correct (ParquetHiveSerDe on Parquet files);
-    permissions verified; table LOCATION correct
-    (s3://prod-analytics/events/).
-REMEDIATION:
-  1. Immediate fix: MSCK REPAIR TABLE analytics.events_daily; (loads
-     the missing partition metadata).
-  2. Permanent fix: configure partition projection so future dates
-     auto-load:
-     ALTER TABLE analytics.events_daily SET TBLPROPERTIES (
-       'projection.enabled' = 'true',
-       'projection.dt.type' = 'date',
-       'projection.dt.range' = '2024-01-01,2026-12-31',
-       'projection.dt.format' = 'yyyy-MM-dd',
-       'storage.location.template' =
-         's3://prod-analytics/events/dt=${dt}'
-     );
-  3. Verify: SELECT count(*) FROM analytics.events_daily WHERE
-     dt='2026-08-05' should return > 0.
-CONFIRM: Before running MSCK REPAIR or ALTER TABLE, emit and await
-  operator approval.
-```
+Secondary worked example moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when emitting a STALE_PARTITIONS verdict.
 
 ### Worked example — CTAS output location permission
 
-```text
-TARGET: analytics.orders_summary_ctas / QueryExecutionId: (offline)
-VERDICT: ROOT_CAUSE_IDENTIFIED
-REASON: CTAS failed with Access Denied on
-  s3://aws-athena-query-results-111111111111-us-east-1/tables/....
-  The workgroup (primary) has EnforceWorkGroupConfiguration=true with
-  OutputLocation pointing at aws-athena-query-results-.... The IAM
-  role lacks s3:PutObject on that result bucket. The operator's
-  CTAS external_location clause was silently overridden by the
-  enforced workgroup config (Step 5).
-LAYER: CTAS_OUTPUT_LOCATION
-EVIDENCE:
-  - Symptom: CREATE TABLE orders_summary AS SELECT ... failed with
-    "Access Denied s3://aws-athena-query-results-...".
-  - Probe: aws athena get-work-group returns
-    EnforceWorkGroupConfiguration=true,
-    OutputLocation=s3://aws-athena-query-results-111111111111-us-east-1.
-  - Probe: aws iam simulate-principal-policy on the role for
-    s3:PutObject on arn:aws:s3:::aws-athena-query-results-111111111111-us-east-1/*
-    returns implicitDeny.
-  - Passing: Glue permissions verified; source table S3 permissions
-    verified; query SQL is valid.
-REMEDIATION:
-  1. Add s3:PutObject on the workgroup result bucket to the IAM role:
-     {
-       "Effect": "Allow",
-       "Action": ["s3:PutObject",
-                  "s3:AbortMultipartUpload"],
-       "Resource": "arn:aws:s3:::aws-athena-query-results-111111111111-us-east-1/*"
-     }
-  2. Verify: re-run the CTAS; it should complete and the new table
-     LOCATION should be under the result bucket.
-CONFIRM: Before updating the IAM policy, emit and await operator
-  approval.
-```
+Secondary worked example moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when emitting a CTAS_OUTPUT_LOCATION verdict.
 
 ## Anti-Patterns — NEVER
 
@@ -875,287 +371,54 @@ CONFIRM: Before updating the IAM policy, emit and await operator
 
 ## Pre-flight safety checks (run before any state-changing SQL)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing SQL
-  (`DROP TABLE`, `CREATE TABLE`, `ALTER TABLE`, `MSCK REPAIR`,
-  `CREATE TABLE AS SELECT`), emit and await operator approval.
-
-- **Read-only first.** Every probe in the diagnostic tree is
-  read-only (`get-query-execution`, `get-work-group`, `glue get-table`,
-  `glue get-partitions`, `s3 ls`, `s3api head-object`,
-  `iam simulate-principal-policy`). Do not perform state-changing
-  operations as diagnostic probes.
-
-- **DROP TABLE** removes the Glue table definition but does NOT delete
-  S3 data. It is recoverable (recreate the table with the same DDL).
-  However, it invalidates any downstream queries referencing the table.
-
-- **ALTER TABLE SET LOCATION** changes where Athena reads data from.
-  Pointing it at the wrong prefix returns wrong or empty results.
-  Always verify the S3 path before applying.
-
-- **ALTER TABLE SET TBLPROPERTIES** for partition projection is safe
-  and non-destructive. It changes how Athena resolves partitions; it
-  does not move data. Verify with a test query after applying.
-
-- **CREATE TABLE AS SELECT** writes data to S3. It consumes storage
-  and incurs scan charges. Verify the `external_location` (or
-  workgroup result location) has sufficient capacity and the right
-  permissions before running.
-
-- **MSCK REPAIR TABLE** lists S3 prefixes and creates Glue partition
-  entries. For large tables it can be slow and may time out. Test on
-  a small partition range first.
-
-- **IAM policy changes** affect every principal using the role. Tighten
-  policies gradually; verify with `simulate-principal-policy` before
-  and after.
-
-- **Bulk remediation batch limit.** If the diagnosis identifies the
-  same root cause across multiple tables (e.g., a wrong SerDe across
-  a set of CSV tables), batch remediation into groups of at most 5
-  tables, emit a single CONFIRM per batch, and verify between batches.
+Pre-flight safety checks (CONFIRMATION GATE, read-only-first rule, per-operation risk notes) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Keep here: every diagnostic probe is read-only; load the reference before any state-changing SQL.
 
 ## Remediation guidance
 
-### For SERDE_MISMATCH
-
-Drop and recreate the table with the correct SerDe for the file
-format:
-
-| File format | Correct SerDe |
-|---|---|
-| CSV with quoted fields | `OpenCSVSerDe` |
-| CSV without quoted fields | `LazySimpleSerDe` or `OpenCSVSerDe` |
-| Tab/pipe delimited | `LazySimpleSerDe` with `field.delim` |
-| Parquet | `ParquetHiveSerDe` |
-| ORC | `OrcSerde` |
-| JSON (one object per line) | `org.openx.data.jsonserde.JsonSerDe` |
-| Avro | `AvroSerDe` |
-
-### For SERDE_PROPERTY
-
-Update the SerDeProperties to match the data:
-
-```sql
--- Recreate the table with corrected SerDeProperties
-CREATE EXTERNAL TABLE <table> (...)
-ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.OpenCSVSerDe'
-WITH SERDEPROPERTIES (
-  'separatorChar' = '\t',
-  'quoteChar' = '"',
-  'escapeChar' = '\\'
-)
-STORED AS TEXTFILE
-LOCATION 's3://...';
-```
-
-### For STALE_PARTITIONS
-
-```sql
--- Immediate: load missing partition metadata
-MSCK REPAIR TABLE <db>.<table>;
-```
-
-### For PARTITION_PROJECTION
-
-```sql
-ALTER TABLE <db>.<table> SET TBLPROPERTIES (
-  'projection.enabled' = 'true',
-  'projection.<col>.type' = 'date',
-  'projection.<col>.range' = '2024-01-01,2026-12-31',
-  'projection.<col>.format' = 'yyyy-MM-dd',
-  'storage.location.template' = 's3://<bucket>/<prefix>/<col>=${<col>}'
-);
-```
-
-### For S3_PERMISSION
-
-Add the minimum-scope S3 permissions to the IAM role:
-
-```json
-{
-  "Effect": "Allow",
-  "Action": ["s3:GetObject", "s3:GetObjectVersion"],
-  "Resource": "arn:aws:s3:::<data-bucket>/*"
-},
-{
-  "Effect": "Allow",
-  "Action": ["s3:ListBucket", "s3:GetBucketLocation"],
-  "Resource": "arn:aws:s3:::<data-bucket>"
-}
-```
-
-### For GLUE_PERMISSION
-
-Add Glue Data Catalog permissions:
-
-```json
-{
-  "Effect": "Allow",
-  "Action": [
-    "glue:GetDatabase", "glue:GetDatabases",
-    "glue:GetTable", "glue:GetTables",
-    "glue:GetPartition", "glue:GetPartitions"
-  ],
-  "Resource": [
-    "arn:aws:glue:<region>:<acct>:catalog",
-    "arn:aws:glue:<region>:<acct>:database/<db>",
-    "arn:aws:glue:<region>:<acct>:table/<db>/<table>"
-  ]
-}
-```
-
-If Lake Formation is enabled, grant LF-Tags or database-level access:
-
-```bash
-aws lakeformation grant-permissions \
-  --principal DataLakePrincipalIdentifier=<role-arn> \
-  --permissions SELECT DESCRIBE \
-  --resource '{ "Table": {"DatabaseName": "<db>", "Name": "<table>"}}'
-```
-
-### For CTAS_OUTPUT_LOCATION
-
-Add `s3:PutObject` and `s3:AbortMultipartUpload` on the workgroup
-result bucket to the IAM role. Verify with
-`simulate-principal-policy`.
-
-### For QUERY_TIMEOUT
-
-- Add partition predicates to prune scan range.
-- Convert to columnar format (Parquet, ORC) to reduce bytes scanned.
-- Use materialized views for repeated complex aggregations.
-- Pre-join large tables via CTAS.
-- Raise workgroup `BytesScannedCutoffPerQuery` if the limit (not the
-  30-min timeout) is the cause.
-
-### For FORMAT_INFERENCE
-
-Fix the table's `STORED AS` and SerDe to match the actual file format.
-Download a sample file and inspect it before recreating the table.
-
-### For NESTED_TYPE_ERROR
-
-- Fix the DDL to declare the correct `ARRAY<...>`, `STRUCT<...>`, or
-  `MAP<...>` type.
-- Use the correct accessor (`col[1]` for arrays, `col.field` for
-  structs, `col['key']` for maps).
-- Use `UNNEST(col)` to flatten arrays in queries.
-- Use JsonSerDe for JSON data with nested fields.
-
-### For DATE_PARSE_ERROR
-
-- Fix the DDL column type (`DATE` vs `TIMESTAMP` vs `STRING`).
-- Use Trino date functions (`format_datetime`, `from_iso8601_date`,
-  `date_add`, `date_diff`).
-- For epoch columns, use `from_unixtime(col)` and declare as `BIGINT`.
-
-### For COLUMN_TYPE_MISMATCH
-
-- Declare the column as STRING and use `TRY(CAST(col AS INT))` in
-  queries for safe casting.
-- Or clean the source data to remove non-numeric values.
-
-### For TABLE_LOCATION
-
-```sql
-ALTER TABLE <db>.<table> SET LOCATION 's3://<correct-bucket>/<prefix>/';
-```
-
-Verify the path with `aws s3 ls` before applying.
+Per-layer remediation guidance (SQL, IAM policies, LF grants) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when writing the REMEDIATION block of the output.
 
 ## Deep reference: Athena failure layer model
 
 ### SerDe matrix
 
-| SerDe class | Format | Handles quoted fields | Column types | Key properties |
-|---|---|---|---|---|
-| `OpenCSVSerDe` | CSV/Text | Yes (`quoteChar`, `escapeChar`) | ALL columns read as STRING | `separatorChar`, `quoteChar`, `escapeChar` |
-| `LazySimpleSerDe` | Delimited Text | No | Native (INT, STRING, etc.) | `field.delim`, `line.delim`, `collection.delim`, `mapkey.delim` |
-| `ParquetHiveSerDe` | Parquet | n/a | Native (from Parquet schema) | (ignored) |
-| `OrcSerde` | ORC | n/a | Native (from ORC schema) | (ignored) |
-| `JsonSerDe` (openx) | JSON (one object per line) | n/a | Native | `ignore.malformed.json` |
-| `AvroSerDe` | Avro | n/a | Native (from Avro schema) | `avro.schema.literal` or `avro.schema.url` |
+SerDe matrix moved verbatim to [references/serde-and-partition-reference.md](references/serde-and-partition-reference.md).
+Load on demand when matching a SerDe class to a file format.
 
 ### Workgroup configuration matrix
 
-| Config | Effect |
-|---|---|
-| `ResultConfiguration.OutputLocation` | Where query results and CTAS output go |
-| `EnforceWorkGroupConfiguration` | `true` = overrides client-side output location; `false` = client can override |
-| `BytesScannedCutoffPerQuery` | Query fails if bytes scanned exceeds this; 0 = no limit (use sparingly) |
-| `RequesterPaysEnabled` | Allows queries on RequesterPays S3 buckets |
-| `EngineVersion.SelectedEngineVersion` | `Athena engine 2` or `Athena engine 3` (Trino); affects function support and type coercion |
-| `PublishCloudWatchMetricsEnabled` | Whether query metrics are emitted to CloudWatch |
+Workgroup configuration matrix moved verbatim to [references/permission-and-ctas-reference.md](references/permission-and-ctas-reference.md).
+Load on demand when the workgroup config changes the diagnosis.
 
 ### Athena error category matrix
 
-| Error category | Meaning | Layer |
-|---|---|---|
-| `SYNTAX_ERROR` | SQL syntax or function mismatch | Re-examine query; check engine version |
-| `HIVE_BAD_DATA` | File format does not match table SerDe | SERDE_MISMATCH / FORMAT_INFERENCE |
-| `HIVE_CURSOR_ERROR` | Row-level parsing error (bad value for column type) | SERDE_MISMATCH / COLUMN_TYPE_MISMATCH |
-| `COLUMN_NOT_FOUND` | Column in query does not exist in table definition | Check DDL; stale table definition |
-| `Access Denied` (S3) | IAM role lacks S3 permissions on data or result bucket | S3_PERMISSION / CTAS_OUTPUT_LOCATION |
-| `is not authorized to perform: glue:*` | IAM role lacks Glue Data Catalog permissions | GLUE_PERMISSION |
-| `Query exhausted resources` | 30-minute timeout hit | QUERY_TIMEOUT |
-| `INSUFFICIENT_RESOURCES` | Workgroup per-query byte limit exceeded | Raise BytesScannedCutoffPerQuery or reduce scan |
-| `TABLE_NOT_FOUND` | Table does not exist in Glue catalog | Check database/table name; cross-account catalog |
-| `PARTITION_NOT_FOUND` | Partition metadata not loaded | STALE_PARTITIONS / PARTITION_PROJECTION |
+Athena error category matrix moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when mapping an error string to a LAYER.
 
 ### Partition projection properties reference
 
-| Property | Purpose |
-|---|---|
-| `projection.enabled` | Master switch (`true` / `false`) |
-| `projection.<col>.type` | `enum`, `integer`, `date`, `injection` |
-| `projection.<col>.range` | For `integer` / `date`: start,end |
-| `projection.<col>.values` | For `enum`: comma-separated list |
-| `projection.<col>.interval` | For `integer` / `date`: step (default 1) |
-| `projection.<col>.interval.unit` | For `date`: `DAYS`, `HOURS`, `MINUTES` |
-| `projection.<col>.format` | For `date`: format pattern (`yyyy-MM-dd`); for `integer`: padding |
-| `projection.<col>.digits` | For `integer`: zero-padding width |
-| `storage.location.template` | S3 path with `${col}` substitution |
+Partition projection properties reference moved verbatim to [references/serde-and-partition-reference.md](references/serde-and-partition-reference.md).
+Load on demand when configuring projection TBLPROPERTIES.
 
 ### Athena engine v2 vs v3 differences
 
-| Feature | v2 (Presto) | v3 (Trino) |
-|---|---|---|
-| Date format function | `date_format(col, '%Y-%m-%d')` | `format_datetime(col, 'yyyy-MM-dd')` |
-| Date parse function | `date_format(col, '%Y-%m-%d')` | `from_iso8601_date(col)`, `date_parse` |
-| Array indexing | 1-indexed | 1-indexed (unchanged) |
-| Type coercion | More permissive implicit casts | Stricter; may reject implicit casts that v2 allowed |
-| GEOMETRY | Supported | Different function names |
-| Error messages | Presto-style | Trino-style |
+Athena engine v2 vs v3 differences moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand on 'worked yesterday, broke today' engine-version failures.
 
 ## Recent AWS features (2024-2026)
 
-- **Athena engine version 3 (Trino) default (2024):** All new
-  workgroups default to engine v3 (Trino). Existing workgroups on v2
-  can be upgraded. Diagnostically, v3 is stricter on type coercion;
-  queries that relied on v2 implicit casts may fail with
-  `TYPE_MISMATCH` or `SYNTAX_ERROR`.
-- **Partition projection GA (2024):** Partition projection is the
-  recommended replacement for MSCK REPAIR on all partitioned tables.
-  Diagnostically, tables without projection require MSCK REPAIR or
-  ALTER TABLE ADD PARTITION for every new partition; tables with
-  projection auto-load.
-- **Athena notebook sessions (2024-2025):** Athena for Apache Spark
-  supports notebook sessions. This is a separate compute model from
-  the SQL engine; this skill covers SQL engine failures, not Spark
-  notebook failures.
-- **Athena parameterized queries (2024-2025):** Athena supports
-  parameterized queries (execStatement with parameters). Diagnostically,
-  parameter binding errors (`INVALID_PARAMETER`) are distinct from
-  SQL syntax errors.
-- **Multi-catalog support (2024-2025):** Athena can query external
-  Hive metastores and Lambda-based federated catalogs. Diagnostically,
-  a `TABLE_NOT_FOUND` on a federated catalog may be a Lambda function
-  failure, not a Glue issue.
-- **Athena query result reuse (2024-2025):** Athena can cache and
-  reuse query results for identical queries. Diagnostically, a query
-  that returns stale results may be hitting the result cache; check
-  `ResultReuseByAgeConfiguration` on the workgroup.
+Recent AWS features (2024-2026) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when result reuse, parameterized queries, or federated catalogs are in play.
+
+## References (load on demand)
+
+- [references/serde-and-partition-reference.md](references/serde-and-partition-reference.md) — SerDe deep dive and partition projection reference; now also holds Steps 2, 3, 7 (probes and verdict tables), the SerDe matrix, and the projection properties table moved from SKILL.md.
+- [references/permission-and-ctas-reference.md](references/permission-and-ctas-reference.md) — Glue/S3 permission and CTAS output location reference; now also holds Steps 4, 5 and the workgroup configuration matrix moved from SKILL.md.
+- [references/worked-examples.md](references/worked-examples.md) — worked diagnostic examples moved from SKILL.md: Steps 6, 8, 9, 10, 11 layer deep dives plus the full stale-partitions and CTAS output examples.
+- [references/error-handling.md](references/error-handling.md) — Athena error category matrix and per-layer remediation guidance moved from SKILL.md.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — account-wide pre-flight command listing and pre-flight safety checks moved from SKILL.md.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — senior-engineer philosophy, Step 0 non-obvious behaviours, engine v2 vs v3 differences, and recent AWS features moved from SKILL.md.
 
 ## Domain
 

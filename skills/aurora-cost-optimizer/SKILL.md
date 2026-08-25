@@ -100,51 +100,11 @@ MIGRATION_STEPS is a contract violation — re-emit the full block.
 
 ### FORBIDDEN output patterns
 
-1. **NEVER preface the block with prose, greetings, or "Here is...".**
-   The first line of the response MUST be `TARGET:`.
-2. **NEVER emit `VERDICT: OPPORTUNITY_FOUND` with `Annual total: $0`.**
-   If no dimension produces a savings line > $0, the verdict MUST be
-   `ALREADY_OPTIMAL`.
-3. **NEVER show savings math that does not balance.** Right-sizing +
-   ACU + I/O + storage + Global DB + backtrack + RI subtotals MUST
-   sum to the displayed annual total (×12 of monthly sum).
-4. **NEVER recommend Aurora I/O-Optimized without computing the
-   break-even I/O count.** Always cite `break-even = storage_GB × 0.4`
-   million I/O/month and the actual measured I/O.
-5. **NEVER recommend an RI without stating the term (1-yr/3-yr), the
-   offering class (No Upfront/Partial/All), and the exact instance
-   class.** A bare "buy an RI" recommendation is not actionable.
-6. **NEVER recommend right-sizing the writer based on CPU alone.** The
-   recommendation MUST cite Performance Insights DBLoad OR explicitly
-   state "PI not enabled — recommendation based on CPU only, MEDIUM
-   confidence."
-7. **NEVER round intermediate formula steps differently from the final
-   figure.** Compute at full precision (e.g., $0.12/ACU-h × 730h =
-   $87.60, not $88), round only the displayed result.
+All seven FORBIDDEN output-pattern rules (no prose before TARGET, no OPPORTUNITY_FOUND with $0 savings, balanced savings math, break-even citation before recommending I/O-Optimized, RI term/offering-class/instance-class specifics, no writer right-size on CPU alone, full-precision intermediate math): [Error handling](references/error-handling.md).
 
 ## Quick start
 
-- **Aurora I/O-Optimized is the highest-leverage 2024+ feature for
-  I/O-heavy workloads.** It charges a flat rate per GB of storage (no
-  per-I/O-request fee). Workloads with > 3-5x I/O-to-storage cost ratio
-  typically save 40-60% on the I/O line. The trade-off: storage cost is
-  ~50-70% higher per GB; for low-I/O workloads, Standard stays cheaper.
-- **Aurora Serverless v2 ACU min is a recurring bill.** A cluster with
-  `ServerlessV2ScalingConfiguration.MinCapacity=8` pays for 8 ACU × 730h
-  even at zero load. Most workloads can drop min to 1-2 ACU and rely on
-  auto-scaling; the floor only matters for sub-second latency SLAs.
-- **Writer + reader right-sizing are independent.** Readers can run on
-  a smaller instance class than the writer because they don't bear the
-  write/commit load. A common waste pattern is mirrored `db.r6g.2xlarge`
-  on all replicas when the readers cruise at < 10% CPU.
-- **Aurora vs RDS: Aurora is slightly pricier per compute unit but
-  free Multi-AZ replication and faster failover often net out cheaper.**
-  Don't migrate for compute savings alone — migrate for HA / reader
-  scale / storage auto-scaling.
-- **Reserved Instances are Aurora's biggest single lever for steady-
-  state clusters.** A 1-yr no-upfront RI on `db.r6g.2xlarge` yields
-  ~40% discount vs On-Demand; a 3-yr is ~60%. Apply to the writer and
-  primary readers only — don't commit on burst-readers.
+Quick-start rules (I/O-Optimized leverage for I/O-heavy workloads, ACU min as a recurring bill, independent writer/reader right-sizing, Aurora vs RDS net-cost framing, RI as the biggest steady-state lever): [Advanced patterns](references/advanced-patterns.md).
 
 ## Mindset
 
@@ -180,167 +140,31 @@ DBLoad top-SQL.
 
 ### Required data sources
 
-```bash
-# 1. Aurora cost breakdown (last 30 days)
-START=$(date -u -v-30d +%F 2>/dev/null || date -u -d '-30 days' +%F)
-END=$(date -u +%F)
-aws ce get-cost-and-usage \
-  --time-period Start=$START,End=$END \
-  --filter '{"Dimensions":{"Key":"SERVICE","Values":["Amazon Aurora"]}}' \
-  --granularity MONTHLY --metrics "BlendedCost" "UsageQuantity" \
-  --group-by Type=DIMENSION,Key=USAGE_TYPE --output json > aurora-cost.json
-
-# 2. Cluster + instance + global + RI topology
-aws rds describe-db-clusters --output json > aurora-clusters.json
-aws rds describe-db-instances \
-  --filters Name=engine,Values=aurora-mysql,aurora-postgresql \
-  --output json > aurora-instances.json
-aws rds describe-global-clusters --output json > aurora-global.json
-aws rds describe-reserved-db-instances --output json > aurora-ris.json
-
-# 3. Backtrack inventory (clusters with backtrack enabled)
-for cluster in $(jq -r '.DBClusters[].DBClusterIdentifier' aurora-clusters.json); do
-  aws rds describe-db-cluster-backtracks --db-cluster-identifier $cluster --output json
-done > aurora-backtracks.json
-
-# 4. CloudWatch CPU + Performance Insights top-SQL (per instance)
-START_CW=$(date -u -v-30d +%FT%TZ 2>/dev/null || date -u -d '-30 days' +%FT%TZ)
-END_CW=$(date -u +%FT%TZ)
-for inst in $(jq -r '.DBInstances[].DBInstanceIdentifier' aurora-instances.json); do
-  aws cloudwatch get-metric-statistics --namespace AWS/RDS \
-    --metric-name CPUUtilization \
-    --dimensions Name=DBInstanceIdentifier,Value=$inst \
-    --start-time $START_CW --end-time $END_CW \
-    --period 3600 --statistics Average Maximum --output json
-  aws pi describe-dimension-keys --service-type RDS --identifier $inst \
-    --start-time $START_CW --end-time $END_CW \
-    --metric db.load.avg --group-by Group=db.sql --output json
-done > aurora-cpu-pi.json
-```
+The four required data-source CLI captures (Cost Explorer Aurora breakdown, cluster/instance/global/RI topology, backtrack inventory, per-instance CloudWatch CPU + Performance Insights top-SQL): [Diagnostic commands](references/diagnostic-commands.md).
 
 ### Data-quality short-circuits
 
-| Condition | Effect on optimisation |
-|---|---|
-| Cost Explorer access denied | NEED_MORE_INFO for cost quantification; topology still analysable. |
-| Observation window < 14 days | NEED_MORE_INFO: workload may reflect atypical load. Min 14 days; 30 preferred. |
-| Performance Insights not enabled | NEED_MORE_INFO for DBLoad / top-SQL; right-sizing still works from CPU. |
-| Aurora cluster in `creating` / `modifying` / `failing-over` | Wait for `available` before emitting a change recommendation. |
-| Serverless v2 with auto-pause enabled | Min ACU floor is 0 when paused; don't flag the floor as waste. |
-| I/O-Optimized already enabled | Skip the I/O tier dimension — already optimal. |
-| Cluster part of Aurora Limitless Database | Route to Step 10 (Limitless) — standard right-sizing does not apply. |
+Data-quality short-circuit table (CE access denied, window < 14 days, PI not enabled, transient cluster states, auto-pause floor, already I/O-Optimized, Limitless routing): [Advanced patterns](references/advanced-patterns.md).
 
 ## Process — Optimisation logic (apply in order)
 
 ### Step 0: Non-obvious behaviours that change the recommendation
 
-- **Aurora I/O-Optimized charges per GB of storage, not per I/O request.**
-  Standard tier: ~$0.10/GB-month storage + ~$0.20/million I/O requests.
-  I/O-Optimized tier: ~$0.18/GB-month storage + $0 I/O. Break-even is
-  when I/O cost > storage price differential. For 1,000 GB doing 500M
-  I/O/month: Standard ~$100 + ~$100 = $200; I/O-Optimized ~$180 —
-  I/O-Optimized wins. At 50M I/O: Standard ~$90; I/O-Optimized ~$180 —
-  Standard wins.
-
-- **Aurora Serverless v2 ACU = compute + memory bundled.** 1 ACU ≈ 2
-  vCPU / 16 GB. MinCapacity is the floor; the cluster bills at the ACU
-  value averaged per hour. A cluster at MinCapacity=8 when it could sit
-  at MinCapacity=2 wastes 6 ACU × $0.12/h × 730h = $525/month.
-
-- **Aurora writer and readers are billed independently.** The writer
-  instance class can differ from readers. A common waste pattern is
-  mirroring `db.r6g.2xlarge` on all replicas "for symmetry," when
-  readers cruise at < 10% CPU.
-
-- **Aurora Multi-AZ replication is free; RDS Multi-AZ is $0.01/GB.**
-  For high-write workloads, migrating RDS Multi-AZ to Aurora eliminates
-  this data-transfer charge.
-
-- **Aurora Global Database replication traffic is free; the secondary-
-  region read replicas bill as full Aurora instances at the secondary
-  region's rate.** Right-size DR-region instances independently of the
-  primary.
-
-- **Backtrack storage is billed per GB-month of change log.** Every
-  change is stored. High-change workloads with backtrack enabled can
-  rack up significant charges; tune the backtrack window.
-
-- **Reserved Instances apply to a specific instance class + engine +
-  region.** A `db.r6g.2xlarge` Aurora PostgreSQL RI does NOT apply to
-  `db.r6g.large` or to Aurora MySQL. Match the RI to the longest-
-  running instance class.
-
-- **Aurora Limitless Database (2024+) adds compute shard cost.** Each
-  shard is an Aurora instance; right-sizing shards and the router (SLG)
-  is the cost lever — different from standard right-sizing.
-
-- **Performance Insights top-SQL identifies the query driving 30%+ of
-  DBLoad.** Fixing it (e.g., adding an index) reduces DBLoad and often
-  lets the cluster downsize — turning a DBA task into a cost saving.
+All nine Step-0 non-obvious behaviours (I/O-Optimized per-GB pricing with break-even math, ACU = compute + memory bundle, independent writer/reader billing, free Multi-AZ replication, Global DB replica billing, backtrack change-log cost, RI class/engine/region binding, Limitless shard cost, PI top-SQL as a downsizing enabler): [Advanced patterns](references/advanced-patterns.md).
 
 ### Step 1: Validate input and data sufficiency
 
 If Cost Explorer access is unavailable AND the caller has not pasted
 billing line items, emit NEED_MORE_INFO:
-
-```text
-TARGET: <cluster-identifier>
-VERDICT: NEED_MORE_INFO
-REASON: Cost Explorer access is required to quantify per-dimension
-  savings. Without USAGE_TYPE granularity (Aurora:InstanceUsage,
-  Aurora:StorageUsage, Aurora:IOUsage, Aurora:ServerlessUsage), the
-  seven dimensions can be analysed qualitatively but the dollar
-  savings cannot be computed.
-RECOMMENDATION:
-  1. Grant the auditor role `ce:GetCostAndUsage`.
-  2. Or, paste the top 10 Aurora USAGE_TYPE line items from the
-     last 30 days of CUR.
-ESTIMATED_SAVINGS: $0 (cannot quantify without CUR data)
-MIGRATION_STEPS:
-  - IAM policy addition:
-    {"Effect":"Allow",
-     "Action":["ce:GetCostAndUsage","ce:GetDimensionValues"],
-     "Resource":"*"}
-```
+NEED_MORE_INFO output template for missing Cost Explorer access (with the ce:GetCostAndUsage IAM remediation): [Error handling](references/error-handling.md).
 
 ### Step 2: Cost Explorer reconciliation
 
-```bash
-aws ce get-cost-and-usage \
-  --time-period Start=$START,End=$END \
-  --granularity MONTHLY \
-  --metrics "BlendedCost" "UsageQuantity" \
-  --group-by Type=DIMENSION,Key=USAGE_TYPE \
-  --filter '{"Dimensions":{"Key":"SERVICE","Values":["Amazon Aurora"]}}' \
-  --output json | \
-  jq '.ResultsByTime[].Groups[] | {usage: .Keys[0],
-    cost: (.Metrics.BlendedCost.Amount | tonumber)}'
-```
-
-| USAGE_TYPE | Dimension | What it represents |
-|---|---|---|
-| `Aurora:InstanceUsage` | Compute (provisioned) | Per-instance-hour by class |
-| `Aurora:ServerlessUsage` | Compute (Serverless v2) | Per-ACU-hour |
-| `Aurora:StorageUsage` | Storage | Per-GB-month |
-| `Aurora:IOUsage` | I/O (Standard tier) | Per-million I/O requests |
-| `Aurora:BackupUsage` | Backtrack / snapshots | Per-GB-month |
-| `Aurora:ReplicaUsage` | Cross-region replicas | Per-replica-instance-hour |
-
-If `Aurora:IOUsage` is > 30% of total Aurora bill AND the cluster is on
-Standard tier, I/O-Optimized is a prime candidate. If
-`Aurora:ServerlessUsage` dominates with low CPU, ACU floor is too high.
+Cost Explorer reconciliation CLI, the USAGE_TYPE → dimension table, and the > 30% I/O / Serverless-dominance triggers: [Diagnostic commands](references/diagnostic-commands.md).
 
 ### Step 3: Cost classification
 
-| Cost profile | Indicators | Emphasis |
-|---|---|---|
-| I/O-heavy | Aurora:IOUsage > 30% of total | I/O-Optimized tier (Step 6) |
-| Serverless waste | ServerlessUsage high, CPU < 10% | ACU min tuning (Step 5) |
-| Compute-heavy, low CPU | InstanceUsage high, avg CPU < 20% | Right-sizing (Step 4) |
-| Compute-heavy, On-Demand | No RI, uptime > 6 months | Reserved Instance (Step 11) |
-| Storage / backtrack creep | StorageUsage/BackupUsage growing | Storage cleanup (Step 7) |
-| Global DB DR | ReplicaUsage in DR region, CPU < 5% | Replica right-sizing (Step 8) |
-| Mixed (no single dimension > 30%) | Even distribution | Apply all dimensions in parallel |
+Cost-profile classification table (I/O-heavy, serverless waste, over-provisioned compute, RI candidate, storage/backtrack creep, Global DB DR, mixed): [Advanced patterns](references/advanced-patterns.md).
 
 ### Step 4: Instance-class right-sizing
 
@@ -357,16 +181,7 @@ Standard tier, I/O-Optimized is a prime candidate. If
 | Burstable db.t4g with frequent CPU credit exhaustion | Move to db.r6g (unlimited is more expensive) | Variable |
 
 **Worked example — writer + reader right-sizing:**
-
-Cluster with writer `db.r6g.2xlarge` ($1.00/h in us-east-1) and two
-readers `db.r6g.2xlarge` (mirrored). Writer CPU avg=15%, max=28%;
-readers CPU avg=8%, max=18%. Right-size writer to `db.r6g.xlarge`
-($0.50/h) and readers to `db.r6g.large` ($0.25/h):
-- Writer: ($1.00 - $0.50) × 730h = $365/month
-- Each reader: ($1.00 - $0.25) × 730h = $547.50/month
-- Total monthly savings: $365 + $547.50 × 2 = $1,460/month
-- Trade-off: writer has less headroom for traffic spikes. Confirm max
-  CPU stays < 70% after the downsize; otherwise keep writer at 2xlarge.
+Worked example — writer db.r6g.2xlarge → xlarge and mirrored readers → large ($1,460/month): [Worked examples](references/worked-examples.md).
 
 ### Step 5: Aurora Serverless v2 ACU tuning
 
@@ -381,51 +196,14 @@ readers CPU avg=8%, max=18%. Right-size writer to `db.r6g.xlarge`
 | ACU spikes brief but high | Keep MaxCapacity; tune Min down | Per above |
 
 **Worked example — Serverless v2 ACU floor:**
-
-Cluster with MinCapacity=8, MaxCapacity=32, avg ACU=4.5 over 30 days,
-peak ACU=14. Drop MinCapacity to 2 (MaxCapacity stays at 32):
-- Current floor: 8 ACU × $0.12 × 730h = $700.80/month minimum
-- New floor: 2 ACU × $0.12 × 730h = $175.20/month minimum
-- Actual billed ACU drops by ~3.5 ACU average → ~3.5 × $0.12 × 730 =
-  $306.60/month savings
-- Trade-off: sub-second response on cold-start; verify p99 latency
-  stays within SLA during scale-up events.
+Worked example — MinCapacity 8 → 2 (~$306.60/month floor savings): [Worked examples](references/worked-examples.md).
 
 ### Step 6: Aurora I/O-Optimized tier
 
-**Break-even calculation:**
-
-```
-Standard_monthly = (storage_GB × $0.10) + (IO_millions × $0.20)
-IOOptimized_monthly = storage_GB × $0.18
-
-break_even_IO_millions = (storage_GB × ($0.18 - $0.10)) / $0.20
-                      = storage_GB × 0.4
-```
-
-| Storage (GB) | Break-even I/O (millions/month) | Example workload |
-|---|---|---|
-| 100 | 40M | Small db, dev/test |
-| 500 | 200M | Mid-size OLTP |
-| 1,000 | 400M | Standard production |
-| 5,000 | 2,000M | Large production |
-
-If actual I/O exceeds break-even, I/O-Optimized is cheaper.
+Break-even math (break_even_IO_millions = storage_GB × 0.4) and the per-storage-size break-even table: [Advanced patterns](references/advanced-patterns.md).
 
 **Worked example — I/O-Optimized migration:**
-
-Aurora PostgreSQL cluster, 1,000 GB storage, 600M I/O requests/month.
-- Standard: 1,000 × $0.10 + 600 × $0.20 = $100 + $120 = $220/month
-- I/O-Optimized: 1,000 × $0.18 + $0 = $180/month
-- Monthly savings: $40
-- Annual savings: $480
-- Switch with `modify-db-cluster --storage-type aurora-iopt1` (Aurora
-  PostgreSQL 14+/MySQL 8+); non-disruptive, takes effect within minutes.
-
-If I/O is only 200M/month, Standard stays cheaper:
-- Standard: $100 + $40 = $140
-- I/O-Optimized: $180
-- Stay on Standard.
+Worked example — 1,000 GB + 600M I/O saves $40/month on I/O-Optimized; 200M I/O stays on Standard: [Worked examples](references/worked-examples.md).
 
 ### Step 7: Storage, snapshot, and backtrack cleanup
 
@@ -476,12 +254,7 @@ levers differ from standard right-sizing.
 
 ### Step 11: Reserved Instance evaluation
 
-```bash
-aws rds describe-reserved-db-instances-offerings \
-  --db-instance-class db.r6g.2xlarge \
-  --product-description "aurora postgresql" \
-  --offering-type "No Upfront" --duration 31536000 --output json
-```
+RI-offering lookup CLI (describe-reserved-db-instances-offerings): [Diagnostic commands](references/diagnostic-commands.md).
 
 | Pattern | Recommendation | Savings vs On-Demand |
 |---|---|---|
@@ -621,51 +394,7 @@ CONFIRM: Before each state-changing CLI, emit and await operator
 
 ### Worked example — already optimal
 
-```text
-TARGET: reporting-cluster-prod
-VERDICT: ALREADY_OPTIMAL
-REASON: All seven dimensions verified at cost-optimal config:
-  Aurora I/O-Optimized enabled; Serverless v2 Min=2/Max=16 with
-  steady ACU 6-10; writer and readers rightsized to CPU avg 45%;
-  1-yr RI on writer and primary reader; no Global DB waste; no
-  backtrack; Performance Insights top-SQL evenly distributed.
-RECOMMENDATION:
-  Current: All dimensions optimal
-  Proposed: no change
-  Confidence: HIGH — CE confirms 30-day spending pattern stable;
-    Performance Insights shows no dominant SQL.
-ESTIMATED_SAVINGS:
-  Monthly (all dimensions): $0
-  Annual total: $0
-MIGRATION_STEPS:
-  - None required. Continue monthly CE review.
-  - Re-evaluate at next growth forecast — Serverless v2 Max may
-    need to scale if reader count doubles.
-```
-
-### Worked example — already optimal
-
-```text
-TARGET: reporting-cluster-prod
-VERDICT: ALREADY_OPTIMAL
-REASON: All seven dimensions verified at cost-optimal config:
-  Aurora I/O-Optimized enabled; Serverless v2 Min=2/Max=16 with
-  steady ACU 6-10; writer and readers rightsized to CPU avg 45%;
-  1-yr RI on writer and primary reader; no Global DB waste; no
-  backtrack; Performance Insights top-SQL evenly distributed.
-RECOMMENDATION:
-  Current: All dimensions optimal
-  Proposed: no change
-  Confidence: HIGH — CE confirms 30-day spending pattern stable;
-    Performance Insights shows no dominant SQL.
-ESTIMATED_SAVINGS:
-  Monthly (all dimensions): $0
-  Annual total: $0
-MIGRATION_STEPS:
-  - None required. Continue monthly CE review.
-  - Re-evaluate at next growth forecast — Serverless v2 Max may
-    need to scale if reader count doubles.
-```
+Two worked examples (the identical ALREADY_OPTIMAL baseline, reporting-cluster-prod, preserved verbatim): [Worked examples](references/worked-examples.md).
 
 ## Anti-Patterns — NEVER do these things
 
@@ -723,25 +452,7 @@ MIGRATION_STEPS:
 
 ## Expert heuristic — the 60-second triage
 
-When handed an Aurora bill and asked "why is this so high?", run this
-60-second triage before deep-diving any single dimension:
-
-1. **Pull CE Aurora USAGE_TYPE breakdown.** If `Aurora:IOUsage` > 30%
-   on Standard tier, deep-dive Step 6 (I/O-Optimized).
-2. **Pull cluster inventory + ACU config.** Serverless v2 with
-   MinCapacity > 2 and low CPU = guaranteed ACU floor waste.
-3. **Pull writer / reader CPU.** Avg CPU < 20% on a large instance
-   class = right-size opportunity.
-4. **Pull RI inventory.** Long-running clusters On-Demand with no RI
-   = RI opportunity.
-5. **Pull Performance Insights top-SQL.** One query > 30% of DBLoad =
-   waste-driving SQL that, once fixed, enables further rightsizing.
-6. **Pull Global DB + backtrack.** DR region CPU < 5% or backtrack
-   window > 24h on high-change = cleanup opportunity.
-
-If any of the six checks hits, deep-dive the corresponding step. If all
-six pass, the cluster is likely ALREADY_OPTIMAL — verify with the full
-ordered process.
+The 60-second triage checklist (CE USAGE_TYPE breakdown, ACU config, writer/reader CPU, RI inventory, PI top-SQL, Global DB + backtrack): [Advanced patterns](references/advanced-patterns.md).
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
@@ -781,22 +492,15 @@ ordered process.
 
 ## Recent AWS features (2024-2026)
 
-- **Aurora I/O-Optimized (2024):** Flat-rate storage tier eliminating
-  per-I/O-request charges. Break-even at ~0.4M I/O per GB of storage
-  per month. Switch via `modify-db-cluster --storage-type aurora-iopt1`.
-- **Aurora Limitless Database (2024+):** Horizontal sharding with a
-  routing layer (SLG). Cost premium per shard; right-size shards and
-  the router instance.
-- **Aurora Serverless v2 ACU seconds-level billing (2023-2024):**
-  Per-second ACU billing with 1-minute minimum. MinCapacity floor is
-  the dominant cost lever.
-- **Aurora Global Database managed planned failover (2024):** Engine-
-  level planned failover preserving replication topology; no cost change.
-- **Aurora PostgreSQL 16 / MySQL 8.4 (2024-2025):** Verify RI product-
-  description matches the new engine before purchase.
-- **Performance Insights anomaly detection (2024-2025):** Automatic
-  DBLoad anomaly flagging. Aurora Zero-ETL to Redshift (2024-2025)
-  offloads analytics from OLTP readers; cost is Redshift-side.
+Recent AWS features (I/O-Optimized, Limitless, Serverless v2 per-second billing, managed planned failover, PostgreSQL 16 / MySQL 8.4 RI matching, PI anomaly detection, Zero-ETL): [Advanced patterns](references/advanced-patterns.md).
+
+## References (load on demand)
+
+- [Advanced patterns](references/advanced-patterns.md) — quick-start rules, data-quality short-circuits, Step-0 non-obvious behaviours, cost-profile classification, I/O-Optimized break-even math, 60-second triage, recent AWS features
+- [Worked examples](references/worked-examples.md) — per-step worked examples (right-sizing, ACU floor, I/O-Optimized migration) and the ALREADY_OPTIMAL baseline
+- [Error handling](references/error-handling.md) — FORBIDDEN output-pattern rules and the NEED_MORE_INFO template for missing Cost Explorer access
+- [Diagnostic commands](references/diagnostic-commands.md) — required data-source CLI captures, Cost Explorer reconciliation, RI offering lookup
+- `references/aurora-pricing-reference.md` — instance-class pricing, storage/backup/Global pricing, ACU tuning math, RI discount matrix, backtrack projections, top-SQL remediation playbook
 
 ## AWS documentation
 

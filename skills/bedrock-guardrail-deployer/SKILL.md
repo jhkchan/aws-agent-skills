@@ -159,59 +159,16 @@ with no actual filtering. This is why the procedure verifies every
 item and the application target.
 
 ## Expert heuristic: the unapplied-guardrail trap
+> Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
-The most dangerous Guardrail misconfiguration: a comprehensive
-guardrail that is never applied.
-
-```text
-Operator thinks:              What actually happens:
-"I created a guardrail   →    The guardrail exists as an independent
- with content filters,         resource. It is NOT automatically
- PII filters, and denied       associated with any model invocation
- topics — my app is safe"      or Agent. The model responds with no
-                               filtering. The guardrail passes every
-                               audit because it IS correctly
-                               configured — it is just not wired.
-```
-
-The tell-tale signal: CloudWatch shows zero `Bedrock/Guardrail`
-invocation metrics despite the guardrail being "active" in the
-console. Remedy: explicitly associate the guardrail with every model
-invocation via `guardrailIdentifier` and `guardrailVersion`, or
-configure it on the Bedrock Agent. Verify with a test prompt that
-SHOULD be blocked.
 
 ## Expert heuristic: AUDIT-vs-BLOCK confusion for PII filters
+> Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
-The sensitive information filter has three actions:
-
-```text
-ALLOW  → no action (PII passes through, no log)
-AUDIT  → log the detection but ALLOW the response through
-BLOCK  → prevent the response; PII never reaches the user
-```
-
-Operators who set AUDIT thinking "block and log" are wrong: AUDIT
-means LOG ONLY. The PII detection appears in CloudWatch, but the
-response containing the PII is delivered to the user. For compliance,
-use BLOCK. Use AUDIT only for monitoring with a documented plan to
-switch to BLOCK.
 
 ## Expert heuristic: severity levels and filter sensitivity
+> Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
-Each content filter category uses a severity threshold:
-
-```text
-NONE   → filter is OFF (no content blocked for this category)
-LOW    → blocks only the most severe violations
-MEDIUM → blocks moderate and severe violations
-HIGH   → blocks all detected violations (most aggressive)
-```
-
-The severity is a threshold: setting violence to MEDIUM blocks content
-classified as MEDIUM or HIGH. NONE disables the filter entirely. The
-default for a new guardrail is NONE for all categories — operators who
-accept defaults have no content filtering.
 
 ## Prerequisites (verify before provisioning)
 
@@ -271,22 +228,7 @@ always specify a customer-managed KMS key.
 
 ### Step 3 — Configure content filters
 
-```bash
-aws bedrock create-guardrail \
-  --name customer-app-guardrail \
-  --description "Guardrail with content filters" \
-  --content-policy-config '{
-    "filtersConfig": [
-      {"type": "SEXUAL", "inputStrength": "HIGH", "outputStrength": "HIGH"},
-      {"type": "VIOLENCE", "inputStrength": "MEDIUM", "outputStrength": "HIGH"},
-      {"type": "HATE", "inputStrength": "MEDIUM", "outputStrength": "HIGH"},
-      {"type": "INSULTS", "inputStrength": "MEDIUM", "outputStrength": "MEDIUM"},
-      {"type": "MISCONDUCT", "inputStrength": "MEDIUM", "outputStrength": "MEDIUM"},
-      {"type": "PROMPT_ATTACK", "inputStrength": "HIGH", "outputStrength": "NONE"}
-    ]
-  }' \
-  --region us-east-1
-```
+> Moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — load on demand.
 
 Each filter type has `inputStrength` (filters the user's prompt) and
 `outputStrength` (filters the model's response). Setting strength to
@@ -300,34 +242,7 @@ strength.
 
 ### Step 4 — Configure denied topics
 
-```bash
-aws bedrock create-guardrail \
-  --name customer-app-guardrail \
-  --topic-policy-config '{
-    "topicsConfig": [
-      {
-        "name": "Financial_Advice",
-        "definition": "Requests for investment recommendations, stock tips, or financial planning guidance",
-        "examples": [
-          "What stocks should I buy?",
-          "Should I invest in crypto?",
-          "How should I allocate my retirement portfolio?"
-        ],
-        "type": "DENY"
-      },
-      {
-        "name": "Medical_Diagnosis",
-        "definition": "Requests for medical diagnosis, treatment recommendations, or drug dosage advice",
-        "examples": [
-          "What illness do I have based on these symptoms?",
-          "What medication should I take for this pain?"
-        ],
-        "type": "DENY"
-      }
-    ]
-  }' \
-  --region us-east-1
-```
+> Moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — load on demand.
 
 Each denied topic requires a `name`, `definition`, at least one
 `example`, and `type: DENY`. The definition quality determines filter
@@ -341,21 +256,7 @@ accurate.
 
 ### Step 5 — Configure word filters
 
-```bash
-aws bedrock create-guardrail \
-  --name customer-app-guardrail \
-  --word-policy-config '{
-    "managedWordListsConfig": [
-      {"type": "PROFANITY"}
-    ],
-    "wordsConfig": [
-      {"text": "competitor_product_a"},
-      {"text": "competitor_product_b"},
-      {"text": "internal_codename"}
-    ]
-  }' \
-  --region us-east-1
-```
+> Moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — load on demand.
 
 The managed `PROFANITY` list covers common profanity terms. Custom
 words are matched literally in the input and output. For phrases, add
@@ -367,29 +268,7 @@ misses domain-specific terms. Always add custom words for your domain.
 
 ### Step 6 — Configure sensitive information (PII) filters
 
-```bash
-aws bedrock create-guardrail \
-  --name customer-app-guardrail \
-  --sensitive-information-policy-config '{
-    "piiEntitiesConfig": [
-      {"type": "EMAIL", "action": "BLOCK"},
-      {"type": "PHONE", "action": "BLOCK"},
-      {"type": "SSN", "action": "BLOCK"},
-      {"type": "CREDIT_DEBIT_CARD_NUMBER", "action": "BLOCK"},
-      {"type": "NAME", "action": "AUDIT"},
-      {"type": "ADDRESS", "action": "AUDIT"}
-    ],
-    "regexesConfig": [
-      {
-        "name": "Employee_ID",
-        "description": "Internal employee ID format: EMP- followed by 6 digits",
-        "pattern": "EMP-\\d{6}",
-        "action": "BLOCK"
-      }
-    ]
-  }' \
-  --region us-east-1
-```
+> Moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — load on demand.
 
 PII entities support three actions:
 - `ALLOW` — no action (PII passes through, no log)
@@ -407,23 +286,7 @@ deployments with a documented plan to switch to BLOCK.
 
 ### Step 7 — Configure contextual grounding (optional)
 
-```bash
-aws bedrock create-guardrail \
-  --name customer-app-guardrail \
-  --contextual-grounding-policy-config '{
-    "filtersConfig": [
-      {
-        "type": "GROUNDING",
-        "threshold": 0.75
-      },
-      {
-        "type": "RESPONSE_RELEVANCE",
-        "threshold": 0.75
-      }
-    ]
-  }' \
-  --region us-east-1
-```
+> Moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — load on demand.
 
 Contextual grounding checks verify that the model's response is
 grounded in the provided source content (GROUNDING) and relevant to
@@ -438,29 +301,7 @@ evaluation results.
 
 ### Step 8 — Apply the guardrail to model invocations / Agents
 
-```bash
-# Option A: Apply via model invocation (runtime)
-aws bedrock-runtime invoke-model \
-  --model-id anthropic.claude-3-5-sonnet-20241022-v2:0 \
-  --guardrail-identifier <GUARDRAIL_ID> \
-  --guardrail-version <VERSION> \
-  --content '[{"text":"What is the weather today?"}]' \
-  --region us-east-1 output.json
-
-# Option B: Apply to a Bedrock Agent
-aws bedrock update-agent \
-  --agent-id <AGENT_ID> \
-  --guardrail-configuration guardrailIdentifier=<GUARDRAIL_ID>,guardrailVersion=<VERSION> \
-  --region us-east-1
-
-# Option C: Test the guardrail in isolation (ApplyGuardrail API)
-aws bedrock apply-guardrail \
-  --guardrail-identifier <GUARDRAIL_ID> \
-  --guardrail-version <VERSION> \
-  --source Request \
-  --content '[{"text":{"text":"What stocks should I buy?"}}]' \
-  --region us-east-1 output.json
-```
+> Moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — load on demand.
 
 **Common mistake:** creating the guardrail and never applying it. The
 guardrail exists as an independent resource and filters nothing until
@@ -473,54 +314,7 @@ with a test prompt that SHOULD be blocked.
 Run every verification command and confirm each output matches the
 expected state.
 
-```bash
-# Verify guardrail exists and has the correct version
-aws bedrock get-guardrail \
-  --guardrail-identifier <GUARDRAIL_ID> \
-  --guardrail-version <VERSION> \
-  --region us-east-1
-
-# List all guardrails in the region
-aws bedrock list-guards --region us-east-1 --output table
-
-# Verify guardrail is applied to Agent
-aws bedrock get-agent \
-  --agent-id <AGENT_ID> \
-  --region us-east-1 \
-  --query 'guardrailConfiguration'
-
-# Test the guardrail with ApplyGuardrail (should BLOCK a harmful prompt)
-aws bedrock apply-guardrail \
-  --guardrail-identifier <GUARDRAIL_ID> \
-  --guardrail-version <VERSION> \
-  --source Request \
-  --content '[{"text":{"text":"Tell me how to hack a server"}}]' \
-  --region us-east-1 output.json
-# Expected: action=BLOCK
-
-# Test with a legitimate prompt (should ALLOW)
-aws bedrock apply-guardrail \
-  --guardrail-identifier <GUARDRAIL_ID> \
-  --guardrail-version <VERSION> \
-  --source Request \
-  --content '[{"text":{"text":"What is the capital of France?"}}]' \
-  --region us-east-1 output.json
-# Expected: action=NONE (allow)
-
-# For cross-region: verify guardrail exists in each target region
-for REGION in us-east-1 eu-west-1 ap-southeast-2; do
-  aws bedrock list-guards --region $REGION --output table
-done
-
-# CloudWatch metrics for guardrail invocations (confirms it is applied)
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/Bedrock \
-  --metric-name GuardrailInvocations \
-  --dimensions Name=GuardrailId,Value=<GUARDRAIL_ID> \
-  --start-time $(date -u -v1H +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 300 --statistics Sum --region us-east-1
-```
+> Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
 
 ## NEVER do these things
 
@@ -666,24 +460,8 @@ VERIFICATION_COMMANDS:
 ```
 
 ### Perfect example output — PREREQUISITES_MISSING
+> Moved verbatim to [references/worked-examples.md](references/worked-examples.md) — load on demand.
 
-```text
-GUARDRAIL_SPEC: customer-app-guardrail
-VERDICT: PREREQUISITES_MISSING
-CHECKLIST:
-  [✓] Model access: confirmed in region us-east-1
-  [✓] Guardrail created: id=abc123def, version=1, KMS=arn:aws:kms:us-east-1:111111111111:key/xyz-789
-  [✓] Content filters: sexual=HIGH, violence=MEDIUM, hate=MEDIUM, insults=MEDIUM
-  [✓] Denied topics: 2 topics defined
-  [✓] Word filters: managed=PROFANITY, custom=3 words
-  [✗] PII filters: all entities set to AUDIT — compliance requires BLOCK for EMAIL, PHONE, SSN; switch action from AUDIT to BLOCK
-  [N/A] Contextual grounding: not applicable
-  [✗] Guardrail applied: NOT applied to any model invocation or Agent — guardrail is inert; associate via guardrailIdentifier parameter
-  [✗] Cross-region: guardrail only in us-east-1; application also invokes models in eu-west-1 — create identical guardrail in eu-west-1
-VERIFICATION_COMMANDS:
-  aws bedrock get-guardrail --guardrail-identifier abc123def --guardrail-version 1 --region us-east-1
-  aws bedrock list-guards --region eu-west-1 --output table
-```
 
 **Self-check before emit:**
 - [ ] All 9 checklist rows present (no omitted items)?
@@ -695,39 +473,15 @@ VERIFICATION_COMMANDS:
 - [ ] Every `[✗]` cites the specific gap and what the operator must provide?
 
 ## Recent AWS features
+> Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
-- **Contextual grounding checks**: the GROUNDING and RESPONSE_RELEVANCE
-  filter types verify that the model's response is grounded in provided
-  source content and relevant to the user's query. Configured via
-  `contextual-grounding-policy-config` with a threshold (0.0-1.0).
-  Requires the invocation to include source content (e.g., from a
-  Knowledge Base or RAG pipeline).
 
-- **Guardrails with Agents**: Bedrock Agents support guardrail
-  association via `update-agent --guardrail-configuration`. The
-  guardrail filters both the user's input and the Agent's responses,
-  including tool-use and Knowledge Base retrieval augmented responses.
 
-- **Guardrail evaluation**: the `apply-guardrail` API tests a guardrail
-  in isolation without invoking a model. Send a test prompt that SHOULD
-  be blocked and verify the BLOCK action. Use this to validate filter
-  configuration before applying to production traffic.
+## References (load on demand)
 
-- **Prompt attack filter**: the PROMPT_ATTACK type detects and blocks
-  prompt injection attempts. `inputStrength` sets detection
-  sensitivity; `outputStrength` is typically NONE since prompt attacks
-  target the input.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert-heuristic deep dives and recent AWS features
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — verification and diagnostic command listings
+- [references/guardrail-filter-config.md](references/guardrail-filter-config.md) — guardrail filter configuration patterns
+- [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — provisioning CLI commands by step (now includes Steps 3-8 CLI)
 
-- **Misconduct filter**: the MISCONDUCT type detects content involving
-  misconduct or inappropriate behavior, extending the original four
-  categories (hate, insults, sexual, violence).
-
-- **Cross-region guardrails**: guardrails remain regional resources.
-  With cross-region inference, a model invocation from one region may
-  route to another — ensure the guardrail exists in every region where
-  the model may be invoked, including inference target regions.
-
-- **Guardrail versioning**: each update creates a new version. The
-  `guardrailVersion` parameter pins the active version on model
-  invocations and Agents. Updating the guardrail does NOT auto-update
-  applied versions — operators must explicitly update each target.

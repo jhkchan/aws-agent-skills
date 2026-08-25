@@ -75,19 +75,8 @@ READY):**
    health. Unhealthy proxy targets cause connection failures during
    failover.
 
-**Failover timing baselines (2026):**
-
-- Automatic failover detection: ~30 seconds (Aurora health check interval).
-- Replica promotion: ~60 seconds (Aurora writer promotion sequence).
-- Total automatic failover RTO: ~30-90 seconds (detection + promotion +
-  DNS propagation).
-- Planned failover via `failover-db-cluster`: 30-120 seconds.
-- Aurora Global Database managed failover: 1-5 minutes (promotes a
-  secondary region cluster).
-- RDS Proxy connection survival: connections pool transparently through
-  failover — no drops if the proxy is configured correctly.
-- DNS cache propagation: writer endpoint updates within 30-60 seconds
-  at the RDS layer; application-layer DNS caches may take longer.
+Timing baselines moved to [references/failover-procedures.md](references/failover-procedures.md)
+(section: Failover timing baselines) — load when estimating RTO.
 
 ## STRICT output contract
 
@@ -161,23 +150,8 @@ Driven by four Aurora realities:
 
 Run before classification. Misclassifying these produces wrong plans.
 
-**Live-account pre-flight (skip if offline plan audit):**
-1. `aws rds describe-db-clusters --db-cluster-identifier <id>` — confirm
-   `DBClusterStatus: available`. Capture `Engine`, `EngineVersion`,
-   `MultiAZ`, `DBClusterMembers` (writer/reader roles, `IsClusterWriter`
-   flag), `GlobalClusterIdentifier` (if Global DB member), `DBSubnetGroup`,
-   `VpcSecurityGroups`, `DBClusterEndpoint` (writer and reader endpoints),
-   `AllocatedStorage`, `StorageEncrypted`, `KmsKeyId`.
-2. `aws rds describe-db-instances --db-cluster-identifier <id>` — capture
-   per-instance status, AZ, instance class, `AuroraReplicaLag`,
-   `DBInstanceStatus`.
-3. `aws rds describe-global-clusters --global-cluster-identifier <gid>`
-   (if Global DB member) — capture global cluster membership, primary
-   region, secondary regions.
-4. `aws rds describe-db-proxy-target-groups --target-group-name <tg>` (if
-   RDS Proxy is associated) — verify target health.
-5. `aws ec2 describe-subnets --filters Name=vpc-id,Values=<vpc-id>` —
-   verify the cluster's subnets span multiple AZs.
+Live-account pre-flight commands moved to [references/diagnostic-commands.md](references/diagnostic-commands.md)
+— load that file before executing against a live account.
 
 **Malformed input:** if the input is invalid or missing required fields,
 emit `VERDICT: BLOCKED` with `REASON: Cluster/operation configuration is
@@ -204,82 +178,8 @@ not valid or is missing required fields — cannot plan.`
 
 ### Step 0: Expert heuristic — non-obvious Aurora failover behaviours
 
-These behaviours are easy to misjudge without operational Aurora
-experience. Each changes a plan if ignored:
-
-- **The writer endpoint DNS update takes 30-60 seconds at the RDS layer,
-  but application DNS caches can hold the old IP for minutes.** The JVM
-  default DNS cache TTL is 60 seconds (or infinite if configured via
-  `networkaddress.cache.ttl=-1`). Node.js, Python, and Go have their own
-  resolver caches. After failover, applications with long DNS cache TTLs
-  continue connecting to the old writer (now a reader) and get read-only
-  errors. Always surface the DNS cache flush step in the failover plan.
-
-- **RDS Proxy eliminates connection drops during failover, but only if the
-  application connects THROUGH the proxy endpoint, not the cluster
-  endpoint.** The proxy endpoint is separate from the cluster writer
-  endpoint. Applications that connect to the cluster endpoint directly do
-  NOT benefit from proxy pooling. Verify the application connection string
-  uses the proxy endpoint before claiming "connections survive failover."
-
-- **Aurora failover promotes a reader to writer; the old writer becomes a
-  reader.** This is a role swap, not a "new instance." The instance that
-  was the writer is now a reader. After failback, the original writer is
-  promoted back. Each failover/failback cycle causes a brief write outage
-  (30-120 seconds). Minimize unnecessary failback cycles.
-
-- **`failover-db-cluster --target-db-instance-identifier` lets you choose
-  which replica to promote.** Without this flag, Aurora picks the replica
-  with the lowest `AuroraReplicaLag` automatically. For planned failovers
-  (e.g., AZ maintenance), specify the target to control the promotion.
-
-- **Aurora Replica lag (`AuroraReplicaLag`) determines potential data
-  loss during unplanned failover.** Aurora replicates synchronously within
-  a region (shared storage volume), so replica lag is typically < 100ms.
-  However, under heavy write load, lag can spike. If the primary fails
-  during a lag spike, the promoted replica may be missing recent writes.
-  Always check `AuroraReplicaLag` before a planned failover.
-
-- **Aurora Global Database uses asynchronous cross-region replication
-  (typically < 1 second lag, but no SLA).** During an unplanned global
-  failover (primary region is down), the secondary region may be behind.
-  The RPO depends on the replication lag at the time of the outage. For
-  planned global failover, AWS ensures the secondary is fully caught up
-  before promoting.
-
-- **`failover-global-cluster` is the managed path for Aurora Global
-  Database failover.** It promotes a secondary region cluster to primary
-  and demotes the original. This is the safest path. The unplanned
-  alternative (`detach-from-global-cluster` + manual promote) is faster
-  but does not coordinate with the original primary — if the original
-  comes back, you have split-brain.
-
-- **Split-brain risk exists only with Aurora Global Database unplanned
-  failover.** In a single-region Aurora cluster, failover is atomic (shared
-  storage volume ensures only one writer). In a Global Database, if you
-  detach a secondary and promote it while the primary region is still
-  alive (false-positive outage detection), both regions have active
-  writers writing to divergent storage volumes. This is unrecoverable
-  without manual data reconciliation.
-
-- **The reader endpoint does NOT change during failover.** The reader
-  endpoint (`<cluster>.cluster-ro-<random>.<region>.rds.amazonaws.com`)
-  load-balances across all readers. During failover, the old writer joins
-  the reader pool; the promoted reader leaves it. The endpoint itself
-  does not change. Applications using the reader endpoint are unaffected.
-
-- **Aurora Serverless v2 failover behaves like provisioned Aurora.** The
-  cluster automatically promotes a reader and adjusts capacity. No special
-  handling is needed — the same pre-checks and CLI commands apply.
-
-- **Cross-AZ failover does NOT incur cross-AZ data transfer charges.**
-  Aurora's shared storage volume spans AZs transparently. Failover within
-  a region has no data-transfer cost implications.
-
-- **`failover-db-cluster` returns immediately; the actual promotion takes
-  30-120 seconds.** The CLI returns the cluster description with
-  `DBClusterStatus: available` (or `failing-over` briefly). Use
-  `aws rds wait db-cluster-available` to wait for the failover to complete.
+Deep dive moved to [references/advanced-patterns.md](references/advanced-patterns.md)
+(Step 0: non-obvious Aurora failover behaviours) — load before complex decisions.
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
@@ -429,108 +329,18 @@ CONNECTION_NOTES:
 
 ### Worked example — unplanned failover BLOCKED (no healthy replica)
 
-```text
-OPERATION: unplanned
-VERDICT: BLOCKED
-TARGET: prod-orders-cluster
-PRE_CHECKS:
-  - [PASS] prod-orders-cluster DBClusterStatus is available (cluster is up)
-  - [FAIL] No healthy reader available — prod-orders-cluster has 1 reader
-    (node-2) but it is in status 'creating' (recently launched, not yet
-    promoted-capable). Cannot failover without an available reader.
-  - [FAIL] Writer node-1 is unreachable (health check failed) AND no
-    available reader to promote — the cluster cannot elect a new writer.
-STEPS: (none — pre-checks failed)
-POST_VERIFY: (none)
-WRITER_ENDPOINT: prod-orders-cluster.cluster-abc123.us-east-1.rds.amazonaws.com
-  (writer endpoint still points to node-1 which is unreachable)
-CONNECTION_NOTES:
-  - BLOCKED: no available failover target. Remediation:
-    1. Wait for node-2 to reach 'available' status:
-       aws rds wait db-instance-available \
-         --db-instance-identifier prod-orders-cluster-node-2
-    2. Then retry failover:
-       aws rds failover-db-cluster \
-         --db-cluster-identifier prod-orders-cluster
-  - If node-1 is permanently lost and node-2 cannot reach available,
-    restore from the most recent snapshot as a last resort:
-    aws rds restore-db-cluster-from-snapshot \
-      --db-cluster-identifier prod-orders-cluster-recovery \
-      --snapshot-identifier <latest-snapshot>
-```
+Full example moved to [references/worked-examples.md](references/worked-examples.md).
+Load it when formatting a BLOCKED unplanned-failover response.
 
 ### Worked example — COMPLETED (automatic failover verified)
 
-```text
-OPERATION: automatic
-VERDICT: COMPLETED
-TARGET: prod-checkout-cluster
-PRE_CHECKS:
-  - [PASS] (automatic failover — pre-checks bypassed, Aurora initiated
-    failover due to writer health check failure)
-STEPS:
-  1. (Automatic failover triggered by Aurora at 2026-08-07T10:02:15Z)
-  2. Aurora promoted node-2 (us-east-1b) to writer at 2026-08-07T10:03:12Z
-  3. Failover duration: 57 seconds (detection + promotion)
-POST_VERIFY:
-  - [PASS] DBClusterStatus is available
-  - [PASS] node-2 is the writer (IsClusterWriter: true)
-  - [PASS] node-1 is now a reader (IsClusterWriter: false, AuroraReplicaLag: 12ms)
-  - [PASS] Writer endpoint resolves to node-2's endpoint
-  - [PASS] mysql -h <writer-endpoint> SELECT @@innodb_read_only returns 0 (read-write)
-  - [PASS] Reader endpoint load-balances across node-1 and node-3
-  - [PASS] RDS Proxy target group HEALTHY on new writer
-  - [WARN] JVM DNS cache may hold old writer IP for up to 60s (default TTL).
-    Flush if write errors persist.
-WRITER_ENDPOINT: prod-checkout-cluster.cluster-def456.us-east-1.rds.amazonaws.com
-  (unchanged — DNS CNAME now resolves to node-2)
-READER_ENDPOINT: prod-checkout-cluster.cluster-ro-def456.us-east-1.rds.amazonaws.com
-  (unchanged — now includes node-1)
-CONNECTION_NOTES:
-  - Automatic failover completed successfully (RTO: 57s).
-  - RDS Proxy connections survived the failover with no drops.
-  - Flush application DNS caches if write errors persist beyond 60 seconds.
-  - Consider failing back to node-1 during the next maintenance window if
-    AZ preference matters (node-1 is in us-east-1a, node-2 is in us-east-1b).
-```
+Full example moved to [references/worked-examples.md](references/worked-examples.md).
+Load it when formatting a COMPLETED post-failover verification response.
 
 ### Worked example — Aurora Global Database failover (READY)
 
-```text
-OPERATION: global
-VERDICT: READY
-TARGET: prod-global-cluster (primary: us-east-1, secondary: eu-west-1)
-PRE_CHECKS:
-  - [PASS] Global cluster has 2 region members (us-east-1, eu-west-1)
-  - [PASS] Secondary cluster in eu-west-1 is available
-  - [PASS] AuroraGlobalDBReplicationLag is 0.3s (< 5s threshold)
-  - [PASS] Primary cluster in us-east-1 is available (planned failover)
-STEPS:
-  1. CONFIRM: About to failover-global-cluster prod-global-cluster in
-     account 111111111111. This will promote the eu-west-1 cluster to
-     primary and demote us-east-1 to secondary. Cross-region write
-     redirection will take 1-5 minutes. Proceed? (yes/no)
-  2. aws rds failover-global-cluster \
-       --global-cluster-identifier prod-global-cluster \
-       --target-db-cluster-identifier arn:aws:rds:eu-west-1:111111111111:cluster:prod-global-cluster-eu
-  3. aws rds wait db-cluster-available \
-       --db-cluster-identifier prod-global-cluster-eu --region eu-west-1
-POST_VERIFY: (pending execution)
-WRITER_ENDPOINT: prod-global-cluster-eu.cluster-xyz789.eu-west-1.rds.amazonaws.com
-  (NEW regional endpoint — applications must update connection strings to
-  the eu-west-1 cluster endpoint)
-READER_ENDPOINT: prod-global-cluster-eu.cluster-ro-xyz789.eu-west-1.rds.amazonaws.com
-  (new regional reader endpoint)
-CONNECTION_NOTES:
-  - Global failover changes the primary REGION. Application connection
-    strings must be updated to the eu-west-1 cluster endpoint.
-  - The us-east-1 cluster becomes a read-only secondary.
-  - Aurora Global Database does NOT provide a global writer endpoint —
-    each region has its own cluster endpoint. Use Route 53 health checks
-    + weighted routing for automatic regional connection-string failover.
-  - Cross-region replication will resume from eu-west-1 to us-east-1 once
-    the failover completes.
-```
+Full example moved to [references/worked-examples.md](references/worked-examples.md).
+Load it when formatting a global (cross-region) failover response.
 
 ## Expert heuristic — non-obvious Aurora failover behaviours (consolidated)
 
@@ -676,40 +486,15 @@ CONNECTION_NOTES:
 
 ## Recent AWS features (2024-2026)
 
-- **Aurora Global Database managed planned failover improvements
-  (2024-2025):** `failover-global-cluster` now coordinates more
-  efficiently, reducing the managed failover window from 5-10 minutes to
-  1-5 minutes. The secondary region is confirmed fully caught up before
-  promotion.
+Feature notes moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load when deciding whether a recent feature changes the plan.
 
-- **RDS Proxy multi-AZ failover enhancement (2024):** RDS Proxy now
-  detects Aurora failover events faster and reconnects to the new writer
-  within 5-10 seconds (previously 10-30 seconds). Connection drops during
-  failover are further reduced.
+## References (load on demand)
 
-- **Aurora Serverless v2 failover parity (2024-2025):** Serverless v2
-  clusters now support the same failover behavior as provisioned Aurora,
-  including `failover-db-cluster` with target specification and automatic
-  capacity adjustment on the promoted writer.
-
-- **Aurora Global Database unplanned failover Runbook (2024-2025):** AWS
-  published a formalized runbook for unplanned global failover via
-  `detach-from-global-cluster` + promote. The runbook includes split-brain
-  detection and reconciliation guidance.
-
-- **Aurora I/O-Optimized failover (2024):** Clusters on the Aurora
-  I/O-Optimized storage configuration failover identically to standard
-  Aurora — no special handling needed.
-
-- **Application Auto Scaling with Aurora failover (2024-2025):** Aurora
-  Auto Scaling now adjusts reader count post-failover automatically if
-  the promoted replica's capacity is insufficient. Monitor
-  `CPUUtilization` and `DatabaseConnections` post-failover to verify
-  adequate capacity.
-
-- **Aurora PostgreSQL 16/17 failover improvements (2025):** Faster
-  connection re-establishment for Aurora PostgreSQL during failover.
-  Connection handling now more closely matches Aurora MySQL behavior.
+- [references/failover-procedures.md](references/failover-procedures.md) — per-operation failover procedures, endpoint behavior, DNS flush, timing benchmarks
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples (BLOCKED, COMPLETED, global READY)
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — live-account pre-flight command listing
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step-0 expert deep dive, recent AWS features
 
 ## Domain
 

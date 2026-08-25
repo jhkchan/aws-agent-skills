@@ -182,3 +182,53 @@ aws backup get-backup-plan \
 | Vault Lock in governance mode | MEDIUM | Switch to compliance mode for regulatory requirements |
 | Retention below minimum threshold | MEDIUM | Update lifecycle to meet minimum retention days |
 | Backup job failed | HIGH | Investigate failure, retry or fix resource |
+
+## Expert heuristic: Vault Lock compliance vs governance
+
+A baseline model may not distinguish the two Vault Lock modes. The
+correct heuristic recognizes that compliance mode is IMMUTABLE and
+governance mode is NOT.
+
+```text
+Vault Lock modes:
+
+  COMPLIANCE mode:
+    - Cannot be deleted or changed by ANY user (including root)
+    - Retention period is enforced permanently
+    - Once enabled, CANNOT be disabled
+    - Required for: SEC 17a-4, FINRA 4511, HIPAA, CFTC 1.31
+    - Use when: regulatory immutability is required
+
+  GOVERNANCE mode:
+    - Can be overridden by users with s3:PutBucketObjectLockConfiguration
+      or backup:DeleteBackupVault permissions
+    - Retention period is advisory (can be bypassed)
+    - CAN be disabled by privileged users
+    - Required for: operational guardrails (not regulatory)
+    - Use when: preventing accidental deletion, but allowing override
+```
+
+**Key implication:** for regulatory compliance, ONLY compliance mode
+satisfies immutability requirements. Governance mode does not meet
+WORM requirements for SEC/FINRA/HIPAA. An audit must verify the mode,
+not just whether Vault Lock is enabled.
+
+## Expert heuristic: encryption audit checks KMS key presence
+
+A baseline model may assume all recovery points are encrypted. The
+correct heuristic recognizes that KMS encryption depends on the backup
+plan configuration.
+
+```text
+Recovery point encryption audit:
+  For each recovery point:
+    1. Check if encryption key is present
+    2. If KMS key present → PASS
+    3. If no KMS key → FAIL (recovery point not encrypted with KMS)
+    4. If AWS-managed default key → WARN (consider customer-managed key)
+
+  Audit command:
+    aws backup list-recovery-points-by-backup-vault \
+      --backup-vault-name "my-vault" \
+      --query 'RecoveryPoints[?EncryptionKeyArn==`null`]'
+```

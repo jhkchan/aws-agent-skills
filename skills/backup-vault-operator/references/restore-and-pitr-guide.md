@@ -165,3 +165,52 @@ A quarterly restore drill is required by most compliance frameworks:
 
 ALWAYS pair the drill with a vault lock audit (verify compliance mode
 is still active, retention window unchanged).
+---
+
+### Start a point-in-time restore (PITR) (moved verbatim from SKILL.md)
+
+```bash
+aws backup start-restore-job \
+  --recovery-point-arn arn:aws:backup:us-east-1:111111111111:recovery-point:1-2-3-4 \
+  --metadata '{"InstanceId": "i-0 restored", "SubnetId": "subnet-abc123", "SecurityGroupIds": "sg-abc123", "InstanceType": "t3.medium"}' \
+  --iam-role-arn "arn:aws:iam::111111111111:role/AWSBackupDefaultServiceRole" \
+  --resource-type EC2
+```
+
+The `--metadata` fields vary by `--resource-type`. For RDS, use
+`{"NewDBInstanceIdentifier": "restored-db"}`. For EBS, use
+`{"VolumeId": "vol-..."}`. Use
+`aws backup get-recovery-point-restore-metadata --recovery-point-arn
+<arn>` to get the template metadata for the recovery point.
+
+---
+
+### Enable continuous backup for EC2 PITR (moved verbatim from SKILL.md)
+
+Continuous backup is set in the backup plan rule via
+`advanced backup settings` and the rule's continuous flag:
+
+```bash
+aws backup create-backup-plan \
+  --backup-plan '{
+    "BackupPlanName": "prod-ec2-pitr",
+    "Rules": [
+      {
+        "RuleName": "ContinuousBackup",
+        "TargetBackupVaultName": "prod-daily-vault",
+        "ScheduleExpression": "cron(0 5 ? * * *)",
+        "StartWindowMinutes": 60,
+        "CompletionWindowMinutes": 1440,
+        "ContinuousBackup": true
+      }
+    ],
+    "AdvancedBackupSettings": [
+      {"ResourceType": "EC2", "BackupOptions": {"WindowsVSS": "enabled"}}
+    ]
+  }'
+```
+
+EC2 PITR allows restoring to any 1-minute point within the past 35
+days. Verify via `describe-recovery-point` that `ContinuousBackup:
+true`.
+

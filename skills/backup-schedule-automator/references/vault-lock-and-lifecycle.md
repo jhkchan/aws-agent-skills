@@ -140,3 +140,45 @@ conflicts with production resources.
 
 Reports are delivered to S3 with a 24-hour delay. For real-time job
 status, use CloudWatch Events on `Backup Job State Change`.
+---
+
+### Step 6: Configure backup vault lock (WORM) (moved verbatim from SKILL.md)
+
+```bash
+# GOVERNANCE mode first (test)
+aws backup put-backup-vault-lock-configuration \
+  --backup-vault-name "prod-compliance-vault" \
+  --changeable-for-days 3 \
+  --min-retention-days 30 \
+  --mode GOVERNANCE
+
+# After validation: COMPLIANCE mode (irreversible)
+aws backup put-backup-vault-lock-configuration \
+  --backup-vault-name "prod-compliance-vault" \
+  --min-retention-days 365 \
+  --max-retention-days 2555 \
+  --mode COMPLIANCE
+```
+
+---
+
+### Step 7: Design lifecycle policy for cold storage tiering (moved verbatim from SKILL.md)
+
+```bash
+aws backup create-backup-plan --backup-plan '{
+  "BackupPlanName": "tiered-retention-plan",
+  "Rules": [{
+    "RuleName": "daily-tiered",
+    "TargetBackupVaultName": "prod-vault",
+    "ScheduleExpression": "cron(0 5 ? * * *)",
+    "StartWindowMinutes": 480,
+    "CompletionWindowMinutes": 10080,
+    "Lifecycle": {"MoveToColdStorageAfterDays": 30, "DeleteAfterDays": 365},
+    "CopyActions": [{
+      "DestinationBackupVaultArn": "arn:aws:backup:us-west-2:111111111111:backup-vault:dr-vault",
+      "Lifecycle": {"MoveToColdStorageAfterDays": 30, "DeleteAfterDays": 365}
+    }]
+  }]
+}'
+```
+

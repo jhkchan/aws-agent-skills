@@ -65,3 +65,14 @@ aws backup start-restore-job \
 }
 ```
 Requires: AWS Organizations backup policy + master account vault access policy.
+---
+
+## Appendix A — Backup plan templates (moved verbatim from SKILL.md)
+
+| Template | Rule | Hot retention | Cold retention | Cross-region | Vault lock |
+|---|---|---|---|---|---|
+| dev-minimal | Daily | 7d | None | No | No |
+| prod-standard | Daily + Weekly | 7d + 30d | 90d | Yes | GOVERNANCE |
+| compliance-strict | Daily + Monthly | 7d | 365d-2555d | Yes | COMPLIANCE |
+| pitr-continuous | Continuous | 35d | None | Optional | Optional |
+

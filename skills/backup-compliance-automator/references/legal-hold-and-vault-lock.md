@@ -191,3 +191,43 @@ on each matching recovery point.
   via Vault Lock alone — use BackupLegalHold for older points.
 - **Search scope determines eDiscovery cost.** A broad search across years
   of backups is expensive. Scope tightly per the case.
+
+## EventBridge-triggered litigation hold
+
+```bash
+# Trigger legal hold on a custom event (e.g., from the legal team)
+aws events put-rule --name trigger-litigation-hold \
+  --event-pattern '{"source":["custom.legal"],"detail-type":["Litigation Hold Request"]}' \
+  --state ENABLED
+
+aws events put-targets --rule trigger-litigation-hold \
+  --targets '[{"Id":"HoldResponder","Arn":"arn:aws:lambda:us-east-1:111111111111:function:create-legal-hold"}]'
+```
+
+**Lambda responder (excerpt):**
+
+```python
+import boto3, os
+backup = boto3.client('backup')
+
+def lambda_handler(event, context):
+    detail = event['detail']
+    backup.create_legal_hold(
+        Title=detail['caseName'],
+        Description=detail['caseDescription'],
+        LegalHoldStatus='ACTIVE',
+        RecoveryPointSelection={
+            'ResourceIdentifiers': detail['resourceArns'],
+            'DateRange': {
+                'FromDate': detail['incidentDateStart'],
+                'ToDate': detail['incidentDateEnd']
+            }
+        }
+    )
+    return {'statusCode': 200, 'hold': 'created'}
+```
+
+**Gotchas:** Legal holds cannot be bypassed — even the root account
+cannot delete a held recovery point. Always include the case ID in the
+hold title for traceability. Test release (status -> INACTIVE) before
+needing it under court deadline pressure.

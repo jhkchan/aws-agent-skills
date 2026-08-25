@@ -88,31 +88,8 @@ is immutable (cannot be deleted or changed); governance mode is NOT
 immutable (can be overridden by privileged users). Every recovery
 point should have KMS encryption verified.
 
-Three misconceptions dominate backup audit automation at provisioning
-time:
-
-- **"Backup plans equal backup compliance."** They do NOT. Having a
-  backup plan does not mean ALL resources are covered. A backup audit
-  identifies resources that are NOT in any backup plan — these are the
-  compliance gaps. The compliance report template
-  (COMPLIANCE_REPORT) explicitly lists resources without backup
-  coverage.
-
-- **"Vault Lock governance mode is the same as compliance mode."** It
-  is NOT. Compliance mode is IMMUTABLE — once a Vault Lock is set in
-  compliance mode, NO user (including root) can delete the vault or
-  change the lock. Governance mode allows privileged users to bypass
-  the lock. For regulatory compliance (SEC, FINRA, HIPAA), compliance
-  mode is required. Governance mode is for operational guardrails, not
-  regulatory immutability.
-
-- **"Encryption on recovery points is automatic."** It is NOT
-  guaranteed. While AWS Backup can encrypt recovery points with KMS,
-  the KMS key must be explicitly configured in the backup plan. If the
-  plan does not specify a KMS key, recovery points may use the default
-  AWS-managed key or no encryption (depending on the resource type).
-  An encryption audit verifies that ALL recovery points have KMS
-  encryption.
+Deep-dive misconceptions moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when explaining coverage gaps, Vault Lock modes, or encryption defaults.
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -137,94 +114,20 @@ misses.** Compliance mode and governance mode look similar in the API
 but have fundamentally different immutability properties. The procedure
 below forces an explicit check of the Vault Lock mode.
 
-**Cross-dependency gotchas:**
-- Report plans deliver to S3. The S3 bucket policy MUST allow
-  `backup.amazonaws.com` to write to the bucket. Without the policy,
-  reports are not delivered.
-- Compliance reports list resources NOT covered by backup plans. This
-  is different from backup job reports (which list backup job status).
-- Vault Lock in compliance mode CANNOT be reversed. Once set, it is
-  permanent. Governance mode CAN be reversed by privileged users.
-- SNS alerting requires the SNS topic policy to allow the CloudWatch
-  alarm or EventBridge rule to publish.
+Cross-dependency gotchas moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when report delivery or SNS alerting fails silently.
 
 ## Expert heuristic: report plan types and when to use each
-
-A baseline model may not know the three report template types. The
-correct heuristic recognizes that each template serves a different
-compliance question.
-
-```text
-BACKUP_JOB_REPORT:
-  Question: "Are my backup jobs succeeding?"
-  Content: job status (succeeded/failed/abandoned), job duration,
-           resource type, backup vault
-
-COMPLIANCE_REPORT:
-  Question: "Are all resources covered by backup plans?"
-  Content: resources WITH backup coverage, resources WITHOUT coverage,
-           backup plan mapping per resource
-
-RECOVERY_POINT_REPORT:
-  Question: "Are my recovery points encrypted and within retention?"
-  Content: recovery point ARN, encryption status (KMS key),
-           vault name, creation date, expiry date, deletion status
-```
-
-**Key implication:** the COMPLIANCE_REPORT is the most important for
-audit. It identifies the coverage gap — resources that are NOT in any
-backup plan. This is the report that auditors and compliance teams
-request.
+Full heuristic moved to [references/report-templates-and-frameworks.md](references/report-templates-and-frameworks.md).
+Load it when choosing among the three report templates.
 
 ## Expert heuristic: Vault Lock compliance vs governance
-
-A baseline model may not distinguish the two Vault Lock modes. The
-correct heuristic recognizes that compliance mode is IMMUTABLE and
-governance mode is NOT.
-
-```text
-Vault Lock modes:
-
-  COMPLIANCE mode:
-    - Cannot be deleted or changed by ANY user (including root)
-    - Retention period is enforced permanently
-    - Once enabled, CANNOT be disabled
-    - Required for: SEC 17a-4, FINRA 4511, HIPAA, CFTC 1.31
-    - Use when: regulatory immutability is required
-
-  GOVERNANCE mode:
-    - Can be overridden by users with s3:PutBucketObjectLockConfiguration
-      or backup:DeleteBackupVault permissions
-    - Retention period is advisory (can be bypassed)
-    - CAN be disabled by privileged users
-    - Required for: operational guardrails (not regulatory)
-    - Use when: preventing accidental deletion, but allowing override
-```
-
-**Key implication:** for regulatory compliance, ONLY compliance mode
-satisfies immutability requirements. Governance mode does not meet
-WORM requirements for SEC/FINRA/HIPAA. An audit must verify the mode,
-not just whether Vault Lock is enabled.
+Full heuristic moved to [references/vault-lock-and-encryption.md](references/vault-lock-and-encryption.md).
+Load it before claiming Vault Lock compliance.
 
 ## Expert heuristic: encryption audit checks KMS key presence
-
-A baseline model may assume all recovery points are encrypted. The
-correct heuristic recognizes that KMS encryption depends on the backup
-plan configuration.
-
-```text
-Recovery point encryption audit:
-  For each recovery point:
-    1. Check if encryption key is present
-    2. If KMS key present → PASS
-    3. If no KMS key → FAIL (recovery point not encrypted with KMS)
-    4. If AWS-managed default key → WARN (consider customer-managed key)
-
-  Audit command:
-    aws backup list-recovery-points-by-backup-vault \
-      --backup-vault-name "my-vault" \
-      --query 'RecoveryPoints[?EncryptionKeyArn==`null`]'
-```
+Full heuristic moved to [references/vault-lock-and-encryption.md](references/vault-lock-and-encryption.md).
+Load it when auditing recovery-point encryption.
 
 ## Prerequisites (verify before automating)
 
@@ -535,32 +438,15 @@ VERIFICATION_COMMANDS:
 ```
 
 ## Error handling
+Full error-handling deep dives moved to [references/error-handling.md](references/error-handling.md).
+Load it when reports are not delivered, alerts are missing, or findings appear.
 
-### Reports not delivered to S3
-- S3 bucket policy is missing or incorrect. Verify
-  `backup.amazonaws.com` has `s3:PutObject` permission on the report
-  prefix. Re-deliver by triggering a new report job.
+## References (load on demand)
 
-### Vault Lock cannot be changed
-- The vault is in compliance mode. Compliance mode is permanent and
-  cannot be reversed. This is by design. Create a new vault if a
-  different configuration is needed.
-
-### Compliance report shows resources without coverage
-- These resources are not in any backup plan. Create backup selections
-  that include these resources, or tag them for inclusion in existing
-  plans.
-
-### Recovery points without KMS encryption
-- The backup plan does not specify a KMS key. Update the backup plan
-  to include a KMS key in the advanced backup settings. New recovery
-  points will be encrypted. Existing unencrypted recovery points remain
-  unencrypted until they expire.
-
-### SNS alerts not received
-- SNS subscription is not confirmed. Check subscription status and
-  confirm the email/HTTPS endpoint. Verify the EventBridge rule is
-  enabled and targets the SNS topic.
+- [Report templates and frameworks](references/report-templates-and-frameworks.md) — report-plan types deep dive: which template answers which compliance question
+- [Vault lock and encryption](references/vault-lock-and-encryption.md) — Vault Lock compliance vs governance modes; encryption-audit heuristic (KMS key presence)
+- [Error handling](references/error-handling.md) — undelivered reports, permanent Vault Lock, coverage gaps, unencrypted recovery points, unconfirmed SNS subscriptions
+- [Advanced patterns](references/advanced-patterns.md) — audit misconceptions and cross-dependency gotchas
 
 ## Domain
 
@@ -574,3 +460,4 @@ AWS CloudOps / AWS Backup Audit Automation & Compliance Reporting.
 - **Vault Lock** — https://docs.aws.amazon.com/aws-backup/latest/devguide/vault-lock.html
 - **Backup compliance** — https://docs.aws.amazon.com/aws-backup/latest/devguide/compliance.html
 - **Backup CLI** — https://docs.aws.amazon.com/cli/latest/reference/backup/
+

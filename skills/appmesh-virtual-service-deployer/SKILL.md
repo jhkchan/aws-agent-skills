@@ -156,21 +156,8 @@ green. The Envoy-sidecar-required row is the second commonly
 misunderstood step.
 
 **Cross-dependency gotchas:**
-- The virtual service DNS name (e.g., `service.mesh.local`) must
-  match what clients call. If clients call `service.namespace.svc
-  .cluster.local`, the virtual service must use that exact hostname.
-- Cloud Map service discovery requires instances to self-register.
-  If the Cloud Map service has no instances, the virtual node has no
-  backends and traffic returns 503.
-- The App Mesh Controller on EKS must be installed BEFORE labeling
-  namespaces for injection. Labeling without the controller does
-  nothing.
-- mTLS STRICT mode on a virtual node rejects all connections that
-  lack a valid client certificate. Start with PERMISSIVE mode during
-  migration, then switch to STRICT.
-- The egress filter on the mesh (DROP_ALL vs ALLOW_ALL) controls
-  whether pods can talk to non-mesh services. DROP_ALL blocks all
-  egress not explicitly allowed — plan for this or use ALLOW_ALL.
+Cross-dependency gotchas moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when sequencing mesh, node, router, gateway, or mTLS provisioning.
 
 ## Expert heuristic: DNS vs Cloud Map service discovery
 
@@ -235,40 +222,8 @@ isn't working."
 
 ## Expert heuristic: Envoy sidecar auto-inject via webhook
 
-A baseline model assumes Envoy is always present. The correct
-heuristic recognizes that auto-injection works ONLY on EKS with the
-App Mesh Controller and namespace labeling. On ECS and EC2, manual
-sidecar configuration is required.
-
-```text
-Envoy sidecar injection by platform:
-  ├── EKS (auto-inject via mutating webhook)
-  │     → Install App Mesh Controller (Helm chart)
-  │     → Controller installs a MutatingWebhookConfiguration
-  │     → Label namespace: kubectl label namespace app mesh=appmesh
-  │     → Annotate pod: appmesh.k8s.aws/virtualNode: <node-name>
-  │     → Webhook injects Envoy container into pods at creation
-  │     → Envoy config pushed via xDS from App Mesh control plane
-  │     → Pod restart NOT needed for route changes (xDS streaming)
-  │
-  ├── ECS (manual sidecar in task definition)
-  │     → Add Envoy container to the task definition
-  │     → Configure App Mesh proxy configuration (type=APPMESH)
-  │     → Set ENVOY_LOG_LEVEL, APPMESH_VIRTUAL_NODE_NAME env vars
-  │     → No webhook — must add to every task definition
-  │
-  └── EC2 (manual Envoy process)
-        → Download and run Envoy binary
-        → Configure with App Mesh bootstrap config
-        → Point to the virtual node
-        → No auto-inject — fully manual
-```
-
-**Key implication:** without the Envoy sidecar, NO mesh policies are
-enforced. Traffic flows directly between services, bypassing routing
-rules, retries, timeouts, circuit breakers, and mTLS. The sidecar is
-the data plane — the control plane (App Mesh) configures it but does
-not enforce policies directly.
+Platform-by-platform injection detail moved verbatim to [references/envoy-and-mtls-guide.md](references/envoy-and-mtls-guide.md).
+Load on demand when deciding EKS auto-inject vs ECS sidecar vs EC2 manual Envoy.
 
 ## Prerequisites (verify before provisioning)
 
@@ -319,183 +274,23 @@ to DROP_ALL with explicit virtual services for allowed egress.
 
 ## Step 2 — Virtual nodes (DNS vs Cloud Map)
 
-A virtual node represents a deployable unit with service discovery.
-
-**DNS service discovery:**
-
-```bash
-aws appmesh create-virtual-node \
-  --mesh-name production-mesh \
-  --virtual-node-name checkout-v1 \
-  --spec '{
-    "serviceDiscovery": {
-      "dns": {
-        "hostname": "checkout.default.svc.cluster.local"
-      }
-    },
-    "listeners": [{
-      "portMapping": {"port": 8080, "protocol": "http"}
-    }],
-    "backends": [
-      {"virtualService": {"virtualServiceName": "inventory.mesh.local"}}
-    ]
-  }' \
-  --region us-east-1
-```
-
-**Cloud Map service discovery:**
-
-```bash
-aws appmesh create-virtual-node \
-  --mesh-name production-mesh \
-  --virtual-node-name checkout-v1 \
-  --spec '{
-    "serviceDiscovery": {
-      "awsCloudMap": {
-        "namespaceName": "mesh-services",
-        "serviceName": "checkout"
-      }
-    },
-    "listeners": [{
-      "portMapping": {"port": 8080, "protocol": "http"}
-    }]
-  }' \
-  --region us-east-1
-```
-
-**Critical differences:**
-- DNS: Envoy resolves the hostname; no instance registration needed.
-  Best for stable IPs, ALB/NLB fronted services.
-- Cloud Map: Instances self-register; Envoy queries Cloud Map for live
-  backends. Best for dynamic scaling (ECS, EKS, EC2 ASG). Requires
-  Cloud Map namespace + service created beforehand.
+create-virtual-node CLI for both discovery modes moved verbatim to [references/service-discovery-and-routing.md](references/service-discovery-and-routing.md).
+Load on demand when emitting virtual-node provisioning commands.
 
 ## Step 3 — Virtual routers and weighted routes
 
-A virtual router holds route definitions that direct traffic to
-virtual nodes with weights for canary/blue-green.
-
-**Create a virtual router:**
-
-```bash
-aws appmesh create-virtual-router \
-  --mesh-name production-mesh \
-  --virtual-router-name checkout-router \
-  --listeners '[{"portMapping":{"port":8080,"protocol":"http"}}]' \
-  --region us-east-1
-```
-
-**Create a weighted HTTP route (canary):**
-
-```bash
-aws appmesh create-route \
-  --mesh-name production-mesh \
-  --virtual-router-name checkout-router \
-  --route-name checkout-canary \
-  --spec '{
-    "httpRoute": {
-      "match": {"prefix": "/"},
-      "action": {
-        "weightedTargets": [
-          {"virtualNode": "checkout-v1", "weight": 90},
-          {"virtualNode": "checkout-v2", "weight": 10}
-        ]
-      }
-    }
-  }' \
-  --region us-east-1
-```
-
-**Critical:** the weights determine traffic splitting. 90/10 sends
-10% to checkout-v2 (canary). Weights do NOT need to sum to 100 — they
-are normalized. But conventionally they do sum to 100 for clarity.
+create-virtual-router and weighted create-route CLI moved verbatim to [references/service-discovery-and-routing.md](references/service-discovery-and-routing.md).
+Load on demand when configuring canary traffic splitting.
 
 ## Step 4 — Route policies (timeout, retry)
 
-Each route can have timeout and retry policies.
-
-**Route with timeout and retry:**
-
-```bash
-aws appmesh create-route \
-  --mesh-name production-mesh \
-  --virtual-router-name checkout-router \
-  --route-name checkout-resilient \
-  --spec '{
-    "httpRoute": {
-      "match": {"prefix": "/"},
-      "action": {
-        "weightedTargets": [
-          {"virtualNode": "checkout-v1", "weight": 100}
-        ]
-      },
-      "retryPolicy": {
-        "httpRetryEvents": ["server-error", "gateway-error"],
-        "maxRetries": 3,
-        "perRetryTimeout": {"unit": "ms", "value": 2000}
-      },
-      "timeout": {
-        "request": {"unit": "s", "value": 15}
-      }
-    }
-  }' \
-  --region us-east-1
-```
-
-**Retry event types:**
-- `server-error` — HTTP 5xx
-- `gateway-error` — gateway-related errors (502, 503, 504)
-- `client-error` — HTTP 4xx (retrying client errors is unusual)
-- `stream-error` — retry on stream reset
+Retry/timeout route-policy CLI and retry event types moved verbatim to [references/service-discovery-and-routing.md](references/service-discovery-and-routing.md).
+Load on demand when adding resilience policies to a route.
 
 ## Step 5 — Circuit breaker and outlier detection
 
-Circuit breaking is configured via virtual node backend defaults
-(connection pool limits) and outlier detection (ejecting unhealthy
-endpoints).
-
-**Virtual node with circuit breaker:**
-
-```bash
-aws appmesh create-virtual-node \
-  --mesh-name production-mesh \
-  --virtual-node-name checkout-v1 \
-  --spec '{
-    "serviceDiscovery": {
-      "awsCloudMap": {
-        "namespaceName": "mesh-services",
-        "serviceName": "checkout"
-      }
-    },
-    "listeners": [{
-      "portMapping": {"port": 8080, "protocol": "http"}
-    }],
-    "backendDefaults": {
-      "clientPolicy": {
-        "healthCheck": {
-          "protocol": "http",
-          "path": "/health",
-          "healthyThreshold": 2,
-          "unhealthyThreshold": 3,
-          "timeoutMillis": 2000,
-          "intervalMillis": 5000
-        }
-      }
-    }
-  }' \
-  --region us-east-1
-```
-
-**Outlier detection** (ejecting unhealthy endpoints):
-
-```json
-"outlierDetection": {
-  "maxServerErrors": 5,
-  "interval": {"unit": "s", "value": 10},
-  "baseEjectionDuration": {"unit": "s", "value": 30},
-  "maxEjectionPercent": 50
-}
-```
+Circuit-breaker and outlier-detection payloads moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when configuring backendDefaults health checks or outlierDetection.
 
 ## Step 6 — Virtual services
 
@@ -542,270 +337,38 @@ green is needed.
 
 ## Step 7 — Virtual gateway (north-south ingress)
 
-A virtual gateway allows external traffic to enter the mesh.
-
-**Create a virtual gateway:**
-
-```bash
-aws appmesh create-virtual-gateway \
-  --mesh-name production-mesh \
-  --virtual-gateway-name ingress-gateway \
-  --spec '{
-    "listeners": [{
-      "portMapping": {"port": 8080, "protocol": "http"},
-      "healthCheck": {
-        "protocol": "http",
-        "path": "/health",
-        "healthyThreshold": 2,
-        "unhealthyThreshold": 2,
-        "timeoutMillis": 2000,
-        "intervalMillis": 5000
-      }
-    }]
-  }' \
-  --region us-east-1
-```
-
-**Create a gateway route:**
-
-```bash
-aws appmesh create-gateway-route \
-  --mesh-name production-mesh \
-  --virtual-gateway-name ingress-gateway \
-  --gateway-route-name checkout-ingress \
-  --spec '{
-    "httpRoute": {
-      "action": {
-        "target": {
-          "virtualService": {
-            "virtualServiceName": "checkout.mesh.local"
-          }
-        }
-      },
-      "match": {"prefix": "/checkout"}
-    }
-  }' \
-  --region us-east-1
-```
-
-External traffic enters via the virtual gateway (fronted by ALB/NLB),
-follows the gateway route to the virtual service, which routes through
-the virtual router to the appropriate virtual node.
+create-virtual-gateway and create-gateway-route CLI moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when provisioning north-south ingress.
 
 ## Step 8 — Envoy sidecar injection
 
-### EKS (auto-inject via mutating webhook)
-
-**Install the App Mesh Controller (Helm):**
-
-```bash
-helm repo add eks https://aws.github.io/eks-charts
-helm upgrade --install appmesh-controller eks/appmesh-controller \
-  --namespace appmesh-system \
-  --create-namespace \
-  --set region=us-east-1 \
-  --set serviceAccount.create=true \
-  --set serviceAccount.name=appmesh-controller
-```
-
-**Label the namespace for injection:**
-
-```bash
-kubectl label namespace default mesh=production-mesh appmesh=enabled
-```
-
-**Annotate the pod's deployment:**
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: checkout-v1
-spec:
-  template:
-    metadata:
-      annotations:
-        appmesh.k8s.aws/virtualNode: checkout-v1
-    spec:
-      containers:
-        - name: checkout
-          image: checkout:1.0
-```
-
-The mutating webhook injects the Envoy sidecar automatically when
-pods are created in the labeled namespace.
-
-### ECS (manual sidecar)
-
-Add the Envoy container to the ECS task definition:
-
-```json
-{
-  "name": "envoy",
-  "image": "840364872350.dkr.ecr.us-east-1.amazonaws.com/aws-appmesh-envoy:v1.29.5.0-prod",
-  "essential": true,
-  "environment": [
-    {"name": "APPMESH_VIRTUAL_NODE_NAME", "value": "mesh/production-mesh/virtualNode/checkout-v1"},
-    {"name": "ENVOY_LOG_LEVEL", "value": "info"}
-  ],
-  "portMappings": [{"containerPort": 9901}]
-}
-```
-
-**Critical:** without the Envoy sidecar, mesh policies are NOT
-enforced. On ECS, forgetting the Envoy container is the #1 cause of
-"mesh policies don't work."
+EKS webhook install, ECS sidecar JSON, and the critical no-Envoy failure mode moved verbatim to [references/envoy-and-mtls-guide.md](references/envoy-and-mtls-guide.md).
+Load on demand when injecting Envoy on any platform.
 
 ## Step 9 — mTLS via ACM Private CA
 
-mTLS encrypts east-west traffic between mesh services.
-
-**Prerequisites:**
-- ACM Private CA in ACTIVE state.
-- Certificates issued for each virtual node.
-- SDS (Secret Discovery Service) backend configured for Envoy to
-  fetch certificates.
-
-**Configure listener TLS (inbound mTLS):**
-
-```json
-"listeners": [{
-  "portMapping": {"port": 8080, "protocol": "http"},
-  "tls": {
-    "mode": "STRICT",
-    "certificate": {
-      "sds": {
-        "secretName": "checkout-cert"
-      }
-    }
-  }
-}]
-```
-
-**Configure backend peer TLS (outbound mTLS):**
-
-```json
-"backends": [{
-  "virtualService": {
-    "virtualServiceName": "inventory.mesh.local",
-    "clientPolicy": {
-      "tls": {
-        "mode": "STRICT",
-        "certificate": {
-          "sds": {"secretName": "checkout-client-cert"}
-        },
-        "validation": {
-          "trust": {
-            "sds": {"secretName": "mesh-ca-bundle"}
-          }
-        }
-      }
-    }
-  }
-}]
-```
-
-**mTLS modes:**
-- STRICT — rejects connections without valid certificates
-- PERMISSIVE — accepts both mTLS and non-mTLS (for migration)
-
-**Critical:** start with PERMISSIVE during migration (mixing mTLS and
-non-mTLS services), then switch to STRICT once all services have
-certificates. STRICT without valid certs = all connections rejected.
+Listener TLS and backend peer TLS (SDS) payloads moved verbatim to [references/envoy-and-mtls-guide.md](references/envoy-and-mtls-guide.md).
+Load on demand when enabling STRICT or PERMISSIVE mTLS.
 
 ## Step 10 — Observability (CloudWatch + X-Ray)
 
-App Mesh integrates with CloudWatch metrics and X-Ray tracing.
-
-**Enable X-Ray tracing (virtual node listener):**
-
-```json
-"listeners": [{
-  "portMapping": {"port": 8080, "protocol": "http"},
-  "healthCheck": {...},
-  "accessLog": {
-    "file": {"path": "/dev/stdout"}
-  }
-}]
-```
-
-**CloudWatch metrics** are automatically emitted by Envoy:
-- `envoy_cluster_upstream_rq_total` — request count
-- `envoy_cluster_upstream_rq_2xx` — successful responses
-- `envoy_cluster_upstream_rq_5xx` — server errors
-- `envoy_cluster_upstream_rq_time` — latency distribution
-
-**X-Ray tracing** requires the X-Ray daemon sidecar (EKS) or the
-X-Ray integration in the Envoy configuration.
+Access-log payload and Envoy metric names moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when wiring observability.
 
 ## Step 11 — Mesh scope (namespace vs cluster)
 
-On EKS, the App Mesh Controller can scope mesh injection to specific
-namespaces.
-
-| Scope | Behavior | Use case |
-|---|---|---|
-| Namespace-level | Only labeled namespaces get injection | Mixed mesh/non-mesh workloads |
-| Cluster-wide | All namespaces get injection | Full mesh adoption |
-
-**Namespace scoping:**
-
-```bash
-# Enable injection for specific namespace
-kubectl label namespace app-team mesh=production-mesh appmesh=enabled
-
-# Disable for other namespaces (default: no injection)
-kubectl label namespace monitoring appmesh=disabled --overwrite
-```
+Namespace-scoping kubectl commands moved verbatim to [references/envoy-and-mtls-guide.md](references/envoy-and-mtls-guide.md).
+Load on demand when scoping injection on EKS.
 
 ## Step 12 — xDS protocol
 
-Envoy communicates with the App Mesh control plane via the xDS
-(Discovery Service) protocol. This is a streaming gRPC connection
-that pushes configuration changes in near-real-time.
-
-```text
-xDS flow:
-  1. Envoy starts and connects to App Mesh control plane via xDS
-  2. App Mesh sends cluster, listener, route, endpoint configurations
-  3. Envoy applies the configuration (no restart needed)
-  4. Route weight change (e.g., canary 10% → 50%) is pushed via xDS
-  5. Envoy updates its routing table within seconds
-  6. New traffic follows the updated weights immediately
-
-  Key: xDS is streaming (not polling). Config changes propagate fast.
-```
-
-**Key implication:** route weight changes do NOT require pod restarts.
-The xDS streaming protocol pushes updates to all Envoy instances
-within seconds. This is what makes canary traffic shifting near-
-instantaneous.
+xDS flow walkthrough moved verbatim to [references/envoy-and-mtls-guide.md](references/envoy-and-mtls-guide.md).
+Key implication kept here: route weight changes need no pod restarts — xDS pushes within seconds.
 
 ## Step 13 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **App Mesh Gateway Controller for EKS (2023-2024):** A CRD-based
-  controller that allows declaring virtual gateways and gateway
-  routes as Kubernetes resources, simplifying ingress configuration.
-
-- **mTLS via SDS enhancement (2024-2025):** Improved Secret Discovery
-  Service integration, allowing Envoy to fetch certificates from
-  external SDS backends (not just Kubernetes secrets), enabling
-  tighter integration with cert-manager and external CA systems.
-
-- **Outlier detection improvements (2024-2025):** Enhanced outlier
-  detection with configurable failure percentage thresholds and
-  consecutive failure gating, giving finer control over endpoint
-  ejection behavior.
-
-- **App Mesh multi-cluster mesh (2025-2026):** Cross-cluster mesh
-  connectivity via Cloud Map multi-cluster service discovery, allowing
-  virtual nodes to span EKS clusters in different regions.
-
-- **Envoy version upgrades (2025-2026):** App Mesh Envoy images
-  updated to Envoy 1.30+ with improved HTTP/3 support and QUIC
-  transport for mesh-internal traffic.
+Recent AWS features (2023-2026) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when evaluating newest App Mesh capabilities.
 
 ## NEVER do these things
 
@@ -909,38 +472,16 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Virtual service returns 503 (no healthy upstream)
-- The virtual node has no backends. If using Cloud Map, verify
-  instances are registered. If using DNS, verify the hostname
-  resolves. Check health check configuration — failing health checks
-  eject all endpoints.
+Error-handling deep dives (503s, canary not splitting, Envoy not injected, mTLS rejected, DROP_ALL breakage, empty Cloud Map) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when a deployment or runtime failure must be diagnosed.
 
-### Canary traffic not splitting (all traffic to one node)
-- The virtual service is backed by a virtual node, not a virtual
-  router. Re-create the virtual service with a virtual router
-  provider. Weighted routing requires the router.
+## References (load on demand)
 
-### Envoy not injected (EKS)
-- The namespace is not labeled for injection. Run
-  `kubectl label namespace <ns> mesh=<mesh-name> appmesh=enabled`.
-  Verify the App Mesh Controller is running in appmesh-system
-  namespace.
-
-### mTLS connections rejected (STRICT mode)
-- Not all services have valid certificates. Switch to PERMISSIVE
-  mode, issue certificates via ACM Private CA for all virtual nodes,
-  verify SDS is distributing certs, then switch back to STRICT.
-
-### DROP_ALL egress filter breaks database connectivity
-- The mesh blocks all non-mesh egress. Create a virtual service for
-  the database endpoint (with a virtual node using DNS discovery
-  pointing to the database hostname), or switch to ALLOW_ALL egress.
-
-### Cloud Map service has no instances
-- Instances are not self-registering. For ECS, verify the task has
-  Cloud Map service registration enabled. For EC2, verify the
-  instance runs the Cloud Map registration agent. For EKS, verify
-  the App Mesh Controller registers pods to Cloud Map.
+- [references/service-discovery-and-routing.md](references/service-discovery-and-routing.md) — DNS vs Cloud Map and routing deep dive; now also holds Steps 2-4 (virtual nodes, weighted routes, route policies) moved from SKILL.md.
+- [references/envoy-and-mtls-guide.md](references/envoy-and-mtls-guide.md) — Envoy injection and mTLS deep dive; now also holds the Envoy auto-inject heuristic and Steps 8, 9, 11, 12 moved from SKILL.md.
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples moved from SKILL.md: circuit breaker (Step 5), virtual gateway (Step 7), observability (Step 10).
+- [references/error-handling.md](references/error-handling.md) — error-handling deep dives moved from SKILL.md: 503 no healthy upstream, canary not splitting, Envoy not injected, mTLS rejections, DROP_ALL egress breakage, Cloud Map with no instances.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — cross-dependency gotchas and Recent AWS features 2023-2026 (Step 13) moved from SKILL.md.
 
 ## Domain
 

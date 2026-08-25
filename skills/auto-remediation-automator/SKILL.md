@@ -118,64 +118,8 @@ GAP: Re-supply describe-config-rules output for the rule and a sample of NON_COM
 
 ### Step 0: Expert knowledge — non-obvious Config + SSM behaviors
 
-These behaviors change the workflow design if ignored:
-
-- **`put-remediation-configurations` accepts a `TargetId` for org-level
-  rules.** When the Config rule is deployed via an organization
-  conformance pack, the remediation must be configured at the org
-  level (`TargetType: AWS_ACCOUNT`) — member-account-level remediation
-  configurations are ignored for org-deployed rules.
-
-- **`Automatic: true` remediation does NOT fire on existing NON_COMPLIANT
-  resources.** It only fires on NEW NON_COMPLIANT evaluations. To
-  remediate the existing backlog, you must explicitly call
-  `start-remediation-execution` per resource. This is the most common
-  "I configured remediation and nothing happened" issue.
-
-- **SSM Automation execution role is a service role, NOT the caller's
-  role.** Config assumes a role to invoke SSM; SSM assumes a role to
-  execute the runbook. Two service roles, both pre-provisioned. A
-  single `AssumeRole` chain failure produces `ACCESS_DENIED` deep in
-  the execution history.
-
-- **The SSM document `Outputs` are NOT visible in the Config timeline.**
-  Config records resource state changes (NON_COMPLIANT → COMPLIANT).
-  SSM records runbook execution status (Success/Failed). To
-  reconstruct what happened, you must join the two via timestamps in
-  CloudTrail — there is no native join.
-
-- **`AWS-Config-*` and `AWS-*` SSM documents are AWS-managed and
-  versioned by AWS.** You cannot edit them. When AWS ships a new
-  version, the remediation configuration automatically picks it up
-  unless you pinned a specific version in `DocumentVersion`. Pinning
-  is safer for stability; floating is better for bug fixes.
-
-- **A Config rule scoped to a resource type that is NOT recorded by
-  the recorder will never emit NON_COMPLIANT.** Remediation wired to
-  such a rule is dead configuration. Always verify the recorder scope
-  includes the rule's target resource type before wiring remediation.
-
-- **`start-remediation-execution` is synchronous API but asynchronous
-  execution.** The API returns immediately with an `ExecutionId`. The
-  runbook continues executing for seconds to minutes. Poll
-  `describe-remediation-execution-status` for completion.
-
-- **SSM Automation step failures do NOT roll back.** Each step is
-  independent. A multi-step runbook that fails on step 3 of 5 leaves
-  steps 1-2 applied. Custom runbooks must include explicit rollback
-  steps (`onFailure: abort` is the default, but earlier mutations
-  persist).
-
-- **EventBridge-driven remediation (Config state-change → Lambda) is
-  not deduplicated.** Config emits a state-change event on every
-  evaluation transition. A flapping resource (NON_COMPLIANT →
-  COMPLIANT → NON_COMPLIANT) triggers the Lambda on every transition.
-  Idempotency is the consumer's responsibility.
-
-- **Conformance-pack `RemediationConfiguration` blocks use the SSM
-  document name, not ARN.** A typo in the document name produces a
-  silent deployment failure (the pack reports CREATE_COMPLETE but the
-  remediation is not wired).
+Deep dive moved to [references/advanced-patterns.md](references/advanced-patterns.md)
+(Step 0: non-obvious Config + SSM behaviors) — load before designing a workflow.
 
 ### Step 1: Classify the trigger source
 
@@ -224,17 +168,8 @@ be created. A common pitfall is referencing a managed runbook that is
 not available in the region (some AWS-managed runbooks are
 region-specific).
 
-Document parameter contract — for
-`AWS-DisableS3BucketPublicAccess`:
-
-| Parameter | Type | Source |
-|---|---|---|
-| `S3BucketName` | String | `ResourceValue: RESOURCE_ID` (Config injects the bucket name) |
-| `AutomationAssumeRole` | String | Static: the SSM service role ARN |
-
-A remediation configuration without the right `ResourceValue` mapping
-fails at execution. Always cross-reference the document's parameter
-list with the remediation configuration.
+Parameter-contract detail moved to [references/error-handling.md](references/error-handling.md).
+Load it when a remediation configuration fails at execution.
 
 ### Step 4: Decide automatic vs manual trigger (the trigger matrix)
 
@@ -274,102 +209,16 @@ aws configservice put-remediation-configurations \
   ]'
 ```
 
-Common errors and fixes:
+Error table moved to [references/error-handling.md](references/error-handling.md).
+Load it when `put-remediation-configurations` or its execution fails.
 
-| Error | Cause | Fix |
-|---|---|---|
-| `AccessDeniedException` | SSM service role missing or wrong ARN | Create `AWS-SSM-AutomationExecutionRole` via `iam create-role` with the `AmazonSSMAutomationRole` policy |
-| `ValidationException: SSM document not found` | Wrong `TargetId` or document not in region | Verify with `ssm describe-document --name <name>` |
-| `InvalidParameterValue` for parameters | Static value where dynamic expected, or vice versa | Cross-reference document parameter list |
-| Remediation configured but no executions | Rule exists but no NEW evaluations since config was set | Call `start-remediation-execution` for existing NON_COMPLIANT resources |
-
-Verify the configuration landed:
-
-```bash
-aws configservice describe-remediation-configurations \
-  --config-rule-names s3-bucket-public-read-prohibited --output json
-```
+Verify command moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load it after wiring any remediation configuration.
 
 ### Step 6: Build a custom SSM Automation document (when no managed runbook fits)
 
-Custom runbook template (YAML shorthand):
-
-```yaml
----
-schemaVersion: '0.3'
-assumeRole: '{{ AutomationAssumeRole }}'
-description: 'Revoke ingress rule on a security group open to 0.0.0.0/0'
-parameters:
-  GroupId:
-    type: String
-    description: 'The security group ID (Config injects via RESOURCE_ID)'
-  AutomationAssumeRole:
-    type: String
-    description: 'The SSM execution role ARN'
-mainSteps:
-  - name: GetOpenRules
-    action: aws:executeAwsApi
-    inputs:
-      Service: ec2
-      Api: DescribeSecurityGroupRules
-      Filters:
-        - Name: group-id
-          Values: ['{{ GroupId }}']
-        - Name: cidr
-          Values: ['0.0.0.0/0']
-    outputs:
-      - Name: RuleIds
-        Selector: '$.SecurityGroupRules[].SecurityGroupRuleId'
-        Type: StringList
-  - name: VerifyFinding
-    action: aws:branch
-    inputs:
-      Choices:
-        - NextStep: RevokeRules
-          Variable: '{{ GetOpenRules.RuleIds }}'
-          Operation: NotEquals
-          Value: '[]'
-      Default: CompleteNoOp
-  - name: RevokeRules
-    action: aws:executeAwsApi
-    inputs:
-      Service: ec2
-      Api: RevokeSecurityGroupIngress
-      GroupId: '{{ GroupId }}'
-      IpPermissions: '[{"IpProtocol":"-1","IpRanges":[{"CidrIp":"0.0.0.0/0"}]}]'
-    isCritical: true
-    onFailure: abort
-  - name: CompleteNoOp
-    action: aws:sleep
-    inputs:
-      Duration: PT0S
-```
-
-Create the document:
-
-```bash
-aws ssm create-document \
-  --name Custom-RevokeOpenSecurityGroupIngress \
-  --document-type Automation \
-  --document-format YAML \
-  --content file://custom-runbook.yaml \
-  --target-type '/AWS::EC2::SecurityGroup'
-```
-
-Test before wiring remediation:
-
-```bash
-aws ssm start-automation-execution \
-  --document-name Custom-RevokeOpenSecurityGroupIngress \
-  --parameters '{"GroupId":["sg-0abc123"],"AutomationAssumeRole":["arn:aws:iam::111111111111:role/aws-service-role/AmazonSSMAutomationRole/AWS-SSM-AutomationExecutionRole"]}'
-
-aws ssm get-automation-execution \
-  --automation-execution-id <execution-id> \
-  --query 'AutomationExecution.AutomationExecutionStatus'
-```
-
-A custom runbook without a tested execution is the most common cause
-of a "remediation wired but doesn't actually fix" failure.
+Template, create-document and test commands moved to
+[references/ssm-automation-runbooks.md](references/ssm-automation-runbooks.md) — load when building a custom runbook.
 
 ### Step 7: EventBridge alternative (Config state-change → Lambda)
 
@@ -377,43 +226,8 @@ Use when: the remediation requires custom logic that an SSM document
 cannot express (call a third-party API, perform multi-resource
 orchestration, query a CMDB first).
 
-EventBridge rule pattern:
-
-```bash
-aws events put-rule \
-  --name config-remediation-custom \
-  --event-pattern '{
-    "source": ["aws.config"],
-    "detail-type": ["Config Configuration Item Change"],
-    "detail": {
-      "configurationItem": {
-        "configurationItemStatus": ["OK"],
-        "resourceType": ["AWS::S3::Bucket"],
-        "complianceType": ["NON_COMPLIANT"]
-      }
-    }
-  }'
-```
-
-Or simpler, on compliance change:
-
-```bash
-aws events put-rule \
-  --name config-compliance-change \
-  --event-pattern '{
-    "source": ["aws.config"],
-    "detail-type": ["Config Rules Compliance Changed"],
-    "detail": {"newEvaluationResult": {"complianceType": ["NON_COMPLIANT"]}}
-  }'
-```
-
-Add the Lambda target with DLQ:
-
-```bash
-aws events put-targets \
-  --rule config-compliance-change \
-  --targets '[{"Id":"custom-remediation-lambda","Arn":"arn:aws:lambda:us-east-1:111111111111:function:custom-remediation","DeadLetterConfig":{"Arn":"arn:aws:sqs:us-east-1:111111111111:config-remediation-dlq"}}]'
-```
+EventBridge rule + target patterns moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load them when choosing the EventBridge + Lambda alternative.
 
 Trade-off table:
 
@@ -430,51 +244,8 @@ Trade-off table:
 For multi-rule baselines, ship remediations inside the conformance pack
 YAML. Sample:
 
-```yaml
-Resources:
-  S3PublicReadProhibitedRule:
-    Type: AWS::Config::ConfigRule
-    Properties:
-      ConfigRuleName: s3-bucket-public-read-prohibited
-      Source:
-        Owner: AWS
-        SourceIdentifier: AWS::S3::Bucket
-      Scope:
-        ComplianceResourceTypes:
-          - AWS::S3::Bucket
-
-  S3PublicReadRemediation:
-    Type: AWS::Config::RemediationConfiguration
-    Properties:
-      ConfigRuleName: !Ref S3PublicReadProhibitedRule
-      TargetType: SSM_DOCUMENT
-      TargetId: AWS-DisableS3BucketPublicAccess
-      Automatic: true
-      Parameters:
-        S3BucketName:
-          ResourceValue:
-            Value: RESOURCE_ID
-        AutomationAssumeRole:
-          StaticValue:
-            Values:
-              - !Sub 'arn:aws:iam::${AWS::AccountId}:role/aws-service-role/AmazonSSMAutomationRole/AWS-SSM-AutomationExecutionRole'
-```
-
-Deploy:
-
-```bash
-aws configservice put-conformance-pack \
-  --conformance-pack-name s3-security-baseline \
-  --template-body file://conformance-pack.yaml \
-  --region us-east-1
-```
-
-Verify both rule AND remediation landed:
-
-```bash
-aws configservice describe-remediation-configurations \
-  --config-rule-names s3-bucket-public-read-prohibited
-```
+Sample pack YAML and deploy/verify commands moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load them when rolling out conformance-pack bulk remediation.
 
 A pack in `CREATE_COMPLETE` does NOT guarantee remediation is wired —
 verify explicitly.
@@ -506,30 +277,8 @@ my app" incidents.
 
 After a remediation executes, verify end-to-end:
 
-```bash
-# 1. SSM execution status
-aws configservice describe-remediation-execution-status \
-  --config-rule-name s3-bucket-public-read-prohibited \
-  --resource-type AWS::S3::Bucket \
-  --resource-id my-public-bucket
-
-# 2. Config compliance state after remediation
-aws configservice get-compliance-details-by-config-rule \
-  --config-rule-name s3-bucket-public-read-prohibited \
-  --compliance-types COMPLIANT
-
-# 3. CloudTrail audit trail
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventName,AttributeValue=StartAutomationExecution \
-  --start-time $(date -v-1H +%Y-%m-%dT%H:%M:%S) \
-  --end-time $(date +%Y-%m-%dT%H:%M:%S)
-
-# 4. Config timeline for the resource
-aws configservice get-resource-config-history \
-  --resource-type AWS::S3::Bucket \
-  --resource-id my-public-bucket \
-  --limit 5
-```
+End-to-end audit commands moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load them to verify a remediation that already ran.
 
 A remediation that reports Success in SSM but leaves the resource
 NON_COMPLIANT in Config indicates the runbook executed but did not
@@ -582,23 +331,8 @@ TEMPLATE:
 
 ### Worked example — MANUAL_STEP_REQUIRED, custom runbook missing
 
-```text
-REMEDIATION: sg-open-ingress-remediation
-RULE: custom-sg-no-open-ingress
-RESOURCE_TYPE: AWS::EC2::SecurityGroup
-WORKFLOW:
-  - Detection: Custom Lambda Config rule on AWS::EC2::SecurityGroup.
-  - Runbook: NONE — no AWS-managed runbook exists for security-group ingress revocation.
-  - Trigger: TBD (manual recommended; the fix is reversible but false-positive prone).
-  - Safety gates: TBD.
-  - Audit: TBD.
-TRIGGER: MANUAL
-SAFETY: NONE — workflow not yet built
-AUDIT: NOT WIRED
-VERDICT: MANUAL_STEP_REQUIRED
-GAP: No managed SSM runbook for security-group revocation. Build and test Custom-RevokeOpenSecurityGroupIngress (template provided in Step 6) before wiring remediation. Verify the SSM execution role exists.
-TEMPLATE: (custom SSM document — see Step 6)
-```
+Full example moved to [references/worked-examples.md](references/worked-examples.md).
+Load it when formatting a MANUAL_STEP_REQUIRED response.
 
 ## Anti-Patterns — NEVER do these things
 
@@ -757,117 +491,21 @@ Is there a managed SSM runbook for the resource/finding?
 
 ## Recent AWS features (2024-2026)
 
-- **SSM Change Manager GA (2024):** Native change-approval workflow
-  for SSM Automation runbooks. Required for production destructive
-  remediations. Wire the remediation runbook as a Change Template
-  and route through the approval workflow instead of direct
-  `Automatic: true`.
-- **Config conformance pack remediation enhancements:** Bulk remediation
-  configurations inside the pack YAML are now first-class. Previously
-  required separate `put-remediation-configurations` calls per rule.
-- **Config evaluation mode (2024):** Hybrid evaluation for periodic
-  rules — combines periodic with configuration-change trigger.
-  Useful for IAM rules that previously could not drive resource-
-  scoped remediation.
-- **EventBridge global endpoints for remediation pipelines (2024-2025):**
-  Multi-region failover for event-driven remediation. Useful for
-  global security-baseline remediations that must continue operating
-  during a regional event.
-- **SSM Automation runbook versioning (2024):** Default version
-  selection per document. Pin the default version explicitly to
-  avoid surprise upgrades when AWS ships a new managed-runbook
-  version.
+Feature notes moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load when deciding whether a recent feature changes the workflow.
 
 ## Expert heuristic: remediation blast radius
 
-Auto-remediation is the highest-leverage and highest-risk Config
-feature. A single misconfigured `RemediationConfiguration` with
-`Automatic: true` can revoke IAM credentials in use, detach security
-groups from production instances, or terminate EC2 — across an entire
-account or OU — within minutes of being enabled.
+Blast-radius deep dive (scoping techniques, 3-cycle validation protocol,
+scoping YAML) moved to [references/advanced-patterns.md](references/advanced-patterns.md) — load before recommending `Automatic: true`.
 
-**The rule (non-negotiable):**
+## References (load on demand)
 
-> ALWAYS test auto-remediation in a non-production account first, and
-> scope every `RemediationConfiguration` with an explicit
-> `ResourceType` filter. Never enable `Automatic: true` against an
-> unbounded resource population in production on first contact.
-
-**Why this rule exists:** AWS Config rules evaluate ALL resources of
-the matched type in the rule's scope. A periodic rule with
-`Scope: {ComplianceResourceTypes: ["AWS::EC2::SecurityGroup"]}` and
-an automatic remediation that revokes 0.0.0.0/0 ingress will fire on
-every matching SG in the account — including the one fronting your
-production RDS — within one evaluation cycle. There is no dry-run
-mode for `Automatic: true`.
-
-**Concrete scoping techniques:**
-
-| Technique | Mechanism | Blast-radius limit |
-|---|---|---|
-| `ResourceType` filter in `RemediationConfiguration` | `--remediation-configurations Parameters.ResourceType` | Restricts remediation to one resource type per config |
-| Conformance pack with `Parameters` resource-id allowlist | `SSMParameter` input bound to a static list | Only listed resource IDs are remediated |
-| Config rule scoped by tag | `Scope.TagKey` + `Scope.TagValue` on the rule itself | Only resources with the matching tag are evaluated NON_COMPLIANT |
-| Account-level isolation | Deploy the conformance pack only to a non-production account | Zero production exposure until promotion |
-| Change Manager gate | Route runbook through SSM Change Manager approval | Human approval per execution, not per config |
-
-**Pre-production validation protocol (3-cycle rule):**
-
-1. **Cycle 1 — MANUAL in non-prod:** Deploy the rule + remediation
-   config with `Automatic: false`. Trigger
-   `start-remediation-execution` manually on at least 3 sample
-   NON_COMPLIANT resources. Verify all 3 succeed AND the resource
-   flips to COMPLIANT in Config within 1 evaluation cycle.
-2. **Cycle 2 — AUTOMATIC in non-prod:** Flip `Automatic: true`. Plant
-   3 deliberately NON_COMPLIANT resources (test buckets, test SGs on
-   stopped instances). Verify all 3 are remediated within
-   `MaximumAutomaticAttempts × RetryAttemptSeconds` (default 30 min)
-   with no false positives on adjacent resources.
-3. **Cycle 3 — MANUAL in prod:** Promote the config to production
-   with `Automatic: false`. Monitor for 1 week of false-positive
-   NON_COMPLIANT evaluations. If zero false positives, flip to
-   `Automatic: true`. If any false positive, refine the rule scope
-   and re-run Cycle 2.
-
-**Conformance pack scoping pattern (recommended for fleet rollout):**
-
-```yaml
-# Conformance pack with explicit resource scope per remediation
-Resources:
-  S3PublicAccessRemediation:
-    Type: AWS::Config::RemediationConfiguration
-    Properties:
-      ConfigRuleName: s3-bucket-public-read-prohibited
-      TargetType: SSM_DOCUMENT
-      TargetId: AWS-DisableS3BucketPublicAccess
-      Automatic: false  # Flip to true only after Cycle 2 validation
-      MaximumAutomaticAttempts: 3
-      RetryAttemptSeconds: 600
-      Parameters:
-        S3BucketName:
-          ResourceValue:
-            Value: RESOURCE_ID
-        AutomationAssumeRole:
-          StaticValue:
-            Values:
-              - !Sub "arn:aws:iam::${AWS::AccountId}:role/aws-service-role/AmazonSSMAutomationRole/AWS-SSM-AutomationExecutionRole"
-```
-
-**Detection of blast-radius breach post-deploy:** CloudWatch alarm on
-`SSM Automation Executions Failed` > N in 5 minutes (suggests a bad
-config rolling out account-wide). Also alarm on
-`Config.ComplianceNonCompliantResources` increasing by > N% in one
-evaluation cycle (suggests the rule scope is too broad). Both alarms
-should page the on-call and trigger an EventBridge rule that flips
-`Automatic` to `false` on the offending config via
-`describe-remediation-configurations` + `delete-remediation-configuration` + `put-remediation-configurations` with `Automatic: false`.
-
-**Surface in the output:** for any recommended auto-remediation,
-include `BLAST_RADIUS: <scope>` (e.g., `account-wide`,
-`tag-scoped:env=prod`, `conformance-pack-scoped`) and
-`VALIDATION_STATUS: <pre-prod-cycle-1 | pre-prod-cycle-2 |
-prod-manual | prod-automatic>`. If `VALIDATION_STATUS` is not
-`prod-automatic`, do NOT mark the recommendation as deployable.
+- [references/ssm-automation-runbooks.md](references/ssm-automation-runbooks.md) — managed-runbook matrix, custom Automation document structure, execution roles, Step 6 custom runbook template
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked example (MANUAL_STEP_REQUIRED)
+- [references/error-handling.md](references/error-handling.md) — parameter contracts, common errors and fixes
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — verify-config and end-to-end audit commands
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step-0 deep dive, EventBridge patterns, conformance-pack sample, blast-radius protocol, recent features
 
 ## Domain
 

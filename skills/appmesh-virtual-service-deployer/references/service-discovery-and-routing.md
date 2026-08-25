@@ -402,3 +402,140 @@ resource "aws_appmesh_virtual_service" "checkout" {
 5. **gRPC route match missing serviceName.** gRPC routes require a
    `serviceName` match (the gRPC service fully-qualified name). Without
    it, the route does not match any gRPC calls.
+
+---
+
+## Step 2 — Virtual nodes (DNS vs Cloud Map) (moved from SKILL.md)
+
+A virtual node represents a deployable unit with service discovery.
+
+**DNS service discovery:**
+
+```bash
+aws appmesh create-virtual-node \
+  --mesh-name production-mesh \
+  --virtual-node-name checkout-v1 \
+  --spec '{
+    "serviceDiscovery": {
+      "dns": {
+        "hostname": "checkout.default.svc.cluster.local"
+      }
+    },
+    "listeners": [{
+      "portMapping": {"port": 8080, "protocol": "http"}
+    }],
+    "backends": [
+      {"virtualService": {"virtualServiceName": "inventory.mesh.local"}}
+    ]
+  }' \
+  --region us-east-1
+```
+
+**Cloud Map service discovery:**
+
+```bash
+aws appmesh create-virtual-node \
+  --mesh-name production-mesh \
+  --virtual-node-name checkout-v1 \
+  --spec '{
+    "serviceDiscovery": {
+      "awsCloudMap": {
+        "namespaceName": "mesh-services",
+        "serviceName": "checkout"
+      }
+    },
+    "listeners": [{
+      "portMapping": {"port": 8080, "protocol": "http"}
+    }]
+  }' \
+  --region us-east-1
+```
+
+**Critical differences:**
+- DNS: Envoy resolves the hostname; no instance registration needed.
+  Best for stable IPs, ALB/NLB fronted services.
+- Cloud Map: Instances self-register; Envoy queries Cloud Map for live
+  backends. Best for dynamic scaling (ECS, EKS, EC2 ASG). Requires
+  Cloud Map namespace + service created beforehand.
+
+---
+
+## Step 3 — Virtual routers and weighted routes (moved from SKILL.md)
+
+A virtual router holds route definitions that direct traffic to
+virtual nodes with weights for canary/blue-green.
+
+**Create a virtual router:**
+
+```bash
+aws appmesh create-virtual-router \
+  --mesh-name production-mesh \
+  --virtual-router-name checkout-router \
+  --listeners '[{"portMapping":{"port":8080,"protocol":"http"}}]' \
+  --region us-east-1
+```
+
+**Create a weighted HTTP route (canary):**
+
+```bash
+aws appmesh create-route \
+  --mesh-name production-mesh \
+  --virtual-router-name checkout-router \
+  --route-name checkout-canary \
+  --spec '{
+    "httpRoute": {
+      "match": {"prefix": "/"},
+      "action": {
+        "weightedTargets": [
+          {"virtualNode": "checkout-v1", "weight": 90},
+          {"virtualNode": "checkout-v2", "weight": 10}
+        ]
+      }
+    }
+  }' \
+  --region us-east-1
+```
+
+**Critical:** the weights determine traffic splitting. 90/10 sends
+10% to checkout-v2 (canary). Weights do NOT need to sum to 100 — they
+are normalized. But conventionally they do sum to 100 for clarity.
+
+---
+
+## Step 4 — Route policies (timeout, retry) (moved from SKILL.md)
+
+Each route can have timeout and retry policies.
+
+**Route with timeout and retry:**
+
+```bash
+aws appmesh create-route \
+  --mesh-name production-mesh \
+  --virtual-router-name checkout-router \
+  --route-name checkout-resilient \
+  --spec '{
+    "httpRoute": {
+      "match": {"prefix": "/"},
+      "action": {
+        "weightedTargets": [
+          {"virtualNode": "checkout-v1", "weight": 100}
+        ]
+      },
+      "retryPolicy": {
+        "httpRetryEvents": ["server-error", "gateway-error"],
+        "maxRetries": 3,
+        "perRetryTimeout": {"unit": "ms", "value": 2000}
+      },
+      "timeout": {
+        "request": {"unit": "s", "value": 15}
+      }
+    }
+  }' \
+  --region us-east-1
+```
+
+**Retry event types:**
+- `server-error` — HTTP 5xx
+- `gateway-error` — gateway-related errors (502, 503, 504)
+- `client-error` — HTTP 4xx (retrying client errors is unusual)
+- `stream-error` — retry on stream reset

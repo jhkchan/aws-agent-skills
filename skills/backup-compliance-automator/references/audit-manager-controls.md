@@ -167,3 +167,21 @@ frameworks (hundreds of resources) adds cost — balance against freshness.
   plan to restore.** Run the drill; document the RTO.
 - **The framework scope is tag-based.** Untagged resources are invisible
   to Audit Manager — pair with a tagging-governance skill.
+
+## Audit Manager gotchas — controls evaluate actual state
+**Gotchas:** Controls are evaluated against actual AWS Backup state, not
+against the plan. A control `BACKUP_RESOURCES_PROTECTED_BY_BACKUP_PLAN`
+fails if a resource is tagged for a plan but the plan never produced a
+recovery point. The control library is fixed by AWS — custom controls
+require Lambda-backed manual controls.
+
+## Audit template report plan CLI
+
+```bash
+aws backup audit-manager create-report-plan \
+  --report-plan-name soc2-monthly-compliance \
+  --report-plan-description "Monthly SOC2 backup compliance report" \
+  --report-setting '{"ReportTemplate":"COMPLIANCE","Frameworks":["arn:aws:backup:us-east-1:111111111111:framework:soc2-backup-compliance"]}' \
+  --reportDeliveryConfig={"S3BucketName":"backup-compliance-reports","S3KeyPrefix":"soc2/2026/"} \
+  --idempotencyToken "$(uuidgen)"
+```

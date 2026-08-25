@@ -120,3 +120,31 @@ cross-region PITR:
    objective (RPO) for each resource type.
 5. Test the cross-account restore flow if applicable — verify KMS
    grants and IAM policies work in the destination region.
+
+## Start a cross-region restore (boilerplate)
+
+```bash
+aws backup start-restore-job \
+  --recovery-point-arn arn:aws:backup:us-west-2:111111111111:recovery-point:5-6-7-8 \
+  --metadata '{"InstanceId":"i-restored-xregion","SubnetId":"subnet-xyz","SecurityGroupIds":"sg-xyz","InstanceType":"t3.medium"}' \
+  --iam-role-arn arn:aws:iam::111111111111:role/AWSBackupDefaultServiceRole \
+  --resource-type EC2 \
+  --region us-west-2
+```
+
+Run the CLI in the destination region (`--region us-west-2`). The
+`--metadata` fields are destination-region-specific.
+
+## Apply vault lock on the DR vault — COMPLIANCE mode (boilerplate)
+
+```bash
+aws backup put-backup-vault-lock-configuration \
+  --backup-vault-name dr-vault \
+  --changeable-for-days 3 \
+  --min-retention-days 30 \
+  --max-retention-days 3650 \
+  --region us-west-2
+```
+
+The lock is independent of the source region's vault lock. After
+the 3-day grace, the lock is irreversible.

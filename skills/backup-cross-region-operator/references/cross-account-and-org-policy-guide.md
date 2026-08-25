@@ -143,3 +143,49 @@ For restoring cross-account backups back to the source:
 For external-key-sharing restore patterns (air-gapped recovery),
 use `kms CreateGrant` to delegate temporary decrypt access to the
 restore role.
+
+## Configure cross-account backup via Organizations policy (boilerplate)
+
+```bash
+# From the Organizations management account
+aws organizations create-policy \
+  --name "cross-account-backup" \
+  --type BACKUP_POLICY \
+  --content '{
+    "plans": [{
+      "rules": [{
+        "rule-name": "rule1",
+        "target-backup-vault-name": "central-vault",
+        "schedule-expression": "cron(0 5 ? * * *)",
+        "start-window-minutes": 480,
+        "completion-window-minutes": 1440,
+        "copy-actions": [{
+          "destination-backup-vault-arn": "arn:aws:backup:us-east-1:222222222222:backup-vault:central-vault",
+          "lifecycle": {"delete-after-days": 90}
+        }]
+      }],
+      "selection-list": [{
+        "selection-name": "tag-based",
+        "iam-role-arn": "arn:aws:iam::111111111111:role/AWSBackupDefaultServiceRole",
+        "list-of-tags": [{"condition-type": "STRINGEQUALS", "condition-key": "backup", "condition-value": "central"}]
+      }]
+    }]
+  }'
+```
+
+Destination account's vault access policy must grant
+`backup:CopyIntoBackupVault` to the source account:
+
+```bash
+aws backup put-backup-vault-access-policy \
+  --backup-vault-name central-vault \
+  --policy '{
+    "Version": "2012-10-17",
+    "Statement": [{
+      "Effect": "Allow",
+      "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
+      "Action": "backup:CopyIntoBackupVault",
+      "Resource": "*"
+    }]
+  }' --region us-east-1
+```

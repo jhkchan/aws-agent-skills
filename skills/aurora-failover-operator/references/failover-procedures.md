@@ -282,3 +282,19 @@ aws rds describe-db-proxy-targets --proxy-name <proxy-name>
 - **Used reader endpoint for writes.** The reader endpoint load-balances
   across readers (read-only). Write operations must target the writer
   endpoint.
+
+## Failover timing baselines (2026) — narrative (moved from SKILL.md Quick reference)
+
+**Failover timing baselines (2026):**
+
+- Automatic failover detection: ~30 seconds (Aurora health check interval).
+- Replica promotion: ~60 seconds (Aurora writer promotion sequence).
+- Total automatic failover RTO: ~30-90 seconds (detection + promotion +
+  DNS propagation).
+- Planned failover via `failover-db-cluster`: 30-120 seconds.
+- Aurora Global Database managed failover: 1-5 minutes (promotes a
+  secondary region cluster).
+- RDS Proxy connection survival: connections pool transparently through
+  failover — no drops if the proxy is configured correctly.
+- DNS cache propagation: writer endpoint updates within 30-60 seconds
+  at the RDS layer; application-layer DNS caches may take longer.

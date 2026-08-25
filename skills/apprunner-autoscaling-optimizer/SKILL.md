@@ -133,28 +133,8 @@ Run before classification. Misclassifying these produces wrong
 recommendations.
 
 **Live-account pre-flight (skip if offline plan audit):**
-1. `aws apprunner describe-service --service-arn <arn>` — capture
-   `ServiceName`, `Status`, `InstanceConfiguration` (Cpu, Memory),
-   `HealthCheckConfiguration` (Protocol, Interval, Timeout,
-   HealthyThreshold, UnhealthyThreshold, Path), `NetworkConfiguration`
-   (EgressConfiguration for VPC), `AutoScalingConfigurationSummary`
-   (AutoScalingConfigurationArn).
-2. Resolve the auto-scaling configuration:
-   `aws apprunner describe-auto-scaling-configuration \
-   --auto-scaling-configuration-arn <arn>` — capture `MinSize`, `MaxSize`,
-   `Concurrency`.
-3. `aws cloudwatch get-metric-statistics` for the service over the last
-   14-30 days:
-   - `RequestCount` (sum, 5-minute period) — traffic pattern
-   - `InstanceCount` (average, 5-minute period) — actual provisioned count
-   - `CPUUtilization` (average, 5-minute period) — instance sizing signal
-   - `MemoryUtilization` (average, 5-minute period) — concurrency sizing signal
-   - `4xxResponseCount` and `5xxResponseCount` (sum, 5-minute period) — health
-   - `Latency` p50/p95/p99 (average, 5-minute period) — concurrency sizing
-4. `aws ce get-cost-and-usage` — filter by `Service=App Runner` and the
-   specific service tag or resource ARN for the last 30 days.
-5. `aws ce get-usage-forecast` — project next 30 days based on historical
-   patterns.
+Live-account pre-flight command listing moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before a live-account optimization; offline plan audits skip it.
 
 **Malformed input:** if the input JSON is invalid or missing required
 fields, emit `VERDICT: ERROR` with `REASON: Service configuration is not
@@ -181,149 +161,8 @@ valid JSON or is missing required fields — cannot plan.` and
 
 ### Step 0: Expert knowledge — non-obvious App Runner autoscaling behaviors
 
-These behaviors are easy to misjudge without operational App Runner
-experience. Each changes a recommendation if ignored:
-
-- **Concurrency is the primary lever, not instance type.** Doubling
-  concurrency from 50 to 100 halves the instance count for the same traffic.
-  This saves ~50% of compute cost. Doubling the instance type (1 vCPU to 2
-  vCPU) doubles the per-instance cost but does not reduce instance count
-  (the autoscaler still provisions based on concurrency). The only reason
-  to increase instance type is if the higher concurrency would cause
-  CPU/memory exhaustion on the smaller instance.
-
-- **Scale-to-zero (MinSize 0) eliminates idle cost.** App Runner bills
-  per-second for on-demand usage (requests being processed). With MinSize 0
-  and no traffic, the service scales to zero and compute charges stop. The
-  tradeoff is cold-start latency on the first request after idle (typically
-  5-30 seconds depending on container image size).
-
-- **MinSize >= 1 means always-provisioned billing.** Each provisioned
-  instance is billed per-hour regardless of traffic. A MinSize of 2 on a
-  1 vCPU/2 GB service costs $0.126/hr * 730 hr/month = ~$92/month in idle
-  compute. If the service has predictable business-hours traffic, set
-  MinSize to 0 and accept the cold start, or set MinSize to 1 for a
-  balance.
-
-- **App Runner concurrency is not the same as Lambda concurrency.** Lambda
-  concurrency = number of simultaneous invocations. App Runner concurrency
-  = number of simultaneous HTTP requests per instance. The total concurrent
-  capacity = instance count * concurrency setting. The autoscaler adjusts
-  instance count to keep concurrent requests per instance at or below the
-  concurrency setting.
-
-- **Higher concurrency increases latency.** At concurrency 100, a single
-  instance handles 100 simultaneous requests. If each request is CPU-bound
-  (1 second of processing), the effective latency is ~100 seconds (serial
-  processing on 1 vCPU) unless the workload is I/O-bound (async I/O allows
-  true concurrency). Benchmark with realistic load before increasing
-  concurrency.
-
-- **Deployment pauses autoscaling.** During a deployment, App Runner
-  replaces instances with the new version. The autoscaler does not add or
-  remove instances during this window. High-traffic deployments may
-  temporarily increase latency because the new instances start from zero.
-
-- **Health check interval affects scale-out speed.** App Runner checks
-  instance health every `Interval` seconds. If an instance becomes
-  unhealthy, the service waits `Interval * UnhealthyThreshold` seconds
-  before replacing it. A 1-second interval with 5 unhealthy-threshold = 5
-  seconds detection. A 10-second interval = 50 seconds detection. Tune
-  for your workload's tolerance.
-
-- **Scale-in cooldown (default 60s) prevents flapping.** After the
-  autoscaler removes an instance, it waits 60 seconds before removing
-  another. This prevents rapid scale-in/scale-out cycles (flapping) on
-  bursty traffic. A longer cooldown saves cost (instances stay longer at
-  lower counts) but delays response to traffic drops. A shorter cooldown
-  saves less but responds faster.
-
-- **VPC egress cost via NAT gateway.** If the App Runner service uses a
-  VPC connector to access private resources (RDS, ElastiCache, internal
-  APIs), all outbound traffic from the VPC to the internet goes through
-  the NAT gateway at $0.045/GB processed + $0.045/GB data transfer. For
-  high-egress workloads, this can exceed the compute cost. Use VPC
-  endpoints for AWS service traffic (S3, DynamoDB, SQS, etc.) to bypass
-  the NAT gateway.
-
-- **Custom domain SSL has negligible compute overhead.** App Runner
-  manages the certificate (via AWS Certificate Manager) and terminates
-  TLS at the load balancer. The TLS handshake adds < 1ms per request.
-  No optimization needed for custom domains.
-
-- **Observability cost from CloudWatch Logs.** App Runner sends
-  application logs to CloudWatch Logs by default. For high-traffic
-  services, log ingestion can be significant (~$0.50/GB ingested). If
-  the service logs verbose output (request/response bodies, debug logs),
-  reducing log verbosity or sampling can save observability cost.
-
-- **Pause/resume is not scale-to-zero.** Pausing a service stops all
-  compute and removes the endpoint. The service configuration is
-  preserved; resuming recreates the endpoint. Pause/resume is for non-
-  prod environments (dev/staging/QA) that are not needed outside business
-  hours. Scale-to-zero (MinSize 0) is for production services that should
-  stay accessible but handle zero-traffic periods.
-
-- **MaxSize limits burst capacity.** If MaxSize is too low, the autoscaler
-  cannot provision enough instances during traffic spikes, and requests
-  queue or fail with 5xx. If MaxSize is too high, the autoscaler may
-  provision excessively during misconfigured scaling policies. Set MaxSize
-  to 2-3x the peak observed instance count.
-
-- **Cost-per-request analysis reveals efficiency.** Total monthly cost /
-  total monthly requests = cost per request. For a $1,200/month service
-  handling 8M requests, that is $0.00015/request. Benchmark against
-  alternative platforms (Lambda + API Gateway, ECS/Fargate, EC2) to
-  determine if App Runner is the right platform.
-
-- **Auto-scaling configuration is versioned.** `create-auto-scaling-
-  configuration` creates a new version. You then `update-service` with the
-  new ARN. Old configurations can be deleted once no service references
-  them.
-
-- **App Runner v2 eliminates the VPC connector requirement for private
-  networking.** The v2 architecture (2025 GA) gives each service a
-  native ENI in your VPC without provisioning a separate VPC connector
-  resource. This removes the connector's NAT gateway dependency for
-  outbound traffic and reduces egress cost by up to 60% for
-  high-egress services. Services still on the v1 architecture must
-  explicitly migrate; existing VPC connectors continue to work but
-  are not eligible for the cost reduction. Check `NetworkConfiguration.
-  EgressConfiguration` — v2 services show `EgressType: VPC` without a
-  `VpcConnectorArn`.
-
-- **The autoscaler uses a Kubernetes-style HPA algorithm under the
-  hood.** App Runner runs containers on a managed Kubernetes cluster.
-  The autoscaler computes desired instance count as `desired =
-  ceil(currentConcurrentRequests / concurrencySetting)`, then applies
-  a stabilization window (default 60 seconds for scale-in, immediate
-  for scale-out). Burst traffic within a 60-second window may not
-  trigger scale-in even if the concurrent request count drops — the
-  autoscaler waits to confirm the drop is sustained. This explains
-  why `InstanceCount` does not track `RequestCount` perfectly in
-  real-time; the stabilization window introduces lag on scale-in.
-
-- **The concurrency-vs-CPU-utilization trade-off follows a non-linear
-  curve.** Below ~70% CPU utilization, increasing concurrency yields
-  near-linear cost savings (fewer instances, same throughput). Above
-  ~70% CPU, the OS scheduler overhead grows super-linearly: context-
-  switching and memory pressure cause per-request latency to spike
-  2-3x even though throughput is maintained. The sweet spot for CPU-
-  bound workloads is 50-65% CPU utilization at the target concurrency.
-  For I/O-bound workloads (API calls, DB queries), the ceiling is
-  higher (~80% CPU) because threads spend time blocked on network I/O,
-  not consuming CPU cycles. Check `CPUUtilization` at the current
-  concurrency before recommending an increase.
-
-- **Pause/resume has a hidden cost beyond zero compute.** Resuming a
-  paused service pulls the container image from ECR again (cold pull,
-  not cached), taking 30-120 seconds depending on image size. For
-  images > 500 MB, the resume delay can exceed 2 minutes.
-  Additionally, the first few requests after resume have elevated
-  latency (~2x p95) as the JIT compiler and connection pools warm up.
-  For dev/staging environments, schedule resume 5 minutes before the
-  team needs access. The ECR data transfer for re-pulling is typically
-  <$1/month but is not zero.
+Step 0 expert-knowledge behaviors moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when a recommendation depends on non-obvious behavior (HPA stabilization window, non-linear concurrency/CPU curve, resume cold-pull).
 
 ### Step 1: Pause/resume analysis (non-prod only)
 
@@ -514,63 +353,13 @@ NOTES:
 
 ### Worked example — pause/resume for non-prod (FURTHER_OPTIMIZATION_AVAILABLE)
 
-```text
-TARGET: dev-staging-service (region: us-east-1)
-VERDICT: FURTHER_OPTIMIZATION_AVAILABLE
-REASON: Service runs 24/7 in a dev environment. Pausing outside business
-        hours (7pm-7am weekdays + all weekend) saves 75% of compute.
-RECOMMENDATION:
-  - Pause service at 7pm and resume at 7am weekdays via EventBridge
-  - Pause for entire weekend (Friday 7pm to Monday 7am)
-  - Use MinSize 0 during business hours for scale-to-zero on idle
-ESTIMATED_SAVINGS: $540/month (75% of current compute spend)
-MIGRATION_STEPS:
-  1. Create EventBridge rule for pause (cron(0 19 ? * MON-FRI *)):
-     aws events put-rule --name apprunner-pause-dev \
-       --schedule-expression "cron(0 19 ? * MON-FRI *)"
-     aws events put-targets --rule apprunner-pause-dev \
-       --targets '{"Id":"1","Arn":"<pause-lambda-arn>"}'
-  2. Create EventBridge rule for resume (cron(0 7 ? * MON-FRI *)):
-     aws events put-rule --name apprunner-resume-dev \
-       --schedule-expression "cron(0 7 ? * MON-FRI *)"
-     aws events put-targets --rule apprunner-resume-dev \
-       --targets '{"Id":"1","Arn":"<resume-lambda-arn>"}'
-  3. Set MinSize to 0 during business hours:
-     aws apprunner create-auto-scaling-configuration \
-       --auto-scaling-configuration-name dev-asg-min0 \
-       --min-size 0 --max-size 5 --concurrency 50
-CURRENT_MONTHLY_COST: $720/month
-PROJECTED_MONTHLY_COST: $180/month
-TRAFFIC_PATTERN: intermittent (only used during business hours)
-RISK: LOW
-NOTES:
-  - Pausing the service removes the endpoint. Developers must wait for
-    resume (~30-60s) before accessing the service.
-  - Consider a Slack bot or CLI alias for manual pause/resume on demand.
-```
+Secondary worked example moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when emitting a pause/resume recommendation.
 
 ### Worked example — already optimal (OPTIMIZED)
 
-```text
-TARGET: prod-web-service (region: us-east-1)
-VERDICT: OPTIMIZED
-REASON: All optimization dimensions are within target. Concurrency 80
-        matches observed peak (72 per instance). MinSize 1 matches
-        steady-state. CPU 45%, memory 38%. No VPC egress. Health check
-        interval 10s is appropriate.
-RECOMMENDATION: (none — service is optimized)
-ESTIMATED_SAVINGS: $0/month
-CURRENT_MONTHLY_COST: $850/month
-PROJECTED_MONTHLY_COST: $850/month
-TRAFFIC_PATTERN: static (consistent 24/7)
-RISK: N/A
-NOTES:
-  - Re-evaluate quarterly or when traffic pattern changes.
-  - Monitor for CPU > 70% sustained — would indicate concurrency is
-    too high or instance type needs upgrading.
-  - Consider cost-per-request benchmarking against ECS/Fargate if
-    monthly cost exceeds $2,000.
-```
+Secondary worked example moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when confirming a service is already optimal.
 
 ## Anti-Patterns — NEVER
 
@@ -638,74 +427,21 @@ NOTES:
 
 ## Pre-flight safety checks (run before any optimization CLI)
 
-- **CONFIRMATION GATE.** Before any state-changing operation
-  (`update-service`, `pause-service`, `resume-service`, `create-auto-scaling-
-  configuration`, `delete-auto-scaling-configuration`), emit:
-  `CONFIRM: About to <operation> on <service-name> in account <account>
-  region <region>. This will <consequence>. Proceed? (yes/no)`.
-
-- **Capture pre-state.** Before changing the auto-scaling configuration:
-  `aws apprunner describe-service --service-arn <arn> --output json >
-  /tmp/<service>-pre-$(date +%s).json` AND
-  `aws apprunner describe-auto-scaling-configuration --auto-scaling-
-  configuration-arn <arn> --output json > /tmp/<service>-asg-$(date +%s).json`.
-
-- **Verify the service is not mid-deployment.** `aws apprunner describe-
-  service --service-arn <arn> --query 'Status'` — confirm `RUNNING` (not
-  `OPERATION_IN_PROGRESS`).
-
-- **Verify the new auto-scaling configuration exists before applying.**
-  `aws apprunner describe-auto-scaling-configuration --auto-scaling-
-  configuration-arn <new-arn>` — confirm it exists and has the correct
-  MinSize/MaxSize/Concurrency.
-
-- **Monitor post-change.** For 7 days after a concurrency or instance type
-  change, monitor:
-  - `Latency` p95 (CloudWatch)
-  - `5xxResponseCount` (CloudWatch)
-  - `InstanceCount` (should decrease for concurrency increase)
-  - `CPUUtilization` and `MemoryUtilization` (should increase per instance)
+Pre-flight safety checks (CONFIRMATION GATE, pre-state capture, post-change monitoring) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before executing any state-changing optimization CLI.
 
 ## Recent AWS features (2024-2026)
 
-- **App Runner v2 native VPC networking (2025 GA):** The v2
-  architecture provisions a native ENI per service in your VPC without
-  a separate VPC connector resource. Eliminates the NAT gateway
-  dependency for outbound traffic, reducing egress cost by up to 60%.
-  Existing v1 services must explicitly migrate. Check
-  `NetworkConfiguration.EgressConfiguration` for `EgressType: VPC`
-  without `VpcConnectorArn`.
+Recent AWS features (2024-2026) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when evaluating v2 native VPC networking, blue/green deployments, or the observability dashboard.
 
-- **VPC connector for private resources (2024 GA):** App Runner services
-  can connect to private VPC resources (RDS, ElastiCache, internal APIs)
-  via a VPC connector. Egress traffic goes through the VPC's NAT gateway
-  unless VPC endpoints are configured.
+## References (load on demand)
 
-- **Custom auto-scaling configurations (2024):** Create reusable auto-
-  scaling configurations with specific MinSize, MaxSize, and Concurrency.
-  Attach to multiple services for consistent scaling behavior.
-
-- **Observability configuration (2024-2025):** Configure CloudWatch Logs
-  ingestion rate, log format (JSON vs text), and trace sampling (AWS X-Ray).
-  Reducing log verbosity lowers observability cost for high-traffic services.
-
-- **Size-aware health checks (2025):** Health check grace period for new
-  instances during scale-out. The service waits for the grace period before
-  checking health, giving the instance time to warm up.
-
-- **Deployment strategies (2025):** Rolling deployment (default) replaces
-  instances gradually. Blue/green deployment creates a new fleet, switches
-  traffic, then tears down the old fleet. Blue/green avoids the deployment-
-  pauses-autoscaling issue.
-
-- **Cost allocation tags (2024-2025):** Tag App Runner services with cost
-  allocation tags for Cost Explorer filtering. Essential for multi-service
-  cost attribution.
-
-- **App Runner observability dashboard (2025):** A pre-built CloudWatch
-  dashboard for App Runner services showing RequestCount, InstanceCount,
-  CPU/Memory utilization, latency, and error rates. Useful for identifying
-  optimization opportunities without manual metric queries.
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples moved from SKILL.md: pause/resume for non-prod, already-optimal OPTIMIZED output.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 non-obvious autoscaling behaviors and Recent AWS features (2024-2026) moved from SKILL.md.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — live-account pre-flight command listing and pre-flight safety checks moved from SKILL.md.
+- [references/apprunner-pricing-and-sizing.md](references/apprunner-pricing-and-sizing.md) — pricing model, instance-type pricing, monthly cost examples, sizing heuristics.
+- [references/optimization-procedures.md](references/optimization-procedures.md) — per-dimension optimization procedures (concurrency, MinSize, instance type, health check, VPC, pause/resume).
 
 ## Domain
 

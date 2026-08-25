@@ -127,25 +127,8 @@ Run before classification. Misclassifying these produces wrong plans.
 `describe-lifecycle-hooks` returns all hooks in one call. `describe-warm-
 pool` paginates at 100 instances/page.
 
-**Live-account pre-flight (skip if offline plan audit):**
-1. `describe-auto-scaling-groups --auto-scaling-group-names <asg>` —
-   capture `MinSize`, `MaxSize`, `DesiredCapacity`, `LaunchTemplate`,
-   `LoadBalancerNames`, `TargetGroupARNs`, `HealthCheckType`,
-   `HealthCheckGracePeriod`, `ServiceLinkedRoleARN`, `MixedInstancesPolicy`.
-2. `describe-lifecycle-hooks --auto-scaling-group-name <asg>` — capture
-   existing hooks: `LifecycleHookName`, `LifecycleTransition`,
-   `HeartbeatTimeout`, `DefaultResult`, `NotificationTargetARN`, `RoleARN`.
-3. `describe-warm-pool --auto-scaling-group-name <asg>` — capture
-   `PoolMinSize`, `MaxGroupPreparedCapacity`, `WarmPoolState`, instances.
-4. `describe-notification-configurations` and `describe-scaling-policies`
-   and `describe-scheduled-actions` — capture existing configs.
-5. For lifecycle Lambdas: `get-function-configuration` and `get-policy` —
-   confirm the Lambda exists and its role has
-   `autoscaling:CompleteLifecycleAction`.
-6. `describe-instance-status` — check for instances stuck in
-   `Pending:Wait` or `Terminating:Wait`.
-7. `logs filter-log-events` on the lifecycle Lambda log group — capture
-   recent lifecycle action errors.
+Live-account pre-flight commands moved to [references/diagnostic-procedures.md](references/diagnostic-procedures.md).
+Load that file before executing against a live account.
 
 **Malformed input:** emit `VERDICT: ERROR` with `REASON: ASG/operation
 configuration is not valid JSON or is missing required fields` and
@@ -169,80 +152,8 @@ configuration is not valid JSON or is missing required fields` and
 
 ### Step 0: Expert knowledge — non-obvious Auto Scaling lifecycle behaviors
 
-- **The lifecycle hook extends the transition by HeartbeatTimeout.**
-  Without a hook, `Pending` -> `InService` is immediate. With a launch
-  hook, the instance enters `Pending:Wait` for up to `HeartbeatTimeout`
-  (default 3600s). The action must call `complete-lifecycle-action` to
-  release the instance early, or wait for timeout + `DefaultResult`.
-
-- **complete-lifecycle-action is the release valve.** The Lambda receives
-  an EventBridge/SNS event with `LifecycleActionToken`,
-  `LifecycleHookName`, `AutoScalingGroupName`, `EC2InstanceId`, and
-  `LifecycleTransition`. It must call `aws autoscaling
-  complete-lifecycle-action --lifecycle-hook-name <hook>
-  --auto-scaling-group-name <asg> --lifecycle-action-token <token>
-  --lifecycle-action-result CONTINUE|ABANDON`. Missing or failed = stuck.
-
-- **HeartbeatTimeout default (3600s) is almost always too long.** A
-  bootstrap that takes 60 seconds will leave the instance stuck for the
-  remaining 3540 seconds if the Lambda crashes. Set HeartbeatTimeout to
-  2-3x the expected action duration.
-
-- **record-lifecycle-action-heartbeat extends the timeout.** For long-
-  running actions (large artifact downloads), the Lambda can call this to
-  reset the timer. This is how you handle multi-step bootstraps.
-
-- **DefaultResult controls what happens on timeout.** `CONTINUE` proceeds
-  (instance enters InService or gets terminated). `ABANDON` for launch
-  hooks terminates the instance and triggers replacement; for terminate
-  hooks, the instance dies regardless. Use `CONTINUE` for most launch hooks
-  (fail-open); `ABANDON` only if failed bootstrap should trigger replacement.
-
-- **Warm pool instances enter `Pending:Wait` when claimed.** The hook
-  fires the same as a cold launch. The Lambda should detect warm-pool-
-  sourced instances (already booted) and skip redundant bootstrap.
-
-- **Warm pool state: Stopped vs Running.** `Stopped` keeps instances booted
-  to OS but stopped (cheaper, EBS only). `Running` keeps them ready (faster
-  but costs compute). Most use cases want `Stopped` — resume takes 10-30s.
-
-- **MaxGroupPreparedCapacity caps the warm pool.** Each warm pool instance
-  incurs EBS + (if Running) compute charges. If not set, defaults to ASG
-  `MaxSize`.
-
-- **Instance protection prevents ASG termination but not Spot
-  interruption.** Use for stateful workloads during normal scaling; use
-  terminate hooks for graceful drain during Spot events.
-
-- **Standby removes from service without terminating.** `enter-standby`
-  moves an instance to `Standby` — no traffic, not counted toward
-  DesiredCapacity, but stays running. `exit-standby` returns it.
-
-- **Capacity rebalance + terminate hooks interact.** When rebalance fires,
-  the ASG launches a replacement and puts the old instance into
-  `Terminating:Wait`. The hook fires with the rebalance context. Must
-  complete before the 2-minute interruption notice force-terminates.
-
-- **Multiple hooks on the same transition fire in sequence.** Each must
-  complete before the next. Total transition time = sum of all
-  HeartbeatTimeouts.
-
-- **HealthCheckGracePeriod interacts with launch hooks.** If
-  `HealthCheckType: ELB` and the grace period is shorter than the hook
-  timeout, the ELB health check runs on an instance still in
-  `Pending:Wait`, marks it unhealthy, and the ASG replaces it.
-
-- **SNS/SQS notification targets deliver a JSON payload.** Contains
-  `LifecycleActionToken`, `LifecycleHookName`, `LifecycleTransition`,
-  `EC2InstanceId`, etc. Use `NotificationMetadata` to pass context to the
-  action Lambda.
-
-- **Scheduled actions override DesiredCapacity at a specific time.**
-  Scale-out triggers launch hooks, scale-in triggers terminate hooks.
-
-- **CloudWatch alarm-based scaling uses metric alarms + policies.** Target
-  tracking adjusts DesiredCapacity to maintain a metric target (e.g.,
-  CPUUtilization). Step scaling adjusts by a fixed amount per alarm.
+Deep dive moved to [references/advanced-patterns.md](references/advanced-patterns.md)
+(Step 0: non-obvious lifecycle behaviors) — load before complex hook/warm-pool decisions.
 
 ### Step 1: Pre-check gate — REVIEW_REQUIRED if any check fails
 
@@ -395,24 +306,8 @@ NOTES:
 
 ### Worked example — diagnose-stuck (REVIEW_REQUIRED)
 
-```text
-OPERATION: diagnose-stuck
-VERDICT: REVIEW_REQUIRED
-TARGET: prod-api-asg (hook: api-bootstrap-hook)
-PRE_CHECKS:
-  - [PASS] ASG exists, DesiredCapacity: 6
-  - [PASS] Hook api-bootstrap-hook exists (HeartbeatTimeout 3600)
-  - [FAIL] Instance i-xxx stuck in Pending:Wait for 42 minutes
-  - [FAIL] Lambda timed out after 30s — bootstrap takes ~45s
-STEPS: (none — root cause is Lambda timeout too short)
-NOTES:
-  - Fix: increase Lambda timeout to 60s, then manually complete:
-    aws lambda update-function-configuration --function-name api-lifecycle-action --timeout 60
-    aws autoscaling complete-lifecycle-action \
-      --lifecycle-hook-name api-bootstrap-hook --auto-scaling-group-name prod-api-asg \
-      --lifecycle-action-token <token> --lifecycle-action-result CONTINUE
-  - Also reduce HeartbeatTimeout from 3600 to 300.
-```
+Full example moved to [references/worked-examples.md](references/worked-examples.md).
+Load it when formatting a diagnose-stuck REVIEW_REQUIRED response.
 
 ## Anti-Patterns — NEVER
 
@@ -500,27 +395,15 @@ NOTES:
 
 ## Recent AWS features (2024-2026)
 
-- **Warm pool instance reuse (2024):** Instances returning to the warm
-  pool on scale-in preserve state. The launch hook can detect previously-
-  warmed instances and skip redundant setup.
-- **Capacity rebalance + lifecycle hook (2024-2025):** Terminate hook fires
-  on the rebalance recommendation (before the 2-min interruption notice),
-  giving a head start on drain.
-- **EventBridge lifecycle event enrichment (2024):** Events include
-  `NotificationMetadata` for passing context (e.g., config endpoint) to the
-  action Lambda.
-- **Spot allocation strategies (2024-2025):** `capacity-optimized` and
-  `price-capacity-optimized` reduce Spot interruptions, reducing terminate
-  hook frequency.
-- **Instance maintenance policy (2025):** `MaxHealthyPercentage` /
-  `MinHealthyPercentage` for ASG replacement during maintenance. Replacement
-  instances fire the launch hook.
-- **Predictive scaling + warm pools (2025):** Predictive scaling pre-scales
-  before demand spikes. Combined with warm pools, achieves near-instant
-  scale-out.
-- **EventBridge to Step Functions (2024):** Route lifecycle events to a
-  state machine for multi-step orchestration. The state machine calls
-  `complete-lifecycle-action` at the final step.
+Feature notes moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load when deciding whether a recent feature changes the plan.
+
+## References (load on demand)
+
+- [references/lifecycle-hook-patterns.md](references/lifecycle-hook-patterns.md) — hook configuration matrix, notification targets, Lambda handler skeleton, IAM policies
+- [references/diagnostic-procedures.md](references/diagnostic-procedures.md) — stuck-instance diagnostic procedures, command quick-reference, live-account pre-flight
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked example (diagnose-stuck, REVIEW_REQUIRED)
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step-0 expert deep dive, recent AWS features
 
 ## Domain
 

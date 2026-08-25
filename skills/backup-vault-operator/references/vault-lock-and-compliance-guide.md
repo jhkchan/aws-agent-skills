@@ -134,3 +134,78 @@ transition time, not at plan creation.
    lock configuration. Applying a new lock replaces the existing
    configuration. Compliance mode cannot be "downgraded" to
    governance after the grace window.
+---
+
+### Apply vault lock in COMPLIANCE mode (WORM, immutable) (moved verbatim from SKILL.md)
+
+```bash
+aws backup put-backup-vault-lock-configuration \
+  --backup-vault-name "prod-compliance-vault" \
+  --changeable-for-days 3 \
+  --min-retention-days 30 \
+  --max-retention-days 3650
+```
+
+The `--changeable-for-days 3` grace window allows reversing for 72
+hours. After that, the lock is permanent. COMPLIANCE mode is the
+default; `--mode` flag exists for explicit governance mode.
+
+---
+
+### Apply vault lock in GOVERNANCE mode (soft, mutable by privileged) (moved verbatim from SKILL.md)
+
+```bash
+aws backup put-backup-vault-lock-configuration \
+  --backup-vault-name "prod-governance-vault" \
+  --mode GOVERNANCE \
+  --min-retention-days 30 \
+  --max-retention-days 365
+```
+
+Governance mode can be removed by a principal with
+`backup:DeleteBackupVaultLockConfiguration`. Not suitable for
+regulatory compliance.
+
+---
+
+## Expert heuristic: COMPLIANCE vs GOVERNANCE vault lock (moved verbatim from SKILL.md)
+
+```
+COMPLIANCE MODE
+   ├─ Regulatory requirement (CIS, NIST, FedRAMP, SOX, HIPAA)?
+   │    └─ YES → COMPLIANCE mode
+   │         • MinRetentionDays set to regulatory minimum (>= 90 for HIPAA)
+   │         • MaxRetentionDays set to data-retention policy ceiling
+   │         • ChangeableForDays 3 (max grace for rollback window)
+   │         • Lock cannot be removed by root after grace
+   ├─ Operational policy (no regulatory mandate)?
+   │    └─ GOVERNANCE mode
+   │         • MinRetentionDays set to operational minimum
+   │         • Lock can be removed by privileged principal
+   │         • Suitable for internal controls, NOT for audit
+```
+
+**Per-service backup semantic differences:**
+
+| Service / ResourceType | What to check |
+|---|---|
+| `EC2` instance | Continuous backup enabled for PITR; WindowsVSS for Windows instances; restore creates new instance (new IP) |
+| `RDS` DB instance | PITR requires `AdvancedBackupSettings.BackupOptions.WindowsVSS=enabled` for Windows; restore creates new DB instance (new endpoint) |
+| `EBS` volume | Snapshot-only; restore creates new volume (must detach/attach original) |
+| `S3` bucket | Versioning must be enabled; restore overwrites by version, not by replace |
+| `DynamoDB` table | Continuous backup (PITR) is the native option; AWS Backup adds cross-region copy |
+| `EFS` file system | Incremental; restore to new file system or item-level via Backup Search |
+| `FSx` Windows / Lustre / OpenZFS / ONTAP | Volume-level restore; filesystem-level differs by type |
+| `Aurora` cluster | Cluster-level PITR via `aws:backup:request-continuous-backup`; restore to new cluster |
+
+**Cold-storage transition policy:**
+- WARM (default): immediate restore, no extra cost. Use for
+  operational recovery.
+- COLD (GLACIER): 3-5 hour restore. Use for archives accessed monthly.
+- ARCHIVE (DEEP_ARCHIVE): 12+ hour restore. Use for multi-year
+  compliance archives.
+
+ALWAYS pair cold storage with a documented RTO/RPO matrix — operators
+frequently assume cold-storage recovery points restore as fast as
+warm, then discover 3+ hour waits during incidents.
+

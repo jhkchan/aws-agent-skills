@@ -253,3 +253,155 @@ Common PII entity types for the sensitive information filter:
 | MEDICAL_PROCEDURE | Medical procedure names |
 | MEDICATION_NAME | Medication names |
 | HEALTH_NUMBER | Health insurance numbers |
+---
+
+### Step 3 — Configure content filters (CLI) (moved verbatim from SKILL.md)
+
+```bash
+aws bedrock create-guardrail \
+  --name customer-app-guardrail \
+  --description "Guardrail with content filters" \
+  --content-policy-config '{
+    "filtersConfig": [
+      {"type": "SEXUAL", "inputStrength": "HIGH", "outputStrength": "HIGH"},
+      {"type": "VIOLENCE", "inputStrength": "MEDIUM", "outputStrength": "HIGH"},
+      {"type": "HATE", "inputStrength": "MEDIUM", "outputStrength": "HIGH"},
+      {"type": "INSULTS", "inputStrength": "MEDIUM", "outputStrength": "MEDIUM"},
+      {"type": "MISCONDUCT", "inputStrength": "MEDIUM", "outputStrength": "MEDIUM"},
+      {"type": "PROMPT_ATTACK", "inputStrength": "HIGH", "outputStrength": "NONE"}
+    ]
+  }' \
+  --region us-east-1
+```
+
+---
+
+### Step 4 — Configure denied topics (CLI) (moved verbatim from SKILL.md)
+
+```bash
+aws bedrock create-guardrail \
+  --name customer-app-guardrail \
+  --topic-policy-config '{
+    "topicsConfig": [
+      {
+        "name": "Financial_Advice",
+        "definition": "Requests for investment recommendations, stock tips, or financial planning guidance",
+        "examples": [
+          "What stocks should I buy?",
+          "Should I invest in crypto?",
+          "How should I allocate my retirement portfolio?"
+        ],
+        "type": "DENY"
+      },
+      {
+        "name": "Medical_Diagnosis",
+        "definition": "Requests for medical diagnosis, treatment recommendations, or drug dosage advice",
+        "examples": [
+          "What illness do I have based on these symptoms?",
+          "What medication should I take for this pain?"
+        ],
+        "type": "DENY"
+      }
+    ]
+  }' \
+  --region us-east-1
+```
+
+---
+
+### Step 5 — Configure word filters (CLI) (moved verbatim from SKILL.md)
+
+```bash
+aws bedrock create-guardrail \
+  --name customer-app-guardrail \
+  --word-policy-config '{
+    "managedWordListsConfig": [
+      {"type": "PROFANITY"}
+    ],
+    "wordsConfig": [
+      {"text": "competitor_product_a"},
+      {"text": "competitor_product_b"},
+      {"text": "internal_codename"}
+    ]
+  }' \
+  --region us-east-1
+```
+
+---
+
+### Step 6 — Configure sensitive information (PII) filters (CLI) (moved verbatim from SKILL.md)
+
+```bash
+aws bedrock create-guardrail \
+  --name customer-app-guardrail \
+  --sensitive-information-policy-config '{
+    "piiEntitiesConfig": [
+      {"type": "EMAIL", "action": "BLOCK"},
+      {"type": "PHONE", "action": "BLOCK"},
+      {"type": "SSN", "action": "BLOCK"},
+      {"type": "CREDIT_DEBIT_CARD_NUMBER", "action": "BLOCK"},
+      {"type": "NAME", "action": "AUDIT"},
+      {"type": "ADDRESS", "action": "AUDIT"}
+    ],
+    "regexesConfig": [
+      {
+        "name": "Employee_ID",
+        "description": "Internal employee ID format: EMP- followed by 6 digits",
+        "pattern": "EMP-\\d{6}",
+        "action": "BLOCK"
+      }
+    ]
+  }' \
+  --region us-east-1
+```
+
+---
+
+### Step 7 — Configure contextual grounding (CLI) (moved verbatim from SKILL.md)
+
+```bash
+aws bedrock create-guardrail \
+  --name customer-app-guardrail \
+  --contextual-grounding-policy-config '{
+    "filtersConfig": [
+      {
+        "type": "GROUNDING",
+        "threshold": 0.75
+      },
+      {
+        "type": "RESPONSE_RELEVANCE",
+        "threshold": 0.75
+      }
+    ]
+  }' \
+  --region us-east-1
+```
+
+---
+
+### Step 8 — Apply the guardrail to model invocations / Agents (CLI) (moved verbatim from SKILL.md)
+
+```bash
+# Option A: Apply via model invocation (runtime)
+aws bedrock-runtime invoke-model \
+  --model-id anthropic.claude-3-5-sonnet-20241022-v2:0 \
+  --guardrail-identifier <GUARDRAIL_ID> \
+  --guardrail-version <VERSION> \
+  --content '[{"text":"What is the weather today?"}]' \
+  --region us-east-1 output.json
+
+# Option B: Apply to a Bedrock Agent
+aws bedrock update-agent \
+  --agent-id <AGENT_ID> \
+  --guardrail-configuration guardrailIdentifier=<GUARDRAIL_ID>,guardrailVersion=<VERSION> \
+  --region us-east-1
+
+# Option C: Test the guardrail in isolation (ApplyGuardrail API)
+aws bedrock apply-guardrail \
+  --guardrail-identifier <GUARDRAIL_ID> \
+  --guardrail-version <VERSION> \
+  --source Request \
+  --content '[{"text":{"text":"What stocks should I buy?"}}]' \
+  --region us-east-1 output.json
+```
+

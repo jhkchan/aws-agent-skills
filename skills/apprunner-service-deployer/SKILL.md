@@ -143,79 +143,13 @@ VERIFICATION_COMMANDS:
 
 ### Step 1: ECR access role (for ECR source — separate from instance role)
 
-**Two distinct roles. Never combine them.**
-
-The ECR access role is assumed by the App Runner service to pull the
-container image. The instance role is assumed by the application at
-runtime. They are NEVER the same role.
-
-```bash
-aws iam create-role \
-  --role-name AppRunnerECRAccess \
-  --assume-role-policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [{
-      "Effect": "Allow",
-      "Principal": {"Service": "tasks.apprunner.amazonaws.com"},
-      "Action": "sts:AssumeRole"
-    }]
-  }'
-
-aws iam attach-role-policy \
-  --role-name AppRunnerECRAccess \
-  --policy-arn arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess
-```
-
-`AWSAppRunnerServicePolicyForECRAccess` grants `ecr:GetDownloadUrlForLayer`,
-`ecr:BatchGetImage`, `ecr:GetAuthorizationToken`. It is the managed policy
-purpose-built for this role. Do NOT write a custom inline policy for ECR
-pull — the managed policy is scoped and maintained by AWS.
+ECR access-role trust policy and managed-policy CLI moved verbatim to [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md).
+Load on demand when creating the access role; keep here: access role and instance role are NEVER the same role.
 
 ### Step 2: Instance role (application runtime identity)
 
-The instance role is assumed by the application at runtime for AWS SDK
-calls (DynamoDB, S3, Secrets Manager, etc.).
-
-```bash
-aws iam create-role \
-  --role-name <service>-instance \
-  --assume-role-policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [{
-      "Effect": "Allow",
-      "Principal": {"Service": "tasks.apprunner.amazonaws.com"},
-      "Action": "sts:AssumeRole"
-    }]
-  }'
-
-aws iam put-role-policy \
-  --role-name <service>-instance \
-  --policy-name <service>-app-access \
-  --policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Effect": "Allow",
-        "Action": ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query"],
-        "Resource": "arn:aws:dynamodb:<region>:<acct>:table/<table>"
-      },
-      {
-        "Effect": "Allow",
-        "Action": ["secretsmanager:GetSecretValue"],
-        "Resource": "arn:aws:secretsmanager:<region>:<acct>:secret:<service>/*"
-      }
-    ]
-  }'
-```
-
-| Workload | Instance role permissions |
-|---|---|
-| API backend (DynamoDB) | `dynamodb:GetItem`, `PutItem`, `Query` on table ARN |
-| API backend (RDS via VPC connector) | No IAM — RDS auth is via secrets. Instance role fetches the secret. |
-| S3 processor | `s3:GetObject`, `PutObject` on bucket ARN |
-| SQS consumer | `sqs:ReceiveMessage`, `DeleteMessage` on queue ARN |
-
-**NEVER use `AdministratorAccess` on either role.**
+Instance-role creation CLI and workload permission table moved verbatim to [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md).
+Load on demand when scoping the application runtime identity.
 
 ### Step 3: Instance configuration (CPU/memory combos)
 
@@ -240,187 +174,38 @@ CPU units: 1024 = 1 vCPU. Memory: 2048 = 2 GB. Memory MUST be >= 2x CPU.
 
 ### Step 4: VPC connector (private resources)
 
-**This is the #1 App Runner networking pitfall.** If your app connects
-to RDS, ElastiCache, internal ALBs, or any VPC-only resource, you MUST
-attach a VPC connector. Without it, DNS resolves but the TCP connection
-hangs silently until timeout.
-
-```bash
-aws apprunner create-vpc-connector \
-  --vpc-connector-name <service>-vpc \
-  --subnets subnet-aaa subnet-bbb subnet-ccc \
-  --security-groups sg-priv-app
-```
-
-Rules:
-- **Use PRIVATE subnets.** App Runner instances do not need public IPs.
-- **Span >= 2 AZs** (3 for production HA).
-- **Security group outbound** must allow the database port (e.g., 5432
-  for Postgres, 3306 for MySQL, 6379 for Redis).
-- **NAT Gateway NOT required** — the VPC connector uses AWS PrivateLink
-  internally. The connector itself does not need internet access.
-- **VPC connector is a separate resource** — create it before the service.
+create-vpc-connector CLI and subnet/SG rules moved verbatim to [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md).
+Keep here: without a connector, DNS resolves but the TCP connection hangs silently — the #1 App Runner networking pitfall.
 
 ### Step 5: Health check policy
 
-App Runner probes the service on the configured path and port. A
-mismatched path or port causes the service to stay in `CreateFailed`.
-
-```json
-{
-  "Type": "APP",
-  "Protocol": "HTTP",
-  "Path": "/healthz",
-  "IntervalInSeconds": 10,
-  "TimeoutInSeconds": 5,
-  "HealthyThreshold": 3,
-  "UnhealthyThreshold": 5
-}
-```
-
-- **Path MUST return HTTP 200** for the service to be considered healthy.
-- **Interval 10s, healthy threshold 3** means a service is marked healthy
-  after ~30s of successful probes.
-- **Unhealthy threshold 5** means a service is marked unhealthy after
-  ~50s of consecutive failures. NEVER set below 3 — transient blips
-  cause spurious rollbacks.
-- **If no health check is configured**, App Runner uses TCP probe on the
-  service port. This catches the port being closed but NOT app-level
-  unhealthiness (e.g., DB pool exhausted).
+Health-check JSON and threshold guidance moved verbatim to [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md).
+Load on demand when tuning probes; keep here: path MUST return HTTP 200 and unhealthyThreshold >= 3.
 
 ### Step 6: Auto-scaling configuration
 
-```bash
-aws apprunner update-service \
-  --service-arn <arn> \
-  --auto-scaling-configuration-arn arn:aws:apprunner:<region>:<acct>:autoscalingconfiguration/DefaultConfiguration/1
-```
-
-Custom auto-scaling:
-
-```bash
-aws apprunner create-auto-scaling-configuration \
-  --auto-scaling-configuration-name <service>-autoscale \
-  --min-size 2 \
-  --max-size 10 \
-  --max-concurrency 100
-```
-
-| Parameter | Default | Production | Why |
-|---|---|---|---|
-| `min-size` | 1 | 2 (HA) | 1 = single point of failure during AZ outage |
-| `max-size` | 25 | 10-20 | Cap cost; tune to traffic profile |
-| `max-concurrency` | 100 | 50-200 | Requests per instance. Lower for CPU-heavy. |
-
-- **Scale-to-zero**: `min-size=0` saves cost but adds cold-start latency
-  (30-60s). ONLY for dev/staging or non-user-facing batch endpoints.
-- **Provisioned concurrency** = `min-size >= 1`. This is the ONLY latency
-  guarantee. At least one instance is always warm.
-- **Scaling metric**: App Runner uses concurrent requests per instance
-  (not CPU). An instance scales when `max-concurrency` is exceeded.
+Auto-scaling CLI and parameter table moved verbatim to [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md).
+Load on demand when right-sizing min/max/concurrency; keep here: scaling is on concurrent requests, not CPU.
 
 ### Step 7: Secrets (Secrets Manager / SSM Parameter Store)
 
-Secrets are injected as environment variables at runtime via ARN
-reference in `ConfigurationSources`. NOT visible in plaintext.
-
-```json
-{
-  "RuntimeEnvironmentSecrets": [
-    {"DB_PASSWORD": "arn:aws:secretsmanager:us-east-1:123456789012:secret:checkout/db-XXXXXX"},
-    {"STRIPE_KEY": "arn:aws:ssm:us-east-1:123456789012:parameter/checkout/stripe-key"}
-  ]
-}
-```
-
-Instance role needs `secretsmanager:GetSecretValue` or
-`ssm:GetParameters` plus `kms:Decrypt` if a customer-managed KMS key is
-used.
+RuntimeEnvironmentSecrets payload moved verbatim to [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md).
+Load on demand when wiring secrets; keep here: secrets are ARN references, never plaintext.
 
 ### Step 8: Observability (CloudWatch Logs, X-Ray, Application Signals)
 
-**CloudWatch Logs:** App Runner streams to
-`/aws/apprunner/<service-name>/<service-id>`. The log group name is NOT
-configurable — it is derived from the service name. Pre-create a log
-group with the right retention BEFORE creating the service, or App Runner
-creates one with `Never Expire`.
-
-```bash
-aws logs create-log-group --log-group-name /aws/apprunner/<service-name>
-aws logs put-retention-policy \
-  --log-group-name /aws/apprunner/<service-name> \
-  --retention-in-days 30
-```
-
-**X-Ray tracing:** set `TracingConfiguration Vendor=AWSXRay`. The instance
-role needs `xray:PutTraceSegments` and `xray:PutTelemetryRecords`.
-
-**Application Signals:** auto-instrumented for Java, Python, Node.js when
-tracing is enabled. No code changes required.
+Log-group pre-creation and retention CLI moved verbatim to [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md).
+Load on demand when configuring observability; keep here: the log group name is NOT configurable.
 
 ### Step 9: Custom domain (optional)
 
-```bash
-aws apprunner associate-custom-domain \
-  --service-arn <arn> \
-  --domain-name checkout.example.com \
-  --enable-www-subdomain
-```
-
-App Runner provisions and manages the TLS certificate via AWS Certificate
-Manager. For non-Route 53 domains, you must add CNAME records manually
-to verify ownership.
+associate-custom-domain CLI moved verbatim to [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md).
+Load on demand when attaching a domain with managed TLS.
 
 ### Step 10: Create the service
 
-```bash
-aws apprunner create-service \
-  --service-name checkout-api-prod \
-  --source-configuration '{
-    "ImageRepository": {
-      "ImageIdentifier": "123456789012.dkr.ecr.us-east-1.amazonaws.com/checkout-api:2.1.0",
-      "ImageRepositoryType": "ECR",
-      "ImageConfiguration": {
-        "Port": "8080",
-        "RuntimeEnvironmentVariables": [
-          {"LOG_LEVEL": "info"},
-          {"ENV": "production"}
-        ],
-        "RuntimeEnvironmentSecrets": [
-          {"DB_PASSWORD": "arn:aws:secretsmanager:us-east-1:123456789012:secret:checkout/db-XXXXXX"}
-        ],
-        "StartCommand": "node server.js"
-      }
-    },
-    "AuthenticationConfiguration": {
-      "AccessRoleArn": "arn:aws:iam::123456789012:role/AppRunnerECRAccess"
-    },
-    "AutoDeploymentsEnabled": true
-  }' \
-  --instance-configuration '{
-    "Cpu": "2048",
-    "Memory": "4096",
-    "InstanceRoleArn": "arn:aws:iam::123456789012:role/checkout-instance"
-  }' \
-  --health-check-configuration '{
-    "Type": "APP",
-    "Protocol": "HTTP",
-    "Path": "/healthz",
-    "IntervalInSeconds": 10,
-    "TimeoutInSeconds": 5,
-    "HealthyThreshold": 3,
-    "UnhealthyThreshold": 5
-  }' \
-  --network-configuration '{
-    "EgressConfiguration": {
-      "EgressType": "VPC",
-      "VpcConnectorArn": "arn:aws:apprunner:us-east-1:123456789012:vpcconnector/checkout-vpc/abc"
-    }
-  }' \
-  --observability-enabled \
-  --observability-configuration-configuration-source AWS_XRAY \
-  --tags Environment=production Application=checkout-api
-```
+The full create-service payload moved verbatim to [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md).
+Load on demand when emitting the create-service call.
 
 ### Step 11: Verification
 
@@ -435,32 +220,8 @@ aws apprunner list-operations --service-arn <arn>
 
 ## Latest App Runner features (2024-2026)
 
-- **VPC ingress connection (2024-2025):** allows clients in a private VPC
-  to reach an App Runner service via AWS PrivateLink WITHOUT traversing
-  the public internet. Configure with
-  `aws apprunner create-vpc-ingress-connection`. This is the long-awaited
-  "private endpoint" feature for App Runner.
-- **Application Load Balancer integration (2024-2025):** App Runner
-  services can now front an ALB for advanced routing (weighted target
-  groups, path-based routing, sticky sessions). Previously only the
-  managed App Runner endpoint was available.
-- **ARM64 / Graviton support (2024-2025):** set `CpuArchitecture=ARM64`
-  for up to 20% price-performance. The ECR image MUST be ARM64.
-- **Manual deployments with pause/resume (2024-2025):** set
-  `AutoDeploymentsEnabled=false` to pause automatic deployments. Trigger
-  a manual deployment with `aws apprunner start-deployment`. Useful for
-  controlled rollout windows and change-management compliance.
-- **Observability configuration (2024-2025):** dedicated
-  `ObservabilityConfiguration` resource for X-Ray tracing toggle without
-  embedding it in the service definition.
-- **Private worker mode (2024-2025):** services with no public endpoint,
-  reachable only via VPC ingress. Eliminates the need for a "deny all"
-  security group workaround.
-- **Deployment priority queues (2024-2025):** concurrent deployments in
-  the same account are queued. The service displays `OperationInProgress`
-  status. Use `list-operations` to track progress.
-- **Enhanced health checks (2024-2025):** TCP probe type for non-HTTP
-  services. Previously only APP (HTTP) probe was available.
+Latest App Runner features (2024-2026) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when using VPC ingress, ALB integration, ARM64/Graviton, or private worker mode.
 
 ## Workload matrix
 
@@ -569,38 +330,20 @@ VERIFICATION_COMMANDS:
 instance role for AWS-SDK-calling apps, secrets ARN for named secrets),
 the verdict is `PREREQUISITES_MISSING`.
 
+## References (load on demand)
+
+- [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md) — full copy-pasteable CLI sequence and IaC equivalents; now also holds the Step 1, 2, 4-10 command payloads moved from SKILL.md.
+- [references/source-and-config-guide.md](references/source-and-config-guide.md) — source type selection, VPC connector networking, auto-scaling tuning, health check policy, observability, full NEVER list, pre-flight safety CLI.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Latest App Runner features (2024-2026) and edge-case handling moved from SKILL.md.
+
 ## Domain
 
 AWS CloudOps / App Runner Managed Container Compute Provisioning.
 
 ## Edge-case handling
 
-- **Cross-account ECR pull:** the access role needs
-  `ecr:BatchGetImage` on the cross-account repo AND the repo policy in
-  the other account must grant your root. The managed
-  `AWSAppRunnerServicePolicyForECRAccess` does NOT cover cross-account —
-  add an inline policy.
-- **VPC connector sharing:** a VPC connector can be attached to multiple
-  services, but the ENI pool is shared. For high-throughput workloads,
-  create a dedicated connector per service.
-- **Private endpoint mode:** set the network egress type to `VPC` and
-  create a VPC ingress connection in the consumer VPC. The service has
-  no public URL — only the PrivateLink endpoint.
-- **Slow-start JVM tasks:** set `unhealthyThreshold=5` and
-  `interval=10s` to give the JVM 50s to start before being marked
-  unhealthy. For very slow starts, consider `StartCommand` with a
-  readiness probe wrapper.
-- **Source code repository build failures:** App Runner builds the image
-  from source if `ImageRepositoryType=ECR` is not set. Build failures
-  show up in `list-operations` as `OperationType=CREATE_SERVICE` with
-  `Status=FAILED`. Check the build logs in CloudWatch under
-  `/aws/apprunner/<service>/build`.
-- **Auto-deployment surprises:** `AutoDeploymentsEnabled=true` means
-  every push to the source branch triggers a deployment. For production,
-  use `false` and trigger `start-deployment` after review.
-- **Log group naming:** the log group is `/aws/apprunner/<service-name>`
-  (NOT the service ARN). If you rename the service, the log group does
-  NOT follow — old logs stay under the old name.
+Edge-case catalog (cross-account ECR, connector sharing, private endpoint mode, slow-start JVM, build failures, auto-deploy surprises, log group naming) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when the deployment hits a non-standard path.
 
 ## AWS documentation
 

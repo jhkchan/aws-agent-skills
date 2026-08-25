@@ -209,3 +209,180 @@ The IAM role running the CTAS needs:
 | GEOMETRY | Presto functions | Different Trino function names |
 | Query timeout | 30 min (DML) | 30 min (DML) |
 | DDL timeout | 600 hours | 600 hours |
+
+---
+
+## Step 2: SerDe mismatch and SerDe property error (moved from SKILL.md)
+
+Symptom: query succeeds but columns return NULL or wrong values. OR
+`HIVE_CURSOR_ERROR` on specific rows.
+
+```bash
+aws glue get-table \
+  --database-name <db> --name <table> --output json | \
+  jq '.Table.{StorageDescriptor: .StorageDescriptor.SerdeInfo, Columns: .StorageDescriptor.Columns}'
+```
+
+Check the SerDe info:
+
+| SerDe | Handles | Does NOT handle |
+|---|---|---|
+| `OpenCSVSerDe` | CSV with quoted fields; configurable `separatorChar`, `quoteChar`, `escapeChar` | Non-STRING column types (reads as STRING, casts); custom delimiters other than separator/quote/escape |
+| `LazySimpleSerDe` | Delimited text (tab, pipe, comma); configurable `field.delim`, `line.delim`, `collection.delim`, `mapkey.delim` | Quoted fields; CSV with embedded delimiters inside quotes |
+| `ParquetHiveSerDe` | Parquet columnar | Text/CSV; ignores SerDeProperties |
+| `OrcSerde` | ORC columnar | Text/CSV; ignores SerDeProperties |
+| `JsonSerDe` (`org.openx.data.jsonserde.JsonSerDe`) | JSON (one JSON object per line) | Multi-line JSON; CSV |
+| `AvroSerDe` | Avro | Text/CSV |
+
+Common SerDe property errors:
+
+| Property | Error | Fix |
+|---|---|---|
+| `separatorChar` set to `,` but data is tab-delimited | Fields not split correctly; NULL columns | Set `separatorChar = '\t'` or switch to LazySimpleSerDe with `field.delim = '\t'` |
+| `quoteChar` set to `"` but data uses `'` | Quoted fields not stripped properly | Set `quoteChar = "'"` |
+| `escapeChar` set to `\` but data uses `""` (CSV-style escaping) | Escaped quotes not parsed | Set `escapeChar = '"'` or use default OpenCSVSerDe (handles `""`) |
+| OpenCSVSerDe with `serialization.null.format` not set | Empty strings returned as `""` instead of NULL | Set `serialization.null.format = ''` |
+
+**Verdicts:**
+- SerDe does not match file format (e.g., OpenCSVSerDe on Parquet):
+  ROOT_CAUSE_IDENTIFIED, `LAYER: SERDE_MISMATCH`. Fix: change SerDe to
+  ParquetHiveSerDe.
+- SerDe is correct but SerDeProperties are wrong (e.g.,
+  separatorChar mismatch): ROOT_CAUSE_IDENTIFIED,
+  `LAYER: SERDE_PROPERTY`. Fix: update SerDeProperties.
+
+#### To update the SerDe
+
+```sql
+-- Drop and recreate the table with the correct SerDe
+-- (Athena does not support ALTER TABLE SET SERDEPROPERTIES directly)
+DROP TABLE analytics.orders_csv;
+
+CREATE EXTERNAL TABLE analytics.orders_csv (
+  order_id STRING, customer_id STRING, amount STRING
+)
+ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.OpenCSVSerDe'
+WITH SERDEPROPERTIES (
+  'separatorChar' = '\t',
+  'quoteChar' = '"',
+  'escapeChar' = '\\'
+)
+STORED AS TEXTFILE
+LOCATION 's3://prod-analytics/orders/';
+```
+
+---
+
+## Step 3: Stale partitions and partition projection (moved from SKILL.md)
+
+Symptom: query returns zero rows on data that exists on S3. Partition
+keys are non-null in the query predicate.
+
+```bash
+aws glue get-partitions \
+  --database-name <db> --table-name <table> --output json | \
+  jq '.Partitions | {count: length, values: [.[].Values]}'
+```
+
+If `count: 0` but S3 has partition directories, the partition metadata
+is not loaded.
+
+#### 3a: MSCK REPAIR (immediate fix, does not scale)
+
+```sql
+MSCK REPAIR TABLE analytics.orders_csv;
+```
+
+This loads partition metadata by listing S3 prefixes. For tables with
+few partitions (< 100), this is the quickest fix. For large tables,
+use `ALTER TABLE ADD PARTITION` for specific ranges.
+
+#### 3b: Partition projection (permanent fix)
+
+Configure partition projection on the table's TBLPROPERTIES:
+
+```sql
+-- For a table partitioned by dt (date) with daily partitions
+ALTER TABLE analytics.orders_csv SET TBLPROPERTIES (
+  'projection.enabled' = 'true',
+  'projection.dt.type' = 'date',
+  'projection.dt.range' = '2024-01-01,2026-12-31',
+  'projection.dt.format' = 'yyyy-MM-dd',
+  'storage.location.template' = 's3://prod-analytics/orders/dt=${dt}'
+);
+```
+
+Partition projection auto-loads partitions based on the pattern;
+no MSCK REPAIR needed for new partitions.
+
+| Projection property | Effect |
+|---|---|
+| `projection.enabled = true` | Enables partition projection for the table |
+| `projection.<col>.type` | `enum`, `integer`, `date`, `injection` |
+| `projection.<col>.range` | Valid range (for `integer` / `date`) |
+| `projection.<col>.values` | Enumerated values (for `enum`) |
+| `projection.<col>.format` | Date or integer format (e.g., `yyyy-MM-dd`) |
+| `storage.location.template` | S3 path template with `${col}` substitution |
+
+**Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: STALE_PARTITIONS` (if MSCK
+REPAIR fixes it) or `LAYER: PARTITION_PROJECTION` (if projection is
+not configured and should be).
+
+---
+
+## Step 7: Format inference error (moved from SKILL.md)
+
+Symptom: `HIVE_BAD_DATA: Error parsing field value for field X` or
+`Error opening Hive split s3://...`.
+
+```bash
+aws s3api head-object \
+  --bucket <bucket> --key <data-file-key> --output json --profile <p>
+
+# Download a sample to inspect the actual format
+aws s3 cp s3://<bucket>/<key> /tmp/sample --profile <p>
+head -5 /tmp/sample
+```
+
+Check the actual file format against the table's `STORED AS` and SerDe:
+
+| Table `STORED AS` / SerDe | Actual file | Result |
+|---|---|---|
+| `TEXTFILE` + OpenCSVSerDe | Parquet file | `HIVE_BAD_DATA` — binary Parquet bytes parsed as text |
+| `PARQUET` + ParquetHiveSerDe | CSV text | `HIVE_BAD_DATA` — text bytes parsed as Parquet |
+| `ORC` + OrcSerde | JSON | `HIVE_BAD_DATA` |
+| `TEXTFILE` + JsonSerDe | CSV | `HIVE_BAD_DATA` — CSV is not valid JSON |
+| `INPUTFORMAT` mismatch | Any | Error reading the input format |
+
+If the file format does not match, ROOT_CAUSE_IDENTIFIED,
+`LAYER: FORMAT_INFERENCE` (or `LAYER: SERDE_MISMATCH` if the SerDe is
+wrong but the format is consistent).
+
+---
+
+## SerDe matrix (moved from SKILL.md)
+
+| SerDe class | Format | Handles quoted fields | Column types | Key properties |
+|---|---|---|---|---|
+| `OpenCSVSerDe` | CSV/Text | Yes (`quoteChar`, `escapeChar`) | ALL columns read as STRING | `separatorChar`, `quoteChar`, `escapeChar` |
+| `LazySimpleSerDe` | Delimited Text | No | Native (INT, STRING, etc.) | `field.delim`, `line.delim`, `collection.delim`, `mapkey.delim` |
+| `ParquetHiveSerDe` | Parquet | n/a | Native (from Parquet schema) | (ignored) |
+| `OrcSerde` | ORC | n/a | Native (from ORC schema) | (ignored) |
+| `JsonSerDe` (openx) | JSON (one object per line) | n/a | Native | `ignore.malformed.json` |
+| `AvroSerDe` | Avro | n/a | Native (from Avro schema) | `avro.schema.literal` or `avro.schema.url` |
+
+---
+
+## Partition projection properties reference (moved from SKILL.md)
+
+| Property | Purpose |
+|---|---|
+| `projection.enabled` | Master switch (`true` / `false`) |
+| `projection.<col>.type` | `enum`, `integer`, `date`, `injection` |
+| `projection.<col>.range` | For `integer` / `date`: start,end |
+| `projection.<col>.values` | For `enum`: comma-separated list |
+| `projection.<col>.interval` | For `integer` / `date`: step (default 1) |
+| `projection.<col>.interval.unit` | For `date`: `DAYS`, `HOURS`, `MINUTES` |
+| `projection.<col>.format` | For `date`: format pattern (`yyyy-MM-dd`); for `integer`: padding |
+| `projection.<col>.digits` | For `integer`: zero-padding width |
+| `storage.location.template` | S3 path with `${col}` substitution |

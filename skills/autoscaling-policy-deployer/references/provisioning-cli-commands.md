@@ -187,3 +187,148 @@ aws autoscaling rollback-instance-refresh --auto-scaling-group-name <ASG>
 # Disable capacity rebalance
 aws autoscaling update-auto-scaling-group --auto-scaling-group-name <ASG> --no-capacity-rebalance
 ```
+
+## 9-step procedure — Step 1: confirm ASG baseline (CLI)
+
+```bash
+aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names <ASG> \
+  --query 'AutoScalingGroups[].[AutoScalingGroupName,MinSize,MaxSize,DesiredCapacity,HealthCheckType,VPCZoneIdentifier,LaunchTemplate.LaunchTemplateId]'
+```
+
+## 9-step procedure — Step 3: target tracking (CLI)
+
+```bash
+# Predefined CPU metric (recommended default)
+aws autoscaling put-scaling-policy \
+  --auto-scaling-group-name <ASG> --policy-name cpu-target-50 \
+  --policy-type TargetTrackingScaling \
+  --target-tracking-configuration '{
+    "PredefinedMetricSpecification": {"PredefinedMetricType": "ASGAverageCPUUtilization"},
+    "TargetValue": 50.0, "ScaleOutCooldown": 60, "ScaleInCooldown": 300
+  }'
+
+# ALB RequestCountPerTarget (include ResourceLabel from Target Group)
+#   "PredefinedMetricType": "ALBRequestCountPerTarget",
+#   "ResourceLabel": "app/<ALB>/<TG>", "TargetValue": 1000.0
+
+# Custom metric (e.g., SQS queue depth — verify Dimensions match emitted metric)
+#   "CustomizedMetricSpecification": {
+#     "MetricName": "ApproximateNumberOfMessagesVisible",
+#     "Namespace": "AWS/SQS",
+#     "Dimensions": [{"Name": "QueueName", "Value": "my-queue"}],
+#     "Statistic": "Average"
+#   }, "TargetValue": 100.0
+```
+
+## 9-step procedure — Step 4: step scaling (CLI)
+
+```bash
+aws cloudwatch put-metric-alarm \
+  --alarm-name <ASG>-sqs-depth-high \
+  --metric-name ApproximateNumberOfMessagesVisible --namespace AWS/SQS \
+  --statistic Average --period 60 --evaluation-periods 2 --threshold 500 \
+  --comparison-operator GreaterThanThreshold \
+  --dimensions Name=QueueName,Value=my-queue \
+  --treat-missing-data breaching --alarm-actions <POLICY_ARN>
+
+aws autoscaling put-scaling-policy \
+  --auto-scaling-group-name <ASG> --policy-name sqs-step-scaling-out \
+  --policy-type StepScaling --adjustment-type PercentChangeInCapacity \
+  --metric-aggregation-type Average \
+  --step-adjustments \
+    MetricIntervalLowerBound=0,MetricIntervalUpperBound=100,ScalingAdjustment=20 \
+    MetricIntervalLowerBound=100,MetricIntervalUpperBound=500,ScalingAdjustment=50 \
+    MetricIntervalLowerBound=500,ScalingAdjustment=100
+```
+
+## 9-step procedure — Step 5: scheduled scaling (CLI)
+
+```bash
+aws autoscaling put-scheduled-update-group-action \
+  --auto-scaling-group-name <ASG> \
+  --scheduled-action-name business-hours-scale-up \
+  --recurrence "0 9 * * Mon-Fri" \
+  --min-size 3 --desired-capacity 5 --max-size 10 \
+  --time-zone "America/New_York"
+```
+
+## 9-step procedure — Step 6: warm pool (CLI)
+
+```bash
+aws autoscaling put-warm-pool \
+  --auto-scaling-group-name <ASG> \
+  --pool-state Stopped \
+  --min-size 2 \
+  --instance-reuse-policy '{"ReuseOnScaleIn": true}'
+```
+
+## 9-step procedure — Step 7: instance refresh (CLI)
+
+```bash
+aws autoscaling start-instance-refresh \
+  --auto-scaling-group-name <ASG> \
+  --strategy Rolling \
+  --preferences '{
+    "MinHealthyPercentage": 50,
+    "InstanceWarmup": 300,
+    "CheckpointPercentages": [50, 100],
+    "CheckpointDelay": 300
+  }'
+```
+
+## 9-step procedure — Step 8a: capacity rebalance (CLI)
+
+```bash
+aws autoscaling update-auto-scaling-group \
+  --auto-scaling-group-name <ASG> \
+  --capacity-rebalance
+```
+
+## 9-step procedure — Step 8b: predictive scaling (CLI)
+
+```bash
+aws autoscaling put-scaling-policy \
+  --auto-scaling-group-name <ASG> \
+  --policy-name predictive-cpu-forecast \
+  --policy-type PredictiveScaling \
+  --predictive-scaling-configuration '{
+    "MetricSpecifications": [{
+      "TargetValue": 40.0,
+      "PredefinedMetricPairSpecification": {
+        "PredefinedMetricType": "ASGCPUUtilization",
+        "ResourceLabel": ""
+      }
+    }],
+    "Mode": "ForecastAndScale",
+    "SchedulingBufferTime": 300,
+    "MaxCapacityBreachBehavior": "IncreaseMaxCapacity",
+    "MaxCapacityBuffer": 10
+  }'
+```
+
+## 9-step procedure — Step 8c: Mixed Instances Policy (CLI)
+
+```bash
+aws autoscaling create-auto-scaling-group \
+  --auto-scaling-group-name <ASG> \
+  --mixed-instances-policy '{
+    "LaunchTemplate": {
+      "LaunchTemplateSpecification": {
+        "LaunchTemplateName": "my-template",
+        "Version": "$Default"
+      },
+      "Overrides": [
+        {"InstanceType": "m5.large"},
+        {"InstanceType": "m5a.large"},
+        {"InstanceType": "m4.large"}
+      ]
+    },
+    "InstancesDistribution": {
+      "OnDemandPercentageAboveBaseCapacity": 50,
+      "SpotAllocationStrategy": "capacity-optimized",
+      "SpotInstancePools": 3
+    }
+  }' \
+  --min-size 2 --max-size 10 --desired-capacity 4 \
+  --vpc-zone-identifier "subnet-abc,subnet-def,subnet-ghi"
+```

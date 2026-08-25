@@ -264,3 +264,112 @@ get-query-execution → Status?
 │   └── COLUMN_NOT_FOUND → TABLE_LOCATION
 └── CANCELLED → near 30 min? → QUERY_TIMEOUT
 ```
+
+---
+
+## Step 4: S3 and Glue permission (moved from SKILL.md)
+
+Symptom: `Access Denied s3://...` or `glue:GetTable is not authorized`.
+
+#### 4a: S3 permission
+
+```bash
+# Check if the IAM role can list and get objects on the data bucket
+aws iam simulate-principal-policy \
+  --policy-source-arn <role-arn> \
+  --action-names s3:GetObject s3:ListBucket \
+  --resource-arns arn:aws:s3:::<bucket> arn:aws:s3:::<bucket>/* \
+  --output json --profile <p>
+```
+
+The role needs:
+- `s3:ListBucket` on `arn:aws:s3:::<bucket>`
+- `s3:GetObject` on `arn:aws:s3:::<bucket>/*`
+
+Also check the bucket policy (it can deny even when IAM allows):
+
+```bash
+aws s3api get-bucket-policy --bucket <bucket> --output json --profile <p>
+```
+
+If the role lacks S3 permissions, ROOT_CAUSE_IDENTIFIED,
+`LAYER: S3_PERMISSION`.
+
+#### 4b: Glue Data Catalog permission
+
+```bash
+aws iam simulate-principal-policy \
+  --policy-source-arn <role-arn> \
+  --action-names glue:GetTable glue:GetPartitions glue:GetDatabase \
+  --resource-arns arn:aws:glue:<region>:<acct>:catalog \
+    arn:aws:glue:<region>:<acct>:database/<db> \
+    arn:aws:glue:<region>:<acct>:table/<db>/<table> \
+  --output json --profile <p>
+```
+
+If the role lacks Glue permissions, ROOT_CAUSE_IDENTIFIED,
+`LAYER: GLUE_PERMISSION`.
+
+If the catalog has Lake Formation enabled, also check LF-Tags:
+
+```bash
+aws lakeformation list-permissions \
+  --principal DataLakePrincipalIdentifier=<role-arn> --output json
+```
+
+Lake Formation grants override IAM; an IAM allow does not help if Lake
+Formation does not grant access.
+
+---
+
+## Step 5: CTAS output location (moved from SKILL.md)
+
+Symptom: `CREATE TABLE AS SELECT` fails with Access Denied.
+
+```bash
+aws athena get-work-group --work-group <wg> --output json | \
+  jq '.WorkGroup.Configuration.ResultConfiguration.OutputLocation'
+
+aws athena get-work-group --work-group <wg> --output json | \
+  jq '.WorkGroup.Configuration.EnforceWorkGroupConfiguration'
+```
+
+The CTAS output goes to:
+1. The workgroup result location (if
+   `EnforceWorkGroupConfiguration: true`) — overrides everything.
+2. The `external_location` in the CTAS (if
+   `EnforceWorkGroupConfiguration: false`).
+3. The client-side output location (if neither is set).
+
+Check the IAM role's permission on the RESULT bucket:
+
+```bash
+aws iam simulate-principal-policy \
+  --policy-source-arn <role-arn> \
+  --action-names s3:PutObject s3:AbortMultipartUpload \
+  --resource-arns arn:aws:s3:::<result-bucket>/* \
+  --output json --profile <p>
+```
+
+The role needs `s3:PutObject` on the result bucket. If missing,
+ROOT_CAUSE_IDENTIFIED, `LAYER: CTAS_OUTPUT_LOCATION`.
+
+| CTAS failure pattern | Cause |
+|---|---|
+| Access Denied on workgroup result bucket | Role lacks `s3:PutObject` on the result bucket |
+| CTAS writes to unexpected bucket | `EnforceWorkGroupConfiguration: true` overrides `external_location` |
+| CTAS table's LOCATION is wrong in Glue | The table LOCATION is set to the actual output path after the write; it will be under the result bucket, not the source table bucket |
+| CTAS fails with "Query output location is not set" | Workgroup has no result location configured AND no client-side location provided |
+
+---
+
+## Workgroup configuration matrix (moved from SKILL.md)
+
+| Config | Effect |
+|---|---|
+| `ResultConfiguration.OutputLocation` | Where query results and CTAS output go |
+| `EnforceWorkGroupConfiguration` | `true` = overrides client-side output location; `false` = client can override |
+| `BytesScannedCutoffPerQuery` | Query fails if bytes scanned exceeds this; 0 = no limit (use sparingly) |
+| `RequesterPaysEnabled` | Allows queries on RequesterPays S3 buckets |
+| `EngineVersion.SelectedEngineVersion` | `Athena engine 2` or `Athena engine 3` (Trino); affects function support and type coercion |
+| `PublishCloudWatchMetricsEnabled` | Whether query metrics are emitted to CloudWatch |
