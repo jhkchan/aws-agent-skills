@@ -48,54 +48,11 @@ metadata:
 
 ## Mindset
 
-A "5xx from the ALB" page is almost always a target or configuration
-incident wearing a load balancer costume. The ALB itself is rarely the
-cause — it is the messenger reporting that the targets are unhealthy,
-unreachable, slow, or returning invalid responses. The broken thing is
-the target application, the target security group, the health check
-configuration, or the listener rule. Treat the ALB as a relay until the
-target health, security group, and listener layers are proven clean.
+Full diagnostic mindset (the ALB is the messenger, not the cause): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Philosophy
 
-Four behaviours separate a senior ELBv2 engineer from a generalist:
-
-- **The 5xx code tells you WHERE the failure happened.** A 502 means the
-  target returned an invalid response (connection reset, malformed HTTP,
-  non-HTTP bytes) or the connection failed (target port closed, SSL
-  error). A 503 means no healthy target is available to receive traffic
-  (all targets unhealthy, draining, or unregistered). A 504 means the
-  target did not respond within the idle timeout (default 60s). A 561
-  means WAF blocked the request. A 500 means the ALB itself failed (rare).
-  Routing the code to the wrong layer is the #1 source of wasted cycles.
-
-- **Target health check configuration is the most common 5xx root cause.**
-  A health check on `/health` that returns 200 does NOT mean the
-  application is healthy on its actual endpoints. The target passes the
-  health check but returns 500 on real requests. Conversely, a health
-  check path that 404s marks the target unhealthy even when the
-  application is fine — the ALB returns 503 because it has no healthy
-  targets. Always compare the health check path against the actual
-  application routes.
-
-- **Security group rules are bidirectional and frequently misconfigured.**
-  The ALB security group controls client-to-ALB traffic. The target
-  security group controls ALB-to-target traffic. A common
-  misconfiguration: the target SG allows 0.0.0.0/0 "because the ALB
-  handles security" — this exposes the target directly, bypassing the
-  ALB. Conversely, the target SG allowing only the ALB's public IP (not
-  the ALB SG) breaks when the ALB scales and its IP changes. The
-  correct pattern: target SG inbound allows the ALB SG on the target
-  port.
-
-- **Access logs are the forensic trail.** Without ALB access logs in S3,
-  you have only aggregate CloudWatch metrics — no per-request
-  `target_processing_time`, `target_status_code`, or `error_reason`.
-  The `error_reason` field in ALB access logs pinpoints the exact 5xx
-  cause (`Target.InvalidResponse`, `Target.ConnectionFailed`,
-  `Target.Timeout`). Operators who "see 5xx in CloudWatch but no detail"
-  almost always have access logs disabled. Enable them as the first
-  remediation step.
+The four senior-engineer behaviours (5xx code tells WHERE, health check config is the top root cause, SG rules are bidirectional, access logs are the forensic trail): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Quick navigation
 
@@ -111,6 +68,10 @@ Four behaviours separate a senior ELBv2 engineer from a generalist:
 | 502/503 from wrong target group on listener | Step 6 | `describe-rules` for listener priorities |
 | 500 sustained, healthy targets, no change | Step 7 | AWS Health Dashboard — ESCALATE |
 | Need the access log format and fields | Reference | `references/target-health-reference.md` |
+| Need full probes for any Step | Reference | `references/diagnostic-commands.md` |
+| Need more worked examples | Reference | `references/worked-examples.md` |
+| Need per-layer fix commands | Reference | `references/error-handling.md` |
+| Need Step 0 gotchas in full | Reference | `references/advanced-patterns.md` |
 
 ## Pre-flight: load balancer type and gather-info gate
 
@@ -121,42 +82,7 @@ lambda) produces false root causes.
 
 ### Account-wide pre-flight commands
 
-```bash
-# 1. Load balancer configuration (type, scheme, state, subnets, SGs)
-aws elbv2 describe-load-balancers --load-balancer-arns <arn> --output json
-
-# 2. Listeners (protocols, SSL policies, default actions, certificates)
-aws elbv2 describe-listeners --load-balancer-arn <arn> --output json
-
-# 3. Listener rules (priorities, conditions, actions — the routing logic)
-aws elbv2 describe-rules --listener-arn <listener-arn> --output json
-
-# 4. Target groups (health check config, target type, port, protocol)
-aws elbv2 describe-target-groups --load-balancer-arn <arn> --output json
-
-# 5. Target health (the single highest-signal command)
-aws elbv2 describe-target-health --target-group-arn <tg-arn> --output json
-
-# 6. Load balancer attributes (idle timeout, deregistration delay, access logs)
-aws elbv2 describe-load-balancer-attributes --load-balancer-arn <arn> --output json
-
-# 7. Security groups on the ALB
-aws ec2 describe-security-groups \
-  --group-ids $(aws elbv2 describe-load-balancers \
-    --load-balancer-arns <arn> --output json | \
-    jq -r '.LoadBalancers[0].SecurityGroups[]') --output json
-
-# 8. CloudWatch metrics — HTTPCode_Target_5XX_Count, TargetResponseTime
-aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB \
-  --metric-name HTTPCode_Target_5XX_Count \
-  --dimensions Name=LoadBalancer,Value=<arn-suffix> Name=TargetGroup,Value=<tg-suffix> \
-  --start-time $(date -u -d '-1 hour' +%FT%TZ) --end-time $(date -u +%FT%TZ) \
-  --period 300 --statistics Sum --output json
-
-# 9. AWS Health (regional events for ELB)
-aws health describe-events --filter services=ELASTICLOADBALANCING,\
-  eventStatusCodes=OPEN,UPCOMING --region us-east-1 --output json
-```
+Account-wide pre-flight commands (describe-load-balancers, -listeners, -rules, -target-groups, -target-health, attributes, SGs, CloudWatch 5xx metrics, AWS Health): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### Load-balancer-type short-circuit
 
@@ -180,20 +106,7 @@ aws health describe-events --filter services=ELASTICLOADBALANCING,\
 If the input is malformed (missing load balancer ARN, missing target
 group ARN, ambiguous error code), emit:
 
-```text
-TARGET: <lb-arn or unknown>
-VERDICT: NEED_MORE_INFO
-REASON: Input is missing required context — at minimum the 5xx error
-  code (500/502/503/504/561), the load balancer ARN, and the target
-  group ARN. Cannot drive a diagnostic tree without the error-code layer.
-LAYER: UNKNOWN
-EVIDENCE:
-  - Missing: <list specific missing fields>
-REMEDIATION: Re-prompt the operator for: (1) the exact 5xx error code
-  from the client or ALB access log, (2) the load balancer ARN or name,
-  (3) the target group ARN, and (4) for live diagnosis, the time window
-  of the failure.
-```
+NEED_MORE_INFO re-prompt template for malformed/missing input: [references/worked-examples.md](references/worked-examples.md).
 
 ## Process — Diagnostic decision tree (apply in error-code order)
 
@@ -205,111 +118,7 @@ emit ROOT_CAUSE_FOUND without a failing probe that matches the symptom.**
 
 ### Step 0: Non-obvious behaviours that change diagnosis
 
-These are the operational gotchas a senior ELBv2 engineer knows from
-incident experience. Each one routes a diagnosis away from the obvious
-layer to a less obvious one:
-
-- **A health check on `/health` passing does NOT mean the application is
-  healthy.** The health check probes one path; the application serves
-  many. A common pattern: `/health` returns 200 (static page), but the
-  actual endpoints return 500 (database connection failed). The target
-  is marked `healthy`, traffic flows, and clients see 500/502 from the
-  target — not from the ALB. The fix is a deep health check (e.g.,
-  `/health/deep` that checks the database), not a target restart.
-
-- **NLB TCP health checks succeed even when the application is broken.**
-  The default NLB health check is TCP — a successful three-way handshake
-  marks the target `healthy`. An application returning 500s, serving the
-  wrong content, or hung after the handshake all pass a TCP check. For
-  HTTP/HTTPS applications behind an NLB, ALWAYS verify
-  `health_check.type` is HTTP/HTTPS with a real `path`. A TCP check on
-  an HTTP target produces false-healthy status — the ALB routes traffic
-  to a broken target, and users see 502/504.
-
-- **Target security group rules must reference the ALB SG, not the ALB's
-  IPs.** ALB IPs change when the ALB scales. A target SG rule allowing a
-  specific ALB IP breaks when the ALB adds a node. The correct pattern:
-  target SG inbound allows the ALB SG ID (`Source: sg-alb-xxx`) on the
-  target port. Operators who "see the SG allows the ALB" but still get
-  502 often have a stale IP-based rule from before the ALB scaled.
-
-- **The deregistration delay (default 300s) keeps targets in `draining`
-  state.** During deregistration, targets receive in-flight requests but
-  no new ones. An ALB with all targets `draining` has no healthy targets
-  for new requests — it returns 503. The signature is
-  `describe-target-health` showing `State: draining` for all targets.
-  This happens during deployments if the new targets are not registered
-  before the old ones are deregistered.
-
-- **ALB access logs are in S3, not CloudWatch Logs.** Unlike API Gateway
-  (which logs to CloudWatch Logs), ALB access logs are delivered to an
-  S3 bucket. The bucket must have the correct policy granting
-  `elasticloadbalancing.amazonaws.com` write access with
-  `aws:SourceAccount` condition. Operators who "can't find the logs"
-  often have the S3 bucket policy misconfigured — logs are enabled but
-  never delivered.
-
-- **The `error_reason` field in ALB access logs pinpoints the 5xx cause.**
-  For 502 and 503, the access log includes an `error_reason` field:
-  - `Target.InvalidResponse` — target returned malformed HTTP.
-  - `Target.ConnectionFailed` — connection to target refused/failed.
-  - `Target.Timeout` — target did not respond within the idle timeout.
-  - `Target.HealthCheckFailed` — target failed health checks.
-  This field is the single highest-signal diagnostic for ALB 5xx.
-
-- **ALB idle timeout (60s default) applies to BOTH frontend and backend.**
-  The timeout applies to the client-to-ALB connection AND the
-  ALB-to-target connection. If the target takes > 60s to respond, the
-  ALB closes the connection with a 504. Long-polling, WebSocket, or
-  slow-upload workloads need the timeout raised (up to 4000s).
-
-- **NLB cross-zone load balancing is OFF by default.** Without cross-zone,
-  traffic is distributed per-AZ. If one AZ has more targets or more
-  capacity, the distribution is uneven. With cross-zone ON (always ON
-  for ALB, toggleable for NLB), traffic distributes across all targets
-  in all AZs. A 503 in one AZ while another AZ has healthy targets is
-  the signature of cross-zone OFF on an NLB.
-
-- **Listener rules are evaluated in priority order.** The lowest numeric
-  priority rule that matches the request is applied. A misconfigured
-  high-priority rule can shadow the intended target group — requests
-  that should go to target group A go to target group B (which may be
-  unhealthy or wrong). Always check `describe-rules` priority ordering
-  when the "wrong" targets are receiving traffic.
-
-- **A target registered by instance ID uses the instance's primary
-  private IP.** If the application runs on a secondary IP or a container
-  port, the instance-type registration sends traffic to the wrong place.
-  Use IP-type registration for containers, secondary IPs, or non-VPC
-  targets.
-
-- **WAF 561 errors are not always obvious.** WAF blocks produce a 561
-  (custom error) from the ALB, not a 403. Operators debug this as a
-  backend failure because 561 is uncommon. Check the WAF Web ACL
-  associated with the ALB — a rule blocking legitimate traffic (false
-  positive) produces 561.
-
-- **ALB HTTP 502 from a Lambda target means the function failed.** When
-  an ALB invokes a Lambda function and the function crashes, returns an
-  invalid response, or times out, the ALB returns 502. The Lambda
-  Multi-Value Headers setting and the response format (similar to but
-  different from API Gateway Lambda proxy) must match. Check Lambda
-  logs, not ALB logs, for the function error.
-
-- **Health check grace period matters for new deployments.** When a new
-  target is registered, it starts in `initial` state. The health check
-  must pass `healthy_threshold_count` consecutive times before the target
-  becomes `healthy`. During this window, the ALB does not route traffic
-  to the new target. If all old targets were deregistered, the ALB has
-  no healthy targets and returns 503 until the new targets pass health
-  checks.
-
-- **A target in a different AZ than the ALB subnets cannot receive
-  traffic without cross-zone.** ALB subnets are configured at creation.
-  If the ALB has subnets in us-east-1a and us-east-1b, but the target is
-  in us-east-1c, the ALB cannot route to it (for ALB, cross-zone handles
-  this; for NLB without cross-zone, the target is unreachable from the
-  ALB's AZs).
+The 13 non-obvious behaviours (shallow /health checks, NLB TCP false-healthy, ALB-SG-vs-IP rules, draining window, S3 log delivery, error_reason semantics, idle-timeout scope, NLB cross-zone default, rule priority order, instance-ID registration, WAF 561, Lambda 502, grace period, AZ reachability): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 1: Symptom entry — pick the diagnostic branch
 
@@ -326,35 +135,7 @@ Map the 5xx error code to a branch and jump to that branch's section.
 
 ### Step 1b: Gather access logs (when the code is ambiguous)
 
-If the operator reports "we're getting 5xx" without a specific code, or
-the code varies request-to-request, fetch access logs first.
-
-**ALB access log location:** S3 bucket configured in
-`describe-load-balancer-attributes` under `access_logs.s3.bucket`.
-
-```bash
-# List recent access log objects
-aws s3 ls s3://<bucket>/<prefix>/AWSLogs/<account>/elasticloadbalancing/<region>/ \
-  --recursive | sort | tail -20
-
-# Download and analyze recent logs (filter for 5xx)
-aws s3 cp s3://<bucket>/<prefix>/AWSLogs/<account>/elasticloadbalancing/<region>/ \
-  /tmp/alb-logs/ --recursive
-# Parse for 5xx responses
-awk '$14 >= 500' /tmp/alb-logs/*.log.gz | zcat | head -50
-```
-
-**ALB access log format (space-delimited, key fields):**
-```
-time elb client:port target:port request_time target_processing_time
-response_time elb_status_code target_status_code received_bytes
-sent_bytes request "user_agent" ssl_cipher ssl_protocol
-target_group_arn trace_id domain_name chosen_cert_arn ...
-error_reason
-```
-
-The `target_processing_time`, `target_status_code`, and `error_reason`
-fields are the highest-signal for 5xx diagnosis.
+Access-log location (access_logs.s3.bucket), fetch/parse commands, and the space-delimited field format (target_processing_time, target_status_code, error_reason): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### Step 2: 502 BadGateway — target returned invalid response
 
@@ -363,20 +144,7 @@ Symptom: client receives `502 BadGateway`. The ALB reached the target
 
 #### 2a: Target returned invalid HTTP or connection failed
 
-```bash
-# Target health (are the targets even healthy?)
-aws elbv2 describe-target-health --target-group-arn <tg-arn> --output json
-
-# If targets are healthy, test the target directly (bypassing the ALB)
-# For instance-type targets:
-aws ec2 describe-instances --instance-ids <i-id> --output json | \
-  jq '.Reservations[0].Instances[0].PrivateIpAddress'
-ssh <bastion> "curl -v http://<target-private-ip>:<target-port>/"
-
-# Check ALB access logs for error_reason
-aws s3 ls s3://<bucket>/<prefix>/... --recursive | tail -5
-# Download and grep for error_reason on 502 responses
-```
+Probes (describe-target-health, direct curl on target, access-log error_reason): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - Access log `error_reason: Target.InvalidResponse` → target returned
@@ -393,19 +161,7 @@ aws s3 ls s3://<bucket>/<prefix>/... --recursive | tail -5
 
 #### 2b: Target security group does not allow ALB SG
 
-```bash
-# Fetch the target's security group (for instance-type targets)
-aws ec2 describe-instances --instance-ids <i-id> --output json | \
-  jq '.Reservations[0].Instances[0].SecurityGroups[].GroupId'
-
-# For each target SG, check inbound rules on the target port
-aws ec2 describe-security-groups --group-ids <sg-target> --output json | \
-  jq '.SecurityGroups[].IpPermissions[]'
-
-# Fetch the ALB's security group
-aws elbv2 describe-load-balancers --load-balancer-arns <arn> --output json | \
-  jq -r '.LoadBalancers[0].SecurityGroups[]'
-```
+Probes (target SG inbound rules vs ALB SG on target port): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - Target SG has NO inbound rule allowing the ALB SG on the target port
@@ -425,21 +181,7 @@ healthy target in the target group to receive the request.
 
 #### 3a: All targets unhealthy (health check failing)
 
-```bash
-# Target health (the smoking gun)
-aws elbv2 describe-target-health --target-group-arn <tg-arn> --output json
-# Look for: State: unhealthy, Reason: Target.FailedHealthChecks
-
-# Target group health check configuration
-aws elbv2 describe-target-groups --target-group-arns <tg-arn> --output json | \
-  jq '.TargetGroups[0].HealthCheckConfig'
-# Key fields: HealthCheckPath, HealthCheckPort, HealthCheckProtocol,
-#   Matcher.HttpCode, HealthCheckIntervalSeconds, HealthCheckTimeoutSeconds,
-#   HealthyThresholdCount, UnhealthyThresholdCount
-
-# Test the health check endpoint directly on a target
-ssh <bastion> "curl -v http://<target-ip>:<target-port><health-check-path>"
-```
+Probes (target health reason, HealthCheckConfig fields, direct curl of the health path): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - Target health check path returns non-200 (e.g., 404, 500) → the
@@ -460,15 +202,7 @@ ssh <bastion> "curl -v http://<target-ip>:<target-port><health-check-path>"
 
 #### 3b: Zero registered targets
 
-```bash
-# Target group configuration
-aws elbv2 describe-target-groups --target-group-arns <tg-arn> --output json | \
-  jq '.TargetGroups[0] | {TargetType, Port, Protocol}'
-
-# Registered targets
-aws elbv2 describe-target-health --target-group-arn <tg-arn> --output json | \
-  jq '.TargetHealthDescriptions'
-```
+Probes (TargetType + registered target list): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - `TargetHealthDescriptions` is empty → no targets registered.
@@ -482,15 +216,7 @@ aws elbv2 describe-target-health --target-group-arn <tg-arn> --output json | \
 
 #### 3c: All targets in draining state
 
-```bash
-# Target health
-aws elbv2 describe-target-health --target-group-arn <tg-arn> --output json
-# Look for: State: draining
-
-# Deregistration delay
-aws elbv2 describe-target-group-attributes --target-group-arn <tg-arn> --output json | \
-  jq '.Attributes[] | select(.Key == "deregistration_delay.timeout_seconds")'
-```
+Probes (draining state + deregistration_delay.timeout_seconds): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - All targets `State: draining` with a long deregistration delay →
@@ -504,25 +230,7 @@ aws elbv2 describe-target-group-attributes --target-group-arn <tg-arn> --output 
 Symptom: client receives `504 GatewayTimeout`. The target did not
 respond within the ALB idle timeout.
 
-```bash
-# ALB idle timeout
-aws elbv2 describe-load-balancer-attributes --load-balancer-arn <arn> --output json | \
-  jq '.Attributes[] | select(.Key == "idle_timeout.timeout_seconds")'
-
-# Target response time (from ALB access logs)
-# Download logs and check target_processing_time
-# Values approaching the idle timeout indicate a slow target
-
-# CloudWatch TargetResponseTime metric
-aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB \
-  --metric-name TargetResponseTime \
-  --dimensions Name=LoadBalancer,Value=<arn-suffix> Name=TargetGroup,Value=<tg-suffix> \
-  --start-time $(date -u -d '-1 hour' +%FT%TZ) --end-time $(date -u +%FT%TZ) \
-  --period 300 --statistics Average,Maximum --output json
-
-# Test the target directly (bypassing the ALB)
-ssh <bastion> "time curl -v http://<target-ip>:<target-port>/"
-```
+Probes (idle_timeout.timeout_seconds, access-log target_processing_time, TargetResponseTime metric, direct timed curl): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - `idle_timeout.timeout_seconds` is 60 (default), target response time
@@ -540,20 +248,7 @@ ssh <bastion> "time curl -v http://<target-ip>:<target-port>/"
 Symptom: client receives `561 Unauthorized`. This is a custom error from
 WAF blocking the request.
 
-```bash
-# Check WAF Web ACLs associated with the ALB
-aws wafv2 get-web-acl-for-resource --resource-arn <alb-arn> --output json
-
-# Or list Web ACLs in the region
-aws wafv2 list-web-acls --scope REGIONAL --output json
-
-# Fetch WAF logs (if logged to CloudWatch or S3)
-aws logs filter-log-events \
-  --log-group-name aws-waf-logs-<acl-name> \
-  --filter-pattern '"action":"BLOCK"' \
-  --start-time $(date -u -d '-1 hour' +%s)000 \
-  --output json | jq '.events[].message'
-```
+Probes (get-web-acl-for-resource, list-web-acls, WAF BLOCK log filter): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - WAF Web ACL is associated with the ALB, and WAF logs show BLOCK actions
@@ -568,15 +263,7 @@ Symptom: the "wrong" targets are receiving traffic, or a specific path
 returns 503 while the root path works. This is a routing issue, not a
 target health issue.
 
-```bash
-# Listener rules (priority order matters!)
-aws elbv2 describe-rules --listener-arn <listener-arn> --output json | \
-  jq '.Rules[] | {Priority, Conditions, Actions}'
-
-# Default action on the listener
-aws elbv2 describe-listeners --listener-arns <listener-arn> --output json | \
-  jq '.Listeners[0].DefaultActions'
-```
+Probes (describe-rules priority order, listener DefaultActions): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - A high-priority rule (low number) matches all paths (`path-pattern: /*`)
@@ -595,12 +282,7 @@ aws elbv2 describe-listeners --listener-arns <listener-arn> --output json | \
 Symptom: client receives `500 InternalServerError`. This is rare and
 usually indicates an AWS-side issue.
 
-```bash
-# Check AWS Health Dashboard for ELB events
-aws health describe-events \
-  --filter services=ELASTICLOADBALANCING,eventStatusCodes=OPEN,UPCOMING \
-  --region us-east-1 --output json
-```
+Probe (aws health describe-events for ELB): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - 500 sustained, all targets healthy, no recent change → **ESCALATE**,
@@ -681,78 +363,11 @@ CONFIRM: Before modifying the target group, emit and await:
 
 ### Worked example — 502 from target SG not allowing ALB SG
 
-```text
-TARGET: arn:aws:elasticloadbalancing:us-east-1:111:load-balancer/app/prod-api/ghi / target-group/tg-api/jkl
-VERDICT: ROOT_CAUSE_FOUND
-REASON: The target security group sg-target-api has no inbound rule
-  allowing the ALB security group sg-alb-prod on port 443 — the ALB
-  cannot establish a connection to the targets (Step 2b).
-LAYER: TARGET_SG_BLOCKED
-EVIDENCE:
-  - Symptom: clients receive 502 BadGateway. ALB access logs show
-    error_reason: Target.ConnectionFailed for all requests.
-  - Probe: aws elbv2 describe-target-health shows all targets State:
-    healthy (health check is on a different port that IS allowed by
-    the SG — port 80, while the target group serves on 443).
-  - Probe: aws ec2 describe-security-groups --group-ids sg-target-api
-    returns inbound rules allowing tcp/80 from sg-alb-prod but NO rule
-    for tcp/443.
-  - Probe: aws elbv2 describe-target-groups returns Port: 443 for
-    tg-api (the target group forwards on 443, not 80).
-  - Passing: health check passes on port 80 (traffic from sg-alb-prod
-    on port 80 is allowed); targets are healthy; ALB idle timeout is
-    60s; listener rule correctly points to tg-api.
-REMEDIATION:
-  1. Add an inbound rule to sg-target-api allowing the ALB SG on port
-     443:
-     aws ec2 authorize-security-group-ingress --group-id sg-target-api
-       --protocol tcp --port 443 --source-security-group-id sg-alb-prod
-       --profile <p>
-  2. Verify: curl from the ALB subnet to the target on 443 succeeds;
-     clients no longer see 502.
-CONFIRM: Before authorizing the SG ingress, emit and await:
-  "CONFIRM: About to authorize-security-group-ingress on sg-target-api
-   for sg-alb-prod on tcp/443. Proceed? (yes/no)"
-```
+Full worked example (502, healthy targets, SG missing tcp/443 from ALB SG; LAYER: TARGET_SG_BLOCKED): [references/worked-examples.md](references/worked-examples.md).
 
 ### Worked example — 504 from target exceeding idle timeout
 
-```text
-TARGET: arn:aws:elasticloadbalancing:us-east-1:111:load-balancer/app/prod-reports/mno / target-group/tg-reports/pqr
-VERDICT: ROOT_CAUSE_FOUND
-REASON: The report-generation endpoint takes 75-90 seconds to respond,
-  exceeding the ALB idle timeout of 60 seconds. The ALB returns 504 at
-  60s while the target continues processing (Step 4).
-LAYER: TARGET_TIMEOUT
-EVIDENCE:
-  - Symptom: clients receive 504 GatewayTimeout on POST /reports/generate
-    after exactly 60 seconds.
-  - Probe: aws elbv2 describe-load-balancer-attributes returns
-    idle_timeout.timeout_seconds: 60.
-  - Probe: ALB access logs show target_processing_time: 60.0 and
-    error_reason: Target.Timeout for the failing requests.
-  - Probe: CloudWatch TargetResponseTime metric shows Maximum 60.0s
-    (capped — the ALB closes at 60s even though the target continues).
-  - Probe: ssh <bastion> "time curl -X POST
-    http://<target-ip>:8080/reports/generate -d '@test.json'"
-    returns the response in 82 seconds (the target is slow but succeeds
-    when given time).
-  - Passing: targets are healthy; target SG allows ALB SG on 8080;
-    listener rule correctly points to tg-reports.
-REMEDIATION:
-  1. Raise the ALB idle timeout to 120s (verify the target can finish
-     within 120s):
-     aws elbv2 modify-load-balancer-attributes --load-balancer-arn <arn>
-       --attributes Key=idle_timeout.timeout_seconds,Value=120
-       --profile <p>
-  2. Alternatively, migrate the report-generation endpoint to an async
-     pattern (POST returns 202 with a job ID; client polls for status).
-     This is preferred for endpoints that take > 60s.
-  3. Verify: POST /reports/generate returns 200 within 120s.
-CONFIRM: Before modifying the ALB attributes, emit and await:
-  "CONFIRM: About to modify-load-balancer-attributes on <arn>
-   (idle_timeout 60 → 120). Proceed? (yes/no)"
-```
+Full worked example (504 at exactly 60s, Target.Timeout; LAYER: TARGET_TIMEOUT): [references/worked-examples.md](references/worked-examples.md).
 
 ## Anti-Patterns — NEVER
 
@@ -870,95 +485,7 @@ CONFIRM: Before modifying the ALB attributes, emit and await:
 
 ## Remediation guidance
 
-### For TARGET_HEALTH_CHECK — wrong health check configuration
-
-1. Identify the correct health check endpoint (an application route that
-   returns 200 when healthy):
-   ```bash
-   ssh <bastion> "curl -v http://<target-ip>:<port><candidate-path>"
-   # Test multiple paths: /health, /healthz, /ready, /status
-   ```
-2. Update the health check configuration:
-   ```bash
-   aws elbv2 modify-target-group --target-group-arn <tg-arn> \
-     --health-check-path /healthz \
-     --matcher HttpCode=200,204 \
-     --profile <p>
-   ```
-3. Wait for `healthy_threshold_count` consecutive successful checks.
-4. Verify: `describe-target-health` shows `healthy`.
-
-### For TARGET_SG_BLOCKED — target SG does not allow ALB SG
-
-1. Add an inbound rule to the target SG:
-   ```bash
-   aws ec2 authorize-security-group-ingress --group-id <sg-target> \
-     --protocol tcp --port <target-port> \
-     --source-security-group-id <sg-alb> --profile <p>
-   ```
-2. Verify: `curl` from the ALB subnet to the target on the target port.
-
-### For TARGET_NONE_HEALTHY — no registered targets
-
-1. Register targets:
-   ```bash
-   aws elbv2 register-targets --target-group-arn <tg-arn> \
-     --targets Id=<i-id>,Port=<port> --profile <p>
-   ```
-2. Wait for health checks to pass.
-3. Verify: `describe-target-health` shows `healthy`.
-
-### For TARGET_TIMEOUT — target exceeding idle timeout
-
-1. Raise the idle timeout (if the workload legitimately needs it):
-   ```bash
-   aws elbv2 modify-load-balancer-attributes --load-balancer-arn <arn> \
-     --attributes Key=idle_timeout.timeout_seconds,Value=120 \
-     --profile <p>
-   ```
-2. Or migrate to an async pattern for long-running requests.
-
-### For TARGET_INVALID_RESPONSE — target returning malformed HTTP
-
-1. Test the target directly to identify the malformed response:
-   ```bash
-   ssh <bastion> "curl -v http://<target-ip>:<port>/"
-   ```
-2. Fix the target application (HTTP server crash, wrong port, SSL
-   configuration).
-3. Verify: the target returns a valid HTTP response.
-
-### For DEREGISTRATION_STUCK — targets stuck in draining
-
-1. Register new targets to replace the draining ones.
-2. Optionally reduce the deregistration delay:
-   ```bash
-   aws elbv2 modify-target-group-attributes --target-group-arn <tg-arn> \
-     --attributes Key=deregistration_delay.timeout_seconds,Value=30 \
-     --profile <p>
-   ```
-
-### For WAF_BLOCKED — WAF false positive
-
-1. Identify the blocking rule in WAF logs.
-2. Add an exemption or tune the rule:
-   ```bash
-   aws wafv2 update-web-acl --web-acl-arn <acl-arn> \
-     --rules file://updated-rules.json --profile <p>
-   ```
-
-### For LISTENER_MISCONFIGURED — wrong target group or priority
-
-1. Update the listener rule:
-   ```bash
-   aws elbv2 modify-rule --rule-arn <rule-arn> \
-     --actions Type=forward,TargetGroupArn=<correct-tg-arn> --profile <p>
-   ```
-
-### For ESCALATE — AWS-side incident
-
-1. Surface the AWS Health event ARN and load balancer ARN.
-2. Open a Support case with the time window and access-log evidence.
+Per-LAYER fix playbooks (TARGET_HEALTH_CHECK, TARGET_SG_BLOCKED, TARGET_NONE_HEALTHY, TARGET_TIMEOUT, TARGET_INVALID_RESPONSE, DEREGISTRATION_STUCK, WAF_BLOCKED, LISTENER_MISCONFIGURED, ESCALATE): [references/error-handling.md](references/error-handling.md).
 
 ## Domain
 
@@ -967,27 +494,15 @@ Security Group Verification, and Incident Diagnosis.
 
 ## Recent AWS features (2024-2026)
 
-- **ALB target group health check enhancements (2024-2025):** Improved
-  health check granularity including configurable success codes per
-  target group. Operators should verify the matcher includes all success
-  codes the application returns (200, 204, 301).
-- **NLB TCP health check improvements (2024):** Optional HTTP/HTTPS
-  health checks for NLB target groups. Operators migrating from ALB to
-  NLB for static IPs should switch health check type from TCP to HTTP
-  to avoid false-healthy status.
-- **ALB access log field additions (2024):** New fields including
-  `chosen_cert_arn` and enhanced `error_reason` values. Enable access
-  logs with the latest format for the richest 5xx diagnosis surface.
-- **WAF integration enhancements (2024-2025):** Custom response codes
-  and headers for WAF blocks. The 561 error code is now customizable —
-  operators may see 403 or other codes depending on WAF configuration.
-- **Cross-zone load balancing for NLB (2024):** Continued support for
-  toggling cross-zone on NLB. New NLBs default to OFF; operators should
-  evaluate whether ON is needed for even distribution.
-- **ALB Lambda target improvements (2024-2025):** Enhanced Lambda
-  multi-value header support and response format validation. Lambda
-  targets behind ALB now have clearer error messages for malformed
-  responses.
+Full feature list with dates: [references/advanced-patterns.md](references/advanced-patterns.md).
+
+## References (load on demand)
+
+- [Diagnostic commands](references/diagnostic-commands.md) — account-wide pre-flight gather-info gate, Step 1b access-log fetch, and every step's probe commands (2a-7)
+- [Worked examples](references/worked-examples.md) — 502 from target SG not allowing ALB SG, 504 from target exceeding idle timeout, NEED_MORE_INFO re-prompt
+- [Error handling](references/error-handling.md) — per-LAYER remediation guidance with fix and verify commands
+- [Advanced patterns](references/advanced-patterns.md) — diagnostic mindset, philosophy, Step 0 non-obvious behaviours, recent AWS features
+- [Target health reference](references/target-health-reference.md) — error-code catalog, reason codes, access-log fields, SG evaluation, metrics
 
 ## AWS documentation
 

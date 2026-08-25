@@ -401,3 +401,166 @@ resource "aws_ssoadmin_account_assignment" "data_team" {
   target_type        = "AWS_ACCOUNT"
 }
 ```
+
+## Expert heuristic — SSO permission set auto-assignment
+
+A baseline model says "assign permission sets manually per account."
+The correct heuristic recognizes that Control Tower SSO integration
+enables auto-assignment of permission sets to Account Factory-vended
+accounts, and that group-based assignment scales better than
+individual user assignment.
+
+```text
+SSO permission set assignment flow:
+  1. Define permission set in Identity Center
+     → e.g., "AWSAdministratorAccess" (maps to AdministratorAccess)
+     → e.g., "AWSReadOnlyAccess" (maps to ReadOnlyAccess)
+     → e.g., "DataEngineerAccess" (custom policy)
+
+  2. Assign permission set to a GROUP
+     → group: "PlatformTeam" → permission: "AWSAdministratorAccess"
+     → group: "Developers" → permission: "AWSReadOnlyAccess"
+     → This is an account-scoped assignment
+
+  3. Account Factory auto-provisions SSO
+     → when a new account is vended, Control Tower provisions the
+       Identity Center instance to the account
+     → permission sets assigned to the OU (via account group) are
+       automatically available in the new account
+
+  4. Users access via Identity Center portal
+     → user authenticates via SSO
+     → sees available accounts and permission sets
+     → assumes role in the target account
+
+  Scaling model:
+    Instead of: assign permission to user per account (O(users × accounts))
+    Use: assign permission to group per OU (O(groups × OUs))
+    → add users to groups; groups inherit permission sets across OU accounts
+```
+
+**Key implication:** group-based permission set assignment at the OU
+level is the scaling pattern. New accounts vended into the OU
+automatically inherit the group-to-permission-set bindings, so new
+accounts immediately have the correct access without per-account
+configuration.
+
+## Step 3 — SSO permission set assignment (CLI detail)
+
+**Create a permission set:**
+
+```bash
+PERMISSION_SET_ARN=$(aws sso-admin create-permission-set \
+  --instance-arn "$SSO_INSTANCE_ARN" \
+  --name "DataEngineerAccess" \
+  --description "Data engineering read-write access" \
+  --session-duration "PT8H" \
+  --relay-state-type "https://console.aws.amazon.com/" \
+  --query 'PermissionSet.PermissionSetArn' --output text)
+
+# Attach a managed policy
+aws sso-admin attach-managed-policy-to-permission-set \
+  --instance-arn "$SSO_INSTANCE_ARN" \
+  --permission-set-arn "$PERMISSION_SET_ARN" \
+  --managed-policy-arn "arn:aws:iam::aws:policy/AWSGlueConsoleFullAccess"
+
+# Attach an inline policy (custom)
+aws sso-admin put-inline-policy-to-permission-set \
+  --instance-arn "$SSO_INSTANCE_ARN" \
+  --permission-set-arn "$PERMISSION_SET_ARN" \
+  --inline-policy file://data-engineer-inline-policy.json
+```
+
+**Assign to a group for an account:**
+
+```bash
+aws sso-admin create-account-assignment \
+  --instance-arn "$SSO_INSTANCE_ARN" \
+  --target-id "123456789012" \
+  --target-type "AWS_ACCOUNT" \
+  --permission-set-arn "$PERMISSION_SET_ARN" \
+  --principal-type "GROUP" \
+  --principal-id "group-id-xxx"
+```
+
+**Critical:** the assignment does NOT take effect until the permission
+set is provisioned to the account. Control Tower auto-provisions SSO
+for Account Factory accounts, but manual assignments require a
+provisioning step:
+
+```bash
+# Provision the permission set to the account
+aws sso-admin provision-permission-set \
+  --instance-arn "$SSO_INSTANCE_ARN" \
+  --permission-set-arn "$PERMISSION_SET_ARN" \
+  --target-id "123456789012" \
+  --target-type "AWS_ACCOUNT"
+```
+
+## Step 6 — email and account name uniqueness (detail)
+
+**Recommended email pattern:**
+
+```text
+aws+<ou>-<account-name>@<company-domain>
+
+Examples:
+  aws+prod-data-platform@company.com
+  aws+dev-sandbox-01@company.com
+  aws+security-audit@company.com
+```
+
+Using the `+` alias pattern (Gmail, Outlook, most email providers)
+routes all emails to the same inbox while providing unique addresses
+for each account.
+
+**Account name uniqueness:** while not enforced by the API, duplicate
+account names cause confusion in billing, the console, and automation.
+Always verify:
+
+```bash
+aws organizations list-accounts \
+  --query 'Accounts[*].Name' --output text | tr '\t' '\n' | \
+  grep -q "data-platform-prod" && echo "DUPLICATE" || echo "UNIQUE"
+```
+
+## Step 9 — account lifecycle (vending, updating, terminating)
+
+### Vending new accounts
+
+Covered in Step 1. The vending process creates the account, places it
+in the OU, deploys baselines, and configures SSO.
+
+### Updating account baseline
+
+When the landing zone is updated (new Control Tower version), baseline
+StackSets are redeployed to all enrolled accounts. For custom
+customizations, update the StackSet:
+
+```bash
+aws cloudformation update-stack-set \
+  --stack-set-name "CustomBaseline-VPC" \
+  --template-body file://vpc-template-v2.yaml \
+  --operation-preferences RegionConcurrencyType=PARALLEL
+```
+
+### Terminating accounts
+
+Account Factory supports account termination via Service Catalog:
+
+```bash
+# Terminate the provisioned product
+aws servicecatalog terminate-provisioned-product \
+  --provisioned-product-name "data-platform-prod"
+
+# Note: this dis-enrolls the account from Control Tower and removes
+# baseline StackSets. The AWS account itself is NOT deleted — it enters
+# SUSPENDED state and is permanently closed after 90 days.
+```
+
+**Critical:** terminating an Account Factory provisioned product does
+NOT delete the AWS account. It only removes Control Tower management
+(SCPs remain until the account is moved out of the OU, baselines are
+removed). The account transitions to SUSPENDED and is closed after
+90 days. To fully remove an account, you must also close it via the
+Organizations console/API.

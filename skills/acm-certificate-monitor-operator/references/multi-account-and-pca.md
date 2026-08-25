@@ -509,3 +509,69 @@ resource "aws_cloudwatch_metric_alarm" "cert_critical" {
   ok_actions    = [aws_sns_topic.cert_critical.arn]
 }
 ```
+
+## Step 7 — certificate-to-load-balancer mapping (CLI)
+
+**Find certificates attached to ALBs/NLBs:**
+
+```bash
+# List listeners with cert details for each LB
+for LB_ARN in $(aws elbv2 describe-load-balancers \
+  --query 'LoadBalancers[*].LoadBalancerArn' --output text --region us-east-1); do
+  aws elbv2 describe-listeners --load-balancer-arn "$LB_ARN" \
+    --query 'Listeners[*].{Protocol:Protocol,Certs:Certificates[*].CertificateArn}' \
+    --output table --region us-east-1
+done
+```
+
+**CloudFront and API Gateway:** CloudFront cert ARNs are in
+`aws cloudfront list-distributions --query 'DistributionList.Items[*].ViewerCertificate.ACMCertificateArn'`.
+API Gateway custom domain certs are in
+`aws apigateway get-domain-names --query 'items[*].certificateArn'`.
+
+**Identify unattached certificates (at risk of not auto-renewing):**
+
+```bash
+# Cross-reference all ISSUED certs with ALB/NLB/CloudFront/API GW attached certs
+# Any cert in the full list not found in attached lists is unattached
+```
+```
+
+## Step 8 — multi-account audit via Organizations (script)
+
+**Audit certificates in each account:**
+
+```bash
+for ACCT_ID in $(aws organizations list-accounts \
+  --query 'Accounts[?Status==`ACTIVE`].Id' --output text | tr '\t' '\n'); do
+  CREDS=$(aws sts assume-role \
+    --role-arn "arn:aws:iam::$ACCT_ID:role/ACMMonitoringRole" \
+    --role-session-name "acm-audit" --query 'Credentials' --output json)
+  export AWS_ACCESS_KEY_ID=$(echo "$CREDS" | jq -r '.AccessKeyId')
+  export AWS_SECRET_ACCESS_KEY=$(echo "$CREDS" | jq -r '.SecretAccessKey')
+  export AWS_SESSION_TOKEN=$(echo "$CREDS" | jq -r '.SessionToken')
+  for REGION in us-east-1 us-west-2 eu-west-1; do
+    echo "  $ACCT_ID / $REGION:"
+    aws acm list-certificates --region "$REGION" \
+      --query 'CertificateSummaryList[*].{Domain:DomainName,Status:Status}' --output table
+  done
+  unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+done
+```
+
+## Step 12 — private certificate (ACM PCA) monitoring (CLI)
+
+```bash
+# List private CAs and check expiry
+aws acm-pca list-certificate-authorities \
+  --query 'CertificateAuthorities[*].{Arn:Arn,Status:Status,NotAfter:NotAfter}' \
+  --output table --region us-east-1
+
+# PCA CA certs don't have a built-in DaysToExpiry metric.
+# Compute days remaining from NotAfter:
+NOT_AFTER=$(aws acm-pca describe-certificate-authority \
+  --certificate-authority-arn arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/abc123 \
+  --query 'CertificateAuthority.NotAfter' --output text --region us-east-1)
+DAYS_REMAINING=$(( ( $(date -d "$NOT_AFTER" +%s) - $(date +%s) ) / 86400 ))
+echo "PCA CA cert days remaining: $DAYS_REMAINING"
+```

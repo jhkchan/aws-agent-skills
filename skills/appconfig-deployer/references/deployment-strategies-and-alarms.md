@@ -231,3 +231,120 @@ resource "aws_appconfig_deployment" "production" {
   description              = "Deploy production config"
 }
 ```
+
+---
+
+## Step-by-step CLI walkthroughs (moved verbatim from SKILL.md)
+
+The SKILL.md body keeps only step stubs under progressive disclosure
+(agentskills.io); the original step sections below were moved verbatim
+so no content is lost.
+
+## Step 4 — Deployment strategies (linear, exponential, all-at-once)
+
+Deployment strategies control the rollout rate. The growth factor
+defines the percentage of targets per step; the bake time defines the
+monitoring window between steps.
+
+```bash
+# Linear — 20% per step, 10-minute bake
+STRATEGY_ID=$(aws appconfig create-deployment-strategy \
+  --name "linear-20pct-10min" --growth-factor 20 --growth-type "LINEAR" \
+  --replicate-to "NONE" --final-bake-time-in-minutes 10 --query 'Id' --output text)
+
+# Exponential — 2% initial, doubles each step (change growth-type to EXPONENTIAL)
+# All-at-once — growth-factor 100, bake-time 0 (RISKY — no alarm monitoring)
+```
+
+**Critical:** all-at-once with bake time 0 provides NO alarm monitoring.
+This is acceptable for non-critical configs but risky for production.
+
+## Step 5 — Bake time and CloudWatch alarms
+
+Bake time is the monitoring window between deployment steps. During each
+bake window, AppConfig monitors configured CloudWatch alarms. If any
+alarm fires, the deployment is automatically rolled back.
+
+**Create a CloudWatch alarm for error rate:**
+
+```bash
+ALARM_ARN=$(aws cloudwatch put-metric-alarm \
+  --alarm-name "appconfig-deploy-error-rate" \
+  --metric-name "5XXError" \
+  --namespace "AWS/ApiGateway" \
+  --statistic "Sum" \
+  --period 60 \
+  --threshold 10 \
+  --comparison-operator "GreaterThanThreshold" \
+  --evaluation-periods 1 \
+  --query 'AlarmArn' --output text)
+```
+
+**Attach alarms to a deployment:**
+
+The alarm ARNs are specified when starting the deployment (see Step 8).
+AppConfig monitors these alarms during each bake window.
+
+**Critical:** a bake time of 0 means NO alarm monitoring. Always use a
+bake time > 0 for production deployments with at least one alarm.
+
+## Step 8 — Configuration version management
+
+Configuration versions are immutable. To update a configuration, create
+a new version and deploy it.
+
+**Create a configuration version:**
+
+```bash
+# Upload configuration content as a new version
+VERSION_ID=$(aws appconfig create-hosted-configuration-version \
+  --application-id "$APP_ID" \
+  --configuration-profile-id "$PROFILE_ID_JSON" \
+  --content '{"timeout": 30, "retries": 3}' \
+  --content-type "application/json" \
+  --query 'VersionNumber' --output text)
+
+echo "Configuration version: $VERSION_ID"
+```
+
+**List versions:**
+
+```bash
+aws appconfig list-hosted-configuration-versions \
+  --application-id "$APP_ID" \
+  --configuration-profile-id "$PROFILE_ID_JSON"
+```
+
+## Step 9 — Rollback on alarm
+
+When a CloudWatch alarm fires during the bake time, AppConfig
+automatically rolls back the deployment to the previous configuration
+version.
+
+**Start a deployment with alarm monitoring:**
+
+```bash
+DEPLOYMENT_ID=$(aws appconfig start-deployment \
+  --application-id "$APP_ID" \
+  --environment-id "$ENV_ID" \
+  --deployment-strategy-id "$STRATEGY_ID_LINEAR" \
+  --configuration-profile-id "$PROFILE_ID_JSON" \
+  --configuration-version "$VERSION_ID" \
+  --description "Deploy timeout configuration update" \
+  --query 'DeploymentNumber' --output text)
+
+echo "Deployment number: $DEPLOYMENT_ID"
+```
+
+**Monitor the deployment:**
+
+```bash
+aws appconfig get-deployment \
+  --application-id "$APP_ID" \
+  --environment-id "$ENV_ID" \
+  --deployment-number "$DEPLOYMENT_ID"
+```
+
+**Key:** the deployment state transitions through BAKING, DEPLOYING,
+and COMPLETE. If an alarm fires during BAKING, the state becomes
+ROLLED_BACK.

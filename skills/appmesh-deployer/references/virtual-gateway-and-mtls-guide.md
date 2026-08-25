@@ -146,3 +146,61 @@ aws appmesh update-virtual-node \
    forward to a gateway listener configured for HTTPS (with ACM
    cert) or HTTP (with TLS terminated at ALB). Mismatch = TLS errors
    at the gateway.
+
+## CLI boilerplate (moved from SKILL.md)
+
+### Create a virtual gateway for ingress
+
+```bash
+aws appmesh create-virtual-gateway \
+  --mesh-name "prod-checkout-mesh" \
+  --virtual-gateway-name "ingress-gateway" \
+  --spec '{
+    "listeners": [{
+      "portMapping": {"port": 8443, "protocol": "http"},
+      "tls": {
+        "certificate": {"acm": {"certificateArn": "arn:aws:acm:us-east-1:111111111111:certificate/abc123"}},
+        "mode": "PERMISSIVE"
+      }
+    }]
+  }'
+
+aws appmesh create-gateway-route \
+  --mesh-name "prod-checkout-mesh" \
+  --virtual-gateway-name "ingress-gateway" \
+  --gateway-route-name "checkout-ingress" \
+  --spec '{
+    "httpRoute": {
+      "match": {"prefix": "/checkout"},
+      "action": {
+        "target": {"virtualService": {"virtualServiceName": "checkout.prod-checkout-mesh.svc.cluster.local"}}
+      }
+    }
+  }'
+```
+
+### Enable mutual TLS on a listener
+
+```bash
+aws appmesh update-virtual-node \
+  --mesh-name "prod-checkout-mesh" \
+  --virtual-node-name "checkout-service-v1" \
+  --spec '{
+    "serviceDiscovery": {"cloudMap": {"namespaceName": "prod-internal", "serviceName": "checkout-v1"}},
+    "listeners": [{
+      "portMapping": {"port": 8080, "protocol": "http"},
+      "tls": {
+        "certificate": {"sds": {"secretName": "checkout-cert"}},
+        "mode": "STRICT",
+        "validation": {
+          "trust": {"sds": {"secretName": "checkout-ca-bundle"}}
+        }
+      }
+    }]
+  }'
+```
+
+`mode: STRICT` rejects clients without a valid cert; `PERMISSIVE`
+allows both mTLS and plaintext during migration. SDS (Secret
+Discovery Service) is the recommended cert distribution mechanism.
+

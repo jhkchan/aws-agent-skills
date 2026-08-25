@@ -236,3 +236,76 @@ aws apigateway update-stage --rest-api-id <id> --stage-name prod \
 Enable stage variable caching (`cacheClusterEnabled: true`) for high-
 traffic APIs to avoid re-resolving the variable per request. Cache TTL
 defaults to 300 seconds.
+
+### Step 6: Usage plans and API keys
+
+```bash
+aws apigateway create-usage-plan --name prod-consumer-plan \
+  --description "Per-consumer rate limiting for prod API" \
+  --throttle burstLimit=200,rateLimit=100 \
+  --quota limit=1000000,period=MONTH \
+  --api-stages apiId=<api-id>,stage=prod
+```
+
+```bash
+aws apigateway create-api-key --name consumer-a-key --description "Consumer A" --enabled
+aws apigateway create-usage-plan-key --usage-plan-id <plan-id> \
+  --key-id <key-id> --key-type API_KEY
+```
+
+**Per-method requirement:**
+```bash
+aws apigateway update-method --rest-api-id <id> --resource-id <rid> \
+  --http-method GET \
+  --patch-operations op=replace,path=/apiKeyRequired,value=true
+```
+
+
+### Step 7: Stage throttling
+
+```bash
+aws apigateway update-stage --rest-api-id <id> --stage-name prod \
+  --patch-operations \
+    op=replace,path=/methods/GET/throttling/rateLimit,value=100 \
+    op=replace,path=/methods/GET/throttling/burstLimit,value=50 \
+    op=replace,path=/*/throttling/rateLimit,value=1000 \
+    op=replace,path=/*/throttling/burstLimit,value=500
+```
+
+The stage-level `*` (default) applies to all methods without explicit
+overrides. Method-level overrides take precedence. Always set both rate
+and burst — burst must be ≤ 25% of rate for sustained traffic.
+
+
+### Step 9: VPC Link for private integrations
+
+```bash
+aws apigateway create-vpc-link --name prod-nlb-link \
+  --target-arns arn:aws:elasticloadbalancing:<region>:<account>:loadbalancer/net/<nlb-name>/<nlb-id> \
+  --description "VPC Link to prod NLB"
+```
+
+Wait for VPC Link status `AVAILABLE` (2-5 minutes). Then configure
+HTTP or HTTP_PROXY integration with `connectionId: <vpc-link-id>` and
+`connectionType: VPC_LINK`.
+
+**Anti-pattern:** NEVER target an ALB directly via VPC Link — it is not
+supported. Front the ALB with an NLB, or use HTTP integration with the
+ALB DNS (which exposes the ALB to internet egress).
+
+
+### Step 11: Canary deployments
+
+```bash
+aws apigateway update-stage --rest-api-id <id> --stage-name prod \
+  --patch-operations \
+    op=replace,path=/canarySettings/percentTraffic,value=10 \
+    op=replace,path=/canarySettings/deploymentId,value=<new-deployment-id> \
+    op=replace,path=/canarySettings/useStageCache,value=true
+```
+
+Canary routes 10% of traffic to the new deployment; 90% stays on the
+current. Promote by setting `percentTraffic` to 100, then deleting the
+canary (which makes the new deployment the stage's stable version).
+
+

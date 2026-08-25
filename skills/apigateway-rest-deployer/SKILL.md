@@ -25,41 +25,7 @@ metadata:
 ---
 
 # API Gateway REST Deployer
-
-## Mindset
-
-**One-line takeaway:** a production REST API is not "a method on a path"
-— it is a **layered security and contract model** where every method
-has an explicit authorization, every integration has a typed contract
-(mapping templates or proxy), every stage has a deployment snapshot with
-throttling, and every consumer has a usage plan. The route-to-Lambda is
-the least interesting part; the **authorization model, throttle budget,
-and deployment discipline** determine blast radius and uptime.
-
-Three facts make API Gateway provisioning different from "expose a
-Lambda over HTTP":
-
-- **Stage + Deployment is a snapshot model, not live editing.** A
-  deployment is an immutable snapshot of the API configuration. The
-  stage points to a deployment. Modifying methods/resources without
-  `create-deployment` leaves the OLD configuration live. Many operators
-  change auth type, see "success" in the console, and walk away — the
-  insecure old version is still serving because no deployment was created.
-
-- **API keys are NOT authentication.** `apiKeyRequired: true` on a method
-  with `authorizationType: NONE` provides ZERO access control. API keys
-  are identification tokens for usage plans (throttling/quotas) — they are
-  transmitted in cleartext (`x-api-key`), shareable, and extractable from
-  client code. Authentication comes from `AWS_IAM`, `COGNITO_USER_POOLS`,
-  or a `CUSTOM` Lambda authorizer.
-
-- **REST API (v1) and HTTP API (v2) are different products, not versions.**
-  HTTP API is cheaper, simpler, and faster — but lacks mapping templates,
-  usage plans, API keys, resource policies, and EDGE endpoint type. REST
-  API supports the full feature surface. Choose based on requirements, not
-  on "newer is better." For Lambda proxy with JWT auth, HTTP API is often
-  the right choice. For per-consumer rate limiting or SOAP-style XML
-  transforms, REST API is required.
+Mindset — layered security and contract model (snapshot deployments, API keys are not authentication, REST vs HTTP are different products): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Quick reference — deployment checklist
 
@@ -86,20 +52,7 @@ Before producing the deployment plan, validate the input specification.
 Several requirements **block deployment** — proceeding with an invalid
 spec produces a non-functional or insecure API.
 
-**Live-account pre-flight checks (skip if doing offline architecture plan):**
-1. Verify IAM permissions for `apigateway:CreateRestApi`, `CreateResource`,
-   `PutMethod`, `PutIntegration`, `CreateAuthorizer`, `CreateUsagePlan`,
-   `CreateApiKey`, `CreateDeployment`, `CreateStage`, `UpdateStage`,
-   `apigatewayv2:CreateApi`, `CreateDomainName`, `CreateVpcLink`, and
-   `wafv2:CreateWebACL`, `wafv2:AssociateWebACL`.
-2. For Lambda integrations, verify the function exists in the same region
-   and the API Gateway service has `lambda:InvokeFunction` permission.
-3. For VPC Link, verify the NLB exists and has target groups in multiple
-   AZs.
-4. For Cognito authorizers, verify the user pool exists and the app client
-   is configured.
-5. For custom domains, verify the ACM certificate is ISSUED in the same
-   region as the API (REGIONAL) or us-east-1 (EDGE).
+Live-account pre-flight checks (IAM permissions, Lambda function and invoke permission, NLB multi-AZ, Cognito user pool, ACM cert region): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 | Attribute | Value | Effect on plan |
 |---|---|---|
@@ -133,94 +86,10 @@ REQUIRED:
 ## Process — Architecture planning (apply in order, produce deployment plan)
 
 ### Step 0: Expert knowledge — non-obvious API Gateway behaviors that change the plan
-
-- **Changes are not live until `create-deployment`.** Resources, methods,
-  integrations, and authorizers are configuration. The deployment is the
-  snapshot that goes live. Operators frequently modify auth and walk away
-  without deploying — the old (often insecure) config keeps serving.
-  Always emit `create-deployment` as the final command.
-
-- **API keys are NOT authentication.** `apiKeyRequired: true` gates usage
-  plan enforcement. `authorizationType: NONE` + `apiKeyRequired: true` is
-  PUBLIC_NO_AUTH. The key is in the `x-api-key` header in cleartext. Use
-  AWS_IAM, COGNITO_USER_POOLS, or a Lambda authorizer for real auth.
-
-- **ANY method covers all HTTP verbs.** ANY maps to GET, POST, PUT, PATCH,
-  DELETE, HEAD, OPTIONS simultaneously. ANY + NONE auth is the most
-  dangerous method configuration — it exposes every verb including
-  destructive ones (DELETE, PUT) without authentication.
-
-- **`{proxy+}` is a catch-all greedy path.** ANY on `{proxy+}` catches
-  every sub-path. If this combination has NONE auth, every route beneath
-  is exposed. Use `{proxy+}` carefully and always with an authorizer.
-
-- **Usage plan without API keys is dormant.** A plan with zero associated
-  keys cannot enforce throttling or quotas. Always link at least one API
-  key after creating the plan.
-
-- **Account-level default throttle is shared across all APIs in the region.**
-  Default is 10,000 rps / 5,000 burst. One abused API can exhaust the
-  budget and 429 every other API in the region. Always create a usage plan
-  with explicit per-consumer throttles.
-
-- **EDGE endpoint hides the client IP behind CloudFront.** `aws:SourceIp`
-  in a resource policy matches CloudFront edge IPs, not client IPs. For
-  client-IP restrictions on EDGE APIs, use WAF or a Lambda authorizer
-  reading `x-forwarded-for`.
-
-- **WAF rate-based rules count per IP, not per API key.** One attacker
-  rotating across 100 IPs with 100 API keys bypasses a 2,000-req/5-min
-  IP rule. For per-key limiting, only usage-plan throttling is effective.
-
-- **Mapping templates are Velocity (VTL).** REST API supports
-  request/response mapping templates for transformation between client
-  and integration format. HTTP API does NOT support mapping templates —
-  you get the raw request or use a Lambda to transform.
-
-- **VPC Link target must be an NLB.** The NLB must have target groups in
-  the API's region. ALB is NOT directly supported as a VPC Link target —
-  front the ALB with an NLB, or use an HTTP integration with the ALB DNS.
-
-- **Stage variables enable per-stage config.** Use stage variables to
-  point at different Lambda function versions, endpoint URLs, or feature
-  flags per stage (prod, staging, dev). Reference in integration as
-  `${stageVariables.functionName}`.
-
-- **Canary deployment shifts a percentage of traffic.** Configure the
-  canary to send e.g., 10% of traffic to the new deployment; 90% stays on
-  the stable deployment. Promote by increasing to 100% when metrics are
-  green.
-
-- **Access logging uses CloudWatch Logs with JSON format.** Configure
-  `$context` variables (requestId, accountId, stage, httpMethod, status,
-  responseLatency, sourceIp, errorMessage, authorizer error). JSON format
-  enables Athena/CloudWatch Logs Insights queries.
-
-- **Custom domain requires ACM cert + base path mapping.** The cert must
-  cover the domain. The base path mapping determines which API stage a
-  path maps to (e.g., `api.example.com/v1` → API-1 prod stage).
+Step 0 expert knowledge — non-obvious behaviors that change the plan (changes not live until create-deployment, API keys are not authentication, ANY/{proxy+} dangers, dormant usage plans, shared account throttle, EDGE client IP, WAF per-IP rules, VTL mapping templates, NLB-only VPC Link, stage variables, canary traffic shifting, JSON access logging, custom domains): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 1: API type selection — REST (v1) vs HTTP (v2)
-
-| Dimension | REST API (v1) | HTTP API (v2) |
-|---|---|---|
-| Cost | $3.50/M requests + data transfer | $1.00/M requests (cheaper) |
-| Latency | Higher (more features) | Lower (~30% better) |
-| Mapping templates | Yes (Velocity/VTL) | No |
-| Usage plans + API keys | Yes | No (use Lambda for throttling) |
-| Resource policies | Yes | No |
-| Authorization | AWS_IAM, COGNITO_USER_POOLS, CUSTOM | JWT, IAM |
-| EDGE endpoint | Yes (CloudFront) | No |
-| PRIVATE endpoint | Yes | Yes |
-| WAF association | Yes | Yes |
-| Canary deployments | Yes (stage level) | Yes (stage level) |
-| Custom domains | Yes | Yes |
-| Migration path | — | Re-create (no in-place conversion) |
-
-**Decision rule:**
-- Use HTTP API for: Lambda proxy with JWT auth, simple CRUD, microservices.
-- Use REST API for: usage plans with API keys, mapping templates, EDGE
-  global deployment, resource policies, existing clients on v1 features.
+Step 1 decision detail — REST (v1) vs HTTP (v2) comparison matrix, decision rule, and migration notes: [references/rest-vs-http-api-guide.md](references/rest-vs-http-api-guide.md).
 
 ### Step 2: Endpoint type
 
@@ -287,69 +156,13 @@ aws lambda add-permission --function-name <name> \
 ```
 
 ### Step 5: Authorization
-
-| Type | Use case | Configuration |
-|---|---|---|
-| `AWS_IAM` | Service-to-service, internal APIs | Caller signs request with sigv4 credentials. |
-| `COGNITO_USER_POOLS` | User-facing apps | Caller passes JWT `Authorization: Bearer <token>`. Authorizer validates against Cognito. |
-| `CUSTOM` (Lambda) | Flexible auth (SAML, OAuth introspection, custom logic) | Lambda returns IAM policy. Token authorizer (header) or request authorizer (full request). |
-| `NONE` | Public endpoints (health checks, public docs) | No auth. Acceptable only for genuinely public data. |
-
-**Cognito authorizer:**
-```bash
-aws apigateway create-authorizer --rest-api-id <id> \
-  --name cognito-auth --type COGNITO_USER_POOLS \
-  --provider-arns arn:aws:cognito-idp:<region>:<account>:userpool/<pool-id> \
-  --identity-source method.request.header.Authorization
-```
-
-**Lambda request authorizer:**
-```bash
-aws apigateway create-authorizer --rest-api-id <id> \
-  --name lambda-auth --type REQUEST \
-  --authorizer-uri arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/arn:aws:lambda:<region>:<account>:function:my-auth/invocations \
-  --authorizer-credentials-arn arn:aws:iam::<account>:role:apigw-invoker \
-  --identity-source method.request.header.Authorization \
-  --identity-validation-expression '^Bearer .+$'
-```
+Step 5 detail — authorization model matrix plus Cognito and Lambda request authorizer creation commands: [references/rest-vs-http-api-guide.md](references/rest-vs-http-api-guide.md).
 
 ### Step 6: Usage plans and API keys
-
-```bash
-aws apigateway create-usage-plan --name prod-consumer-plan \
-  --description "Per-consumer rate limiting for prod API" \
-  --throttle burstLimit=200,rateLimit=100 \
-  --quota limit=1000000,period=MONTH \
-  --api-stages apiId=<api-id>,stage=prod
-```
-
-```bash
-aws apigateway create-api-key --name consumer-a-key --description "Consumer A" --enabled
-aws apigateway create-usage-plan-key --usage-plan-id <plan-id> \
-  --key-id <key-id> --key-type API_KEY
-```
-
-**Per-method requirement:**
-```bash
-aws apigateway update-method --rest-api-id <id> --resource-id <rid> \
-  --http-method GET \
-  --patch-operations op=replace,path=/apiKeyRequired,value=true
-```
+Step 6 CLI sequences (create-usage-plan with throttle/quota, create-api-key, create-usage-plan-key, per-method apiKeyRequired): [references/usage-plans-vpclink-canary-guide.md](references/usage-plans-vpclink-canary-guide.md).
 
 ### Step 7: Stage throttling
-
-```bash
-aws apigateway update-stage --rest-api-id <id> --stage-name prod \
-  --patch-operations \
-    op=replace,path=/methods/GET/throttling/rateLimit,value=100 \
-    op=replace,path=/methods/GET/throttling/burstLimit,value=50 \
-    op=replace,path=/*/throttling/rateLimit,value=1000 \
-    op=replace,path=/*/throttling/burstLimit,value=500
-```
-
-The stage-level `*` (default) applies to all methods without explicit
-overrides. Method-level overrides take precedence. Always set both rate
-and burst — burst must be ≤ 25% of rate for sustained traffic.
+Step 7 CLI sequence (update-stage throttle patch-operations; method-level overrides win; burst must be <= 25% of rate): [references/usage-plans-vpclink-canary-guide.md](references/usage-plans-vpclink-canary-guide.md).
 
 ### Step 8: WAFv2 Web ACL association
 
@@ -373,20 +186,7 @@ For HTTP API (v2), use the same association — the resource ARN is
 and a rate-based rule (e.g., 2000 requests per 5 minutes per IP).
 
 ### Step 9: VPC Link for private integrations
-
-```bash
-aws apigateway create-vpc-link --name prod-nlb-link \
-  --target-arns arn:aws:elasticloadbalancing:<region>:<account>:loadbalancer/net/<nlb-name>/<nlb-id> \
-  --description "VPC Link to prod NLB"
-```
-
-Wait for VPC Link status `AVAILABLE` (2-5 minutes). Then configure
-HTTP or HTTP_PROXY integration with `connectionId: <vpc-link-id>` and
-`connectionType: VPC_LINK`.
-
-**Anti-pattern:** NEVER target an ALB directly via VPC Link — it is not
-supported. Front the ALB with an NLB, or use HTTP integration with the
-ALB DNS (which exposes the ALB to internet egress).
+Step 9 CLI sequence (create-vpc-link targeting an NLB, wait for AVAILABLE, connectionType VPC_LINK; NEVER target an ALB directly): [references/usage-plans-vpclink-canary-guide.md](references/usage-plans-vpclink-canary-guide.md).
 
 ### Step 10: Mapping templates (REST API only)
 
@@ -418,18 +218,7 @@ NOT support mapping templates.
 `$context.responseLatency`, `$context.status`, `$context.error_message`.
 
 ### Step 11: Canary deployments
-
-```bash
-aws apigateway update-stage --rest-api-id <id> --stage-name prod \
-  --patch-operations \
-    op=replace,path=/canarySettings/percentTraffic,value=10 \
-    op=replace,path=/canarySettings/deploymentId,value=<new-deployment-id> \
-    op=replace,path=/canarySettings/useStageCache,value=true
-```
-
-Canary routes 10% of traffic to the new deployment; 90% stays on the
-current. Promote by setting `percentTraffic` to 100, then deleting the
-canary (which makes the new deployment the stage's stable version).
+Step 11 CLI sequence (canary percentTraffic / deploymentId / useStageCache; promote at 100%): [references/usage-plans-vpclink-canary-guide.md](references/usage-plans-vpclink-canary-guide.md).
 
 ### Step 12: Access logging
 
@@ -582,58 +371,10 @@ DEPLOY_COMMANDS:
 ```
 
 ## Verification commands (run after deployment)
-
-```bash
-# Verify API is deployed and stage exists
-aws apigateway get-stage --rest-api-id <id> --stage-name prod
-
-# Verify all methods have correct authorization
-aws apigateway get-methods --rest-api-id <id> \
-  --query 'items[*].[httpMethod,authorizationType,authorizerId]'
-
-# Verify usage plan and keys are linked
-aws apigateway get-usage-plans --query 'items[?apiStages[?apiId==`<id>`]]'
-aws apigateway get-usage-plan-keys --usage-plan-id <plan-id>
-
-# Verify WAF is associated
-aws apigatewayv2 get-web-acl-for-resource --resource-arn arn:aws:apigateway:<region>::/restapis/<id>/stages/prod
-
-# Verify access logging is configured
-aws apigateway get-stage --rest-api-id <id> --stage-name prod \
-  --query 'accessLogSettings'
-
-# Test invocation (with valid auth)
-curl -X GET https://<api-id>.execute-api.<region>.amazonaws.com/prod/users \
-  -H "Authorization: Bearer <jwt>"
-
-# Verify custom domain mapping
-aws apigateway get-base-path-mappings --domain-name api.example.com
-```
+Verification commands (get-stage, get-methods authorization check, usage-plan keys, WAF association, access logging, curl invocation, base-path mappings): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ## Edge-case handling
-
-- **Stage without deployment.** A stage with no current deployment serves
-  nothing. Always create the deployment first, then point the stage at it.
-
-- **Lambda function in different region.** API Gateway integrations can
-  target Lambda in another region, but this adds latency and is an
-  anti-pattern. Deploy function in the same region as the API.
-
-- **WAF rate-based rule with rotating attackers.** IP-based rate limiting
-  does not correlate with API keys. For per-key limiting, rely on usage
-  plan throttles, not WAF.
-
-- **Cognito authorizer caching.** Default TTL is 300 seconds. A revoked
-  token may still work for up to 5 minutes. Lower the TTL for sensitive
-  APIs, but expect higher Cognito invocation costs.
-
-- **Edge endpoint with resource policy IP conditions.** `aws:SourceIp`
-  matches CloudFront edge IPs, not client IPs. Use WAF or Lambda
-  authorizer for client-IP restrictions on EDGE APIs.
-
-- **HTTP API without authorizer.** An HTTP API with no JWT or IAM
-  authorizer is fully public. Treat as equivalent to REST API with
-  `authorizationType: NONE`.
+Edge-case handling (undeployed stage, cross-region Lambda, rotating attackers vs WAF, Cognito authorizer caching TTL, EDGE source IP, HTTP API without authorizer): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Anti-Patterns — NEVER
 
@@ -728,58 +469,22 @@ aws apigateway get-base-path-mappings --domain-name api.example.com
   each `create-deployment`.
 
 ## Remediation guidance
+Remediation guidance — PREREQUISITES_MISSING fixes (ACM cert region, VPC Link to ALB, cross-region Lambda) under the ordering principle authorization first, then deployment snapshot, then throttling, then optimization: [references/error-handling.md](references/error-handling.md).
 
-**Ordering principle:** authorization first (active exposure if wrong),
-then deployment snapshot (changes not live), then throttling/quotas
-(abuse prevention), then optimization (logging, canary, custom domain).
+## References (load on demand)
 
-### For PREREQUISITES_MISSING — ACM cert in wrong region
-
-1. Re-issue or import the cert in the correct region:
-   - EDGE API: us-east-1
-   - REGIONAL API: API region
-2. Update the custom domain configuration with the new cert ARN.
-
-### For PREREQUISITES_MISSING — VPC Link to ALB
-
-1. Create an NLB that targets the ALB (or ALB's targets directly).
-2. Verify NLB has target groups in the API's region across multiple AZs.
-3. Create the VPC Link targeting the NLB ARN.
-4. Update the HTTP integration with `connectionType: VPC_LINK`.
-
-### For PREREQUISITES_MISSING — Lambda in different region
-
-1. Recreate the function in the API's region.
-2. Update the integration URI with the new function ARN.
-3. Re-issue `lambda:AddPermission` for the API Gateway principal.
+- [REST vs HTTP API guide](references/rest-vs-http-api-guide.md) - full REST/HTTP comparison, decision tree, authorization models (Steps 1, 5)
+- [Usage plans, VPC Link, and canary guide](references/usage-plans-vpclink-canary-guide.md) - usage plans and API keys, throttle semantics, VPC Link, canary deployments (Steps 6, 7, 9, 11)
+- [Diagnostic commands](references/diagnostic-commands.md) - live-account pre-flight checks, post-deployment verification commands
+- [Error handling](references/error-handling.md) - PREREQUISITES_MISSING remediations (ACM cert region, ALB VPC Link, cross-region Lambda)
+- [Advanced patterns](references/advanced-patterns.md) - mindset, Step-0 expert knowledge, edge-case handling, recent AWS features
 
 ## Domain
 
 AWS CloudOps / API Gateway REST & HTTP API Provisioning.
 
 ## Recent AWS features (2024-2026)
-
-- **HTTP API mTLS:** HTTP APIs support mutual TLS via custom domain names.
-  Use for B2B APIs with strict client certificate requirements.
-
-- **VPC Lattice integration:** HTTP APIs can integrate with VPC Lattice
-  as a private integration. A Lattice-backed API may not appear in
-  standard VPC security group audits — check Lattice auth policies.
-
-- **OpenAPI 3.1 support:** REST and HTTP APIs support OpenAPI 3.1 import.
-  Auth configurations can be imported from external specs. Verify the
-  imported `x-amazon-apigateway-*` extensions match intended security.
-
-- **API Gateway v2 OpenAPI importer:** Enhanced importer for HTTP APIs
-  with better JWT authorizer and route mapping support.
-
-- **Canary deployment improvements:** Stage canary now supports weighted
-  logging — canary vs stable traffic split is visible in CloudWatch
-  metrics dimensions.
-
-- **WebSocket APIs (stable):** API Gateway WebSocket APIs are GA and
-  integrate with Lambda for real-time bidirectional workloads. Not
-  covered by this skill (REST/HTTP only).
+Recent AWS features 2024-2026 (HTTP API mTLS, VPC Lattice, OpenAPI 3.1, v2 OpenAPI importer, weighted canary logging, WebSocket GA): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## AWS documentation
 

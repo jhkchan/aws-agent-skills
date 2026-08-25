@@ -301,3 +301,74 @@ Certificate lifecycle with DNS validation:
 **Critical:** the validation CNAME and CAA records must be present
 at ALL times, not just during initial validation. ACM re-checks them
 during every renewal attempt.
+
+## Expert heuristic — CAA record conflict detection
+
+CAA (Certification Authority Authorization) DNS records specify which
+CAs are allowed to issue certificates for a domain. ACM requires a CAA
+record that permits Amazon (issuer: `amazon.com`) or no CAA record at
+all. A CAA record that does NOT include `amazon.com` silently blocks
+ACM renewal.
+
+```text
+CAA record scenarios:
+  ├── No CAA records → Any CA can issue → ACM renewal OK
+  ├── CAA record includes amazon.com → ACM can issue → renewal OK
+  ├── CAA record includes only letsencrypt.org → ACM BLOCKED
+  │     Issue: "amazon.com" not in CAA allowlist
+  │     Symptom: renewal status stays PENDING_VALIDATION, DaysToExpiry keeps decreasing
+  │     Fix: add CAA record for amazon.com OR remove restrictive CAA
+  └── CAA record includes amazon.com + issuewild → wildcard renewal OK
+        issuewild controls wildcard cert issuance specifically
+
+Detection:
+  dig caa example.com +short
+  # Expected for ACM-compatible: 0 issue "amazon.com"
+  # Or: no output (no CAA records)
+```
+
+**Key implication:** always check CAA records when renewal fails. The
+DaysToExpiry alarm fires but the renewal does not complete because the
+CAA record blocks ACM. This is the #1 renewal failure cause and is
+invisible without an explicit DNS check.
+
+## Step 5 — DNS validation record verification (CLI)
+
+**Retrieve the validation CNAME records:**
+
+```bash
+aws acm describe-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/abc123-def456 \
+  --query 'Certificate.DomainValidationOptions[*].{Domain:DomainName,ValidationStatus:ValidationStatus,CNAMEName:ResourceRecord.Name,CNAMEValue:ResourceRecord.Value}' \
+  --region us-east-1 --output table
+```
+
+**Verify the CNAME exists in DNS:**
+
+```bash
+# Verify the CNAME exists and resolves
+dig _abc123.example.com.example.com CNAME +short
+nslookup -type=CNAME _abc123.example.com.example.com
+# Or via Route53 API: list-resource-record-sets filtered by CNAME type
+```
+
+## Step 6 — CAA record conflict detection (CLI and fix)
+
+**Check CAA records for the domain:**
+
+```bash
+dig example.com CAA +short
+nslookup -type=CAA example.com
+```
+
+**Interpret CAA results:**
+
+| CAA record | Effect on ACM renewal |
+|---|---|
+| No CAA records (empty) | No restriction — ACM OK |
+| `0 issue "amazon.com"` | ACM authorized — OK |
+| `0 issue "letsencrypt.org"` (no amazon.com) | ACM BLOCKED |
+| `0 issue ";"` | All renewal blocked |
+
+**Fix CAA conflict (Route53):** add `0 issue "amazon.com"` CAA record
+via `aws route53 change-resource-record-sets` UPSERT.

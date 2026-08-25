@@ -506,3 +506,323 @@ execution role with permissions for:
 **Critical:** the `execute-api:ManageConnections` permission is
 required for PostToConnection. The resource ARN format is:
 `arn:aws:execute-api:{region}:{account}:{api-id}/{stage}/POST/@connections/*`
+
+---
+
+## Step-by-step CLI walkthroughs (moved verbatim from SKILL.md)
+
+The SKILL.md body keeps only step stubs under progressive disclosure
+(agentskills.io); the original step sections below were moved verbatim
+so no content is lost.
+
+## Step 2 — Connection routes ($connect, $disconnect)
+
+WebSocket APIs have two built-in routes for connection lifecycle:
+
+| Route | When it fires | Use case |
+|---|---|---|
+| `$connect` | Client opens WebSocket connection | Store ConnectionId, authenticate |
+| `$disconnect` | Client or server closes connection | Delete ConnectionId, cleanup |
+
+**Create the $connect route:**
+
+```bash
+aws apigatewayv2 create-route \
+  --api-id abc123def4 \
+  --route-key '$connect' \
+  --target integrations/abc123 \
+  --region us-east-1
+```
+
+**Create the $disconnect route:**
+
+```bash
+aws apigatewayv2 create-route \
+  --api-id abc123def4 \
+  --route-key '$disconnect' \
+  --target integrations/def456 \
+  --region us-east-1
+```
+
+**$connect event structure (Lambda):**
+
+```json
+{
+  "requestContext": {
+    "routeKey": "$connect",
+    "connectionId": "abc123=-",
+    "apiId": "abc123def4",
+    "domainName": "abc123def4.execute-api.us-east-1.amazonaws.com",
+    "stage": "prod"
+  },
+  "queryStringParameters": {
+    "token": "user-auth-token"
+  },
+  "headers": {
+    "Authorization": "Bearer ..."
+  }
+}
+```
+
+The `connectionId` is the unique identifier for this connection. It
+must be stored on $connect and used for PostToConnection later.
+
+**$disconnect event structure (Lambda):**
+
+```json
+{
+  "requestContext": {
+    "routeKey": "$disconnect",
+    "connectionId": "abc123=-",
+    "disconnectReason": "CLIENT_INITIATED",
+    "eventType": "DISCONNECT"
+  }
+}
+```
+
+**Critical:** the $connect integration response determines whether
+the connection is accepted. A 2xx status accepts the connection;
+a non-2xx status rejects it. This is where custom authorizers or
+authentication checks run.
+
+## Step 7 — Connection management (DynamoDB)
+
+Connection management is the APPLICATION'S responsibility. The
+standard pattern uses DynamoDB to store ConnectionIds.
+
+**DynamoDB table for connections:**
+
+```bash
+aws dynamodb create-table \
+  --table-name WebSocketConnections \
+  --attribute-definitions AttributeName=connectionId,AttributeType=S \
+  --key-schema AttributeName=connectionId,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST \
+  --region us-east-1
+```
+
+**$connect handler (store ConnectionId):**
+
+```javascript
+const AWS = require('aws-sdk');
+const dynamo = new AWS.DynamoDB.DocumentClient();
+const TABLE_NAME = process.env.CONNECTIONS_TABLE;
+
+exports.handler = async (event) => {
+  const connectionId = event.requestContext.connectionId;
+  
+  // Store the connection
+  await dynamo.put({
+    TableName: TABLE_NAME,
+    Item: {
+      connectionId: connectionId,
+      timestamp: Date.now(),
+      userId: event.queryStringParameters.userId || 'anonymous'
+    }
+  }).promise();
+  
+  return { statusCode: 200 };
+};
+```
+
+**$disconnect handler (delete ConnectionId):**
+
+```javascript
+exports.handler = async (event) => {
+  const connectionId = event.requestContext.connectionId;
+  
+  await dynamo.delete({
+    TableName: TABLE_NAME,
+    Key: { connectionId: connectionId }
+  }).promise();
+  
+  return { statusCode: 200 };
+};
+```
+
+**Sending messages to clients (PostToConnection):**
+
+```javascript
+const AWS = require('aws-sdk');
+
+// IMPORTANT: Use ApiGatewayManagementApi, NOT ApiGatewayV2
+const endpoint = event.requestContext.domainName + '/' + event.requestContext.stage;
+const managementApi = new AWS.ApiGatewayManagementApi({
+  apiVersion: '2018-11-29',
+  endpoint: endpoint
+});
+
+async function sendMessage(connectionId, data) {
+  try {
+    await managementApi.postToConnection({
+      ConnectionId: connectionId,
+      Data: JSON.stringify(data)
+    }).promise();
+  } catch (err) {
+    if (err.statusCode === 410) {
+      // Connection is gone (client disconnected without $disconnect)
+      await dynamo.delete({
+        TableName: TABLE_NAME,
+        Key: { connectionId: connectionId }
+      }).promise();
+    } else {
+      throw err;
+    }
+  }
+}
+```
+
+**Critical:** the ApiGatewayManagementApi endpoint is
+`https://{api-id}.execute-api.{region}.amazonaws.com/{stage}`. It
+must be constructed from the event's `domainName` and `stage`. The
+SDK does NOT auto-detect the endpoint.
+
+## Step 8 — Custom authorizer (Lambda)
+
+A Lambda custom authorizer authenticates WebSocket connections at
+the $connect route. The authorizer runs BEFORE the $connect
+integration.
+
+**Create a Lambda authorizer:**
+
+```bash
+aws apigatewayv2 create-authorizer \
+  --api-id abc123def4 \
+  --authorizer-type REQUEST \
+  --authorizer-uri arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:111122223333:function:ws-auth/invocations \
+  --identity-source '$request.querystring.token' \
+  --authorizer-result-ttl-in-seconds 300 \
+  --name "ws-auth" \
+  --region us-east-1
+```
+
+**Attach the authorizer to the $connect route:**
+
+```bash
+aws apigatewayv2 update-route \
+  --api-id abc123def4 \
+  --route-id <connect-route-id> \
+  --authorizer-id <authorizer-id> \
+  --authorization-type CUSTOM \
+  --region us-east-1
+```
+
+**Authorizer Lambda handler:**
+
+```javascript
+exports.handler = async (event) => {
+  const token = event.queryStringParameters.token;
+  
+  // Validate token
+  const isValid = await validateToken(token);
+  
+  if (!isValid) {
+    return {
+      isAuthorized: false
+    };
+  }
+  
+  return {
+    isAuthorized: true,
+    context: {
+      userId: token.userId
+    }
+  };
+};
+```
+
+**Key point:** the authorizer returns `{ isAuthorized: boolean }`.
+If `false`, the connection is rejected (HTTP 403 on $connect). If
+`true`, the connection proceeds. The `context` object is available
+in the $connect integration's event.
+
+## Step 10 — WAF integration
+
+AWS WAF can be attached to a WebSocket API to filter connection
+requests. WAF inspects the initial HTTP upgrade request (the
+WebSocket handshake) but does NOT inspect individual WebSocket
+frames after the connection is established.
+
+**Attach WAF to the WebSocket API:**
+
+```bash
+# Associate WAF Web ACL with the API (via the API stage ARN)
+aws wafv2 associate-web-acl \
+  --web-acl-arn arn:aws:wafv2:us-east-1:111122223333:regional/webacl/ws-waf/abc123 \
+  --resource-arn arn:aws:apigateway:us-east-1::/restapis/abc123def4/stages/prod \
+  --region us-east-1
+```
+
+**WAF rule examples for WebSocket:**
+
+- IP-based filtering (allow/block specific IPs for connections)
+- Rate-based rules (limit connections per IP)
+- Geographic restrictions (allow/block countries)
+- Header inspection (validate auth headers on connection)
+
+**Key limitation:** WAF only inspects the initial connection
+request (HTTP upgrade). Messages sent after connection are NOT
+inspected by WAF. For message-level filtering, implement it in the
+backend.
+
+## Step 11 — Ping/pong keepalive
+
+API Gateway WebSocket connections auto-disconnect after 2 hours of
+inactivity. Implement keepalive to maintain long-lived connections.
+
+**Client-side WebSocket ping (recommended):**
+
+```javascript
+// Browser WebSocket API automatically handles ping/pong at protocol level
+// But not all browsers send periodic pings. Implement application-level heartbeat:
+
+const ws = new WebSocket('wss://abc123def4.execute-api.us-east-1.amazonaws.com/prod');
+
+// Send heartbeat every 60 seconds
+setInterval(() => {
+  if (ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ action: 'ping' }));
+  }
+}, 60000);
+```
+
+**Server-side heartbeat response:**
+
+```javascript
+// In the "ping" route handler
+exports.handler = async (event) => {
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ type: 'pong', timestamp: Date.now() })
+  };
+};
+```
+
+**Important:** any traffic on the connection resets the idle timer.
+This includes the client sending a message, the server sending a
+message via PostToConnection, or protocol-level ping/pong frames.
+
+## Step 13 — Message size limit (128 KB)
+
+The maximum message size for WebSocket API messages is **128 KB**
+(131,072 bytes) per frame. Messages larger than 128 KB are rejected
+with a 413 Payload Too Large error.
+
+**Implications:**
+- JSON payloads must be under 128 KB. Large objects should be
+  offloaded to S3 and a reference (URL) sent via WebSocket.
+- Binary data must be base64-encoded (which increases size by ~33%),
+  effectively limiting binary payloads to ~96 KB pre-encoding.
+- For large data transfers, chunk messages into multiple frames
+  under 128 KB each.
+
+**Message size verification:**
+
+```javascript
+// Client-side check before sending
+const message = JSON.stringify({ action: 'sendData', data: largePayload });
+if (message.length > 128 * 1024) {
+  // Chunk or offload to S3
+  console.error('Message exceeds 128 KB limit');
+}
+```

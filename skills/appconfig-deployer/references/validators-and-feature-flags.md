@@ -297,3 +297,72 @@ resource "aws_appconfig_hosted_configuration_version" "flags_v1" {
   content_type = "application/json"
 }
 ```
+
+---
+
+## Step-by-step CLI walkthroughs (moved verbatim from SKILL.md)
+
+The SKILL.md body keeps only step stubs under progressive disclosure
+(agentskills.io); the original step sections below were moved verbatim
+so no content is lost.
+
+## Step 6 — Lambda validators (deployment validation)
+
+Lambda validators run BEFORE the deployment begins. They validate the
+configuration content and block deployment if validation fails. See
+`references/validators-and-feature-flags.md` for a full validator
+function example with semantic validation patterns.
+
+**Attach the validator to a configuration profile:**
+
+```bash
+aws appconfig create-configuration-profile \
+  --application-id "$APP_ID" \
+  --name "validated-config" \
+  --location-uri "hosted" \
+  --type "AWS.AppConfig.JSON" \
+  --validators '[{"Type":"LAMBDA","Content":"'$(aws lambda get-function --function-name config-validator --query Configuration.FunctionArn --output text)'"}]'
+```
+
+**Critical:** validators run on EVERY deployment of that profile. A
+failing validator blocks the deployment entirely.
+
+## Step 7 — Feature flags and dynamic JSON schema
+
+Feature flags enable dynamic configuration management. They use a
+specific configuration profile schema that supports flag-level
+operations.
+
+**Create a feature flag schema:**
+
+```json
+{
+  "flags": {
+    "newCheckoutFlow": {
+      "enabled": true,
+      "percentage": 25
+    },
+    "betaDashboard": {
+      "enabled": false,
+      "percentage": 0
+    }
+  }
+}
+```
+
+**JSON schema validation for configuration profiles:**
+
+For JSON/YAML profiles, attach a JSON schema to validate structure:
+
+```bash
+aws appconfig create-configuration-profile \
+  --application-id "$APP_ID" \
+  --name "schema-validated-config" \
+  --location-uri "hosted" \
+  --type "AWS.AppConfig.JSON" \
+  --validators '[{"Type":"JSON_SCHEMA","Content":"{\"type\":\"object\",\"properties\":{\"timeout\":{\"type\":\"number\",\"minimum\":1,\"maximum\":300}},\"required\":[\"timeout\"]}"}]'
+```
+
+**Key:** JSON schema validation catches structural errors at version
+creation time. Lambda validators catch semantic errors at deployment
+time. Both are complementary.

@@ -80,6 +80,9 @@ with a specific gap citation in the checklist (marked `[✗]`), and
 | Output format | The literal checklist template |
 | references/guardrails-and-baseline.md | Guardrail + baseline detail |
 | references/sso-and-lifecycle.md | SSO + lifecycle detail |
+| references/advanced-patterns.md | Dependency graph + recent features |
+| references/error-handling.md | Provisioning failure remedies |
+| references/diagnostic-commands.md | Verification CLI detail |
 
 ## Mindset
 
@@ -93,35 +96,7 @@ supported way to create accounts that Control Tower manages — accounts
 created directly via Organizations `CreateAccount` are NOT enrolled in
 Control Tower and do NOT inherit Guardrails or baselines.
 
-Three misconceptions dominate Account Factory misdesign at provisioning
-time:
-
-- **"Creating an account via Organizations is the same as Account
-  Factory."** It is NOT. Organizations `CreateAccount` creates a raw
-  AWS account with no Guardrails, no baseline, no SSO enrollment, and
-  no landing zone integration. The account exists in the org but is
-  unmanaged by Control Tower. Account Factory wraps Organizations
-  `CreateAccount` with additional steps: SCP inheritance, Config
-  recorder setup, CloudTrail logging, Security Hub enablement, SSO
-  integration, and StackSet deployment. Using raw Organizations creates
-  a governance gap that must be retroactively fixed.
-
-- **"Guardrails apply automatically to all accounts."** Only to accounts
-  in enrolled OUs. Guardrails (SCPs) are attached at the OU level in
-  Organizations. An account in an OU with Guardrails inherits them
-  automatically. But an account in the root or an unregistered OU gets
-  NO Guardrails. The landing zone defines which OUs are registered for
-  Guardrails. The #1 cause of "my account has no Guardrails" is that
-  the account was placed in an OU that is not registered with Control
-  Tower.
-
-- **"SSO permission sets are assigned at the account level."** They are
-  assigned at the account level, but they are DEFINED at the Identity
-  Center (SSO) level and then PROVISIONED to accounts. The permission
-  set must exist in Identity Center first, then be assigned to a
-  principal (user or group) for a specific account (or account group).
-  The assignment is a three-way binding: principal → permission set →
-  account. Missing any leg of this binding means no access.
+Three misconceptions in full (raw Organizations ≠ Account Factory; Guardrails apply only to registered OUs; SSO assignment is a three-way binding): [Advanced patterns](references/advanced-patterns.md).
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -131,169 +106,19 @@ accounts can be enrolled. The Service Catalog product must be available
 before provisioning. SSO permission sets must exist before assignment.
 Use this graph to sequence provisioning.
 
-| Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| Landing zone | Control Tower enabled in the management account | landing zone version must be up to date for latest features; an outdated version silently lacks newer Guardrails | registered OUs, Account Factory |
-| Registered OU | Landing zone exists; OU exists in Organizations | OU must be registered via Control Tower console or API — an unregistered OU does NOT get Guardrails even if it is in the org | Guardrail inheritance for accounts in that OU |
-| Service Catalog product | Landing zone exists; Account Factory portfolio provisioned | the Account Factory product is auto-created by Control Tower; the product must be in AVAILABLE state; a deleted product blocks all new account creation | account vending |
-| Account (vending) | Service Catalog product available; target OU registered; unique email and account name | account creation is asynchronous (5-30 minutes); email must be globally unique across ALL AWS accounts; a duplicate email fails the entire provisioning | managed account with Guardrails + baseline |
-| SSO permission set | Identity Center enabled; permission set created in Identity Center store | permission set must be provisioned to the account before users can assume it; provisioning is a separate step from assignment | SSO access |
-| SSO assignment | Permission set provisioned to account; principal exists in Identity Center | assignment is a three-way binding: principal + permission set + account; missing any leg = no access | user access to the account |
-| Guardrail (SCP) | OU registered with Control Tower | SCPs are attached at the OU level; an account inherits from its OU; moving an account to a different OU changes its SCPs | preventive controls |
-| Baseline (StackSet) | Landing zone deployed; account enrolled in Control Tower | StackSets deploy to the account automatically upon enrollment; a failed StackSet leaves the account with incomplete baseline (security/logging gaps) | logging, security, operational standards |
-| Custom product (customization) | Account Factory portfolio exists; custom CloudFormation template published | custom products deploy additional StackSets beyond the default baseline; template errors cause StackSet drift | account-specific customization |
-| Alternate contacts | Account exists; account is ACTIVE | alternate contacts (Billing, Security, Operations) are set via Account Management API; not inherited from OU | operational metadata for alerts |
-
-**The OU-registration row is the one a baseline model misses.** Many
-operators assume that any OU in the org automatically gets Guardrails.
-It does NOT — the OU must be explicitly registered with Control Tower.
-An account placed in an unregistered OU has NO preventive Guardrails,
-NO Detective detection, and NO Config baseline. This is the #1 cause of
-"my new account has no compliance controls."
-
-**Cross-dependency gotchas:**
-- The Service Catalog product (AWS Control Tower Account Factory
-  Factory) is auto-created by Control Tower during landing zone setup.
-  If it is deleted or misconfigured, ALL account vending stops.
-- SSO permission set assignment requires TWO API calls:
-  `CreatePermissionSet` (define the role), then
-  `AssignPermissions` (bind to principal + account). Forgetting the
-  second call means the permission set exists but no one has access.
-- Account email must be globally unique. AWS rejects the entire
-  provisioning if the email is already used by any AWS account,
-  including closed accounts. Use a consistent email alias pattern
-  (e.g., `aws+<account-name>@company.com`).
-- Baseline StackSets are deployed by Control Tower's `AWSControlTower`
-  role in the management account. If the StackSet execution role is
-  missing or misconfigured in the target account, the StackSet fails
-  silently — the account is enrolled but the baseline is incomplete.
-- Moving an account between OUs changes its inherited SCPs. An account
-  moved from a "Production" OU (strict SCPs) to a "Sandbox" OU (loose
-  SCPs) immediately loses its production Guardrails.
+Full dependency table (landing zone → registered OU → SC product → account → SSO → guardrails → baseline → custom product → alternate contacts) plus cross-dependency gotchas: [Advanced patterns](references/advanced-patterns.md).
 
 ## Expert heuristic: landing zone baseline propagation
 
-A baseline model says "create an account and it's done." The correct
-heuristic recognizes that Control Tower's landing zone propagates a
-baseline (set of StackSets) to every enrolled account automatically.
-Understanding this propagation is essential for troubleshooting
-"missing baseline" issues.
-
-```text
-Landing zone baseline propagation:
-  1. Control Tower Landing Zone (management account)
-     → defines baseline StackSets (AWSControlTowerLogging,
-        AWSControlTowerSecurity, AWSControlTowerBP-BASELINE-CLOUDTRAIL,
-        etc.)
-     → StackSets target all registered OUs
-
-  2. New account vended via Account Factory
-     → placed in a registered OU
-     → Control Tower's AWSControlTowerExecutionRole auto-created
-     → StackSets deploy to the new account via this role
-
-  3. Baseline resources in the new account:
-     ├── CloudTrail trail (logging to the logging account)
-     ├── Config recorder (compliance tracking)
-     ├── Security Hub (security findings)
-     ├── GuardDuty (threat detection, if enabled)
-     ├── IAM password policy (if configured)
-     └── CloudWatch alarms (if configured in baseline)
-
-  4. If a StackSet fails (e.g., role missing):
-     → account is enrolled but baseline is INCOMPLETE
-     → no CloudTrail, no Config, no Security Hub
-     → the account is a compliance gap
-```
-
-**Key implication:** baseline propagation is automatic for enrolled
-accounts in registered OUs, but it is NOT guaranteed to succeed. Always
-verify StackSet deployment status in the management account after
-vending a new account. A failed StackSet leaves a compliance gap.
+Baseline propagation walkthrough (StackSet fan-out via AWSControlTowerExecutionRole, per-account baseline resources, incomplete-baseline failure mode): [Guardrails and baseline](references/guardrails-and-baseline.md).
 
 ## Expert heuristic: SCP inheritance from parent OU
 
-SCPs flow top-down through the Organizations hierarchy. An account's
-effective SCPs are the intersection of all SCPs at every level from the
-root down to the account's OU.
-
-```text
-Organizations SCP hierarchy:
-  Root
-    ├── SCP: DenyLeavingOrg (preventative)
-    ├── SCP: RequireMFA
-    └── OU: "Production"
-        ├── SCP: DenyUnapprovedRegions (only us-east-1, us-west-2, eu-west-1)
-        ├── SCP: RequireEncryption (S3, EBS, RDS)
-        └── Account: prod-app-001
-            → effective SCPs = Root ∩ Production OU
-            = DenyLeavingOrg + RequireMFA + DenyUnapprovedRegions + RequireEncryption
-
-  If the account moves to OU "Sandbox":
-    └── OU: "Sandbox"
-        ├── SCP: AllowAllServices (no restrictions)
-        └── Account: prod-app-001 (moved here)
-            → effective SCPs = Root ∩ Sandbox OU
-            = DenyLeavingOrg + RequireMFA + AllowAllServices
-            → LOST: DenyUnapprovedRegions, RequireEncryption
-```
-
-**Key implication:** the effective permissions of an account depend on
-its OU placement. Moving an account between OUs changes its SCPs
-immediately. Always verify SCPs after any OU move.
-
-**Control Tower Guardrail types:**
-- **Preventive Guardrails** — implemented as SCPs. Block disallowed
-  actions (e.g., leaving the org, disabling CloudTrail, creating
-  resources in unapproved regions).
-- **Detective Guardrails** — implemented as Config rules + Security Hub
-  controls. Detect non-compliance and alert (e.g., publicly readable
-  S3 bucket, unencrypted EBS volume).
-- **Proactive Guardrails** — implemented as Config rules. Detect
-  resources that would violate policy before they are fully provisioned.
+SCP hierarchy walkthrough (effective-SCP intersection, OU-move consequences) and the preventive/detective/proactive Guardrail types: [Guardrails and baseline](references/guardrails-and-baseline.md).
 
 ## Expert heuristic: SSO permission set auto-assignment
 
-A baseline model says "assign permission sets manually per account."
-The correct heuristic recognizes that Control Tower SSO integration
-enables auto-assignment of permission sets to Account Factory-vended
-accounts, and that group-based assignment scales better than
-individual user assignment.
-
-```text
-SSO permission set assignment flow:
-  1. Define permission set in Identity Center
-     → e.g., "AWSAdministratorAccess" (maps to AdministratorAccess)
-     → e.g., "AWSReadOnlyAccess" (maps to ReadOnlyAccess)
-     → e.g., "DataEngineerAccess" (custom policy)
-
-  2. Assign permission set to a GROUP
-     → group: "PlatformTeam" → permission: "AWSAdministratorAccess"
-     → group: "Developers" → permission: "AWSReadOnlyAccess"
-     → This is an account-scoped assignment
-
-  3. Account Factory auto-provisions SSO
-     → when a new account is vended, Control Tower provisions the
-       Identity Center instance to the account
-     → permission sets assigned to the OU (via account group) are
-       automatically available in the new account
-
-  4. Users access via Identity Center portal
-     → user authenticates via SSO
-     → sees available accounts and permission sets
-     → assumes role in the target account
-
-  Scaling model:
-    Instead of: assign permission to user per account (O(users × accounts))
-    Use: assign permission to group per OU (O(groups × OUs))
-    → add users to groups; groups inherit permission sets across OU accounts
-```
-
-**Key implication:** group-based permission set assignment at the OU
-level is the scaling pattern. New accounts vended into the OU
-automatically inherit the group-to-permission-set bindings, so new
-accounts immediately have the correct access without per-account
-configuration.
+Group-based auto-assignment flow and the O(groups × OUs) scaling model: [SSO and lifecycle](references/sso-and-lifecycle.md).
 
 ## Prerequisites (verify before provisioning)
 
@@ -415,55 +240,7 @@ SSO (Identity Center) provides federated access to accounts via
 permission sets. Assignment is a three-way binding: principal (user or
 group) + permission set + account.
 
-**Create a permission set:**
-
-```bash
-PERMISSION_SET_ARN=$(aws sso-admin create-permission-set \
-  --instance-arn "$SSO_INSTANCE_ARN" \
-  --name "DataEngineerAccess" \
-  --description "Data engineering read-write access" \
-  --session-duration "PT8H" \
-  --relay-state-type "https://console.aws.amazon.com/" \
-  --query 'PermissionSet.PermissionSetArn' --output text)
-
-# Attach a managed policy
-aws sso-admin attach-managed-policy-to-permission-set \
-  --instance-arn "$SSO_INSTANCE_ARN" \
-  --permission-set-arn "$PERMISSION_SET_ARN" \
-  --managed-policy-arn "arn:aws:iam::aws:policy/AWSGlueConsoleFullAccess"
-
-# Attach an inline policy (custom)
-aws sso-admin put-inline-policy-to-permission-set \
-  --instance-arn "$SSO_INSTANCE_ARN" \
-  --permission-set-arn "$PERMISSION_SET_ARN" \
-  --inline-policy file://data-engineer-inline-policy.json
-```
-
-**Assign to a group for an account:**
-
-```bash
-aws sso-admin create-account-assignment \
-  --instance-arn "$SSO_INSTANCE_ARN" \
-  --target-id "123456789012" \
-  --target-type "AWS_ACCOUNT" \
-  --permission-set-arn "$PERMISSION_SET_ARN" \
-  --principal-type "GROUP" \
-  --principal-id "group-id-xxx"
-```
-
-**Critical:** the assignment does NOT take effect until the permission
-set is provisioned to the account. Control Tower auto-provisions SSO
-for Account Factory accounts, but manual assignments require a
-provisioning step:
-
-```bash
-# Provision the permission set to the account
-aws sso-admin provision-permission-set \
-  --instance-arn "$SSO_INSTANCE_ARN" \
-  --permission-set-arn "$PERMISSION_SET_ARN" \
-  --target-id "123456789012" \
-  --target-type "AWS_ACCOUNT"
-```
+Create/attach/assign/provision CLI sequence and the provisioning-is-separate-from-assignment rule: [SSO and lifecycle](references/sso-and-lifecycle.md).
 
 ## Step 4 — Guardrail inheritance (SCP, Detective, Config)
 
@@ -476,33 +253,7 @@ OU automatically gets:
 | Detective | Config rule + Security Hub control | Detect publicly readable S3 bucket |
 | Proactive | Config rule | Detect non-compliant resource creation |
 
-**Verify SCP inheritance:**
-
-```bash
-# List SCPs attached to the account's OU
-aws organizations list-policies-for-target \
-  --target-id "ou-bbb-dataplatform" \
-  --filter SERVICE_CONTROL_POLICY \
-  --query 'Policies[*].{Name:Name,Id:Id,Type:Type}' \
-  --output table
-
-# Get the effective SCPs for the account (intersection of all levels)
-aws organizations list-policies-for-target \
-  --target-id "123456789012" \
-  --filter SERVICE_CONTROL_POLICY \
-  --output table
-```
-
-**Verify Detective Guardrails:**
-
-```bash
-# Check Config rules in the account
-aws configservice describe-config-rules \
-  --config-rule-names "AWSControlTower" \
-  --query 'ConfigRules[*].ConfigRuleName' \
-  --output table \
-  --profile data-platform-prod
-```
+SCP and Config-rule verification CLI: [Diagnostic commands](references/diagnostic-commands.md).
 
 ## Step 5 — Landing zone baseline conformance
 
@@ -517,19 +268,7 @@ account. The baseline includes:
 | AWSControlTowerBP-BASELINE-CONFIG | Config recorder baseline | All enrolled accounts |
 | AWSControlTowerBP-BASELINE-CLOUDWATCH | CloudWatch alarms baseline | All enrolled accounts |
 
-**Verify baseline StackSet deployment:**
-
-```bash
-# In the management account, check StackSet status for the new account
-aws cloudformation list-stack-instances \
-  --stack-set-name "AWSControlTowerLogging" \
-  --query 'Summaries[?Account==`123456789012`].{Account:Account,Status:StackInstanceStatus}' \
-  --output table
-```
-
-**If a StackSet fails:** check the StackSet operation details in the
-management account. Common causes: missing execution role in the target
-account, IAM permission issues, or conflicting resources.
+StackSet instance-status check and failure triage: [Diagnostic commands](references/diagnostic-commands.md).
 
 ## Step 6 — Email and account name uniqueness
 
@@ -538,30 +277,7 @@ globally unique across ALL AWS accounts (including accounts in other
 orgs and closed accounts). AWS rejects provisioning with a duplicate
 email.
 
-**Recommended email pattern:**
-
-```text
-aws+<ou>-<account-name>@<company-domain>
-
-Examples:
-  aws+prod-data-platform@company.com
-  aws+dev-sandbox-01@company.com
-  aws+security-audit@company.com
-```
-
-Using the `+` alias pattern (Gmail, Outlook, most email providers)
-routes all emails to the same inbox while providing unique addresses
-for each account.
-
-**Account name uniqueness:** while not enforced by the API, duplicate
-account names cause confusion in billing, the console, and automation.
-Always verify:
-
-```bash
-aws organizations list-accounts \
-  --query 'Accounts[*].Name' --output text | tr '\t' '\n' | \
-  grep -q "data-platform-prod" && echo "DUPLICATE" || echo "UNIQUE"
-```
+Email alias pattern, examples, and the uniqueness-check CLI: [SSO and lifecycle](references/sso-and-lifecycle.md).
 
 ## Step 7 — Alternate contacts
 
@@ -569,36 +285,7 @@ Alternate contacts provide operational metadata for billing, security,
 and operational notifications. They are set per-account via the Account
 Management API.
 
-**Set alternate contacts:**
-
-```bash
-# Billing contact
-aws account put-alternate-contact \
-  --account-id "123456789012" \
-  --alternate-contact-type "BILLING" \
-  --email-address "billing@company.com" \
-  --name "Finance Team" \
-  --phone-number "+1-555-0100" \
-  --title "Accounts Payable"
-
-# Security contact
-aws account put-alternate-contact \
-  --account-id "123456789012" \
-  --alternate-contact-type "SECURITY" \
-  --email-address "security@company.com" \
-  --name "Security Operations" \
-  --phone-number "+1-555-0200" \
-  --title "SOC"
-
-# Operations contact
-aws account put-alternate-contact \
-  --account-id "123456789012" \
-  --alternate-contact-type "OPERATIONS" \
-  --email-address "ops@company.com" \
-  --name "DevOps Team" \
-  --phone-number "+1-555-0300" \
-  --title "Platform Engineering"
-```
+put-alternate-contact CLI for BILLING, SECURITY, and OPERATIONS contacts: [Diagnostic commands](references/diagnostic-commands.md).
 
 **Critical:** alternate contacts are NOT inherited from the OU or org
 level. They must be set per-account. Automate this in the account
@@ -623,130 +310,21 @@ Custom account customization flow:
      baseline
 ```
 
-**Example custom StackSet (deploy VPC in every new account):**
-
-```bash
-# Create a custom StackSet
-aws cloudformation create-stack-set \
-  --stack-set-name "CustomBaseline-VPC" \
-  --template-body file://vpc-template.yaml \
-  --permission-model SERVICE_MANAGED \
-  --capabilities CAPABILITY_NAMED_IAM \
-  --auto-deployment 'Enabled=true,RetainStacksOnAccountRemoval=false'
-```
-
-**Account Factory customization via CloudFormation StackSets:**
-
-Control Tower supports customized account factory via the
-`AWSControlTowerBP-ENABLE-CONFIG-RULES` and custom products in the
-Account Factory portfolio. The customization template runs during
-account provisioning.
+Custom StackSet create CLI and the customization-template flow: [Guardrails and baseline](references/guardrails-and-baseline.md).
 
 ## Step 9 — Account lifecycle (vending, updating, terminating)
 
-### Vending new accounts
-
-Covered in Step 1. The vending process creates the account, places it
-in the OU, deploys baselines, and configures SSO.
-
-### Updating account baseline
-
-When the landing zone is updated (new Control Tower version), baseline
-StackSets are redeployed to all enrolled accounts. For custom
-customizations, update the StackSet:
-
-```bash
-aws cloudformation update-stack-set \
-  --stack-set-name "CustomBaseline-VPC" \
-  --template-body file://vpc-template-v2.yaml \
-  --operation-preferences RegionConcurrencyType=PARALLEL
-```
-
-### Terminating accounts
-
-Account Factory supports account termination via Service Catalog:
-
-```bash
-# Terminate the provisioned product
-aws servicecatalog terminate-provisioned-product \
-  --provisioned-product-name "data-platform-prod"
-
-# Note: this dis-enrolls the account from Control Tower and removes
-# baseline StackSets. The AWS account itself is NOT deleted — it enters
-# SUSPENDED state and is permanently closed after 90 days.
-```
-
-**Critical:** terminating an Account Factory provisioned product does
-NOT delete the AWS account. It only removes Control Tower management
-(SCPs remain until the account is moved out of the OU, baselines are
-removed). The account transitions to SUSPENDED and is closed after
-90 days. To fully remove an account, you must also close it via the
-Organizations console/API.
+Baseline update, terminate-provisioned-product, and the SUSPENDED-then-closed-after-90-days lifecycle: [SSO and lifecycle](references/sso-and-lifecycle.md).
 
 ## Step 10 — Compliance status verification
 
 After provisioning, verify the account's compliance status:
 
-```bash
-# Verify account is in the correct OU
-aws organizations list-parents \
-  --child-id "123456789012" \
-  --query 'Parents[0]' --output table
-
-# Verify SCPs are inherited
-aws organizations list-policies-for-target \
-  --target-id "123456789012" \
-  --filter SERVICE_CONTROL_POLICY \
-  --output table
-
-# Verify Config rules are deployed
-aws configservice describe-config-rule \
-  --config-rule-names "aws-control-tower" \
-  --query 'ConfigRules[0].ConfigRuleName' \
-  --output text \
-  --profile data-platform-prod
-
-# Verify Security Hub is enabled
-aws securityhub describe-hub \
-  --profile data-platform-prod
-
-# Verify SSO permission set provisioning
-aws sso-admin describe-account-assignment-creation-status \
-  --instance-arn "$SSO_INSTANCE_ARN" \
-  --account-assignment-creation-request-id "$REQUEST_ID"
-```
+OU placement, SCP, Config, Security Hub, and SSO verification CLI: [Diagnostic commands](references/diagnostic-commands.md).
 
 ## Step 11 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Control Tower Account Factory Customization (2023-2024):** Enhanced
-  support for custom CloudFormation templates that run during account
-  provisioning, enabling account-specific baselines beyond the default
-  Control Tower StackSets. Custom products can include VPC setup, KMS
-  keys, and IAM roles.
-
-- **Identity Center group-based auto-assignment (2023-2024):** SSO
-  permission sets can be auto-assigned to groups at the OU level, so
-  new accounts vended into the OU automatically inherit the correct
-  access without per-account configuration.
-
-- **Account Factory email validation (2023-2024):** Pre-provisioning
-  email validation API that checks email uniqueness before submitting
-  the provisioning request, reducing failed account creations.
-
-- **Landing Zone 3.0+ (2024-2025):** Enhanced landing zone with
-  improved Guardrail coverage, including new Detective controls for
-  generative AI workloads and strengthened encryption requirements.
-
-- **Account termination via API (2024-2025):** Programmatic account
-  termination via the Account Factory Service Catalog product,
-  enabling automated account lifecycle management without console
-  access.
-
-- **Alternate contacts via StackSet (2024-2025):** Alternate contacts
-  can now be set via CloudFormation StackSet, simplifying bulk
-  deployment across hundreds of accounts.
+2023-2026 features — Account Factory Customization, group-based auto-assignment, email validation API, Landing Zone 3.0+, API termination, StackSet alternate contacts: [Advanced patterns](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -862,34 +440,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Account provisioning stuck in CREATE_IN_PROGRESS
-- Account creation takes 5-30 minutes. If it exceeds 30 minutes, check
-  the Service Catalog provisioning status for errors. Common causes:
-  duplicate email, OU not registered, or IAM permission issues in the
-  management account.
+Stuck provisioning, failed baseline StackSet, unprovisioned permission set, missing Guardrails, unset alternate contacts: [Error handling](references/error-handling.md).
 
-### Baseline StackSet deployment failed
-- Check the StackSet operation status in the management account. Common
-  causes: missing `AWSControlTowerExecutionRole` in the target account,
-  conflicting resources (e.g., an existing CloudTrail), or IAM
-  permission issues. Re-run the StackSet after fixing the root cause.
+## References (load on demand)
 
-### SSO permission set not available in the account
-- The permission set was assigned but not provisioned. Run
-  `provision-permission-set` to push the permission set to the account.
-  Also verify the account is enrolled in the Identity Center.
-
-### Account has no Guardrails despite being in an OU
-- The OU is NOT registered with Control Tower. Only registered OUs get
-  Guardrails. Register the OU via the Control Tower console or verify
-  the OU's registration status. If the account was in the OU before
-  registration, it may need to be re-enrolled.
-
-### Alternate contacts not set
-- The contacts were not set during provisioning. They are per-account
-  and NOT inherited from the OU. Set them manually via
-  `put-alternate-contact` or automate via a custom StackSet in the
-  account customization pipeline.
+- [Guardrails and baseline](references/guardrails-and-baseline.md) — guardrail types, OU registration, baseline StackSets, SCP-inheritance and propagation heuristics, custom StackSets
+- [SSO and lifecycle](references/sso-and-lifecycle.md) — permission sets, group assignment, vending/updating/terminating, email management
+- [Advanced patterns](references/advanced-patterns.md) — provisioning misconceptions, configuration dependency graph, recent features
+- [Error handling](references/error-handling.md) — provisioning, StackSet, SSO, and Guardrail failure remedies
+- [Diagnostic commands](references/diagnostic-commands.md) — guardrail, baseline, alternate-contact, and compliance verification CLI
 
 ## Domain
 

@@ -217,3 +217,32 @@ MIGRATION_STEPS.
    or backend caching.
 10. NEVER recommend compression on responses < 1 KB. The overhead of
     gzip headers exceeds the compression benefit.
+
+# Output format and templates moved from SKILL.md
+
+## Output format — template block
+
+```text
+TARGET: <api-name>
+VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
+REASON: <1-2 sentences naming the recommendation and the supporting data>
+RECOMMENDATION:
+  Current: <api type>, <throttle>, <cache>, <usage plans>, <payload strategy>
+  Proposed: <api type>, <throttle>, <cache>, <usage plans>, <payload strategy>
+  Dimensions changed: <api-type | throttle | usage-plans | caching | payload | waf | vpc-endpoint>
+  Dimensions checked: <list ALL seven, each ✓ (no finding) or → (finding)>
+  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
+ESTIMATED_SAVINGS:
+  Current monthly: $<amount>    ← MUST show request + overhead breakdown
+  Projected monthly: $<amount>
+  Monthly saving: $<amount>     ← MUST equal Current − Projected, 2 decimals
+  Annual saving: $<amount>      ← MUST equal Monthly × 12
+MIGRATION_STEPS:
+  1. <specific action with CLI command>
+  2. <verification step>
+CONFIRM: Before executing any state-changing CLI, emit and await operator
+  approval: "CONFIRM: About to <action> on <api-name> in <region>.
+  Proceed? (yes/no)"
+```
+
+

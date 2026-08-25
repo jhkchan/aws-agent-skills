@@ -48,48 +48,13 @@ metadata:
 
 ## Mindset
 
-A "5xx from API Gateway" page is usually a backend or configuration incident
-wearing an API Gateway costume. API Gateway itself is rarely the cause —
-it is the messenger. The broken thing is the Lambda function, the HTTP
-backend, the VPC Link target, the throttling policy, or the timeout
-configuration. Treat API Gateway as a relay until the backend response,
-timing, and throttle layers are proven clean.
+Messenger-not-cause framing and the backend-layers litany:
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Philosophy
 
-Four behaviours separate a senior API Gateway engineer from a generalist:
-
-- **The 5xx code tells you WHERE the failure happened.** A 502 means API
-  Gateway reached the backend but the backend returned something invalid
-  (Lambda proxy format error, HTTP backend malformed response, VPC Link
-  unhealthy target). A 504 means the backend did not respond within the
-  integration timeout (Lambda exceeded 29s, HTTP backend too slow). A 503
-  means API Gateway or Lambda refused the request before reaching the
-  backend (throttling). A 500 means API Gateway itself failed. Routing
-  the code to the wrong layer is the #1 source of wasted cycles.
-
-- **Lambda proxy response format is non-negotiable.** A REST API Lambda
-  proxy integration REQUIRES the function to return
-  `{statusCode, body, headers}`. A function returning a bare string, a
-  Promise reject, or an Error object produces a 502 with
-  `Execution failed due to configuration: Malformed Lambda proxy response`.
-  This is the single most common 502 root cause. HTTP APIs (v2) have the
-  same format requirement but a slightly different error string.
-
-- **Integration timeout (29s) is shorter than Lambda timeout (15 min).**
-  A Lambda function configured with a 60s timeout behind a REST API will
-  be killed at 29s by API Gateway's integration timeout — the function
-  continues running (and billing) for up to 60s, but the client receives
-  a 504 at 29s. The mismatch is invisible in the Lambda console (the
-  function succeeds) but visible in API Gateway access logs
-  (`integrationErrorMessage: Execution failed due to a timeout error`).
-
-- **Throttling has three layers.** Stage-level (rate/burst on the stage),
-  usage-plan-level (per-API-key rate/burst/quota), and account-level Lambda
-  concurrency (reserved + unreserved). A 503 with no backend error and no
-  timeout is almost always one of these three. The 5xxError CloudWatch
-  metric spiking during traffic peaks, with Count also spiking, is the
-  signature of throttling — not backend failure.
+Senior-engineer philosophy (5xx code locality; Lambda proxy contract;
+29s ceiling; three throttling layers): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Quick navigation
 
@@ -115,36 +80,8 @@ integration type (Lambda proxy vs non-proxy) produces false root causes.
 
 ### Account-wide pre-flight commands
 
-```bash
-# 1. REST API (v1) — stage config (throttling, deploymentId, access logs)
-aws apigateway get-stage --rest-api-id <id> --stage-name <stage> --output json
-
-# 2. HTTP API (v2) — stage config (throttling, route settings)
-aws apigatewayv2 get-stage --api-id <id> --stage-name <stage> --output json
-
-# 3. Integration type and timeout (REST)
-aws apigateway get-resources --rest-api-id <id> --output json | \
-  jq '.items[].resourceMethods'
-aws apigateway get-integration --rest-api-id <id> --resource-id <rid> \
-  --http-method <verb> --output json
-
-# 4. Integration type and timeout (HTTP API v2)
-aws apigatewayv2 get-integrations --api-id <id> --output json
-
-# 5. Lambda function configuration (timeout, memory, runtime)
-aws lambda get-function-configuration --function-name <fn> --output json
-
-# 6. CloudWatch metrics — 5xxError, 4xxError, Count, Latency (per stage)
-aws cloudwatch get-metric-statistics --namespace AWS/ApiGateway \
-  --metric-name 5XXError \
-  --dimensions Name=ApiName,Value=<api> Name=Stage,Value=<stage> \
-  --start-time $(date -u -d '-1 hour' +%FT%TZ) --end-time $(date -u +%FT%TZ) \
-  --period 300 --statistics Sum,Average --output json
-
-# 7. AWS Health (regional events for API Gateway or Lambda)
-aws health describe-events --filter eventStatusCodes=OPEN,UPCOMING \
-  --region us-east-1 --output json
-```
+The seven read-only probes (stage config REST/HTTP, integration, Lambda
+config, 5XXError metrics, AWS Health): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### API-type short-circuit
 
@@ -185,108 +122,8 @@ ROOT_CAUSE_FOUND without a failing probe that matches the symptom.**
 
 ### Step 0: Non-obvious behaviours that change diagnosis
 
-These are the operational gotchas a senior API Gateway engineer knows from
-incident experience. Each one routes a diagnosis away from the obvious
-layer to a less obvious one:
-
-- **Lambda proxy response MUST include `statusCode` as an integer.** A
-  REST API Lambda proxy function returning `{status: 200, body: "ok"}`
-  (note: `status`, not `statusCode`) produces
-  `Execution failed due to configuration: Malformed Lambda proxy response`.
-  The same applies to a string statusCode (`"200"`) in some runtimes.
-  Operators debug this as a Lambda failure because the function executed
-  successfully — the response contract is the issue, not the code.
-
-- **A function that throws an unhandled exception produces a 502, not a
-  500.** If the Lambda function rejects (Promise reject, uncaught throw,
-  `Runtime.LogError`), API Gateway receives no valid proxy response and
-  returns 502. The error is in Lambda logs, not API Gateway. A common
-  trap: the function works locally but fails in production due to a
-  missing env var or IAM permission — the error surfaces as 502 in API
-  Gateway, masking the real cause.
-
-- **`Task timed out` in Lambda logs produces a 504, not 502.** When
-  Lambda kills the function at its configured timeout, API Gateway
-  receives no response and returns 504. The signature is
-  `Task timed out after X.00 seconds` in the Lambda log, with the
-  matching 504 timestamp in API Gateway access logs. Do NOT confuse
-  this with a Lambda runtime error (which produces 502).
-
-- **The 29-second integration timeout is a hard ceiling for REST APIs.**
-  Even if Lambda is configured with `Timeout: 900` (15 minutes), API
-  Gateway returns 504 at 29 seconds for REST APIs (30 seconds for HTTP
-  APIs). The Lambda function continues running to completion — the client
-  sees 504 while Lambda logs show success. Always compare
-  `aws lambda get-function-configuration Timeout` against the 29s ceiling.
-  If Lambda Timeout > 29, BACKEND_TIMEOUT_MISMATCH is the cause.
-
-- **HTTP API (v2) `SimpleProxy` integrations have a slightly different
-  error string.** The same malformed Lambda proxy response on an HTTP API
-  produces `[InvalidResponseContent] ...` or a 502 without the
-  "Malformed Lambda proxy response" string. Do NOT pattern-match on the
-  REST API error string when diagnosing an HTTP API.
-
-- **Stage-level throttling applies BEFORE the integration is invoked.**
-  When the stage rate limit or burst limit is exceeded, API Gateway
-  returns 503 without ever calling the Lambda function. Lambda
-  ConcurrentExecutions will NOT spike — the request was rejected upstream.
-  The signature is 5xxError spiking while Lambda Invocations does NOT
-  spike. This distinguishes THROTTLE_STAGE from BACKEND_LAMBDA_ERROR.
-
-- **Account-level Lambda concurrency limit produces 502, not 503, on some
-  configurations.** When Lambda concurrent executions hit the account
-  reserved limit, Lambda returns `TooManyRequestsException` (HTTP 429).
-  API Gateway maps this to 502 for REST API Lambda proxy integrations —
-  NOT 503. The signature is Lambda Throttles metric spiking alongside
-  API Gateway 5xxError. Check Lambda throttling, not just API Gateway
-  throttling.
-
-- **Usage plan throttling only applies to API-key-authenticated requests.**
-  A request without an API key (or with an invalid key) bypasses the usage
-  plan entirely and is subject only to stage-level throttling. A 503
-  during traffic peaks with no usage-plan throttle breach likely means
-  stage-level or concurrency throttling — check which layer applies to
-  the failing requests.
-
-- **VPC Link integrations do NOT have per-target health checks in API
-  Gateway.** API Gateway delegates to the NLB. If the NLB target group
-  has no healthy targets, API Gateway returns 502 (not 503). The
-  signature is `502 BadGateway` with `integrationStatus: 502` and no
-  Lambda invocation in CloudTrail. The fix is in the NLB target group,
-  not API Gateway.
-
-- **A deployment is required for integration changes to take effect.**
-  Modifying a method, integration, or stage setting via `update-method`
-  or `update-integration` does NOT change the live API until a new
-  deployment is created (`create-deployment`). An operator who "fixed"
-  the timeout but forgot to deploy leaves the OLD configuration live.
-  Always verify `deploymentId` in `get-stage` matches the latest
-  deployment timestamp.
-
-- **HTTP integration (non-Lambda) 502s often come from SSL handshake
-  failures.** If the backend uses HTTPS with a self-signed or expired
-  certificate, API Gateway cannot establish the connection and returns
-  502. The access log shows `integrationErrorMessage` referencing the SSL
-  error. The fix is on the backend certificate, not the API Gateway
-  integration.
-
-- **Payload size limit is 10 MB for both REST and HTTP APIs.** A request
-  body exceeding 10 MB receives a 413 from API Gateway — but if the
-  integration is Lambda proxy and the function also has a payload limit
-  (6 MB synchronous invocation), the failure can surface as 502. Check
-  both the request size (access log `requestSize`) and the Lambda
-  payload (InvocationError in CloudTrail).
-
-- **Access logs must be enabled to diagnose intermittent 5xx.** Without
-  access logs, you have only aggregate CloudWatch metrics — no per-request
-  `integrationErrorMessage`, `responseLatency`, or `integrationStatus`.
-  Operators who "see 5xx in CloudWatch but no detail" almost always have
-  access logs disabled. Enable them as the first remediation step.
-
-- **CloudWatch metrics dimension differs between REST and HTTP APIs.**
-  REST API metrics use `ApiName` + `Stage`. HTTP API metrics use `ApiId`
-  + `Stage`. Querying with the wrong dimension returns no data points —
-  a common cause of "the metrics show nothing" during a live incident.
+Full catalog (statusCode int, throw=502, Task timed out=504, 29s ceiling,
+HTTP API strings, throttle layers, VPC Link, SSL, 10MB, dimensions): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 1: Symptom entry — pick the diagnostic branch
 
@@ -302,36 +139,8 @@ Map the 5xx error code to a branch and jump to that branch's section.
 
 ### Step 1b: Gather access logs (when the code is ambiguous)
 
-If the operator reports "we're getting 5xx" without a specific code, or
-the code varies request-to-request, enable or fetch access logs first.
-
-**REST API access log format (recommended JSON):**
-```json
-{
-  "requestId": "$context.requestId",
-  "status": "$context.status",
-  "integrationStatus": "$context.integrationStatus",
-  "integrationErrorMessage": "$context.integrationErrorMessage",
-  "responseLatency": "$context.responseLatency",
-  "integrationLatency": "$context.integrationLatency",
-  "httpMethod": "$context.httpMethod",
-  "resourcePath": "$context.resourcePath",
-  "sourceIp": "$context.identity.sourceIp"
-}
-```
-
-```bash
-# Fetch access logs from CloudWatch Logs
-aws logs filter-log-events \
-  --log-group-name /aws/apigateway/<api>/<stage> \
-  --filter-pattern '"status":50' \
-  --start-time $(date -u -d '-1 hour' +%s)000 \
-  --output json | jq '.events[].message'
-```
-
-The `integrationErrorMessage` field is the single most valuable signal —
-it pinpoints the exact failure (Malformed Lambda proxy response, Execution
-failed due to a timeout error, etc.).
+Access-log JSON format + filter-log-events fetch command:
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### Step 2: 502 BadGateway — backend returned invalid response
 
@@ -344,29 +153,8 @@ layer):
 
 #### 2a: Lambda integration — runtime error or crash
 
-```bash
-# Fetch the Lambda function's recent errors
-aws logs filter-log-events \
-  --log-group-name /aws/lambda/<function-name> \
-  --filter-pattern '"ERROR"' \
-  --start-time $(date -u -d '-1 hour' +%s)000 \
-  --output json | jq '.events[].message'
-
-# Also check for runtime-level errors (Task timed out, Runtime.LogError)
-aws logs filter-log-events \
-  --log-group-name /aws/lambda/<function-name> \
-  --filter-pattern 'Task timed out' \
-  --start-time $(date -u -d '-1 hour' +%s)000 \
-  --output json | jq '.events[].message'
-
-# CloudTrail — confirm the Lambda was invoked and check for errors
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventName,AttributeValue=Invoke \
-  --start-time $(date -u -d '-1 hour' +%FT%TZ) \
-  --end-time $(date -u +%FT%TZ) \
-  --output json | \
-  jq '.Events[] | select(.ResourceName == "<function-name>")'
-```
+Probe commands (Lambda log ERROR scan, Task timed out scan, CloudTrail
+Invoke): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - Lambda log shows `Runtime.LogError` or a stack trace at the matching
@@ -382,18 +170,8 @@ aws cloudtrail lookup-events \
 
 #### 2b: Lambda proxy — malformed response format
 
-```bash
-# Check the Lambda function's return shape by inspecting recent logs
-# Lambda proxy logs the return value in some runtimes; otherwise test:
-aws lambda invoke \
-  --function-name <function-name> \
-  --payload file://test-event.json \
-  --log-type Tail \
-  /tmp/response.json --query 'LogResult' --output text | base64 -d
-
-# Inspect the response body
-cat /tmp/response.json | jq .
-```
+Probe commands (lambda invoke with Tail, inspect response shape):
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - Response is a bare string, an Error object, or missing `statusCode` →
@@ -410,16 +188,8 @@ cat /tmp/response.json | jq .
 
 #### 2c: HTTP integration — backend invalid response
 
-```bash
-# Test the backend directly (bypassing API Gateway)
-curl -v -X <method> https://<backend-host>/<path> -d '<test-payload>'
-
-# Check the backend's health endpoint
-curl -v https://<backend-host>/health
-
-# If the backend is an ALB, check target health
-aws elbv2 describe-target-health --target-group-arn <tg-arn> --output json
-```
+Probe commands (direct curl, health check, ALB target health):
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - Backend returns a non-HTTP response, closes the connection mid-stream,
@@ -436,19 +206,8 @@ aws elbv2 describe-target-health --target-group-arn <tg-arn> --output json
 
 #### 2d: VPC Link integration — NLB target unhealthy
 
-```bash
-# Identify the VPC Link and its associated NLB
-aws apigateway get-integration --rest-api-id <id> --resource-id <rid> \
-  --http-method <verb> --output json | \
-  jq '.connectionId'  # This is the VPC Link ID (vpcl-xxx)
-
-# Check the NLB target group health (find the NLB behind the VPC Link)
-aws elbv2 describe-target-groups --load-balancer-arn <nlb-arn> --output json
-aws elbv2 describe-target-health --target-group-arn <tg-arn> --output json
-
-# Check the VPC Link itself
-aws apigateway get-vpc-links --output json
-```
+Probe commands (integration connectionId, target groups + health,
+get-vpc-links): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - Target group has zero healthy targets (all `unhealthy` or `unused`) →
@@ -463,19 +222,8 @@ aws apigateway get-vpc-links --output json
 
 #### 2e: Mapping template error (non-proxy Lambda integration)
 
-```bash
-# Check the integration response mapping template
-aws apigateway get-integration-response --rest-api-id <id> \
-  --resource-id <rid> --http-method <verb> \
-  --status-code 200 --output json | jq '.responseTemplates'
-
-# Check CloudWatch Logs for mapping template evaluation errors
-aws logs filter-log-events \
-  --log-group-name /aws/apigateway/<api>/<stage> \
-  --filter-pattern 'MappingTemplate' \
-  --start-time $(date -u -d '-1 hour' +%s)000 \
-  --output json
-```
+Probe commands (get-integration-response templates, MappingTemplate log
+scan): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - Mapping template references a missing JSON path, or Velocity Template
@@ -490,25 +238,8 @@ backend but did not receive a response within the integration timeout.
 
 #### 3a: Lambda function execution exceeded the integration timeout
 
-```bash
-# Lambda function configured timeout
-aws lambda get-function-configuration --function-name <fn> --output json | \
-  jq '.Timeout'
-
-# Lambda Duration metric (actual execution time)
-aws cloudwatch get-metric-statistics --namespace AWS/Lambda \
-  --metric-name Duration \
-  --dimensions Name=FunctionName,Value=<fn> \
-  --start-time $(date -u -d '-1 hour' +%FT%TZ) --end-time $(date -u +%FT%TZ) \
-  --period 300 --statistics Average,Maximum --output json
-
-# API Gateway Latency metric (what the client experienced)
-aws cloudwatch get-metric-statistics --namespace AWS/ApiGateway \
-  --metric-name Latency \
-  --dimensions Name=ApiName,Value=<api> Name=Stage,Value=<stage> \
-  --start-time $(date -u -d '-1 hour' +%FT%TZ) --end-time $(date -u +%FT%TZ) \
-  --period 300 --statistics Average,Maximum --output json
-```
+Probe commands (Lambda Timeout config, Duration metric, API Gateway
+Latency metric): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - Lambda Duration Maximum > 29000ms (29s) while API Gateway reports 504 →
@@ -520,15 +251,8 @@ aws cloudwatch get-metric-statistics --namespace AWS/ApiGateway \
 
 #### 3b: HTTP integration backend too slow
 
-```bash
-# Test the backend response time directly
-time curl -X <method> https://<backend-host>/<path> -d '<test-payload>'
-
-# If the backend is an ALB, check target_processing_time in access logs
-# ALB access logs in S3:
-aws s3 ls s3://<access-log-bucket>/<prefix>/ \
-  --recursive | tail -20
-```
+Probe commands (timed curl, ALB access logs in S3):
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - Backend takes > 29s (REST) or > 30s (HTTP API) to respond →
@@ -539,18 +263,8 @@ aws s3 ls s3://<access-log-bucket>/<prefix>/ \
 
 #### 3c: Timeout mismatch (Lambda timeout > integration timeout)
 
-```bash
-# Compare Lambda timeout to the integration timeout
-LAMBDA_TIMEOUT=$(aws lambda get-function-configuration \
-  --function-name <fn> --output json | jq '.Timeout')
-echo "Lambda Timeout: ${LAMBDA_TIMEOUT}s"
-echo "API Gateway integration timeout: 29s (REST) / 30s (HTTP API)"
-
-# Check the integration timeout setting (if explicitly configured)
-aws apigateway get-integration --rest-api-id <id> \
-  --resource-id <rid> --http-method <verb> --output json | \
-  jq '.timeoutInMillis'
-```
+Probe commands (compare Lambda Timeout to the 29s/30s ceiling,
+timeoutInMillis): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - Lambda Timeout > 29 (REST) or > 30 (HTTP API) AND the function
@@ -567,22 +281,8 @@ rejected before reaching the backend. There are three throttling layers.
 
 #### 4a: Stage-level throttling (rate limit + burst limit)
 
-```bash
-# REST API stage throttling
-aws apigateway get-stage --rest-api-id <id> --stage-name <stage> --output json | \
-  jq '.methodSettings, .throttle'
-
-# HTTP API stage throttling
-aws apigatewayv2 get-stage --api-id <id> --stage-name <stage> --output json | \
-  jq '.defaultRouteSettings'
-
-# API Gateway Count metric (total requests)
-aws cloudwatch get-metric-statistics --namespace AWS/ApiGateway \
-  --metric-name Count \
-  --dimensions Name=ApiName,Value=<api> Name=Stage,Value=<stage> \
-  --start-time $(date -u -d '-1 hour' +%FT%TZ) --end-time $(date -u +%FT%TZ) \
-  --period 60 --statistics Sum --output json
-```
+Probe commands (stage throttling REST + HTTP API, Count metric):
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - Stage `rateLimit` or `burstLimit` is set, and Count metric exceeds them
@@ -594,25 +294,8 @@ aws cloudwatch get-metric-statistics --namespace AWS/ApiGateway \
 
 #### 4b: Account-level Lambda concurrency limit
 
-```bash
-# Lambda account-level concurrency settings
-aws lambda get-account-settings --output json | \
-  jq '.AccountLimit'
-
-# Lambda ConcurrentExecutions metric
-aws cloudwatch get-metric-statistics --namespace AWS/Lambda \
-  --metric-name ConcurrentExecutions \
-  --dimensions Name=FunctionName,Value=<fn> \
-  --start-time $(date -u -d '-1 hour' +%FT%TZ) --end-time $(date -u +%FT%TZ) \
-  --period 300 --statistics Maximum --output json
-
-# Lambda Throttles metric (the smoking gun)
-aws cloudwatch get-metric-statistics --namespace AWS/Lambda \
-  --metric-name Throttles \
-  --dimensions Name=FunctionName,Value=<fn> \
-  --start-time $(date -u -d '-1 hour' +%FT%TZ) --end-time $(date -u +%FT%TZ) \
-  --period 300 --statistics Sum --output json
-```
+Probe commands (account concurrency settings, ConcurrentExecutions,
+Throttles metrics): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - Lambda Throttles metric > 0 during the failure window, AND
@@ -625,16 +308,8 @@ aws cloudwatch get-metric-statistics --namespace AWS/Lambda \
 
 #### 4c: Usage plan throttling (API-key-authenticated requests)
 
-```bash
-# Check usage plans associated with the API stage
-aws apigateway get-usage-plans --output json | \
-  jq '.items[] | select(.apiStages[]?.apiId == "<api-id>")'
-
-# Check the usage for a specific API key in the failure window
-aws apigateway get-usage --usage-plan-id <plan-id> \
-  --key-id <key-id> \
-  --start-date 2026-08-01 --end-date 2026-08-09 --output json
-```
+Probe commands (usage plans by apiId, get-usage per key window):
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - Usage plan rate/burst/quota exceeded for the API key →
@@ -648,18 +323,8 @@ aws apigateway get-usage --usage-plan-id <plan-id> \
 Symptom: client receives `500 InternalServerError`. This is rare and
 usually indicates an AWS-side issue.
 
-```bash
-# Check AWS Health Dashboard for API Gateway events
-aws health describe-events \
-  --filter services=APIGATEWAY,eventStatusCodes=OPEN,UPCOMING \
-  --region us-east-1 --output json
-
-# Check for a corrupted deployment (if 500 started after a deployment)
-aws apigateway get-stage --rest-api-id <id> --stage-name <stage> --output json | \
-  jq '.deploymentId'
-aws apigateway get-deployment --rest-api-id <id> \
-  --deployment-id <dep-id> --output json
-```
+Probe commands (AWS Health events, deployment inspection):
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Verdict signals:**
 - 500 sustained, no recent deployment, no throttling, clean backends →
@@ -739,66 +404,9 @@ CONFIRM: Before deploying, emit and await:
   "CONFIRM: About to create-deployment on abc123/prod. Proceed? (yes/no)"
 ```
 
-### Worked example — 504 from timeout mismatch
+Further worked examples (504 timeout mismatch; 503 stage-level
+throttling): [references/worked-examples.md](references/worked-examples.md).
 
-```text
-TARGET: def456/prod (integration: AWS_PROXY Lambda)
-VERDICT: ROOT_CAUSE_FOUND
-REASON: Lambda function timeout is configured at 60s but the REST API
-  integration timeout is 29s — API Gateway returns 504 at 29s while the
-  function continues running (Step 3c).
-LAYER: TIMEOUT_MISMATCH
-EVIDENCE:
-  - Symptom: clients receive 504 GatewayTimeout on GET /reports after
-    exactly 29 seconds.
-  - Probe: aws lambda get-function-configuration returns Timeout: 60.
-    The REST API integration timeout is 29s (hard ceiling).
-  - Probe: Lambda Duration metric shows Maximum 45000ms — the function
-    finishes at 45s, well after API Gateway returned 504 at 29s.
-  - Passing: No Lambda Runtime.LogError; Lambda Throttles metric is zero;
-    stage throttling not exceeded.
-REMEDIATION:
-  1. Reduce the Lambda Timeout to 29s so the function fails fast and
-     logs the timeout error:
-     aws lambda update-function-configuration --function-name reports-handler
-       --timeout 29 --profile <p>
-  2. Optimize the function to complete within 29s (database query tuning,
-     caching, async processing for long-running reports).
-  3. Alternatively, migrate to an async pattern: API Gateway returns 202
-     immediately; the client polls or receives a webhook when the report
-     is ready.
-  4. Verify: GET /reports completes within 29s, or returns 202 for async.
-```
-
-### Worked example — 503 from stage-level throttling
-
-```text
-TARGET: ghi789/prod (integration: AWS_PROXY Lambda)
-VERDICT: ROOT_CAUSE_FOUND
-REASON: Stage prod has a rate limit of 100 rps and burst of 200; traffic
-  peaked at 500 rps during the marketing campaign launch. API Gateway
-  returned 503 for requests exceeding the throttle (Step 4a).
-LAYER: THROTTLE_STAGE
-EVIDENCE:
-  - Symptom: clients receive 503 ServiceUnavailable during the 14:00 UTC
-    traffic peak. No 502 or 504 reported.
-  - Probe: aws apigateway get-stage returns methodSettings with
-    throttlingRateLimit: 100, throttlingBurstLimit: 200.
-  - Probe: CloudWatch Count metric for the stage shows Sum 300000 in the
-    14:00-14:05 window (1000 rps average) — well above the 100 rps limit.
-  - Passing: Lambda Throttles metric is zero (the function was not the
-    bottleneck); Lambda ConcurrentExecutions is below the account limit;
-    no usage plan is associated with the stage.
-REMEDIATION:
-  1. Raise the stage throttle to match expected peak traffic:
-     aws apigateway update-stage --rest-api-id ghi789 --stage-name prod
-       --patch-operations
-       op=replace,path=/methods/*/throttling/rateLimit,value=1000,
-       op=replace,path=/methods/*/throttling/burstLimit,value=2000
-  2. Create a usage plan for per-API-key throttling to prevent a single
-     client from exhausting the stage budget.
-  3. Verify: CloudWatch 5xxError drops to zero after the throttle change.
-```
 
 ## Anti-Patterns — NEVER
 
@@ -875,135 +483,21 @@ REMEDIATION:
 
 ## Pre-flight safety checks (run before any state-changing CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`create-deployment`, `update-stage`, `update-function-configuration`,
-  `put-method`, `update-integration`), emit and await operator approval.
-  Do NOT execute the CLI until the operator confirms.
-
-- **Read-only first.** Every probe in the diagnostic tree is read-only
-  (`get-*`, `filter-log-events`, `get-metric-statistics`,
-  `lookup-events`, `lambda invoke` with a test payload). Do not perform
-  state-changing operations as diagnostic probes.
-
-- **Deployment is required after config changes.** Modifying a method,
-  integration, or stage setting does NOT change the live API until
-  `create-deployment`. Always include the deployment step in
-  remediation.
-
-- **Lambda timeout reduction can cause failures.** Reducing Lambda
-  Timeout from 60s to 29s to fix a timeout mismatch will cause the
-  function to fail (with `Task timed out`) if it consistently runs > 29s.
-  This is the desired behaviour (fail fast, log the error) but the
-  operator must be warned.
-
-- **Stage throttle changes apply immediately.** Raising the rate limit
-  or burst limit takes effect without a deployment. But it exposes the
-  backend to higher traffic — verify the backend can handle the new
-  limits before raising them.
-
-- **Access log enablement is non-disruptive** but requires a CloudWatch
-  Logs destination (or S3). Verify the log group exists or create it
-  before enabling access logs on the stage.
+All checks (confirmation gate, read-only-first, deploy-after-config,
+timeout-reduction warning, throttle exposure, access-log enablement): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Remediation guidance
 
-### For BACKEND_RESPONSE_FORMAT — Lambda proxy malformed response
+Per-LAYER remediation steps and fix commands (BACKEND_*, TIMEOUT_*,
+THROTTLE_*, INTERNAL_ERROR, ESCALATE): [references/error-handling.md](references/error-handling.md).
 
-1. Update the Lambda function to return the proxy response format:
-   ```javascript
-   // Node.js — correct format
-   return {
-     statusCode: 200,                    // integer, not string
-     body: JSON.stringify(result),       // body MUST be a string
-     headers: { "Content-Type": "application/json" }
-   };
-   ```
-   ```python
-   # Python — correct format
-   return {
-       "statusCode": 200,
-       "body": json.dumps(result),
-       "headers": {"Content-Type": "application/json"}
-   }
-   ```
-2. Deploy the Lambda function (`aws lambda update-function-code`).
-3. Deploy the API: `aws apigateway create-deployment --rest-api-id <id>
-   --stage-name <stage>`.
-4. Verify: the endpoint returns 200 with the expected body.
+## References (load on demand)
 
-### For BACKEND_LAMBDA_ERROR — Lambda runtime crash
-
-1. Identify the exception in the Lambda CloudWatch Logs.
-2. Fix the code (add null checks, env var validation, IAM permissions).
-3. Redeploy the function and verify with a test invoke.
-
-### For BACKEND_HTTP_INVALID — HTTP backend invalid response
-
-1. Test the backend directly with `curl -v`.
-2. If SSL handshake fails: renew/replace the backend certificate.
-3. If the backend returns malformed HTTP: fix the backend application.
-4. If the backend is unreachable: check the backend instance/ALB health.
-
-### For BACKEND_VPC_LINK — NLB target unhealthy
-
-1. Fix the target health:
-   ```bash
-   aws elbv2 describe-target-health --target-group-arn <tg-arn>
-   # Address the unhealthy reason (Target.FailedHealthChecks, Target.Timeout)
-   ```
-2. Verify the VPC Link is `AVAILABLE`:
-   `aws apigateway get-vpc-links`.
-3. Verify the integration `connectionId` matches the VPC Link ID.
-
-### For TIMEOUT_LAMBDA — Lambda too slow
-
-1. Optimize the function (database query tuning, caching, async I/O).
-2. Increase the integration timeout (if < 29s for REST):
-   `aws apigateway update-integration --rest-api-id <id> --resource-id <rid>
-   --http-method <verb> --patch-operations
-   op=replace,path=/timeoutInMillis,value=29000`.
-3. If the function genuinely needs > 29s: migrate to an async pattern
-   (API Gateway returns 202; client polls or receives a webhook).
-
-### For TIMEOUT_MISMATCH — Lambda timeout > integration timeout
-
-1. Reduce the Lambda Timeout to ≤ 29s:
-   `aws lambda update-function-configuration --function-name <fn> --timeout 29`.
-2. Optimize the function to complete within 29s.
-3. For long-running workloads: use Step Functions or async invocation.
-
-### For THROTTLE_STAGE — stage-level throttling
-
-1. Raise the stage throttle (verify the backend can handle it):
-   ```bash
-   aws apigateway update-stage --rest-api-id <id> --stage-name <stage> \
-     --patch-operations \
-     op=replace,path=/methods/*/throttling/rateLimit,value=1000,\
-     op=replace,path=/methods/*/throttling/burstLimit,value=2000
-   ```
-2. Add a usage plan for per-key throttling.
-
-### For THROTTLE_CONCURRENCY — Lambda concurrency limit
-
-1. Request a concurrency quota increase via the Lambda console or:
-   ```bash
-   aws lambda put-function-concurrency --function-name <fn> \
-     --reserved-concurrent-configurations ReservedConcurrentExecutions=500
-   ```
-2. Or add an SQS queue + Lambda consumer to smooth traffic spikes.
-
-### For INTERNAL_ERROR — corrupted deployment
-
-1. Create a new deployment:
-   ```bash
-   aws apigateway create-deployment --rest-api-id <id> --stage-name <stage>
-   ```
-2. If the 500 persists: escalate to AWS Support.
-
-### For ESCALATE — AWS-side incident
-
-1. Surface the AWS Health event ARN and API id.
-2. Open a Support case with the time window and request IDs from access logs.
+- [Worked examples](references/worked-examples.md) - full walkthroughs: 504 from timeout mismatch, 503 from stage-level throttling
+- [Error handling](references/error-handling.md) - per-LAYER remediation steps and fix commands (BACKEND_*, TIMEOUT_*, THROTTLE_*, INTERNAL_ERROR, ESCALATE)
+- [Diagnostic commands](references/diagnostic-commands.md) - the seven read-only pre-flight probes + every per-layer probe command block (Steps 1b, 2a-2e, 3a-3c, 4a-4c, 5)
+- [Advanced patterns](references/advanced-patterns.md) - mindset, philosophy, Step 0 non-obvious behaviours, pre-flight safety checks, recent AWS features
+- [Error codes and metrics](references/error-codes-and-metrics.md) - exact error strings, CloudWatch metric dimensions, access-log $context variables
 
 ## Domain
 
@@ -1012,26 +506,8 @@ Throttling Analysis, and Incident Diagnosis.
 
 ## Recent AWS features (2024-2026)
 
-- **HTTP API improvements (2024-2025):** HTTP APIs now support private
-  integrations via VPC Lattice, expanding the integration surface beyond
-  Lambda and HTTP backends. Diagnosing 502s on a Lattice-backed HTTP API
-  requires checking the Lattice service network, not just the NLB.
-- **Lambda SnapStart (2024-2025):** SnapStart reduces cold-start latency
-  for Java functions. A 504 that previously correlated with cold starts
-  may disappear after enabling SnapStart. But SnapStart does not help
-  with warm-function timeouts — do not conflate the two.
-- **API Gateway access log enhancements (2024):** New `$context` fields
-  including `integrationLatency` and `integrationStatus` provide finer-
-  grained per-request diagnostics. Enable access logs with these fields
-  for the richest 5xx diagnosis surface.
-- **Lambda response streaming (2024-2025):** Function URL response
-  streaming changes the timeout model — streamed responses can exceed
-  29s because the first byte is sent before processing completes. This
-  does NOT apply to API Gateway integrations (which remain 29s/30s).
-- **Account-level Lambda concurrency improvements (2025):** Per-function
-  reserved concurrency and provisioned concurrency controls are more
-  granular. Use provisioned concurrency to eliminate cold-start 502s on
-  latency-sensitive APIs.
+Recent AWS features (VPC Lattice, SnapStart, access-log $context fields,
+response streaming, concurrency controls): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## AWS documentation
 

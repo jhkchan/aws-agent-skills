@@ -335,3 +335,44 @@ resource "aws_amplify_domain_association" "main" {
 GitHub personal access token). The console-based OAuth flow does NOT
 work with Terraform. For console-connected apps, manage the app outside
 Terraform and use Terraform only for branches and domain associations.
+
+## Moved from SKILL.md Step 5 — custom headers YAML
+
+```yaml
+customHeaders:
+  - pattern: '**/*'
+    headers:
+      - key: Strict-Transport-Security
+        value: 'max-age=31536000; includeSubDomains'
+      - key: X-Frame-Options
+        value: SAMEORIGIN
+      - key: X-Content-Type-Options
+        value: nosniff
+  - pattern: '/static/*'
+    headers:
+      - key: Cache-Control
+        value: 'public, max-age=31536000, immutable'
+```
+
+## Moved from SKILL.md Step 6 — basic auth per branch
+
+Basic auth protects a branch with HTTP Basic Authentication at the CDN
+edge. Useful for staging/preview environments that should not be public.
+
+```bash
+aws amplify update-branch \
+  --app-id d2y0lrmp1qq2tu \
+  --branch-name staging \
+  --enable-basic-auth \
+  --basic-auth-credentials base64-encoded-credentials
+```
+
+**Format:** the credentials are `username:password` (the API accepts the
+raw string; the SDK base64-encodes). Anyone visiting the branch URL sees
+a browser auth prompt. Basic auth applies to all paths under the branch
+domain.
+
+**Common use cases:**
+- Staging branch behind auth during pre-launch
+- Preview branches for internal review
+- Compliance: preventing public access to non-production environments

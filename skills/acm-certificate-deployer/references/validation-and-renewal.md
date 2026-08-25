@@ -199,3 +199,88 @@ aws acm-pca describe-certificate-authority \
    Add explicit SANs.
 6. **Forgetting PCA CA cert expiry.** If PCA CA cert expires, all
    private certs become invalid.
+
+## Expert heuristic — DNS validation CNAME lifecycle
+
+ACM DNS validation is NOT a one-time check. ACM re-validates
+periodically (and before each renewal). A baseline model says "add
+the CNAME and forget"; this heuristic explains the full lifecycle.
+
+```text
+request-certificate
+  → ACM generates a unique CNAME record per domain name
+  → CNAME format: _<random>.example.com → _<random>.acm-validations.aws.
+
+add CNAME to Route53 (or third-party DNS)
+  → ACM detects the CNAME (typically 5-30 minutes)
+  → certificate status: PENDING_VALIDATION → ISSUED
+
+CNAME must REMAIN in DNS for the certificate's lifetime
+  → ACM re-checks periodically (opaque schedule)
+  → removing the CNAME blocks renewal
+  → certificate enters " renewal eligibility" check before expiry
+
+renewal (60 days before expiry for ACM-managed certs)
+  → ACM checks the CNAME is still present
+  → if present: auto-renews (no action needed)
+  → if absent: renewal fails, certificate expires
+```
+
+**Key implication:** the DNS validation CNAME is a permanent
+infrastructure dependency. Deleting it (e.g., during DNS cleanup or
+migration) silently breaks certificate renewal. Always document the
+CNAME as a permanent record.
+
+**Cross-account DNS validation:** when the certificate is in Account
+A but the Route53 hosted zone is in Account B, the CNAME must be
+created in Account B's Route53. This requires cross-account IAM
+permissions (Account A's ACM needs permission to write to Account B's
+hosted zone, OR the operator manually creates the CNAME in Account B).
+
+## Expert heuristic — ACM-managed vs imported renewal matrix
+
+The renewal behavior depends on HOW the certificate was issued. A
+baseline model conflates the two; this matrix separates them.
+
+| Certificate source | Renewal | Operator action | Monitoring needed |
+|---|---|---|---|
+| ACM-issued (DNS validation) | **Automatic** (60 days before expiry) | None — keep the CNAME in DNS | Alert if status != ISSUED |
+| ACM-issued (email validation) | **Automatic** but requires email click-through | Click the renewal email | Alert if status != ISSUED |
+| Imported (third-party CA) | **NOT automatic** — must re-import | Renew with the CA, re-import the PEM | Alert on expiry < 30 days |
+| Private (via AWS Private CA) | **Automatic** (ACM manages) if PCA is active | Keep PCA active; ensure PCA CA cert not expired | Alert if PCA CA cert nearing expiry |
+
+**Key implication:** imported certificates are a manual renewal
+burden. If your organization imports certificates from an external
+CA, you MUST have a renewal process (calendar reminder, automated
+monitoring, or a re-import pipeline). ACM will NOT remind you.
+
+## Step 4 — email validation (deprecated, detail)
+
+**Why email validation is problematic:**
+- Requires manual click-through for initial validation AND each renewal.
+- If the email is not received (spam filter, wrong contact), the
+  certificate cannot be issued or renewed.
+- Not automatable — no API to "click the link."
+- Unreliable for domains with stale WHOIS data.
+
+**If email validation is the only option:** verify WHOIS data is
+current, check spam folders, use `aws acm resend-validation-email` to
+re-send. **Recommendation:** always use DNS validation. If email
+validation was used, re-request the certificate with DNS validation.
+
+## Step 5 — renewal eligibility and monitoring
+
+**Renewal eligibility:**
+- The DNS validation CNAME must remain in DNS.
+- For imported certificates: NO auto-renewal. Must re-import.
+
+**Monitoring:**
+- Alert on `CertificateStatus` != `ISSUED`.
+- For imported certificates, alert on `NotAfter` < 30 days from now.
+- CloudWatch metric: `AWS/CertificateManager DaysToExpiry`.
+
+## Step 6 — renewal for imported certificates
+
+- ACM does NOT auto-renew imported certificates.
+- The operator must renew with the CA and re-import before expiry.
+- Use `aws acm import-certificate` with the same ARN to update.

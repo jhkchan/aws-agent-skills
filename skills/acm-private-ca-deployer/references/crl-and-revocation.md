@@ -405,3 +405,89 @@ resource "aws_s3_bucket_policy" "crl" {
   })
 }
 ```
+
+---
+
+## CRL S3 bucket creation and policy (moved from SKILL.md Step 3)
+
+**Create the CRL S3 bucket:**
+
+```bash
+aws s3api create-bucket \
+  --bucket acm-pca-crl-123456789012-us-east-1 \
+  --region us-east-1
+```
+
+**Apply the bucket policy granting ACM PCA write access:**
+
+```bash
+aws s3api put-bucket-policy \
+  --bucket acm-pca-crl-123456789012-us-east-1 \
+  --policy '{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Principal": { "Service": "acm-pca.amazonaws.com" },
+        "Action": ["s3:PutObject", "s3:PutObjectAcl", "s3:GetBucketAcl", "s3:GetBucketLocation"],
+        "Resource": [
+          "arn:aws:s3:::acm-pca-crl-123456789012-us-east-1",
+          "arn:aws:s3:::acm-pca-crl-123456789012-us-east-1/*"
+        ]
+      }
+    ]
+  }'
+```
+
+**Critical:** without this policy, CRL publication silently fails.
+
+## Revocation and OCSP commands (moved from SKILL.md Step 7)
+
+**Revoke a certificate:**
+
+```bash
+aws acm-pca revoke-certificate \
+  --certificate-authority-arn "$SUB_CA_ARN" \
+  --certificate-serial 1234567890ABCDEF \
+  --revocation-reason "KEY_COMPROMISE" \
+  --region us-east-1
+```
+
+Revocation reasons: `UNSPECIFIED`, `KEY_COMPROMISE`,
+`CERTIFICATE_AUTHORITY_COMPROMISE`, `AFFILIATION_CHANGED`,
+`SUPERCEDED`, `CESSATION_OF_OPERATION`, `PRIVILEGE_WITHDRAWN`,
+`A_A_COMPROMISE`.
+
+**Enable OCSP on a CA:**
+
+```bash
+aws acm-pca update-certificate-authority \
+  --certificate-authority-arn "$SUB_CA_ARN" \
+  --revocation-configuration \
+    "OcspConfiguration={Enabled=true},CrlConfiguration={Enabled=true,S3BucketName=acm-pca-crl-xxx,ExpirationInDays=7}" \
+  --region us-east-1
+```
+
+OCSP and CRL can both be enabled simultaneously. OCSP provides real-time
+status; CRL provides a cached list. Enable both for maximum client
+compatibility.
+
+## CA deletion commands (moved from SKILL.md Step 8)
+
+```bash
+aws acm-pca delete-certificate-authority \
+  --certificate-authority-arn "$SUB_CA_ARN" \
+  --permanent-deletion-time-in-days 30 \
+  --region us-east-1
+```
+
+**Restore during the waiting period:**
+
+```bash
+aws acm-pca restore-certificate-authority \
+  --certificate-authority-arn "$SUB_CA_ARN" --region us-east-1
+```
+
+**Critical:** the waiting period is mandatory (7-30 days). After
+expiration, the CA is permanently deleted and CANNOT be recovered.
+Existing certificates remain valid but can no longer be revoked.

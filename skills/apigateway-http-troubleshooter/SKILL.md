@@ -99,95 +99,12 @@ metadata:
   routed to a failing probe because critical config (integration URI,
   authorizer ID, stage auto-deploy flag, VPC link ID) is absent, emit
   INSUFFICIENT_DATA and list exactly what is missing.
+Mindset and philosophy (treat the backend as innocent until the route, authorizer, integration, and stage layers are proven clean; the HTTP status code drives the diagnostic order): [references/advanced-patterns.md](references/advanced-patterns.md).
 
-## Mindset
-
-A failing API Gateway HTTP API is usually a configuration, mapping, or
-deployment issue wearing a backend-code costume. The integration is
-fine in the majority of cases; the broken thing is route priority, JWT
-claim mapping, CORS headers, payload format version, stage deployment,
-throttling, or VPC link connectivity. Treat the backend handler as
-innocent until the route, authorizer, integration, and stage layers
-are proven clean.
-
-## Philosophy
-
-- **The HTTP status code drives the diagnostic order.** A `403` with a
-  JWT authorizer means the authorizer denied the request. A `502` with
-  a Lambda integration means API Gateway could not parse the response.
-  A `504` or `502` after exactly 29 seconds means the integration
-  timed out. Routing the symptom to the wrong layer is the #1 source
-  of wasted cycles.
-
-- **Payload format version 2.0 is the single most common silent-break
-  for Lambda integrations on HTTP APIs.** The v2.0 event wraps the body
-  differently, flattens headers, and base64-encodes binary content. A
-  handler that worked on a REST API (v1.0) silently breaks on POST
-  bodies after migration to HTTP API (v2.0).
-
-- **Route priority evaluation is deterministic but non-obvious.**
-  Exact match → greedy (variable) match → `$default`. If `$default` is
-  configured, any request not matching an explicit route falls through
-  to it, masking undeployed or mis-keyed routes.
-
-- **Stage deployment is mandatory for REST APIs and optional
-  (auto-deploy) for HTTP APIs — but auto-deploy can be disabled.** An
-  HTTP API stage with `AutoDeploy: false` requires manual
-  `create-deployment`.
-
-## Quick reference — symptom triage table
-
-| Symptom phrase / error | Most likely layer | First probe |
-|---|---|---|
-| `403 Forbidden`, `{"message":"User is not authorized"}}` | JWT_AUTHORIZER | `get-authorizer`, JWT issuer/audience/identity source |
-| `404 Not Found` on a known route | ROUTE_MATCHING / ROUTE_PRIORITY_CATCHALL | `get-routes`, route key match, `$default` catch-all |
-| Browser CORS: `Access-Control-Allow-Origin` missing | CORS_MISCONFIG | `get-api` CorsConfiguration (HTTP) or get-method OPTIONS (REST) |
-| `502 Bad Gateway` from Lambda proxy | INTEGRATION_LAMBDA_PROXY / PAYLOAD_FORMAT_VERSION | `get-integration` PayloadFormatVersion, Lambda response shape |
-| `502` / `504` after ~29 seconds | INTEGRATION_TIMEOUT | Integration timeout setting, backend duration |
-| `429 Too Many Requests` | THROTTLING_BURST | Stage/route throttling config |
-| Config changed but "not live" | STAGE_DEPLOYMENT | `get-stage` AutoDeploy, deployment history |
-| `502` from private integration / VPC link | VPCLINK_CONNECTIVITY | `get-vpc-links`, `elbv2 describe-target-health` |
-| Traffic flows but no logs | LOGGING_MISCONFIG | Stage access log settings, execution logging level |
-| Lambda receives garbled / base64 body | PAYLOAD_FORMAT_VERSION | Integration PayloadFormatVersion 1.0 vs 2.0 |
-| None of the above | UNKNOWN / INSUFFICIENT_DATA | Gather API type, full request/response, integration config |
+Quick reference — symptom triage table (symptom → most likely layer → first probe): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ## Pre-flight: API state and gather-info gate
-
-```bash
-# 1. API metadata (type, protocol, endpoint)
-aws apigatewayv2 get-api --api-id <api-id> --output json
-
-# 2. All routes (route key, target, authorizer)
-aws apigatewayv2 get-routes --api-id <api-id> --output json
-
-# 3. Integration details (type, connection, payload format version)
-aws apigatewayv2 get-integration --api-id <api-id> \
-  --integration-id <id> --output json
-
-# 4. Stage configuration (auto-deploy, throttling, access logs)
-aws apigatewayv2 get-stage --api-id <api-id> --stage-name <stage> --output json
-
-# 5. Authorizer configuration (type, issuer, audience, identity source)
-aws apigatewayv2 get-authorizer --api-id <api-id> \
-  --authorizer-id <id> --output json
-
-# 6. Recent execution logs (if execution logging enabled)
-aws logs filter-log-events \
-  --log-group-name /aws/apigateway/<api-id>/<stage> \
-  --start-time $(date -d '-30 minutes' +%s)000 \
-  --filter-pattern '"403" OR "502" OR "504" OR "429" OR "ERROR"' \
-  --output json
-
-# 7. VPC links (for private integrations)
-aws apigatewayv2 get-vpc-links --output json
-
-# 8. CloudWatch 5XX metrics
-aws cloudwatch get-metric-statistics --namespace AWS/ApiGateway \
-  --metric-name 5XXError \
-  --dimensions Name=ApiId,Value=<api-id> \
-  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Sum --output json
-```
+Gather-info probes (get-api, get-routes, get-integration, get-stage, get-authorizer, execution logs, get-vpc-links, 5XX metrics): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### API-type identification short-circuit
 
@@ -215,41 +132,7 @@ REMEDIATION: Re-prompt the operator for: (1) the exact HTTP status code
 ## Diagnostic decision tree
 
 ### Step 0: Non-obvious behaviours that change diagnosis
-
-- **Payload format version 2.0 base64-encodes binary and non-JSON
-  bodies.** A handler that does `JSON.parse(event.body)` on a base64
-  string throws. Check `event.isBase64Encoded` and decode first, or
-  switch to `PayloadFormatVersion: 1.0`.
-
-- **JWT authorizer identity source controls which claim is evaluated.**
-  If the client sends the token in a different header than
-  `IdentitySource` specifies, the authorizer sees an empty string and
-  denies with 403.
-
-- **JWT audience must match the `aud` claim exactly.** Case-sensitive.
-  Authorizer `Audience: ["client-1"]` denies a token with
-  `aud: ["client-2"]`.
-
-- **Route priority: exact → greedy → `$default`.** `$default` is
-  intentional but masks undeployed or mis-keyed routes.
-
-- **The 29-second integration timeout is NOT tunable.** If the backend
-  takes longer, API Gateway returns 504 (REST) or 502 (HTTP). Move
-  long-running work to async.
-
-- **`AutoDeploy: true` may not pick up authorizer or access-log
-  changes.** When in doubt, run `create-deployment` explicitly.
-
-- **CORS on HTTP APIs is API-level (`cors-configuration`); on REST
-  APIs it is per-resource (mock OPTIONS method).** Missing
-  `AllowMethods: [OPTIONS]` means preflight fails.
-
-- **VPC link integrations require the NLB target group to be healthy.**
-  The VPC link is transparent; always `describe-target-health`.
-
-- **Access logging and execution logging are separate.** Access logs
-  record every request; execution logs record API Gateway internals.
-  Operators who "don't see logs" often enabled one but not the other.
+Non-obvious behaviours that change diagnosis (payload v2.0 base64 encoding, JWT identity source and audience matching, route priority order, the untunable 29-second timeout, auto-deploy gaps, CORS API-level vs per-resource, VPC link health, access vs execution logging): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 1: Symptom entry
 
@@ -267,12 +150,7 @@ REMEDIATION: Re-prompt the operator for: (1) the exact HTTP status code
 | None of the above | Step 11 — INSUFFICIENT_DATA |
 
 ### Step 2: JWT Authorizer — 403 Forbidden
-
-```bash
-aws apigatewayv2 get-authorizer --api-id <api-id> \
-  --authorizer-id <id> --output json | \
-  jq '{AuthorizerType, IdentitySource, JwtConfiguration}'
-```
+Probe: [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 2 get-authorizer (IdentitySource, Issuer, JwtConfiguration).
 
 | Field | Effect |
 |---|---|
@@ -287,11 +165,7 @@ Common failures: identity source header mismatch, issuer mismatch
 `IdentitySource`, `Issuer`, or `Audience`; create a deployment.
 
 ### Step 3: Route matching — 404 or wrong route handling
-
-```bash
-aws apigatewayv2 get-routes --api-id <api-id> --output json | \
-  jq '.Items[] | {RouteKey, RouteId, Target, AuthorizerId}'
-```
+Probe: [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 3 get-routes (RouteKey, Target, AuthorizerId).
 
 | Pattern | Cause |
 |---|---|
@@ -304,14 +178,7 @@ aws apigatewayv2 get-routes --api-id <api-id> --output json | \
 `ROUTE_PRIORITY_CATCHALL`. Fix: correct route key; deploy the stage.
 
 ### Step 4: CORS — browser preflight errors
-
-```bash
-# HTTP API: CORS is API-level
-aws apigatewayv2 get-api --api-id <api-id> --output json | jq '.CorsConfiguration'
-# REST API: CORS is per-resource (mock OPTIONS method)
-aws apigateway get-method --rest-api-id <id> --resource-id <rid> \
-  --http-method OPTIONS --output json
-```
+Probe: [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 4 get-api CorsConfiguration (HTTP) / get-method OPTIONS (REST).
 
 | Pattern | Cause |
 |---|---|
@@ -325,12 +192,7 @@ aws apigateway get-method --rest-api-id <id> --resource-id <rid> \
 `CorsConfiguration` (HTTP API) or add mock OPTIONS method (REST API).
 
 ### Step 5: Lambda proxy 502 — payload format version and response shape
-
-```bash
-aws apigatewayv2 get-integration --api-id <api-id> \
-  --integration-id <id> --output json | \
-  jq '{IntegrationType, IntegrationSubtype, PayloadFormatVersion}'
-```
+Probe: [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 5 get-integration (IntegrationType, PayloadFormatVersion).
 
 **5a: Payload format version mismatch.** `PayloadFormatVersion: 2.0`
 may deliver `event.body` as base64 with `isBase64Encoded: true`. A
@@ -363,12 +225,7 @@ The 29-second cap is enforced regardless of the integration's timeout.
 **Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: INTEGRATION_TIMEOUT`.
 
 ### Step 7: Throttling — 429 Too Many Requests
-
-```bash
-aws apigatewayv2 get-stage --api-id <api-id> \
-  --stage-name <stage> --output json | \
-  jq '{DefaultRouteSettings, RouteSettings}'
-```
+Probe: [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 7 get-stage (DefaultRouteSettings, RouteSettings).
 
 | Pattern | Cause |
 |---|---|
@@ -380,31 +237,19 @@ aws apigatewayv2 get-stage --api-id <api-id> \
 **Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: THROTTLING_BURST`.
 
 ### Step 8: Stage deployment — changes not live
-
-```bash
-aws apigatewayv2 get-stage --api-id <api-id> \
-  --stage-name <stage> --output json | jq '{AutoDeploy, LastDeploymentStatus}'
-```
+Probe: [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 8 get-stage (AutoDeploy, LastDeploymentStatus).
 
 | Pattern | Cause |
 |---|---|
 | `AutoDeploy: false` | Requires manual `create-deployment`. |
 | `AutoDeploy: true` but `LastDeploymentStatus: FAILED` | Auto-deploy failed. Check error details. |
 | REST API: no deployment after change | REST APIs ALWAYS require manual deployment. |
-
-```bash
-aws apigatewayv2 create-deployment --api-id <api-id> --stage-name <stage>
-```
+Fix command: [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 8 create-deployment.
 
 **Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: STAGE_DEPLOYMENT`.
 
 ### Step 9: VPC link — private integration 502
-
-```bash
-aws apigatewayv2 get-vpc-links --output json | \
-  jq '.Items[] | {VpcLinkId, Name, SubnetIds, SecurityGroupIds}'
-aws elbv2 describe-target-health --target-group-arn <arn> --output json
-```
+Probe: [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 9 get-vpc-links + elbv2 describe-target-health.
 
 | Pattern | Cause |
 |---|---|
@@ -416,12 +261,7 @@ aws elbv2 describe-target-health --target-group-arn <arn> --output json
 **Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: VPCLINK_CONNECTIVITY`.
 
 ### Step 10: Logging — no logs despite traffic
-
-```bash
-aws apigatewayv2 get-stage --api-id <api-id> \
-  --stage-name <stage> --output json | \
-  jq '{AccessLogSettings, DefaultRouteSettings: .DefaultRouteSettings.LoggingLevel}'
-```
+Probe: [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 10 get-stage (AccessLogSettings, LoggingLevel).
 
 | Pattern | Cause |
 |---|---|
@@ -600,27 +440,7 @@ CONFIRM: Before updating, emit: "CONFIRM: About to update integration
   PayloadFormatVersion on api abc1234 from 2.0 to 1.0. This changes the
   Lambda event shape. Test in non-prod first. Proceed? (yes/no)"
 ```
-
-### Worked example — INSUFFICIENT_DATA
-
-```text
-TARGET: api abc1234 / unknown route
-VERDICT: INSUFFICIENT_DATA
-REASON: Symptom is 502 on POST /webhook, but integration ID,
-  PayloadFormatVersion, and VPC link configuration are not provided.
-  Cannot distinguish payload format mismatch, Lambda response shape
-  error, or VPC link backend failure.
-LAYER: UNKNOWN
-EVIDENCE:
-  - Symptom: POST /webhook returns 502 intermittently.
-  - Missing: IntegrationId, PayloadFormatVersion, ConnectionType,
-    VPC link ID, NLB target group ARN.
-  - Missing: Execution logs or Lambda logs for a failing request.
-REMEDIATION: Provide: (1) integration config from get-integration,
-  (2) VPC link details if private integration, (3) execution logs or
-  Lambda logs for a failing request, (4) confirm intermittent vs
-  consistent 502.
-```
+Further worked example — INSUFFICIENT_DATA (502 on POST /webhook with missing integration and VPC link context): [references/worked-examples.md](references/worked-examples.md).
 
 **Self-check before emit:**
 - [ ] API type identified (HTTP vs REST) and cited in TARGET?
@@ -688,74 +508,18 @@ REMEDIATION: Provide: (1) integration config from get-integration,
   shape. Test in non-prod first.
 
 ## Expert heuristic
-
-Three heuristics separate a senior API Gateway engineer from a
-generalist:
-
-### Heuristic 1: Payload format version determines body encoding
-
-- **v2.0** → body may be base64-encoded (`isBase64Encoded: true`),
-  headers are flat, `requestContext` is simplified. Handler must check
-  and decode.
-- **v1.0** → body is a raw string, headers are multi-value,
-  `requestContext` is the REST API shape.
-- The silent break: a handler migrated from REST API (v1.0) to HTTP
-  API (v2.0) fails on POST bodies because `JSON.parse(event.body)`
-  encounters a base64 string. The error appears as 502 Bad Gateway.
-
-### Heuristic 2: JWT claim mapping is issuer + audience + identity source
-
-- `Issuer` must match the token's `iss` exactly (scheme + trailing
-  slash). Cognito issuers are
-  `https://cognito-idp.<region>.amazonaws.com/<user-pool-id>`.
-- `Audience` must match at least one value in the token's `aud` claim.
-  Empty `Audience` accepts any audience (insecure).
-- `IdentitySource` maps the request header to the token. A mismatch
-  means the authorizer receives an empty string and denies everything.
-
-### Heuristic 3: Route priority evaluation order
-
-- Exact match first (`GET /orders`), then greedy/variable
-  (`GET /orders/{id}`), then `$default` (catch-all).
-- `$default` masks undeployed routes, mis-keyed routes (case
-  sensitivity, trailing slash), and missing methods.
-- Diagnostic order: (1) check route exists in config, (2) check stage
-  was deployed, (3) check route key for case/slash/method mismatch.
+Expert heuristics (payload format version determines body encoding; JWT claim mapping is issuer + audience + identity source; route priority evaluation order): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Configuration dependency graph
+Configuration dependency graph (stage → route matching → authorizer → CORS → throttling → integration → logging): [references/advanced-patterns.md](references/advanced-patterns.md).
 
-```
-Client Request
-    │
-    ▼
-┌──────────────────────────────────┐
-│  Stage (auto-deploy?)            │── Step 8: STAGE_DEPLOYMENT
-│    │                             │
-│    ▼                             │
-│  Route Matching                  │── Step 3: ROUTE_MATCHING
-│  (exact → greedy → $default)     │   ROUTE_PRIORITY_CATCHALL
-│    │                             │
-│    ▼                             │
-│  Authorizer (JWT?)               │── Step 2: JWT_AUTHORIZER
-│  (issuer, audience, id source)   │
-│    │                             │
-│    ▼                             │
-│  CORS Check (preflight OPTIONS)  │── Step 4: CORS_MISCONFIG
-│    │                             │
-│    ▼                             │
-│  Throttling (rate, burst)        │── Step 7: THROTTLING_BURST
-│    │                             │
-│    ▼                             │
-│  Integration                     │── Step 5: PAYLOAD_FORMAT_VERSION
-│  ┌─ Lambda Proxy (1.0 vs 2.0) ─┐ │   INTEGRATION_LAMBDA_PROXY
-│  └─────────────────────────────┘ │── Step 6: INTEGRATION_TIMEOUT
-│  ┌─ VPC Link → NLB → TG ───────┐ │── Step 9: VPCLINK_CONNECTIVITY
-│  └─────────────────────────────┘ │
-│    │                             │
-│    ▼                             │
-│  Logging (access vs execution)   │── Step 10: LOGGING_MISCONFIG
-└──────────────────────────────────┘
-```
+## References (load on demand)
+
+- [Worked examples](references/worked-examples.md) - INSUFFICIENT_DATA worked example
+- [Diagnostic commands](references/diagnostic-commands.md) - symptom triage table, pre-flight gather-info probes, per-step probe commands
+- [Advanced patterns](references/advanced-patterns.md) - mindset and philosophy, Step-0 non-obvious behaviours, expert heuristics, configuration dependency graph
+- [HTTP vs REST API quick reference](references/http-vs-rest-api-quick-reference.md) - CLI and feature comparison, v1.0/v2.0 event shapes, migration pitfalls
+- [Payload format and JWT reference](references/payload-format-and-jwt-reference.md) - payload format gotchas, JWT authorizer configuration matrix, route priority rules
 
 ## Domain
 

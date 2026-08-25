@@ -111,23 +111,8 @@ Before producing the deployment plan, validate the input specification.
 Several requirements **block deployment** — proceeding with an invalid
 spec produces a non-functional or insecure mesh.
 
-**Live-account pre-flight checks (skip if doing offline architecture plan):**
-1. Verify IAM permissions for `appmesh:CreateMesh`,
-   `CreateVirtualNode`, `CreateVirtualRouter`, `CreateRoute`,
-   `CreateVirtualGateway`, `CreateGatewayRoute`,
-   `CreateVirtualService`, and `servicediscovery:CreateService`.
-2. Verify the Cloud Map namespace exists:
-   `aws servicediscovery list-namespaces --output table`.
-   Capture the namespace ID — virtual nodes reference it.
-3. For mTLS, verify the ACM Private CA exists and is ACTIVE:
-   `aws acm-pca list-certificate-authorities --output table`.
-4. For virtual gateway, verify the ALB/NLB listener forwards to the
-   gateway's target group (the gateway's Envoy pods).
-5. For EKS sidecar injection, verify the App Mesh Controller is
-   installed: `kubectl get pods -n appmesh-system`.
-6. For EKS namespace injection, verify the namespace is labeled:
-   `kubectl get namespace <ns> --show-labels` —
-   `appmesh.k8s.aws/sidecarInjectorWebhook=enabled`.
+Full live-account pre-flight command listing moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load it before running pre-flight checks against a live account.
 
 | Attribute | Value | Effect on plan |
 |---|---|---|
@@ -158,75 +143,8 @@ Do NOT proceed to architecture output.
 ## Process — deployment planning (apply in order)
 
 ### Step 0: Expert knowledge — non-obvious App Mesh behaviors
-
-- **Mesh name is region-scoped, not global.** The same mesh name can
-  exist in `us-east-1` and `us-west-2` as independent meshes. Cross-
-  region mesh federation is NOT a feature — use multi-mesh with
-  Gateway-to-Gateway over Transit Gateway/VPC Peering.
-
-- **`egress_filter: DROP_ALL` is the default but easily overridden.**
-  The default `DROP_ALL` blocks egress to anything outside the mesh
-  (databases, SaaS APIs, etc.) unless explicitly added as a backend
-  virtual service. Operators hit this on day 1 and switch to
-  `ALLOW_ALL` to "fix" it. Surface the choice explicitly.
-
-- **Virtual node does NOT deploy Envoy.** The virtual node is a
-  configuration object that maps to a Cloud Map service. Deploying
-  Envoy is a separate step (EKS controller injection, ECS task
-  definition, EC2 binary). This is the #1 confusion point.
-
-- **Virtual gateway is a per-mesh resource, not per-node.** There
-  is typically ONE virtual gateway per mesh for north-south ingress.
-  It runs a dedicated Envoy deployment (gateway pods). The ALB
-  forwards to the gateway's target group, NOT directly to the
-  service pods.
-
-- **Route weights are relative, not absolute.** A route with two
-  targets weighted 90/10 sends 90% to target A. Weights must sum to
-  100 for canary; for blue/green, weights are 100/0 then 0/100. The
-  App Mesh controller and CLI auto-normalize but verify the sum.
-
-- **mTLS uses SPIFFE, not raw certs.** App Mesh mTLS uses the SPIFFE
-  (Secure Production Identity Framework for Everyone) framework
-  with `sdS` (Secret Discovery Service). The cert chain must be
-  issued by ACM Private CA or self-signed and provided via SDS. The
-  Envoy sidecar negotiates the cert; the listener enforces client
-  cert validation.
-
-- **TCP routes have NO match criteria.** A TCP route simply forwards
-  all traffic to weighted targets. There is no L7 routing for TCP —
-  use HTTP or gRPC for path/header routing.
-
-- **Retry policy applies to HTTP and gRPC only.** TCP routes do not
-  support retries. For HTTP, retries on `gateway-error` (5xx) by
-  default; configurable to `5xx`, `gateway-error`, `reset`,
-  `connect-failure`, `refused-stream`, `retriable-status-codes`,
-  `retriable-headers`.
-
-- **Timeout policy has TWO fields: `per_request_timeout` (request
-  RTT) and `idle_timeout` (connection idle).** Set both — long-
-  running requests can hang the connection pool if
-  `per_request_timeout` is unset.
-
-- **Circuit breaking has two axes: connection pool and outlier
-  detection.** Connection pool caps concurrent connections / pending
-  requests; outlier detection ejects unhealthy endpoints from the
-  load-balancing pool. Without both, a slow downstream can exhaust
-  the connection pool and cascade.
-
-- **Cloud Map service name MUST match the virtual node's
-  `cloudMapServiceName`.** Mismatch = service discovery returns
-  empty endpoints = 503 from Envoy.
-
-- **App Mesh Gateway Controller for EKS (2024) reconciles gateway
-  routes via CRDs.** The CRD `gatewayroutes.appmesh.k8s.aws` is
-  reconciled by the controller; CLI changes are overwritten on next
-  reconciliation. Pick one (CRD or CLI) per mesh; do NOT mix.
-
-- **Envoy hot restart preserves connection state across restarts.**
-  Sidecar upgrades (App Mesh controller version, Envoy version) do
-  not drop active connections, but verify via canary before
-  rolling to production.
+Step 0 deep-dive detail moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it before producing the deployment plan or when mesh behavior seems non-obvious.
 
 ### Step 1: Pre-check gate — PREREQUISITES_MISSING if any check fails
 
@@ -301,227 +219,13 @@ CONFIRM gate:
 
 ### Step 4: Post-verification — COMPLETED-equivalent check
 
-After the deploy commands, run:
-1. `describe-mesh --mesh-name <name>` returns the mesh with expected
-   `egress_filter`.
-2. `list-virtual-nodes --mesh-name <name>` returns all expected
-   nodes.
-3. `list-routes --mesh-name <name> --virtual-router-name <router>`
-   returns routes with the expected weighted targets.
-4. `describe-route` on a route returns the expected retry/timeout
-   policy.
-5. `list-virtual-gateways --mesh-name <name>` (if gateway) returns
-   the gateway with expected listeners.
-6. For EKS: `kubectl get pods -n <ns>` shows Envoy sidecar injected
-   (2/2 containers in READY column).
-7. For mTLS: `kubectl exec -it <pod> -c envoy -- curl -s localhost:9901/listeners`
-   shows the listener with `tls_context` populated.
+Verification command listing moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load it after the CONFIRM gate executes to verify the deployment.
 
 ## Common patterns (boilerplate)
 
-### Create a mesh with DROP_ALL egress (production default)
-
-```bash
-aws appmesh create-mesh \
-  --mesh-name "prod-checkout-mesh" \
-  --spec '{"egressFilter":{"type":"DROP_ALL"}}'
-```
-
-`DROP_ALL` blocks egress to anything outside the mesh unless added
-as a backend virtual service.
-
-### Create a virtual node with Cloud Map service discovery
-
-```bash
-aws appmesh create-virtual-node \
-  --mesh-name "prod-checkout-mesh" \
-  --virtual-node-name "checkout-service-v1" \
-  --spec '{
-    "serviceDiscovery": {
-      "cloudMap": {
-        "namespaceName": "prod-internal",
-        "serviceName": "checkout-v1",
-        "attributes": [{"key":"version","value":"v1"}]
-      }
-    },
-    "listeners": [{
-      "portMapping": {"port": 8080, "protocol": "http"},
-      "healthCheck": {
-        "protocol": "http",
-        "path": "/health",
-        "healthyThreshold": 2,
-        "unhealthyThreshold": 2,
-        "timeoutMillis": 2000,
-        "intervalMillis": 5000
-      }
-    }],
-    "backends": [{"virtualService": {"virtualServiceName": "inventory.prod-checkout-mesh.svc.cluster.local"}}],
-    "logging": {"accessLog": {"file": {"path": "/dev/stdout"}}}
-  }'
-```
-
-### Create a virtual router with HTTP routing
-
-```bash
-aws appmesh create-virtual-router \
-  --mesh-name "prod-checkout-mesh" \
-  --virtual-router-name "checkout-router" \
-  --spec '{
-    "listeners": [{"portMapping": {"port": 8080, "protocol": "http"}}]
-  }'
-```
-
-### Create a weighted route (canary: 90/10)
-
-```bash
-aws appmesh create-route \
-  --mesh-name "prod-checkout-mesh" \
-  --virtual-router-name "checkout-router" \
-  --route-name "checkout-canary" \
-  --spec '{
-    "httpRoute": {
-      "match": {"prefix": "/"},
-      "action": {
-        "weightedTargets": [
-          {"virtualNode": "checkout-service-v1", "weight": 90},
-          {"virtualNode": "checkout-service-v2", "weight": 10}
-        ]
-      },
-      "retryPolicy": {
-        "httpRetryEvents": ["gateway-error", "5xx"],
-        "maxRetries": 3,
-        "perRetryTimeoutMillis": 2000
-      },
-      "timeout": {
-        "requestTimeoutMillis": 5000,
-        "idleTimeoutMillis": 300000
-      }
-    }
-  }'
-```
-
-For blue/green: swap weights to 100/0 (v1 full), then 0/100 (v2
-full) over the deployment window.
-
-### Create a virtual gateway for ingress
-
-```bash
-aws appmesh create-virtual-gateway \
-  --mesh-name "prod-checkout-mesh" \
-  --virtual-gateway-name "ingress-gateway" \
-  --spec '{
-    "listeners": [{
-      "portMapping": {"port": 8443, "protocol": "http"},
-      "tls": {
-        "certificate": {"acm": {"certificateArn": "arn:aws:acm:us-east-1:111111111111:certificate/abc123"}},
-        "mode": "PERMISSIVE"
-      }
-    }]
-  }'
-
-aws appmesh create-gateway-route \
-  --mesh-name "prod-checkout-mesh" \
-  --virtual-gateway-name "ingress-gateway" \
-  --gateway-route-name "checkout-ingress" \
-  --spec '{
-    "httpRoute": {
-      "match": {"prefix": "/checkout"},
-      "action": {
-        "target": {"virtualService": {"virtualServiceName": "checkout.prod-checkout-mesh.svc.cluster.local"}}
-      }
-    }
-  }'
-```
-
-### Enable mutual TLS on a listener
-
-```bash
-aws appmesh update-virtual-node \
-  --mesh-name "prod-checkout-mesh" \
-  --virtual-node-name "checkout-service-v1" \
-  --spec '{
-    "serviceDiscovery": {"cloudMap": {"namespaceName": "prod-internal", "serviceName": "checkout-v1"}},
-    "listeners": [{
-      "portMapping": {"port": 8080, "protocol": "http"},
-      "tls": {
-        "certificate": {"sds": {"secretName": "checkout-cert"}},
-        "mode": "STRICT",
-        "validation": {
-          "trust": {"sds": {"secretName": "checkout-ca-bundle"}}
-        }
-      }
-    }]
-  }'
-```
-
-`mode: STRICT` rejects clients without a valid cert; `PERMISSIVE`
-allows both mTLS and plaintext during migration. SDS (Secret
-Discovery Service) is the recommended cert distribution mechanism.
-
-### Configure circuit breaking (connection pool + outlier detection)
-
-```bash
-aws appmesh update-virtual-node \
-  --mesh-name "prod-checkout-mesh" \
-  --virtual-node-name "checkout-service-v1" \
-  --spec '{
-    "serviceDiscovery": {"cloudMap": {"namespaceName": "prod-internal", "serviceName": "checkout-v1"}},
-    "listeners": [{
-      "portMapping": {"port": 8080, "protocol": "http"},
-      "connectionPool": {
-        "http": {"maxConnections": 100, "maxPendingRequests": 50, "maxRequests": 200, "maxRetries": 3}
-      },
-      "outlierDetection": {
-        "maxServerErrors": 5,
-        "intervalMillis": 10000,
-        "baseEjectionDurationMillis": 30000,
-        "maxEjectionPercent": 50
-      }
-    }]
-  }'
-```
-
-### Enable Envoy sidecar injection on EKS namespace
-
-```bash
-# Install App Mesh Controller (one-time)
-helm repo add eks https://aws.github.io/eks-charts
-helm install appmesh-controller eks/appmesh-controller \
-  --namespace appmesh-system --create-namespace
-
-# Label the namespace for sidecar injection
-kubectl label namespace prod appmesh.k8s.aws/sidecarInjectorWebhook=enabled
-
-# Annotate pods with mesh + virtual node references
-kubectl annotate pod checkout-v1-xyz \
-  appmesh.k8s.aws/meshName=prod-checkout-mesh \
-  appmesh.k8s.aws/virtualNode=checkout-service-v1
-```
-
-### Use App Mesh Gateway Controller CRD for EKS
-
-```bash
-# GatewayRoute CRD (reconciled by controller)
-cat <<EOF | kubectl apply -f -
-apiVersion: appmesh.k8s.aws/v1beta2
-kind: GatewayRoute
-metadata:
-  name: checkout-ingress
-  namespace: prod
-spec:
-  httpRoute:
-    match:
-      prefix: "/checkout"
-    action:
-      target:
-        virtualService:
-          virtualServiceRef:
-            name: checkout
-EOF
-```
-
-CRD-managed resources override CLI changes; pick one mechanism per
-mesh.
+All boilerplate moved: mesh/node/router and sidecar/CRD examples to [references/worked-examples.md](references/worked-examples.md); weighted-route and circuit-breaking examples to [references/traffic-policy-and-resilience-guide.md](references/traffic-policy-and-resilience-guide.md); gateway and mTLS examples to [references/virtual-gateway-and-mtls-guide.md](references/virtual-gateway-and-mtls-guide.md).
+Load the fitting reference when emitting DEPLOY_COMMANDS.
 
 ## Output format (per deployment)
 
@@ -596,23 +300,8 @@ DEPLOY_COMMANDS:
 
 ### Worked example — mTLS missing CA (PREREQUISITES_MISSING)
 
-```text
-MESH_SPEC: prod-secure-mesh
-VERDICT: PREREQUISITES_MISSING
-ARCHITECTURE: (incomplete — pre-checks failed)
-CHECKLIST:
-  - [FAIL] ACM Private CA not found in account 111111111111
-FINDINGS:
-  - [BLOCKER] mTLS requires an ACM Private CA in ACTIVE status. List
-    current CAs: aws acm-pca list-certificate-authorities. Create a
-    new CA: aws acm-pca create-certificate-authority --certificate-authority-configuration ...
-    Wait for Status: ACTIVE before referencing it in the listener
-    tls block.
-  - [BLOCKER] Cloud Map namespace secure-internal not found. Create:
-    aws servicediscovery create-private-dns-namespace --name secure-internal --vpc vpc-abc123
-    Wait for Status: ACTIVE before referencing in virtual nodes.
-DEPLOY_COMMANDS: (none — pre-checks failed)
-```
+Full example moved to [references/worked-examples.md](references/worked-examples.md).
+Load it when pre-checks fail and the verdict is PREREQUISITES_MISSING.
 
 ## STRICT output contract
 
@@ -708,26 +397,8 @@ supplements, not replaces, service-level health.
 
 ## Recent AWS features (2024-2026)
 
-- **App Mesh Gateway Controller for EKS (2024)**: CRD-based
-  reconciliation of gateway routes, virtual nodes, virtual routers,
-  virtual services, and virtual gateways. Replaces direct CLI
-  management for EKS-native workflows; pick one mechanism per mesh.
-- **mTLS via SDS (Secret Discovery Service)** (2023, refined 2024):
-  Envoy negotiates certs via SDS instead of static file mounts;
-  supports ACM Private CA and self-signed; rolling cert updates
-  without Envoy restart.
-- **Circuit breaking improvements**: connection pool and outlier
-  detection on virtual node listeners (per-listener granularity);
-  ejection duration, max-ejection-percent configurable.
-- **gRPC route enhancements**: `serviceName` and `methodName` match;
-  retry on gRPC status codes.
-- **App Mesh timeout policy**: per-route `requestTimeoutMillis` and
-  `idleTimeoutMillis` (separate from retry `perRetryTimeoutMillis`).
-- **Multi-cluster mesh via Gateway-to-Gateway**: limited support
-  via virtual gateway peering over Transit Gateway; not a true
-  federated mesh.
-- **Envoy version upgrades**: App Mesh controller pins Envoy
-  versions; verify before controller upgrade.
+Feature detail moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when choosing CRD vs CLI management or planning controller/Envoy upgrades.
 
 ## Domain
 
@@ -745,3 +416,11 @@ AWS CloudOps / App Mesh Service Mesh Provisioning.
 - **App Mesh Gateway Controller** — https://docs.aws.amazon.com/app-mesh/latest/userguide/gateway-controller.html
 - **AWS App Mesh API Reference** — https://docs.aws.amazon.com/app-mesh/latest/APIReference/
 - **AWS CLI appmesh reference** — https://docs.aws.amazon.com/cli/latest/reference/appmesh/
+
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked example (PREREQUISITES_MISSING) and common-pattern CLI boilerplate: mesh, virtual node, virtual router, EKS sidecar injection, Gateway Controller CRD
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — live-account pre-flight command listing and post-deployment verification commands (Step 4)
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 expert-knowledge deep dives and Recent AWS features (2024-2026)
+- [references/traffic-policy-and-resilience-guide.md](references/traffic-policy-and-resilience-guide.md) — weighted canary route (with retry/timeout) and circuit-breaking CLI boilerplate
+- [references/virtual-gateway-and-mtls-guide.md](references/virtual-gateway-and-mtls-guide.md) — virtual gateway ingress and mTLS listener CLI boilerplate

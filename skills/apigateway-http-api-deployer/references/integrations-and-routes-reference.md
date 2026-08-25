@@ -233,3 +233,52 @@ surprise operators who add a public `/health` route later.
 - **Set up HTTP proxy integrations for HTTP APIs** — https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-develop-integrations-http.html
 - **Set up VPC links for HTTP APIs** — https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vpc-links.html
 - **Step Functions direct integration** — https://docs.aws.amazon.com/step-functions/latest/dg/connect-api-gateway.html
+
+## Moved from SKILL.md Step 3 — per-integration create commands
+
+**Lambda proxy:**
+```bash
+aws apigatewayv2 create-integration --api-id <id> \
+  --integration-type AWS_PROXY --integration-method POST \
+  --integration-uri arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/arn:aws:lambda:<region>:<account>:function:<name>/invocations
+
+aws lambda add-permission --function-name <name> \
+  --statement-id apigw-v2-invoke --action lambda:InvokeFunction \
+  --principal apigateway.amazonaws.com \
+  --source-arn arn:aws:execute-api:<region>:<account>:<api-id>/*/POST/users
+```
+
+**HTTP proxy via VPC link:**
+```bash
+aws apigatewayv2 create-vpc-link --name prod-nlb-link \
+  --subnet-ids subnet-abc subnet-def --security-group-ids sg-xyz
+
+aws apigatewayv2 create-integration --api-id <id> \
+  --integration-type HTTP_PROXY --integration-method ANY \
+  --integration-uri https://<nlb-dns>/api \
+  --connection-id <vpc-link-id> --connection-type VPC_LINK
+```
+
+**Step Functions START_SYNC_EXECUTION (direct, no Lambda):** use
+`StartSyncExecution` for Express Workflows (caller needs the result
+inline, 5s ceiling); `StartExecution` for Standard Workflows (async —
+API returns the execution ARN immediately).
+```bash
+aws apigatewayv2 create-integration --api-id <id> \
+  --integration-type AWS --integration-method POST \
+  --integration-subtype STEP_FUNCTION \
+  --request-parameters '{"StateMachineArn":"arn:aws:states:<region>:<account>:stateMachine:<name>","Action":"StartSyncExecution","Input":"$request.body"}'
+```
+
+**SQS SendMessage (direct):** uses `credentials-arn` (IAM role trusting
+`apigateway.amazonaws.com`) with `MessageBody` mapped from the request
+body.
+
+**Kinesis PutRecord (direct):** uses `credentials-arn` with `Data`
+mapped from the request body and `PartitionKey` mapped from
+`$context.requestId` (or a JWT claim for tenant-partitioned streams).
+
+Direct AWS integrations need a `credentials-arn` (an IAM role trusting
+`apigateway.amazonaws.com` with permission to call the target service).
+This role is the blast radius — scope it tightly to the one queue,
+state machine, or stream.

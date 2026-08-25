@@ -261,3 +261,54 @@ Account A (123456789012)           Account B (123456789012)
 - Amazon MQ Authentication — https://docs.aws.amazon.com/amazon-mq/latest/developer-guide/amazon-mq-authentication.html
 - RabbitMQ IAM Auth — https://docs.aws.amazon.com/amazon-mq/latest/developer-guide/rabbitmq-iam-authentication.html
 - Transit Gateway — https://docs.aws.amazon.com/vpc/latest/tgw/what-is-transit-gateway.html
+
+---
+
+## ActiveMQ vs RabbitMQ feature comparison (moved from SKILL.md Step 1)
+
+**Feature comparison:**
+
+| Feature | ActiveMQ | RabbitMQ |
+|---|---|---|
+| Protocols | OpenWire, STOMP, MQTT, AMQP 1.0, WS | AMQP 0-9-1, AMQP 1.0, MQTT, STOMP |
+| Topology model | Queues, Topics, Virtual Topics, Durable Subscribers | Exchanges (direct, fanout, topic, headers) + Queues + Bindings |
+| HA mode | Active/Standby (shared EBS) | Active/Standby OR Cluster (3+ nodes, quorum) |
+| Horizontal scaling | NO (single active instance) | YES (cluster mode) |
+| Encryption at rest | YES (KMS) | YES (KMS) |
+| Encryption in transit (TLS) | YES | YES |
+| AWS IAM authentication | NO | YES (creation-time-only) |
+| LDAP authentication | YES (JAAS) | YES (via backend) |
+| Mutual TLS | YES | YES |
+| Audit logging | YES (CloudWatch) | YES (CloudWatch) |
+| Automatic minor version upgrades | YES (default on) | YES (default on) |
+
+## Deployment mode specifics (moved from SKILL.md Step 2)
+
+**ActiveMQ active/standby specifics:**
+- 1 active broker + 1 standby in a different AZ.
+- Shared EBS storage — the standby does NOT accept connections.
+- Failover: 5-15 minutes (EBS volume promotion + restart).
+- Clients must use `failover:(ssl://...)` URI for automatic reconnect.
+
+**RabbitMQ cluster mode specifics:**
+- 3 nodes minimum (quorum requirement).
+- Nodes in different AZs for HA.
+- Quorum queues provide automatic leader election (10-30 seconds).
+- Horizontal scaling: connections distribute across nodes.
+- Going from active/standby to cluster REQUIRES broker deletion +
+  recreation. Decide at creation.
+
+## Size by workload (moved from SKILL.md Step 3)
+
+**Size by workload:**
+- **Dev / test / prototype:** `mq.t3.micro` (1 GiB, ~1,000 connections).
+  Free-tier eligible; burst CPU.
+- **Small production (< 1,000 connections, < 1,000 msg/s):**
+  `mq.m5.large` (8 GiB, ~1,000-2,000 connections).
+- **Mid production (2,000-5,000 connections, 1,000-10,000 msg/s):**
+  `mq.m5.2xlarge` (32 GiB).
+- **Large production (5,000-10,000 connections, 10,000+ msg/s):**
+  `mq.m5.4xlarge` (64 GiB).
+- **Very large (10,000+ connections):** `mq.m5.8xlarge` or
+  `mq.m5.16xlarge`. For RabbitMQ, prefer cluster mode with multiple
+  `mq.m5.2xlarge` nodes over a single large node.

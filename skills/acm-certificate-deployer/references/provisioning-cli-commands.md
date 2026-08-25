@@ -256,3 +256,93 @@ resource "aws_cloudfront_distribution" "cdn" {
 | List PCA CAs | `aws acm-pca list-certificate-authorities` |
 | Create PCA permission | `aws acm-pca create-permission` |
 | Wait for validation | `aws acm wait certificate-validated` |
+
+## Step 3 — request with DNS validation (CLI)
+
+```bash
+aws acm request-certificate \
+  --domain-name example.com \
+  --subject-alternative-names "*.example.com" \
+  --validation-method DNS \
+  --region us-east-1
+```
+
+## Step 3 — retrieve the CNAME records (CLI)
+
+```bash
+aws acm describe-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:<acct>:certificate/<uuid> \
+  --query 'Certificate.DomainValidationOptions[*].ResourceRecord' \
+  --region us-east-1
+```
+
+## Step 3 — add the CNAME to Route53 (CLI)
+
+```bash
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z2KVMGOMGDOOU2 \
+  --change-batch '{
+    "Changes": [{
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "_<random>.example.com.",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [{"Value": "_<random>.acm-validations.aws."}]
+      }
+    }]
+  }'
+```
+
+## Step 7 — attach certificate to CloudFront (CLI)
+
+```bash
+aws cloudfront update-distribution \
+  --id E1234567890ABC \
+  --distribution-config '{
+    "ViewerCertificate": {
+      "AcmCertificateArn": "arn:aws:acm:us-east-1:<acct>:certificate/<uuid>",
+      "SslSupportMethod": "sni-only",
+      "MinimumProtocolVersion": "TLSv1.2_2021"
+    },
+    ... (rest of distribution config)
+  }'
+```
+
+## Step 8 — share a Private CA cross-account (CLI)
+
+```bash
+# In the PCA-owning account
+aws acm-pca create-permission \
+  --certificate-authority-arn arn:aws:acm-pca:us-east-1:<acct>:certificate-authority/<uuid> \
+  --principal <consumer-account-id> \
+  --actions IssueCertificate GetCertificate ListPermissions
+```
+
+## Step 9 — private certificate workflow (CLI)
+
+```bash
+# Step 1: Create a Private CA (one-time)
+aws acm-pca create-certificate-authority \
+  --certificate-authority-configuration '{
+    "KeyAlgorithm": "RSA_2048",
+    "SigningAlgorithm": "SHA256WITHRSA",
+    "Subject": {"CommonName": "My Private CA"}
+  }' \
+  --certificate-authority-type "SUBORDINATE" \
+  --region us-east-1
+
+# Step 2: Install the CA certificate (sign the CSR)
+aws acm-pca issue-certificate \
+  --certificate-authority-arn <ca-arn> \
+  --csr fileb://ca-csr.pem \
+  --signing-algorithm SHA256WITHRSA \
+  --validity Value=10,Type=YEARS
+
+# Step 3: Request a private certificate via ACM
+aws acm request-certificate \
+  --domain-name internal.example.com \
+  --certificate-authority-arn <ca-arn> \
+  --validation-method DNS \
+  --region us-east-1
+```

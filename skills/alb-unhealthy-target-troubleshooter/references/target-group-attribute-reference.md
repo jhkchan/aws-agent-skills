@@ -176,3 +176,101 @@ aws ec2 authorize-security-group-ingress \
   --ip-permissions \
     IpProtocol=tcp,FromPort=<port>,ToPort=<port>,UserIdGroupPairs=[{GroupId=<alb-sg>}]
 ```
+
+---
+
+## Step 10: Listener/TG protocol compatibility and 502 causes (moved from SKILL.md)
+
+The listener protocol and target group protocol must be compatible:
+
+| Listener protocol | TG protocol | Works? |
+|---|---|---|
+| HTTPS | HTTP | Yes (TLS termination at ALB) |
+| HTTPS | HTTPS | Yes (end-to-end TLS) |
+| HTTP | HTTP | Yes |
+| HTTP | HTTPS | Yes (but requires HTTPS TG) |
+| HTTPS | HTTPS with self-signed cert | Yes (ALB does not verify cert) |
+
+A 502 from the ALB when targets are healthy usually means the target
+closed the connection unexpectedly. Common causes:
+- The application has a keep-alive timeout shorter than the ALB's.
+- The application does not support HTTP/1.1 (ALB uses HTTP/1.1 to
+  targets).
+- The target is an HTTPS endpoint but the TG protocol is HTTP,
+  causing a protocol mismatch.
+
+## Deep reference: ALB target health layer model (moved from SKILL.md)
+
+### Symptom -> layer decision matrix (offline classification)
+
+```
+TargetHealthReason                        -> Layer
+Target.FailedHealthChecks (all targets)   -> HEALTH_CHECK_PATH / PORT_MISMATCH / PROTOCOL_MISMATCH
+Target.ConnectionFailed (all targets)     -> SG_BLOCKING_HEALTH_CHECK / PORT_MISMATCH
+Target.FailedHealthChecks (some targets)  -> per-target app issue or AZ issue
+Target.InvalidState                       -> target stopped/terminated (not a health check issue)
+Unused                                    -> WEIGHTED_ROUTING / CROSS_ZONE
+Draining                                  -> DEREGISTRATION_DELAY
+healthy but flapping                      -> HEALTH_CHECK_THRESHOLD
+healthy but low traffic                   -> SLOW_START
+Lambda target unhealthy                   -> LAMBDA_TARGET_INTEGRATION
+```
+
+### Health check parameter defaults and ranges
+
+| Parameter | Default | Range | Notes |
+|---|---|---|---|
+| `HealthCheckIntervalSeconds` | 30 | 5-300 | Lower = faster detection but more load |
+| `HealthCheckTimeoutSeconds` | 5 | 2-60 | Must be < interval |
+| `HealthyThresholdCount` | 5 | 2-10 | Consecutive successes to mark healthy |
+| `UnhealthyThresholdCount` | 2 | 2-10 | Consecutive failures to mark unhealthy |
+| `HealthCheckPath` | `/` | 1-1024 chars | Case-sensitive |
+| `HealthCheckPort` | `traffic-port` | `traffic-port` or 1-65535 | Overrides target port |
+| `Matcher.HttpCode` | `200` | `200`-`599`, comma-separated | Default does not match 204, 301 |
+
+### Target group attributes reference
+
+| Attribute | Default | Range | Effect |
+|---|---|---|---|
+| `deregistration_delay.timeout_seconds` | 300 | 0-3600 | Time to drain in-flight requests after deregistration |
+| `stickiness.enabled` | false | true/false | Pin clients to targets via cookie |
+| `stickiness.type` | lb_cookie | lb_cookie / app_cookie | Cookie mechanism |
+| `stickiness.duration_seconds` | 86400 | 1-604800 | Cookie lifetime (lb_cookie) |
+| `load_balancing.algorithm.type` | round_robin | round_robin / least_outstanding_requests | Load distribution algorithm |
+| `slow_start.duration_seconds` | 0 | 0, 30-900 | Ramp-up time for new healthy targets |
+| `proxy_protocol_v2.enabled` | false | true/false | PROXY protocol v2 header prepended |
+| `preserve_client_ip.enabled` | false | true/false | Target sees client IP instead of ALB IP |
+| `target.group_arn` | (read-only) | n/a | The TG ARN |
+
+### TargetType differences
+
+| TargetType | Health check mechanism | Notes |
+|---|---|---|
+| `instance` | TCP + HTTP/HTTPS probe to HealthCheckPort | EC2 instances; health check port configurable |
+| `ip` | TCP + HTTP/HTTPS probe to HealthCheckPort | IP addresses; supports targets outside the VPC |
+| `lambda` | Synchronous Lambda invoke with GET | No health check path/port; function must return 200 |
+| `alb` | Cascaded health check via the nested TG | Target group as a target (weighted routing); health check delegates to the nested TG |
+
+### ECS health check grace period
+
+For ECS services with ALB targets, `healthCheckGracePeriodSeconds`
+controls how long ECS ignores ALB health check failures for newly
+started tasks:
+
+```bash
+aws ecs describe-services \
+  --cluster <cluster> --services <service> --output json | \
+  jq '.services[].healthCheckGracePeriodSeconds'
+```
+
+If the grace period is too short, tasks are killed before the
+application finishes starting. Typical values: 30-300 seconds
+depending on application startup time.
+
+### ALB listener protocol compatibility
+
+| Listener Protocol | TG Protocol | TLS Termination | Notes |
+|---|---|---|---|
+| HTTP | HTTP | None | Plain text end-to-end |
+| HTTPS | HTTP | At ALB | ALB terminates TLS; target receives HTTP |
+| HTTPS | HTTPS | End-to-end | ALB terminates and re-encrypts; ALB does not verify target cert |

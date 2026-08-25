@@ -251,3 +251,20 @@ fields @timestamp, routeKey, status, latency
 - **Custom domain names for HTTP APIs** — https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-custom-domain-names.html
 - **Stages for HTTP APIs (auto-deploy)** — https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-stages.html
 - **Access logging for HTTP APIs** — https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-logging.html
+
+## Moved from SKILL.md Step 4 — critical JWT configuration rules
+
+**Critical JWT config rules:**
+- The issuer URL MUST be HTTPS and end with a trailing slash for
+  Cognito pools. A missing slash is the #1 cause of "invalid JWT
+  configuration" errors.
+- Audience must match the `aud` claim in the token. Cognito tokens use
+  `client_id` instead of `aud` — API Gateway handles this automatically
+  when it detects a Cognito issuer, but for third-party OIDC ensure the
+  audience matches.
+- `identity-source` defaults to `$request.header.Authorization`. A
+  missing or malformed Authorization header returns `401 Unauthorized`
+  without invoking the integration.
+- Authorizer caching TTL defaults to 0 (no cache). For high-volume
+  APIs, set TTL via `authorizerResultTtlInSeconds` on
+  `update-authorizer` (300s typical).

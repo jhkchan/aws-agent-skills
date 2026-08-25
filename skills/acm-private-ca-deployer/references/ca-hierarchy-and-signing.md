@@ -331,3 +331,139 @@ resource "aws_acmpca_permission" "acm" {
 5. **Not waiting for certificate issuance.** The `issue-certificate`
    call is asynchronous. You must wait for ISSUED status before
    getting the certificate. Use `wait certificate-issued`.
+
+---
+
+## Create the CA — root and subordinate (moved from SKILL.md Step 4)
+
+**Create a root CA:**
+
+```bash
+ROOT_CA_ARN=$(aws acm-pca create-certificate-authority \
+  --certificate-authority-configuration \
+    "KeyAlgorithm=RSA_2048,SigningAlgorithm=SHA256withRSA,Subject={CN=Example Root CA,O=Example Org,C=US}" \
+  --revocation-configuration \
+    "CrlConfiguration={Enabled=true,S3BucketName=acm-pca-crl-123456789012-us-east-1,ExpirationInDays=7,CustomCname=crl.example.com}" \
+  --certificate-authority-type ROOT \
+  --region us-east-1 \
+  --query 'CertificateAuthorityArn' --output text)
+```
+
+**Create a subordinate CA:**
+
+```bash
+SUB_CA_ARN=$(aws acm-pca create-certificate-authority \
+  --certificate-authority-configuration \
+    "KeyAlgorithm=RSA_2048,SigningAlgorithm=SHA256withRSA,Subject={CN=Example Subordinate CA,O=Example Org,C=US}" \
+  --revocation-configuration \
+    "CrlConfiguration={Enabled=true,S3BucketName=acm-pca-crl-123456789012-us-east-1,ExpirationInDays=7}" \
+  --certificate-authority-type SUBORDINATE \
+  --region us-east-1 \
+  --query 'CertificateAuthorityArn' --output text)
+```
+
+## Activate the root CA (moved from SKILL.md Step 4)
+
+**Activate the root CA (self-signed certificate):**
+
+```bash
+# 1. Get CSR
+aws acm-pca get-certificate-authority-csr \
+  --certificate-authority-arn "$ROOT_CA_ARN" \
+  --region us-east-1 --query 'Csr' --output text > root-ca.csr
+
+# 2. Issue self-signed cert using RootCACertificate/V1 template
+ROOT_CERT_ARN=$(aws acm-pca issue-certificate \
+  --certificate-authority-arn "$ROOT_CA_ARN" \
+  --csr fileb://root-ca.csr \
+  --signing-algorithm SHA256withRSA \
+  --template-arn arn:aws:acm-pca:::template/RootCACertificate/V1 \
+  --validity Value=10,Type=YEARS \
+  --region us-east-1 --query 'CertificateArn' --output text)
+
+# 3. Wait for issuance, then get cert and import
+aws acm-pca wait certificate-issued \
+  --certificate-authority-arn "$ROOT_CA_ARN" \
+  --certificate-arn "$ROOT_CERT_ARN" --region us-east-1
+
+aws acm-pca get-certificate \
+  --certificate-authority-arn "$ROOT_CA_ARN" \
+  --certificate-arn "$ROOT_CERT_ARN" --region us-east-1 | \
+  jq -r '.Certificate' > root-ca-cert.pem
+
+aws acm-pca import-certificate-authority-certificate \
+  --certificate-authority-arn "$ROOT_CA_ARN" \
+  --certificate fileb://root-ca-cert.pem --region us-east-1
+```
+
+## Activate the subordinate CA (moved from SKILL.md Step 4)
+
+**Activate the subordinate CA (signed by parent):**
+
+```bash
+# PREREQUISITE: Parent CA must be ACTIVE and have create-permission
+# 1. Get subordinate CSR
+aws acm-pca get-certificate-authority-csr \
+  --certificate-authority-arn "$SUB_CA_ARN" \
+  --region us-east-1 --query 'Csr' --output text > sub-ca.csr
+
+# 2. Issue certificate from PARENT CA
+SUB_CERT_ARN=$(aws acm-pca issue-certificate \
+  --certificate-authority-arn "$ROOT_CA_ARN" \
+  --csr fileb://sub-ca.csr \
+  --signing-algorithm SHA256withRSA \
+  --template-arn arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen0/V1 \
+  --validity Value=5,Type=YEARS \
+  --region us-east-1 --query 'CertificateArn' --output text)
+
+# 3. Wait, get cert + chain, import into subordinate
+aws acm-pca wait certificate-issued \
+  --certificate-authority-arn "$ROOT_CA_ARN" \
+  --certificate-arn "$SUB_CERT_ARN" --region us-east-1
+
+aws acm-pca get-certificate \
+  --certificate-authority-arn "$ROOT_CA_ARN" \
+  --certificate-arn "$SUB_CERT_ARN" --region us-east-1 | \
+  jq -r '.Certificate' > sub-ca-cert.pem
+
+aws acm-pca get-certificate \
+  --certificate-authority-arn "$ROOT_CA_ARN" \
+  --certificate-arn "$SUB_CERT_ARN" --region us-east-1 | \
+  jq -r '.CertificateChain' > sub-ca-chain.pem
+
+aws acm-pca import-certificate-authority-certificate \
+  --certificate-authority-arn "$SUB_CA_ARN" \
+  --certificate fileb://sub-ca-cert.pem \
+  --certificate-chain fileb://sub-ca-chain.pem --region us-east-1
+```
+
+## End-entity issuance command (moved from SKILL.md Step 5)
+
+**Issue an end-entity certificate:**
+
+```bash
+EE_CERT_ARN=$(aws acm-pca issue-certificate \
+  --certificate-authority-arn "$SUB_CA_ARN" \
+  --csr fileb://server.csr \
+  --signing-algorithm SHA256withRSA \
+  --template-arn arn:aws:acm-pca:::template/EndEntityCertificate/CertPassedPathLen/0 \
+  --validity Value=365,Type=DAYS \
+  --region us-east-1 --query 'CertificateArn' --output text)
+```
+
+## Cross-account ACM permission (moved from SKILL.md Step 6)
+
+**For cross-account ACM access:**
+
+```bash
+aws acm-pca create-permission \
+  --certificate-authority-arn "$SUB_CA_ARN" \
+  --principal 999999999999 \
+  --source-account 123456789012 \
+  --actions IssueCertificate GetCertificate ListPermissions \
+  --region us-east-1
+```
+
+**Critical:** without this permission, ACM cannot request private
+certificates. Certificate requests through ACM will fail with access
+denied.

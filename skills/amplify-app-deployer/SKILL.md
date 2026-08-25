@@ -63,52 +63,13 @@ creation; retrofitting it later causes silent deploy failures.
 
 Three behaviours separate a senior Amplify engineer from a generalist:
 
-- **The buildspec (amplify.yml) is the source of truth.** Build phases,
-  environment variables, custom headers, and redirects all live in
-  `amplify.yml` committed to the repo. Operators who configure these in
-  the Console produce uncommitted, untracked config that vanishes on
-  repo re-clone. Commit `amplify.yml` from day one.
-
-- **SSR vs SSG vs SPA is decided at framework + Amplify config level.**
-  Next.js on Amplify supports SSR (via Amplify's SSR compute), SSG
-  (static export), and SPA (single-page with rewrites). The choice
-  affects cost, cold-start, and the redirect rule. A common mistake:
-  deploying a Next.js SSR app as SPA, then wondering why
-  `getServerSideProps` returns 404. The framework directive
-  (`output: 'export'`, `ssr`) tells Amplify how to host.
-
-- **Custom domain needs DNS verification before the cert issues.** An
-  Amplify custom domain uses an ACM certificate with DNS validation.
-  The Route 53 / third-party DNS must have the CNAME validation record
-  in place before the cert goes to ISSUED. Operators who add the domain
-  but skip DNS validation wait hours for a cert that never issues.
+Senior-engineer behaviours (buildspec as source of truth; rendering mode;
+DNS validation before cert issue): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Philosophy
 
-- **Amplify Gen 2 (TypeScript CDK) replaces Gen 1's CLI-driven backend.**
-  Gen 2 uses `defineBackend` in `amplify/backend.ts` — fully CDK-based,
-  no `amplify init` / `amplify push` ceremony. The backend is IaC,
-  deployable via `npx ampx pipeline-deploy` in the Amplify build phase.
-  Gen 1's `amplify add auth` mutation model is legacy; new apps should
-  use Gen 2.
-
-- **Branch environments are first-class.** Every git branch gets its
-  own Amplify URL (`https://branch.dXXXX.amplifyapp.com`). A `main`
-  branch is production; a `staging` branch is the staging URL; a PR
-  branch is a preview. The CI/CD pipeline is per-branch. Operators who
-  run one big `main` branch and manually promote lose the preview-URL
-  workflow that is Amplify's superpower.
-
-- **Environment variables are branch-scoped.** An env var set on
-  `main` does NOT appear on `staging` unless explicitly added. Secrets
-  (API keys, DB credentials) should be AWS Secrets Manager references,
-  not plaintext env vars — Amplify reads the secret at build time and
-  never logs the value.
-
-- **Custom headers and redirects are committed, not Console-configured.**
-  `amplify.yml`'s `customHeaders` and `redirects` sections are the IaC
-  surface. Console-configured headers and redirects are overwritten on
-  the next push that includes `amplify.yml`. Always commit.
+Provisioning philosophy (Gen 2 over Gen 1; branch environments; Secrets
+Manager env vars; committed headers): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Quick navigation
 
@@ -166,15 +127,8 @@ that make the provisioning order non-trivial:
 | Branch environments | Per-branch URL | PR previews only if branch detection is on |
 
 **Cross-dependency gotchas:**
-- A Next.js SSR app needs the Amplify SSR compute role automatically
-  created on first deploy — do not delete it.
-- A custom domain on a third-party DNS (GoDaddy, Namecheap) needs the
-  ACM validation CNAME copied manually; Route 53 does it automatically
-  only if the hosted zone is in the same account.
-- Amplify Gen 2 backend deploys in the build phase via
-  `npx ampx pipeline-deploy --branch $AWS_BRANCH`. The role assumed by
-  the Amplify build needs `iam:PassRole` + CDK bootstrapped in the
-  account.
+Full catalog (SSR compute role, third-party DNS validation, ampx IAM
++ CDK bootstrap): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Expert heuristic: rendering mode cost and latency
 
@@ -346,22 +300,8 @@ the secret value at build time, never logs it.
 Custom headers (security headers, CORS) and redirects (SPA rewrite,
 legacy URL redirects) live in `amplify.yml`.
 
-```yaml
-customHeaders:
-  - pattern: '**/*'
-    headers:
-      - key: Strict-Transport-Security
-        value: 'max-age=31536000; includeSubDomains'
-      - key: Content-Security-Policy
-        value: "default-src 'self'; script-src 'self'"
-redirects:
-  - source: '/old-path'
-    target: '/new-path'
-    status: '301'
-  - source: '/<*>'
-    target: '/index.html'
-    status: '200'
-```
+Full customHeaders + redirects YAML (HSTS, CSP, 301s, SPA rewrite):
+[references/build-and-domain-reference.md](references/build-and-domain-reference.md).
 
 **Common mistake:** Console-configuring headers and redirects. They are
 overwritten on the next push that includes `amplify.yml`. Always commit.
@@ -370,22 +310,8 @@ overwritten on the next push that includes `amplify.yml`. Always commit.
 
 A custom domain uses an ACM certificate with DNS validation.
 
-```bash
-# Request an ACM cert in us-east-1 (Amplify requires us-east-1)
-aws acm request-certificate \
-  --domain-name app.example.com \
-  --validation-method DNS \
-  --region us-east-1 \
-  --output json
-# Add the validation CNAME to Route 53 / third-party DNS
-
-# Associate the domain with the Amplify app
-aws amplify create-domain-association \
-  --app-id dXXXX \
-  --domain-name example.com \
-  --sub-domain-settings '[{"prefix":"app","branchName":"main"}]' \
-  --output json
-```
+ACM cert request + domain-association commands:
+[references/build-and-domain-reference.md](references/build-and-domain-reference.md).
 
 **Route 53 automatic validation:** if the hosted zone for
 `example.com` is in the same account, ACM auto-writes the validation
@@ -415,25 +341,8 @@ export const backend = defineBackend({
 });
 ```
 
-**Backend resources (Gen 2 patterns):**
-- **Auth:** Amazon Cognito user pool + identity pool.
-  `npx ampx add auth` generates the `auth/resource.ts`.
-- **Data (API):** AppSync GraphQL API with TypeScript schema.
-  `npx ampx add data`.
-- **Storage:** S3 bucket with per-user prefixes.
-  `npx ampx add storage`.
-- **Functions:** Lambda functions wired to API or storage triggers.
-  `npx ampx add function`.
-
-**Backend deploy in build phase:**
-
-```bash
-npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
-```
-
-This runs in the `build` phase of `amplify.yml` and deploys the CDK
-stack for the branch. The build role needs `iam:PassRole` and the
-CDK bootstrap (`CDKToolkit`) must exist in the account.
+Gen 2 backend resource catalog (auth/data/storage/functions) + build-phase
+pipeline-deploy contract: [references/backend-gen2-reference.md](references/backend-gen2-reference.md).
 
 **Common mistake:** running `ampx push` (sandbox mode) in CI instead of
 `ampx pipeline-deploy`. Sandbox mode is for local dev; CI uses
@@ -468,37 +377,13 @@ aws amplify create-branch \
 
 ### Step 9 — Amplify Gen 2 latest features (2024-2026)
 
-- **Amplify Gen 2 TypeScript CDK backend (2024-2025):** Replaces Gen 1's
-  CLI mutation model. `amplify/backend.ts` with `defineBackend` is
-  fully CDK; deployable via `npx ampx pipeline-deploy`. Backend is
-  IaC, branch-aware, and composable with any CDK construct.
-- **Branch-based backend environments (2024-2025):** Each git branch
-  gets its own backend stack (Cognito, AppSync, S3) via
-  `pipeline-deploy --branch`. PR previews include a full sandbox
-  backend.
-- **Amplify Build Image updates (2024-2025):** Node 20, Python 3.12,
-  newer bundlers. Specify `amplifyBuildSpec: buildImage: amplify:nodejs-20`
-  to pin.
-- **Custom IAM roles for Amplify SSR compute (2024-2025):** Next.js SSR
-  apps can pin a custom role for the SSR compute (instead of the
-  auto-generated one) for least-privilege.
-- **Secrets Manager integration (2024-2025):** Amplify reads Secrets
-  Manager secrets at build time via the app's service role. No more
-  plaintext env vars for secrets.
-- **Amplify Studio for Gen 2 (2024-2025):** Visual UI builder for
-  Gen 2 backends; generates `ui-components/` from Figma.
+Gen 2 feature detail (CDK backend, branch backends, build image, SSR
+roles, Secrets Manager, Studio): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 10 — Transit / networking edge cases
 
-- **Amplify apps are public-internet by default.** There is no VPC
-  attachment for Amplify build or SSR compute. If the backend (RDS,
-  ElastiCache) is private, the Amplify build / SSR compute needs a
-  NAT or VPC endpoint — typically via a Lambda in a VPC fronted by
-  API Gateway.
-- **CloudFront in front of Amplify** is supported but rare — Amplify
-  already fronts the app with a managed CloudFront distribution. A
-  second CloudFront in front is for custom WAF rules or origin
-  selection.
+Transit/networking edge cases (no VPC attachment, NAT for private
+backends, second CloudFront): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## NEVER do these things (top 5)
 
@@ -586,84 +471,27 @@ VERIFICATION_COMMANDS:
   aws acm describe-certificate --certificate-arn arn:aws:acm:us-east-1:111:certificate/abc --region us-east-1
 ```
 
-### Worked example — React SPA with S3 + CloudFront-equivalent
+Further worked examples (React SPA static site; PREREQUISITES_MISSING with
+no Git provider / no amplify.yml): [references/worked-examples.md](references/worked-examples.md).
 
-```text
-APP: marketing-site
-VERDICT: READY_TO_DEPLOY
-CHECKLIST:
-  [✓] Git provider: CodeCommit (connection: service role AWSAmplifyServiceRole)
-  [✓] Repository: codecommit::us-east-1://marketing-site (amplify.yml committed: YES)
-  [✓] Framework: React 18 (Vite)
-  [✓] Rendering mode: SPA (client-side render, CDN-served)
-  [✓] Build settings: amplify.yml (preBuild: npm ci; build: npm run build; artifacts: dist/**/*)
-  [✓] Environment variables: 2 plaintext (VITE_API_URL, NODE_ENV)
-  [✓] Custom headers: HSTS, X-Content-Type-Options nosniff
-  [✓] Redirects: /<*> -> /index.html status 200 (SPA rewrite for React Router)
-  [✓] Custom domain: marketing.example.com (ACM cert in us-east-1; DNS validated via Route 53)
-  [✓] Backend (Gen 2): N/A (static SPA, no backend)
-  [✓] CI/CD: branch builds on every push; main = production
-  [✓] Branch environments: main=marketing.example.com, PR=pr<N>.dXXXX.amplifyapp.com
-VERIFICATION_COMMANDS:
-  aws amplify get-app --app-id dXXXX
-  aws amplify list-branches --app-id dXXXX
-  aws amplify get-domain-association --app-id dXXXX --domain-name example.com
-```
-
-### Worked example — PREREQUISITES_MISSING (no Git provider, no amplify.yml)
-
-```text
-APP: new-app
-VERDICT: PREREQUISITES_MISSING
-CHECKLIST:
-  [✗] Git provider: NOT specified — need CodeCommit / GitHub / GitLab / Bitbucket + connection
-  [✗] Repository: NOT specified — need repo URL with amplify.yml committed
-  [✗] Framework: NOT specified — need Next.js / React / Vue / Angular / Svelte
-  [✗] Rendering mode: NOT specified — need SSR / SSG / SPA / ISR
-  [✗] ACM certificate: NOT specified — custom domain needs a cert in us-east-1
-VERIFICATION_COMMANDS:
-  aws codeconnections list-connections
-  aws acm list-certificates --region us-east-1
-  aws route53 list-hosted-zones
-```
 
 ## Error handling
 
-| Error | Cause | Fix |
-|---|---|---|
-| `Repository access denied` | PAT missing `repo` scope or connection PENDING | Re-auth the CodeConnections connection in the Console |
-| `Build failed: command not found: ampx` | `npx ampx` not installed | Add `npm install -g @aws-amplify/backend-cli` to preBuild |
-| `Next.js SSR compute role missing` | Role was deleted | Re-deploy the branch; Amplify recreates the role automatically |
-| `Certificate validation timed out` | DNS CNAME missing | Add the ACM validation CNAME to Route 53 / third-party DNS |
-| `CDK bootstrap not found` | `CDKToolkit` stack missing | `npx cdk bootstrap aws://<account>/<region>` before first Gen 2 deploy |
-| `Environment variable not found on staging` | Var set only on `main` | Amplify env vars are branch-scoped; set on each branch |
-| `404 on dynamic routes` | SSR deployed as SPA | Switch to SSR (auto-detected) or SSG with rewrite rule |
+Error-to-cause-to-fix table (repo access, ampx missing, SSR role, cert
+timeout, CDK bootstrap, 404s): [references/error-handling.md](references/error-handling.md).
 
 ## Recent AWS features (2024-2026)
 
-- **Amplify Gen 2 (2024-2025):** TypeScript CDK-based backend with
-  `defineBackend`. Replaces Gen 1's `amplify init` / `amplify push`
-  mutation model. Deploy via `npx ampx pipeline-deploy` in the build
-  phase. Fully IaC, branch-aware, composable with any CDK construct.
-- **Branch-based backend environments (2024-2025):** Each git branch
-  gets its own backend stack (Cognito, AppSync, S3) via
-  `pipeline-deploy --branch`. PR previews include a full sandbox
-  backend, not just a frontend preview.
-- **Secrets Manager integration (2024-2025):** Amplify reads Secrets
-  Manager secrets at build time via the app's service role. Eliminates
-  plaintext env vars for secrets. Configure via `customRules` in
-  `update-app`.
-- **Custom IAM roles for Amplify SSR compute (2024-2025):** Next.js SSR
-  apps can pin a custom role for the SSR compute (instead of the
-  auto-generated one) for least-privilege.
-- **Amplify Build Image Node 20 (2024-2025):** Updated build image with
-  Node 20, Python 3.12, newer bundlers. Pin via
-  `buildImage: amplify:nodejs-20` in the app settings.
-- **Amplify Studio for Gen 2 (2024-2025):** Visual UI builder for
-  Gen 2 backends; generates `ui-components/` from Figma designs.
-- **CodeConnections GA (2024-2025):** CodeConnections (formerly
-  CodeStar connections) GA for GitHub, GitLab, Bitbucket. Replaces
-  PAT-based auth for long-lived CI connections.
+Recent AWS features (2024-2026) — Gen 2, branch backends, Secrets
+Manager, Node 20, Studio, CodeConnections: [references/advanced-patterns.md](references/advanced-patterns.md).
+
+## References (load on demand)
+
+- [Worked examples](references/worked-examples.md) - further checklists: React SPA static site; PREREQUISITES_MISSING (no Git provider / no amplify.yml)
+- [Error handling](references/error-handling.md) - error-to-cause-to-fix table: repo access, ampx missing, SSR role, cert validation, CDK bootstrap, branch-scoped env vars, 404s
+- [Advanced patterns](references/advanced-patterns.md) - senior-engineer behaviours, philosophy tenets, cross-dependency gotchas, Gen 2 features, networking edge cases, recent AWS features
+- [Build and domain reference](references/build-and-domain-reference.md) - deep buildspec + domain detail: custom headers/redirects YAML, ACM cert request + domain association commands
+- [Gen 2 backend reference](references/backend-gen2-reference.md) - Gen 2 backend patterns: resource catalog, pipeline-deploy build-phase contract
 
 ## Domain
 

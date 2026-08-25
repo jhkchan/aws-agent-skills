@@ -272,3 +272,51 @@ aws amplify update-app \
   --app-id d2y0lrmp1qq2tu \
   --iam-service-role-arn arn:aws:iam::123456789012:role/amplify-service-role
 ```
+
+## Moved from SKILL.md Step 9 — monorepo app detection commands
+
+For monorepos, set `appRoot` at app creation:
+
+```bash
+aws amplify create-app \
+  --name my-web-app \
+  --repository https://github.com/org/my-monorepo \
+  --app-root packages/web-app \
+  --platform WEB
+```
+
+Amplify then reads `packages/web-app/amplify.yml` for build settings.
+Without `appRoot`, Amplify looks at the repo root and misses the app.
+
+**Detect existing appRoot:**
+
+```bash
+aws amplify get-app \
+  --app-id d2y0lrmp1qq2tu \
+  --query 'app.appRoot'
+```
+
+**Update appRoot** (requires app update):
+
+```bash
+aws amplify update-app \
+  --app-id d2y0lrmp1qq2tu \
+  --app-root packages/web-app
+```
+
+## Moved from SKILL.md Step 11 — Lambda serverless functions
+
+Amplify deploys Lambda serverless functions from the build output,
+powering SSR pages, API routes, and custom compute:
+
+```yaml
+# amplify.yml — functions section for serverless functions
+functions:
+  - src: api/hello
+    name: hello-function
+    runtime: nodejs18.x
+    handler: handler.main
+```
+
+Functions are deployed per branch — each branch has its own set. They
+are invoked via the branch URL under `/api/<function-name>`.

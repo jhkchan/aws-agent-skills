@@ -84,6 +84,9 @@ issues were found during execution.
 | Output format | The literal report template |
 | references/dns-and-caa-validation.md | DNS validation + CAA detail |
 | references/multi-account-and-pca.md | Multi-account + PCA detail |
+| references/advanced-patterns.md | Dependency graph + alarm model + recent features |
+| references/error-handling.md | Monitoring failure remedies |
+| references/diagnostic-commands.md | Alarm/inventory CLI detail |
 
 ## Mindset
 
@@ -96,31 +99,7 @@ certificate is not attached to a supported service. Always monitor
 DaysToExpiry with tiered alarms (warning <30 days, critical <7 days)
 and verify renewal status proactively.
 
-Three misconceptions dominate ACM certificate monitoring at operation
-time:
-
-- **"ACM auto-renews all certificates."** It does NOT. ACM auto-renews
-  only certificates that meet ALL of these conditions: (1) DNS-
-  validated (email-validated certs require manual action), (2) issued
-  (not in PENDING_VALIDATION), (3) currently in use (attached to a
-  supported AWS service like ALB, NLB, CloudFront, API Gateway), and
-  (4) not blocked by CAA record conflicts. A certificate that is
-  issued but not attached to any resource will NOT be auto-renewed.
-
-- **"DaysToExpiry alarm is unnecessary because ACM renews
-  automatically."** It IS necessary. Even with auto-renewal, CAA
-  record changes, DNS configuration changes, or service detachment can
-  silently block renewal. The certificate will continue approaching
-  expiry without any visible error until the DaysToExpiry alarm fires.
-  Without monitoring, the first sign of a problem is a production
-  outage when the certificate expires.
-
-- **"CAA records are set once and never cause issues."** CAA records
-  can be added or modified by any party with DNS access (including
-  DNS providers' automated processes). A CAA record that restricts
-  certificate issuance to a specific CA (e.g., only Let's Encrypt)
-  will silently block ACM renewal. CAA conflicts are the #1 cause of
-  unexpected ACM renewal failures.
+Three misconceptions in full (ACM does NOT auto-renew all certs; the DaysToExpiry alarm IS necessary; CAA records can break renewal at any time): [Advanced patterns](references/advanced-patterns.md).
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -129,101 +108,15 @@ metric is the primary signal, but renewal depends on DNS validation,
 CAA records, service attachment, and certificate status. Use this
 graph to sequence monitoring checks.
 
-| Check | Hard dependencies (fails without) | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| DaysToExpiry alarm | certificate in ISSUED state; CloudWatch metric available for the certificate | DaysToExpiry = -1 if cert is not ISSUED or not eligible for renewal monitoring | expiry alerting |
-| Certificate status | certificate exists in ACM | PENDING_VALIDATION certs do not have a valid DaysToExpiry; EXPIRED certs need re-issuance | renewal tracking |
-| DNS validation record | certificate was DNS-validated; CNAME validation record exists in Route53 (or other DNS) | if the validation CNAME is deleted, renewal fails silently; ACM shows status as PENDING_VALIDATION or VALIDATION_TIMED_OUT | renewal eligibility |
-| CAA record check | domain's DNS zone accessible; CAA record query possible | CAA records can be set at the zone apex or subdomain level; restrictive CAA blocks ACM silently | renewal unblocking |
-| Service attachment | certificate attached to ALB/NLB/CloudFront/API Gateway/etc. | unattached certificates are NOT auto-renewed; ACM does not alert on detachment | auto-renewal eligibility |
-| Renewal status | certificate eligible for renewal (60 days before expiry) | ACM attempts renewal starting 60 days before expiry; failures are not always immediately visible | renewal confirmation |
-| Multi-region inventory | per-region API calls (list-certificates is region-scoped) | certificates are regional resources (except CloudFront which uses us-east-1); missing a region = missing certs | complete inventory |
-| Multi-account audit | Organizations all-features enabled; assume-role access to member accounts | without Organizations access or cross-account roles, cannot inventory member account certs | org-wide visibility |
-| Private cert (PCA) | ACM PCA private CA exists; private certificates issued | private cert renewal depends on PCA CA certificate health; PCA CA cert expiry is a separate alarm | private cert monitoring |
-
-**The CAA-record row is the one a baseline model misses.** CAA
-records are the #1 silent renewal blocker. The DaysToExpiry alarm
-fires, the operator sees the cert approaching expiry, but the renewal
-keeps failing because a CAA record was added (possibly by another
-team or DNS provider automation) that restricts issuance to a
-different CA. The procedure below forces an explicit CAA check.
-
-**Cross-dependency gotchas:**
-- DaysToExpiry monitoring requires the certificate to be ISSUED.
-  PENDING_VALIDATION or EXPIRED certificates need different handling.
-- Auto-renewal requires the certificate to be attached to a supported
-  service. Detaching the certificate stops auto-renewal silently.
-- DNS-validated certificates auto-renew; email-validated certificates
-  require manual approval of the renewal email.
-- CAA records can be set at the zone apex, affecting all subdomains.
-  A wildcard cert (`*.example.com`) can be blocked by a CAA record on
-  `example.com`.
-- Private certificates (via ACM PCA) have a separate renewal cycle
-  that depends on the PCA CA certificate health.
+Full check-dependency table (alarm, status, DNS record, CAA, attachment, renewal, region/account coverage, PCA) and cross-dependency gotchas: [Advanced patterns](references/advanced-patterns.md).
 
 ## Expert heuristic: the DaysToExpiry tiered alarm model
 
-A baseline model says "set an alarm for certificate expiry." The
-correct heuristic recognizes that DaysToExpiry needs tiered thresholds
-for graduated response.
-
-```text
-DaysToExpiry timeline for a 1-year certificate (365 days):
-
-  365 ──────────────────────────────────────────────────────── 0
-       │                  │              │         │           │
-       │                  │              │         │           └─ EXPIRED (outage)
-       │                  │              │         │
-       │                  │              │         └─ <7 days: CRITICAL alarm
-       │                  │              │              (page on-call, escalate)
-       │                  │              │
-       │                  │              └─ <30 days: WARNING alarm
-       │                  │                   (notify team, verify renewal)
-       │                  │
-       │                  └─ ~60 days: ACM begins auto-renewal attempts
-       │                       (renewal should complete here for healthy certs)
-       │
-       └─ 365 days: certificate issued/renewed
-
-Alarm tiers:
-  WARNING (< 30 days)  → SNS topic: cert-warning-notifications
-  CRITICAL (< 7 days)  → SNS topic: cert-critical-escalation
-```
-
-**Key implication:** the warning alarm at 30 days gives the team
-ample time to investigate and fix renewal issues before the critical
-alarm at 7 days forces emergency action. This two-tier approach
-prevents certificate-expiry production outages.
+Tiered-alarm timeline diagram (365→60→30→7→0) and SNS tier routing: [Advanced patterns](references/advanced-patterns.md).
 
 ## Expert heuristic: CAA record conflict detection
 
-CAA (Certification Authority Authorization) DNS records specify which
-CAs are allowed to issue certificates for a domain. ACM requires a CAA
-record that permits Amazon (issuer: `amazon.com`) or no CAA record at
-all. A CAA record that does NOT include `amazon.com` silently blocks
-ACM renewal.
-
-```text
-CAA record scenarios:
-  ├── No CAA records → Any CA can issue → ACM renewal OK
-  ├── CAA record includes amazon.com → ACM can issue → renewal OK
-  ├── CAA record includes only letsencrypt.org → ACM BLOCKED
-  │     Issue: "amazon.com" not in CAA allowlist
-  │     Symptom: renewal status stays PENDING_VALIDATION, DaysToExpiry keeps decreasing
-  │     Fix: add CAA record for amazon.com OR remove restrictive CAA
-  └── CAA record includes amazon.com + issuewild → wildcard renewal OK
-        issuewild controls wildcard cert issuance specifically
-
-Detection:
-  dig caa example.com +short
-  # Expected for ACM-compatible: 0 issue "amazon.com"
-  # Or: no output (no CAA records)
-```
-
-**Key implication:** always check CAA records when renewal fails. The
-DaysToExpiry alarm fires but the renewal does not complete because the
-CAA record blocks ACM. This is the #1 renewal failure cause and is
-invisible without an explicit DNS check.
+CAA scenario tree (no CAA / amazon.com / letsencrypt-only / issuewild) and the dig-based detection: [DNS and CAA validation](references/dns-and-caa-validation.md).
 
 ## Prerequisites (verify before operating)
 
@@ -265,17 +158,7 @@ self-signed certs that are not managed by ACM for renewal).
 
 **Verify the metric is available:**
 
-```bash
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/CertificateManager \
-  --metric-name DaysToExpiry \
-  --dimensions Name=CertificateArn,Value=arn:aws:acm:us-east-1:123456789012:certificate/abc123-def456 \
-  --statistics Average \
-  --period 86400 \
-  --start-time $(date -u -v-3d +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --region us-east-1
-```
+get-metric-statistics CLI for the metric check: [Diagnostic commands](references/diagnostic-commands.md).
 
 ## Step 2 — Certificate expiry alarm tiers
 
@@ -283,43 +166,11 @@ Create tiered CloudWatch alarms on DaysToExpiry for graduated response.
 
 ### Warning alarm (< 30 days)
 
-```bash
-aws cloudwatch put-metric-alarm \
-  --alarm-name "acm-cert-warning-<cert-id>" \
-  --alarm-description "ACM certificate expires in < 30 days" \
-  --namespace AWS/CertificateManager \
-  --metric-name DaysToExpiry \
-  --dimensions Name=CertificateArn,Value=arn:aws:acm:us-east-1:123456789012:certificate/abc123-def456 \
-  --statistic Average \
-  --period 86400 \
-  --evaluation-periods 1 \
-  --threshold 30 \
-  --comparison-operator LessThanThreshold \
-  --treat-missing-data "breaching" \
-  --alarm-actions "arn:aws:sns:us-east-1:123456789012:cert-warning-notifications" \
-  --ok-actions "arn:aws:sns:us-east-1:123456789012:cert-warning-notifications" \
-  --region us-east-1
-```
+put-metric-alarm CLI (threshold 30, cert-warning-notifications SNS): [Diagnostic commands](references/diagnostic-commands.md).
 
 ### Critical alarm (< 7 days)
 
-```bash
-aws cloudwatch put-metric-alarm \
-  --alarm-name "acm-cert-critical-<cert-id>" \
-  --alarm-description "ACM certificate expires in < 7 days — URGENT" \
-  --namespace AWS/CertificateManager \
-  --metric-name DaysToExpiry \
-  --dimensions Name=CertificateArn,Value=arn:aws:acm:us-east-1:123456789012:certificate/abc123-def456 \
-  --statistic Average \
-  --period 86400 \
-  --evaluation-periods 1 \
-  --threshold 7 \
-  --comparison-operator LessThanThreshold \
-  --treat-missing-data "breaching" \
-  --alarm-actions "arn:aws:sns:us-east-1:123456789012:cert-critical-escalation" \
-  --ok-actions "arn:aws:sns:us-east-1:123456789012:cert-critical-escalation" \
-  --region us-east-1
-```
+put-metric-alarm CLI (threshold 7, cert-critical-escalation SNS): [Diagnostic commands](references/diagnostic-commands.md).
 
 **Alarm behavior:**
 
@@ -341,37 +192,7 @@ ACM certificates are regional resources. CloudFront distributions use
 certificates from us-east-1. To get a complete inventory, list
 certificates in ALL active regions.
 
-```bash
-# List certificates across all enabled regions
-for REGION in $(aws account get-contact-information \
-  --query 'ContactInformation' --output text 2>/dev/null \
-  || aws ec2 describe-regions --query 'Regions[*].RegionName' --output text | tr '\t' '\n'); do
-  echo "=== Region: $REGION ==="
-  aws acm list-certificates --region "$REGION" \
-    --output table \
-    --query 'CertificateSummaryList[*].{Domain:DomainName,Arn:CertificateArn,Type:Type}'
-done
-```
-
-**Or for a specific set of regions:**
-
-```bash
-for REGION in us-east-1 us-west-2 eu-west-1 ap-southeast-1; do
-  echo "=== Region: $REGION ==="
-  aws acm list-certificates --region "$REGION" \
-    --query 'CertificateSummaryList[*].{Domain:DomainName,Status:Status,Arn:CertificateArn}' \
-    --output table
-done
-```
-
-**Detail per certificate:**
-
-```bash
-aws acm describe-certificate \
-  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/abc123-def456 \
-  --query 'Certificate.{Domain:DomainName,Status:Status,Type:Type,Issuer:Issuer,NotAfter:NotAfter,NotBefore:NotBefore,KeyAlgorithm:KeyAlgorithm,ValidationMethod:DomainValidationOptions[0].ValidationMethod,RenewalEligibility:RenewalEligibility}' \
-  --region us-east-1 --output table
-```
+All-region and specific-region inventory loops plus per-certificate detail query: [Diagnostic commands](references/diagnostic-commands.md).
 
 ## Step 4 — Certificate renewal status tracking
 
@@ -397,12 +218,7 @@ indicates whether it will auto-renew.
 
 **Check renewal status:**
 
-```bash
-aws acm describe-certificate \
-  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/abc123-def456 \
-  --query 'Certificate.{Status:Status,RenewalEligibility:RenewalEligibility,DomainValidation:DomainValidationOptions[*].{Domain:DomainName,ValidationStatus:ValidationStatus,ValidationMethod:ValidationMethod},RenewalSummary:RenewalSummary}' \
-  --region us-east-1 --output table
-```
+Renewal-status describe-certificate query: [Diagnostic commands](references/diagnostic-commands.md).
 
 **If `RenewalSummary` is present**, ACM has begun the renewal process.
 Check `RenewalSummary.RenewalStatus` for `PENDING_AUTO_RENEWAL`,
@@ -414,23 +230,7 @@ DNS-validated certificates have CNAME records that ACM uses to verify
 domain ownership. These records MUST remain in DNS for the certificate
 to renew.
 
-**Retrieve the validation CNAME records:**
-
-```bash
-aws acm describe-certificate \
-  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/abc123-def456 \
-  --query 'Certificate.DomainValidationOptions[*].{Domain:DomainName,ValidationStatus:ValidationStatus,CNAMEName:ResourceRecord.Name,CNAMEValue:ResourceRecord.Value}' \
-  --region us-east-1 --output table
-```
-
-**Verify the CNAME exists in DNS:**
-
-```bash
-# Verify the CNAME exists and resolves
-dig _abc123.example.com.example.com CNAME +short
-nslookup -type=CNAME _abc123.example.com.example.com
-# Or via Route53 API: list-resource-record-sets filtered by CNAME type
-```
+CNAME retrieval and dig/nslookup verification CLI: [DNS and CAA validation](references/dns-and-caa-validation.md).
 
 **Critical:** if the validation CNAME is missing from DNS, renewal
 will fail. The certificate status will show `PENDING_VALIDATION` or
@@ -442,24 +242,7 @@ CAA records are the #1 silent blocker of ACM certificate renewal. A
 CAA record that does not include `amazon.com` prevents ACM from
 renewing the certificate.
 
-**Check CAA records for the domain:**
-
-```bash
-dig example.com CAA +short
-nslookup -type=CAA example.com
-```
-
-**Interpret CAA results:**
-
-| CAA record | Effect on ACM renewal |
-|---|---|
-| No CAA records (empty) | No restriction — ACM OK |
-| `0 issue "amazon.com"` | ACM authorized — OK |
-| `0 issue "letsencrypt.org"` (no amazon.com) | ACM BLOCKED |
-| `0 issue ";"` | All renewal blocked |
-
-**Fix CAA conflict (Route53):** add `0 issue "amazon.com"` CAA record
-via `aws route53 change-resource-record-sets` UPSERT.
+CAA query CLI, interpretation table, and the Route53 UPSERT fix: [DNS and CAA validation](references/dns-and-caa-validation.md).
 
 **Key implication:** CAA records can be modified by anyone with DNS
 access. A CAA conflict can appear at any time, even for certificates
@@ -471,30 +254,7 @@ certificate health audits.
 ACM certificates must be attached to supported services for auto-
 renewal. The most common attachment is to load balancers (ALB/NLB).
 
-**Find certificates attached to ALBs/NLBs:**
-
-```bash
-# List listeners with cert details for each LB
-for LB_ARN in $(aws elbv2 describe-load-balancers \
-  --query 'LoadBalancers[*].LoadBalancerArn' --output text --region us-east-1); do
-  aws elbv2 describe-listeners --load-balancer-arn "$LB_ARN" \
-    --query 'Listeners[*].{Protocol:Protocol,Certs:Certificates[*].CertificateArn}' \
-    --output table --region us-east-1
-done
-```
-
-**CloudFront and API Gateway:** CloudFront cert ARNs are in
-`aws cloudfront list-distributions --query 'DistributionList.Items[*].ViewerCertificate.ACMCertificateArn'`.
-API Gateway custom domain certs are in
-`aws apigateway get-domain-names --query 'items[*].certificateArn'`.
-
-**Identify unattached certificates (at risk of not auto-renewing):**
-
-```bash
-# Cross-reference all ISSUED certs with ALB/NLB/CloudFront/API GW attached certs
-# Any cert in the full list not found in attached lists is unattached
-```
-```
+ALB/NLB listener scan, CloudFront/API Gateway ARN queries, and the unattached-cert cross-reference: [Multi-account and PCA](references/multi-account-and-pca.md).
 
 **Critical:** unattached certificates are NOT auto-renewed by ACM.
 Either re-attach them or delete them if no longer needed.
@@ -507,25 +267,7 @@ Organizations all-features enabled, a monitoring role (e.g.
 `ACMMonitoringRole`) in each member account with ACM read access,
 and the audit account can assume the monitoring role in each member.
 
-**Audit certificates in each account:**
-
-```bash
-for ACCT_ID in $(aws organizations list-accounts \
-  --query 'Accounts[?Status==`ACTIVE`].Id' --output text | tr '\t' '\n'); do
-  CREDS=$(aws sts assume-role \
-    --role-arn "arn:aws:iam::$ACCT_ID:role/ACMMonitoringRole" \
-    --role-session-name "acm-audit" --query 'Credentials' --output json)
-  export AWS_ACCESS_KEY_ID=$(echo "$CREDS" | jq -r '.AccessKeyId')
-  export AWS_SECRET_ACCESS_KEY=$(echo "$CREDS" | jq -r '.SecretAccessKey')
-  export AWS_SESSION_TOKEN=$(echo "$CREDS" | jq -r '.SessionToken')
-  for REGION in us-east-1 us-west-2 eu-west-1; do
-    echo "  $ACCT_ID / $REGION:"
-    aws acm list-certificates --region "$REGION" \
-      --query 'CertificateSummaryList[*].{Domain:DomainName,Status:Status}' --output table
-  done
-  unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
-done
-```
+Assume-role audit loop across org accounts and regions: [Multi-account and PCA](references/multi-account-and-pca.md).
 
 ## Step 9 — Automated renewal failure detection
 
@@ -535,14 +277,7 @@ them via API by checking `RenewalSummary.RenewalStatus` for all
 ISSUED certificates — if `FAILED`, investigate CAA records, DNS
 validation records, and service attachment.
 
-```bash
-for CERT_ARN in $(aws acm list-certificates --certificate-statuses ISSUED \
-  --query 'CertificateSummaryList[*].CertificateArn' --output text --region us-east-1); do
-  STATUS=$(aws acm describe-certificate --certificate-arn "$CERT_ARN" \
-    --query 'Certificate.RenewalSummary.RenewalStatus' --output text --region us-east-1 2>/dev/null)
-  [ "$STATUS" = "FAILED" ] && echo "RENEWAL FAILED: $CERT_ARN"
-done
-```
+RenewalSummary.RenewalStatus scan across ISSUED certificates: [Diagnostic commands](references/diagnostic-commands.md).
 
 **Renewal failure reasons:**
 
@@ -594,39 +329,11 @@ renewed manually or via API, and the PCA CA certificate itself
 (10-year default validity) must be monitored for expiry — if the CA
 cert expires, all private certs issued by it become invalid.
 
-```bash
-# List private CAs and check expiry
-aws acm-pca list-certificate-authorities \
-  --query 'CertificateAuthorities[*].{Arn:Arn,Status:Status,NotAfter:NotAfter}' \
-  --output table --region us-east-1
-
-# PCA CA certs don't have a built-in DaysToExpiry metric.
-# Compute days remaining from NotAfter:
-NOT_AFTER=$(aws acm-pca describe-certificate-authority \
-  --certificate-authority-arn arn:aws:acm-pca:us-east-1:123456789012:certificate-authority/abc123 \
-  --query 'CertificateAuthority.NotAfter' --output text --region us-east-1)
-DAYS_REMAINING=$(( ( $(date -d "$NOT_AFTER" +%s) - $(date +%s) ) / 86400 ))
-echo "PCA CA cert days remaining: $DAYS_REMAINING"
-```
+PCA CA listing and NotAfter days-remaining computation: [Multi-account and PCA](references/multi-account-and-pca.md).
 
 ## Step 13 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **ACM multi-region certificates (2023-2024):** Managed across
-  multiple regions for global applications using Route53 latency-based
-  routing.
-- **Enhanced renewal visibility (2023-2024):** API renewal summary now
-  includes detailed failure reasons.
-- **PCA short-lived certificate support (2023-2024):** Short-lived
-  certs (hours to days) requiring more frequent renewal automation.
-- **CloudTrail certificate events (2023-2024):** Enhanced events for
-  lifecycle changes, renewal attempts, and CAA conflict detection.
-- **EventBridge renewal failure events (2024-2025):** ACM emits
-  EventBridge events on renewal failure for automated response.
-- **Cross-account certificate sharing via RAM (2025-2026):**
-  Certificates shared across accounts with monitoring for usage and
-  renewal status.
+2023-2026 features — multi-region certificates, renewal visibility, PCA short-lived certs, CloudTrail events, EventBridge renewal-failure events, RAM sharing: [Advanced patterns](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -726,30 +433,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### DaysToExpiry metric reporting -1
-- The certificate is not eligible for DaysToExpiry monitoring. Check
-  certificate status (must be ISSUED). Imported certificates may not
-  report DaysToExpiry correctly.
+DaysToExpiry -1, renewal FAILED, stuck PENDING_VALIDATION, INSUFFICIENT_DATA alarms, member-account audit failures: [Error handling](references/error-handling.md).
 
-### Renewal status shows FAILED
-- Check (in order): CAA records, DNS validation records, service
-  attachment, domain ownership. The most common cause is a CAA record
-  conflict, followed by missing DNS validation records.
+## References (load on demand)
 
-### Certificate status is PENDING_VALIDATION for an extended period
-- DNS validation CNAME may be missing or incorrect. Verify the CNAME
-  record matches exactly what ACM specifies. Check for trailing dots
-  in the DNS record name.
-
-### Alarm stays in INSUFFICIENT_DATA
-- The metric is not reporting. The certificate may be in a non-ISSUED
-  state, or the alarm dimensions may not match the certificate ARN
-  exactly. Verify with `describe-alarms` and `get-metric-statistics`.
-
-### Multi-account audit fails for a member account
-- The monitoring role may not exist in the member account, or the
-  audit account does not have permission to assume it. Verify the
-  trust policy on the member account's monitoring role.
+- [DNS and CAA validation](references/dns-and-caa-validation.md) — validation-record persistence, CAA resolution rules and fixes
+- [Multi-account and PCA](references/multi-account-and-pca.md) — org audit architecture, PCA monitoring, certificate-to-resource mapping
+- [Advanced patterns](references/advanced-patterns.md) — dependency graph, tiered alarm model, recent features
+- [Error handling](references/error-handling.md) — metric, renewal, validation, alarm, and audit failure remedies
+- [Diagnostic commands](references/diagnostic-commands.md) — alarm, inventory, and renewal-status CLI
 
 ## Domain
 

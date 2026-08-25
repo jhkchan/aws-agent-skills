@@ -223,3 +223,25 @@ Amplify.configure(outputs);
 For `pipeline-deploy` builds, `amplify_outputs.json` is generated in
 the project root during the build phase — commit a placeholder or
 .gitignore it; Amplify regenerates it on every build.
+
+## Moved from SKILL.md Step 7 — backend resources + pipeline-deploy contract
+
+**Backend resources (Gen 2 patterns):**
+- **Auth:** Amazon Cognito user pool + identity pool.
+  `npx ampx add auth` generates the `auth/resource.ts`.
+- **Data (API):** AppSync GraphQL API with TypeScript schema.
+  `npx ampx add data`.
+- **Storage:** S3 bucket with per-user prefixes.
+  `npx ampx add storage`.
+- **Functions:** Lambda functions wired to API or storage triggers.
+  `npx ampx add function`.
+
+**Backend deploy in build phase:**
+
+```bash
+npx ampx pipeline-deploy --branch $AWS_BRANCH --app-id $AWS_APP_ID
+```
+
+This runs in the `build` phase of `amplify.yml` and deploys the CDK
+stack for the branch. The build role needs `iam:PassRole` and the
+CDK bootstrap (`CDKToolkit`) must exist in the account.

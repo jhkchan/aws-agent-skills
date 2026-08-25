@@ -204,3 +204,55 @@ risk within the VPC.
 **Wildcard certs:** `*.example.com` covers `api.example.com`,
 `www.example.com`, etc. but NOT `api.v2.example.com` (two-level
 wildcards require separate certs or per-level wildcards).
+
+### Step 1: API type selection — REST (v1) vs HTTP (v2)
+
+| Dimension | REST API (v1) | HTTP API (v2) |
+|---|---|---|
+| Cost | $3.50/M requests + data transfer | $1.00/M requests (cheaper) |
+| Latency | Higher (more features) | Lower (~30% better) |
+| Mapping templates | Yes (Velocity/VTL) | No |
+| Usage plans + API keys | Yes | No (use Lambda for throttling) |
+| Resource policies | Yes | No |
+| Authorization | AWS_IAM, COGNITO_USER_POOLS, CUSTOM | JWT, IAM |
+| EDGE endpoint | Yes (CloudFront) | No |
+| PRIVATE endpoint | Yes | Yes |
+| WAF association | Yes | Yes |
+| Canary deployments | Yes (stage level) | Yes (stage level) |
+| Custom domains | Yes | Yes |
+| Migration path | — | Re-create (no in-place conversion) |
+
+**Decision rule:**
+- Use HTTP API for: Lambda proxy with JWT auth, simple CRUD, microservices.
+- Use REST API for: usage plans with API keys, mapping templates, EDGE
+  global deployment, resource policies, existing clients on v1 features.
+
+
+### Step 5: Authorization
+
+| Type | Use case | Configuration |
+|---|---|---|
+| `AWS_IAM` | Service-to-service, internal APIs | Caller signs request with sigv4 credentials. |
+| `COGNITO_USER_POOLS` | User-facing apps | Caller passes JWT `Authorization: Bearer <token>`. Authorizer validates against Cognito. |
+| `CUSTOM` (Lambda) | Flexible auth (SAML, OAuth introspection, custom logic) | Lambda returns IAM policy. Token authorizer (header) or request authorizer (full request). |
+| `NONE` | Public endpoints (health checks, public docs) | No auth. Acceptable only for genuinely public data. |
+
+**Cognito authorizer:**
+```bash
+aws apigateway create-authorizer --rest-api-id <id> \
+  --name cognito-auth --type COGNITO_USER_POOLS \
+  --provider-arns arn:aws:cognito-idp:<region>:<account>:userpool/<pool-id> \
+  --identity-source method.request.header.Authorization
+```
+
+**Lambda request authorizer:**
+```bash
+aws apigateway create-authorizer --rest-api-id <id> \
+  --name lambda-auth --type REQUEST \
+  --authorizer-uri arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/arn:aws:lambda:<region>:<account>:function:my-auth/invocations \
+  --authorizer-credentials-arn arn:aws:iam::<account>:role:apigw-invoker \
+  --identity-source method.request.header.Authorization \
+  --identity-validation-expression '^Bearer .+$'
+```
+
+

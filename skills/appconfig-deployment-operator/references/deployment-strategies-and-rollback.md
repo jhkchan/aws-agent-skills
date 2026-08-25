@@ -232,3 +232,69 @@ healthy.
 
 After fixing the cause, always issue a fresh `start-deployment` —
 a terminated deployment cannot be resumed.
+
+---
+
+## Step-by-step CLI walkthroughs (moved verbatim from SKILL.md)
+
+The SKILL.md body keeps only pattern stubs under progressive disclosure
+(agentskills.io); the original boilerplate sections below were moved
+verbatim so no content is lost.
+
+### Create a linear deployment strategy with bake time (5-step canary)
+
+```bash
+aws appconfig create-deployment-strategy \
+  --name "linear-20-percent-30min-bake" \
+  --description "5-step canary: 20% every 30 min with 30-min bake" \
+  --deployment-duration-in-minutes 30 \
+  --growth-factor 20 \
+  --growth-type LINEAR \
+  --replicate-to NONE \
+  --bake-time-in-minutes 30 \
+  --final-bake-time-in-minutes 30
+```
+
+`GrowthFactor=20` with `GrowthType=LINEAR` produces 5 steps
+(20/40/60/80/100). `BakeTimeInMinutes=30` holds each step for 30
+minutes after the deployment step completes. Total wall-clock is
+~5 × (30 + 30) = 300 minutes.
+
+### Start a deployment with rollback alarms
+
+```bash
+aws appconfig start-deployment \
+  --application-id $APP_ID \
+  --environment-id $ENV_ID \
+  --deployment-strategy-id "linear-20-percent-30min-bake" \
+  --configuration-profile-id $PROFILE_ID \
+  --configuration-version 7 \
+  --description "Raise checkout timeout to 5000 ms (cutoff 2026-08)" \
+  --tags '[{"Key":"owner","Value":"payments-platform"}]' \
+  --kms-key-identifier arn:aws:kms:us-east-1:111122223333:key/abc
+```
+
+To wire rollback alarms, use the AppConfig API
+(`UpdateDeploymentStrategy` does not accept alarms in the CLI);
+use the SDK or the AWS console to set
+`DeploymentStrategy.MonitorList[].AlarmArn` and
+`TriggerPattern`. Alternatively, attach alarms via
+`cloudwatch describe-alarms` polling in the deployment watcher.
+
+### CodeDeploy-managed AppConfig deployment (canary)
+
+```bash
+# Deployment group using AppConfig.50Percent canary over 15 minutes
+aws deploy create-deployment-group \
+  --application-name checkout-codedeploy \
+  --deployment-group-name checkout-dg-prod \
+  --service-role-arn arn:aws:iam::111122223333:role/codedeploy-role \
+  --deployment-config-name AppConfig.50Percent \
+  --deployment-style deploymentType=BLUE_GREEN,deploymentOption=WITH_TRAFFIC_CONTROL
+```
+
+Use `AppConfig.50Percent`, `AppConfig.AllAtOnce`, or
+`AppConfig.Linear20PercentEvery30Minutes` as the
+`deployment-config-name` to drive CodeDeploy with the AppConfig
+router. CodeDeploy orchestrates pre/post traffic hooks; AppConfig
+provides the configuration store.

@@ -257,3 +257,115 @@ aws apigateway update-rest-api \
   --rest-api-id <api-id> \
   --patch-operations op=add,path=/minimumCompressionSize,value=1024
 ```
+
+# Step-by-step savings math and CLI (moved from SKILL.md)
+
+### Step 1 — API type selection: savings math
+
+**Savings math:**
+```
+monthly_saving = (monthly_requests / 1M) × ($3.50 − $1.00)
+              = (monthly_requests / 1M) × $2.50
+
+Example: 200M requests/month → 200 × $2.50 = $500/month
+```
+
+
+### Step 2 — throttle tuning: backend-capacity math and update-stage CLI
+
+**Setting throttle to match backend capacity:**
+```
+max_rate = backend_max_concurrent / avg_integration_latency_s
+
+Example: Lambda reserved concurrency = 200, avg latency = 0.1s
+  max_rate = 200 / 0.1 = 2000 rps
+  Set stage throttle: rate=2000, burst=1000
+```
+
+```bash
+aws apigateway update-stage \
+  --rest-api-id <api-id> \
+  --stage-name prod \
+  --patch-operations op=replace,path=/throttle/rateLimit,value=2000 op=replace,path=/throttle/burstLimit,value=1000
+```
+
+
+### Step 4 — response caching: cache cost vs benefit math
+
+**Cache cost vs benefit:**
+```
+cache_cost = cache_size_GB × $0.02 × 730 hours/month
+
+Example: 1.3 GB cache = $18.98/month
+
+backend_saving = cached_requests × backend_cost_per_request
+Example: 100M cached requests × $0.0000043 (Lambda avg) = $430/month
+
+Net monthly saving: $430 − $18.98 = $411.02/month
+```
+
+
+### Step 4 — response caching: TTL tuning and update-stage CLI
+
+**TTL tuning:**
+- Default TTL: 300 seconds. Start here for most read APIs.
+- Product catalog (changes hourly): TTL 3600 (1 hour).
+- Configuration API (changes daily): TTL 86400 (1 day).
+- User-specific data: TTL 0 (no cache) or use cache key variation.
+
+```bash
+aws apigateway update-stage \
+  --rest-api-id <api-id> \
+  --stage-name prod \
+  --patch-operations op=replace,path=/caching/enabled,value=true \
+                    op=replace,path=/caching/cacheClusterStatus,value=AVAILABLE \
+                    op=replace,path=/caching/sizeInGB,value=1.3 \
+                    op=replace,path=/caching/ttlInSeconds,value=300
+```
+
+
+### Step 5 — payload optimization: compression math
+
+**Compression math:**
+```
+uncompressed_transfer = requests × avg_payload_KB / 1024
+compressed_transfer = uncompressed_transfer × 0.3 (typical gzip ratio for JSON)
+
+Example: 100M requests × 200 KB = 19,531 GB uncompressed
+  Compressed (30%): 5,859 GB
+  DTO saving: 13,672 GB × $0.09/GB = $1,230.48/month
+```
+
+
+### Step 5 — payload optimization: enable-gzip CLI
+
+**Enable gzip on REST API (backend must send Content-Encoding: gzip):**
+```bash
+aws apigateway update-rest-api \
+  --rest-api-id <api-id> \
+  --patch-operations op=add,path=/minimumCompressionSize,value=1024
+```
+
+
+### Step 6 — WAF on API Gateway: cost math
+
+**WAF on API Gateway:**
+```
+waf_cost = (rules × $5/month) + (requests_inspected / 1M × $1)
+
+Example: 5 rules, 100M requests/month
+  Rule cost: 5 × $5 = $25/month
+  Request cost: 100 × $1 = $100/month
+  Total: $125/month
+```
+
+
+### Step 6 — private API via VPC endpoint: cost math
+**Private API via VPC endpoint:**
+```
+vpc_endpoint_cost = ($0.01 × 730 hours) + (data_transfer_GB × $0.01)
+
+Example: $7.30/month + 10 GB × $0.01 = $7.40/month
+```
+
+

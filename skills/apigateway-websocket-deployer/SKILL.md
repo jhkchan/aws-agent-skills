@@ -87,6 +87,8 @@ with a specific gap citation in the checklist (marked `[✗]`), and
 | Output format | The literal checklist template |
 | references/routes-and-integrations.md | Routes + integrations detail |
 | references/connection-management-and-auth.md | Connections + auth detail |
+| references/advanced-patterns.md | Heuristics + edge cases + recent features |
+| references/error-handling.md | Symptom-to-cause remedies |
 
 ## Mindset
 
@@ -190,99 +192,18 @@ procedure below forces an explicit connection-management decision.
 
 ## Expert heuristic: the connection management lifecycle
 
-A baseline model says "create routes and deploy." The correct
-heuristic recognizes that WebSocket communication is bidirectional,
-and the server needs ConnectionIds to push messages to clients.
-
-```text
-WebSocket connection lifecycle:
-
-1. Client connects:
-   Client → wss://{api-id}.execute-api.{region}.amazonaws.com/{stage}
-   → $connect route fires
-   → Lambda integration stores ConnectionId in DynamoDB
-   → Connection established (HTTP 101 Switching Protocols)
-
-2. Client sends message:
-   Client → { "action": "sendMessage", "data": "hello" }
-   → Route selection expression evaluates: $request.body.action = "sendMessage"
-   → "sendMessage" route fires → Lambda integration
-   → Lambda reads ConnectionId(s) from DynamoDB
-   → Lambda calls PostToConnection to deliver message to recipient(s)
-
-3. Client or server disconnects:
-   → $disconnect route fires
-   → Lambda integration deletes ConnectionId from DynamoDB
-   → Connection closed
-
-4. Idle timeout (no traffic for 2 hours):
-   → API Gateway auto-disconnects
-   → $disconnect route fires
-   → Lambda integration deletes ConnectionId from DynamoDB
-```
-
-**Key implication:** without storing ConnectionIds in DynamoDB (or
-equivalent), the server CANNOT push messages to clients. This is
-the #1 cause of "my WebSocket API can receive but not send" issues.
+Deep dive: [advanced-patterns.md](references/advanced-patterns.md). The four-phase lifecycle — $connect stores the ConnectionId in DynamoDB, route-selection dispatch handles messages, $disconnect deletes it, and the 2-hour idle timeout fires $disconnect.
+Without ConnectionId storage the server cannot push via PostToConnection — the #1 cause of "my WebSocket API can receive but not send".
 
 ## Expert heuristic: route selection expression mechanics
 
-The route selection expression is a Velocity Template Language (VTL)
-expression that evaluates the incoming message body to produce a
-route key. The route key determines which route handles the message.
-
-```text
-Default: $request.body.action
-  Input: { "action": "sendMessage", "message": "hello" }
-  Evaluation: $request.body.action → "sendMessage"
-  Route invoked: "sendMessage"
-
-Custom: $request.body.type
-  Input: { "type": "chat", "payload": "hello" }
-  Evaluation: $request.body.type → "chat"
-  Route invoked: "chat"
-
-No selection expression (or empty body without $default):
-  Input: { "message": "hello" }
-  Evaluation: no "action" field → null
-  Route invoked: none → message rejected (or $default if configured)
-```
-
-**Key implication:** the route selection expression MUST match the
-message format the client sends. If clients send `{ "type": "..." }`
-but the expression evaluates `$request.body.action`, custom routes
-never fire. Verify the expression matches the client message format.
+Deep dive: [advanced-patterns.md](references/advanced-patterns.md). The VTL expression (default `$request.body.action`) evaluates each message body to a route key; unmatched or null keys fall to `$default` or are rejected.
+The expression MUST match the client's message format or custom routes never fire.
 
 ## Expert heuristic: idle disconnect and keepalive
 
-API Gateway WebSocket connections auto-disconnect after **2 hours**
-(7200 seconds) of inactivity. This is a hard limit that cannot be
-configured. To maintain long-lived connections, implement keepalive.
-
-```text
-Keepalive strategies:
-
-1. Client-side ping (recommended):
-   Client sends periodic ping frame (WebSocket protocol-level ping)
-   every 30-60 seconds
-   → API Gateway responds with pong frame (resetting idle timer)
-   → Connection stays alive
-
-2. Application-level heartbeat:
-   Client sends { "action": "ping" } every 30-60 seconds
-   → Server responds with { "type": "pong" }
-   → Connection stays alive (any traffic resets idle timer)
-
-3. Server-side heartbeat:
-   Server calls PostToConnection with heartbeat message
-   every 30-60 seconds per active ConnectionId
-   → More expensive ( Lambda invocations + DynamoDB reads)
-```
-
-**Key implication:** without keepalive, connections drop after 2
-hours. The $disconnect route fires (cleaning up DynamoDB), but the
-client must reconnect. For chat/real-time applications, implement
-client-side ping or application-level heartbeat.
+Deep dive: [advanced-patterns.md](references/advanced-patterns.md). Connections idle-disconnect after 2 hours (hard limit); keepalive via client ping frames, application-level heartbeat every 30-60 s, or server-side PostToConnection heartbeats.
+Any traffic on the connection resets the idle timer.
 
 ## Prerequisites (verify before provisioning)
 
@@ -304,648 +225,73 @@ and cite the specific gap.
 
 ## Step 1 — Route selection expression
 
-The route selection expression is set at API creation time. It
-determines which route handles each incoming message.
-
-```bash
-# Create a WebSocket API with route selection expression
-aws apigatewayv2 create-api \
-  --name "my-websocket-api" \
-  --protocol-type WEBSOCKET \
-  --route-selection-expression '$request.body.action' \
-  --region us-east-1
-```
-
-The response includes the `ApiId`, which is used in all subsequent
-commands.
-
-**Common expressions:**
-
-| Expression | Message format | Route key |
-|---|---|---|
-| `$request.body.action` | `{ "action": "sendMessage", ... }` | `sendMessage` |
-| `$request.body.type` | `{ "type": "chat", ... }` | `chat` |
-| `$request.body.routeKey` | `{ "routeKey": "joinRoom", ... }` | `joinRoom` |
-
-**Update the route selection expression:**
-
-```bash
-aws apigatewayv2 update-api \
-  --api-id abc123def4 \
-  --route-selection-expression '$request.body.type' \
-  --region us-east-1
-```
-
-**Critical:** changing the route selection expression requires a new
-deployment for the change to take effect (unless using auto-deploy
-stage).
+CLI walkthrough: [routes-and-integrations.md](references/routes-and-integrations.md). `create-api` sets the route selection expression at creation; `update-api` changes it, which requires a new deployment (auto-deploy stages excepted).
+Common expressions: `$request.body.action`, `$request.body.type`, `$request.body.routeKey`.
 
 ## Step 2 — Connection routes ($connect, $disconnect)
 
-WebSocket APIs have two built-in routes for connection lifecycle:
-
-| Route | When it fires | Use case |
-|---|---|---|
-| `$connect` | Client opens WebSocket connection | Store ConnectionId, authenticate |
-| `$disconnect` | Client or server closes connection | Delete ConnectionId, cleanup |
-
-**Create the $connect route:**
-
-```bash
-aws apigatewayv2 create-route \
-  --api-id abc123def4 \
-  --route-key '$connect' \
-  --target integrations/abc123 \
-  --region us-east-1
-```
-
-**Create the $disconnect route:**
-
-```bash
-aws apigatewayv2 create-route \
-  --api-id abc123def4 \
-  --route-key '$disconnect' \
-  --target integrations/def456 \
-  --region us-east-1
-```
-
-**$connect event structure (Lambda):**
-
-```json
-{
-  "requestContext": {
-    "routeKey": "$connect",
-    "connectionId": "abc123=-",
-    "apiId": "abc123def4",
-    "domainName": "abc123def4.execute-api.us-east-1.amazonaws.com",
-    "stage": "prod"
-  },
-  "queryStringParameters": {
-    "token": "user-auth-token"
-  },
-  "headers": {
-    "Authorization": "Bearer ..."
-  }
-}
-```
-
-The `connectionId` is the unique identifier for this connection. It
-must be stored on $connect and used for PostToConnection later.
-
-**$disconnect event structure (Lambda):**
-
-```json
-{
-  "requestContext": {
-    "routeKey": "$disconnect",
-    "connectionId": "abc123=-",
-    "disconnectReason": "CLIENT_INITIATED",
-    "eventType": "DISCONNECT"
-  }
-}
-```
-
-**Critical:** the $connect integration response determines whether
-the connection is accepted. A 2xx status accepts the connection;
-a non-2xx status rejects it. This is where custom authorizers or
-authentication checks run.
+CLI walkthrough: [connection-management-and-auth.md](references/connection-management-and-auth.md). `$connect` fires on open (store the ConnectionId; a non-2xx integration response rejects the connection) and `$disconnect` fires on close or idle timeout (delete the ConnectionId).
+Event structures carry `requestContext.connectionId` — the key the backend must persist.
 
 ## Step 3 — Custom routes
 
-Custom routes handle specific message types based on the route
-selection expression. Each route maps to an integration.
-
-```bash
-# Create a "sendMessage" route
-aws apigatewayv2 create-route \
-  --api-id abc123def4 \
-  --route-key 'sendMessage' \
-  --target integrations/ghi789 \
-  --region us-east-1
-
-# Create a "joinRoom" route
-aws apigatewayv2 create-route \
-  --api-id abc123def4 \
-  --route-key 'joinRoom' \
-  --target integrations/jkl012 \
-  --region us-east-1
-
-# Create a "$default" route (handles unmatched messages)
-aws apigatewayv2 create-route \
-  --api-id abc123def4 \
-  --route-key '$default' \
-  --target integrations/mno345 \
-  --region us-east-1
-```
-
-When a client sends `{ "action": "sendMessage", "message": "hello" }`,
-the route selection expression evaluates `$request.body.action` =
-`sendMessage`, and the `sendMessage` route fires.
-
-**Custom route event structure (Lambda):**
-
-```json
-{
-  "requestContext": {
-    "routeKey": "sendMessage",
-    "connectionId": "abc123=-",
-    "apiId": "abc123def4",
-    "domainName": "abc123def4.execute-api.us-east-1.amazonaws.com",
-    "stage": "prod"
-  },
-  "body": "{\"action\":\"sendMessage\",\"message\":\"hello\"}"
-}
-```
-
-The `body` contains the raw message. Parse it in the Lambda handler.
+CLI walkthrough: [routes-and-integrations.md](references/routes-and-integrations.md). Route keys must match what the selection expression evaluates (e.g., `action=sendMessage` → route `sendMessage`).
+Add a `$default` route to catch unmatched messages.
 
 ## Step 4 — Route responses (bidirectional communication)
 
-By default, WebSocket routes do NOT return responses to the client
-(unless the integration returns a non-2xx status for $connect). To
-enable two-way communication (route response), create a route
-response.
-
-```bash
-# Create a route response for the "sendMessage" route
-aws apigatewayv2 create-route-response \
-  --api-id abc123def4 \
-  --route-id xyz789 \
-  --route-response-key '$default' \
-  --region us-east-1
-```
-
-With a route response configured, the Lambda integration can return
-a response that is sent back to the client over the same WebSocket
-connection.
-
-**Lambda handler returning a route response:**
-
-```javascript
-exports.handler = async (event) => {
-  const body = JSON.parse(event.body);
-  
-  // Process the message...
-  
-  // Return response (sent back to client via route response)
-  return {
-    statusCode: 200,
-    body: JSON.stringify({ type: "ack", messageId: body.messageId })
-  };
-};
-```
-
-**Key point:** route responses are NOT push notifications. They are
-synchronous responses to the client's message. For server-initiated
-push messages, use PostToConnection (Step 7).
+CLI walkthrough: [routes-and-integrations.md](references/routes-and-integrations.md). `create-route-response` enables synchronous two-way replies from the integration.
+Route responses are NOT push notifications — server-initiated pushes use PostToConnection (Step 7).
 
 ## Step 5 — Integration types
 
-WebSocket APIs support four integration types:
-
-| Integration | Use case | Async/Sync | Timeout |
-|---|---|---|---|
-| Lambda | Custom backend logic | Sync | 30s max |
-| AWS Service | Direct AWS service call (e.g., SQS, Kinesis) | Sync/Async | Service-dependent |
-| Mock | Return a fixed response without backend | Sync | N/A |
-| HTTP | Forward to an HTTP endpoint | Sync | 30s max |
-
-**Create a Lambda integration:**
-
-```bash
-aws apigatewayv2 create-integration \
-  --api-id abc123def4 \
-  --integration-type AWS_PROXY \
-  --integration-uri arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:111122223333:function:ws-handler/invocations \
-  --region us-east-1
-```
-
-**Create an HTTP integration:**
-
-```bash
-aws apigatewayv2 create-integration \
-  --api-id abc123def4 \
-  --integration-type HTTP_PROXY \
-  --integration-uri https://backend.example.com/websocket \
-  --integration-method POST \
-  --region us-east-1
-```
-
-**Create a Mock integration:**
-
-```bash
-aws apigatewayv2 create-integration \
-  --api-id abc123def4 \
-  --integration-type MOCK \
-  --region us-east-1
-```
-
-**Grant API Gateway permission to invoke Lambda:**
-
-```bash
-aws lambda add-permission \
-  --function-name ws-handler \
-  --statement-id apigateway-ws-invoke \
-  --action lambda:InvokeFunction \
-  --principal apigateway.amazonaws.com \
-  --source-arn arn:aws:execute-api:us-east-1:111122223333:abc123def4/*/sendMessage \
-  --region us-east-1
-```
-
-**Critical:** without the resource-based policy granting
-`lambda:InvokeFunction` to `apigateway.amazonaws.com`, API Gateway
-cannot invoke the Lambda function. Integration returns 500.
+CLI walkthrough: [routes-and-integrations.md](references/routes-and-integrations.md). Lambda (AWS_PROXY, 30 s max), AWS Service, Mock, and HTTP integrations.
+Grant `lambda:InvokeFunction` to `apigateway.amazonaws.com` via `add-permission`, or integrations return 500.
 
 ## Step 6 — Deployment and stage
 
-After creating routes and integrations, create a deployment and
-stage. The deployment is an immutable snapshot; the stage is the
-client-facing environment.
-
-```bash
-# Create a deployment
-aws apigatewayv2 create-deployment \
-  --api-id abc123def4 \
-  --region us-east-1
-
-# Create a stage
-aws apigatewayv2 create-stage \
-  --api-id abc123def4 \
-  --stage-name prod \
-  --deployment-id <deployment-id-from-previous-command> \
-  --region us-east-1
-```
-
-**WebSocket URL format:**
-
-```text
-wss://{api-id}.execute-api.{region}.amazonaws.com/{stage}
-```
-
-Example: `wss://abc123def4.execute-api.us-east-1.amazonaws.com/prod`
-
-**Auto-deploy stage (recommended):**
-
-```bash
-aws apigatewayv2 create-stage \
-  --api-id abc123def4 \
-  --stage-name prod \
-  --auto-deploy \
-  --region us-east-1
-```
-
-With `--auto-deploy`, route and integration changes are automatically
-deployed without creating explicit deployments.
-
-**Stage-level throttling:**
-
-```bash
-aws apigatewayv2 update-stage \
-  --api-id abc123def4 \
-  --stage-name prod \
-  --default-route-settings '{
-    "ThrottlingBurstLimit": 500,
-    "ThrottlingRateLimit": 1000,
-    "DataTraceEnabled": false,
-    "LoggingLevel": "INFO"
-  }' \
-  --region us-east-1
-```
-
-**Critical:** WebSocket APIs do NOT support usage plans or API keys.
-Throttling is configured at the stage level via route settings.
+CLI walkthrough: [routes-and-integrations.md](references/routes-and-integrations.md). Deployments are immutable snapshots; the stage exposes `wss://{api-id}.execute-api.{region}.amazonaws.com/{stage}`.
+Prefer `--auto-deploy` stages; throttle via stage route settings (WebSocket APIs do NOT support usage plans or API keys).
 
 ## Step 7 — Connection management (DynamoDB)
 
-Connection management is the APPLICATION'S responsibility. The
-standard pattern uses DynamoDB to store ConnectionIds.
-
-**DynamoDB table for connections:**
-
-```bash
-aws dynamodb create-table \
-  --table-name WebSocketConnections \
-  --attribute-definitions AttributeName=connectionId,AttributeType=S \
-  --key-schema AttributeName=connectionId,KeyType=HASH \
-  --billing-mode PAY_PER_REQUEST \
-  --region us-east-1
-```
-
-**$connect handler (store ConnectionId):**
-
-```javascript
-const AWS = require('aws-sdk');
-const dynamo = new AWS.DynamoDB.DocumentClient();
-const TABLE_NAME = process.env.CONNECTIONS_TABLE;
-
-exports.handler = async (event) => {
-  const connectionId = event.requestContext.connectionId;
-  
-  // Store the connection
-  await dynamo.put({
-    TableName: TABLE_NAME,
-    Item: {
-      connectionId: connectionId,
-      timestamp: Date.now(),
-      userId: event.queryStringParameters.userId || 'anonymous'
-    }
-  }).promise();
-  
-  return { statusCode: 200 };
-};
-```
-
-**$disconnect handler (delete ConnectionId):**
-
-```javascript
-exports.handler = async (event) => {
-  const connectionId = event.requestContext.connectionId;
-  
-  await dynamo.delete({
-    TableName: TABLE_NAME,
-    Key: { connectionId: connectionId }
-  }).promise();
-  
-  return { statusCode: 200 };
-};
-```
-
-**Sending messages to clients (PostToConnection):**
-
-```javascript
-const AWS = require('aws-sdk');
-
-// IMPORTANT: Use ApiGatewayManagementApi, NOT ApiGatewayV2
-const endpoint = event.requestContext.domainName + '/' + event.requestContext.stage;
-const managementApi = new AWS.ApiGatewayManagementApi({
-  apiVersion: '2018-11-29',
-  endpoint: endpoint
-});
-
-async function sendMessage(connectionId, data) {
-  try {
-    await managementApi.postToConnection({
-      ConnectionId: connectionId,
-      Data: JSON.stringify(data)
-    }).promise();
-  } catch (err) {
-    if (err.statusCode === 410) {
-      // Connection is gone (client disconnected without $disconnect)
-      await dynamo.delete({
-        TableName: TABLE_NAME,
-        Key: { connectionId: connectionId }
-      }).promise();
-    } else {
-      throw err;
-    }
-  }
-}
-```
-
-**Critical:** the ApiGatewayManagementApi endpoint is
-`https://{api-id}.execute-api.{region}.amazonaws.com/{stage}`. It
-must be constructed from the event's `domainName` and `stage`. The
-SDK does NOT auto-detect the endpoint.
+CLI walkthrough: [connection-management-and-auth.md](references/connection-management-and-auth.md). DynamoDB connections table + `$connect`/`$disconnect` handlers + PostToConnection via the ApiGatewayManagementApi SDK (NOT ApiGatewayV2).
+Handle 410 Gone by deleting the stale ConnectionId; the SDK does NOT auto-detect the endpoint.
 
 ## Step 8 — Custom authorizer (Lambda)
 
-A Lambda custom authorizer authenticates WebSocket connections at
-the $connect route. The authorizer runs BEFORE the $connect
-integration.
-
-**Create a Lambda authorizer:**
-
-```bash
-aws apigatewayv2 create-authorizer \
-  --api-id abc123def4 \
-  --authorizer-type REQUEST \
-  --authorizer-uri arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:111122223333:function:ws-auth/invocations \
-  --identity-source '$request.querystring.token' \
-  --authorizer-result-ttl-in-seconds 300 \
-  --name "ws-auth" \
-  --region us-east-1
-```
-
-**Attach the authorizer to the $connect route:**
-
-```bash
-aws apigatewayv2 update-route \
-  --api-id abc123def4 \
-  --route-id <connect-route-id> \
-  --authorizer-id <authorizer-id> \
-  --authorization-type CUSTOM \
-  --region us-east-1
-```
-
-**Authorizer Lambda handler:**
-
-```javascript
-exports.handler = async (event) => {
-  const token = event.queryStringParameters.token;
-  
-  // Validate token
-  const isValid = await validateToken(token);
-  
-  if (!isValid) {
-    return {
-      isAuthorized: false
-    };
-  }
-  
-  return {
-    isAuthorized: true,
-    context: {
-      userId: token.userId
-    }
-  };
-};
-```
-
-**Key point:** the authorizer returns `{ isAuthorized: boolean }`.
-If `false`, the connection is rejected (HTTP 403 on $connect). If
-`true`, the connection proceeds. The `context` object is available
-in the $connect integration's event.
+CLI walkthrough: [connection-management-and-auth.md](references/connection-management-and-auth.md). REQUEST authorizer attached to `$connect` with an identity source (e.g., `$request.querystring.token`).
+Returns `{ isAuthorized: boolean }` and runs BEFORE the $connect integration; `false` rejects the connection with 403.
 
 ## Step 9 — CloudWatch Logs
 
-WebSocket APIs support two types of CloudWatch Logs:
-
-| Log type | Description | Configuration |
-|---|---|---|
-| Execution logs | Log API Gateway execution details (requests, responses) | Stage-level `--default-route-settings LoggingLevel` |
-| Access logs | Log access information to CloudWatch Logs in JSON | Stage-level `--access-log-settings` |
-
-**Enable execution logs:**
-
-```bash
-aws apigatewayv2 update-stage \
-  --api-id abc123def4 \
-  --stage-name prod \
-  --default-route-settings '{
-    "DataTraceEnabled": true,
-    "LoggingLevel": "INFO"
-  }' \
-  --region us-east-1
-```
-
-`LoggingLevel` can be `OFF`, `INFO`, or `ERROR`. `DataTraceEnabled`
-includes full request/response payloads (use with caution for
-sensitive data).
-
-**Enable access logs:**
-
-```bash
-aws apigatewayv2 update-stage \
-  --api-id abc123def4 \
-  --stage-name prod \
-  --access-log-settings '{
-    "DestinationArn": "arn:aws:logs:us-east-1:111122223333:log-group:/aws/apigateway/ws-api",
-    "Format": "{\"requestId\":\"$context.requestId\",\"connectionId\":\"$context.connectionId\",\"routeKey\":\"$context.routeKey\",\"status\":$context.status,\"time\":$context.time}"
-  }' \
-  --region us-east-1
-```
+CLI walkthrough: [routes-and-integrations.md](references/routes-and-integrations.md). Execution logs via stage `LoggingLevel` (OFF/INFO/ERROR) and access logs via `--access-log-settings`.
+`DataTraceEnabled` logs full request/response payloads — use with caution for sensitive data.
 
 ## Step 10 — WAF integration
 
-AWS WAF can be attached to a WebSocket API to filter connection
-requests. WAF inspects the initial HTTP upgrade request (the
-WebSocket handshake) but does NOT inspect individual WebSocket
-frames after the connection is established.
-
-**Attach WAF to the WebSocket API:**
-
-```bash
-# Associate WAF Web ACL with the API (via the API stage ARN)
-aws wafv2 associate-web-acl \
-  --web-acl-arn arn:aws:wafv2:us-east-1:111122223333:regional/webacl/ws-waf/abc123 \
-  --resource-arn arn:aws:apigateway:us-east-1::/restapis/abc123def4/stages/prod \
-  --region us-east-1
-```
-
-**WAF rule examples for WebSocket:**
-
-- IP-based filtering (allow/block specific IPs for connections)
-- Rate-based rules (limit connections per IP)
-- Geographic restrictions (allow/block countries)
-- Header inspection (validate auth headers on connection)
-
-**Key limitation:** WAF only inspects the initial connection
-request (HTTP upgrade). Messages sent after connection are NOT
-inspected by WAF. For message-level filtering, implement it in the
-backend.
+CLI walkthrough: [connection-management-and-auth.md](references/connection-management-and-auth.md). Associate the Web ACL with the API stage ARN; WAF inspects ONLY the initial handshake.
+Post-connection frames are NOT inspected — message-level filtering belongs in the backend.
 
 ## Step 11 — Ping/pong keepalive
 
-API Gateway WebSocket connections auto-disconnect after 2 hours of
-inactivity. Implement keepalive to maintain long-lived connections.
-
-**Client-side WebSocket ping (recommended):**
-
-```javascript
-// Browser WebSocket API automatically handles ping/pong at protocol level
-// But not all browsers send periodic pings. Implement application-level heartbeat:
-
-const ws = new WebSocket('wss://abc123def4.execute-api.us-east-1.amazonaws.com/prod');
-
-// Send heartbeat every 60 seconds
-setInterval(() => {
-  if (ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ action: 'ping' }));
-  }
-}, 60000);
-```
-
-**Server-side heartbeat response:**
-
-```javascript
-// In the "ping" route handler
-exports.handler = async (event) => {
-  return {
-    statusCode: 200,
-    body: JSON.stringify({ type: 'pong', timestamp: Date.now() })
-  };
-};
-```
-
-**Important:** any traffic on the connection resets the idle timer.
-This includes the client sending a message, the server sending a
-message via PostToConnection, or protocol-level ping/pong frames.
+CLI walkthrough: [connection-management-and-auth.md](references/connection-management-and-auth.md). Client-side heartbeat every 30-60 s (e.g., `{ "action": "ping" }`) with a pong route response.
+Any traffic on the connection resets the 2-hour idle timer.
 
 ## Step 12 — Cross-account backend invocation
 
-If the Lambda function (or other backend) is in a different AWS
-account from the WebSocket API, configure cross-account invocation.
-
-```bash
-# In the Lambda account: grant API Gateway account permission to invoke
-aws lambda add-permission \
-  --function-name ws-handler \
-  --statement-id apigateway-cross-account \
-  --action lambda:InvokeFunction \
-  --principal apigateway.amazonaws.com \
-  --source-arn arn:aws:execute-api:us-east-1:<api-account-id>:abc123def4/*/* \
-  --region us-east-1
-```
-
-The `--source-arn` must include the API account's account ID to
-scope the permission to this specific API.
+Deep dive: [advanced-patterns.md](references/advanced-patterns.md). Cross-account Lambda invocation needs `add-permission` in the Lambda account.
+Scope `--source-arn` to the API account's ID: `arn:aws:execute-api:{region}:<api-account-id>:{api-id}/*/*`.
 
 ## Step 13 — Message size limit (128 KB)
 
-The maximum message size for WebSocket API messages is **128 KB**
-(131,072 bytes) per frame. Messages larger than 128 KB are rejected
-with a 413 Payload Too Large error.
-
-**Implications:**
-- JSON payloads must be under 128 KB. Large objects should be
-  offloaded to S3 and a reference (URL) sent via WebSocket.
-- Binary data must be base64-encoded (which increases size by ~33%),
-  effectively limiting binary payloads to ~96 KB pre-encoding.
-- For large data transfers, chunk messages into multiple frames
-  under 128 KB each.
-
-**Message size verification:**
-
-```javascript
-// Client-side check before sending
-const message = JSON.stringify({ action: 'sendData', data: largePayload });
-if (message.length > 128 * 1024) {
-  // Chunk or offload to S3
-  console.error('Message exceeds 128 KB limit');
-}
-```
+Deep dive: [advanced-patterns.md](references/advanced-patterns.md). 128 KB per-frame limit (131,072 bytes); larger messages are rejected with 413.
+Base64 inflates binary ~33% (~96 KB effective); chunk frames or offload to S3 and send a reference.
 
 ## Step 14 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Auto-deploy stages (2023-2024):** WebSocket stages now support
-  `--auto-deploy`, eliminating the need to create explicit
-  deployments after route or integration changes. Changes are
-  deployed automatically within seconds.
-
-- **WebSocket API private integrations (2023-2024):** Enhanced
-  support for private integrations (VPC link) allowing WebSocket
-  APIs to route to backends in private VPCs without public
-  internet exposure.
-
-- **WAF WebSocket enhancements (2024-2025):** AWS WAF added
-  WebSocket-specific rule conditions, allowing finer-grained
-  connection-request filtering (header-based, query-parameter-based,
-  and body inspection for the initial handshake).
-
-- **ApiGatewayManagementApi SDK improvements (2024-2025):** The
-  SDK now supports batch PostToConnection calls, reducing per-
-  connection Lambda invocations for broadcast scenarios.
-
-- **CloudWatch metrics for WebSocket APIs (2024-2025):** Enhanced
-  metrics including `ConnectCount`, `DisconnectCount`,
-  `MessageCount`, `ExecutionErrorCount`, and `ClientErrorCount`
-  for better observability of WebSocket API health.
-
-- **WebSocket API tagging and cost allocation (2024-2025):**
-  WebSocket APIs now support resource-level tagging for cost
-  allocation and governance across multiple APIs and stages.
+Deep dive: [advanced-patterns.md](references/advanced-patterns.md). Auto-deploy stages, VPC-link private integrations, WAF WebSocket conditions, batch PostToConnection, WebSocket CloudWatch metrics, tagging (2023-2026).
+Loaded on demand when the task calls for the newest capabilities.
 
 ## NEVER do these things
 
@@ -1058,34 +404,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Connections not receiving server-pushed messages
-- ConnectionId not stored in DynamoDB on $connect. Verify the
-  $connect handler stores the ConnectionId. Check DynamoDB for the
-  connection.
+Deep dive: [error-handling.md](references/error-handling.md). Symptom-to-cause remedies for the six common failure modes.
+No server push (ConnectionId not stored), routes never firing (expression mismatch), 500s (missing invoke permission), 410 Gone (stale connection), 2-hour drops (idle timeout), 413 (size limit).
 
-### Custom routes never fire
-- Route selection expression does not match the client message
-  format. If clients send `{ "type": "..." }` but the expression
-  evaluates `$request.body.action`, routes never match. Verify the
-  expression.
+## References (load on demand)
 
-### Integrations return 500
-- Lambda resource-based policy missing. Verify
-  `lambda:InvokeFunction` is granted to `apigateway.amazonaws.com`
-  with the correct source ARN. Use `aws lambda get-policy`.
-
-### PostToConnection returns 410 Gone
-- The client disconnected without $disconnect firing (e.g.,
-  network failure). Delete the stale ConnectionId from DynamoDB.
-  The 410 is expected; handle it gracefully.
-
-### Connections drop after 2 hours
-- Idle timeout. Implement keepalive (client-side ping or
-  application-level heartbeat every 30-60 seconds).
-
-### Large messages rejected (413)
-- Message exceeds the 128 KB limit. Chunk the payload or offload
-  to S3 and send a reference URL via WebSocket.
+- [Routes and integrations](references/routes-and-integrations.md) — route selection expressions, route types, route responses, integration types, deployment/stage/throttling, CloudWatch log enablement (Steps 1, 3, 4, 5, 6, 9 CLI walkthroughs in detail)
+- [Connection management and auth](references/connection-management-and-auth.md) — DynamoDB ConnectionId tracking, PostToConnection, Lambda authorizers, WAF, keepalive, 128 KB limit (Steps 2, 7, 8, 10, 11, 13 CLI walkthroughs in detail)
+- [Advanced patterns](references/advanced-patterns.md) — connection-lifecycle / route-selection / keepalive expert heuristics, cross-account invocation (Step 12), recent AWS features 2023-2026 (Step 14)
+- [Error handling](references/error-handling.md) — symptom-to-cause remedies: no server push, routes not firing, 500s, 410 Gone, 2-hour idle drops, 413 size rejections
 
 ## Domain
 

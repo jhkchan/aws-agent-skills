@@ -187,3 +187,61 @@ Before shifting weight from 90/10 to 100/0:
 5. Rollback plan documented (snapshot weights, revert command ready).
 
 If any check fails, hold at current weights or rollback.
+
+## CLI boilerplate (moved from SKILL.md)
+
+### Create a weighted route (canary: 90/10)
+
+```bash
+aws appmesh create-route \
+  --mesh-name "prod-checkout-mesh" \
+  --virtual-router-name "checkout-router" \
+  --route-name "checkout-canary" \
+  --spec '{
+    "httpRoute": {
+      "match": {"prefix": "/"},
+      "action": {
+        "weightedTargets": [
+          {"virtualNode": "checkout-service-v1", "weight": 90},
+          {"virtualNode": "checkout-service-v2", "weight": 10}
+        ]
+      },
+      "retryPolicy": {
+        "httpRetryEvents": ["gateway-error", "5xx"],
+        "maxRetries": 3,
+        "perRetryTimeoutMillis": 2000
+      },
+      "timeout": {
+        "requestTimeoutMillis": 5000,
+        "idleTimeoutMillis": 300000
+      }
+    }
+  }'
+```
+
+For blue/green: swap weights to 100/0 (v1 full), then 0/100 (v2
+full) over the deployment window.
+
+### Configure circuit breaking (connection pool + outlier detection)
+
+```bash
+aws appmesh update-virtual-node \
+  --mesh-name "prod-checkout-mesh" \
+  --virtual-node-name "checkout-service-v1" \
+  --spec '{
+    "serviceDiscovery": {"cloudMap": {"namespaceName": "prod-internal", "serviceName": "checkout-v1"}},
+    "listeners": [{
+      "portMapping": {"port": 8080, "protocol": "http"},
+      "connectionPool": {
+        "http": {"maxConnections": 100, "maxPendingRequests": 50, "maxRequests": 200, "maxRetries": 3}
+      },
+      "outlierDetection": {
+        "maxServerErrors": 5,
+        "intervalMillis": 10000,
+        "baseEjectionDurationMillis": 30000,
+        "maxEjectionPercent": 50
+      }
+    }]
+  }'
+```
+

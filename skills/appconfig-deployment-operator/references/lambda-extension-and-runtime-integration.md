@@ -308,3 +308,36 @@ application extracts the relevant flag.
 | Agent on ECS without shared volume | Application container cannot read `/etc/aws-appconfig/config.json` | Mount the volume in both containers |
 | Direct API polling too aggressively | `ThrottlingException` from AppConfig | Respect `NextPollIntervalInSeconds`; minimum is 45 seconds |
 | Feature-flag payload sent as freeform | Validation error at `create-hosted-configuration-version` | Use `Type: AWS.AppConfig.FeatureFlags` profile with the flag schema |
+
+---
+
+## Step-by-step CLI walkthroughs (moved verbatim from SKILL.md)
+
+The SKILL.md body keeps only pattern stubs under progressive disclosure
+(agentskills.io); the original boilerplate sections below were moved
+verbatim so no content is lost.
+
+### Lambda extension (runtime feature flags without redeploy)
+
+Add the AppConfig extension layer to the Lambda function, then set
+environment variables:
+
+```bash
+aws lambda update-function-configuration \
+  --function-name checkout-handler \
+  --layers arn:aws:lambda:us-east-1:027253079308:layer:AWS-AppConfig-Extension:131 \
+  --environment '{
+    "Variables": {
+      "AWS_APPCONFIG_EXTENSION_APPLICATION_NAME": "checkout-service",
+      "AWS_APPCONFIG_EXTENSION_ENVIRONMENT": "prod",
+      "AWS_APPCONFIG_EXTENSION_CONFIGURATION_PROFILE": "checkout-config",
+      "AWS_APPCONFIG_EXTENSION_POLL_INTERVAL_SECONDS": "45"
+    }
+  }'
+```
+
+The function reads the configuration via HTTP GET to
+`http://localhost:2772/applications/checkout-service/environments/prod/configurations/checkout-config`
+— no AWS SDK call needed. The extension polls AppConfig every 45
+seconds and caches; updates land within the polling interval without
+a function redeploy.

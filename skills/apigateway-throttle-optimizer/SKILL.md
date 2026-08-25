@@ -81,30 +81,7 @@ recommendation with exact CLI commands.
   stage.
 
 ## Mindset
-
-API Gateway cost optimization is primarily an API-type and caching
-exercise, not a throttle-tuning exercise. The goal is to route each
-request through the cheapest path (HTTP API > REST API), cache responses
-at the edge (eliminate backend calls), and enforce per-client rate
-limits (prevent cost runaway from a single client) — not to maximize
-throttle limits.
-
-Four principles guide every recommendation:
-
-- **API type is the biggest lever.** Moving from REST to HTTP API saves
-  71% on per-request cost ($3.50 → $1.00 per million). This is a
-  re-deployment, not a configuration change, but the savings compound.
-- **Caching is the second lever.** A read-heavy API with cacheable
-  responses (product catalog, configuration, static lookups) can
-  eliminate 50-80% of backend integration calls. Cache cost ($0.02/hr
-  per GB) is trivial compared to the backend compute it replaces.
-- **Throttle limits are a protection mechanism, not a cost lever.**
-  Tighter throttles reduce cost ONLY if they prevent runaway traffic;
-  looser throttles increase availability but do not change per-request
-  cost. Usage plans are the key throttle optimization.
-- **Payload size affects data transfer cost.** APIs returning large JSON
-  payloads (> 100 KB) incur data transfer cost. Compression (gzip)
-  reduces transfer volume 5-10x.
+Mindset — an API-type and caching exercise, not a throttle-tuning exercise; four principles (API type is the biggest lever, caching is the second, throttle limits are protection not cost, payload size affects transfer cost): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Quick reference — verdict thresholds
 
@@ -153,46 +130,7 @@ per-API tags).
 ## Process — Optimization logic (apply in order)
 
 ### Step 0: Non-obvious behaviours that change the recommendation
-
-These operational gotchas route a recommendation away from the obvious
-choice:
-
-- **REST and HTTP APIs are different services.** REST API uses
-  `get-rest-apis` / `update-stage`; HTTP API uses `get-apis` /
-  `update-api`. They have different feature sets, pricing, and CLI
-  commands. Migration is a re-deployment, not a config change.
-- **HTTP API does NOT support: mapping templates, request validation,
-  API Gateway CORS (must be handled at integration), client certificates,
-  WAF (added 2024 but only for HTTP API in select regions), method-level
-  request/response models.** If any of these are in use, REST is
-  required — do not recommend migration.
-- **Caching is REST-only (stage level).** HTTP API does not support
-  response caching natively (as of 2026). Cache at CloudFront or the
-  backend instead.
-- **Cache TTL is per-method, but cache capacity is per-stage.** A 0.5 GB
-  cache at $0.02/hr serves ~5000 unique cache keys (avg 100 KB response).
-  Size the cache for the working set, not the total key count.
-- **Usage plans require API keys.** API keys are sent as `x-api-key`
-  header. Clients MUST include this header — adding usage plans to an
-  existing API requires a client-side change.
-- **WAF on API Gateway costs per-rule AND per-request.** $5/rule/month +
-  $1/M requests inspected. At low traffic, the per-rule cost dominates;
-  at high traffic, the per-request cost dominates.
-- **Private API (VPC endpoint) charges $0.01/hour + $0.01/GB.** For low-
-  traffic private APIs, the hourly cost ($7.30/month) can exceed the API
-  request cost.
-- **Data transfer out (DTO) is billed on response payload.** API
-  Gateway does not compress responses by default. A 500 KB JSON response
-  to 1M clients = 500 GB DTO ($0.09/GB = $45/month in transfer alone).
-- **Account-level throttle applies to ALL APIs in the region.** Setting
-  a high account-level throttle does not help if one API consumes all
-  capacity. Usage plans are the per-client mechanism.
-- **Lambda reserved concurrency caps API throughput.** If the backend is
-  Lambda with reserved concurrency = 100, API Gateway returns 502 (not
-  429) when concurrency is exhausted. The API throttle should be lower
-  than Lambda reserved concurrency.
-- **Stage throttle overrides account-level.** Method-level throttle
-  overrides stage-level. The most specific throttle wins.
+Step 0 non-obvious behaviours (REST/HTTP are different services, HTTP API feature gaps, REST-only stage caching, cache TTL vs capacity, usage plans require API keys, WAF per-rule and per-request cost, VPC endpoint hourly cost, DTO billing on response payload, account-level throttle scope, Lambda reserved concurrency returns 502, most-specific throttle wins): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 1: API type selection (REST to HTTP migration)
 
@@ -223,14 +161,7 @@ cheaper and simpler.
 | Proxy + request validation | NO (validation is REST-only) | Not recommended; stay on REST |
 | Proxy + mapping templates | NO | Not recommended; stay on REST |
 | Proxy + stage caching | Evaluate: cache savings vs type savings | Run Step 4 first, then re-evaluate |
-
-**Savings math:**
-```
-monthly_saving = (monthly_requests / 1M) × ($3.50 − $1.00)
-              = (monthly_requests / 1M) × $2.50
-
-Example: 200M requests/month → 200 × $2.50 = $500/month
-```
+Savings math (monthly_requests / 1M × $2.50): [references/apigateway-pricing-and-throttle-reference.md](references/apigateway-pricing-and-throttle-reference.md) — Step 1.
 
 ### Step 2: Throttle tuning (rate and burst limits)
 
@@ -245,22 +176,7 @@ unauthorized traffic spikes.
 | Account-level (default) | All APIs in region | Last-resort cap |
 | Stage-level | All methods in a stage | Per-environment protection |
 | Method-level | Single method | Per-endpoint tuning (e.g., expensive POST vs cheap GET) |
-
-**Setting throttle to match backend capacity:**
-```
-max_rate = backend_max_concurrent / avg_integration_latency_s
-
-Example: Lambda reserved concurrency = 200, avg latency = 0.1s
-  max_rate = 200 / 0.1 = 2000 rps
-  Set stage throttle: rate=2000, burst=1000
-```
-
-```bash
-aws apigateway update-stage \
-  --rest-api-id <api-id> \
-  --stage-name prod \
-  --patch-operations op=replace,path=/throttle/rateLimit,value=2000 op=replace,path=/throttle/burstLimit,value=1000
-```
+Backend-capacity throttle math (max_rate = backend_max_concurrent / avg_integration_latency_s) and update-stage CLI: [references/apigateway-pricing-and-throttle-reference.md](references/apigateway-pricing-and-throttle-reference.md) — Step 2.
 
 ### Step 3: Usage plans + API keys (per-client throttling)
 
@@ -298,18 +214,7 @@ the backend never sees cached requests.
 
 **REST-only feature.** HTTP API does not support response caching (as
 of 2026).
-
-**Cache cost vs benefit:**
-```
-cache_cost = cache_size_GB × $0.02 × 730 hours/month
-
-Example: 1.3 GB cache = $18.98/month
-
-backend_saving = cached_requests × backend_cost_per_request
-Example: 100M cached requests × $0.0000043 (Lambda avg) = $430/month
-
-Net monthly saving: $430 − $18.98 = $411.02/month
-```
+Cache cost vs benefit math (cache_cost = GB × $0.02 × 730; backend_saving = cached × cost/request): [references/apigateway-pricing-and-throttle-reference.md](references/apigateway-pricing-and-throttle-reference.md) — Step 4.
 
 **Decision gate:**
 
@@ -318,38 +223,14 @@ Net monthly saving: $430 − $18.98 = $411.02/month
 | Caching disabled AND > 50% idempotent GETs AND IntegrationLatency > 50 ms | **FURTHER_OPTIMIZATION_AVAILABLE** | Enable stage-level caching |
 | Caching enabled AND cache hit rate < 20% | **FURTHER_OPTIMIZATION_AVAILABLE** | Increase TTL or reduce cache scope to high-hit methods |
 | Caching enabled AND cache hit rate > 50% | No finding | Cache is effective |
-
-**TTL tuning:**
-- Default TTL: 300 seconds. Start here for most read APIs.
-- Product catalog (changes hourly): TTL 3600 (1 hour).
-- Configuration API (changes daily): TTL 86400 (1 day).
-- User-specific data: TTL 0 (no cache) or use cache key variation.
-
-```bash
-aws apigateway update-stage \
-  --rest-api-id <api-id> \
-  --stage-name prod \
-  --patch-operations op=replace,path=/caching/enabled,value=true \
-                    op=replace,path=/caching/cacheClusterStatus,value=AVAILABLE \
-                    op=replace,path=/caching/sizeInGB,value=1.3 \
-                    op=replace,path=/caching/ttlInSeconds,value=300
-```
+TTL tuning guidance (300s default; 3600 catalog; 86400 config; 0 user-specific) and caching update-stage CLI: [references/apigateway-pricing-and-throttle-reference.md](references/apigateway-pricing-and-throttle-reference.md) — Step 4.
 
 ### Step 5: Payload optimization (compression and field filtering)
 
 Large payloads increase data transfer cost and latency. API Gateway does
 NOT compress responses by default; the backend or CloudFront must handle
 gzip.
-
-**Compression math:**
-```
-uncompressed_transfer = requests × avg_payload_KB / 1024
-compressed_transfer = uncompressed_transfer × 0.3 (typical gzip ratio for JSON)
-
-Example: 100M requests × 200 KB = 19,531 GB uncompressed
-  Compressed (30%): 5,859 GB
-  DTO saving: 13,672 GB × $0.09/GB = $1,230.48/month
-```
+Compression math (gzip ratio ~0.3 on JSON): [references/apigateway-pricing-and-throttle-reference.md](references/apigateway-pricing-and-throttle-reference.md) — Step 5.
 
 **Decision gate:**
 
@@ -358,32 +239,12 @@ Example: 100M requests × 200 KB = 19,531 GB uncompressed
 | Avg payload > 100 KB AND compression disabled | **FURTHER_OPTIMIZATION_AVAILABLE** | Enable gzip at backend or CloudFront |
 | Response includes unused fields (over-fetching) | **FURTHER_OPTIMIZATION_AVAILABLE** | Implement field filtering (GraphQL or sparse fieldsets) |
 | Avg payload < 10 KB | No finding | Compression overhead not justified |
-
-**Enable gzip on REST API (backend must send Content-Encoding: gzip):**
-```bash
-aws apigateway update-rest-api \
-  --rest-api-id <api-id> \
-  --patch-operations op=add,path=/minimumCompressionSize,value=1024
-```
+Enable-gzip CLI (minimumCompressionSize=1024; backend must send Content-Encoding: gzip): [references/apigateway-pricing-and-throttle-reference.md](references/apigateway-pricing-and-throttle-reference.md) — Step 5.
 
 ### Step 6: WAF and VPC endpoint cost analysis
+WAF cost math ((rules × $5/month) + (requests_inspected / 1M × $1)): [references/apigateway-pricing-and-throttle-reference.md](references/apigateway-pricing-and-throttle-reference.md) — Step 6.
 
-**WAF on API Gateway:**
-```
-waf_cost = (rules × $5/month) + (requests_inspected / 1M × $1)
-
-Example: 5 rules, 100M requests/month
-  Rule cost: 5 × $5 = $25/month
-  Request cost: 100 × $1 = $100/month
-  Total: $125/month
-```
-
-**Private API via VPC endpoint:**
-```
-vpc_endpoint_cost = ($0.01 × 730 hours) + (data_transfer_GB × $0.01)
-
-Example: $7.30/month + 10 GB × $0.01 = $7.40/month
-```
+VPC endpoint cost math (($0.01 × 730 hours) + (data_transfer_GB × $0.01)): [references/apigateway-pricing-and-throttle-reference.md](references/apigateway-pricing-and-throttle-reference.md) — Step 6.
 
 **Decision gate:**
 
@@ -428,29 +289,7 @@ proposed), cache hit ratio, payload size, pricing region.
   **NEED_MORE_INFO**.
 
 ## Output format
-
-```text
-TARGET: <api-name>
-VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-REASON: <1-2 sentences naming the recommendation and the supporting data>
-RECOMMENDATION:
-  Current: <api type>, <throttle>, <cache>, <usage plans>, <payload strategy>
-  Proposed: <api type>, <throttle>, <cache>, <usage plans>, <payload strategy>
-  Dimensions changed: <api-type | throttle | usage-plans | caching | payload | waf | vpc-endpoint>
-  Dimensions checked: <list ALL seven, each ✓ (no finding) or → (finding)>
-  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
-ESTIMATED_SAVINGS:
-  Current monthly: $<amount>    ← MUST show request + overhead breakdown
-  Projected monthly: $<amount>
-  Monthly saving: $<amount>     ← MUST equal Current − Projected, 2 decimals
-  Annual saving: $<amount>      ← MUST equal Monthly × 12
-MIGRATION_STEPS:
-  1. <specific action with CLI command>
-  2. <verification step>
-CONFIRM: Before executing any state-changing CLI, emit and await operator
-  approval: "CONFIRM: About to <action> on <api-name> in <region>.
-  Proceed? (yes/no)"
-```
+Output template block (identical labels to the Required output structure below): [references/worked-examples.md](references/worked-examples.md).
 
 Full worked examples in `references/worked-examples.md`.
 
@@ -585,36 +424,7 @@ on an unthrottled multi-client API) is surfaced in REASON as a risk
 mitigation, not as dollar savings.
 
 ## Configuration dependency graph
-
-```
-API type (REST / HTTP)
- ├─ determines: per-request cost ($3.50/M REST vs $1.00/M HTTP)
- ├─ determines: feature set (REST: caching, validation, templates; HTTP: proxy-only)
- └─ affects: which optimization dimensions are available (cache is REST-only)
-
-Stage throttle (rate + burst)
- ├─ protects: backend from traffic spikes
- ├─ interacts with: account-level throttle (more specific wins)
- └── if too high: backend overload (502 errors)
-
-Usage plans (per-client throttle)
- ├─ requires: API keys (x-api-key header)
- ├─ prevents: noisy-neighbor throttling across clients
- └── if absent: single client can monopolize stage throttle
-
-Response caching (REST-only, stage-level)
- ├─ eliminates: 50-80% of backend integration calls
- ├─ TTL determines: cache freshness vs hit ratio tradeoff
- └── cache size: must match working set (unique cache keys × avg response size)
-
-WAF Web ACL
- ├─ adds: $5/rule/month + $1/M requests inspected
- └── at low traffic: rule cost dominates; at high traffic: request cost dominates
-
-VPC endpoint (private API)
- ├─ adds: $0.01/hour + $0.01/GB
- └── for low-traffic APIs: hourly cost may exceed request cost
-```
+Configuration dependency graph (API type determines cost and available dimensions; throttle protects backend; usage plans prevent noisy neighbors; caching eliminates 50-80% of integration calls; WAF and VPC endpoint overhead): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Anti-Patterns — NEVER (top 5)
 
@@ -662,19 +472,7 @@ Extended anti-patterns in `references/worked-examples.md`.
   any API shows increased 5xx errors post-change.
 
 ## Recent AWS features (2024-2026)
-
-- **HTTP API WAF support (2024-2025):** WAF Web ACL can now be attached
-  to HTTP APIs (previously REST-only). Region availability expanding.
-- **HTTP API custom authorizers (2025):** Lambda authorizer support added
-  to HTTP API in select regions, reducing the feature gap with REST.
-- **API Gateway data export (2024):** Access logs can be exported to
-  CloudWatch Logs, S3, Kinesis for per-request analysis.
-- **Stage variables enhancement (2024):** Stage variables now support
-  canary deployment configurations, enabling gradual API-type migration
-  (route 10% traffic to HTTP API, 90% to REST).
-- **CloudFront compression for API Gateway origins (2024):** CloudFront
-  can compress API Gateway responses (gzip/Brotli), reducing DTO cost
-  for HTTP API workloads that lack native compression.
+Recent AWS features 2024-2026 (HTTP API WAF support, HTTP API Lambda authorizers, data export, stage-variable canary migration, CloudFront compression): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## References
 
@@ -686,6 +484,7 @@ Extended anti-patterns in `references/worked-examples.md`.
   migration, cache enablement, usage plan setup, payload compression,
   already-optimal, NEED_MORE_INFO) plus error handling, CLI failure
   recovery, and extended NEVER list.
+- [Advanced patterns](references/advanced-patterns.md) - mindset, Step-0 non-obvious behaviours, configuration dependency graph, recent AWS features
 
 ## Domain
 

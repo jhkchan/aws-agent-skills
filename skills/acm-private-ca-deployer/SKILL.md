@@ -77,6 +77,8 @@ with a specific gap citation in the checklist (marked `[✗]`), and
 | Output format | The literal checklist template |
 | references/ca-hierarchy-and-signing.md | Root/subordinate detail |
 | references/crl-and-revocation.md | CRL + revocation detail |
+| references/advanced-patterns.md | Expert-heuristic deep dives + recent features |
+| references/error-handling.md | Error remedies |
 
 ## Mindset
 
@@ -147,76 +149,15 @@ signed by the parent and stays in `PENDING_CERTIFICATE` forever.
 
 ## Expert heuristic: root vs subordinate CA hierarchy
 
-A baseline model says "create a CA." The correct heuristic recognizes
-that the CA type determines the entire provisioning flow.
-
-```text
-PKI Hierarchy Decision:
-  ├── Need a self-signed trust anchor?
-  │     → Create ROOT CA
-  │       1. create-certificate-authority --certificate-authority-configuration ...
-  │       2. get-certificate-authority-csr → get CSR
-  │       3. issue-certificate (self-signed, template: RootCACertificate/V1)
-  │       4. get-certificate → get the certificate
-  │       5. import-certificate-authority-certificate → activate root CA
-  │
-  ├── Need a CA signed by an existing parent CA?
-  │     → Create SUBORDINATE CA
-  │       PREREQUISITE: parent CA must be ACTIVE and have create-permission
-  │       1. create-certificate-authority --certificate-authority-configuration ...
-  │       2. get-certificate-authority-csr → get subordinate CSR
-  │       3. issue-certificate on PARENT CA with subordinate's CSR
-  │          (template: SubordinateCACertificate_PathLen0/V1)
-  │       4. get-certificate on parent → get the signed subordinate cert
-  │       5. import-certificate-authority-certificate on subordinate CA
-  │
-  └── Need to issue end-entity (TLS) certificates?
-        → CA (root or subordinate) must be ACTIVE
-        → issue-certificate with template:
-          arn:aws:acm-pca:::template/EndEntityCertificate/CertPassedPathLen/0
-```
-
-**Key implication:** the root CA requires self-signing (using the
-`RootCACertificate/V1` template). The subordinate CA requires parent
-signing (using a `SubordinateCACertificate` template). End-entity
-certificates use `EndEntityCertificate` templates. Using the wrong
-template produces a certificate with the wrong extensions.
+Full hierarchy decision tree (root self-sign vs subordinate parent-sign flows): moved to [references/advanced-patterns.md](references/advanced-patterns.md); command-level detail in [references/ca-hierarchy-and-signing.md](references/ca-hierarchy-and-signing.md).
 
 ## Expert heuristic: CRL S3 bucket policy
 
-CRL revocation is only as good as the S3 bucket that distributes the
-CRL. A baseline model configures the CRL but forgets the bucket policy.
-
-```text
-CRL requires:
-  1. S3 bucket exists (acm-pca-crl-<account>-<region>)
-  2. CRL configuration on the CA:
-     S3BucketName, ExpirationInDays (default 7), CustomCname (optional)
-  3. S3 bucket policy granting acm-pca.amazonaws.com:
-     s3:PutObject, s3:PutObjectAcl, s3:GetBucketAcl, s3:GetBucketLocation
-
-  WITHOUT the bucket policy → CRL publication SILENTLY FAILS
-  Clients cannot check revocation → revoked certs still trusted
-```
+CRL prerequisite checklist and silent-failure mode: moved to [references/advanced-patterns.md](references/advanced-patterns.md); bucket setup commands in [references/crl-and-revocation.md](references/crl-and-revocation.md).
 
 ## Expert heuristic: CA deletion waiting period
 
-```text
-CA Deletion Flow:
-  1. delete-certificate-authority --permanent-deletion-time-in-days 7..30
-     → CA status: DELETED (disabled; no new certs can be issued)
-     → Existing certs remain valid (they carry the CA's signature)
-  2. Waiting period (7-30 days):
-     → CA can be restored: restore-certificate-authority
-  3. After expiration:
-     → CA permanently deleted; all data destroyed
-     → Existing certs remain valid but CANNOT be revoked
-       (the CA no longer exists to publish CRL updates)
-```
-
-**Key implication:** always set the waiting period to 30 days unless
-there is an urgent security reason. After expiration, revocation of
-existing certificates becomes impossible.
+Deletion flow and restore semantics: moved to [references/advanced-patterns.md](references/advanced-patterns.md); delete/restore commands in [references/crl-and-revocation.md](references/crl-and-revocation.md).
 
 ## Prerequisites (verify before provisioning)
 
@@ -265,135 +206,15 @@ keys. These have the broadest client compatibility.
 
 ## Step 3 — CRL configuration (S3 bucket)
 
-**Create the CRL S3 bucket:**
-
-```bash
-aws s3api create-bucket \
-  --bucket acm-pca-crl-123456789012-us-east-1 \
-  --region us-east-1
-```
-
-**Apply the bucket policy granting ACM PCA write access:**
-
-```bash
-aws s3api put-bucket-policy \
-  --bucket acm-pca-crl-123456789012-us-east-1 \
-  --policy '{
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Effect": "Allow",
-        "Principal": { "Service": "acm-pca.amazonaws.com" },
-        "Action": ["s3:PutObject", "s3:PutObjectAcl", "s3:GetBucketAcl", "s3:GetBucketLocation"],
-        "Resource": [
-          "arn:aws:s3:::acm-pca-crl-123456789012-us-east-1",
-          "arn:aws:s3:::acm-pca-crl-123456789012-us-east-1/*"
-        ]
-      }
-    ]
-  }'
-```
-
-**Critical:** without this policy, CRL publication silently fails.
+Bucket creation and PCA bucket-policy commands: [references/crl-and-revocation.md](references/crl-and-revocation.md).
 
 ## Step 4 — Create the CA and issue CA certificate
 
-**Create a root CA:**
+create-certificate-authority commands (root + subordinate): [references/ca-hierarchy-and-signing.md](references/ca-hierarchy-and-signing.md).
 
-```bash
-ROOT_CA_ARN=$(aws acm-pca create-certificate-authority \
-  --certificate-authority-configuration \
-    "KeyAlgorithm=RSA_2048,SigningAlgorithm=SHA256withRSA,Subject={CN=Example Root CA,O=Example Org,C=US}" \
-  --revocation-configuration \
-    "CrlConfiguration={Enabled=true,S3BucketName=acm-pca-crl-123456789012-us-east-1,ExpirationInDays=7,CustomCname=crl.example.com}" \
-  --certificate-authority-type ROOT \
-  --region us-east-1 \
-  --query 'CertificateAuthorityArn' --output text)
-```
+Root CA activation commands (CSR -> self-signed issue -> import): [references/ca-hierarchy-and-signing.md](references/ca-hierarchy-and-signing.md).
 
-**Create a subordinate CA:**
-
-```bash
-SUB_CA_ARN=$(aws acm-pca create-certificate-authority \
-  --certificate-authority-configuration \
-    "KeyAlgorithm=RSA_2048,SigningAlgorithm=SHA256withRSA,Subject={CN=Example Subordinate CA,O=Example Org,C=US}" \
-  --revocation-configuration \
-    "CrlConfiguration={Enabled=true,S3BucketName=acm-pca-crl-123456789012-us-east-1,ExpirationInDays=7}" \
-  --certificate-authority-type SUBORDINATE \
-  --region us-east-1 \
-  --query 'CertificateAuthorityArn' --output text)
-```
-
-**Activate the root CA (self-signed certificate):**
-
-```bash
-# 1. Get CSR
-aws acm-pca get-certificate-authority-csr \
-  --certificate-authority-arn "$ROOT_CA_ARN" \
-  --region us-east-1 --query 'Csr' --output text > root-ca.csr
-
-# 2. Issue self-signed cert using RootCACertificate/V1 template
-ROOT_CERT_ARN=$(aws acm-pca issue-certificate \
-  --certificate-authority-arn "$ROOT_CA_ARN" \
-  --csr fileb://root-ca.csr \
-  --signing-algorithm SHA256withRSA \
-  --template-arn arn:aws:acm-pca:::template/RootCACertificate/V1 \
-  --validity Value=10,Type=YEARS \
-  --region us-east-1 --query 'CertificateArn' --output text)
-
-# 3. Wait for issuance, then get cert and import
-aws acm-pca wait certificate-issued \
-  --certificate-authority-arn "$ROOT_CA_ARN" \
-  --certificate-arn "$ROOT_CERT_ARN" --region us-east-1
-
-aws acm-pca get-certificate \
-  --certificate-authority-arn "$ROOT_CA_ARN" \
-  --certificate-arn "$ROOT_CERT_ARN" --region us-east-1 | \
-  jq -r '.Certificate' > root-ca-cert.pem
-
-aws acm-pca import-certificate-authority-certificate \
-  --certificate-authority-arn "$ROOT_CA_ARN" \
-  --certificate fileb://root-ca-cert.pem --region us-east-1
-```
-
-**Activate the subordinate CA (signed by parent):**
-
-```bash
-# PREREQUISITE: Parent CA must be ACTIVE and have create-permission
-# 1. Get subordinate CSR
-aws acm-pca get-certificate-authority-csr \
-  --certificate-authority-arn "$SUB_CA_ARN" \
-  --region us-east-1 --query 'Csr' --output text > sub-ca.csr
-
-# 2. Issue certificate from PARENT CA
-SUB_CERT_ARN=$(aws acm-pca issue-certificate \
-  --certificate-authority-arn "$ROOT_CA_ARN" \
-  --csr fileb://sub-ca.csr \
-  --signing-algorithm SHA256withRSA \
-  --template-arn arn:aws:acm-pca:::template/SubordinateCACertificate_PathLen0/V1 \
-  --validity Value=5,Type=YEARS \
-  --region us-east-1 --query 'CertificateArn' --output text)
-
-# 3. Wait, get cert + chain, import into subordinate
-aws acm-pca wait certificate-issued \
-  --certificate-authority-arn "$ROOT_CA_ARN" \
-  --certificate-arn "$SUB_CERT_ARN" --region us-east-1
-
-aws acm-pca get-certificate \
-  --certificate-authority-arn "$ROOT_CA_ARN" \
-  --certificate-arn "$SUB_CERT_ARN" --region us-east-1 | \
-  jq -r '.Certificate' > sub-ca-cert.pem
-
-aws acm-pca get-certificate \
-  --certificate-authority-arn "$ROOT_CA_ARN" \
-  --certificate-arn "$SUB_CERT_ARN" --region us-east-1 | \
-  jq -r '.CertificateChain' > sub-ca-chain.pem
-
-aws acm-pca import-certificate-authority-certificate \
-  --certificate-authority-arn "$SUB_CA_ARN" \
-  --certificate fileb://sub-ca-cert.pem \
-  --certificate-chain fileb://sub-ca-chain.pem --region us-east-1
-```
+Subordinate CA activation commands (parent signs CSR -> import chain): [references/ca-hierarchy-and-signing.md](references/ca-hierarchy-and-signing.md).
 
 **Verify CA is ACTIVE:**
 
@@ -420,17 +241,7 @@ certificate to become `ACTIVE`.
 | `CodeSigningCertificate/V1` | Code signing certificate | N/A |
 | `OCSPSigningCertificate/V1` | OCSP responder signing | N/A |
 
-**Issue an end-entity certificate:**
-
-```bash
-EE_CERT_ARN=$(aws acm-pca issue-certificate \
-  --certificate-authority-arn "$SUB_CA_ARN" \
-  --csr fileb://server.csr \
-  --signing-algorithm SHA256withRSA \
-  --template-arn arn:aws:acm-pca:::template/EndEntityCertificate/CertPassedPathLen/0 \
-  --validity Value=365,Type=DAYS \
-  --region us-east-1 --query 'CertificateArn' --output text)
-```
+issue-certificate end-entity command: [references/ca-hierarchy-and-signing.md](references/ca-hierarchy-and-signing.md).
 
 ## Step 6 — CA permissions for ACM integration
 
@@ -445,71 +256,15 @@ aws acm-pca create-permission \
   --region us-east-1
 ```
 
-**For cross-account ACM access:**
-
-```bash
-aws acm-pca create-permission \
-  --certificate-authority-arn "$SUB_CA_ARN" \
-  --principal 999999999999 \
-  --source-account 123456789012 \
-  --actions IssueCertificate GetCertificate ListPermissions \
-  --region us-east-1
-```
-
-**Critical:** without this permission, ACM cannot request private
-certificates. Certificate requests through ACM will fail with access
-denied.
+Cross-account create-permission command: [references/ca-hierarchy-and-signing.md](references/ca-hierarchy-and-signing.md).
 
 ## Step 7 — Certificate revocation and OCSP
 
-**Revoke a certificate:**
-
-```bash
-aws acm-pca revoke-certificate \
-  --certificate-authority-arn "$SUB_CA_ARN" \
-  --certificate-serial 1234567890ABCDEF \
-  --revocation-reason "KEY_COMPROMISE" \
-  --region us-east-1
-```
-
-Revocation reasons: `UNSPECIFIED`, `KEY_COMPROMISE`,
-`CERTIFICATE_AUTHORITY_COMPROMISE`, `AFFILIATION_CHANGED`,
-`SUPERCEDED`, `CESSATION_OF_OPERATION`, `PRIVILEGE_WITHDRAWN`,
-`A_A_COMPROMISE`.
-
-**Enable OCSP on a CA:**
-
-```bash
-aws acm-pca update-certificate-authority \
-  --certificate-authority-arn "$SUB_CA_ARN" \
-  --revocation-configuration \
-    "OcspConfiguration={Enabled=true},CrlConfiguration={Enabled=true,S3BucketName=acm-pca-crl-xxx,ExpirationInDays=7}" \
-  --region us-east-1
-```
-
-OCSP and CRL can both be enabled simultaneously. OCSP provides real-time
-status; CRL provides a cached list. Enable both for maximum client
-compatibility.
+revoke-certificate and OCSP enable commands: [references/crl-and-revocation.md](references/crl-and-revocation.md).
 
 ## Step 8 — CA deletion (mandatory waiting period)
 
-```bash
-aws acm-pca delete-certificate-authority \
-  --certificate-authority-arn "$SUB_CA_ARN" \
-  --permanent-deletion-time-in-days 30 \
-  --region us-east-1
-```
-
-**Restore during the waiting period:**
-
-```bash
-aws acm-pca restore-certificate-authority \
-  --certificate-authority-arn "$SUB_CA_ARN" --region us-east-1
-```
-
-**Critical:** the waiting period is mandatory (7-30 days). After
-expiration, the CA is permanently deleted and CANNOT be recovered.
-Existing certificates remain valid but can no longer be revoked.
+delete/restore-certificate-authority commands: [references/crl-and-revocation.md](references/crl-and-revocation.md).
 
 ## Step 9 — Audit via CloudTrail
 
@@ -528,18 +283,7 @@ trail.
 
 ## Step 10 — Recent features
 
-- **OCSP support (2023-2024):** Native OCSP responder support for
-  real-time certificate status checking alongside CRL.
-- **EC key algorithm expansion (2023-2024):** Full `EC_prime256v1`
-  and `EC_secp384r1` support with all signing algorithm combinations.
-- **Report generation API (2023-2024):** Detailed compliance reports
-  of certificate issuance, revocation, and CA usage.
-- **Quota increases (2024-2025):** Up to 10,000 CAs per account in
-  most regions; higher per-second certificate issuance rates.
-- **CRL distribution point customization (2024-2025):** Enhanced CRL
-  CNAME and frequency controls.
-- **Terraform provider (2023-2024):** Full CRL/OCSP config, templates,
-  and permission management in `aws_acmpca_certificate_authority`.
+Full feature list with dates: [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -728,31 +472,19 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### CA stuck in PENDING_CERTIFICATE
-- The CA has not received its CA certificate. For root, issue a self-
-  signed cert and import. For subordinate, request from parent and
-  import. Check with `describe-certificate-authority`.
-
-### Subordinate CA cannot be signed by parent
-- The parent CA lacks `create-permission`. Use `create-permission` on
-  the parent CA to grant `IssueCertificate` and `GetCertificate`.
-
-### CRL not publishing to S3
-- The bucket policy does not grant `acm-pca.amazonaws.com`
-  `s3:PutObject`. Verify with `get-bucket-policy` and add the policy.
-
-### ACM cannot request private certificates
-- The PCA lacks `create-permission` for `acm.amazonaws.com`. Grant
-  `IssueCertificate`, `GetCertificate`, `ListPermissions`.
-
-### CA deletion did not take effect immediately
-- CA deletion has a mandatory 7-30 day waiting period. This is by
-  design, not an error. Use `restore-certificate-authority` to undo.
+Error remedies (stuck PENDING_CERTIFICATE, parent will not sign, CRL not publishing, ACM access denied, deletion delay): [references/error-handling.md](references/error-handling.md).
 
 ## Domain
 
 AWS CloudOps / AWS Private Certificate Authority (ACM PCA) Provisioning
 & PKI Management.
+
+## References (load on demand)
+
+- [CA hierarchy and signing](references/ca-hierarchy-and-signing.md) — full root/subordinate provisioning and activation flows, end-entity issuance, ACM + cross-account permissions, Terraform
+- [CRL and revocation](references/crl-and-revocation.md) — CRL bucket setup and policy, revocation + OCSP commands, CA deletion/restore, CloudTrail auditing
+- [Advanced patterns](references/advanced-patterns.md) — expert heuristics (hierarchy decision tree, CRL bucket policy, deletion waiting period), recent AWS features
+- [Error handling](references/error-handling.md) — stuck-state and access-denied remedies
 
 ## AWS documentation
 

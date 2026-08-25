@@ -270,3 +270,105 @@ aws cloudformation list-stack-instances \
   --stack-set-name "AWSControlTowerLogging" \
   --query "Summaries[?Account=='123456789012'].Status"
 ```
+
+## Expert heuristic — landing zone baseline propagation
+
+A baseline model says "create an account and it's done." The correct
+heuristic recognizes that Control Tower's landing zone propagates a
+baseline (set of StackSets) to every enrolled account automatically.
+Understanding this propagation is essential for troubleshooting
+"missing baseline" issues.
+
+```text
+Landing zone baseline propagation:
+  1. Control Tower Landing Zone (management account)
+     → defines baseline StackSets (AWSControlTowerLogging,
+        AWSControlTowerSecurity, AWSControlTowerBP-BASELINE-CLOUDTRAIL,
+        etc.)
+     → StackSets target all registered OUs
+
+  2. New account vended via Account Factory
+     → placed in a registered OU
+     → Control Tower's AWSControlTowerExecutionRole auto-created
+     → StackSets deploy to the new account via this role
+
+  3. Baseline resources in the new account:
+     ├── CloudTrail trail (logging to the logging account)
+     ├── Config recorder (compliance tracking)
+     ├── Security Hub (security findings)
+     ├── GuardDuty (threat detection, if enabled)
+     ├── IAM password policy (if configured)
+     └── CloudWatch alarms (if configured in baseline)
+
+  4. If a StackSet fails (e.g., role missing):
+     → account is enrolled but baseline is INCOMPLETE
+     → no CloudTrail, no Config, no Security Hub
+     → the account is a compliance gap
+```
+
+**Key implication:** baseline propagation is automatic for enrolled
+accounts in registered OUs, but it is NOT guaranteed to succeed. Always
+verify StackSet deployment status in the management account after
+vending a new account. A failed StackSet leaves a compliance gap.
+
+## Expert heuristic — SCP inheritance from parent OU
+
+SCPs flow top-down through the Organizations hierarchy. An account's
+effective SCPs are the intersection of all SCPs at every level from the
+root down to the account's OU.
+
+```text
+Organizations SCP hierarchy:
+  Root
+    ├── SCP: DenyLeavingOrg (preventative)
+    ├── SCP: RequireMFA
+    └── OU: "Production"
+        ├── SCP: DenyUnapprovedRegions (only us-east-1, us-west-2, eu-west-1)
+        ├── SCP: RequireEncryption (S3, EBS, RDS)
+        └── Account: prod-app-001
+            → effective SCPs = Root ∩ Production OU
+            = DenyLeavingOrg + RequireMFA + DenyUnapprovedRegions + RequireEncryption
+
+  If the account moves to OU "Sandbox":
+    └── OU: "Sandbox"
+        ├── SCP: AllowAllServices (no restrictions)
+        └── Account: prod-app-001 (moved here)
+            → effective SCPs = Root ∩ Sandbox OU
+            = DenyLeavingOrg + RequireMFA + AllowAllServices
+            → LOST: DenyUnapprovedRegions, RequireEncryption
+```
+
+**Key implication:** the effective permissions of an account depend on
+its OU placement. Moving an account between OUs changes its SCPs
+immediately. Always verify SCPs after any OU move.
+
+**Control Tower Guardrail types:**
+- **Preventive Guardrails** — implemented as SCPs. Block disallowed
+  actions (e.g., leaving the org, disabling CloudTrail, creating
+  resources in unapproved regions).
+- **Detective Guardrails** — implemented as Config rules + Security Hub
+  controls. Detect non-compliance and alert (e.g., publicly readable
+  S3 bucket, unencrypted EBS volume).
+- **Proactive Guardrails** — implemented as Config rules. Detect
+  resources that would violate policy before they are fully provisioned.
+
+## Step 8 — account customization (custom StackSet detail)
+
+**Example custom StackSet (deploy VPC in every new account):**
+
+```bash
+# Create a custom StackSet
+aws cloudformation create-stack-set \
+  --stack-set-name "CustomBaseline-VPC" \
+  --template-body file://vpc-template.yaml \
+  --permission-model SERVICE_MANAGED \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --auto-deployment 'Enabled=true,RetainStacksOnAccountRemoval=false'
+```
+
+**Account Factory customization via CloudFormation StackSets:**
+
+Control Tower supports customized account factory via the
+`AWSControlTowerBP-ENABLE-CONFIG-RULES` and custom products in the
+Account Factory portfolio. The customization template runs during
+account provisioning.

@@ -36,29 +36,8 @@ there are no mapping templates, and stages default to **auto-deploy**.
 The route table and the JWT authorizer are the load-bearing decisions;
 CORS, logging, and custom domain are deterministic follow-ons.
 
-Three facts make HTTP API (v2) provisioning different from REST API
-(v1):
-
-- **Routes are flat `(method, path)` pairs, not a resource tree.** A
-  route is `$default`, `ANY /{proxy+}`, `GET /users`, or `POST
-  /orders`. No resources, no methods on resources, no nested hierarchy.
-  The greedy `{proxy+}` catches every sub-path — combined with `ANY`
-  it is the catch-all that makes exposure mistakes trivial.
-
-- **Integrations are typed targets, not mapping-template contracts.**
-  `AWS_PROXY` (Lambda proxy) is the default, but HTTP API also exposes
-  `HTTP_PROXY`, `HTTP`, and direct AWS-service integrations including
-  `STEP_FUNCTION` (`START_EXECUTION` / `START_SYNC_EXECUTION`), `SQS`
-  (`SendMessage`), and `KINESIS` (`PutRecord` / `PutRecords`). These
-  run **without a Lambda in the path**, lowering latency and cost —
-  but the request/response shape is fixed by API Gateway.
-
-- **JWT is the only user-facing authorizer; CORS and auto-deploy are
-  first-class.** HTTP API supports `JWT` (OpenID Connect / Cognito
-  issuer) and `AWS_IAM`. There is no `COGNITO_USER_POOLS` type and no
-  Lambda authorizer — JWT is the user-facing contract. CORS is set at
-  the API level. Stages default to `auto-deploy: true`, so every route
-  change is live within seconds — there is no `create-deployment` step.
+The three differentiators (flat routes, typed integrations, JWT-only +
+auto-deploy defaults): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Quick reference — deployment checklist
 
@@ -81,21 +60,8 @@ Before producing the deployment plan, validate the input specification.
 Several requirements **block deployment** — proceeding with an invalid
 spec produces a non-functional or insecure API.
 
-**Live-account pre-flight checks (skip if doing offline plan):**
-1. Verify IAM permissions for `apigatewayv2:CreateApi`, `CreateRoute`,
-   `CreateIntegration`, `CreateAuthorizer`, `CreateStage`,
-   `UpdateStage`, `CreateDomainName`, `CreateApiMapping`,
-   `UpdateRoute`, and `wafv2:CreateWebACL`, `wafv2:AssociateWebACL`.
-2. For Lambda integrations, verify the function exists in the same
-   region and grant `lambda:InvokeFunction` to the
-   `apigateway.amazonaws.com` principal scoped to the API's source ARN.
-3. For VPC link, verify the NLB exists and target groups span multiple
-   AZs. **NLB only — ALB is not a valid target.**
-4. For JWT authorizers, verify the OIDC issuer returns a valid OpenID
-   configuration with a JWKS URI, and that the audience claim matches
-   an issued `client_id`.
-5. For custom domains, verify the ACM certificate is `ISSUED` in the
-   API's region (`REGIONAL` only — HTTP API does not support EDGE).
+IAM permission sweep, Lambda invoke permission, NLB/AZ check, JWKS
+reachability, ACM ISSUED check: [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 | Attribute | Value | Effect on plan |
 |---|---|---|
@@ -270,52 +236,8 @@ aws apigatewayv2 create-route --api-id <id> \
 | `AWS` | `SQS` (`SendMessage`) | Drop message to SQS queue directly. |
 | `AWS` | `KINESIS` (`PutRecord` / `PutRecords`) | Stream record to Kinesis directly. |
 
-**Lambda proxy:**
-```bash
-aws apigatewayv2 create-integration --api-id <id> \
-  --integration-type AWS_PROXY --integration-method POST \
-  --integration-uri arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/arn:aws:lambda:<region>:<account>:function:<name>/invocations
-
-aws lambda add-permission --function-name <name> \
-  --statement-id apigw-v2-invoke --action lambda:InvokeFunction \
-  --principal apigateway.amazonaws.com \
-  --source-arn arn:aws:execute-api:<region>:<account>:<api-id>/*/POST/users
-```
-
-**HTTP proxy via VPC link:**
-```bash
-aws apigatewayv2 create-vpc-link --name prod-nlb-link \
-  --subnet-ids subnet-abc subnet-def --security-group-ids sg-xyz
-
-aws apigatewayv2 create-integration --api-id <id> \
-  --integration-type HTTP_PROXY --integration-method ANY \
-  --integration-uri https://<nlb-dns>/api \
-  --connection-id <vpc-link-id> --connection-type VPC_LINK
-```
-
-**Step Functions START_SYNC_EXECUTION (direct, no Lambda):** use
-`StartSyncExecution` for Express Workflows (caller needs the result
-inline, 5s ceiling); `StartExecution` for Standard Workflows (async —
-API returns the execution ARN immediately).
-```bash
-aws apigatewayv2 create-integration --api-id <id> \
-  --integration-type AWS --integration-method POST \
-  --integration-subtype STEP_FUNCTION \
-  --request-parameters '{"StateMachineArn":"arn:aws:states:<region>:<account>:stateMachine:<name>","Action":"StartSyncExecution","Input":"$request.body"}'
-```
-
-**SQS SendMessage (direct):** uses `credentials-arn` (IAM role trusting
-`apigateway.amazonaws.com`) with `MessageBody` mapped from the request
-body.
-
-**Kinesis PutRecord (direct):** uses `credentials-arn` with `Data`
-mapped from the request body and `PartitionKey` mapped from
-`$context.requestId` (or a JWT claim for tenant-partitioned streams).
-
-Direct AWS integrations need a `credentials-arn` (an IAM role trusting
-`apigateway.amazonaws.com` with permission to call the target service).
-This role is the blast radius — scope it tightly to the one queue,
-state machine, or stream.
+create-integration / add-permission / create-vpc-link command set for
+every integration type: [references/integrations-and-routes-reference.md](references/integrations-and-routes-reference.md).
 
 ### Step 4: JWT authorizer (OpenID Connect / Cognito)
 
@@ -333,20 +255,8 @@ aws apigatewayv2 create-authorizer --api-id <id> \
 `https://cognito-idp.<region>.amazonaws.com/<user-pool-id>/` (trailing
 slash required) and the audience is the **app client id**.
 
-**Critical JWT config rules:**
-- The issuer URL MUST be HTTPS and end with a trailing slash for
-  Cognito pools. A missing slash is the #1 cause of "invalid JWT
-  configuration" errors.
-- Audience must match the `aud` claim in the token. Cognito tokens use
-  `client_id` instead of `aud` — API Gateway handles this automatically
-  when it detects a Cognito issuer, but for third-party OIDC ensure the
-  audience matches.
-- `identity-source` defaults to `$request.header.Authorization`. A
-  missing or malformed Authorization header returns `401 Unauthorized`
-  without invoking the integration.
-- Authorizer caching TTL defaults to 0 (no cache). For high-volume
-  APIs, set TTL via `authorizerResultTtlInSeconds` on
-  `update-authorizer` (300s typical).
+Critical JWT rules (HTTPS + trailing slash, aud matching, identity-source,
+caching TTL): [references/jwt-cors-domain-auto-deploy-reference.md](references/jwt-cors-domain-auto-deploy-reference.md).
 
 ```bash
 aws apigatewayv2 update-route --api-id <id> --route-id <rid> \
@@ -399,17 +309,8 @@ the stage serves 404 until a deployment is pinned.
 
 ### Step 7: Access logging (JSON)
 
-```bash
-aws apigatewayv2 update-stage --api-id <id> --stage-name '$default' \
-  --access-log-settings DestinationArn=arn:aws:logs:<region>:<account>:log-group:prod-http-api-access,Format='{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","requestTime":"$context.requestTime","httpMethod":"$context.httpMethod","routeKey":"$context.routeKey","status":"$context.status","responseLength":"$context.responseLength","latency":$context.integrationLatency,"errorMessage":"$context.error.message"}'
-```
-
-CloudWatch Logs Insights query:
-```
-fields @timestamp, status, latency, ip
-| filter status >= 400
-| stats count() by status
-```
+Access-log settings command + Logs Insights query:
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### Step 8: Custom domain (API mapping)
 
@@ -458,48 +359,13 @@ need true per-consumer throttling, switch to REST API.
 
 ## Expert heuristic: $default stage race with Infrastructure-as-Code
 
-When deploying HTTP API via CloudFormation, CDK, SAM, or Terraform, a
-common failure is the `$default` auto-deploy racing the IaC engine's
-`AWS::ApiGatewayV2::Deployment` resource. The symptom is drift: the
-deployment resource reports CREATE_COMPLETE, but `$default` already
-served traffic using the live config seconds earlier.
-
-**Resolution heuristics:**
-- Use **one** of: `AWS::ApiGatewayV2::Deployment` + pinned stage, OR
-  `auto-deploy: true` with no deployment resource. Mixing both causes
-  drift.
-- For event-driven pipelines (CodePipeline Source + Build + Deploy),
-  set stage `auto-deploy: true` and let CloudFormation manage only
-  `::Route`, `::Integration`, `::Authorizer` — skip `::Deployment`.
-- For audit-controlled environments, pin the stage and emit
-  `::Deployment` with explicit `DependsOn` on every route and
-  integration.
-
-A baseline model trained on REST API assumes `create-deployment` is
-mandatory. On HTTP API it is **optional and frequently harmful** when
-`auto-deploy` is also enabled.
+IaC race resolution heuristics (auto-deploy vs pinned Deployment
+resource): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Expert heuristic: greedy {proxy+} route precedence and the ANY trap
 
-HTTP API route matching uses **most-specific match**, but `ANY` matches
-every method including `OPTIONS`. Combined with `{proxy+}` it becomes a
-catch-all that defeats narrower routes.
-
-```text
-GET /users/me                → exact match, wins over ANY /{proxy+}
-ANY /{proxy+}                → catches everything else, ALL methods
-ANY /users/{proxy+}          → narrower greedy under /users
-$default                     → only when no route matches at all
-```
-
-**The ANY trap:** an `ANY /{proxy+}` route with `authorizationType:
-NONE` exposes every sub-path on every method (GET, POST, PUT, PATCH,
-DELETE, HEAD, OPTIONS). Operators add it for "a single Lambda handles
-everything" and forget it includes DELETE. Always bind a JWT authorizer
-to ANY routes, or split the greedy into explicit verbs. A baseline
-model often suggests `ANY /{proxy+}` as the default route because it
-minimizes route count. The secure pattern is the opposite: explicit
-verbs, explicit authorizer per route.
+Route precedence table and the ANY-trap secure pattern:
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Output format (per HTTP API deployment plan)
 
@@ -544,47 +410,13 @@ DEPLOY_COMMANDS:
 
 ## Verification commands (run after deployment)
 
-```bash
-aws apigatewayv2 get-api --api-id <id>
-aws apigatewayv2 get-routes --api-id <id> --query 'Items[*].[RouteKey,AuthorizationType,Target]'
-aws apigatewayv2 get-integrations --api-id <id> --query 'Items[*].[IntegrationType,IntegrationMethod,IntegrationUri]'
-aws apigatewayv2 get-authorizer --api-id <id> --authorizer-id <auth-id>
-aws apigatewayv2 get-api --api-id <id> --query 'CorsConfiguration'
-aws apigatewayv2 get-stage --api-id <id> --stage-name '$default'
-aws apigatewayv2 get-web-acl-for-resource --resource-arn arn:aws:apigateway:<region>::/apis/<id>/stages/$default
-aws apigatewayv2 get-api-mappings --domain-name api.example.com
-
-# Live invocation
-curl -X GET https://<api-id>.execute-api.<region>.amazonaws.com/health
-curl -X GET https://<api-id>.execute-api.<region>.amazonaws.com/users -H "Authorization: Bearer <jwt>"
-```
+get-api / get-routes / get-integrations / get-authorizer / CORS / stage /
+WAF / api-mappings + live curl checks: [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ## Edge-case handling
 
-- **$default stage 404 after pinning.** A pinned stage
-  (`auto-deploy=false`) without a current deployment ID serves 404 for
-  every route. Always emit `create-deployment` before pinning.
-
-- **JWT issuer trailing slash.** Cognito issuer URLs MUST end with `/`.
-  A missing slash returns "invalid JWT configuration". Third-party OIDC
-  providers may or may not require the trailing slash — match the
-  OpenID configuration's `issuer` field exactly.
-
-- **Audience mismatch on third-party OIDC.** Cognito uses `client_id`,
-  which API Gateway recognizes. Other OIDC providers (Auth0, Okta) emit
-  `aud` — the audience list MUST contain the exact `aud` value.
-
-- **CORS `allowCredentials=true` with wildcard origin.** Hard AWS
-  rejection — `allowOrigins` must enumerate explicit origins.
-
-- **VPC link to ALB.** ALB is not a valid VPC link target. Front the
-  ALB with an NLB, or use HTTP integration with the ALB DNS (which
-  exposes the ALB to internet egress).
-
-- **Direct SQS / Kinesis integration role.** The `credentials-arn` role
-  must trust `apigateway.amazonaws.com` and have a policy scoped to the
-  exact queue or stream ARN. A wildcard (`sqs:*`) creates a privilege
-  escalation path if the API is exposed publicly.
+Edge cases ($default 404 after pinning, JWT trailing slash, aud mismatch,
+CORS wildcard+credentials, ALB VPC link, credentials-arn scope): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -628,47 +460,21 @@ enabled (API Gateway synthesizes preflight); never skip
 
 ## Pre-flight safety checks (run before any deployment CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before changes go live (auto-deploy
-  is on by default!), the deployer MUST emit:
-  `CONFIRM: HTTP API <name> has auto-deploy enabled on stage '$default'.
-  Any route / integration / authorizer change goes live within seconds.
-  Proceed? (yes/no)`
-- **Authorizer verification.** List every route; verify `NONE` auth
-  appears ONLY on intentionally public routes (e.g., `/health`). The
-  catch-all `ANY /{proxy+}` MUST have an authorizer bound.
-- **JWT issuer reachability.** Verify
-  `<issuer>/.well-known/openid-configuration` returns 200 with a JWKS
-  URI. A non-reachable issuer breaks every authorized route.
-- **CORS verification.** `allowOrigins` explicit (no `*` with
-  credentials), `Authorization` in `allowHeaders` for JWT routes,
-  `OPTIONS` in `allowMethods`.
-- **Custom domain ACM cert.** Must be in the API's region (REGIONAL).
-  HTTP API does not support EDGE custom domains.
-- **Cost estimate.** HTTP API $1.00/M requests; WAF $5/ACL/month +
-  $0.60/M requests; Cognito $0.0055/MAU; Lambda $0.20/M invocations +
-  GB-second; Step Functions Express $1.00/M invocations + GB-second.
+All checks (confirmation gate quote, authorizer sweep, issuer reachability,
+CORS, ACM region, cost estimate): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Remediation guidance
 
-**Ordering principle:** authorization first (active exposure if wrong),
-then routes and greedy catch-alls (exposure surface), then CORS
-(browser UX), then observability (logging), then optimization (WAF,
-custom domain, throttle).
+Ordering principle + fixes for JWT issuer, VPC link to ALB, REST features
+required: [references/error-handling.md](references/error-handling.md).
 
-- **JWT issuer unreachable or malformed:** resolve the issuer URL via
-  `curl <issuer>/.well-known/openid-configuration`; if Cognito, ensure
-  trailing slash; verify audience matches the app client id (Cognito)
-  or the `aud` claim (third-party OIDC); re-issue `create-authorizer`.
-- **VPC link to ALB:** create an NLB that targets the ALB (or the
-  ALB's targets directly); verify target groups span multiple AZs;
-  create the VPC link; update the HTTP_PROXY integration with
-  `connection-type: VPC_LINK` and `connection-id`.
-- **HTTP API chosen but REST features required:** confirm whether usage
-  plans, mapping templates, resource policies, EDGE, or Lambda
-  authorizers are genuinely required. If yes, switch to REST API (no
-  in-place conversion — re-create the API). If no, proceed with HTTP
-  API and document the trade-off (e.g., per-consumer throttling via
-  WAF instead of usage plans).
+## References (load on demand)
+
+- [Error handling](references/error-handling.md) - remediation ordering principle + fixes: JWT issuer unreachable, VPC link to ALB, REST features required
+- [Diagnostic commands](references/diagnostic-commands.md) - live-account pre-flight checks, access-log setup, post-deployment verification commands
+- [Advanced patterns](references/advanced-patterns.md) - three differentiators, IaC auto-deploy race, ANY/{proxy+} trap, edge cases, safety gate, recent features
+- [Integrations and routes](references/integrations-and-routes-reference.md) - per-integration contracts; create-integration command set
+- [JWT / CORS / domain / auto-deploy](references/jwt-cors-domain-auto-deploy-reference.md) - authorizer deep dive; critical JWT config rules
 
 ## Domain
 
@@ -676,30 +482,8 @@ AWS CloudOps / API Gateway HTTP API (v2) Provisioning.
 
 ## Recent AWS features (2024-2026)
 
-- **Step Functions direct integration (HTTP API):** HTTP APIs now
-  integrate natively with Step Functions (`START_EXECUTION` for
-  Standard, `START_SYNC_EXECUTION` for Express) without a Lambda in
-  the path. Useful for synchronous workflow APIs (5s ceiling).
-
-- **HTTP API private integrations via VPC Lattice:** HTTP APIs can
-  route to VPC Lattice services as private integrations, expanding
-  beyond NLB VPC link targets. Lattice auth policies may not appear in
-  standard VPC security group audits — check separately.
-
-- **Private integrations with VPC link improvements:** VPC link
-  creation supports multiple security groups and subnet IDs directly
-  via `create-vpc-link`, removing the need for a separate
-  NLB-per-AZ configuration in many cases.
-
-- **HTTP API mTLS:** HTTP APIs support mutual TLS via custom domain
-  names. Use for B2B APIs with strict client certificate requirements.
-
-- **OpenAPI 3.1 import + auto-deploy metrics + CORS subdomain
-  wildcards:** OpenAPI 3.1 import now carries JWT authorizer and
-  direct-integration subtypes; CloudWatch exposes
-  `AutoDeployStageChanges` for drift detection; `cors-configuration`
-  accepts up to 100 origins and `https://*.example.com` subdomain
-  wildcards for tenant apps.
+Recent AWS features — Step Functions direct, VPC Lattice, mTLS, OpenAPI
+3.1 import, CORS wildcards: [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## AWS documentation
 

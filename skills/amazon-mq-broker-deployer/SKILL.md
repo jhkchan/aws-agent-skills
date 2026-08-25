@@ -71,31 +71,7 @@ are impossible or disruptive to change later — the provisioning procedure
 treats each as a one-way door and forces an explicit decision before the
 `create-broker` call.
 
-Three misconceptions dominate Amazon MQ misdesign at provisioning time:
-
-- **"ActiveMQ and RabbitMQ are interchangeable message brokers."** This
-  is wrong at the protocol and semantics level. ActiveMQ supports
-  OpenWire, STOMP, MQTT, AMQP, and WS — five wire-level protocols with
-  JMS-style durable subscribers, queue browsers, and virtual topics.
-  RabbitMQ supports AMQP 0-9-1, AMQP 1.0, MQTT, and STOMP with
-  exchanges (direct, fanout, topic, headers), queue bindings, and
-  consumer prefetch. The client libraries, topology model, and retry
-  semantics differ. Migrating between engines is a full application
-  rewrite, not a reconfiguration.
-
-- **"Single instance is the safe default for dev — easy to upgrade
-  later."** The deployment mode is set at creation. Going from single
-  instance to active/standby is a `reboot-broker` that causes downtime.
-  Going from active/standby to cluster (RabbitMQ only) requires deleting
-  and recreating the broker. For any production workload, default to
-  active/standby up front.
-
-- **"Audit logging is optional; enable it if compliance asks."** Amazon
-  MQ audit logs capture every administrative and publish/subscribe
-  action. Enabling them post-creation is possible but the gap between
-  creation and enablement is an unaudited window. For regulated
-  workloads (PCI-DSS, HIPAA, FedRAMP), enable general AND audit logs at
-  creation.
+The three misconceptions (engines are interchangeable, single-instance is a safe default, audit logging can wait) with full reasoning: [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Quick navigation
 
@@ -116,6 +92,8 @@ Three misconceptions dominate Amazon MQ misdesign at provisioning time:
 | §"Output format" | The literal checklist template |
 | references/engine-and-topology.md | Deep ActiveMQ-vs-RabbitMQ + topology |
 | references/provisioning-cli-commands.md | Copy-pasteable CLI sequence |
+| references/advanced-patterns.md | Sizing heuristic + misconceptions + recent features |
+| references/error-handling.md | API error table |
 
 ## Reasoning framework (why provisioning order matters)
 
@@ -169,23 +147,7 @@ procedure forces an explicit decision on each before `create-broker`.
 
 ## Expert heuristic: instance type and connection sizing
 
-Amazon MQ markets instance types by vCPU and memory, but the limiting
-factor is **connection count** and **message throughput**, not raw
-memory. Size by connections first, throughput second, memory third.
-
-| Instance type | Memory | ActiveMQ connections | RabbitMQ connections | Approx throughput |
-|---|---|---|---|---|
-| mq.t3.micro | 1 GiB | ~1,000 | ~500 | ~100-200 msg/s |
-| mq.m5.large | 8 GiB | ~1,000 | ~2,000 | ~1,000-5,000 msg/s |
-| mq.m5.2xlarge | 32 GiB | ~3,000 | ~10,000 | ~5,000-30,000 msg/s |
-| mq.m5.4xlarge | 64 GiB | ~5,000 | ~20,000 | ~10,000-60,000 msg/s |
-| mq.m5.16xlarge | 256 GiB | ~15,000 | — | ~30,000+ msg/s |
-
-**Common mistake:** sizing by memory. A 64 GiB broker at 5,000
-connections is CPU-bound on connection management long before memory
-fills. See references/engine-and-topology.md for full failover
-semantics (ActiveMQ 5-15 min EBS promotion; RabbitMQ 10-30 sec quorum
-election) and detailed sizing tables.
+Sizing table (memory vs ActiveMQ/RabbitMQ connection limits vs throughput) and the size-by-connections rule: [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Prerequisites (verify before provisioning)
 
@@ -228,21 +190,7 @@ durable subscriber semantics?
     └── NO  → ActiveMQ  (broader protocol surface; default for greenfield)
 ```
 
-**Feature comparison:**
-
-| Feature | ActiveMQ | RabbitMQ |
-|---|---|---|
-| Protocols | OpenWire, STOMP, MQTT, AMQP 1.0, WS | AMQP 0-9-1, AMQP 1.0, MQTT, STOMP |
-| Topology model | Queues, Topics, Virtual Topics, Durable Subscribers | Exchanges (direct, fanout, topic, headers) + Queues + Bindings |
-| HA mode | Active/Standby (shared EBS) | Active/Standby OR Cluster (3+ nodes, quorum) |
-| Horizontal scaling | NO (single active instance) | YES (cluster mode) |
-| Encryption at rest | YES (KMS) | YES (KMS) |
-| Encryption in transit (TLS) | YES | YES |
-| AWS IAM authentication | NO | YES (creation-time-only) |
-| LDAP authentication | YES (JAAS) | YES (via backend) |
-| Mutual TLS | YES | YES |
-| Audit logging | YES (CloudWatch) | YES (CloudWatch) |
-| Automatic minor version upgrades | YES (default on) | YES (default on) |
+Full feature-comparison table (protocols, topology model, HA modes, horizontal scaling, encryption, auth, logging, upgrades): [references/engine-and-topology.md](references/engine-and-topology.md).
 
 **Common mistake:** picking RabbitMQ for "IAM auth" then needing JMS or
 OpenWire. RabbitMQ does NOT support OpenWire or JMS. Conversely, picking
@@ -265,19 +213,7 @@ Is the workload production / HA-required?
         └── NO  → Active/Standby  (2 nodes; standby in different AZ)
 ```
 
-**ActiveMQ active/standby specifics:**
-- 1 active broker + 1 standby in a different AZ.
-- Shared EBS storage — the standby does NOT accept connections.
-- Failover: 5-15 minutes (EBS volume promotion + restart).
-- Clients must use `failover:(ssl://...)` URI for automatic reconnect.
-
-**RabbitMQ cluster mode specifics:**
-- 3 nodes minimum (quorum requirement).
-- Nodes in different AZs for HA.
-- Quorum queues provide automatic leader election (10-30 seconds).
-- Horizontal scaling: connections distribute across nodes.
-- Going from active/standby to cluster REQUIRES broker deletion +
-  recreation. Decide at creation.
+ActiveMQ active/standby and RabbitMQ cluster specifics (shared EBS, 5-15 min promotion, failover URI, 3-node quorum): [references/engine-and-topology.md](references/engine-and-topology.md).
 
 **Common mistake:** provisioning an ActiveMQ single-instance broker for
 production, then needing HA. Going from single instance to active/standby
@@ -289,18 +225,7 @@ any production workload.
 Amazon MQ offers `mq.t3` and `mq.m5` families. Choose based on
 connection count and throughput, not just memory.
 
-**Size by workload:**
-- **Dev / test / prototype:** `mq.t3.micro` (1 GiB, ~1,000 connections).
-  Free-tier eligible; burst CPU.
-- **Small production (< 1,000 connections, < 1,000 msg/s):**
-  `mq.m5.large` (8 GiB, ~1,000-2,000 connections).
-- **Mid production (2,000-5,000 connections, 1,000-10,000 msg/s):**
-  `mq.m5.2xlarge` (32 GiB).
-- **Large production (5,000-10,000 connections, 10,000+ msg/s):**
-  `mq.m5.4xlarge` (64 GiB).
-- **Very large (10,000+ connections):** `mq.m5.8xlarge` or
-  `mq.m5.16xlarge`. For RabbitMQ, prefer cluster mode with multiple
-  `mq.m5.2xlarge` nodes over a single large node.
+Size-by-workload ladder (mq.t3.micro -> mq.m5.16xlarge with connection/throughput ranges): [references/engine-and-topology.md](references/engine-and-topology.md).
 
 **Common mistake:** sizing by memory. Connection-handling overhead and
 file-handle limits are the real bottleneck. A 64 GiB broker hitting
@@ -320,17 +245,7 @@ Amazon MQ uses EBS-backed storage for message persistence.
 - Can be added post-creation via modify (requires reboot).
 - **Cannot be removed** once enabled.
 
-```bash
-aws mq create-broker \
-  --broker-name prod-broker \
-  --broker-instance-type mq.m5.large \
-  --engine-type ACTIVEMQ \
-  --engine-version "5.18.0" \
-  --storage-type ebs \
-  --ebs-volume-size 200 \
-  --kms-key-id arn:aws:kms:us-east-1:123456789012:alias/prod-mq-kms \
-  ...
-```
+create-broker with --storage-type/--ebs-volume-size/--kms-key-id: [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
 **Common mistake:** not sizing EBS for message backlog. If the broker
 buffers messages (consumer lag), EBS fills and the broker stalls. Size
@@ -358,14 +273,7 @@ default for production).
 | ActiveMQ Web Console | 8162 | YES | NO |
 | RabbitMQ Management | 15671 | NO | YES |
 
-```bash
-# Inbound: allow the application's SG to reach the broker ports
-aws ec2 authorize-security-group-ingress \
-  --group-id sg-mq123 \
-  --protocol tcp \
-  --port 61617 \
-  --source-security-group-id sg-app456
-```
+authorize-security-group-ingress for broker ports from the application SG: [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
 **NEVER** open broker ports to `0.0.0.0/0` — even with TLS and auth,
 this exposes the broker to internet scanning.
@@ -395,15 +303,7 @@ Authentication is engine-specific and, for RabbitMQ IAM, creation-time.
   broker without recreation.
 - **Mutual TLS:** client cert validation.
 
-```bash
-# RabbitMQ with IAM authentication (creation-time-only)
-aws mq create-broker \
-  --broker-name prod-rabbit \
-  --engine-type RABBITMQ \
-  --engine-version "3.13" \
-  --authentication-strategy ldap \
-  ...
-```
+RabbitMQ IAM-auth creation command: [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
 **Common mistake:** creating a RabbitMQ broker with basic auth, then
 needing IAM auth. IAM auth is a creation-time-only setting. The broker
@@ -415,56 +315,14 @@ Configuration is engine-specific and must be created BEFORE the broker.
 
 **ActiveMQ configuration (XML):**
 
-```bash
-# Create a configuration revision
-aws mq create-configuration \
-  --configuration-name prod-activemq-config \
-  --engine-type ACTIVEMQ \
-  --engine-version "5.18.0"
-
-# Update the configuration with XML
-aws mq update-configuration \
-  --configuration-id <config-id> \
-  --configuration-data "<base64-encoded-broker.xml>"
-```
-
-The broker.xml controls destinations, plugins, slow consumer handling,
-and destination policies. Example:
-
-```xml
-<broker xmlns="http://activemq.apache.org/schema/core">
-  <destinationPolicy>
-    <policyMap>
-      <policyEntries>
-        <policyEntry topic=">" producerFlowControl="true"
-                     memoryLimit="1gb">
-          <pendingSubscriberPolicy>
-            <vmCursor/>
-          </pendingSubscriberPolicy>
-        </policyEntry>
-      </policyEntries>
-    </policyMap>
-  </destinationPolicy>
-</broker>
-```
+create/update-configuration commands plus the broker.xml destination-policy example: [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
 **RabbitMQ configuration (definitions JSON):**
 
 RabbitMQ uses a definitions JSON for exchanges, queues, bindings, and
 users. Upload via the RabbitMQ Management UI or embed at creation.
 
-```bash
-# RabbitMQ definitions are applied via the management UI or
-# a configuration revision (engine-type RABBITMQ)
-aws mq create-configuration \
-  --configuration-name prod-rabbit-config \
-  --engine-type RABBITMQ \
-  --engine-version "3.13"
-
-aws mq update-configuration \
-  --configuration-id <config-id> \
-  --configuration-data "<base64-encoded-definitions.json>"
-```
+RabbitMQ definitions-JSON configuration commands: [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
 **Common mistake:** creating the broker before the configuration. The
 configuration ID must be referenced at `create-broker` via
@@ -481,13 +339,7 @@ Amazon MQ publishes two log types to CloudWatch:
 
 **Enable at creation:**
 
-```bash
-aws mq create-broker \
-  --broker-name prod-broker \
-  --logs General=true \
-  --logs Audit=true \
-  ...
-```
+create-broker --logs General=true Audit=true: [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
 **Audit logging is critical for compliance:**
 - PCI-DSS, HIPAA, FedRAMP require an audit trail of all broker access.
@@ -510,13 +362,7 @@ maintenance window.
 
 **Override the maintenance window:**
 
-```bash
-aws mq create-broker \
-  --broker-name prod-broker \
-  --maintenance-window-start-time \
-    DayOfWeek=SUNDAY,TimeOfDay=03:00,TimeZone=UTC \
-  ...
-```
+create-broker --maintenance-window-start-time: [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
 **Common mistake:** disabling automatic upgrades for "stability." This
 leaves the broker unpatched against security vulnerabilities. Keep
@@ -529,13 +375,7 @@ upgrades enabled and set an explicit maintenance window.
 - Configure the TGW attachment, route tables, and security group rules.
 - Use RAM (Resource Access Manager) to share the TGW across accounts.
 
-```bash
-# Share the transit gateway with the consuming account
-aws ram create-resource-share \
-  --name mq-tgw-share \
-  --resource-arns arn:aws:ec2:us-east-1:123456789012:transit-gateway/tgw-0abc \
-  --principals 123456789012
-```
+RAM create-resource-share command: [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
 **ActiveMQ protocol surface (STOMP, MQTT, AMQP, WS):**
 - ActiveMQ supports OpenWire (61617), AMQP (5671), STOMP (61614),
@@ -543,16 +383,7 @@ aws ram create-resource-share \
 - Enable the protocols in broker.xml.
 - Each protocol needs a security group inbound rule.
 
-```xml
-<!-- broker.xml: enable all protocols -->
-<transportConnectors>
-  <transportConnector name="openwire" uri="ssl://0.0.0.0:61617"/>
-  <transportConnector name="amqp" uri="amqp+ssl://0.0.0.0:5671"/>
-  <transportConnector name="stomp" uri="stomp+ssl://0.0.0.0:61614"/>
-  <transportConnector name="mqtt" uri="ssl+mqtt://0.0.0.0:8883"/>
-  <transportConnector name="ws" uri="wss://0.0.0.0:61619"/>
-</transportConnectors>
-```
+broker.xml transportConnectors example (OpenWire/AMQP/STOMP/MQTT/WS ports): [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
 **Common mistake:** provisioning a RabbitMQ broker expecting ActiveMQ
 protocols (OpenWire, WS console). RabbitMQ does NOT support OpenWire.
@@ -650,42 +481,22 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-| Error | Cause | Fix |
-|---|---|---|
-| `BrokerAlreadyExists` | Broker name in use | `describe-broker` — if config matches, emit READY_TO_DEPLOY; if differs, modify (mutable: instance type, SG, logs) or create NEW broker |
-| `Subnet does not span multiple AZs` | All subnets in one AZ | Add subnets in different AZs; verify with `describe-subnets` |
-| `IAM authentication requires RabbitMQ engine` | IAM auth on ActiveMQ | Use LDAP/basic for ActiveMQ; IAM is RabbitMQ-only and creation-time |
-| `Configuration revision not compatible` | Engine-type/version mismatch | Create new configuration with correct engine-type + version |
-| Broker stuck in `REBOOT_IN_PROGRESS` | Modify triggered reboot | Wait for `RUNNING` via `describe-broker --query 'BrokerState'` |
+API error -> cause -> fix table: [references/error-handling.md](references/error-handling.md).
 
 ## Recent AWS features (2024-2026)
 
-- **Amazon MQ for RabbitMQ with transit gateway (2024-2025):**
-  Cross-account and cross-VPC broker access via AWS Transit Gateway.
-  Configure TGW attachments, route tables, and RAM principal
-  associations for sharing.
-- **Amazon MQ for ActiveMQ multi-protocol (STOMP, MQTT, AMQP, WS):**
-  Full protocol surface enabled in broker.xml. OpenWire, AMQP, STOMP,
-  MQTT, and WebSocket simultaneously. Each protocol needs a security
-  group inbound rule.
-- **RabbitMQ IAM authentication (2023-2024):** AWS principals (users,
-  roles) connect using SigV4-signed credentials. Creation-time-only
-  setting. Eliminates password management for AWS-native workloads.
-- **Automatic minor version upgrades (2023-2024):** Amazon MQ applies
-  minor version upgrades automatically during a maintenance window.
-  Override the window with `--maintenance-window-start-time`.
-- **Amazon MQ audit logging (2023-2024):** CloudWatch audit logs capture
-  every administrative and publish/subscribe action. Enable at creation
-  for compliance-regulated workloads.
-- **RabbitMQ 3.13 / 3.12 support (2024):** Quorum queues, classic
-  mirrored queues, stream queues. Provisioning tip: use quorum queues
-  for HA (3-node cluster minimum).
-- **ActiveMQ 5.18 support (2024):** Updated STOMP, MQTT, and AMQP
-  protocol adapters. Java 11 runtime.
+Full feature list with dates: [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Domain
 
 AWS CloudOps / Amazon MQ Broker Provisioning & Messaging Topology Design.
+
+## References (load on demand)
+
+- [Engine and topology](references/engine-and-topology.md) — ActiveMQ vs RabbitMQ matrix, deployment-mode mechanics, size-by-workload ladder, failover semantics
+- [Provisioning CLI commands](references/provisioning-cli-commands.md) — end-to-end create sequence: prerequisites, configuration, subnet, SG, brokers, TGW share, verification
+- [Advanced patterns](references/advanced-patterns.md) — mindset misconceptions, instance-type sizing heuristic, recent AWS features
+- [Error handling](references/error-handling.md) — API error to cause to fix table
 
 ## AWS documentation
 

@@ -250,3 +250,135 @@ aws logs describe-log-groups \
   --log-group-name-prefix /aws/amazonmq/broker/prod-mq \
   --query 'logGroups[*].logGroupName' --output text
 ```
+
+---
+
+## Step 4: create-broker with EBS + KMS (moved from SKILL.md)
+
+```bash
+aws mq create-broker \
+  --broker-name prod-broker \
+  --broker-instance-type mq.m5.large \
+  --engine-type ACTIVEMQ \
+  --engine-version "5.18.0" \
+  --storage-type ebs \
+  --ebs-volume-size 200 \
+  --kms-key-id arn:aws:kms:us-east-1:123456789012:alias/prod-mq-kms \
+  ...
+```
+
+## Step 5: authorize broker port ingress (moved from SKILL.md)
+
+```bash
+# Inbound: allow the application's SG to reach the broker ports
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-mq123 \
+  --protocol tcp \
+  --port 61617 \
+  --source-security-group-id sg-app456
+```
+
+## Step 6: RabbitMQ IAM auth creation flag (moved from SKILL.md)
+
+```bash
+# RabbitMQ with IAM authentication (creation-time-only)
+aws mq create-broker \
+  --broker-name prod-rabbit \
+  --engine-type RABBITMQ \
+  --engine-version "3.13" \
+  --authentication-strategy ldap \
+  ...
+```
+
+## Step 7: ActiveMQ XML configuration (moved from SKILL.md)
+
+```bash
+# Create a configuration revision
+aws mq create-configuration \
+  --configuration-name prod-activemq-config \
+  --engine-type ACTIVEMQ \
+  --engine-version "5.18.0"
+
+# Update the configuration with XML
+aws mq update-configuration \
+  --configuration-id <config-id> \
+  --configuration-data "<base64-encoded-broker.xml>"
+```
+
+The broker.xml controls destinations, plugins, slow consumer handling,
+and destination policies. Example:
+
+```xml
+<broker xmlns="http://activemq.apache.org/schema/core">
+  <destinationPolicy>
+    <policyMap>
+      <policyEntries>
+        <policyEntry topic=">" producerFlowControl="true"
+                     memoryLimit="1gb">
+          <pendingSubscriberPolicy>
+            <vmCursor/>
+          </pendingSubscriberPolicy>
+        </policyEntry>
+      </policyEntries>
+    </policyMap>
+  </destinationPolicy>
+</broker>
+```
+
+## Step 7: RabbitMQ definitions JSON configuration (moved from SKILL.md)
+
+```bash
+# RabbitMQ definitions are applied via the management UI or
+# a configuration revision (engine-type RABBITMQ)
+aws mq create-configuration \
+  --configuration-name prod-rabbit-config \
+  --engine-type RABBITMQ \
+  --engine-version "3.13"
+
+aws mq update-configuration \
+  --configuration-id <config-id> \
+  --configuration-data "<base64-encoded-definitions.json>"
+```
+
+## Step 8: enable general + audit logs at creation (moved from SKILL.md)
+
+```bash
+aws mq create-broker \
+  --broker-name prod-broker \
+  --logs General=true \
+  --logs Audit=true \
+  ...
+```
+
+## Step 9: override the maintenance window (moved from SKILL.md)
+
+```bash
+aws mq create-broker \
+  --broker-name prod-broker \
+  --maintenance-window-start-time \
+    DayOfWeek=SUNDAY,TimeOfDay=03:00,TimeZone=UTC \
+  ...
+```
+
+## Step 10: share the transit gateway cross-account (moved from SKILL.md)
+
+```bash
+# Share the transit gateway with the consuming account
+aws ram create-resource-share \
+  --name mq-tgw-share \
+  --resource-arns arn:aws:ec2:us-east-1:123456789012:transit-gateway/tgw-0abc \
+  --principals 123456789012
+```
+
+## Step 10: broker.xml transportConnectors (moved from SKILL.md)
+
+```xml
+<!-- broker.xml: enable all protocols -->
+<transportConnectors>
+  <transportConnector name="openwire" uri="ssl://0.0.0.0:61617"/>
+  <transportConnector name="amqp" uri="amqp+ssl://0.0.0.0:5671"/>
+  <transportConnector name="stomp" uri="stomp+ssl://0.0.0.0:61614"/>
+  <transportConnector name="mqtt" uri="ssl+mqtt://0.0.0.0:8883"/>
+  <transportConnector name="ws" uri="wss://0.0.0.0:61619"/>
+</transportConnectors>
+```

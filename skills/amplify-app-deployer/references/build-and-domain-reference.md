@@ -198,3 +198,41 @@ Origins:
 
 Note: this adds latency (extra hop) and cost (second CF distribution).
 Document the reason in the project README.
+
+## Moved from SKILL.md Step 5 — custom headers + redirects YAML
+
+```yaml
+customHeaders:
+  - pattern: '**/*'
+    headers:
+      - key: Strict-Transport-Security
+        value: 'max-age=31536000; includeSubDomains'
+      - key: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self'"
+redirects:
+  - source: '/old-path'
+    target: '/new-path'
+    status: '301'
+  - source: '/<*>'
+    target: '/index.html'
+    status: '200'
+```
+
+## Moved from SKILL.md Step 6 — ACM cert + domain association commands
+
+```bash
+# Request an ACM cert in us-east-1 (Amplify requires us-east-1)
+aws acm request-certificate \
+  --domain-name app.example.com \
+  --validation-method DNS \
+  --region us-east-1 \
+  --output json
+# Add the validation CNAME to Route 53 / third-party DNS
+
+# Associate the domain with the Amplify app
+aws amplify create-domain-association \
+  --app-id dXXXX \
+  --domain-name example.com \
+  --sub-domain-settings '[{"prefix":"app","branchName":"main"}]' \
+  --output json
+```

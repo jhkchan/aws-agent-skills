@@ -375,3 +375,293 @@ resource "aws_lambda_permission" "apigateway_connect" {
   source_arn    = "${aws_apigatewayv2_api.websocket.execution_arn}/*/$connect"
 }
 ```
+
+---
+
+## Step-by-step CLI walkthroughs (moved verbatim from SKILL.md)
+
+The SKILL.md body keeps only step stubs under progressive disclosure
+(agentskills.io); the original step sections below were moved verbatim
+so no content is lost.
+
+## Step 1 — Route selection expression
+
+The route selection expression is set at API creation time. It
+determines which route handles each incoming message.
+
+```bash
+# Create a WebSocket API with route selection expression
+aws apigatewayv2 create-api \
+  --name "my-websocket-api" \
+  --protocol-type WEBSOCKET \
+  --route-selection-expression '$request.body.action' \
+  --region us-east-1
+```
+
+The response includes the `ApiId`, which is used in all subsequent
+commands.
+
+**Common expressions:**
+
+| Expression | Message format | Route key |
+|---|---|---|
+| `$request.body.action` | `{ "action": "sendMessage", ... }` | `sendMessage` |
+| `$request.body.type` | `{ "type": "chat", ... }` | `chat` |
+| `$request.body.routeKey` | `{ "routeKey": "joinRoom", ... }` | `joinRoom` |
+
+**Update the route selection expression:**
+
+```bash
+aws apigatewayv2 update-api \
+  --api-id abc123def4 \
+  --route-selection-expression '$request.body.type' \
+  --region us-east-1
+```
+
+**Critical:** changing the route selection expression requires a new
+deployment for the change to take effect (unless using auto-deploy
+stage).
+
+## Step 3 — Custom routes
+
+Custom routes handle specific message types based on the route
+selection expression. Each route maps to an integration.
+
+```bash
+# Create a "sendMessage" route
+aws apigatewayv2 create-route \
+  --api-id abc123def4 \
+  --route-key 'sendMessage' \
+  --target integrations/ghi789 \
+  --region us-east-1
+
+# Create a "joinRoom" route
+aws apigatewayv2 create-route \
+  --api-id abc123def4 \
+  --route-key 'joinRoom' \
+  --target integrations/jkl012 \
+  --region us-east-1
+
+# Create a "$default" route (handles unmatched messages)
+aws apigatewayv2 create-route \
+  --api-id abc123def4 \
+  --route-key '$default' \
+  --target integrations/mno345 \
+  --region us-east-1
+```
+
+When a client sends `{ "action": "sendMessage", "message": "hello" }`,
+the route selection expression evaluates `$request.body.action` =
+`sendMessage`, and the `sendMessage` route fires.
+
+**Custom route event structure (Lambda):**
+
+```json
+{
+  "requestContext": {
+    "routeKey": "sendMessage",
+    "connectionId": "abc123=-",
+    "apiId": "abc123def4",
+    "domainName": "abc123def4.execute-api.us-east-1.amazonaws.com",
+    "stage": "prod"
+  },
+  "body": "{\"action\":\"sendMessage\",\"message\":\"hello\"}"
+}
+```
+
+The `body` contains the raw message. Parse it in the Lambda handler.
+
+## Step 4 — Route responses (bidirectional communication)
+
+By default, WebSocket routes do NOT return responses to the client
+(unless the integration returns a non-2xx status for $connect). To
+enable two-way communication (route response), create a route
+response.
+
+```bash
+# Create a route response for the "sendMessage" route
+aws apigatewayv2 create-route-response \
+  --api-id abc123def4 \
+  --route-id xyz789 \
+  --route-response-key '$default' \
+  --region us-east-1
+```
+
+With a route response configured, the Lambda integration can return
+a response that is sent back to the client over the same WebSocket
+connection.
+
+**Lambda handler returning a route response:**
+
+```javascript
+exports.handler = async (event) => {
+  const body = JSON.parse(event.body);
+  
+  // Process the message...
+  
+  // Return response (sent back to client via route response)
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ type: "ack", messageId: body.messageId })
+  };
+};
+```
+
+**Key point:** route responses are NOT push notifications. They are
+synchronous responses to the client's message. For server-initiated
+push messages, use PostToConnection (Step 7).
+
+## Step 5 — Integration types
+
+WebSocket APIs support four integration types:
+
+| Integration | Use case | Async/Sync | Timeout |
+|---|---|---|---|
+| Lambda | Custom backend logic | Sync | 30s max |
+| AWS Service | Direct AWS service call (e.g., SQS, Kinesis) | Sync/Async | Service-dependent |
+| Mock | Return a fixed response without backend | Sync | N/A |
+| HTTP | Forward to an HTTP endpoint | Sync | 30s max |
+
+**Create a Lambda integration:**
+
+```bash
+aws apigatewayv2 create-integration \
+  --api-id abc123def4 \
+  --integration-type AWS_PROXY \
+  --integration-uri arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:111122223333:function:ws-handler/invocations \
+  --region us-east-1
+```
+
+**Create an HTTP integration:**
+
+```bash
+aws apigatewayv2 create-integration \
+  --api-id abc123def4 \
+  --integration-type HTTP_PROXY \
+  --integration-uri https://backend.example.com/websocket \
+  --integration-method POST \
+  --region us-east-1
+```
+
+**Create a Mock integration:**
+
+```bash
+aws apigatewayv2 create-integration \
+  --api-id abc123def4 \
+  --integration-type MOCK \
+  --region us-east-1
+```
+
+**Grant API Gateway permission to invoke Lambda:**
+
+```bash
+aws lambda add-permission \
+  --function-name ws-handler \
+  --statement-id apigateway-ws-invoke \
+  --action lambda:InvokeFunction \
+  --principal apigateway.amazonaws.com \
+  --source-arn arn:aws:execute-api:us-east-1:111122223333:abc123def4/*/sendMessage \
+  --region us-east-1
+```
+
+**Critical:** without the resource-based policy granting
+`lambda:InvokeFunction` to `apigateway.amazonaws.com`, API Gateway
+cannot invoke the Lambda function. Integration returns 500.
+
+## Step 6 — Deployment and stage
+
+After creating routes and integrations, create a deployment and
+stage. The deployment is an immutable snapshot; the stage is the
+client-facing environment.
+
+```bash
+# Create a deployment
+aws apigatewayv2 create-deployment \
+  --api-id abc123def4 \
+  --region us-east-1
+
+# Create a stage
+aws apigatewayv2 create-stage \
+  --api-id abc123def4 \
+  --stage-name prod \
+  --deployment-id <deployment-id-from-previous-command> \
+  --region us-east-1
+```
+
+**WebSocket URL format:**
+
+```text
+wss://{api-id}.execute-api.{region}.amazonaws.com/{stage}
+```
+
+Example: `wss://abc123def4.execute-api.us-east-1.amazonaws.com/prod`
+
+**Auto-deploy stage (recommended):**
+
+```bash
+aws apigatewayv2 create-stage \
+  --api-id abc123def4 \
+  --stage-name prod \
+  --auto-deploy \
+  --region us-east-1
+```
+
+With `--auto-deploy`, route and integration changes are automatically
+deployed without creating explicit deployments.
+
+**Stage-level throttling:**
+
+```bash
+aws apigatewayv2 update-stage \
+  --api-id abc123def4 \
+  --stage-name prod \
+  --default-route-settings '{
+    "ThrottlingBurstLimit": 500,
+    "ThrottlingRateLimit": 1000,
+    "DataTraceEnabled": false,
+    "LoggingLevel": "INFO"
+  }' \
+  --region us-east-1
+```
+
+**Critical:** WebSocket APIs do NOT support usage plans or API keys.
+Throttling is configured at the stage level via route settings.
+
+## Step 9 — CloudWatch Logs
+
+WebSocket APIs support two types of CloudWatch Logs:
+
+| Log type | Description | Configuration |
+|---|---|---|
+| Execution logs | Log API Gateway execution details (requests, responses) | Stage-level `--default-route-settings LoggingLevel` |
+| Access logs | Log access information to CloudWatch Logs in JSON | Stage-level `--access-log-settings` |
+
+**Enable execution logs:**
+
+```bash
+aws apigatewayv2 update-stage \
+  --api-id abc123def4 \
+  --stage-name prod \
+  --default-route-settings '{
+    "DataTraceEnabled": true,
+    "LoggingLevel": "INFO"
+  }' \
+  --region us-east-1
+```
+
+`LoggingLevel` can be `OFF`, `INFO`, or `ERROR`. `DataTraceEnabled`
+includes full request/response payloads (use with caution for
+sensitive data).
+
+**Enable access logs:**
+
+```bash
+aws apigatewayv2 update-stage \
+  --api-id abc123def4 \
+  --stage-name prod \
+  --access-log-settings '{
+    "DestinationArn": "arn:aws:logs:us-east-1:111122223333:log-group:/aws/apigateway/ws-api",
+    "Format": "{\"requestId\":\"$context.requestId\",\"connectionId\":\"$context.connectionId\",\"routeKey\":\"$context.routeKey\",\"status\":$context.status,\"time\":$context.time}"
+  }' \
+  --region us-east-1
+```
