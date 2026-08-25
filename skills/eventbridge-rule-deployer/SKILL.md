@@ -28,30 +28,8 @@ metadata:
 
 ## Mindset
 
-**One-line takeaway:** an EventBridge rule is a **stateless filter
-plus a fan-out dispatcher** — it matches events on a bus (or fires
-on a schedule) and dispatches to up to 5 targets. Correct deployment
-is three independent gates: pattern (does the right event match?),
-target wiring (does the right consumer get invoked with the right
-payload?), and resilience (DLQ + retry + idempotency). Skip any one
-and the workflow is silently broken in production.
-
-- **Pattern vs Schedule is the first fork.** A pattern rule listens
-  on a bus for matching events; a schedule rule fires on a cron/rate.
-  They share the `put-rule` API but share no semantics. Picking the
-  wrong type produces a rule that never fires (schedule when events
-  are expected) or fires on every event (pattern when a schedule is
-  intended).
-- **The target is where most production bugs live.** A mis-scoped
-  invocation permission, a missing DLQ, an unconfigured input
-  transformer, or a target ARN from the wrong account each produces
-  silent non-delivery. The rule looks healthy; the consumer never
-  runs.
-- **At-least-once delivery is the implicit contract.** EventBridge
-  may deliver the same event multiple times (retry, replay, regional
-  failover). Every target consumer MUST be idempotent. A rule
-  deployment that omits an idempotency note for the consumer is
-  incomplete.
+Mindset prose (stateless filter + fan-out dispatcher, pattern-vs-schedule fork, target wiring as the bug surface, at-least-once contract) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand framing a rule deployment.
 
 ## Quick navigation
 
@@ -100,16 +78,8 @@ and the workflow is silently broken in production.
 
 ## Pre-flight: data requirements
 
-| Input | Source | Why |
-|---|---|---|
-| Event source (for pattern rules) | Service docs / `events list-event-sources` | Drives the `source` field |
-| Detail-type | Service docs | Drives the `detail-type` filter |
-| Sample event payload | `PutEvents` test or `TestEventPattern` | Validates the pattern matches before deploy |
-| Target type and ARN | Application config / `aws lambda list-functions` etc. | Determines target config |
-| Region(s) | Single-region vs multi-region | Drives global-endpoint decision |
-| Existing rules on the bus | `aws events list-rules --event-bus-name <bus>` | Detect name collisions and rule-graph cycles |
-| Cross-account producer account IDs | `aws organizations list-accounts` or stated input | Required for bus policy |
-| Existing DLQs | `aws sqs list-queues --queue-name-prefix eventbridge-` | Reuse vs create |
+The required-data command listing (event source, sample payload, target ARN, region, existing rules, producer accounts, existing DLQs) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand gathering the required inputs.
 
 **If the input is malformed** (no event source for a pattern rule,
 no target ARN, ambiguous bus), emit:
@@ -128,80 +98,8 @@ GAP: Cannot generate deployment plan — required inputs missing.
 
 ### Step 0: Expert knowledge — non-obvious EventBridge behaviors
 
-These behaviours change a deployment plan if ignored. Each has caused
-production silent-non-delivery incidents:
-
-- **`PutEvents` is the only event ingestion API.** AWS services call
-  it implicitly; applications must call it explicitly. The bus
-  policy controls who can call `PutEvents` — same-account same-bus
-  is implicit, cross-account requires a resource policy.
-
-- **`EventPattern` is JSONPath-like, not full JSONPath.** It supports
-  exact match, prefix, suffix, contains, equals-ignore-case, numeric
-  ranges, CIDR matching, exists, and anything-but. It does NOT
-  support arbitrary JSONPath expressions like `$..user`. Complex
-  filters must be done in the consumer.
-
-- **`InputTransformer` is per-target and replaces the payload.** A
-  rule can have up to 5 targets, each with its own transformer. The
-  original event payload is NOT passed to the target unless the
-  transformer explicitly maps it via `InputPathsMap` +
-  `InputTemplate`.
-
-- **`put-targets` accepts a non-existent DLQ ARN silently.** The
-  first failed delivery will then fail to write to the DLQ — double
-  silent failure. Always verify the DLQ exists with
-  `aws sqs get-queue-url` before `put-targets`.
-
-- **`test-event-pattern` is the deployment test fixture.** It
-  validates a pattern against a sample event WITHOUT creating the
-  rule. Always run it before `put-rule` to confirm the match.
-
-- **Schedule expression format differs by AWS service.** EventBridge
-  rules use AWS cron with required `?` in the day-of-week or
-  day-of-month field (`cron(0 2 * * ? *)`). EventBridge Scheduler
-  uses standard cron with optional `?`. Mixing them produces a
-  validation error.
-
-- **Same-bus same-account PutEvents does not require a bus policy.**
-  Same-account access is implicit. The bus policy gates
-  cross-account and service-principal delegation only.
-
-- **Cross-account rules are bus-policy + target-ACL problems.** The
-  producing account needs `events:PutEvents` permission on the
-  receiving bus (via bus resource policy). The receiving rule's
-  target must trust the producing account if it is in yet another
-  account.
-
-- **`PutEvents` accepts up to 10 events per call, 256 KB per event,
-  2 MB total.** Events over 256 KB must be parked in S3 and
-  referenced by URI in the event detail. Application publishers must
-  batch and respect size caps.
-
-- **API destinations rate-limit per connection.** A target API
-  destination has a per-connection rate limit (default 300 TPS).
-  Sustained excess is buffered up to the
-  `InvocationRateLimitPerSec` cap; sustained overage is dropped to
-  DLQ.
-
-- **Archives replay to ALL matching rules — including rules created
-  AFTER the original events.** Replay can cause unexpected duplicate
-  processing. Pause new rules before replaying.
-
-- **Rule quotas: 300 rules per bus, 5 targets per rule.** A
-  high-volume workflow with many filtered sub-routes hits the cap.
-  Fan out to SQS for finer-grained per-consumer filtering.
-
-- **Scheduler has a 1M-schedule quota; rule-based scheduling has a
-  300-rule-per-bus quota.** Beyond ~300 schedules, use Scheduler.
-
-- **Global endpoints replicate EVENTS, not rules.** Both regional
-  buses must have equivalent rules and targets. A failover to a bus
-  without matching rules is silent event loss.
-
-- **Schema Registry auto-discovery captures schemas only on the
-  default bus by default.** Custom-bus schema discovery must be
-  explicitly enabled via `discoverers` API.
+Step 0 expert-knowledge bullets (PutEvents ingestion, pattern JSONPath-like, per-target transformer, silent DLQ ARNs, schedule syntax, cross-account gates, size caps, API-destination limits, replay semantics, quotas, global endpoints, schema discovery) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand a plan depends on a non-obvious behaviour.
 
 ### Step 1: Pick pattern vs schedule rule
 
@@ -216,35 +114,8 @@ Is the trigger an event on a bus?
         └─ Existing rule-based cron → Schedule rule (put-rule --schedule-expression)
 ```
 
-**Pattern rule** — triggered by matching events:
-
-```bash
-aws events put-rule \
-  --name guardduty-high-severity \
-  --event-bus-name default \
-  --event-pattern '{"source":["aws.guardduty"],"detail-type":["GuardDuty Finding"],"detail":{"severity":[{"numeric":[">=",7]}]}}' \
-  --state ENABLED \
-  --description "Match GuardDuty severity >= 7"
-```
-
-**Schedule rule** — cron-based (legacy path; prefer Scheduler):
-
-```bash
-aws events put-rule \
-  --name nightly-backup \
-  --schedule-expression 'cron(0 2 * * ? *)' \
-  --state ENABLED \
-  --description "Run nightly at 02:00 UTC"
-```
-
-**Rate rule** — fixed interval:
-
-```bash
-aws events put-rule \
-  --name healthcheck-every-5-min \
-  --schedule-expression 'rate(5 minutes)' \
-  --state ENABLED
-```
+Step 1 put-rule CLI examples (pattern rule, cron schedule rule, rate rule) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand emitting the put-rule command for the chosen rule type.
 
 | Dimension | Pattern rule | Schedule rule |
 |---|---|---|
@@ -268,75 +139,24 @@ Filter operators (Appendix A has the full table):
 }
 ```
 
-| Operator | JSON form | Matches when |
-|---|---|---|
-| Exact | `["v1", "v2"]` | Field equals any listed value |
-| Prefix | `{"prefix": "ord-"}` | Field starts with prefix |
-| Suffix | `{"suffix": "-prod"}` | Field ends with suffix |
-| Contains | `{"contains": ["error"]}` | Field contains substring (case-sensitive) |
-| Equals-ignore-case | `{"equals-ignore-case": "true"}` | Case-insensitive match |
-| Numeric | `{"numeric": [">=", 7]}` | Numeric comparison; supports `>`, `>=`, `<`, `<=`, `=`, ranges |
-| CIDR | `{"cidr": "10.0.0.0/8"}` | IP address in CIDR block |
-| Exists | `{"exists": true}` | Field is present (or `false` for absent) |
-| Anything-but | `{"anything-but": ["dev"]}` | Field is anything except listed values |
+Step 2 filter-operator table moved verbatim to [references/eventbridge-rules-and-targets.md](references/eventbridge-rules-and-targets.md).
+Load on demand authoring an event pattern filter.
 
-Validate before deploying:
-
-```bash
-aws events test-event-pattern \
-  --event-pattern file://pattern.json \
-  --event file://sample-event.json
-```
+Step 2 test-event-pattern validation CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand validating the pattern before put-rule.
 
 A pattern that returns no matches on a real sample will never fire in
 production. Always test.
 
 ### Step 3: Pick target type
 
-| Target | Use | Pros | Cons |
-|---|---|---|---|
-| **Lambda** | Custom logic, lightweight transforms | Fast invocation; simple | 15-min timeout |
-| **Step Functions** | Multi-step orchestration, long-running | State, retries, branching | Higher per-invocation cost |
-| **SQS** | Decouple producer from consumer; buffering | Backpressure handling | Requires separate consumer |
-| **SNS** | Fan-out to many subscribers | Many subscribers | Filter via SQS subs |
-| **API destination** | External HTTP/S endpoint | Webhook delivery | Rate-limit, credential management |
-| **ECS task** | Run a containerized job | Full runtime flexibility | Slower startup |
-| **Systems Manager** | Run an Automation runbook | Native AWS ops integration | Async execution |
-| **Batch** | Submitted job queue | Job scheduling, retries | Overkill for simple tasks |
-| **Redshift Data API** | Run SQL on Redshift | Direct data warehouse access | Cluster availability dependency |
-| **SageMaker Pipeline** | Trigger ML pipeline | Native ML orchestration | Pipeline execution cost |
-| **API Gateway** | Trigger a REST endpoint | Existing API reuse | Auth surface |
-| **Kinesis Firehose** | Stream to S3/Redshift/OpenSearch | Buffered delivery | Transformation limits |
-| **Inspector** | Start an assessment run | Security automation | Async; assessment scope dep |
+Step 3 target-type comparison table (Lambda, SFN, SQS, SNS, API destination, ECS, SSM, Batch, Redshift, SageMaker, API Gateway, Firehose, Inspector) moved verbatim to [references/eventbridge-rules-and-targets.md](references/eventbridge-rules-and-targets.md).
+Load on demand choosing a target type.
 
 Target wiring pattern:
 
-```bash
-aws events put-targets \
-  --rule <rule-name> \
-  --event-bus-name <bus> \
-  --targets '[{"Id":"lambda-target","Arn":"arn:aws:lambda:us-east-1:111111111111:function:my-fn","DeadLetterConfig":{"Arn":"arn:aws:sqs:us-east-1:111111111111:eventbridge-my-rule-dlq"},"RetryPolicy":{"MaximumRetryAttempts":3,"MaximumEventAgeInSeconds":900}}]'
-```
-
-For Lambda targets, grant EventBridge permission to invoke:
-
-```bash
-aws lambda add-permission \
-  --function-name my-fn \
-  --statement-id EventBridgeInvoke-<rule-name> \
-  --action lambda:InvokeFunction \
-  --principal events.amazonaws.com \
-  --source-arn arn:aws:events:us-east-1:111111111111:rule/<bus>/<rule-name> \
-  --source-account 111111111111
-```
-
-A missing invocation permission produces silent non-delivery. Verify
-after wiring:
-
-```bash
-aws lambda get-policy --function-name my-fn --query 'Policy' --output text \
-  | jq '.Statement[] | select(.Principal.Service=="events.amazonaws.com")'
-```
+Step 3 CLI (put-targets with DLQ + RetryPolicy, lambda add-permission, get-policy verification) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand emitting the target wiring commands.
 
 ### Step 4: Wire retry policy and DLQ
 
@@ -352,28 +172,8 @@ retries, 24h max age) are usually too aggressive.
 
 Create the DLQ first, then attach:
 
-```bash
-aws sqs create-queue --queue-name eventbridge-<rule>-dlq
-aws sqs set-queue-attributes \
-  --queue-url https://sqs.<region>.amazonaws.com/<account>/eventbridge-<rule>-dlq \
-  --attributes MessageRetentionPeriod=1209600
-aws events put-targets \
-  --rule <rule> --event-bus-name <bus> \
-  --targets '[{"Id":"<target-id>","Arn":"<target-arn>","DeadLetterConfig":{"Arn":"arn:aws:sqs:<region>:<account>:eventbridge-<rule>-dlq"},"RetryPolicy":{"MaximumRetryAttempts":3,"MaximumEventAgeInSeconds":900}}]'
-```
-
-CloudWatch alarm on DLQ depth (non-negotiable for production):
-
-```bash
-aws cloudwatch put-metric-alarm \
-  --alarm-name EventBridge-<rule>-DLQ-Depth \
-  --metric-name ApproximateNumberOfMessagesVisible \
-  --namespace AWS/SQS \
-  --statistic Sum --period 60 --evaluation-periods 1 \
-  --threshold 0 --comparison-operator GreaterThanThreshold \
-  --dimensions Name=QueueName,Values=eventbridge-<rule>-dlq \
-  --alarm-actions <sns-arn>
-```
+Step 4 CLI (create-queue with 14-day retention, put-targets attach, CloudWatch DLQ-depth alarm) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand wiring retry policy, DLQ, and the DLQ alarm.
 
 ### Step 5: Configure input transformation
 
@@ -381,22 +181,8 @@ aws cloudwatch put-metric-alarm \
 parts: `InputPathsMap` (extract values from the event) and
 `InputTemplate` (build the new payload).
 
-```bash
-aws events put-targets \
-  --rule <rule> --event-bus-name <bus> \
-  --targets '[{
-    "Id":"lambda-target",
-    "Arn":"arn:aws:lambda:us-east-1:111111111111:function:my-fn",
-    "InputTransformer":{
-      "InputPathsMap":{
-        "user":"$.detail.user",
-        "event_time":"$.time",
-        "source":"$.source"
-      },
-      "InputTemplate":"{\"event_type\":\"eventbridge-trigger\",\"user\":<user>,\"triggered_at\":\"<event_time>\",\"origin\":\"<source>\"}"
-    }
-  }]'
-```
+Step 5 InputTransformer CLI (InputPathsMap + InputTemplate) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand configuring input transformation.
 
 Key rules:
 - `InputPathsMap` values are JSONPath strings starting with `$.`
@@ -407,110 +193,23 @@ Key rules:
   event envelope** (including `version`, `id`, `time`, `source`,
   `detail-type`, `detail`, `account`, `region`)
 
-Common patterns:
-
-| Target type | Typical InputTemplate |
-|---|---|
-| Lambda | `{"event_type":"<name>", "payload": <detail>}` |
-| Step Functions | `{"input": "{\"id\":\"<id>\",\"user\":\"<user>\"}"}` (escaped JSON string) |
-| SQS | `{"body":"<detail>","type":"<source>"}` |
-| API Destination | `{"event":"<name>","at":"<time>","detail":<detail>}` |
+Step 5 per-target-type InputTemplate patterns moved verbatim to [references/eventbridge-rules-and-targets.md](references/eventbridge-rules-and-targets.md).
+Load on demand choosing an InputTemplate shape.
 
 ### Step 6: Deploy cross-account event routing
 
-Cross-account events require TWO configurations:
-
-1. **Receiving bus resource policy** grants the producing account
-   `events:PutEvents` permission:
-
-```bash
-aws events put-permission \
-  --event-bus-name <receiving-bus> \
-  --action events:PutEvents \
-  --principal <producer-account-id> \
-  --statement-id AllowProducerAccount-<id> \
-  --condition '{"Type":"StringEquals","Key":"aws:SourceAccount","Value":"<producer-account-id>"}'
-```
-
-2. **Producer calls PutEvents with the receiving bus ARN:**
-
-```bash
-aws events put-events \
-  --entries '[{"EventBusName":"arn:aws:events:us-east-1:<receiver-account>:event-bus/<receiving-bus>","Source":"my.app","DetailType":"order.created","Detail":"{\"order_id\":\"ord-123\"}"}]'
-```
-
-For organization-wide routing (all accounts in an Organization):
-
-```bash
-aws events put-permission \
-  --event-bus-name <receiving-bus> \
-  --action events:PutEvents \
-  --principal "*" \
-  --statement-id AllowOrg \
-  --condition '{"Type":"StringEquals","Key":"aws:PrincipalOrgID","Value":"o-xxxxxxxxxx"}'
-```
-
-**Cross-account security rule:** prefer `aws:SourceAccount` or
-`aws:PrincipalOrgID` over `aws:SourceIp` — IP-based restrictions are
-bypassable.
+Step 6 cross-account CLI (receiving-bus put-permission with SourceAccount, producer PutEvents with bus ARN, org-wide PrincipalOrgID) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand deploying cross-account routing.
 
 ### Step 7: Use custom event bus vs default
 
-| Bus type | Use when | Example events |
-|---|---|---|
-| **default** | AWS service events | `aws.ec2`, `aws.guardduty`, `aws.securityhub` |
-| **custom** | Application events | `my.app.order`, `my.app.user` |
-| **partner** | SaaS partner events | `aws.partner/datadog.com/*`, `aws.partner/stripe.com/*` |
-
-Create a custom bus:
-
-```bash
-aws events create-event-bus \
-  --name app-events \
-  --event-source-name "" \
-  --tags '[{"Key":"Owner","Value":"app-team"},{"Key":"Environment","Value":"prod"}]'
-```
-
-Naming conventions:
-- Lowercase, hyphen-separated: `app-events`, `order-bus`, `audit-events`
-- Avoid `default` (reserved), `aws.*` (reserved for AWS)
-- Prefix with team or domain for clarity: `payments-events`, `secops-events`
-
-Cross-bus routing is not supported — a rule on the default bus
-cannot match events on a custom bus. Use a Lambda on the default bus
-that re-publishes to the custom bus if cross-bus routing is required.
+Step 7 bus selection (bus-type table, create-event-bus CLI, naming conventions, cross-bus routing limit) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand choosing or creating the bus.
 
 ### Step 8: Configure archive and replay
 
-Archives capture events for debugging and replay. Create on a bus:
-
-```bash
-aws events create-archive \
-  --name app-events-archive \
-  --event-source-arn arn:aws:events:us-east-1:111111111111:event-bus/app-events \
-  --retention 7 \
-  --event-pattern '{"source":["my.app"]}'
-```
-
-Replay a specific time range:
-
-```bash
-aws events start-replay \
-  --name debug-2026-08-incident \
-  --event-source-arn arn:aws:events:us-east-1:111111111111:event-bus/app-events \
-  --event-start-time 2026-08-04T00:00:00Z \
-  --event-end-time 2026-08-04T06:00:00Z \
-  --destination '{"Arn":"arn:aws:events:us-east-1:111111111111:event-bus/app-events"}'
-```
-
-**Critical warnings:**
-- Replay re-publishes events to ALL rules matching the archive
-  pattern, including rules created AFTER the original events. Pause
-  new rules before replaying.
-- Archives are NOT backups — they are operational tools. For
-  compliance retention, use S3 with lifecycle policies.
-- Archives bill per-event-month. A high-volume bus with 90-day
-  retention is a significant line item. Default to 7-30 days.
+Step 8 CLI (create-archive, start-replay) and the critical replay warnings moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand configuring archives or a replay.
 
 ### Step 9: Pick between Rules, Pipes, Scheduler
 
@@ -537,92 +236,18 @@ pattern matching is required.
 
 ### Step 10: Configure global endpoints
 
-For multi-region failover:
-
-```bash
-aws events create-endpoint \
-  --name orders-failover \
-  --routing-config '{"FailoverConfig":{"Primary":{"HealthCheck":"arn:aws:route53:...:healthcheck/primary"},"Secondary":{"RouteDetails":{"HealthCheck":"arn:aws:route53:...:healthcheck/secondary"}}}}' \
-  --event-buses '[{"EventBusArn":"arn:aws:events:us-east-1:111111111111:event-bus/orders"},{"EventBusArn":"arn:aws:events:us-west-2:111111111111:event-bus/orders"}]' \
-  --replication-config '{"State":"ENABLED"}'
-```
-
-Requirements:
-- Both buses must have equivalent rules and targets
-- Both buses must have equivalent bus policies, DLQs, KMS keys
-- Schema Registry and archives are per-region — replicate separately
-- Producers target the endpoint ARN, not a regional bus ARN
-- Failover is driven by Route53 health checks; replication is
-  asynchronous (a few seconds of lag during failover)
+Step 10 create-endpoint CLI and equivalence requirements moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand configuring multi-region failover.
 
 ### Step 11: Enable Schema Registry
 
-```bash
-aws schemas create-registry \
-  --registry-name app-events-schemas \
-  --description "Discovered schemas for app-events bus"
-
-aws schemas create-discoverer \
-  --discoverer-name app-events-discoverer \
-  --source-arn arn:aws:events:us-east-1:111111111111:event-bus/app-events \
-  --description "Auto-discover schemas from app-events bus"
-```
-
-Notes:
-- Auto-discovery captures schemas ONLY on the default bus by default
-- Custom-bus schema discovery must be explicitly enabled via
-  `create-discoverer`
-- Code bindings (Java, Python, TypeScript) can be generated from
-  discovered schemas for type-safe event publishing/consumption
-- Do NOT enable schema discovery on a bus with untrusted publishers —
-  attacker-crafted events pollute the registry
+Step 11 CLI (create-registry, create-discoverer) and schema-discovery notes moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand enabling schema discovery.
 
 ### Step 12: Verify the deployment
 
-```bash
-# 1. Rule exists and is ENABLED
-aws events describe-rule --name <rule> --event-bus-name <bus> \
-  --query '[Name, State, EventPattern, ScheduleExpression]'
-
-# 2. Targets wired with DLQ and retry
-aws events list-targets-by-rule --rule <rule> --event-bus-name <bus>
-
-# 3. Lambda invocation permission
-aws lambda get-policy --function-name <fn> --query 'Policy' --output text \
-  | jq '.Statement[] | select(.Principal.Service=="events.amazonaws.com")'
-
-# 4. DLQ exists and depth is zero
-aws sqs get-queue-url --queue-name eventbridge-<rule>-dlq
-aws sqs get-queue-attributes \
-  --queue-url https://sqs.<region>.amazonaws.com/<account>/eventbridge-<rule>-dlq \
-  --attribute-names ApproximateNumberOfMessagesVisible
-
-# 5. Bus policy for cross-account (if applicable)
-aws events describe-event-bus --name <bus> --query 'Policy'
-
-# 6. Archive configured (if used)
-aws events describe-archive --archive-name <archive>
-
-# 7. Test the pattern against a fresh sample
-aws events test-event-pattern \
-  --event-pattern file://pattern.json --event file://sample-event.json
-
-# 8. CloudWatch metrics post-deploy
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/Events \
-  --metric-name Invocations \
-  --dimensions Name=RuleName,Values=<rule> \
-  --start-time $(date -v-1H +%Y-%m-%dT%H:%M:%S) \
-  --end-time $(date +%Y-%m-%dT%H:%M:%S) --period 300 --statistics Sum
-
-# 9. TriggeredInvocations vs FailedInvocations
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/Events \
-  --metric-name FailedInvocations \
-  --dimensions Name=RuleName,Values=<rule> \
-  --start-time $(date -v-1H +%Y-%m-%dT%H:%M:%S) \
-  --end-time $(date +%Y-%m-%dT%H:%M:%S) --period 300 --statistics Sum
-```
+Step 12 verification CLI (describe-rule, list-targets-by-rule, Lambda policy, DLQ depth, bus policy, archive, test-event-pattern, CloudWatch Invocations/FailedInvocations) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand verifying the deployment end to end.
 
 ## Output format
 
@@ -699,35 +324,8 @@ TEMPLATE:
 
 ### Worked example — PREREQUISITES_MISSING, no DLQ
 
-```text
-PLAN: codebuild-notify-deploy
-RULE:
-  Name: codebuild-failed
-  Bus: default
-  Type: event-pattern
-  Pattern: source=aws.codebuild, detail-type=CodeBuild Build State Change, detail.build-status=FAILED
-  State: ENABLED
-TARGETS:
-  - notify-slack (Lambda): arn:aws:lambda:us-east-1:111111111111:function:notify-slack
-    RetryPolicy: defaults (185 attempts / 24h) — too aggressive for notification
-    DeadLetterConfig: NONE
-    InputTransformer: no
-    InvocationPermission: verified
-RETRY: defaults (185 / 24h) — should be 3 / 900s
-DLQ: NONE — silent event loss on Lambda failure
-INPUT_TRANSFORM: full event
-CROSS_ACCOUNT: none
-PREREQUISITES:
-  [x] Pattern validated via TestEventPattern
-  [x] Target exists and ARN verified
-  [ ] DLQ missing — create eventbridge-codebuild-failed-dlq
-  [x] Lambda invocation permission verified
-  [ ] CloudWatch alarm on DLQ depth not configured
-  [ ] Idempotency note missing — CodeBuild emits multiple state-change events per build
-VERDICT: PREREQUISITES_MISSING
-GAP: (1) DLQ not configured — failed invocations will be silently dropped after retry exhaustion. (2) Default retry policy (185 attempts / 24h) is too aggressive for a Slack notification; should be 3 attempts / 900s. (3) No idempotency note — CodeBuild emits multiple state-change events per build (STARTED, IN_PROGRESS, FAILED, FAILED-retry); the Lambda will post duplicate Slack messages without dedup on detail.build-id + detail.build-status. (4) No CloudWatch alarm on DLQ depth. Address all four before deployment.
-TEMPLATE: (incomplete — fix GAPs first)
-```
+The PREREQUISITES_MISSING worked example (CodeBuild failure notification without DLQ/idempotency) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand citing the negative-path verdict format.
 
 ## Anti-Patterns — NEVER do these things
 
@@ -846,35 +444,13 @@ TEMPLATE: (incomplete — fix GAPs first)
 
 ## Appendix A — Event pattern operators
 
-| Operator | JSON form | Matches when |
-|---|---|---|
-| Exact | `["v1", "v2"]` | Field equals any listed value |
-| Prefix | `{"prefix": "ord-"}` | Field starts with prefix |
-| Suffix | `{"suffix": "-prod"}` | Field ends with suffix |
-| Contains | `{"contains": ["error"]}` | Field contains substring (case-sensitive) |
-| Equals-ignore-case | `{"equals-ignore-case": "true"}` | Case-insensitive match |
-| Numeric | `{"numeric": [">=", 7]}` | Numeric comparison; supports `>`, `>=`, `<`, `<=`, `=`, ranges |
-| CIDR | `{"cidr": "10.0.0.0/8"}` | IP address in CIDR block |
-| Exists | `{"exists": true}` | Field is present (or `false` for absent) |
-| Anything-but | `{"anything-but": ["dev"]}` | Field is anything except listed values |
-
-Combine operators with nested JSON. EventBridge matches ALL specified
-fields (AND). For OR within a field, use a list.
+Appendix A operator reference table and combination note moved verbatim to [references/eventbridge-rules-and-targets.md](references/eventbridge-rules-and-targets.md).
+Load on demand authoring an event pattern filter.
 
 ## Appendix B — Common AWS event sources
 
-| Source | Detail-type | Common filter | Typical target |
-|---|---|---|---|
-| `aws.ec2` | `EC2 Instance State-change Notification` | `detail.state=["running"]` | Lambda auto-tagger |
-| `aws.guardduty` | `GuardDuty Finding` | `detail.severity>=7` | Lambda isolate-instance |
-| `aws.securityhub` | `Security Hub Findings - Imported` | `detail.findings[].Severity.Label=["CRITICAL","HIGH"]` | Step Functions workflow |
-| `aws.codebuild` | `CodeBuild Build State Change` | `detail.build-status=["FAILED"]` | SNS + Lambda notify |
-| `aws.autoscaling` | `EC2 Instance Launch Successful` | — | Lambda register-to-target-group |
-| `aws.s3` | `Object Created` | `detail.object.key=[{"prefix":"uploads/"}]` | Lambda trigger-processing |
-| `aws.cloudwatch` | `CloudWatch Alarm State Transition` | `detail.stateName=["ALARM"]` | SNS then Lambda ack |
-| `aws.signin` | `AWS Console Sign In` | `detail.eventName=["ConsoleLogin"]`, `detail.responseElements.ConsoleLogin=["Success"]` | Lambda alert on new MFA-disabled logins |
-| `aws.iam` | `AWS API Call via CloudTrail` | `detail.eventName=["DeleteRole"]` | Lambda revert or alert |
-| `aws.health` | `AWS Health Event` | `detail.service=["EC2"]` | SNS page on-call |
+Appendix B common AWS event-source catalog (EC2, GuardDuty, Security Hub, CodeBuild, Auto Scaling, S3, CloudWatch, Sign-In, IAM, Health) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand matching a common AWS service event.
 
 ## Appendix C — Decision tree (which architecture to deploy)
 
@@ -897,63 +473,20 @@ For rule + target deployments:
 
 ## Expert heuristic: "The 5-point deployment gate"
 
-Before emitting READY_TO_DEPLOY, every rule deployment plan MUST pass
-these five checks. Any failure is PREREQUISITES_MISSING with a
-specific citation:
-
-1. **Pattern validates** — `test-event-pattern` returns a match on
-   a known-good sample. A pattern that matches nothing in test will
-   never fire in production.
-2. **Target ARNs resolve** — every target ARN exists in the target
-   account/region. A non-existent target produces silent non-delivery.
-3. **DLQ exists with 14-day retention** — `aws sqs get-queue-url`
-   returns the queue; `MessageRetentionPeriod=1209600`. Default 4-day
-   retention is too short for triage.
-4. **Invocation permissions granted** — Lambda targets have
-   `events.amazonaws.com` in their resource policy; cross-account
-   targets have the appropriate bus policy.
-5. **Consumer idempotency noted** — the plan explicitly documents
-   the dedup key (e.g., `detail.id`, `bucket+key+etag`,
-   `build-id+status`) and the consumer's idempotency mechanism.
-   EventBridge is at-least-once; a consumer without idempotency is
-   a production incident waiting to happen.
-
-If all five pass, emit READY_TO_DEPLOY. Any miss is a specific GAP.
+The 5-point deployment gate (pattern validates, target ARNs resolve, DLQ 14-day retention, invocation permissions, consumer idempotency noted) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand deciding READY_TO_DEPLOY vs PREREQUISITES_MISSING.
 
 ## Recent AWS features (2024-2026)
 
-- **EventBridge global endpoints GA (2024):** Automatic regional
-  failover for event buses. Requires matching rules and targets on
-  the secondary bus; verify before failover.
+Recent AWS features (global endpoints GA, Scheduler, Pipes enhancements, Schema Registry, API destinations, PutEvents limits, PrincipalOrgID routing) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand checking whether a newer AWS feature changes the plan.
 
-- **EventBridge Scheduler (2024-2025):** First-class time-based
-  scheduling with per-schedule IAM roles, timezones, and one-time
-  schedules. Preferred over cron-style EventBridge rules for any
-  new time-based workflow.
+## References (load on demand)
 
-- **EventBridge Pipes enhancements (2024):** Added support for
-  self-managed Kafka, MSK, and improved enrichment (Lambda, Step
-  Functions, API destination, Batch, ECS). Pipes are the standard
-  path for stream/queue fan-out.
-
-- **Schema Registry updates (2024):** OpenAPI and JSON Schema
-  support. Discover schemas on custom buses explicitly — auto-
-  discovery only applies to the default bus. Code bindings available
-  for Java, Python, TypeScript.
-
-- **EventBridge API destinations improvements (2024-2025):**
-  Enhanced credential management for OAuth client-credentials. API
-  key and basic-auth credentials still do NOT auto-rotate — monitor
-  `InvocationHttpStatusCode` for stale credentials.
-
-- **`PutEvents` batch size and EntrySize limits (2024):** Still 10
-  entries per call, 256 KB per entry. Events over 256 KB must be
-  parked in S3 and referenced by URI.
-
-- **Cross-account event routing via AWS Organizations (2024):** Bus
-  policies now support `aws:PrincipalOrgID` condition for
-  organization-wide event routing. Simplifies multi-account
-  architectures vs. enumerating each account principal.
+- [references/worked-examples.md](references/worked-examples.md) — the PREREQUISITES_MISSING worked example (CodeBuild, no DLQ), moved from SKILL.md.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight data sources, per-step deploy CLI (rule/targets/DLQ alarm/input-transformer/cross-account/bus/archive/global endpoints/Schema Registry), and Step 12 verification commands, moved from SKILL.md.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — mindset, Step 0 expert knowledge, Step 7 bus selection, Appendix B event-source catalog, the 5-point deployment gate heuristic, and recent AWS features, moved from SKILL.md.
+- [references/eventbridge-rules-and-targets.md](references/eventbridge-rules-and-targets.md) — rules/targets reference, plus the Step 2/Appendix A operator table, Step 3 target-type table, and Step 5 input-transformer patterns moved from SKILL.md.
 
 ## Domain
 

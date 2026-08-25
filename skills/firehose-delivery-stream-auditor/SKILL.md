@@ -25,36 +25,8 @@ metadata:
 
 ## Mindset
 
-**One-line takeaway:** encryption is the only verdict-altering dimension
-— everything else (buffering, Lambda, logging, source backup, dynamic
-partitioning) is a `CONFIG_GAP`. Firehose is a streaming pipeline, so
-silent-failure modes (transformation errors with no logging, dynamic
-partitioning without source backup) are the dominant data-loss vector,
-not the obvious S3 destination.
-
-Firehose is a managed pipeline: source → optional transformation →
-destination. Three properties make it unlike batch storage:
-
-- **`NoEncryption` is explicit.** Firehose's `EncryptionConfiguration`
-  block has two literal modes: `{NoEncryption: {}}` and
-  `{KMSEncryptionConfig: {AWSKMSKeyArn: ...}}`. There is no "explicit
-  SSE-S3" choice — absence of the block means the stream inherits the
-  bucket default (still encrypted if the bucket has SSE-S3, but the
-  stream itself has no declarative encryption posture). Explicit
-  `NoEncryption` is the only path to plaintext delivery.
-- **Transformation failures are silent by default.** Pre-2023 streams
-  had no in-process error logging; `LoggingConfig` was added later and
-  defaults to disabled on streams created via certain SDK paths. With
-  `LoggingConfig.Enabled: false`, Lambda transformation errors,
-  `MetadataExtraction` parse failures, and dynamic-partitioning
-  retry-exhaustion are all invisible — the operator sees green checkmarks
-  while records drop.
-- **Dynamic partitioning + missing source backup = guaranteed data loss
-  on any extraction failure.** When DP is enabled, Firehose evaluates a
-  JQ/JSON-path expression per record. If the expression fails (or
-  `RetryDuration` expires), the record is discarded unless
-  `S3BackupConfiguration` captures the pre-partitioned source. There is
-  no automatic fallback.
+Mindset and silent-failure model moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Quick reference — first-fail-wins verdict
 
@@ -114,108 +86,8 @@ pagination), but `list-tags-for-delivery-stream` paginates separately at
 
 ### Step 0: Expert knowledge — non-obvious Firehose behaviors that change classification
 
-Each behavior below will produce a false positive if ignored:
-
-- **`NoEncryption: {}` is an explicit, deliberate opt-out, not a default.**
-  Firehose has no `SSE-S3` literal in the API. If you do not specify
-  `KMSEncryptionConfig`, Firehose writes to S3 using whatever the bucket
-  defaults to (typically SSE-S3 AES256). The only path to plaintext
-  delivery is to set `NoEncryption: {}` explicitly — which means a
-  `NoEncryption` finding is always a deliberate operator choice (or a
-  Terraform module bug), never an oversight. Treat it as the highest-
-  severity finding.
-
-- **The destination field name is `ExtendedS3DestinationConfiguration`,
-  NOT `S3DestinationConfiguration` (legacy).** The legacy field is
-  frozen — no dynamic partitioning, no Lambda-aware backup, no
-  ErrorOutputPrefix. Streams created after ~2019 should use
-  `ExtendedS3DestinationConfiguration` exclusively. If you see
-  `S3DestinationConfiguration` on a stream with DP enabled, it is a
-  structural impossibility (Firehose API rejects it at creation), which
-  means the input is stale or fabricated — re-fetch.
-
-- **`LoggingConfig` is the in-process error log, not delivery metrics.**
-  `LoggingConfig.LogGroupName` captures Firehose transformation errors
-  (Lambda invocation failures, JQ parse errors, dynamic-partitioning
-  retries). CloudWatch metrics (`AWS/Firehose` namespace) are always
-  emitted regardless. An operator who checks metrics and sees
-  `DeliveryToS3.Success` green may have zero transformation errors
-  reaching S3 (silent drops) — only the log group reveals it. Pre-2023
-  streams had no LoggingConfig at all; for those, treat absence as
-  CONFIG_GAP only when processing is enabled.
-
-- **`S3BackupMode: FailedDataOnly` (default) vs `Enabled` (all data).**
-  The default backup captures only records Firehose itself flags as
-  failed — but Lambda-transformation failures where the function returns
-  success with malformed output are NOT captured by `FailedDataOnly`.
-  Use `Enabled` for any stream where transformation correctness is
-  load-bearing.
-
-- **Dynamic partitioning `RetryDuration` is in seconds, max 300 (5min).**
-  Default is 300. A value of `0` disables retry — a single JQ parse
-  failure discards the record immediately. Treat `RetryDuration: 0` on
-  a DP-enabled stream as a data-loss config gap regardless of source
-  backup (source backup captures the raw record, not the partitioning
-  intent).
-
-- **DP requires `ExtendedS3DestinationConfiguration` + a
-  `MetadataExtraction` processor with a JQ expression.** The expression
-  runs per record. If the record is not valid JSON, the JQ parse fails.
-  If your source emits JSON arrays (not newline-delimited JSON), every
-  record will fail — wire a `RecordDeAggregation` processor BEFORE
-  `MetadataExtraction`.
-
-- **`KMSEncryptionConfig.AWSKMSKeyArn` must be a fully-qualified ARN,
-  not a key ID or alias.** Firehose does not resolve aliases. A bare
-  `mrk-abc123` or `alias/prod-firehose` value is silently accepted at
-  creation time and fails at the first delivery attempt. Treat a
-  non-ARN `AWSKMSKeyArn` as CONFIG_GAP.
-
-- **The CMK must be in the SAME region as the delivery stream.** A
-  multi-region key (`mrk-`) is permitted but each stream binds to one
-  replica. Cross-region references fail at delivery time.
-
-- **`ErrorOutputPrefix` uses magic templating: `{firehose:errorType}`,
-  `{timestamp:yyyy-MM-dd-HH-mm-ss}`, `{partitionKeyFromQuery:...}`.**
-  Without `ErrorOutputPrefix`, all errors land in a single prefix and
-  you cannot distinguish Lambda transformation errors from S3 delivery
-  errors. Recommend (not verdict-impacting) — surface in REMEDIATION.
-
-- **`StartDeliveryStreamEncryption` / `StopDeliveryStreamEncryption`
-  are state-changing APIs, not config edits.** They toggle encryption
-  on an ACTIVE stream and take 5-60 seconds. A re-audit immediately
-  after calling them will see `DeliveryStreamStatus: STARTING` /
-  `STOPPING`, not the new steady state. Wait for ACTIVE.
-
-- **BufferingHints interact with compression.** When
-  `DataFormatConversionConfiguration` (JSON→Parquet/ORC) is enabled,
-  the 128 MB `SizeInMBs` cap is per-block, but Parquet row-groups are
-  typically 128 MB compressed ≈ 1-2 GB uncompressed. Operators who set
-  `SizeInMBs: 1` thinking they want low latency end up with thousands
-  of tiny Parquet files — a Glue/Athena query performance disaster.
-  Flag only as a recommendation, not CONFIG_GAP.
-
-- **`DeleteDeliveryStream --allow-force-delete` succeeds even with data
-  in flight.** There is no undelete. Pre-flight must capture config
-  before any destructive operation.
-
-- **The S3 bucket policy and Firehose encryption are independent
-  controls.** A bucket with `bucket-key-enabled` SSE-KMS will reject
-  Firehose writes if Firehose is configured with `NoEncryption` — but
-  only if the bucket policy enforces SSE. A bucket with no policy
-  enforcement accepts plaintext writes silently. Do not assume the
-  bucket enforces what Firehose does not.
-
-- **`Amazon OpenSearch Service` / `Splunk` destinations stage data in
-  S3 first.** They have their own `S3BackupConfiguration` for the
-  staging buffer. Evaluate it for encryption + buffering as if it were
-  a primary S3 destination, even though the user-facing destination is
-  the index.
-
-- **Tag-based access control is not evaluated by this skill.** If the
-  audit reveals tags like `Environment=prod` or `PCI=true`, note them
-  in REMEDIATION for downstream tag-policy enforcement — but do not
-  make them verdict-impacting.
+Step 0 expert knowledge moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 1: Encryption evaluation (drives NO_ENCRYPTION verdict)
 
@@ -414,44 +286,8 @@ REMEDIATION:
 
 ## Edge-case handling
 
-- **Multi-destination streams (per-account destinations were deprecated
-  in 2019).** Modern Firehose is single-destination per stream. If the
-  input shows multiple `DestinationSet` entries, the input is stale —
-  re-fetch with `describe-delivery-stream`.
-
-- **`DeliveryStreamStatus: DELETING`.** A stream mid-deletion cannot
-  accept new config but existing buffered data is still delivered (or
-  dropped on force-delete). Emit `VERDDICT: OK, REASON: Stream is
-  DELETING — no steady state to audit.` and do not flag.
-
-- **Stream created via CloudFormation with `AWS::KinesisFirehose::DeliveryStream`.**
-  CloudFormation drift detection does not cover `BufferingHints` or
-  `ProcessingConfiguration` sub-fields — a hand-edit via `update-destination`
-  will not appear in CloudFormation drift. Note in REMEDIATION when the
-  config appears CloudFormation-managed.
-
-- **KMS key disabled or pending deletion.** If the referenced CMK is
-  `Disabled` or `PendingDeletion`, Firehose writes will fail with
-  `KMSNotAccessible`. Surface as CONFIG_GAP (not NO_ENCRYPTION — the
-  config declares encryption; the key is unavailable). Reference the
-  kms-key-policy-auditor skill for key-state evaluation.
-
-- **Bucket deleted or renamed out from under the stream.** Firehose
-  does not pre-validate bucket existence after creation. A stream
-  pointing at a deleted bucket will silently fail every delivery.
-  Surface as CONFIG_GAP with `REASON: S3 destination bucket does not
-  exist or is not accessible`.
-
-- **Mixed SSE on backup vs primary.** If the primary destination uses
-  CMK and the `S3BackupConfiguration` uses `NoEncryption` → the
-  verdict is NO_ENCRYPTION (Step 1a fires on the backup destination).
-  Backup plaintext is still plaintext at rest.
-
-- **`Prefix` templating without partitionKeyFromQuery.** When DP is
-  enabled, the `Prefix` field uses `{:partitionKeyFromQuery:...}` tokens.
-  A literal `Prefix: "events/"` without the token means DP keys are
-  ignored for path layout — data lands in a single prefix despite DP
-  extraction. Recommend (do not flag) as a configuration smell.
+Edge-case catalog moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Anti-Patterns — NEVER
 
@@ -569,140 +405,23 @@ backup before changing the primary destination. Enable LoggingConfig
 before changing transformation logic — otherwise the change is
 unobservable.
 
-### For NO_ENCRYPTION — explicit NoEncryption
-
-1. Identify why `NoEncryption` was set. Common causes: a Terraform
-   module that omits the block, a legacy stream from before SSE-KMS
-   support, or a deliberate choice for a non-sensitive workload.
-2. If the workload is sensitive (PII, financial, healthcare), enable
-   SSE-KMS with a customer-managed key:
-   ```bash
-   aws firehose update-destination \
-     --delivery-stream-name <name> \
-     --current-delivery-stream-version-id <version> \
-     --destination-id destinationId-000000000001 \
-     --extended-s3-update '{
-       "EncryptionConfiguration": {
-         "KMSEncryptionConfig": { "AWSKMSKeyArn": "arn:aws:kms:us-east-1:111111111111:key/abc-123" }
-       }
-     }'
-   ```
-3. If the workload is non-sensitive and SSE-S3 (AES256) is acceptable,
-   REMOVE the explicit `NoEncryption` block so the stream inherits the
-   bucket default declaratively:
-   ```bash
-   # Update with an EncryptionConfiguration block that uses bucket default
-   # (Firehose will write with SSE-S3 unless the bucket enforces SSE-KMS)
-   aws firehose update-destination ... --extended-s3-update '{"EncryptionConfiguration": {"NoEncryption": {}}}'
-   # ^ This is the literal API — to REMOVE the explicit opt-out, omit
-   # the block entirely in the update payload, or use a fresh destination config.
-   ```
-4. Verify the CMK policy grants Firehose before the update (see
-   Pre-flight). Re-audit with this skill after `DeliveryStreamStatus`
-   returns to ACTIVE.
-
-### For CONFIG_GAP — absent EncryptionConfiguration (Step 1c)
-
-1. Add an explicit `KMSEncryptionConfig` block referencing a same-region
-   CMK (preferred), or document acceptance of bucket-default SSE-S3 in
-   the workload's risk register.
-2. Re-audit after the update — the block should appear under
-   `ExtendedS3DestinationConfiguration.EncryptionConfiguration`.
-
-### For CONFIG_GAP — BufferingHints out of range (Step 2)
-
-1. Correct the values to within `[1,128]` MiB and `[60,900]` seconds.
-2. For Parquet/ORC destinations, prefer `SizeInMBs: 128` to amortise
-   row-group write cost; for JSON/CSV, prefer the 5 MiB default.
-3. `aws firehose update-destination --extended-s3-update '{"BufferingHints": {"SizeInMBs": 64, "IntervalInSeconds": 300}}'`
-
-### For CONFIG_GAP — Lambda transformation without source backup (Step 3)
-
-1. Add `S3BackupConfiguration` to the ExtendedS3 destination with a
-   dedicated backup bucket and prefix:
-   ```bash
-   aws firehose update-destination --extended-s3-update '{
-     "S3BackupMode": "Enabled",
-     "S3BackupConfiguration": {
-       "RoleARN": "arn:aws:iam::111111111111:role/firehose-backup",
-       "BucketARN": "arn:aws:s3:::firehose-backup-prod",
-       "Prefix": "lambda-source/",
-       "BufferingHints": {"SizeInMBs": 5, "IntervalInSeconds": 300}
-     }
-   }'
-   ```
-2. Verify the backup bucket's lifecycle policy — long-running
-   transformation streams accumulate backup data indefinitely.
-
-### For CONFIG_GAP — LoggingConfig disabled or absent (Step 4)
-
-1. Enable on the stream (top-level config, not per-destination):
-   ```bash
-   aws firehose update-destination --delivery-stream-name <name> \
-     --current-delivery-stream-version-id <version> \
-     --destination-id destinationId-000000000001 \
-     --extended-s3-update '{"...": "..."}'
-   # LoggingConfig is a top-level field on certain CLI versions; on older
-   # versions, recreate the stream. Verify with: aws firehose help update-destination
-   ```
-2. Set a retention period on the log group (`logs put-retention-policy`)
-   — Firehose error volume can be high on misconfigured transformations.
-
-### For CONFIG_GAP — DP without source backup (Step 5a)
-
-1. Add `S3BackupConfiguration` (same guidance as Step 3). The backup
-   captures the pre-partitioned raw record, which is the recovery
-   source when JQ extraction fails.
-2. Verify the JQ expression against representative records using
-   `jq '<expr>'` locally before relying on it in production.
-
-### For CONFIG_GAP — DP with RetryDuration: 0 (Step 5b)
-
-1. Set `RetryDuration` to 300 (the max) for maximum resilience:
-   ```bash
-   aws firehose update-destination --extended-s3-update '{
-     "DynamicPartitioningConfiguration": {"Enabled": true, "RetryDuration": 300}
-   }'
-   ```
-2. Investigate WHY RetryDuration is 0 — it is not the default, which
-   means an operator explicitly chose immediate-fail semantics.
-
-### For OK
-
-1. No remediation required.
-2. Recommend verifying the CMK rotation status (refer to
-   kms-key-policy-auditor) — encryption posture is only as strong as
-   the key.
-3. Recommend an `ErrorOutputPrefix` template if not set:
-   `!{partitionKeyFromQuery:errorType}/!{timestamp:yyyy/MM/dd}/` —
-   enables error triage without full log inspection.
-4. Recommend `S3BackupMode: Enabled` (all data) over
-   `FailedDataOnly` for streams where transformation correctness is
-   load-bearing.
+Per-verdict remediation fixes moved to
+[references/error-handling.md](references/error-handling.md).
 
 ## Deep reference: Firehose destination-shape matrix
 
-| Destination type | EncryptionConfiguration supported | BufferingHints | S3BackupConfiguration | DP supported |
-|---|---|---|---|---|
-| `ExtendedS3DestinationConfiguration` | Yes (NoEncryption / KMSEncryptionConfig) | Yes | Yes | Yes |
-| `S3DestinationConfiguration` (legacy) | Yes (same) | Yes | No | No |
-| `HttpEndpointDestinationConfiguration` | No (endpoint-side) | Yes (seconds only) | Yes (staging) | No |
-| `RedshiftDestinationConfiguration` | Yes (on the S3 staging copy) | Yes (copy command size) | Yes (staging) | No |
-| `AmazonopensearchserviceDestinationConfiguration` | Yes (on S3 staging) | Yes | Yes (staging + backup) | No |
-| `SplunkDestinationConfiguration` | Yes (on S3 backup) | Yes | Yes | No |
-| `AmazonOpenSearchServerlessDestinationConfiguration` | Yes (on S3 staging) | Yes | Yes | No |
-
-**Audit scope rule:** for non-S3 destinations, evaluate encryption and
-backup on the S3 staging/backup layer (Steps 1, 3, 5). Skip Step 2's
-size hints unless the destination exposes native buffering (most do
-in seconds only, not MiB).
+Destination-shape matrix moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Recent AWS features (2024-2026)
 
-- **Apache Iceberg support (2024-2025):** Firehose can now deliver data directly to Apache Iceberg tables in S3. Auditors should verify that Iceberg table destinations have appropriate KMS encryption and that the commit frequency is tuned for the workload.
-- **Snowflake and Redshift destination improvements (2024):** Enhanced Snowflake and Redshift destination support with improved buffering and error handling. Auditors should verify that destination credentials use Secrets Manager rather than plaintext.
-- **Microsoft Fabric / OneLake destination (2024-2025):** Firehose now supports Microsoft Fabric OneLake as a destination. Auditors should verify that cross-cloud credentials are scoped appropriately.
-- **Data transformation with Lambda — enhanced error handling:** Improved Lambda transformation error reporting with dead-letter queue support. The skill already covers this, but auditors should verify the DLQ is configured and monitored.
+Recent AWS features moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — mindset, Step 0 expert knowledge, edge-case catalog, destination-shape matrix, recent AWS features (moved from this file)
+- [references/error-handling.md](references/error-handling.md) — per-verdict remediation guidance with CLI fixes (moved from this file)
 
 ## Domain
 

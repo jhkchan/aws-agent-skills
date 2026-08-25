@@ -146,3 +146,89 @@ aws ecs describe-services \
   --service <service> \
   --query 'services[0].events[:10]'
 ```
+
+## Step 0: target capture commands (moved from SKILL.md)
+
+```bash
+# Describe the current task definition:
+aws ecs describe-task-definition \
+  --task-definition <task-def> \
+  --query 'taskDefinition.{cpu:cpu,memory:memory,arch:runtimePlatform.cpuArchitecture,containerDefs:containerDefinitions[*].{name:name,cpu:cpu,memory:memory,memoryReservation:memoryReservation}}'
+
+# Pull 14-day CPU and memory utilization:
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ECS \
+  --metric-name CPUUtilization \
+  --dimensions Name=ClusterName,Value=<cluster> Name=ServiceName,Value=<service> \
+  --start-time $(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  --period 3600 \
+  --statistics Average Maximum \
+  --query 'Datapoints[*].{time:Timestamp,avg:Average,max:Maximum}'
+```
+
+## Step 2: right-size diagnostic commands (moved from SKILL.md)
+
+**Diagnostic commands:**
+
+```bash
+# 14-day CPU utilization (hourly avg + max):
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ECS \
+  --metric-name CPUUtilization \
+  --dimensions Name=ClusterName,Value=<cluster> Name=ServiceName,Value=<service> \
+  --start-time $(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  --period 3600 --statistics Average Maximum
+
+# 14-day Memory utilization:
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ECS \
+  --metric-name MemoryUtilization \
+  --dimensions Name=ClusterName,Value=<cluster> Name=ServiceName,Value=<service> \
+  --start-time $(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  --period 3600 --statistics Average Maximum
+```
+
+## Step 5: auto scaling policy command (moved from SKILL.md)
+
+**Auto scaling policy recommendation:**
+
+```bash
+# Create a target tracking scaling policy on CPU utilization:
+aws application-autoscaling register-scalable-target \
+  --service-namespace ecs \
+  --resource-id service/<cluster>/<service> \
+  --scalable-dimension ecs:service:DesiredCount \
+  --min-capacity 2 \
+  --max-capacity 20
+
+aws application-autoscaling put-scaling-policy \
+  --service-namespace ecs \
+  --resource-id service/<cluster>/<service> \
+  --scalable-dimension ecs:service:DesiredCount \
+  --policy-name cpu-target-tracking \
+  --policy-type TargetTrackingScaling \
+  --target-tracking-scaling-policy-configuration \
+    '{"TargetValue":60.0,"PredefinedMetricSpecification":{"PredefinedMetricType":"ECSServiceAverageCPUUtilization"},"ScaleOutCooldown":60,"ScaleInCooldown":300}'
+```
+
+## Step 6: Savings Plans diagnostic commands (moved from SKILL.md)
+
+**Diagnostic commands:**
+
+```bash
+# Check current Savings Plans utilization and coverage:
+aws ce get-savings-plans-utilization \
+  --time-period Start=2026-07-01,End=2026-08-01 \
+  --granularity MONTHLY
+
+# Get Fargate spend by service:
+aws ce get-cost-and-usage \
+  --time-period Start=2026-07-01,End=2026-08-01 \
+  --granularity MONTHLY \
+  --filter '{"Dimensions":{"Key":"Service","Values":["Elastic Compute Cloud - CloudWatch"]}}' \
+  --metrics "UsageQuantity" "UnblendedCost" \
+  --group-by Type=DIMENSION,Key=USAGE_TYPE
+```

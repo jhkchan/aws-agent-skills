@@ -28,28 +28,8 @@ metadata:
 
 ## Mindset
 
-**One-line takeaway:** an event-driven workflow on EventBridge is
-**at-least-once delivery over an unordered (or partition-ordered)
-async bus** — every design choice (DLQ, idempotency, retry, ordering,
-circular-dependency guard) flows from that one fact. A workflow
-without a DLQ is a workflow that silently loses events; a consumer
-without idempotency is a consumer that double-charges, double-creates,
-and double-notifies.
-
-- **EventBridge is the routing layer, not the execution layer.** It
-  matches events to rules and dispatches to targets. The targets do
-  the work. A misconfigured rule (too narrow → events missed; too
-  broad → fan-out storm) is the most common failure.
-- **At-least-once means exactly-once must be enforced by the
-  consumer.** EventBridge may deliver the same event twice
-  (retried delivery, regional failover, replay). Consumers MUST be
-  idempotent — typically via a deduplication ID hashed from event
-  fields and stored in DynamoDB with a conditional write.
-- **Ordering is per-partition, not global.** Within a partition
-  (e.g., a DynamoDB shard, a Kinesis shard), EventBridge preserves
-  order. Across partitions, ordering is not guaranteed. Workflows
-  that require global ordering must serialize via a single-partition
-  fan-in.
+Mindset prose (one-line takeaway, routing vs execution layer, at-least-once, per-partition ordering) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand framing an EventBridge design or explaining duplicate-delivery and ordering semantics.
 
 ## Quick navigation
 
@@ -121,81 +101,8 @@ GAP: Re-supply the source service (e.g., aws.guardduty), detail-type, and the de
 
 ### Step 0: Expert knowledge — non-obvious EventBridge behaviors
 
-- **EventBridge delivers at-least-once, not exactly-once.** Retries,
-  regional failover, replay (via archive), and target throttling can
-  all produce duplicate deliveries. Idempotent consumers are not
-  optional.
-
-- **`PutEvents` is the only API that ingests events.** Every
-  EventBridge workflow begins with a `PutEvents` call (from an AWS
-  service, an application, or a partner). The bus policy controls
-  who can call `PutEvents`. See the
-  `eventbridge-bus-policy-auditor` skill for ingestion-gate audit.
-
-- **Rule `EventPattern` is JSONPath-like, not full JSONPath.** It
-  supports exact match, prefix, suffix, contains, equals-ignore-case,
-  numeric ranges, and CIDR matching. It does NOT support arbitrary
-  JSONPath expressions. Complex filters must be done in the consumer.
-
-- **`InputTransformer` reshape is per-target.** A rule can have up
-  to 5 targets, each with its own input transformer. The original
-  event payload is NOT passed to the target unless the transformer
-  explicitly maps it.
-
-- **Retry policy is per-target.** `RetryPolicy` on
-  `put-targets` controls `MaximumRetryAttempts` and
-  `MaximumEventAgeInSeconds`. Defaults: 185 retries (24 hours for
-  API destinations, 6 hours for others). A target without an
-  explicit retry policy uses defaults.
-
-- **Same-bus same-account PutEvents does not require a bus policy.**
-  Same-account access is implicit (root of trust). The bus policy
-  gates cross-account and service-principal delegation.
-
-- **EventBridge Pipes is a separate API surface from rules.** Pipes
-  connect a source (DynamoDB Streams, Kinesis, SQS, MQ, MSK,
-  self-managed Kafka) to a target with optional filtering and
-  enrichment (Lambda, Step Functions, API destination, Batch, ECS
-  task). Pipes are for stream/queue fan-out, NOT for matching
-  arbitrary events on a bus.
-
-- **EventBridge Scheduler is a separate service for time-based
-  triggers.** It does not use rules. Each schedule is a first-class
-  resource with its own IAM role, target, and timeframe. Use it
-  instead of cron-style EventBridge rules for per-schedule management.
-
-- **`TestEventPattern` is your test fixture.** It validates a
-  pattern against a sample event without creating the rule. Always
-  run `test-event-pattern` before `put-rule` to confirm the match.
-
-- **Rule quotas: 300 rules per bus, 5 targets per rule.** A
-  high-volume workflow with many filtered sub-routes hits the cap.
-  Consider fan-out to SQS for finer-grained per-consumer filtering.
-
-- **API destinations rate-limit per connection.** A target API
-  destination has a per-connection rate limit (default 300 TPS). A
-  burst of events above the limit is buffered up to the
-  `InvocationRateLimitPerSec` cap; sustained excess is dropped to
-  DLQ.
-
-- **`PutEvents` accepts up to 10 events per API call, 256 KB per
-  event, 2 MB total request.** Application publishers must batch for
-  throughput and respect the size cap. Events over 256 KB must be
-  parked in S3 and referenced by URI.
-
-- **Cross-region delivery is NOT default.** EventBridge rules are
-  regional. To route events cross-region, use a global endpoint or
-  fan-out to an SNS topic with cross-region subscriptions, or use
-  `PutEvents` with a region-specific bus ARN.
-
-- **Schema Registry auto-discovery captures schemas only on the
-  default bus by default.** Custom-bus schema discovery must be
-  explicitly enabled. Undiscovered schemas cannot be code-generated.
-
-- **Archives capture events for replay but are NOT backups.** Replay
-  re-publishes events to ALL rules matching the archive pattern,
-  including rules created AFTER the original events. This can cause
-  unexpected duplicate processing.
+Step 0 expert-knowledge bullets (PutEvents semantics, pattern vs transformer, per-target retry, quotas, API-destination limits, cross-region, schema discovery, archive replay) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand a design decision depends on a non-obvious EventBridge behaviour.
 
 ### Step 1: Choose the event bus
 
@@ -271,23 +178,8 @@ fire in production. Always test.
 
 Target wiring pattern:
 
-```bash
-aws events put-targets \
-  --rule <rule-name> \
-  --event-bus-name <bus> \
-  --targets '[{"Id":"lambda-target","Arn":"arn:aws:lambda:us-east-1:111111111111:function:my-fn","DeadLetterConfig":{"Arn":"arn:aws:sqs:us-east-1:111111111111:my-dlq"},"RetryPolicy":{"MaximumRetryAttempts":3,"MaximumEventAgeInSeconds":900}}]'
-```
-
-For Lambda targets, also grant EventBridge permission to invoke:
-
-```bash
-aws lambda add-permission \
-  --function-name my-fn \
-  --statement-id EventBridgeInvoke \
-  --action lambda:InvokeFunction \
-  --principal events.amazonaws.com \
-  --source-arn arn:aws:events:us-east-1:111111111111:rule/<rule-name>
-```
+Step 3 target wiring CLI (put-targets with DeadLetterConfig + RetryPolicy, lambda add-permission for events.amazonaws.com) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand emitting the exact wiring commands for a rule target.
 
 A missing invocation permission produces silent non-delivery (events
 match the rule but the Lambda is never invoked). This is the most
@@ -308,55 +200,21 @@ consumer's behavior.
 
 Create the DLQ first, then attach:
 
-```bash
-aws sqs create-queue --queue-name eventbridge-<rule>-dlq
-aws events put-targets \
-  --rule <rule> --event-bus-name <bus> \
-  --targets '[{"Id":"<target-id>","Arn":"<target-arn>","DeadLetterConfig":{"Arn":"arn:aws:sqs:<region>:<account>:eventbridge-<rule>-dlq"},"RetryPolicy":{"MaximumRetryAttempts":3,"MaximumEventAgeInSeconds":900}}]'
-```
+Step 4 DLQ create-and-attach CLI moved verbatim to [references/eventbridge-targets-and-retries.md](references/eventbridge-targets-and-retries.md).
+Load on demand attaching the mandatory DLQ to a target.
 
 Wire a CloudWatch alarm on DLQ depth — non-negotiable:
 
-```bash
-aws cloudwatch put-metric-alarm \
-  --alarm-name EventBridge-<rule>-DLQ-Depth \
-  --metric-name ApproximateNumberOfMessagesVisible \
-  --namespace AWS/SQS \
-  --statistic Sum --period 60 --evaluation-periods 1 \
-  --threshold 0 --comparison-operator GreaterThanThreshold \
-  --dimensions Name=QueueName,Values=eventbridge-<rule>-dlq \
-  --alarm-actions <sns-arn>
-```
+Step 4 DLQ-depth CloudWatch alarm CLI moved verbatim to [references/eventbridge-targets-and-retries.md](references/eventbridge-targets-and-retries.md).
+Load on demand wiring the non-negotiable DLQ-depth alarm.
 
 ### Step 5: Add idempotency to the consumer
 
 EventBridge is at-least-once. The consumer MUST be idempotent.
 Reference Lambda pattern:
 
-```python
-import boto3, hashlib, json
-dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table('event-dedup')
-
-def lambda_handler(event, context):
-    # Compute a deterministic dedup key from event fields
-    key = hashlib.sha256(json.dumps({
-        'source': event['source'],
-        'detail-type': event['detail-type'],
-        'id': event.get('id'),  # EventBridge assigns a unique id per event
-    }, sort_keys=True).encode()).hexdigest()
-
-    try:
-        table.put_item(
-            Item={'dedup_key': key, 'ts': event['time']},
-            ConditionExpression='attribute_not_exists(dedup_key)'
-        )
-    except dynamodb.meta.client.exceptions.ConditionalCheckFailedException:
-        # Already processed — skip
-        return {'status': 'duplicate'}
-
-    # ... actual processing ...
-```
+Step 5 reference idempotent-consumer Lambda pattern (DynamoDB conditional-write dedup) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand writing the consumer's deduplication logic.
 
 Key idempotency rules:
 - Hash fields that uniquely identify the semantic event (not just the
@@ -400,125 +258,23 @@ MANUAL_STEP_REQUIRED until the cycle is broken.
 
 ### Step 7: EventBridge Pipes
 
-Use Pipes when the source is a stream or queue (DynamoDB Streams,
-Kinesis, SQS, MQ, MSK, self-managed Kafka). Pipes differ from rules:
-the source is a pollable resource, not a published event.
-
-```bash
-aws pipes create-pipe \
-  --name orders-pipe \
-  --source arn:aws:dynamodb:us-east-1:111111111111:table/Orders/stream/2026-08-01 \
-  --source-parameters '{"DynamoDBStreamParameters":{"StartingPosition":"LATEST","BatchSize":10,"MaximumBatchingWindowInSeconds":5}}' \
-  --target arn:aws:lambda:us-east-1:111111111111:function:process-order \
-  --target-parameters '{"LambdaFunctionParameters":{"InvocationType":"REQUEST_RESPONSE"}}' \
-  --role-arn arn:aws:iam::111111111111:role/service-role/EventBridge-Pipe-Role \
-  --filter-pattern '{"dynamodb": {"NewImage": {"status": {"S": [{"prefix": "PAID"}]}}}}'
-```
-
-Pipes support optional enrichment (Lambda, Step Functions, API
-destination) between source and target for transformation.
-
-| Dimension | Rule-based | Pipes |
-|---|---|---|
-| Source | Event bus | DynamoDB Streams, Kinesis, SQS, MQ, MSK |
-| Filtering | EventPattern | FilterCriteria (similar syntax) |
-| Enrichment | InputTransformer | Lambda / SFN / API destination in-between |
-| Use case | Service event routing | Stream/queue fan-out |
-
-After creating, start the pipe:
-
-```bash
-aws pipes start-pipe --name orders-pipe
-aws pipes describe-pipe --name orders-pipe --query 'CurrentState'
-```
+Step 7 EventBridge Pipes (create-pipe CLI, rules-vs-Pipes comparison table, start-pipe) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand the source is a stream or queue, or comparing Pipes with rules.
 
 ### Step 8: EventBridge Scheduler
 
-For time-based triggers, prefer Scheduler over cron-style rules.
-Each schedule is a first-class resource with its own role.
-
-```bash
-aws scheduler create-schedule \
-  --name nightly-report \
-  --schedule-expression 'cron(0 2 * * ? *)' \
-  --flexible-time-window '{"Mode": "OFF"}' \
-  --target '{"Arn":"arn:aws:lambda:us-east-1:111111111111:function:nightly-report","RoleArn":"arn:aws:iam::111111111111:role/service-role/Scheduler-Invoke-Lambda"}' \
-  --description "Nightly report at 02:00 UTC"
-```
-
-Trade-offs:
-
-| Dimension | EventBridge rule (cron) | EventBridge Scheduler |
-|---|---|---|
-| Per-schedule management | Limited | First-class resource, individual update/delete |
-| Schedule count quota | 300 rules per bus | 1M schedules per account |
-| Timezone | UTC only | UTC plus tz library |
-| Start/stop windows | Not supported | `StartDate`/`EndDate`/`ScheduleExpression` |
-| One-time schedules | Hack (rate + delete) | Native via `StartDate == EndDate` |
-
-For any new time-based workflow, default to Scheduler unless you need
-event-pattern matching.
+Step 8 EventBridge Scheduler (create-schedule CLI, rules-vs-Scheduler trade-off table) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand configuring time-based triggers.
 
 ### Step 9: Global endpoints (multi-region failover)
 
-For regional-failure-resilient workflows:
-
-```bash
-aws events create-endpoint \
-  --name orders-failover \
-  --routing-config '{"FailoverConfig":{"Primary":{"HealthCheck":"arn:aws:route53:...:healthcheck/primary"},"Secondary":{"RouteDetails":{"HealthCheck":"arn:aws:route53:...:healthcheck/secondary"}}}}' \
-  --event-buses '[{"EventBusArn":"arn:aws:events:us-east-1:111111111111:event-bus/orders"},{"EventBusArn":"arn:aws:events:us-west-2:111111111111:event-bus/orders"}]'
-```
-
-The endpoint ARN is used as the target for producers. Route53
-health checks drive failover. The replication is asynchronous — a
-few seconds of lag during failover.
-
-Requirements:
-- Both buses must have equivalent rules and targets.
-- Both buses must have equivalent bus policies, DLQs, KMS keys.
-- Schema Registry and archives are per-region — replicate separately.
+Step 9 global endpoints (create-endpoint CLI, replication requirements) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand multi-region failover is required.
 
 ### Step 10: Audit and verify
 
-```bash
-# 1. Rule exists and is ENABLED
-aws events describe-rule --name <rule> --event-bus-name <bus> \
-  --query '[Name, State, EventPattern]'
-
-# 2. Targets wired with DLQ and retry
-aws events list-targets-by-rule --rule <rule> --event-bus-name <bus>
-
-# 3. Lambda invocation permission
-aws lambda get-policy --function-name <fn> \
-  --query 'Policy' --output text | jq '.Statement[] | select(.Principal.Service=="events.amazonaws.com")'
-
-# 4. DLQ depth
-aws sqs get-queue-attributes \
-  --queue-url https://sqs.<region>.amazonaws.com/<account>/<dlq> \
-  --attribute-names ApproximateNumberOfMessagesVisible
-
-# 5. Recent invocations (CloudTrail)
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventName,AttributeValue=InvokeFunction \
-  --start-time $(date -v-1H +%Y-%m-%dT%H:%M:%S) --end-time $(date +%Y-%m-%dT%H:%M:%S)
-
-# 6. Test the pattern against a fresh sample
-aws events test-event-pattern \
-  --event-pattern file://pattern.json --event file://sample-event.json
-```
-
-For replay capability, verify an archive exists:
-
-```bash
-aws events describe-archive --archive-name <archive>
-```
-
-For schema discovery:
-
-```bash
-aws schemas describe-registry --registry-name <bus>-schemas
-```
+Step 10 audit commands (describe-rule, list-targets-by-rule, Lambda policy, DLQ depth, CloudTrail, test-event-pattern, archive, schema registry) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand verifying a deployed workflow end to end.
 
 ## Output format
 
@@ -559,19 +315,8 @@ TEMPLATE:
 
 ### Worked example — MANUAL_STEP_REQUIRED, missing idempotency
 
-```text
-ARCHITECTURE: codebuild-failure-notify
-BUS: default
-PATTERN: source=aws.codebuild, detail-type=CodeBuild Build State Change, detail.build-status=FAILED
-TARGETS:
-  - Lambda notify-oncall (no idempotency check, no DLQ)
-RETRY: defaults (185 attempts / 24h) — too aggressive for a notification
-SAFETY: NO DLQ; idempotency NOT IMPLEMENTED (CodeBuild emits multiple state-change events per build); circular-dep check PASS.
-AUDIT: NO CloudWatch alarm on DLQ.
-VERDICT: MANUAL_STEP_REQUIRED
-GAP: (1) No DLQ on Lambda target — failed invocations are silently dropped. (2) No idempotency — CodeBuild emits multiple state-change events per build (STARTED, IN_PROGRESS, FAILED), and each FAILED state can fire more than once during retries; the Lambda will post duplicate Slack notifications. (3) No CloudWatch alarm on DLQ. Implement dedup on detail.build-id + detail.build-status in DynamoDB before enabling.
-TEMPLATE: (incomplete — fix GAPs first)
-```
+The MANUAL_STEP_REQUIRED worked example (CodeBuild failure notification without idempotency or DLQ) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand citing the negative-path verdict format.
 
 ## Anti-Patterns — NEVER do these things
 
@@ -692,37 +437,13 @@ TEMPLATE: (incomplete — fix GAPs first)
 
 ## Appendix A — Event pattern operators
 
-| Operator | JSON form | Matches when |
-|---|---|---|
-| Exact | `["v1", "v2"]` | Field equals any listed value |
-| Prefix | `{"prefix": "ord-"}` | Field starts with prefix |
-| Suffix | `{"suffix": "-prod"}` | Field ends with suffix |
-| Contains | `{"contains": ["error"]}` | Field contains substring (case-sensitive) |
-| Equals-ignore-case | `{"equals-ignore-case": "true"}` | Case-insensitive match |
-| Numeric | `{"numeric": [">=", 7]}` | Numeric comparison; supports `>`, `>=`, `<`, `<=`, `=`, ranges |
-| CIDR | `{"cidr": "10.0.0.0/8"}` | IP address in CIDR block |
-| Exists | `{"exists": true}` | Field is present (or `false` for absent) |
-| Anything-but | `{"anything-but": ["dev"]}` | Field is anything except listed values |
-
-Combine operators with nested JSON. EventBridge matches ALL specified
-fields (AND). For OR within a field, use a list.
+Appendix A operator reference table moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand authoring an event pattern filter.
 
 ## Appendix B — Common AWS event patterns
 
-| Source | Detail-type | Common filter | Typical target |
-|---|---|---|---|
-| `aws.ec2` | `EC2 Instance State-change Notification` | `detail.state=["running"]` | Lambda auto-tagger |
-| `aws.guardduty` | `GuardDuty Finding` | `detail.severity>=7` | Lambda isolate-instance |
-| `aws.securityhub` | `Security Hub Findings - Imported` | `detail.findings[].Severity.Label=["CRITICAL","HIGH"]` | Step Functions workflow |
-| `aws.codebuild` | `CodeBuild Build State Change` | `detail.build-status=["FAILED"]` | SNS + Lambda notify |
-| `aws.autoscaling` | `EC2 Instance Launch Successful` | — | Lambda register-to-target-group |
-| `aws.s3` | `Object Created` | `detail.object.key=[{"prefix":"uploads/"}]` | Lambda trigger-processing |
-| `aws.cloudwatch` | `CloudWatch Alarm State Transition` | `detail.stateName=["ALARM"]` | SNS → Lambda ack |
-| `aws.signin` | `AWS Console Sign In` | `detail.eventName=["ConsoleLogin"]`, `detail.responseElements.ConsoleLogin=["Success"]` | Lambda alert on new MFA-disabled logins |
-| `aws.iam` | `AWS API Call via CloudTrail` | `detail.eventName=["DeleteRole"]` | Lambda revert or alert |
-
-For AWS service events on the default bus, the `detail` field shape
-varies by service — consult the service's EventBridge documentation.
+Appendix B common AWS event-pattern catalog (EC2, GuardDuty, Security Hub, CodeBuild, Auto Scaling, S3, CloudWatch, Sign-In, IAM) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand matching a common AWS service event.
 
 ## Appendix C — Decision tree (which architecture)
 
@@ -745,32 +466,15 @@ For rule + target workflows:
 
 ## Recent AWS features (2024-2026)
 
-- **EventBridge global endpoints GA (2024):** Automatic regional
-  failover for event buses. Requires matching rules and targets on
-  the secondary bus; verify before failover.
+Recent AWS features (global endpoints GA, Scheduler, Pipes enhancements, Schema Registry, API destinations, PutEvents limits) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand checking whether a newer AWS feature changes the design.
 
-- **EventBridge Scheduler (2024-2025):** First-class time-based
-  scheduling with per-schedule IAM roles, timezones, and one-time
-  schedules. Preferred over cron-style EventBridge rules for any
-  new time-based workflow.
+## References (load on demand)
 
-- **EventBridge Pipes enhancements (2024):** Added support for
-  self-managed Kafka, MSK, and improved enrichment (Lambda, Step
-  Functions, API destination, Batch, ECS). Pipes are now the
-  standard path for stream/queue fan-out.
-
-- **Schema Registry updates (2024):** OpenAPI and JSON Schema
-  support. Discover schemas on custom buses explicitly — auto-
-  discovery only applies to the default bus.
-
-- **EventBridge API destinations improvements (2024-2025):**
-  Enhanced credential management for OAuth client-credentials. API
-  key and basic-auth credentials still do NOT auto-rotate —
-  monitor `InvocationHttpStatusCode` for stale credentials.
-
-- **`PutEvents` batch size and EntrySize limits (2024):** Still
-  10 entries per call, 256 KB per entry. Events over 256 KB must
-  be parked in S3 and referenced by URI.
+- [references/worked-examples.md](references/worked-examples.md) — the MANUAL_STEP_REQUIRED worked example (CodeBuild) and the reference idempotent-consumer Lambda pattern, moved from SKILL.md.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 3 target wiring CLI and Step 10 audit/verify commands, moved from SKILL.md.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — mindset, Step 0 expert knowledge, Steps 7-9 (Pipes, Scheduler, global endpoints), Appendix A operators, Appendix B event-pattern catalog, and recent AWS features, moved from SKILL.md.
+- [references/eventbridge-targets-and-retries.md](references/eventbridge-targets-and-retries.md) — target/retry/DLQ reference, plus the Step 4 DLQ attach and DLQ-alarm CLI moved from SKILL.md.
 
 ## Domain
 

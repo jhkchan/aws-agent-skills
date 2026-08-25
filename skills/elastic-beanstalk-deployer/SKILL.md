@@ -100,24 +100,8 @@ between deployment speed and availability during the cutover.
 Three misconceptions dominate Elastic Beanstalk misdesign at
 provisioning time:
 
-- **"All-at-once deployment is fine for production."** It is not. All-
-  at-once takes the entire fleet out of service simultaneously during
-  the deploy. If the new version is broken, 100% of traffic fails.
-  Immutable or rolling-with-additional-batch is the production-grade
-  default because it preserves capacity during cutover.
-
-- **".ebextensions are just configuration files."** They are not.
-  .ebextensions are ordered infrastructure-as-code directives that can
-  create ANY AWS resource (RDS, DynamoDB tables, SNS topics, IAM
-  roles) via CloudFormation under the hood. Ordering matters: a
-  directive in `01-setup.config` runs before `02-storage.config`, and
-  a malformed directive silently aborts the deployment.
-
-- **"CNAME swap is automatic."** It is not. Blue-green via CNAME swap
-  requires TWO environments (green and blue), both fully deployed and
-  healthy, and then a `SwapEnvironmentCNAMEs` API call. The swap is
-  atomic at the DNS level, but the TTL of the old CNAME means clients
-  may still hit the old environment for up to 60 seconds.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Mindset misconceptions".
+> Load when: you need the complete argument behind the three Beanstalk misdesign misconceptions.
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -139,228 +123,38 @@ this graph to sequence provisioning.
 | CNAME swap | BOTH environments must be `Ready` and `Green`/`Blue` health | swapping CNAMEs on an environment that is still launching causes DNS to point at a non-functional endpoint | blue-green zero-downtime cutover |
 | Managed platform updates | must not conflict with deployment window | managed updates and deployments can conflict; managed updates are suppressed during an active deployment | automated patching and platform minor version upgrades |
 
-**The service-role-and-instance-profile row is the one a baseline model
-misses.** Creating the environment without the correct service role and
-instance profile either fails at creation time or results in a stuck
-deployment where EC2 instances cannot pull the source bundle. The
-deployment policy row is another commonly misunderstood configuration
-— operators pick all-at-once for speed and discover the blast radius
-only when a bad deploy takes down the entire fleet.
-
-**Cross-dependency gotchas:**
-- The service role and instance profile are separate IAM roles with
-  separate trust policies. The service role is assumed BY Beanstalk;
-  the instance profile is assumed BY the EC2 instances.
-- Traffic splitting deployment policy requires an ALB. If the
-  environment uses an NLB or single-instance (no ELB), traffic
-  splitting is not available.
-- Managed platform updates have a configurable window. If the window
-  overlaps with a scheduled deployment, the managed update is
-  suppressed until the next window.
-- .ebextensions ordering is lexicographic: `01-config.config` runs
-  before `02-config.config`. A resource created in `02-config.config`
-  cannot be referenced in `01-config.config`.
-- Worker tier environments do NOT have a load balancer. The SQS daemon
-  runs on each instance and polls the queue.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Configuration dependency graph".
+> Load when: sequencing the service role / instance profile / platform / LB / worker-tier dependencies.
 
 ## Expert heuristic: immutable deployment for zero downtime
 
-A baseline model says "deploy the new version." The correct heuristic
-recognizes that the deployment policy determines the blast radius
-during cutover.
-
-```text
-Deployment policy decision tree:
-  ├── Development / testing → All at once (fastest, full downtime OK)
-  ├── Production, single-instance → Immutable (launches fresh ASG, swaps)
-  ├── Production, multi-instance, cost-sensitive → Rolling + additional batch
-  │     (adds temp instances, deploys in batches, no capacity loss)
-  ├── Production, multi-instance, canary needed → Traffic splitting
-  │     (routes a percentage of traffic to the new version via ALB)
-  └── Production, multi-instance, simplest rolling → Rolling
-        (takes batches out of service, reduced capacity during deploy)
-
-Key: "immutable" is safest for production because it launches an
-entirely new fleet with the new version, verifies health, then swaps.
-If health checks fail, the old fleet is untouched.
-```
-
-**Key implication:** immutable deployment costs more during the deploy
-(double capacity temporarily) but eliminates the risk of a partially
-deployed state. For production environments where downtime is costly,
-immutable is the default recommendation.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Expert heuristic: immutable deployment".
+> Load when: choosing a deployment policy by blast radius; includes the decision tree.
 
 ## Expert heuristic: .ebextensions for infrastructure as code
 
-.ebextensions allow you to manage AWS resources as part of the
-Beanstalk deployment. This is powerful but ordering-dependent.
-
-```text
-.ebextensions/ directory structure (lexicographic ordering):
-  .ebextensions/
-    ├── 01-options.config      (namespace options, env vars)
-    ├── 02-rds.config          (create RDS instance via CloudFormation)
-    ├── 03-dynamodb.config     (create DynamoDB table)
-    └── 05-hooks.config        (post-deployment hooks)
-
-Each .config file supports:
-  option_settings:    (Beanstalk namespace options)
-  Resources:          (CloudFormation resources created on deploy)
-  files:              (files written to EC2 instances)
-  commands:           (commands run BEFORE app deployment)
-  container_commands: (commands run DURING app deployment, app dir is CWD)
-```
-
-**Key implication:** .ebextensions are the Beanstalk-native way to do
-IaC without a separate Terraform/CloudFormation pipeline. But the
-resources created in .ebextensions are managed by Beanstalk's internal
-CloudFormation stack — deleting the environment deletes those resources
-unless `DeletionPolicy: Retain` is set.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Expert heuristic: .ebextensions".
+> Load when: authoring .ebextensions IaC (directory layout, option_settings/Resources/files/commands).
 
 ## Expert heuristic: CNAME swap for blue-green
 
-CNAME swap is the Beanstalk-native blue-green mechanism. Two
-environments (green and blue) are deployed with different CNAME
-prefixes. The swap exchanges CNAMEs atomically.
-
-```text
-Blue-green CNAME swap flow:
-  1. Blue env: myapp-blue.elasticbeanstalk.com (ACTIVE, serving traffic)
-  2. Deploy green env: myapp-green.elasticbeanstalk.com (new version)
-  3. Wait for green to reach "Ready" + "Green" health
-  4. Swap CNAMEs (atomic DNS cutover):
-     aws elasticbeanstalk swap-environment-cnames \
-       --source-environment-id <blue-id> \
-       --destination-environment-id <green-id>
-  5. Traffic routes to green (new version). Blue is standby.
-  6. Verify green. If rollback needed, swap CNAMEs back.
-  7. Terminate blue after monitoring period.
-
-Key: the swap is atomic at the DNS level. But DNS TTL means some
-clients hit the old environment for up to 60 seconds after the swap.
-```
-
-**Key implication:** CNAME swap is simpler than URL swaps or Route 53
-weighted routing for Beanstalk blue-green. The swap is reversible
-(swap back to roll back). Always keep the old environment alive until
-the monitoring period passes.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Expert heuristic: CNAME swap".
+> Load when: running the blue-green swap flow and reasoning about DNS TTL overlap.
 
 ## Expert heuristic: .ebextensions YAML syntax gotchas
 
-A baseline model assumes .ebextensions are straightforward YAML. The
-expert knows that leading whitespace and YAML parser strictness are
-the #1 cause of silent deployment failures.
-
-```text
-Common .ebextensions YAML gotchas:
-  ├── Leading whitespace: Beanstalk's YAML parser is stricter than
-  │     most YAML libraries. A single space before a top-level key
-  │     (e.g., "  option_settings:" instead of "option_settings:")
-  │     causes the entire config file to be silently skipped.
-  │     No error, no warning — the resources/options simply don't apply.
-  ├── option_settings list vs map syntax:
-  │     AL2023 requires the LIST-of-objects syntax:
-  │       option_settings:
-  │         - namespace: ...
-  │           option_name: ...
-  │           value: ...
-  │     The older MAP syntax (key-value pairs) is silently ignored
-  │     on AL2023 but worked on AL2.
-  ├── Tabs are NEVER valid YAML indentation. Copy-pasting from
-  │     documentation that uses tabs causes silent parse failures.
-  └── CloudFormation Resources block must use exact CFN types —
-        a typo like "AWS::S3::Buckett" fails the deployment but
-        the error message points at CloudFormation, not the typo.
-
-Expert rule:
-  1. Validate every .config file with `yamllint` before deploying
-  2. Check Beanstalk events after EVERY deploy — silent skips show
-     as "info: No options were updated" for the config file
-  3. Use `eb config` to verify the options were actually applied
-```
-
-**Key implication:** A syntactically valid YAML file that Beanstalk
-silently ignores is worse than a syntax error — it gives false
-confidence that configuration was applied. Always verify via
-`describe-configuration-settings` after deployment.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Expert heuristic: .ebextensions YAML syntax gotchas".
+> Load when: a .config file is silently skipped or a deploy fails with no clear error.
 
 ## Expert heuristic: worker tier SQS visibility timeout auto-configuration
 
-A baseline model configures the SQS queue visibility timeout on the
-queue itself. The expert knows Beanstalk worker tiers have a
-non-obvious auto-configuration behavior that overrides it.
-
-```text
-Worker tier SQS visibility timeout:
-  ├── Beanstalk sets the queue's VisibilityTimeout to MATCH the
-  │     environment's HTTP timeout (default 60s)
-  ├── If you set a custom timeout on the SQS queue directly,
-  │     Beanstalk OVERWRITES it on the next environment update
-  ├── To control visibility timeout, set the Beanstalk namespace:
-  │     aws:elasticbeanstalk:sqsd:VisibilityTimeout
-  └── The SQS daemon also sets maxReceiveCount automatically based
-        on the dead-letter queue configuration
-
-Expert rules:
-  1. NEVER set visibility timeout on the SQS queue directly —
-     Beanstalk will overwrite it
-  2. Set it via the sqsd namespace option:
-     Namespace=aws:elasticbeanstalk:sqsd,OptionName=VisibilityTimeout
-  3. Set the HTTP timeout to be LESS than visibility timeout:
-     aws:elasticbeanstalk:application:Environment → HTTP_TIMEOUT
-     If HTTP timeout > visibility timeout, the daemon processes
-     a message while SQS has already made it visible again →
-     duplicate processing
-  4. The daemon retries up to maxReceiveCount then sends to DLQ
-     — configure the DLQ BEFORE the worker environment starts
-```
-
-**Key implication:** The visibility timeout must be coordinated
-between Beanstalk's sqsd namespace and the HTTP timeout. Mismatches
-cause either duplicate processing (timeout too short) or zombie
-messages (timeout too long with no retry).
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Expert heuristic: worker tier SQS visibility timeout auto-configuration".
+> Load when: configuring worker-tier SQS visibility timeout, HTTP timeout, or DLQ behavior.
 
 ## Expert heuristic: .platform/hooks vs .ebextensions ordering
 
-AL2023 introduced `.platform/hooks/` alongside `.ebextensions/`. A
-baseline model assumes they run at the same time. The expert knows
-the execution order determines whether resource references work.
-
-```text
-Execution order on AL2023 (critical sequence):
-  Phase 1: .ebextensions processing
-    ├── 01-setup.config → 02-storage.config → ... (lexicographic)
-    │   Each file runs in order:
-    │     1. commands         (root, pre-deployment)
-    │     2. CloudFormation Resources (if any)
-    │     3. files
-    │
-  Phase 2: Application deployment
-    ├── Source bundle extracted to /var/app/current/
-    ├── container_commands run (leader_only gate applies)
-    │
-  Phase 3: .platform/hooks/ execution
-    ├── prebuild/   hooks (during build, before deployment)
-    ├── predeploy/  hooks (after container_commands, before app start)
-    └── postdeploy/ hooks (after app is running and accepting traffic)
-
-Key ordering constraint:
-  .ebextensions commands run BEFORE .platform/hooks
-  → a file created in .ebextensions/commands IS available to
-    .platform/hooks/prebuild/
-  → a resource created in .ebextensions/Resources IS available to
-    .platform/hooks/postdeploy/
-  → BUT .platform/hooks/predeploy/ runs DURING container_commands
-    phase — race condition if both modify the same file
-```
-
-**Key implication:** `.platform/hooks/` is the AL2023-native
-replacement for `.ebextensions/` container commands, but they
-co-exist with a specific phase ordering. Use `.ebextensions/` for
-infrastructure (CloudFormation resources, packages) and
-`.platform/hooks/` for application lifecycle (migrations, cache
-warming, smoke tests). Never split related logic across both —
-the ordering interaction is a source of silent failures.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Expert heuristic: .platform/hooks vs .ebextensions ordering".
+> Load when: mixing .ebextensions and .platform/hooks or debugging hook phase ordering.
 
 ## Prerequisites (verify before provisioning)
 
@@ -458,14 +252,8 @@ automatically.
 Managed platform updates apply minor version patches and security fixes
 to the platform within a configurable window.
 
-```bash
-aws elasticbeanstalk update-environment \
-  --environment-name myapp-env \
-  --option-settings \
-    Namespace=aws:elasticbeanstalk:managedactions:platformaction,OptionName=UpdateLevel,Value=minor \
-    Namespace=aws:elasticbeanstalk:managedactions,OptionName=ManagedActionsEnabled,Value=true \
-    Namespace=aws:elasticbeanstalk:managedactions,OptionName=PreferredStartTime,Value=Mon:02:00
-```
+> **Moved verbatim** → [references/worked-examples.md](references/worked-examples.md) § "Step 5".
+> Load when: enabling managed updates and setting the maintenance window.
 
 Managed updates are suppressed during an active deployment. Schedule
 deployments outside the managed update window to avoid conflicts.
@@ -475,12 +263,8 @@ deployments outside the managed update window to avoid conflicts.
 Enhanced health reporting provides detailed metrics (CPU, latency,
 request count, status codes) aggregated from EC2 instances and the ELB.
 
-```bash
-aws elasticbeanstalk update-environment \
-  --environment-name myapp-env \
-  --option-settings \
-    Namespace=aws:elasticbeanstalk:healthreporting:system,OptionName=SystemType,Value=enhanced
-```
+> **Moved verbatim** → [references/worked-examples.md](references/worked-examples.md) § "Step 6".
+> Load when: switching an environment to enhanced health reporting.
 
 Enhanced health is REQUIRED for blue-green CNAME swap health checks
 and for managed platform updates to work correctly.
@@ -515,13 +299,8 @@ allowing `ec2.amazonaws.com`, the `AWSElasticBeanstalkWebTier` managed
 policy (includes S3 read for source bundles), and be attached as an
 instance profile.
 
-```bash
-# Verify service role exists
-aws iam get-role --role-name aws-elasticbeanstalk-service-role
-
-# Verify instance profile exists with correct role
-aws iam get-instance-profile --instance-profile-name aws-elasticbeanstalk-ec2-role
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "IAM pre-flight verification commands".
+> Load when: verifying the service role and instance profile before create-environment.
 
 **Critical:** the instance profile MUST have S3 read access to the
 bucket where the source bundle is stored. Without it, EC2 instances
@@ -533,17 +312,8 @@ launch but cannot pull the application code — the deployment hangs in
 For VPC-mode environments, specify public and private subnets and
 security groups:
 
-```bash
-aws elasticbeanstalk create-environment \
-  --application-name myapp \
-  --environment-name myapp-env \
-  --solution-stack-name "64bit Amazon Linux 2023 v6.0.4 running Node.js 20" \
-  --option-settings \
-    Namespace=aws:ec2:vpc,OptionName=VPCId,Value=vpc-aaa11122 \
-    Namespace=aws:ec2:vpc,OptionName=Subnets,Value=subnet-aaa,subnet-bbb \
-    Namespace=aws:ec2:vpc,OptionName=ELBSubnets,Value=subnet-aaa,subnet-bbb \
-    Namespace=aws:autoscaling:launchconfiguration,OptionName=SecurityGroups,Value=sg-app
-```
+> **Moved verbatim** → [references/worked-examples.md](references/worked-examples.md) § "Step 9".
+> Load when: launching the environment into a specific VPC/subnets/security groups.
 
 For load-balanced environments, the ELB and EC2 instances should be in
 the same subnets (or ELB in public subnets, EC2 in private subnets).
@@ -555,16 +325,8 @@ gateway for internet egress.
 Beanstalk provisions an ASG behind the environment. Configure min/max
 size and scaling triggers:
 
-```bash
-aws elasticbeanstalk update-environment \
-  --environment-name myapp-env \
-  --option-settings \
-    Namespace=aws:autoscaling:asg,OptionName=MinSize,Value=2 \
-    Namespace=aws:autoscaling:asg,OptionName=MaxSize,Value=8 \
-    Namespace=aws:autoscaling:trigger,OptionName=MeasureName,Value=CPUUtilization \
-    Namespace=aws:autoscaling:trigger,OptionName=LowerThreshold,Value=20 \
-    Namespace=aws:autoscaling:trigger,OptionName=UpperThreshold,Value=80
-```
+> **Moved verbatim** → [references/worked-examples.md](references/worked-examples.md) § "Step 10".
+> Load when: setting ASG min/max and CPU trigger thresholds.
 
 For worker tier, scale on SQS queue depth: use
 `MeasureName=ApproximateNumberOfMessagesVisible` with lower/upper
@@ -574,35 +336,8 @@ thresholds based on expected processing time.
 
 .ebextensions provide infrastructure as code within the source bundle.
 
-**`.ebextensions/01-options.config`** — set namespace options and
-environment variables:
-```yaml
-option_settings:
-  - namespace: aws:elasticbeanstalk:application:environment
-    option_name: NODE_ENV
-    value: production
-```
-
-**`.ebextensions/02-rds.config`** — create an RDS instance:
-```yaml
-Resources:
-  AWSEBRDSDatabase:
-    Type: AWS::RDS::DBInstance
-    Properties:
-      AllocatedStorage: 20
-      DBInstanceClass: db.t3.micro
-      Engine: postgres
-      MasterUsername: myapp
-      DeletionPolicy: Retain
-```
-
-**`.ebextensions/03-hooks.config`** — deployment hooks:
-```yaml
-container_commands:
-  01_migrate:
-    command: "npm run migrate"
-    leader_only: true
-```
+> **Moved verbatim** → [references/ebextensions-and-platforms.md](references/ebextensions-and-platforms.md) § "Step 11 .ebextensions config examples".
+> Load when: writing the 01-options / 02-rds / 03-hooks .config files.
 
 **`.platform/hooks/`** is the AL2023-native hook directory, organized by phase: `prebuild/`, `predeploy/`, `postdeploy/`.
 
@@ -625,74 +360,21 @@ environment property.
 
 ## Step 13 — CNAME swap for blue-green
 
-```bash
-# Deploy green environment (new version)
-aws elasticbeanstalk create-environment \
-  --application-name myapp --environment-name myapp-green \
-  --cname-prefix myapp-green --version-label v2 \
-  --template-name myapp-prod-template
-
-# Wait for green to be Ready + Green health
-aws elasticbeanstalk describe-environments \
-  --environment-names myapp-green \
-  --query 'Environments[0].{Status:Status,Health:Health}'
-
-# Swap CNAMEs (atomic DNS cutover)
-aws elasticbeanstalk swap-environment-cnames \
-  --source-environment-id s-xxxx --destination-environment-id d-yyyy
-
-# Monitor green traffic; if rollback needed, swap back.
-# Terminate blue after monitoring period.
-```
+> **Moved verbatim** → [references/worked-examples.md](references/worked-examples.md) § "Step 13".
+> Load when: executing the green→swap→verify→terminate blue sequence.
 
 ## Step 14 — Application version lifecycle
 
 Application versions accumulate over time. Beanstalk has a per-
 application version limit (500 by default, soft limit).
 
-```bash
-# Create a new version
-aws elasticbeanstalk create-application-version \
-  --application-name myapp --version-label v3 \
-  --source-bundle S3Bucket=my-bucket,S3Key=app-v3.zip
-
-# Apply a lifecycle policy (keep max 200, delete older)
-aws elasticbeanstalk update-application \
-  --application-name myapp \
-  --resource-lifecycle-config '{"VersionLifecycleConfig":{"MaxCountRule":{"Enabled":true,"MaxCount":200,"DeleteSourceFromS3":true}}}'
-```
+> **Moved verbatim** → [references/worked-examples.md](references/worked-examples.md) § "Step 14".
+> Load when: creating application versions or applying the max-count lifecycle policy.
 
 ## Step 15 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Amazon Linux 2023 platform GA (2023-2024):** All Beanstalk platform
-  branches now default to AL2023. AL2 branches are in deprecation.
-  AL2023 brings faster boot times, deterministic package updates via
-  DNF, and improved security posture.
-
-- **Platform hooks `.platform/hooks/` (2023-2024):** The `.platform/`
-  directory replaces `.ebextensions/hooks/` for deployment lifecycle
-  hooks on AL2023. Hooks are organized by phase (prebuild, predeploy,
-  postdeploy) and support executable scripts.
-
-- **Traffic splitting deployment GA (2023-2024):** Traffic splitting
-  is now generally available for all ALB-based environments.
-  Configurable canary percentage and evaluation period with automatic
-  rollback on health check failure.
-
-- **Enhanced health with AL2023 metrics (2023-2024):** AL2023
-  environments report additional health metrics including per-instance
-  memory utilization and disk I/O, visible in the Beanstalk health
-  dashboard and CloudWatch.
-
-- **Graviton-based instance support (2024-2025):** Beanstalk
-  environments on AL2023 support Graviton (arm64) instance types.
-  Specify `arm64` architecture in the solution stack for cost-optimized
-  compute (up to 20% price/performance improvement).
-
-- **Environment cancellation API (2024-2025):** Long-running
-  environment updates can be cancelled via `AbortEnvironmentUpdate`.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Recent AWS features 2023-2026".
+> Load when: deciding on Graviton, traffic splitting, AL2023 metrics, or AbortEnvironmentUpdate.
 
 ## NEVER do these things
 
@@ -801,16 +483,17 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-- **Environment stuck in "Launching"/"Pending":** IAM issue — verify
-  instance profile S3 read. Check events via `describe-events`.
-- **Deployment fails ("Failed to deploy application"):** check logs via
-  `retrieve-environment-info`. Common causes: .ebextensions syntax
-  error, failed `container_commands`, incompatible runtime.
-- **Health "Red" after deploy:** ELB health check failing. Verify the
-  health check path (`/health`) returns 200 OK.
-- **CNAME swap fails:** both environments must be "Ready". Wait, retry.
-- **Managed updates not applying:** suppressed during active
-  deployments. Verify update level is `minor` or `patch`.
+> **Moved verbatim** → [references/error-handling.md](references/error-handling.md) § "Error handling".
+> Load when: a launch is stuck, a deploy fails, health is Red, a swap fails, or updates never apply.
+
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) — full command sequences: CNAME-swap blue-green, version lifecycle, VPC launch, ASG triggers, managed updates, enhanced health
+- [references/error-handling.md](references/error-handling.md) — deployment failure triage: stuck launches, failed deploys, Red health, swap failures
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight IAM verification (service role, instance profile)
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert heuristics (immutable deploy, .ebextensions IaC, CNAME swap, YAML gotchas, worker SQS, hook ordering), dependency-graph deep dive, misconceptions, recent AWS features
+- [references/deployment-policies.md](references/deployment-policies.md) — deployment policy decision detail
+- [references/ebextensions-and-platforms.md](references/ebextensions-and-platforms.md) — .ebextensions + platform detail, incl. Step 11 config examples
 
 ## Domain
 

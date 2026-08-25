@@ -225,3 +225,25 @@ aws configservice put-configuration-recorder \
 6. **Forgetting that AWS Config is required.** Without Config, FMS
    cannot evaluate compliance. Resources show as "unknown," not
    "compliant." Ensure Config is enabled in all target accounts.
+
+## Step 10 — Policy priority ordering
+When multiple policies of the same type target overlapping resources,
+FMS evaluates in priority order. The first matching policy wins.
+
+| Priority | Behavior |
+|---|---|
+| Lower number = higher priority | Evaluated first |
+| First match wins | Resource is managed by the first matching policy |
+| Lower-priority policies | NOT applied to resources already covered |
+
+**Reorder priorities:**
+
+```bash
+# List policies in priority order
+aws fms list-policies --region us-east-1 \
+  --query 'PolicyList[*].{Name:PolicyName,Type:SecurityServicePolicyData.Type,Pri:Priority}' \
+  --output table
+
+# Reorder (use put-apps-list or update policy priority)
+# Priority is set when creating/updating the policy
+```

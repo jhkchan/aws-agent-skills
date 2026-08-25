@@ -37,30 +37,8 @@ memory combo", "Fargate Spot savings", "Fargate capacity provider",
 
 ## Mindset
 
-**One-line takeaway:** Fargate charges per vCPU-second and per
-GB-second. Every dimension of optimization either reduces vCPU-seconds
-(fewer vCPUs, cheaper ARM64 vCPUs, Spot pricing) or reduces GB-seconds
-(less memory), or eliminates idle capacity (bin-packing, capacity
-providers, Savings Plans). Start with right-sizing, then pricing model,
-then architecture.
-
-Three facts make Fargate cost optimization different from generic
-container tuning:
-
-- **Fargate task CPU and memory must be from a fixed combination
-  table — you cannot pick arbitrary values.** There are 28 allowed
-  combinations (e.g. 0.25 vCPU pairs with 0.5/1/2 GB; 1 vCPU pairs with
-  2-8 GB). Right-sizing means finding the smallest combo that still
-  meets the workload's needs, not arbitrary increments.
-- **CloudWatch CPUUtilization and MemoryUtilization are measured
-  against the task's configured limits, not the node.** A task at 15%
-  CPUUtilization on a 2-vCPU config is using 0.3 vCPU — it can likely
-  drop to 0.5 vCPU. The metric IS the right-sizing signal.
-- **Fargate Spot and Savings Plans stack with architecture savings.**
-  ARM64 is 20% cheaper per-unit. Spot is up to 70% cheaper. Savings
-  Plans commits for 1-3 years at a discount. The optimal workload uses
-  all three: ARM64 + Spot + Savings Plans for fault-tolerant, steady
-  workloads; ARM64 + On-Demand for stateful services.
+Mindset and optimization facts moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Quick reference — optimization dimensions
 
@@ -101,34 +79,11 @@ Gather these inputs. Each step below branches on which are available.
 
 If the user has not provided the task definition or metrics, output:
 
-```text
-TARGET: <task-definition or service>
-VERDICT: NEED_MORE_INFO
-REASON: Cannot optimize without CPU/memory utilization data.
-MISSING:
-  - Task definition ARN or name:revision
-  - CloudWatch CPUUtilization and MemoryUtilization (14+ days)
-  - Current capacity provider strategy (if any)
-  - Monthly Fargate spend (from Cost Explorer)
-```
+NEED_MORE_INFO re-prompt template moved to
+[references/worked-examples.md](references/worked-examples.md).
 
-```bash
-# Describe the current task definition:
-aws ecs describe-task-definition \
-  --task-definition <task-def> \
-  --query 'taskDefinition.{cpu:cpu,memory:memory,arch:runtimePlatform.cpuArchitecture,containerDefs:containerDefinitions[*].{name:name,cpu:cpu,memory:memory,memoryReservation:memoryReservation}}'
-
-# Pull 14-day CPU and memory utilization:
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/ECS \
-  --metric-name CPUUtilization \
-  --dimensions Name=ClusterName,Value=<cluster> Name=ServiceName,Value=<service> \
-  --start-time $(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 3600 \
-  --statistics Average Maximum \
-  --query 'Datapoints[*].{time:Timestamp,avg:Average,max:Maximum}'
-```
+Step 0 capture commands moved to
+[references/rightsizing-commands.md](references/rightsizing-commands.md).
 
 ### Step 1: Identify the optimization category
 
@@ -186,40 +141,11 @@ to 8 GB needs at least 8 GB task memory regardless of
 MemoryUtilization averages. Check `-Xmx` / `MaxRAMPercentage` before
 downsizing memory on Java tasks.
 
-**Diagnostic commands:**
+Step 2 diagnostic commands moved to
+[references/rightsizing-commands.md](references/rightsizing-commands.md).
 
-```bash
-# 14-day CPU utilization (hourly avg + max):
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/ECS \
-  --metric-name CPUUtilization \
-  --dimensions Name=ClusterName,Value=<cluster> Name=ServiceName,Value=<service> \
-  --start-time $(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 3600 --statistics Average Maximum
-
-# 14-day Memory utilization:
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/ECS \
-  --metric-name MemoryUtilization \
-  --dimensions Name=ClusterName,Value=<cluster> Name=ServiceName,Value=<service> \
-  --start-time $(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 3600 --statistics Average Maximum
-```
-
-**Savings estimation (us-east-1, On-Demand, x86_64, 2026):**
-
-| Config | Hourly rate | Monthly (730h) |
-|---|---|---|
-| 0.25 vCPU / 0.5 GB | $0.011 | $8.03 |
-| 0.5 vCPU / 1 GB | $0.022 | $16.06 |
-| 1 vCPU / 2 GB | $0.043 | $31.39 |
-| 2 vCPU / 4 GB | $0.087 | $63.51 |
-| 4 vCPU / 8 GB | $0.173 | $126.29 |
-| 8 vCPU / 16 GB | $0.346 | $252.58 |
-
-Dropping from 2 vCPU / 4 GB to 1 vCPU / 2 GB saves ~$32/task/month.
+Savings estimation table moved to
+[references/fargate-pricing-matrix.md](references/fargate-pricing-matrix.md).
 
 ### Step 3: SPOT — Fargate Spot vs On-Demand evaluation
 
@@ -335,26 +261,8 @@ needed to handle the load, with auto scaling that tracks demand.
 | No capacity provider strategy; 100% Fargate On-Demand | Missing Spot savings | Add FargateSpot capacity provider (Step 3) |
 | Provisioned capacity for unpredictable traffic | Paying for idle baseline | Evaluate if traffic is truly unpredictable; if predictable, provisioned is correct |
 
-**Auto scaling policy recommendation:**
-
-```bash
-# Create a target tracking scaling policy on CPU utilization:
-aws application-autoscaling register-scalable-target \
-  --service-namespace ecs \
-  --resource-id service/<cluster>/<service> \
-  --scalable-dimension ecs:service:DesiredCount \
-  --min-capacity 2 \
-  --max-capacity 20
-
-aws application-autoscaling put-scaling-policy \
-  --service-namespace ecs \
-  --resource-id service/<cluster>/<service> \
-  --scalable-dimension ecs:service:DesiredCount \
-  --policy-name cpu-target-tracking \
-  --policy-type TargetTrackingScaling \
-  --target-tracking-scaling-policy-configuration \
-    '{"TargetValue":60.0,"PredefinedMetricSpecification":{"PredefinedMetricType":"ECSServiceAverageCPUUtilization"},"ScaleOutCooldown":60,"ScaleInCooldown":300}'
-```
+Auto scaling policy command moved to
+[references/rightsizing-commands.md](references/rightsizing-commands.md).
 
 Target 60% CPU gives headroom for traffic spikes while avoiding
 over-provisioning. `ScaleInCooldown` of 300s prevents flapping.
@@ -388,22 +296,8 @@ of tasks that run 24/7). The SP covers the baseline; On-Demand or Spot
 handles spikes above the baseline. Over-committing wastes money;
 under-committing leaves savings on the table.
 
-**Diagnostic commands:**
-
-```bash
-# Check current Savings Plans utilization and coverage:
-aws ce get-savings-plans-utilization \
-  --time-period Start=2026-07-01,End=2026-08-01 \
-  --granularity MONTHLY
-
-# Get Fargate spend by service:
-aws ce get-cost-and-usage \
-  --time-period Start=2026-07-01,End=2026-08-01 \
-  --granularity MONTHLY \
-  --filter '{"Dimensions":{"Key":"Service","Values":["Elastic Compute Cloud - CloudWatch"]}}' \
-  --metrics "UsageQuantity" "UnblendedCost" \
-  --group-by Type=DIMENSION,Key=USAGE_TYPE
-```
+Step 6 diagnostic commands moved to
+[references/rightsizing-commands.md](references/rightsizing-commands.md).
 
 ### Step 7: Map to root-cause catalog
 
@@ -498,21 +392,8 @@ MIGRATION_STEPS:
 
 ## Expert heuristic — "Right-size first, pricing model second, commitment third"
 
-Three rules, in order, produce 90% of Fargate savings:
-
-1. **Right-size the task definition first.** This reduces the base cost
-   that all other optimizations multiply against. A 2-vCPU task at 18%
-   CPU is paying for 1.6 vCPUs it never uses. Dropping to 1 vCPU nearly
-   halves the cost — and then Spot, ARM64, and Savings Plans all apply
-   to the smaller (cheaper) base.
-2. **Switch the pricing model second.** Once the task is right-sized,
-   evaluate Spot for fault-tolerant workloads (70% off) and ARM64 for
-   compatible runtimes (20% off). These are multiplicative: ARM64 Spot
-   is 76% off the x86_64 On-Demand price of the same task.
-3. **Commit with Savings Plans third.** Only after the task is
-   right-sized and on the right pricing model. The SP commitment should
-   match the steady-state baseline of the optimized configuration.
-   Committing to an over-provisioned baseline locks in waste.
+Expert heuristic reasoning moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Anti-Patterns — NEVER
 
@@ -554,28 +435,8 @@ Three rules, in order, produce 90% of Fargate savings:
 
 ## Recent AWS features (2024-2026)
 
-- **Fargate with EFA (Elastic Fabric Adapter, 2024-2025):** Fargate
-  now supports EFA for HPC and distributed ML training workloads.
-  EFA provides low-latency node-to-node communication. Relevant for
-  distributed training (PyTorch DDP, TensorFlow) and MPI-based HPC.
-  Not a cost optimization per se, but enables Fargate for workloads
-  that previously required EC2 with EFA.
-- **Fargate with instance storage (2025-2026):** Fargate tasks can now
-  access ephemeral instance storage (NVMe-backed) for high-I/O
-  workloads. This eliminates the need for EBS-attached storage for
-  scratch space, reducing cost for tasks that need fast local disk
-  (e.g., video transcoding, data processing intermediates).
-- **Graviton3 on Fargate (2024+):** Fargate ARM64 tasks run on
-  Graviton3 processors, which offer ~25% better price-performance
-  than Graviton2. No configuration change needed — selecting ARM64
-  automatically uses the latest Graviton generation.
-- **Fargate Spot capacity provider improvements (2024-2025):** The
-  FargateSpot capacity provider now supports `base` tasks on
-  On-Demand, making it easier to maintain a minimum guaranteed
-  capacity while running the bulk on Spot.
-- **Compute Savings Plans coverage for Fargate (2024-2026):** Compute
-  Savings Plans (1yr/3yr) apply to Fargate vCPU and GB charges,
-  stacking with Spot and ARM64 for maximum savings.
+Recent AWS features moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## References
 
@@ -583,6 +444,13 @@ See `references/fargate-pricing-matrix.md` for the full pricing
 reference (all CPU/memory combos, Spot vs On-Demand, x86_64 vs ARM64,
 regional rate notes), and `references/rightsizing-commands.md` for the
 canonical command script for each optimization dimension.
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — mindset, right-size/pricing/commitment heuristic, recent AWS features (moved from this file)
+- [references/worked-examples.md](references/worked-examples.md) — NEED_MORE_INFO re-prompt template (moved from this file)
+- [references/fargate-pricing-matrix.md](references/fargate-pricing-matrix.md) — full pricing matrix, Spot/ARM64/Savings Plans rates (savings-estimation table moved from this file appended)
+- [references/rightsizing-commands.md](references/rightsizing-commands.md) — canonical per-dimension command script (Step 0/2/5/6 listings moved from this file appended)
 
 ## Domain
 

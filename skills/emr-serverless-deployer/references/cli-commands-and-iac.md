@@ -470,3 +470,264 @@ Properties:
     - Key: Application
       Value: etl-spark
 ```
+
+
+## Step 1 — IAM execution role creation CLI (moved verbatim from SKILL.md lines 149-195)
+
+
+```bash
+aws iam create-role \
+  --role-name EMRServerlessExecRole \
+  --assume-role-policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [{
+      "Effect": "Allow",
+      "Principal": {"Service": "emr-serverless.amazonaws.com"},
+      "Action": "sts:AssumeRole"
+    }]
+  }'
+
+aws iam put-role-policy \
+  --role-name EMRServerlessExecRole \
+  --policy-name emr-serverless-exec \
+  --policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Action": ["s3:GetObject", "s3:ListBucket"],
+        "Resource": ["arn:aws:s3:::etl-scripts", "arn:aws:s3:::etl-scripts/*", "arn:aws:s3:::raw-data", "arn:aws:s3:::raw-data/*"]
+      },
+      {
+        "Effect": "Allow",
+        "Action": ["s3:PutObject"],
+        "Resource": ["arn:aws:s3:::curated/*", "arn:aws:s3:::emr-logs-123456789012/*"]
+      },
+      {
+        "Effect": "Allow",
+        "Action": ["glue:GetTable", "glue:GetDatabase", "glue:GetPartitions", "glue:CreateTable", "glue:UpdateTable"],
+        "Resource": "*"
+      },
+      {
+        "Effect": "Allow",
+        "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+        "Resource": "arn:aws:logs:<region>:<account-id>:log-group:/aws/emr-serverless/*"
+      },
+      {
+        "Effect": "Allow",
+        "Action": ["secretsmanager:GetSecretValue"],
+        "Resource": "arn:aws:secretsmanager:<region>:<account-id>:secret:etl/*"
+      }
+    ]
+  }'
+```
+
+## Step 2 — S3 log bucket CLI (moved verbatim from SKILL.md lines 205-228)
+
+
+```bash
+aws s3api create-bucket \
+  --bucket emr-logs-123456789012 \
+  --region us-east-1
+
+# Block public access (recommended)
+aws s3api put-public-access-block \
+  --bucket emr-logs-123456789012 \
+  --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+
+# Lifecycle rule to transition logs to Glacier after 30 days
+aws s3api put-bucket-lifecycle-configuration \
+  --bucket emr-logs-123456789012 \
+  --lifecycle-configuration '{
+    "Rules": [{
+      "ID": "log-archive",
+      "Status": "Enabled",
+      "Filter": {"Prefix": ""},
+      "Transitions": [{"Days": 30, "StorageClass": "GLACIER"}],
+      "Expiration": {"Days": 365}
+    }]
+  }'
+```
+
+## Step 3 — create-application CLI (moved verbatim from SKILL.md lines 231-266)
+
+
+```bash
+aws emr-serverless create-application \
+  --name etl-spark-prod \
+  --release-label emr-7.2.0 \
+  --type SPARK \
+  --initial-capacity '[
+    {
+      "workerType": {
+        "cpu": "4 vCPU",
+        "memory": "16 GB",
+        "disk": "20 GB"
+      },
+      "initialCount": 50,
+      "workerTypeConfiguration": {
+        "driver": {"cpu": "2 vCPU", "memory": "8 GB"},
+        "executor": {"cpu": "4 vCPU", "memory": "16 GB"}
+      }
+    }
+  ]' \
+  --maximum-capacity '{
+    "cpu": "800 vCPU",
+    "memory": "3200 GB",
+    "disk": "4000 GB"
+  }' \
+  --network-configuration '{
+    "subnetIds": ["subnet-aaa", "subnet-bbb"],
+    "securityGroupIds": ["sg-emr-prod"]
+  }' \
+  --auto-start-configuration '{"enabled": true}' \
+  --auto-stop-configuration '{"enabled": true, "idleTimeoutMinutes": 15}' \
+  --image-configuration '{
+    "imageUri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/emr-serverless:7.2.0-custom"
+  }' \
+  --tags Environment=production,Application=etl-spark
+```
+
+## Step 4 — start-application CLI (moved verbatim from SKILL.md lines 289-302)
+
+
+```bash
+APP_ID=$(aws emr-serverless create-application ... --query 'applicationId' --output text)
+
+aws emr-serverless start-application --application-id "$APP_ID"
+```
+
+Wait for the application to reach `STARTED` state:
+
+```bash
+aws emr-serverless get-application --application-id "$APP_ID" \
+  --query 'application.state' --output text
+# Should return 'STARTED'
+```
+
+## Step 5 — pre-initialized capacity CLI (moved verbatim from SKILL.md lines 309-323)
+
+
+```bash
+aws emr-serverless update-application \
+  --application-id "$APP_ID" \
+  --initial-capacity '[
+    {
+      "workerType": {
+        "cpu": "4 vCPU",
+        "memory": "16 GB",
+        "disk": "20 GB"
+      },
+      "initialCount": 50
+    }
+  ]'
+```
+
+## Step 6 — Spark job submission CLI (moved verbatim from SKILL.md lines 335-377)
+
+
+```bash
+aws emr-serverless start-job-run \
+  --application-id "$APP_ID" \
+  --execution-role-arn arn:aws:iam::123456789012:role/EMRServerlessExecRole \
+  --job-driver '{
+    "sparkSubmit": {
+      "entryPoint": "s3://etl-scripts/daily_transform.py",
+      "entryPointArguments": [
+        "--source", "s3://raw-data/events/",
+        "--target", "s3://curated/events/",
+        "--date", "2026-08-11"
+      ],
+      "sparkSubmitParameters": "--conf spark.sql.shuffle.partitions=200 --conf spark.executor.memoryOverhead=2g --conf spark.sql.adaptive.enabled=true"
+    }
+  }' \
+  --configuration-overrides '{
+    "monitoringConfiguration": {
+      "s3MonitoringConfiguration": {
+        "logUri": "s3://emr-logs-123456789012/etl-spark-prod/"
+      },
+      "managedPersistentAppUI": "ENABLED",
+      "cloudWatchLoggingConfiguration": {
+        "enabled": true,
+        "logGroupName": "/aws/emr-serverless/etl-spark-prod",
+        "logStreamNamePrefix": "job"
+      }
+    },
+    "applicationConfiguration": [
+      {
+        "classification": "spark-defaults",
+        "properties": {
+          "spark.sql.shuffle.partitions": "200",
+          "spark.sql.adaptive.enabled": "true",
+          "spark.sql.adaptive.coalescePartitions.enabled": "true",
+          "spark.executor.memoryOverhead": "2g"
+        }
+      }
+    ]
+  }' \
+  --name daily-transform-2026-08-11 \
+  --tags Environment=production,Pipeline=daily-transform
+```
+
+## Step 7 — Hive job submission CLI (moved verbatim from SKILL.md lines 380-399)
+
+
+```bash
+aws emr-serverless start-job-run \
+  --application-id "$APP_ID" \
+  --execution-role-arn arn:aws:iam::123456789012:role/EMRServerlessExecRole \
+  --job-driver '{
+    "hive": {
+      "query": "SELECT COUNT(*) FROM sales WHERE dt = '\''2026-08-11'\''",
+      "initScriptFileS3Path": "s3://etl-scripts/hive-init.sql",
+      "parameters": "--hiveconf hive.execution.engine=tez --hiveconf tez.grouping.min-size=268435456"
+    }
+  }' \
+  --configuration-overrides '{
+    "monitoringConfiguration": {
+      "s3MonitoringConfiguration": {"logUri": "s3://emr-logs-123456789012/hive-app/"},
+      "cloudWatchLoggingConfiguration": {"enabled": true}
+    }
+  }' \
+  --name hive-sales-count-2026-08-11
+```
+
+## Step 9 — VPC access CLI (moved verbatim from SKILL.md lines 419-427)
+
+
+```bash
+aws emr-serverless update-application \
+  --application-id "$APP_ID" \
+  --network-configuration '{
+    "subnetIds": ["subnet-aaa", "subnet-bbb"],
+    "securityGroupIds": ["sg-emr-prod"]
+  }'
+```
+
+## Step 10 — interactive endpoint CLI (moved verbatim from SKILL.md lines 444-456)
+
+
+```bash
+aws emr-serverless create-interactive-endpoint \
+  --application-id "$APP_ID" \
+  --execution-role-arn arn:aws:iam::123456789012:role/EMRServerlessExecRole \
+  --release-label emr-7.2.0 \
+  --configuration-overrides '{
+    "monitoringConfiguration": {
+      "s3MonitoringConfiguration": {"logUri": "s3://emr-logs-123456789012/interactive/"},
+      "cloudWatchLoggingConfiguration": {"enabled": true}
+    }
+  }'
+```
+
+## Step 11 — verification CLI (moved verbatim from SKILL.md lines 468-476)
+
+
+```bash
+aws emr-serverless get-application --application-id "$APP_ID"
+aws emr-serverless list-job-runs --application-id "$APP_ID"
+aws emr-serverless get-job-run --application-id "$APP_ID" --job-run-id "<job-id>"
+aws iam get-role --role-name EMRServerlessExecRole
+aws s3 ls s3://emr-logs-123456789012/etl-spark-prod/
+aws logs describe-log-groups --log-group-name-prefix /aws/emr-serverless/etl-spark-prod
+```

@@ -466,3 +466,135 @@ resource "aws_kms_alias" "cache" {
 | Wait for available | `aws elasticache wait replication-group-available` |
 | Delete replication group | `aws elasticache delete-replication-group` |
 | Delete cache cluster | `aws elasticache delete-cache-cluster` |
+
+## Step 5 — create subnet group command (from SKILL.md)
+
+```bash
+aws elasticache create-cache-subnet-group \
+  --cache-subnet-group-name prod-cache-subnet \
+  --cache-subnet-group-description "Multi-AZ subnet group for prod cache" \
+  --subnet-ids subnet-0aaa subnet-0bbb subnet-0ccc \
+  --tags Key=Environment,Value=production
+```
+
+## Step 5 — verify subnet group spans 2+ AZs (from SKILL.md)
+
+```bash
+aws ec2 describe-subnets --subnet-ids subnet-0aaa subnet-0bbb subnet-0ccc \
+  --query 'Subnets[*].AvailabilityZone' --output text
+# Expect at least 2 distinct AZs for Multi-AZ
+```
+
+## Step 5 — security group ingress command (from SKILL.md)
+
+```bash
+# Inbound: allow the application's SG to reach the cache port
+# Redis: port 6379
+# Memcached: port 11211
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-cache123 \
+  --protocol tcp \
+  --port 6379 \
+  --source-security-group-id sg-app456
+```
+
+## Step 7 — parameter values: timeout, tcp-keepalive, max-item-size (from SKILL.md)
+
+**Other Redis parameters worth setting:**
+
+```text
+timeout 300          # Close idle clients after 5 min (default 0 = never)
+tcp-keepalive 60     # Send TCP keepalive every 60s (default 300)
+maxmemory-policy allkeys-lru  # Per above table
+```
+
+**Memcached parameters:**
+
+```text
+max-item-size 4194304   # 4 MB max (default 1 MB; max 1024 MB)
+chunk_size_growth_factor 1.25  # Slab allocator tuning (rarely changed)
+```
+
+**Common mistake:** using `noeviction` for a cache (data is disposable
+— `allkeys-lru` is correct), or `allkeys-lru` for a session store
+(silent eviction breaks sessions — `noeviction` is correct).
+
+## Step 8 — enable automated snapshots at creation (from SKILL.md)
+
+```bash
+aws elasticache create-replication-group ... \
+  --snapshot-retention-limit 7 \
+  --snapshot-window "03:00-05:00" \
+  --snapshot-name prod-cache-snapshot
+```
+
+## Step 8 — snapshot retention parameters (from SKILL.md)
+
+- `snapshot-retention-limit`: days to keep automated snapshots (1-35).
+- `snapshot-window`: daily backup window (UTC). Avoid overlap with the
+  maintenance window.
+- Snapshots are stored in S3 (AWS-managed bucket, not customer-visible).
+
+## Step 8 — manual snapshot command (from SKILL.md)
+
+```bash
+aws elasticache create-snapshot \
+  --cache-cluster-id prod-cache \
+  --snapshot-name prod-cache-2026-08-05-preupgrade
+```
+
+## Step 8 — restore from snapshot command (from SKILL.md)
+
+```bash
+aws elasticache create-replication-group \
+  --replication-group-id prod-cache-restored \
+  --replication-group-description "Restored from snapshot" \
+  --engine redis \
+  --cache-node-type cache.r6g.large \
+  --num-cache-clusters 2 \
+  --snapshot-arns arn:aws:elasticache:us-east-1:123456789012:snapshot:prod-cache-snapshot
+```
+
+## Step 10 — CloudWatch alarm commands (from SKILL.md)
+
+```bash
+# CPU utilization > 90% for 5 min
+aws cloudwatch put-metric-alarm \
+  --alarm-name "prod-cache-cpu-high" \
+  --namespace AWS/ElastiCache \
+  --metric-name CPUUtilization \
+  --dimensions Name=CacheClusterId,Value=prod-cache \
+  --statistic Average --period 60 --threshold 90 \
+  --comparison-operator GreaterThan --evaluation-periods 5 \
+  --alarm-actions <sns-arn>
+
+# Memory: swap usage > 0 (Redis should never swap)
+aws cloudwatch put-metric-alarm \
+  --alarm-name "prod-cache-swap" \
+  --namespace AWS/ElastiCache \
+  --metric-name SwapUsage \
+  --dimensions Name=CacheClusterId,Value=prod-cache \
+  --statistic Average --period 60 --threshold 0 \
+  --comparison-operator GreaterThan --evaluation-periods 1 \
+  --alarm-actions <sns-arn>
+
+# Evictions > threshold (cache is full and evicting — capacity issue)
+aws cloudwatch put-metric-alarm \
+  --alarm-name "prod-cache-evictions" \
+  --namespace AWS/ElastiCache \
+  --metric-name Evictions \
+  --dimensions Name=CacheClusterId,Value=prod-cache \
+  --statistic Sum --period 60 --threshold 1000 \
+  --comparison-operator GreaterThan --evaluation-periods 5 \
+  --alarm-actions <sns-arn>
+
+# Replication lag (Redis replication groups)
+aws cloudwatch put-metric-alarm \
+  --alarm-name "prod-cache-repl-lag" \
+  --namespace AWS/ElastiCache \
+  --metric-name ReplicationLag \
+  --dimensions Name=CacheClusterId,Value=prod-cache \
+  --statistic Average --period 60 --threshold 30 \
+  --comparison-operator GreaterThan --evaluation-periods 3 \
+  --alarm-actions <sns-arn>
+```

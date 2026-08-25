@@ -351,3 +351,66 @@ aws elasticbeanstalk update-environment \
     Namespace=aws:autoscaling:trigger,OptionName=BreachDuration,Value=300 \
   --region us-east-1
 ```
+
+## Opt 7 — right-size capacity command (from SKILL.md)
+
+```bash
+# Set min/max/desired capacity based on traffic analysis
+# For dev: min=1, max=1, desired=1 (no scaling)
+# For staging: min=1, max=2, desired=1 (limited scaling)
+# For prod: min=2, max=N (based on peak traffic)
+aws elasticbeanstalk update-environment \
+  --environment-name my-env \
+  --option-settings \
+    Namespace=aws:autoscaling:asg,OptionName=MinSize,Value=2 \
+    Namespace=aws:autoscaling:asg,OptionName=MaxSize,Value=6 \
+    Namespace=aws:autoscaling:asg,OptionName=DesiredCapacity,Value=2 \
+  --region us-east-1
+```
+
+## Opt 7 — tune scaling triggers command (from SKILL.md)
+
+```bash
+# Use CPU utilization as the scaling trigger (default)
+# Adjust thresholds based on steady-state CPU patterns
+aws elasticbeanstalk update-environment \
+  --environment-name my-env \
+  --option-settings \
+    Namespace=aws:autoscaling:trigger,OptionName=MeasureName,Value=CPUUtilization \
+    Namespace=aws:autoscaling:trigger,OptionName=Statistic,Value=Average \
+    Namespace=aws:autoscaling:trigger,OptionName=Unit,Value=Percent \
+    Namespace=aws:autoscaling:trigger,OptionName=LowerThreshold,Value=20 \
+    Namespace=aws:autoscaling:trigger,OptionName=UpperThreshold,Value=70 \
+    Namespace=aws:autoscaling:trigger,OptionName=LowerBreachScaleIncrement,Value=-1 \
+    Namespace=aws:autoscaling:trigger,OptionName=UpperBreachScaleIncrement,Value=1 \
+    Namespace=aws:autoscaling:trigger,OptionName=BreachDuration,Value=300 \
+  --region us-east-1
+```
+
+## Opt 10 — common health check issues (from SKILL.md)
+
+- Health check URL path is wrong (returns 404, marked unhealthy).
+- Health check timeout is too short (marks instances unhealthy before
+  the application starts up).
+- Threshold too sensitive (marks instances unhealthy on brief CPU spike).
+
+## Opt 10 — tune health check command (from SKILL.md)
+
+```bash
+aws elasticbeanstalk update-environment \
+  --environment-name my-env \
+  --option-settings \
+    Namespace=aws:elasticbeanstalk:application,OptionName=Application Healthcheck URL,Value=/health \
+    Namespace=aws:elasticbeanstalk:healthreporting:system,OptionName=SystemType,Value=enhanced \
+  --region us-east-1
+```
+
+## Opt 11 — disable termination protection command (from SKILL.md)
+
+```bash
+# Only for dev/staging environments that should be torn down
+aws elasticbeanstalk update-environment \
+  --environment-name my-dev-env \
+  --no-terminate-on-failure \
+  --region us-east-1
+```

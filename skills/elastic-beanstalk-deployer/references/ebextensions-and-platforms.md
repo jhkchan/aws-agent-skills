@@ -184,3 +184,35 @@ price/performance improvement over equivalent x86 instances.
 
 5. **Platform incompatibility:** `.ebextensions/hooks/` is NOT
    supported on AL2023. Use `.platform/hooks/` instead.
+
+## Step 11 .ebextensions config examples (from SKILL.md)
+
+**`.ebextensions/01-options.config`** — set namespace options and
+environment variables:
+```yaml
+option_settings:
+  - namespace: aws:elasticbeanstalk:application:environment
+    option_name: NODE_ENV
+    value: production
+```
+
+**`.ebextensions/02-rds.config`** — create an RDS instance:
+```yaml
+Resources:
+  AWSEBRDSDatabase:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      AllocatedStorage: 20
+      DBInstanceClass: db.t3.micro
+      Engine: postgres
+      MasterUsername: myapp
+      DeletionPolicy: Retain
+```
+
+**`.ebextensions/03-hooks.config`** — deployment hooks:
+```yaml
+container_commands:
+  01_migrate:
+    command: "npm run migrate"
+    leader_only: true
+```

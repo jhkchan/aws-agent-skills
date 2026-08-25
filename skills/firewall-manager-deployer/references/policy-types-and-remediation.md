@@ -240,3 +240,141 @@ resource "aws_fms_policy" "sg_audit" {
 5. **Assuming Shield Advanced policies need resource-level config.**
    Shield Advanced policies auto-protect supported resources. No
    additional resource-level configuration is needed.
+
+## Step 5 — WAF managed rule group association
+WAF policies reference managed rule groups (AWS or marketplace) or
+custom rule groups. The managed rule group set determines which rules
+are applied to all Web ACLs created by the policy.
+
+**Common managed rule groups:**
+
+| Rule Group | Purpose |
+|---|---|
+| AWSManagedRulesCommonRuleSet | Core rules (LFI, RFI, SQLi, XSS) |
+| AWSManagedRulesKnownBadInputsRuleSet | Log4j, SSRF, bad inputs |
+| AWSManagedRulesAmazonIpReputationList | Malicious IP reputation |
+| AWSManagedRulesSQLiRuleSet | SQL injection |
+| AWSManagedRulesLinuxRuleSet | Linux-specific exploits |
+| AWSManagedRulesWindowsRuleSet | Windows-specific exploits |
+| AWSManagedRulesWordPressRuleSet | WordPress exploits |
+
+**Create a WAF FMS policy:**
+
+```bash
+aws fms put-policy \
+  --policy-name "org-waf-common-rules" \
+  --policy-type "WAFV2" \
+  --region us-east-1 \
+  --cli-input-json file://fms-waf-policy.json
+```
+
+**fms-waf-policy.json structure:**
+
+```json
+{
+  "PolicyName": "org-waf-common-rules",
+  "SecurityServicePolicyData": {
+    "Type": "WAFV2",
+    "ManagedServiceData": "{\"type\":\"WAFV2\",\"preProcessRuleGroups\":[{\"managedRuleGroupStatement\":{\"vendorName\":\"AWS\",\"name\":\"AWSManagedRulesCommonRuleSet\"}}]}"
+  },
+  "IncludeMap": {"ORG_UNIT": ["ou-xxxx-yyyy"]},
+  "RemediationEnabled": true,
+  "RemediationGracePeriodDays": 7,
+  "DeleteUnusedFMSPortals": false
+}
+```
+
+**Common mistake:** using a standalone WAF Web ACL ARN instead of a
+managed rule group. FMS creates the Web ACLs; you only specify the rule
+groups.
+
+## Step 6 — Security group policies (common vs content audit)
+Security group policies have two modes:
+
+| Mode | Behavior | Use Case |
+|---|---|---|
+| Common | Applies the SAME security group rules to all targeted ENIs | Enforce a baseline SG across accounts |
+| Content Audit | Checks existing SGs against audit rules; flags/remediates nonconforming SGs | Ensure SGs comply with policy (e.g., no port 22 open to 0.0.0.0/0) |
+
+**Common SG policy:**
+
+```json
+{
+  "PolicyName": "org-sg-baseline",
+  "SecurityServicePolicyData": {
+    "Type": "SECURITY_GROUPS_COMMON",
+    "ManagedServiceData": "{\"type\":\"SECURITY_GROUPS_COMMON\",\"securityGroups\":[{\"id\":\"sg-aaa11122\"}]}"
+  },
+  "IncludeMap": {"ORG_UNIT": ["ou-xxxx-yyyy"]},
+  "RemediationEnabled": true
+}
+```
+
+**Content audit SG policy (audit existing SGs):**
+
+```json
+{
+  "PolicyName": "org-sg-audit-no-ssh-open",
+  "SecurityServicePolicyData": {
+    "Type": "SECURITY_GROUPS_CONTENT_AUDIT",
+    "ManagedServiceData": "{\"type\":\"SECURITY_GROUPS_CONTENT_AUDIT\",\"securityGroupAction\":{\"type\":\"ALLOW\"},\"recursiveSecurityGroupEgressRules\":false}"
+  },
+  "IncludeMap": {"ORG_UNIT": ["ou-xxxx-yyyy"]},
+  "RemediationEnabled": false
+}
+```
+
+## Step 7 — Network Firewall policy deployment
+Network Firewall policies deploy managed Network Firewall firewalls in
+target accounts. Each target account needs firewall subnet mappings for
+firewall placement.
+
+```bash
+aws fms put-policy \
+  --policy-name "org-nfw-inspection" \
+  --policy-type "NETWORK_FIREWALL" \
+  --region us-east-1 \
+  --cli-input-json file://fms-nfw-policy.json
+```
+
+**fms-nfw-policy.json structure:**
+
+```json
+{
+  "PolicyName": "org-nfw-inspection",
+  "SecurityServicePolicyData": {
+    "Type": "NETWORK_FIREWALL",
+    "ManagedServiceData": "{\"type\":\"NETWORK_FIREWALL\",\"networkFirewallStatelessRuleGroupReferences\":[],\"networkFirewallStatefulRuleGroupReferences\":[]}"
+  },
+  "IncludeMap": {"ORG_UNIT": ["ou-xxxx-yyyy"]},
+  "RemediationEnabled": true,
+  "RemediationGracePeriodDays": 14
+}
+```
+
+## Step 8 — Shield Advanced policy deployment
+Shield Advanced policies enable automatic DDoS protection for supported
+resources in targeted accounts. No additional configuration is needed
+beyond the policy — Shield automatically protects ALBs, NLBs,
+CloudFront distributions, Route53 hosted zones, and Global Accelerators.
+
+```bash
+aws fms put-policy \
+  --policy-name "org-shield-advanced" \
+  --policy-type "SHIELD_ADVANCED" \
+  --region us-east-1 \
+  --cli-input-json file://fms-shield-policy.json
+```
+
+**fms-shield-policy.json structure:**
+
+```json
+{
+  "PolicyName": "org-shield-advanced",
+  "SecurityServicePolicyData": {
+    "Type": "SHIELD_ADVANCED"
+  },
+  "IncludeMap": {"ORG_UNIT": ["ou-xxxx-yyyy"]},
+  "RemediationEnabled": true
+}
+```

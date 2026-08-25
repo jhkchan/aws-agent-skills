@@ -276,3 +276,70 @@ iptables -F
 
 Run via SSM Run Command on the target instance, or via Session
 Manager if SSH is unavailable.
+
+### Step 5 — Create IAM execution role with least privilege
+**Trust policy:**
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": {"Service": "fis.amazonaws.com"},
+    "Action": "sts:AssumeRole"
+  }]
+}
+```
+
+**Permission policy (least privilege):**
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["ec2:StopInstances", "ec2:StartInstances"],
+      "Resource": "*",
+      "Condition": {"StringEquals": {"aws:ResourceTag/fis-target": "true"}}
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["cloudwatch:DescribeAlarms"],
+      "Resource": "arn:aws:cloudwatch:<region>:<account>:alarm:<ALARM_NAME>"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["ssm:SendCommand", "ssm:GetCommandInvocation"],
+      "Resource": ["arn:aws:ssm:<region>::document/AWS-RunShellScript",
+                   "arn:aws:ec2:<region>:<account>:instance/*"]
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+      "Resource": "arn:aws:logs:<region>:<account>:log-group:/aws/fis/<exp>:*"
+    }
+  ]
+}
+```
+
+**Common mistake:** granting `ec2:StopInstances` on `Resource: "*"`
+without the tag condition. The condition is the second line of
+defense — if the target filter is misconfigured, the IAM condition
+still blocks the action on non-FIS resources.
+
+### Step 6 — Configure experiment logging (S3 / CloudWatch Logs)
+**S3 logging:**
+```json
+"logConfiguration": {
+  "logSchemaVersion": 2,
+  "cloudWatchLogsConfiguration": {"logGroupArn": "arn:aws:logs:<region>:<account>:log-group:/aws/fis/<exp>"},
+  "s3Configuration": {"bucketName": "fis-experiment-logs-<account>", "prefix": "experiments/<exp>/"},
+  "logsSchemaVersion": 2
+}
+```
+
+The S3 bucket MUST grant `s3:PutObject` to the FIS service principal
+(`service-role/fis.amazonaws.com` or the FIS logging account). The
+CloudWatch log group MUST exist before the experiment starts.
+
+**Common mistake:** referencing a log group that does not exist. FIS
+does not create it; logging silently fails.

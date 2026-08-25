@@ -134,25 +134,8 @@ with zero downtime using the use-online-resharding flag.
 Three misconceptions dominate ElastiCache misdesign at provisioning
 time:
 
-- **"Encryption can be enabled later."** It CANNOT. At-rest encryption
-  (KMS) and in-transit encryption (TLS) are creation-time-only settings
-  for Redis replication groups. If you need encryption, you must enable
-  it when creating the replication group. Existing non-encrypted
-  clusters require migration (create new encrypted cluster, seed from
-  backup or application-level replication).
-
-- **"Cluster mode and non-cluster mode are interchangeable."** They are
-  NOT. Non-cluster mode uses a single primary with up to 5 read
-  replicas — simple, but limited to the memory of one node. Cluster
-  mode enabled shards data across multiple primaries (1-500 shards),
-  each with its own replicas — horizontally scalable, but requires
-  cluster-aware client libraries. Switching modes requires migration.
-
-- **"Memcached and Redis are the same to provision."** They are NOT.
-  Memcached is a flat cache (no replication, no persistence, no
-  encryption, no multi-AZ failover, no snapshots). Redis supports all
-  of these. Choose Memcached only for simple, ephemeral, multi-
-  threaded caching with no durability requirements.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Mindset misconceptions".
+> Load when: you need the full argument behind encryption/cluster-mode/engine misconceptions.
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -176,66 +159,13 @@ to sequence provisioning.
 | Online resharding | Cluster mode enabled; async operation | Non-cluster mode CANNOT be resharded | scale without downtime |
 | Auto-scaling | Replication group exists; scaling policy defined | Min/max must be within node-group limits | capacity elasticity |
 
-**The encryption-at-creation row is the one a baseline model misses.**
-A model may suggest "enable encryption after creating the cluster."
-This is IMPOSSIBLE for Redis replication groups. The procedure forces
-an explicit encryption decision before the create call.
-
-**Cross-dependency gotchas:**
-- AUTH token requires in-transit encryption (TLS). AUTH without TLS
-  sends the token in cleartext.
-- Multi-AZ automatic failover requires at least one replica per shard.
-- Cluster mode and non-cluster mode use different API parameters
-  (`--num-node-groups` vs `--num-cache-clusters`). Client libraries
-  must be cluster-aware for cluster mode.
-- Online resharding is supported ONLY on cluster-mode-enabled groups.
-- Global Datastore requires matching engine versions across regions.
-- Snapshot window and maintenance window must NOT overlap.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Configuration dependency graph".
+> Load when: the cross-dependency gotchas behind the table.
 
 ## Expert heuristic: cluster mode enabled topology + replica promotion priority + snapshot window vs maintenance window overlap
 
-A baseline model says "create a Redis cluster." The correct heuristic
-designs the cluster-mode topology (shards and hash slots), sets replica
-promotion priorities for predictable failover, and ensures the snapshot
-window does not overlap the maintenance window.
-
-```text
-Cluster mode enabled — 3 shards, 1 replica each (6 nodes total):
-
-  Shard 1 (slots 0-5460):
-    Primary: node-0001 (AZ-a)
-    Replica: node-0004 (AZ-b, priority 100) ← failover target
-
-  Shard 2 (slots 5461-10922):
-    Primary: node-0002 (AZ-b)
-    Replica: node-0005 (AZ-c, priority 100)
-
-  Shard 3 (slots 10923-16383):
-    Primary: node-0003 (AZ-c)
-    Replica: node-0006 (AZ-a, priority 100)
-
-Replica promotion priority (ReplicaPriority, default 100):
-  Lower number = higher promotion priority.
-  Priority 0 = never promoted (read-only replica).
-
-Failover: primary fails → highest-priority replica promoted → DNS updated.
-```
-
-**Window overlap check:**
-```text
-Snapshot window:   03:00-05:00 UTC daily
-Maintenance window: mon:05:00-mon:06:00 UTC weekly
-
-If they overlap → snapshots skipped or maintenance delayed.
-Best practice: gap of 1+ hours between snapshot end and maintenance.
-  Snapshot:   01:00-03:00 UTC
-  Maintenance: mon:05:00-mon:06:00 UTC
-```
-
-**Key implication:** the topology (shard count, replica count, AZ
-placement) determines capacity and availability. Replica promotion
-priority controls failover behavior. Window overlap is a silent failure
-that causes missing backups.
+> **Moved verbatim** → [references/config-patterns.md](references/config-patterns.md) § "Expert heuristic: cluster mode topology, promotion priority, window overlap".
+> Load when: designing shard/replica/AZ layout, promotion priorities, or non-overlapping windows.
 
 ## Prerequisites (verify before provisioning)
 
@@ -291,30 +221,13 @@ threaded caching with no durability.
 
 **Non-cluster mode:**
 
-```bash
-aws elasticache create-replication-group \
-  --replication-group-id my-redis-non-cluster \
-  --engine redis \
-  --cache-node-type cache.r6g.large \
-  --num-cache-clusters 2 \
-  --cache-subnet-group-name my-subnet-group \
-  --security-group-ids sg-aaa11122 \
-  --automatic-failover-enabled --multi-az-enabled
-```
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 2".
+> Load when: creating a non-cluster replication group.
 
 **Cluster mode enabled:**
 
-```bash
-aws elasticache create-replication-group \
-  --replication-group-id my-redis-cluster \
-  --engine redis \
-  --cache-node-type cache.r6g.large \
-  --num-node-groups 3 --replicas-per-node-group 1 \
-  --cache-subnet-group-name my-subnet-group \
-  --security-group-ids sg-aaa11122 \
-  --automatic-failover-enabled --multi-az-enabled \
-  --cache-parameter-group-name my-param-group
-```
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 2".
+> Load when: creating a cluster-mode-enabled replication group.
 
 **Common mistake:** using `--num-cache-clusters` when you need cluster
 mode. Cluster mode uses `--num-node-groups` and `--replicas-per-node-group`.
@@ -325,21 +238,8 @@ A Redis replication group has a primary and 0-5 read replicas per shard.
 Multi-AZ with automatic failover promotes a replica in a different AZ
 when the primary fails.
 
-```bash
-# At creation (recommended):
-aws elasticache create-replication-group \
-  --replication-group-id my-redis-ha \
-  --engine redis --cache-node-type cache.r6g.large \
-  --num-node-groups 3 --replicas-per-node-group 1 \
-  --automatic-failover-enabled --multi-az-enabled \
-  --cache-subnet-group-name my-subnet-group \
-  --security-group-ids sg-aaa11122
-
-# Modify existing:
-aws elasticache modify-replication-group \
-  --replication-group-id my-redis-ha \
-  --automatic-failover-enabled --multi-az-enabled --apply-immediately
-```
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 3".
+> Load when: enabling multi-AZ + automatic failover at creation or via modify.
 
 **Critical:** multi-AZ without at least one replica per shard is
 ineffective — failover has no target to promote.
@@ -360,40 +260,21 @@ Per-shard throughput scales with replicas (reads) and shards (writes).
 
 **Create a subnet group (requires >= 2 AZs for multi-AZ):**
 
-```bash
-aws elasticache create-cache-subnet-group \
-  --cache-subnet-group-name my-cache-subnet-group \
-  --cache-subnet-group-description "ElastiCache subnet group" \
-  --subnet-ids subnet-aaa11122 subnet-bbb22233 subnet-ccc33344
-```
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 5".
+> Load when: creating the multi-AZ subnet group.
 
 **Security group (Redis 6379, Memcached 11211):**
 
-```bash
-SG_ID=$(aws ec2 create-security-group \
-  --group-name elasticache-redis-sg --description "ElastiCache Redis SG" \
-  --vpc-id vpc-aaa11122 --query 'GroupId' --output text)
-
-aws ec2 authorize-security-group-ingress \
-  --group-id "$SG_ID" --protocol tcp --port 6379 \
-  --source-security-group-id sg-app11122
-```
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 5".
+> Load when: creating the SG and authorizing inbound from the app SG.
 
 **Critical:** the SG must allow inbound from the application SG (not
 CIDR) for least-privilege. Port differs: Redis = 6379, Memcached = 11211.
 
 ## Step 6 — Parameter groups
 
-```bash
-aws elasticache create-cache-parameter-group \
-  --cache-parameter-group-name my-redis-params \
-  --cache-parameter-group-family redis6.x \
-  --description "Custom Redis parameters"
-
-aws elasticache modify-cache-parameter-group \
-  --cache-parameter-group-name my-redis-params \
-  --parameter-name-values ParameterName=maxmemory-policy,ParameterValue=allkeys-lru
-```
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 6".
+> Load when: creating and modifying a Redis parameter group.
 
 | Parameter | Default | Effect |
 |---|---|---|
@@ -406,17 +287,8 @@ aws elasticache modify-cache-parameter-group \
 **Encryption is creation-time-only for Redis replication groups.** It
 CANNOT be toggled on after the cluster exists.
 
-```bash
-aws elasticache create-replication-group \
-  --replication-group-id my-redis-encrypted \
-  --engine redis --cache-node-type cache.r6g.large \
-  --num-node-groups 3 --replicas-per-node-group 1 \
-  --at-rest-encryption-enabled \
-  --kms-key-id arn:aws:kms:us-east-1:123456789012:key/aaa11122 \
-  --transit-encryption-enabled \
-  --cache-subnet-group-name my-subnet-group \
-  --security-group-ids sg-aaa11122
-```
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 7".
+> Load when: creating with KMS + TLS encryption at creation.
 
 | Encryption type | Parameter | Post-creation |
 |---|---|---|
@@ -432,21 +304,8 @@ create a new encrypted cluster and migrate data.
 AUTH tokens require in-transit encryption (TLS) — otherwise the token
 is sent in cleartext.
 
-```bash
-aws elasticache create-replication-group \
-  --replication-group-id my-redis-auth \
-  --engine redis --cache-node-type cache.r6g.large \
-  --num-node-groups 3 --replicas-per-node-group 1 \
-  --transit-encryption-enabled \
-  --auth-token "MyStr0ngT0k3n!2026" \
-  --cache-subnet-group-name my-subnet-group \
-  --security-group-ids sg-aaa11122
-
-# Store token in Secrets Manager for rotation
-aws secretsmanager create-secret \
-  --name elasticache/redis-auth-token \
-  --secret-string "MyStr0ngT0k3n!2026"
-```
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 8".
+> Load when: setting an AUTH token and storing it for rotation.
 
 ## Step 9 — Backup and snapshot management
 
@@ -455,21 +314,8 @@ aws secretsmanager create-secret \
 | Automated | Daily snapshot in snapshot window | 0-35 days (0 = disabled) |
 | Manual | On-demand via API | Until manually deleted |
 
-```bash
-aws elasticache create-replication-group \
-  --replication-group-id my-redis-backup \
-  --engine redis --cache-node-type cache.r6g.large \
-  --num-cache-clusters 2 \
-  --snapshot-retention-limit 7 \
-  --snapshot-window "03:00-05:00" \
-  --cache-subnet-group-name my-subnet-group \
-  --security-group-ids sg-aaa11122
-
-# Manual snapshot
-aws elasticache create-snapshot \
-  --snapshot-name my-manual-snapshot-20260805 \
-  --replication-group-id my-redis-backup
-```
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 9".
+> Load when: creating with automated snapshots or taking a manual snapshot.
 
 **Critical:** the snapshot window MUST NOT overlap the maintenance
 window. If they overlap, snapshots may be skipped.
@@ -479,52 +325,16 @@ window. If they overlap, snapshots may be skipped.
 Global Datastore provides cross-region replication for DR and low-
 latency multi-region reads.
 
-```bash
-# Step 1: Create primary in region A with global suffix
-aws elasticache create-replication-group \
-  --replication-group-id my-redis-global-primary \
-  --engine redis --cache-node-type cache.r6g.large \
-  --num-node-groups 3 --replicas-per-node-group 1 \
-  --global-replication-group-suffix-group-id my-global \
-  --cache-subnet-group-name my-subnet-useast \
-  --security-group-ids sg-useast111 --region us-east-1
-
-# Step 2: Create the Global Datastore
-aws elasticache create-global-replication-group \
-  --global-replication-group-id my-global-datastore \
-  --primary-replication-group-id my-redis-global-primary \
-  --global-replication-group-description "Cross-region DR" \
-  --region us-east-1
-
-# Step 3: Add secondary in region B
-aws elasticache create-replication-group \
-  --replication-group-id my-redis-global-secondary \
-  --global-replication-group-id <global-id-fqn> \
-  --cache-subnet-group-name my-subnet-euwest \
-  --security-group-ids sg-euwest111 --region eu-west-1
-```
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 10".
+> Load when: building a Global Datastore with primary + secondary.
 
 **Constraints:** same engine version across regions; encryption config
 must match; secondary is read-only until failover.
 
 ## Step 11 — Auto-scaling
 
-```bash
-# Register scalable target (shard count)
-aws application-autoscaling register-scalable-target \
-  --service-namespace elasticache \
-  --resource-id replication-group/my-redis-cluster \
-  --scalable-dimension elasticache:replication-group:NodeGroups \
-  --min-capacity 3 --max-capacity 10
-
-# Target tracking policy
-aws application-autoscaling put-scaling-policy \
-  --service-namespace elasticache \
-  --resource-id replication-group/my-redis-cluster \
-  --scalable-dimension elasticache:replication-group:NodeGroups \
-  --policy-name my-scaling-policy --policy-type TargetTrackingScaling \
-  --target-tracking-scaling-policy-configuration '{"PredefinedMetricSpecification":{"PredefinedMetricType":"ElastiCachePrimaryEngineCPUUtilization"},"TargetValue":60.0,"ScaleOutCooldown":300,"ScaleInCooldown":300}'
-```
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 11".
+> Load when: registering a scalable target and attaching the policy.
 
 Auto-scaling uses CloudWatch metrics (EngineCPUUtilization,
 DatabaseMemoryUsagePercentage) as triggers. Scale-out adds shards;
@@ -535,41 +345,16 @@ scale-in removes shards. Online resharding is performed automatically.
 Online resharding adds/removes shards from a cluster-mode-enabled
 replication group with ZERO downtime.
 
-```bash
-# Scale out (add shards)
-aws elasticache modify-replication-group-shard-configuration \
-  --replication-group-id my-redis-cluster \
-  --node-group-count 5 --apply-immediately
-
-# Scale in (remove specific shards)
-aws elasticache modify-replication-group-shard-configuration \
-  --replication-group-id my-redis-cluster \
-  --node-group-count 2 \
-  --node-groups-to-remove "0003" "0004" --apply-immediately
-
-# Check resharding status (async operation)
-aws elasticache describe-replication-groups \
-  --replication-group-id my-redis-cluster \
-  --query 'ReplicationGroups[0].Status'
-# "modifying" = in progress; "available" = complete
-```
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 12".
+> Load when: adding/removing shards and polling resharding status.
 
 **Key implication:** online resharding is ONLY for cluster-mode-enabled
 groups. Non-cluster mode requires migration to a new cluster.
 
 ## Step 13 — Recent features
 
-- **Graviton3 (r7g) node types (2023-2024):** Significant price/
-  performance improvements over r6g. Recommended for new clusters.
-- **Serverless ElastiCache (2023-2024):** Auto-scaling without cluster
-  management. Currently in preview for Redis.
-- **TLS 1.3 support (2023-2024):** Enhanced in-transit encryption.
-- **Global Datastore improvements (2023-2024):** Higher throughput,
-  lower lag, more regions.
-- **Online vertical scaling (2024-2025):** Change node type without
-  downtime for cluster-mode groups.
-- **Enhanced CloudWatch metrics (2024-2025):** Per-shard metrics and
-  replication lag tracking.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Step 13".
+> Load when: deciding on r7g, serverless, TLS 1.3, or online vertical scaling.
 
 ## NEVER do these things
 
@@ -675,52 +460,21 @@ VERIFICATION_COMMANDS:
 
 ### Worked example — PREREQUISITES_MISSING (subnet group absent)
 
-```text
-ELASTICACHE_CLUSTER: cache-dev (Redis OSS 7.0, cache.r6g.large, cluster mode enabled)
-VERDICT: PREREQUISITES_MISSING
-CHECKLIST:
-  [✓] Engine: Redis OSS (version 7.0)
-  [✓] Topology: Cluster mode enabled (3 shards x 1 replica = 6 nodes total)
-  [✓] Node type: cache.r6g.large
-  [✗] Subnet group: dev-redis-subnet-group — DOES NOT EXIST. Run `aws elasticache describe-cache-subnet-groups --cache-subnet-group-name dev-redis-subnet-group` returns ResourceNotFound. Create the subnet group with subnets in at least 2 AZs before deploying.
-  [✓] Security group: sg-dev123456 (port 6379, inbound from sg-app-dev)
-  [✓] Multi-AZ failover: Enabled (3 AZs planned)
-  [✓] At-rest encryption (KMS): Enabled (key arn:aws:kms:us-east-1:123456789012:key/b2c3d4e5-6789-01ab-cdef-234567890abc)
-  [✓] In-transit encryption (TLS): Enabled
-  [✓] Snapshot window: 01:00-03:00 UTC (no overlap with maintenance wed:04:00-wed:05:00 UTC)
-VERIFICATION_COMMANDS:
-  aws elasticache describe-cache-subnet-groups --cache-subnet-group-name dev-redis-subnet-group --region us-east-1
-  # Create the subnet group first, then re-invoke this skill
-```
+> **Moved verbatim** → [references/worked-examples.md](references/worked-examples.md) § "Worked example".
+> Load when: emitting a PREREQUISITES_MISSING checklist with a cited gap.
 
 ## Error handling
 
-### Cluster creation fails with "encryption not supported"
+> **Moved verbatim** → [references/error-handling.md](references/error-handling.md) § "Error handling".
+> Load when: encryption unsupported, failover not triggering, clients cannot connect, resharding stuck.
 
-- Verify the engine version supports encryption (Redis >= 6.x for TLS
-  1.3). Upgrade the engine version and retry.
+## References (load on demand)
 
-### Multi-AZ failover not triggering
-
-- Verify at least one replica per shard. Check nodes are across >= 2
-  AZs. Use `describe-replication-groups` to confirm `AutomaticFailover`
-  status is "enabled."
-
-### Clients cannot connect
-
-- Check the security group allows inbound from the app SG on the
-  correct port. For TLS-enabled clusters, verify the client library
-  supports TLS connections.
-
-### Online resharding stuck in "modifying"
-
-- Resharding is asynchronous (minutes to hours). Monitor with
-  `describe-replication-groups`. Check CloudWatch for replication lag
-  or memory pressure if stuck.
-
-### Snapshot skipped
-
-- Snapshot window overlaps maintenance window. Reschedule one of them.
+- [references/worked-examples.md](references/worked-examples.md) — PREREQUISITES_MISSING worked example (subnet group absent)
+- [references/error-handling.md](references/error-handling.md) — triage: encryption unsupported, failover not triggering, connect failures, resharding stuck, skipped snapshots
+- [references/advanced-patterns.md](references/advanced-patterns.md) — misconceptions, dependency-graph deep dive, recent AWS features
+- [references/config-patterns.md](references/config-patterns.md) — topology + promotion priority + window overlap pattern (extended)
+- [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — copy-pasteable CLI sequences for Steps 2-12 (extended)
 
 ## Domain
 

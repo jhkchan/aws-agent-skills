@@ -509,3 +509,105 @@ resource "aws_scheduler_schedule" "resilient" {
   }
 }
 ```
+
+## Expert heuristic: Scheduler-managed IAM role (moved from SKILL.md)
+
+A baseline model tries to create an IAM role for the Scheduler to
+assume. The correct heuristic recognizes that the Scheduler creates
+and manages its own role.
+
+```text
+Target invocation flow:
+  1. Caller creates schedule with target ARN (e.g., Lambda function)
+  2. Scheduler auto-creates IAM role:
+     → Role name: Amazon_EventBridge_Scheduler_Lambda_Assume_Role_<random>
+     → Trust policy: allows scheduler.amazonaws.com to assume
+     → Permissions: lambda:InvokeFunction on the target ARN
+  3. Caller must have iam:PassRole to authorize role usage
+  4. Scheduler invokes the target using the auto-created role
+
+What the caller needs:
+  ├── scheduler:CreateSchedule (to create the schedule)
+  ├── iam:PassRole (to authorize the Scheduler's managed role)
+  └── NOT iam:CreateRole (Scheduler handles this)
+
+Per-target-type permissions:
+  ├── Lambda target → lambda:InvokeFunction
+  ├── Step Functions → states:StartExecution
+  ├── SNS target → sns:Publish
+  ├── SQS target → sqs:SendMessage
+  ├── Kinesis target → kinesis:PutRecord
+  ├── CodeBuild → codebuild:StartBuild
+  ├── Inspector → inspector-specific actions
+  └── Universal template → Amazon EventBridge Scheduler Lambda role
+```
+
+**Key implication:** do NOT pre-create roles. Do NOT manually edit
+the Scheduler-managed role. The role is auto-scoped to the specific
+target ARN, providing least-privilege access without manual
+configuration.
+
+## Expert heuristic: schedule groups for bulk operations (moved from SKILL.md)
+
+A baseline model creates schedules without groups. The correct
+heuristic uses groups for bulk enable/disable, which is critical
+for maintenance windows and environment promotions.
+
+```text
+Group operations:
+  aws scheduler update-schedule-group \
+    --name prod-schedules --state DISABLED
+  → ALL schedules in prod-schedules are disabled instantly
+
+  aws scheduler update-schedule-group \
+    --name prod-schedules --state ENABLED
+  → ALL schedules in prod-schedules are enabled instantly
+
+Use cases:
+  ├── Maintenance windows: disable non-critical schedules during deploys
+  ├── Feature flags: enable/disable scheduled jobs per environment
+  ├── Cost control: disable schedules in non-prod during off-hours
+  └── Environment promotion: disable staging, enable prod
+
+Without groups:
+  → Must call update-schedule for EACH schedule individually
+  → N schedules = N API calls (slow, error-prone)
+  → No atomic bulk operation
+```
+
+**Key implication:** always assign schedules to groups at creation
+time. Retroactively grouping schedules requires deletion and
+recreation (group assignment is immutable after creation).
+
+## Error handling (moved from SKILL.md)
+
+### Schedule creation fails with IAM error
+- The caller does not have `iam:PassRole` permission. Add this to
+  the caller's IAM policy. The Scheduler needs to assume the role
+  it manages, and `iam:PassRole` authorizes this handoff.
+
+### Invocations failing silently
+- Check CloudWatch `InvocationsFailed` metric. Common causes: target
+  does not exist, target permissions are wrong, or the target input
+  JSON is malformed. Enable DLQ to capture failed events for
+  debugging.
+
+### DLQ not receiving failed events
+- The SQS queue may not exist, or the Scheduler's role may not have
+  `sqs:SendMessage` on the queue. Verify the queue ARN and that the
+  role policy includes SQS access.
+
+### Flexible time window rejected
+- The MaximumWindowInMinutes is smaller than the rate interval. The
+  window must be >= the rate. For `rate(15 minutes)`, the window
+  must be >= 15 minutes.
+
+### Group deletion fails
+- The group still has schedules. Delete or move all schedules to
+  another group, then delete the group. Use `list-schedules --group-
+  name <name>` to find remaining schedules.
+
+### One-time schedule did not fire
+- Verify the datetime is in the future and the timezone is correct.
+  One-time schedules use `at(<datetime>)`. If the datetime has
+  passed, the schedule will never fire. Check with `get-schedule`.

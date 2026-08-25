@@ -236,3 +236,64 @@ or Kinesis for finer-grained consumer routing.
   }]
 }
 ```
+---
+
+## Step 2: Event pattern operators (moved from SKILL.md)
+
+| Operator | JSON form | Matches when |
+|---|---|---|
+| Exact | `["v1", "v2"]` | Field equals any listed value |
+| Prefix | `{"prefix": "ord-"}` | Field starts with prefix |
+| Suffix | `{"suffix": "-prod"}` | Field ends with suffix |
+| Contains | `{"contains": ["error"]}` | Field contains substring (case-sensitive) |
+| Equals-ignore-case | `{"equals-ignore-case": "true"}` | Case-insensitive match |
+| Numeric | `{"numeric": [">=", 7]}` | Numeric comparison; supports `>`, `>=`, `<`, `<=`, `=`, ranges |
+| CIDR | `{"cidr": "10.0.0.0/8"}` | IP address in CIDR block |
+| Exists | `{"exists": true}` | Field is present (or `false` for absent) |
+| Anything-but | `{"anything-but": ["dev"]}` | Field is anything except listed values |
+
+## Step 3: Target type comparison (moved from SKILL.md)
+
+| Target | Use | Pros | Cons |
+|---|---|---|---|
+| **Lambda** | Custom logic, lightweight transforms | Fast invocation; simple | 15-min timeout |
+| **Step Functions** | Multi-step orchestration, long-running | State, retries, branching | Higher per-invocation cost |
+| **SQS** | Decouple producer from consumer; buffering | Backpressure handling | Requires separate consumer |
+| **SNS** | Fan-out to many subscribers | Many subscribers | Filter via SQS subs |
+| **API destination** | External HTTP/S endpoint | Webhook delivery | Rate-limit, credential management |
+| **ECS task** | Run a containerized job | Full runtime flexibility | Slower startup |
+| **Systems Manager** | Run an Automation runbook | Native AWS ops integration | Async execution |
+| **Batch** | Submitted job queue | Job scheduling, retries | Overkill for simple tasks |
+| **Redshift Data API** | Run SQL on Redshift | Direct data warehouse access | Cluster availability dependency |
+| **SageMaker Pipeline** | Trigger ML pipeline | Native ML orchestration | Pipeline execution cost |
+| **API Gateway** | Trigger a REST endpoint | Existing API reuse | Auth surface |
+| **Kinesis Firehose** | Stream to S3/Redshift/OpenSearch | Buffered delivery | Transformation limits |
+| **Inspector** | Start an assessment run | Security automation | Async; assessment scope dep |
+
+## Step 5: Input transformer common patterns (moved from SKILL.md)
+
+Common patterns:
+
+| Target type | Typical InputTemplate |
+|---|---|
+| Lambda | `{"event_type":"<name>", "payload": <detail>}` |
+| Step Functions | `{"input": "{\"id\":\"<id>\",\"user\":\"<user>\"}"}` (escaped JSON string) |
+| SQS | `{"body":"<detail>","type":"<source>"}` |
+| API Destination | `{"event":"<name>","at":"<time>","detail":<detail>}` |
+
+## Appendix A — Event pattern operators (moved from SKILL.md)
+
+| Operator | JSON form | Matches when |
+|---|---|---|
+| Exact | `["v1", "v2"]` | Field equals any listed value |
+| Prefix | `{"prefix": "ord-"}` | Field starts with prefix |
+| Suffix | `{"suffix": "-prod"}` | Field ends with suffix |
+| Contains | `{"contains": ["error"]}` | Field contains substring (case-sensitive) |
+| Equals-ignore-case | `{"equals-ignore-case": "true"}` | Case-insensitive match |
+| Numeric | `{"numeric": [">=", 7]}` | Numeric comparison; supports `>`, `>=`, `<`, `<=`, `=`, ranges |
+| CIDR | `{"cidr": "10.0.0.0/8"}` | IP address in CIDR block |
+| Exists | `{"exists": true}` | Field is present (or `false` for absent) |
+| Anything-but | `{"anything-but": ["dev"]}` | Field is anything except listed values |
+
+Combine operators with nested JSON. EventBridge matches ALL specified
+fields (AND). For OR within a field, use a list.

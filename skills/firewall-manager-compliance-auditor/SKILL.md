@@ -24,32 +24,8 @@ metadata:
 
 ## When to invoke
 
-**Invoke pattern:** the operator provides an FMS policy JSON (from
-`aws fms get-policy` or `list-policies`) AND asks about compliance,
-scope, or enforcement posture. Specifically, invoke when the operator
-asks any of:
-
-- "audit this FMS policy" / "check FMS compliance" / "is this FMS
-  policy enforced?"
-- "FMS coverage gap" / "is my FMS scope correct?"
-- "why does FMS report zero violations?" (the Config-disabled dark-spot
-  trap)
-- "is the FMS policy NOT_READY?" / "PolicyState NOT_READY"
-- "is RemediationEnabled off?" / "FMS detect-only mode"
-- "does this Shield Advanced FMS policy cover all resources?"
-- "is this a legacy WAF Classic FMS policy?" / "PolicyType WAF"
-- "FMS IncludeMap / ExcludeMap coverage"
-- "audit my FMS deployment" / "audit firewall manager"
-- reviewing an FMS policy before a compliance review, production
-  rollout, or org-wide deployment
-
-Do NOT invoke for: per-WebACL rule analysis (use
-`wafv2-web-acl-auditor`), per-SG rule analysis (use
-`ec2-security-group-auditor`), or Shield Advanced resource-level
-protection audits outside FMS (use `shield-advanced-coverage-auditor`).
-This skill audits the FMS policy layer — how WAF/SG/Shield/Network
-Firewall are applied and enforced across accounts — not the underlying
-rule sets.
+Invoke-pattern catalog and do-not-invoke routing moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § When to invoke
 
 ## Mindset
 
@@ -126,27 +102,8 @@ the end.
 Before evaluating any policy, classify the FMS deployment itself. FMS
 cannot operate without an Organizations-managed administrator account.
 
-**Live-account pre-flight checks (skip if doing offline policy-doc
-audit):**
-1. Verify the caller's identity is the FMS administrator account
-   (`aws fms get-admin-scope`). Member accounts can READ policies via
-   `aws fms list-policies` but CANNOT remediate. Remediation commands
-   emitted from a member account fail with `AccessDeniedException`.
-2. Verify the AWS Organization is present and the FMS admin is a
-   delegated administrator (`aws organizations
-   list-delegated-administrators --service-principal
-   fms.amazonaws.com`). FMS without Organizations is a hard
-   misconfiguration — the service has no scope.
-3. Verify AWS Config is enabled in EVERY member account and region in
-   scope. FMS uses Config as its compliance data source — without Config,
-   a member account is a dark spot: `NonCompliantResourceCount` reads as
-   0 (no data), not "compliant." Run `aws configservice
-   describe-configuration-recorders` per member per region before
-   trusting the count.
-4. Verify the FMS notification channel
-   (`aws fms get-notification-channel`). Without SNS topic wiring,
-   NONCOMPLIANT transitions produce zero operator alerting — the gap
-   surfaces only when a Console operator happens to look.
+Live-account pre-flight CLI checks (admin scope, Org delegation, Config recorders, notification channel) moved to references.
+→ [references/diagnostic-commands.md](references/diagnostic-commands.md) § Live-account pre-flight checks
 
 | Attribute | Value | Effect on audit |
 |---|---|---|
@@ -173,63 +130,8 @@ REMEDIATION: Retrieve the canonical policy with `aws fms get-policy
 
 ### Step 0: Expert knowledge — non-obvious FMS behaviors
 
-Each behavior below changes a verdict if ignored. Detailed mechanics
-for PolicyState, RemediationEnabled, ResourceTags scope, and
-PolicyType currency are in Steps 1–7 — this section covers what the
-Steps do not.
-
-- **`EvaluationLimitExceeded` produces a silent false-compliant.** In
-  `list-compliance-status`, each `PolicyComplianceStatus` can carry
-  `EvaluationLimitExceeded: true`. When Config cannot complete
-  evaluation for a member (resource explosion, throttling), FMS marks
-  the member compliant by default — not unknown. A `true` value
-  invalidates the compliance verdict for that account.
-
-- **Cost trap: stale FMS policies generate continuous Config charges.**
-  Each policy triggers AWS Config evaluations per-resource per-region
-  per-cycle. One policy scoped to `AwsEc2Instance` across 500 accounts
-  = ~500 evaluations per region per cycle. Unused policies (>90 days,
-  ProtectedResourceCount=0) are a measurable cost leak in Cost Explorer
-  under `AWS Config`.
-
-- **FMS remediation in CloudTrail shows the service-linked role.** When
-  FMS auto-applies a WebACL (`wafv2:AssociateWebACL`), the CloudTrail
-  actor is `AWSServiceRoleForFMSService`, not the operator. Correlate
-  with `fms:PutPolicy` events by timestamp for incident attribution.
-
-- **`PutPolicy` with `ResourceType: ""` (empty string) is accepted but
-  matches zero resources.** The API does not reject it. Always validate
-  `ResourceType` is non-empty before `put-policy`.
-
-- **ResourceTags multi-value semantics: AND across keys, OR within
-  values.** `[{Key:env,Value:prod},{Key:tier,Value:web}]` = env=prod
-  AND tier=web. Multi-value tags narrow scope — flag if the intent
-  was OR.
-
-- **ExcludeMap wins over IncludeMap** (mirrors IAM explicit-deny). An
-  account in both is excluded. Always cross-reference both maps — an
-  ExcludeMap entry silently punches holes in coverage.
-
-- **FMS uses AWS Config as its sole compliance data source.** A member
-  with Config disabled is a dark spot: `NonCompliantResourceCount`
-  reads 0 (no data), not "compliant." Cross-reference Config recorder
-  status before trusting any clean count.
-
-- **`PutPolicy` is atomic per policy, not per resource.** A WebACL swap
-  applies to ALL in-scope resources simultaneously — no staged rollout.
-  Edit the WebACL via `wafv2` for reversible changes.
-
-- **PolicyType-specific resource vocabularies.** Each PolicyType
-  accepts a constrained set; entries outside the allowed set are
-  silently ignored. Key types: WAFV2 → `AwsWafv2WebAcl`,
-  `AwsApiGatewayStage`, `AwsElasticLoadBalancingV2LoadBalancer`,
-  `CloudFrontDistribution`; SHIELD_ADVANCED → `AwsEc2Eip`,
-  `AwsElasticLoadBalancingV2LoadBalancer`, `CloudFrontDistribution`;
-  SECURITY_GROUPS_* → `AwsEc2Instance`, `AwsEc2NetworkInterface`;
-  NETWORK_FIREWALL / DNS_FIREWALL → `AwsEc2Vpc`.
-
-- **Quota: 50 FMS policies per org** (soft cap). `put-policy` at the
-  cap fails with `LimitExceededException`.
+Non-obvious FMS behavior catalog (NOT_READY lifecycle, Config dark spots, silent exclusions, quota traps) moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Step 0: Expert knowledge
 
 ### Step 1: PolicyState evaluation (NOT_READY is a lifecycle trap)
 
@@ -445,66 +347,13 @@ REMEDIATION:
 
 ### Worked example — malformed ManagedServiceData (WAFV2 with broken WebACL ref)
 
-```text
-POLICY: wafv2-broken-managed-data
-POLICY_NAME: edge-waf-v2
-POLICY_TYPE: WAFV2
-VERDICT: CONFIG_GAP
-REASON: ManagedServiceData JSON is malformed — the referenced WebACL
-ARN cannot be validated (Step 6). PolicyState is READY and
-RemediationEnabled is true, but FMS has nothing to apply.
-FINDINGS:
-  - [CONFIG_GAP] SecurityServicePolicyData.ManagedServiceData does not
-    contain a valid webACLId — cannot confirm WebACL exists (Step 6)
-  - [OK] PolicyState=READY (Step 1)
-  - [OK] RemediationEnabled=true (Step 4)
-REMEDIATION:
-  1. Re-fetch canonical policy: `aws fms get-policy --policy-id <id>
-     --output json`.
-  2. Inspect SecurityServicePolicyData.ManagedServiceData — parse as
-     JSON and verify webACLId is non-empty.
-  3. If WebACL was deleted, recreate via `aws wafv2 create-web-acl`,
-     then `aws fms put-policy` with corrected ManagedServiceData.
-```
+This second worked example (malformed ManagedServiceData) moved to references.
+→ [references/worked-examples.md](references/worked-examples.md) § Worked example — malformed ManagedServiceData
 
 ## Edge-case handling
 
-- **Partially malformed policy.** If the policy JSON parses but
-  individual fields are missing (`PolicyType`, `PolicyId`), classify
-  the valid dimensions and emit an ERROR note for each malformed field.
-  Do NOT silently classify the entire policy as ERROR when only one
-  field is broken.
-
-- **Multi-policy aggregation.** When auditing an entire FMS deployment
-  (`aws fms list-policies`), classify each policy independently. The
-  deployment-level verdict is the worst across all policies. A single
-  NONCOMPLIANT policy makes the deployment NONCOMPLIANT.
-
-- **Cross-admin-scope policies.** With multiple FMS administrators
-  (per-OU delegation, available 2024+), each admin sees only its scope.
-  `list-policies` returns only policies the calling admin manages. A
-  "clean" deployment from one admin's perspective may have policies
-  owned by another admin — cross-reference `get-admin-scope` to map
-  coverage.
-
-- **ResourceTags with multiple values.** FMS treats multi-value
-  ResourceTags as logical AND across keys, OR within values
-  (`[{Key: env, Value: prod}, {Key: tier, Value: web}]` = env=prod AND
-  tier=web). Multi-value tags narrow scope — flag if the intent was OR.
-
-- **Policy with `DeleteUnusedFMSPolicies: true`.** This is a hygiene
-  flag, not a security verdict driver. Note it as OK with a comment
-  "auto-cleanup enabled."
-
-- **Stale `IncludeMap` OUs.** An OU that has been dissolved (deleted
-  from Organizations) but remains in `IncludeMap` is silently ignored
-  by FMS. The policy applies to fewer accounts than the operator
-  believes. Cross-reference `aws organizations list-ous` and flag stale
-  entries as CONFIG_GAP.
-
-- **Empty ResourceTypeLists AND non-empty ResourceType (singular).**
-  Treat the singular `ResourceType` as the effective scope. Do NOT flag
-  as empty — the field is the legacy form.
+Edge-case catalog (partially malformed policies, legacy fields, conflicting scopes) moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Edge-case handling
 
 ## Anti-Patterns — NEVER
 
@@ -607,352 +456,37 @@ REMEDIATION:
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`put-policy`, `delete-policy`, `associate-admin-account`), emit:
-  `CONFIRM: About to <action> on policy <id> in account <admin-acct>.
-  This affects <consequence>. Proceed? (yes/no)`
-  Do NOT execute the CLI command until the operator confirms. FMS
-  policy changes propagate to ALL member accounts in scope — there is
-  no staged rollout.
-- **MANDATORY QUOTA PRE-CHECK before `put-policy` creating a new
-  policy.** Run `aws fms list-policies --output json | jq '.PolicyList
-  | length'`. If the count is at or above 50 (the org soft cap),
-  REFUSE to emit the create command and instruct the operator to
-  delete unused policies first. Hitting the cap mid-remediation leaves
-  the org in a partially-migrated state — `LimitExceededException` on
-  `put-policy` is not recoverable without a deletion.
-- **Admin scope verification.** Confirm the caller is the FMS
-  administrator: `aws fms get-admin-scope --profile <p>`. Member
-  accounts CANNOT remediate — `put-policy` fails with
-  `AccessDeniedException`. Surface this BEFORE the operator approves.
-- **Capture current policy for rollback.**
-  `aws fms get-policy --policy-id <id> --output json > /tmp/<id>-backup-$(date +%s).json`
-  BEFORE any modification. FMS policies are not versioned — `put-policy`
-  replaces the entire policy atomically. There is no undo without a
-  backup.
-- **Verify ProtectedResourceCount before deletion.**
-  `aws fms get-protection-status --policy-id <id>`. If the count is >0,
-  deleting the policy removes protection from those resources
-  immediately. Require explicit operator acknowledgement of the count.
-- **Verify the WebACL exists before WAFV2 policy creation.** The
-  WebACL referenced in `SecurityServicePolicyData.ManagedServiceData`
-  must exist in the policy's region. A `put-policy` with a non-existent
-  WebACL is accepted but the policy enters NOT_READY.
-- **Detect-only staging for new policies.** Any new FMS policy should
-  be created with `RemediationEnabled: false` for the first 1-2 weeks.
-  Transition to `true` only after reviewing `list-compliance-status`
-  output. Switching directly to enforce applies the WebACL/SG to all
-  resources simultaneously — false positives break applications.
-- **Prefer WebACL edits over FMS policy swaps.** When the rule set
-  needs updating, edit the WebACL via `wafv2 update-web-acl` (staged,
-  reversible) and let FMS re-apply. Swapping the WebACL via a new FMS
-  policy is atomic — a bad WebACL breaks every protected resource at
-  once.
-- **Multi-region awareness.** For multi-region workloads, a remediation
-  must be applied to each regional FMS policy independently. FMS does
-  NOT sync policies across regions.
-- **For NONCOMPLIANT findings**, treat as incident-response if
-  RemediationEnabled was previously false — the violations represent
-  resources that were silently unprotected during the detect-only
-  window. Audit CloudTrail for relevant API activity during the gap.
+Pre-flight safety checks and confirmation gates before any remediation CLI moved to references.
+→ [references/diagnostic-commands.md](references/diagnostic-commands.md) § Pre-flight safety checks
 
 ## Remediation guidance
 
-**Remediation ordering principle:** always prefer the smallest blast-
-radius change first. Edit the WebACL/SG (one resource type, reversible)
-BEFORE editing the FMS policy (atomic across all resources). Stage any
-new FMS policy in detect-only mode before enforcing.
-
-### For NONCOMPLIANT — live violations (Step 5)
-
-1. Drill per-member-account:
-   `aws fms get-compliance-detail --policy-id <id> --member-account <acct>`
-   to enumerate violators.
-2. If RemediationEnabled is true, the violations indicate Config
-   discovered resources that FMS could not bring into compliance
-   (typically: underlying WebACL missing, member-local override, or
-   resource deletion race). Address root cause per violator.
-3. If RemediationEnabled is false, re-enable after staging:
-   `aws fms put-policy --policy <json-with-RemediationEnabled-true>`.
-4. For SHIELD_ADVANCED policies, verify each violator resource still
-   exists — Shield protection on a deleted resource is a stale finding.
-5. For NETWORK_FIREWALL policies, provision the missing firewall in
-   the violating VPC: `aws network-firewall create-firewall`. FMS will
-   manage the policy once the firewall exists.
-
-### For INCOMPLETE_COVERAGE — scope gaps (Step 3)
-
-1. For ResourceTags-only scope: either add the tag to all resources
-   that should be in scope (enforced via SCP), or broaden
-   ResourceTypeLists and use ResourceTags as a refinement.
-2. For missing critical resource types: update ResourceTypeLists via
-   `aws fms put-policy` with the additional types. Verify the change
-   does not exceed the 50-policy org quota.
-3. For missing OUs in IncludeMap: cross-reference `aws organizations
-   list-roots` and add the missing OU IDs. Stale OU IDs in IncludeMap
-   must be removed — they are silently ignored today but may produce
-   errors on future FMS versions.
-4. After scope expansion, re-evaluate in detect-only mode
-   (`RemediationEnabled: false`) for 1-2 weeks before re-enforcing.
-
-### For CONFIG_GAP — policy misconfiguration
-
-1. **PolicyState NOT_READY**: investigate root cause. Run
-   `aws fms get-policy --policy-id <id>` and inspect
-   `PolicyUpdateToken`. If the underlying WebACL/SG baseline is
-   missing, recreate it. If stuck for >24h, open an AWS support case.
-2. **RemediationEnabled false**: stage transition to true. Review
-   `list-compliance-status` first; address any existing violations
-   before flipping to enforce.
-3. **PolicyType WAF (legacy)**: create a parallel WAFV2 policy with
-   equivalent WebACL coverage. Verify parity via
-   `get-protection-status` comparison. Then
-   `aws fms delete-policy --policy-id <legacy>`.
-4. **Empty ResourceTypeLists**: identify the intended scope and add
-   types. If the policy is genuinely unused (>90 days, 0 protected),
-   delete it.
-
-### For OK
-
-1. No remediation required for the current posture.
-2. Recommend verifying FMS notification channel is wired
-   (`aws fms get-notification-channel`) — operators miss NONCOMPLIANT
-   transitions without SNS alerts.
-3. Recommend periodic re-audit (quarterly) — FMS scope drifts as
-   accounts join/leave the Org and resources are created/destroyed.
-4. For Shield Advanced policies, recommend annual review of protected
-   resource coverage against current infra (EIPs, LBs, CloudFront).
+Full per-verdict remediation runbooks (ordering principle + For NONCOMPLIANT / INCOMPLETE_COVERAGE / CONFIG_GAP / OK) moved to references.
+→ [references/diagnostic-commands.md](references/diagnostic-commands.md) § Remediation guidance
 
 ## Practical execution reference (pagination, multi-region, error branching)
 
-These patterns are the execution layer the classification logic above
-depends on. Skipping them produces silent under-counts and false OK
-verdicts.
-
-### Pagination — drain every NextToken
-
-Every FMS list API is paginated. Truncating after the first page silently
-undercounts scope and compliance:
-
-| API | Max per page | Required loop |
-|---|---|---|
-| `aws fms list-policies` | 100 (default 100) | Drain `NextToken` to completion; audit every returned policy. |
-| `aws fms list-compliance-status --policy-id <id>` | 100 | Page per policy until `NextToken` is empty; aggregate `PolicyComplianceStatus` across all member accounts. |
-| `aws fms list-member-accounts` | 100 | Page to enumerate the full in-scope member set; cross-reference against the Organization tree. |
-| `aws fms get-protection-status --policy-id <id>` | single response | `ProtectedResourceCounters` is a complete list — no pagination, but verify it is non-empty. |
-
-Pattern (bash, all AWS CLI v2):
-
-```bash
-TOKEN=""
-while :; do
-  if [ -z "$TOKEN" ]; then
-    RESP=$(aws fms list-compliance-status --policy-id "$PID" --output json)
-  else
-    RESP=$(aws fms list-compliance-status --policy-id "$PID" --next-token "$TOKEN" --output json)
-  fi
-  echo "$RESP" | jq -r '.PolicyComplianceStatusList[]'
-  TOKEN=$(echo "$RESP" | jq -r '.NextToken // empty')
-  [ -z "$TOKEN" ] && break
-done
-```
-
-**Stale pagination caveat:** AWS Config-backed resource inventories lag
-by 5-15 minutes. A `list-compliance-status` response reflects the
-Config snapshot, not real-time. A resource created 2 minutes ago is NOT
-in the compliance count yet. Note this in the audit timestamp.
-
-### Multi-region iteration
-
-WAF, SG, and Network Firewall policies are regional. Auditing a single
-region misses the other N-1 regional policies. The iteration:
-
-```bash
-for REGION in $(aws account list-regions --profile "$P" --output json \
-  | jq -r '.Regions[] | select(.RegionOptStatus!="DISABLED") | .RegionName'); do
-  aws fms list-policies --region "$REGION" --profile "$P" --output json \
-    | jq -r '.PolicyList[].PolicyId'
-done
-```
-
-- **Skip DISABLED regions** — FMS cannot operate there even if a policy
-  exists (it will be stale).
-- **Shield Advanced CloudFront policies are global** — they appear in
-  every region's `list-policies`. De-duplicate by `PolicyId` to avoid
-  double-counting.
-- **`list-policies` returns policies MANAGED BY the calling admin
-  account.** With per-OU admin delegation (2024+), each admin sees only
-  its scope. Iterate `aws fms list-admin-accounts-for-organization` and
-  assume each admin role to enumerate the full policy set.
-
-### Error-code branching
-
-| Error | Meaning | Auditor action |
-|---|---|---|
-| `AccessDeniedException` on `fms put-policy` | Caller is a member account, not the FMS admin. | Surface before remediation: only the delegated admin can remediate. |
-| `ResourceNotFoundException` on `get-policy` | Policy was deleted between list and get (race). | Re-run `list-policies`; skip the stale id. |
-| `InvalidOperationException` on `get-compliance-detail` | Policy is NOT_READY (no compliance data). | Confirm Step 1 finding; compliance count is not trustworthy. |
-| `LimitExceededException` on `put-policy` | Org hit the 50-policy quota. | Delete unused policies before creating new ones; do NOT silently retry. |
-| `InternalErrorException` | Transient FMS backend. | Retry with exponential backoff (max 3). |
-
-### Malformed JSON recovery
-
-When `get-policy` returns a policy with malformed `ManagedServiceData`
-(the embedded WebACL/SG JSON inside
-`SecurityServicePolicyData.ManagedServiceData`), classify the
-dimensions you can (PolicyState, RemediationEnabled, scope) and emit
-a CONFIG_GAP for the unvalidatable dimension:
-
-**Detection steps:**
-1. Parse `SecurityServicePolicyData.ManagedServiceData` as JSON. If it
-   fails, the WebACL/SG baseline reference is unverifiable.
-2. For WAFV2 policies, verify the parsed JSON contains a `webACLId`
-   field. Empty or missing = CONFIG_GAP.
-3. For SECURITY_GROUPS_COMMON, verify it contains a `defaultSecurityGroupId`.
-   Empty or missing = CONFIG_GAP.
-4. For NETWORK_FIREWALL, verify it contains a `firewallPolicyId`. Empty
-   or missing = CONFIG_GAP.
-
-```text
-NOTE: ManagedServiceData JSON is malformed for policy <id> — cannot
-validate the referenced WebACL/SG baseline. Re-fetch with `aws fms
-get-policy --policy-id <id> --output json` and inspect
-SecurityServicePolicyData.ManagedServiceData.
-```
-
-Do NOT silently mark the policy OK — the WebACL reference may be
-broken, meaning FMS has nothing to apply even if RemediationEnabled is
-true and PolicyState is READY.
-
-### FMS quotas (the quantitative guardrails)
-
-- **50 FMS policies per organization** (soft cap). Remediations that
-  propose new policies must validate headroom via `aws fms list-policies
-  | jq 'length'` before `put-policy`. Hitting the cap mid-remediation
-  leaves the org in a partially-migrated state.
-- **1 FMS administrator account per org** (legacy) or multiple admins
-  per OU scope (2024+). With multiple admins, each admin's
-  `list-policies` is scoped — enumerate all admins via
-  `aws fms list-admin-accounts-for-organization` to get the full policy
-  set.
-- **AWS Config recorder must be enabled** in every member account in
-  every in-scope region. A member with Config disabled is a dark spot
-  — `NonCompliantResourceCount` reads 0 (no data), not "compliant".
-- **FMS service-linked role (`AWSServiceRoleForFMSService`)** must
-  exist in every member account. FMS auto-creates it on first policy
-  application; if a member deleted it, enforcement silently fails and
-  the resource stays NONCOMPLIANT. Verify via
-  `aws iam get-role --role-name AWSServiceRoleForFMSService` per member.
-  Recovery: `aws iam create-service-linked-role --aws-service-name
-  fms.amazonaws.com`.
-
-### ExcludeMap precedence and stale-OU handling
-
-- **Exclude wins over Include.** An account appearing in both
-  `IncludeMap` and `ExcludeMap` is EXCLUDED. This mirrors IAM
-  evaluation (explicit deny wins). Always cross-reference both maps —
-  an ExcludeMap entry silently punches holes in coverage.
-- **Stale OU IDs** in `IncludeMap` are silently ignored by FMS (the OU
-  was dissolved or recreated). Cross-reference
-  `aws organizations list-roots` recursively and flag any
-  `IncludeMap.ORG_UNIT` entry not in the current tree as a CONFIG_GAP.
-- **Account-level IncludeMap entries** do not auto-track new accounts
-  joining an OU. Use OU-level scoping whenever possible — it auto-tracks
-  org changes.
-- **Shield Advanced CloudFront scope** is global; `IncludeMap.ACCOUNT`
-  still applies (the resource owner account). Verify CloudFront
-  distributions in excluded accounts are intentionally unprotected.
-
-
-
-### Enforcement pipeline
-
-When FMS enforces a policy on a member account, the sequence is:
-
-1. **AWS Config** discovers resources in the member account and
-   evaluates them against the FMS policy's scope (ResourceTypeLists ×
-   ResourceTags × IncludeMap).
-2. **FMS service-linked role** in the member account
-   (`AWSServiceRoleForFMSService`) is assumed by FMS to apply the
-   WebACL/SG/Shield protection. If the role is missing or modified,
-   enforcement silently fails.
-3. **Resource tagging check** — resources must match ResourceTags if
-   specified. Resources without the tag are excluded from scope
-   entirely.
-4. **WebACL/SG application** — FMS calls `wafv2 associate-web-acl` /
-   `ec2 modify-network-interface-attribute` / `shield create-protection`
-   on each in-scope resource.
-5. **Compliance reporting** — FMS writes `PolicyComplianceStatus` per
-   member account, observable via `list-compliance-status`.
-
-A break at any stage produces NONCOMPLIANT resources. The stage of
-breakage is NOT reported — operators must drill via
-`get-compliance-detail` to identify root cause.
-
-### AWS Config coupling
-
-FMS is structurally dependent on AWS Config:
-- Config discovers resources; FMS uses Config's resource inventory as
-  its source of truth.
-- Config's `ConformancePack` and `ConfigRule` are separate from FMS —
-  FMS has its own compliance dimension.
-- A member account with Config disabled is a dark spot: FMS sees zero
-  resources, zero violations. The absence of data is NOT the absence of
-  exposure.
-- Config recorder coverage gaps (e.g., recorder not recording EC2)
-  produce partial FMS visibility — `NonCompliantResourceCount` may
-  undercount.
-
-### Region semantics
-
-- WAF, SG, and Network Firewall policies are **regional** — a policy
-  in us-east-1 protects resources in us-east-1 only.
-- Shield Advanced CloudFront protection is **global** — CloudFront
-  distributions are global resources; the policy applies regardless of
-  region.
-- Shield Advanced EIP/ALB/NLB/CLB protection is **regional**.
-- A multi-region workload requires auditing N regional FMS policies.
-  Use `aws fms list-policies --region <r>` per region.
-
-### PolicyType migration paths
-
-- **WAF Classic → WAFv2**: create a new WAFV2 FMS policy with an
-  equivalent WAFv2 WebACL. Verify `ProtectedResourceCounter` parity.
-  Then delete the legacy WAF policy. There is no in-place migration —
-  the PolicyType is immutable per policy.
-- **SG COMMON → CONTENT_AUDIT**: these are distinct policy types with
-  distinct purposes. COMMON applies a baseline; CONTENT_AUDIT audits
-  existing SG rules. Both can coexist on the same resource scope.
+Execution-layer patterns (pagination, multi-region, error branching, malformed JSON, quotas, ExcludeMap, enforcement pipeline, Config coupling, region semantics, migration) moved to references.
+→ [references/diagnostic-commands.md](references/diagnostic-commands.md), [references/error-handling.md](references/error-handling.md), [references/advanced-patterns.md](references/advanced-patterns.md)
 
 ## Condition strength reference (FMS-specific)
 
-| Condition | Strength | Reason |
-|---|---|---|
-| ResourceTags + SCP tag enforcement | STRONG | SCP requires the tag on resource creation; FMS scope tracks the tag. Coupled, they prevent bypass. |
-| ResourceTags only | WEAK | Tags are mutable; operators can remove them to escape FMS scope. Without SCP enforcement, the boundary is advisory. |
-| IncludeMap `ORG_UNIT` | STRONG | Org tree is the source of truth; OU membership is enforced by Organizations. |
-| IncludeMap `ACCOUNT` | MODERATE | Account IDs are stable but specific — easy to miss new accounts joining the org. |
-| ExcludeMap | STRONG | Exclude wins. An ExcludeMap entry is a deliberate carve-out. |
-| ResourceTypeLists | STRONG | Resource type is intrinsic to the resource; not bypassable. |
+Condition-strength table (STRONG/WEAK scope conditions) moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Condition strength reference
 
 ## Recent AWS features (2024-2026)
 
-- **Network Firewall stateless rules (2024):** FMS manages stateless
-  Suricata rule groups. Verify `FirewallPolicy` includes both stateful
-  and stateless — stateless-only is a coverage gap.
-- **DNS Firewall GA (2024):** FMS manages Route 53 Resolver DNS
-  Firewall rule groups per-VPC. Verify VPC associations exist — FMS
-  manages the rule group, not the association.
-- **Third-party / Imported firewall (2024-2025):** Fortinet FortiGate
-  Cloud, Palo Alto Cloud NGFW, and imported policies. Verify vendor
-  registration via `list-third-party-firewall-firewall-policies`.
-- **Per-OU admin delegation (2024-2025):** Multiple FMS admins manage
-  distinct OU scopes. Enumerate all admins via
-  `list-admin-accounts-for-organization` — one admin's view does not
-  imply org-wide coverage.
-- **DefaultApplicationReportingCriteria (2024-2025):** FMS reports on
-  apps outside explicit policy scope when enabled. Check `GetAdminScope`
-  response.
+2024-2026 FMS feature notes moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Recent AWS features
+
+## References (load on demand)
+
+Consult these only when the corresponding topic comes up:
+
+- [references/worked-examples.md](references/worked-examples.md) — the malformed-ManagedServiceData worked example (moved from § Worked example)
+- [references/error-handling.md](references/error-handling.md) — error-code branching and malformed JSON recovery (moved from § Practical execution reference)
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — live pre-flight checks, pre-flight safety checks, per-verdict remediation runbooks, pagination and multi-region iteration
+- [references/advanced-patterns.md](references/advanced-patterns.md) — invoke patterns, Step-0 expert knowledge, edge cases, quotas/ExcludeMap/enforcement/Config/regions/migration, condition strength, recent AWS features
 
 ## Domain
 

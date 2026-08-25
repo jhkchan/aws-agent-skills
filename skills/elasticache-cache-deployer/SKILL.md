@@ -64,28 +64,8 @@ door and forces an explicit decision before the `create` call.
 
 Three misconceptions dominate ElastiCache misdesign at provisioning time:
 
-- **"Memcached is the simple default; pick Redis only if you need
-  persistence."** This is backwards for modern workloads. Redis supports
-  Multi-AZ failover, encryption at rest and in transit, AUTH, TLS,
-  clustering (sharded writes), pub/sub, sorted sets, and Global
-  Datastore. Memcached supports NONE of these. Pick Redis unless the
-  workload is a genuinely simple, ephemeral, multi-threaded key-value
-  cache AND the operator explicitly accepts no failover, no encryption,
-  no persistence, no snapshots.
-
-- **"Cluster mode disabled with one replica is the safe default."** A
-  cluster-mode-disabled Redis replication group supports at most 5
-  replicas per shard and **cannot scale writes horizontally** — all
-  writes hit one node. The moment write throughput exceeds one node's
-  capacity, the only path forward is migrate to cluster mode enabled
-  (create-new → backfill → cutover). For any workload whose write rate
-  may grow, default to cluster mode enabled up front.
-
-- **"Multi-AZ is a checkbox; pick one AZ for the replica."** Multi-AZ
-  with automatic failover requires the replica in a DIFFERENT AZ than
-  the primary. ElastiCache enforces this at creation for Redis, but a
-  subnet group with only one AZ silently blocks Multi-AZ. Verify the
-  subnet group spans at least 2 AZs before `create-replication-group`.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Mindset misconceptions".
+> Load when: you need the full argument behind the engine/cluster-mode/Multi-AZ misconceptions.
 
 ## Quick navigation
 
@@ -109,42 +89,8 @@ Three misconceptions dominate ElastiCache misdesign at provisioning time:
 
 ## Reasoning framework (why provisioning order matters)
 
-ElastiCache configurations have **dependency and immutability
-semantics** that make the provisioning order non-trivial. Wrong-order or
-wrong-time decisions either cannot be reversed or require a full
-cluster migration:
-
-1. **Engine BEFORE the first write** — Redis and Memcached are NOT
-   interchangeable. Memcached has no persistence, no replication, no
-   failover, no encryption, no pub/sub. Migrating Memcached → Redis
-   means a cache-miss cold-start window and application client
-   rewrite (different APIs). Decide at provisioning.
-
-2. **Cluster mode BEFORE write-rate growth** — Redis cluster-mode
-   disabled caps writes at one node. To switch to cluster mode enabled
-   later, you create a new replication group and repoint clients (full
-   cutover). Default to cluster mode enabled for any workload whose
-   write rate may grow.
-
-3. **Multi-AZ + encryption BEFORE the first production write** —
-   enabling encryption in transit on an existing Redis cluster requires
-   a full `modify-replication-group` with a rolling node replacement
-   that disconnects clients. Enable at creation. Encryption at rest
-   CANNOT be added to a non-encrypted cluster without dump-and-restore.
-
-4. **Subnet group BEFORE Multi-AZ** — Multi-AZ Redis requires the
-   subnet group to span at least 2 AZs. Create the subnet group first
-   with `--subnet-ids` covering multiple AZs.
-
-5. **Node type BEFORE production traffic** — changing node type later
-   requires a `modify` with rolling replacement (or for cluster mode
-   enabled, a `modify-replication-group-shard-configuration` + upgrade).
-   Size up front; scale testing pre-production is mandatory.
-
-6. **Parameter group + maxmemory-policy EARLY** — a wrong
-   maxmemory-policy causes silent write failures (`noeviction` returns
-   OOM on writes when memory fills; `allkeys-lru` silently evicts).
-   Pick at provisioning based on cache-vs-store semantics.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Reasoning framework".
+> Load when: sequencing engine, cluster mode, encryption, subnet group, node type, and parameter decisions.
 
 ## ElastiCache configuration dependency graph (novel heuristic)
 
@@ -172,158 +118,24 @@ sequence provisioning and to debug "why can't I add this?" later.
 | ElastiCache Serverless | none — separate API (`create-serverless-cache`) | NOT compatible with cluster mode, Global Datastore, Outposts; VPC-only | no capacity management, automatic scaling |
 | Outposts | Redis engine + Outpost in account | subset of node types only; data residency constraint | on-prem latency, data-sovereign workloads |
 
-**The four immutable-or-near-immutable rows are the ones a baseline
-model misses.** Engine, cluster-mode write-scaling, encryption at rest,
-and AUTH-without-TLS are decided at creation time. The procedure below
-forces an explicit decision on each before the `create` call.
-
-**Cross-dependency gotchas** (not visible in the table):
-- Enabling encryption in transit on an existing Redis cluster triggers
-  a rolling node replacement that **disconnects every client** for
-  30-90 seconds per node. Enable at creation, not in production.
-- AUTH tokens require TLS — enabling AUTH without TLS sends the
-  password in plaintext over the wire.
-- A cluster-mode-disabled Redis with 5 replicas has **no horizontal
-  write scaling**: all writes go to the single primary. Adding replicas
-  scales reads only.
-- Global Datastore does NOT replicate encryption configuration — each
-  region's cluster manages its own KMS key. A missing key in a region
-  blocks cluster creation there.
-- Memcached `create-cache-cluster` accepts `AZMode` (`single-az` or
-  `cross-az`), but `cross-az` only distributes nodes across AZs — it
-  does NOT provide failover. A failed Memcached node loses its data.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Configuration dependency graph".
+> Load when: the immutability analysis and cross-dependency gotchas behind the table.
 
 ## Expert heuristic: effective memory calculator
 
-ElastiCache markets a node type by total memory, but the usable memory
-for application data is significantly less. A baseline model quotes
-the spec-sheet number; this heuristic gives the real figure.
-
-**Formula for Redis (cluster mode enabled, no replicas):**
-
-```text
-usable_per_shard = node_memory_bytes × 0.50
-# 50% rule: Redis reserves ~50% for overhead, COPY-on-write fork
-# during BGSAVE, and the QUERY/Sort buffer. Going above 50% risks
-# OOM during snapshot / failover.
-
-total_usable = usable_per_shard × number_of_shards
-max_item_size = 512 MB per single value (Redis hard limit, NOT node-size-dependent)
-```
-
-**Formula for Redis (cluster mode disabled, with replicas):**
-
-```text
-usable_total = node_memory_bytes × 0.50
-# Replicas do NOT add usable memory — they hold a copy of the same data.
-# Multi-AZ replicas add availability, NOT capacity.
-```
-
-**Formula for Memcached (multi-threaded, no replication):**
-
-```text
-usable_per_node = node_memory_bytes × 0.90
-# Memcached has minimal overhead (no persistence, no replication, no fork).
-
-total_usable = usable_per_node × number_of_nodes
-max_item_size = 1 MB default (configurable via parameter group `max-item-size`,
-                               max 1024 MB)
-```
-
-**Concrete example — cache.r6g.2xlarge (62.34 GiB nominal):**
-
-| Topology | Calculation | Usable for application data |
-|---|---|---|
-| Redis cluster mode disabled, 1 primary + 1 replica | 62.34 × 0.50 | **31.17 GiB** (replica holds copy, no extra) |
-| Redis cluster mode enabled, 3 shards × 1 primary + 1 replica each | 62.34 × 0.50 × 3 | **93.51 GiB** |
-| Memcached, 3 nodes | 62.34 × 0.90 × 3 | **168.32 GiB** |
-
-**Implication:** for the SAME node type and node count, Memcached
-exposes ~3-5x the usable memory of Redis cluster-mode-disabled.
-Redis's overhead is the price of persistence + replication + failover.
-Choose the engine knowing this overhead, not by comparing spec-sheet
+> **Moved verbatim** → [references/engine-and-topology.md](references/engine-and-topology.md) § "Expert heuristic: effective memory calculator".
+> Load when: sizing real usable memory (Redis 50% rule vs Memcached 90%).
 numbers.
 
 ## Expert heuristic: cluster mode shard count estimator
 
-Redis cluster mode enabled distributes writes across shards. Each shard
-is a separate primary; the cluster hash-slots data across 16,384 slots
-(0-16383) sharded by key. The number of shards is the horizontal-write
-scaling factor.
-
-**Rule:** for write-heavy workloads (more than 50,000 writes/sec
-sustained), size shards so that per-shard write rate stays under 60% of
-the node's published baseline.
-
-**Quick check formula:**
-
-```text
-required_shards = ceil(sustained_writes_per_sec / (node_write_baseline × 0.60))
-max_shards = 500   # ElastiCache hard limit (250 soft, 500 via support ticket)
-
-# cache.r6g.2xlarge baseline: ~100,000 writes/sec per primary
-# Example: 200,000 writes/sec sustained
-# required_shards = ceil(200000 / (100000 × 0.60)) = ceil(3.33) = 4 shards
-```
-
-**Why 60%:** ElastiCache node baselines are measured with pipelined
-`SET` on small values. Real-world workloads have larger values,
-non-pipelined patterns, and `EVAL`/`SORT` that consume CPU. Leaving
-40% headroom is the threshold observed in production incident
-post-mortems, not a documented AWS limit.
-
-**Read-scaling note:** replicas per shard scale READS, not writes. A
-4-shard cluster with 2 replicas per shard has 4 primaries (write
-capacity) and 8 replicas (read capacity in addition to primaries).
-
-**Common scenarios:**
-- **Low write, high read session store** (1k writes/sec, 50k reads/sec):
-  2 shards × 3 replicas each → 2 write paths, 6 read paths + primaries.
-- **High-write real-time leaderboard** (300k writes/sec): 5 shards × 1
-  replica each → 5 write paths, 5 read paths. Verify per-shard rate.
-- **Globally distributed geo-cache**: 3 shards in primary region +
-  Global Datastore to 2 secondary regions. Writes go to primary;
-  secondary regions serve local reads.
+> **Moved verbatim** → [references/engine-and-topology.md](references/engine-and-topology.md) § "Expert heuristic: cluster mode shard count estimator".
+> Load when: computing shard count from sustained write rate (60% rule) and scenario shapes.
 
 ## Expert heuristic: failover promotion semantics
 
-A baseline model says "Multi-AZ gives you failover" without explaining
-what gets promoted and how long it takes. This is the load-bearing
-detail for production SLAs.
-
-**Redis cluster mode disabled + Multi-AZ + automatic failover:**
-- The replica in a different AZ is promoted to primary on primary
-  failure.
-- Promotion time: typically **10-30 seconds** (DNS update +
-  replica-promotion sequence).
-- Existing client connections drop; clients must reconnect to the new
-  primary endpoint (the replication group's PrimaryEndpoint is stable
-  and updates automatically).
-- Data loss window: writes that were in-flight to the old primary but
-  not yet replicated to the promoted replica are LOST. This is
-  asynchronous replication — there is no synchronous Redis option in
-  ElastiCache.
-
-**Redis cluster mode enabled + Multi-AZ + automatic failover:**
-- The replica in a different AZ is promoted PER SHARD. A 5-shard
-  cluster can have up to 5 simultaneous shard failovers.
-- Promotion time: typically **10-30 seconds** per shard; the
-  ConfigurationEndpoint stays stable.
-- Cross-shard operations (`MGET`, `MULTI` on multi-key transactions)
-  may fail transiently during failover.
-
-**Memcached with `AZMode=cross-az`:**
-- **NO automatic failover.** A failed node is gone — clients must
-  rehash or remove it from the consistent-hash ring.
-- Data on the failed node is LOST (no persistence, no replication).
-- This is the most commonly missed detail: "cross-AZ Memcached" sounds
-  like Multi-AZ but is NOT.
-
-**Practical implication:** if the workload's SLA cannot tolerate a
-30-second client reconnect or any data loss window, Redis alone is
-insufficient — the application must handle retry/idempotency, and
-critical state must live in a durable store (DynamoDB, RDS) with Redis
-as a cache in front. ElastiCache Redis is NOT a primary database.
+> **Moved verbatim** → [references/engine-and-topology.md](references/engine-and-topology.md) § "Expert heuristic: failover promotion semantics".
+> Load when: reasoning about promotion time, data-loss windows, and Memcached cross-az.
 
 ## Prerequisites (verify before provisioning)
 
@@ -354,48 +166,11 @@ and is **immutable** without a full migration.
 
 **Decision tree:**
 
-```text
-Does the workload need ANY of: persistence, replication, failover,
-encryption, pub/sub, sorted sets, Lua scripts, Global Datastore,
-cross-region replication?
-├── YES → Redis OSS  (the only engine that supports these)
-│         Note: ElastiCache also offers Valkey (Redis fork) — same
-│         APIs, drop-in replacement, fully supported by AWS.
-└── NO → Is the workload a genuinely simple, ephemeral,
-         multi-threaded key-value cache where the operator explicitly
-         accepts no failover, no persistence, no encryption?
-    ├── YES → Memcached
-    └── NO  → Redis OSS  (default; the safest choice)
-```
+> **Moved verbatim** → [references/engine-and-topology.md](references/engine-and-topology.md) § "Step 1".
+> Load when: walking the Redis-vs-Memcached engine decision. The condensed tree lives in § Decision tree: Redis vs Memcached.
 
-**Feature comparison:**
-
-| Feature | Redis OSS | Memcached |
-|---|---|---|
-| Data types | strings, lists, sets, sorted sets, hashes, streams, bitmaps, hyperloglog | strings only |
-| Persistence (RDB snapshots / AOF) | YES | NO |
-| Replication | YES (primary + replicas) | NO |
-| Multi-AZ failover | YES (automatic) | NO (`AZMode=cross-az` distributes nodes only) |
-| Clustering / sharded writes | YES (cluster mode enabled, up to 500 shards) | NO (multi-threaded single node, scale-up only) |
-| Encryption at rest | YES | NO |
-| Encryption in transit (TLS) | YES | NO |
-| AUTH password | YES | NO |
-| pub/sub | YES | NO |
-| Lua scripting | YES | NO |
-| Streams | YES | NO |
-| Multi-AZ | YES | NO |
-| Global Datastore (cross-region) | YES | NO |
-| Max item size | 512 MB | 1 MB default (1024 MB max via `max-item-size`) |
-| Multi-threading | NO (single-threaded per shard; scale via shards) | YES (multi-threaded per node) |
-| Eviction policies | configurable (LRU, LFU, TTL, noeviction) | LRU only |
-| Snapshot / backup | YES (automated + manual) | NO |
-
-**Common mistake:** picking Memcached for "simplicity" then needing
-encryption or failover later. Memcached → Redis migration is a full
-application client rewrite (different APIs) plus a cache-miss
-cold-start window. Default to Redis unless Memcached's specific
-properties (multi-threading, simple strings, no overhead) are
-explicitly required.
+> **Moved verbatim** → [references/engine-and-topology.md](references/engine-and-topology.md) § "Step 1".
+> Load when: comparing engines feature-by-feature or reviewing the Memcached migration mistake.
 
 ### Step 2 — Cluster mode decision (immutable for write scaling — decide BEFORE create)
 
@@ -405,42 +180,11 @@ immutable** without a full cluster migration.
 
 **Decision tree:**
 
-```text
-Is the Redis write rate expected to grow beyond a single primary's capacity?
-├── YES → Cluster mode ENABLED (sharded; up to 500 shards; hash-slot
-│         partitioned; horizontal write scaling)
-└── NO  → Is the workload stable and modest (< 50k writes/sec)?
-    ├── YES → Cluster mode DISABLED (single primary + up to 5 replicas)
-    │         Simpler client configuration; no cross-slot restrictions.
-    └── NO  → Cluster mode ENABLED (default for any growing workload)
+> **Moved verbatim** → [references/engine-and-topology.md](references/engine-and-topology.md) § "Step 2".
+> Load when: walking the cluster-mode decision incl. MULTI/EXEC. The condensed tree lives in § Decision tree: Redis cluster mode enabled vs disabled.
 
-Is multi-key transactional consistency (MULTI/EXEC across keys) required?
-├── YES → Cluster mode DISABLED  (all keys on one primary; transactions trivial)
-│         OR cluster mode ENABLED with hash-tag keys ({tag}) to force
-│         co-location. Accept the operational overhead of hash tags.
-└── NO  → Cluster mode ENABLED is safe
-```
-
-**Cluster mode enabled specifics:**
-- Hash slots: 16,384 total, distributed across shards.
-- Key distribution: `SLOT = CRC16(key) mod 16384`. Use hash tags
-  `{user1000}:cart`, `{user1000}:profile` to force co-location.
-- Cross-slot operations (`MGET`, `MULTI` on different slots) fail with
-  `CROSSSLOT` error. Application must use hash tags or fan out.
-- Shard count: 1-500 shards per cluster.
-- Replicas per shard: 0-5.
-
-**Cluster mode disabled specifics:**
-- Single primary, up to 5 replicas.
-- Writes go to the single primary only — no horizontal write scaling.
-- Multi-key transactions trivial (all keys on one primary).
-- Supports Multi-AZ with failover (replica promoted on primary loss).
-
-**Common mistake:** picking cluster mode disabled for a "simpler"
-setup, then needing write scaling later. Migrating from disabled to
-enabled requires creating a new replication group and repointing all
-clients (full cutover). Default to cluster mode enabled for any
-workload whose write rate may grow.
+> **Moved verbatim** → [references/engine-and-topology.md](references/engine-and-topology.md) § "Step 2".
+> Load when: hash slots, CROSSSLOT limits, or the disabled→enabled migration mistake.
 
 ### Step 3 — Node type sizing
 
@@ -458,70 +202,19 @@ shape.
 | `cache.t4g`, `cache.t3` | Burst | Dev / test / low-traffic; non-production |
 | `cache.t1`, `cache.m1`, `cache.m2` | Legacy | DO NOT USE — end-of-life |
 
-**Size by workload:**
-
-- **Dev / test / prototype:** `cache.t3.micro` (0.5 GiB) or
-  `cache.t3.small` (1.37 GiB). Free-tier compatible; burst CPU.
-- **Small production (cache, < 5 GiB data):** `cache.r6g.large`
-  (13.13 GiB nominal → 6.5 GiB usable per shard).
-- **Mid production (10-50 GiB data):** `cache.r6g.2xlarge`
-  (62.34 GiB nominal → 31 GiB usable per shard).
-- **Large production (50-200 GiB data):** `cache.r6g.4xlarge`
-  (124.66 GiB) or sharded cluster mode enabled with smaller nodes.
-- **Very large (200+ GiB):** `cache.r6g.8xlarge` (249.32 GiB) per
-  shard; cluster mode enabled with N shards.
-
-**Sizing rules:**
-- Plan for 50% memory utilization on Redis (see §"Expert heuristic:
-  effective memory calculator"). 50% of nominal is the operating budget.
-- Plan for 90% on Memcached.
-- For Redis with replicas, replicas do NOT add usable memory — they
-  hold a copy of the same data.
-- For Redis cluster mode enabled, multiply usable memory per shard by
-  shard count.
-
-**Common mistake:** sizing by spec-sheet memory. Redis needs ~50%
-overhead for fork-on-BGSAVE, query buffers, and copy-on-write. Memcached
-runs close to spec-sheet.
+> **Moved verbatim** → [references/engine-and-topology.md](references/engine-and-topology.md) § "Step 3".
+> Load when: picking node families/sizes and applying the 50%/90% memory rules.
 
 ### Step 4 — Multi-AZ + automatic failover (Redis only)
 
 Multi-AZ with automatic failover is the primary resilience control for
 Redis. Memcached does NOT support Multi-AZ.
 
-**Requirements:**
-- Redis engine.
-- Cluster mode enabled OR disabled (both support Multi-AZ).
-- At least 1 replica in a different AZ than the primary.
-- Subnet group spanning at least 2 AZs.
-- `AutomaticFailoverEnabled=true` on `create-replication-group`.
+> **Moved verbatim** → [references/engine-and-topology.md](references/engine-and-topology.md) § "Step 4".
+> Load when: checking the five gating requirements for Multi-AZ failover.
 
-**Behavior on primary failure:**
-- ElastiCache detects primary failure (health check).
-- A replica in a different AZ is promoted to primary (10-30 seconds).
-- The replication group's PrimaryEndpoint (cluster mode disabled) or
-  ConfigurationEndpoint (cluster mode enabled) updates to the new primary.
-- Clients reconnect automatically through the stable endpoint.
-- Data loss window: writes in-flight to the old primary but not yet
-  replicated are LOST (asynchronous replication).
-
-**Topology examples:**
-
-```text
-# Cluster mode DISABLED, Multi-AZ:
-#   Primary in us-east-1a, 1 replica in us-east-1b
-#   Promotes on primary failure (10-30s)
-
-# Cluster mode ENABLED, Multi-AZ, 3 shards:
-#   Shard 1: primary us-east-1a, replica us-east-1b
-#   Shard 2: primary us-east-1b, replica us-east-1c
-#   Shard 3: primary us-east-1c, replica us-east-1a
-#   Promotes per-shard on failure (10-30s per shard)
-```
-
-**Common mistake:** subnet group with only one AZ. Multi-AZ fails
-silently — ElastiCache cannot place the replica in a different AZ.
-Verify subnet group spans >=2 AZs before `create-replication-group`.
+> **Moved verbatim** → [references/engine-and-topology.md](references/engine-and-topology.md) § "Step 4".
+> Load when: promotion flow, endpoint behavior, or AZ topology examples.
 
 ### Step 5 — Network + security (VPC, subnet group, security group)
 
@@ -530,44 +223,25 @@ RDS). All clusters live inside a VPC.
 
 **Subnet group creation:**
 
-```bash
-aws elasticache create-cache-subnet-group \
-  --cache-subnet-group-name prod-cache-subnet \
-  --cache-subnet-group-description "Multi-AZ subnet group for prod cache" \
-  --subnet-ids subnet-0aaa subnet-0bbb subnet-0ccc \
-  --tags Key=Environment,Value=production
-```
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 5".
+> Load when: creating the multi-AZ cache subnet group.
 
 Verify the subnets span >=2 AZs:
 
-```bash
-aws ec2 describe-subnets --subnet-ids subnet-0aaa subnet-0bbb subnet-0ccc \
-  --query 'Subnets[*].AvailabilityZone' --output text
-# Expect at least 2 distinct AZs for Multi-AZ
-```
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 5".
+> Load when: verifying the subnet group spans >=2 AZs before create.
 
 **Security group rules:**
 
-```bash
-# Inbound: allow the application's SG to reach the cache port
-# Redis: port 6379
-# Memcached: port 11211
-aws ec2 authorize-security-group-ingress \
-  --group-id sg-cache123 \
-  --protocol tcp \
-  --port 6379 \
-  --source-security-group-id sg-app456
-```
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 5".
+> Load when: opening port 6379/11211 inbound from the application SG.
 
 **NEVER** open the cache port to `0.0.0.0/0` — even with AUTH, this
 exposes the cluster to internet scanning. Always scope inbound to the
 application's SG.
 
-**Common mistake:** forgetting to attach the security group at
-creation. ElastiCache accepts `--security-group-ids` on
-`create-replication-group` / `create-cache-cluster`. A missing SG
-defaults to the VPC's default SG, which typically allows no inbound —
-the cluster is unreachable.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Step 5".
+> Load when: the cluster is unreachable or the SG was not attached at creation.
 
 ### Step 6 — Encryption + AUTH + TLS (Redis only)
 
@@ -575,36 +249,19 @@ Encryption and AUTH are Redis-only. Memcached has NO encryption
 support — if compliance requires encryption, the answer is Redis.
 
 **Encryption at rest:**
-- Apply at creation via `--at-rest-encryption-enabled`.
-- CANNOT be added to an existing cluster without dump-and-restore.
-- Uses AWS-managed KMS key by default; customer CMK via
-  `--kms-key-id`.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Step 6".
+> Load when: using a customer CMK or adding encryption to an existing cluster.
 
 **Encryption in transit (TLS):**
-- Apply at creation via `--transit-encryption-enabled`.
-- Can be added post-creation via `modify-replication-group` — but
-  this triggers a rolling node replacement that DISCONNECTS every
-  client for 30-90 seconds per node.
-- Default: AWS-generated cert. Custom certs via ACM are NOT supported
-  on ElastiCache (use the AWS-generated cert and pin via
-  `--transit-encryption-enabled`).
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Step 6".
+> Load when: enabling TLS post-creation or reasoning about rolling replacement.
 
 **AUTH token:**
-- Apply at creation via `--auth-token` (or `MODIFY` post-creation).
-- Requires TLS (`--transit-encryption-enabled=true`) — without TLS,
-  the AUTH token traverses the network in plaintext.
-- Token rules: 16-128 chars, printable, non-whitespace.
-- Generate via `openssl rand -base64 24`.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Step 6".
+> Load when: generating and applying the Redis AUTH token.
 
-**Redis 6+ ACL (user-based access control):**
-- ElastiCache supports Redis 6.x ACLs via `--user-group-id`.
-- Pre-defined user groups: `default` (full access + AUTH token),
-  `readonly` (read-only), `readwrite` (read-write).
-- Use ACLs to scope application vs analytics clients.
-
-**Common mistake:** enabling AUTH without TLS. The token traverses
-the wire in plaintext — sniffable. ALWAYS pair AUTH with
-`--transit-encryption-enabled=true`.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Step 6".
+> Load when: using ACL user groups or pairing AUTH with TLS.
 
 ### Step 7 — Parameter groups (maxmemory-policy, timeout)
 
@@ -624,32 +281,12 @@ apply on next reboot (not immediate).
 | `volatile-random` | Evict random TTL'd key | Rare; use volatile-lru instead |
 
 **Decision rule:**
-- Workload is a CACHE (data is disposable; cache-miss is acceptable):
-  `allkeys-lru` (or `allkeys-lfu` for skewed access).
-- Workload is a STORE (data loss breaks the application; e.g.,
-  session store, rate-limiter): `noeviction`. Plan capacity so memory
-  never fills (Redis will return OOM errors instead of evicting).
-- Workload is a MIX (some persistent, some disposable): `volatile-lru`
+> **Moved verbatim** → [references/engine-and-topology.md](references/engine-and-topology.md) § "Step 7".
+> Load when: mapping cache vs store vs mix workloads to a policy.
   with TTL on disposable keys.
 
-**Other Redis parameters worth setting:**
-
-```text
-timeout 300          # Close idle clients after 5 min (default 0 = never)
-tcp-keepalive 60     # Send TCP keepalive every 60s (default 300)
-maxmemory-policy allkeys-lru  # Per above table
-```
-
-**Memcached parameters:**
-
-```text
-max-item-size 4194304   # 4 MB max (default 1 MB; max 1024 MB)
-chunk_size_growth_factor 1.25  # Slab allocator tuning (rarely changed)
-```
-
-**Common mistake:** using `noeviction` for a cache (data is disposable
-— `allkeys-lru` is correct), or `allkeys-lru` for a session store
-(silent eviction breaks sessions — `noeviction` is correct).
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 7".
+> Load when: setting non-maxmemory parameters for Redis or Memcached.
 
 ### Step 8 — Snapshots / backups (Redis only)
 
@@ -658,140 +295,36 @@ recovery. Memcached does NOT support snapshots.
 
 **Enable automated snapshots at creation:**
 
-```bash
-aws elasticache create-replication-group ... \
-  --snapshot-retention-limit 7 \
-  --snapshot-window "03:00-05:00" \
-  --snapshot-name prod-cache-snapshot
-```
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 8".
+> Load when: enabling snapshot retention/window at creation.
 
-- `snapshot-retention-limit`: days to keep automated snapshots (1-35).
-- `snapshot-window`: daily backup window (UTC). Avoid overlap with the
-  maintenance window.
-- Snapshots are stored in S3 (AWS-managed bucket, not customer-visible).
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 8".
+> Load when: choosing retention days and windows.
 
 **Manual snapshot:**
 
-```bash
-aws elasticache create-snapshot \
-  --cache-cluster-id prod-cache \
-  --snapshot-name prod-cache-2026-08-05-preupgrade
-```
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 8".
+> Load when: taking an on-demand snapshot.
 
 **Restore from snapshot creates a NEW cluster:**
 
-```bash
-aws elasticache create-replication-group \
-  --replication-group-id prod-cache-restored \
-  --replication-group-description "Restored from snapshot" \
-  --engine redis \
-  --cache-node-type cache.r6g.large \
-  --num-cache-clusters 2 \
-  --snapshot-arns arn:aws:elasticache:us-east-1:123456789012:snapshot:prod-cache-snapshot
-```
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 8".
+> Load when: restoring a replication group from a snapshot ARN.
 
 **Common mistake:** setting retention limit to 0 (snapshots disabled).
 For production Redis, set retention 7-35 days. For dev, 1-3 days is fine.
 
 ### Step 9 — ElastiCache Serverless / Global Datastore (latest features)
 
-**ElastiCache Serverless (2023-2024):**
-- No capacity management. AWS scales automatically based on traffic.
-- VPC-only; creates its own security group and endpoint.
-- Charged per request + storage (similar to DynamoDB on-demand).
-- Does NOT support: cluster mode configuration, Global Datastore,
-  Outposts, custom parameter groups (limited set).
-- Use when the workload is unknown / bursty and the operator does not
-  want to size nodes or shards.
-
-```bash
-aws elasticache create-serverless-cache \
-  --serverless-cache-name prod-serverless-cache \
-  --engine redis \
-  --description "Serverless Redis cache" \
-  --security-group-ids sg-0aaa \
-  --subnet-ids subnet-0aaa subnet-0bbb \
-  --user-group-id default \
-  --data-storage Maximum 5000 \
-  --daily-storage- retention-period 7
-```
-
-**Global Datastore (cross-region replication):**
-- Redis-only; requires cluster mode enabled in primary region.
-- Replicates from a primary cluster to 1+ secondary clusters in other
-  regions. Writes go to primary; secondaries serve local reads.
-- Typical replication lag: < 1 second (depends on inter-region latency).
-- Each region's cluster has its own node type, encryption, KMS key.
-- Use for: cross-region low-latency reads, DR, geo-distributed apps.
-
-```bash
-# Create the primary (must be cluster-mode enabled)
-aws elasticache create-global-replication-group \
-  --global-replication-group-id-suffix prod-global-cache \
-  --global-replication-group-description "Global Redis cache" \
-  --primary-replication-group-id prod-cache-us-east-1
-
-# Add a secondary region
-aws elasticache create-global-replication-group-member \
-  --global-replication-group-id fgid:prod-global-cache \
-  --replication-group-id prod-cache-eu-west-1 \
-  --replication-group-region eu-west-1
-```
-
-**Outposts support:**
-- Redis only; subset of node types (cache.m5, cache.r5, cache.t3).
-- Data residency / on-prem latency workloads.
-- Uses Outpost-local hardware; capacity subject to Outpost sizing.
-
-**Common mistake:** provisioning a cluster-mode-disabled Redis then
-trying to add Global Datastore. Global Datastore requires cluster mode
-enabled in the primary. Decide at creation.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Step 9".
+> Load when: provisioning serverless, Global Datastore, or Outposts topologies.
 
 ### Step 10 — CloudWatch alarms (operational hygiene)
 
 Recommended CloudWatch alarms on every production cluster:
 
-```bash
-# CPU utilization > 90% for 5 min
-aws cloudwatch put-metric-alarm \
-  --alarm-name "prod-cache-cpu-high" \
-  --namespace AWS/ElastiCache \
-  --metric-name CPUUtilization \
-  --dimensions Name=CacheClusterId,Value=prod-cache \
-  --statistic Average --period 60 --threshold 90 \
-  --comparison-operator GreaterThan --evaluation-periods 5 \
-  --alarm-actions <sns-arn>
-
-# Memory: swap usage > 0 (Redis should never swap)
-aws cloudwatch put-metric-alarm \
-  --alarm-name "prod-cache-swap" \
-  --namespace AWS/ElastiCache \
-  --metric-name SwapUsage \
-  --dimensions Name=CacheClusterId,Value=prod-cache \
-  --statistic Average --period 60 --threshold 0 \
-  --comparison-operator GreaterThan --evaluation-periods 1 \
-  --alarm-actions <sns-arn>
-
-# Evictions > threshold (cache is full and evicting — capacity issue)
-aws cloudwatch put-metric-alarm \
-  --alarm-name "prod-cache-evictions" \
-  --namespace AWS/ElastiCache \
-  --metric-name Evictions \
-  --dimensions Name=CacheClusterId,Value=prod-cache \
-  --statistic Sum --period 60 --threshold 1000 \
-  --comparison-operator GreaterThan --evaluation-periods 5 \
-  --alarm-actions <sns-arn>
-
-# Replication lag (Redis replication groups)
-aws cloudwatch put-metric-alarm \
-  --alarm-name "prod-cache-repl-lag" \
-  --namespace AWS/ElastiCache \
-  --metric-name ReplicationLag \
-  --dimensions Name=CacheClusterId,Value=prod-cache \
-  --statistic Average --period 60 --threshold 30 \
-  --comparison-operator GreaterThan --evaluation-periods 3 \
-  --alarm-actions <sns-arn>
-```
+> **Moved verbatim** → [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) § "Step 10".
+> Load when: creating CPU/swap/eviction/replication-lag alarms.
 
 ## NEVER do these things
 
@@ -949,230 +482,26 @@ Does the workload need ANY of:
 
 ## Error handling
 
-### Cluster name already exists (`ReplicationGroupAlreadyExists`)
-
-```bash
-aws elasticache describe-replication-groups --replication-group-id <name>
-```
-
-- If configuration matches intent: the cluster is already provisioned
-  correctly. Skip to verification and emit READY_TO_DEPLOY.
-- If configuration differs: decide whether to `modify-replication-group`
-  (mutable settings: node type, parameter group, snapshots, maintenance
-  window, security groups, AUTH token) or create a NEW cluster.
-  Engine, cluster-mode, and at-rest-encryption CANNOT be changed
-  post-creation — those require a new cluster + client repoint.
-
-### Multi-AZ create fails (`CacheSubnetGroup does not span multiple AZs`)
-
-The subnet group has all subnets in one AZ. Multi-AZ Redis requires
-the subnet group to span at least 2 AZs.
-
-**Fix:**
-
-```bash
-# Add a subnet in a different AZ to the subnet group
-# (ElastiCache does not allow removing subnets, only adding)
-aws elasticache modify-cache-subnet-group \
-  --cache-subnet-group-name prod-cache-subnet \
-  --subnet-ids subnet-0aaa subnet-0bbb subnet-0ccc   # now spans >=2 AZs
-```
-
-**Verify** with `aws ec2 describe-subnets --subnet-ids ...` — confirm
-distinct `AvailabilityZone` values.
-
-### AUTH enable fails (`Encryption in transit is not enabled`)
-
-AUTH requires TLS. Without `--transit-encryption-enabled=true`,
-ElastiCache rejects `--auth-token`.
-
-**Fix:** enable both together:
-
-```bash
-aws elasticache modify-replication-group \
-  --replication-group-id prod-cache \
-  --auth-token "$(aws secretsmanager get-secret-value ...)" \
-  --transit-encryption-enabled true \
-  --apply-immediately
-```
-
-Note: enabling TLS post-creation triggers a rolling node replacement
-that disconnects every client for 30-90 seconds per node. Plan a
-maintenance window.
-
-### Snapshot restore creates cluster with wrong node type
-
-Snapshot restore uses the node type specified at restore time, NOT the
-source's node type. Verify `--cache-node-type` on the
-`create-replication-group` call.
-
-```bash
-aws elasticache create-replication-group \
-  --replication-group-id prod-cache-restored \
-  --cache-node-type cache.r6g.2xlarge \   # specify explicitly
-  --snapshot-arns arn:aws:elasticache:...:snapshot:prod-cache-snap
-```
-
-### Cluster stuck in `MODIFYING` after `apply-immediately`
-
-A rolling node replacement on a large cluster (many shards + replicas)
-can take 30+ minutes. Use `--apply-immediately` only for emergencies;
-otherwise schedule modifications in the maintenance window.
-
-```bash
-aws elasticache describe-replication-groups --replication-group-id <name> \
-  --query 'ReplicationGroups[0].Status'
-# Wait for "available" before issuing the next modify.
-```
-
-### Cluster mode enabled → disabled migration is NOT a modify
-
-There is NO `modify-replication-group` flag to switch cluster mode.
-Migration requires:
-
-1. Create a NEW replication group with `--num-node-groups 1`
-   (cluster mode disabled equivalent) or no cluster config.
-2. Repoint clients to the new endpoint.
-3. Delete the old cluster.
-
-NEVER attempt to "downgrade" cluster mode by reducing shard count to
-1 — the cluster remains in cluster-mode-enabled state.
+> **Moved verbatim** → [references/error-handling.md](references/error-handling.md) § "Error handling".
+> Load when: an API error fires, a cluster is stuck MODIFYING, or a migration is needed.
 
 ## Worked example — provisioned Redis cluster mode enabled with Multi-AZ
 
-A production 3-shard Redis cluster with 1 replica per shard, Multi-AZ,
-TLS + AUTH, customer CMK, snapshots, and CloudWatch alarms. This is
-the canonical production pattern.
-
-```bash
-# 1. Create the subnet group (must span >=2 AZs)
-aws elasticache create-cache-subnet-group \
-  --cache-subnet-group-name prod-cache-subnet \
-  --cache-subnet-group-description "Multi-AZ subnet group for prod cache" \
-  --subnet-ids subnet-0aaa subnet-0bbb subnet-0ccc
-
-# 2. Create the parameter group
-aws elasticache create-cache-parameter-group \
-  --cache-parameter-group-name prod-redis-pg \
-  --cache-parameter-group-family redis6.x \
-  --description "Production Redis parameter group"
-
-aws elasticache modify-cache-parameter-group \
-  --cache-parameter-group-name prod-redis-pg \
-  --parameter-name-values \
-    ParameterName=maxmemory-policy,ParameterValue=allkeys-lru \
-    ParameterName=timeout,ParameterValue=300 \
-    ParameterName=tcp-keepalive,ParameterValue=60
-
-# 3. Generate AUTH token and store in Secrets Manager
-AUTH_TOKEN=$(openssl rand -base64 24)
-aws secretsmanager create-secret \
-  --name prod-cache-auth-token \
-  --secret-string "$AUTH_TOKEN"
-
-# 4. Create the replication group with cluster mode enabled + Multi-AZ + TLS + AUTH
-aws elasticache create-replication-group \
-  --replication-group-id prod-cache \
-  --replication-group-description "Production Redis cluster" \
-  --engine redis \
-  --cache-node-type cache.r6g.2xlarge \
-  --cache-parameter-group-name prod-redis-pg \
-  --cache-subnet-group-name prod-cache-subnet \
-  --security-group-ids sg-cache123 \
-  --num-node-groups 3 \
-  --replicas-per-node-group 1 \
-  --automatic-failover-enabled \
-  --multi-az-enabled \
-  --transit-encryption-enabled \
-  --at-rest-encryption-enabled \
-  --kms-key-id arn:aws:kms:us-east-1:123456789012:alias/prod-cache-kms \
-  --auth-token "$AUTH_TOKEN" \
-  --snapshot-retention-limit 7 \
-  --snapshot-window "03:00-05:00" \
-  --maintenance-window "sun:05:00-sun:07:00" \
-  --tags Key=Environment,Value=production Key=Workload,Value=cache
-
-# 5. Wait for the replication group to become available
-aws elasticache wait replication-group-available --replication-group-id prod-cache
-
-# 6. Verify
-aws elasticache describe-replication-groups --replication-group-id prod-cache
-aws elasticache describe-cache-clusters --cache-cluster-id prod-cache-0001 --show-cache-node-info
-aws kms describe-key --key-id alias/prod-cache-kms
-
-# 7. CloudWatch alarms
-aws cloudwatch put-metric-alarm \
-  --alarm-name "prod-cache-cpu-high" \
-  --namespace AWS/ElastiCache \
-  --metric-name CPUUtilization \
-  --dimensions Name=CacheClusterId,Value=prod-cache-0001 \
-  --statistic Average --period 60 --threshold 90 \
-  --comparison-operator GreaterThan --evaluation-periods 5 \
-  --alarm-actions arn:aws:sns:us-east-1:123456789012:cache-alerts
-
-aws cloudwatch put-metric-alarm \
-  --alarm-name "prod-cache-swap" \
-  --namespace AWS/ElastiCache \
-  --metric-name SwapUsage \
-  --dimensions Name=CacheClusterId,Value=prod-cache-0001 \
-  --statistic Average --period 60 --threshold 0 \
-  --comparison-operator GreaterThan --evaluation-periods 1 \
-  --alarm-actions arn:aws:sns:us-east-1:123456789012:cache-alerts
-```
-
-The checklist for this cluster:
-
-```text
-CACHE: prod-cache
-VERDICT: READY_TO_DEPLOY
-CHECKLIST:
-  [✓] Engine: redis
-  [✓] Cluster mode: ENABLED (3 shards)
-  [✓] Node type: cache.r6g.2xlarge (62.34 GiB nominal; 31.17 GiB usable per shard; 93.51 GiB total usable)
-  [✓] Replicas: 1 per shard (3 total) — Multi-AZ failover
-  [✓] Multi-AZ with automatic failover: Enabled
-  [✓] Subnet group: prod-cache-subnet (3 AZs)
-  [✓] Security group: sg-cache123 (inbound 6379 from sg-app456)
-  [✓] Encryption at rest: Enabled (customer CMK alias/prod-cache-kms)
-  [✓] Encryption in transit (TLS): Enabled
-  [✓] AUTH token: Enabled (24-char base64 in Secrets Manager)
-  [✓] Parameter group: prod-redis-pg (maxmemory-policy=allkeys-lru)
-  [✓] Snapshot retention: 7 days (03:00-05:00 UTC)
-  [✓] Maintenance window: sun:05:00-sun:07:00
-  [✓] Global Datastore: Single-region
-  [✓] ElastiCache Serverless: No
-VERIFICATION_COMMANDS:
-  aws elasticache describe-replication-groups --replication-group-id prod-cache
-  aws elasticache describe-cache-clusters --cache-cluster-id prod-cache-0001 --show-cache-node-info
-  aws elasticache describe-cache-parameter-groups --cache-parameter-group-name prod-redis-pg
-  aws kms describe-key --key-id alias/prod-cache-kms
-```
+> **Moved verbatim** → [references/worked-examples.md](references/worked-examples.md) § "Worked example".
+> Load when: emitting the full CLI sequence and checklist for the canonical production pattern.
 
 ## Recent AWS features (2023-2026)
 
-- **ElastiCache Serverless (2023-2024):** AWS manages capacity, scaling,
-  and shard count automatically. Charged per request + storage. Use for
-  unknown / bursty workloads where the operator does not want to size
-  nodes. Provisioning tip: VPC-only; limited parameter group support.
-- **Global Datastore enhancements (2023-2024):** Cross-region replication
-  with sub-second typical lag. Now supports up to 5 secondary regions.
-  Provisioning tip: primary must be cluster-mode-enabled; each region
-  uses its own KMS key.
-- **Valkey engine support (2024-2025):** Redis fork (after Redis license
-  change); drop-in replacement, fully supported by AWS. Use
-  `--engine valkey` if license-permissive alternative is preferred.
-- **Outposts support (2023-2024):** Redis on Outposts for on-prem
-  latency / data sovereignty. Subset of node types (cache.m5, cache.r5,
-  cache.t3).
-- **Graviton (g-series) node types (2022-2024):** `cache.r6g`,
-  `cache.m6g`, `cache.t4g` offer ~20% better price/performance over
-  previous gen. Default to Graviton for new clusters.
-- **Redis 7.x support (2023-2024):** ACLs, sharded pub/sub, functions
-  (Lua enhancement). Provisioning tip: use Redis 6+ ACLs to scope
-  application vs analytics clients.
-- **AWS-managed service updates (rolling):** ElastiCache applies engine
-  upgrades during the maintenance window. Provisioning tip: set
-  maintenance window explicitly; do NOT use the default random window.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Recent AWS features 2023-2026".
+> Load when: deciding on Valkey, Graviton nodes, Redis 7.x, or serverless.
+
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) — canonical production Redis cluster-mode-enabled CLI sequence + checklist
+- [references/error-handling.md](references/error-handling.md) — API error triage: name exists, subnet single-AZ, AUTH/TLS, snapshot restore, MODIFYING stuck, cluster-mode migration
+- [references/advanced-patterns.md](references/advanced-patterns.md) — reasoning framework, dependency-graph deep dive, misconceptions, ACL detail, Serverless/Global Datastore/Outposts, recent AWS features
+- [references/engine-and-topology.md](references/engine-and-topology.md) — engine math, shard estimator, failover semantics, feature matrix, sizing rules (extended with SKILL.md detail)
+- [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — copy-pasteable CLI sequence (extended with subnet group, SG, snapshot, restore, alarms, parameters)
 
 ## Domain
 

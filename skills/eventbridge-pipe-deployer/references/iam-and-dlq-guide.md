@@ -225,3 +225,48 @@ to consume from the source. AWS Config rule `eventbridge-pipe-role-trust-check`
 
 A pipe processing 100M records/month with a Lambda enrichment costs
 roughly: $0.50 pipe + $50 invocations + Lambda compute.
+---
+
+## Step 7: Pipe IAM role — trust policy and permission matrices (moved from SKILL.md)
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {"Service": "pipes.amazonaws.com"},
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringEquals": {"aws:SourceAccount": "111111111111"},
+        "ArnEquals": {"aws:SourceArn": "arn:aws:pipes:us-east-1:111111111111:pipe/prod-ddb-pipe"}
+      }
+    }
+  ]
+}
+```
+
+**Required permissions on the pipe role:**
+
+| Source | Permissions |
+|---|---|
+| DynamoDB Streams | `dynamodbstreams:DescribeStream`, `GetShardIterator`, `GetRecords`; `dynamodb:DescribeTable` |
+| Kinesis | `kinesis:DescribeStream`, `GetShardIterator`, `GetRecords`, `ListShards` |
+| SQS | `sqs:ReceiveMessage`, `DeleteMessage`, `GetQueueAttributes` |
+| MSK | `kafka-cluster:Connect`, `ReadData`, `DescribeTopic`, `DescribeGroup`, `AlterGroup` |
+| Amazon MQ | Secrets Manager `secretsmanager:GetSecretValue` on broker credentials; STS for credential exchange |
+| Self-managed Kafka | (Same as MSK) + MSK-style VPC config |
+
+| Enrichment / Target | Permissions |
+|---|---|
+| Lambda enrichment/target | `lambda:InvokeFunction` on enrichment ARN + target ARN |
+| Step Functions target | `states:StartExecution` (Standard) or `StartSyncExecution` (Express enrichment) |
+| EventBridge bus target | `events:PutEvents` |
+| SQS target | `sqs:SendMessage` |
+| SNS target | `sns:Publish` |
+| ECS target | `ecs:RunTask`, `iam:PassRole` on task execution + task roles |
+| API Gateway / API Destination target | `apigateway:POST` / `events:InvokeApiDestination` |
+| Redshift target | `redshift-serverless:GetCredentials` / `redshift-data:ExecuteStatement` |
+| SageMaker target | `sagemaker:StartPipelineExecution` |
+| AWS Batch target | `batch:SubmitJob` |
+| DLQ | `sqs:SendMessage` on DLQ ARN |

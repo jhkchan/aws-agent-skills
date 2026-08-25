@@ -166,39 +166,10 @@ Gather these inputs. Each step below branches on which are available.
 
 If the user has not provided LB data or metrics, output:
 
-```text
-TARGET: <load balancer or account>
-VERDICT: NEED_MORE_INFO
-REASON: Cannot optimize ELB cost without LCU metrics and LB inventory.
-MISSING:
-  - Load balancer ARN or name
-  - CloudWatch ConsumedLCUs (14+ days)
-  - CloudWatch per-dimension metrics: NewConnectionCount,
-    ActiveConnectionCount, ProcessedBytes, RuleEvaluations
-  - Listener and target group configuration
-  - Monthly ELB spend (from Cost Explorer)
-```
-
-```bash
-# List all ALBs and NLBs:
-aws elbv2 describe-load-balancers \
-  --query 'LoadBalancers[*].{name:LoadBalancerName,arn:LoadBalancerArn,type:Type,scheme:Scheme,vpc:VpcId,dns:DNSName,created:CreatedTime}'
-
-# List all CLBs (legacy):
-aws elb describe-load-balancers \
-  --query 'LoadBalancerDescriptions[*].{name:LoadBalancerName,dns:DNSName,scheme:Scheme,created:CreatedTime}'
-
-# Pull 14-day LCU consumption (ALB):
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/ApplicationELB \
-  --metric-name ConsumedLCUs \
-  --dimensions Name=LoadBalancer,Value=<lb-full-name> \
-  --start-time $(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 3600 \
-  --statistics Average Maximum \
-  --query 'Datapoints[*].{time:Timestamp,avg:Average,max:Maximum}'
-```
+Full NEED_MORE_INFO output block moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when LB inventory or LCU metrics are missing.
+Inventory / LCU capture CLI (describe-load-balancers, describe-load-balancers for CLB, 14-day ConsumedLCUs) moved verbatim to [references/elb-optimization-commands.md](references/elb-optimization-commands.md).
+Load on demand when gathering ELB inventory and LCU metrics.
 
 ### Step 1: Identify the optimization category
 
@@ -233,34 +204,8 @@ Idle LBs are the #1 ELB cost waste.
 | NewConnectionCount | < 50/day for 7 days | Investigate; likely deletable |
 
 **Diagnostic commands:**
-
-```bash
-# Check ALB request count (14-day daily):
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/ApplicationELB \
-  --metric-name RequestCount \
-  --dimensions Name=LoadBalancer,Value=<lb-full-name> \
-  --start-time $(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 86400 \
-  --statistics Sum \
-  --query 'Datapoints[*].{time:Timestamp,sum:Sum}'
-
-# Check healthy host count:
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/ApplicationELB \
-  --metric-name HealthyHostCount \
-  --dimensions Name=LoadBalancer,Value=<lb-full-name> Name=TargetGroup,Value=<tg-full-name> \
-  --start-time $(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 3600 \
-  --statistics Average Minimum
-
-# Check Route 53 records pointing to the LB (avoid orphaning DNS):
-aws route53 list-resource-record-sets \
-  --hosted-zone-id <zone-id> \
-  --query 'ResourceRecordSets[?contains(ResourceRecords[].Value, `<lb-dns-name>`) || contains(AliasTarget.DNSName, `<lb-dns-name>`)]'
-```
+Idle-detection CLI (RequestCount, HealthyHostCount, Route 53 record check) moved verbatim to [references/elb-optimization-commands.md](references/elb-optimization-commands.md).
+Load on demand when confirming a load balancer is idle before deletion.
 
 **Savings: deleting one idle ALB = $16.43/month + LCU charges.
 Deleting 5 idle ALBs = $82+/month.**
@@ -305,44 +250,8 @@ the bill is to reduce new connections/sec.
 | Rule evaluations | Reduce listener rules, simplify conditions | 10-40% |
 
 **Diagnostic commands for per-dimension analysis:**
-
-```bash
-# New connections per second (14-day hourly):
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/ApplicationELB \
-  --metric-name NewConnectionCount \
-  --dimensions Name=LoadBalancer,Value=<lb-full-name> \
-  --start-time $(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 3600 --statistics Average Maximum
-
-# Active connections:
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/ApplicationELB \
-  --metric-name ActiveConnectionCount \
-  --dimensions Name=LoadBalancer,Value=<lb-full-name> \
-  --start-time $(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 3600 --statistics Average Maximum
-
-# Processed bytes:
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/ApplicationELB \
-  --metric-name ProcessedBytes \
-  --dimensions Name=LoadBalancer,Value=<lb-full-name> \
-  --start-time $(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 3600 --statistics Average Maximum
-
-# Rule evaluations:
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/ApplicationELB \
-  --metric-name RuleEvaluations \
-  --dimensions Name=LoadBalancer,Value=<lb-full-name> \
-  --start-time $(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 3600 --statistics Average Maximum
-```
+Per-dimension LCU metric CLI (NewConnectionCount, ActiveConnectionCount, ProcessedBytes, RuleEvaluations) moved verbatim to [references/elb-optimization-commands.md](references/elb-optimization-commands.md).
+Load on demand when identifying the peak LCU billing dimension.
 
 ### Step 4: CONSOLIDATION — multi-path routing to reduce ALB count
 
@@ -365,27 +274,8 @@ routing. Each consolidated ALB saves $16.43/month + its LCU charges.
 Before: 3 ALBs at $16.43/month each = $49.29/month + LCU charges.
 After: 1 ALB at $16.43/month + LCU charges (merged).
 **Savings: $32.86/month minimum (just from per-hour charges).**
-
-```bash
-# Create path-based rules on the consolidated ALB:
-aws elbv2 create-rule \
-  --listener-arn <listener-arn> \
-  --priority 10 \
-  --conditions Field=path-pattern,Values='/api/*' \
-  --actions Type=forward,TargetGroupArn=<api-tg-arn>
-
-aws elbv2 create-rule \
-  --listener-arn <listener-arn> \
-  --priority 20 \
-  --conditions Field=path-pattern,Values='/admin/*' \
-  --actions Type=forward,TargetGroupArn=<admin-tg-arn>
-
-aws elbv2 create-rule \
-  --listener-arn <listener-arn> \
-  --priority 30 \
-  --conditions Field=path-pattern,Values='/static/*' \
-  --actions Type=forward,TargetGroupArn=<static-tg-arn>
-```
+Consolidation CLI (create-rule path-pattern rules for merged ALB) moved verbatim to [references/elb-optimization-commands.md](references/elb-optimization-commands.md).
+Load on demand when consolidating ALBs via multi-path routing.
 
 ### Step 5: CLB_MIGRATION — CLB to ALB/NLB cost and feature savings
 
@@ -410,30 +300,8 @@ modern features (path routing, SNI, LCU-based pricing).
 | ALB | $0.0225/h | LCU-based | $16.43 + LCU charges | Path routing, SNI, metrics |
 | NLB | $0.0225/h | $0.006/GB | $16.43 + $6.00 = $22.43 | TCP/UDP, static IPs |
 
-```bash
-# Describe CLB listeners and backends for migration planning:
-aws elb describe-load-balancers \
-  --load-balancer-names <clb-name> \
-  --query 'LoadBalancerDescriptions[*].{name:LoadBalancerName,listeners:ListenerDescriptions,instances:Instances,scheme:Scheme,subnets:Subnets,sg:SecurityGroups}'
-
-# Create the target group for the migrated ALB:
-aws elbv2 create-target-group \
-  --name migrated-tg \
-  --protocol HTTP \
-  --port 80 \
-  --vpc-id <vpc-id> \
-  --health-check-path /health \
-  --health-check-interval-seconds 30
-
-# Create the replacement ALB:
-aws elbv2 create-load-balancer \
-  --name migrated-alb \
-  --subnets <subnet-1> <subnet-2> \
-  --security-groups <sg-id> \
-  --scheme internet-facing \
-  --type application
-```
-
+CLB migration CLI (describe CLB listeners, create target group, create replacement ALB) moved verbatim to [references/elb-optimization-commands.md](references/elb-optimization-commands.md).
+Load on demand when planning a CLB migration.
 ### Step 6: DATA_TRANSFER — cross-zone and PrivateLink optimization
 
 **Cross-zone load balancing:**
@@ -519,34 +387,8 @@ to Standard-IA after 30 days, Glacier after 90 days, and expire after
   optimized, and access logs have lifecycle rules. No further action.
 
 ## Expert heuristic — "LCU is max not sum, consolidate to cut the floor, idle is free money"
-
-Three rules, in order, produce 90% of ELB savings:
-
-1. **LCU dimension maximization.** ALB bills on the MAX of four
-   dimensions, not the sum. Identify the peak dimension and focus all
-   optimization there. If new connections is the peak at 20 LCU, then
-   reducing active connections from 5 LCU to 0 saves nothing. Enable
-   keep-alive (reduces new connections by 80%+), compress responses
-   (reduces processed bytes), and simplify rules (reduces rule
-   evaluations). The peak dimension determines the bill.
-
-2. **Multi-path routing to consolidate ALBs.** Each ALB costs
-   $16.43/month minimum. Ten ALBs cost $164/month. Consolidating to
-   three ALBs (one per environment: prod, staging, dev) using host-based
-   and path-based routing saves $114/month. Use a single multi-domain
-   TLS certificate (SAN) to cover all hostnames.
-
-3. **CLB elimination urgency.** Every CLB is $18.25/month plus per-GB
-   charges, with no path routing, no LCU-based pricing, and no new
-   features. Migrating CLBs to ALBs is both a cost saving ($1.82/month
-   per CLB on hourly rate alone) and a feature upgrade. Prioritize CLBs
-   with the highest traffic — the per-GB savings are larger.
-
-**The idle LB is the lowest-hanging fruit.** A single idle ALB at
-$16.43/month costs $197/year for nothing. In accounts with 10+
-ALBs, typically 2-3 are idle (leftover from testing, deprecated
-services, or blue/green standby). Deleting them is 100% savings with
-zero risk.
+Expert heuristic deep dive (LCU dimension maximization, multi-path consolidation math, CLB elimination urgency, idle-LB economics) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when explaining or prioritizing ELB savings levers.
 
 ## Configuration dependency graph
 
@@ -585,25 +427,8 @@ ELB Inventory (describe-load-balancers + describe-load-balancers for CLB)
 ```
 
 ## Recent AWS features (2024-2026)
-
-- **ALB Zonal DNS Exclusion (2024-2025):** ALB now supports zonal DNS
-  exclusion, allowing you to route traffic only to specific AZs. This
-  reduces cross-AZ data transfer for workloads with geographically
-  concentrated clients.
-- **NLB cross-zone traffic visibility (2024-2025):** CloudWatch now
-  provides per-AZ metrics for NLB cross-zone traffic, making it easier
-  to quantify the cost impact of cross-zone load balancing.
-- **ALB access log partitioning (2025-2026):** ALB access logs now
-  support S3 partitioning by date and load balancer name, improving
-  query performance and reducing Athena scan costs for log analysis.
-- **L7 load balancer capacity unit improvements (2024-2026):** AWS
-  has increased the LCU efficiency for ALBs handling HTTP/2 and HTTP/3
-  (QUIC) traffic, reducing the effective LCU consumption for modern
-  protocol workloads.
-- **PrivateLink integration with ALB (2024-2026):** AWS PrivateLink
-  now supports ALB as a resource, allowing private connectivity to ALB
-  endpoints across VPCs without internet gateway or NAT gateway
-  charges.
+Recent AWS features (ALB Zonal DNS Exclusion, NLB cross-zone visibility, access log partitioning, LCU efficiency, PrivateLink-ALB) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when checking feature-dependent optimizations.
 
 ## References
 
@@ -611,6 +436,13 @@ See `references/elb-pricing-and-lcu-matrix.md` for the full pricing
 reference (ALB/NLB/CLB rates, LCU dimension calculations, data transfer
 rates, regional notes) and `references/elb-optimization-commands.md`
 for the canonical command script for each optimization dimension.
+
+## References (load on demand)
+
+- [references/elb-optimization-commands.md](references/elb-optimization-commands.md) — canonical command script per optimization dimension; extended with the CLI blocks moved from SKILL.md Steps 0, 2, 3, 4, and 5.
+- [references/worked-examples.md](references/worked-examples.md) — the NEED_MORE_INFO output example from Step 0.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert heuristic deep dive and recent AWS features.
+- [references/elb-pricing-and-lcu-matrix.md](references/elb-pricing-and-lcu-matrix.md) — full ALB/NLB/CLB pricing and LCU dimension matrix.
 
 ## Domain
 

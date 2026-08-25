@@ -205,3 +205,53 @@ entirely separate path.
 
 If the event source is Kinesis/Stream, EventBridge is NOT the delivery
 mechanism. Diagnose the event source mapping, not the EventBridge rule.
+
+## Cron and rate syntax validation tables (moved from SKILL.md)
+
+**Cron expressions** have 6 required fields:
+`Minutes Hours Day-of-month Month Day-of-week Year`
+
+| Field | Values | Wildcards |
+|---|---|---|
+| Minutes | 0-59 | `,` `-` `*` `/` |
+| Hours | 0-23 | `,` `-` `*` `/` |
+| Day-of-month | 1-31 | `,` `-` `*` `/` `?` `L` `W` |
+| Month | 1-12 or JAN-DEC | `,` `-` `*` `/` |
+| Day-of-week | 1-7 or SUN-SAT | `,` `-` `*` `/` `?` `L` `#` |
+| Year | 1970-2199 | `,` `-` `*` `/` |
+
+Common cron syntax errors:
+
+| Expression | Error | Fix |
+|---|---|---|
+| `cron(0 12 * * ? *)` | Correct — runs at 12:00 UTC daily | — |
+| `cron(0 12 * * * *)` | Missing `?` for day-of-week/day-of-month mutual exclusion | Use `?` in one of the two fields: `cron(0 12 * * ? *)` |
+| `cron(0 12 * * ?)` | Missing year field (5-field cron) | Add year: `cron(0 12 * * ? *)` |
+| `cron(* 0 1 * * *)` | Both day-of-month and day-of-week are `*` (ambiguous) | Use `?` in one: `cron(* 0 1 * ? *)` |
+| `cron(0 12 31 2 * *)` | February 31 does not exist | Use valid date |
+| `rate(5 m)` | Wrong unit format | Use `rate(5 minutes)` |
+| `rate(1 hour)` | Correct | — |
+
+**Rate expressions** use `rate(value unit)`:
+- value: positive integer
+- unit: `minute(s)`, `hour(s)`, `day(s)` (singular if value=1, plural if >1)
+- minimum: `rate(1 minute)`
+- cannot be `rate(0 ...)` — minimum is 1
+
+**Important:** EventBridge cron uses UTC. A rule set to
+`cron(0 9 * * ? *)` fires at 09:00 UTC, not local time. Operators in
+UTC+8 see the rule fire at 17:00 local and assume it is broken.
+
+## Step 7: input transformer data-shape validation (moved from SKILL.md)
+
+If `InputTransformer` is absent and `InputPath` is absent, the target
+receives the full event envelope (including `version`, `id`, `source`,
+`detail-type`, etc.). If the target expects only the `detail` field,
+configure `InputPath: "$.detail"`.
+
+If `InputTransformer` is present, validate:
+1. Every variable in `InputTemplate` has a mapping in `InputPathsMap`.
+2. Every JSON path in `InputPathsMap` exists in the actual event.
+3. The template produces valid JSON for JSON-expecting targets.
+
+See Step 4b for detailed transformer validation.

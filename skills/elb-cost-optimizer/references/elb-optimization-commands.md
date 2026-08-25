@@ -250,3 +250,150 @@ aws elbv2 describe-target-health \
   --target-group-arn <tg-arn> \
   --query 'TargetHealthDescriptions[*].{target:Target.Id,port:Target.Port,state:TargetHealth.State}'
 ```
+
+
+## ELB inventory & LCU metric capture CLI (Step 0) (moved verbatim from SKILL.md lines 182-201)
+
+```bash
+# List all ALBs and NLBs:
+aws elbv2 describe-load-balancers \
+  --query 'LoadBalancers[*].{name:LoadBalancerName,arn:LoadBalancerArn,type:Type,scheme:Scheme,vpc:VpcId,dns:DNSName,created:CreatedTime}'
+
+# List all CLBs (legacy):
+aws elb describe-load-balancers \
+  --query 'LoadBalancerDescriptions[*].{name:LoadBalancerName,dns:DNSName,scheme:Scheme,created:CreatedTime}'
+
+# Pull 14-day LCU consumption (ALB):
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ApplicationELB \
+  --metric-name ConsumedLCUs \
+  --dimensions Name=LoadBalancer,Value=<lb-full-name> \
+  --start-time $(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  --period 3600 \
+  --statistics Average Maximum \
+  --query 'Datapoints[*].{time:Timestamp,avg:Average,max:Maximum}'
+```
+
+## Idle-LB diagnostic CLI (Step 2: IDLE_LB) (moved verbatim from SKILL.md lines 236-263)
+
+
+```bash
+# Check ALB request count (14-day daily):
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ApplicationELB \
+  --metric-name RequestCount \
+  --dimensions Name=LoadBalancer,Value=<lb-full-name> \
+  --start-time $(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  --period 86400 \
+  --statistics Sum \
+  --query 'Datapoints[*].{time:Timestamp,sum:Sum}'
+
+# Check healthy host count:
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ApplicationELB \
+  --metric-name HealthyHostCount \
+  --dimensions Name=LoadBalancer,Value=<lb-full-name> Name=TargetGroup,Value=<tg-full-name> \
+  --start-time $(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  --period 3600 \
+  --statistics Average Minimum
+
+# Check Route 53 records pointing to the LB (avoid orphaning DNS):
+aws route53 list-resource-record-sets \
+  --hosted-zone-id <zone-id> \
+  --query 'ResourceRecordSets[?contains(ResourceRecords[].Value, `<lb-dns-name>`) || contains(AliasTarget.DNSName, `<lb-dns-name>`)]'
+```
+
+## Per-dimension LCU analysis CLI (Step 3: LCU_DIM) (moved verbatim from SKILL.md lines 308-345)
+
+
+```bash
+# New connections per second (14-day hourly):
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ApplicationELB \
+  --metric-name NewConnectionCount \
+  --dimensions Name=LoadBalancer,Value=<lb-full-name> \
+  --start-time $(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  --period 3600 --statistics Average Maximum
+
+# Active connections:
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ApplicationELB \
+  --metric-name ActiveConnectionCount \
+  --dimensions Name=LoadBalancer,Value=<lb-full-name> \
+  --start-time $(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  --period 3600 --statistics Average Maximum
+
+# Processed bytes:
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ApplicationELB \
+  --metric-name ProcessedBytes \
+  --dimensions Name=LoadBalancer,Value=<lb-full-name> \
+  --start-time $(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  --period 3600 --statistics Average Maximum
+
+# Rule evaluations:
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/ApplicationELB \
+  --metric-name RuleEvaluations \
+  --dimensions Name=LoadBalancer,Value=<lb-full-name> \
+  --start-time $(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  --period 3600 --statistics Average Maximum
+```
+
+## Consolidation multi-path rule creation CLI (Step 4: CONSOLIDATION) (moved verbatim from SKILL.md lines 368-388)
+
+
+```bash
+# Create path-based rules on the consolidated ALB:
+aws elbv2 create-rule \
+  --listener-arn <listener-arn> \
+  --priority 10 \
+  --conditions Field=path-pattern,Values='/api/*' \
+  --actions Type=forward,TargetGroupArn=<api-tg-arn>
+
+aws elbv2 create-rule \
+  --listener-arn <listener-arn> \
+  --priority 20 \
+  --conditions Field=path-pattern,Values='/admin/*' \
+  --actions Type=forward,TargetGroupArn=<admin-tg-arn>
+
+aws elbv2 create-rule \
+  --listener-arn <listener-arn> \
+  --priority 30 \
+  --conditions Field=path-pattern,Values='/static/*' \
+  --actions Type=forward,TargetGroupArn=<static-tg-arn>
+```
+
+## CLB-to-ALB/NLB migration CLI (Step 5: CLB_MIGRATION) (moved verbatim from SKILL.md lines 413-436)
+
+```bash
+# Describe CLB listeners and backends for migration planning:
+aws elb describe-load-balancers \
+  --load-balancer-names <clb-name> \
+  --query 'LoadBalancerDescriptions[*].{name:LoadBalancerName,listeners:ListenerDescriptions,instances:Instances,scheme:Scheme,subnets:Subnets,sg:SecurityGroups}'
+
+# Create the target group for the migrated ALB:
+aws elbv2 create-target-group \
+  --name migrated-tg \
+  --protocol HTTP \
+  --port 80 \
+  --vpc-id <vpc-id> \
+  --health-check-path /health \
+  --health-check-interval-seconds 30
+
+# Create the replacement ALB:
+aws elbv2 create-load-balancer \
+  --name migrated-alb \
+  --subnets <subnet-1> <subnet-2> \
+  --security-groups <sg-id> \
+  --scheme internet-facing \
+  --type application
+```
+

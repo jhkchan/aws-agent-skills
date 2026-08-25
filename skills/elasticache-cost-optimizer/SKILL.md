@@ -134,147 +134,29 @@ replicas, persistence), CloudWatch metrics for utilisation, and the
 reserved-node inventory.
 
 ### Required data sources
-
-```bash
-# 1. ElastiCache cost breakdown (last 30 days)
-START=$(date -u -v-30d +%F 2>/dev/null || date -u -d '-30 days' +%F)
-END=$(date -u +%F)
-aws ce get-cost-and-usage \
-  --time-period Start=$START,End=$END \
-  --filter '{"Dimensions":{"Key":"SERVICE","Values":["Amazon ElastiCache"]}}' \
-  --granularity MONTHLY --metrics "BlendedCost" "UsageQuantity" \
-  --group-by Type=DIMENSION,Key=USAGE_TYPE --output json > elasticache-cost.json
-
-# 2. Cluster + replication group + RN topology
-aws elasticache describe-replication-groups --output json > elasticache-rgs.json
-aws elasticache describe-cache-clusters --show-cache-node-info --output json \
-  > elasticache-clusters.json
-aws elasticache describe-reserved-cache-nodes --output json > elasticache-rns.json
-aws elasticache describe-reserved-cache-nodes-offerings --output json \
-  > elasticache-rn-offerings.json
-
-# 3. CloudWatch CPUUtilization, EngineCPUUtilization, CurrConnections (per node)
-START_CW=$(date -u -v-30d +%FT%TZ 2>/dev/null || date -u -d '-30 days' +%FT%TZ)
-END_CW=$(date -u +%FT%TZ)
-for node in $(jq -r '.CacheClusters[].CacheNodes[].CacheNodeId' \
-  elasticache-clusters.json); do
-  for metric in CPUUtilization EngineCPUUtilization CurrConnections \
-    NetworkBandwidthInOut FreeableMemory; do
-    aws cloudwatch get-metric-statistics --namespace AWS/ElastiCache \
-      --metric-name $metric \
-      --dimensions Name=CacheClusterId,Value=$node \
-      --start-time $START_CW --end-time $END_CW \
-      --period 3600 --statistics Average Maximum --output json
-  done
-done > elasticache-cw.json
-```
+CLI data-gathering commands (Cost Explorer, ElastiCache topology, CloudWatch) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when running the live-account pre-flight data gate.
 
 ### Data-quality short-circuits
 
-| Condition | Effect on optimisation |
-|---|---|
-| Cost Explorer access denied | NEED_MORE_INFO for cost quantification; topology still analysable. |
-| Observation window < 14 days | NEED_MORE_INFO: workload may reflect atypical load. Min 14 days; 30 preferred. |
-| Cluster in `creating` / `modifying` / `snapshotting` | Wait for `available` before emitting a change recommendation. |
-| Global Datastore enabled | Cross-region replication adds full node cost in secondary region; analyse separately. |
-| ElastiCache Serverless already in use | Skip the serverless-fit dimension; analyse per-GB-hour billing instead of node-hour. |
-| Memcached with no replicas | Replica count dimension not applicable; focus on node size and Graviton. |
-
+Data-quality short-circuit table (window length, cluster states, Global Datastore, Serverless, Memcached) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when validating observation windows and cluster states before emitting recommendations.
 ## Process — Optimisation logic (apply in order)
 
 ### Step 0: Non-obvious behaviours that change the recommendation
-
-- **Graviton (r6g/r7g) is a flat ~20% price cut vs m5/r5, not a
-  performance trade-off.** The r6g and r7g generations use AWS Graviton
-  processors; for Redis and Memcached workloads they deliver equivalent
-  or better throughput at ~20% lower hourly cost. There is no reason to
-  stay on m5/r5 unless a specific library or module lacks ARM support.
-
-- **Redis EngineCPUUtilization is the engine's own CPU, not the OS
-  total.** Redis is single-threaded for command processing; a node with
-  8 vCPU but EngineCPUUtilization avg=60% is near saturation on one
-  core. Downsize only when EngineCPUUtilization has clear headroom. For
-  Memcached, use CPUUtilization (the engine uses all cores).
-
-- **Each Redis replica is a full node billed at the same hourly rate.**
-  ReplicasForShard=2 means 3 nodes per shard (1 primary + 2 replicas).
-  The cost scales linearly: 3 shards × 3 nodes = 9 nodes. Most read-
-  heavy workloads need only 1 replica per shard for failover; additional
-  replicas are only justified when read QPS exceeds a single replica's
-  capacity.
-
-- **AOF (append-only file) persistence adds write amplification cost.**
-  Every write is appended to the AOF on disk; for high-write workloads,
-  this consumes network and I/O that could otherwise serve clients. AOF
-  is billed as part of the node (no separate storage charge), but the
-  performance tax may force a larger node than otherwise needed. RDB
-  snapshots are periodic and lighter. If the cache is truly ephemeral,
-  disable persistence entirely.
-
-- **ElastiCache Serverless bills per-GB-hour of data and per-vCPU-hour
-  of compute, with no minimum capacity fee.** A serverless cache sitting
-  at 1 GB overnight pays only for 1 GB-hour. Provisioned nodes bill the
-  full node-hour regardless of usage. The break-even is when the
-  workload's steady-state data + compute exceeds ~60-70% of an
-  equivalent provisioned node's cost.
-
-- **Reserved Nodes are size-flexible within a family for Redis OSS.** A
-  `cache.r6g.large` Redis RN applies to any `cache.r6g.*` Redis node of
-  equal or smaller size. Memcached RNs are NOT size-flexible — they are
-  tied to the specific node type purchased. Use `modify-reserved-cache-
-  nodes-offering` to exchange an unused RN for a different offering
-  within the same family (no penalty, pro-rated).
-
-- **Data tiering (r6gd/r7gd) uses SSD-backed cold storage for values
-  below a configurable threshold.** This halves the effective cost for
-  large datasets with a cold tail (e.g., session stores where 80% of
-  keys are inactive). The tiered nodes cost ~10% more per hour but hold
-  2x the effective data, so per-GB cost drops ~45%.
-
-- **Cluster mode (sharding) adds a cost: each shard is a full primary +
-  replicas.** A 3-shard cluster with 1 replica each = 6 nodes. Sharding
-  is for capacity (data doesn't fit one node) or throughput (single
-  core saturated), not cost savings. If the dataset fits in one large
-  node, non-cluster mode with 1 replica (2 nodes) is cheaper than 3
-  shards × 1 replica (6 nodes).
+Step-0 deep dive on non-obvious ElastiCache cost behaviours (Graviton pricing, EngineCPU vs CPU, replica billing, AOF write amplification, Serverless billing model, RN size-flexibility, data tiering, cluster-mode cost) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before classifying a cluster — each behaviour changes the recommendation if ignored.
 
 ### Step 1: Validate input and data sufficiency
 
 If Cost Explorer access is unavailable AND the caller has not pasted
 billing line items, emit NEED_MORE_INFO:
 
-```text
-TARGET: <cluster-identifier>
-VERDICT: NEED_MORE_INFO
-REASON: Cost Explorer access is required to quantify per-dimension
-  savings. Without USAGE_TYPE granularity (ElastiCache:NodeUsage), the
-  seven dimensions can be analysed qualitatively but the dollar
-  savings cannot be computed.
-RECOMMENDATION:
-  1. Grant the auditor role `ce:GetCostAndUsage`.
-  2. Or, paste the top 10 ElastiCache USAGE_TYPE line items from the
-     last 30 days of CUR.
-ESTIMATED_SAVINGS: $0 (cannot quantify without CUR data)
-MIGRATION_STEPS:
-  - IAM policy addition:
-    {"Effect":"Allow",
-     "Action":["ce:GetCostAndUsage","ce:GetDimensionValues"],
-     "Resource":"*"}
-```
-
+Full NEED_MORE_INFO output block moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when the Cost Explorer data gate fails.
 ### Step 2: Cost Explorer reconciliation
-
-```bash
-aws ce get-cost-and-usage \
-  --time-period Start=$START,End=$END \
-  --granularity MONTHLY \
-  --metrics "BlendedCost" "UsageQuantity" \
-  --group-by Type=DIMENSION,Key=USAGE_TYPE \
-  --filter '{"Dimensions":{"Key":"SERVICE","Values":["Amazon ElastiCache"]}}' \
-  --output json | \
-  jq '.ResultsByTime[].Groups[] | {usage: .Keys[0],
-    cost: (.Metrics.BlendedCost.Amount | tonumber)}'
-```
+Cost Explorer reconciliation CLI (USAGE_TYPE breakdown) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when quantifying per-dimension spend.
 
 | USAGE_TYPE | Dimension | What it represents |
 |---|---|---|
@@ -319,17 +201,8 @@ steady load, the workload may be cheaper on provisioned nodes.
 | avg > 70% | Upsize (Memcached uses all cores) | None |
 
 **Worked example — Redis right-sizing:**
-
-Replication group with 3 shards × 2 nodes (primary + replica) on
-`cache.r6g.2xlarge` ($0.664/h each in us-east-1). EngineCPUUtilization
-avg=12%, max=25%. CurrConnections avg=150. Downsize all nodes to
-`cache.r6g.xlarge` ($0.334/h):
-- Current: 6 nodes × $0.664 × 730h = $2,908/month
-- New: 6 nodes × $0.334 × 730h = $1,463/month
-- Monthly savings: $1,445
-- Trade-off: less memory per node (13.13 GB vs 26.36 GB). Verify the
-  dataset fits at 60% of 13.13 GB (7.88 GB) per shard with headroom.
-  If evictions spike, revert to 2xlarge.
+Full worked example (6 × cache.r6g.2xlarge → xlarge, $1,445/month) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when right-sizing Redis nodes.
 
 ### Step 5: Graviton-based node migration
 
@@ -346,14 +219,8 @@ Graviton generation.
 | cache.c4.* (legacy) | cache.r7g.* equivalent | ~35-40% | c4 is oldest; large savings |
 
 **Worked example — Graviton migration:**
-
-Cluster with 3 shards × 2 nodes on `cache.m5.2xlarge` ($0.452/h):
-- Current: 6 × $0.452 × 730h = $1,980/month
-- Migrate to cache.r6g.2xlarge: 6 × $0.334 × 730h = $1,463/month
-- Monthly savings: $517 (26%)
-- Migration: create a new replication group on r6g, sync via DMS or
-  application-level dual-write, cut over the endpoint. No code change.
-- After migration, evaluate right-sizing (Step 4) on the new nodes.
+Full worked example (m5.2xlarge → r6g.2xlarge, $517/month, 26%) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when evaluating Graviton migration.
 
 ### Step 6: ElastiCache Serverless fit evaluation
 
@@ -382,15 +249,8 @@ with an RN is cheaper.
 | Dataset > 100 GB with steady load | Keep provisioned | Serverless per-GB adds up at scale |
 
 **Worked example — Serverless migration:**
-
-A `cache.r6g.large` node ($0.167/h = $122/month) holding 3 GB of data,
-EngineCPU avg=8%, overnight idle 8h/day. Effective utilisation ~25%.
-- Provisioned: $122/month (billed 24/7 regardless of load)
-- Serverless: 3 GB × $0.00383 × 730h = $8.39 data + compute ~$10 =
-  $18.39/month
-- Monthly savings: ~$104 (85%)
-- Trade-off: Serverless has a slight cold-start latency on first access
-  after idle; verify p99 tolerance.
+Full worked example ($122/month provisioned → $18.39/month serverless, 85%) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when evaluating Serverless fit.
 
 ### Step 7: Replication group topology
 
@@ -402,26 +262,12 @@ EngineCPU avg=8%, overnight idle 8h/day. Effective utilisation ~25%.
 | Cluster mode with 1 shard | Revert to non-cluster (simpler, same cost) | None (operational only) |
 
 **Worked example — replica reduction:**
-
-Replication group with 3 shards × 3 nodes (primary + 2 replicas) on
-`cache.r6g.large` ($0.167/h). Read QPS avg=2,000, well within one
-replica's capacity (~100,000 QPS for r6g.large).
-- Current: 9 nodes × $0.167 × 730h = $1,097/month
-- Reduce to 3 shards × 2 nodes (primary + 1 replica):
-  6 nodes × $0.167 × 730h = $731/month
-- Monthly savings: $366
-- Trade-off: failover still works with 1 replica. Read capacity drops
-  by 50%, but 2,000 QPS is 2% of one replica's ceiling. Confirm no
-  analytics reader depends on the second replica.
+Full worked example (9 → 6 nodes, $366/month) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when reducing replica count.
 
 ### Step 8: Reserved Node evaluation
-
-```bash
-aws elasticache describe-reserved-cache-nodes-offerings \
-  --cache-node-type cache.r6g.2xlarge \
-  --product-description "redis" \
-  --offering-type "No Upfront" --duration 31536000 --output json
-```
+Reserved Node offering query CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when pricing an RN purchase.
 
 | Pattern | Recommendation | Savings vs On-Demand |
 |---|---|---|
@@ -433,16 +279,8 @@ aws elasticache describe-reserved-cache-nodes-offerings \
 
 **Reserved node exchange:**
 
-```bash
-aws elasticache modify-reserved-cache-nodes-offering \
-  --reserved-cache-node-id my-rn-1234 \
-  --reserved-cache-nodes-offering-id <new-offering-id>
-```
-
-RN exchange is available within the same engine family. No penalty; the
-new offering is pro-rated from the exchange date. Use this when
-migrating from m5 to r6g and an m5 RN is still active.
-
+Reserved node exchange CLI and exchange rules moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when migrating node generations with an active RN.
 ### Step 9: Persistence cost optimisation
 
 | Observation | Recommendation | Savings |
@@ -453,11 +291,8 @@ migrating from m5 to r6g and an m5 RN is still active.
 | AOF + RDB both enabled | Pick one; both is redundant | AOF performance tax |
 | Persistence on, but never restored from backup in 12 months | Disable or reduce frequency | Full persistence overhead |
 
-AOF persists every write; RDB takes periodic snapshots. For a cache
-that is rebuilt from the primary database on restart (e.g., session
-store with DB backing), disable persistence entirely — the cache does
-not need its own durability.
-
+Persistence deep dive (AOF vs RDB mechanics, when to disable persistence) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when auditing persistence cost (Step 9).
 ### Step 10: Data tiering evaluation (r6gd/r7gd)
 
 Data tiering automatically moves infrequently accessed items to SSD,
@@ -471,15 +306,8 @@ halving the effective per-GB cost for datasets with a cold tail.
 | Using 4+ nodes to hold a large dataset | Consolidate to fewer r6gd nodes | Node count reduction |
 
 **Worked example — data tiering:**
-
-Session store on 6 × `cache.r6g.2xlarge` (26.36 GB each, 158 GB total).
-60% of keys are inactive sessions. Migrate to 3 × `cache.r7gd.4xlarge`
-(105.42 GB tiered each, 316 GB total, ~2x density):
-- Current: 6 × $0.664 × 730h = $2,908/month
-- New: 3 × $1.336 × 730h = $2,926/month
-- Node-hour cost is similar, BUT the dataset now has 2x headroom with
-  fewer nodes — enabling future consolidation or right-sizing. If the
-  dataset grows, tiered nodes absorb it without adding nodes.
+Full worked example (6 × r6g.2xlarge → 3 × r7gd.4xlarge) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when evaluating data tiering (Step 10).
 
 ### Step 11: Final verdict
 
@@ -562,27 +390,8 @@ CONFIRM: Before each state-changing CLI, emit and await operator
 ```
 
 ### Worked example — already optimal
-
-```text
-TARGET: sessions-cache-prod
-VERDICT: ALREADY_OPTIMAL
-REASON: All seven dimensions verified at cost-optimal config:
-  cache.r7g.large nodes (latest Graviton), EngineCPU avg 35%,
-  1 replica per shard for failover, RDB snapshots (1-day retention),
-  1-yr RN on all nodes, no AOF, dataset at 40% of memory.
-RECOMMENDATION:
-  Current: All dimensions optimal
-  Proposed: no change
-  Confidence: HIGH — CE confirms 30-day spending stable; CloudWatch
-    confirms EngineCPU in the healthy 20-50% band.
-ESTIMATED_SAVINGS:
-  Monthly (all dimensions): $0
-  Annual total: $0
-MIGRATION_STEPS:
-  - None required. Continue monthly CE review.
-  - Re-evaluate at next dataset growth forecast — if memory exceeds
-    60% of node capacity, evaluate data tiering (r7gd).
-```
+Full ALREADY_OPTIMAL worked example moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when all seven dimensions pass.
 
 ## Anti-Patterns — NEVER do these things
 
@@ -647,29 +456,8 @@ MIGRATION_STEPS:
 | Look up pricing / node types | references/elasticache-pricing-reference.md |
 
 ## Expert heuristic — the 60-second triage
-
-When handed an ElastiCache bill and asked "why is this so high?", run
-this 60-second triage before deep-diving any single dimension:
-
-1. **Pull CE ElastiCache USAGE_TYPE breakdown.** If nodes are on m5/r5
-   generation, the Graviton migration (Step 5) is the first lever —
-   flat ~20% cut.
-2. **Pull cluster node types + shard count.** A cluster on r6g with
-   EngineCPU < 20% = right-size opportunity (Step 4).
-3. **Pull replica count per shard.** ReplicasPerShard > 1 with read
-   QPS well under a single replica's capacity = topology waste
-   (Step 7).
-4. **Pull RN inventory.** Long-running clusters On-Demand with no RN =
-   RN opportunity (Step 8).
-5. **Pull persistence mode.** AOF on an ephemeral cache = persistence
-   overhead (Step 9). RDB with long retention on a small dataset =
-   backup cost.
-6. **Pull Serverless vs provisioned split.** Provisioned clusters with
-   overnight idle > 50% = Serverless candidate (Step 6).
-
-If any of the six checks hits, deep-dive the corresponding step. If all
-six pass, the cluster is likely ALREADY_OPTIMAL — verify with the full
-ordered process.
+The 60-second bill triage (six ordered checks mapping symptoms to steps) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when triaging an ElastiCache bill before deep-diving.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
@@ -709,27 +497,15 @@ ordered process.
 | `NEED_MORE_INFO` | Data gate failed: CE access denied, CloudWatch window < 14 days. | Pre-decision — emit per-dimension; other dimensions can still emit OPPORTUNITY_FOUND. |
 
 ## Recent AWS features (2024-2026)
+Recent AWS features (Serverless billing, r7g, data tiering, Redis 7.2+, Global Datastore, RN exchange) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when checking feature-dependent recommendations.
 
-- **ElastiCache Serverless (2024):** Auto-scaling, no node management.
-  Per-GB-hour data + per-vCPU-hour compute billing. Break-even against
-  provisioned at ~30% avg utilisation; cheaper for variable workloads.
-- **Graviton-based nodes — cache.r7g generation (2024-2025):** Latest
-  ARM-based nodes; ~8% cheaper than r6g, ~20-33% cheaper than m5/r5.
-  Full Redis and Memcached engine support.
-- **Data tiering — cache.r6gd / r7gd (2023-2024):** SSD-backed cold
-  data offload for large datasets. Halves effective per-GB cost for
-  workloads with a cold tail (e.g., session stores). Configurable
-  tiering threshold.
-- **ElastiCache for Redis 7.2+ (2024):** Native Redis functions,
-  ACL improvements, and Sharded Pub/Sub. Verify RN product-description
-  matches the new engine version before purchase.
-- **Global Datastore cross-region (2024-2025):** Multi-region
-  replication for Redis. Each secondary region bills full node cost;
-  right-size DR-region clusters independently.
-- **Reserved Node exchange via modify-reserved-cache-nodes-offering
-  (2024+):** Exchange an active RN for a different offering within
-  the same family — no penalty, pro-rated. Use when migrating between
-  node generations with an active RN.
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples: NEED_MORE_INFO block, right-sizing, Graviton, Serverless, replica-reduction, data-tiering, and ALREADY_OPTIMAL.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight data-gathering CLI, data-quality short-circuits, Cost Explorer reconciliation, RN offering query and exchange.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step-0 non-obvious behaviours, persistence deep dive, 60-second bill triage, recent AWS features.
+- [references/elasticache-pricing-reference.md](references/elasticache-pricing-reference.md) — node-type pricing lookup.
 
 ## AWS documentation
 

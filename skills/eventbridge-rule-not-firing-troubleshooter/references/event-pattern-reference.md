@@ -177,3 +177,59 @@ PutEvents returns HTTP 200 with a response body:
 
 If `FailedEntryCount > 0`, the `Entries` array includes `ErrorCode` and
 `ErrorMessage` for each failed entry.
+
+## Pattern field match table (moved from SKILL.md)
+
+| Pattern field | Event field | Match rule |
+|---|---|---|
+| `source` | `source` | Exact string match (case-sensitive). Array = OR. |
+| `detail-type` | `detail-type` | Exact string match (case-sensitive). Array = OR. |
+| `detail.{path}` | `detail.{path}` | Exact value match. Content filter operators apply. |
+| `account` | `account` | Exact string match. Array = OR. |
+| `region` | `region` | Exact string match. Array = OR. |
+| `time` | `time` | Not matched as a pattern field (timestamp). Use content filters on `detail.time` if needed. |
+| `resources` | `resources` | Exact ARN match. Array = OR. |
+
+## Common pattern mismatch patterns (moved from SKILL.md)
+
+Common mismatch patterns:
+
+| Pattern | Event | Result | Fix |
+|---|---|---|---|
+| `source: ["myapp"]` | `source: "myapp.orders"` | No match | Use `source: ["myapp.orders"]` or `source: [{prefix: "myapp"}]` |
+| `detail-type: ["Order Created"]` | `detail-type: "order created"` | No match | Case-sensitive — use exact casing |
+| `detail: {status: ["confirmed"]}` | `detail: {status: "pending"}` | No match | Add "pending" to the array or change the condition |
+| `detail: {amount: [100]}` | `detail: {amount: "100"}` | No match | Type mismatch — number vs string |
+| `detail: {order: {id: ["123"]}}` | event has `detail.order.id = "123"` at depth 3 | Match (depth is within limit) | Verify depth ≤ 10 |
+
+## Content filter operator validation tables (moved from SKILL.md)
+
+| Operator | Syntax | Matches | Common error |
+|---|---|---|---|
+| `prefix` | `{"prefix": "ord"}` | Strings starting with "ord" | Applied to non-string value (number, boolean) |
+| `numeric` | `{"numeric": [">=", 100]}` | Numbers ≥ 100 | Applied to string value `"100"` |
+| `equals-ignore-case` | `{"equals-ignore-case": "abc"}` | String "abc" case-insensitive | Only works on strings, not numbers |
+| `any-but` | `{"anything-but": ["cancelled"]}` | Any value except "cancelled" | Does not match null/undefined |
+| `wildcard` | `{"wildcard": "ord-*"}` | Strings matching glob "ord-*" | Only `*` is supported (no `?`) |
+| `cidr` | `{"cidr": "10.0.0.0/8"}` | IP addresses in CIDR range | Only IPv4 |
+| `exists` | `{"exists": true}` | Field is present | `{"exists": false}` = field is absent |
+
+Common content filter failure patterns:
+
+| Pattern | Event | Result | Why |
+|---|---|---|---|
+| `{"prefix": "ord"}` on `detail.type` | `detail.type: 123` | No match | `prefix` works on strings only |
+| `{"numeric": [">=", 100]}` on `detail.amount` | `detail.amount: "150"` | No match | Value is string, not number |
+| `{"exists": true}` on `detail.optional` | Event has no `detail.optional` | No match | Field genuinely absent |
+| `{"anything-but": ["x"]}` on `detail.tag` | Event has no `detail.tag` | No match | Missing field does not match anything-but |
+
+## Nested depth limit illustration (moved from SKILL.md)
+
+```text
+detail                          → depth 1
+detail.level1                   → depth 2
+detail.level1.level2            → depth 3
+...
+detail.l1.l2.l3.l4.l5.l6.l7.l8.l9 → depth 10 (maximum)
+detail.l1.l2.l3.l4.l5.l6.l7.l8.l9.l10 → depth 11 (FAILS SILENTLY)
+```

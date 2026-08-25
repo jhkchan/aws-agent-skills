@@ -172,77 +172,18 @@ non-negotiable for any production-adjacent experiment.
 
 ## Expert heuristic: the permissive-target myth
 
-The most common misconception: "the FIS action determines what gets
-disrupted." It does not, by itself, decide the scope.
-
-```text
-Operator thinks:                  What actually happens:
-"aws:ec2:stop-instances action    FIS stops every instance matching
-on the template" -> safe,         the target filter. If the filter is
-action-level scope.               resourceTags env=prod, that is
-                                  every production instance. There is
-                                  no action-level scoping in FIS; the
-                                  target is the scope.
-```
-
-Target scoping is a deterministic resolution at experiment start: FIS
-lists all resources matching the filter and applies the action to
-each. With no stop condition, the experiment runs to budget. With an
-over-scoped IAM role (`ec2:StopInstances: *`), there is no second line
-of defense.
-
-This applies equally to ECS, RDS, Aurora, Lambda, and network actions:
-the target filter is the blast radius. The remedy is one tag reserved
-for FIS targeting (e.g., `fis-target=true`), applied only to drill
-resources, plus an IAM role scoped to that tag on every action.
+Why targets — not actions — define blast radius, and the tag-scoping model, moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Expert heuristic: the permissive-target myth
 
 ## Expert heuristic: stop-condition silent no-op
 
-A stop condition is an alarm ARN. FIS polls the alarm state during the
-experiment and halts when it goes ALARM. The trap: FIS needs
-`cloudwatch:DescribeAlarms` permission in its execution role for those
-specific alarm ARNs. Without the permission, FIS cannot read the alarm
-state — and it fails open (continues the experiment) rather than
-aborting on the permission gap. There is no error and no log line that
-says "stop condition disabled."
-
-**Three invariants before any production-adjacent experiment:**
-
-1. **The alarm exists and is monitored.** `aws cloudwatch describe-
-   alarms --alarm-names <name>` returns the alarm.
-2. **The FIS role has `cloudwatch:DescribeAlarms` on the alarm ARN.**
-   Inspect the role policy; do not assume.
-3. **A manual ALARM trigger halts a dry-run experiment.** Set the alarm
-   to ALARM state (force-metric) and start a 60-second experiment; the
-   experiment should halt within the polling interval.
+Alarm-permission trap and polling semantics moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Expert heuristic: stop-condition silent no-op
 
 ## Expert heuristic: budgetDuration vs. action natural duration
 
-`budgetDuration` is the upper bound on the experiment. It is NOT the
-duration of the fault's effect. Each FIS action has its own model:
-
-- `aws:ec2:stop-instances`: stops instances, then (on experiment end)
-  attempts to start them. The instances are STOPPED for ~(budget -
-  action-duration) minutes. If start fails, they stay stopped.
-- `aws:ec2:send-api-error`: returns the configured error code for API
-  calls made by the target IAM role for the duration. Effect ends when
-  the action ends.
-- `aws:ecs:stop-task`: stops the task. ECS reschedules per the service.
-  No rollback — the task stays stopped and a new one starts (or
-  doesn't, depending on deployment min/ideal).
-- `aws:rds:failover-db-cluster`: triggers a failover; the failover
-  itself takes 30-120 seconds. No rollback — the cluster stays
-  promoted until the next failover.
-- `aws:network:disrupt-connectivity` (SSM-based): injects iptables/tc
-  rules; on action end, SSM removes them. If SSM agent is unreachable
-  at end, the rules persist.
-- `aws:lambda:invoke-async`: invokes the function with the payload,
-  once or N times. Effect ends when invocation completes.
-
-**Practical default:** set `budgetDuration` to 2x the action's
-expected effect duration. A 1-minute stop-instances drill gets a
-2-minute budget. A 5-minute network blackhole gets a 10-minute budget.
-This bounds the failure-domain if rollback fails.
+Per-action natural-duration model and rollback bounds moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Expert heuristic: budgetDuration vs. action natural duration
 
 ## Prerequisites (verify before provisioning)
 
@@ -326,72 +267,13 @@ Confirm:
 
 ### Step 5 — Create IAM execution role with least privilege
 
-**Trust policy:**
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": {"Service": "fis.amazonaws.com"},
-    "Action": "sts:AssumeRole"
-  }]
-}
-```
-
-**Permission policy (least privilege):**
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": ["ec2:StopInstances", "ec2:StartInstances"],
-      "Resource": "*",
-      "Condition": {"StringEquals": {"aws:ResourceTag/fis-target": "true"}}
-    },
-    {
-      "Effect": "Allow",
-      "Action": ["cloudwatch:DescribeAlarms"],
-      "Resource": "arn:aws:cloudwatch:<region>:<account>:alarm:<ALARM_NAME>"
-    },
-    {
-      "Effect": "Allow",
-      "Action": ["ssm:SendCommand", "ssm:GetCommandInvocation"],
-      "Resource": ["arn:aws:ssm:<region>::document/AWS-RunShellScript",
-                   "arn:aws:ec2:<region>:<account>:instance/*"]
-    },
-    {
-      "Effect": "Allow",
-      "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
-      "Resource": "arn:aws:logs:<region>:<account>:log-group:/aws/fis/<exp>:*"
-    }
-  ]
-}
-```
-
-**Common mistake:** granting `ec2:StopInstances` on `Resource: "*"`
-without the tag condition. The condition is the second line of
-defense — if the target filter is misconfigured, the IAM condition
-still blocks the action on non-FIS resources.
+Full least-privilege trust policy, permissions policy templates, and condition scoping moved to references.
+→ [references/iam-and-logging-templates.md](references/iam-and-logging-templates.md) § Step 5 — Create IAM execution role
 
 ### Step 6 — Configure experiment logging (S3 / CloudWatch Logs)
 
-**S3 logging:**
-```json
-"logConfiguration": {
-  "logSchemaVersion": 2,
-  "cloudWatchLogsConfiguration": {"logGroupArn": "arn:aws:logs:<region>:<account>:log-group:/aws/fis/<exp>"},
-  "s3Configuration": {"bucketName": "fis-experiment-logs-<account>", "prefix": "experiments/<exp>/"},
-  "logsSchemaVersion": 2
-}
-```
-
-The S3 bucket MUST grant `s3:PutObject` to the FIS service principal
-(`service-role/fis.amazonaws.com` or the FIS logging account). The
-CloudWatch log group MUST exist before the experiment starts.
-
-**Common mistake:** referencing a log group that does not exist. FIS
-does not create it; logging silently fails.
+S3 / CloudWatch Logs logConfiguration JSON templates and prerequisites moved to references.
+→ [references/iam-and-logging-templates.md](references/iam-and-logging-templates.md) § Step 6 — Configure experiment logging
 
 ### Step 7 — Set budgetDuration + (optional) schedule
 
@@ -568,60 +450,13 @@ VERIFICATION_COMMANDS:
 
 ### Perfect example output — PREREQUISITES_MISSING
 
-```text
-EXPERIMENT_TEMPLATE: ec2-stop-canary (action: aws:ec2:stop-instances, target: env=prod)
-VERDICT: PREREQUISITES_MISSING
-CHECKLIST:
-  [✓] Intent + blast radius: Stop production instances for a drill, blast radius unknown
-  [✗] Target scoped: resourceTags env=prod matches 247 instances — refusing to deploy with this filter. Switch to fis-target=true and tag only eligible resources.
-  [✓] Action(s): aws:ec2:stop-instances (duration PT60S)
-  [✗] Stop condition(s): no alarm name provided — without a stop condition, the experiment runs to budget with no auto-halt. Configure an error-rate or availability alarm.
-  [—] IAM role: deferred until target scope is corrected
-  [—] Logging: deferred
-  [✗] budgetDuration: cannot set without target + stop-condition confirmation (PT2M recommended)
-VERIFICATION_COMMANDS:
-  aws ec2 describe-instances --filters Name=tag:env,Values=prod --query 'Reservations[*].Instances[0].InstanceId'
-  aws cloudwatch describe-alarms --query 'MetricAlarms[?Namespace==`CWAgent`].AlarmName'
-```
-
-**Self-check before emit:**
-- [ ] All 7 checklist rows present (no omitted items)?
-- [ ] Every `[✓]` has a matching verification command?
-- [ ] Target count is cited explicitly?
-- [ ] Stop-condition alarm state + role permission both cited?
-- [ ] IAM role cites tag conditions on action APIs?
-- [ ] budgetDuration rationale ties to the action?
-- [ ] Every `[✗]` cites the specific gap?
-- [ ] terminate-instances (if present) carries a `[WARN]`?
+Full PREREQUISITES_MISSING example output moved to references.
+→ [references/worked-examples.md](references/worked-examples.md) § Perfect example output — PREREQUISITES_MISSING
 
 ## Recent AWS features
 
-- **Aurora failover action (`aws:rds:failover-db-cluster`):** FIS can
-  trigger an Aurora writer failover as a managed action. The failover
-  takes 30-120 seconds; FIS does NOT roll it back. Use for RTO
-  validation with explicit promotion acceptance.
-- **EKS pod disruption via SSM:** FIS does not have a native
-  `aws:eks:*` action in all regions; the canonical pattern is an
-  `aws:ssm:start-automation-execution` or `aws:ssm:send-command` that
-  runs `kubectl delete pod` on the EKS worker node via SSM. Verify
-  the worker node has the SSM agent and kubeconfig.
-- **Network actions (blackhole / latency / loss):** via SSM Run
-  Command on EC2 or ECS ENIs, injecting iptables/tc rules. The
-  network action's rollback depends on the SSM agent being reachable
-  at action end — if offline, the rules persist. Always pair with a
-  stop condition and a manual rollback runbook.
-- **`aws:ec2:send-api-error`:** injects API errors for an IAM role
-  (e.g., ThrottlingException on ssm:GetParameters). Useful for
-  testing client retry logic without taking down the dependency.
-  Scope the target by IAM role, not by resource.
-- **Experiment logging to CloudWatch Logs and S3 (logSchemaVersion
-  2):** emits structured JSON per experiment step. Configure both
-  destinations; S3 for long-term retention, CloudWatch Logs for
-  near-real-time anomaly detection on experiment outcomes.
-- **Cross-account FIS via Organizations:** the FIS service-linked
-  role can be shared across accounts in an Organization for
-  centralized chaos engineering. Verify the trust policy includes
-  the organization ID condition.
+2024-2026 FIS feature notes (Aurora failover, EKS actions, SSM-based network disruption, org-ID conditions) moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Recent AWS features
 
 ## AWS documentation
 
@@ -635,3 +470,12 @@ VERIFICATION_COMMANDS:
 - **FIS CLI Reference** — https://docs.aws.amazon.com/cli/latest/reference/fis/
 - **Blog: AWS Resilience Hub + FIS** — https://aws.amazon.com/blogs/mt/test-application-resilience-using-aws-resilience-hub-and-aws-fault-injection-service/
 - **Workshop: chaos engineering with FIS** — https://catalog.workshops.aws/chaosengineering
+
+## References (load on demand)
+
+Consult these only when the corresponding topic comes up:
+
+- [references/fault-action-catalog.md](references/fault-action-catalog.md) — fault action IDs, parameters, and rollback semantics
+- [references/iam-and-logging-templates.md](references/iam-and-logging-templates.md) — execution-role policies (moved from Step 5) and logging config (moved from Step 6)
+- [references/worked-examples.md](references/worked-examples.md) — the PREREQUISITES_MISSING full-output example (moved from § Output format)
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert heuristics (permissive-target myth, stop-condition no-op, budgetDuration) and recent AWS features

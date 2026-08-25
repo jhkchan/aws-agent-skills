@@ -40,41 +40,8 @@ Emits a deployment plan with a READY_TO_DEPLOY checklist.
 
 ## Mindset
 
-**One-line takeaway:** an EventBridge Pipe is a **point-to-point
-stream processor** — one source, one target, optional filter +
-enrichment in between. Unlike an EventBridge rule (which is a fan-out
-dispatcher from a bus), a Pipe pulls records from a source on the
-Pipe's own concurrency, optionally transforms them, and delivers them
-to exactly one target. Pipes own the polling, batching, retry, and DLQ.
-
-Three facts make Pipe provisioning different from "trigger Lambda on
-stream events":
-
-- **The Pipe is the poller — not the target.** For DynamoDB Streams
-  and Kinesis sources, you do NOT attach the Lambda trigger directly.
-  The Pipe's IAM role reads from the stream; the Pipe delivers batches
-  to the target. Two independent permissions are required: the Pipe
-  role reads the source, the target resource policy allows the Pipe
-  role to invoke it. Skipping the target resource policy is the most
-  common failure.
-
-- **Batch window behavior is source-dependent.** For streaming sources
-  (DynamoDB Streams, Kinesis, MSK, MQ, self-managed Kafka),
-  `MaximumBatchingWindowInSeconds` (0-300s) controls how long the Pipe
-  waits to assemble a batch before invoking the target. For SQS sources
-  the window is ignored — SQS already has its own `VisibilityTimeout`
-  and `ReceiveMessage` semantics. Set `MaximumBatchSize` (1-10000,
-  source-specific cap) and `MaximumRecordAgeInSeconds` (60-86400s) to
-  bound batch behavior.
-
-- **Enrichment and target are separate stages with separate
-  permissions.** The enrichment step (Lambda, Step Functions, API
-  Gateway, API Destination) transforms the batched payload before it
-  reaches the target. The Pipe role needs `lambda:InvokeFunction` (or
-  equivalent) on the enrichment AND a separate grant on the target.
-  Each stage has its own retry policy; enrichment failures do NOT
-  automatically replay to the DLQ unless the Pipe's `OnPartialBatchItemFailure`
-  is configured for SQS/Kinesis sources.
+Mindset prose (pipe as point-to-point stream processor, pipe-as-poller, source-dependent batch windows, separate enrichment/target stages) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand framing a Pipe deployment.
 
 ## Quick navigation
 
@@ -132,31 +99,8 @@ Before producing the deployment plan, validate the input specification.
 Several requirements **block deployment** — proceeding with an invalid
 spec produces a non-functional or insecure Pipe.
 
-**Live-account pre-flight checks (skip if doing offline architecture plan):**
-
-1. Verify IAM permissions: `pipes:CreatePipe`, `StartPipe`,
-   `UpdatePipe`, `DescribePipe`, plus source/target/enrichment rights
-   (e.g., `dynamodbstreams:GetRecords`, `lambda:InvokeFunction`,
-   `sqs:ReceiveMessage`, `kafka-cluster:ReadData`).
-2. Verify source ARN resolves and region matches Pipe region:
-   - DynamoDB Streams: `aws dynamodbstreams describe-stream --stream-arn <arn>` returns `StreamStatus=ENABLED`.
-   - Kinesis: `aws kinesis describe-stream --stream-arn <arn>` returns `StreamStatus=ACTIVE`.
-   - SQS: `aws sqs get-queue-attributes --queue-url <url>` returns `QueueArn`.
-   - MSK: `aws kafka describe-cluster --cluster-arn <arn>` returns `State=ACTIVE`.
-   - Amazon MQ: `aws mq describe-broker --broker-id <id>` returns `BrokerState=RUNNING`.
-3. Verify target ARN resolves and resource policy grants invoke to
-   `pipes.amazonaws.com` (Lambda, Step Functions, API Gateway) or the
-   pipe role ARN (SQS, SNS, ECS task).
-4. Verify DLQ (if configured): SQS queue exists in same region, queue
-   policy allows the pipe role to `sqs:SendMessage`.
-5. Verify enrichment (if configured): Lambda function state `Active`,
-   Step Functions state machine state `ACTIVE`, API Gateway stage
-   deployed, API Destination with active connection.
-6. For MSK / self-managed Kafka: verify `AuthType` (`SASL_SCRAM_512_AUTH`,
-   `SASL_SCRAM_256_AUTH`, `IAM`, `MTLS`, `NONE` — `NONE` rejected for
-   non-local clusters) and `ConsumerGroupID` is unique.
-7. For Amazon MQ: verify `Credentials` secret in Secrets Manager with
-   `username`/`password` keys, broker state `RUNNING`.
+Live-account pre-flight verification commands (IAM rights, source/target/enrichment state, DLQ policy, MSK AuthType, MQ credentials secret) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand running pre-checks against a live account.
 
 | Attribute | Value | Effect on plan |
 |---|---|---|
@@ -190,57 +134,8 @@ REQUIRED:
 
 ### Step 0: Expert knowledge — non-obvious Pipe behaviors that change the plan
 
-- **The Pipe is the poller — the target's trigger config is NOT used.**
-  For DynamoDB Streams → Lambda, you do NOT call
-  `lambda create-event-source-mapping`. The Pipe role reads the stream
-  and invokes Lambda. The Lambda does NOT have a direct AWS::Lambda::EventSourceMapping.
-
-- **Two independent permissions are required per pipe.** (a) The pipe
-  role reads from the source (`dynamodbstreams:GetRecords` or
-  `sqs:ReceiveMessage` or `kinesis:GetRecords` or `kafka-cluster:ReadData`).
-  (b) The target resource policy allows the pipe role (or
-  `pipes.amazonaws.com`) to invoke. Lambda / Step Functions / API
-  Gateway targets accept resource-based policies; SQS / SNS / ECS
-  require the pipe role to have the action in its identity-based policy.
-
-- **`MaximumBatchingWindowInSeconds` is ignored for SQS sources.** SQS
-  already controls visibility and receipt semantics. For SQS source,
-  set the source queue's `VisibilityTimeout` to at least 6x the target
-  Lambda timeout (standard Lambda event-source mapping rule). For
-  streaming sources, the batching window controls how long the Pipe
-  waits to gather records before invoking.
-
-- **DLQ behavior differs by source type.** For DynamoDB Streams,
-  Kinesis, MSK, Amazon MQ, and self-managed Kafka: the pipe DLQ receives
-  records that exceed retry or record-age limits. For SQS source: the
-  DLQ is on the **source queue** (configured via `RedrivePolicy`); the
-  pipe-level `DeadLetterConfig` is ignored for SQS. Configure both
-  correctly or your poison-pill messages disappear.
-
-- **Enrichment runs on the BATCHED payload, not individual records.**
-  The enrichment Lambda receives the full batch in one invocation. If
-  it throws, the entire batch is retried. Use enrichment for batch
-  transformations (e.g., join records, schema reshape, enrichment
-  lookup) — NOT for per-record validation (use the target Lambda for that).
-
-- **MSK / self-managed Kafka require explicit `ConsumerGroupID`.** Two
-  pipes sharing a consumer group split partitions between them. Two
-  pipes with different consumer groups both receive all records. Pick
-  the consumer group deliberately — wrong choice silently halves or
-  duplicates throughput.
-
-- **Filter pattern runs on the source's raw payload, BEFORE enrichment.**
-  For DynamoDB Streams the filter matches the `dynamodb.NewImage` /
-  `OldImage` fields. For SQS it matches the `body` (JSON-parsed). For
-  Kinesis it matches the decoded record. Malformed patterns silently
-  filter everything — always validate with `test-event-pattern` style
-  dry-run before deploying.
-
-- **`OnPartialBatchItemFailure` controls partial failure behavior for
-  SQS and Kinesis/DDB sources (2024+).** `AUTOMATIC_BISECT` splits the
-  batch in half on failure (helps isolate poison records). Set this
-  when working with large batches where one bad record should not
-  reprocess the whole batch.
+Step 0 expert-knowledge bullets (pipe-as-poller, two independent permissions, SQS batch-window exception, DLQ behaviour by source type, enrichment on the batched payload, consumer groups, filter placement, OnPartialBatchItemFailure) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand a plan depends on a non-obvious Pipe behaviour.
 
 ### Step 1: Source — type, ARN, region, state
 
@@ -373,107 +268,18 @@ permissions, not the pipe role's).
 
 ### Step 7: IAM role — least-privilege trust + permissions
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {"Service": "pipes.amazonaws.com"},
-      "Action": "sts:AssumeRole",
-      "Condition": {
-        "StringEquals": {"aws:SourceAccount": "111111111111"},
-        "ArnEquals": {"aws:SourceArn": "arn:aws:pipes:us-east-1:111111111111:pipe/prod-ddb-pipe"}
-      }
-    }
-  ]
-}
-```
-
-**Required permissions on the pipe role:**
-
-| Source | Permissions |
-|---|---|
-| DynamoDB Streams | `dynamodbstreams:DescribeStream`, `GetShardIterator`, `GetRecords`; `dynamodb:DescribeTable` |
-| Kinesis | `kinesis:DescribeStream`, `GetShardIterator`, `GetRecords`, `ListShards` |
-| SQS | `sqs:ReceiveMessage`, `DeleteMessage`, `GetQueueAttributes` |
-| MSK | `kafka-cluster:Connect`, `ReadData`, `DescribeTopic`, `DescribeGroup`, `AlterGroup` |
-| Amazon MQ | Secrets Manager `secretsmanager:GetSecretValue` on broker credentials; STS for credential exchange |
-| Self-managed Kafka | (Same as MSK) + MSK-style VPC config |
-
-| Enrichment / Target | Permissions |
-|---|---|
-| Lambda enrichment/target | `lambda:InvokeFunction` on enrichment ARN + target ARN |
-| Step Functions target | `states:StartExecution` (Standard) or `StartSyncExecution` (Express enrichment) |
-| EventBridge bus target | `events:PutEvents` |
-| SQS target | `sqs:SendMessage` |
-| SNS target | `sns:Publish` |
-| ECS target | `ecs:RunTask`, `iam:PassRole` on task execution + task roles |
-| API Gateway / API Destination target | `apigateway:POST` / `events:InvokeApiDestination` |
-| Redshift target | `redshift-serverless:GetCredentials` / `redshift-data:ExecuteStatement` |
-| SageMaker target | `sagemaker:StartPipelineExecution` |
-| AWS Batch target | `batch:SubmitJob` |
-| DLQ | `sqs:SendMessage` on DLQ ARN |
+Step 7 IAM trust-policy JSON plus the per-source and per-enrichment/target permission matrices moved verbatim to [references/iam-and-dlq-guide.md](references/iam-and-dlq-guide.md).
+Load on demand generating the pipe role trust and permissions policies.
 
 ## Common patterns
 
-- **DynamoDB Streams → Lambda with filter + DLQ.** Filter pattern
-  matches `dynamodb.NewImage.status.S = CONFIRMED`. Pipe role reads
-  stream and invokes Lambda. DLQ catches records exceeding 3 retries
-  or 1-hour age. Most common Pipe pattern.
-
-- **Kinesis → Step Functions with batch windowing.** `MaximumBatchingWindowInSeconds=30`
-  collects up to 100 records per invocation. Step Functions Express
-  Workflow runs sync; failures retry up to 185 times. Use for
-  stream-triggered orchestration.
-
-- **SQS → Lambda without pipe-level DLQ.** Source SQS queue has its
-  own DLQ via `RedrivePolicy` with `maxReceiveCount=5`. Pipe-level
-  `DeadLetterConfig` ignored. The pipe just connects the queue to
-  Lambda with batching.
-
-- **MSK → AWS Batch target.** Kafka consumer group `pipe-batch-consumer`
-  reads from `orders-events` topic; pipe submits a Batch job per batch
-  for offline processing. Enables event-driven batch processing without
-  a separate consumer service.
-
-- **DynamoDB Streams → Lambda enrichment → Step Functions target.**
-  Enrichment Lambda joins with customer data, returns transformed
-  batch; Step Functions runs orchestration. Two permission grants
-  needed: enrichment Lambda + target state machine.
+Common Pipe patterns (DDB Streams→Lambda, Kinesis→Step Functions, SQS→Lambda, MSK→Batch, DDB Streams→enrichment→Step Functions) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand selecting a boilerplate pattern.
 
 ## Output format
 
-```text
-PIPE_SPEC: <name>
-VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
-ARCHITECTURE:
-  Source: <type> <arn> (region <region>, state <ACTIVE|ENABLED|RUNNING>)
-  Filter pattern: <none | JSON pattern>
-  Enrichment: <none | Lambda/Step Functions/API Gateway/API Destination arn>
-  Target: <type> <arn>
-  Batch window: <seconds> seconds (ignored for SQS source)
-  Batch size: <records>
-  Record age: <seconds> (streaming sources only)
-  Retry attempts: <count>
-  DLQ: <arn> (pipe-level for streaming / source-queue-level for SQS)
-CHECKLIST:
-  [x] Source ARN resolves in region matching pipe
-  [x] Source state ACTIVE / ENABLED / RUNNING
-  [x] Filter pattern valid JSON (if specified)
-  [x] Enrichment ARN resolves and grants pipe role invoke (if specified)
-  [x] Target ARN resolves and grants pipe role invoke
-  [x] Batch window 0-300 (ignored for SQS)
-  [x] Batch size within source-specific cap
-  [x] Record age 60-86400 (streaming sources only)
-  [x] DLQ policy grants pipe role sqs:SendMessage
-  [x] IAM role trust policy scoped to pipes.amazonaws.com with SourceAccount/SourceArn condition
-FINDINGS:
-  - [INFO] Estimated monthly cost: $0.50 base + $0.50 per million invocations + source throughput
-  - [WARN] SQS source configured with pipe-level DeadLetterConfig — ignored, configure RedrivePolicy on source queue
-DEPLOY_COMMANDS:
-  <ordered list of aws pipes create-pipe commands and prerequisite IAM/DLQ setup>
-```
+The PIPE_SPEC/ARCHITECTURE/CHECKLIST/FINDINGS/DEPLOY_COMMANDS output template moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand formatting the architecture summary block.
 
 ## STRICT output contract
 
@@ -613,74 +419,13 @@ correctness or security regression.
 
 ## Expert heuristic: when to use enrichment vs. inline target Lambda
 
-The enrichment stage is optional. The heuristic below resolves whether
-to put transformation logic in an enrichment Lambda or in the target
-Lambda itself.
-
-| Signal | Choose |
-|---|---|
-| Transformation reuses the same lookup/join across multiple pipes | Enrichment Lambda (DRY, one function reused) |
-| Transformation is per-record validation with selective drop | Target Lambda (enrichment can't drop individual records) |
-| Transformation is schema reshape for a Step Functions target | Enrichment Lambda (Step Functions input must be shaped correctly) |
-| Transformation is a synchronous external API call | API Destination enrichment (no code) or API Gateway enrichment (existing endpoint) |
-| Transformation + business logic are coupled in one function | Target Lambda (skip enrichment, keep it simple) |
-| Multiple stages needed (e.g., lookup + transform + validate) | Step Functions enrichment (Express Workflow for sync) |
-| Cost optimization: large batches vs. fine-grained invocations | Enrichment reduces target invocations when multiple records can be coalesced into one target call |
-
-**Decision rules:**
-
-- Default: target Lambda only. Add enrichment when (a) the same
-  transformation is used across 2+ pipes, OR (b) the target is Step
-  Functions / Batch / Redshift / SageMaker and needs pre-shaped input.
-- Enrichment Lambda runs on the **batched payload** — it can drop
-  records only by returning a smaller batch, not by selectively
-  filtering per record across retry boundaries.
-- For API Gateway / API Destination enrichment, the external endpoint
-  must return within the pipe's batch window or the batch fails.
-- Enrichment failures retry the ENTIRE batch — keep enrichment logic
-  idempotent.
-
-ALWAYS emit the enrichment decision as a PRE_CHECKS row naming the
-enrichment ARN, target ARN, and the rationale (DRY, schema-reshape,
-cost).
+The enrichment-vs-inline-target decision table and rules moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand choosing where transformation logic belongs.
 
 ## Recent AWS features (2024-2026)
 
-- **AWS Batch target (2024-2025):** EventBridge Pipes supports AWS Batch
-  job queues as a target. Pipe submits a Batch job per batched payload
-  — enables event-driven batch processing without a separate consumer
-  Lambda. Pipe role requires `batch:SubmitJob` plus `iam:PassRole` on
-  the job role.
-
-- **Enrichment transformations (2024-2025):** documented patterns for
-  enrichment Lambda returning a transformed batch payload. Useful for
-  fan-in (joining customer data before target invocation), schema
-  reshape (CSV → JSON for Step Functions), or coalescing (multiple
-  records → one target call to reduce invocations).
-
-- **OnPartialBatchItemFailure `AUTOMATIC_BISECT` (2024):** for DynamoDB
-  Streams, Kinesis, and SQS sources, the pipe automatically bisects a
-  failing batch to isolate poison records — prevents one bad record
-  from blocking the whole batch.
-
-- **Self-managed Kafka source (2024):** Pipes can consume from
-  self-managed Kafka clusters (including MSK Serverless, Confluent
-  Cloud, on-prem clusters via VPC). Requires `ServerRootCA`,
-  `VpcSubnets`, `SecurityGroups`, and `AuthType`.
-
-- **Amazon MQ source (2023-2024):** Pipes consume from Amazon MQ
-  ActiveMQ and RabbitMQ brokers. Requires Secrets Manager credentials
-  secret with `username`/`password` keys.
-
-- **Redshift and SageMaker targets (2024):** Pipes can write directly
-  to Redshift (Serverless or Provisioned) via the Redshift Data API
-  and trigger SageMaker Pipelines. Enables event-driven ML inference
-  and data ingestion without Lambda glue.
-
-- **API Destination target and enrichment (2024):** Pipes can invoke
-  API Destinations as enrichment (pre-transform via external HTTPS) or
-  as target (fan-out to external webhook). Requires Connection resource
-  with auth config.
+Recent AWS features (Batch target, enrichment transformations, AUTOMATIC_BISECT, self-managed Kafka, Amazon MQ, Redshift/SageMaker targets, API Destination) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand checking whether a newer AWS feature changes the plan.
 
 ## AWS documentation
 
@@ -693,3 +438,11 @@ cost).
 - **Self-managed Kafka as a Pipe source** — https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-pipes-self-managed-kafka.html
 - **EventBridge Pipes IAM** — https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-pipes-permissions.html
 - **EventBridge Pipes API Reference** — https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_Operations_Amazon_EventBridge_Pipes.html
+
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) — the common Pipe patterns and the PIPE_SPEC output-format template, moved from SKILL.md.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — live-account pre-flight verification commands (IAM, source/target/enrichment state, DLQ policy, MSK auth, MQ credentials), moved from SKILL.md.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — mindset, Step 0 expert knowledge, the enrichment-vs-inline-target heuristic, and recent AWS features, moved from SKILL.md.
+- [references/iam-and-dlq-guide.md](references/iam-and-dlq-guide.md) — pipe role permission templates, plus the Step 7 trust-policy JSON and per-source/per-target permission matrices moved from SKILL.md.
+- [references/sources-and-targets.md](references/sources-and-targets.md) — source/target matrices, batch behavior, filter pattern rules, MSK/MQ guides.

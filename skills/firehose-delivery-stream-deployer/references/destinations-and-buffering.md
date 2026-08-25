@@ -291,3 +291,73 @@ resource "aws_kinesis_firehose_delivery_stream" "events" {
   }
 }
 ```
+
+## Step 5 — OpenSearch destination
+Firehose writes to an OpenSearch index. Configure domain ARN, index
+name, index rotation, retry, and S3 backup.
+
+```bash
+ElasticsearchDestinationConfiguration:
+  RoleARN: arn:aws:iam::123456789012:role/FirehoseStreamRole
+  DomainARN: arn:aws:es:us-east-1:123456789012:domain/my-domain
+  IndexName: logs
+  IndexRotationPeriod: OneDay  # NoRotation/OneHour/OneDay/OneWeek/OneMonth
+  TypeName: _doc
+  BufferingHints:
+    IntervalInSeconds: 300
+    SizeInMBs: 5
+  RetryOptions:
+    DurationInSeconds: 300
+  S3BackupMode: FailedDocumentsOnly
+  S3Configuration:
+    RoleARN: arn:aws:iam::123456789012:role/FirehoseStreamRole
+    BucketARN: arn:aws:s3:::firehose-opensearch-backup
+    Prefix: "failed/"
+```
+
+**Retry:** failed writes to OpenSearch are retried for up to
+`DurationInSeconds`. After that, failed documents go to the S3 backup
+bucket.
+
+## Step 6 — HTTP endpoint destination (Splunk/custom)
+Firehose POSTs batches to an HTTP endpoint (Splunk, Datadog, custom).
+
+```bash
+HttpEndpointDestinationConfiguration:
+  EndpointConfiguration:
+    Url: https://splunk.example.com:8088/services/collector
+    AccessKey: my-splunk-hec-token
+  RoleARN: arn:aws:iam::123456789012:role/FirehoseStreamRole
+  S3Configuration:
+    RoleARN: arn:aws:iam::123456789012:role/FirehoseStreamRole
+    BucketARN: arn:aws:s3:::firehose-splunk-backup
+  BufferingHints:
+    IntervalInSeconds: 60
+    SizeInMBs: 5
+  RetryOptions:
+    DurationInSeconds: 300
+```
+
+**Endpoint ACK:** the endpoint must return HTTP 200 within 30 seconds.
+Non-200 responses trigger retry.
+
+## Step 7 — Redshift destination
+Firehose stages data to S3, then issues a COPY command to Redshift.
+
+```bash
+RedshiftDestinationConfiguration:
+  RoleARN: arn:aws:iam::123456789012:role/FirehoseStreamRole
+  ClusterJDBCURL: jdbc:redshift://my-cluster.abc123.us-east-1.redshift.amazonaws.com:5439/mydb
+  CopyCommand:
+    DataTableName: my_table
+    CopyOptions: "FORMAT AS JSON 'auto'"
+  Username: admin
+  Password: <password>
+  S3Configuration:
+    RoleARN: arn:aws:iam::123456789012:role/FirehoseStreamRole
+    BucketARN: arn:aws:s3:::firehose-redshift-staging
+    Prefix: "staging/"
+```
+
+**The COPY command** loads the staged S3 data into the Redshift table.
+Configure `CopyOptions` based on the data format (JSON, CSV, Parquet).

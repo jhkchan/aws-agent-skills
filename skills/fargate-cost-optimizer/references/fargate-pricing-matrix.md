@@ -101,3 +101,18 @@ Compute Savings Plans apply to Fargate, EC2, and Lambda combined.
 - sa-east-1: ~15-20% higher.
 - Re-state regional rates from `aws ce get-cost-and-usage` for
   accurate savings in non-us-east-1 regions.
+
+## Savings estimation — x86_64 On-Demand (moved from SKILL.md)
+
+**Savings estimation (us-east-1, On-Demand, x86_64, 2026):**
+
+| Config | Hourly rate | Monthly (730h) |
+|---|---|---|
+| 0.25 vCPU / 0.5 GB | $0.011 | $8.03 |
+| 0.5 vCPU / 1 GB | $0.022 | $16.06 |
+| 1 vCPU / 2 GB | $0.043 | $31.39 |
+| 2 vCPU / 4 GB | $0.087 | $63.51 |
+| 4 vCPU / 8 GB | $0.173 | $126.29 |
+| 8 vCPU / 16 GB | $0.346 | $252.58 |
+
+Dropping from 2 vCPU / 4 GB to 1 vCPU / 2 GB saves ~$32/task/month.

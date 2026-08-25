@@ -29,89 +29,18 @@ metadata:
 
 ## Quick start
 
-- **Symptom → layer map (first plausible match drives the first probe):**
-  PutEvents returns 200 but target never fires → PATTERN mismatch or
-  BUS_MISMATCH or TARGET permission; DLQ filling → DLQ_MISCONFIGURED or
-  INPUT_TRANSFORMER_ERROR or PATTERN mismatch (rejected events);
-  schedule-based rule never fires → SCHEDULE_SYNTAX; cross-account
-  target Lambda never invoked → TARGET_IAM_ROLE or
-  TARGET_LAMBDA_PERMISSION; PutEvents returns AccessDenied →
-  EVENTBUS_POLICY; content-based filter seems correct but event does
-  not match → CONTENT_FILTER_TOO_STRICT or
-  CONTENT_FILTER_NESTED_DEPTH.
-- **An event pattern is a FILTER, not a transformation.** The pattern
-  declares what the event MUST contain to trigger the rule; it does not
-  modify the event. Operators who write patterns expecting the event to
-  be reshaped are confused when events do not match. Every field in the
-  pattern is an AND condition — all must match for the rule to fire.
-- **Content-based filtering JSON path has a maximum depth of 10 levels.**
-  A pattern referencing `$.detail.a.b.c.d.e.f.g.h.i.j` (11 levels) will
-  silently fail to match because EventBridge caps nested JSON path
-  resolution at 10 levels. No error is emitted — the rule simply never
-  fires for events whose matching value lives at depth 11+.
-- **The target Lambda resource-based policy must allow
-  `lambda:InvokeFunction` for the `events.amazonaws.com` principal.**
-  EventBridge assumes a service-linked role to invoke targets, but the
-  target Lambda itself must grant the EventBridge service principal via
-  its resource-based policy. Without this, the rule fires (visible in
-  CloudTrail) but the invocation is silently denied.
-- **Always verify with `test-event-pattern`, never guess.** The single
-  most decisive probe is `aws events test-event-pattern` — it returns a
-  boolean match/no-match and eliminates all ambiguity about whether the
-  pattern matches the event.
+Quick-start insights and gotchas moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Mindset
 
-An EventBridge rule that "does not fire" is almost always a pattern
-matching problem, not a routing problem. The EventBridge service is
-extremely reliable at delivering matched events; the failure is in the
-match logic (pattern does not correspond to the event shape), the bus
-routing (event put on bus A, rule on bus B), the schedule expression
-(syntax error silently disables the rule), or the target permissions
-(the rule fires but the target invocation is denied). Senior
-integration engineers start with `test-event-pattern` and the rule's
-`State` field, not by re-creating the rule.
+Mindset reasoning moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Philosophy
 
-Four behaviours separate a senior EventBridge engineer from a generalist:
-
-- **The event pattern is a declarative filter, not an imperative
-  transformation.** Every key in the pattern is a condition that the
-  event MUST satisfy. `source: ["myapp"]` means the event's `source`
-  field must exactly equal `"myapp"`. `detail-type: ["Order Created"]`
-  means the event's `detail-type` must exactly equal `"Order Created"`.
-  There is no fuzzy matching, no regex, no partial match. Operators who
-  expect `"myapp.orders"` to match a pattern of `["myapp"]` are
-  confused — the comparison is exact-string, not prefix, unless the
-  `prefix` content filter operator is explicitly used.
-
-- **Content-based filtering operators are powerful but have silent
-  failure modes.** The `prefix`, `numeric`, `exists`, `anything-but`,
-  `wildcard`, and `cidr` operators extend matching beyond exact string
-  equality, but each has quirks: `prefix` matches on string values only
-  (not numbers), `numeric` requires the value to be a JSON number (not
-  a string containing digits), `exists` true/false inverts the check,
-  and nested JSON paths beyond 10 levels silently fail to resolve. An
-  operator that looks syntactically correct can fail to match because
-  the value type does not match the operator's expectation.
-
-- **The EventBus is a routing boundary, not just a namespace.** An
-  event put on the default bus (`aws.events`) will never match a rule
-  on a custom bus (`custom.my-bus`), and vice versa. The `EventBusName`
-  parameter in `PutEvents` and `put-rule` must be the same.
-  Operators who put events on the default bus and create rules on a
-  custom bus see zero matches and assume the pattern is wrong — the
-  pattern is fine, the buses are different.
-
-- **Cross-account and cross-service target invocation requires BOTH
-  the EventBridge rule's IAM role AND the target's resource-based
-  policy.** EventBridge assumes a service-linked role to invoke
-  targets, but for cross-account Lambda targets, the target Lambda's
-  resource-based policy must explicitly allow
-  `lambda:InvokeFunction` from `events.amazonaws.com` with a
-  `SourceArn` condition matching the rule ARN. Missing either side
-  silently drops the invocation.
+Philosophy behaviours moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Quick reference — symptom triage table
 
@@ -136,46 +65,18 @@ a problem that is not a pattern problem.
 
 ### Account-wide pre-flight commands
 
-```bash
-# 1. Rule configuration (EventPattern, ScheduleExpression, State,
-#    EventBusName, Targets, RoleArn)
-aws events describe-rule \
-  --name <rule-name> --event-bus-name <bus-name> --output json
-
-# 2. List targets for the rule (Target Id, Arn, InputTransformers,
-#    DeadLetterConfig, RetryPolicy)
-aws events list-targets-by-rule \
-  --rule <rule-name> --event-bus-name <bus-name> --output json
-
-# 3. Event bus configuration (Name, Policy, source-type)
-aws events describe-event-bus \
-  --name <bus-name> --output json
-
-# 4. Test the event pattern against a sample event (THE decisive probe)
-aws events test-event-pattern \
-  --event-pattern '<json-pattern-from-rule>' \
-  --event '<sample-event-json>' --output json
-
-# 5. Recent EventBridge API calls (CloudTrail)
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventName,AttributeValue=PutEvents \
-  --start-time $(date -d '-1 hour' +%s) --end-time $(date +%s) \
-  --output json
-```
+Account-wide pre-flight command block moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### Rule-state short-circuit
 
-| `State` | Effect on diagnosis |
-|---|---|
-| `ENABLED` | Proceed with pattern/bus/target diagnosis. |
-| `DISABLED` | The rule was manually disabled OR EventBridge auto-disabled it after a schedule expression syntax error. Check `ScheduleExpression` for syntax errors; re-enable with `enable-rule`. |
-| `ENABLED` with `ManagedBy: [SVC]` | AWS service-managed rule (e.g., CloudWatch Alarm → SNS). Do not modify directly; the owning service controls state. |
+Rule-state short-circuit table moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### Bus existence check
 
-```bash
-aws events list-event-buses --name-prefix <bus-name> --output json
-```
+Bus existence check command moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If the bus does not exist, the rule was created on a non-existent bus.
 Events put on a different (or default) bus will never match. This is
@@ -183,23 +84,8 @@ BUS_MISMATCH.
 
 ### Input validation gate
 
-If the input is malformed (missing RuleName, absent EventBusName, no
-sample event for pattern diagnosis), emit:
-
-```text
-TARGET: <rule-name or unknown>
-VERDICT: INSUFFICIENT_DATA
-REASON: Input is missing required context — at minimum the RuleName,
-  the EventBusName, and a sample event payload to test against the
-  pattern.
-LAYER: UNKNOWN
-EVIDENCE:
-  - Missing: <list specific missing fields>
-REMEDIATION: Re-prompt the operator for: (1) the RuleName and
-  EventBusName, (2) a sample event that SHOULD have triggered the
-  rule, and (3) for schedule-based rules, the ScheduleExpression
-  string.
-```
+INSUFFICIENT_DATA re-prompt template moved to
+[references/worked-examples.md](references/worked-examples.md).
 
 ## Process — Diagnostic decision tree (apply in symptom order)
 
@@ -212,91 +98,8 @@ the symptom.**
 
 ### Step 0: Non-obvious behaviours that change diagnosis
 
-These are the operational gotchas a senior EventBridge engineer knows
-from incident experience. Each one routes a diagnosis away from the
-obvious layer to a less obvious one:
-
-- **EventBridge silently auto-disables rules with invalid schedule
-  expressions.** If a cron or rate expression has a syntax error (wrong
-  number of fields, invalid wildcard position, unsupported day-of-week
-  value), EventBridge sets the rule State to DISABLED without emitting
-  an error event. The operator sees "rule not firing" and assumes a
-  pattern issue. Always check `State: DISABLED` as a first signal for
-  schedule-based rules.
-
-- **The `test-event-pattern` API is the single most decisive probe.**
-  It takes the exact pattern from the rule and a sample event and
-  returns `{"Result": true}` or `{"Result": false}`. This eliminates
-  ALL ambiguity about whether the pattern matches. Operators who eyeball
-  the pattern against the event are wrong ~30% of the time because of
-  case sensitivity, array vs scalar wrapping, and content filter
-  operator quirks.
-
-- **Content-based filtering supports a maximum nesting depth of 10
-  levels in the JSON path.** A pattern referencing
-  `detail.level1.level2.level3.level4.level5.level6.level7.level8.
-  level9.level10` works; adding `level11` silently fails. EventBridge
-  does not emit an error — the path is simply unresolvable, and the
-  rule never fires for events whose value lives at depth 11+. Flatten
-  deeply nested structures before putting them on the bus, or restructure
-  the pattern to reference a shallower path.
-
-- **The `source` and `detail-type` fields are case-sensitive exact
-  string matches.** `"Order Created"` does not match `"order created"`
-  or `"OrderCreated"`. AWS service-emitted events use specific casing
-  (e.g., `"aws.ec2"` for source, `"EC2 Instance State-change
-  Notification"` for detail-type). Always copy the exact strings from
-  the event, not from memory.
-
-- **The `detail` field in the pattern is matched against the `detail`
-  field in the event — not against the top-level event.** A pattern
-  with `detail: { status: ["confirmed"] }` matches an event with
-  `"detail": { "status": "confirmed" }`, NOT an event with
-  `"status": "confirmed"` at the top level. Operators who put their
-  payload fields at the top level of the PutEvents entry (instead of
-  inside `detail`) never match detail-based patterns.
-
-- **PutEvents returns 200 even if no rule matches.** The PutEvents API
-  response indicates successful ingestion onto the bus, not successful
-  rule matching. A 200 with `FailedEntryCount: 0` means the event was
-  accepted; whether any rule fires depends on pattern matching. Operators
-  who see 200 and conclude "the rule should have fired" are conflating
-  ingestion with matching.
-
-- **Input transformer errors send the original event to the DLQ, not
-  the transformed event.** If the input transformer template references
-  a JSON path that does not exist in the event, the transformation fails
-  silently and the event is routed to the DLQ (if configured) or dropped
-  (if not). The DLQ message contains an `errorMessage` field explaining
-  the transformation failure.
-
-- **Cross-account PutEvents requires the bus policy to explicitly grant
-  `events:PutEvents` to the source account.** The default bus and
-  custom buses do not allow cross-account PutEvents by default. The
-  bus policy must include a statement allowing
-  `events:PutEvents` from the source account ARN.
-
-- **The target Lambda resource-based policy must allow
-  `events.amazonaws.com` as principal, not the rule's IAM role ARN.**
-  EventBridge invokes Lambda via its service principal, not via
-  `sts:AssumeRole` on the rule's role. The `SourceArn` condition in the
-  Lambda policy should match the rule ARN for least privilege.
-
-- **EventBridge cron expressions have 6 fields (not 5 like standard
-  cron), do NOT support the `?` wildcard in the year field, and use
-  `L` (last day of month) and `W` (nearest weekday) modifiers.** A
-  standard 5-field cron expression pasted into EventBridge silently
-  fails. Rate expressions use `rate(value unit)` where unit is
-  `minutes`/`hours`/`days` (not `m`/`h`/`d`).
-
-- **Event source mapping for Kinesis/Stream targets is configured on
-  the target side (Lambda event source mapping), not on the
-  EventBridge rule.** An EventBridge rule that triggers a Lambda which
-  reads from Kinesis has two independent trigger paths. If the Kinesis
-  stream is the actual event source, the EventBridge rule is not the
-  delivery mechanism — check the Lambda event source mapping
-  (`get-event-source-mapping`) for Kinesis-specific issues (shard
-  iterator, batch size, starting position).
+Step 0 non-obvious behaviours moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 1: Symptom entry — pick the diagnostic branch
 
@@ -325,47 +128,21 @@ the event.
 
 #### 2a: Run test-event-pattern (THE decisive probe)
 
-```bash
-# Extract the pattern from the rule
-PATTERN=$(aws events describe-rule \
-  --name <rule-name> --event-bus-name <bus-name> \
-  --output json | jq '.EventPattern')
+test-event-pattern probe commands moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
-# Test against a sample event
-aws events test-event-pattern \
-  --event-pattern "$PATTERN" \
-  --event '<sample-event-json>' --output json
-```
-
-If `Result: false`, the pattern does not match. Proceed to 2b to
-identify which field mismatches.
-
-If `Result: true`, the pattern matches — the issue is downstream (bus
-mismatch, target permissions, DLQ). Proceed to Steps 5-8.
+Result interpretation and routing moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 #### 2b: Identify the mismatched field
 
 Compare each pattern field against the event field:
 
-| Pattern field | Event field | Match rule |
-|---|---|---|
-| `source` | `source` | Exact string match (case-sensitive). Array = OR. |
-| `detail-type` | `detail-type` | Exact string match (case-sensitive). Array = OR. |
-| `detail.{path}` | `detail.{path}` | Exact value match. Content filter operators apply. |
-| `account` | `account` | Exact string match. Array = OR. |
-| `region` | `region` | Exact string match. Array = OR. |
-| `time` | `time` | Not matched as a pattern field (timestamp). Use content filters on `detail.time` if needed. |
-| `resources` | `resources` | Exact ARN match. Array = OR. |
+Pattern-field match table moved to
+[references/event-pattern-reference.md](references/event-pattern-reference.md).
 
-Common mismatch patterns:
-
-| Pattern | Event | Result | Fix |
-|---|---|---|---|
-| `source: ["myapp"]` | `source: "myapp.orders"` | No match | Use `source: ["myapp.orders"]` or `source: [{prefix: "myapp"}]` |
-| `detail-type: ["Order Created"]` | `detail-type: "order created"` | No match | Case-sensitive — use exact casing |
-| `detail: {status: ["confirmed"]}` | `detail: {status: "pending"}` | No match | Add "pending" to the array or change the condition |
-| `detail: {amount: [100]}` | `detail: {amount: "100"}` | No match | Type mismatch — number vs string |
-| `detail: {order: {id: ["123"]}}` | event has `detail.order.id = "123"` at depth 3 | Match (depth is within limit) | Verify depth ≤ 10 |
+Common mismatch patterns table moved to
+[references/event-pattern-reference.md](references/event-pattern-reference.md).
 
 **Verdicts:**
 - `source` mismatch: ROOT_CAUSE_IDENTIFIED,
@@ -377,51 +154,13 @@ Common mismatch patterns:
 
 ### Step 3: Schedule expression — cron and rate syntax
 
-Symptom: a schedule-based rule (no EventPattern, has
-ScheduleExpression) never fires at the expected time, or the rule's
-State is DISABLED.
-
-```bash
-aws events describe-rule \
-  --name <rule-name> --event-bus-name <bus-name> \
-  --output json | jq '{ScheduleExpression, State}'
-```
+Schedule expression probe and gate moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 #### 3a: Validate the schedule expression syntax
 
-**Cron expressions** have 6 required fields:
-`Minutes Hours Day-of-month Month Day-of-week Year`
-
-| Field | Values | Wildcards |
-|---|---|---|
-| Minutes | 0-59 | `,` `-` `*` `/` |
-| Hours | 0-23 | `,` `-` `*` `/` |
-| Day-of-month | 1-31 | `,` `-` `*` `/` `?` `L` `W` |
-| Month | 1-12 or JAN-DEC | `,` `-` `*` `/` |
-| Day-of-week | 1-7 or SUN-SAT | `,` `-` `*` `/` `?` `L` `#` |
-| Year | 1970-2199 | `,` `-` `*` `/` |
-
-Common cron syntax errors:
-
-| Expression | Error | Fix |
-|---|---|---|
-| `cron(0 12 * * ? *)` | Correct — runs at 12:00 UTC daily | — |
-| `cron(0 12 * * * *)` | Missing `?` for day-of-week/day-of-month mutual exclusion | Use `?` in one of the two fields: `cron(0 12 * * ? *)` |
-| `cron(0 12 * * ?)` | Missing year field (5-field cron) | Add year: `cron(0 12 * * ? *)` |
-| `cron(* 0 1 * * *)` | Both day-of-month and day-of-week are `*` (ambiguous) | Use `?` in one: `cron(* 0 1 * ? *)` |
-| `cron(0 12 31 2 * *)` | February 31 does not exist | Use valid date |
-| `rate(5 m)` | Wrong unit format | Use `rate(5 minutes)` |
-| `rate(1 hour)` | Correct | — |
-
-**Rate expressions** use `rate(value unit)`:
-- value: positive integer
-- unit: `minute(s)`, `hour(s)`, `day(s)` (singular if value=1, plural if >1)
-- minimum: `rate(1 minute)`
-- cannot be `rate(0 ...)` — minimum is 1
-
-**Important:** EventBridge cron uses UTC. A rule set to
-`cron(0 9 * * ? *)` fires at 09:00 UTC, not local time. Operators in
-UTC+8 see the rule fire at 17:00 local and assume it is broken.
+Cron/rate syntax validation tables moved to
+[references/schedule-and-permissions-reference.md](references/schedule-and-permissions-reference.md).
 
 #### 3b: Check for auto-disable
 
@@ -444,54 +183,19 @@ delivery failed.
 
 #### 4a: Inspect DLQ messages
 
-```bash
-# For SQS DLQ:
-aws sqs receive-message --queue-url <dlq-url> \
-  --max-number-of-messages 5 --output json
+DLQ inspection commands moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
-# Extract the errorMessage field from each message body
-aws sqs receive-message --queue-url <dlq-url> \
-  --max-number-of-messages 5 --output json | \
-  jq '.Messages[].Body | fromjson | .errorMessage // .'
-```
-
-The `errorMessage` field in the DLQ message body identifies the failure
-reason:
-
-| errorMessage pattern | Cause | Layer |
-|---|---|---|
-| `"InputTemplate is invalid"` or `"Invalid template"` | Input transformer template has a syntax error | INPUT_TRANSFORMER_ERROR |
-| `"Path ... is not present"` | Input transformer references a JSON path absent from the event | INPUT_TRANSFORMER_ERROR |
-| `"ResourceArn"` or `"AccessDenied"` | Target invocation denied (permissions) | TARGET_IAM_ROLE / TARGET_LAMBDA_PERMISSION |
-| No errorMessage, event body present | Rule matched, target invocation failed at the target side | Depends on target-side probe |
+DLQ errorMessage mapping table moved to
+[references/error-handling.md](references/error-handling.md).
 
 #### 4b: Validate input transformer templates
 
-```bash
-aws events describe-rule \
-  --name <rule-name> --event-bus-name <bus-name> \
-  --output json | jq '.Targets[0].InputTransformer'
-```
+Input transformer inspection command moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
-Input transformer rules:
-- `InputPathsMap`: maps template variables to JSON paths from the event
-  (e.g., `"order_id": "$.detail.orderId"`).
-- `InputTemplate`: a string template referencing the variables (e.g.,
-  `"{\"orderId\": \"<order_id>\"}"`).
-- Every variable in the template MUST have a corresponding path in
-  `InputPathsMap`.
-- If the JSON path in `InputPathsMap` does not exist in the event, the
-  transformation fails.
-- The template MUST produce valid JSON if the target expects JSON
-  (Lambda, Step Functions).
-
-Common input transformer errors:
-
-| Error | Cause | Fix |
-|---|---|---|
-| Template references `<var>` but `InputPathsMap` has no `var` | Missing path mapping | Add the path to `InputPathsMap` |
-| Path `$.detail.nested.field` does not exist in event | Event shape changed | Update the path or ensure the event contains the field |
-| Template produces invalid JSON | Missing quote, extra comma | Validate the template output with `jq` |
+Input transformer rules and error table moved to
+[references/error-handling.md](references/error-handling.md).
 
 **Verdicts:**
 - Input transformer error: ROOT_CAUSE_IDENTIFIED,
@@ -507,113 +211,40 @@ or receives AccessDenied.
 
 #### 5a: Check the rule's IAM role (for cross-account targets)
 
-```bash
-aws events describe-rule \
-  --name <rule-name> --event-bus-name <bus-name> \
-  --output json | jq '.RoleArn'
-```
+Rule IAM role check commands moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
-If `RoleArn` is present, the rule uses an IAM role to invoke targets.
-For cross-account Lambda targets:
-
-```bash
-aws iam simulate-principal-policy \
-  --policy-source-arn <role-arn> \
-  --action-names lambda:InvokeFunction \
-  --resource-arns <target-lambda-arn> \
-  --output json
-```
-
-If `implicitDeny`, the role lacks `lambda:InvokeFunction` on the target.
-**ROOT_CAUSE_IDENTIFIED**, `LAYER: TARGET_IAM_ROLE`.
-
-For same-account targets, EventBridge uses a service-linked role and
-does NOT require a RoleArn on the rule. The target's resource-based
-policy is the gate.
+Step 5a verdict and same-account note moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 #### 5b: Check the target Lambda resource-based policy
 
-```bash
-aws lambda get-policy --function-name <target-lambda> --output json 2>/dev/null
-```
+Lambda get-policy probe moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 The policy MUST include a statement allowing `lambda:InvokeFunction`
 for principal `events.amazonaws.com` with a `SourceArn` condition
 matching the rule ARN:
 
-```json
-{
-  "Effect": "Allow",
-  "Principal": {"Service": "events.amazonaws.com"},
-  "Action": "lambda:InvokeFunction",
-  "Condition": {"ArnLike": {"AWS:SourceArn": "arn:aws:events:<region>:<account>:rule/<bus>/<rule-name>"}},
-  "Resource": "<lambda-arn>"
-}
-```
+Required policy statement and add-permission fix moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
-If the statement is missing, the EventBridge service principal cannot
-invoke the Lambda. **ROOT_CAUSE_IDENTIFIED**,
-`LAYER: TARGET_LAMBDA_PERMISSION`.
-
-Fix:
-
-```bash
-aws lambda add-permission \
-  --function-name <target-lambda> \
-  --statement-id EventBridgeInvoke \
-  --action lambda:InvokeFunction \
-  --principal events.amazonaws.com \
-  --source-arn arn:aws:events:<region>:<account>:rule/<bus>/<rule-name> \
-  --output json
-```
-
-#### 5c: Common target permission failure patterns
-
-| Pattern | Cause |
-|---|---|
-| Same-account Lambda, no resource-based policy for events.amazonaws.com | Missing EventBridge principal grant. Add via `lambda add-permission`. |
-| Cross-account Lambda, rule has no RoleArn | EventBridge cannot assume a role to invoke cross-account. Add a RoleArn with `lambda:InvokeFunction` on the target. |
-| Cross-account Lambda, RoleArn present but role lacks `lambda:InvokeFunction` | Role identity-based policy missing the permission. |
-| Cross-account Lambda, role has permission but target lacks resource-based policy | Both sides must allow for cross-account. Add the resource-based policy statement. |
-| SourceArn condition mismatch | The condition's ArnLike pattern does not match the actual rule ARN (e.g., wrong bus name in the ARN). |
-| Multiple rules targeting same Lambda | Each rule needs its own `add-permission` statement (or a wildcard SourceArn, which is less secure). |
+Common target permission failure patterns moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 6: EventBus policy — PutEvents AccessDenied
 
 Symptom: `PutEvents` returns `AccessDenied` or
 `NotAuthorizedForSourceException`.
 
-```bash
-aws events describe-event-bus --name <bus-name> --output json | jq '.Policy'
-```
-
-For cross-account PutEvents (account B putting events on a bus in
-account A):
-
-The bus policy in account A MUST grant `events:PutEvents` to account B:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": {"AWS": "arn:aws:iam::<account-b-id>:root"},
-    "Action": "events:PutEvents",
-    "Resource": "arn:aws:events:<region>:<account-a-id>:event-bus/<bus-name>"
-  }]
-}
-```
+EventBus policy probe and cross-account policy example moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If the policy is missing or does not list the source account,
 **ROOT_CAUSE_IDENTIFIED**, `LAYER: EVENTBUS_POLICY`.
 
-Fix:
-
-```bash
-aws events put-event-bus-policy \
-  --event-bus-name <bus-name> \
-  --policy '<json-policy>' --output json
-```
+put-event-bus-policy fix command moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 For same-account PutEvents with a custom bus, the account automatically
 has `events:PutEvents` — no policy needed. An AccessDenied here
@@ -624,53 +255,26 @@ indicates an SCP or permissions boundary issue.
 Symptom: the rule fires and the target is invoked, but the target
 receives unexpected or malformed data.
 
-```bash
-aws events describe-rule \
-  --name <rule-name> --event-bus-name <bus-name> \
-  --output json | jq '.Targets[0].InputTransformer, .Targets[0].InputPath'
-```
+Input transformer inspection command moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
-If `InputTransformer` is absent and `InputPath` is absent, the target
-receives the full event envelope (including `version`, `id`, `source`,
-`detail-type`, etc.). If the target expects only the `detail` field,
-configure `InputPath: "$.detail"`.
-
-If `InputTransformer` is present, validate:
-1. Every variable in `InputTemplate` has a mapping in `InputPathsMap`.
-2. Every JSON path in `InputPathsMap` exists in the actual event.
-3. The template produces valid JSON for JSON-expecting targets.
-
-See Step 4b for detailed transformer validation.
+Input transformer data-shape validation moved to
+[references/schedule-and-permissions-reference.md](references/schedule-and-permissions-reference.md).
 
 ### Step 8: Bus mismatch — custom bus vs default bus
 
 Symptom: events are successfully put on one bus, but the rule is on
 another bus.
 
-```bash
-# What bus does the rule live on?
-aws events describe-rule --name <rule-name> --output json | jq '.EventBusName'
-
-# What bus was the event put on?
-# Check CloudTrail for the PutEvents call:
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventName,AttributeValue=PutEvents \
-  --start-time $(date -d '-1 hour' +%s) --end-time $(date +%s) \
-  --output json | jq '.Events[0].CloudTrailEvent | fromjson |
-    .requestParameters.entries[0].eventBusName'
-```
+Bus mismatch probes (rule bus vs PutEvents bus) moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If the rule's `EventBusName` differs from the PutEvents entry's
 `eventBusName`, the events are on a different bus. **ROOT_CAUSE_IDENTIFIED**,
 `LAYER: BUS_MISMATCH`.
 
-Common bus mismatch patterns:
-
-| Rule EventBusName | PutEvents EventBusName | Result |
-|---|---|---|
-| `custom.orders` | `default` (or omitted) | No match — events on default bus, rule on custom |
-| `default` | `custom.orders` | No match — events on custom bus, rule on default |
-| `custom.orders` | `custom.orders` | Correct — same bus |
+Bus mismatch patterns table moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 Fix: align the PutEvents `EventBusName` parameter with the rule's
 `EventBusName`, OR recreate the rule on the correct bus.
@@ -685,21 +289,11 @@ The Lambda event source mapping is a separate delivery path from
 EventBridge. If the Lambda's trigger is the Kinesis stream (not the
 EventBridge rule), diagnose the event source mapping:
 
-```bash
-aws lambda get-event-source-mapping \
-  --function-name <lambda-name> --output json 2>/dev/null
-```
+Event source mapping probe moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
-Check:
-- `State: Enabled` — the mapping is active.
-- `BatchSize` — reasonable for the throughput.
-- `StartingPosition: LATEST` vs `TRIM_HORIZON` — LATEST skips old
-  records; TRIM_HORIZON reads from the earliest available.
-- `FunctionResponseTypes: [ReportBatchItemFailures]` — enables
-  partial batch failure reporting.
-
-If the mapping is disabled or misconfigured, the Lambda never receives
-records regardless of the EventBridge rule configuration.
+Event source mapping checklist moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### Step 10: Content-based filtering — operators and depth limits
 
@@ -708,38 +302,16 @@ match. The pattern uses content-based filtering operators.
 
 #### 10a: Validate content filter operators
 
-| Operator | Syntax | Matches | Common error |
-|---|---|---|---|
-| `prefix` | `{"prefix": "ord"}` | Strings starting with "ord" | Applied to non-string value (number, boolean) |
-| `numeric` | `{"numeric": [">=", 100]}` | Numbers ≥ 100 | Applied to string value `"100"` |
-| `equals-ignore-case` | `{"equals-ignore-case": "abc"}` | String "abc" case-insensitive | Only works on strings, not numbers |
-| `any-but` | `{"anything-but": ["cancelled"]}` | Any value except "cancelled" | Does not match null/undefined |
-| `wildcard` | `{"wildcard": "ord-*"}` | Strings matching glob "ord-*" | Only `*` is supported (no `?`) |
-| `cidr` | `{"cidr": "10.0.0.0/8"}` | IP addresses in CIDR range | Only IPv4 |
-| `exists` | `{"exists": true}` | Field is present | `{"exists": false}` = field is absent |
-
-Common content filter failure patterns:
-
-| Pattern | Event | Result | Why |
-|---|---|---|---|
-| `{"prefix": "ord"}` on `detail.type` | `detail.type: 123` | No match | `prefix` works on strings only |
-| `{"numeric": [">=", 100]}` on `detail.amount` | `detail.amount: "150"` | No match | Value is string, not number |
-| `{"exists": true}` on `detail.optional` | Event has no `detail.optional` | No match | Field genuinely absent |
-| `{"anything-but": ["x"]}` on `detail.tag` | Event has no `detail.tag` | No match | Missing field does not match anything-but |
+Content filter operator and failure tables moved to
+[references/event-pattern-reference.md](references/event-pattern-reference.md).
 
 #### 10b: Check nested path depth
 
 Count the depth of the JSON path in the pattern. EventBridge caps at
 10 levels of nesting for content-based filtering.
 
-```text
-detail                          → depth 1
-detail.level1                   → depth 2
-detail.level1.level2            → depth 3
-...
-detail.l1.l2.l3.l4.l5.l6.l7.l8.l9 → depth 10 (maximum)
-detail.l1.l2.l3.l4.l5.l6.l7.l8.l9.l10 → depth 11 (FAILS SILENTLY)
-```
+Nested depth limit illustration moved to
+[references/event-pattern-reference.md](references/event-pattern-reference.md).
 
 If the pattern references a path at depth > 10, **ROOT_CAUSE_IDENTIFIED**,
 `LAYER: CONTENT_FILTER_NESTED_DEPTH`. Fix: flatten the event structure
@@ -752,37 +324,15 @@ operator for the value type), **ROOT_CAUSE_IDENTIFIED**,
 
 ### Step 11: Verify with TestEventPattern (final confirmation)
 
-After identifying the likely root cause and proposing a fix, always
-verify the corrected pattern:
-
-```bash
-aws events test-event-pattern \
-  --event-pattern '<corrected-pattern-json>' \
-  --event '<sample-event-json>' --output json
-```
-
-`Result: true` confirms the corrected pattern matches. Only then
-update the rule.
+Verification command and guidance moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### Step 12: INSUFFICIENT_DATA
 
 If none of the above produced a positive root-cause match, emit:
 
-```text
-TARGET: <rule-name>
-VERDICT: INSUFFICIENT_DATA
-REASON: The available evidence does not conclusively identify a root
-  cause. One or more probes returned ambiguous results or required
-  operator input that was not provided.
-LAYER: UNKNOWN
-EVIDENCE:
-  - <list what was probed and what was inconclusive>
-REMEDIATION: Provide: (1) a sample event payload that should have
-  triggered the rule, (2) the output of `describe-rule` including
-  EventBusName and Targets, (3) for schedule-based rules, the exact
-  ScheduleExpression string, and (4) for cross-account targets, the
-  target Lambda's resource-based policy.
-```
+INSUFFICIENT_DATA output template moved to
+[references/worked-examples.md](references/worked-examples.md).
 
 ## Output format
 
@@ -849,79 +399,13 @@ CONFIRM: Before updating the rule, emit and await:
 
 ### Worked example — Schedule expression syntax
 
-```text
-TARGET: ev-nightly-report-rule on default bus
-VERDICT: ROOT_CAUSE_IDENTIFIED
-REASON: The rule's ScheduleExpression is "cron(0 9 * * *)" which has
-  only 5 fields. EventBridge cron requires 6 fields (including Year).
-  EventBridge auto-disabled the rule (State: DISABLED) due to the
-  syntax error (Step 3a/3b).
-LAYER: SCHEDULE_SYNTAX
-EVIDENCE:
-  - Symptom: schedule-based rule ev-nightly-report-rule never fires.
-    describe-rule shows State: DISABLED.
-  - Probe: aws events describe-rule returns ScheduleExpression:
-    "cron(0 9 * * *)" and State: DISABLED.
-  - Probe: The cron expression has 5 fields; EventBridge requires 6
-    (Minutes Hours Day-of-month Month Day-of-week Year).
-  - Passing: EventBusName is default (correct); the target Lambda has
-    events.amazonaws.com principal; no EventPattern on the rule
-    (schedule-based, not event-based).
-REMEDIATION:
-  1. Update the ScheduleExpression to use 6 fields:
-     aws events put-rule --name ev-nightly-report-rule \
-       --schedule-expression "cron(0 9 * * ? *)"
-  2. Re-enable the rule (it was auto-disabled):
-     aws events enable-rule --name ev-nightly-report-rule
-  3. Verify:
-     aws events describe-rule --name ev-nightly-report-rule \
-       --output json | jq '{State, ScheduleExpression}'
-     Expected: State: ENABLED, ScheduleExpression: "cron(0 9 * * ? *)"
-CONFIRM: Before updating the rule, emit and await:
-  "CONFIRM: About to update ev-nightly-report-rule schedule expression
-   and re-enable. Proceed? (yes/no)"
-```
+Worked example (schedule expression syntax) moved to
+[references/worked-examples.md](references/worked-examples.md).
 
 ### Worked example — Target Lambda missing EventBridge principal
 
-```text
-TARGET: ev-order-processor-rule on custom.orders-bus
-VERDICT: ROOT_CAUSE_IDENTIFIED
-REASON: The rule fires (test-event-pattern returns true, CloudTrail
-  shows successful PutEvents), but the target Lambda fn-order-processor
-  is never invoked. The Lambda's resource-based policy has no statement
-  allowing events.amazonaws.com to invoke it. EventBridge's invocation
-  is silently denied (Step 5b).
-LAYER: TARGET_LAMBDA_PERMISSION
-EVIDENCE:
-  - Symptom: PutEvents returns 200; test-event-pattern returns Result:
-    true; but the Lambda's CloudWatch logs show zero invocations.
-  - Probe: aws lambda get-policy on fn-order-processor returns a policy
-    with statements for API Gateway and S3, but NO statement for
-    events.amazonaws.com.
-  - Probe: aws cloudtrail lookup-events for the Lambda ARN in the last
-    hour shows EventBridge invocation attempts returning AccessDenied.
-  - Passing: EventBusName matches; rule State is ENABLED; pattern
-    matches the event (test-event-pattern: true); rule has no RoleArn
-    (same-account, service-linked role path).
-REMEDIATION:
-  1. Add the EventBridge principal to the Lambda resource-based policy:
-     aws lambda add-permission \
-       --function-name fn-order-processor \
-       --statement-id EventBridgeInvoke \
-       --action lambda:InvokeFunction \
-       --principal events.amazonaws.com \
-       --source-arn arn:aws:events:us-east-1:111111111111:rule/custom.orders-bus/ev-order-processor-rule
-  2. Verify:
-     aws lambda get-policy --function-name fn-order-processor \
-       --output json | jq '.Policy | fromjson | .Statement[] |
-         select(.Principal.Service == "events.amazonaws.com")'
-     Expected: a statement with Action lambda:InvokeFunction and
-     SourceArn matching the rule ARN.
-CONFIRM: Before adding the permission, emit and await:
-  "CONFIRM: About to add EventBridge invoke permission to
-   fn-order-processor. Proceed? (yes/no)"
-```
+Worked example (target Lambda missing principal) moved to
+[references/worked-examples.md](references/worked-examples.md).
 
 ## Anti-Patterns — NEVER
 
@@ -990,275 +474,32 @@ CONFIRM: Before adding the permission, emit and await:
 
 ## Pre-flight safety checks (run before any state-changing CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`put-rule`, `enable-rule`, `disable-rule`, `put-targets`,
-  `remove-targets`, `put-event-bus-policy`, `lambda add-permission`),
-  emit and await operator approval. Do NOT execute the CLI until the
-  operator confirms.
-
-- **Read-only first.** Every probe in the diagnostic tree is
-  read-only (`describe-rule`, `test-event-pattern`, `describe-event-bus`,
-  `list-targets-by-rule`, `get-policy`, `lookup-events`,
-  `simulate-principal-policy`). Do not perform state-changing
-  operations as diagnostic probes.
-
-- **`put-rule` with the same name overwrites** the existing rule's
-  configuration. Always include the full EventPattern or
-  ScheduleExpression; omitting a field reverts it to default.
-
-- **`enable-rule` / `disable-rule`** toggle the rule state. Enabling a
-  rule with a still-broken schedule expression re-triggers
-  auto-disable. Fix the expression before re-enabling.
-
-- **`put-targets` adds to the existing target list** unless
-  `--event-bus-name` and the existing target Ids are managed carefully.
-  Use `remove-targets` to clear old targets before adding new ones if
-  the target configuration changes substantively.
-
-- **`lambda add-permission`** adds a statement to the resource-based
-  policy. Duplicate statement IDs overwrite. Each EventBridge rule
-  targeting the same Lambda needs a unique statement ID.
-
-- **Bulk remediation batch limit.** If the diagnosis identifies the
-  same root cause across multiple rules (e.g., a missing
-  `events.amazonaws.com` principal after a Lambda recreation), batch
-  remediation into groups of at most 5 rules, emit a single CONFIRM
-  per batch, and verify between batches.
+Pre-flight safety checks moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ## Remediation guidance
 
-### For PATTERN_SOURCE_MISMATCH
-
-```bash
-aws events put-rule --name <rule-name> \
-  --event-bus-name <bus-name> \
-  --event-pattern '<corrected-pattern-with-matching-source>'
-```
-
-### For PATTERN_DETAIL_TYPE_MISMATCH
-
-Update the `detail-type` array to include the exact string from the
-event (case-sensitive):
-
-```bash
-aws events put-rule --name <rule-name> \
-  --event-bus-name <bus-name> \
-  --event-pattern '<corrected-pattern-with-matching-detail-type>'
-```
-
-### For PATTERN_DETAIL_PATH_MISMATCH
-
-Update the `detail` path to reference the correct key and value type:
-
-```bash
-aws events put-rule --name <rule-name> \
-  --event-bus-name <bus-name> \
-  --event-pattern '{"source":["..."],"detail-type":["..."],"detail":{"correctKey":["correctValue"]}}'
-```
-
-### For CONTENT_FILTER_TOO_STRICT
-
-Fix the operator type mismatch (e.g., use `numeric` for number values,
-`prefix` for strings only):
-
-```bash
-aws events put-rule --name <rule-name> \
-  --event-bus-name <bus-name> \
-  --event-pattern '{"detail":{"amount":{"numeric":[">=",100]}}}'
-```
-
-### For CONTENT_FILTER_NESTED_DEPTH
-
-Flatten the event structure before PutEvents, or restructure the
-pattern to reference a shallower path (depth ≤ 10).
-
-### For INPUT_TRANSFORMER_ERROR
-
-Fix the template and path mappings:
-
-```bash
-aws events put-targets --rule <rule-name> \
-  --event-bus-name <bus-name> \
-  --targets '[{"Id":"1","Arn":"<target-arn>","InputTransformer":{"InputPathsMap":{"order_id":"$.detail.orderId"},"InputTemplate":"{\"orderId\": \"<order_id>\"}"}}]'
-```
-
-### For DLQ_MISCONFIGURED
-
-Configure or correct the DLQ ARN on the target:
-
-```bash
-aws events put-targets --rule <rule-name> \
-  --event-bus-name <bus-name> \
-  --targets '[{"Id":"1","Arn":"<target-arn>","DeadLetterConfig":{"Arn":"arn:aws:sqs:<region>:<account>:<dlq-name>"}}]'
-```
-
-### For BUS_MISMATCH
-
-Align the PutEvents EventBusName with the rule's EventBusName, or
-recreate the rule on the correct bus.
-
-### For SCHEDULE_SYNTAX
-
-```bash
-aws events put-rule --name <rule-name> \
-  --schedule-expression "cron(0 9 * * ? *)"
-aws events enable-rule --name <rule-name>
-```
-
-### For TARGET_IAM_ROLE
-
-Add `lambda:InvokeFunction` to the rule's IAM role on the target ARN:
-
-```bash
-aws iam put-role-policy --role-name <role-name> \
-  --policy-name <policy-name> \
-  --policy-document '<JSON granting lambda:InvokeFunction on target ARN>'
-```
-
-### For TARGET_LAMBDA_PERMISSION
-
-```bash
-aws lambda add-permission \
-  --function-name <target-lambda> \
-  --statement-id EventBridgeInvoke \
-  --action lambda:InvokeFunction \
-  --principal events.amazonaws.com \
-  --source-arn arn:aws:events:<region>:<account>:rule/<bus>/<rule-name>
-```
-
-### For EVENTBUS_POLICY
-
-```bash
-aws events put-event-bus-policy \
-  --event-bus-name <bus-name> \
-  --policy '<json-granting-events:PutEvents-to-source-account>'
-```
+Per-verdict fix commands moved to
+[references/error-handling.md](references/error-handling.md).
 
 ## Deep reference: EventBridge rule-firing layer model
 
-### Symptom → layer decision matrix (offline classification)
-
-```
-Error string / symptom                          → Layer
-test-event-pattern returns false                 → PATTERN_*_MISMATCH / CONTENT_FILTER_*
-DLQ filling                                      → INPUT_TRANSFORMER_ERROR / DLQ_MISCONFIGURED
-ScheduleExpression State: DISABLED               → SCHEDULE_SYNTAX
-Cross-account Lambda never invoked               → TARGET_IAM_ROLE / TARGET_LAMBDA_PERMISSION
-PutEvents AccessDenied                           → EVENTBUS_POLICY
-Events on bus A, rule on bus B                   → BUS_MISMATCH
-Nested path > 10 levels never matches            → CONTENT_FILTER_NESTED_DEPTH
-```
-
-### EventBridge event structure (canonical)
-
-```json
-{
-  "version": "0",
-  "id": "abc123-...",
-  "detail-type": "Order Created",
-  "source": "myapp.orders",
-  "account": "111111111111",
-  "time": "2026-08-05T12:00:00Z",
-  "region": "us-east-1",
-  "resources": ["arn:aws:s3:::my-bucket/order-123"],
-  "detail": {
-    "orderId": "12345",
-    "status": "confirmed",
-    "amount": 150
-  }
-}
-```
-
-The pattern matches against `source`, `detail-type`, `detail`,
-`account`, `region`, and `resources`. The `version`, `id`, and `time`
-fields are metadata and are not pattern-matched.
-
-### Cron expression reference (6 fields)
-
-```
-Field             Values             Wildcards
-─────────────────────────────────────────────────────
-Minutes           0-59               , - * /
-Hours             0-23               , - * /
-Day-of-month      1-31               , - * / ? L W
-Month             1-12 or JAN-DEC    , - * /
-Day-of-week       1-7 or SUN-SAT     , - * / ? L #
-Year              1970-2199          , - * /
-```
-
-Rules:
-- Day-of-month and Day-of-week are mutually exclusive. Use `?` in one
-  to mean "no specific value."
-- `L` = last (last day of month, last specific weekday).
-- `W` = nearest weekday to the given day.
-- `#` = nth occurrence of a weekday in the month (e.g., `2#1` = first
-  Monday).
-
-### Rate expression reference
-
-```
-rate(value unit)
-```
-- value: positive integer (≥ 1)
-- unit: `minute(s)`, `hour(s)`, `day(s)`
-- singular if value = 1: `rate(1 minute)`
-- plural if value > 1: `rate(5 minutes)`
-
-### Content-based filtering operator reference
-
-| Operator | Syntax | Works on | Example |
-|---|---|---|---|
-| `prefix` | `{"prefix": "abc"}` | String | `{"source": [{"prefix": "aws."}]}` |
-| `numeric` | `{"numeric": [op, val, ...]}` | Number | `{"detail": {"amount": {"numeric": [">", 100]}}}` |
-| `equals-ignore-case` | `{"equals-ignore-case": "abc"}` | String | `{"detail": {"type": {"equals-ignore-case": "ORDER"}}}` |
-| `anything-but` | `{"anything-but": [vals]}` | Any | `{"detail": {"status": {"anything-but": ["cancelled"]}}}` |
-| `wildcard` | `{"wildcard": "abc-*"}` | String | `{"detail": {"id": {"wildcard": "ord-*"}}}` |
-| `cidr` | `{"cidr": "10.0.0.0/8"}` | String (IP) | `{"detail": {"ip": {"cidr": "10.0.0.0/8"}}}` |
-| `exists` | `{"exists": bool}` | Any | `{"detail": {"optional_field": {"exists": true}}}` |
-
-### Nested path depth limit
-
-EventBridge resolves JSON paths in the `detail` object up to 10 levels
-deep. Paths at depth 11+ silently fail to resolve — the rule never
-fires for events whose value lives beyond depth 10.
-
-```
-$.detail                                    → depth 1
-$.detail.a                                  → depth 2
-$.detail.a.b                                → depth 3
-$.detail.a.b.c                              → depth 4
-$.detail.a.b.c.d                            → depth 5
-$.detail.a.b.c.d.e                          → depth 6
-$.detail.a.b.c.d.e.f                        → depth 7
-$.detail.a.b.c.d.e.f.g                      → depth 8
-$.detail.a.b.c.d.e.f.g.h                    → depth 9
-$.detail.a.b.c.d.e.f.g.h.i                  → depth 10 (maximum)
-$.detail.a.b.c.d.e.f.g.h.i.j                → depth 11 (FAILS)
-```
+Layer model deep reference tables moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Recent AWS features (2024-2026)
 
-- **EventBridge advanced JSON matching (2024):** Extended support for
-  `$or` matching at the top level of the pattern, allowing alternative
-  pattern branches. Diagnostically, `$or` patterns must have at least
-  one branch that fully matches for the rule to fire.
-- **EventBridge input transformer enhancements (2024-2025):** Increased
-  template size limit and support for more complex JSON path
-  expressions. Diagnostically, templates that previously exceeded the
-  limit may now work without changes.
-- **EventBridge Scheduler (2022-2024):** A separate service from
-  EventBridge rules that provides one-time and recurring schedules with
-  enhanced timezone support. Diagnostically, if the operator created
-  the schedule in EventBridge Scheduler (not EventBridge rules), the
-  `describe-rule` API will not find it — use `scheduler
-  get-schedule`.
-- **EventBridge global endpoints (2024):** Multi-region failover for
-  event buses. Diagnostically, a global endpoint may route events to a
-  secondary region during a failover, causing rules in the primary
-  region to appear non-firing.
-- **PutEvents maximum entry size (2024-2025):** 256 KB per event entry
-  (up from an earlier limit). Events larger than 256 KB are rejected
-  with a specific error in the PutEvents response.
+Recent AWS features moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — quick-start insights, mindset, philosophy, Step 0 non-obvious behaviours, failure-pattern tables, layer-model deep reference, recent AWS features (moved from this file)
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight commands, safety checks, and every step's probe/fix command listings (moved from this file)
+- [references/error-handling.md](references/error-handling.md) — DLQ errorMessage mapping, input-transformer error table, per-verdict remediation fixes (moved from this file)
+- [references/worked-examples.md](references/worked-examples.md) — INSUFFICIENT_DATA re-prompt templates and secondary worked examples (moved from this file)
+- [references/event-pattern-reference.md](references/event-pattern-reference.md) — pattern matching model, content-filter operators, nested depth limits (moved-from tables appended)
+- [references/schedule-and-permissions-reference.md](references/schedule-and-permissions-reference.md) — schedule expressions, target/bus permissions, input transformer reference (moved-from tables appended)
 
 ## Domain
 

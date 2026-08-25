@@ -324,3 +324,38 @@ resource "aws_scheduler_schedule_group" "prod" {
   name = "prod-schedules"
 }
 ```
+
+## Expert heuristic: the flexible time window trade-off (moved from SKILL.md)
+
+A baseline model says "set flexible time window to OFF for
+precision." The correct heuristic recognizes that MAXIMUM reduces
+cost by batching invocations within the window, trading precision
+for cost savings.
+
+```text
+Schedule: rate(1 hour)
+
+Flexible time window OFF:
+  → Invokes EXACTLY at :00 each hour (or close to it)
+  → 24 invocations per day per schedule
+  → Higher cost (more invocations)
+  → Use when: precision matters (billing, reminders, exact-time jobs)
+
+Flexible time window MAXIMUM(1 hour):
+  → Invokes any time within the 1-hour window
+  → Scheduler batches invocations for efficiency
+  → Fewer "actual" API calls (batched internally)
+  → Lower cost
+  → Use when: precision does NOT matter (cleanup, health checks,
+    periodic polling, log rotation)
+
+Decision matrix:
+  ├── Need exact-time invocation? → OFF
+  ├── Need cost optimization for periodic tasks? → MAXIMUM
+  └── One-time schedule? → OFF (window does not apply meaningfully)
+```
+
+**Key implication:** for periodic maintenance tasks (cleanup, log
+rotation, health checks), MAXIMUM can reduce costs significantly
+when you have hundreds of schedules. For time-sensitive tasks
+(billing, reminders, alerts), use OFF.

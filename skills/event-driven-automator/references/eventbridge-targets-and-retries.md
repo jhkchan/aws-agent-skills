@@ -132,3 +132,26 @@ EventBridge metrics.
 
 For high-volume workflows that exceed these quotas, fan out to SQS
 or Kinesis for finer-grained consumer routing.
+---
+
+## Step 4: DLQ create-and-attach CLI (moved from SKILL.md)
+
+```bash
+aws sqs create-queue --queue-name eventbridge-<rule>-dlq
+aws events put-targets \
+  --rule <rule> --event-bus-name <bus> \
+  --targets '[{"Id":"<target-id>","Arn":"<target-arn>","DeadLetterConfig":{"Arn":"arn:aws:sqs:<region>:<account>:eventbridge-<rule>-dlq"},"RetryPolicy":{"MaximumRetryAttempts":3,"MaximumEventAgeInSeconds":900}}]'
+```
+
+## Step 4: DLQ-depth CloudWatch alarm CLI (moved from SKILL.md)
+
+```bash
+aws cloudwatch put-metric-alarm \
+  --alarm-name EventBridge-<rule>-DLQ-Depth \
+  --metric-name ApproximateNumberOfMessagesVisible \
+  --namespace AWS/SQS \
+  --statistic Sum --period 60 --evaluation-periods 1 \
+  --threshold 0 --comparison-operator GreaterThanThreshold \
+  --dimensions Name=QueueName,Values=eventbridge-<rule>-dlq \
+  --alarm-actions <sns-arn>
+```

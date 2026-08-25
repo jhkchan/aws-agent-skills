@@ -169,90 +169,18 @@ explicit decision on remediation mode and grace period.
 
 ## Expert heuristic: policy priority evaluation order (first-match wins)
 
-A baseline model says "create the policy." The correct heuristic
-recognizes that when multiple policies of the same type target
-overlapping resources, FMS evaluates in priority order — first match
-wins, and lower-priority policies are NOT applied to those resources.
-
-```text
-Policy Type: WAF
-  Policy A (priority 1): OU=Prod, RuleGroup=AWSManagedRulesCommonRuleSet
-  Policy B (priority 2): OU=Root (all accounts), RuleGroup=CustomRules
-
-Account 111111111111 is in OU=Prod:
-  → Evaluated by Policy A (priority 1, first match)
-  → Gets AWSManagedRulesCommonRuleSet
-  → Policy B does NOT apply (already covered by Policy A)
-
-Account 222222222222 is NOT in OU=Prod:
-  → Policy A does not match (OU scope excludes it)
-  → Evaluated by Policy B (priority 2, next match)
-  → Gets CustomRules
-
-Key: if you want Policy B to also apply to Prod accounts, use a
-different policy type, or restructure so Policy A and B target
-non-overlapping resource sets.
-```
-
-**Key implication:** policy priority ordering is critical for layered
-designs. Always verify which policy is the first match for each target
-account.
+First-match-wins evaluation model with worked overlap examples moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Expert heuristic: policy priority evaluation order
 
 ## Expert heuristic: OU scope vs account scope expansion
 
-FMS policies can target an entire Organization, specific OUs, or
-individual accounts. OU-based targeting automatically expands to include
-all accounts currently in the OU AND accounts moved into the OU later.
-
-```text
-Targeting options (broadest to narrowest):
-  ├── Organization → all accounts in the Organization (including future)
-  ├── OU → all accounts in the OU (including future additions)
-  ├── OU + sub-OUs → all accounts in the OU and its children
-  └── Individual accounts → only the listed accounts (no auto-expansion)
-
-OU expansion behavior:
-  OU=Workloads
-    ├── Prod (accounts: 111, 222, 333)
-    │     └── New account 444 added later → automatically in scope
-    └── Dev (accounts: 555, 666)
-
-Exclude mechanism: add ExcludeAccounts or ExcludeResourceTags to
-override OU scope for specific accounts or tagged resources.
-```
-
-**Key implication:** OU-based targeting is dynamic. New accounts moved
-into the OU are automatically in scope. Use exclude tags for resources
-that must opt out of a policy.
+OU auto-expansion semantics (future accounts, IncludeMap/ExcludeMap interplay) moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Expert heuristic: OU scope vs account scope expansion
 
 ## Expert heuristic: remediation grace period
 
-Remediation mode determines whether FMS actively fixes noncompliant
-resources or just reports them. The grace period adds a delay before
-auto-remediation.
-
-```text
-Remediation modes:
-  RemediationEnabled=false (monitor-only):
-    → Noncompliant resources reported in FMS console + Config
-    → NO automatic changes to resources
-    → Use for phased rollout / auditing
-
-  RemediationEnabled=true (auto-apply):
-    → FMS automatically creates/modifies resources to comply
-    → Grace period (days) delays remediation after detection
-    → RemediationGracePeriodDays: 0 = immediate, 7 = 1 week buffer
-
-Grace period decision framework:
-  ├── New policy, first rollout → monitor-only for 1-2 weeks
-  ├── Confident, ready to enforce → auto-apply with 7-day grace
-  ├── Mature, strict enforcement → auto-apply with 0-day grace
-  └── Critical production, no tolerance → auto-apply with 0-day grace
-```
-
-**Key implication:** always start with monitor-only for new policies,
-then transition to auto-apply with a grace period once the compliance
-posture is understood.
+Auto-apply vs monitor-only behavior and grace-period timing model moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Expert heuristic: remediation grace period
 
 ## Prerequisites (verify before provisioning)
 
@@ -369,145 +297,23 @@ New policy → start monitor-only (RemediationEnabled=false)
 
 ## Step 5 — WAF managed rule group association
 
-WAF policies reference managed rule groups (AWS or marketplace) or
-custom rule groups. The managed rule group set determines which rules
-are applied to all Web ACLs created by the policy.
-
-**Common managed rule groups:**
-
-| Rule Group | Purpose |
-|---|---|
-| AWSManagedRulesCommonRuleSet | Core rules (LFI, RFI, SQLi, XSS) |
-| AWSManagedRulesKnownBadInputsRuleSet | Log4j, SSRF, bad inputs |
-| AWSManagedRulesAmazonIpReputationList | Malicious IP reputation |
-| AWSManagedRulesSQLiRuleSet | SQL injection |
-| AWSManagedRulesLinuxRuleSet | Linux-specific exploits |
-| AWSManagedRulesWindowsRuleSet | Windows-specific exploits |
-| AWSManagedRulesWordPressRuleSet | WordPress exploits |
-
-**Create a WAF FMS policy:**
-
-```bash
-aws fms put-policy \
-  --policy-name "org-waf-common-rules" \
-  --policy-type "WAFV2" \
-  --region us-east-1 \
-  --cli-input-json file://fms-waf-policy.json
-```
-
-**fms-waf-policy.json structure:**
-
-```json
-{
-  "PolicyName": "org-waf-common-rules",
-  "SecurityServicePolicyData": {
-    "Type": "WAFV2",
-    "ManagedServiceData": "{\"type\":\"WAFV2\",\"preProcessRuleGroups\":[{\"managedRuleGroupStatement\":{\"vendorName\":\"AWS\",\"name\":\"AWSManagedRulesCommonRuleSet\"}}]}"
-  },
-  "IncludeMap": {"ORG_UNIT": ["ou-xxxx-yyyy"]},
-  "RemediationEnabled": true,
-  "RemediationGracePeriodDays": 7,
-  "DeleteUnusedFMSPortals": false
-}
-```
-
-**Common mistake:** using a standalone WAF Web ACL ARN instead of a
-managed rule group. FMS creates the Web ACLs; you only specify the rule
-groups.
+Full WAF policy configuration (managed rule groups, pre/post rule sets, remediation) moved to references.
+→ [references/policy-types-and-remediation.md](references/policy-types-and-remediation.md) § Step 5 — WAF managed rule group association
 
 ## Step 6 — Security group policies (common vs content audit)
 
-Security group policies have two modes:
-
-| Mode | Behavior | Use Case |
-|---|---|---|
-| Common | Applies the SAME security group rules to all targeted ENIs | Enforce a baseline SG across accounts |
-| Content Audit | Checks existing SGs against audit rules; flags/remediates nonconforming SGs | Ensure SGs comply with policy (e.g., no port 22 open to 0.0.0.0/0) |
-
-**Common SG policy:**
-
-```json
-{
-  "PolicyName": "org-sg-baseline",
-  "SecurityServicePolicyData": {
-    "Type": "SECURITY_GROUPS_COMMON",
-    "ManagedServiceData": "{\"type\":\"SECURITY_GROUPS_COMMON\",\"securityGroups\":[{\"id\":\"sg-aaa11122\"}]}"
-  },
-  "IncludeMap": {"ORG_UNIT": ["ou-xxxx-yyyy"]},
-  "RemediationEnabled": true
-}
-```
-
-**Content audit SG policy (audit existing SGs):**
-
-```json
-{
-  "PolicyName": "org-sg-audit-no-ssh-open",
-  "SecurityServicePolicyData": {
-    "Type": "SECURITY_GROUPS_CONTENT_AUDIT",
-    "ManagedServiceData": "{\"type\":\"SECURITY_GROUPS_CONTENT_AUDIT\",\"securityGroupAction\":{\"type\":\"ALLOW\"},\"recursiveSecurityGroupEgressRules\":false}"
-  },
-  "IncludeMap": {"ORG_UNIT": ["ou-xxxx-yyyy"]},
-  "RemediationEnabled": false
-}
-```
+SG common vs content-audit mode table and ManagedServiceData structure moved to references.
+→ [references/policy-types-and-remediation.md](references/policy-types-and-remediation.md) § Step 6 — Security group policies
 
 ## Step 7 — Network Firewall policy deployment
 
-Network Firewall policies deploy managed Network Firewall firewalls in
-target accounts. Each target account needs firewall subnet mappings for
-firewall placement.
-
-```bash
-aws fms put-policy \
-  --policy-name "org-nfw-inspection" \
-  --policy-type "NETWORK_FIREWALL" \
-  --region us-east-1 \
-  --cli-input-json file://fms-nfw-policy.json
-```
-
-**fms-nfw-policy.json structure:**
-
-```json
-{
-  "PolicyName": "org-nfw-inspection",
-  "SecurityServicePolicyData": {
-    "Type": "NETWORK_FIREWALL",
-    "ManagedServiceData": "{\"type\":\"NETWORK_FIREWALL\",\"networkFirewallStatelessRuleGroupReferences\":[],\"networkFirewallStatefulRuleGroupReferences\":[]}"
-  },
-  "IncludeMap": {"ORG_UNIT": ["ou-xxxx-yyyy"]},
-  "RemediationEnabled": true,
-  "RemediationGracePeriodDays": 14
-}
-```
+Network Firewall policy configuration (firewall subnet mappings, rule groups) moved to references.
+→ [references/policy-types-and-remediation.md](references/policy-types-and-remediation.md) § Step 7 — Network Firewall policy deployment
 
 ## Step 8 — Shield Advanced policy deployment
 
-Shield Advanced policies enable automatic DDoS protection for supported
-resources in targeted accounts. No additional configuration is needed
-beyond the policy — Shield automatically protects ALBs, NLBs,
-CloudFront distributions, Route53 hosted zones, and Global Accelerators.
-
-```bash
-aws fms put-policy \
-  --policy-name "org-shield-advanced" \
-  --policy-type "SHIELD_ADVANCED" \
-  --region us-east-1 \
-  --cli-input-json file://fms-shield-policy.json
-```
-
-**fms-shield-policy.json structure:**
-
-```json
-{
-  "PolicyName": "org-shield-advanced",
-  "SecurityServicePolicyData": {
-    "Type": "SHIELD_ADVANCED"
-  },
-  "IncludeMap": {"ORG_UNIT": ["ou-xxxx-yyyy"]},
-  "RemediationEnabled": true
-}
-```
+Shield Advanced policy configuration and coverage behavior moved to references.
+→ [references/policy-types-and-remediation.md](references/policy-types-and-remediation.md) § Step 8 — Shield Advanced policy deployment
 
 ## Step 9 — Resource tag inclusion/exclusion
 
@@ -531,26 +337,8 @@ Result:
 
 ## Step 10 — Policy priority ordering
 
-When multiple policies of the same type target overlapping resources,
-FMS evaluates in priority order. The first matching policy wins.
-
-| Priority | Behavior |
-|---|---|
-| Lower number = higher priority | Evaluated first |
-| First match wins | Resource is managed by the first matching policy |
-| Lower-priority policies | NOT applied to resources already covered |
-
-**Reorder priorities:**
-
-```bash
-# List policies in priority order
-aws fms list-policies --region us-east-1 \
-  --query 'PolicyList[*].{Name:PolicyName,Type:SecurityServicePolicyData.Type,Pri:Priority}' \
-  --output table
-
-# Reorder (use put-apps-list or update policy priority)
-# Priority is set when creating/updating the policy
-```
+Priority-conflict resolution workflow and reorder commands moved to references.
+→ [references/targeting-and-priority.md](references/targeting-and-priority.md) § Step 10 — Policy priority ordering
 
 ## Step 11 — Compliance monitoring via AWS Config
 
@@ -581,37 +369,8 @@ aws fms list-compliance-status \
 
 ## Step 12 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **FMS WAFv2 policy support (2023-2024):** Full support for WAFv2
-  managed rule groups in FMS policies, including version-pinned rule
-  groups and managed rule group marketplace integrations.
-
-- **FMS Network Firewall policy enhancements (2023-2024):** Improved
-  subnet mapping automation and stateful rule group support in Network
-  Firewall policies. Policies can now auto-create firewall subnets in
-  target accounts.
-
-- **FMS Shield Advanced auto-remediation (2023-2024):** Shield Advanced
-  policies now automatically apply proactive DDoS mitigations and
-  layer 7 rate-based rules without manual Shield engagement.
-
-- **FMS DNS Firewall policy support (2023-2024):** Route 53 Resolver
-  DNS Firewall policies can now be managed via FMS, enabling
-  centralized DNS threat protection across the Organization.
-
-- **FMS third-party managed rule groups (2024-2025):** Marketplace rule
-  groups (e.g., Imperva, F5, Imperva) can now be referenced in FMS WAF
-  policies, expanding the managed rule ecosystem.
-
-- **FMS policy priority reordering (2024-2025):** Enhanced priority
-  management allowing dynamic reordering without recreating policies,
-  making layered security designs easier to maintain.
-
-- **FMS compliance notifications via Security Hub (2024-2025):** FMS
-  compliance findings now automatically integrate with Security Hub,
-  providing a unified security posture view across WAF, SG, Network
-  Firewall, and Shield Advanced policies.
+2023-2026 FMS feature notes moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Step 12 — Recent features
 
 ## NEVER do these things
 
@@ -713,36 +472,17 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### AccessDeniedException on put-policy
-- The calling account is not the delegated FMS administrator. Verify
-  with `get-admin-account`. If no admin is delegated, run
-  `associate-admin-account` from the Organizations management account.
+Error deep dives (AccessDenied on put-policy, unknown compliance, reverted changes, priority conflicts, missing NFW) moved to references.
+→ [references/error-handling.md](references/error-handling.md) § Error handling
 
-### Resources show as "unknown" compliance
-- AWS Config is not enabled in the member account. Enable Config in
-  the member account, then wait for FMS to re-evaluate (can take up to
-  15 minutes).
+## References (load on demand)
 
-### Web ACL changes in member accounts are reverted
-- This is expected behavior. FMS-managed Web ACLs are read-only in
-  member accounts. All changes must go through the FMS policy in the
-  admin account. Editing directly will be reverted on the next
-  remediation cycle.
+Consult these only when the corresponding topic comes up:
 
-### Policy applies to unexpected accounts
-- OU-based targeting auto-expands. New accounts moved into the OU are
-  automatically in scope. Use exclude accounts or exclude tags to
-  narrow scope. Verify with `list-apps-lists` or the FMS console.
-
-### Policy does not apply to expected accounts (priority conflict)
-- A higher-priority policy of the same type is covering the target
-  accounts. Verify priority ordering. FMS evaluates first-match wins.
-
-### Network Firewall policy deploys but no firewall is created
-- Missing subnet mappings in target accounts. Network Firewall policies
-  require firewall subnet mappings for firewall placement. Define
-  subnet mappings in the policy or ensure subnets exist in target
-  accounts.
+- [references/policy-types-and-remediation.md](references/policy-types-and-remediation.md) — policy-type configurations moved from Steps 5-8 (WAF, SG, Network Firewall, Shield)
+- [references/targeting-and-priority.md](references/targeting-and-priority.md) — OU/account scope detail and the Step 10 priority-ordering workflow
+- [references/error-handling.md](references/error-handling.md) — failure modes moved from § Error handling
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert heuristics (priority order, OU scope, grace period) and recent AWS features
 
 ## Domain
 

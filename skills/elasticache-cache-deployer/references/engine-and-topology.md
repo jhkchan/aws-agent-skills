@@ -337,3 +337,297 @@ Always prefer Graviton for new clusters.
 - Global Datastore — https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Redis-Global-Datastore.html
 - ElastiCache Serverless — https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/serverless.html
 - Node Type Sizing — https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/nodes-select-size.html
+
+## Expert heuristic: effective memory calculator (from SKILL.md)
+
+ElastiCache markets a node type by total memory, but the usable memory
+for application data is significantly less. A baseline model quotes
+the spec-sheet number; this heuristic gives the real figure.
+
+**Formula for Redis (cluster mode enabled, no replicas):**
+
+```text
+usable_per_shard = node_memory_bytes × 0.50
+# 50% rule: Redis reserves ~50% for overhead, COPY-on-write fork
+# during BGSAVE, and the QUERY/Sort buffer. Going above 50% risks
+# OOM during snapshot / failover.
+
+total_usable = usable_per_shard × number_of_shards
+max_item_size = 512 MB per single value (Redis hard limit, NOT node-size-dependent)
+```
+
+**Formula for Redis (cluster mode disabled, with replicas):**
+
+```text
+usable_total = node_memory_bytes × 0.50
+# Replicas do NOT add usable memory — they hold a copy of the same data.
+# Multi-AZ replicas add availability, NOT capacity.
+```
+
+**Formula for Memcached (multi-threaded, no replication):**
+
+```text
+usable_per_node = node_memory_bytes × 0.90
+# Memcached has minimal overhead (no persistence, no replication, no fork).
+
+total_usable = usable_per_node × number_of_nodes
+max_item_size = 1 MB default (configurable via parameter group `max-item-size`,
+                               max 1024 MB)
+```
+
+**Concrete example — cache.r6g.2xlarge (62.34 GiB nominal):**
+
+| Topology | Calculation | Usable for application data |
+|---|---|---|
+| Redis cluster mode disabled, 1 primary + 1 replica | 62.34 × 0.50 | **31.17 GiB** (replica holds copy, no extra) |
+| Redis cluster mode enabled, 3 shards × 1 primary + 1 replica each | 62.34 × 0.50 × 3 | **93.51 GiB** |
+| Memcached, 3 nodes | 62.34 × 0.90 × 3 | **168.32 GiB** |
+
+**Implication:** for the SAME node type and node count, Memcached
+exposes ~3-5x the usable memory of Redis cluster-mode-disabled.
+Redis's overhead is the price of persistence + replication + failover.
+Choose the engine knowing this overhead, not by comparing spec-sheet
+
+## Expert heuristic: cluster mode shard count estimator (from SKILL.md)
+
+Redis cluster mode enabled distributes writes across shards. Each shard
+is a separate primary; the cluster hash-slots data across 16,384 slots
+(0-16383) sharded by key. The number of shards is the horizontal-write
+scaling factor.
+
+**Rule:** for write-heavy workloads (more than 50,000 writes/sec
+sustained), size shards so that per-shard write rate stays under 60% of
+the node's published baseline.
+
+**Quick check formula:**
+
+```text
+required_shards = ceil(sustained_writes_per_sec / (node_write_baseline × 0.60))
+max_shards = 500   # ElastiCache hard limit (250 soft, 500 via support ticket)
+
+# cache.r6g.2xlarge baseline: ~100,000 writes/sec per primary
+# Example: 200,000 writes/sec sustained
+# required_shards = ceil(200000 / (100000 × 0.60)) = ceil(3.33) = 4 shards
+```
+
+**Why 60%:** ElastiCache node baselines are measured with pipelined
+`SET` on small values. Real-world workloads have larger values,
+non-pipelined patterns, and `EVAL`/`SORT` that consume CPU. Leaving
+40% headroom is the threshold observed in production incident
+post-mortems, not a documented AWS limit.
+
+**Read-scaling note:** replicas per shard scale READS, not writes. A
+4-shard cluster with 2 replicas per shard has 4 primaries (write
+capacity) and 8 replicas (read capacity in addition to primaries).
+
+**Common scenarios:**
+- **Low write, high read session store** (1k writes/sec, 50k reads/sec):
+  2 shards × 3 replicas each → 2 write paths, 6 read paths + primaries.
+- **High-write real-time leaderboard** (300k writes/sec): 5 shards × 1
+  replica each → 5 write paths, 5 read paths. Verify per-shard rate.
+- **Globally distributed geo-cache**: 3 shards in primary region +
+  Global Datastore to 2 secondary regions. Writes go to primary;
+  secondary regions serve local reads.
+
+## Expert heuristic: failover promotion semantics (from SKILL.md)
+
+A baseline model says "Multi-AZ gives you failover" without explaining
+what gets promoted and how long it takes. This is the load-bearing
+detail for production SLAs.
+
+**Redis cluster mode disabled + Multi-AZ + automatic failover:**
+- The replica in a different AZ is promoted to primary on primary
+  failure.
+- Promotion time: typically **10-30 seconds** (DNS update +
+  replica-promotion sequence).
+- Existing client connections drop; clients must reconnect to the new
+  primary endpoint (the replication group's PrimaryEndpoint is stable
+  and updates automatically).
+- Data loss window: writes that were in-flight to the old primary but
+  not yet replicated to the promoted replica are LOST. This is
+  asynchronous replication — there is no synchronous Redis option in
+  ElastiCache.
+
+**Redis cluster mode enabled + Multi-AZ + automatic failover:**
+- The replica in a different AZ is promoted PER SHARD. A 5-shard
+  cluster can have up to 5 simultaneous shard failovers.
+- Promotion time: typically **10-30 seconds** per shard; the
+  ConfigurationEndpoint stays stable.
+- Cross-shard operations (`MGET`, `MULTI` on multi-key transactions)
+  may fail transiently during failover.
+
+**Memcached with `AZMode=cross-az`:**
+- **NO automatic failover.** A failed node is gone — clients must
+  rehash or remove it from the consistent-hash ring.
+- Data on the failed node is LOST (no persistence, no replication).
+- This is the most commonly missed detail: "cross-AZ Memcached" sounds
+  like Multi-AZ but is NOT.
+
+**Practical implication:** if the workload's SLA cannot tolerate a
+30-second client reconnect or any data loss window, Redis alone is
+insufficient — the application must handle retry/idempotency, and
+critical state must live in a durable store (DynamoDB, RDS) with Redis
+as a cache in front. ElastiCache Redis is NOT a primary database.
+
+## Step 1 — engine decision tree (from SKILL.md)
+
+```text
+Does the workload need ANY of: persistence, replication, failover,
+encryption, pub/sub, sorted sets, Lua scripts, Global Datastore,
+cross-region replication?
+├── YES → Redis OSS  (the only engine that supports these)
+│         Note: ElastiCache also offers Valkey (Redis fork) — same
+│         APIs, drop-in replacement, fully supported by AWS.
+└── NO → Is the workload a genuinely simple, ephemeral,
+         multi-threaded key-value cache where the operator explicitly
+         accepts no failover, no persistence, no encryption?
+    ├── YES → Memcached
+    └── NO  → Redis OSS  (default; the safest choice)
+```
+
+## Step 1 — Redis vs Memcached feature comparison (from SKILL.md)
+
+**Feature comparison:**
+
+| Feature | Redis OSS | Memcached |
+|---|---|---|
+| Data types | strings, lists, sets, sorted sets, hashes, streams, bitmaps, hyperloglog | strings only |
+| Persistence (RDB snapshots / AOF) | YES | NO |
+| Replication | YES (primary + replicas) | NO |
+| Multi-AZ failover | YES (automatic) | NO (`AZMode=cross-az` distributes nodes only) |
+| Clustering / sharded writes | YES (cluster mode enabled, up to 500 shards) | NO (multi-threaded single node, scale-up only) |
+| Encryption at rest | YES | NO |
+| Encryption in transit (TLS) | YES | NO |
+| AUTH password | YES | NO |
+| pub/sub | YES | NO |
+| Lua scripting | YES | NO |
+| Streams | YES | NO |
+| Multi-AZ | YES | NO |
+| Global Datastore (cross-region) | YES | NO |
+| Max item size | 512 MB | 1 MB default (1024 MB max via `max-item-size`) |
+| Multi-threading | NO (single-threaded per shard; scale via shards) | YES (multi-threaded per node) |
+| Eviction policies | configurable (LRU, LFU, TTL, noeviction) | LRU only |
+| Snapshot / backup | YES (automated + manual) | NO |
+
+**Common mistake:** picking Memcached for "simplicity" then needing
+encryption or failover later. Memcached → Redis migration is a full
+application client rewrite (different APIs) plus a cache-miss
+cold-start window. Default to Redis unless Memcached's specific
+properties (multi-threading, simple strings, no overhead) are
+explicitly required.
+
+## Step 2 — cluster mode decision tree (from SKILL.md)
+
+```text
+Is the Redis write rate expected to grow beyond a single primary's capacity?
+├── YES → Cluster mode ENABLED (sharded; up to 500 shards; hash-slot
+│         partitioned; horizontal write scaling)
+└── NO  → Is the workload stable and modest (< 50k writes/sec)?
+    ├── YES → Cluster mode DISABLED (single primary + up to 5 replicas)
+    │         Simpler client configuration; no cross-slot restrictions.
+    └── NO  → Cluster mode ENABLED (default for any growing workload)
+
+Is multi-key transactional consistency (MULTI/EXEC across keys) required?
+├── YES → Cluster mode DISABLED  (all keys on one primary; transactions trivial)
+│         OR cluster mode ENABLED with hash-tag keys ({tag}) to force
+│         co-location. Accept the operational overhead of hash tags.
+└── NO  → Cluster mode ENABLED is safe
+```
+
+## Step 2 — cluster mode enabled/disabled specifics (from SKILL.md)
+
+**Cluster mode enabled specifics:**
+- Hash slots: 16,384 total, distributed across shards.
+- Key distribution: `SLOT = CRC16(key) mod 16384`. Use hash tags
+  `{user1000}:cart`, `{user1000}:profile` to force co-location.
+- Cross-slot operations (`MGET`, `MULTI` on different slots) fail with
+  `CROSSSLOT` error. Application must use hash tags or fan out.
+- Shard count: 1-500 shards per cluster.
+- Replicas per shard: 0-5.
+
+**Cluster mode disabled specifics:**
+- Single primary, up to 5 replicas.
+- Writes go to the single primary only — no horizontal write scaling.
+- Multi-key transactions trivial (all keys on one primary).
+- Supports Multi-AZ with failover (replica promoted on primary loss).
+
+**Common mistake:** picking cluster mode disabled for a "simpler"
+setup, then needing write scaling later. Migrating from disabled to
+enabled requires creating a new replication group and repointing all
+clients (full cutover). Default to cluster mode enabled for any
+workload whose write rate may grow.
+
+## Step 3 — sizing by workload and sizing rules (from SKILL.md)
+
+**Size by workload:**
+
+- **Dev / test / prototype:** `cache.t3.micro` (0.5 GiB) or
+  `cache.t3.small` (1.37 GiB). Free-tier compatible; burst CPU.
+- **Small production (cache, < 5 GiB data):** `cache.r6g.large`
+  (13.13 GiB nominal → 6.5 GiB usable per shard).
+- **Mid production (10-50 GiB data):** `cache.r6g.2xlarge`
+  (62.34 GiB nominal → 31 GiB usable per shard).
+- **Large production (50-200 GiB data):** `cache.r6g.4xlarge`
+  (124.66 GiB) or sharded cluster mode enabled with smaller nodes.
+- **Very large (200+ GiB):** `cache.r6g.8xlarge` (249.32 GiB) per
+  shard; cluster mode enabled with N shards.
+
+**Sizing rules:**
+- Plan for 50% memory utilization on Redis (see §"Expert heuristic:
+  effective memory calculator"). 50% of nominal is the operating budget.
+- Plan for 90% on Memcached.
+- For Redis with replicas, replicas do NOT add usable memory — they
+  hold a copy of the same data.
+- For Redis cluster mode enabled, multiply usable memory per shard by
+  shard count.
+
+**Common mistake:** sizing by spec-sheet memory. Redis needs ~50%
+overhead for fork-on-BGSAVE, query buffers, and copy-on-write. Memcached
+runs close to spec-sheet.
+
+## Step 4 — Multi-AZ requirements list (from SKILL.md)
+
+**Requirements:**
+- Redis engine.
+- Cluster mode enabled OR disabled (both support Multi-AZ).
+- At least 1 replica in a different AZ than the primary.
+- Subnet group spanning at least 2 AZs.
+- `AutomaticFailoverEnabled=true` on `create-replication-group`.
+
+## Step 4 — failover behavior and topology examples (from SKILL.md)
+
+**Behavior on primary failure:**
+- ElastiCache detects primary failure (health check).
+- A replica in a different AZ is promoted to primary (10-30 seconds).
+- The replication group's PrimaryEndpoint (cluster mode disabled) or
+  ConfigurationEndpoint (cluster mode enabled) updates to the new primary.
+- Clients reconnect automatically through the stable endpoint.
+- Data loss window: writes in-flight to the old primary but not yet
+  replicated are LOST (asynchronous replication).
+
+**Topology examples:**
+
+```text
+# Cluster mode DISABLED, Multi-AZ:
+#   Primary in us-east-1a, 1 replica in us-east-1b
+#   Promotes on primary failure (10-30s)
+
+# Cluster mode ENABLED, Multi-AZ, 3 shards:
+#   Shard 1: primary us-east-1a, replica us-east-1b
+#   Shard 2: primary us-east-1b, replica us-east-1c
+#   Shard 3: primary us-east-1c, replica us-east-1a
+#   Promotes per-shard on failure (10-30s per shard)
+```
+
+**Common mistake:** subnet group with only one AZ. Multi-AZ fails
+silently — ElastiCache cannot place the replica in a different AZ.
+Verify subnet group spans >=2 AZs before `create-replication-group`.
+
+## Step 7 — maxmemory-policy decision rule (from SKILL.md)
+
+- Workload is a CACHE (data is disposable; cache-miss is acceptable):
+  `allkeys-lru` (or `allkeys-lfu` for skewed access).
+- Workload is a STORE (data loss breaks the application; e.g.,
+  session store, rate-limiter): `noeviction`. Plan capacity so memory
+  never fills (Redis will return OOM errors instead of evicting).
+- Workload is a MIX (some persistent, some disposable): `volatile-lru`

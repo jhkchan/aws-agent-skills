@@ -146,53 +146,8 @@ The execution role is assumed by the EMR Serverless application for
 all runtime AWS API calls (S3 reads/writes, Glue catalog access,
 CloudWatch logging, Secrets Manager). Without it, the job fails on
 the first S3 operation.
-
-```bash
-aws iam create-role \
-  --role-name EMRServerlessExecRole \
-  --assume-role-policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [{
-      "Effect": "Allow",
-      "Principal": {"Service": "emr-serverless.amazonaws.com"},
-      "Action": "sts:AssumeRole"
-    }]
-  }'
-
-aws iam put-role-policy \
-  --role-name EMRServerlessExecRole \
-  --policy-name emr-serverless-exec \
-  --policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Effect": "Allow",
-        "Action": ["s3:GetObject", "s3:ListBucket"],
-        "Resource": ["arn:aws:s3:::etl-scripts", "arn:aws:s3:::etl-scripts/*", "arn:aws:s3:::raw-data", "arn:aws:s3:::raw-data/*"]
-      },
-      {
-        "Effect": "Allow",
-        "Action": ["s3:PutObject"],
-        "Resource": ["arn:aws:s3:::curated/*", "arn:aws:s3:::emr-logs-123456789012/*"]
-      },
-      {
-        "Effect": "Allow",
-        "Action": ["glue:GetTable", "glue:GetDatabase", "glue:GetPartitions", "glue:CreateTable", "glue:UpdateTable"],
-        "Resource": "*"
-      },
-      {
-        "Effect": "Allow",
-        "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
-        "Resource": "arn:aws:logs:<region>:<account-id>:log-group:/aws/emr-serverless/*"
-      },
-      {
-        "Effect": "Allow",
-        "Action": ["secretsmanager:GetSecretValue"],
-        "Resource": "arn:aws:secretsmanager:<region>:<account-id>:secret:etl/*"
-      }
-    ]
-  }'
-```
+Execution-role CLI (create-role with emr-serverless trust policy, put-role-policy scoping S3/Glue/CloudWatch/Secrets Manager) moved verbatim to [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md).
+Load on demand when creating the execution role.
 
 Rules:
 - **Trust `emr-serverless.amazonaws.com`** — NOT `elasticmapreduce.amazonaws.com`
@@ -202,68 +157,12 @@ Rules:
 - **CloudWatch Logs permissions** — required for structured logging.
 
 ### Step 2: S3 log bucket
-
-```bash
-aws s3api create-bucket \
-  --bucket emr-logs-123456789012 \
-  --region us-east-1
-
-# Block public access (recommended)
-aws s3api put-public-access-block \
-  --bucket emr-logs-123456789012 \
-  --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
-
-# Lifecycle rule to transition logs to Glacier after 30 days
-aws s3api put-bucket-lifecycle-configuration \
-  --bucket emr-logs-123456789012 \
-  --lifecycle-configuration '{
-    "Rules": [{
-      "ID": "log-archive",
-      "Status": "Enabled",
-      "Filter": {"Prefix": ""},
-      "Transitions": [{"Days": 30, "StorageClass": "GLACIER"}],
-      "Expiration": {"Days": 365}
-    }]
-  }'
-```
+S3 log bucket CLI (create-bucket, put-public-access-block, Glacier lifecycle rule) moved verbatim to [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md).
+Load on demand when setting up the log bucket.
 
 ### Step 3: Create the application
-
-```bash
-aws emr-serverless create-application \
-  --name etl-spark-prod \
-  --release-label emr-7.2.0 \
-  --type SPARK \
-  --initial-capacity '[
-    {
-      "workerType": {
-        "cpu": "4 vCPU",
-        "memory": "16 GB",
-        "disk": "20 GB"
-      },
-      "initialCount": 50,
-      "workerTypeConfiguration": {
-        "driver": {"cpu": "2 vCPU", "memory": "8 GB"},
-        "executor": {"cpu": "4 vCPU", "memory": "16 GB"}
-      }
-    }
-  ]' \
-  --maximum-capacity '{
-    "cpu": "800 vCPU",
-    "memory": "3200 GB",
-    "disk": "4000 GB"
-  }' \
-  --network-configuration '{
-    "subnetIds": ["subnet-aaa", "subnet-bbb"],
-    "securityGroupIds": ["sg-emr-prod"]
-  }' \
-  --auto-start-configuration '{"enabled": true}' \
-  --auto-stop-configuration '{"enabled": true, "idleTimeoutMinutes": 15}' \
-  --image-configuration '{
-    "imageUri": "123456789012.dkr.ecr.us-east-1.amazonaws.com/emr-serverless:7.2.0-custom"
-  }' \
-  --tags Environment=production,Application=etl-spark
-```
+create-application CLI (release label, type, initial/maximum capacity, network config, auto-start/stop, custom image, tags) moved verbatim to [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md).
+Load on demand when creating the application.
 
 Parameters:
 - **release-label** — the EMR release version (e.g., `emr-7.2.0`).
@@ -286,41 +185,16 @@ Parameters:
   additional libraries (pandas, scikit-learn, custom JARs). Optional.
 
 ### Step 4: Start the application
-
-```bash
-APP_ID=$(aws emr-serverless create-application ... --query 'applicationId' --output text)
-
-aws emr-serverless start-application --application-id "$APP_ID"
-```
-
-Wait for the application to reach `STARTED` state:
-
-```bash
-aws emr-serverless get-application --application-id "$APP_ID" \
-  --query 'application.state' --output text
-# Should return 'STARTED'
-```
+start-application CLI and STARTED-state check moved verbatim to [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md).
+Load on demand when starting the application.
 
 ### Step 5: Configure pre-initialized capacity (warm workers)
 
 Pre-initialized capacity keeps workers warm so the first job starts
 immediately (no 60-90s cold start). This is the ONLY way to get
 sub-minute job start latency.
-
-```bash
-aws emr-serverless update-application \
-  --application-id "$APP_ID" \
-  --initial-capacity '[
-    {
-      "workerType": {
-        "cpu": "4 vCPU",
-        "memory": "16 GB",
-        "disk": "20 GB"
-      },
-      "initialCount": 50
-    }
-  ]'
-```
+Pre-initialized capacity CLI (update-application --initial-capacity) moved verbatim to [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md).
+Load on demand when configuring warm workers.
 
 Rules:
 - **Pre-initialized capacity is billed even when idle.** Set
@@ -332,71 +206,12 @@ Rules:
   is billed at the hourly rate whether or not it runs a job.
 
 ### Step 6: Job submission (Spark)
-
-```bash
-aws emr-serverless start-job-run \
-  --application-id "$APP_ID" \
-  --execution-role-arn arn:aws:iam::123456789012:role/EMRServerlessExecRole \
-  --job-driver '{
-    "sparkSubmit": {
-      "entryPoint": "s3://etl-scripts/daily_transform.py",
-      "entryPointArguments": [
-        "--source", "s3://raw-data/events/",
-        "--target", "s3://curated/events/",
-        "--date", "2026-08-11"
-      ],
-      "sparkSubmitParameters": "--conf spark.sql.shuffle.partitions=200 --conf spark.executor.memoryOverhead=2g --conf spark.sql.adaptive.enabled=true"
-    }
-  }' \
-  --configuration-overrides '{
-    "monitoringConfiguration": {
-      "s3MonitoringConfiguration": {
-        "logUri": "s3://emr-logs-123456789012/etl-spark-prod/"
-      },
-      "managedPersistentAppUI": "ENABLED",
-      "cloudWatchLoggingConfiguration": {
-        "enabled": true,
-        "logGroupName": "/aws/emr-serverless/etl-spark-prod",
-        "logStreamNamePrefix": "job"
-      }
-    },
-    "applicationConfiguration": [
-      {
-        "classification": "spark-defaults",
-        "properties": {
-          "spark.sql.shuffle.partitions": "200",
-          "spark.sql.adaptive.enabled": "true",
-          "spark.sql.adaptive.coalescePartitions.enabled": "true",
-          "spark.executor.memoryOverhead": "2g"
-        }
-      }
-    ]
-  }' \
-  --name daily-transform-2026-08-11 \
-  --tags Environment=production,Pipeline=daily-transform
-```
+Spark start-job-run CLI (sparkSubmit job driver, monitoring and application configuration overrides) moved verbatim to [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md).
+Load on demand when submitting a Spark job.
 
 ### Step 7: Job submission (Hive)
-
-```bash
-aws emr-serverless start-job-run \
-  --application-id "$APP_ID" \
-  --execution-role-arn arn:aws:iam::123456789012:role/EMRServerlessExecRole \
-  --job-driver '{
-    "hive": {
-      "query": "SELECT COUNT(*) FROM sales WHERE dt = '\''2026-08-11'\''",
-      "initScriptFileS3Path": "s3://etl-scripts/hive-init.sql",
-      "parameters": "--hiveconf hive.execution.engine=tez --hiveconf tez.grouping.min-size=268435456"
-    }
-  }' \
-  --configuration-overrides '{
-    "monitoringConfiguration": {
-      "s3MonitoringConfiguration": {"logUri": "s3://emr-logs-123456789012/hive-app/"},
-      "cloudWatchLoggingConfiguration": {"enabled": true}
-    }
-  }' \
-  --name hive-sales-count-2026-08-11
-```
+Hive start-job-run CLI (hive job driver, monitoring configuration) moved verbatim to [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md).
+Load on demand when submitting a Hive job.
 
 ### Step 8: Configuration overrides (Spark tuning)
 
@@ -416,15 +231,8 @@ be overridden per-job via `sparkSubmitParameters`.
 
 If the job reads from RDS, Redshift (private), or internal APIs, VPC
 access is REQUIRED.
-
-```bash
-aws emr-serverless update-application \
-  --application-id "$APP_ID" \
-  --network-configuration '{
-    "subnetIds": ["subnet-aaa", "subnet-bbb"],
-    "securityGroupIds": ["sg-emr-prod"]
-  }'
-```
+VPC access CLI (update-application --network-configuration) moved verbatim to [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md).
+Load on demand when attaching subnets and security groups.
 
 Rules:
 - **Use PRIVATE subnets.** EMR Serverless workers do not need public IPs.
@@ -441,19 +249,8 @@ Rules:
 Spark Connect allows remote Spark sessions from notebooks (Jupyter,
 Zeppelin), IDEs (Databricks Connect, IntelliJ), and applications
 without running a full Spark driver locally.
-
-```bash
-aws emr-serverless create-interactive-endpoint \
-  --application-id "$APP_ID" \
-  --execution-role-arn arn:aws:iam::123456789012:role/EMRServerlessExecRole \
-  --release-label emr-7.2.0 \
-  --configuration-overrides '{
-    "monitoringConfiguration": {
-      "s3MonitoringConfiguration": {"logUri": "s3://emr-logs-123456789012/interactive/"},
-      "cloudWatchLoggingConfiguration": {"enabled": true}
-    }
-  }'
-```
+Interactive endpoint CLI (create-interactive-endpoint for Spark Connect) moved verbatim to [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md).
+Load on demand when creating interactive endpoints.
 
 Rules:
 - **Interactive endpoints are billed per-second** while active. Set
@@ -465,42 +262,12 @@ Rules:
   interactive sessions. Configured via the `managedEndpoints` option.
 
 ### Step 11: Verification
-
-```bash
-aws emr-serverless get-application --application-id "$APP_ID"
-aws emr-serverless list-job-runs --application-id "$APP_ID"
-aws emr-serverless get-job-run --application-id "$APP_ID" --job-run-id "<job-id>"
-aws iam get-role --role-name EMRServerlessExecRole
-aws s3 ls s3://emr-logs-123456789012/etl-spark-prod/
-aws logs describe-log-groups --log-group-name-prefix /aws/emr-serverless/etl-spark-prod
-```
+Verification CLI (get-application, list-job-runs, get-job-run, role/bucket/log-group checks) moved verbatim to [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md).
+Load on demand when verifying the deployment.
 
 ## Latest EMR Serverless features (2024-2026)
-
-- **Spark Connect (2024-2026):** remote Spark sessions via thin client
-  protocol. Enables interactive data exploration from notebooks and
-  IDEs without running a local Spark driver. The driver runs on the
-  EMR Serverless cluster.
-- **Interactive endpoints (2024-2026):** managed endpoints for Jupyter
-  Enterprise Gateway and Spark Connect. Billed per-second while active.
-  Pair with auto-stop for cost control.
-- **Automated application start/stop (2024-2025):** auto-start when a
-  job is submitted; auto-stop after configurable idle timeout. Saves
-  cost for non-24/7 workloads.
-- **Lake Formation integration (2024-2026):** fine-grained access
-  control (column-level, row-level) on Glue tables via Lake Formation.
-  The execution role needs `lakeformation:GetDataAccess`.
-- **Gang scheduling (2024-2025):** all workers for a job are scheduled
-  simultaneously or the job waits. Eliminates partial allocation
-  deadlocks for large Spark jobs.
-- **Custom images (2024-2025):** custom Docker images from ECR for
-  additional libraries (pandas, scikit-learn, custom JARs). Pin the
-  image tag — NEVER use `latest`.
-- **Blueprints (2024-2026):** reusable application templates for
-  common Spark/Hive patterns. Reduces setup time for teams.
-- **Application snapshots (2024-2026):** save and restore application
-  state (including loaded libraries and initialized JVMs) to reduce
-  cold-start time for recurring jobs.
+Feature deep dive (Spark Connect, interactive endpoints, automated start/stop, Lake Formation integration, gang scheduling, custom images, blueprints, application snapshots) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when deciding which 2024-2026 features to enable.
 
 ## Workload matrix
 
@@ -620,41 +387,19 @@ missing (execution role, S3 log bucket, S3 entry-point script, VPC
 subnets for private-resource workloads), the verdict is
 `PREREQUISITES_MISSING`.
 
+## References (load on demand)
+
+- [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md) — full CLI sequence for all 11 deployment steps plus Terraform/CloudFormation; extended with the CLI blocks moved verbatim from the Deployment procedure.
+- [references/execution-and-capacity-guide.md](references/execution-and-capacity-guide.md) — execution roles, VPC, capacity tuning, full NEVER list, pre-flight safety CLI.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — 2024-2026 feature deep dive and the edge-case handling catalog.
+
 ## Domain
 
 AWS CloudOps / EMR Serverless Analytics Compute Provisioning.
 
 ## Edge-case handling
-
-- **Cross-account S3 access:** the execution role needs `s3:GetObject`
-  on the cross-account bucket AND the bucket policy in the other
-  account must grant your execution role. EMR Serverless does NOT
-  support cross-account IAM role assumption within a job.
-- **Custom image updates:** when updating a custom image, the
-  application must be stopped and restarted to pull the new image.
-  Running jobs are NOT interrupted; new jobs use the new image.
-- **Pre-initialized capacity with auto-stop:** when auto-stop triggers
-  (idle for `idleTimeoutMinutes`), pre-initialized capacity is released.
-  A new job re-starts the application and re-initializes workers
-  (cold start 60-90s). To avoid this, set auto-stop timeout longer
-  than the expected gap between jobs.
-- **Lake Formation column-level access:** the execution role needs
-  `lakeformation:GetDataAccess` and the Lake Formation admin must
-  grant column-level permissions to the role. Without it, the job
-  sees all columns (security risk) or none (AccessDenied).
-- **Gang scheduling for large jobs:** jobs with > 100 workers may
-  partially allocate and deadlock if gang scheduling is disabled.
-  Enable gang scheduling via `--configuration-overrides` with
-  `spark.scheduler.gang.enabled=true`.
-- **Spark Connect session isolation:** each Spark Connect session runs
-  in the same application but with isolated SparkContext. Resource
-  contention is possible if multiple sessions run heavy queries
-  simultaneously. Use separate applications for teams that need
-  guaranteed resources.
-- **Hive to Spark migration:** HiveQL queries can run on Spark SQL
-  with minimal changes. Common gotchas: `CLUSTER BY` (not supported
-  in Spark SQL), `TRANSFORM` (different syntax), and SerDe
-  differences for custom formats. Test before migrating.
+Edge-case catalog (cross-account S3, custom image updates, pre-init capacity with auto-stop, Lake Formation column-level access, gang scheduling, Spark Connect session isolation, Hive-to-Spark migration) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when a deployment hits a non-obvious edge case.
 
 ## AWS documentation
 
