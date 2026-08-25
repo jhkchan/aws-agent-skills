@@ -122,3 +122,16 @@ aws configservice describe-aggregate-compliance-by-conformance-packs \
 | Security-critical (root MFA, trail) | `One_Hour` | Fast detection of security regressions |
 | Compliance (encryption, versioning) | `Six_Hours` | Balance between detection speed and cost |
 | Operational (tagging) | `TwentyFour_Hours` | Low urgency; cost minimization |
+
+---
+
+## Appendix A — Managed rules by framework (moved from SKILL.md)
+
+| Framework | Key managed rules | Coverage |
+|---|---|---|
+| CIS 1.x (IAM) | `iam-root-access-key-check`, `root-account-mfa-enabled`, `iam-password-policy` | ~90% |
+| CIS 2.x (Networking) | `vpc-sg-open-only-to-authorized-ports`, default SG: custom needed | ~70% |
+| CIS 3.x (Logging) | `cloudtrail-enabled`, `multi-region-cloudtrail-enabled`, `s3-bucket-logging-enabled` | ~100% |
+| CIS 4.x (Monitoring) | `cloudwatch-alarm-action-check`, `config-enabled` | ~80% |
+| PCI-DSS | `s3-bucket-versioning-enabled`, `iam-policy-no-statements-with-admin-access` | ~75% |
+| NIST 800-53 | `acm-certificate-expiration-check`, `rds-snapshots-public-prohibited`, `vpc-flow-logs-enabled` | ~65% |

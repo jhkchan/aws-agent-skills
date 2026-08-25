@@ -87,176 +87,28 @@ appear.
 
 ## Mindset
 
-**One-line takeaway:** AWS Data Exchange is a marketplace for data
-products. A subscription grants access to a data set. Revisions are
-versioned snapshots of the data — each revision contains assets (S3
-objects, DynamoDB table exports, API endpoints). Auto-export
-(EventBridge rule) triggers an export job when a new revision is
-published, automatically delivering fresh data to your S3 bucket.
-Entitlements are the sharing mechanism — NOT IAM. Lake Formation
-integration provides governed, fine-grained access to the exported
-data.
-
-Three misconceptions dominate Data Exchange misdesign at provisioning
-time:
-
-- **"IAM policies control data access."** They do NOT for Data
-  Exchange sharing. Entitlements are the sharing mechanism. A data
-  set is shared with a specific AWS account via an entitlement, not
-  via IAM role trust or bucket policy. The receiving account accesses
-  the data through the Data Exchange API or auto-export, not through
-  direct S3 access. IAM controls who can call Data Exchange APIs,
-  but entitlements control which data sets an account can access.
-
-- **"Revisions auto-export by default."** They do NOT. By default,
-  when a provider publishes a new revision, the subscriber must
-  manually trigger an export job to get the new data. Auto-export
-  requires an EventBridge rule that triggers on the
-  "Data Update" event from Data Exchange, which then calls
-  StartJob to export the new revision to the subscriber's S3 bucket.
-  Without this rule, new revisions sit in Data Exchange and are
-  never delivered to the subscriber's analytics pipeline.
-
-- **"Export jobs are synchronous."** They are NOT. Export jobs are
-  asynchronous — they run in the background and can take minutes to
-  hours depending on data volume. The job status transitions from
-  PENDING to IN_PROGRESS to COMPLETED (or ERROR). Polling job status
-  via GetJob or monitoring via EventBridge/CloudWatch is required.
-  Scripts that start a job and immediately try to read the exported
-  data will fail.
+Mindset framing and the three misconceptions (entitlements NOT IAM for sharing, revisions do NOT auto-export by default, export jobs are asynchronous) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before designing any Data Exchange configuration.
 
 ## Configuration dependency graph (novel heuristic)
 
-Data Exchange configurations are NOT independent. The subscription
-must exist before revisions are visible. Revisions must be finalized
-before assets can be exported. Auto-export rules must reference the
-correct job definition. Entitlements must be set before the receiving
-account can access the data set. Use this graph to sequence
-provisioning.
-
-| Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| Subscription | data product exists in marketplace; subscriber account approved | subscription terms accepted at creation; cannot be partially scoped | access to data set revisions |
-| Data set | subscription active; data set ID known | data set belongs to the provider; subscribers cannot modify the data set | revisions |
-| Revision | data set exists; revision created by provider | revision must be FINALIZED before assets can be exported; drafts are invisible to subscribers | asset export |
-| Assets | revision exists; asset type matches export destination | S3 snapshot assets export to S3; API assets are accessed live (not exported); DynamoDB exports as S3 objects | export job |
-| Export job | revision FINALIZED; destination S3 bucket exists; IAM role with s3:PutObject | job is ASYNCHRONOUS; polling required; job definition specifies mapping of assets to S3 keys | data in subscriber S3 |
-| Auto-export rule | EventBridge rule on "Data Update" event; Lambda or Step Functions to call StartJob | auto-export does NOT exist by default; must be explicitly configured; wrong job definition = silent failure | automatic data delivery on new revisions |
-| Entitlement | data set exists; target AWS account ID known; entitlement created by provider (or via product) | entitlement is the SHARING mechanism — not IAM; receiving account cannot access without entitlement; target account must accept | data sharing across accounts |
-| Lake Formation | exported data in S3; Lake Formation enabled; Data Catalog database/table created | LF grants control column/row-level access; without LF, IAM bucket policy is the only access control | governed, fine-grained data access |
-| API asset | subscription active; API asset type in data set | API assets are accessed LIVE via Data Exchange API gateway; NOT exported to S3; auth via Data Exchange credentials | REST endpoint data consumption |
-
-**The auto-export-rule row is the one a baseline model misses.**
-Without an EventBridge auto-export rule, new revisions are published
-but never delivered to the subscriber's S3 bucket. The data sits in
-Data Exchange and the subscriber never knows a new revision arrived.
-The procedure below forces an explicit decision on auto-export.
-
-**Cross-dependency gotchas:**
-- Export jobs are asynchronous. Scripts that start a job and
-  immediately read from the destination S3 bucket will fail. Poll
-  job status or use EventBridge to trigger downstream processing
-  only after job completion.
-- Entitlements are the sharing mechanism, NOT IAM. Adding IAM
-  policies for the receiving account does NOT grant access to the
-  data set. The provider must create an entitlement for the target
-  account.
-- API assets are accessed LIVE through the Data Exchange API
-  gateway — they are NOT exported to S3. S3 auto-export rules do
-  not apply to API assets.
-- Lake Formation grants apply to the exported data in the Data
-  Catalog, not to Data Exchange itself. LF integration requires the
-  data to be exported to S3 first, then registered as a LF-managed
-  table.
-- Revision finalization is a one-way operation. Once finalized, a
-  revision cannot be modified. All assets must be added BEFORE
-  finalization.
+Configuration dependency graph (subscription → data set → revision → assets → export job → auto-export rule → entitlement → Lake Formation → API asset) with hard-dependency, silent-failure, and downstream columns moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand to sequence provisioning in the correct order.
 
 ## Expert heuristic: auto-export revision rule
 
-A baseline model says "subscribe and export." The correct heuristic
-recognizes that auto-export is a separate EventBridge-triggered
-workflow that must be explicitly configured.
-
-```text
-Auto-export flow:
-  1. Provider publishes new revision (finalize + publish)
-  2. EventBridge emits "Data Update" event
-     → Event source: aws.dataexchange
-     → Detail type: Data Update
-     → Contains: data set ID, revision ID
-  3. EventBridge rule matches the event
-     → Routes to Lambda / Step Functions target
-  4. Lambda calls StartJob with:
-     → Job type: EXPORT_ASSETS_TO_S3
-     → Revision ID from the event
-     → Destination S3 bucket (subscriber's)
-     → Asset-to-key mapping
-  5. Export job runs asynchronously
-     → Status: PENDING → IN_PROGRESS → COMPLETED
-  6. Data appears in subscriber's S3 bucket
-  7. Downstream EventBridge/Step Functions triggered by S3 PUT
-
-Without steps 2-4: revision sits in Data Exchange, never delivered.
-```
-
-**Key implication:** auto-export is NOT a Data Exchange feature
-that you toggle on. It is an EventBridge + Lambda orchestration
-that you build. The skill provides the template for this
-orchestration.
+Auto-export heuristic (the 7-step EventBridge → Lambda → StartJob flow and the without-it failure mode) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when configuring revision auto-export.
 
 ## Expert heuristic: entitlement is the sharing mechanism
 
-A baseline model says "share via IAM role." The correct heuristic
-recognizes that entitlements control data set access across
-accounts.
-
-```text
-Sharing decision tree:
-  ├── Provider shares with subscriber → entitlement (provider creates)
-  │     └── Subscriber accepts → accesses data via Data Exchange API or auto-export
-  ├── Internal account sharing → Lake Formation grants (after export to S3)
-  │     └── LF controls column/row-level access for IAM principals
-  └── Cross-account S3 access (post-export) → S3 bucket policy or cross-account IAM
-        └── This is for the EXPORTED data only, not the Data Exchange data set
-
-Entitlement vs IAM:
-  Entitlement: "Account X is allowed to access data set Y"
-  IAM:         "Principal Z is allowed to call dataexchange:StartJob"
-  Both needed: entitlement (what you can access) + IAM (what you can call)
-```
-
-**Key implication:** to share a Data Exchange data set with another
-account, create an entitlement. IAM alone does not grant data set
-access.
+Entitlement heuristic (sharing decision tree: provider entitlement, Lake Formation for internal, S3 bucket policy post-export; entitlement-vs-IAM distinction) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when sharing a data set with another account.
 
 ## Expert heuristic: asset types determine export behavior
 
-A baseline model says "export the data." The correct heuristic
-recognizes that different asset types have different export behavior.
-
-```text
-Asset type → Export behavior:
-  S3_SNAPSHOT  → Exported to subscriber's S3 bucket as objects
-                  Export job copies S3 objects from provider to subscriber
-                  Mapping: asset name → S3 key prefix
-
-  REDSHIFT_SNAPSHOT → Exported as Redshift snapshot (must have Redshift cluster)
-                       NOT exported to S3
-
-  API         → Accessed LIVE via Data Exchange API gateway
-                NOT exported to S3
-                Auth via Data Exchange signing key
-                Rate-limited per entitlement
-
-  QUERY       → Lake Formation-backed SQL query results
-                Requires LF integration
-                Results exported to S3
-```
-
-**Key implication:** S3 auto-export works for S3_SNAPSHOT assets.
-API assets are consumed live and cannot be auto-exported. Redshift
-snapshots require a Redshift cluster.
+Asset-type heuristic (S3_SNAPSHOT exports to S3, REDSHIFT_SNAPSHOT restores to a cluster, API is live-only, QUERY is Lake Formation-backed) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when predicting export behavior per asset type.
 
 ## Prerequisites (verify before provisioning)
 
@@ -283,33 +135,8 @@ If any prerequisite is missing, output
 A subscription grants access to a data product from a provider. The
 data product contains one or more data sets.
 
-**Create a subscription (subscribe to a product):**
-
-```bash
-# List available data sets
-aws dataexchange list-data-sets \
-  --region us-east-1
-
-# Create a subscription (from AWS marketplace product)
-aws marketplace subscribe \
-  --product-id <product-id> \
-  --region us-east-1
-```
-
-**View subscription details:**
-
-```bash
-# List revisions for a subscribed data set
-aws dataexchange list-data-set-revisions \
-  --data-set-id <data-set-id> \
-  --region us-east-1
-
-# Get revision details
-aws dataexchange get-revision \
-  --data-set-id <data-set-id> \
-  --revision-id <revision-id> \
-  --region us-east-1
-```
+Step 1 CLI listings (marketplace subscribe, list-data-sets, list-data-set-revisions, get-revision) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when creating or inspecting a subscription.
 
 **Subscription states:**
 
@@ -331,52 +158,16 @@ how the data is consumed.
 | API | REST API endpoints (live access) | Data Exchange API gateway (live) | NO |
 | QUERY | Lake Formation SQL query results | S3 (via LF) | YES |
 
-**List assets in a revision:**
-
-```bash
-aws dataexchange list-data-set-revisions \
-  --data-set-id <data-set-id> \
-  --region us-east-1
-
-# Get assets for a specific revision
-aws dataexchange get-revision \
-  --data-set-id <data-set-id> \
-  --revision-id <revision-id> \
-  --region us-east-1
-```
+Step 2 CLI listings (list-data-set-revisions, get-revision for asset discovery) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when enumerating assets in a revision.
 
 ## Step 3 — Revision lifecycle
 
 Revisions are versioned snapshots of the data set. Each revision
 follows a lifecycle.
 
-```text
-Revision lifecycle:
-  1. Create revision → status: DRAFT
-  2. Add assets → attach S3, API, or query assets
-  3. Finalize → status: FINALIZED (one-way operation — cannot modify after)
-  4. Publish → visible to subscribers
-  5. Subscriber exports → creates export job
-```
-
-**Create a revision (provider):**
-
-```bash
-aws dataexchange create-revision \
-  --data-set-id <data-set-id> \
-  --comment "Monthly data update - August 2026" \
-  --region us-east-1
-```
-
-**Finalize a revision:**
-
-```bash
-aws dataexchange update-revision \
-  --data-set-id <data-set-id> \
-  --revision-id <revision-id> \
-  --finalized \
-  --region us-east-1
-```
+Step 3 revision-lifecycle text block (create → add assets → finalize → publish → export) and the create-revision / finalize-revision CLI moved verbatim to [references/revision-and-export.md](references/revision-and-export.md).
+Load on demand when driving the provider revision lifecycle.
 
 **Critical:** finalization is a ONE-WAY operation. Once finalized,
 assets cannot be added or removed. Verify all assets are present
@@ -387,134 +178,22 @@ before finalizing.
 Export jobs copy S3_SNAPSHOT assets from the provider to the
 subscriber's S3 bucket.
 
-**Create an export job:**
-
-```bash
-aws dataexchange start-job \
-  --job-id <job-id> \
-  --region us-east-1
-
-# Or create and start a job
-aws dataexchange create-job \
-  --type EXPORT_ASSETS_TO_S3 \
-  --details '{
-    "ExportAssetsToS3": {
-      "DataSetId": "<data-set-id>",
-      "RevisionId": "<revision-id>",
-      "AssetDestination": {
-        "AssetSources": [
-          {
-            "Bucket": "provider-bucket",
-            "Key": "data/file.csv"
-          }
-        ],
-        "Destination": {
-          "Bucket": "subscriber-bucket",
-          "Key": "exports/data-exchange/file.csv"
-        }
-      }
-    }
-  }' \
-  --region us-east-1
-```
-
-**Job is asynchronous — poll for completion:**
-
-```bash
-aws dataexchange get-job \
-  --job-id <job-id> \
-  --region us-east-1
-# Expected: state: COMPLETED
-```
+Step 4 CLI listings (start-job, create-job EXPORT_ASSETS_TO_S3 with AssetSources/Destination JSON, asynchronous get-job polling) moved verbatim to [references/revision-and-export.md](references/revision-and-export.md).
+Load on demand when exporting assets to S3.
 
 ## Step 5 — Revision auto-export (EventBridge)
 
 Auto-export delivers new revisions to the subscriber's S3 bucket
 automatically. This requires an EventBridge rule + Lambda function.
 
-**EventBridge rule (triggers on new revision):**
+Step 5 EventBridge rule CLI (put-rule on aws.dataexchange Data Update with data-set-id pattern) moved verbatim to [references/revision-and-export.md](references/revision-and-export.md).
+Load on demand when wiring the auto-export trigger.
 
-```bash
-aws events put-rule \
-  --name "DataExchangeAutoExport" \
-  --event-pattern '{
-    "source": ["aws.dataexchange"],
-    "detail-type": ["Data Update"],
-    "detail": {
-      "data-set-id": ["<data-set-id>"]
-    }
-  }' \
-  --region us-east-1
-```
+Step 5 auto-export Lambda function (boto3 create_job EXPORT_ASSETS_TO_S3 + start_job on revision events) moved verbatim to [references/revision-and-export.md](references/revision-and-export.md).
+Load on demand when implementing the auto-export target.
 
-**Lambda function (starts export job):**
-
-```python
-import boto3
-import json
-import os
-
-dataexchange = boto3.client('dataexchange')
-s3 = boto3.client('s3')
-
-DESTINATION_BUCKET = os.environ['DESTINATION_BUCKET']
-DATA_SET_ID = os.environ['DATA_SET_ID']
-
-def lambda_handler(event, context):
-    # Extract revision info from EventBridge event
-    revision_id = event['detail']['revision-id']
-    data_set_id = event['detail']['data-set-id']
-
-    # Get the revision's assets
-    revision = dataexchange.get_revision(
-        DataSetId=data_set_id,
-        RevisionId=revision_id
-    )
-
-    # Create an export job
-    job = dataexchange.create_job(
-        type='EXPORT_ASSETS_TO_S3',
-        details={
-            'ExportAssetsToS3': {
-                'DataSetId': data_set_id,
-                'RevisionId': revision_id,
-                'AssetDestination': {
-                    'Bucket': DESTINATION_BUCKET,
-                    'Key': f'auto-export/{revision_id}/'
-                }
-            }
-        }
-    )
-
-    # Start the job
-    dataexchange.start_job(JobId=job['Id'])
-
-    return {
-        'statusCode': 200,
-        'body': json.dumps({
-            'job_id': job['Id'],
-            'revision_id': revision_id
-        })
-    }
-```
-
-**Deploy the Lambda + EventBridge target:**
-
-```bash
-# Add EventBridge target (Lambda)
-aws events put-targets \
-  --rule "DataExchangeAutoExport" \
-  --targets '{"Id": "1", "Arn": "arn:aws:lambda:us-east-1:123456789012:function:dx-auto-export"}' \
-  --region us-east-1
-
-# Add Lambda permission for EventBridge
-aws lambda add-permission \
-  --function-name dx-auto-export \
-  --statement-id EventBridgeInvoke \
-  --action lambda:InvokeFunction \
-  --principal events.amazonaws.com \
-  --region us-east-1
-```
+Step 5 deploy CLI (events put-targets, lambda add-permission for EventBridgeInvoke) moved verbatim to [references/revision-and-export.md](references/revision-and-export.md).
+Load on demand when deploying the auto-export orchestration.
 
 ## Step 6 — Data set entitlement
 
@@ -522,29 +201,8 @@ Entitlements are the sharing mechanism for Data Exchange. They
 control which AWS accounts can access a data set. This is NOT done
 via IAM.
 
-**Create an entitlement (provider shares with subscriber):**
-
-```bash
-aws dataexchange create-data-set \
-  --asset-type S3_SNAPSHOT \
-  --name "My Data Product" \
-  --region us-east-1
-
-# Entitlements are typically managed through the product listing
-# in AWS Marketplace. When a subscriber subscribes to the product,
-# the entitlement is automatically created.
-```
-
-**Entitlement verification:**
-
-```bash
-# Check if the subscriber account has access
-aws dataexchange get-data-set \
-  --data-set-id <data-set-id> \
-  --region us-east-1
-# The Origin field shows "PROVIDER" (you are the provider)
-# or "SUBSCRIBER" (you subscribed to it)
-```
+Step 6 CLI listings (create-data-set via product listing, get-data-set Origin check) moved verbatim to [references/entitlement-and-lake-formation.md](references/entitlement-and-lake-formation.md).
+Load on demand when creating or verifying an entitlement.
 
 **Key:** entitlements grant account-level access to the data set.
 Within the account, IAM controls which principals can call Data
@@ -560,34 +218,8 @@ Data Exchange supports two job types:
 | EXPORT_ASSETS_TO_S3 | Copy assets from Data Exchange to subscriber S3 | Provider → Subscriber |
 | IMPORT_ASSETS_FROM_S3 | Copy assets from subscriber S3 to Data Exchange (for providers publishing data) | Subscriber → Provider |
 
-**Export job (subscriber gets data):**
-
-```bash
-JOB_ID=$(aws dataexchange create-job \
-  --type EXPORT_ASSETS_TO_S3 \
-  --details '{
-    "ExportAssetsToS3": {
-      "DataSetId": "<data-set-id>",
-      "RevisionId": "<revision-id>",
-      "AssetDestination": {
-        "Bucket": "my-subscriber-bucket",
-        "Key": "data-exchange/exports/"
-      }
-    }
-  }' \
-  --query 'Id' --output text \
-  --region us-east-1)
-
-# Start the job
-aws dataexchange start-job \
-  --job-id "$JOB_ID" \
-  --region us-east-1
-
-# Poll for completion
-aws dataexchange get-job \
-  --job-id "$JOB_ID" \
-  --region us-east-1
-```
+Step 7 export-job CLI (create-job/start-job/get-job sequence with AssetDestination JSON) moved verbatim to [references/revision-and-export.md](references/revision-and-export.md).
+Load on demand when running the subscriber export flow.
 
 **Job states:**
 
@@ -599,30 +231,8 @@ aws dataexchange get-job \
 | ERROR | Job failed (check errors array) |
 | CANCELLED | Job cancelled |
 
-**Import job (provider publishes data):**
-
-```bash
-JOB_ID=$(aws dataexchange create-job \
-  --type IMPORT_ASSETS_FROM_S3 \
-  --details '{
-    "ImportAssetsFromS3": {
-      "DataSetId": "<data-set-id>",
-      "RevisionId": "<revision-id>",
-      "AssetSources": [
-        {
-          "Bucket": "my-source-bucket",
-          "Key": "data/new-dataset.csv"
-        }
-      ]
-    }
-  }' \
-  --query 'Id' --output text \
-  --region us-east-1)
-
-aws dataexchange start-job \
-  --job-id "$JOB_ID" \
-  --region us-east-1
-```
+Step 7 import-job CLI (create-job IMPORT_ASSETS_FROM_S3 with AssetSources) moved verbatim to [references/revision-and-export.md](references/revision-and-export.md).
+Load on demand when publishing data as a provider.
 
 ## Step 8 — Lake Formation integration
 
@@ -631,61 +241,8 @@ exported from Data Exchange. After exporting data to S3, register
 the S3 location with Lake Formation and create a Data Catalog
 table.
 
-**Register S3 location with Lake Formation:**
-
-```bash
-aws lakeformation register-resource \
-  --resource-arn "arn:aws:s3:::my-subscriber-bucket/data-exchange/" \
-  --use-iam-role-access \
-  --region us-east-1
-```
-
-**Create Data Catalog database and table:**
-
-```bash
-# Create database
-aws glue create-database \
-  --database-input '{"Name": "data_exchange_db"}' \
-  --region us-east-1
-
-# Create table (Crawler or manual)
-aws glue create-table \
-  --database-name data_exchange_db \
-  --table-input '{
-    "Name": "market_data",
-    "StorageDescriptor": {
-      "Columns": [
-        {"Name": "date", "Type": "date"},
-        {"Name": "symbol", "Type": "string"},
-        {"Name": "price", "Type": "double"}
-      ],
-      "Location": "s3://my-subscriber-bucket/data-exchange/exports/",
-      "InputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
-      "OutputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
-    },
-    "TableType": "EXTERNAL_TABLE"
-  }' \
-  --region us-east-1
-```
-
-**Grant Lake Formation permissions:**
-
-```bash
-# Grant SELECT on table to a principal
-aws lakeformation grant-permissions \
-  --principal '{"DataLakePrincipalIdentifier": "arn:aws:iam::123456789012:role/AnalystRole"}' \
-  --permissions ["SELECT"] \
-  --resource '{"Table": {"DatabaseName": "data_exchange_db", "Name": "market_data"}}' \
-  --region us-east-1
-
-# Grant with column-level (fine-grained)
-aws lakeformation grant-permissions \
-  --principal '{"DataLakePrincipalIdentifier": "arn:aws:iam::123456789012:role/AnalystRole"}' \
-  --permissions ["SELECT"] \
-  --permissions-with-grant-option [] \
-  --resource '{"Table": {"DatabaseName": "data_exchange_db", "Name": "market_data", "ColumnWildcard": {}}}' \
-  --region us-east-1
-```
+Step 8 CLI listings (lakeformation register-resource, glue create-database/create-table, lakeformation grant-permissions table and column-level) moved verbatim to [references/entitlement-and-lake-formation.md](references/entitlement-and-lake-formation.md).
+Load on demand when configuring Lake Formation over exported data.
 
 ## Step 9 — Auto-export to S3 for BI tools
 
@@ -693,47 +250,8 @@ For BI tool consumption (QuickSight, Tableau, PowerBI), export
 Data Exchange data to S3 in a BI-friendly format (CSV or Parquet)
 and configure the BI tool to read from S3.
 
-**Auto-export with Parquet partitioning:**
-
-```python
-import boto3
-import json
-import os
-
-dataexchange = boto3.client('dataexchange')
-athena = boto3.client('athena')
-
-DESTINATION_BUCKET = os.environ['DESTINATION_BUCKET']
-
-def lambda_handler(event, context):
-    revision_id = event['detail']['revision-id']
-    data_set_id = event['detail']['data-set-id']
-
-    # Export to S3
-    job = dataexchange.create_job(
-        type='EXPORT_ASSETS_TO_S3',
-        details={
-            'ExportAssetsToS3': {
-                'DataSetId': data_set_id,
-                'RevisionId': revision_id,
-                'AssetDestination': {
-                    'Bucket': DESTINATION_BUCKET,
-                    'Key': f'bi-exports/year={2026}/month={8}/'
-                }
-            }
-        }
-    )
-
-    dataexchange.start_job(JobId=job['Id'])
-
-    return {
-        'statusCode': 200,
-        'body': json.dumps({
-            'job_id': job['Id'],
-            's3_path': f's3://{DESTINATION_BUCKET}/bi-exports/year=2026/month=8/'
-        })
-    }
-```
+Step 9 BI Lambda (year=/month= partitioned auto-export to a BI bucket) moved verbatim to [references/revision-and-export.md](references/revision-and-export.md).
+Load on demand when exporting for BI tool consumption.
 
 **QuickSight integration:**
 
@@ -750,37 +268,8 @@ API assets provide live REST endpoints as data products. Unlike S3
 assets, API assets are NOT exported — they are accessed live through
 the Data Exchange API gateway.
 
-**Accessing an API asset:**
-
-```python
-import boto3
-import requests
-from botocore.auth import SigV4Auth
-from botocore.credentials import get_credentials
-
-# Data Exchange provides API signing keys for authentication
-dataexchange = boto3.client('dataexchange')
-
-# Get API asset details
-asset = dataexchange.get_asset(
-    DataSetId='<data-set-id>',
-    RevisionId='<revision-id>',
-    AssetId='<asset-id>'
-)
-
-# API assets require Data Exchange-specific authentication
-# Use the Data Exchange API gateway URL from the asset details
-api_url = asset['ApiDescription']['Url']
-
-# Sign request with Data Exchange credentials
-session = boto3.Session()
-credentials = session.get_credentials()
-# Make authenticated API call
-response = requests.get(
-    f'{api_url}/endpoint',
-    auth=aws_auth  # Data Exchange signing
-)
-```
+Step 10 API-asset access code (get_asset, API gateway URL, Data Exchange signing) moved verbatim to [references/revision-and-export.md](references/revision-and-export.md).
+Load on demand when consuming API assets live.
 
 **Key differences from S3 assets:**
 
@@ -806,75 +295,13 @@ CloudWatch and EventBridge.
 | AssetCount | Number of assets per revision |
 | RevisionAge | Time since last revision (custom metric) |
 
-**EventBridge job completion rule:**
-
-```bash
-aws events put-rule \
-  --name "DataExchangeJobCompleted" \
-  --event-pattern '{
-    "source": ["aws.dataexchange"],
-    "detail-type": ["Job Status Change"],
-    "detail": {
-      "state": ["COMPLETED"]
-    }
-  }' \
-  --region us-east-1
-```
-
-**CloudWatch alarm for stale data:**
-
-```bash
-# Alarm if no revision in 7 days (custom metric via Lambda)
-aws cloudwatch put-metric-alarm \
-  --alarm-name "DataExchangeStaleData" \
-  --metric-name RevisionAge \
-  --namespace DataExchange \
-  --statistic Maximum \
-  --period 86400 \
-  --threshold 7 \
-  --comparison-operator GreaterThanThreshold \
-  --evaluation-periods 1 \
-  --alarm-actions ["arn:aws:sns:us-east-1:123456789012:data-alerts"] \
-  --region us-east-1
-```
+Step 11 monitoring CLI (job-completion EventBridge rule, RevisionAge stale-data alarm) moved verbatim to [references/entitlement-and-lake-formation.md](references/entitlement-and-lake-formation.md).
+Load on demand when configuring production monitoring.
 
 ## Step 12 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Data Exchange for Amazon S3 (2023-2024):** Direct S3 access for
-  subscribed data products without manual export jobs. Subscribers
-  can read directly from the provider's S3 bucket via Data Exchange-
-  managed access, eliminating the need for export job orchestration.
-
-- **Data Exchange API assets (2023-2024):** Providers can now offer
-  REST API endpoints as data products. Subscribers access live data
-  via authenticated API calls, enabling real-time data consumption
-  without export latency.
-
-- **Lake Formation fine-grained access control (2023-2024):**
-  Enhanced integration between Data Exchange and Lake Formation
-  enables column-level and row-level access control on exported
-  data, supporting multi-tenant analytics with per-tenant visibility
-  rules.
-
-- **EventBridge auto-export templates (2023-2024):** AWS introduced
-  pre-built EventBridge + Lambda templates for auto-export, reducing
-  the setup overhead for subscribers who want automatic data
-  delivery.
-
-- **Data Exchange for API Gateway (2024-2025):** Providers can
-  monetize API endpoints through Data Exchange, with built-in rate
-  limiting, usage tracking, and per-subscriber authentication.
-
-- **CloudWatch dashboards for Data Exchange (2024-2025):** Pre-built
-  CloudWatch dashboard templates for monitoring export job health,
-  revision freshness, and data volume across subscriptions.
-
-- **Step Functions integration for multi-step exports (2024-2025):**
-  Step Functions state machines for orchestrating multi-step export
-  pipelines (export → transform → load into Redshift/Athena),
-  replacing custom Lambda orchestration.
+Recent AWS features (Data Exchange for S3, API assets, LF fine-grained access, EventBridge auto-export templates, API Gateway monetization, CloudWatch dashboards, Step Functions multi-step exports) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before recommending 2023-2026 capabilities.
 
 ## NEVER do these things
 
@@ -979,33 +406,16 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Export job fails with ERROR state
-- The IAM role may lack `s3:PutObject` on the destination bucket.
-  Check the job errors array for IAM-related messages. Verify the
-  export job's role has the correct S3 permissions.
+Error-handling deep dives (export job ERROR, auto-export not triggering, revision invisible to subscriber, LF table inaccessible, API authentication failures) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when a deployment or job fails.
 
-### Auto-export not triggering on new revisions
-- The EventBridge rule may not match the event pattern. Verify the
-  rule's event pattern includes the correct data-set-id. Check
-  CloudWatch Metrics for EventBridge invocations. Ensure the Lambda
-  function has permission to be invoked by EventBridge.
+## References (load on demand)
 
-### Revision not visible to subscriber
-- The revision may not be finalized. Only FINALIZED revisions are
-  visible to subscribers. Verify revision state via
-  `get-revision`. If the revision is still DRAFT, the provider must
-  finalize it.
-
-### Lake Formation table not accessible
-- The S3 location may not be registered with Lake Formation. Run
-  `register-resource` for the S3 path. Verify the Data Catalog
-  table points to the correct S3 location. Check LF grants for the
-  principal.
-
-### API asset authentication fails
-- The API signing key may be expired. Regenerate the Data Exchange
-  API key via the console or API. Verify the API URL from the asset
-  details. Ensure rate limits are not exceeded.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Mindset misconceptions, configuration dependency graph, expert heuristics, and Recent AWS features moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — subscription and revision/asset listing CLI moved from SKILL.md
+- [references/error-handling.md](references/error-handling.md) — failure-mode deep dives moved from SKILL.md
+- [references/revision-and-export.md](references/revision-and-export.md) — revision lifecycle, export/import jobs, auto-export orchestration, BI/API asset code moved from SKILL.md (pre-existing; extended)
+- [references/entitlement-and-lake-formation.md](references/entitlement-and-lake-formation.md) — entitlement, Lake Formation, and monitoring CLI moved from SKILL.md (pre-existing; extended)
 
 ## Domain
 

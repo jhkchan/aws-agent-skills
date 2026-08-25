@@ -229,3 +229,37 @@ resource "aws_comprehend_endpoint" "ticket" {
   }
 }
 ```
+
+## Step 2 — Training data format (moved from SKILL.md)
+
+**CSV format (line-level):**
+
+```csv
+label,text
+billing,"I need a refund for my last invoice"
+technical,"The API returns a 500 error"
+```
+
+Column 1 = label, column 2 = document text (inline). For multi-label,
+pipe-separate labels: `billing|technical,"..."`.
+
+**Augmented Manifest format (from Ground Truth):**
+
+```json
+{"source":"The invoice amount is incorrect","target":"billing"}
+{"source":"The server is down","target":"technical"}
+```
+
+`source` = document text, `target` = label. For multi-label, `target`
+is an array: `"target":["billing","technical"]`. Used when labeling is
+done via SageMaker Ground Truth.
+
+**Native PDF mode training data:**
+
+```json
+{"source":"s3://my-bucket/training/doc1.pdf","target":"invoice"}
+{"source":"s3://my-bucket/training/doc2.pdf","target":"contract"}
+```
+
+`source` = S3 URI to the PDF file. Augmented Manifest ONLY (no CSV for
+Native PDF). PDF files must be in the same region.

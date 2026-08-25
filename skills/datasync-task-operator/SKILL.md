@@ -147,49 +147,13 @@ for READY):**
     `S3BucketArn` for reports exists and task role has
     `s3:PutObject` on the report bucket.
 
-**Cost/time baselines (2026):**
-
-- Transfer throughput per agent: ~10 Gbps saturated for a single
-  task on a dedicated VM with NVMe; 1-3 Gbps typical on EC2
-  c5.2xlarge.
-- Verify pass overhead: `POINT_IN_TIME_CONSISTENT` adds 5-15% wall
-  time on the first run; `ONLY_FILES_TRANSFERRED` is fastest for
-  incremental runs.
-- DataSync pricing: $0.0125/GB for transfers in + out of AWS (US
-  regions); Snowball Edge transfers billed separately.
-- Discovery job: 14- or 28-day collection window; recommendation
-  reports available within 4 hours of completion.
+Cost/time baselines (per-agent throughput ~10 Gbps, verify-pass overhead 5-15%, $0.0125/GB pricing, 14/28-day discovery windows) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when estimating transfer duration and cost.
 
 ## Mindset
 
-**One-line takeaway:** A DataSync task with `Status: AVAILABLE` is a
-*registration*, not proof of a successful transfer. A task is only
-"done" once `describe-task-execution` returns `Status: SUCCESS`,
-`FilesTransferred == EstimatedFilesToTransfer`, and the verify pass
-shows zero failed files (when `VerifyMode != NONE`). Driven by three
-DataSync realities:
-
-- **DataSync is an agent-mediated async pipeline.** The agent (or
-  agents) running in the source or destination VPC performs the
-  actual read/write. AWS schedules execution on the agent; the
-  control-plane API (`start-task-execution`) returns immediately with
-  a `TaskExecutionArn`. Failures in the agent, source location, or
-  destination location surface only in `describe-task-execution` and
-  the task's `ErrorCode`/`ErrorDetail` fields — never on the task's
-  own `Status` field.
-- **`VerifyMode` is a separate pass, not a transfer property.** With
-  `POINT_IN_TIME_CONSISTENT`, DataSync re-scans source and destination
-  after transfer, comparing checksums and metadata. With
-  `ONLY_FILES_TRANSFERRED`, verify runs only on the files just moved.
-  `NONE` skips verification entirely — fast but unsafe; never use for
-  compliance-driven migrations.
-- **The destination file system or bucket must be writable AS the
-  DataSync service.** For EFS, the file system policy must allow
-  `elasticfilesystem:ClientMount`, `ClientWrite`, `ClientRootAccess`.
-  For cross-account S3, the destination bucket policy must allow the
-  source account's task role. Missing either surfaces as a misleading
-  `AccessDenied (403)` only visible in the task execution error
-  detail.
+Mindset framing (agent-mediated async pipeline, VerifyMode as a separate pass, destination must be writable AS the DataSync service) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand to internalize why execution status — not task status — proves delivery.
 
 ## Pre-flight: source + destination metadata gate
 
@@ -200,35 +164,8 @@ Run before classification. Misclassifying these produces wrong plans.
 by `StartTime`. `describe-task-execution` returns the full execution
 detail.
 
-**Live-account pre-flight (skip if offline plan audit):**
-1. `aws datasync list-agents` — confirm an agent exists, capture
-   `AgentArn`. `describe-agent` returns `LastConnectionTime`,
-   `Status`. Anything older than 5 minutes or `Status != ONLINE`
-   is BLOCKED.
-2. `aws datasync list-locations` — find source and destination
-   `LocationArn` and capture their `LocationUri` and `LocationType`.
-3. For S3 sources: `aws s3api get-bucket-location`,
-   `get-bucket-encryption`, `get-bucket-versioning`.
-4. For S3 destinations: same set as #3, plus `get-bucket-policy`
-   (cross-account), `get-bucket-ownership-controls`.
-5. For EFS destinations: `aws efs describe-file-systems`,
-   `describe-mount-targets` — confirm `available` and a mount target
-   exists in the agent's subnet.
-6. For FSx family destinations: `aws fsx describe-file-systems` and
-   the file-system-specific describe call. Confirm `Lifecycle:
-   AVAILABLE` and the agent subnet has network reachability.
-7. `aws iam list-attached-role-policies --role-name <task-role>` and
-   `list-role-policies` — verify the task role's permission chain.
-8. `aws kms describe-key --key-id <destination-key>` — confirm
-   `Enabled` and key policy grants the task role.
-9. `aws datasync describe-task --task-arn <task>` — capture
-   `CurrentTaskExecutionArn`, `Status`, `Options`, `Schedule`.
-10. `aws datasync describe-task-execution --task-execution-arn <arn>`
-    for the most recent execution — capture `Status`,
-    `BytesTransferred`, `FilesTransferred`, `EstimatedFilesToTransfer`,
-    `VerificationFilesFailed`, `ErrorCode`, `ErrorDetail`.
-11. For discovery: `aws datasync list-discovery-jobs` — confirm no
-    in-flight discovery job covers the same storage system.
+Live-account pre-flight listing (list-agents, list-locations, S3/EFS/FSx describes, IAM policy checks, KMS describe-key, describe-task, describe-task-execution, list-discovery-jobs) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before planning against a live account.
 
 **Malformed input:** if the input JSON is invalid or missing required
 fields, emit `VERDICT: ERROR` with `REASON: Task/location configuration
@@ -261,82 +198,8 @@ is not valid JSON or is missing required fields — cannot plan.` and
 
 ### Step 0: Expert knowledge — non-obvious DataSync behaviors
 
-These behaviors are easy to misjudge without operational DataSync
-experience. Each changes a plan if ignored. (See
-`references/task-options-and-failure-modes.md` for the full Options
-reference and per-source-type setup details.)
-
-- **An agent is mandatory for self-managed sources.** NFS, SMB, HDFS,
-  Object Storage sources REQUIRE a DataSync agent (VM on-prem, or EC2
-  in a connecting VPC). AWS-native sources (S3) can be read directly
-  when both source and destination are in AWS. The agent is activated
-  via `create-agent --activation-key` (key fetched from the agent's
-  local console at `http://<agent-ip>`, valid 24 hours).
-
-- **`VerifyMode: POINT_IN_TIME_CONSISTENT` re-reads source AND
-  destination after transfer.** Compares metadata + checksums of
-  EVERY file in scope, not just transferred files. For 50 TB this
-  adds hours. Use `ONLY_FILES_TRANSFERRED` for delta syncs.
-
-- **`TransferMode: CHANGED` (default) is delta, not full.** Copies
-  everything on the first run (no baseline), but subsequent runs only
-  copy new/modified files. For forced re-copy, use `TransferMode:
-  ALL`.
-
-- **`OverwriteMode: NEVER` does NOT skip the file silently — it
-  errors or warns.** To skip-when-exists, use `OverwriteMode: NEVER`
-  + `TransferMode: CHANGED` together. To always overwrite, use
-  `ALWAYS` (default).
-
-- **PosixPermissions preservation depends on destination type.**
-  EFS, FSx for OpenZFS, FSx for Lustre preserve POSIX natively. FSx
-  for Windows and SMB shares do NOT — use `BEST_EFFORT` or `NONE`.
-  S3 destinations store POSIX metadata in object metadata when
-  `PRESERVE` is set; the S3 API itself does not enforce it.
-
-- **SMB sources require a Secrets Manager secret for credentials.**
-  `create-location-smb` takes `SMBUser` and references a secret ARN
-  for the password. Task role needs `secretsmanager:GetSecretValue`.
-  Hard-coded passwords NOT supported.
-
-- **Bandwidth throttling is per-agent, not per-task.** Two tasks on
-  one agent with `BandwidthLimitInMb: 1000` share the 1,000 Mb cap.
-  Schedule sequentially if total bandwidth is a hard cap.
-
-- **Task schedules auto-disable after 1 year.** `ScheduleExpression`
-  uses EventBridge-like `rate`/`at` syntax but the schedule stops
-  firing after 1 year. Re-arm annually or move the trigger to
-  EventBridge calling `start-task-execution`.
-
-- **EFS destination MUST be in the same AZ as the agent subnet (or
-  have a mount target there).** Cross-AZ EFS access works but incurs
-  cross-AZ charges; Single-AZ FSx requires same-AZ.
-
-- **FSx for NetApp ONTAP destinations require a Storage Virtual
-  Machine (SVM).** `create-location-fsx-ontap` takes
-  `StorageVirtualMachineArn`. The SVM's inter-cluster endpoint or
-  VPC route must be reachable from the agent subnet.
-
-- **DataSync Discovery is read-only.** A discovery job connects to
-  the on-prem storage (NFS or SMB), collects 14- or 28-day metrics,
-  emits recommendations. It does NOT migrate data.
-
-- **Task Reports are written to an S3 bucket.** Configure via
-  `update-task` with `S3BucketArn`, `ReportLevel` (`ERRORS_ONLY |
-  SUCCESSES_AND_ERRORS`), optional `ReportCode` filters. Per-file
-  JSON Lines emitted after each execution.
-
-- **A task can only have ONE in-flight execution at a time.**
-  `start-task-execution` while `Status: RUNNING` errors. Use
-  `Includes`/`Excludes` filters on multiple tasks to parallelize.
-
-- **`DeleteOnDelete` (2024) controls source-side delete mirroring.**
-  Default FALSE — files deleted on source between runs do NOT
-  propagate to destination. Set TRUE for true-mirror semantics.
-
-- **`StartTaskExecution` overrides do NOT persist.** Only the task's
-  `Options` block is the source of truth. For a permanent change use
-  `update-task`.
+Step 0 expert knowledge (agent mandatory for self-managed sources, VerifyMode re-read semantics, TransferMode delta behavior, OverwriteMode interplay, PosixPermissions per destination, SMB Secrets Manager requirement, per-agent bandwidth, 1-year schedule auto-disable, EFS same-AZ, FSx ONTAP SVM, read-only Discovery, Task Reports, single in-flight execution, DeleteOnDelete, non-persistent start overrides) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand — each behavior changes a plan if ignored.
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
@@ -404,19 +267,8 @@ ONTAP-specific permissions.
 Region; task role has `s3:PutObject` on the reports bucket;
 `ReportLevel` is one of `ERRORS_ONLY`, `SUCCESSES_AND_ERRORS`.
 
-**DataSync failure-mode table (use during diagnose-failing-execution):**
-
-| Symptom (`ErrorCode` / Status) | Root cause | Fix |
-|---|---|---|
-| `Status: ERROR`, `ErrorDetail: "Agent is offline"` | Agent VM/EC2 unreachable or stopped | `describe-agent`; restart VM; verify outbound HTTPS 443 to DataSync endpoints. |
-| `ErrorDetail: "AccessDenied for s3:PutObject on <dest>"` | Task role missing `s3:PutObject` on destination | Attach policy granting `s3:PutObject` on `arn:aws:s3:::<dest>/*` |
-| `ErrorDetail: "Mount target not found"` | EFS/FSx in wrong AZ vs agent subnet | Re-create agent in matching AZ or add mount target in agent subnet |
-| `ErrorDetail: "SMB login failed"` | SMB secret expired or rotated | Update Secrets Manager secret; re-create SMB location |
-| `ErrorDetail: "KMS key policy does not grant role"` | Destination KMS key policy missing task role | Add `kms:Encrypt`, `kms:GenerateDataKey` grant on destination key policy |
-| `VerificationFilesFailed > 0` | Source/destination checksums differ after transfer | Re-run with `VerifyMode: POINT_IN_TIME_CONSISTENT` + `TransferMode: CHANGED`; if persists, investigate destination write path |
-| `Status: TRANSFERRING` forever, `BytesTransferred` flat | Network bottleneck, throttling, source saturated | Check `BandwidthLimitInMb`, agent CPU, source disk I/O. Increase agent size or remove throttle. |
-| `FilesTransferred` < `EstimatedFilesToTransfer`, `Status: SUCCESS` | Some files skipped via `Includes`/`Excludes` filter (verify intent); if no filter, permission-denied on specific files | Inspect Task Report; widen task role permissions. |
-| `Status: LAUNCHING` > 30 min | Agent capacity exhausted (too many queued executions) | Wait; or reduce concurrent tasks on this agent. |
+Failure-mode table (agent offline, s3:PutObject denied, mount target AZ mismatch, SMB login failed, KMS key policy, VerificationFilesFailed, flat BytesTransferred, skipped files, LAUNCHING > 30 min) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when diagnosing a failing execution from ErrorCode + ErrorDetail.
 
 ### Step 2: READY — emit operation plan
 
@@ -541,86 +393,13 @@ NOTES:
 
 ### Worked example — diagnose-failing-execution (BLOCKED with fix)
 
-```text
-OPERATION: diagnose-failing-execution
-VERDICT: BLOCKED
-TARGET: nfs://10.0.10.20/vol/data -> s3://prod-migration-archive-2026
-        (task: nfs-to-s3-archive)
-PRE_CHECKS:
-  - [PASS] Task exists, Status: AVAILABLE
-  - [PASS] Agent Status: ONLINE, LastConnectionTime recent
-  - [PASS] Source location reachable from agent subnet
-  - [FAIL] Latest execution Status: ERROR
-    ErrorDetail: "AccessDenied (403) for s3:PutObject on
-    arn:aws:s3:::prod-migration-archive-2026/logs/app.log" — the
-    task role arn:aws:iam::111111111111:role/datasync-task-role
-    is missing s3:PutObject on the destination bucket.
-  - [PASS] KMS grants verified
-STEPS: (none — pre-checks failed)
-POST_VERIFY: (none)
-NOTES:
-  - Root cause: task role datasync-task-role is missing
-    s3:PutObject on prod-migration-archive-2026. DataSync
-    executions partially completed (2.1 TB of 12 TB) before
-    failing; partially-transferred objects exist on the destination.
-  - Fix: attach a policy granting s3:PutObject,
-    s3:AbortMultipartUpload, s3:GetObject, s3:ListBucket on
-    arn:aws:s3:::prod-migration-archive-2026/* to the task role,
-    then re-run:
-    aws iam attach-role-policy --role-name datasync-task-role \
-      --policy-arn arn:aws:iam::111111111111:policy/datasync-dest-write
-    aws datasync start-task-execution \
-      --task-arn arn:aws:datasync:us-east-1:111111111111:task/task-001 \
-      --override-options file:///tmp/datasync-options-verify-all.json
-  - Set TransferMode: CHANGED on the override; the prior partial
-    transfer leaves a baseline so only the failed files re-transfer.
-    Do NOT use TransferMode: ALL unless you want to re-copy 12 TB.
-```
+Worked example (diagnose-failing-execution: AccessDenied on s3:PutObject, partial 2.1TB transfer, IAM attach + TransferMode CHANGED re-run) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand for the shape of a BLOCKED diagnosis with fix.
 
 ### Worked example — transfer-to-fsx-ontap (COMPLETED)
 
-```text
-OPERATION: transfer-to-fsx-ontap
-VERDICT: COMPLETED
-TARGET: smb://10.0.20.30/share/finance -> fsxn://fs-0abc123/vol1/finance
-        (task: smb-to-fsxn-finance)
-PRE_CHECKS:
-  - [PASS] Agent Status: ONLINE
-  - [PASS] FSx for NetApp ONTAP fs-0abc123 Lifecycle: AVAILABLE
-  - [PASS] SVM svm-0456 inter-cluster endpoint reachable from
-    agent subnet 10.0.30.0/24
-  - [PASS] Task role has fsx:CreateMountTarget,
-    fsx:DescribeFileSystems on fs-0abc123
-  - [PASS] SMB source secret smb-cred-finance valid in Secrets Manager
-  - [PASS] Options.SecurityDescriptorCopyFlags: OWNER_DACL
-    Options.VerifyMode: POINT_IN_TIME_CONSISTENT
-STEPS:
-  1. CONFIRM: About to create task "smb-to-fsxn-finance"
-     transferring smb://10.0.20.30/share/finance to
-     fsxn://fs-0abc123/vol1/finance. Proceed? (yes/no)
-  2. aws datasync create-location-smb ...
-  3. aws datasync create-location-fsx-ontap ...
-  4. aws datasync create-task --source-location-arn <smb-loc> \
-       --destination-location-arn <ontap-loc> \
-       --name smb-to-fsxn-finance --options file:///tmp/options.json
-  5. aws datasync start-task-execution --task-arn <task-arn>
-POST_VERIFY:
-  - [PASS] Latest execution Status: SUCCESS
-  - [PASS] FilesTransferred: 48,231 == EstimatedFilesToTransfer: 48,231
-  - [PASS] VerificationFilesFailed: 0
-  - [PASS] Spot-check: \\fsx\vol1\finance\2026\Q3.xlsx size matches
-    SMB source (4.2 MB), mtime within 1 second
-  - [PASS] ACL on \\fsx\vol1\finance\2026 preserves OWNER_DACL
-    per SecurityDescriptorCopyFlags
-NOTES:
-  - FSx for NetApp ONTAP SVM must remain reachable for future
-    delta syncs. CloudWatch alarm on SVM inter-cluster endpoint
-    reachability recommended.
-  - VerifyMode POINT_IN_TIME_CONSISTENT confirmed zero checksum
-    mismatches after the 48,231-file transfer.
-  - Re-run scheduled: set ScheduleExpression: rate(1 day) and
-    TransferMode: CHANGED for nightly delta sync.
-```
+Worked example (transfer-to-fsx-ontap COMPLETED: SMB → FSx ONTAP, OWNER_DACL, 48,231 files, zero verify failures) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand for the shape of a COMPLETED FSx ONTAP transfer.
 
 ## Anti-Patterns — NEVER
 
@@ -698,152 +477,26 @@ NOTES:
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`create-task`, `update-task`, `start-task-execution`,
-  `delete-task`, `create-agent`, `update-task-schedule`,
-  `start-discovery-job`), emit: `CONFIRM: About to <operation> on
-  <task> in account <account> region <region>. This will
-  <consequence>. Proceed? (yes/no)`. Do NOT execute until the
-  operator confirms.
-
-- **Capture pre-state for rollback.** Before any task change:
-  `aws datasync describe-task --task-arn <task> --output json >
-  /tmp/<task>-pre-$(date +%s).json`. This is the only rollback path
-  — `update-task` is full-replacement of `Options`.
-
-- **Verify agent health before any execution.** An offline agent
-  produces `Status: LAUNCHING` indefinitely on the execution; the
-  diagnostic surface for that is poor. Check `describe-agent`
-  `LastConnectionTime` < 5 min ago.
-
-- **Verify KMS key policies, not just IAM.** Cross-account KMS
-  requires the destination key policy to grant the task role. IAM
-  alone is not sufficient.
-
-- **Verify the destination bucket policy for cross-account S3.**
-  Check for `s3:PutObject` grant with the source account condition.
-  Without it, the task fails partway through with a misleading
-  AccessDenied.
-
-- **Prefer additive changes over destructive ones.** Adding a new
-  task is reversible; deleting a task loses all execution history
-  and Task Reports.
-
-- **Validate `Includes`/`Excludes` filter scope before applying.**
-  An empty filter transfers everything under the source location.
-  Confirm intent — cost/time scales with bytes scanned.
+Pre-flight safety checks (CONFIRM gate, pre-state capture, agent health, KMS key policies, cross-account bucket policy, additive-over-destructive, Includes/Excludes scope validation) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before executing any remediation CLI.
 
 ## Expert heuristic: the false-green task
 
-DataSync is async and eventually-consistent. The single highest-
-leverage rule for operating it safely is:
-
-> A DataSync task with `Status: AVAILABLE` is a REGISTRATION claim,
-> not a DELIVERY claim. The only proof of a successful transfer is a
-> `describe-task-execution` returning `Status: SUCCESS`,
-> `FilesTransferred == EstimatedFilesToTransfer`, and (when
-> `VerifyMode != NONE`) `VerificationFilesFailed == 0`. Treat any
-> dashboard that shows "task AVAILABLE" as a health signal worth
-> less than a single end-to-end execution check.
-
-**Why this rule exists:** DataSync evaluates the task asynchronously
-after `start-task-execution` returns. Failures in the agent, source
-location, destination location, IAM role, KMS key policy, or
-destination bucket policy do NOT fail the task creation — the task
-remains `AVAILABLE`. The execution `Status` is the only signal of
-actual transfer success; the task's own `Status` field is decoupled.
-
-**Concrete verification techniques:**
-
-| Technique | Mechanism | What it proves |
-|---|---|---|
-| `describe-task-execution` poll until terminal | Tail `Status`, `BytesTransferred`, `FilesTransferred` | End-to-end execution reached SUCCESS or ERROR |
-| `VerificationFilesFailed == 0` (when VerifyMode != NONE) | Built-in checksum + metadata verify pass | Source and destination are byte-identical for the transferred scope |
-| Spot-check via `head-object` (S3) or `ls`/`stat` (file) | Sample 3-5 random files | Independent confirmation beyond aggregate counters |
-| Task Reports (per-file JSON) | Filter for `TransferStatus: ERROR` rows | Per-file failure attribution |
-| CloudWatch Logs `/aws/datasync/<task>` | Filter for `Transfer` log level | Detailed agent-side diagnostics |
-| `BytesWritten` vs `BytesTransferred` divergence | Compare after SUCCESS | Compression or partial-write detection |
-
-**Three-point verification protocol (apply on every new task):**
-
-1. **Execution status:** poll `describe-task-execution` until
-   `Status` is `SUCCESS`. `ERROR` is a hard fail. `TRANSFERRING`
-   for > 24h on a small dataset is suspicious.
-2. **Counter alignment:** `FilesTransferred == EstimatedFilesToTransfer`
-   (unless `Includes`/`Excludes` filters narrow the scope). If
-   `FilesTransferred < Estimated`, inspect Task Reports for skipped
-   files (often permission-denied).
-3. **Verify-mode confirmation (when VerifyMode != NONE):**
-   `VerificationFilesTransferred == FilesTransferred` AND
-   `VerificationFilesFailed == 0`. A non-zero `VerificationFilesFailed`
-   means checksum mismatch — re-run with `TransferMode: CHANGED`.
-
-**Surface in the output:** for any task change, include
-`DELIVERY_STATUS: <verified | pending | failed>` and the latest
-execution's `FilesTransferred` vs `EstimatedFilesToTransfer`. If
-`DELIVERY_STATUS` is not `verified`, do NOT mark the operation
-COMPLETED.
-
-**Detection of silent transfer failure post-deploy:** CloudWatch
-alarm on `Status == ERROR` for any execution in the task's log group
-AND a daily scheduled Lambda that calls `describe-task-execution`
-for the latest execution and verifies `Status == SUCCESS`. The daily
-check catches executions that the CloudWatch alarm missed (e.g.,
-when the alarm was misconfigured).
+False-green-task heuristic (registration vs delivery claim, verification-techniques table, three-point verification protocol, DELIVERY_STATUS surfacing, post-deploy silent-failure detection) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before trusting a task's AVAILABLE status.
 
 ## Recent AWS features (2024-2026)
 
-- **FSx for NetApp ONTAP destination support (2023 GA, enhanced
-  2024-2025):** `create-location-fsx-ontap` accepts an SVM ARN; the
-  SVM's inter-cluster endpoint or VPC route must be reachable from
-  the agent. Supports SMB and NFS protocols on the destination.
+Recent AWS features (FSx ONTAP destinations, Discovery, Task Reports, DeleteOnDelete, Object Storage locations, per-task bandwidth override, HDFS Kerberos, Snowball Edge, multi-agent tasks, CloudWatch metrics) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before recommending 2024-2026 capabilities.
 
-- **DataSync Discovery (2023 GA, expanded 2024-2025):** Run a 14- or
-  28-day discovery job against an on-prem NFS or SMB storage system
-  to collect capacity, performance, and file-type metrics. Produces
-  recommendations for right-sizing the AWS destination and
-  identifying cold data. Discovery is read-only — no migration.
+## References (load on demand)
 
-- **Task Reports (2023 GA, filters expanded 2024):** Per-file JSON
-  reports after each execution, written to an S3 bucket.
-  Configurable `ReportLevel`: `ERRORS_ONLY` or
-  `SUCCESSES_AND_ERRORS`. Optional `ReportCode` filters (e.g.,
-  `TRANSFER_ERROR`, `VERIFY_CATEGORY`, `DELETE_SKIP`).
-
-- **`DeleteOnDelete` Option (2024):** When TRUE, files deleted on
-  source between executions are also deleted on destination — true
-  mirror semantics. Default is FALSE (deletions on source do not
-  propagate), preserving destination as a backup.
-
-- **Object Storage location type (2023 GA, S3-compatible + Alibaba
-  OSS 2024):** `create-location-object-storage` for non-AWS S3-
-  compatible systems. Specify `ServerHostname`, `BucketName`,
-  `AccessKey`, `SecretKey`, `ServerProtocol`.
-
-- **Bandwidth throttle per-task override (2024):**
-  `start-task-execution --overrides BandwidthLimitInMb` allows
-  per-execution bandwidth caps without changing the task's default.
-  Useful for off-hours bulk transfers.
-
-- **HDFS source GA (2022, Kerberos refined 2024):**
-  `create-location-hdfs` with `NameNodes` list, `AuthenticationType:
-  SIMPLE | KERBEROS`, optional `KerberosPrincipal`/keytab.
-
-- **DataSync on Snowball Edge (2024):** Snowball Edge supports a
-  DataSync agent for air-gapped migration. Activate the agent locally
-  on the Snowball; ship the device to AWS; DataSync ingests from the
-  Snowball into S3.
-
-- **Multi-Agent tasks (2024-2025):** A single task can leverage
-  multiple agents for parallel throughput (scales beyond a single
-  agent's 10 Gbps ceiling). Configure at the task level via the
-  console or CLI `--agent-arns` (list).
-
-- **CloudWatch Metrics for DataSync (2024):**
-  `BytesTransferred`, `BytesWritten`, `FilesTransferred`,
-  `BytesCompressed`, `TransferDurationBytesPerSecond`,
-  `VerificationFilesTransferred`, `VerificationFilesFailed` available
-  at 1-minute period in `AWS/DataSync` namespace.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Mindset, cost/time baselines, Step 0 non-obvious behaviors, false-green heuristic, and Recent AWS features moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — live-account pre-flight listing and pre-flight safety checks moved from SKILL.md
+- [references/error-handling.md](references/error-handling.md) — DataSync failure-mode table moved from SKILL.md
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples moved from SKILL.md
+- [references/agent-deployment-and-discovery.md](references/agent-deployment-and-discovery.md) and [references/task-options-and-failure-modes.md](references/task-options-and-failure-modes.md) — agent lifecycle, full Options reference, per-source-type setup, and pre-operation checklists (pre-existing)
 
 ## Domain
 

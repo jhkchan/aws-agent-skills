@@ -65,17 +65,7 @@ Before evaluating findings, verify that Compute Optimizer is producing real
 data. Several conditions short-circuit the audit — misclassifying them
 produces false confidence.
 
-**Live-account pre-flight checks (skip if doing offline finding-doc audit):**
-1. Verify enrollment: `aws compute-optimizer get-enrollment-status`. If
-   `status: Inactive`, the account is NOT enrolled — no findings exist
-   regardless of resource count. Output `NOT_OPTIMIZED` with reason
-   "enrollment inactive."
-2. Paginate findings: EC2/EBS/Lambda recommendation APIs return up to 1,000
-   items per page. Use `--next-token` from the prior response to page through
-   all resources; iterating only the first page silently skips the long tail.
-3. Cross-check CloudTrail for `compute-optimizer:Get*Recommendations` calls —
-   a recommendation export may have been run days ago and the findings are
-   stale. Always check `lastRefreshTimestamp` on each finding.
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 | Condition | Effect on audit |
 |---|---|
@@ -254,112 +244,11 @@ REMEDIATION:
 
 ### Worked example — EC2 Overprovisioned, LOW confidence (inferred memory)
 
-```text
-RESOURCE: arn:aws:ec2:us-east-1:111111111111:instance/i-0def456
-VERDICT: NOT_OPTIMIZED
-REASON: Finding is Overprovisioned but confidence is LOW — Memory metric is
-absent (CloudWatch Agent not installed; memory inferred). performanceRisk 4
-on recommended option. Cannot safely recommend right-sizing.
-RISK: MEDIUM
-FINDINGS:
-  - [MEDIUM] Overprovisioned finding is low-confidence: CPU-only data (12%
-    max). Memory utilization is inferred, not measured (Step 3, condition 1).
-  - [MEDIUM] performanceRisk 4 on recommended option — right-sizing may
-    cause performance regression (Step 3, condition 2).
-REMEDIATION:
-  1. Install the CloudWatch Agent on the instance to report actual Memory
-     utilization: see AWS docs for CWAgent installation and Memory metric
-     configuration.
-  2. Wait 30 days for Compute Optimizer to analyse with real Memory data.
-  3. Re-evaluate the finding once Memory metrics are present.
-  4. Do NOT right-size based on this finding — it may be a false positive.
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand (see References below).
 
 ## Expert edge cases — non-obvious Compute Optimizer behaviors
 
-These behaviors change classification if ignored:
-
-- **Memory inference without CWAgent.** Compute Optimizer cannot see actual
-  memory usage unless the CloudWatch Agent is installed. Without it, the
-  Memory metric is absent from `utilizationMetrics` and memory utilization is
-  inferred from the instance type's specs. An `Overprovisioned` finding based
-  on CPU-only data may be a false positive — the instance could be
-  memory-bound. This is the #1 source of unreliable findings.
-
-- **performanceRisk scale is 1-5, not 0-1.** Each recommendation option
-  includes a `performanceRisk` integer (1 = very safe, 5 = very risky). The
-  cheapest option often carries the highest risk. Risk 1-2 is safe to act on;
-  Risk 3 is acceptable with monitoring; Risk 4-5 requires load testing before
-  acting. Treat Risk ≥ 4 as LOW confidence (Step 3).
-
-- **30-hour continuous data requirement.** Compute Optimizer needs at least
-  30 hours of continuous utilization data to produce a finding. A frequently
-  stopped/started instance may not accumulate enough continuous data,
-  producing no finding or a misleading one from partial data. Check the
-  number of utilization metric data points as a proxy for data completeness.
-
-- **Lambda memory increase can REDUCE total cost.** For Lambda functions,
-  increasing memory also increases CPU allocation, which can reduce
-  execution time. Since Lambda bills on `memory × duration`, a faster
-  function may cost LESS even with more memory. An `Underprovisioned` Lambda
-  finding that recommends more memory may show a negative savingsOpportunity
-  (cost increase on paper) but actually reduce real cost through faster
-  execution. Always cross-reference `projectedUtilizationMetrics` with the
-  function's billed duration.
-
-- **gp2 → gp3 EBS recommendations are price-driven, not utilization-driven.**
-  Compute Optimizer frequently recommends migrating `gp2` volumes to `gp3`
-  because gp3 has a lower baseline price ($0.08/GB vs $0.10/GB) — not because
-  the volume is misconfigured. A gp2 volume at 80% IOPS utilization may still
-  get an `Overprovisioned` finding simply because gp3 is cheaper. Treat gp2
-  → gp3 recommendations as cost optimizations, not performance issues.
-
-- **ASG recommendations are launch-template level.** Changing an Auto Scaling
-  Group recommendation requires updating the launch template AND rolling
-  existing instances — this is a higher-effort change than a standalone
-  instance right-size. Old instances continue running on the old type until
-  terminated and replaced. Flag ASG findings as higher-effort remediation.
-
-- **Savings opportunity can be negligible.** Even with an `Overprovisioned`
-  finding, the `estimatedMonthlySavings` may be $0 or near-zero (e.g.,
-  t3.nano → t3.micro saves pennies). Do not treat all `Overprovisioned`
-  findings as equally urgent. Use savings magnitude to prioritise.
-
-- **External metrics integration raises confidence.** Compute Optimizer
-  supports external metrics (Datadog, Dynatrace, Instana) via the AWS
-  Marketplace. When external metrics are configured, findings include richer
-  data (application-level metrics, not just infrastructure). A finding with
-  external metrics data is HIGHER confidence than one with CloudWatch-only
-  data.
-
-- **Enhanced infrastructure metrics for EC2 bare-metal / metal instance
-  types.** Some instance types (`.metal`, certain 7th-gen types) require
-  enhanced infrastructure metrics enrollment to produce full findings.
-  Without it, these instances may show no finding despite being
-  overprovisioned.
-
-- **Compute Optimizer does not analyse Spot Instance pricing.** A Spot
-  Instance with an `Overprovisioned` finding still represents waste, but the
-  savings opportunity assumes On-Demand pricing. The actual savings from
-  right-sizing a Spot Instance are smaller because Spot is already
-  discounted up to 90%.
-
-- **Finding reasons drive remediation path.** `CPUOverprovisioned` vs
-  `NetworkBandwidthOverprovisioned` lead to different remediation. CPU-
-  based findings are safe to right-size by reducing vCPU. Network-based
-  findings may need a different instance family (e.g., from `m5` to `t3`
-  with burst networking) rather than simply a smaller size. Always extract
-  `findingReasons` and cite the specific reason in remediation.
-
-- **ECS/Fargate recommendations require separate enrollment.** ECS service
-  recommendations on Fargate need the Compute Optimizer ECS enrollment
-  (distinct from the base EC2/EBS/Lambda enrollment). An account enrolled
-  for EC2 may not be enrolled for ECS — check before expecting ECS findings.
-
-- **Recommendation options are ranked by savings, not by safety.** The first
-  recommendation option (index 0) is the cheapest, not the safest. Always
-  check `performanceRisk` on each option. The safest option may be at index
-  1 or 2 with slightly lower savings.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## Anti-Patterns — NEVER
 
@@ -425,159 +314,26 @@ These behaviors change classification if ignored:
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any instance stop, type change,
-  volume modification, or Lambda update, the auditor MUST emit:
-  `CONFIRM: About to <action> on <resource-id> in account <account>. This
-  will cause <consequence>. Proceed? (yes/no)`
-  Do NOT execute the CLI command until the operator confirms.
-
-- **Snapshot EC2 before right-sizing.** Capture the current state:
-  `aws ec2 create-image --instance-id <id> --name "pre-rightsize-$(date +%s)"`
-  before stopping and changing instance type. This provides a rollback path
-  if the new type cannot handle the workload.
-
-- **For ASG right-sizing:** update the launch template version, then trigger
-  an instance refresh: `aws autoscaling start-instance-refresh`. Monitor
-  the rollout — a failed refresh should be rolled back to the previous
-  template version.
-
-- **For EBS volume type changes:** `aws ec2 modify-volume --volume-id <id>
-  --volume-type gp3` is non-disruptive (the volume stays online), but
-  performance may degrade during the migration window. Flag this in the
-  confirmation gate.
-
-- **For Lambda memory changes:** `aws lambda update-function-configuration
-  --function-name <name> --memory-size <mb>` takes effect immediately on
-  the next invocation. Test with a small percentage of traffic first (use
-  alias routing) before applying to all invocations.
-
-- **Verify CWAgent is installed** before acting on any EC2 finding. If
-  Memory metrics are absent, install CWAgent first, wait 30 days, then
-  re-evaluate. Right-sizing without memory data is guessing.
-
-- Prefer the recommendation option with `performanceRisk` ≤ 2, even if it
-  has slightly lower savings. The cost of a performance regression
-  (customer impact, rollback effort) exceeds the marginal savings of a
-  riskier option.
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 ## Remediation guidance
 
-### For UNDERUTILIZED (Overprovisioned, HIGH confidence)
-
-**EC2:**
-1. Create a pre-rightsize AMI (see Pre-flight).
-2. Stop the instance: `aws ec2 stop-instances --instance-ids <id>`.
-3. Change type: `aws ec2 modify-instance-attribute --instance-id <id>
-   --instance-type "{\"Value\": \"<new-type>\"}"`.
-4. Start: `aws ec2 start-instances --instance-ids <id>`.
-5. Monitor CloudWatch CPU + Memory for 7 days. If CPU > 80% or Memory >
-   85%, roll back to the original type.
-
-**EBS:**
-1. `aws ec2 modify-volume --volume-id <id> --volume-type <new-type>
-   --size <new-size> --iops <new-iops>`.
-2. Verify the modification completes: `aws ec2 describe-volumes-modifications
-   --volume-ids <id>`.
-
-**Lambda:**
-1. `aws lambda update-function-configuration --function-name <name>
-   --memory-size <new-mb>`.
-2. Check CloudWatch metrics `Duration` and `Errors` for 1-3 days.
-3. If Duration increases or Errors spike, roll back to original memory.
-
-**ASG:**
-1. Create a new launch template version with the recommended instance type.
-2. Update the ASG to use the new template version.
-3. Trigger instance refresh: `aws autoscaling start-instance-refresh
-   --auto-scaling-group-name <name>`.
-4. Monitor the refresh until complete.
-
-### For NOT_OPTIMIZED
-
-**Underprovisioned (performance risk):**
-1. Identify the bottleneck from `findingReasons`
-   (CPUUnderprovisioned, MemoryUnderprovisioned, etc.).
-2. UP-size the resource to a recommendation option with
-   `performanceRisk` ≤ 2.
-3. Same EC2/EBS/Lambda CLI steps as UNDERUTILIZED, but with a LARGER type.
-
-**Low confidence (inferred memory / high performanceRisk):**
-1. Install CloudWatch Agent for memory metrics (EC2).
-2. Wait 30 days for Compute Optimizer to analyse with real data.
-3. Re-evaluate. Do NOT act on the current finding.
-
-**Stale finding:**
-1. Re-run recommendations: `aws compute-optimizer
-   get-ec2-instance-recommendations --instance-arns <arn>`.
-2. Check `lastRefreshTimestamp` on the new finding.
-3. Re-evaluate with fresh data.
-
-### For OK
-
-1. No remediation required for the current posture.
-2. Recommend installing CWAgent if not present (defense-in-depth for future
-   findings).
-3. Recommend reviewing findings quarterly as workloads evolve.
+Moved verbatim to [references/error-handling.md](references/error-handling.md) - load on demand (see References below).
 
 ## Deep reference: Compute Optimizer internals
 
-### Analysis window and data sources
-
-Compute Optimizer analyses the trailing **30 days** of CloudWatch metrics.
-The minimum data threshold is **30 hours of continuous** utilization within
-that window. Resources that do not accumulate 30 hours (frequently stopped
-instances, rarely invoked Lambda functions) receive no finding.
-
-For EC2, the data sources are:
-- **CPU** — always available from CloudWatch (`AWS/EC2` namespace,
-  `CPUUtilization`).
-- **Memory** — only available when CloudWatch Agent is installed
-  (`CWAgent` namespace, `mem_used_percent`). Without CWAgent, Memory is
-  inferred from instance type specifications.
-- **Network** — always available (`NetworkIn`, `NetworkOut`).
-- **Disk** — available for instance-store volumes (`DiskReadOps`,
-  `DiskWriteOps`). EBS-attached volumes are analysed separately via the EBS
-  recommendations API.
-
-### Recommendation option ranking
-
-Recommendation options are ranked by `savingsOpportunity`
-(highest savings first), NOT by safety. The `performanceRisk` field (1-5)
-is the safety indicator — it is independent of ranking. Always evaluate
-both fields: an option with high savings but performanceRisk 5 is not
-actionable.
-
-### Finding refresh cycle
-
-Compute Optimizer refreshes findings approximately every **24 hours**. The
-`lastRefreshTimestamp` on each finding indicates when it was last
-recomputed. A finding with a stale timestamp (> 30 days) may indicate:
-(1) the resource was stopped or terminated, (2) Compute Optimizer lost
-access to CloudWatch data, or (3) enrollment was paused. Always verify
-resource state before acting on a stale finding.
-
-### EBS volume type migration matrix
-
-| From | To | Performance impact | Cost impact |
-|---|---|---|---|
-| gp2 | gp3 | Baseline 3,000 IOPS / 125 MiB/s (vs gp2's size-scaled IOPS). Purchase provisioned IOPS to match. | Cheaper per GB; may need provisioned IOPS for parity. |
-| io1 | gp3 | gp3 caps at 16,000 IOPS; io1 supports up to 64,000. High-IOPS workloads may lose performance. | Significantly cheaper. |
-| st1 | gp3 | gp3 is SSD (random I/O); st1 is HDD (sequential). Random-I/O workloads improve, sequential may not. | More expensive per GB but better random I/O. |
-
-### Lambda memory-cost relationship
-
-Lambda allocates CPU proportional to memory (approximately 1 vCPU per
-1,769 MB). Increasing memory increases CPU, which can reduce duration. The
-optimal memory setting minimises `memory × duration` (total cost). Compute
-Optimizer's Lambda recommendations model this trade-off, but always verify
-with `aws lambda get-function` and CloudWatch Duration metrics
-post-change.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## Recent AWS features (2024-2026)
 
-- **EBS volume recommendations (2024):** Compute Optimizer now provides right-sizing recommendations for EBS volumes (gp2 to gp3, io1 to io2, size adjustments). Auditors should include EBS findings in the cost-optimization review alongside EC2 and Lambda.
-- **Enhanced finding filters and trade-off analysis (2024-2025):** Compute Optimizer now supports filtering by workload metadata and trade-off analysis between cost and performance risk. Auditors should verify that the finding confidence and performance-risk thresholds are appropriate before acting on recommendations.
-- **ECS service recommendations (2024):** Compute Optimizer now provides right-sizing recommendations for ECS services (CPU and memory task-size optimization). Auditors should include ECS task-definition findings in the optimization review.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
+
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked example (LOW-confidence inferred memory) moved from SKILL.md
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert edge cases, deep internals reference, 2024-2026 features moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — live pre-flight checks + pre-rightsize safety checks moved from SKILL.md
+- [references/error-handling.md](references/error-handling.md) — per-verdict remediation guidance moved from SKILL.md
 
 ## Domain
 

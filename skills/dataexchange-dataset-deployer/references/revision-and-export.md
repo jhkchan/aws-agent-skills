@@ -384,3 +384,337 @@ resource "aws_dataexchange_job" "export" {
   })
 }
 ```
+
+## Step 3 — revision lifecycle walkthrough (moved from SKILL.md)
+
+
+
+```text
+Revision lifecycle:
+  1. Create revision → status: DRAFT
+  2. Add assets → attach S3, API, or query assets
+  3. Finalize → status: FINALIZED (one-way operation — cannot modify after)
+  4. Publish → visible to subscribers
+  5. Subscriber exports → creates export job
+```
+
+**Create a revision (provider):**
+
+```bash
+aws dataexchange create-revision \
+  --data-set-id <data-set-id> \
+  --comment "Monthly data update - August 2026" \
+  --region us-east-1
+```
+
+**Finalize a revision:**
+
+```bash
+aws dataexchange update-revision \
+  --data-set-id <data-set-id> \
+  --revision-id <revision-id> \
+  --finalized \
+  --region us-east-1
+```
+
+
+
+## Step 4 — asset export job commands (moved from SKILL.md)
+
+
+
+**Create an export job:**
+
+```bash
+aws dataexchange start-job \
+  --job-id <job-id> \
+  --region us-east-1
+
+# Or create and start a job
+aws dataexchange create-job \
+  --type EXPORT_ASSETS_TO_S3 \
+  --details '{
+    "ExportAssetsToS3": {
+      "DataSetId": "<data-set-id>",
+      "RevisionId": "<revision-id>",
+      "AssetDestination": {
+        "AssetSources": [
+          {
+            "Bucket": "provider-bucket",
+            "Key": "data/file.csv"
+          }
+        ],
+        "Destination": {
+          "Bucket": "subscriber-bucket",
+          "Key": "exports/data-exchange/file.csv"
+        }
+      }
+    }
+  }' \
+  --region us-east-1
+```
+
+**Job is asynchronous — poll for completion:**
+
+```bash
+aws dataexchange get-job \
+  --job-id <job-id> \
+  --region us-east-1
+# Expected: state: COMPLETED
+```
+
+
+
+## Step 5 — EventBridge auto-export rule (moved from SKILL.md)
+
+
+
+**EventBridge rule (triggers on new revision):**
+
+```bash
+aws events put-rule \
+  --name "DataExchangeAutoExport" \
+  --event-pattern '{
+    "source": ["aws.dataexchange"],
+    "detail-type": ["Data Update"],
+    "detail": {
+      "data-set-id": ["<data-set-id>"]
+    }
+  }' \
+  --region us-east-1
+```
+
+
+
+## Step 5 — auto-export Lambda function (moved from SKILL.md)
+
+
+
+**Lambda function (starts export job):**
+
+```python
+import boto3
+import json
+import os
+
+dataexchange = boto3.client('dataexchange')
+s3 = boto3.client('s3')
+
+DESTINATION_BUCKET = os.environ['DESTINATION_BUCKET']
+DATA_SET_ID = os.environ['DATA_SET_ID']
+
+def lambda_handler(event, context):
+    # Extract revision info from EventBridge event
+    revision_id = event['detail']['revision-id']
+    data_set_id = event['detail']['data-set-id']
+
+    # Get the revision's assets
+    revision = dataexchange.get_revision(
+        DataSetId=data_set_id,
+        RevisionId=revision_id
+    )
+
+    # Create an export job
+    job = dataexchange.create_job(
+        type='EXPORT_ASSETS_TO_S3',
+        details={
+            'ExportAssetsToS3': {
+                'DataSetId': data_set_id,
+                'RevisionId': revision_id,
+                'AssetDestination': {
+                    'Bucket': DESTINATION_BUCKET,
+                    'Key': f'auto-export/{revision_id}/'
+                }
+            }
+        }
+    )
+
+    # Start the job
+    dataexchange.start_job(JobId=job['Id'])
+
+    return {
+        'statusCode': 200,
+        'body': json.dumps({
+            'job_id': job['Id'],
+            'revision_id': revision_id
+        })
+    }
+```
+
+
+
+## Step 5 — deploying the Lambda + EventBridge target (moved from SKILL.md)
+
+
+
+**Deploy the Lambda + EventBridge target:**
+
+```bash
+# Add EventBridge target (Lambda)
+aws events put-targets \
+  --rule "DataExchangeAutoExport" \
+  --targets '{"Id": "1", "Arn": "arn:aws:lambda:us-east-1:123456789012:function:dx-auto-export"}' \
+  --region us-east-1
+
+# Add Lambda permission for EventBridge
+aws lambda add-permission \
+  --function-name dx-auto-export \
+  --statement-id EventBridgeInvoke \
+  --action lambda:InvokeFunction \
+  --principal events.amazonaws.com \
+  --region us-east-1
+```
+
+
+
+## Step 7 — export job (subscriber gets data) (moved from SKILL.md)
+
+
+
+**Export job (subscriber gets data):**
+
+```bash
+JOB_ID=$(aws dataexchange create-job \
+  --type EXPORT_ASSETS_TO_S3 \
+  --details '{
+    "ExportAssetsToS3": {
+      "DataSetId": "<data-set-id>",
+      "RevisionId": "<revision-id>",
+      "AssetDestination": {
+        "Bucket": "my-subscriber-bucket",
+        "Key": "data-exchange/exports/"
+      }
+    }
+  }' \
+  --query 'Id' --output text \
+  --region us-east-1)
+
+# Start the job
+aws dataexchange start-job \
+  --job-id "$JOB_ID" \
+  --region us-east-1
+
+# Poll for completion
+aws dataexchange get-job \
+  --job-id "$JOB_ID" \
+  --region us-east-1
+```
+
+
+
+## Step 7 — import job (provider publishes data) (moved from SKILL.md)
+
+
+
+**Import job (provider publishes data):**
+
+```bash
+JOB_ID=$(aws dataexchange create-job \
+  --type IMPORT_ASSETS_FROM_S3 \
+  --details '{
+    "ImportAssetsFromS3": {
+      "DataSetId": "<data-set-id>",
+      "RevisionId": "<revision-id>",
+      "AssetSources": [
+        {
+          "Bucket": "my-source-bucket",
+          "Key": "data/new-dataset.csv"
+        }
+      ]
+    }
+  }' \
+  --query 'Id' --output text \
+  --region us-east-1)
+
+aws dataexchange start-job \
+  --job-id "$JOB_ID" \
+  --region us-east-1
+```
+
+
+
+## Step 9 — BI auto-export Lambda with Parquet partitioning (moved from SKILL.md)
+
+
+
+**Auto-export with Parquet partitioning:**
+
+```python
+import boto3
+import json
+import os
+
+dataexchange = boto3.client('dataexchange')
+athena = boto3.client('athena')
+
+DESTINATION_BUCKET = os.environ['DESTINATION_BUCKET']
+
+def lambda_handler(event, context):
+    revision_id = event['detail']['revision-id']
+    data_set_id = event['detail']['data-set-id']
+
+    # Export to S3
+    job = dataexchange.create_job(
+        type='EXPORT_ASSETS_TO_S3',
+        details={
+            'ExportAssetsToS3': {
+                'DataSetId': data_set_id,
+                'RevisionId': revision_id,
+                'AssetDestination': {
+                    'Bucket': DESTINATION_BUCKET,
+                    'Key': f'bi-exports/year={2026}/month={8}/'
+                }
+            }
+        }
+    )
+
+    dataexchange.start_job(JobId=job['Id'])
+
+    return {
+        'statusCode': 200,
+        'body': json.dumps({
+            'job_id': job['Id'],
+            's3_path': f's3://{DESTINATION_BUCKET}/bi-exports/year=2026/month=8/'
+        })
+    }
+```
+
+
+
+## Step 10 — accessing an API asset (moved from SKILL.md)
+
+
+
+**Accessing an API asset:**
+
+```python
+import boto3
+import requests
+from botocore.auth import SigV4Auth
+from botocore.credentials import get_credentials
+
+# Data Exchange provides API signing keys for authentication
+dataexchange = boto3.client('dataexchange')
+
+# Get API asset details
+asset = dataexchange.get_asset(
+    DataSetId='<data-set-id>',
+    RevisionId='<revision-id>',
+    AssetId='<asset-id>'
+)
+
+# API assets require Data Exchange-specific authentication
+# Use the Data Exchange API gateway URL from the asset details
+api_url = asset['ApiDescription']['Url']
+
+# Sign request with Data Exchange credentials
+session = boto3.Session()
+credentials = session.get_credentials()
+# Make authenticated API call
+response = requests.get(
+    f'{api_url}/endpoint',
+    auth=aws_auth  # Data Exchange signing
+)
+```
+
+

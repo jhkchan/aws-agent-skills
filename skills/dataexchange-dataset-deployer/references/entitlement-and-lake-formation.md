@@ -336,3 +336,133 @@ resource "aws_lakeformation_permissions" "analyst" {
   }
 }
 ```
+
+## Step 6 — entitlement creation and verification commands (moved from SKILL.md)
+
+
+
+**Create an entitlement (provider shares with subscriber):**
+
+```bash
+aws dataexchange create-data-set \
+  --asset-type S3_SNAPSHOT \
+  --name "My Data Product" \
+  --region us-east-1
+
+# Entitlements are typically managed through the product listing
+# in AWS Marketplace. When a subscriber subscribes to the product,
+# the entitlement is automatically created.
+```
+
+**Entitlement verification:**
+
+```bash
+# Check if the subscriber account has access
+aws dataexchange get-data-set \
+  --data-set-id <data-set-id> \
+  --region us-east-1
+# The Origin field shows "PROVIDER" (you are the provider)
+# or "SUBSCRIBER" (you subscribed to it)
+```
+
+
+
+## Step 8 — Lake Formation integration commands (moved from SKILL.md)
+
+
+
+**Register S3 location with Lake Formation:**
+
+```bash
+aws lakeformation register-resource \
+  --resource-arn "arn:aws:s3:::my-subscriber-bucket/data-exchange/" \
+  --use-iam-role-access \
+  --region us-east-1
+```
+
+**Create Data Catalog database and table:**
+
+```bash
+# Create database
+aws glue create-database \
+  --database-input '{"Name": "data_exchange_db"}' \
+  --region us-east-1
+
+# Create table (Crawler or manual)
+aws glue create-table \
+  --database-name data_exchange_db \
+  --table-input '{
+    "Name": "market_data",
+    "StorageDescriptor": {
+      "Columns": [
+        {"Name": "date", "Type": "date"},
+        {"Name": "symbol", "Type": "string"},
+        {"Name": "price", "Type": "double"}
+      ],
+      "Location": "s3://my-subscriber-bucket/data-exchange/exports/",
+      "InputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat",
+      "OutputFormat": "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
+    },
+    "TableType": "EXTERNAL_TABLE"
+  }' \
+  --region us-east-1
+```
+
+**Grant Lake Formation permissions:**
+
+```bash
+# Grant SELECT on table to a principal
+aws lakeformation grant-permissions \
+  --principal '{"DataLakePrincipalIdentifier": "arn:aws:iam::123456789012:role/AnalystRole"}' \
+  --permissions ["SELECT"] \
+  --resource '{"Table": {"DatabaseName": "data_exchange_db", "Name": "market_data"}}' \
+  --region us-east-1
+
+# Grant with column-level (fine-grained)
+aws lakeformation grant-permissions \
+  --principal '{"DataLakePrincipalIdentifier": "arn:aws:iam::123456789012:role/AnalystRole"}' \
+  --permissions ["SELECT"] \
+  --permissions-with-grant-option [] \
+  --resource '{"Table": {"DatabaseName": "data_exchange_db", "Name": "market_data", "ColumnWildcard": {}}}' \
+  --region us-east-1
+```
+
+
+
+## Step 11 — CloudWatch and EventBridge monitoring commands (moved from SKILL.md)
+
+
+
+**EventBridge job completion rule:**
+
+```bash
+aws events put-rule \
+  --name "DataExchangeJobCompleted" \
+  --event-pattern '{
+    "source": ["aws.dataexchange"],
+    "detail-type": ["Job Status Change"],
+    "detail": {
+      "state": ["COMPLETED"]
+    }
+  }' \
+  --region us-east-1
+```
+
+**CloudWatch alarm for stale data:**
+
+```bash
+# Alarm if no revision in 7 days (custom metric via Lambda)
+aws cloudwatch put-metric-alarm \
+  --alarm-name "DataExchangeStaleData" \
+  --metric-name RevisionAge \
+  --namespace DataExchange \
+  --statistic Maximum \
+  --period 86400 \
+  --threshold 7 \
+  --comparison-operator GreaterThanThreshold \
+  --evaluation-periods 1 \
+  --alarm-actions ["arn:aws:sns:us-east-1:123456789012:data-alerts"] \
+  --region us-east-1
+```
+
+

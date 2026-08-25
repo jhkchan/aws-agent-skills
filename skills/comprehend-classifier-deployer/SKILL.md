@@ -263,37 +263,7 @@ that should have one, producing noisy predictions.
 
 ## Step 2 — Training data format
 
-**CSV format (line-level):**
-
-```csv
-label,text
-billing,"I need a refund for my last invoice"
-technical,"The API returns a 500 error"
-```
-
-Column 1 = label, column 2 = document text (inline). For multi-label,
-pipe-separate labels: `billing|technical,"..."`.
-
-**Augmented Manifest format (from Ground Truth):**
-
-```json
-{"source":"The invoice amount is incorrect","target":"billing"}
-{"source":"The server is down","target":"technical"}
-```
-
-`source` = document text, `target` = label. For multi-label, `target`
-is an array: `"target":["billing","technical"]`. Used when labeling is
-done via SageMaker Ground Truth.
-
-**Native PDF mode training data:**
-
-```json
-{"source":"s3://my-bucket/training/doc1.pdf","target":"invoice"}
-{"source":"s3://my-bucket/training/doc2.pdf","target":"contract"}
-```
-
-`source` = S3 URI to the PDF file. Augmented Manifest ONLY (no CSV for
-Native PDF). PDF files must be in the same region.
+Moved verbatim to [references/training-data-and-modes.md](references/training-data-and-modes.md) - load on demand (see References below).
 
 ## Step 3 — Classifier input mode (PLAIN_TEXT vs Native PDF)
 
@@ -325,22 +295,7 @@ CLASSIFIER_ARN=$(aws comprehend create-document-classifier \
   --query 'DocumentClassifierArn' --output text)
 ```
 
-**With KMS encryption and VPC config:**
-
-```bash
-CLASSIFIER_ARN=$(aws comprehend create-document-classifier \
-  --document-classifier-name "secure-classifier" \
-  --data-format COMPREHEND_CSV \
-  --input-data-config S3Uri=s3://my-bucket/comprehend/training/training.csv \
-  --document-classifier-config "Mode=MULTI_CLASS,LanguageCode=en" \
-  --language-code en \
-  --role-arn arn:aws:iam::123456789012:role/ComprehendRole \
-  --model-kms-key-id arn:aws:kms:us-east-1:123456789012:key/abcd1234 \
-  --volume-kms-key-id arn:aws:kms:us-east-1:123456789012:key/abcd1234 \
-  --vpc-config '{"SecurityGroupIds":["sg-abc123"],"Subnets":["subnet-aaa","subnet-bbb"]}' \
-  --region us-east-1 \
-  --query 'DocumentClassifierArn' --output text)
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand (see References below).
 
 For Native PDF mode, add `--input-type NATIVE_PDF_DOCUMENTS` and use
 Augmented Manifest format in the input S3 path. For multi-label,
@@ -382,134 +337,19 @@ classification scheme (too many classes? ambiguous labels?).
 
 ## Step 6 — Endpoint deployment and auto-scaling
 
-Deploy a real-time inference endpoint for sub-second classification.
-
-```bash
-ENDPOINT_ARN=$(aws comprehend create-endpoint \
-  --endpoint-name "ticket-classifier-endpoint" \
-  --model-arn "$CLASSIFIER_ARN" \
-  --desired-inference-units 1 \
-  --data-access-role-arn arn:aws:iam::123456789012:role/ComprehendEndpointRole \
-  --region us-east-1 \
-  --query 'EndpointArn' --output text)
-```
-
-**Verify endpoint status:**
-
-```bash
-aws comprehend describe-endpoint \
-  --endpoint-arn "$ENDPOINT_ARN" \
-  --query 'EndpointProperties.Status' \
-  --region us-east-1
-# Expected: CREATING → IN_SERVICE
-```
-
-**Classify a document (real-time):**
-
-```bash
-aws comprehend classify-document \
-  --endpoint-arn "$ENDPOINT_ARN" \
-  --text "I need a refund for invoice #12345" \
-  --region us-east-1
-```
-
-**Auto-scaling (Application Auto Scaling):**
-
-```bash
-aws application-autoscaling register-scalable-target \
-  --service-namespace comprehend \
-  --resource-id "arn:aws:comprehend:us-east-1:123456789012:document-endpoint/ticket-classifier-endpoint" \
-  --scalable-dimension "comprehend:document-classifier-endpoint:DesiredInferenceUnits" \
-  --min-capacity 1 --max-capacity 5
-
-aws application-autoscaling put-scaling-policy \
-  --policy-name "comprehend-scaling" \
-  --service-namespace comprehend \
-  --resource-id "arn:aws:comprehend:us-east-1:123456789012:document-endpoint/ticket-classifier-endpoint" \
-  --scalable-dimension "comprehend:document-classifier-endpoint:DesiredInferenceUnits" \
-  --policy-type TargetTrackingScaling \
-  --target-tracking-scaling-policy-configuration '{"TargetValue":50.0,"PredefinedMetricSpecification":{"PredefinedMetricType":"ComprehendApproximateBacklogSize"},"ScaleInCooldown":300,"ScaleOutCooldown":60}'
-```
+Moved verbatim to [references/endpoint-and-security.md](references/endpoint-and-security.md) - load on demand (see References below).
 
 ## Step 7 — Batch inference job
 
-Run asynchronous classification on documents in S3.
-
-```bash
-JOB_ID=$(aws comprehend classify-documents \
-  --job-name "batch-classify-2026-08" \
-  --document-classifier-arn "$CLASSIFIER_ARN" \
-  --input-data-config S3Uri=s3://my-bucket/comprehend/input/ \
-  --output-data-config S3Uri=s3://my-bucket/comprehend/output/ \
-  --data-access-role-arn arn:aws:iam::123456789012:role/ComprehendBatchRole \
-  --region us-east-1 \
-  --query 'JobId' --output text)
-```
-
-**Monitor batch job:**
-
-```bash
-aws comprehend describe-document-classification-job \
-  --job-id "$JOB_ID" \
-  --query 'DocumentClassificationJobProperties.JobStatus' \
-  --region us-east-1
-# Expected: SUBMITTED → IN_PROGRESS → COMPLETED (or FAILED)
-```
-
-Batch output: JSONL files in the output S3 path, one classification
-result per line. Use a unique output prefix per batch run to avoid
-overwriting previous results.
+Moved verbatim to [references/endpoint-and-security.md](references/endpoint-and-security.md) - load on demand (see References below).
 
 ## Step 8 — KMS encryption and VPC endpoint
 
-**KMS encryption:** use `--model-kms-key-id` for model artifacts and
-`--volume-kms-key-id` for the EBS volume during training. The IAM role
-must have `kms:Decrypt` and `kms:GenerateDataKey` on the key.
-
-**VPC endpoint for private Comprehend API access:**
-
-```bash
-aws ec2 create-vpc-endpoint \
-  --vpc-id vpc-aaa11122 \
-  --service-name com.amazonaws.us-east-1.comprehend \
-  --vpc-endpoint-type Interface \
-  --subnet-ids subnet-aaa subnet-bbb \
-  --security-group-ids sg-comprehend \
-  --region us-east-1
-```
-
-This enables inference calls from within the VPC to stay on the AWS
-network (no internet gateway needed). The security group must allow
-inbound 443 from the calling resource.
-
-**VPC config for training job:** add `--vpc-config` to create-document-
-classifier to run training entirely within a VPC.
+Moved verbatim to [references/endpoint-and-security.md](references/endpoint-and-security.md) - load on demand (see References below).
 
 ## Step 9 — IAM roles and versioning
 
-**Training role trust policy** must allow `comprehend.amazonaws.com` to
-assume. Permissions: `s3:GetObject` and `s3:ListBucket` on the training
-data bucket, plus `kms:Decrypt`/`kms:GenerateDataKey` on the KMS key
-(if encrypting). Scope to the specific bucket — avoid `s3:*`.
-
-**Endpoint role** only needs `comprehend:Detect*` permissions. It does
-NOT need S3 access. Over-privileged endpoint roles are a security risk.
-
-**Versioning:** each `create-document-classifier` call with the same
-name creates a new immutable version. The latest version is the
-default. To use a specific version, include the version suffix in the
-ARN. Old versions incur storage cost — delete unused versions.
-
-```bash
-# List all versions
-aws comprehend list-document-classifiers \
-  --query 'DocumentClassifierPropertiesList[*].{Name:DocumentClassifierName,Version:Version,Status:Status}' \
-  --region us-east-1
-
-# Delete a specific version
-aws comprehend delete-document-classifier \
-  --document-classifier-arn "arn:aws:comprehend:us-east-1:123456789012:document-classifier/my-classifier/version/1"
-```
+Moved verbatim to [references/endpoint-and-security.md](references/endpoint-and-security.md) - load on demand (see References below).
 
 ## Step 10 — Cost and recent features
 
@@ -526,24 +366,7 @@ aws comprehend delete-document-classifier \
 model versions; use auto-scaling to scale down during low-traffic;
 reduce label count for multi-label classifiers.
 
-**Recent features (2023-2026):**
-
-- **Native PDF classification (2023-2024):** Comprehend supports
-  classifying multi-page PDF documents natively using layout and visual
-  features in addition to text. Training data as S3 URIs in Augmented
-  Manifest format.
-- **Auto-scaling for endpoints (2023-2024):** Application Auto Scaling
-  supports Comprehend endpoints via ApproximateBacklogSize metric.
-- **VPC training support (2024-2025):** Training jobs can run entirely
-  within a VPC via VpcConfig in create-document-classifier.
-- **Volume KMS encryption (2024-2025):** `--volume-kms-key-id`
-  parameter encrypts the EBS volume during training.
-- **Multi-label threshold tuning (2025-2026):** Multi-label output
-  includes per-class confidence scores that can be independently
-  thresholded at inference time without retraining.
-- **Terraform provider maturity (2024-2025):** Terraform
-  `aws_comprehend_document_classifier` and `aws_comprehend_endpoint`
-  now support multi-label, Native PDF, VPC config, and both KMS params.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## NEVER do these things
 
@@ -651,26 +474,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Training job FAILED
-- Check CloudWatch Logs (log group: `/aws/comprehend/<classifier-name>`).
-- Common causes: training data format error (wrong column count, invalid
-  JSON in Augmented Manifest), S3 access denied, KMS access denied.
-- Fix the data or IAM policy, then resubmit (creates a new version).
+Moved verbatim to [references/error-handling.md](references/error-handling.md) - load on demand (see References below).
 
-### Low evaluation metrics (F1 < 0.60)
-- Insufficient training data per class. Collect more labeled documents.
-- Ambiguous or overlapping class definitions. Re-evaluate the label set.
-- Class imbalance. Oversample minority classes or collect more data.
+## References (load on demand)
 
-### Endpoint not scaling
-- Verify auto-scaling target tracking policy is attached.
-- Check CloudWatch alarm for ApproximateBacklogSize exists.
-- ScaleInCooldown may be too aggressive; increase to avoid flapping.
-
-### VPC endpoint inference fails
-- Security group must allow inbound 443 from the calling resource.
-- Route table must include the VPC endpoint entry.
-- DNS resolution must be enabled on the VPC.
+- [references/worked-examples.md](references/worked-examples.md) — KMS + VPC training-job CLI variant moved from SKILL.md
+- [references/advanced-patterns.md](references/advanced-patterns.md) — 2023-2026 feature changes moved from SKILL.md
+- [references/error-handling.md](references/error-handling.md) — failed training / low metrics / scaling / VPC failure guidance moved from SKILL.md
+- [references/training-data-and-modes.md](references/training-data-and-modes.md) — training data format detail (now also holds Step 2 moved from SKILL.md)
+- [references/endpoint-and-security.md](references/endpoint-and-security.md) — endpoint, auto-scaling, batch, KMS, VPC, IAM detail (now also holds Steps 6-9 moved from SKILL.md)
 
 ## Domain
 

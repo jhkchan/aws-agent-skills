@@ -118,54 +118,8 @@ GAP: Re-supply the account ID, desired monitor type, and target service or dimen
 
 ### Step 0: Expert knowledge — non-obvious Cost Anomaly behaviors
 
-- **Cost Anomaly Detection evaluates cost data daily, not in real time.**
-  Anomalies are detected after the daily cost data refresh (8-24 hours
-  behind real-time spend). A runaway Lambda function burning $1000/hour
-  is NOT caught until the next daily cycle. For real-time protection,
-  pair with CloudWatch billing alarms.
-
-- **The ML model requires 10+ days of historical data per monitored
-  dimension.** For new services, use Budgets as an interim static guard.
-
-- **`create-anomaly-monitor` is async.** The API returns immediately
-  with the monitor ARN, but the monitor state is `PENDING` for minutes.
-  Poll `get-anomaly-monitors` until `monitorStatus` is `ACTIVE`. A
-  subscription against a `PENDING` monitor silently fails to alert.
-
-- **Severity is operator-defined, not AWS-defined.** The subscription
-  `threshold` parameter controls sensitivity (percentage deviation).
-  AWS does NOT classify anomalies as Critical/High/Low — the operator
-  maps threshold percentages to severity. Recommended: threshold >= 50%
-  = Critical, 20-50% = High, < 20% = Low.
-
-- **`get-anomalies` returns `rootCauseService`.** This is ML-inferred,
-  not always accurate — cross-reference with Cost Explorer contribution
-  analysis before acting on auto-remediation.
-
-- **Anomaly subscriptions support SNS, email, and Lambda targets.** SNS
-  is the most flexible (fan-out to multiple endpoints). For any non-
-  trivial pipeline, use SNS → Lambda.
-
-- **Budgets and Cost Anomaly Detection alerts are independent.** Both
-  can fire for the same event, or only one. Never assume one covers
-  the other.
-
-- **`provide-anomaly-feedback` is per-anomaly.** Each anomaly has a
-  unique `anomalyId`. Bulk feedback is not supported. For high-volume
-  accounts, build a Lambda that auto-submits feedback.
-
-- **Dimension-based monitors filter by a single dimension value**
-  (`LINKED_ACCOUNT`, `SERVICE`, `REGION`, `USAGE_TYPE`,
-  `INSTANCE_TYPE`, etc.). A dimension-based monitor on `SERVICE=EC2`
-  filters BEFORE ML evaluation; a service-level monitor evaluates ALL
-  services and identifies the culprit via `rootCauseService`. Choose
-  dimension-based for targeted monitoring; service-level for broad
-  coverage.
-
-- **Organizations Payer monitors cover ALL linked accounts.** A single
-  monitor at the payer level detects anomalies across the entire org.
-  More efficient than per-account monitors for large orgs, but requires
-  routing logic to identify which linked account caused the anomaly.
+Step 0 expert knowledge (daily-not-real-time evaluation, 10-day ML warm-up, async monitor PENDING state, operator-defined severity thresholds, rootCauseService accuracy, SNS/email/Lambda targets, Budgets independence, per-anomaly feedback, dimension vs service monitors, Payer coverage) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before designing the pipeline..
 
 ### Step 1: Classify the monitoring requirement
 
@@ -255,14 +209,8 @@ aws ce create-anomaly-subscription \
 | High | 20-50% deviation | DAILY | Slack/Teams notification via SNS → Lambda |
 | Low | < 20% deviation | WEEKLY | Log to dashboard; no active notification |
 
-Common errors and fixes:
-
-| Error | Cause | Fix |
-|---|---|---|
-| `ValidationException` on monitor ARN | Monitor still PENDING | Wait for ACTIVE, then retry |
-| `AccessDeniedException` | CE service role missing | Ensure caller has `ce:CreateAnomalySubscription` |
-| `LimitExceededException` | Too many subscriptions per monitor | Consolidate via SNS fan-out |
-| No alerts despite subscription | SNS topic policy blocks CE | Add `events.costanomaly.amazonaws.com` as trusted publisher |
+Step 3 subscription-creation error table (ValidationException on PENDING monitor, AccessDeniedException, LimitExceededException, no-alerts SNS policy) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when the subscription API fails..
 
 ### Step 4: Wire SNS fan-out for multi-channel routing
 
@@ -302,60 +250,8 @@ received."
 The Lambda receives the SNS message containing the anomaly JSON and
 performs remediation based on the root cause.
 
-```python
-import json, boto3, os, urllib.request
-
-ce = boto3.client('ce')
-ec2 = boto3.client('ec2')
-tagging = boto3.client('resourcegroupstaggingapi')
-SLACK_WEBHOOK = os.environ.get('SLACK_WEBHOOK_URL', '')
-
-def lambda_handler(event, context):
-    for record in event['Records']:
-        msg = json.loads(record['Sns']['Message'])
-        anomaly_id = msg.get('anomalyId', '')
-        root_cause = msg.get('rootCauseService', '')
-        impact = msg.get('impact', {}).get('maxImpact', 0)
-        severity = 'Critical' if impact >= 500 else 'High' if impact >= 100 else 'Low'
-
-        if 'Elastic Compute Cloud' in root_cause:
-            remediate_ec2(anomaly_id, severity)
-        else:
-            log_anomaly(anomaly_id, severity, root_cause)
-
-        if SLACK_WEBHOOK and severity in ('Critical', 'High'):
-            send_slack(anomaly_id, root_cause, impact, severity)
-        submit_feedback(anomaly_id, is_true_positive=True)
-
-def remediate_ec2(anomaly_id, severity):
-    # 1. Tag untagged EC2 instances
-    untagged = tagging.get_resources(ResourceTypeFilters=['ec2:instance'])
-    for r in untagged.get('ResourceTagMappingList', []):
-        tagging.tag_resources(ResourceARNList=[r['ResourceARN']],
-                              Tags={'auto-remediated': 'true', 'anomaly-id': anomaly_id[:50]})
-    # 2. Critical: shutdown non-prod instances
-    if severity == 'Critical':
-        instances = ec2.describe_instances(Filters=[
-            {'Name': 'tag:Environment', 'Values': ['non-prod']},
-            {'Name': 'instance-state-name', 'Values': ['running']}])
-        ids = [i['InstanceId'] for r in instances['Reservations'] for i in r['Instances']]
-        if ids:
-            ec2.stop_instances(InstanceIds=ids)
-
-def submit_feedback(anomaly_id, is_true_positive):
-    try:
-        ce.provide_anomaly_feedback(anomalyId=anomaly_id, isTruePositive=is_true_positive)
-    except Exception as e:
-        print(f"Feedback failed: {e}")
-
-def send_slack(anomaly_id, root_cause, impact, severity):
-    payload = json.dumps({'text': f':rotating_light: [{severity}] Cost Anomaly — {root_cause} — ${impact:.2f}'}).encode('utf-8')
-    req = urllib.request.Request(SLACK_WEBHOOK, data=payload, headers={'Content-Type': 'application/json'})
-    urllib.request.urlopen(req)
-
-def log_anomaly(anomaly_id, severity, root_cause):
-    print(json.dumps({'anomaly_id': anomaly_id, 'severity': severity, 'root_cause': root_cause}))
-```
+Step 5 auto-remediation Lambda (full Python: severity from maxImpact, EC2 tag-and-stop remediation, Slack notify, auto feedback) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when building the remediation function..
 
 **Decision rule:** default to **notify-only** unless ALL of the
 following are true: (a) the remediation is reversible within 15
@@ -367,26 +263,8 @@ production-impact assessment), (d) the action is logged to CloudTrail.
 
 Budgets complement anomaly detection with static thresholds.
 
-```bash
-aws budgets create-budget \
-  --account-id 111111111111 \
-  --budget '{
-    "BudgetName": "monthly-cost-budget",
-    "BudgetLimit": {"Amount": "10000", "Unit": "USD"},
-    "TimeUnit": "MONTHLY",
-    "BudgetType": "COST"
-  }' \
-  --notifications-with-subscribers '[
-    {
-      "Notification": {"NotificationType": "ACTUAL", "ComparisonOperator": "GREATER_THAN", "Threshold": 80, "ThresholdType": "PERCENTAGE"},
-      "Subscribers": [{"SubscriptionType": "SNS", "Address": "arn:aws:sns:us-east-1:111111111111:budget-alerts"}]
-    },
-    {
-      "Notification": {"NotificationType": "FORECASTED", "ComparisonOperator": "GREATER_THAN", "Threshold": 100, "ThresholdType": "PERCENTAGE"},
-      "Subscribers": [{"SubscriptionType": "SNS", "Address": "arn:aws:sns:us-east-1:111111111111:budget-alerts"}]
-    }
-  ]'
-```
+Step 6 create-budget CLI (ACTUAL 80% + FORECASTED 100% notifications with SNS subscribers) moved verbatim to [references/budgets-and-anomaly-integration.md](references/budgets-and-anomaly-integration.md).
+Load on demand when wiring Budgets hard limits..
 
 | Dimension | Cost Anomaly Detection | AWS Budgets |
 |---|---|---|
@@ -397,92 +275,26 @@ aws budgets create-budget \
 
 ### Step 7: Multi-account via Organizations Payer
 
-For multi-account coverage, create a monitor at the Payer level. This
-single monitor detects anomalies across all linked accounts.
-
-```bash
-aws ce create-anomaly-monitor \
-  --anomaly-monitor '{
-    "MonitorName": "org-payer-anomaly-monitor",
-    "MonitorType": "DIMENSION",
-    "MonitorDimension": "SERVICE",
-    "MonitorSpecification": "{\"Dimensions\":{\"Key\":\"LINKED_ACCOUNT\",\"Values\":[],\"MatchOptions\":[\"EQUALS\"]}}"
-  }'
-```
-
-**Key constraint:** Cost Anomaly Detection must be configured from the
-Payer account. Verify the caller's profile is the Payer before creating
-monitors. For per-linked-account alerting, the Lambda router extracts
-`accountId` from the anomaly event and routes to the appropriate
-account-specific SNS topic.
+Step 7 Payer-level monitor CLI and the Payer-account constraint + per-linked-account Lambda routing moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for multi-account coverage..
 
 ### Step 8: Slack and Teams webhook notifications
 
 The Lambda router formats and sends notifications. Configure the webhook
 URL as a Lambda environment variable.
 
-```python
-def format_slack_message(message):
-    impact = message.get('impact', {}).get('maxImpact', 0)
-    severity = 'Critical' if impact >= 500 else 'High' if impact >= 100 else 'Low'
-    color = '#FF0000' if severity == 'Critical' else '#FFA500' if severity == 'High' else '#36a64f'
-    return {'attachments': [{'color': color, 'title': f'AWS Cost Anomaly — {severity}',
-        'fields': [
-            {'title': 'Root Cause', 'value': message.get('rootCauseService', 'Unknown'), 'short': True},
-            {'title': 'Impact', 'value': f"${impact:.2f}", 'short': True},
-            {'title': 'Monitor', 'value': message.get('monitorName', 'Unknown'), 'short': True},
-            {'title': 'Anomaly ID', 'value': message.get('anomalyId', 'Unknown'), 'short': True}]}]}
-```
-
-For Microsoft Teams, use an Adaptive Card payload and the Teams webhook
-URL format (`https://outlook.office.com/webhook/...`).
+Step 8 Slack message formatter (severity-colored attachments) and Teams Adaptive Card note moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when wiring webhooks..
 
 ### Step 9: Submit anomaly feedback
 
-```bash
-# Mark as true positive (confirmed real cost spike)
-aws ce provide-anomaly-feedback --anomaly-id "<anomaly-id>" --is-true-positive true
-
-# Mark as false positive (expected spend)
-aws ce provide-anomaly-feedback --anomaly-id "<anomaly-id>" --is-true-positive false
-```
-
-Automated feedback rules in the Lambda router:
-
-```python
-FALSE_POSITIVE_SERVICES = ['AWS Premium Support', 'Tax']
-TRUE_POSITIVE_THRESHOLD = 200
-
-def should_auto_feedback(message):
-    root_cause = message.get('rootCauseService', '')
-    impact = message.get('impact', {}).get('maxImpact', 0)
-    if any(fp in root_cause for fp in FALSE_POSITIVE_SERVICES):
-        return False
-    if impact >= TRUE_POSITIVE_THRESHOLD:
-        return True
-    return None  # manual review
-```
+Step 9 provide-anomaly-feedback CLI and automated feedback rules (false-positive service list, impact threshold) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when closing the feedback loop..
 
 ### Step 10: Analyze anomalies via Cost Explorer
 
-```bash
-# Cost breakdown by service for the anomaly period
-aws ce get-cost-and-usage \
-  --time-period Start=2026-08-05,End=2026-08-11 \
-  --granularity DAILY --metrics UnblendedCost \
-  --group-by Type=DIMENSION,Key=SERVICE \
-  --filter '{"Dimensions":{"Key":"LINKED_ACCOUNT","Values":["111111111111"]}}'
-
-# Cost breakdown by usage type for the root-cause service
-aws ce get-cost-and-usage \
-  --time-period Start=2026-08-05,End=2026-08-11 \
-  --granularity DAILY --metrics UnblendedCost \
-  --group-by Type=DIMENSION,Key=USAGE_TYPE \
-  --filter '{"Dimensions":{"Key":"SERVICE","Values":["Amazon Elastic Compute Cloud - Compute"]}}'
-```
-
-Use contribution analysis to confirm the anomaly's `rootCauseService`
-before acting on auto-remediation.
+Step 10 Cost Explorer breakdown queries (by service, by usage type for the root-cause service) and contribution-analysis confirmation moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when deep-diving a detected anomaly..
 
 ## Output format
 
@@ -550,31 +362,8 @@ TEMPLATE:
 
 ### Worked example — REVIEW_REQUIRED, monitor without subscription
 
-```text
-ANOMALY: org-payer-coverage-gap
-MONITOR:
-  - Name: org-payer-anomaly-monitor
-  - Type: DIMENSION (SERVICE, all services)
-  - Status: ACTIVE
-  - Scope: All linked accounts under payer 111111111111
-SUBSCRIPTION:
-  - Severity routing: NONE — no subscription created
-  - Endpoints: NONE
-  - Frequency: N/A
-ROUTING:
-  - Critical: NOT WIRED
-  - High: NOT WIRED
-  - Low: NOT WIRED
-REMEDIATION:
-  - Actions: NONE
-  - Lambda: NOT WIRED
-AUDIT:
-  - Budgets: NONE at org level
-  - Feedback: NONE
-VERDICT: REVIEW_REQUIRED
-GAP: Monitor is ACTIVE but has zero subscriptions. Anomalies are detected silently. Create subscriptions (Step 3), wire SNS fan-out (Step 4), deploy Lambda router (Step 5). For multi-account, add per-linked-account routing (Step 7).
-TEMPLATE: (see Steps 3-5)
-```
+Worked example — REVIEW_REQUIRED, monitor without subscription (NOT-WIRED routing/remediation/audit rows) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand for the REVIEW_REQUIRED output shape..
 
 ## Anti-Patterns — NEVER do these things
 
@@ -664,13 +453,8 @@ TEMPLATE: (see Steps 3-5)
 
 ## Appendix A — Monitor type comparison
 
-| Monitor type | `MonitorDimension` | Coverage | Best for |
-|---|---|---|---|
-| Service-level | `SERVICE` | All spend for a specific service | EC2, S3, RDS — high-spend services |
-| Linked-account | `LINKED_ACCOUNT` | All spend for one account | Per-member accountability in org |
-| Region-based | `REGION` | Spend in a specific region | Multi-region workloads |
-| Instance-type | `INSTANCE_TYPE` | Spend on a specific instance family | GPU/spot instance monitoring |
-| All-services | `SERVICE` (all values) | All services | Broadest ML-based detection |
+Appendix A monitor-type comparison table (service-level, linked-account, region, instance-type, all-services) moved verbatim to [references/cost-anomaly-monitor-types.md](references/cost-anomaly-monitor-types.md).
+Load on demand when choosing a monitor type..
 
 ## Appendix B — Decision tree
 
@@ -693,64 +477,21 @@ For each monitor:
 
 ## Recent AWS features (2024-2026)
 
-- **Cost Anomaly Detection contribution analysis (2024-2025):**
-  Enhanced anomaly payloads include contribution breakdown by
-  dimension. Top contributing dimension values (service, usage type,
-  linked account) reduce manual Cost Explorer deep-dives.
-
-- **Anomaly feedback API GA (2024):** `provide-anomaly-feedback` is GA.
-  Enables automated feedback from Lambda routers, closing the ML
-  improvement loop programmatically.
-
-- **Budgets with Budget Actions (2024-2025):** Budgets can trigger IAM
-  policy application, SSM execution, or EC2 stop on breach. Provides a
-  hard-limit remediation path complementing Anomaly Detection.
-
-- **Multi-account anomaly routing (2025-2026):** Payer-level monitors
-  now include richer linked-account context in the anomaly payload.
+Recent AWS features (contribution analysis, feedback API GA, Budget Actions, multi-account routing context) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when auditing recent setups..
 
 ## Expert heuristic: anomaly detection coverage gaps
 
-The most dangerous coverage gap is "monitor exists but alerts go
-nowhere." An operator creates a Cost Anomaly Monitor (the API succeeds),
-assumes coverage exists, and never creates the subscription. Anomalies
-are detected — they appear in the console — but no alert is ever
-delivered.
+Expert heuristic deep dive (monitor-without-subscription rule, verification protocol table, 3-cycle pre-production validation, COVERAGE_STATUS / VALIDATION_STATUS output fields) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before declaring the pipeline deployed..
 
-**The rule (non-negotiable):**
+## References (load on demand)
 
-> A monitor without a subscription is NOT coverage. It is silent
-> detection. ALWAYS pair `create-anomaly-monitor` with
-> `create-anomaly-subscription` and verify the subscription with
-> `get-anomaly-subscriptions` before considering the pipeline deployed.
-
-**Verification protocol:**
-
-| Check | Command | Expected |
-|---|---|---|
-| Monitor active | `get-anomaly-monitors --monitor-arn-list <arn>` | `monitorStatus: ACTIVE` |
-| Subscription exists | `get-anomaly-subscriptions` | `status: ACTIVE` |
-| SNS topic policy | `sns get-topic-attributes --topic-arn <arn>` | Includes `events.costanomaly.amazonaws.com` |
-| Lambda invocation | CloudTrail `Lambda Invoke` from SNS | Non-zero in 24h |
-| Feedback submitted | `get-anomalies --feedback True` | Non-zero count |
-
-**Pre-production validation (3-cycle rule):**
-
-1. **Cycle 1 — Notify-only in non-prod:** Deploy monitor + subscription
-   + Slack. Plant a deliberate cost spike. Verify notification within
-   24 hours.
-2. **Cycle 2 — Auto-remediation in non-prod:** Deploy Lambda with
-   tagging-only. Plant a spike from untagged resources. Verify tagging
-   and feedback.
-3. **Cycle 3 — Production notify-only:** Deploy in production with
-   notify-only. Monitor 2 weeks. If false-positive rate < 10%, enable
-   auto-remediation for non-prod resources.
-
-**Surface in the output:** for any recommended pipeline, include
-`COVERAGE_STATUS: <monitor-active | subscription-active | sns-policy-
-verified | lambda-invoking | feedback-loop-active>` and
-`VALIDATION_STATUS: <notify-only-nonprod | remediation-nonprod |
-notify-only-prod | full-prod>`.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 expert knowledge, Steps 5/7/8/9/10 recipes (remediation Lambda, Payer monitor, Slack/Teams, feedback, Cost Explorer), Recent AWS features, and the coverage-gap expert heuristic moved from SKILL.md.
+- [references/worked-examples.md](references/worked-examples.md) — the REVIEW_REQUIRED worked example moved from SKILL.md.
+- [references/error-handling.md](references/error-handling.md) — the Step 3 subscription error table moved from SKILL.md.
+- [references/budgets-and-anomaly-integration.md](references/budgets-and-anomaly-integration.md) — now also holds the Step 6 Budgets hard-limit CLI moved from SKILL.md.
+- [references/cost-anomaly-monitor-types.md](references/cost-anomaly-monitor-types.md) — now also holds the Appendix A monitor-type comparison moved from SKILL.md.
 
 ## Domain
 

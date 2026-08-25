@@ -167,3 +167,28 @@ the role has `iam:PutUserPolicy`, `ssm:StartAutomationExecution`, or
 Budgets can be scoped by service, linked account, tag, or cost category.
 A budget scoped to `SERVICE=EC2` does NOT alert on S3 spend. Verify the
 budget filter covers the intended spend scope.
+
+---
+
+## Step 6 — Budgets integration CLI (hard limits) (moved from SKILL.md)
+
+```bash
+aws budgets create-budget \
+  --account-id 111111111111 \
+  --budget '{
+    "BudgetName": "monthly-cost-budget",
+    "BudgetLimit": {"Amount": "10000", "Unit": "USD"},
+    "TimeUnit": "MONTHLY",
+    "BudgetType": "COST"
+  }' \
+  --notifications-with-subscribers '[
+    {
+      "Notification": {"NotificationType": "ACTUAL", "ComparisonOperator": "GREATER_THAN", "Threshold": 80, "ThresholdType": "PERCENTAGE"},
+      "Subscribers": [{"SubscriptionType": "SNS", "Address": "arn:aws:sns:us-east-1:111111111111:budget-alerts"}]
+    },
+    {
+      "Notification": {"NotificationType": "FORECASTED", "ComparisonOperator": "GREATER_THAN", "Threshold": 100, "ThresholdType": "PERCENTAGE"},
+      "Subscribers": [{"SubscriptionType": "SNS", "Address": "arn:aws:sns:us-east-1:111111111111:budget-alerts"}]
+    }
+  ]'
+```

@@ -278,3 +278,63 @@ resource "aws_lambda_permission" "connect_invoke" {
    is for attributes set via SetAttributes.
    `$.External.X` is for attributes returned by Lambda. Mixing them
    up produces null values.
+
+---
+
+## Step 2 — Contact flow JSON (block catalog, CLI, verify) (moved from SKILL.md)
+
+Contact flows are JSON specs. Block categories: Action (PlayPrompt,
+InvokeLambda, InvokeAmazonLex, TransferToQueue, SetAttributes,
+SetRecordingBehavior), Branch (CheckHoursOfOperation, Compare,
+EvaluateAttribute, GetCustomerInput, Loop), Transfer
+(TransferToQueue, TransferToFlow), Terminal (Disconnect).
+
+```bash
+aws connect create-contact-flow \
+  --instance-id "$INSTANCE_ID" \
+  --name "inbound-main-flow" \
+  --type CONTACT_FLOW \
+  --content "$(cat flow.json)"
+```
+
+The flow JSON has `Version`, `StartAction`, and `Actions[]`. Each
+action has `Identifier`, `Type`, `Parameters`, and `Transitions`
+(`NextAction`, optional `Conditions` or `Exceptions`). See
+`references/contact-flow-json-and-lambda.md` for the full schema,
+sample flow, and Terraform example.
+
+Verify: `aws connect describe-contact-flow` and
+`start-test-contact-flow`.
+
+---
+
+## Step 3 — Lambda integration (resource policy, handler) (moved from SKILL.md)
+
+Connect invokes Lambda via the InvokeLambda block. The Lambda
+receives a Connect event (with `Details.ContactData.CustomerEndpoint.
+Address` for the caller phone) and returns JSON that updates
+contact attributes (retrievable via `$.External.<key>` in
+subsequent blocks).
+
+```bash
+# Grant Connect invoke permission (CRITICAL — without this, InvokeLambda returns AccessDenied)
+aws lambda add-permission \
+  --function-name lookup-customer \
+  --statement-id connect-invoke \
+  --action lambda:InvokeFunction \
+  --principal connect.amazonaws.com \
+  --source-arn "arn:aws:connect:us-east-1:123456789012:instance/$INSTANCE_ID"
+```
+
+Lambda response example (Python):
+
+```python
+def lambda_handler(event, context):
+    phone = event['Details']['ContactData']['CustomerEndpoint']['Address']
+    customer = lookup_customer(phone)
+    return {'customer_id': customer['id'], 'department': route_call(customer)}
+```
+
+The InvokeLambda block MUST handle exceptions (AccessDenied,
+Timeout, GenericError); see
+`references/contact-flow-json-and-lambda.md` for the full anatomy.

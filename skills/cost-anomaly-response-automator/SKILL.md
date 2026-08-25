@@ -147,12 +147,7 @@ REMEDIATION: Provide both fields. Example: "notify Slack on any CAD
   response_scope=notify, severity_threshold=500.
 ```
 
-**Live-account pre-flight (skip for offline authoring):**
-1. `aws ce get-anomaly-monitors` (CAD enabled).
-2. `aws cur describe-report-definitions` (CUR exists).
-3. SNS topic exists or is in the template.
-4. Lambda role has `ce:GetAnomalies` (read) + scoped action perms.
-5. `aws budgets describe-budgets --account-id <payer>` (Budgets enabled).
+Live-account pre-flight commands (CAD enabled, CUR exists, SNS topic, Lambda role scope, Budgets enabled): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ## Decision tree — orchestration selection
 
@@ -190,121 +185,17 @@ START
 
 ## Step 0: Expert knowledge — non-obvious cost behaviors
 
-- **CAD evaluates daily or weekly, not in real time.** An anomaly at
-  09:00 UTC Tuesday reflects spend through Monday end-of-day. For
-  near-real-time, use CloudWatch billing alarms (4h poll) or
-  CUR/Athena hourly.
-- **CAD `Impact.TotalImpact` is the dollar deviation, not total spend.**
-  An Impact of USD 500 means spend deviated USD 500 from baseline —
-  total spend could be much higher. Filter on Impact for severity but
-  include actual spend in the notification.
-- **AWS Budgets evaluates every ~8-12 hours.** A budget at 80% may
-  not fire until 85-90%. Pair with CAD for finer-grained detection.
-- **Budgets `TimeUnit=MONTHLY` resets on the calendar month.** A
-  budget set on the 15th covers only half a month. Use
-  `TimePeriod.Start` to align with the billing cycle.
-- **Budgets actions have a single threshold per action.** A budget
-  can have multiple actions (notify at 80%, IAM deny at 100%), but
-  each is a separate `put-budget-action` call. A common mistake:
-  setting one action at 80% that both notifies AND stops EC2, instead
-  of two actions at 80% and 100%.
-- **`BudgetsAction` IAM policy applies to users/roles, NOT root.** It
-  attaches a deny-all policy to specified IAM principals. Does not
-  affect root or federated identities outside the listed principals.
-- **`BudgetsAction` EC2 stop targets specific instances and regions.**
-  It does NOT stop all EC2 globally. Specify exact instance IDs and
-  regions in `SubscriberResourceList`. A misconfigured action silently
-  does nothing if instances don't match.
-- **CUR delivery latency is 8-24 hours.** A CUR for yesterday lands in
-  S3 between 08:00-24:00 UTC today. An Athena query at 06:00 UTC runs
-  against stale data; schedule for 12:00 UTC or later.
-- **CUR Athena needs Glue partitions.** A CUR report in S3 is
-  partitioned by `year/month`. The Athena table must use
-  `PARTITIONED BY (year string, month string)` and partitions loaded
-  via `MSCK REPAIR TABLE`. A new CUR without partitions returns zero
-  rows.
-- **SNS subscription must be confirmed before delivery.** A new SNS
-  topic with an unconfirmed email/HTTPS subscription silently drops
-  messages. Always send a test message.
-- **Slack/Teams needs an incoming webhook or Lambda.** SNS does not
-  natively post to Slack. Pattern: SNS -> Lambda -> webhook POST.
-  Store the webhook URL in Parameter Store (or Secrets Manager for
-  tokens) — never hardcode.
-- **EventBridge does not natively emit events for CAD anomalies.**
-  CAD surfaces via SNS subscriptions (CAD -> SNS -> Lambda).
-  EventBridge schedules drive CUR/Athena and Q recommendation polling.
-- **Amazon Q cost recommendations are account-scoped.** Q Business
-  returns recommendations for the account it is deployed in. For
-  multi-account, deploy Q in each member or use Cost Optimization Hub
-  (`aws cost-optimization-hub get-recommendations`).
-- **Cost Optimization Hub dedupes by resource ARN.** A Lambda polling
-  daily must dedupe by `recommendationId` to avoid re-posting. Track
-  last-seen in DynamoDB or Parameter Store.
-- **CAD `MonitorType=CUSTOM` uses an Expression (MetricSource), not a
-  service filter.** Service monitors (`SERVICE`) filter by AWS service
-  name. Linked account monitors (`LINKED_ACCOUNT`) monitor member
-  accounts.
+Full catalog (CAD daily/weekly lag, TotalImpact semantics, Budgets 8-12h evaluation, calendar-month reset, single-threshold actions, IAM-policy vs EC2-stop targeting, CUR 8-24h latency, Glue partitions, SNS confirmation, webhook storage, EventBridge gaps, Q scoping, COH dedupe, monitor types): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Detection sources
 
 ### AWS Cost Anomaly Detection (CAD)
 
-```bash
-aws ce get-anomaly-monitors --output json  # list existing
-
-# Service monitor for EC2 spend
-aws ce create-anomaly-monitor --anomaly-monitor '{
-  "MonitorName": "ec2-spend-monitor", "MonitorType": "SERVICE",
-  "MonitorSpecification": "{\"Dimensions\":{\"Key\":\"SERVICE\",\"Values\":[\"Amazon Elastic Compute Cloud - Compute\"]}}"
-}'
-
-# Linked account monitor
-aws ce create-anomaly-monitor --anomaly-monitor '{
-  "MonitorName": "member-111122223333-monitor", "MonitorType": "LINKED_ACCOUNT",
-  "MonitorSpecification": "{\"Dimensions\":{\"Key\":\"LINKED_ACCOUNT\",\"Values\":[\"111122223333\"]}}"
-}'
-
-# Anomaly subscription wired to SNS (threshold USD 100, daily)
-TOPIC_ARN=$(aws sns create-topic --name cost-anomaly-alerts --output text)
-aws ce create-anomaly-subscription --anomaly-subscription '{
-  "Name": "prod-cost-anomaly-sub", "Threshold": 100.0, "Frequency": "DAILY",
-  "MonitorArnList": ["<monitor-arn>"],
-  "Subscribers": [{"Address": "'"$TOPIC_ARN"'", "Type": "SNS"}]
-}'
-
-aws ce get-anomalies --monitor-arn <monitor-arn> \
-  --start-date 2026-08-01 --end-date 2026-08-10 --output json
-```
+Monitor and subscription CLI (list monitors, SERVICE and LINKED_ACCOUNT monitors, SNS-wired anomaly subscription, get-anomalies): [references/cad-budgets-action-catalog.md](references/cad-budgets-action-catalog.md).
 
 ### AWS Budgets
 
-```bash
-aws budgets create-budget --account-id 111122223333 --budget '{
-  "BudgetName": "monthly-ec2-budget", "BudgetType": "COST", "TimeUnit": "MONTHLY",
-  "BudgetLimit": {"Amount": "10000", "Unit": "USD"},
-  "CostFilters": {"Service": ["Amazon Elastic Compute Cloud - Compute"]}
-}'
-
-# Notify at 80% via SNS
-aws budgets create-notification --account-id 111122223333 \
-  --budget-name monthly-ec2-budget \
-  --notification '{"NotificationType":"ACTUAL","ComparisonOperator":"GREATER_THAN","Threshold":80,"ThresholdType":"PERCENTAGE"}' \
-  --subscribers SubscriptionType=SNS,Address=<topic-arn>
-
-# IAM deny policy action at 100% (ApprovalModel=AUTOMATIC OK for reversible)
-aws budgets put-budget-action --account-id 111122223333 --budget-name monthly-ec2-budget \
-  --notification-type ACTUAL --action-type APPLY_IAM_POLICY \
-  --action-threshold ActionThresholdValue=100,ActionThresholdType=PERCENTAGE \
-  --definition '{"IamActionDefinition":{"PolicyArn":"arn:aws:iam::111122223333:policy/BudgetDenyAll","Roles":["BillingAlertDenyRole"]}}' \
-  --execution-role-arn arn:aws:iam::111122223333:role/BudgetActionRole --approval-model AUTOMATIC
-
-# EC2 stop action at 120% (ApprovalModel=MANUAL — destructive)
-aws budgets put-budget-action --account-id 111122223333 --budget-name monthly-ec2-budget \
-  --notification-type ACTUAL --action-type RUN_SSM_DOCUMENTS \
-  --action-threshold ActionThresholdValue=120,ActionThresholdType=PERCENTAGE \
-  --definition '{"SsmActionDefinition":{"ActionSubType":"STOP_EC2_INSTANCES","Region":"us-east-1","InstanceIds":["i-0abc12345"]}}' \
-  --execution-role-arn arn:aws:iam::111122223333:role/BudgetActionRole --approval-model MANUAL
-```
+Budget and action CLI (create-budget, 80% SNS notify, 100% IAM deny AUTOMATIC, 120% EC2 stop MANUAL): [references/cad-budgets-action-catalog.md](references/cad-budgets-action-catalog.md).
 
 ### Cost Explorer anomaly view
 
@@ -316,38 +207,11 @@ Lambda.
 
 ### CUR analysis automation
 
-```bash
-aws cur describe-report-definitions --output json  # verify CUR configured
-```
-
-**Top-spenders Athena query (schedule daily via EventBridge):**
-
-```sql
-SELECT lineitem_product_servicename AS service, resource_id,
-       SUM(lineitem_unblendedcost) AS spend
-FROM "cur"."cur_table"
-WHERE year = '2026' AND month = '08'
-  AND lineitem_lineitemtype IN ('Usage', 'DiscountedUsage')
-GROUP BY 1, 2
-HAVING SUM(lineitem_unblendedcost) > 100
-ORDER BY spend DESC LIMIT 20;
-```
-
-```bash
-aws events put-rule --name cur-daily-top-spenders \
-  --schedule-expression "cron(0 12 * * ? *)" --state ENABLED
-aws events put-targets --rule cur-daily-top-spenders \
-  --targets '{"Id":"1","Arn":"arn:aws:lambda:us-east-1:111122223333:function:cur-top-spenders"}'
-```
+CUR verify + top-spenders Athena SQL + EventBridge daily schedule CLI: [references/cad-budgets-action-catalog.md](references/cad-budgets-action-catalog.md).
 
 ### Amazon Q cost-optimization recommendations
 
-```bash
-# Cost Optimization Hub (Org-level)
-aws cost-optimization-hub get-recommendations \
-  --filter '{"implementAfterTimestamp": 0}' --max-results 50 --output json
-# Lambda (scheduled) polls, dedupes by recommendationId, posts to Slack
-```
+Cost Optimization Hub get-recommendations CLI + scheduled Lambda poll/dedupe pattern: [references/cad-budgets-action-catalog.md](references/cad-budgets-action-catalog.md).
 
 ## Response patterns
 
@@ -408,56 +272,7 @@ def lambda_handler(event, context):
 
 ### 5. Full-playbook (Step Functions)
 
-```json
-{
-  "StartAt": "CheckKillSwitch",
-  "States": {
-    "CheckKillSwitch": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::ssm:get-parameter",
-      "Parameters": {"Name": "/cost/kill-switch"},
-      "Next": "KillChoice"
-    },
-    "KillChoice": {
-      "Type": "Choice",
-      "Choices": [{"Variable": "$.Parameter.Value", "StringEquals": "disabled", "Next": "Abort"}],
-      "Default": "NotifySlack"
-    },
-    "Abort": {"Type": "Succeed"},
-    "NotifySlack": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:<region>:<account>:function:cost-notify-slack",
-      "Next": "TagResources"
-    },
-    "TagResources": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:<region>:<account>:function:cost-tag-resources",
-      "Next": "WaitForApproval"
-    },
-    "WaitForApproval": {
-      "Comment": "Human callback via SQS task token",
-      "Type": "Task",
-      "Resource": "arn:aws:states:::sqs:sendMessage.waitForTaskToken",
-      "Parameters": {
-        "QueueUrl": "https://sqs.<region>.amazonaws.com/<account>/cost-approval",
-        "MessageBody": {"anomalyId.$": "$.anomalyId", "impact.$": "$.impact", "taskToken.$": "$$.Task.Token"}
-      },
-      "Next": "ActionOrClose"
-    },
-    "ActionOrClose": {
-      "Type": "Choice",
-      "Choices": [{"Variable": "$.decision", "StringEquals": "act", "Next": "RunBudgetAction"}],
-      "Default": "CloseIncident"
-    },
-    "RunBudgetAction": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:<region>:<account>:function:cost-budget-action",
-      "Next": "CloseIncident"
-    },
-    "CloseIncident": {"Type": "Succeed"}
-  }
-}
-```
+Full state-machine JSON (kill-switch check -> notify -> tag -> SQS task-token approval -> optional Budgets action -> close): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Step Functions orchestration
 
@@ -535,31 +350,7 @@ REMEDIATION: aws cloudformation deploy --stack-name prod-cost-workflow \
 
 ### Worked example — MANUAL_STEP_REQUIRED (missing approval gate)
 
-```text
-DETECTION_SOURCE: budgets
-RESPONSE_SCOPE: budget-action
-VERDICT: MANUAL_STEP_REQUIRED
-WORKFLOW: (partial — blocked)
-GUARDRAILS:
-  - [PASS] Kill-switch: Parameter Store /cost/kill-switch
-  - [FAIL] No approval gate — Budgets EC2 stop runs AUTOMATIC at 120%
-  - [PASS] IAM role scoped to budgets:ExecuteBudgetAction
-AUDIT:
-  - [PASS] CloudTrail covers the account; Budgets action execution logged
-FINDINGS:
-  - [CRITICAL] No approval gate: a breach at 120% auto-stops instances with
-    no human check. A billing-cycle lag (CUR delivery 8-24h) could trigger
-    the stop after spend has already returned to normal.
-  - [HIGH] Action lists i-0abc12345 only — horizontally scaled instances
-    are NOT covered.
-REMEDIATION:
-  1. Move EC2 stop from 120% AUTOMATIC to 120% MANUAL:
-     aws budgets put-budget-action --account-id 111122223333 \
-       --budget-name monthly-ec2-budget --notification-type ACTUAL \
-       --action-type RUN_SSM_DOCUMENTS --approval-model MANUAL
-  2. Add a notify-only action at 100% so on-call is paged before stop.
-  3. Tag EC2 with BudgetsActionMonitored=true; audit monthly.
-```
+Full MANUAL_STEP_REQUIRED example (Budgets EC2 stop AUTOMATIC at 120%, no approval gate): [references/worked-examples.md](references/worked-examples.md).
 
 ## NEVER (these things)
 
@@ -650,37 +441,18 @@ If any of the five is missing or unclear, emit MANUAL_STEP_REQUIRED.
 
 ## Edge-case handling
 
-- **Anomaly for a deleted resource.** CAD may surface an anomaly for a
-  resource terminated between detection and response. The Lambda must
-  handle `InvalidInstanceID.NotFound` gracefully — log and move on.
-- **Cross-account cost rollup.** A payer sees aggregated spend; member
-  anomalies may be hidden. Deploy per-member CAD monitors.
-- **Planned spend spike (marketing launch, load test).** Disable the
-  workflow before the event; re-enable after.
-- **CUR schema change.** AWS occasionally adds columns. `SELECT *`
-  survives; explicit-column queries break. Test after CUR updates.
-- **Budgets action stale instance list.** If instances rotate
-  (autoscaling), the action silently does nothing. Audit monthly.
+Edge-case catalog (deleted resource, cross-account rollup, planned spike, CUR schema change, stale instance list): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Recent AWS features (2024-2026)
 
-- **CAD with ML impact evaluation (2024-2025):** CAD uses ML to
-  evaluate dollar impact per anomaly (`Impact.TotalImpact`). Filter on
-  this for severity; do not rely on legacy `AnomalyScore`.
-- **Budgets advanced actions (2024-2025):** `RUN_SSM_DOCUMENTS` now
-  supports SSM documents beyond `AWS-StopEC2Instance` — custom
-  documents for RDS stop, ECS task scale-in, Lambda throttle.
-- **AWS Cost Optimization Hub (2024-2025):** Aggregates
-  recommendations across services (EC2 rightsize, RDS rightsize, SP
-  commitment, S3 lifecycle). Use `get-recommendations --filter` for
-  service-scoped recs. Dedupe by `recommendationId`.
-- **Amazon Q cost optimization (2024-2025):** Q Business with the
-  cost-optimization plugin answers natural-language spend questions.
-  Layer Q insights on top of CAD alerts for richer notifications.
-- **CUR 2.0 (2024-2025):** CUR supports columnar (Parquet) delivery
-  with 5-10x faster Athena queries. Migrate from CSV to Parquet.
-- **Budgets reset at calendar month (2025):** `TimeUnit=MONTHLY`
-  budgets now reset strictly on the 1st of the calendar month.
+What changed in 24 months (CAD ML impact, Budgets SSM documents, Cost Optimization Hub, Amazon Q, CUR 2.0 Parquet, calendar-month reset): [references/advanced-patterns.md](references/advanced-patterns.md).
+
+## References (load on demand)
+
+- [Worked examples](references/worked-examples.md) - MANUAL_STEP_REQUIRED worked example: Budgets EC2 stop at 120% with no approval gate
+- [Diagnostic commands](references/diagnostic-commands.md) - live-account pre-flight commands (CAD monitors, CUR, SNS, Lambda role, Budgets)
+- [Advanced patterns](references/advanced-patterns.md) - Step 0 non-obvious cost behaviors, full-playbook Step Functions state machine, edge-case handling, recent AWS features
+- [CAD/Budgets/Athena action catalog](references/cad-budgets-action-catalog.md) - detection-source CLI (CAD monitors/subscriptions, Budgets + native actions, CUR top-spenders query, Cost Optimization Hub polling)
 
 ## Domain
 

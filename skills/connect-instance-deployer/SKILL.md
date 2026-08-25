@@ -265,157 +265,28 @@ flow.
 
 Three misconceptions dominate Connect misdesign:
 
-- **"A contact flow is just an IVR menu."** It is not. A contact
-  flow is a JSON spec DAG of typed blocks: Action (PlayPrompt,
-  InvokeLambda, TransferToQueue, InvokeAmazonLex), Branch
-  (CheckHoursOfOperation, Compare, EvaluateAttribute), Terminal
-  (Disconnect). The drag-and-drop console edits this JSON;
-  programmatic deployments author it directly. Treating it as a
-  flat menu misses Lambda-driven dynamic routing and Lex-driven
-  conversational IVR.
-
-- **"A routing profile is just a queue assignment."** It is not. A
-  routing profile associates an agent with queues AND specifies
-  the SKILL REQUIREMENTS that determine which contacts the agent
-  handles. Without skills, routing is pure queue-and-priority.
-  With skills, contacts route to the agent with the highest
-  proficiency matching the contact's required skill. Misdesigning
-  skill requirements produces "the contact routed to the wrong
-  agent" tickets.
-
-- **"IVR means pressing 1 or 2."** Modern IVR is conversational
-  via Amazon Lex V2. The InvokeAmazonLex block invokes a Lex bot
-  to elicit an intent and fill slots through natural-language
-  conversation. The bot returns an intent and slots to the flow,
-  which branches on those values. Treating IVR as touch-tone only
-  misses the conversational IVR pattern.
+The three misconceptions in full (contact flow is a JSON DAG, routing profile carries skill requirements, IVR is conversational Lex) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before designing the deployment.
 
 ## Configuration dependency graph
 
-Connect configurations are NOT independent. Instance before flows;
-flows reference queues and Lambda functions; routing profiles
-reference queues and skills; phone numbers are claimed at instance
-level.
-
-| Configuration | Hard dependencies (silent failure without) | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| Instance | Identity mode selected | Alias immutable; identity mode set at creation | flows, queues, routing profiles, phone numbers, users |
-| Contact flow | Instance; flow JSON valid; referenced queues/Lambda exist | flow with dangling refs creates at API but fails at run time | inbound contact handling |
-| Lambda function | Function deployed in same region; resource policy grants Connect invoke | without resource policy, Lambda invocations fail AccessDenied | dynamic IVR logic |
-| Queue | Instance; HoursOfOperation defined | queue with no agents via routing profile holds contacts indefinitely | routing target |
-| Routing profile | Instance; queues defined; skills defined (if used) | agent without routing profile cannot log in to CCP | agent routing |
-| Skill | Instance; skill name unique | proficiency is set on the agent, not the skill | skills-based routing |
-| User (agent) | Instance; routing profile + security profile assigned | SAML users managed in IdP; Connect-dir users via CreateUser | login to CCP, handle contacts |
-| Phone number | Instance claimed via ClaimedPhoneNumber or porting | per-region; toll-free vs DID affects inbound | inbound voice |
-| Lex bot (V2) | Dialect ID set; bot published; Connect integrated via InvokeAmazonLex | Lex V1 deprecated path | conversational IVR |
-| Voice ID | Instance; domain created; consent disclosure in flow | enrollment requires caller consent | authentication, fraud |
-| Contact Lens | Instance; language model; sentiment/redaction settings | post-call vs real-time (different features) | sentiment, transcription |
-| Recording (S3+KMS) | S3 bucket with KMS; KMS key policy grants Connect | recordings encrypted with KMS | call recording storage |
-| Real-time metrics | Instance | built-in; custom via Kinesis | operations |
-| Historical metrics | Instance; CTR export configured | CTRs available 24 months; longer needs S3 | analytics |
-
-**The contact-flow-block-references row is the one a baseline model
-misses.** A model that authors a flow JSON without verifying
-referenced queues, Lambda functions, and Lex bots will produce a
-flow that creates at the API but fails at run time when a contact
-hits the dangling reference.
-
-**Cross-dependency gotchas:**
-- A flow referencing a non-existent queue (or wrong queue ARN)
-  creates successfully but every contact fails at TransferToQueue.
-- A Lambda without a resource policy granting `connect.amazonaws.com`
-  returns AccessDenied when the flow runs.
-- A routing profile without skill requirements produces pure queue-
-  priority routing (no skills-based matching).
-- Phone numbers are per-region. US toll-free does not work in EU.
-- Amazon Lex V1 is on a deprecation path; use Lex V2 via
-  InvokeAmazonLex.
+The full dependency table (instance → flow → queue/routing/Lambda/Lex → phone/Voice ID/Contact Lens/recording/metrics) and cross-dependency gotchas moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before sequencing the deployment.
 
 ## Expert heuristic: contact flow JSON with Lambda invoke blocks
 
-A baseline model treats the flow as a touch-tone IVR. The correct
-heuristic recognizes the flow as a DAG of typed blocks and the
-InvokeLambda block as the integration point for dynamic IVR logic.
-
-```text
-Sample flow DAG:
-  Start → CheckHoursOfOperation
-            ├── (Open) → InvokeLambda(lookup_customer)
-            │             ├── Return → PlayPrompt(greeting) → InvokeAmazonLex(route_call)
-            │             │                              ├── intent=Sales    → TransferToQueue(Sales)
-            │             │                              └── intent=Support  → TransferToQueue(Support)
-            │             └── Error → TransferToQueue(Default)
-            └── (Closed) → PlayPrompt(closed) → Disconnect
-
-InvokeLambda block (JSON):
-  Identifier: "lookup_customer", Type: "Action"
-  Parameters: { FunctionARN, InvocationTimeLimitSeconds: 5 }
-  Transitions: {
-    NextAction: "play_greeting",
-    Exceptions: [
-      { NextAction: "transfer_default", Error: "Lambda.AccessDenied" },
-      { NextAction: "transfer_default", Error: "Lambda.Timeout" }
-    ]
-  }
-```
-
-**Key implication:** Lambda invocations from Connect flows MUST
-handle exceptions (AccessDenied, Timeout, GenericError). Without
-exceptions, a Lambda failure traps the contact. The Lambda
-resource policy MUST grant `connect.amazonaws.com` invoke with the
-instance ARN as source.
+Contact-flow DAG walkthrough (CheckHours → InvokeLambda → Lex → branch → TransferToQueue), InvokeLambda JSON anatomy, and the resource-policy implication moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when authoring flows.
 
 ## Expert heuristic: routing profile skill requirements
 
-A baseline model treats routing profiles as queue priorities. The
-correct heuristic recognizes that skill requirements (skill name +
-proficiency) determine which contacts route to which agents.
-
-```text
-Routing profile with skill requirements:
-  Queues: Sales (priority 1), Support (priority 2)
-
-  Agent A: Sales=5, Support=3
-  Agent B: Support=5
-
-Contact X (required skill: Sales, proficiency ≥ 4):
-  → Agent A (Sales=5 ≥ 4)
-  → Agent B INELIGIBLE (no Sales skill)
-
-Contact Y (required skill: Support, proficiency ≥ 4):
-  → Agent B (Support=5 ≥ 4)
-  → Agent A INELIGIBLE for this contact (Support=3 < 4)
-```
-
-**Key implication:** skills are defined at the instance level,
-proficiency is set on each agent per skill, and contacts specify
-the required skill + proficiency via the contact flow. Without all
-three, skills-based routing silently degrades to queue-priority.
+Skills-based routing worked scenario (Agent A/B eligibility by proficiency) and the three-component model moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when configuring routing.
 
 ## Expert heuristic: Lex bot integration for IVR
 
-A baseline model treats IVR as touch-tone menus. The correct
-heuristic recognizes the InvokeAmazonLex block as the integration
-point for conversational IVR.
-
-```text
-Flow with Lex IVR:
-  Start → PlayPrompt("How can I help you?")
-       → InvokeAmazonLex(bot=CustomerService, intent=RouteCall, slot=department)
-            ├── Lex elicits slot via conversation:
-            │     "Are you calling about Sales or Support?"
-            │     Caller: "Sales" → slot filled {department: "Sales"}
-            └── Lex returns intent=RouteCall, slots={department: Sales}
-       → Branch on slot value:
-            ├── department == "Sales"   → TransferToQueue(Sales)
-            ├── department == "Support" → TransferToQueue(Support)
-            └── unknown → loop back to InvokeAmazonLex
-```
-
-**Key implication:** the Lex bot must be a published alias (not
-DRAFT) and the locale must match the Connect instance language.
-Bot responses can be slow on cold paths; set session timeouts and
-Lambda fallbacks.
+Conversational-IVR walkthrough (intent elicitation, slot filling, branch-on-slot, unknown-intent loop) and published-alias requirement moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when wiring Lex.
 
 ## Prerequisites (verify before provisioning)
 
@@ -445,159 +316,43 @@ If any prerequisite is missing, output
 | `CONNECT_MANAGED` | Amazon Connect directory (built-in user pool) | Standalone; small teams |
 | `EXISTING_DIRECTORY` | Existing AWS Directory Service directory | AD-integrated enterprises |
 
-```bash
-INSTANCE_ID=$(aws connect create-instance \
-  --instance-name "my-connect-cc" \
-  --IdentityManagementType SAML \
-  --InboundCallsEnabled --OutboundCallsEnabled \
-  --ClientToken "unique-token-1" \
-  --query 'Id' --output text)
-aws connect describe-instance --instance-id "$INSTANCE_ID"
-```
-
-For `CONNECT_MANAGED`, omit `--DirectoryId`. For
-`EXISTING_DIRECTORY`, pass `--DirectoryId d-1234567890`.
+Step 1 create-instance CLI (SAML / CONNECT_MANAGED / EXISTING_DIRECTORY variants) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when provisioning the instance.
 
 ## Step 2 — Contact flow JSON
 
-Contact flows are JSON specs. Block categories: Action (PlayPrompt,
-InvokeLambda, InvokeAmazonLex, TransferToQueue, SetAttributes,
-SetRecordingBehavior), Branch (CheckHoursOfOperation, Compare,
-EvaluateAttribute, GetCustomerInput, Loop), Transfer
-(TransferToQueue, TransferToFlow), Terminal (Disconnect).
-
-```bash
-aws connect create-contact-flow \
-  --instance-id "$INSTANCE_ID" \
-  --name "inbound-main-flow" \
-  --type CONTACT_FLOW \
-  --content "$(cat flow.json)"
-```
-
-The flow JSON has `Version`, `StartAction`, and `Actions[]`. Each
-action has `Identifier`, `Type`, `Parameters`, and `Transitions`
-(`NextAction`, optional `Conditions` or `Exceptions`). See
-`references/contact-flow-json-and-lambda.md` for the full schema,
-sample flow, and Terraform example.
-
-Verify: `aws connect describe-contact-flow` and
-`start-test-contact-flow`.
+Step 2 block-category catalog, create-contact-flow CLI, JSON schema notes, and verify commands moved verbatim to [references/contact-flow-json-and-lambda.md](references/contact-flow-json-and-lambda.md).
+Load on demand when authoring the flow.
 
 ## Step 3 — Lambda function integration (InvokeLambda block)
 
-Connect invokes Lambda via the InvokeLambda block. The Lambda
-receives a Connect event (with `Details.ContactData.CustomerEndpoint.
-Address` for the caller phone) and returns JSON that updates
-contact attributes (retrievable via `$.External.<key>` in
-subsequent blocks).
-
-```bash
-# Grant Connect invoke permission (CRITICAL — without this, InvokeLambda returns AccessDenied)
-aws lambda add-permission \
-  --function-name lookup-customer \
-  --statement-id connect-invoke \
-  --action lambda:InvokeFunction \
-  --principal connect.amazonaws.com \
-  --source-arn "arn:aws:connect:us-east-1:123456789012:instance/$INSTANCE_ID"
-```
-
-Lambda response example (Python):
-
-```python
-def lambda_handler(event, context):
-    phone = event['Details']['ContactData']['CustomerEndpoint']['Address']
-    customer = lookup_customer(phone)
-    return {'customer_id': customer['id'], 'department': route_call(customer)}
-```
-
-The InvokeLambda block MUST handle exceptions (AccessDenied,
-Timeout, GenericError); see
-`references/contact-flow-json-and-lambda.md` for the full anatomy.
+Step 3 add-permission CLI (connect.amazonaws.com principal + SourceArn), Python handler example, and exception-handling requirement moved verbatim to [references/contact-flow-json-and-lambda.md](references/contact-flow-json-and-lambda.md).
+Load on demand when integrating Lambda.
 
 ## Step 4 — Queues and quick-connect lists
 
-Queues are routing targets. Each queue has HoursOfOperation,
-quick-connect list (for transfers), hold-flow, and outbound caller
-ID.
-
-```bash
-QUEUE_ID=$(aws connect create-queue \
-  --instance-id "$INSTANCE_ID" \
-  --name "sales-queue" \
-  --hours-of-operation-id <hours-of-operation-id> \
-  --outbound-caller-id-number-id <phone-number-id> \
-  --query 'QueueId' --output text)
-```
-
-Quick-connect (transfer target):
-
-```bash
-aws connect create-quick-connect --instance-id "$INSTANCE_ID" \
-  --name "sales-escalation" \
-  --quick-connect-config '{"QuickConnectType":"QUEUE","QueueConfig":{"QueueId":"'"$QUEUE_ID"'","ContactFlowId":"<flow-id>"}}'
-```
+Step 4 create-queue and create-quick-connect CLI moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when creating queues.
 
 ## Step 5 — Routing profiles (skills, proficiency, queue associations)
 
-```bash
-ROUTING_PROFILE_ID=$(aws connect create-routing-profile \
-  --instance-id "$INSTANCE_ID" \
-  --name "tier-1-sales-support" \
-  --default-outbound-queue-id "$QUEUE_ID" \
-  --queue-configs '[
-    {"QueueReference":{"QueueId":"'"$SALES_QUEUE_ID"'","Channel":"VOICE"},"Priority":1,"Delay":0},
-    {"QueueReference":{"QueueId":"'"$SUPPORT_QUEUE_ID"'","Channel":"VOICE"},"Priority":2,"Delay":0}]' \
-  --media-concurrencies '[{"Channel":"VOICE","Concurrency":1}]' \
-  --query 'RoutingProfileId' --output text)
-```
-
-Queue priority: lower = higher priority. Media concurrency: VOICE
-typically 1, CHAT 3-5, TASK 5-10. Skill requirements and the
-three-component model (skill/proficiency/required-skill) are
-detailed in `references/routing-and-lex-integration.md`.
+Step 5 create-routing-profile CLI (queue configs, priorities, media concurrencies) and queue-priority guidance moved verbatim to [references/routing-and-lex-integration.md](references/routing-and-lex-integration.md).
+Load on demand when creating routing profiles.
 
 ## Step 6 — Agent hierarchy
 
-```bash
-HIERARCHY_GROUP_ID=$(aws connect create-user-hierarchy-group \
-  --instance-id "$INSTANCE_ID" \
-  --name "Sales - North America" \
-  --parent-group-id <parent-group-id-or-omit> \
-  --query 'HierarchyGroupId' --output text)
-```
+Step 6 create-user-hierarchy-group CLI moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when building the hierarchy.
 
 ## Step 7 — Phone number claim (toll-free, DID)
 
-```bash
-PHONE_NUMBER_ID=$(aws connect claim-phone-number \
-  --instance-id "$INSTANCE_ID" \
-  --target-arn "arn:aws:connect:us-east-1:123456789012:instance/$INSTANCE_ID" \
-  --phone-number-description "Main inbound toll-free" \
-  --phone-number-type TOLL_FREE \
-  --phone-number +18005551234 \
-  --query 'PhoneNumberId' --output text)
-```
-
-For DID: `--phone-number-type DID`. Porting: use the console or
-`create-task` to start; requires a Letter of Authorization and may
-take 2-4 weeks. Match phone number region to instance region.
+Step 7 claim-phone-number CLI, DID/porting notes, and region-matching rule moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when claiming numbers.
 
 ## Step 8 — Skills-based routing
 
-Three components must all be configured:
-
-| Component | Where | Example |
-|---|---|---|
-| Skill | Instance (defined once) | "Sales", proficiency levels 1-5 |
-| Skill proficiency | User (per-agent) | Agent A: Sales=5, Support=3 |
-| Required skill | Contact (via SetAttributes or TransferToQueue) | Contact X: Sales, proficiency ≥ 4 |
-
-Skills are typically defined via the Connect console. Once defined,
-agents are assigned proficiencies via `create-user` /
-`update-user-routing-profile`. Contacts specify required skills via
-contact attributes set in the flow. See
-`references/routing-and-lex-integration.md` for the routing-match
-algorithm.
+Step 8 three-component table (skill on instance, proficiency on agent, required skill on contact) and configuration notes moved verbatim to [references/routing-and-lex-integration.md](references/routing-and-lex-integration.md).
+Load on demand when configuring skills-based routing.
 
 ## Step 9 — Amazon Lex bot integration (IVR)
 
@@ -608,20 +363,8 @@ intent + slots to the flow.
 Prerequisites: Lex V2 bot with at least one published alias (NOT
 DRAFT); bot locale matches the Connect instance language.
 
-```json
-{
-  "Identifier": "lex-ivr", "Type": "Action",
-  "Parameters": {
-    "BotAliasArn": "arn:aws:lex:us-east-1:123456789012:bot-alias/CustomerService:Prod",
-    "Intent": "RouteCall", "Slots": {"department": null},
-    "SessionAttributes": {"caller_id": "$.CustomerEndpoint.Address"}
-  },
-  "Transitions": {
-    "NextAction": "branch-on-department",
-    "Exceptions": [{"NextAction": "transfer-default", "Error": "Lex.Timeout"}]
-  }
-}
-```
+Step 9 InvokeAmazonLex block JSON (BotAliasArn, Intent, Slots, SessionAttributes, Lex.Timeout exception) moved verbatim to [references/routing-and-lex-integration.md](references/routing-and-lex-integration.md).
+Load on demand when wiring Lex IVR.
 
 Verify: `aws lexv2-models describe-bot-alias` and
 `aws lexv2-runtime recognize-text`. Lex V1 is on a deprecation
@@ -629,108 +372,33 @@ path — use Lex V2 for all new deployments.
 
 ## Step 10 — Voice ID (speaker enrollment, fraud)
 
-Amazon Connect Voice ID authenticates callers by voice biometrics.
-
-Prerequisites: Voice ID domain created; consent disclosure in the
-flow (legal requirement); opt-in/opt-out handling.
-
-```json
-{
-  "Identifier": "voice-id-enroll", "Type": "Action",
-  "Parameters": {"VoiceIdDomainId": "<domain-id>", "VoiceIdOperation": "ENROLL_OR_AUTHENTICATE"},
-  "Transitions": {
-    "NextAction": "branch-on-voice-id-result",
-    "Conditions": [
-      {"NextAction": "high-confidence", "Condition": {"VoiceIdResult": "AUTHENTICATED_HIGH"}},
-      {"NextAction": "low-confidence", "Condition": {"VoiceIdResult": "AUTHENTICATED_LOW"}},
-      {"NextAction": "fraud-risk", "Condition": {"VoiceIdResult": "FRAUD_RISK_DETECTED"}}
-    ]
-  }
-}
-```
+Step 10 Voice ID prerequisites (domain, consent disclosure) and block JSON (enroll/authenticate, result branches) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when enabling Voice ID.
 
 ## Step 11 — Contact Lens (sentiment, transcription, redaction)
 
-| Feature | Mode | Use case |
-|---|---|---|
-| Real-time sentiment | Real-time | Supervisor alerts on negative sentiment |
-| Post-call transcription | Post-call | Searchable call transcripts |
-| Post-call summary | Post-call | Auto-generated issue + outcome summary |
-| Sensitive-data redaction | Post-call | Mask credit card / SSN in transcript |
-| Categories | Both | Auto-tag contacts by keyword / sentiment pattern |
-
-```bash
-aws connect update-instance-storage-config \
-  --instance-id "$INSTANCE_ID" \
-  --association-id <association-id> \
-  --resource-type CONTACT_LENS
-```
+Step 11 Contact Lens feature table (real-time vs post-call) and storage-config CLI moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when enabling Contact Lens.
 
 ## Step 12 — Chat, voice, task channels
 
-| Channel | Provisioning |
-|---|---|
-| VOICE | Phone number claimed + contact flow |
-| CHAT | Chat widget on website / mobile; chat contact flow |
-| TASK | Task template created; task contact flow |
-
-```bash
-aws connect create-task-template \
-  --instance-id "$INSTANCE_ID" \
-  --name "follow-up-task" \
-  --contact-flow-id <task-flow-id> \
-  --fields '[{"Description":"Reason","Id":"reason","Type":"TEXT"}]' \
-  --status ACTIVE
-```
+Step 12 channel table (VOICE/CHAT/TASK provisioning) and create-task-template CLI moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when covering channels.
 
 ## Step 13 — S3 recording storage (KMS encryption)
 
-```bash
-aws s3api put-bucket-encryption \
-  --bucket connect-recordings-123456789012 \
-  --server-side-encryption-configuration \
-    '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"aws:kms","KMSMasterKeyID":"arn:aws:kms:us-east-1:123456789012:key/abc123"}}]}'
-
-aws connect associate-instance-storage-config \
-  --instance-id "$INSTANCE_ID" \
-  --resource-type CALL_RECORDINGS \
-  --storage-config \
-    '{"S3Config":{"BucketName":"connect-recordings-123456789012","BucketPrefix":"recordings","EncryptionConfig":{"EncryptionType":"KMS","KeyId":"arn:aws:kms:us-east-1:123456789012:key/abc123"}},"StorageType":"S3"}'
-```
-
-KMS key policy MUST grant `connect.amazonaws.com` Encrypt/Decrypt/
-GenerateDataKey with `aws:SourceAccount` condition. Plain S3
-recordings are unencrypted at rest — always use SSE-KMS.
+Step 13 put-bucket-encryption + associate-instance-storage-config CLI and the KMS key-policy requirement moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when configuring recordings.
 
 ## Step 14 — Real-time and historical metrics
 
-| Type | Source | Latency |
-|---|---|---|
-| Real-time (ContactFlow, RoutingProfile, Queue, Agent) | Instance built-in | Seconds |
-| Historical (ContactTraceRecord) | S3 export or console | Up to 24 months |
-| Custom real-time metrics | Kinesis stream | Seconds |
-
-```bash
-aws connect get-contact-metrics --instance-id "$INSTANCE_ID" \
-  --filters '{"Queues":["'"$QUEUE_ID"'"],"Channels":["VOICE"]}'
-```
+Step 14 metrics table (real-time, historical CTR, Kinesis custom) and get-contact-metrics CLI moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when wiring metrics.
 
 ## Step 15 — Recent features
 
-- **Amazon Q in Connect (2023-2026):** generative AI assistant for
-  agents — real-time suggested responses and KB articles.
-- **Customer Profiles (2023-2024):** unified profile store with
-  event-triggered updates.
-- **Amazon Connect Cases (2023-2024):** case management for
-  multi-contact issues; integrates with Tasks.
-- **Voice ID generative improvements (2024-2025):** reduced
-  enrollment time, improved fraud-risk accuracy, multi-language.
-- **Contact Lens real-time summaries (2024-2025):** generative AI
-  summaries in real-time, not just post-call.
-- **Amazon Lex V2 generative AI (2024-2025):** open-ended intent
-  elicitation and assisted slot filling.
-- **WebRTC media streaming (2024-2025):** browser-based voice
-  reducing PSTN costs.
+Step 15 recent features (Amazon Q in Connect, Customer Profiles, Cases, Voice ID improvements, real-time summaries, Lex generative AI, WebRTC) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for latest capabilities.
 
 ## NEVER do these things
 
@@ -792,55 +460,21 @@ VERIFICATION_COMMANDS:
 
 ### Worked example — SAML instance with Lambda-driven flow and Lex IVR
 
-```text
-CONNECT_INSTANCE: inst-abc123 (my-connect-cc, SAML)
-VERDICT: READY_TO_DEPLOY
-CHECKLIST:
-  [✓] Instance: inst-abc123 (my-connect-cc)
-  [✓] Identity mode: SAML (Okta IdP)
-  [✓] Directory: N/A
-  [✓] Contact flow: flow-def456 (inbound-main-flow, CONTACT_FLOW, all referenced resources verified)
-  [✓] Lambda integration: arn:aws:lambda:us-east-1:123456789012:function:lookup-customer (resource policy grants Connect)
-  [✓] Queues: sales-queue-id, support-queue-id, default-queue-id
-  [✓] Routing profile: rp-xyz789 (sales queue P1, support queue P2, VOICE concurrency 1)
-  [✓] Skill requirements: Sales (proficiency ≥ 4), Support (proficiency ≥ 4)
-  [✓] User hierarchy: Sales - North America
-  [✓] Phone number: +18005551234 (toll-free, us-east-1)
-  [✓] Lex bot: arn:aws:lex:us-east-1:123456789012:bot-alias/CustomerService:Prod (V2, published, en_US)
-  [✓] Voice ID: domain-123 (consent disclosure in flow)
-  [✓] Contact Lens: post-call (transcription, sentiment, redaction)
-  [✓] Channels: VOICE, CHAT, TASK
-  [✓] Recording storage: S3 (connect-recordings-123456789012, KMS key-id abc-123)
-  [✓] Tags: Environment=production, Project=sales-cc
-VERIFICATION_COMMANDS:
-  aws connect describe-instance --instance-id inst-abc123
-  aws connect describe-contact-flow --instance-id inst-abc123 --contact-flow-id flow-def456
-  aws connect describe-routing-profile --instance-id inst-abc123 --routing-profile-id rp-xyz789
-  aws connect describe-phone-number --instance-id inst-abc123 --phone-number-id pn-456
-  aws connect list-instance-storage-configs --instance-id inst-abc123
-```
+Worked example — SAML instance with Lambda-driven flow and Lex IVR (READY_TO_DEPLOY checklist + verification commands) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand for the filled-in output shape.
 
 ## Error handling
 
-- **Flow fails at run time despite creating:** referenced resource
-  (queue/Lambda/Lex) does not exist or ARN is wrong. Pre-flight
-  check every referenced resource.
-- **Lambda invocations return AccessDenied:** Lambda lacks a
-  resource policy granting `connect.amazonaws.com`. Add via
-  `aws lambda add-permission --principal connect.amazonaws.com
-  --source-arn <instance-arn>`.
-- **Contacts route to wrong agents:** routing profile lacks skill
-  requirements → routing is pure queue-priority.
-- **Phone number claim fails:** different region from instance, or
-  not available in AWS pool.
-- **Lex bot invocations time out:** alias is DRAFT (not published),
-  or locale does not match instance language.
-- **Voice ID enrollment fails:** caller did not provide consent
-  (consent disclosure prompt missing in flow).
-- **Recordings not in S3:** KMS key policy or S3 bucket policy
-  blocks Connect. Verify both grant `connect.amazonaws.com`.
-- **Real-time metrics missing:** instance created before the
-  feature was enabled, or stream not configured.
+Error handling (dangling flow refs, Lambda AccessDenied, wrong-agent routing, phone-claim failures, Lex timeouts, Voice ID consent, missing recordings, metrics) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when diagnosing failures.
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Mindset misconceptions, configuration dependency graph, expert heuristics, Step 1/4/6/7/10-15 provisioning recipes, and recent features moved from SKILL.md.
+- [references/worked-examples.md](references/worked-examples.md) — the checklist-form worked example moved from SKILL.md.
+- [references/error-handling.md](references/error-handling.md) — error handling for flows, Lambda, routing, phone claims, Lex, Voice ID, recordings, and metrics moved from SKILL.md.
+- [references/contact-flow-json-and-lambda.md](references/contact-flow-json-and-lambda.md) — now also holds the Step 2 flow-JSON detail and Step 3 Lambda-integration detail moved from SKILL.md.
+- [references/routing-and-lex-integration.md](references/routing-and-lex-integration.md) — now also holds the Step 5 routing-profile CLI, Step 8 skills components, and Step 9 InvokeAmazonLex JSON moved from SKILL.md.
 
 ## Domain
 

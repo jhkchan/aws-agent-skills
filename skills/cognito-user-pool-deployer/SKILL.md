@@ -149,25 +149,7 @@ Driven by three Cognito realities:
 
 Run before classification. Misclassifying these produces wrong plans.
 
-**Pagination:** `list-user-pools` returns at most 20 pools per page (via
-`--max-items`). Use `--starting-token` to drain.
-
-**Live-account pre-flight (skip if offline plan audit):**
-1. `aws cognito-idp list-user-pools --max-results 60` — confirm the pool
-   name does not collide (for create) or matches (for update).
-2. `aws cognito-idp describe-user-pool --user-pool-id <id>` — capture
-   the full pool config for snapshot/diff.
-3. `aws cognito-idp list-user-pool-clients --user-pool-id <id>` — check
-   for client name conflicts.
-4. `aws iam get-role --role-name <SnsCallerRoleName>` — for SMS MFA,
-   verify the SNS caller role exists.
-5. `aws lambda get-function --function-name <fn>` — for each Lambda
-   trigger, verify the function exists and the pool principal can
-   invoke it.
-6. `aws acm describe-certificate --certificate-arn <arn>` — for custom
-   domain, verify the cert is in us-east-1 and `ISSUED`.
-7. `aws cognito-idp describe-user-pool-domain --domain <domain>` — for
-   domain ops, confirm the domain is not already taken.
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 **Malformed input:** if the pool spec is missing required fields
 (`PoolName`, `Policies.PasswordPolicy`, or `MfaConfiguration`), emit
@@ -191,87 +173,7 @@ https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-cre
 
 ### Step 0: Expert knowledge — non-obvious Cognito behaviors
 
-These behaviors are easy to misjudge without operational Cognito
-experience. Each changes a plan if ignored:
-
-- **Schema is immutable after pool creation.** The `Schema` array in
-  `create-user-pool` can be set only once. To add a new attribute to an
-  existing pool, you must create a new pool and migrate users. Always
-  over-specify attributes at creation.
-
-- **`RequiredAttributes` and `Schema` are independent.** An attribute
-  listed in `RequiredAttributes` but missing from `Schema` will be
-  auto-added by Cognito, but explicitly declaring in both is safer.
-  Custom attributes (`custom:companyId`) must be declared in `Schema`
-  with type `String`, `Number`, or `DateTime`.
-
-- **`MfaConfiguration` values: OFF, ON, OPTIONAL.** `ON` requires every
-  user to enroll. `OPTIONAL` (newer; also surfaced as `ENABLED`) lets
-  users opt in. Prefer `ON` with TOTP only — SMS requires an SNS caller
-  role and incurs per-message cost.
-
-- **App client `ExplicitAuthFlows` controls the credential path.**
-  `ALLOW_USER_SRP_AUTH` + `ALLOW_REFRESH_TOKEN_AUTH` is the secure
-  baseline. `ALLOW_USER_PASSWORD_AUTH` sends the password to the client
-  SDK (acceptable only for trusted server-side clients).
-  `ALLOW_ADMIN_USER_PASSWORD_AUTH` enables admin password auth — almost
-  always a security red flag.
-
-- **OAuth `AllowedOAuthFlows`: code is the only safe grant.** `code`
-  with PKCE keeps tokens off the URL fragment.
-  `implicit` leaks tokens via the URL fragment — block it. The
-  `client-credentials` grant is for machine-to-machine and requires a
-  `GenerateClientSecret: true` app client plus a resource server with
-  custom scopes.
-
-- **`PreventUserExistenceErrors: ENABLED` (default).** Returns generic
-  auth errors regardless of whether the user exists — blocks user
-  enumeration. `LEGACY` returns distinct errors for "user not found"
-  vs "wrong password" and is blocked by the skill.
-
-- **`UserPoolAddOns.AdvancedSecurityMode`: ENFORCED preferred.** ASF
-  detects compromised credentials, impossible travel, and account
-  takeover. `AUDIT` mode logs but does not block; `ENFORCED` blocks
-  at runtime. Always emit `ENFORCED` for production pools.
-
-- **DeletionProtection defaults to ACTIVE on new pools.** Set
-  `DeletionProtection: INACTIVE` only when intentionally destroying.
-  Never set INACTIVE for production deploys.
-
-- **Lambda triggers are ARNs in `LambdaConfig`.** The pool needs
-  `lambda:InvokeFunction` permission via resource-based policy on each
-  function. Cognito does not auto-grant this — missing permission causes
-  triggers to silently no-op.
-
-- **Custom domain requires ACM cert in us-east-1.** Always. The cert
-  subject must match the custom domain exactly. Wildcard certs work
-  for subdomains.
-
-- **Hosted UI branding (2024-2026).** Newer managed branding via
-  `cognito-idp:CreateManagedLoginBranding` lets you customize the
-  hosted UI per app client (logo, background, colors, font). Legacy
-  `UISettings` (CSS customization) is being deprecated for managed
-  branding.
-
-- **Resource servers define custom scopes.** A resource server with
-  identifier `https://api.example.com` and scope `products.read` is
-  requested as `https://api.example.com/products.read` in OAuth scope
-  negotiation. Mismatched identifiers are the #1 cause of "invalid
-  scope" errors in client-credentials flows.
-
-- **User pool groups carry IAM roles.** A group with `Precedence: 1`
-  and `RoleArn` set can issue credentials via the identity pool
-  (classic) flow. Pure user-pool JWTs include `cognito:groups` as a
-  claim — your app enforces authorization from there.
-
-- **Token revocation requires `EnableTokenRevocation: true`.** New
-  app clients default to true. Without it, refresh tokens remain
-  valid until expiry even after sign-out. Always set true.
-
-- **`AccessTokenValidity` and `IdTokenValidity` use hours units.** A
-  value of `5` means 5 hours, not 5 minutes. Cognito also accepts
-  `TokenValidityUnits` (Hours/Minutes/Days) explicitly — set this to
-  avoid off-by-60 bugs.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ### Step 1: Pre-check gate — PREREQUISITES_MISSING if any check fails
 
@@ -390,156 +292,7 @@ After the operation finishes, run post-verification:
 
 ## Common pool patterns (boilerplate)
 
-### Production user pool — TOTP MFA, email login
-
-```bash
-aws cognito-idp create-user-pool \
-  --pool-name "prod-users" \
-  --policies '{
-    "PasswordPolicy": {
-      "MinimumLength": 16,
-      "RequireUppercase": true,
-      "RequireLowercase": true,
-      "RequireNumbers": true,
-      "RequireSymbols": true,
-      "TemporaryPasswordValidityDays": 1
-    }
-  }' \
-  --mfa-configuration ON \
-  --enabled-mfas "[\"TOTP\"]" \
-  --username-attributes '["email"]' \
-  --schema '[
-    {"Name":"email","AttributeDataType":"String","Required":true,"Mutable":false},
-    {"Name":"given_name","AttributeDataType":"String","Required":true,"Mutable":true},
-    {"Name":"family_name","AttributeDataType":"String","Required":true,"Mutable":true},
-    {"Name":"custom:tenantId","AttributeDataType":"String","Required":false,"Mutable":false}
-  ]' \
-  --user-pool-add-ons 'AdvancedSecurityMode=ENFORCED' \
-  --account-recovery-setting '{
-    "RecoveryMechanisms": [
-      {"Priority":1,"Name":"verified_email"}
-    ]
-  }' \
-  --deletion-protection ACTIVE \
-  --prevent-user-existence-errors ENABLED
-```
-
-### App client — OAuth code flow with PKCE, web SPA
-
-```bash
-aws cognito-idp create-user-pool-client \
-  --user-pool-id <pool-id> \
-  --client-name "prod-web-spa" \
-  --generate-client-secret \
-  --explicit-auth-flows ALLOW_USER_SRP_AUTH ALLOW_REFRESH_TOKEN_AUTH \
-  --allowed-o-auth-flows code \
-  --allowed-o-auth-scopes openid email profile \
-  --callback-urls '["https://app.example.com/callback"]' \
-  --logout-urls '["https://app.example.com/logout"]' \
-  --supported-identity-providers COGNITO \
-  --access-token-validity 1 \
-  --id-token-validity 1 \
-  --token-validity-units '{
-    "AccessToken":"hours","IdToken":"hours","RefreshToken":"days"
-  }' \
-  --refresh-token-validity 30 \
-  --enable-token-revocation \
-  --prevent-user-existence-errors ENABLED
-```
-
-### App client — machine-to-machine (client-credentials)
-
-```bash
-aws cognito-idp create-resource-server \
-  --user-pool-id <pool-id> \
-  --identifier "https://api.example.com" \
-  --name "products-api" \
-  --scopes '[{"ScopeName":"products.read","ScopeDescription":"Read products"},{"ScopeName":"products.write","ScopeDescription":"Write products"}]'
-
-aws cognito-idp create-user-pool-client \
-  --user-pool-id <pool-id> \
-  --client-name "m2m-orders-service" \
-  --generate-client-secret \
-  --explicit-auth-flows ALLOW_CUSTOM_AUTH ALLOW_REFRESH_TOKEN_AUTH \
-  --allowed-o-auth-flows client-credentials \
-  --allowed-o-auth-scopes "https://api.example.com/products.read" \
-  --access-token-validity 1 \
-  --token-validity-units '{"AccessToken":"hours"}'
-```
-
-### SAML identity provider federation
-
-```bash
-aws cognito-idp create-identity-provider \
-  --user-pool-id <pool-id> \
-  --provider-name "CorpOkta" \
-  --provider-type SAML \
-  --provider-details '{
-    "MetadataFile": "<saml metadata XML>",
-    "EncryptedResponses": "false"
-  }' \
-  --attribute-mapping '{
-    "email":"http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
-    "given_name":"http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname"
-  }'
-```
-
-### Custom domain (hosted UI branding)
-
-```bash
-aws cognito-idp create-user-pool-domain \
-  --user-pool-id <pool-id> \
-  --domain "auth.example.com" \
-  --custom-domain-config '{
-    "CertificateArn": "arn:aws:acm:us-east-1:111111111111:certificate/abc-123"
-  }'
-
-# Managed branding (2024-2026):
-aws cognito-idp create-managed-login-branding \
-  --user-pool-id <pool-id> \
-  --client-id <client-id> \
-  --assets '[{"Bytes":"<base64-logo>","Category":"BANNER_LOGO","ColorMode":"LIGHT","Extension":"PNG"}]' \
-  --settings '{"brandingBackgroundColor":"#FFFFFF","brandingPrimaryColor":"#1a73e8"}'
-```
-
-### Lambda triggers (pre-signup, post-confirmation)
-
-```bash
-# Resource-based policy so the pool can invoke the function
-aws lambda add-permission \
-  --function-name prod-cognito-pre-signup \
-  --statement-id cognito-invoke \
-  --action lambda:InvokeFunction \
-  --principal cognito-idp.amazonaws.com \
-  --source-arn arn:aws:cognito-idp:us-east-1:111111111111:userpool/<pool-id>
-
-aws cognito-idp create-user-pool \
-  --pool-name "prod-users" \
-  --lambda-config '{
-    "PreSignUp": "arn:aws:lambda:us-east-1:111111111111:function:prod-cognito-pre-signup",
-    "PostConfirmation": "arn:aws:lambda:us-east-1:111111111111:function:prod-cognito-post-confirmation",
-    "CustomMessage": "arn:aws:lambda:us-east-1:111111111111:function:prod-cognito-custom-message",
-    "PreTokenGeneration": "arn:aws:lambda:us-east-1:111111111111:function:prod-cognito-pre-token-gen"
-  }' \
-  --policies '...' --mfa-configuration ON ...
-```
-
-### User pool groups (RBAC)
-
-```bash
-aws cognito-idp create-group \
-  --user-pool-id <pool-id> \
-  --group-name "admins" \
-  --description "Administrative users" \
-  --role-arn "arn:aws:iam::111111111111:role/CognitoAdminRole" \
-  --precedence 1
-
-aws cognito-idp create-group \
-  --user-pool-id <pool-id> \
-  --group-name "editors" \
-  --description "Content editors" \
-  --precedence 2
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand (see References below).
 
 ## STRICT output contract
 
@@ -706,32 +459,7 @@ rates before promoting to ENFORCED.
 
 ## Recent AWS features (2024-2026)
 
-- **Cognito Managed Login Branding (2024-2025):** the new managed
-  branding API (`create-managed-login-branding`) lets you customize the
-  hosted UI per app client — logo, background, primary color, fonts,
-  dark/light mode variants. Replaces the legacy `UISettings` CSS-based
-  customization which is being deprecated.
-- **Advanced Security Features ENFORCED mode improvements (2024-2025):**
-  ASF ENFORCED now blocks risky sign-ins (impossible travel, leaked
-  password) and exposes risk events to CloudWatch. Cheaper to run and
-  no longer requires per-user pricing on most tiers.
-- **Token revocation default (2024):** new app clients default to
-  `EnableTokenRevocation: true`. Older pools created before 2024 still
-  need explicit enablement.
-- **`OPTIONAL` MFA configuration (2024-2025):** introduced as the
-  recommended middle ground between OFF and ON. Users opt in to MFA
-  but the pool advertises both factors. Equivalent to the legacy
-  `ENABLED` value with clearer semantics.
-- **Cognito user pool groups IAM role vending (2024):** groups with
-  `RoleArn` set can issue AWS credentials via the identity pool flow.
-  The user pool JWT also includes `cognito:groups` as a claim for
-  application-layer RBAC.
-- **Hosted UI custom domain alias for app clients (2024-2025):** a
-  single user pool can host multiple custom domains, one per app
-  client, enabling white-label B2B portals.
-- **Cognito Managed Login Branding asset API (2025):** programmatic
-  upload of logo images via `CreateManagedLoginBranding` assets —
-  previously console-only.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## AWS documentation
 
@@ -745,6 +473,14 @@ rates before promoting to ENFORCED.
 - **Resource servers and custom scopes** — https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-define-resource-servers.html
 - **Advanced Security Features** — https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-advanced-security.html
 - **Managed Login Branding** — https://docs.aws.amazon.com/cognito/latest/developerguide/managed-login-branding.html
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step-0 expert Cognito behaviors and 2024-2026 feature changes moved from SKILL.md
+- [references/worked-examples.md](references/worked-examples.md) — common pool / client / IdP / domain / trigger / group CLI boilerplate moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — live-account pre-flight command listing moved from SKILL.md
+- [references/pool-config-and-security-defaults.md](references/pool-config-and-security-defaults.md) — pool archetypes, app client procedure, token validity, verification commands
+- [references/identity-providers-and-triggers.md](references/identity-providers-and-triggers.md) — SAML/OIDC/social IdP, Lambda trigger, and domain procedures
 
 ## Domain
 

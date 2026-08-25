@@ -102,46 +102,8 @@ not running, or a delivery channel can exist but be failing silently.
 | `describe-config-rules` | Rule count, type (managed/custom/Lambda), scope | Rules |
 | `describe-conformance-packs` | Conformance pack name, deployment status | Rules |
 
-**Multi-region sweep note:** AWS Config is regional — each region has its
-own recorder and delivery channel. An account-level audit must iterate all
-enabled regions (`account:get-regions` or `aws ec2 describe-regions
---filters OptInStatus=opt-in-status --query 'Regions[].RegionName'`). A
-common failure is auditing only us-east-1 and missing gaps in other regions.
-For each region, run all six API calls. Use `--region <r>` on each.
-
-**Pagination and throttling handling:** `describe-config-rules` and
-`describe-conformance-packs` return paginated results. In accounts with
-many rules or packs, a single API call returns only the first page —
-silently undercounting rules and producing a false NO_RULES verdict.
-Always paginate using `--next-token` / `NextToken` until the response
-contains no `NextToken`, then aggregate the full rule/pack count before
-classifying. Config API calls are also subject to throttling (rate limit
-~10 req/s for read APIs in most regions). When auditing many regions
-sequentially, expect intermittent `ThrottlingException` responses;
-retry with exponential backoff (initial 200ms, factor 2, max 5 retries)
-and treat a throttled response as "data missing — re-fetch," NOT as an
-empty result that would produce a false NO_RULES or CONFIG_GAP verdict.
-
-**Live-account pre-flight checks:**
-1. Verify the caller's identity has these exact IAM permissions:
-   `configservice:DescribeConfigurationRecorders`,
-   `configservice:DescribeConfigurationRecorderStatus`,
-   `configservice:DescribeDeliveryChannels`,
-   `configservice:DescribeDeliveryChannelStatus`,
-   `configservice:DescribeConfigRules`,
-   `configservice:DescribeConformancePacks`,
-   `configservice:DescribeOrganizationConformancePacks`,
-   `configservice:DescribeConfigurationAggregators`.
-   These are read-only auditor permissions and are separate from the
-   service-linked role that Config itself uses.
-2. Check `aws iam get-role --role-name AWSServiceRoleForConfig` — if this
-   service-linked role is missing, the recorder cannot function regardless
-   of its configuration. This is the most common root cause of
-   `lastStatus: FAILURE`.
-3. For multi-account audits, check whether an aggregator exists
-   (`describe-configuration-aggregators`) — an aggregator collects data
-   from source accounts but does NOT deploy recorders or rules. A region
-   with only an aggregator and no local recorder has a CONFIG_GAP.
+Multi-region sweep commands, pagination/throttling handling, and live-account pre-flight checks (IAM permissions, `AWSServiceRoleForConfig`, aggregator check) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load them before a live-account audit.
 
 **If the input is malformed** (missing required fields, invalid JSON),
 output:
@@ -158,99 +120,8 @@ REMEDIATION: Re-fetch with the six required describe-* calls and re-audit.
 
 ### Step 0: Expert knowledge — non-obvious AWS Config behaviors
 
-These behaviors change the verdict if ignored:
-
-- **`describe-configuration-recorders` returns config, NOT status.** A
-  recorder that looks perfectly configured (allSupported: true, correct
-  role) can be stopped or failing. You MUST also check
-  `describe-configuration-recorder-status` for the operational truth.
-  Checking only the configuration is the most common audit error.
-
-- **`includeGlobalResourceTypes: true` in multiple regions records IAM
-  changes N times.** Each region with this flag independently records the
-  same IAM/CloudFront/Route 53 change. In a 20-region account, one IAM
-  user creation generates 20 configuration items. AWS recommends enabling
-  this in ONE region (typically us-east-1) to avoid duplicate items,
-  inflated S3 costs, and forensic confusion (which region's copy is
-  authoritative?). Flag regions beyond the designated global-resource
-  region that have this enabled — it's a cost waste, not a coverage gap.
-
-- **`allSupported: false` silently loses new AWS services.** When AWS
-  launches a new resource type, a recorder with `allSupported: true`
-  automatically includes it. A recorder with `allSupported: false` and an
-  explicit resourceTypes list does NOT — the new resource type is invisible
-  to Config until someone manually adds it. This is a creeping coverage
-  gap that goes undetected for months.
-
-- **Delivery channel `lastErrorCode` is the diagnostic key.** `FAILURE`
-  status alone tells you delivery is broken; the error code tells you WHY:
-  `NO_SUCH_BUCKET` (bucket deleted), `ACCESS_DENIED` (bucket policy missing
-  the required grant to config.amazonaws.com), `INTERNAL_ERROR` (transient
-  AWS-side issue). Always surface the error code in the FINDINGS.
-
-- **Conformance packs are CloudFormation stacks under the hood.** A
-  conformance pack in `CREATE_COMPLETE` or `UPDATE_COMPLETE` is effective.
-  A pack in `ROLLBACK_COMPLETE` or `CREATE_FAILED` deployed zero effective
-  rules — the pack name appears in the API response, but no rules are
-  active. Check `DeploymentStatus`, not just existence.
-
-- **Custom Lambda rules freeze when the Lambda is deleted.** A Config rule
-  backed by a Lambda function continues to appear in `describe-config-rules`
-  even after the Lambda is deleted. The rule stops evaluating compliance,
-  and its last compliance result freezes indefinitely. The rule's
-  `LastEvaluationTime` timestamp is the indicator — if it is stale (days/
-  weeks old), the evaluation engine is dead.
-
-- **Recording is continuous; delivery is periodic.** Config records
-  configuration changes as they happen, but delivers configuration snapshots
-  to S3 at the configured `deliveryFrequency` (`One_Hour`, `Three_Hours`,
-  `Six_Hours`, `TwentyFour_Hours`). There is always a lag between a change
-  and its appearance in S3. A `TwentyFour_Hours` frequency means up to 24
-  hours of latency before a snapshot reflects the latest state.
-
-- **Config rules quota is 150 per region by default** (adjustable via
-  Service Quotas). Conformance packs deploy many rules at once — a large
-  pack can push a region to the quota ceiling, silently blocking future
-  rule or pack deployments. When a conformance pack is near the quota,
-  flag it as a scaling risk.
-
-- **`AWSServiceRoleForConfig` is mandatory.** The service-linked role must
-  exist with the `AWSConfigRole` managed policy attached. Deleting this
-  role (or detaching the policy) breaks recording with `lastStatus:
-  FAILURE` — the recorder configuration looks correct but cannot function.
-
-- **An aggregator is NOT a recorder.** A Config aggregator collects
-  compliance and configuration data from source accounts/regions into a
-  central account. But it does NOT record local resources — the aggregator
-  account still needs its own recorder for local coverage. A region with
-  only an aggregator and no local recorder has a CONFIG_GAP.
-
-- **Rule scope can silently exclude every resource the recorder captures.**
-  A Config rule has its own `Scope` (by resource type or tag). If the rule
-  scope targets `AWS::EC2::Instance` but the recorder's `resourceTypes`
-  list does NOT include `AWS::EC2::Instance`, the rule evaluates nothing —
-  no configuration items exist for it to evaluate against. Conversely, a
-  rule scope wider than the recorder scope produces silent rule inactivity
-  with no error. Cross-check rule `Scope` against the recorder's recording
-  group; flag rules whose target resource types are not being recorded.
-
-- **`put-configuration-recorder` overwrites, it does not merge.** Calling
-  `put-configuration-recorder` replaces the ENTIRE recorder configuration.
-  A common breakage pattern: fetch the recorder, modify one field (e.g.
-  flip `allSupported`), and `put` it back without preserving the existing
-  `recordingGroup.resourceTypes` list — the resourceTypes array is wiped
-  to empty. Always re-send the full configuration object, not a partial
-  diff.
-
-- **Organization conformance packs do NOT appear in
-  `describe-conformance-packs`.** Packs deployed at the organization
-  level (via the management account, CloudFormation StackSets, or
-  `put-organization-conformance-pack`) are visible only through
-  `describe-organization-conformance-packs` and
-  `describe-organization-conformance-pack-status`. An audit that checks
-  only `describe-conformance-packs` in a member account will falsely
-  report zero conformance packs even when org-level packs are active and
-  enforcing rules in that account.
+Step 0 expert knowledge (recorder config vs status, global-resource-type duplication, creeping `allSupported` gaps, delivery error codes, conformance-pack rollback, frozen Lambda rules, quota ceiling, aggregator is NOT a recorder, scope mismatch, overwrite semantics, org packs) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before classifying edge cases.
 
 ### Classification discipline — avoid redundant and over-classified findings
 
@@ -554,127 +425,24 @@ REMEDIATION:
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`put-configuration-recorder`, `put-delivery-channel`, `start-configuration-
-  recorder`, `stop-configuration-recorder`, `put-conformance-pack`,
-  `delete-conformance-pack`), the auditor MUST emit:
-  `CONFIRM: About to <action> in region <region> for account <account>.
-  This affects <consequence>. Proceed? (yes/no)`
-
-- **Before changing the recorder configuration**, capture the current state:
-  `aws configservice describe-configuration-recorders --region <r> --output json > /tmp/config-recorder-backup-$(date +%s).json`
-  Recorder configuration changes are not versioned — there is no rollback
-  without a backup.
-
-- **Before starting a stopped recorder**, verify the `AWSServiceRoleForConfig`
-  role exists and has the `AWSConfigRole` policy attached. Starting a
-  recorder with a missing role immediately fails.
-
-- **Before changing `allSupported` from false to true**, warn the operator
-  about cost impact: `allSupported: true` records ALL resource types,
-  including high-churn types (e.g., `AWS::CloudTrail::Trail` API events).
-  In a large account, this can multiply Config costs by 5-10x.
-
-- **Before deploying a conformance pack**, verify the region has not hit
-  the 150-rule quota (`describe-config-rules --region <r>` and count). A
-  conformance pack that pushes the region over quota silently fails to
-  deploy rules.
+Pre-flight safety checks (confirmation gate, recorder backup, service-linked role, `allSupported` cost warning, rule-quota check) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Run them before any remediation CLI.
 
 ## Remediation guidance
 
-### For CONFIG_GAP — no recorder or recorder not recording
-
-1. **No recorder:** create one:
-   ```bash
-   aws configservice put-configuration-recorder \
-     --configuration-recorder name=default,roleARN=arn:aws:iam::<account>:role/service-role/AWSServiceRoleForConfig \
-     --recording-group allSupported=true,includeGlobalResourceTypes=true \
-     --region <region>
-   aws configservice start-configuration-recorder \
-     --configuration-recorder-name default --region <region>
-   ```
-
-2. **Recorder stopped:** restart it:
-   ```bash
-   aws configservice start-configuration-recorder \
-     --configuration-recorder-name default --region <region>
-   ```
-
-3. **Recorder `lastStatus: FAILURE`:** diagnose via `lastErrorMessage`. The
-   most common fix is recreating the service-linked role:
-   ```bash
-   aws iam create-service-linked-role --aws-service-name config.amazonaws.com
-   ```
-   Then restart the recorder.
-
-### For DELIVERY_GAP — delivery channel broken
-
-1. **No delivery channel:** create one pointing to an S3 bucket with the
-   correct bucket policy:
-   ```bash
-   aws configservice put-delivery-channel \
-     --delivery-channel name=default,s3BucketName=<bucket>,configSnapshotDeliveryProperties={deliveryFrequency=Six_Hours} \
-     --region <region>
-   ```
-
-2. **`NO_SUCH_BUCKET`:** either recreate the bucket or update the delivery
-   channel to point to an existing bucket.
-
-3. **`ACCESS_DENIED`:** add the required bucket policy statement granting
-   `s3:PutObject` to `config.amazonaws.com`:
-   ```json
-   {"Effect": "Allow", "Principal": {"Service": "config.amazonaws.com"},
-    "Action": "s3:PutObject", "Resource": "arn:aws:s3:::<bucket>/AWSLogs/<account>/Config/*"}
-   ```
-
-### For INCOMPLETE_COVERAGE — partial resource-type or region scope
-
-1. **`allSupported: false`:** switch to `allSupported: true` unless there is
-   a documented cost-control reason for the narrow scope. Enumerate the
-   missing critical types in the finding so the operator can assess impact.
-
-2. **No region with `includeGlobalResourceTypes: true`:** enable it in
-   exactly ONE region (typically us-east-1):
-   ```bash
-   aws configservice put-configuration-recorder \
-     --configuration-recorder name=default,roleARN=<role-arn> \
-     --recording-group allSupported=true,includeGlobalResourceTypes=true \
-     --region us-east-1
-   ```
-   Disable it in other regions to avoid duplicate IAM recordings.
-
-### For NO_RULES — no compliance evaluation
-
-1. Deploy an AWS-managed conformance pack as a baseline:
-   ```bash
-   aws configservice put-conformance-pack \
-     --conformance-pack-name operational-best-practices \
-     --template-s3-uri s3://aws-quickstart/config-conformance-packs/operational-best-practices.yaml \
-     --region <region>
-   ```
-
-2. Alternatively, deploy individual managed rules:
-   ```bash
-   aws configservice put-config-rule \
-     --config-rule file://rule.json --region <region>
-   ```
-
-3. For custom Lambda-backed rules, verify the Lambda function exists and
-   has the required permissions (`configservice:PutEvaluations`).
-
-### For OK
-
-1. No remediation required.
-2. Recommend periodic re-audit (monthly) to catch configuration drift.
-3. Verify conformance pack deployments remain in `CREATE_COMPLETE` or
-   `UPDATE_COMPLETE` status.
+Remediation guidance per verdict (CONFIG_GAP, DELIVERY_GAP, INCOMPLETE_COVERAGE, NO_RULES, OK — full CLI fixes) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when emitting REMEDIATION.
 
 ## Recent AWS features (2024-2026)
 
-- **New resource types for recording (2024-2025):** AWS Config now supports recording for many additional resource types (S3 directory buckets, VPC Lattice resources, Clean Rooms, Bedrock resources). Auditors should verify that `allSupported=true` is set to automatically capture new resource types, or manually add newly relevant types to the recording scope.
-- **Config conformance pack updates (2024):** New sample conformance packs for compliance frameworks. Auditors should verify that deployed conformance packs match the organization's active compliance requirements and are not stale.
-- **Organization config aggregator enhancements:** Improved multi-account aggregation with better error reporting. Auditors should verify that the aggregator includes all organization accounts and that authorization errors are resolved.
-- **Config rule evaluation frequency:** Enhanced support for periodic evaluation intervals. Auditors should verify that critical rules use appropriate evaluation frequency — over-triggered periodic rules consume Lambda budget, while under-triggered rules miss configuration drift.
+Recent AWS features (new recordable resource types, conformance-pack updates, aggregator enhancements, evaluation frequency) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when auditing recently changed environments.
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 expert-knowledge deep dive and Recent AWS features moved from SKILL.md.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — multi-region sweep commands, pagination/throttling handling, live-account pre-flight checks, and pre-flight safety checks moved from SKILL.md.
+- [references/error-handling.md](references/error-handling.md) — remediation guidance per verdict moved from SKILL.md.
 
 ## Domain
 

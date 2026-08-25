@@ -225,3 +225,29 @@ Why these defaults:
   legitimate monthly top-spenders query scans ~50 GB.
 - **Athena engine version 3** — required for partition projection with
   `NOW` as the range end.
+
+## Patterns — IaC templates: non-negotiable TBLPROPERTIES and workgroup blocks
+
+Full CloudFormation and Terraform templates (CUR definition + Glue DB +
+Glue Table with partition projection + non-primary workgroup with DSL +
+named queries) live in `references/athena-partition-projection-and-queries.md`.
+
+The non-negotiable TBLPROPERTIES block for partition projection:
+
+```text
+projection.enabled = true
+projection.day.type = date
+projection.day.range = "2024/01/01,NOW"  # literal NOW, Athena engine v3
+projection.day.format = "yyyy/MM/dd"
+projection.day.interval = 1
+projection.day.interval.unit = DAYS
+storage.location.template = s3://<bucket>/<prefix>/year=${year}/month=${month}/day=${day}
+```
+
+The non-negotiable workgroup configuration:
+
+```text
+EnforceWorkgroupConfiguration = true
+BytesScannedCutoffPerQuery = 1099511627776  # 1 TB cutoff
+EngineVersion = Athena engine version 3  # required for NOW range end
+```

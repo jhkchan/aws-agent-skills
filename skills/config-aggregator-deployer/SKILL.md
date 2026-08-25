@@ -217,246 +217,35 @@ Otherwise use authorized-account aggregation.
 
 ### Step 2: Delegated administrator setup (organization only)
 
-The management account designates the aggregator account as the
-delegated administrator for AWS Config:
-
-```bash
-# Enable AWS Config as a trusted service in Organizations
-aws organizations enable-aws-service-access \
-  --service-principal config.amazonaws.com
-
-# Designate the aggregator account as delegated admin
-aws organizations register-delegated-administrator \
-  --account-id 123456789012 \
-  --service-principal config.amazonaws.com
-```
-
-The delegated admin account can now create organization
-aggregators, deploy org conformance packs, and deploy org config
-rules without needing per-account credentials.
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand (see References below).
 
 ### Step 3: Create the aggregator
 
-**Organization aggregator:**
-```bash
-cat > /tmp/aggregator.json <<'EOF'
-{
-  "ConfigurationAggregatorName": "org-compliance-aggregator",
-  "OrganizationAggregationSource": {
-    "RoleArn": "arn:aws:iam::123456789012:role/ConfigAggregatorRole",
-    "AllAwsRegions": true
-  },
-  "Tags": [
-    { "Key": "Environment", "Value": "production" },
-    { "Key": "Governance", "Value": "compliance" }
-  ]
-}
-EOF
-
-aws configservice put-configuration-aggregator \
-  --cli-input-json file:///tmp/aggregator.json \
-  --region us-east-1
-```
-
-The `RoleArn` is a service-role in the management account that
-Config assumes to read organization details. It needs
-`organizations:ListAccounts` and `sts:AssumeRole` permissions.
-
-**Authorized-account aggregator:**
-```bash
-cat > /tmp/aggregator-auth.json <<'EOF'
-{
-  "ConfigurationAggregatorName": "authorized-accounts-aggregator",
-  "AccountAggregationSources": [
-    {
-      "AccountIds": ["111111111111", "222222222222", "333333333333"],
-      "AllAwsRegions": true
-    }
-  ],
-  "Tags": [
-    { "Key": "Environment", "Value": "production" }
-  ]
-}
-EOF
-
-aws configservice put-configuration-aggregator \
-  --cli-input-json file:///tmp/aggregator-auth.json \
-  --region us-east-1
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand (see References below).
 
 ### Step 4: Authorize source accounts (authorized-account only)
 
-For each source account, the source account must grant the
-aggregator account permission to collect data:
-
-```bash
-# Run on each SOURCE account
-aws configservice put-aggregation-authorization \
-  --authorized-account-id 123456789012 \
-  --authorized-aws-region us-east-1
-```
-
-This creates an `AggregationAuthorization` record that lets the
-aggregator account (123456789012) pull Config data from this
-source account. Organization aggregators do NOT need this — the
-delegated admin role auto-authorizes.
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand (see References below).
 
 ### Step 5: Verify recorders in source accounts
 
-The aggregator collects data from the Config recorder in each
-source account. If the recorder is not running, the aggregator
-will show empty results for that account.
-
-```bash
-# On each source account — verify recorder is running
-aws configservice describe-configuration-recorder-status
-```
-
-If the recorder is not running, enable Config on the source
-account:
-
-```bash
-# Create the Config role
-aws iam create-role \
-  --role-name AWS-ConfigRole \
-  --assume-role-policy-document file:///tmp/config-trust-policy.json
-
-aws iam attach-role-policy \
-  --role-name AWS-ConfigRole \
-  --policy-arn arn:aws:iam::aws:policy/service-role/AWS_ConfigRole
-
-# Create delivery channel (S3 bucket)
-aws configservice put-delivery-channel \
-  --delivery-channel file:///tmp/delivery-channel.json
-
-# Start the recorder
-aws configservice start-configuration-recorder \
-  --configuration-recorder-name default
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand (see References below).
 
 ### Step 6: Conformance packs at organization level
 
-Organization conformance packs deploy a set of Config rules and
-remediation actions to every account in the Organization. Deploy
-from the delegated admin account:
-
-```bash
-# Deploy an org-level conformance pack from a sample template
-aws configservice put-organization-conformance-pack \
-  --organization-conformance-pack-name OperationalBestPractices-for-Security \
-  --template-s3-uri s3://config-templates-123456789012/security-best-practices.yaml \
-  --region us-east-1
-```
-
-AWS provides sample conformance pack templates for common
-compliance frameworks:
-- `OperationalBestPractices-for-CloudWatch`
-- `OperationalBestPractices-for-Security`
-- `OperationalBestPractices-for-EC2`
-- `OperationalBestPractices-for-S3`
-- `OperationalBestPractices-for-IAM`
-- `FedRAMP-moderate`, `HIPAA-Security`, `PCI-DSS`, `CIS-AWS`
-
-Organization conformance packs auto-deploy to all current and
-future accounts. Individual account conformance packs can override
-org-level packs if they share a name.
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand (see References below).
 
 ### Step 7: Organization config rules with Lambda processor
 
-Create a custom Config rule backed by a Lambda function and deploy
-it across the organization:
-
-```bash
-# Deploy the Lambda function for the rule processor
-aws lambda create-function \
-  --function-name config-tag-policy-rule \
-  --runtime python3.12 \
-  --role arn:aws:iam::123456789012:role/ConfigLambdaRole \
-  --handler index.handler \
-  --zip-file fileb://config-rule.zip \
-  --region us-east-1
-
-# Create the organization config rule pointing to the Lambda
-aws configservice put-organization-config-rule \
-  --organization-config-rule-name tag-policy-compliance \
-  --organization-managed-rule \
-    ManagedRuleIdentifier=AWS_CONFIG_MANAGED_RULE_TAG_POLICY_CHECK,\
-    OrganizationRuleStatus=ENABLED \
-  --region us-east-1
-```
-
-The Lambda receives `ConfigurationItemChanged` events, evaluates
-the resource, and returns `COMPLIANT` or `NON_COMPLIANT` via
-`put_evaluations`.
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand (see References below).
 
 ### Step 8: Proactive rules (pre-deployment evaluation)
 
-Proactive Config rules evaluate resources BEFORE they are created.
-A rule must have its `Proactive` mode enabled, then CloudFormation,
-CDK, and Terraform can call `StartResourceEvaluation` to check
-resources during deployment.
-
-```bash
-# Create or update a Config rule with proactive evaluation enabled
-aws configservice put-config-rule \
-  --config-rule '{
-    "ConfigRuleName": "s3-bucket-versioning-proactive",
-    "Source": {
-      "Owner": "AWS",
-      "SourceIdentifier": "S3_BUCKET_VERSIONING_ENABLED"
-    },
-    "Proactive": true
-  }' \
-  --region us-east-1
-
-# Pre-deployment check — evaluate a hypothetical S3 bucket config
-EVAL_TOKEN=$(aws configservice start-resource-evaluation \
-  --resource-type "AWS::S3::Bucket" \
-  --resource-id "my-new-bucket" \
-  --evaluation-mode PROACTIVE \
-  --configuration '{"BucketName":"my-new-bucket","VersioningConfiguration":{"Status":"Suspended"}}' \
-  --query 'EvaluationToken' --output text \
-  --region us-east-1)
-
-# Retrieve the evaluation result
-aws configservice get-resource-evaluation-status \
-  --evaluation-token ${EVAL_TOKEN} \
-  --region us-east-1
-```
-
-The result tells you whether the resource would be compliant or
-non-compliant BEFORE provisioning — enabling shift-left
-compliance in CI/CD pipelines.
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand (see References below).
 
 ### Step 9: Verification and post-deployment checks
 
-```bash
-# Verify the aggregator exists and is configured
-aws configservice describe-configuration-aggregators \
-  --configuration-aggregator-names org-compliance-aggregator \
-  --region us-east-1
-
-# Check aggregation source status (are source accounts sending data?)
-aws configservice describe-configuration-aggregator-sources-status \
-  --configuration-aggregator-name org-compliance-aggregator \
-  --region us-east-1
-
-# List conformance packs deployed org-wide
-aws configservice describe-organization-conformance-packs \
-  --region us-east-1
-
-# Check org config rule deployment status
-aws configservice describe-organization-config-rule-statuses \
-  --region us-east-1
-
-# Aggregate compliance summary across all accounts/regions
-aws configservice get-aggregate-compliance-details-by-config-rule \
-  --configuration-aggregator-name org-compliance-aggregator \
-  --config-rule-name s3-bucket-versioning-enabled \
-  --account-id 111111111111 \
-  --aws-region us-east-1 \
-  --region us-east-1
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand (see References below).
 
 ## Topology matrix
 
@@ -484,35 +273,7 @@ not record, it aggregates.
 
 ## Recent AWS features (2024-2026)
 
-- **Proactive rules GA (2024-2025):** Config rules can now
-  evaluate resources BEFORE they are created via
-  `StartResourceEvaluation`. CloudFormation, CDK, and Terraform
-  integrate with proactive rules to block non-compliant resources
-  at deployment time. Managed rules support proactive mode by
-  setting `Proactive: true`.
-
-- **Config aggregator with Lambda processor (2024-2025):**
-  Organization config rules can now use Lambda functions as
-  evaluation engines, enabling custom compliance logic across all
-  accounts. Integrates with CloudTrail event matching for
-  near-real-time evaluation.
-
-- **Conformance pack org-level improvements (2024):**
-  `PutOrganizationConformancePack` now supports inline template
-  body (not just S3 URI), enabling IaC-native deployment.
-  Per-account status via `GetOrganizationConformancePackDetailedStatus`.
-
-- **Config multi-account aggregation throughput (2025):**
-  Increased source accounts per organization aggregator from
-  3,000 to 10,000, supporting larger enterprise deployments.
-
-- **Resource evaluation SDK expansion (2025):** proactive
-  evaluation now supports 50+ resource types including all EC2,
-  S3, IAM, and RDS resources, with expanded managed rule coverage.
-
-- **Config rules for new services (2024-2025):** new managed rules
-  for AWS Backup, Systems Manager, and AWS WAF, enabling
-  compliance checks in conformance packs.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## NEVER (anti-patterns)
 
@@ -605,19 +366,7 @@ narrower aggregation visibility.
 
 ## Pre-flight safety checks (run before any provisioning CLI)
 
-- **Confirm Organizations all features enabled:**
-  ```bash
-  aws organizations describe-organization --query 'Organization.FeatureSet' --output text
-  aws organizations list-aws-service-access-for-organization --filter config.amazonaws.com
-  aws organizations list-delegated-administrators --service-principal config.amazonaws.com
-  ```
-
-- **Confirm Config recorder and delivery channel on source accounts:**
-  ```bash
-  aws configservice describe-configuration-recorder-status --configuration-recorder-names default
-  aws configservice describe-delivery-channels
-  aws configservice describe-conformance-pack-templates
-  ```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 ## Output format — MANDATORY literal labels
 
@@ -671,39 +420,15 @@ or `[✗]` for unmet prerequisites.
 
 ## Edge-case handling
 
-- **Aggregator shows no source accounts.** For org aggregators:
-  verify Config is a trusted service in Organizations and the
-  delegated admin is registered. For authorized-account
-  aggregators: verify `PutAggregationAuthorization` was called on
-  each source account with the correct aggregator account ID and
-  region.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
-- **Source account status shows FAILED.** The source account's
-  Config recorder may be stopped, delivery channel missing, or
-  ConfigRole lacking permissions. Check
-  `describe-configuration-recorder-status` on the source account.
-  For authorized accounts, verify the aggregation authorization
-  region matches the aggregator region.
+## References (load on demand)
 
-- **Conformance pack fails on some accounts.** Check
-  `GetOrganizationConformancePackDetailedStatus` for per-account
-  errors. Common causes: IAM role missing in member, S3 bucket
-  policy blocking Config, or template syntax error for region-
-  specific resource types.
-
-- **Lambda processor rule never evaluates.** Verify the Lambda
-  resource policy grants `lambda:InvokeFunction` to
-  `config.amazonaws.com`. Check CloudWatch Logs for execution
-  errors.
-
-- **Proactive evaluation returns NOT_APPLICABLE.** The resource
-  type may not be supported for proactive evaluation, or the rule
-  may not have `Proactive: true` set. Verify the rule's
-  `Proactive` flag and resource type support.
-
-- **Aggregator exceeds account limit.** Organization aggregators
-  support up to 10,000 source accounts (2025 limit). For larger
-  fleets, use multiple aggregators partitioned by OU or region.
+- [references/worked-examples.md](references/worked-examples.md) — deployment Steps 2-9 CLI walkthroughs moved from SKILL.md
+- [references/advanced-patterns.md](references/advanced-patterns.md) — 2024-2026 feature changes + edge-case handling moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-provisioning safety checks moved from SKILL.md
+- [references/deployment-cli-commands.md](references/deployment-cli-commands.md) — full copy-pasteable CLI sequences for all 9 steps + Terraform/CloudFormation equivalents
+- [references/conformance-packs-and-proactive-rules.md](references/conformance-packs-and-proactive-rules.md) — conformance packs, proactive rules, Lambda processors, multi-account compliance queries
 
 ## Domain
 

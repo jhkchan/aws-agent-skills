@@ -309,3 +309,62 @@ resource "aws_connect_routing_profile" "tier1" {
    must be published to a version, and the alias must be updated
    to point to the new version. Otherwise Connect invokes the old
    version.
+
+---
+
+## Step 5 — Routing profile CLI and concurrency guidance (moved from SKILL.md)
+
+```bash
+ROUTING_PROFILE_ID=$(aws connect create-routing-profile \
+  --instance-id "$INSTANCE_ID" \
+  --name "tier-1-sales-support" \
+  --default-outbound-queue-id "$QUEUE_ID" \
+  --queue-configs '[
+    {"QueueReference":{"QueueId":"'"$SALES_QUEUE_ID"'","Channel":"VOICE"},"Priority":1,"Delay":0},
+    {"QueueReference":{"QueueId":"'"$SUPPORT_QUEUE_ID"'","Channel":"VOICE"},"Priority":2,"Delay":0}]' \
+  --media-concurrencies '[{"Channel":"VOICE","Concurrency":1}]' \
+  --query 'RoutingProfileId' --output text)
+```
+
+Queue priority: lower = higher priority. Media concurrency: VOICE
+typically 1, CHAT 3-5, TASK 5-10. Skill requirements and the
+three-component model (skill/proficiency/required-skill) are
+detailed in `references/routing-and-lex-integration.md`.
+
+---
+
+## Step 8 — Skills-based routing components (moved from SKILL.md)
+
+Three components must all be configured:
+
+| Component | Where | Example |
+|---|---|---|
+| Skill | Instance (defined once) | "Sales", proficiency levels 1-5 |
+| Skill proficiency | User (per-agent) | Agent A: Sales=5, Support=3 |
+| Required skill | Contact (via SetAttributes or TransferToQueue) | Contact X: Sales, proficiency ≥ 4 |
+
+Skills are typically defined via the Connect console. Once defined,
+agents are assigned proficiencies via `create-user` /
+`update-user-routing-profile`. Contacts specify required skills via
+contact attributes set in the flow. See
+`references/routing-and-lex-integration.md` for the routing-match
+algorithm.
+
+---
+
+## Step 9 — InvokeAmazonLex block JSON (moved from SKILL.md)
+
+```json
+{
+  "Identifier": "lex-ivr", "Type": "Action",
+  "Parameters": {
+    "BotAliasArn": "arn:aws:lex:us-east-1:123456789012:bot-alias/CustomerService:Prod",
+    "Intent": "RouteCall", "Slots": {"department": null},
+    "SessionAttributes": {"caller_id": "$.CustomerEndpoint.Address"}
+  },
+  "Transitions": {
+    "NextAction": "branch-on-department",
+    "Exceptions": [{"NextAction": "transfer-default", "Error": "Lex.Timeout"}]
+  }
+}
+```

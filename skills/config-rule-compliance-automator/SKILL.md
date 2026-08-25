@@ -139,33 +139,8 @@ Config Recorder (per account, per region)
 
 ### Step 0: Expert knowledge — non-obvious Config behaviors
 
-- **A Config rule scoped to a resource type NOT recorded by the recorder
-  will never emit NON_COMPLIANT.** Always verify the recorder's recording
-  group includes the rule's target type. Dead rules = false green
-  checkmark.
-
-- **`MaximumExecutionFrequency` on periodic rules controls cadence.**
-  Default is 24 hours. A non-compliant resource can exist up to 24 hours
-  before detection. For security-critical rules, use `Six_Hours` or
-  `One_Hour`.
-
-- **Custom Lambda rules have a 5-minute timeout and 256MB default.**
-  Multi-API rules (evaluating all S3 buckets) can timeout. Raise memory
-  to 512MB+. A timeout produces "ERROR" not "NON_COMPLIANT" — the rule
-  looks broken, not the resource.
-
-- **Conformance pack `RemediationConfiguration` uses the SSM document
-  NAME, not ARN.** A typo produces silent deployment failure — the pack
-  reports `CREATE_COMPLETE` but remediation is not wired.
-
-- **Organizational config rules require the `AWSServiceRoleForConfig`
-  service-linked role.** Without it, `put-organization-config-rule`
-  returns `AccessDenied`. Enable via `organizations enable-aws-service-
-  access --service-principal config-multiaccountsetup.amazonaws.com`.
-
-- **StackSet auto-deployment is required for ongoing compliance.** New
-  accounts added to the OU after StackSet creation do NOT receive the
-  conformance pack without auto-deployment enabled.
+Step 0 expert knowledge (dead-rule scope mismatch, periodic-rule cadence, Lambda timeout/memory, remediation TargetId name-vs-ARN, org-rule service-linked role, StackSet auto-deployment) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before designing the rule set.
 
 ### Step 1: Managed rule selection for a framework
 
@@ -204,74 +179,13 @@ when the logic exceeds both.
 
 ### Step 3: Build a custom Lambda rule
 
-```python
-import json, boto3
-config = boto3.client('config')
-
-def lambda_handler(event, context):
-    invoking_event = json.loads(event['invokingEvent'])
-    item = invoking_event['configurationItem']
-    compliance = 'NON_COMPLIANT'
-    annotation = ''
-
-    if item['resourceType'] == 'AWS::EC2::SecurityGroup':
-        if item.get('configuration', {}).get('groupName') == 'default':
-            ingress = item.get('configuration', {}).get('ipPermissions', [])
-            if ingress:
-                annotation = 'Default security group has ingress rules'
-            else:
-                compliance = 'COMPLIANT'
-        else:
-            compliance = 'COMPLIANT'
-
-    config.put_evaluations(Evaluations=[{
-        'ComplianceResourceType': item['resourceType'],
-        'ComplianceResourceId': item['resourceId'],
-        'ComplianceType': compliance,
-        'Annotation': annotation,
-        'OrderingTimestamp': item['configurationItemCaptureTime']
-    }], ResultToken=event.get('resultToken', 'NoTokenFound'))
-    return {'compliance': compliance}
-```
-
-Deploy:
-
-```bash
-aws configservice put-config-rule \
-  --config-rule '{
-    "ConfigRuleName": "custom-default-sg-no-ingress",
-    "Source": {
-      "Owner": "CUSTOM_LAMBDA",
-      "SourceIdentifier": "arn:aws:lambda:us-east-1:111111111111:function:custom-default-sg-check",
-      "SourceDetails": [{"EventSource": "aws.config", "MessageType": "ConfigurationItemChangeNotification"}]
-    },
-    "Scope": {"ComplianceResourceTypes": ["AWS::EC2::SecurityGroup"]}
-  }'
-```
+Step 3 custom-Lambda rule (full Python evaluator and `put-config-rule` deploy CLI) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when a CIS gap needs a custom rule.
 
 ### Step 4: Deploy conformance packs via StackSets
 
-```bash
-aws cloudformation create-stack-set \
-  --stack-set-name cis-compliance-baseline \
-  --template-body file://cis-conformance-pack.yaml \
-  --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-  --permission-model SERVICE_MANAGED \
-  --auto-deployment Enabled=true,RetainStacksOnAccountRemoval=false
-
-aws cloudformation create-stack-instances \
-  --stack-set-name cis-compliance-baseline \
-  --deployment-targets OrganizationalUnitIds=["ou-xxxx-root"] \
-  --regions us-east-1,us-west-2,eu-west-1,ap-southeast-2
-```
-
-Verify:
-
-```bash
-aws configservice describe-conformance-packs --region us-east-1
-aws configservice describe-conformance-pack-compliance \
-  --conformance-pack-name cis-compliance-baseline
-```
+Step 4 StackSet deployment CLI (create-stack-set with CAPABILITY_IAM + SERVICE_MANAGED auto-deployment, stack instances, verification) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when deploying the baseline.
 
 ### Step 5: Wire SSM remediation to compliance findings
 
@@ -299,174 +213,38 @@ aws configservice put-remediation-configurations \
 
 ### Step 6: Deploy framework conformance packs
 
-**CIS conformance pack (sample):**
-
-```yaml
-Resources:
-  RootAccessKeyCheck:
-    Type: AWS::Config::ConfigRule
-    Properties:
-      ConfigRuleName: root-access-key-check
-      Source: {Owner: AWS, SourceIdentifier: IAM_ROOT_ACCESS_KEY_CHECK}
-
-  S3EncryptionRule:
-    Type: AWS::Config::ConfigRule
-    Properties:
-      ConfigRuleName: s3-bucket-server-side-encryption-enabled
-      Source: {Owner: AWS, SourceIdentifier: S3_BUCKET_SERVER_SIDE_ENCRYPTION_ENABLED}
-      Scope: {ComplianceResourceTypes: [AWS::S3::Bucket]}
-
-  S3EncryptionRemediation:
-    Type: AWS::Config::RemediationConfiguration
-    Properties:
-      ConfigRuleName: !Ref S3EncryptionRule
-      TargetType: SSM_DOCUMENT
-      TargetId: AWS-EnableS3BucketEncryption
-      Automatic: true
-      MaximumAutomaticAttempts: 3
-      RetryAttemptSeconds: 600
-      Parameters:
-        S3BucketName: {ResourceValue: {Value: RESOURCE_ID}}
-        AutomationAssumeRole:
-          StaticValue:
-            Values: [!Sub 'arn:aws:iam::${AWS::AccountId}:role/aws-service-role/AmazonSSMAutomationRole/AWS-SSM-AutomationExecutionRole']
-
-  ComplianceSNSTopic:
-    Type: AWS::SNS::Topic
-    Properties:
-      TopicName: config-compliance-notifications
-```
+Step 6 CIS conformance-pack sample YAML (rules + RemediationConfiguration + SNS topic) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when authoring the pack template.
 
 ### Step 7: Config Aggregator for multi-account visibility
 
-```bash
-aws configservice put-configuration-aggregator \
-  --configuration-aggregator-name org-compliance-aggregator \
-  --organization-aggregator-source \
-    '{"RoleArn":"arn:aws:iam::111111111111:role/ConfigAggregatorRole","AllAwsRegions":true}'
-```
-
-Query cross-account compliance:
-
-```bash
-aws configservice describe-aggregate-compliance-by-config-rules \
-  --configuration-aggregator-name org-compliance-aggregator \
-  --filters '{"ConfigRuleName":"s3-bucket-server-side-encryption-enabled","ComplianceType":"NON_COMPLIANT"}'
-```
-
-**Key distinction:** the aggregator provides VISIBILITY. To REMEDIATE
-across accounts, deploy remediation configurations per account via
-StackSets.
+Step 7 Config Aggregator CLI (org aggregator + cross-account NON_COMPLIANT query; aggregator = visibility only) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when configuring multi-account visibility.
 
 ### Step 8: Organizational config rules
 
-```bash
-# Enable Config multi-account setup
-aws organizations enable-aws-service-access \
-  --service-principal config-multiaccountsetup.amazonaws.com
-
-# Deploy an org-level rule
-aws configservice put-organization-config-rule \
-  --organization-config-rule-name org-s3-encryption-rule \
-  --organization-managed-rule-metadata \
-    '{"Identifier":"S3_BUCKET_SERVER_SIDE_ENCRYPTION_ENABLED","ResourceTypes":["AWS::S3::Bucket"]}'
-
-# Deploy org-level remediation
-aws configservice put-organization-remediation-configuration \
-  --organization-remediation-configurations '[{
-    "ConfigRuleName":"org-s3-encryption-rule",
-    "TargetType":"SSM_DOCUMENT","TargetId":"AWS-EnableS3BucketEncryption",
-    "Automatic":true,"MaximumAutomaticAttempts":3,"RetryAttemptSeconds":600
-  }]'
-```
-
-Org rules deploy to ALL member accounts automatically. New accounts
-receive the rule via auto-deployment.
+Step 8 organizational config rules CLI (enable service access, org rule + org remediation configuration) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for org-level deployment.
 
 ### Step 9: Custom policy rules (Git-based via CodeCommit)
 
-Custom policy rules use the Guard 2 DSL, evaluated server-side (no
-Lambda cost):
-
-```bash
-aws configservice put-config-rule \
-  --config-rule '{
-    "ConfigRuleName": "custom-policy-no-public-s3-acl",
-    "Source": {
-      "Owner": "CUSTOM_POLICY",
-      "SourceDetails": [{"EventSource":"aws.config","MessageType":"ConfigurationItemChangeNotification"}],
-      "CustomPolicyDetails": {
-        "PolicyRuntime": "guard-2",
-        "PolicyText": "let s3_bucket = Resources.*[ Type == '\''AWS::S3::Bucket'\'' ]; rule s3_no_public when %s3_bucket !empty { s3_bucket.Properties.AccessControl != '\''PublicReadWrite'\'' }"
-      }
-    },
-    "Scope": {"ComplianceResourceTypes": ["AWS::S3::Bucket"]}
-  }'
-```
+Step 9 custom policy rule CLI (Guard 2 DSL, server-side evaluation, no Lambda cost) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for policy-expressible checks.
 
 ### Step 10: SNS compliance notifications
 
-```python
-import json, boto3
-sns = boto3.client('sns')
-TOPIC_ARN = 'arn:aws:sns:us-east-1:111111111111:config-compliance-alerts'
-
-def lambda_handler(event, context):
-    for record in event.get('Records', []):
-        msg = json.loads(record['Sns']['Message'])
-        new = msg.get('newEvaluationResult', {}).get('complianceType')
-        if new == 'NON_COMPLIANT':
-            rule = msg.get('configRuleName', 'unknown')
-            resource = msg.get('resourceId', 'unknown')
-            sns.publish(TopicArn=TOPIC_ARN,
-                Message=f'NON_COMPLIANT: {rule} on {resource}',
-                Subject=f'[Config Compliance] {rule}')
-```
+Step 10 SNS compliance-notification Lambda (Python publisher) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when wiring notifications.
 
 ### Step 11: Compliance dashboard
 
-```bash
-aws cloudwatch put-dashboard \
-  --dashboard-name config-compliance-dashboard \
-  --dashboard-body '{
-    "widgets": [{
-      "type": "metric",
-      "properties": {
-        "metrics": [
-          ["AWS/Config","ComplianceNonCompliantResources","ConfigRuleName","s3-bucket-server-side-encryption-enabled"],
-          ["AWS/Config","ComplianceNonCompliantResources","ConfigRuleName","iam-root-access-key-check"],
-          ["AWS/Config","ComplianceNonCompliantResources","ConfigRuleName","root-account-mfa-enabled"]
-        ],
-        "period": 300, "stat": "Maximum", "region": "us-east-1",
-        "title": "Non-Compliant Resources by Rule", "view": "timeSeries"
-      }
-    }]
-  }'
-```
+Step 11 compliance-dashboard CLI (CloudWatch put-dashboard with per-rule NON_COMPLIANT metrics) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when building the dashboard.
 
 ### Step 12: Drift detection
 
-**CloudFormation drift (IaC divergence):**
-
-```bash
-aws cloudformation detect-stack-drift --stack-name my-compliant-stack
-aws cloudformation describe-stack-drift-detection-status \
-  --stack-drift-detection-id <id>
-```
-
-**Config drift (configuration timeline):**
-
-```bash
-aws configservice get-resource-config-history \
-  --resource-type AWS::S3::Bucket --resource-id my-bucket --limit 10
-```
-
-Alert on drift via EventBridge:
-
-```bash
-aws events put-rule --name config-drift-detection \
-  --event-pattern '{"source":["aws.config"],"detail-type":["Config Configuration Item Change"],"detail":{"configurationItemDiff":{"changeType":["UPDATE"]}}}'
-```
+Step 12 drift-detection CLI (CloudFormation drift, Config timeline, EventBridge alert rule) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when detecting drift.
 
 ## Output format (STRICT output contract)
 
@@ -519,25 +297,8 @@ TEMPLATE:
 
 ### Worked example — REVIEW_REQUIRED, Aggregator missing
 
-```text
-COMPLIANCE: multi-account-cis-baseline
-FRAMEWORK: CIS AWS Foundations Benchmark
-RULES:
-  - Managed: root-account-mfa-enabled, iam-root-access-key-check, cloudtrail-enabled
-  - Custom: custom-default-sg-no-ingress (CIS 2.1 gap — no managed equivalent)
-REMEDIATION:
-  - Automatic: none
-  - Manual: custom-default-sg-no-ingress → Custom-RevokeDefaultSGIngress (requires build + test)
-AGGREGATOR:
-  - Status: NOT CONFIGURED
-  - Scope: N/A
-FRAMEWORK_DEPLOYMENT:
-  - Method: StackSet (cis-compliance-baseline)
-  - Auto-deployment: disabled
-  - Regions: us-east-1 only
-VERDICT: REVIEW_REQUIRED
-GAP: (1) Config Aggregator not configured — deploy org aggregator for cross-account visibility. (2) Auto-deployment disabled — new accounts won't receive rules. (3) Multi-region missing — rules in us-east-1 only.
-```
+Worked example — REVIEW_REQUIRED, Aggregator missing (failure-mode output shape) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand for the REVIEW_REQUIRED output shape.
 
 ## Anti-Patterns — NEVER do these things
 
@@ -613,14 +374,8 @@ GAP: (1) Config Aggregator not configured — deploy org aggregator for cross-ac
 
 ## Appendix A — Managed rules by framework
 
-| Framework | Key managed rules | Coverage |
-|---|---|---|
-| CIS 1.x (IAM) | `iam-root-access-key-check`, `root-account-mfa-enabled`, `iam-password-policy` | ~90% |
-| CIS 2.x (Networking) | `vpc-sg-open-only-to-authorized-ports`, default SG: custom needed | ~70% |
-| CIS 3.x (Logging) | `cloudtrail-enabled`, `multi-region-cloudtrail-enabled`, `s3-bucket-logging-enabled` | ~100% |
-| CIS 4.x (Monitoring) | `cloudwatch-alarm-action-check`, `config-enabled` | ~80% |
-| PCI-DSS | `s3-bucket-versioning-enabled`, `iam-policy-no-statements-with-admin-access` | ~75% |
-| NIST 800-53 | `acm-certificate-expiration-check`, `rds-snapshots-public-prohibited`, `vpc-flow-logs-enabled` | ~65% |
+Appendix A managed-rules-by-framework coverage table (~90% CIS IAM, ~70% CIS networking, ~100% CIS logging, PCI-DSS, NIST 800-53) moved verbatim to [references/managed-rules-and-frameworks.md](references/managed-rules-and-frameworks.md).
+Load on demand when selecting rules for a framework.
 
 ## Appendix B — Decision tree
 
@@ -637,63 +392,19 @@ Is there a managed rule for the check?
 
 ## Recent AWS features (2024-2026)
 
-- **Organizational config rules GA (2024):** Org-level rule deployment
-  with auto-propagation to member accounts.
-- **Custom policy rules with Guard 2 (2024-2025):** Server-side policy
-  evaluation, eliminating Lambda runtime costs for policy-expressible
-  rules.
-- **Config drift detection enhancements (2025):** Real-time drift alerts
-  via EventBridge with diff metadata in the event payload.
-- **Config Aggregator cost optimization (2025):** Selective aggregation
-  — aggregate only specific rules per account, reducing costs.
-- **StackSet auto-deployment with OU targeting (2024):** New accounts
-  added to a targeted OU automatically receive the StackSet.
-- **Config conformance pack template builder (2024-2025):** Visual
-  template builder for composing conformance packs from managed rule
-  libraries.
+Recent AWS features (org rules GA, Guard 2 custom policy rules, drift enhancements, selective aggregation, OU auto-deployment, template builder) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when auditing recent setups.
 
 ## Expert heuristic: managed vs custom rule selection criteria + SSM remediation document lifecycle + conformance pack deployment via StackSets
 
-The highest-leverage Config compliance pattern is a three-layer
-deployment: prefer managed rules wherever possible, wire SSM remediation
-with appropriate trigger semantics, and deploy the baseline via
-StackSets with auto-deployment enabled.
+Expert heuristic deep dive (managed-vs-custom selection rule, SSM remediation document lifecycle, conformance-pack deployment checklist, MANAGED_RULE_COUNT / CUSTOM_RULE_COUNT / AUTO_DEPLOYMENT / REGION_COVERAGE output fields) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before finalizing the design.
 
-**The rule (non-negotiable):**
+## References (load on demand)
 
-> ALWAYS prefer managed rules when they exist (80+ available, AWS-
-> maintained, no Lambda cost). For gaps, use custom policy rules (Guard
-> 2, server-side) before falling back to custom Lambda rules. Deploy
-> the entire compliance baseline via StackSets with auto-deployment
-> enabled, targeting the full OU and all active regions. Never deploy a
-> compliance baseline to a single account or single region.
-
-**SSM remediation document lifecycle:**
-
-| Phase | Action |
-|---|---|
-| Select | Check for managed runbook (`AWS-*` prefix) |
-| Build (if custom) | Create document, test in pre-prod |
-| Wire | `put-remediation-configurations` with trigger semantics |
-| Backlog | `start-remediation-execution` for existing NON_COMPLIANT |
-| Verify | `describe-remediation-execution-status` + Config timeline |
-
-**Conformance pack deployment checklist:**
-
-| Item | Required |
-|---|---|
-| `CAPABILITY_IAM CAPABILITY_NAMED_IAM` on StackSet | YES |
-| `SERVICE_MANAGED` permission model | YES |
-| Auto-deployment enabled | YES |
-| All active regions in `--regions` | YES |
-| RemediationConfiguration resources in pack YAML | YES (not implicit) |
-| SNS topic for compliance notifications | Recommended |
-| Config recorder active in each target account | YES |
-
-**Surface in output:** include `MANAGED_RULE_COUNT: <n>`,
-`CUSTOM_RULE_COUNT: <n>`, `AUTO_DEPLOYMENT: enabled|disabled`, and
-`REGION_COVERAGE: <n>`. If `REGION_COVERAGE` is 1 or `AUTO_DEPLOYMENT`
-is disabled, do NOT mark as deployable.
+- [references/worked-examples.md](references/worked-examples.md) — Steps 3/4/6 full CLI payloads and the REVIEW_REQUIRED worked example moved from SKILL.md.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 expert knowledge, Steps 7-12 recipes (aggregator, org rules, Guard 2 policy rules, SNS, dashboard, drift), Recent AWS features, and the expert heuristic moved from SKILL.md.
+- [references/managed-rules-and-frameworks.md](references/managed-rules-and-frameworks.md) — now also holds the Appendix A framework coverage table moved from SKILL.md.
 
 ## Domain
 

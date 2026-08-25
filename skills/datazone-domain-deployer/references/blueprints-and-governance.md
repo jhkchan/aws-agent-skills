@@ -507,3 +507,239 @@ resource "aws_datazone_environment_profile" "production" {
   })
 }
 ```
+
+## Expert heuristic: glossary-driven governance (moved from SKILL.md)
+
+
+
+The glossary is not a tagging system — it is the policy engine.
+Glossary terms define classification, ownership, and subscription
+policies that are applied when assets are tagged.
+
+```text
+Glossary hierarchy example:
+  Business Glossary (root)
+  ├── Data Classification (category)
+  │   ├── Public → auto-approve subscription policy
+  │   ├── Internal → project owner approval
+  │   ├── Confidential → data steward approval
+  │   └── Restricted → executive approval (multi-level workflow)
+  ├── Data Domain (category)
+  │   ├── Customer Data → ownership: CRM team
+  │   ├── Financial Data → ownership: Finance team
+  │   └── Operational Data → ownership: Operations team
+  └── Data Quality (category)
+      ├── Certified → published, validated, ready for consumption
+      └── Draft → not validated, subscriptions require additional review
+```
+
+When an asset is tagged with a glossary term, the term's subscription
+policy is applied. An asset tagged "Public" gets auto-approval; an
+asset tagged "Restricted" requires executive approval. This is the
+governance mechanism that makes DataZone scalable — you don't approve
+each subscription individually; you set policies at the glossary
+level.
+
+**Key implication:** design the glossary BEFORE publishing assets.
+Adding glossary terms and policies after assets are published does
+NOT retroactively apply to existing subscriptions. The glossary must
+be the first governance artifact, not an afterthought.
+
+
+
+## Step 4 — asset listing and publishing commands (moved from SKILL.md)
+
+
+
+```bash
+# List discovered assets (after a data source crawl)
+aws datazone list-assets \
+  --domain-id "$DOMAIN_ID" \
+  --project-id "$PROJECT_ID" \
+  --region us-east-1
+
+# Publish an asset (make it available in the catalog)
+aws datazone update-asset \
+  --domain-id "$DOMAIN_ID" \
+  --identifier "$(aws datazone list-assets \
+    --domain-id "$DOMAIN_ID" \
+    --project-id "$PROJECT_ID" \
+    --query 'items[0].id' --output text)" \
+  --status PUBLISHED \
+  --region us-east-1
+```
+
+
+
+## Step 4 — glossary term creation and association commands (moved from SKILL.md)
+
+
+
+```bash
+# Create a glossary term
+aws datazone create-glossary-term \
+  --domain-id "$DOMAIN_ID" \
+  --name "PII" \
+  --long-description "Personally Identifiable Data — requires data steward approval for subscription" \
+  --status ENABLED \
+  --region us-east-1
+
+# Attach a glossary term to an asset
+aws datazone associate-glossary-term-with-asset \
+  --domain-id "$DOMAIN_ID" \
+  --glossary-term-id "$(aws datazone list-glossary-terms \
+    --domain-id "$DOMAIN_ID" \
+    --query 'items[?name==`PII`].id' --output text)" \
+  --identifier "<asset-id>" \
+  --region us-east-1
+```
+
+
+
+## Step 5 — metadata enrichment Lambda walkthrough (moved from SKILL.md)
+
+
+
+Metadata enrichment uses Lambda functions to auto-classify assets when
+they are discovered or updated. This automates glossary tagging.
+
+```bash
+# Create a metadata enrichment Lambda function
+LAMBDA_ARN=$(aws lambda create-function \
+  --function-name datazone-auto-classify \
+  --runtime python3.12 \
+  --role arn:aws:iam::111111111111:role/DataZoneEnrichmentRole \
+  --handler index.lambda_handler \
+  --zip-file fileb://enrichment.zip \
+  --query 'FunctionArn' --output text)
+
+# Register the enrichment function with the DataZone project
+aws datazone create-environment \
+  --domain-id "$DOMAIN_ID" \
+  --project-id "$PROJECT_ID" \
+  --name enrichment-environment \
+  --blueprint-id default-data-lake \
+  --region us-east-1 \
+  --query 'id' --output text
+```
+
+The Lambda function receives asset metadata events from DataZone,
+analyzes column names or data samples, and auto-tags the asset with
+relevant glossary terms (e.g., tagging columns containing email
+addresses with "PII").
+
+```python
+# Lambda handler for DataZone metadata enrichment
+import json
+import re
+
+def lambda_handler(event, context):
+    asset = event['detail']['asset']
+    columns = asset.get('forms', {}).get('columnNameMapping', {})
+
+    pii_patterns = {
+        'email': r'^[a-z_]*email[a-z_]*$',
+        'phone': r'^[a-z_]*phone[a-z_]*$',
+        'ssn': r'^[a-z_]*ssn[a-z_]*$',
+        'address': r'^[a-z_]*address[a-z_]*$',
+    }
+
+    detected_pii = False
+    for col_name in columns:
+        for pii_type, pattern in pii_patterns.items():
+            if re.match(pattern, col_name, re.IGNORECASE):
+                detected_pii = True
+                break
+
+    return {
+        'assetId': asset['id'],
+        'glossaryTerms': ['PII'] if detected_pii else ['Public'],
+        'forms': {
+            'autoClassification': {
+                'detectedPII': detected_pii,
+                'confidence': 0.85 if detected_pii else 1.0
+            }
+        }
+    }
+```
+
+
+
+## Step 8 — blueprint listing and enablement commands (moved from SKILL.md)
+
+
+
+```bash
+# List available blueprints
+aws datazone list-environment-blueprints \
+  --domain-id "$DOMAIN_ID" \
+  --region us-east-1
+
+# Enable a blueprint in the domain
+aws datazone update-environment-blueprint \
+  --domain-id "$DOMAIN_ID" \
+  --blueprint-id default-data-lake \
+  --enabled \
+  --region us-east-1
+```
+
+
+
+## Step 9 — environment profile creation command (moved from SKILL.md)
+
+
+
+```bash
+# Create an environment profile for the data lake blueprint
+aws datazone create-environment-profile \
+  --domain-id "$DOMAIN_ID" \
+  --name production-data-lake \
+  --description "Production data lake environment in the data account" \
+  --blueprint-id default-data-lake \
+  --environment-configuration '{
+    "awsAccountId": "222222222222",
+    "awsRegion": "us-east-1",
+    "parameters": {
+      "s3BucketName": "datazone-data-lake-prod",
+      "glueDatabaseName": "datazone_catalog"
+    }
+  }' \
+  --region us-east-1
+```
+
+
+
+## Step 11 — metadata form commands (moved from SKILL.md)
+
+
+
+```bash
+# Create a metadata form type
+aws datazone create-form-type \
+  --domain-id "$DOMAIN_ID" \
+  --model '{
+    "typeName": "DataQualityMetrics",
+    "fields": {
+      "freshnessHours": {"type": "number", "description": "Data freshness in hours"},
+      "completenessPct": {"type": "number", "description": "Data completeness percentage"},
+      "accuracyScore": {"type": "number", "description": "Data accuracy score 0-1"},
+      "lastValidatedAt": {"type": "timestamp", "description": "Last validation timestamp"}
+    }
+  }' \
+  --region us-east-1
+
+# Attach metadata form to an asset
+aws datazone post-form-data \
+  --domain-id "$DOMAIN_ID" \
+  --identifier "<asset-id>" \
+  --form-name DataQualityMetrics \
+  --content '{
+    "freshnessHours": 2.5,
+    "completenessPct": 98.7,
+    "accuracyScore": 0.95,
+    "lastValidatedAt": "2026-08-05T10:00:00Z"
+  }' \
+  --region us-east-1
+```
+
+

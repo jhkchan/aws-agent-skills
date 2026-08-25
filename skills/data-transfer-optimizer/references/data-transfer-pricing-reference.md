@@ -336,3 +336,121 @@ the canonical reference.
 - RDS pricing: https://aws.amazon.com/rds/pricing/
 - Aurora pricing: https://aws.amazon.com/rds/aurora/pricing/
 - Data Transfer Savings Plans: https://aws.amazon.com/savingsplans/data-transfer-pricing/
+
+## Step 9 — Direct Connect port break-even table and verdict rule (moved from SKILL.md)
+
+
+
+| Port speed | Port cost/month | Break-even vs $0.09/GB | Break-even vs $0.05/GB |
+|---|---|---|---|
+| 50 Mbps | ~$60 | ~857 GB/month | ~2,000 GB/month |
+| 1 Gbps | ~$220 | ~3,143 GB/month | ~7,333 GB/month |
+| 10 Gbps | ~$2,000 | ~28,571 GB/month | ~66,667 GB/month |
+| 100 Gbps | ~$20,000 | ~285,714 GB/month | ~666,667 GB/month |
+
+If steady-state egress exceeds the break-even, recommend DX. If
+below, internet egress is cheaper.
+
+
+
+## Pricing notes (us-east-1 baseline, 2026) (moved from SKILL.md)
+
+
+
+**Pricing notes (us-east-1 baseline, 2026):**
+
+- Cross-AZ: $0.01/GB each direction
+- Cross-region: $0.02/GB (within North America) to $0.09/GB (to
+  South America or Africa)
+- Internet egress: $0.09/GB (first 10TB), $0.085 (10-40TB),
+  $0.07 (40-100TB), $0.05 (>150TB)
+- NAT Gateway: $0.045/GB + $0.045/hour
+- VPC Gateway Endpoint (S3, DynamoDB): FREE
+- VPC Interface Endpoint: $0.05/hour per AZ + $0.01/GB
+- Transit Gateway: $0.05/hour per attachment + $0.02/GB (in + out)
+- VPC peering (intra-region): FREE
+- VPC peering (cross-region): $0.01-0.02/GB
+- Direct Connect: port fee + $0.02/GB outbound
+- RDS Multi-AZ (non-Aurora): $0.01/GB
+- Aurora Multi-AZ: FREE
+- S3 cross-region replication: cross-region transfer + S3 PUT
+  requests
+
+
+
+## Deep reference: AWS data transfer pricing matrix (moved from SKILL.md)
+
+
+
+### Cross-AZ data transfer (per GB, each direction)
+
+| Source → Destination | Rate |
+|---|---|
+| EC2 (AZ-1) → EC2 (AZ-2), same region | $0.01/GB |
+| EC2 (AZ-1) → RDS (AZ-2), same region | $0.01/GB |
+| RDS Multi-AZ replication (non-Aurora) | $0.01/GB |
+| Aurora Multi-AZ replication | FREE (storage-layer) |
+| ELB → EC2 target in different AZ | $0.01/GB |
+| VPC peering intra-region | FREE |
+| Transit Gateway intra-region | $0.02/GB (in + out) |
+
+### Cross-region data transfer (per GB, outbound)
+
+| Source region → Destination region | Rate |
+|---|---|
+| us-east-1 → us-west-2 | $0.02/GB |
+| us-east-1 → eu-west-1 | $0.02/GB |
+| us-east-1 → ap-southeast-1 | $0.09/GB |
+| us-east-1 → sa-east-1 | $0.16/GB |
+| eu-west-1 → ap-northeast-1 | $0.09/GB |
+| Any region → CloudFront | FREE from S3; $0.02/GB from EC2 same-region |
+| Any region → Direct Connect | $0.02/GB |
+
+### Internet egress (per GB, tiered)
+
+| Tier | Rate |
+|---|---|
+| First 10TB / month | $0.09/GB |
+| Next 40TB (10-50TB) | $0.085/GB |
+| Next 100TB (50-150TB) | $0.070/GB |
+| Next 350TB (150-500TB) | $0.050/GB |
+| > 500TB / month | Contact AWS |
+
+### NAT Gateway pricing
+
+| Component | Rate |
+|---|---|
+| Per GB processed | $0.045/GB |
+| Hourly | $0.045/hour per NAT |
+
+### VPC Endpoint pricing
+
+| Endpoint type | Hourly | Per-GB |
+|---|---|---|
+| Gateway (S3, DynamoDB) | FREE | FREE |
+| Interface (other AWS services) | $0.05/AZ/hour | $0.01/GB |
+| PrivateLink (partner services) | $0.05/AZ/hour | $0.01/GB |
+| Gateway Load Balancer Endpoint | $0.035/AZ/hour | $0.0035/GB |
+
+### Transit Gateway pricing
+
+| Component | Rate |
+|---|---|
+| Per attachment per hour | $0.05/hour |
+| Per GB inbound | $0.02/GB |
+| Per GB outbound | $0.02/GB |
+
+### Direct Connect pricing (varies by region)
+
+| Port speed | Port hourly | Per-GB outbound |
+|---|---|---|
+| 50 Mbps | ~$0.082 ($60/month) | $0.02/GB |
+| 1 Gbps | ~$0.30 ($220/month) | $0.02/GB |
+| 10 Gbps | ~$2.74 ($2,000/month) | $0.02/GB |
+| 100 Gbps | ~$27.40 ($20,000/month) | $0.02/GB |
+
+For per-region pricing precision, always check
+`https://aws.amazon.com/ec2/pricing/on-demand/` (Data Transfer
+section) for the current matrix.
+
+

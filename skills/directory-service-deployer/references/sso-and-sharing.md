@@ -208,3 +208,26 @@ resource "aws_ssoadmin_managed_policy_attachment" "developer_readonly" {
   managed_policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
 }
 ```
+
+---
+
+## Step 8 — Cross-account directory sharing commands (moved from SKILL.md)
+
+```bash
+# Share the directory with another account
+aws ds share-directory \
+  --directory-id d-aaa111222 \
+  --share-target Id=999999999999,Type=ACCOUNT \
+  --share-method HANDSHAKE \
+  --region us-east-1
+
+# Target account accepts
+aws ds accept-shared-directory \
+  --shared-directory-id d-xxx \
+  --region us-east-1
+
+# Verify
+aws ds describe-shared-directories \
+  --owner-directory-id d-aaa111222 \
+  --region us-east-1
+```

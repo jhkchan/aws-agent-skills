@@ -260,3 +260,110 @@ resource "aws_directory_service_trust" "onprem_trust" {
   depends_on = [aws_directory_service_conditional_forwarder.onprem]
 }
 ```
+
+---
+
+## Expert heuristic: trust direction (one-way vs two-way) (moved from SKILL.md)
+
+Trust direction determines which domain's users can access which
+domain's resources. Getting the direction wrong is a silent failure.
+
+```text
+One-Way Incoming (local trusts remote):
+  Remote users → CAN access → Local resources
+  Local users  → CANNOT access → Remote resources
+
+One-Way Outgoing (local is trusted by remote):
+  Local users  → CAN access → Remote resources
+  Remote users → CANNOT access → Local resources
+
+Two-Way (bidirectional):
+  Both domains' users → CAN access → Both domains' resources
+
+Trust scope:
+  External trust — between two domains in DIFFERENT forests
+  Forest trust   — between two entire forests (all domains)
+```
+
+**Key implication:** "Incoming" and "Outgoing" are from the
+perspective of the local directory. Incoming = external users access
+YOUR resources. Outgoing = YOUR users access external resources.
+Direction CANNOT be changed after creation.
+
+---
+
+## Expert heuristic: LDAPS certificate authority lifecycle (moved from SKILL.md)
+
+LDAPS requires a certificate from a trusted CA with a full lifecycle.
+
+```text
+1. Obtain cert from trusted CA:
+   ├── AWS Private CA (PCA) — issue cert for directory FQDN
+   └── External CA — generate CSR, get signed, import
+
+2. Register cert with directory:
+   aws ds register-certificate --directory-id d-xxx --certificate-data file://cert.pem
+
+3. Enable LDAPS:
+   aws ds enable-ldaps --directory-id d-xxx --type Client
+
+4. Monitor expiry:
+   ├── PCA-issued certs get automatic ACM renewal
+   ├── External CA certs must be manually renewed
+   └── Set CloudWatch alarm on DaysToExpiry
+
+5. On expiry (if not renewed):
+   LDAPS silently breaks → TLS errors → authentication failures
+```
+
+**Key implication:** LDAPS is not "set and forget." Plan the CA
+lifecycle from day one. Use AWS PCA for auto-renewal.
+
+---
+
+## Step 5 — Trust creation and verification commands (moved from SKILL.md)
+
+```bash
+# Create a two-way forest trust
+aws ds create-trust \
+  --directory-id d-aaa111222 \
+  --remote-domain-name corp.example.com \
+  --trust-direction Two-Way \
+  --trust-type Forest \
+  --trust-password 'TrustP@ssw0rd!' \
+  --region us-east-1
+
+# Verify trust status
+aws ds describe-trusts \
+  --directory-id d-aaa111222 \
+  --region us-east-1
+# Expected: TrustState: Verified
+```
+
+---
+
+## Step 6 — LDAPS enablement and monitoring commands (moved from SKILL.md)
+
+```bash
+# Step 1: Register certificate with the directory
+aws ds register-certificate \
+  --directory-id d-aaa111222 \
+  --certificate-data file://certificate.pem \
+  --region us-east-1
+
+# Step 2: Enable LDAPS for client connections
+aws ds enable-ldaps \
+  --directory-id d-aaa111222 \
+  --type Client \
+  --region us-east-1
+
+# Step 3: Monitor certificate expiry
+aws ds list-certificates \
+  --directory-id d-aaa111222 \
+  --region us-east-1
+
+aws acm describe-certificate \
+  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/xxx \
+  --query 'Certificate.{Domain:DomainName,Expiry:NotAfter,Status:Status}' \
+  --region us-east-1
+```

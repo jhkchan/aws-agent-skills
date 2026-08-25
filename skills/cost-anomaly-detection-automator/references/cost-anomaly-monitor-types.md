@@ -156,3 +156,15 @@ aws ce delete-anomaly-monitor \
 
 All subscriptions for the monitor are also deleted. Back up the monitor
 configuration before deleting.
+
+---
+
+## Appendix A — Monitor type comparison (moved from SKILL.md)
+
+| Monitor type | `MonitorDimension` | Coverage | Best for |
+|---|---|---|---|
+| Service-level | `SERVICE` | All spend for a specific service | EC2, S3, RDS — high-spend services |
+| Linked-account | `LINKED_ACCOUNT` | All spend for one account | Per-member accountability in org |
+| Region-based | `REGION` | Spend in a specific region | Multi-region workloads |
+| Instance-type | `INSTANCE_TYPE` | Spend on a specific instance family | GPU/spot instance monitoring |
+| All-services | `SERVICE` (all values) | All services | Broadest ML-based detection |

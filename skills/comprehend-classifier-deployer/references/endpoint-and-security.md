@@ -307,3 +307,134 @@ role to comprehend inference only.
 applications, use endpoint. If you process documents in bulk on a
 schedule, use batch. For anything in between, calculate the breakeven:
 endpoint cost (per hour) vs batch cost (per document).
+
+## Step 6 — Endpoint deployment and auto-scaling (moved from SKILL.md)
+
+Deploy a real-time inference endpoint for sub-second classification.
+
+```bash
+ENDPOINT_ARN=$(aws comprehend create-endpoint \
+  --endpoint-name "ticket-classifier-endpoint" \
+  --model-arn "$CLASSIFIER_ARN" \
+  --desired-inference-units 1 \
+  --data-access-role-arn arn:aws:iam::123456789012:role/ComprehendEndpointRole \
+  --region us-east-1 \
+  --query 'EndpointArn' --output text)
+```
+
+**Verify endpoint status:**
+
+```bash
+aws comprehend describe-endpoint \
+  --endpoint-arn "$ENDPOINT_ARN" \
+  --query 'EndpointProperties.Status' \
+  --region us-east-1
+# Expected: CREATING → IN_SERVICE
+```
+
+**Classify a document (real-time):**
+
+```bash
+aws comprehend classify-document \
+  --endpoint-arn "$ENDPOINT_ARN" \
+  --text "I need a refund for invoice #12345" \
+  --region us-east-1
+```
+
+**Auto-scaling (Application Auto Scaling):**
+
+```bash
+aws application-autoscaling register-scalable-target \
+  --service-namespace comprehend \
+  --resource-id "arn:aws:comprehend:us-east-1:123456789012:document-endpoint/ticket-classifier-endpoint" \
+  --scalable-dimension "comprehend:document-classifier-endpoint:DesiredInferenceUnits" \
+  --min-capacity 1 --max-capacity 5
+
+aws application-autoscaling put-scaling-policy \
+  --policy-name "comprehend-scaling" \
+  --service-namespace comprehend \
+  --resource-id "arn:aws:comprehend:us-east-1:123456789012:document-endpoint/ticket-classifier-endpoint" \
+  --scalable-dimension "comprehend:document-classifier-endpoint:DesiredInferenceUnits" \
+  --policy-type TargetTrackingScaling \
+  --target-tracking-scaling-policy-configuration '{"TargetValue":50.0,"PredefinedMetricSpecification":{"PredefinedMetricType":"ComprehendApproximateBacklogSize"},"ScaleInCooldown":300,"ScaleOutCooldown":60}'
+```
+
+## Step 7 — Batch inference job (moved from SKILL.md)
+
+Run asynchronous classification on documents in S3.
+
+```bash
+JOB_ID=$(aws comprehend classify-documents \
+  --job-name "batch-classify-2026-08" \
+  --document-classifier-arn "$CLASSIFIER_ARN" \
+  --input-data-config S3Uri=s3://my-bucket/comprehend/input/ \
+  --output-data-config S3Uri=s3://my-bucket/comprehend/output/ \
+  --data-access-role-arn arn:aws:iam::123456789012:role/ComprehendBatchRole \
+  --region us-east-1 \
+  --query 'JobId' --output text)
+```
+
+**Monitor batch job:**
+
+```bash
+aws comprehend describe-document-classification-job \
+  --job-id "$JOB_ID" \
+  --query 'DocumentClassificationJobProperties.JobStatus' \
+  --region us-east-1
+# Expected: SUBMITTED → IN_PROGRESS → COMPLETED (or FAILED)
+```
+
+Batch output: JSONL files in the output S3 path, one classification
+result per line. Use a unique output prefix per batch run to avoid
+overwriting previous results.
+
+## Step 8 — KMS encryption and VPC endpoint (moved from SKILL.md)
+
+**KMS encryption:** use `--model-kms-key-id` for model artifacts and
+`--volume-kms-key-id` for the EBS volume during training. The IAM role
+must have `kms:Decrypt` and `kms:GenerateDataKey` on the key.
+
+**VPC endpoint for private Comprehend API access:**
+
+```bash
+aws ec2 create-vpc-endpoint \
+  --vpc-id vpc-aaa11122 \
+  --service-name com.amazonaws.us-east-1.comprehend \
+  --vpc-endpoint-type Interface \
+  --subnet-ids subnet-aaa subnet-bbb \
+  --security-group-ids sg-comprehend \
+  --region us-east-1
+```
+
+This enables inference calls from within the VPC to stay on the AWS
+network (no internet gateway needed). The security group must allow
+inbound 443 from the calling resource.
+
+**VPC config for training job:** add `--vpc-config` to create-document-
+classifier to run training entirely within a VPC.
+
+## Step 9 — IAM roles and versioning (moved from SKILL.md)
+
+**Training role trust policy** must allow `comprehend.amazonaws.com` to
+assume. Permissions: `s3:GetObject` and `s3:ListBucket` on the training
+data bucket, plus `kms:Decrypt`/`kms:GenerateDataKey` on the KMS key
+(if encrypting). Scope to the specific bucket — avoid `s3:*`.
+
+**Endpoint role** only needs `comprehend:Detect*` permissions. It does
+NOT need S3 access. Over-privileged endpoint roles are a security risk.
+
+**Versioning:** each `create-document-classifier` call with the same
+name creates a new immutable version. The latest version is the
+default. To use a specific version, include the version suffix in the
+ARN. Old versions incur storage cost — delete unused versions.
+
+```bash
+# List all versions
+aws comprehend list-document-classifiers \
+  --query 'DocumentClassifierPropertiesList[*].{Name:DocumentClassifierName,Version:Version,Status:Status}' \
+  --region us-east-1
+
+# Delete a specific version
+aws comprehend delete-document-classifier \
+  --document-classifier-arn "arn:aws:comprehend:us-east-1:123456789012:document-classifier/my-classifier/version/1"
+```

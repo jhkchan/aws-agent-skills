@@ -157,29 +157,7 @@ Run before emitting any template. Missing requirements produce
 MANUAL_STEP_REQUIRED with the exact gap.
 
 **Live-account pre-flight (skip if offline plan audit):**
-1. `aws organizations describe-organization` — confirm the caller is
-   the payer / management account. If not, CUR scope is limited.
-2. `aws cur describe-report-definitions` — confirm whether a CUR with
-   the target name already exists (create vs. update).
-3. `aws s3api get-bucket-location --bucket <cur-bucket>` and
-   `get-bucket-versioning` — verify the CUR bucket exists, has
-   versioning on, and is in the target region.
-4. `aws s3api get-bucket-policy --bucket <cur-bucket>` — verify the
-   policy grants `billingreports.amazonaws.com` WRITE and
-   `athena.amazonaws.com` READ, with `aws:SourceAccount` conditions.
-5. `aws glue get-database --name <athena_db>` — verify the Glue database
-   exists (or will be created alongside the template).
-6. `aws athena list-work-groups` — verify a non-`primary` workgroup
-   exists with `EnforceWorkgroupConfiguration: true` and a per-query
-   byte cutoff.
-7. `aws quicksight describe-account --aws-account-id <acct>` (if
-   QuickSight requested) — verify `AccountEdition: ENTERPRISE`.
-8. `aws ce list-cost-allocation-tags --status Active` (if tags layer
-   requested) — verify the target tag keys are already activated.
-9. `aws ce list-cost-category-definitions` (if chargeback requested) —
-   verify existing Cost Categories to avoid name conflicts.
-10. `aws bcm-data-exports list-exports` (if BCM Data Exports requested)
-    — verify the service is enabled.
+The ten live-account pre-flight commands (payer check, existing CUR, bucket region/versioning/policy, Glue database, workgroup, QuickSight edition, activated tags, Cost Categories, BCM exports): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Malformed input:** if the input scenario is missing required fields
 (account type, target region, granularity, scope), emit
@@ -202,64 +180,7 @@ field <field>. Provide <field> to proceed.`
 
 ### Step 0: Expert knowledge — non-obvious CUR behaviors
 
-- **The 24-hour delivery lag is a hard SLA, not a target.** CUR is
-  delivered 3 times per day for hourly granularity and 1 time per day
-  for daily. The most recent hour's data is NEVER in CUR — use Cost
-  Anomaly Detection or real-time CloudWatch metrics for that.
-
-- **`OVERWRITE` ReportVersioning breaks time-travel queries.** With
-  OVERWRITE, AWS rewrites the previous day's partition as the day's
-  invoices close. Use `CREATE_NEW` (default) unless you specifically
-  want the final-state snapshot.
-
-- **`Resource` granularity requires hourly CUR.** Daily CUR aggregates
-  by service + linked account + usage type — no resource IDs. To get
-  resource-level cost (EC2 instance ID, S3 bucket name), you MUST set
-  `AdditionalSchemaElements: ["Resources"]` AND `TimeUnit: HOURLY`.
-
-- **CUR 2.0 is a different report, not a setting on CUR 1.0.** CUR 2.0
-  ships via BCM Data Exports (`bcm-data-exports`), not via the legacy
-  `cur` API. The column schema is different.
-
-- **`MSCK REPAIR TABLE` is an anti-pattern on CUR.** It scans every
-  partition object. Past ~20k partitions it throttles and never
-  finishes. Partition projection is the only sustainable model.
-
-- **The `lineItem/UsageAccountId` is the account that USED the
-  resource; `bill/PayerAccountId` is the account that PAID.**
-  Chargeback queries group by `lineItem/UsageAccountId`; refund
-  queries group by `bill/PayerAccountId`.
-
-- **Savings Plans and Reserved Instance discounts appear in two
-  columns.** `lineItem/LineItemType = SavingsPlanCoveredUsage` and
-  `SavingsPlanRecurringFee`. To compute effective rate, you must join
-  the two — naive queries double-count or miss the fee.
-
-- **Cost Category values are evaluated in order.** Always emit a
-  catch-all `Uncategorized` rule at the end; otherwise line items that
-  match no rule vanish from chargeback reports.
-
-- **Cost allocation tags must be activated BEFORE they appear in
-  CUR.** Activating a new tag today makes it appear in CUR starting
-  TOMORROW — historical CUR data does NOT backfill. Payer-account-only.
-
-- **QuickSight SPICE refresh is bounded by edition.** Standard: no
-  scheduled refresh on Athena datasets. Enterprise: up to 32 scheduled
-  refreshes per dataset, hourly granularity.
-
-- **CUR Athena queries can scan the entire report if unfiltered.** A
-  year of hourly CUR with resource IDs can be 5+ TB. Without a
-  partition predicate, a single query costs $25+ at $5/TB. The Athena
-  workgroup BytesScannedCutoffPerQuery MUST be set.
-
-- **CUR 2.0 split cost allocation only covers EKS, ECS (Fargate +
-  EC2), and Lambda today.** Other compute (EC2 dedicated, EMR) is not
-  split. Do not promise "per-pod cost" for non-EKS workloads.
-
-- **Amazon Q cost analysis is a NATURAL LANGUAGE layer, not a data
-  layer.** It queries CUR via Athena under the hood, but adds its own
-  prompt-completion cost. Use Q for ad-hoc exploration; use Athena
-  named queries for repeatable pipelines.
+Full catalog (24h SLA, OVERWRITE vs CREATE_NEW, hourly-only resource granularity, CUR 2.0 via BCM, MSCK anti-pattern, UsageAccountId vs PayerAccountId, SP/RI dual columns, Cost Category ordering, non-backfilling tag activation, SPICE edition bounds, unfiltered scan cost, SCAD coverage, Q as NL layer): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 1: CUR definition design
 
@@ -362,65 +283,11 @@ specific gap and the exact CLI / IaC snippet to close it.
 
 ## Patterns — IaC templates
 
-Full CloudFormation and Terraform templates (CUR definition + Glue DB +
-Glue Table with partition projection + non-primary workgroup with DSL +
-named queries) live in `references/athena-partition-projection-and-queries.md`.
-
-The non-negotiable TBLPROPERTIES block for partition projection:
-
-```text
-projection.enabled = true
-projection.day.type = date
-projection.day.range = "2024/01/01,NOW"  # literal NOW, Athena engine v3
-projection.day.format = "yyyy/MM/dd"
-projection.day.interval = 1
-projection.day.interval.unit = DAYS
-storage.location.template = s3://<bucket>/<prefix>/year=${year}/month=${month}/day=${day}
-```
-
-The non-negotiable workgroup configuration:
-
-```text
-EnforceWorkgroupConfiguration = true
-BytesScannedCutoffPerQuery = 1099511627776  # 1 TB cutoff
-EngineVersion = Athena engine version 3  # required for NOW range end
-```
+The two non-negotiable blocks (partition-projection TBLPROPERTIES, workgroup DSL): [references/athena-partition-projection-and-queries.md](references/athena-partition-projection-and-queries.md).
 
 ## Diagnostic flows
 
-### CUR not delivering to S3
-
-`aws s3 ls s3://<bucket>/<prefix>/year=YYYY/month=MM/` — empty for >
-24 hours is almost always a bucket policy problem. Verify
-`billingreports.amazonaws.com` is present with `aws:SourceAccount`
-condition, and that the bucket region matches `S3Region` in the report
-definition.
-
-### Athena query fails with "HIVE_CURSOR_ERROR"
-
-The CUR table schema is out of date — AWS adds columns when new
-services launch. Pull the latest DDL from the AWS docs or
-`aws cur get-report-definition`. Use `OPENCSVSerde` for legacy CSV CUR;
-`ParquetHiveSerDe` for Parquet.
-
-### Athena query returns "Partition not found"
-
-Partition projection not enabled, or partition date outside range.
-Check `TBLPROPERTIES ('projection.enabled' = 'true')` and
-`projection.day.range = '2024/01/01,NOW'`. The literal `NOW` is
-evaluated at query time — requires Athena engine v3.
-
-### QuickSight SPICE refresh fails with "Athena query timeout"
-
-The auto-generated SQL scans too much data without a partition
-predicate. Add a filter on the partition column in the QuickSight
-dataset, or use a custom SQL dataset with a WHERE clause.
-
-### Tag activation has no effect on CUR data
-
-The tag was activated AFTER the data was delivered. CUR does NOT
-backfill — historical data remains tag-less. Activation applies only
-to data delivered after activation.
+All five flows (CUR not delivering, HIVE_CURSOR_ERROR, Partition not found, SPICE Athena timeout, tag activation no effect): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ## Output format (per operation)
 
@@ -467,22 +334,7 @@ NOTES:
 
 ### Perfect example output — MANUAL_STEP_REQUIRED
 
-```text
-OPERATION: create
-VERDICT: MANUAL_STEP_REQUIRED
-TARGET: linked-account-cur-stack
-REQUIREMENTS:
-  - [FAIL] Caller is linked account 222222222222, not payer 111111111111
-  - [PASS] S3 bucket exists
-IAC_TEMPLATE: (held in draft — apply after closing the gap below)
-MANUAL_GAPS:
-  - GAP: CUR is being created from a linked account.
-    REMEDIATION:
-      aws cur put-report-definition --report-definition file://cur.json --profile payer
-    REASON: CUR API is payer-only; cross-account requires payer IAM role + Glue policy.
-NOTES:
-  - Run this skill from the payer account for organization-wide FinOps.
-```
+Full MANUAL_STEP_REQUIRED example (linked-account caller; CUR API is payer-only): [references/worked-examples.md](references/worked-examples.md).
 
 ## STRICT output contract
 
@@ -559,36 +411,7 @@ NOTES: <delivery lag, partition projection caveats, payer-only caveats>
 
 ## Expert heuristic — top 5 non-obvious failure modes
 
-The five failure modes below are the ones a naive CUR setup misses.
-Each is silently wrong (no error, no log) until 30+ days in.
-
-1. **MSCK REPAIR TABLE silently throttles past ~20k partitions.** No
-   error — Athena returns success with zero new partitions added. The
-   table appears empty for queries on recent dates. The only prevention
-   is partition projection (`projection.day.type=date`). Any CUR table
-   without `projection.enabled=true` is a ticking time bomb at the
-   3-year mark.
-
-2. **CUR bucket policy without `aws:SourceAccount` condition is a
-   confused-deputy risk.** `billingreports.amazonaws.com` is a service
-   principal — without `aws:SourceAccount`, a different account could
-   direct delivery to your bucket. The fix is `Condition: StringEquals:
-   aws:SourceAccount: <account>` on both statements.
-
-3. **QuickSight Standard edition silently fails scheduled SPICE
-   refresh.** No error in the QuickSight console — the schedule simply
-   does not exist. The dataset stays stale, dashboards show last-week
-   data. Fix: upgrade to Enterprise.
-
-4. **Tag activation does NOT backfill historical CUR data.** Activating
-   `cost-center` today makes it appear in CUR data starting tomorrow.
-   September's CUR data remains tag-less. Tag-based chargeback only
-   becomes complete 12 months after activation.
-
-5. **CUR 2.0 SCAD requires EKS Container Insights enabled.** Without
-   CloudWatch Container Insights on the EKS cluster, the SCA data has
-   nothing to split by — the entire node cost appears against the
-   default namespace. Enable Container Insights BEFORE enabling SCAD.
+All five failure modes (MSCK throttle past 20k partitions, bucket policy without aws:SourceAccount, QuickSight Standard silent stale, tag non-backfill, SCAD needs Container Insights): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Anti-Patterns — NEVER do these things
 
@@ -639,58 +462,19 @@ Each is silently wrong (no error, no log) until 30+ days in.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`put-report-definition`, `delete-report-definition`,
-  `update-cost-allocation-tags-status`, `create-cost-category-definition`,
-  `bcm-data-exports create-export`), emit: `CONFIRM: About to <operation>
-  on CUR automation stack <name> in account <account> region <region>.
-  This affects <consequence>. Proceed? (yes/no)`. Do NOT execute until
-  the operator confirms.
-
-- **Verify the caller is the payer account.** `aws sts
-  get-caller-identity` — if the account ID is not the payer, all CUR,
-  Cost Category, and tag-activation operations fail with `AccessDenied`.
-
-- **Snapshot the existing CUR definition before update.**
-  `aws cur describe-report-definitions --output json > /tmp/cur-backup-$(date +%s).json`.
-
-- **Verify the CUR bucket has no in-flight delivery** (02:00-06:00 UTC
-  window) before changing the bucket policy.
-
-- **Before emitting tag activation**, verify the tag keys exist on at
-  least one resource. **Before emitting a Cost Category**, verify no
-  Cost Category with the target name exists. **Before emitting CUR 2.0
-  SCAD**, verify EKS clusters have Container Insights enabled.
-
-- Prefer additive changes over destructive changes.
+All checks (CONFIRM gate, payer verification, definition snapshot, in-flight delivery window, pre-emit verifications, additive-first): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Recent AWS features (2024-2026)
 
-- **CUR 2.0 via BCM Data Exports (2024-2025):** the modern path for new
-  CUR setups. Uses `bcm-data-exports` API (not legacy `cur`). Adds split
-  cost allocation columns natively. Replaces the legacy CUR API for new
-  reports; existing CUR 1.0 reports continue to work.
+What changed (CUR 2.0 via BCM Data Exports, SCAD, Amazon Q cost analysis, Athena engine v3, CAD-CUR correlation, QuickSight Q): [references/advanced-patterns.md](references/advanced-patterns.md).
 
-- **Split Cost Allocation Data (SCAD) for EKS/ECS/Lambda (2024-2025):**
-  divides node cost across pods/containers by CPU/memory usage with idle
-  allocation. Must be enabled separately on the payer. Requires CloudWatch
-  Container Insights on EKS clusters.
+## References (load on demand)
 
-- **Amazon Q Business cost analysis (2025-2026):** natural-language layer
-  on top of CUR. Q Business Pro ($20/user/month) connects to CUR via
-  Athena under the hood. Use for ad-hoc exploration; use Athena named
-  queries for repeatable pipelines.
-
-- **Athena engine version 3 (2024):** required for partition projection
-  with `NOW` as the range end. Engine v2 does not evaluate `NOW` correctly.
-
-- **Cost Anomaly Detection with CUR correlation (2025):** CAD now
-  correlates anomalies with the underlying CUR line items, making it
-  easier to identify the resource that caused the spike. Use CAD for
-  real-time alerting (CUR has 24-hour lag).
-
-- **QuickSight Q (2024-2025):** natural-language Q in QuickSight, layered
-  on top of CUR-backed datasets. Useful for non-technical stakeholders.
+- [Worked examples](references/worked-examples.md) - MANUAL_STEP_REQUIRED example: linked-account caller cannot create CUR
+- [Diagnostic commands](references/diagnostic-commands.md) - live-account pre-flight commands + the five diagnostic flows (delivery, HIVE_CURSOR_ERROR, partition not found, SPICE timeout, tag activation)
+- [Advanced patterns](references/advanced-patterns.md) - Step 0 non-obvious CUR behaviors, expert-heuristic failure modes, pre-flight safety checks, recent AWS features
+- [Athena partition projection and queries](references/athena-partition-projection-and-queries.md) - full TBLPROPERTIES/workgroup config blocks, full named-query SQL, EventBridge automation templates
+- [QuickSight and CUR 2.0 features](references/quicksight-and-cmefeatures.md) - bucket policy JSON, QuickSight datasets, Cost Categories, tag activation, SCAD, BCM Data Exports, Amazon Q
 
 ## Domain
 

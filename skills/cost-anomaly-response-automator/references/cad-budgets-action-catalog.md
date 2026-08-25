@@ -199,3 +199,97 @@ ID in DynamoDB or Parameter Store to avoid re-posting.
 
 **Enrollment:** Cost Optimization Hub must be enabled in the payer
 account. Member account recommendations roll up to the payer.
+
+## Detection source CLI — AWS Cost Anomaly Detection (CAD)
+
+```bash
+aws ce get-anomaly-monitors --output json  # list existing
+
+# Service monitor for EC2 spend
+aws ce create-anomaly-monitor --anomaly-monitor '{
+  "MonitorName": "ec2-spend-monitor", "MonitorType": "SERVICE",
+  "MonitorSpecification": "{\"Dimensions\":{\"Key\":\"SERVICE\",\"Values\":[\"Amazon Elastic Compute Cloud - Compute\"]}}"
+}'
+
+# Linked account monitor
+aws ce create-anomaly-monitor --anomaly-monitor '{
+  "MonitorName": "member-111122223333-monitor", "MonitorType": "LINKED_ACCOUNT",
+  "MonitorSpecification": "{\"Dimensions\":{\"Key\":\"LINKED_ACCOUNT\",\"Values\":[\"111122223333\"]}}"
+}'
+
+# Anomaly subscription wired to SNS (threshold USD 100, daily)
+TOPIC_ARN=$(aws sns create-topic --name cost-anomaly-alerts --output text)
+aws ce create-anomaly-subscription --anomaly-subscription '{
+  "Name": "prod-cost-anomaly-sub", "Threshold": 100.0, "Frequency": "DAILY",
+  "MonitorArnList": ["<monitor-arn>"],
+  "Subscribers": [{"Address": "'"$TOPIC_ARN"'", "Type": "SNS"}]
+}'
+
+aws ce get-anomalies --monitor-arn <monitor-arn> \
+  --start-date 2026-08-01 --end-date 2026-08-10 --output json
+```
+
+## Detection source CLI — AWS Budgets
+
+```bash
+aws budgets create-budget --account-id 111122223333 --budget '{
+  "BudgetName": "monthly-ec2-budget", "BudgetType": "COST", "TimeUnit": "MONTHLY",
+  "BudgetLimit": {"Amount": "10000", "Unit": "USD"},
+  "CostFilters": {"Service": ["Amazon Elastic Compute Cloud - Compute"]}
+}'
+
+# Notify at 80% via SNS
+aws budgets create-notification --account-id 111122223333 \
+  --budget-name monthly-ec2-budget \
+  --notification '{"NotificationType":"ACTUAL","ComparisonOperator":"GREATER_THAN","Threshold":80,"ThresholdType":"PERCENTAGE"}' \
+  --subscribers SubscriptionType=SNS,Address=<topic-arn>
+
+# IAM deny policy action at 100% (ApprovalModel=AUTOMATIC OK for reversible)
+aws budgets put-budget-action --account-id 111122223333 --budget-name monthly-ec2-budget \
+  --notification-type ACTUAL --action-type APPLY_IAM_POLICY \
+  --action-threshold ActionThresholdValue=100,ActionThresholdType=PERCENTAGE \
+  --definition '{"IamActionDefinition":{"PolicyArn":"arn:aws:iam::111122223333:policy/BudgetDenyAll","Roles":["BillingAlertDenyRole"]}}' \
+  --execution-role-arn arn:aws:iam::111122223333:role/BudgetActionRole --approval-model AUTOMATIC
+
+# EC2 stop action at 120% (ApprovalModel=MANUAL — destructive)
+aws budgets put-budget-action --account-id 111122223333 --budget-name monthly-ec2-budget \
+  --notification-type ACTUAL --action-type RUN_SSM_DOCUMENTS \
+  --action-threshold ActionThresholdValue=120,ActionThresholdType=PERCENTAGE \
+  --definition '{"SsmActionDefinition":{"ActionSubType":"STOP_EC2_INSTANCES","Region":"us-east-1","InstanceIds":["i-0abc12345"]}}' \
+  --execution-role-arn arn:aws:iam::111122223333:role/BudgetActionRole --approval-model MANUAL
+```
+
+## Detection source CLI — CUR analysis automation
+
+```bash
+aws cur describe-report-definitions --output json  # verify CUR configured
+```
+
+**Top-spenders Athena query (schedule daily via EventBridge):**
+
+```sql
+SELECT lineitem_product_servicename AS service, resource_id,
+       SUM(lineitem_unblendedcost) AS spend
+FROM "cur"."cur_table"
+WHERE year = '2026' AND month = '08'
+  AND lineitem_lineitemtype IN ('Usage', 'DiscountedUsage')
+GROUP BY 1, 2
+HAVING SUM(lineitem_unblendedcost) > 100
+ORDER BY spend DESC LIMIT 20;
+```
+
+```bash
+aws events put-rule --name cur-daily-top-spenders \
+  --schedule-expression "cron(0 12 * * ? *)" --state ENABLED
+aws events put-targets --rule cur-daily-top-spenders \
+  --targets '{"Id":"1","Arn":"arn:aws:lambda:us-east-1:111122223333:function:cur-top-spenders"}'
+```
+
+## Detection source CLI — Amazon Q / Cost Optimization Hub recommendations
+
+```bash
+# Cost Optimization Hub (Org-level)
+aws cost-optimization-hub get-recommendations \
+  --filter '{"implementAfterTimestamp": 0}' --max-results 50 --output json
+# Lambda (scheduled) polls, dedupes by recommendationId, posts to Slack
+```

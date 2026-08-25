@@ -158,148 +158,28 @@ below forces an explicit decision on each.
 
 ## Expert heuristic: AD Connector vs Managed AD routing
 
-A baseline model says "pick Managed AD." The correct heuristic
-recognizes that the directory type depends on where the source of
-truth lives and what features are needed.
-
-```text
-Where is the authoritative AD?
-  ├── On-premises AD (source of truth)
-  │     └── Need AWS app auth without replicating AD?
-  │           ├── YES → AD Connector (proxy; on-prem stays authoritative)
-  │           └── NO  → Managed AD with forest trust to on-prem AD
-  ├── No existing AD (greenfield)
-  │     └── Managed Microsoft AD
-  │           ├── Standard  — up to 5,000 users
-  │           └── Enterprise — up to 50,000+; supports Multi-Region replication
-  └── Basic needs (no trust, no LDAPS, small scale)
-        └── Simple AD (Small ~500 users, Large ~5,000 users)
-              Constraints: NO trusts, NO LDAPS, NO Seamless Domain Join
-```
-
-**Key implication:** AD Connector is NOT a directory — it is a proxy.
-If on-prem AD is unavailable, AD Connector cannot authenticate.
-Managed AD is standalone and operates independently.
+Expert heuristic — AD Connector vs Managed AD routing decision tree (on-prem source of truth, greenfield, basic needs; Simple AD constraints) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it before Step 1 type selection.
 
 ## Expert heuristic: trust direction (one-way vs two-way)
 
-Trust direction determines which domain's users can access which
-domain's resources. Getting the direction wrong is a silent failure.
-
-```text
-One-Way Incoming (local trusts remote):
-  Remote users → CAN access → Local resources
-  Local users  → CANNOT access → Remote resources
-
-One-Way Outgoing (local is trusted by remote):
-  Local users  → CAN access → Remote resources
-  Remote users → CANNOT access → Local resources
-
-Two-Way (bidirectional):
-  Both domains' users → CAN access → Both domains' resources
-
-Trust scope:
-  External trust — between two domains in DIFFERENT forests
-  Forest trust   — between two entire forests (all domains)
-```
-
-**Key implication:** "Incoming" and "Outgoing" are from the
-perspective of the local directory. Incoming = external users access
-YOUR resources. Outgoing = YOUR users access external resources.
-Direction CANNOT be changed after creation.
+Expert heuristic — trust direction semantics (one-way incoming/outgoing, two-way, external vs forest scope) moved verbatim to [references/trust-and-ldaps.md](references/trust-and-ldaps.md).
+Load it when Step 5 asks for a trust direction.
 
 ## Expert heuristic: LDAPS certificate authority lifecycle
 
-LDAPS requires a certificate from a trusted CA with a full lifecycle.
-
-```text
-1. Obtain cert from trusted CA:
-   ├── AWS Private CA (PCA) — issue cert for directory FQDN
-   └── External CA — generate CSR, get signed, import
-
-2. Register cert with directory:
-   aws ds register-certificate --directory-id d-xxx --certificate-data file://cert.pem
-
-3. Enable LDAPS:
-   aws ds enable-ldaps --directory-id d-xxx --type Client
-
-4. Monitor expiry:
-   ├── PCA-issued certs get automatic ACM renewal
-   ├── External CA certs must be manually renewed
-   └── Set CloudWatch alarm on DaysToExpiry
-
-5. On expiry (if not renewed):
-   LDAPS silently breaks → TLS errors → authentication failures
-```
-
-**Key implication:** LDAPS is not "set and forget." Plan the CA
-lifecycle from day one. Use AWS PCA for auto-renewal.
+Expert heuristic — LDAPS certificate authority lifecycle (PCA/external CA issuance, register-certificate, enable-ldaps, expiry monitoring, silent breakage) moved verbatim to [references/trust-and-ldaps.md](references/trust-and-ldaps.md).
+Load it when Step 6 enables LDAPS.
 
 ## Expert heuristic: Multi-Region replication conflict resolution
 
-Multi-Region replication is one-way (PRIMARY-to-REPLICA). A baseline
-model assumes failover is a simple promotion. The expert knows that
-conflict resolution during failover and re-convergence is the danger
-zone.
-
-```text
-Failover scenario (primary us-east-1 → replica us-west-2):
-  1. Promote us-west-2 replica to primary (manual API call)
-  2. us-east-1 is now STALE — writes that happened after the last
-     replication sync are LOST (RPO = replication lag, typically < 60s)
-  3. When us-east-1 comes back, it CANNOT auto-rejoin as primary
-     → must be re-added as a REPLICA of the new primary
-     → conflicting writes on the old primary are discarded
-
-Conflict resolution rules:
-  ├── Last-writer-wins on the NEW primary's timeline
-  ├── Old-primary unreplicated writes → silently dropped
-  └── No merge logic — this is NOT multi-master
-
-Expert rules:
-  1. Document the RPO gap: replication lag = data loss window
-  2. After failover, NEVER write to the old primary until it is
-     re-added as a replica (split-brain causes irrecoverable conflict)
-  3. Test failover at least quarterly — promotion + re-add is a
-     multi-step manual process that fails under stress if untested
-```
-
-**Key implication:** Multi-Region replication is NOT active-active.
-It is asynchronous one-way copy with manual failover. Treat the RPO
-window as potential data loss and rehearse the failover runbook.
+Expert heuristic — Multi-Region replication conflict resolution (manual failover, RPO gap, old-primary re-add as replica, last-writer-wins, split-brain rules) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when Step 9 configures replication.
 
 ## Expert heuristic: DNS forwarder — stub zone vs conditional forwarder
 
-A baseline model treats all cross-domain DNS as "conditional
-forwarders." AWS Directory Service supports both conditional
-forwarders AND stub zones, and choosing the wrong one causes
-resolution failures in multi-domain trust topologies.
-
-```text
-Conditional forwarder (aws ds create-conditional-forwarder):
-  ├── Forwards queries for ONE specific domain suffix
-  │     e.g., corp.example.com → 10.0.1.53
-  ├── Resolves ONLY that suffix (not sub-domains of other forests)
-  └── Must be recreated on EACH directory independently
-
-Stub zone (via Microsoft DNS console on the domain controller):
-  ├── Resolves an ENTIRE zone and follows referrals
-  ├── Maintains a list of NS servers, updates dynamically
-  └── Better for complex multi-forest topologies with delegation
-
-Decision rule:
-  ├── Single remote domain → conditional forwarder (simpler, API-native)
-  ├── Multi-forest with delegation → stub zone (follows NS chain)
-  └── AD Connector → conditional forwarder is the ONLY option
-        (stub zones require domain controller access, which AD
-        Connector does not provide)
-```
-
-**Key implication:** Conditional forwarders are API-managed and
-directory-type-agnostic. Stub zones require direct domain controller
-access and are NOT available for AD Connector. For Simple AD, only
-conditional forwarders work. Match the DNS strategy to the directory
-type and topology complexity.
+Expert heuristic — stub zone vs conditional forwarder decision rule (single remote domain, multi-forest delegation, AD Connector constraint) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when Step 4 configures cross-domain DNS.
 
 ## Prerequisites (verify before provisioning)
 
@@ -354,23 +234,8 @@ Enterprise from the start. Simple AD size also CANNOT be changed.
 All Directory Service types require at least 2 private subnets in
 different Availability Zones.
 
-```bash
-# Verify subnets exist and are in different AZs
-aws ec2 describe-subnets \
-  --filters Name=vpc-id,Values=vpc-aaa11122 \
-  --query 'Subnets[*].{SubnetId:SubnetId,AZ:AvailabilityZone,CIDR:CidrBlock}' \
-  --region us-east-1 --output table
-
-# Verify VPC DNS support
-aws ec2 describe-vpc-attribute --vpc-id vpc-aaa11122 \
-  --attribute enableDnsSupport --region us-east-1
-
-# Enable if needed
-aws ec2 modify-vpc-attribute --vpc-id vpc-aaa11122 \
-  --enable-dns-support --region us-east-1
-aws ec2 modify-vpc-attribute --vpc-id vpc-aaa11122 \
-  --enable-dns-hostnames --region us-east-1
-```
+Subnet/AZ verification and VPC DNS enablement commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load them when verifying the multi-AZ placement prerequisites.
 
 **Common mistake:** creating a directory in public subnets. Directory
 Service requires PRIVATE subnets. Domain controllers should never be
@@ -404,22 +269,8 @@ at creation via `--dns-ip-addrs`.
 | Forest trust | Between two entire forests | Enterprise-wide trust |
 | External trust | Between two specific domains | Limited trust |
 
-```bash
-# Create a two-way forest trust
-aws ds create-trust \
-  --directory-id d-aaa111222 \
-  --remote-domain-name corp.example.com \
-  --trust-direction Two-Way \
-  --trust-type Forest \
-  --trust-password 'TrustP@ssw0rd!' \
-  --region us-east-1
-
-# Verify trust status
-aws ds describe-trusts \
-  --directory-id d-aaa111222 \
-  --region us-east-1
-# Expected: TrustState: Verified
-```
+Trust creation and verification commands (create-trust, describe-trusts, expected TrustState Verified) moved verbatim to [references/trust-and-ldaps.md](references/trust-and-ldaps.md).
+Load them when emitting the trust provisioning checklist.
 
 **Prerequisites for trust:**
 - DNS conditional forwarders on BOTH sides
@@ -431,29 +282,8 @@ aws ds describe-trusts \
 LDAPS enables encrypted LDAP communication. Only Managed Microsoft AD
 supports LDAPS.
 
-```bash
-# Step 1: Register certificate with the directory
-aws ds register-certificate \
-  --directory-id d-aaa111222 \
-  --certificate-data file://certificate.pem \
-  --region us-east-1
-
-# Step 2: Enable LDAPS for client connections
-aws ds enable-ldaps \
-  --directory-id d-aaa111222 \
-  --type Client \
-  --region us-east-1
-
-# Step 3: Monitor certificate expiry
-aws ds list-certificates \
-  --directory-id d-aaa111222 \
-  --region us-east-1
-
-aws acm describe-certificate \
-  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/xxx \
-  --query 'Certificate.{Domain:DomainName,Expiry:NotAfter,Status:Status}' \
-  --region us-east-1
-```
+LDAPS commands (register-certificate, enable-ldaps, list-certificates, ACM expiry query) moved verbatim to [references/trust-and-ldaps.md](references/trust-and-ldaps.md).
+Load them when enabling LDAPS or monitoring certificate expiry.
 
 **Critical:** if the certificate expires, LDAPS breaks silently.
 Clients get TLS errors but the directory appears healthy. Set up
@@ -478,24 +308,8 @@ SSO users and permission sets.
 Directory sharing allows other AWS accounts to access a directory
 managed in your account. Only Managed Microsoft AD can be shared.
 
-```bash
-# Share the directory with another account
-aws ds share-directory \
-  --directory-id d-aaa111222 \
-  --share-target Id=999999999999,Type=ACCOUNT \
-  --share-method HANDSHAKE \
-  --region us-east-1
-
-# Target account accepts
-aws ds accept-shared-directory \
-  --shared-directory-id d-xxx \
-  --region us-east-1
-
-# Verify
-aws ds describe-shared-directories \
-  --owner-directory-id d-aaa111222 \
-  --region us-east-1
-```
+Directory sharing commands (share-directory, accept-shared-directory, describe-shared-directories) moved verbatim to [references/sso-and-sharing.md](references/sso-and-sharing.md).
+Load them when emitting the sharing checklist.
 
 **Constraints:** Unsharing breaks all accepter-account resources that
 reference the directory.
@@ -551,45 +365,16 @@ Required AD ports for security group rules:
 
 ## Step 11 — Snapshot and restore
 
-```bash
-# Create a manual snapshot
-aws ds create-snapshot \
-  --directory-id d-aaa111222 \
-  --name "pre-change-snapshot" \
-  --region us-east-1
-
-# Restore from a snapshot (full overwrite, 1-2 hours)
-aws ds restore-from-snapshot \
-  --snapshot-id s-xxx \
-  --region us-east-1
-
-# List snapshots
-aws ds describe-snapshots \
-  --directory-id d-aaa111222 \
-  --region us-east-1 --output table
-```
+Snapshot and restore commands (create-snapshot, restore-from-snapshot, describe-snapshots) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load them when backup or restore is in scope.
 
 **Constraints:** Restore replaces the current directory state (full
 overwrite). Directory is unavailable during restore (1-2 hours).
 
 ## Step 12 — Recent features
 
-- **IAM Identity Center deep integration (2023-2024):** Enhanced
-  integration with automated user provisioning and group sync.
-
-- **Multi-Region replication improvements (2023-2024):** Faster
-  replication convergence and improved failover tooling for
-  Enterprise edition.
-
-- **LDAPS for DC replication (2024-2025):** Extended LDAPS support to
-  domain controller-to-controller replication for end-to-end
-  encryption.
-
-- **Directory sharing with AWS Organizations (2024-2025):**
-  Simplified bulk sharing across accounts in an organization unit.
-
-- **Password policy enforcement improvements (2025-2026):** Real-time
-  validation and custom password filters for Managed Microsoft AD.
+Step 12 recent features (IAM Identity Center deep integration, replication improvements, LDAPS for DC replication, Organizations bulk sharing, password-policy enforcement) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when a request involves a 2023+ capability.
 
 ## NEVER do these things
 
@@ -693,28 +478,16 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Directory stuck in CREATING state
-- Creation takes 20-60 minutes. If it exceeds expected time, check
-  subnet configuration, VPC DNS settings, and IAM permissions.
+Error-handling deep dives (directory stuck in CREATING, trust stuck in CREATING/FAILED, LDAPS failing despite enabled, AD Connector auth failures, IAM Identity Center SSO failures) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load them when a deployment or verification step fails.
 
-### Trust stuck in CREATING or FAILED state
-- DNS conditional forwarders not configured or incorrect. Verify DNS
-  resolution works between domains before creating the trust. Also
-  verify network connectivity over required AD ports.
+## References (load on demand)
 
-### LDAPS not working despite being enabled
-- Certificate may have expired or CA chain not trusted. Verify
-  certificate validity, check `DaysToExpiry` in ACM, ensure the
-  issuing CA is in the client's trusted root store.
-
-### AD Connector authentication failures
-- On-prem AD unreachable (VPN/DX down) or DNS server IPs incorrect.
-  Verify network connectivity and confirm correct IPs.
-
-### IAM Identity Center SSO not working
-- Directory not connected or IAM Identity Center pointing to wrong
-  directory. Verify directory is ACTIVE and check user/permission
-  set assignments.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert heuristics (AD Connector vs Managed AD routing, Multi-Region replication conflict resolution, stub zone vs conditional forwarder) and Step 12 recent features moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — VPC/subnet/DNS verification commands and snapshot/restore commands moved from SKILL.md
+- [references/error-handling.md](references/error-handling.md) — provisioning failure deep dives moved from SKILL.md
+- [references/trust-and-ldaps.md](references/trust-and-ldaps.md) — trust and LDAPS fundamentals, expert heuristics, and CLI (moved content appended)
+- [references/sso-and-sharing.md](references/sso-and-sharing.md) — SSO, sharing, permission sets, and sharing CLI (moved content appended)
 
 ## Domain
 

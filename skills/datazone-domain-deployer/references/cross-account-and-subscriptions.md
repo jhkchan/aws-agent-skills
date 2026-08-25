@@ -371,3 +371,191 @@ resource "aws_datazone_project" "customer_analytics" {
    Redshift connection requires a Secrets Manager secret for
    database credentials. The source account IAM role must have
    `secretsmanager:GetSecretValue` on the secret ARN.
+
+## Expert heuristic: cross-account IAM role chaining (moved from SKILL.md)
+
+
+
+A baseline model says "create a domain and add a data source." The
+correct heuristic recognizes that cross-account data access requires a
+three-hop IAM role chain.
+
+```text
+Role chaining for cross-account S3 data access:
+
+  Hub account (DataZone domain):
+    DataZone execution role: arn:aws:iam::111111111111:role/service-role/AmazonDataZoneDomainExecution
+    → this role is assumed by the DataZone service
+
+  Source account (S3 data):
+    IAM role: arn:aws:iam::222222222222:role/DataZoneS3AccessRole
+    → trust policy allows the hub account's execution role to assume it
+    → permission policy allows s3:GetObject, s3:ListBucket on the data bucket
+
+  Data flow:
+    DataZone service
+      → assumes hub execution role
+      → hub execution role assumes source account role (sts:AssumeRole)
+      → source account role reads S3 data
+```
+
+The trust policy in the source account is the critical piece:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::111111111111:role/service-role/AmazonDataZoneDomainExecution"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+```
+
+**Key implication:** without this trust policy, DataZone creates the
+data source connection but every crawl and read operation fails with
+Access Denied. This is the #1 cause of "my DataZone data source shows
+no assets" tickets.
+
+
+
+## Expert heuristic: subscription approval workflow (moved from SKILL.md)
+
+
+
+The subscription workflow is the governance gate. It is a request-
+approve model, NOT auto-grant.
+
+```text
+Subscription lifecycle:
+  1. Consumer (project member) discovers an asset in the DataZone catalog
+  2. Consumer requests a subscription to the asset
+     → subscription status: PENDING
+  3. Asset owner (project owner or delegated approver) reviews the request
+     ├── Approve → subscription status: ACTIVE (access granted)
+     └── Reject  → subscription status: REJECTED (access denied)
+  4. If approved, DataZone provisions the access:
+     ├── For S3: grants IAM permissions or S3 access point to the consumer
+     ├── For Redshift: grants schema/table permissions
+     └── For RDS: provisions the connection
+  5. Consumer can now query/read the asset
+
+Glossary-term-driven approval routing:
+  ├── Asset tagged "Public" → auto-approve (or pre-approved policy)
+  ├── Asset tagged "Internal" → project owner approval
+  └── Asset tagged "PII" → data steward approval (multi-level)
+```
+
+**Key implication:** the subscription workflow must be designed before
+publishing assets. Decide who approves what, and configure glossary
+terms to route approval requests. Without a defined workflow,
+subscriptions pile up in PENDING state indefinitely.
+
+
+
+## Step 6 — subscription request and approval commands (moved from SKILL.md)
+
+
+
+```bash
+# Consumer requests a subscription to an asset
+SUBSCRIPTION_ID=$(aws datazone create-subscription \
+  --domain-id "$DOMAIN_ID" \
+  --request-subscription '{
+    "assetId": "<asset-id>",
+    "projectId": "<consumer-project-id>",
+    "requestReason": "Need access to customer events for Q3 analysis"
+  }' \
+  --region us-east-1 \
+  --query 'id' --output text)
+
+# Check subscription status (should be PENDING)
+aws datazone get-subscription \
+  --domain-id "$DOMAIN_ID" \
+  --id "$SUBSCRIPTION_ID" \
+  --query 'status' --region us-east-1
+
+# Asset owner approves the subscription
+aws datazone update-subscription \
+  --domain-id "$DOMAIN_ID" \
+  --id "$SUBSCRIPTION_ID" \
+  --status APPROVED \
+  --decision-comment "Approved for Q3 analysis" \
+  --region us-east-1
+```
+
+
+
+## Step 7 — cross-account IAM role creation commands (moved from SKILL.md)
+
+
+
+```bash
+# In the SOURCE account (data owner, account 222222222222):
+# Create an IAM role that the DataZone domain account can assume
+aws iam create-role \
+  --role-name DataZoneS3AccessRole \
+  --assume-role-policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Principal": {
+          "AWS": "arn:aws:iam::111111111111:role/service-role/AmazonDataZoneDomainExecution"
+        },
+        "Action": "sts:AssumeRole"
+      }
+    ]
+  }'
+
+# Attach a permission policy to the role
+aws iam put-role-policy \
+  --role-name DataZoneS3AccessRole \
+  --policy-name DataZoneS3ReadAccess \
+  --policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Action": [
+          "s3:GetObject",
+          "s3:ListBucket",
+          "s3:GetBucketLocation"
+        ],
+        "Resource": [
+          "arn:aws:s3:::my-customer-events",
+          "arn:aws:s3:::my-customer-events/*"
+        ]
+      }
+    ]
+  }'
+```
+
+
+
+## Step 10 — SSO verification commands (moved from SKILL.md)
+
+
+
+```bash
+# Verify SSO is configured
+aws sso-admin list-instances \
+  --query 'Instances[0].IdentityStoreId' --output text
+
+# DataZone user management happens through the SSO directory.
+# Users are assigned to DataZone projects as members or owners.
+# The SSO directory is the source of truth for user identity.
+
+# Verify SSO users
+aws identitystore list-users \
+  --identity-store-id "$(aws sso-admin list-instances \
+    --query 'Instances[0].IdentityStoreId' --output text)" \
+  --query 'Users[].{UserName:UserName,Email:Emails[0].Value}' \
+  --output table
+```
+
+
