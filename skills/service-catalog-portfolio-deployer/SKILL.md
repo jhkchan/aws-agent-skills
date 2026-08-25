@@ -179,56 +179,13 @@ adjacent portfolio.
 
 ## Expert heuristic: the no-LAUNCH-constraint myth
 
-The most common misconception: "the launching user's permissions
-govern what the product can deploy." They do, by default — and that
-is the problem.
-
-```text
-Operator thinks:                  What actually happens:
-"User launches product; their     Without a LAUNCH constraint,
-permissions scope the launch."    CloudFormation assumes the user's
-                                  role. A user with PowerUserAccess
-                                  launches a VPC product and deploys
-                                  a full VPC, NAT gateways, transit
-                                  gateway attachments — all owned
-                                  by their individual role. Central
-                                  governance has no visibility into
-                                  the resources until audit time.
-```
-
-The LAUNCH constraint is the single most important governance
-primitive in Service Catalog. It pins CloudFormation to a specific
-role whose permissions match ONLY the product's requirements — not
-the launching user's permissions. An admin launches a curated VPC
-product; the launch role has only `ec2:*` and `iam:PassRole`; the
-admin cannot inject a privilege-escalation role via a template
-parameter because the launch role will not pass arbitrary roles.
-
-**The remedy is one launch role per product family** (e.g.,
-`sc-launch-vpc-role`, `sc-launch-s3-role`), each scoped to only the
-permissions that product family requires. Tag conditions on the
-launch role add a second line of defense (e.g., the role only passes
-roles tagged `sc-launch-approved=true`).
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-the-no-launch-constraint-myth).
+> Operator-expectation vs actual-behavior comparison and the one-launch-role-per-product-family remedy.
 
 ## Expert heuristic: portfolio share region quirk
 
-A portfolio share is region-scoped. The `create-portfolio-share`
-call has no region parameter — it uses the region of the calling
-profile. A share to organization `o-abc123` made from a us-east-1
-caller makes the portfolio visible to users in us-east-1 only. A user
-in eu-west-1 will not see the portfolio in their console unless they
-switch regions to us-east-1.
-
-**For multi-region deployments:**
-1. Replicate the portfolio in each region via CloudFormation
-   StackSets, or
-2. Document the region expectation explicitly in the portfolio
-   description, or
-3. Build a custom launcher (Lambda-backed) that copies the share to
-   every region in scope.
-
-The region quirk is silent — no error, the share appears to apply
-"everywhere" but only resolves in one region.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-portfolio-share-region-quirk).
+> Region-scoped shares: create-portfolio-share has no region parameter; three multi-region remedies (StackSets replication, documented region expectation, custom launcher).
 
 ## Expert heuristic: TagOptions vs. SCPs vs. TAG_UPDATE constraint
 
@@ -297,24 +254,8 @@ scope. Missing description = consumers cannot find the portfolio.
 
 ### Step 3 — Create products + provisioning artifacts
 
-```bash
-PRODUCT_ID=$(aws servicecatalog create-product \
-  --name "Curated S3 Bucket" \
-  --owner "Platform Governance" \
-  --product-type CLOUDFORMATION_TEMPLATE \
-  --provisioning-artifact-parameters \
-    '{"Name":"v1.0.0","Description":"Initial release","Info":{"LoadTemplateFromURL":"https://s3.amazonaws.com/platform-templates-us-east-1/s3-bucket.yaml"},"Type":"CLOUD_FORMATION_TEMPLATE"}' \
-  --query 'RecordDetail.ProductId' --output text)
-```
-
-For versioned releases, create additional provisioning artifacts on
-the same product:
-
-```bash
-aws servicecatalog create-provisioning-artifact \
-  --product-id $PRODUCT_ID \
-  --parameters file://v1-1-0.json
-```
+> Moved to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md#step-3--create-products--provisioning-artifacts-cli).
+> create-product with provisioning-artifact-parameters and create-provisioning-artifact for new versions.
 
 A provisioning artifact is a version. Multiple versions can coexist;
 consumers pick one at launch. The "active" version is the default;
@@ -343,18 +284,8 @@ not in `search-products` (the consumer-facing API).
 
 ### Step 5 — Configure constraints (LAUNCH, TAG_UPDATE, NOTIFICATION)
 
-```bash
-# Create the launch role first (Step 5 prereq)
-aws iam create-role --role-name sc-launch-s3-role --assume-role-policy-document file://trust-policy.json
-aws iam put-role-policy --role-name sc-launch-s3-role --policy-name s3-only --policy-document file://s3-only-policy.json
-
-# Create the LAUNCH constraint
-aws servicecatalog create-constraint \
-  --portfolio-id $PORTFOLIO_ID \
-  --product-id $PRODUCT_ID \
-  --parameters '{"RoleArn":"arn:aws:iam::111111111111:role/sc-launch-s3-role","LocalRoleName":"sc-launch-s3-role"}' \
-  --type LAUNCH
-```
+> Moved to [references/constraint-and-launch-role-templates.md](references/constraint-and-launch-role-templates.md#step-5--configure-constraints-creation-cli).
+> Launch-role creation (iam create-role / put-role-policy) and LAUNCH create-constraint CLI.
 
 Constraint types:
 
@@ -372,16 +303,8 @@ silently degrades to no constraint — the end-user's role is used.
 
 ### Step 6 — Configure TagOptions + bind to portfolio/products
 
-```bash
-TAG_OPTION_ID=$(aws servicecatalog create-tag-option \
-  --key "CostCenter" \
-  --value "platform-1234" \
-  --query 'TagOptionDetail.Id' --output text)
-
-aws servicecatalog associate-tag-option-with-resource \
-  --resource-id $PORTFOLIO_ID \
-  --tag-option-id $TAG_OPTION_ID
-```
+> Moved to [references/sharing-and-tagoptions-procedures.md](references/sharing-and-tagoptions-procedures.md#step-6--configure-tagoptions-cli).
+> create-tag-option and associate-tag-option-with-resource CLI.
 
 Bind TagOptions at the portfolio level (inherited by all products in
 the portfolio) or at the product level (product-specific). Portfolio-
@@ -393,31 +316,8 @@ level TagOptions propagate to every product on launch.
 The portfolio is launchable by users in the source account (subject
 to IAM).
 
-**Cross-account share (account-level):**
-```bash
-aws servicecatalog create-portfolio-share \
-  --portfolio-id $PORTFOLIO_ID \
-  --account-id 222222222222
-```
-
-**Cross-account share (organization-level):**
-```bash
-# Enable Service Catalog access in Organizations
-aws organizations enable-aws-service-access \
-  --service-principal servicecatalog.amazonaws.com
-
-# Share to the entire organization
-aws servicecatalog create-portfolio-share \
-  --portfolio-id $PORTFOLIO_ID \
-  --organization-node Type=ORGANIZATION,Value=o-abc123def456
-```
-
-**Cross-account share (OU-level):**
-```bash
-aws servicecatalog create-portfolio-share \
-  --portfolio-id $PORTFOLIO_ID \
-  --organization-node Type=ORGANIZATIONAL_UNIT,Value=ou-abc1-abcdef
-```
+> Moved to [references/sharing-and-tagoptions-procedures.md](references/sharing-and-tagoptions-procedures.md#step-7--launch-paths--portfolio-shares-cli).
+> Account-, organization-, and OU-level create-portfolio-share CLI plus Organizations enable-aws-service-access.
 
 **Common mistake:** sharing to the organization root vs. the
 organization ID. `Type=ORGANIZATION` shares to every account in the
@@ -426,19 +326,8 @@ subset. Confirm the recipient set explicitly.
 
 ### Step 8 — Verify via `search-products` + `describe-portfolio`
 
-```bash
-# Verify portfolio is stored
-aws servicecatalog describe-portfolio --id $PORTFOLIO_ID
-
-# Verify product is associated
-aws servicecatalog search-products-as-admin --portfolio-id $PORTFOLIO_ID
-
-# Verify constraints
-aws servicecatalog describe-constraint --id <CONSTRAINT_ID>
-
-# Cross-account verification: switch to a consumer profile and search
-aws servicecatalog search-products --profile consumer-profile
-```
+> Moved to [references/sharing-and-tagoptions-procedures.md](references/sharing-and-tagoptions-procedures.md#step-8--verification-cli).
+> Verification CLI: describe-portfolio, search-products-as-admin, describe-constraint, consumer search-products.
 
 Cross-account verification is critical: a share that looks successful
 from the source account may be invisible in the consumer account due
@@ -592,23 +481,8 @@ VERIFICATION_COMMANDS:
 
 ### Perfect example output — PREREQUISITES_MISSING
 
-```text
-PORTFOLIO: Cross-Region VPC Products (products: 0, shares: o-abc123def456 in us-east-1)
-VERDICT: PREREQUISITES_MISSING
-CHECKLIST:
-  [✓] Intent + consumer scope: Distribute VPC-creator products to the whole organization, scope ORGANIZATION
-  [✗] Portfolio created: pending — deferred until launch role prerequisite is resolved
-  [✗] Product(s): pending — CloudFormation template URL not validated
-  [—] Product-portfolio association: deferred until product exists
-  [✗] Constraint(s): no LAUNCH role exists. Create sc-launch-vpc-role with ec2:* + iam:PassRole (with tag condition) before applying the LAUNCH constraint — without it, products launch as the end-user's role = privilege escalation.
-  [—] TagOptions: deferred
-  [✗] Share(s): Organizations not enabled for Service Catalog — enable-aws-service-access for servicecatalog.amazonaws.com before sharing at the org level. Region us-east-1 confirmed for caller; document for consumers.
-VERIFICATION_COMMANDS:
-  aws organizations describe-organization --query 'Organization.Id'
-  aws organizations list-delegated-administrators --service-principal servicecatalog.amazonaws.com
-  aws iam get-role --role-name sc-launch-vpc-role
-  aws cloudformation validate-template --template-url https://s3.amazonaws.com/platform-templates/vpc.yaml
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#perfect-example-output--prerequisites_missing).
+> PREREQUISITES_MISSING block: org-level share without Organizations enabled and no launch role, gaps cited.
 
 **Self-check before emit:**
 - [ ] All 7 checklist rows present (no omitted items)?
@@ -622,39 +496,16 @@ VERIFICATION_COMMANDS:
 
 ## Recent AWS features
 
-- **Service Catalog with Terraform Open Source (2024-2025):** Service
-  Catalog now supports Terraform-based products in addition to
-  CloudFormation. Products reference a Terraform module from a Git
-  repository; Service Catalog manages `terraform apply` and state
-  storage. Verify the Terraform engine is registered with Service
-  Catalog in your region before publishing Terraform products.
-- **Service Catalog with Terraform Cloud (2025):** integrates with
-  HCP Terraform / Terraform Cloud for state management, plan
-  approval, and policy-as-code (Sentinel). Useful for governance-
-  heavy organizations already standardized on Terraform Cloud.
-- **Service App Registry integration:** Service Catalog products can
-  be associated with Service App Registry applications for unified
-  application inventory. The association persists across launches,
-  giving operations teams a single view of all deployed applications.
-  Verify the application exists before associating.
-- **CloudFormation StackSets as a Service Catalog product:** enables
-  a product that, when launched, deploys a stack set across multiple
-  accounts. Useful for organization-wide rollouts of governance
-  primitives (Config rules, CloudTrail, etc.). Requires the launch
-  role to have `cloudformation:CreateStackSet`.
-- **TagOption inheritance improvements:** TagOptions bound at the
-  portfolio level now propagate to all products and to all
-  provisioning artifacts of those products. Verify inheritance via
-  `list-tag-options` after binding.
-- **Delegated administrator for Service Catalog:** allows a member
-  account to manage Service Catalog portfolios on behalf of the
-  organization. Verify the delegated admin is set before org-level
-  shares; otherwise, member accounts can view portfolios but cannot
-  manage them.
-- **Service Catalog API updates:** new `update-product` and
-  `update-portfolio` APIs accept a `SourceProduct` parameter for
-  copying products across portfolios. Useful for promoting products
-  from a staging portfolio to a production portfolio.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#recent-aws-features).
+> Terraform Open Source/Cloud products, App Registry association, StackSets products, TagOption inheritance, delegated admin, SourceProduct copy.
+
+## References (load on demand)
+
+- [advanced-patterns](references/advanced-patterns.md) — No-LAUNCH-constraint myth deep dive, recent AWS features (Terraform, App Registry, StackSets, delegated admin)
+- [worked-examples](references/worked-examples.md) — Perfect PREREQUISITES_MISSING example output
+- [provisioning-cli-commands](references/provisioning-cli-commands.md) — Product and provisioning-artifact creation CLI (Step 3)
+- [constraint-and-launch-role-templates](references/constraint-and-launch-role-templates.md) — Constraint JSON, launch-role policies, constraint creation commands (incl. Step 5 CLI)
+- [sharing-and-tagoptions-procedures](references/sharing-and-tagoptions-procedures.md) — Sharing, TagOptions, App Registry, verification procedures (incl. Steps 6-8 CLI)
 
 ## AWS documentation
 

@@ -82,164 +82,28 @@ with a specific gap citation in the checklist (marked `[✗]`), and
 
 ## Mindset
 
-**One-line takeaway:** Snowball Edge is a physical data transfer and
-edge computing device shipped by AWS. Import jobs move data FROM
-on-premises TO S3 (device → S3). Export jobs move data FROM S3 TO
-on-premises (S3 → device). Cluster mode connects 5-10 devices for
-compute resiliency. The device must be unlocked with its credentials
-before any data transfer or compute.
-
-Three misconceptions dominate Snowball Edge misdesign at provisioning
-time:
-
-- **"The device uploads data to S3 automatically after I copy files
-  to it."** It does NOT — for import jobs, you copy data to the device
-  via NFS (or aws s3 cp), then physically RETURN the device. AWS
-  uploads the data to S3 after receiving the device back. The device
-  is NOT an internet-connected gateway; it is a suitcase-sized data
-  shuttle. This misunderstanding leads operators to wait for an upload
-  that never starts.
-
-- **"Any device type works for any workload."** Device types have
-  distinct capabilities. Storage Optimized (80 TB or 210 TB usable)
-  is for pure data migration. Compute Optimized adds an AMI and Lambda
-  for edge processing. Snowcone (8 TB usable, 2.1 kg) is for smaller
-  transfers and edge computing in space-constrained environments.
-  Choosing the wrong device wastes money or limits capability.
-
-- **"Cluster mode is just for extra storage."** Cluster mode connects
-  5-10 Storage Optimized or Compute Optimized devices into a single
-  logical entity for COMPUTE resiliency (not just more storage). If
-  one device fails, the cluster continues operating. This is essential
-  for edge computing workloads (IoT processing, ML inference, EKS
-  Anywhere) that cannot tolerate downtime.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#mindset).
+> One-line: import = device→S3 only after physical return; export = S3→device; cluster mode = 5-10 nodes for compute resiliency; unlock precedes any transfer or compute.
 
 ## Configuration dependency graph (novel heuristic)
 
-Snowball Edge configurations are NOT independent. The job must be
-created before the device ships. The device must be unlocked before
-data transfer. NFS must be started before copying data. The device
-must be returned before AWS imports data to S3. Use this graph to
-sequence provisioning.
-
-| Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| Job creation | AWS account; shipping address; S3 bucket exists (import: destination; export: source); device type selected; snowball type (device) | job type (IMPORT/EXPORT) and device type are immutable after creation | device shipment |
-| Shipping address | valid physical address (no PO boxes for Snowball Edge; PO boxes OK for Snowcone) | AWS ships only to supported regions/countries; remote areas may take longer | device delivery |
-| Device delivery | job created; address validated | delivery takes 2-7 business days depending on location | device pairing |
-| Device pairing (manifest + unlock code) | device powered on and connected to network; manifest downloaded from AWS console | the manifest is job-specific and CANNOT be reused across jobs | device unlock |
-| Device unlock | device paired (manifest applied); unlock code entered via snowballEdge CLI | device CANNOT be used without unlock; wrong manifest = re-pair required | NFS, S3 interface, Lambda |
-| NFS interface start | device unlocked | NFS must be started manually via snowballEdge CLI; does not auto-start | NFS data transfer |
-| S3 adapter interface | device unlocked | provides an S3-compatible endpoint for aws s3 cp; alternative to NFS | S3 CLI data transfer |
-| Data transfer (import) | NFS or S3 interface active | data is stored on device locally; NOT uploaded until device is returned | return shipping |
-| Data transfer (export) | device received from AWS; NFS or S3 interface active | export data was pre-loaded by AWS before shipping | on-premises consumption |
-| Return shipping (import) | data transfer complete | AWS uploads data to S3 AFTER receiving the device; tracking is available | S3 data import |
-| Data validation report | return shipping processed by AWS | report is available in the AWS console after import; shows success/failure per object | transfer verification |
-| Lambda functions | device unlocked; Compute Optimized or Snowcone device | Lambda functions are deployed to the device for edge compute | edge processing |
-| Cluster mode | 5-10 devices; all same device type; all unlocked; connected on same network | cluster provides compute resiliency; single-node failure does not stop the cluster | resilient edge compute |
-
-**The return-before-upload row is the one a baseline model misses.**
-A naive deployment says "copy data to the device." The correct
-heuristic recognizes that for import jobs, copying data is only step
-one — the device must be physically returned for AWS to process the
-upload to S3. The data validation report is only available AFTER the
-return. The procedure below forces explicit planning for the full
-device lifecycle.
-
-**Cross-dependency gotchas:**
-- The manifest is job-specific. Each job has its own manifest and
-  unlock code. Reusing a manifest from a different job fails the
-  pairing step.
-- NFS interface must be started manually after unlock. It does not
-  auto-start. Forgetting to start NFS is a common blocker.
-- For import jobs, the S3 destination bucket must exist BEFORE job
-  creation. AWS validates the bucket at job creation time.
-- Cluster mode requires all devices to be on the same network with
-  mutual network visibility. Devices on different subnets may not
-  form a cluster.
-- Export jobs can only export data from one S3 bucket per job. For
-  multiple buckets, create multiple export jobs.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#configuration-dependency-graph-novel-heuristic).
+> Job→shipping→unlock→NFS→copy→return→S3-upload→report ordering; manifest is job-specific, NFS starts manually, one export bucket per job, cluster nodes need mutual network visibility.
 
 ## Expert heuristic: import job data flow (device → S3 bucket)
 
-A baseline model says "create a job and copy data." The correct
-heuristic recognizes the full lifecycle: create job → receive device →
-unlock → start NFS → copy data → return device → AWS uploads → validate.
-
-```text
-Import job data flow:
-  1. Create import job (specify S3 destination bucket)
-     → AWS prepares and ships the device
-  2. Receive device (2-7 business days)
-     → Power on, connect to network
-  3. Pair device (download manifest from AWS console)
-     → Apply manifest via snowballEdge CLI
-  4. Unlock device (using unlock code from AWS console)
-     → snowballEdge unlock-device --endpoint ...
-  5. Start NFS interface
-     → snowballEdge start-service --service-id nfs-1 ...
-  6. Mount NFS and copy data (or use aws s3 cp via S3 adapter)
-     → mount -t nfs <device-ip>:/nfs/path /mnt/snowball
-     → cp -r /data/* /mnt/snowball/
-     → OR: aws s3 cp /data/ s3://snowball-bucket/ --endpoint ...
-  7. Stop NFS, power off device
-  8. Return device (AWS-provided shipping label)
-  9. AWS receives device → uploads data to S3 (hours to days)
-  10. Data validation report available in AWS console
-```
-
-**Key implication:** the #1 cause of "where is my data in S3?" is
-expecting the device to upload in real-time. The device is a physical
-shuttle — data uploads only AFTER the device is returned and processed
-by AWS.
+> Moved to [references/import-export-data-flow.md](references/import-export-data-flow.md#expert-heuristic-import-job-data-flow-device--s3-bucket).
+> 10-step import lifecycle (create→receive→pair→unlock→NFS→copy→return→AWS uploads→validate); data reaches S3 only AFTER the device is returned.
 
 ## Expert heuristic: cluster mode for resiliency
 
-Cluster mode connects 5-10 Snowball Edge devices into a single logical
-entity for COMPUTE resiliency (not storage aggregation). If one device
-fails, the cluster continues operating.
-
-```text
-Cluster mode decision tree:
-  ├── Need edge compute with HA? → cluster mode (min 5 nodes)
-  │     All nodes same device type, same network
-  │     Quorum: 5-node cluster tolerates 2 node failures
-  │     Use case: IoT processing, ML inference at edge
-  ├── Need just data transfer? → single device (no cluster)
-  │     One device, one job, return when done
-  ├── Need EKS Anywhere? → cluster mode (5 nodes minimum)
-  │     EKS Anywhere requires persistent cluster
-  └── Need more than 210 TB transfer? → multiple single-device jobs
-        NOT cluster mode (cluster is for compute, not storage pooling)
-```
-
-**Key implication:** cluster mode is for compute resiliency, not for
-aggregating storage. For large data transfers, use multiple
-single-device jobs, not a cluster.
+> Moved to [references/cluster-and-compute.md](references/cluster-and-compute.md#expert-heuristic-cluster-mode-for-resiliency).
+> Cluster mode is compute resiliency (5 nodes tolerate 2 failures); for >210 TB use multiple single-device jobs, never a cluster.
 
 ## Expert heuristic: NFS transfer via smbclient/aws s3 cp parallelism
 
-Data transfer speed depends on the interface (NFS vs S3 adapter) and
-the number of parallel threads. NFS is generally faster for large
-files; the S3 adapter supports aws s3 cp with parallelism.
-
-```text
-Transfer optimization:
-  NFS (large files, sequential):
-    ├── mount -t nfs <device-ip>:/nfs/path /mnt/snowball
-    ├── Use parallel copy: find /data -type f | xargs -P 16 -I{} cp {} /mnt/snowball/
-    └── Expected: 400-800 Mbps per NFS connection
-
-  S3 adapter (many small files, aws s3 cp):
-    ├── aws s3 cp /data/ s3://snowball-bucket/ --endpoint http://<device-ip>:8080 --recursive
-    ├── Increase parallelism: --max-concurrent-requests 32 (default 5)
-    └── Expected: 200-500 Mbps with high parallelism
-
-  Rule of thumb:
-    ├── > 100 GB files → NFS (single large sequential copy)
-    ├── < 100 MB files → S3 adapter with --max-concurrent-requests 32
-    └── Mixed → NFS with parallel copy threads
-```
+> Moved to [references/import-export-data-flow.md](references/import-export-data-flow.md#expert-heuristic-nfs-transfer-via-smbclientaws-s3-cp-parallelism).
+> NFS for >100 GB files (xargs -P parallel copy, 400-800 Mbps); S3 adapter with --max-concurrent-requests 32 for <100 MB files.
 
 ## Prerequisites (verify before provisioning)
 
@@ -518,31 +382,8 @@ aws snowball create-job \
   --region us-east-1
 ```
 
-**Recent features (2023-2026):**
-
-- **Snowball Edge Compute Optimized with GPU (2023-2024):** AWS
-  introduced Compute Optimized devices with optional NVIDIA GPUs for
-  ML inference at the edge, supporting models that cannot run on CPU.
-
-- **EKS Anywhere on Snowball maturity (2023-2024):** Enhanced EKS
-  Anywhere support for Snowball Edge clusters, including automated
-  cluster lifecycle management and simplified upgrade paths.
-
-- **Snowcone long-term rental (2023-2024):** Snowcone devices now
-  support 1-year and 3-year rental terms for persistent edge
-  deployments in space-constrained environments.
-
-- **Improved data transfer reporting (2023-2024):** Enhanced job
-  completion reports with per-object status, error categorization,
-  and downloadable CSV summaries for audit and compliance.
-
-- **Snowball Edge 210 TB device (2024-2025):** AWS increased the
-  Storage Optimized device capacity to 210 TB usable, reducing the
-  number of devices needed for large-scale migrations.
-
-- **Faster NFS throughput (2024-2025):** NFS interface throughput
-  improvements, supporting up to 800 Mbps per connection on
-  Storage Optimized devices with 100 GbE networking.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#recent-aws-features-2023-2026).
+> GPU Compute Optimized devices, EKS Anywhere maturity, Snowcone 1/3-year rental, per-object CSV validation reports, 210 TB device, 800 Mbps NFS.
 
 ## NEVER do these things
 
@@ -638,28 +479,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Job creation fails — S3 bucket not found
-- The S3 bucket must exist before creating the job. Verify with
-  `aws s3api head-bucket`. Create the bucket if needed, then retry.
+> Moved to [references/error-handling.md](references/error-handling.md#error-handling).
+> Five deep dives: S3 bucket not found at job creation, manifest mismatch, NFS mount fails (service not started), slow transfer, cluster nodes not visible.
 
-### Device pairing fails — manifest mismatch
-- The manifest is job-specific. Download the correct manifest from
-  the AWS Snowball console for THIS job. Do not reuse manifests from
-  other jobs.
+## References (load on demand)
 
-### NFS mount fails — service not started
-- Start the NFS service via `snowballEdge start-service --service-id nfs`
-  after unlock. NFS does not auto-start.
-
-### Data transfer is slow
-- Use parallel copy threads (`xargs -P 16`) for NFS, or increase
-  `--max-concurrent-requests` for the S3 adapter. Verify the network
-  link speed (100 GbE is optimal; 1 GbE is a bottleneck).
-
-### Cluster formation fails — nodes not visible
-- Verify all nodes are on the same network with mutual visibility.
-  Check firewall rules and subnet configuration. All nodes must be the
-  same device type.
+- [advanced-patterns](references/advanced-patterns.md) — Mindset misconceptions, the configuration dependency graph with cross-dependency gotchas, and Recent AWS features (2023-2026)
+- [cluster-and-compute](references/cluster-and-compute.md) — cluster fundamentals, Lambda, EKS Anywhere, long-term rental, plus the cluster-mode resiliency heuristic moved from SKILL.md
+- [error-handling](references/error-handling.md) — job-creation, pairing, NFS-mount, transfer-speed, and cluster-formation failure deep dives moved from SKILL.md
+- [import-export-data-flow](references/import-export-data-flow.md) — import/export lifecycles, NFS and S3-adapter interfaces, plus the import data-flow and transfer-parallelism heuristics moved from SKILL.md
 
 ## Domain
 

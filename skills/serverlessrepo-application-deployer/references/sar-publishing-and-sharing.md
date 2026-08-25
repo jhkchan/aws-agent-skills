@@ -300,3 +300,102 @@ resource "aws_serverlessapplicationrepository_application_policy" "grant" {
   ])
 }
 ```
+
+### Step 4 — Semantic versioning: bump table and publish CLI
+
+| Version bump | When to use | Example |
+|---|---|---|
+| MAJOR (1.0.0 → 2.0.0) | Breaking changes (new required params, removed resources) | Adding a required parameter |
+| MINOR (1.0.0 → 1.1.0) | Backward-compatible features (new optional params, new resources) | Adding an optional parameter |
+| PATCH (1.0.0 → 1.0.1) | Backward-compatible fixes | Bug fix in template logic |
+| prerelease (1.0.0 → 1.0.0-beta) | Pre-release versions | Beta testing before GA |
+
+**Publish with a version:**
+
+```bash
+aws serverlessrepo create-application \
+  --author "Jacky Chan" \
+  --description "S3 file processor with event-driven Lambda" \
+  --home-page-url "https://github.com/example/s3-processor" \
+  --license-body file://LICENSE \
+  --readme-body file://README.md \
+  --labels "s3" "lambda" "event-driven" \
+  --semantic-version "1.0.0" \
+  --source-code-url "https://github.com/example/s3-processor" \
+  --template-body file://packaged.yaml \
+  --region us-east-1
+```
+
+**Updating an application (new version):**
+
+```bash
+aws serverlessrepo create-application \
+  --application-id "arn:aws:serverlessrepo:us-east-1:123456789012:apps/s3-file-processor" \
+  --author "Jacky Chan" \
+  --description "S3 file processor with event-driven Lambda" \
+  --readme-body file://README.md \
+  --semantic-version "1.1.0" \
+  --template-body file://packaged.yaml \
+  --region us-east-1
+```
+
+**Critical:** you cannot overwrite an existing version. Each publish
+must use a new, unique version string. Reusing a version results in
+a `ConflictException`.
+
+
+### Step 5 — Application sharing: status check and public verification
+
+**Check current sharing status:**
+
+```bash
+aws serverlessrepo get-application \
+  --application-id "arn:aws:serverlessrepo:us-east-1:123456789012:apps/s3-file-processor" \
+  --query '[SpdxLicenseId,IsVerifiedAuthor]' \
+  --region us-east-1 --output text
+```
+
+**Publishing as public** requires the application to pass a verification
+process (AWS reviews public apps). The `IsVerifiedAuthor` flag indicates
+verification status.
+
+
+### Step 6 — Application policy: cross-account grant CLI
+
+**Grant a consumer account deploy permission:**
+
+```bash
+aws serverlessrepo put-application-policy \
+  --application-id "arn:aws:serverlessrepo:us-east-1:123456789012:apps/s3-file-processor" \
+  --statements '[{"StatementId":"grant-dev-account","Actions":["serverlessrepo:CreateCloudFormationChangeSet"],"Principal":{"AWS":["arn:aws:iam::999999999999:root"]}}]' \
+  --region us-east-1
+```
+
+**Verify the policy:**
+
+```bash
+aws serverlessrepo get-application-policy \
+  --application-id "arn:aws:serverlessrepo:us-east-1:123456789012:apps/s3-file-processor" \
+  --region us-east-1
+```
+
+**Critical:** the policy action `serverlessrepo:CreateCloudFormationChangeSet`
+is what allows the consumer to deploy. Without this action in the
+policy, the consumer gets a 403 at deploy time.
+
+
+### Step 11 — Author profile and labels
+
+The published author profile includes:
+
+| Field | Purpose | API parameter |
+|---|---|---|
+| Author name | Displayed in the catalog | `--author` |
+| Home page URL | Link to project page | `--home-page-url` |
+| Source code URL | Link to source repository | `--source-code-url` |
+| Labels | Search tags (max 10) | `--labels` |
+| SpdxLicenseId | SPDX license identifier | `--license-url` (for SPDX) |
+| IsVerifiedAuthor | AWS verification flag (public apps) | Read-only (AWS sets this) |
+
+**Labels** improve discoverability in the SAR catalog. Use relevant
+tags (e.g., "s3", "lambda", "event-driven", "real-time").

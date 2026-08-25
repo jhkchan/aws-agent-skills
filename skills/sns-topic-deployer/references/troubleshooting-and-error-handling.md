@@ -251,3 +251,16 @@ log volume — sample the feedback role or scope to failure-only; (c) per-
 subscription KMS throttle — 100+ concurrent pushes can hit the shared CMK
 rate limit. Fix: customer-managed CMK with higher request quota, or split
 into a topic-of-topics hierarchy.
+
+## Error-handling branches
+
+| Error | Cause | Fix |
+|---|---|---|
+| `InvalidParameter: FIFO topic name must end with .fifo` | FIFO without suffix | Rename with `.fifo` |
+| `InvalidParameter: Subscription to FIFO topic requires FIFO SQS queue` | Non-SQS endpoint on FIFO | Use SQS FIFO queue, or Standard topic |
+| `KMSAccessDeniedException` | Subscriber lacks `kms:Decrypt` on CMK | Add `kms:Decrypt` + `kms:GenerateDataKey*` to subscriber key policy |
+| `AuthorizationError: sns:Subscribe` | Topic policy blocks cross-account | Add foreign account to topic policy |
+| Messages not delivered to cross-account SQS | AWS-managed key blocks decrypt | Switch to customer-managed CMK |
+| HTTP subscription in `PendingConfirmation` | Endpoint did not confirm within 3 days | Re-subscribe; endpoint must GET SubscribeURL |
+| Filter policy silently dropping messages | Non-JSON body with `FilterPolicyScope=MessageBody` | Ensure JSON bodies, or use MessageAttributes |
+| Delivery logs not in CloudWatch | Missing CloudWatch Logs resource policy | Add resource policy granting SNS logs permissions |

@@ -143,66 +143,15 @@ missed configuration.
 
 ## Expert heuristic: integer rate control vs percentage strings
 
-```text
-max-concurrency:
-  ├── Integer (preferred):  max-concurrency: 10
-  │     → exactly 10 in parallel, regardless of fleet size
-  │     → deterministic; identical in dev (3 instances) and prod (3000)
-  └── Percentage (avoid):   max-concurrency: "10%"
-        → 3-instance fleet: rounds to 1 (or 0)
-        → 3000-instance fleet: 300 in parallel (disruptive)
-
-max-errors:
-  ├── Integer (preferred):  max-errors: 3
-  │     → stops after 3 errors, regardless of fleet size
-  └── Percentage (avoid):   max-errors: "5%"
-        → 3-instance fleet: 1 error stops the run
-        → 3000-instance fleet: 150 errors before stop
-```
-
-**Worst-case blast radius** (approx):
-`max-concurrency + max-errors - 1` instances affected before stop.
-
-**Key implication:** always use integer counts. The skill emits
-`max-concurrency: <N>` and `max-errors: <N>` and flags any percentage
-string as REVIEW_REQUIRED.
+→ Moved to [references/rate-control-and-targets.md](references/rate-control-and-targets.md) — integer-vs-percentage decision model and worst-case blast radius.
 
 ## Expert heuristic: tag targets vs instance-ID targets
 
-```text
-Target type decision:
-  ├── Auto Scaling fleet, dynamic membership → USE TAG TARGETS
-  │     Key=tag:Environment, Values=[production]
-  │     → new instances launched by ASG with tag are auto-included
-  ├── Fixed pet instances, one-off servers → INSTANCE IDs acceptable
-  │     Key=InstanceIds, Values=[i-aaa111, i-bbb222]
-  │     → new instances NOT picked up; association must be edited
-  └── All managed instances → Key=InstanceIds, Values=[*]
-```
-
-**Key implication:** for any fleet that autoscales or has churn, tag
-targets are the only safe choice.
+→ Moved to [references/rate-control-and-targets.md](references/rate-control-and-targets.md) — tag-target vs instance-ID decision model.
 
 ## Expert heuristic: S3 output bucket encryption
 
-SSM execution output (stdout, stderr, script payloads) can contain
-sensitive data. The output bucket MUST have SSE enabled, and for
-production that means a customer-managed KMS key.
-
-```text
-Output S3 bucket:
-  ├── Bucket exists
-  │     aws s3api head-bucket --bucket my-ssm-output
-  ├── SSE enabled (KMS preferred over SSE-S3)
-  │     customer-managed KMS key: kms-key-arn
-  │     bucket policy allows ssm: s3:PutObject
-  │     KMS key policy allows ssm: kms:GenerateDataKey
-  └── Without KMS → REVIEW_REQUIRED (silent security finding)
-```
-
-**Key implication:** SSM does not enforce SSE. An unencrypted bucket
-is a silent finding. The skill flags any output bucket without a KMS
-key.
+→ Moved to [references/output-and-compliance.md](references/output-and-compliance.md) — S3 output bucket encryption requirements and silent-finding risk.
 
 ## Prerequisites (verify before operating)
 
@@ -432,19 +381,7 @@ SSM emits metrics in the `AWS/SSM` namespace.
 
 ## Step 12 — Recent features
 
-- **Association-level KMS key for output (2023-2024):** per-association
-  key scoping, separate from bucket default SSE.
-- **Target-locations for multi-account/multi-region (2023-2024):**
-  fan-out across accounts and Regions via `--target-locations` with
-  AWS Organizations integration.
-- **Calendar-based schedules (2023-2024):** change-window integration
-  respects change freeze windows.
-- **Triggered associations via EventBridge (2023-2024):** trigger on
-  events (e.g., EC2 state change) beyond cron/rate.
-- **Compliance dashboard (2024-2025):** drift detection timeline and
-  per-association compliance history.
-- **Terraform provider (2024-2025):** `aws_ssm_association` supports
-  `target_locations` for multi-account/multi-region fan-out.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — recent AWS features (2023-2026).
 
 ## NEVER do these things
 
@@ -536,25 +473,14 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-- **Zero targets processed:** no instances match the target filter, or
-  matching instances are not managed by SSM. Verify with
-  `describe-instance-information` using the same filter. Check that
-  target instances have `AmazonSSMManagedInstanceCore`.
-- **Association stuck in Pending:** created without `--apply-at-
-  creation` and not yet reached scheduled tick. Trigger with
-  `start-associations-once`.
-- **Output not delivered to S3:** bucket policy missing
-  `s3:PutObject` for `ssm.amazonaws.com`, or KMS key policy missing
-  `kms:GenerateDataKey`. SSM silently drops output. Check CloudTrail
-  for `AccessDenied` from `ssm.amazonaws.com`.
-- **Association status Failed:** inspect per-instance output in S3 at
-  `s3://<bucket>/<prefix>/<assoc-id>/<exec-id>/<instance-id>/`. Common
-  causes: invalid parameters, missing dependencies, script errors.
-- **NON_COMPLIANT after successful run:** document has a compliance
-  check step that detected drift. Re-run the association or trigger
-  remediation.
-- **Rate control stopped the run early:** `max-errors` threshold
-  reached. Inspect failed instances, fix root cause, re-run.
+→ Moved to [references/error-handling.md](references/error-handling.md) — six failure modes: zero targets, stuck Pending, output not delivered, Failed status, NON_COMPLIANT, rate-control stop.
+
+## References (load on demand)
+
+- [references/rate-control-and-targets.md](references/rate-control-and-targets.md) — pre-existing; extended with the integer-rate-control and tag-vs-instance-ID expert heuristics moved from SKILL.md.
+- [references/output-and-compliance.md](references/output-and-compliance.md) — pre-existing; extended with the S3 output bucket encryption expert heuristic moved from SKILL.md.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — recent AWS features (2023-2026): association-level KMS, target-locations, calendar schedules, EventBridge triggers, compliance dashboard.
+- [references/error-handling.md](references/error-handling.md) — error-handling deep dive: zero targets, Pending stall, S3 output drop, Failed runs, NON_COMPLIANT after success, rate-control stop.
 
 ## Domain
 

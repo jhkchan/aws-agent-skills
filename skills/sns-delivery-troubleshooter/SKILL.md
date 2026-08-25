@@ -113,33 +113,8 @@ no third verdict value.
 
 ## Expert heuristic
 
-A senior integration engineer applies three quick checks before any
-deep diagnosis. Each is non-obvious and routes the diagnosis away from
-the obvious layer:
-
-1. **HTTP endpoint retry follows a fixed 4-attempt schedule.** SNS
-   retries HTTP/HTTPS delivery: immediate, +1s, +10s, +100s (4
-   immediate by default; configurable up to 4 immediate + 5 delayed).
-   A 5xx endpoint that recovers within the retry window eventually
-   receives the message. A 4xx endpoint is treated as a permanent
-   rejection after the final retry — the message is dropped. If the
-   operator reports "intermittent delivery loss," check whether the
-   endpoint returns 4xx under load (rate limiting, auth expiry).
-2. **Filter policy JSON scope matching is strict.**
-   `{"event": ["order.created"]}` matches attribute
-   `event=order.created` exactly. A message with
-   `event=order.created.v2` does NOT match (no prefix by default). A
-   message with NO `event` attribute does NOT match. Subscriptions
-   with NO filter policy receive all messages; subscriptions WITH a
-   filter policy drop messages lacking the attribute unless the policy
-   uses `exists` or `anything-but` operators.
-3. **Fan-out via SQS is the durability pattern.** SNS-to-SQS fan-out
-   (one topic, N queues, each consumed independently) decouples the
-   consumer from the publisher. A slow or failing consumer does NOT
-   affect other consumers. Direct SNS-to-Lambda does not have this
-   property — a slow Lambda backs up delivery and eventually triggers
-   the retry policy. Recommend SQS fan-out for multi-consumer
-   durability.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic).
+> Three checks: fixed 4-attempt HTTP retry schedule (4xx permanent, 5xx transient), strict filter-policy exact-match scope, SQS fan-out as the durability pattern.
 
 ## Configuration dependency graph
 
@@ -192,33 +167,8 @@ states that mimic delivery failures.
 
 ### Account-wide pre-flight commands
 
-```bash
-# 1. Topic attributes (FifoTopic, policy, delivery status, KmsMasterKeyId)
-aws sns get-topic-attributes --topic-arn <topic-arn> --output json
-
-# 2. All subscriptions on the topic
-aws sns list-subscriptions-by-topic --topic-arn <topic-arn> --output json
-
-# 3. Per-subscription attributes (ConfirmationStatus, FilterPolicy,
-#    DeliveryPolicy, RawMessageDelivery, SubscriptionRolePolicy)
-aws sns get-subscription-attributes \
-  --subscription-arn <subscription-arn> --output json
-
-# 4. SNS delivery metrics (per-subscription dimension available)
-aws cloudwatch get-metric-statistics --namespace AWS/SNS \
-  --metric-name NumberOfNotificationsFailed \
-  --dimensions Name=TopicName,Value=<topic-name> \
-  Name=Endpoint,Value=<endpoint-url> \
-  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Sum --output json
-
-# 5. For Lambda subscriptions: Lambda errors and throttles
-aws cloudwatch get-metric-statistics --namespace AWS/Lambda \
-  --metric-name Errors \
-  --dimensions Name=FunctionName,Value=<fn> \
-  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Sum --output json
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#account-wide-pre-flight-commands).
+> get-topic-attributes, list-subscriptions-by-topic, get-subscription-attributes, AWS/SNS NumberOfNotificationsFailed, and Lambda Errors metric probes.
 
 ### Subscription-state short-circuit
 
@@ -245,31 +195,8 @@ without a failing probe that matches the symptom.**
 
 ### Step 0: Non-obvious behaviours that change diagnosis
 
-- **Subscription confirmation is manual for HTTP/HTTPS.** SNS sends a
-  `SubscriptionConfirmation` token; the endpoint must call
-  `ConfirmSubscription`. Until confirmed, ZERO messages deliver.
-  Lambda and SQS subscriptions auto-confirm; HTTP/HTTPS do not.
-- **Filter policies silently drop non-matching messages.** No error,
-  no DLQ entry, no metric spike. Signal: `Delivered < Published`.
-- **HTTP 4xx is permanent rejection after the retry sequence.** A 403
-  (auth expired) or 429 (rate limited) under load looks like
-  "intermittent delivery loss."
-- **Lambda subscriptions use async invocation (`InvocationType:
-  Event`).** Lambda retries twice on failure then drops. Without an
-  OnFailure destination or DLQ, the SNS message vanishes.
-- **`RawMessageDelivery: true` strips SQS message attributes.**
-  Consumer must parse from the SNS JSON body. `false` propagates
-  attributes but adds envelope overhead that can push a 250 KB payload
-  over the 256 KB SQS cap.
-- **FIFO topics require FIFO queues.** A standard SQS queue subscribed
-  to a FIFO topic delivers but breaks ordering.
-- **Cross-region Lambda subscription needs the function resource
-  policy to grant `lambda:InvokeFunction` from the SNS topic's
-  account.** Console auto-grants same-region; CLI / Terraform do not.
-- **Platform endpoints auto-disable on permanent push failure** (token
-  revoked, app uninstalled). SNS sets `Enabled: false`; future
-  publishes silently fail.
-- **SNS message size cap is 256 KB** (body + attributes combined).
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-0-non-obvious-behaviours-that-change-diagnosis).
+> Manual HTTP confirmation, silent filter drops, 4xx permanent rejection, Lambda async drop without DLQ, RawMessageDelivery attribute stripping, FIFO-needs-FIFO, cross-region grant, auto-disable, 256 KB cap.
 
 ### Step 1: Symptom entry
 
@@ -522,38 +449,8 @@ CONFIRM: Before re-subscribing, emit and await:
 
 ### Worked example — filter policy silent drop
 
-```text
-TARGET: arn:aws:sns:us-east-1:111111111111:order-events
-  (subscription: arn:aws:sns:us-east-1:111111111111:order-events:abc)
-VERDICT: ROOT_CAUSE_IDENTIFIED
-REASON: Subscription filter policy {"event": ["order.created"]} drops
-  messages with attribute event=order.updated. Filter policies silently
-  drop non-matching messages — no error, no DLQ entry (Step 7).
-LAYER: FILTER_POLICY_MISMATCH
-EVIDENCE:
-  - Symptom: consumer reports ~40% of expected messages never arrive.
-    No errors in SNS delivery metrics.
-  - Probe: aws sns get-subscription-attributes returns FilterPolicy:
-    {"event": ["order.created"]}.
-  - Probe: NumberOfNotificationsDelivered for this subscription is
-    ~60% of Published — the drop ratio matches the order.created vs
-    order.updated split. Test publish with event=order.updated does
-    NOT increment Delivered; event=order.created does.
-  - Passing: ConfirmationStatus is Confirmed; Lambda resource policy
-    grants sns.amazonaws.com lambda:InvokeFunction.
-REMEDIATION:
-  1. Update the filter policy to include order.updated:
-     aws sns set-subscription-attributes \
-       --subscription-arn <sub-arn> \
-       --attribute-name FilterPolicy \
-       --attribute-value '{"event": ["order.created", "order.updated"]}' \
-       --profile <p>
-  2. Verify by publishing event=order.updated and confirming
-     NumberOfNotificationsDelivered increments.
-CONFIRM: Before updating the filter policy, emit and await:
-  "CONFIRM: About to add order.updated to the filter policy on
-   subscription <sub-arn>. Proceed? (yes/no)"
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#worked-example--filter-policy-silent-drop).
+> Full FILTER_POLICY_MISMATCH block: ~60% delivered-ratio probe, corrected FilterPolicy via set-subscription-attributes, CONFIRM gate.
 
 ## Pre-flight safety checks (run before any state-changing CLI)
 
@@ -588,166 +485,27 @@ subscription changes, `subscribe` / `confirm-subscription` for HTTP
 lifecycle, or a target-side policy command for permission-layer fixes.
 Always emit CONFIRM before executing; include the diff in the prompt.
 
-### HTTP_SUBSCRIPTION_CONFIRMATION
-
-```bash
-aws sns subscribe --topic-arn <topic> --protocol https \
-  --notification-endpoint <endpoint> --return-subscription-arn --profile <p>
-aws sns confirm-subscription --topic-arn <topic> --token <token> \
-  --authenticate-on-unsubscribe true --profile <p>
-```
-
-### HTTP_4XX_5XX_RETRY
-
-Address the endpoint-side issue (scale, refresh auth, raise rate
-limit). Adjust the subscription delivery policy for more retries:
-
-```bash
-aws sns set-subscription-attributes --subscription-arn <sub-arn> \
-  --attribute-name DeliveryPolicy \
-  --attribute-value '{"healthyRetryPolicy":{"numRetries":5,"minDelayTarget":1,"maxDelayTarget":60}}' \
-  --profile <p>
-```
-
-### HTTP_SIGNATURE_VERIFICATION
-
-No SNS-side fix. Update the endpoint's validation code to fetch the
-cert from `SigningCertURL` and verify per the AWS SNS message spec.
-
-### LAMBDA_ASYNC_INVOCATION
-
-```bash
-aws lambda add-permission --function-name <fn> \
-  --statement-id AllowSNSInvoke \
-  --action lambda:InvokeFunction \
-  --principal sns.amazonaws.com \
-  --source-arn <topic-arn> --profile <p>
-```
-
-### LAMBDA_DLQ
-
-```bash
-aws lambda put-function-event-invoke-config --function-name <fn> \
-  --destination-config '{"OnFailure":{"Destination":"<sns-or-sqs-arn>"}}' \
-  --profile <p>
-```
-Route to `lambda-invocation-troubleshooter` if the handler is throwing.
-
-### SQS_MESSAGE_SIZE / SQS_REDRIVE
-
-```bash
-# Remove envelope overhead
-aws sns set-subscription-attributes --subscription-arn <sub-arn> \
-  --attribute-name RawMessageDelivery --attribute-value true --profile <p>
-```
-For SQS_REDRIVE: inspect the source queue's RedrivePolicy; adjust
-`maxReceiveCount` or fix the consumer so messages don't exhaust
-retries.
-
-### EMAIL_BOUNCE_COMPLAINT
-
-Remove the bounced address from the subscription; implement SES
-bounce/complaint handling via a separate SNS topic.
-
-### PLATFORM_ENDPOINT_DISABLED
-
-```bash
-aws sns create-platform-endpoint --platform-application-arn <app-arn> \
-  --token <device-token> --profile <p>
-aws sns delete-endpoint --endpoint-arn <old-endpoint-arn> --profile <p>
-```
-
-### FILTER_POLICY_MISMATCH / MESSAGE_ATTRIBUTE_LOSS
-
-```bash
-aws sns set-subscription-attributes --subscription-arn <sub-arn> \
-  --attribute-name FilterPolicy \
-  --attribute-value '<corrected-json>' --profile <p>
-```
-Verify the corrected policy against the publisher's actual message
-attributes. Use `prefix`, `anything-but`, `exists` for flexible
-matching. For MESSAGE_ATTRIBUTE_LOSS: set `RawMessageDelivery: false`
-to propagate attributes, OR parse from the body in the consumer.
-
-### FIFO_ORDERING / CROSS_REGION_DELIVERY / DLQ_MISSING
-
-- FIFO_ORDERING: use a `.fifo` queue; ensure publisher assigns
-  `MessageGroupId` correctly.
-- CROSS_REGION_DELIVERY: `aws lambda add-permission --function-name <fn>
-  --principal sns.amazonaws.com --source-arn <topic-arn> ...`.
-- DLQ_MISSING: configure SNS subscription DLQ via
-  `set-subscription-attributes RedrivePolicy`, OR Lambda OnFailure
-  destinations for Lambda subscriptions.
+> Moved to [references/error-handling.md](references/error-handling.md#remediation-guidance--per-layer-fix-commands).
+> Per-layer fix CLIs: re-subscribe/confirm, DeliveryPolicy numRetries, add-permission, OnFailure destination, RawMessageDelivery, endpoint re-registration, corrected FilterPolicy, FIFO/cross-region/DLQ.
 
 ## Deep reference — quick lookup
 
-### HTTP/HTTPS retry schedule (default delivery policy)
-
-```
-Attempt 1: immediate; 2: +1s; 3: +10s; 4: +100s (final immediate)
-Optional delayed: +1000s, +2000s, ... (up to 5 delayed after the 4
-immediate). Maximum: 4 immediate + 5 delayed (9 total).
-```
-4xx = permanent rejection after final retry (dropped). 5xx = transient;
-retried; dropped if all retries fail. Configurable per-subscription
-via `DeliveryPolicy`.
-
-### Subscription protocol matrix
-
-| Protocol | Auto-confirm? | Retry / durability |
-|---|---|---|
-| http / https | NO (manual token) | 4 immediate + up to 5 delayed |
-| lambda | YES (console) / resource policy (IaC) | Lambda async retry (2) |
-| sqs | YES (console) / queue policy (IaC) | SQS handles durability |
-| email / email-json | YES (recipient clicks link) | None |
-| sms / platform (mobile push) | n/a | Best-effort / SNS retries per platform |
-
-### Filter policy operator reference
-
-| Operator | Syntax | Matches |
-|---|---|---|
-| Exact | `["value"]` | Attribute equals value |
-| Prefix | `[{"prefix": "order."}]` | Starts with prefix |
-| Anything-but | `[{"anything-but": ["x"]}]` | Not in the list |
-| Numeric | `[{"numeric": [">=", 100]}]` | Numeric range |
-| Exists | `[{"exists": true}]` / `[{"exists": false}]` | Present / absent |
-
-### SNS message size limits
-
-Message body + attributes: 256 KB total. Attribute name: 256 bytes.
-With `RawMessageDelivery: false`, the JSON envelope adds 1-4 KB
-overhead — a 254 KB SNS message can exceed the 256 KB SQS cap.
-
-### CloudWatch AWS/SNS metrics
-
-| Metric | Dimension | Meaning |
-|---|---|---|
-| `NumberOfNotificationsPublished` | TopicName | Messages received from publishers |
-| `NumberOfNotificationsDelivered` | TopicName + Endpoint | Successful deliveries per subscription |
-| `NumberOfNotificationsFailed` | TopicName + Endpoint | Failed delivery attempts |
-| `PublishSize` | TopicName | Average / tail message size |
-
-If `Delivered + Failed = Published`, SNS accounts for every message.
-If `Delivered + Failed < Published`, filter policies are silently
-dropping messages (not counted as Failed).
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#deep-reference--quick-lookup).
+> Retry schedule (4 immediate + 5 delayed), subscription protocol matrix, filter policy operators, 256 KB size limits, CloudWatch AWS/SNS metrics accounting.
 
 ## Recent AWS features (2024-2026)
 
-- **FIFO topic GA (2024):** In-order, exactly-once within a
-  MessageGroupId. Requires FIFO queues on the subscription side.
-- **`FilterPolicyScope` attribute (2024-2025):** Filter policies can
-  match on `MessageBody` (JSON payload) in addition to
-  `MessageAttributes`. A filter referencing body fields without
-  `FilterPolicyScope: MessageBody` silently drops everything.
-- **`publish-batch` (2024-2025):** Up to 10 messages per call. Batch-
-  level failure (size cap exceeded) fails all 10; per-message filter-
-  policy drops apply individually.
-- **SNS subscription DLQ `RedrivePolicy` (2024-2025):** Routes dropped
-  messages (after retry exhaustion) to an SQS DLQ. Distinct from any
-  Lambda-side OnFailure destination.
-- **Cross-region delivery hardening (2024-2025):** Console now auto-
-  propagates the resource policy for cross-region Lambda subscriptions.
-  CLI / Terraform still require explicit `add-permission`.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#recent-aws-features-2024-2026).
+> FIFO GA, FilterPolicyScope=MessageBody, publish-batch, subscription RedrivePolicy DLQ, cross-region console auto-grant.
+
+## References (load on demand)
+
+- [advanced-patterns](references/advanced-patterns.md) — Expert heuristic three checks, Step 0 non-obvious behaviours, deep quick-lookup (retry schedule, protocol matrix, filter operators, size limits, metrics), Recent AWS features
+- [delivery-and-subscription-reference](references/delivery-and-subscription-reference.md) — delivery retry, subscription lifecycle, and protocol behaviour detail
+- [diagnostic-commands](references/diagnostic-commands.md) — account-wide pre-flight probe commands moved from SKILL.md
+- [error-handling](references/error-handling.md) — per-layer remediation fix commands moved from SKILL.md
+- [fan-out-and-fifo-quick-reference](references/fan-out-and-fifo-quick-reference.md) — fan-out durability and FIFO ordering quick reference
+- [worked-examples](references/worked-examples.md) — filter-policy silent-drop worked example moved from SKILL.md
 
 ## Domain
 

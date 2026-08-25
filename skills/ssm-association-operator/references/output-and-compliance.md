@@ -436,3 +436,24 @@ resource "aws_s3_bucket_lifecycle_configuration" "ssm_output" {
   }
 }
 ```
+
+## Expert heuristic: S3 output bucket encryption
+
+SSM execution output (stdout, stderr, script payloads) can contain
+sensitive data. The output bucket MUST have SSE enabled, and for
+production that means a customer-managed KMS key.
+
+```text
+Output S3 bucket:
+  ├── Bucket exists
+  │     aws s3api head-bucket --bucket my-ssm-output
+  ├── SSE enabled (KMS preferred over SSE-S3)
+  │     customer-managed KMS key: kms-key-arn
+  │     bucket policy allows ssm: s3:PutObject
+  │     KMS key policy allows ssm: kms:GenerateDataKey
+  └── Without KMS → REVIEW_REQUIRED (silent security finding)
+```
+
+**Key implication:** SSM does not enforce SSE. An unencrypted bucket
+is a silent finding. The skill flags any output bucket without a KMS
+key.

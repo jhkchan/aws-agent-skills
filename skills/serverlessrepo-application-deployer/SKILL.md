@@ -87,42 +87,8 @@ with a specific gap citation in the checklist (marked `[✗]`), and
 
 ## Mindset
 
-**One-line takeaway:** A SAR application is a SAM template + README +
-LICENSE + semantic version, packaged into an S3-backed artifact,
-published with a sharing scope (private, account-grant, or public),
-and deployed by consumers via a CloudFormation change set. The SAM
-transform converts `AWS::Serverless::*` types into CloudFormation-
-native resources BEFORE CloudFormation processes the template — this
-is the most misunderstood step.
-
-Three misconceptions dominate SAR misdesign at provisioning time:
-
-- **"Publishing a SAR app is the same as deploying a CloudFormation
-  stack."** It is not. Publishing uploads the application definition
-  (SAM template + artifact) to the SAR catalog. Deploying creates a
-  CloudFormation stack from that definition. The SAM transform
-  (AWS::Serverless-2016-10-31) runs FIRST — it expands
-  `AWS::Serverless::Function`, `AWS::Serverless::Api`, etc. into
-  their CloudFormation-native equivalents (AWS::Lambda::Function,
-  AWS::ApiGateway::RestApi, etc.). The transformed template is what
-  CloudFormation receives. This is why CAPABILITY_IAM is needed even
-  when the SAM template itself does not directly declare IAM resources.
-
-- **"Cross-account deployment works out of the box once the app is
-  public."** Only partially true. A public application is discoverable
-  by anyone, but deploying it in another account still requires an
-  application policy (serverlessrepo:CreateCloudFormationChangeSet)
-  OR the consumer to use the CreateCloudFormationTemplate API with
-  explicit capabilities. For private sharing, the publisher MUST
-  grant each consumer account via an application policy. Without the
-  policy, the consumer gets a 403.
-
-- **"Semantic versioning is optional for SAR."** It is NOT. Every
-  publish operation REQUIRES a semantic version (e.g., 1.0.0,
-  1.2.3-beta). You cannot overwrite an existing version — each
-  publish must use a new version string. This is what enables update
-  management: consumers pin to a version and upgrade by specifying a
-  newer one.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#mindset).
+> Three provisioning-time misconceptions: publish vs deploy, cross-account 403 without an application policy, mandatory immutable SemVer.
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -152,22 +118,9 @@ apps). The SAM-transform-before-CFN row is the second commonly
 misunderstood step.
 
 **Cross-dependency gotchas:**
-- The SAM transform runs at deploy time (when the consumer calls
-  create-cloud-formation-change-set), NOT at publish time. The
-  publisher uploads the raw SAM template; SAR stores it; the consumer's
-  deploy triggers the transform.
-- CAPABILITY_AUTO_EXPAND is REQUIRED when the application uses nested
-  applications (AWS::Serverless::Application). Without it, CloudFormation
-  rejects the template.
-- An application published as PRIVATE can only be deployed by the
-  publisher account. To let another account deploy it, add an application
-  policy granting that account. To let anyone deploy it, publish as PUBLIC.
-- Deleting the CloudFormation stack does NOT delete the SAR application
-  definition. The app remains in the catalog. To remove it, call
-  DeleteApplication explicitly.
-- The semantic version is part of the application's Amazon Resource
-  Name (ARN). Changing the version creates a new ARN suffix; consumers
-  must update their deploy reference.
+
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#configuration-dependency-graph--cross-dependency-gotchas).
+> Five gotchas: deploy-time transform, CAPABILITY_AUTO_EXPAND for nested apps, private sharing tiers, stack vs SAR deletion, version embedded in the ARN.
 
 ## Expert heuristic: the SAM transform pipeline
 
@@ -290,66 +243,8 @@ required only for public sharing):
 | LICENSE | Public sharing only | Open-source license; private apps can omit |
 | (optional) metadata.yaml | Not required | Extra metadata; SAR API has dedicated fields |
 
-**Minimal template.yaml:**
-
-```yaml
-Transform: AWS::Serverless-2016-10-31
-
-Parameters:
-  BucketName:
-    Type: String
-    Description: S3 bucket name for the processed files
-
-Resources:
-  ProcessorFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ./src/
-      Handler: app.handler
-      Runtime: python3.12
-      MemorySize: 256
-      Timeout: 30
-      Policies:
-        - S3CrudPolicy:
-            BucketName: !Ref BucketName
-      Events:
-        FileUpload:
-          Type: S3
-          Properties:
-            Bucket: !Ref FileBucket
-            Events: s3:ObjectCreated:*
-
-  FileBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Ref BucketName
-
-Outputs:
-  FunctionArn:
-    Value: !GetAtt ProcessorFunction.Arn
-```
-
-**README.md (required content):**
-
-```markdown
-# S3 File Processor
-
-A serverless application that processes files uploaded to S3.
-
-## Parameters
-
-- **BucketName** (required): The S3 bucket name for file processing.
-
-## Deployment
-
-Deploy via the AWS Serverless Application Repository or:
-
-    sam deploy --guided
-
-## License
-
-Apache-2.0
-```
+> Moved to [references/sam-transform-and-deploy.md](references/sam-transform-and-deploy.md#step-1--application-structure-minimal-templateyaml--readme).
+> Minimal template.yaml (Transform, Parameters, S3-event Lambda, Outputs) and required README.md content.
 
 ## Step 2 — SAM transform pipeline
 
@@ -358,105 +253,24 @@ expands `AWS::Serverless::*` resource types into CloudFormation-
 native resources. This expansion happens at DEPLOY time (when the
 consumer deploys the app), not at publish time.
 
-| SAM type | Expands to (CloudFormation native) |
-|---|---|
-| AWS::Serverless::Function | AWS::Lambda::Function + AWS::IAM::Role + AWS::Lambda::Permission (for events) |
-| AWS::Serverless::Api | AWS::ApiGateway::RestApi + AWS::ApiGateway::Deployment + AWS::ApiGateway::Stage |
-| AWS::Serverless::HttpApi | AWS::ApiGatewayV2::Api + AWS::ApiGatewayV2::Stage |
-| AWS::Serverless::LayerVersion | AWS::Lambda::LayerVersion |
-| AWS::Serverless::SimpleTable | AWS::DynamoDB::Table |
-| AWS::Serverless::Application | Nested stack (AWS::CloudFormation::Stack with the child template) |
-| AWS::Serverless::StateMachine | AWS::StepFunctions::StateMachine + AWS::IAM::Role |
-
-**Critical:** the transform generates IAM roles automatically (when
-`Policies` is used instead of `Role`). This is why CAPABILITY_IAM
-is required even when the SAM template does not explicitly declare
-AWS::IAM::Role resources. The transform creates them.
-
-**Verification of the transform (dry run):**
-
-```bash
-# See what the transform produces without deploying
-sam build
-sam package --s3-bucket my-artifacts --output-template-file packaged.yaml
-
-# The packaged.yaml contains the EXPANDED template
-# Compare: template.yaml (SAM) vs packaged.yaml (CloudFormation-native)
-```
+> Moved to [references/sam-transform-and-deploy.md](references/sam-transform-and-deploy.md#step-2--sam-transform-pipeline-expansion-table-and-dry-run).
+> SAM type expansion table, auto-generated IAM roles note, transform dry run via sam build/package.
 
 ## Step 3 — Packaging (zip upload or S3 code URI)
 
 Before publishing, the application's code must be packaged into an
 S3-backed artifact. The `sam package` command handles this.
 
-**Package the application:**
-
-```bash
-sam package \
-  --template-file template.yaml \
-  --s3-bucket my-deployment-artifacts \
-  --output-template-file packaged.yaml
-```
-
-This command:
-1. Uploads the `CodeUri` (local directory or file) to the S3 bucket.
-2. Replaces `CodeUri: ./src/` with `CodeUri: s3://bucket/hash.zip`.
-3. Produces `packaged.yaml` — the template with S3-backed code URIs.
-
-**The published template is the PACKAGED template** (with S3 URIs),
-not the original. SAR stores the packaged template and serves it to
-consumers at deploy time.
-
-**S3 bucket requirements:**
-- The bucket must be in the same region as the SAR application.
-- The publisher must have `s3:PutObject` permission.
-- The bucket does NOT need to be public — SAR accesses it via the
-  publisher's credentials at publish time and stores a copy.
+> Moved to [references/sam-transform-and-deploy.md](references/sam-transform-and-deploy.md#step-3--packaging-sam-package-and-s3-artifact-requirements).
+> sam package CLI, CodeUri rewrite to S3, published-template rule, S3 bucket requirements.
 
 ## Step 4 — Semantic versioning
 
 Every publish operation requires a semantic version. The version
 follows SemVer format: `MAJOR.MINOR.PATCH[-prerelease]`.
 
-| Version bump | When to use | Example |
-|---|---|---|
-| MAJOR (1.0.0 → 2.0.0) | Breaking changes (new required params, removed resources) | Adding a required parameter |
-| MINOR (1.0.0 → 1.1.0) | Backward-compatible features (new optional params, new resources) | Adding an optional parameter |
-| PATCH (1.0.0 → 1.0.1) | Backward-compatible fixes | Bug fix in template logic |
-| prerelease (1.0.0 → 1.0.0-beta) | Pre-release versions | Beta testing before GA |
-
-**Publish with a version:**
-
-```bash
-aws serverlessrepo create-application \
-  --author "Jacky Chan" \
-  --description "S3 file processor with event-driven Lambda" \
-  --home-page-url "https://github.com/example/s3-processor" \
-  --license-body file://LICENSE \
-  --readme-body file://README.md \
-  --labels "s3" "lambda" "event-driven" \
-  --semantic-version "1.0.0" \
-  --source-code-url "https://github.com/example/s3-processor" \
-  --template-body file://packaged.yaml \
-  --region us-east-1
-```
-
-**Updating an application (new version):**
-
-```bash
-aws serverlessrepo create-application \
-  --application-id "arn:aws:serverlessrepo:us-east-1:123456789012:apps/s3-file-processor" \
-  --author "Jacky Chan" \
-  --description "S3 file processor with event-driven Lambda" \
-  --readme-body file://README.md \
-  --semantic-version "1.1.0" \
-  --template-body file://packaged.yaml \
-  --region us-east-1
-```
-
-**Critical:** you cannot overwrite an existing version. Each publish
-must use a new, unique version string. Reusing a version results in
-a `ConflictException`.
+> Moved to [references/sar-publishing-and-sharing.md](references/sar-publishing-and-sharing.md#step-4--semantic-versioning-bump-table-and-publish-cli).
+> MAJOR/MINOR/PATCH/prerelease bump table, create-application publish and version-update CLI, unique-version rule.
 
 ## Step 5 — Application sharing (private vs public)
 
@@ -468,44 +282,16 @@ SAR applications have three sharing tiers:
 | PRIVATE + policy | Discoverable by granted accounts | Granted accounts only | No |
 | PUBLIC | Everyone (catalog search) | Anyone with capabilities | YES |
 
-**Check current sharing status:**
-
-```bash
-aws serverlessrepo get-application \
-  --application-id "arn:aws:serverlessrepo:us-east-1:123456789012:apps/s3-file-processor" \
-  --query '[SpdxLicenseId,IsVerifiedAuthor]' \
-  --region us-east-1 --output text
-```
-
-**Publishing as public** requires the application to pass a verification
-process (AWS reviews public apps). The `IsVerifiedAuthor` flag indicates
-verification status.
+> Moved to [references/sar-publishing-and-sharing.md](references/sar-publishing-and-sharing.md#step-5--application-sharing-status-check-and-public-verification).
+> get-application sharing-status check and IsVerifiedAuthor public-app verification.
 
 ## Step 6 — Application policy (cross-account deploy)
 
 For PRIVATE cross-account sharing, the publisher must grant each
 consumer account via an application policy.
 
-**Grant a consumer account deploy permission:**
-
-```bash
-aws serverlessrepo put-application-policy \
-  --application-id "arn:aws:serverlessrepo:us-east-1:123456789012:apps/s3-file-processor" \
-  --statements '[{"StatementId":"grant-dev-account","Actions":["serverlessrepo:CreateCloudFormationChangeSet"],"Principal":{"AWS":["arn:aws:iam::999999999999:root"]}}]' \
-  --region us-east-1
-```
-
-**Verify the policy:**
-
-```bash
-aws serverlessrepo get-application-policy \
-  --application-id "arn:aws:serverlessrepo:us-east-1:123456789012:apps/s3-file-processor" \
-  --region us-east-1
-```
-
-**Critical:** the policy action `serverlessrepo:CreateCloudFormationChangeSet`
-is what allows the consumer to deploy. Without this action in the
-policy, the consumer gets a 403 at deploy time.
+> Moved to [references/sar-publishing-and-sharing.md](references/sar-publishing-and-sharing.md#step-6--application-policy-cross-account-grant-cli).
+> put-application-policy / get-application-policy CLI; CreateCloudFormationChangeSet action gates consumer deploy.
 
 ## Step 7 — Deployment via CloudFormation change set
 
@@ -513,36 +299,8 @@ Consumers deploy a SAR application by creating a CloudFormation change
 set from the application. This triggers the SAM transform and creates
 the stack.
 
-**Deploy (consumer side):**
-
-```bash
-aws serverlessrepo create-cloud-formation-change-set \
-  --application-id "arn:aws:serverlessrepo:us-east-1:123456789012:apps/s3-file-processor" \
-  --stack-name s3-processor-stack \
-  --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
-  --semantic-version "1.0.0" \
-  --parameter-overrides BucketName=my-processed-files-bucket \
-  --region us-east-1
-```
-
-**Execute the change set:**
-
-```bash
-aws cloudformation execute-change-set \
-  --change-set-name "<ChangeSetId from previous command>" \
-  --region us-east-1
-```
-
-Or use `sam deploy` directly:
-
-```bash
-sam deploy \
-  --guided \
-  --template-file packaged.yaml \
-  --stack-name s3-processor-stack \
-  --capabilities CAPABILITY_IAM \
-  --parameter-overrides BucketName=my-processed-files-bucket
-```
+> Moved to [references/sam-transform-and-deploy.md](references/sam-transform-and-deploy.md#step-7--deployment-via-cloudformation-change-set).
+> Consumer deploy CLI: create-cloud-formation-change-set, execute-change-set, sam deploy.
 
 ## Step 8 — Deployment role and capabilities
 
@@ -566,30 +324,8 @@ Nested applications additionally require CAPABILITY_AUTO_EXPAND.
 A SAR application can include other SAR applications using the
 `AWS::Serverless::Application` resource type. This enables composition.
 
-**Parent template with nested application:**
-
-```yaml
-Transform: AWS::Serverless-2016-10-31
-
-Resources:
-  NestedS3Processor:
-    Type: AWS::Serverless::Application
-    Properties:
-      Location:
-        ApplicationId: arn:aws:serverlessrepo:us-east-1:123456789012:apps/s3-file-processor
-        SemanticVersion: 1.0.0
-      Parameters:
-        BucketName: !Ref ProcessingBucketName
-      NotificationARNs:
-        - !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:deploy-notifications"
-      TimeoutInMinutes: 30
-
-  ProcessingBucketName:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Type: String
-      Value: nested-processor-bucket
-```
+> Moved to [references/sam-transform-and-deploy.md](references/sam-transform-and-deploy.md#step-9--nested-applications-parent-template).
+> Parent template with AWS::Serverless::Application (Location/Parameters/NotificationARNs/TimeoutInMinutes).
 
 **Requirements for nested applications:**
 - The nested app must be published and accessible (shared or public).
@@ -602,122 +338,33 @@ Resources:
 Parameters defined in the SAM template are surfaced to the consumer
 at deploy time. The consumer provides values via `--parameter-overrides`.
 
-```yaml
-Parameters:
-  BucketName:
-    Type: String
-    Description: S3 bucket for processed files
-    Default: default-processor-bucket
-  MemorySize:
-    Type: Number
-    Description: Lambda memory in MB
-    Default: 256
-    MinValue: 128
-    MaxValue: 3008
-  EnableXRay:
-    Type: String
-    Description: Enable X-Ray tracing
-    Default: "false"
-    AllowedValues: ["true", "false"]
-```
-
-**Consumers override at deploy:**
-
-```bash
-aws serverlessrepo create-cloud-formation-change-set \
-  --application-id "arn:aws:serverlessrepo:us-east-1:123456789012:apps/s3-file-processor" \
-  --stack-name s3-processor \
-  --capabilities CAPABILITY_IAM \
-  --parameter-overrides BucketName=my-bucket MemorySize=512 EnableXRay=true
-```
+> Moved to [references/sam-transform-and-deploy.md](references/sam-transform-and-deploy.md#step-10--application-parameters-template-and-overrides).
+> Parameters YAML (BucketName, MemorySize, EnableXRay) and --parameter-overrides deploy example.
 
 ## Step 11 — Author profile and labels
 
-The published author profile includes:
-
-| Field | Purpose | API parameter |
-|---|---|---|
-| Author name | Displayed in the catalog | `--author` |
-| Home page URL | Link to project page | `--home-page-url` |
-| Source code URL | Link to source repository | `--source-code-url` |
-| Labels | Search tags (max 10) | `--labels` |
-| SpdxLicenseId | SPDX license identifier | `--license-url` (for SPDX) |
-| IsVerifiedAuthor | AWS verification flag (public apps) | Read-only (AWS sets this) |
-
-**Labels** improve discoverability in the SAR catalog. Use relevant
-tags (e.g., "s3", "lambda", "event-driven", "real-time").
+> Moved to [references/sar-publishing-and-sharing.md](references/sar-publishing-and-sharing.md#step-11--author-profile-and-labels).
+> Author profile field table: author, home-page-url, source-code-url, labels (max 10), SpdxLicenseId, IsVerifiedAuthor.
 
 ## Step 12 — Deletion and cleanup
 
 Deleting a SAR application is a two-step process: delete the deployed
 stack, then delete the application from the catalog.
 
-**Delete the deployed stack:**
-
-```bash
-aws cloudformation delete-stack \
-  --stack-name s3-processor-stack \
-  --region us-east-1
-```
-
-**Delete the application from SAR:**
-
-```bash
-aws serverlessrepo delete-application \
-  --application-id "arn:aws:serverlessrepo:us-east-1:123456789012:apps/s3-file-processor" \
-  --region us-east-1
-```
-
-**Critical:** deleting the CloudFormation stack does NOT delete the
-SAR application definition. The app remains in the catalog. You must
-call DeleteApplication explicitly. Conversely, deleting the SAR app
-does NOT delete already-deployed stacks — those continue running.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-12--deletion-and-cleanup).
+> Two-step teardown: delete-stack then delete-application; neither cascades to the other.
 
 ## Step 13 — SAR vs AppRegistry
 
 SAR and AppRegistry serve different purposes:
 
-| Feature | SAR | AppRegistry |
-|---|---|---|
-| Purpose | Deploy serverless applications | Group resources for metadata/tagging |
-| Deploy mechanism | CloudFormation change set from SAM template | No deploy — metadata only |
-| Template type | SAM (AWS::Serverless::*) | N/A |
-| Sharing | Private, account-grant, public | N/A |
-| Versioning | Semantic versioning | No versioning |
-| Use case | Publish/deploy Lambda-based apps | Organize existing resources by application |
-
-**Do NOT confuse them.** SAR is a deploy surface. AppRegistry is a
-metadata grouping surface.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-13--sar-vs-appregistry).
+> SAR vs AppRegistry comparison: deploy surface vs metadata grouping, versioning, sharing.
 
 ## Step 14 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **SAM CLI build improvements (2023-2024):** Enhanced `sam build`
-  with esbuild support for Node.js (faster builds), and improved
-  Python dependency resolution for Lambda layers.
-
-- **SAR public app verification streamlining (2023-2024):** AWS
-  simplified the verification process for public SAR applications,
-  reducing review time and adding automated checks for common
-  security and licensing issues.
-
-- **Nested application dependency resolution (2024-2025):** Improved
-  handling of nested application version resolution — consumers can
-  now specify version ranges (e.g., `1.x`) instead of exact versions,
-  with SAR resolving to the latest matching version.
-
-- **SAM transform performance (2024-2025):** The SAM transform macro
-  now runs faster for large templates (100+ resources), reducing
-  deploy time for complex SAR applications.
-
-- **Cross-region SAR deployment (2025-2026):** SAR applications can
-  now be deployed across regions without re-publishing, with the
-  transform handling region-specific resource properties automatically.
-
-- **CDK SAR integration (2025-2026):** The `aws-cdk/aws-sar` construct
-  (cfn-include based) allows CDK apps to deploy SAR applications
-  natively, bridging the CDK and SAR ecosystems.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-14--recent-features).
+> 2023-2026: sam build esbuild, public-app verification streamlining, nested version ranges, transform performance, cross-region deploy, CDK SAR construct.
 
 ## NEVER do these things
 
@@ -812,32 +459,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### CreateApplication fails with "README content is required"
-- The `--readme-body` parameter was not provided. SAR requires README
-  content at publish time. Provide it via `--readme-body file://README.md`.
+> Moved to [references/error-handling.md](references/error-handling.md#-createapplication-fails-with).
+> Six failure modes: README required, ConflictException, 403 policy gap, missing CAPABILITY_AUTO_EXPAND, transform failed, artifact upload.
 
-### CreateApplication fails with ConflictException
-- The semantic version already exists. Each publish must use a unique
-  version. Increment the version (e.g., 1.0.0 → 1.0.1) and retry.
+## References (load on demand)
 
-### Consumer deploy fails with 403 Forbidden
-- The application policy does not grant the consumer account. For
-  private apps, call PutApplicationPolicy with the consumer's account
-  ARN and the `serverlessrepo:CreateCloudFormationChangeSet` action.
-
-### Consumer deploy fails with "Requires capabilities: [CAPABILITY_AUTO_EXPAND]"
-- The template contains nested applications (AWS::Serverless::Application).
-  Add CAPABILITY_AUTO_EXPAND to the `--capabilities` parameter.
-
-### Consumer deploy fails with "Transform failed"
-- The SAM template has an error (e.g., invalid resource property).
-  Run `sam validate` and `sam build` locally to catch transform errors
-  before publishing.
-
-### sam package fails with "Unable to upload artifact"
-- The S3 bucket does not exist or the publisher lacks `s3:PutObject`
-  permission. Verify the bucket exists and the IAM policy includes
-  `s3:PutObject` on the bucket.
+- [advanced-patterns](references/advanced-patterns.md) — Mindset misconceptions, cross-dependency gotchas, deletion/cleanup, SAR vs AppRegistry, recent AWS features
+- [error-handling](references/error-handling.md) — Six API failure modes: missing README, ConflictException, 403 policy gap, AUTO_EXPAND, transform failure, artifact upload
+- [sam-transform-and-deploy](references/sam-transform-and-deploy.md) — Transform/deploy deep reference plus moved Step 1/2/3/7/9/10 template, packaging, and deploy CLI
+- [sar-publishing-and-sharing](references/sar-publishing-and-sharing.md) — Publishing/sharing deep reference plus moved Step 4/5/6/11 versioning, sharing, policy, and author-profile CLI
 
 ## Domain
 

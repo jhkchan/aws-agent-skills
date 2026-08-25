@@ -267,3 +267,216 @@ const app = new sar.CfnApplication(this, 'SarApp', {
 
 5. **Version conflict on update.** Each publish must use a unique
    semantic version. Reusing a version results in ConflictException.
+
+### Step 1 — Application structure: minimal template.yaml + README
+
+**Minimal template.yaml:**
+
+```yaml
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  BucketName:
+    Type: String
+    Description: S3 bucket name for the processed files
+
+Resources:
+  ProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./src/
+      Handler: app.handler
+      Runtime: python3.12
+      MemorySize: 256
+      Timeout: 30
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref BucketName
+      Events:
+        FileUpload:
+          Type: S3
+          Properties:
+            Bucket: !Ref FileBucket
+            Events: s3:ObjectCreated:*
+
+  FileBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+
+Outputs:
+  FunctionArn:
+    Value: !GetAtt ProcessorFunction.Arn
+```
+
+**README.md (required content):**
+
+```markdown
+# S3 File Processor
+
+A serverless application that processes files uploaded to S3.
+
+## Parameters
+
+- **BucketName** (required): The S3 bucket name for file processing.
+
+## Deployment
+
+Deploy via the AWS Serverless Application Repository or:
+
+    sam deploy --guided
+
+## License
+
+Apache-2.0
+```
+
+
+### Step 2 — SAM transform pipeline: expansion table and dry run
+
+| SAM type | Expands to (CloudFormation native) |
+|---|---|
+| AWS::Serverless::Function | AWS::Lambda::Function + AWS::IAM::Role + AWS::Lambda::Permission (for events) |
+| AWS::Serverless::Api | AWS::ApiGateway::RestApi + AWS::ApiGateway::Deployment + AWS::ApiGateway::Stage |
+| AWS::Serverless::HttpApi | AWS::ApiGatewayV2::Api + AWS::ApiGatewayV2::Stage |
+| AWS::Serverless::LayerVersion | AWS::Lambda::LayerVersion |
+| AWS::Serverless::SimpleTable | AWS::DynamoDB::Table |
+| AWS::Serverless::Application | Nested stack (AWS::CloudFormation::Stack with the child template) |
+| AWS::Serverless::StateMachine | AWS::StepFunctions::StateMachine + AWS::IAM::Role |
+
+**Critical:** the transform generates IAM roles automatically (when
+`Policies` is used instead of `Role`). This is why CAPABILITY_IAM
+is required even when the SAM template does not explicitly declare
+AWS::IAM::Role resources. The transform creates them.
+
+**Verification of the transform (dry run):**
+
+```bash
+# See what the transform produces without deploying
+sam build
+sam package --s3-bucket my-artifacts --output-template-file packaged.yaml
+
+# The packaged.yaml contains the EXPANDED template
+# Compare: template.yaml (SAM) vs packaged.yaml (CloudFormation-native)
+```
+
+
+### Step 3 — Packaging: sam package and S3 artifact requirements
+
+**Package the application:**
+
+```bash
+sam package \
+  --template-file template.yaml \
+  --s3-bucket my-deployment-artifacts \
+  --output-template-file packaged.yaml
+```
+
+This command:
+1. Uploads the `CodeUri` (local directory or file) to the S3 bucket.
+2. Replaces `CodeUri: ./src/` with `CodeUri: s3://bucket/hash.zip`.
+3. Produces `packaged.yaml` — the template with S3-backed code URIs.
+
+**The published template is the PACKAGED template** (with S3 URIs),
+not the original. SAR stores the packaged template and serves it to
+consumers at deploy time.
+
+**S3 bucket requirements:**
+- The bucket must be in the same region as the SAR application.
+- The publisher must have `s3:PutObject` permission.
+- The bucket does NOT need to be public — SAR accesses it via the
+  publisher's credentials at publish time and stores a copy.
+
+
+### Step 7 — Deployment via CloudFormation change set
+
+**Deploy (consumer side):**
+
+```bash
+aws serverlessrepo create-cloud-formation-change-set \
+  --application-id "arn:aws:serverlessrepo:us-east-1:123456789012:apps/s3-file-processor" \
+  --stack-name s3-processor-stack \
+  --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
+  --semantic-version "1.0.0" \
+  --parameter-overrides BucketName=my-processed-files-bucket \
+  --region us-east-1
+```
+
+**Execute the change set:**
+
+```bash
+aws cloudformation execute-change-set \
+  --change-set-name "<ChangeSetId from previous command>" \
+  --region us-east-1
+```
+
+Or use `sam deploy` directly:
+
+```bash
+sam deploy \
+  --guided \
+  --template-file packaged.yaml \
+  --stack-name s3-processor-stack \
+  --capabilities CAPABILITY_IAM \
+  --parameter-overrides BucketName=my-processed-files-bucket
+```
+
+
+### Step 9 — Nested applications: parent template
+
+**Parent template with nested application:**
+
+```yaml
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  NestedS3Processor:
+    Type: AWS::Serverless::Application
+    Properties:
+      Location:
+        ApplicationId: arn:aws:serverlessrepo:us-east-1:123456789012:apps/s3-file-processor
+        SemanticVersion: 1.0.0
+      Parameters:
+        BucketName: !Ref ProcessingBucketName
+      NotificationARNs:
+        - !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:deploy-notifications"
+      TimeoutInMinutes: 30
+
+  ProcessingBucketName:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Type: String
+      Value: nested-processor-bucket
+```
+
+
+### Step 10 — Application parameters: template and overrides
+
+```yaml
+Parameters:
+  BucketName:
+    Type: String
+    Description: S3 bucket for processed files
+    Default: default-processor-bucket
+  MemorySize:
+    Type: Number
+    Description: Lambda memory in MB
+    Default: 256
+    MinValue: 128
+    MaxValue: 3008
+  EnableXRay:
+    Type: String
+    Description: Enable X-Ray tracing
+    Default: "false"
+    AllowedValues: ["true", "false"]
+```
+
+**Consumers override at deploy:**
+
+```bash
+aws serverlessrepo create-cloud-formation-change-set \
+  --application-id "arn:aws:serverlessrepo:us-east-1:123456789012:apps/s3-file-processor" \
+  --stack-name s3-processor \
+  --capabilities CAPABILITY_IAM \
+  --parameter-overrides BucketName=my-bucket MemorySize=512 EnableXRay=true
+```

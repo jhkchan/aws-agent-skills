@@ -453,3 +453,152 @@ aws sesv2 list-email-templates --region us-east-1
 aws sesv2 get-suppression-attributes --region us-east-1
 aws ec2 describe-vpc-endpoints --service-name com.amazonaws.us-east-1.sesv2 --region us-east-1
 ```
+
+---
+
+### Step 3: Configure the MAIL FROM domain (SPF alignment)
+
+The custom MAIL FROM domain (`mail.example.com`) replaces the
+default `amazonses.com` envelope sender, enabling SPF alignment.
+
+```bash
+aws sesv2 put-email-identity-mail-from-domain \
+  --email-identity example.com \
+  --mail-from-domain mail.example.com \
+  --behavior-on-mx-failure UseDefaultValue \
+  --region us-east-1
+```
+
+Publish the MX and SPF TXT records:
+
+```bash
+cat > /tmp/mailfrom-change.json <<'EOF'
+{
+  "Changes": [
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "mail.example.com",
+        "Type": "MX",
+        "TTL": 600,
+        "ResourceRecords": [{ "Value": "10 feedback-smtp.us-east-1.amazonses.com" }]
+      }
+    },
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "mail.example.com",
+        "Type": "TXT",
+        "TTL": 600,
+        "ResourceRecords": [{ "Value": "\"v=spf1 include:amazonses.com ~all\"" }]
+      }
+    }
+  ]
+}
+EOF
+
+aws route53 change-resource-record-sets \
+  --hosted-zone-id $HOSTED_ZONE_ID \
+  --change-batch file:///tmp/mailfrom-change.json
+```
+
+The MX record Region endpoint varies: `feedback-smtp.us-east-1.
+amazonses.com` for us-east-1; check the SES docs for other
+Regions.
+
+
+### Step 4: Publish the DMARC record
+
+DMARC is published by the domain owner as a TXT record at
+`_dmarc.example.com`. SES does not manage DMARC; the operator
+publishes it.
+
+```bash
+cat > /tmp/dmarc-change.json <<'EOF'
+{
+  "Changes": [
+    {
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "_dmarc.example.com",
+        "Type": "TXT",
+        "TTL": 600,
+        "ResourceRecords": [{ "Value": "\"v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com; pct=100; adkim=s; aspf=s\"" }]
+      }
+    }
+  ]
+}
+EOF
+
+aws route53 change-resource-record-sets \
+  --hosted-zone-id $HOSTED_ZONE_ID \
+  --change-batch file:///tmp/dmarc-change.json
+```
+
+Start with `p=quarantine`; escalate to `p=reject` once alignment
+is verified. `adkim=s` / `aspf=s` enforce strict alignment.
+
+
+### Step 5: Create the configuration set with event publishing
+
+The configuration set is the unit of event publishing. Create it
+with the event destinations (CloudWatch, SNS, Firehose,
+EventBridge).
+
+```bash
+aws sesv2 create-configuration-set \
+  --configuration-set-name transactional-cs \
+  --tracking-options '{"CustomRedirectDomain": "click.example.com"}' \
+  --region us-east-1
+
+# Attach CloudWatch event destination
+cat > /tmp/cw-destination.json <<'EOF'
+{
+  "ConfigurationSetName": "transactional-cs",
+  "EventDestinationName": "cloudwatch-events",
+  "EventDestination": {
+    "Enabled": true,
+    "MatchingEventTypes": ["SEND", "DELIVERY", "BOUNCE", "COMPLAINT", "OPEN", "CLICK"],
+    "CloudWatchDestination": {
+      "DimensionConfigurations": [
+        {
+          "DimensionName": "Campaign",
+          "DimensionValueSource": "EMAIL_HEADER",
+          "DefaultDimensionValue": "transactional"
+        }
+      ]
+    }
+  }
+}
+EOF
+
+aws sesv2 create-configuration-set-event-destination \
+  --cli-input-json file:///tmp/cw-destination.json \
+  --region us-east-1
+
+# Attach SNS destination for bounce / complaint
+cat > /tmp/sns-destination.json <<'EOF'
+{
+  "ConfigurationSetName": "transactional-cs",
+  "EventDestinationName": "sns-feedback",
+  "EventDestination": {
+    "Enabled": true,
+    "MatchingEventTypes": ["BOUNCE", "COMPLAINT"],
+    "SnsDestination": {
+      "TopicArn": "arn:aws:sns:us-east-1:111122223333:ses-feedback"
+    }
+  }
+}
+EOF
+
+aws sesv2 create-configuration-set-event-destination \
+  --cli-input-json file:///tmp/sns-destination.json \
+  --region us-east-1
+```
+
+`MatchingEventTypes` controls which events publish: `SEND`,
+`DELIVERY`, `BOUNCE`, `COMPLAINT`, `OPEN`, `CLICK`,
+`REJECT`, `RENDERING_FAILURE`, `DELIVERYDELAY`, `SUBSCRIPTION`.
+For bounce / complaint processing, always include `BOUNCE` and
+`COMPLAINT`.
+

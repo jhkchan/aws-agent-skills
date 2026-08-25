@@ -244,3 +244,83 @@ resource "aws_sqs_queue" "encrypted_fifo" {
   kms_data_key_reuse_period_seconds = 300
 }
 ```
+
+## Expert heuristic: message group ID partitioning for parallelism
+
+A baseline model says "create a FIFO queue." The correct heuristic
+recognizes that the message group ID is the parallelism lever.
+
+```text
+FIFO queue throughput:
+  Standard FIFO queue (perQueue):  3,000 messages/sec with batching
+                                    300 transactions/sec per API action
+                                    (shared across ALL message groups)
+
+  High-throughput FIFO (perGroupId):
+                                    300 TPS per API action PER message group
+                                    With N message groups: up to N * 300 TPS
+                                    Scales linearly with group count
+
+Message group ID as partitioning key:
+  Single group ID (e.g., "all-messages"):
+    → ALL messages serialized through one stream
+    → Only ONE consumer can process at a time
+    → Maximum throughput: 300 TPS (one consumer)
+    → Use when: global ordering is required
+
+  Per-entity group ID (e.g., order-123, order-456):
+    → Each entity gets its own ordered stream
+    → Multiple consumers process different entities in parallel
+    → Throughput scales with the number of active groups
+    → Use when: per-entity ordering is sufficient (most common)
+
+Key implication: choosing a coarse group ID (e.g., "all") serializes
+everything. Choosing a fine-grained group ID (e.g., customer-123)
+maximizes parallelism while preserving per-entity ordering.
+```
+
+**Key implication:** the #1 cause of "my FIFO queue is slow" is a
+single message group ID serializing all messages. Use per-entity
+group IDs to scale parallelism.
+
+## Expert heuristic: deduplication ID management
+
+Deduplication prevents duplicate processing within a 5-minute window.
+The deduplication strategy determines how dedup IDs are generated.
+
+```text
+Deduplication strategies:
+
+1. Content-based (ContentBasedDeduplication=true):
+   → SQS generates dedup ID = SHA-256 hash of message body
+   → No producer-side dedup ID needed
+   → Caveat: two messages with DIFFERENT bodies but SAME logical
+     content are NOT deduplicated
+   → Use when: message body uniquely identifies the message
+
+2. Explicit (MessageDeduplicationId):
+   → Producer sends a dedup ID with each message
+   → Producer controls dedup semantics (can use business key,
+     event ID, or composite key)
+   → Overrides content-based dedup if both are present
+   → Use when: message body may vary but logical content is the same
+     (e.g., retry with updated timestamp but same order ID)
+
+3. High-throughput mode (DeduplicationScope=messageGroup):
+   → Dedup window is per message group, not per queue
+   → Same dedup ID in DIFFERENT groups does NOT deduplicate
+   → Enables per-group throughput scaling
+   → Use when: high throughput is needed AND per-group dedup is
+     semantically correct
+
+Dedup window: 5 minutes from first receipt.
+  → Same dedup ID within 5 min: SQS accepts the message but does NOT
+    enqueue it again (producer gets a success response).
+  → Same dedup ID after 5 min: SQS enqueues as a new message.
+```
+
+**Key implication:** the deduplication strategy must align with the
+business semantics. Content-based dedup fails when the same logical
+message has different bodies. Explicit dedup fails when the producer
+generates inconsistent dedup IDs. High-throughput mode changes the
+dedup scope from queue-level to group-level.

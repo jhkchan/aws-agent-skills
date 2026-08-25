@@ -338,33 +338,7 @@ test send/receive. Full verification CLI sequence in
 
 ## Expert heuristic: visibility timeout race condition
 
-The single most common cause of duplicate processing in SQS + Lambda
-pipelines is a visibility timeout shorter than the consumer's actual
-processing time under load.
-
-**The rule (paste into the checklist):**
-
-> Visibility timeout >= 6x expected p99 processing time.
-> For Lambda event source mappings, set it on the mapping
-> (`VisibilityTimeout`), NOT just the queue — the mapping value
-> OVERRIDES the queue value.
-
-| Lambda p99 processing | Minimum visibility timeout |
-|---|---|
-| 1s | 6s (default 30s is fine) |
-| 5s | 30s |
-| 30s | 180s (most queue defaults are wrong here) |
-| 60s | 360s |
-| 300s | 1800s |
-| 900s (Lambda max) | 5400s (90 min) |
-
-**Why 6x:** absorbs cold-start delay (up to 5s for VPC-attached), SDK
-retry backoff (~20s for AWS SDK v2), and one visibility-timeout extension.
-
-**Detection post-deploy:** if CloudWatch `ApproximateNumberOfMessagesVisible`
-is steady/rising while `NumberOfMessagesReceived` is high, the queue is
-re-delivering. Cross-reference with Lambda `Duration` p99 — if p99 x 6 >
-VisibilityTimeout, this race is the root cause.
+→ Moved to [references/queue-configuration-guide.md](references/queue-configuration-guide.md) — the 6× p99 rule, the Lambda ESM override, and post-deploy detection of the visibility-timeout race.
 
 ## Workload-specific deployment matrix
 
@@ -379,12 +353,7 @@ VisibilityTimeout, this race is the root cause.
 
 ## Latest SQS features (2024-2026)
 
-- **SQS partial batch responses (Lambda):** report per-message failures; only failed messages retried. Enable via `--function-response-types ReportBatchItemFailures`.
-- **High-throughput FIFO (1500 TPS):** per-message-group throughput limiting via `FifoThroughputLimit=perMessageGroupId` + `DeduplicationScope=messageGroup`.
-- **No-SQL payload in message attributes:** structured attributes for filtering without parsing the body.
-- **Message retention max 14 days** (more prominently used for DLQs).
-- **SSE-SQS:** Free, FIPS-validated AES-256-GCM. Recommended default.
-- **StartMessageMoveTask API:** Current API for redriving from DLQ back to source. Replaced deprecated legacy `Redrive` API.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — latest SQS features (2024-2026).
 
 ## NEVER (things to never do)
 
@@ -401,32 +370,15 @@ VisibilityTimeout, this race is the root cause.
 
 ## Pre-flight safety checks
 
-- **Confirm queue name available:** `aws sqs get-queue-url --queue-name <name> 2>&1 || echo "Name is available"`
-- **For FIFO, confirm name ends in `.fifo`** — SQS rejects create without it.
-- **Confirm DLQ exists and correct type** — `FifoQueue` attribute must match source.
-- **For SSE-KMS, confirm key exists** and policy grants `sqs.<region>.amazonaws.com` permission.
-- **Capture existing config for rollback** (if updating): `get-queue-attributes --attribute-names All --output json > /tmp/<queue>-backup-$(date +%s).json`
+→ Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight safety checks and rollback capture commands.
 
 ## Edge-case handling
 
-- **FIFO queue with all messages using the same `MessageGroupId`.** Degrades to a single-message-in-flight serial pipeline — throughput drops to 300 TPS (standard) or 10 TPS per group (high-throughput). Detection: `ApproximateNumberOfMessagesNotVisible` rising while `NumberOfEmptyReceives` is high. Fix: shard `MessageGroupId` (e.g., `order-{customer_id}`).
-- **FIFO dedup scope collision after high-throughput mode change.** Switching to `DeduplicationScope=messageGroup` changes dedup from queue-scoped to group-scoped. Messages in different groups that previously deduplicated no longer do. Fix: ensure producers set explicit `MessageDeduplicationId`.
-- **Lambda event source mapping `BatchSize` > 1 without `ReportBatchItemFailures`.** A single failed message causes all 10 to retry. Fix: enable `FunctionResponseTypes: [ReportBatchItemFailures]`.
-- **Cross-account queue access with SSE-KMS.** Both the queue policy AND the KMS key policy must grant the foreign account. Without both, fails with `KMSAccessDeniedException`.
-- **Redrive from DLQ back to FIFO source.** `StartMessageMoveTask` preserves original `MessageGroupId`. Deduplication applies — if original `DeduplicationId` is within the 5-min window, the redriven message is silently dropped.
-- **Queue policy size limit is 64 KiB.** Use IAM identity-based policies for same-account access instead of growing the resource-based policy.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — edge-case catalog (6 cases) moved verbatim.
 
 ## Error-handling branches
 
-| Error | Cause | Fix |
-|---|---|---|
-| `InvalidParameterValueException: FIFO queue name must end with .fifo` | FIFO created without `.fifo` suffix | Rename with `.fifo` suffix |
-| `InvalidParameterValueException: Dead-letter queue does not exist` | Redrive policy references non-existent DLQ | Create DLQ first, then set redrive |
-| `KMSAccessDeniedException` | Role lacks `kms:Decrypt` on SSE-KMS key | Add `kms:Decrypt` + `kms:GenerateDataKey*` |
-| `QueueDeletedRecently: Must wait 60 seconds` | Queue deleted within last 60s | Wait 60 seconds, then recreate |
-| Messages stuck, not moving to DLQ | maxReceiveCount too high, or consumer deleting/re-receiving | Check `ApproximateNumberOfMessagesReceived` vs `Deleted` |
-| Duplicate processing despite FIFO | VisibilityTimeout too short | Increase to >= p99 processing time |
-| FIFO throughput throttle (429) | Exceeding 300 TPS (standard) or 1500 TPS (HT) | Enable high-throughput FIFO or use more message groups |
+→ Moved to [references/error-handling.md](references/error-handling.md) — API error → cause → fix table (7 branches).
 
 ## Output format — MANDATORY literal labels
 
@@ -512,6 +464,14 @@ VERIFICATION_COMMANDS:
 
 - `references/queue-configuration-guide.md` — queue type internals, FIFO message-group ordering, deduplication hash mechanics, visibility timeout interaction with Lambda, high-throughput FIFO, partial batch response details, cross-account access, Terraform equivalents.
 - `references/deployment-cli-commands.md` — full copy-pasteable CLI sequence for all 10 deployment steps including DLQ creation, redrive, SSE-SQS/SSE-KMS, access policies, FIFO dedup, high-throughput FIFO, Lambda event source mapping, verification, and CloudWatch alarms.
+
+## References (load on demand)
+
+- [references/queue-configuration-guide.md](references/queue-configuration-guide.md) — pre-existing; extended with the visibility-timeout race-condition expert heuristic moved from SKILL.md.
+- [references/deployment-cli-commands.md](references/deployment-cli-commands.md) — pre-existing; full copy-pasteable CLI sequence for all 10 deployment steps.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — latest SQS features (2024-2026) and the edge-case catalog moved from SKILL.md.
+- [references/error-handling.md](references/error-handling.md) — API error → cause → fix branches (FIFO suffix, DLQ missing, KMS denied, QueueDeletedRecently, stuck messages, duplicates, throttles).
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight safety checks (name availability, DLQ type, KMS key, rollback capture).
 
 ## Domain
 

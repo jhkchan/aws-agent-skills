@@ -342,3 +342,45 @@ resource "aws_ssm_association" "patch_production" {
 equivalent of `--apply-at-creation`. The default is `true` (do not
 apply at creation), so you must explicitly set it to `false` for an
 immediate first run.
+
+## Expert heuristic: integer rate control vs percentage strings
+
+```text
+max-concurrency:
+  ├── Integer (preferred):  max-concurrency: 10
+  │     → exactly 10 in parallel, regardless of fleet size
+  │     → deterministic; identical in dev (3 instances) and prod (3000)
+  └── Percentage (avoid):   max-concurrency: "10%"
+        → 3-instance fleet: rounds to 1 (or 0)
+        → 3000-instance fleet: 300 in parallel (disruptive)
+
+max-errors:
+  ├── Integer (preferred):  max-errors: 3
+  │     → stops after 3 errors, regardless of fleet size
+  └── Percentage (avoid):   max-errors: "5%"
+        → 3-instance fleet: 1 error stops the run
+        → 3000-instance fleet: 150 errors before stop
+```
+
+**Worst-case blast radius** (approx):
+`max-concurrency + max-errors - 1` instances affected before stop.
+
+**Key implication:** always use integer counts. The skill emits
+`max-concurrency: <N>` and `max-errors: <N>` and flags any percentage
+string as REVIEW_REQUIRED.
+
+## Expert heuristic: tag targets vs instance-ID targets
+
+```text
+Target type decision:
+  ├── Auto Scaling fleet, dynamic membership → USE TAG TARGETS
+  │     Key=tag:Environment, Values=[production]
+  │     → new instances launched by ASG with tag are auto-included
+  ├── Fixed pet instances, one-off servers → INSTANCE IDs acceptable
+  │     Key=InstanceIds, Values=[i-aaa111, i-bbb222]
+  │     → new instances NOT picked up; association must be edited
+  └── All managed instances → Key=InstanceIds, Values=[*]
+```
+
+**Key implication:** for any fleet that autoscales or has churn, tag
+targets are the only safe choice.

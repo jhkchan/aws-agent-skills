@@ -240,3 +240,62 @@ aws servicecatalog list-provisioning-engine-types \
 If `TERRAFORM_OPEN_SOURCE` is not in the list, the region does not
 support Terraform products yet. Fall back to CloudFormation or
 replicate the portfolio in a region that supports Terraform.
+
+### Step 6 — Configure TagOptions (CLI)
+
+```bash
+TAG_OPTION_ID=$(aws servicecatalog create-tag-option \
+  --key "CostCenter" \
+  --value "platform-1234" \
+  --query 'TagOptionDetail.Id' --output text)
+
+aws servicecatalog associate-tag-option-with-resource \
+  --resource-id $PORTFOLIO_ID \
+  --tag-option-id $TAG_OPTION_ID
+```
+
+
+### Step 7 — Launch paths + portfolio shares (CLI)
+
+**Cross-account share (account-level):**
+```bash
+aws servicecatalog create-portfolio-share \
+  --portfolio-id $PORTFOLIO_ID \
+  --account-id 222222222222
+```
+
+**Cross-account share (organization-level):**
+```bash
+# Enable Service Catalog access in Organizations
+aws organizations enable-aws-service-access \
+  --service-principal servicecatalog.amazonaws.com
+
+# Share to the entire organization
+aws servicecatalog create-portfolio-share \
+  --portfolio-id $PORTFOLIO_ID \
+  --organization-node Type=ORGANIZATION,Value=o-abc123def456
+```
+
+**Cross-account share (OU-level):**
+```bash
+aws servicecatalog create-portfolio-share \
+  --portfolio-id $PORTFOLIO_ID \
+  --organization-node Type=ORGANIZATIONAL_UNIT,Value=ou-abc1-abcdef
+```
+
+
+### Step 8 — Verification (CLI)
+
+```bash
+# Verify portfolio is stored
+aws servicecatalog describe-portfolio --id $PORTFOLIO_ID
+
+# Verify product is associated
+aws servicecatalog search-products-as-admin --portfolio-id $PORTFOLIO_ID
+
+# Verify constraints
+aws servicecatalog describe-constraint --id <CONSTRAINT_ID>
+
+# Cross-account verification: switch to a consumer profile and search
+aws servicecatalog search-products --profile consumer-profile
+```

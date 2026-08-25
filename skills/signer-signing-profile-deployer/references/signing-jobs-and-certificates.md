@@ -220,3 +220,56 @@ multi-tenant CI.
 
 5. **Caching the signing certificate.** Signer rotates the cert.
    Always re-fetch via `GetSigningProfile`.
+
+---
+
+## Step 5 — Certificate validation via Signer
+
+Signer generates and rotates the signing certificate for each
+profile. For offline verifiers and audit, fetch the certificate
+chain.
+
+```bash
+# Retrieve the signing certificate for the profile
+aws signer get-signing-profile \
+  --profile-name lambda-signing-prod \
+  --query 'signingMaterial.{CertificateArn:certificateArn}' \
+  --output table --region us-east-1
+
+# For a specific signing job, the certificate used is in describe-signing-job
+aws signer describe-signing-job --job-id "$JOB_ID" \
+  --query '{Signature:signature, SignedObject:signedObject, ProfileVersion:profileVersion}' \
+  --output table --region us-east-1
+```
+
+**Key implication:** Signer rotates certificates on its own schedule.
+Always re-fetch the active certificate via `GetSigningProfile`; do
+not pin a cached certificate indefinitely.
+
+
+## Step 10 — CloudTrail audit of signing operations
+
+Signer is a CloudTrail-logged service. The key events:
+
+| Event name | When | Recorded fields |
+|---|---|---|
+| `PutSigningProfile` | Profile created or version promoted | profileName, platformId, profileVersion |
+| `StartSigningJob` | Job submitted | jobId, profileName, source S3, destination S3 |
+| `GetSigningProfile` | Profile retrieved | profileName |
+| `CancelSigningProfile` | Profile revoked | profileName, profileVersion |
+| `TagResource` / `UntagResource` | Tags changed | profileArn |
+
+```bash
+# Audit signing operations over the last 24 hours
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=EventSource,AttributeValue=signer.amazonaws.com \
+  --start-time $(date -u -v-1d +%Y-%m-%dT%H:%M:%SZ) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  --max-results 50 --region us-east-1
+
+# Audit CSC changes (Lambda service events)
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=UpdateCodeSigningConfig \
+  --max-results 20 --region us-east-1
+```
+

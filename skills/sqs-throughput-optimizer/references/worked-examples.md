@@ -216,3 +216,151 @@ If `ApproximateNumberOfMessagesVisible` keeps rising post-change:
    cross-group dedup is not required.
 10. NEVER assume NumberOfMessagesReceived equals individual API calls. If
     `MaxNumberOfMessages > 1`, one call returns multiple messages.
+
+### Worked math — Step 1 polling (empty-receive math)
+
+**The empty-receive math:**
+```
+empty_receive_ratio =
+  NumberOfEmptyReceives / (NumberOfEmptyReceives + NumberOfMessagesReceived)
+
+monthly_wasted_cost =
+  NumberOfEmptyReceives / 1,000,000 × $0.40
+
+Example: 85M empty receives/month × $0.40/M = $34/month wasted
+         After long polling: empty receives drop 90% → $3.40/month
+         Monthly saving: $30.60
+```
+
+### Worked math — Step 2 batching (batch savings math)
+
+**Batch savings math:**
+```
+Single-API request count: N messages × 3 calls (send + receive + delete)
+Batch-API request count:  N/10 batches × 3 calls = N × 0.3 calls
+Reduction: 10x fewer requests for send and delete, receive is already
+batched by SQS (max 10 per ReceiveMessage call).
+```
+
+### Worked math — Step 3 visibility (re-delivery cost inflation)
+
+**Re-delivery cost inflation:**
+```
+re_delivery_rate = re_delivered_messages / total_received
+effective_receive_cost = base_receive_cost × (1 + re_delivery_rate)
+
+Example: 15M received + 3M re-delivered (20% re-delivery rate)
+  Effective receive cost: 18M × $0.40/M = $7.20/month
+  After fixing visibility timeout: 15M × $0.40/M = $6.00/month
+  Monthly saving: $1.20/month (plus downstream processing savings)
+```
+
+### Worked math — Step 7 impact estimation formulas
+
+```
+current_monthly_cost =
+  (current_total_api_requests / 1,000,000) × $0.40
+  [+ KMS cost if SSE-KMS enabled]
+
+projected_monthly_cost =
+  (projected_total_api_requests / 1,000,000) × $0.40
+  [+ KMS cost at projected request rate]
+
+monthly_saving = current_monthly_cost - projected_monthly_cost
+```
+
+### Output format template (with CONFIRM gate wording)
+
+```text
+TARGET: <queue-name>
+VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
+REASON: <1-2 sentences naming the recommendation and the supporting data>
+RECOMMENDATION:
+  Current: <polling strategy>, <batch pattern>, <visibility timeout>, <queue type/mode>
+  Proposed: <polling strategy>, <batch pattern>, <visibility timeout>, <queue type/mode>
+  Dimensions changed: <polling | batching | visibility | retention | redrive | queue-type>
+  Dimensions checked: <list ALL seven, each ✓ (no finding) or → (finding)>
+  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
+ESTIMATED_SAVINGS:
+  Current monthly: $<amount>    ← MUST show request breakdown
+  Projected monthly: $<amount>
+  Monthly saving: $<amount>     ← MUST equal Current − Projected, 2 decimals
+  Annual saving: $<amount>      ← MUST equal Monthly × 12
+MIGRATION_STEPS:
+  1. <specific action with CLI command>
+  2. <verification step>
+CONFIRM: Before executing any state-changing CLI, emit and await operator
+  approval: "CONFIRM: About to <action> on <queue-name> in <region>.
+  Proceed? (yes/no)"
+```
+
+### Worked example — Standard queue optimized to long-polling + batch (before/after table)
+
+```text
+TARGET: order-events-queue
+VERDICT: FURTHER_OPTIMIZATION_AVAILABLE
+REASON: Standard queue with ReceiveMessageWaitTimeSeconds=0 generating
+  85M empty receives/month (85% of total ReceiveMessage calls).
+  Consumer uses DeleteMessage one-at-a-time. Enabling long polling
+  (WaitTimeSeconds=20) + DeleteMessageBatch reduces total API requests
+  by 74%.
+
+BEFORE/AFTER CONFIG COMPARISON:
+  ┌─────────────────────────────┬──────────────────────────┬──────────────────────────────┐
+  │ Dimension                   │ CURRENT                  │ RECOMMENDED                  │
+  ├─────────────────────────────┼──────────────────────────┼──────────────────────────────┤
+  │ Queue type                  │ Standard                 │ Standard (unchanged)         │
+  │ Polling mode                │ Short (WaitTimeSeconds=0)│ Long (WaitTimeSeconds=20)    │
+  │ Consumer batch size         │ 1 (single-message API)   │ 10 (DeleteMessageBatch)      │
+  │ Visibility timeout          │ 30s                      │ 30s (consumer p95=200ms ✓)   │
+  │ Message retention           │ 4 days (345600s)         │ 4 days (unchanged)           │
+  │ DLQ redrive                 │ maxReceiveCount=3, ok    │ unchanged                    │
+  │ FIFO mode                   │ N/A (Standard)           │ N/A (Standard)               │
+  └─────────────────────────────┴──────────────────────────┴──────────────────────────────┘
+
+RECOMMENDATION:
+  Current: short polling (WaitTimeSeconds=0), single-message delete,
+           VisibilityTimeout=30s, Standard
+  Proposed: long polling (WaitTimeSeconds=20), batch delete (size 10),
+            VisibilityTimeout=30s, Standard
+  Dimensions changed: polling (Step 1) + batching (Step 2)
+  Dimensions checked: polling → (enable long)  batching → (batch delete)
+    visibility ✓ (30s > consumer p95 200ms)  retention ✓ (4 days, healthy)
+    redrive ✓ (maxReceiveCount=3, DLQ depth < 50)  queue-type ✓ (Standard)
+    fifo-mode ✓ (N/A — Standard queue)
+  Confidence: HIGH — CloudWatch NumberOfEmptyReceives directly measured;
+    batch delete is a code-level change with no infrastructure risk.
+
+ESTIMATED_SAVINGS:
+  Current monthly: $40.00
+    Request breakdown: 100M total API requests / 1M × $0.40 = $40.00
+      (15M SendMessage + 85M ReceiveMessage [85% empty] +
+       15M DeleteMessage one-at-a-time ≈ 15M send + 100M receive + 15M delete)
+  Projected monthly: $10.40
+    Request breakdown: 26M total API requests / 1M × $0.40 = $10.40
+      (15M SendMessage + 8.5M ReceiveMessage [90% empty reduction] +
+       1.5M DeleteMessageBatch [10 messages per call])
+  Monthly saving: $29.60   ($40.00 − $10.40 = $29.60 ✓)
+  Annual saving: $355.20   ($29.60 × 12 = $355.20 ✓)
+
+MIGRATION_STEPS:
+  1. Enable long polling on the queue:
+     aws sqs set-queue-attributes \
+       --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/order-events-queue \
+       --attributes ReceiveMessageWaitTimeSeconds=20
+  2. Update consumer to use DeleteMessageBatch (replace per-message DeleteMessage):
+     aws sqs delete-message-batch \
+       --queue-url https://sqs.us-east-1.amazonaws.com/123456789012/order-events-queue \
+       --entries file://delete-batch.json
+  3. Monitor NumberOfEmptyReceives for 7 days post-change (expect 90% drop):
+     aws cloudwatch get-metric-statistics --namespace AWS/SQS \
+       --metric-name NumberOfEmptyReceives \
+       --dimensions Name=QueueName,Value=order-events-queue \
+       --start-time 2026-08-05T00:00:00Z --end-time 2026-08-12T00:00:00Z \
+       --period 86400 --statistics Sum
+  4. Verify ApproximateAgeOfOldestMessage stays under 60s (no consumer backlog).
+
+CONFIRM: About to set-queue-attributes on order-events-queue
+  (WaitTimeSeconds 0 → 20) and switch consumer to batch delete. Monthly
+  saving $29.60 (74% request reduction). Proceed? (yes/no)
+```

@@ -326,3 +326,113 @@ resource "aws_iotsitewise_gateway_capability" "opcua_source" {
   })
 }
 ```
+
+---
+
+## Step 3 — Gateway and SiteWise Edge
+
+SiteWise Edge gateway runs on IoT Greengrass V2 and collects data from
+industrial sources (OPC-UA, Modbus) at the edge, then forwards to
+SiteWise in the cloud.
+
+**Create a gateway:**
+
+```bash
+GATEWAY_ID=$(aws iotsitewise create-gateway \
+  --gateway-name "Factory Floor Gateway" \
+  --gateway-platform greengrassV2CoreDevice=MyGreengrassCoreDevice \
+  --query 'gatewayId' --output text)
+```
+
+**Gateway states:**
+- `PENDING` — created, not yet syncing
+- `SYNCING` — downloading configuration from SiteWise
+- `RUNNING` — active, collecting and forwarding data
+- `ERROR` — check gateway logs on the Greengrass core device
+
+**Gateway capability:** the gateway runs the "SiteWise Edge" IoT
+Greengrass component (`aws.iotsitewise.EdgeConnector`), which is
+auto-deployed to the Greengrass core device when the gateway is
+created.
+
+
+## Step 4 — OPC-UA source configuration
+
+OPC-UA sources are configured per-gateway. Each source connects to an
+OPC-UA server and maps its nodes to asset model properties.
+
+**Create an OPC-UA source:**
+
+```bash
+SOURCE_ID=$(aws iotsitewise create-gateway \
+  --gateway-id "$GATEWAY_ID" \
+  --gateway-capability-namespace "iotsitewise:opcuacollector:1" \
+  --gateway-capability-configuration file://opcua-source-config.json \
+  --query 'gatewayCapabilitySummaries[0].capabilitySyncStatus' --output text)
+```
+
+**OPC-UA source configuration JSON structure:**
+
+```json
+{
+  "sources": [
+    {
+      "name": "PLC-Primary",
+      "endpoint": {
+        "certificateTrust": {
+          "type": "TrustAny"
+        },
+        "endpointUri": "opc.tcp://192.168.1.100:4840",
+        "securityPolicy": "BASIC256",
+        "messageSecurityMode": "SIGN_AND_ENCRYPT"
+      },
+      "nodePathMappings": [
+        {
+          "assetPropertyAlias": "/factory/line1/turbine1/temperature",
+          "nodePath": "Objects/Device/Temperature"
+        },
+        {
+          "assetPropertyAlias": "/factory/line1/turbine1/rpm",
+          "nodePath": "Objects/Device/RPM"
+        }
+      ],
+      "measurementDataStreamPrefix": "/factory/line1"
+    }
+  ]
+}
+```
+
+**Critical:** the `nodePathMappings` array maps OPC-UA node paths to
+asset property aliases. Each alias must match an alias set on an asset
+property (Step 6). The gateway reads the OPC-UA node and writes the
+value to the matching alias.
+
+
+## Step 9 — Time series storage and CloudWatch integration
+
+SiteWise stores measurement data in its own time series storage (the
+SiteWise warm tier). Data is queryable via
+`BatchGetAssetPropertyValueHistory` (historical) and
+`BatchGetAssetPropertyAggregates` (aggregated).
+
+**Storage configuration:**
+
+```bash
+aws iotsitewise put-storage-configuration \
+  --storage-type "SITE_WISE" \
+  --disassociated-data-storage "ENABLED" \
+  --retention-period "{\"warmRetentionInDays\": 365}"
+```
+
+**Warm tier:** stores the last N days of data (configurable, default
+depends on tier). Cold storage (SiteWise Edge or S3 export) is used
+for longer retention.
+
+**CloudWatch integration:** SiteWise publishes operational metrics to
+CloudWatch, including:
+- Ingestion metrics: `IngestionState` (Active/ActiveWithFailures),
+  `AssetPropertyReportedValueCount`.
+- Gateway metrics: `GatewayConnectivity`, `GatewayDataIngress`.
+
+These metrics enable CloudWatch alarms for ingestion health monitoring.
+

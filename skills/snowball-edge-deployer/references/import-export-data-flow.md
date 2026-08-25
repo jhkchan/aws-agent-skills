@@ -233,3 +233,60 @@ resource "aws_snowball_job" "import" {
   }
 }
 ```
+
+## Expert heuristic: import job data flow (device → S3 bucket)
+
+A baseline model says "create a job and copy data." The correct
+heuristic recognizes the full lifecycle: create job → receive device →
+unlock → start NFS → copy data → return device → AWS uploads → validate.
+
+```text
+Import job data flow:
+  1. Create import job (specify S3 destination bucket)
+     → AWS prepares and ships the device
+  2. Receive device (2-7 business days)
+     → Power on, connect to network
+  3. Pair device (download manifest from AWS console)
+     → Apply manifest via snowballEdge CLI
+  4. Unlock device (using unlock code from AWS console)
+     → snowballEdge unlock-device --endpoint ...
+  5. Start NFS interface
+     → snowballEdge start-service --service-id nfs-1 ...
+  6. Mount NFS and copy data (or use aws s3 cp via S3 adapter)
+     → mount -t nfs <device-ip>:/nfs/path /mnt/snowball
+     → cp -r /data/* /mnt/snowball/
+     → OR: aws s3 cp /data/ s3://snowball-bucket/ --endpoint ...
+  7. Stop NFS, power off device
+  8. Return device (AWS-provided shipping label)
+  9. AWS receives device → uploads data to S3 (hours to days)
+  10. Data validation report available in AWS console
+```
+
+**Key implication:** the #1 cause of "where is my data in S3?" is
+expecting the device to upload in real-time. The device is a physical
+shuttle — data uploads only AFTER the device is returned and processed
+by AWS.
+
+## Expert heuristic: NFS transfer via smbclient/aws s3 cp parallelism
+
+Data transfer speed depends on the interface (NFS vs S3 adapter) and
+the number of parallel threads. NFS is generally faster for large
+files; the S3 adapter supports aws s3 cp with parallelism.
+
+```text
+Transfer optimization:
+  NFS (large files, sequential):
+    ├── mount -t nfs <device-ip>:/nfs/path /mnt/snowball
+    ├── Use parallel copy: find /data -type f | xargs -P 16 -I{} cp {} /mnt/snowball/
+    └── Expected: 400-800 Mbps per NFS connection
+
+  S3 adapter (many small files, aws s3 cp):
+    ├── aws s3 cp /data/ s3://snowball-bucket/ --endpoint http://<device-ip>:8080 --recursive
+    ├── Increase parallelism: --max-concurrent-requests 32 (default 5)
+    └── Expected: 200-500 Mbps with high parallelism
+
+  Rule of thumb:
+    ├── > 100 GB files → NFS (single large sequential copy)
+    ├── < 100 MB files → S3 adapter with --max-concurrent-requests 32
+    └── Mixed → NFS with parallel copy threads
+```

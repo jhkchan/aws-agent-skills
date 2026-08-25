@@ -232,17 +232,8 @@ aws sns set-topic-attributes \
   --attribute-value alias/my-sns-key
 ```
 
-Cross-account KMS key policy requirement:
-```json
-{
-  "Sid": "Allow cross-account SNS subscribers",
-  "Effect": "Allow",
-  "Principal": { "AWS": "arn:aws:iam::222222222222:root" },
-  "Action": ["kms:Decrypt", "kms:GenerateDataKey*"],
-  "Resource": "*",
-  "Condition": { "StringEquals": { "kms:ViaService": "sns.us-east-1.amazonaws.com" } }
-}
-```
+> Moved to [references/topic-configuration-guide.md](references/topic-configuration-guide.md#cross-account-kms-key-policy-requirement).
+> The cross-account subscriber kms:Decrypt + kms:GenerateDataKey* key-policy JSON with the kms:ViaService condition.
 
 ### Step 6: Delivery status logging
 
@@ -305,31 +296,8 @@ aws sns publish \
 
 ### Step 9: Mobile push notifications
 
-```bash
-# Create platform application
-aws sns create-platform-application \
-  --name MyAppAPNS --platform APNS \
-  --attributes PlatformCredential=<private-key>,PlatformPrincipal=<certificate>
-
-# Register device endpoint
-aws sns create-platform-endpoint \
-  --platform-application-arn arn:aws:sns:us-east-1:111111111111:app/APNS/MyAppAPNS \
-  --token <device-token> \
-  --custom-user-data '{"userId": "12345"}'
-
-# Publish to mobile endpoint (use --message-structure json with default key)
-aws sns publish \
-  --target-arn <endpoint-arn> \
-  --message-structure json \
-  --message '{"default": "...", "APNS": "{\"aps\":{\"alert\":\"Order shipped\"}}", "FCM": "{\"notification\":{\"title\":\"Order shipped\"}}"}'
-```
-
-| Platform | Key | Format |
-|---|---|---|
-| APNS | `APNS` | `{"aps":{"alert":"message"}}` |
-| FCM (Android) | `FCM`/`GCM` | `{"notification":{"title":"...","body":"..."}}` |
-| Baidu | `Baidu` | `{"title":"...","description":"..."}` |
-| Default | `default` | Fallback for all platforms |
+> Moved to [references/topic-configuration-guide.md](references/topic-configuration-guide.md#mobile-push-notifications-step-9).
+> create-platform-application, create-platform-endpoint, and target-arn publish CLI plus the APNS/FCM/Baidu/default message-format table.
 
 ### Step 10: Verification
 
@@ -343,29 +311,13 @@ aws sns publish --topic-arn <topic-arn> --message '{"test": true}'
 
 ## Latest SNS features (2024-2026)
 
-- **SNS message archiving (Direct Messaging):** Archive messages to S3 via
-  Kinesis Data Firehose for long-term storage and replay.
-- **SNS-to-EventBridge integration:** Route messages directly to EventBridge
-  event buses for event-driven architectures.
-- **Message body filter policy (GA):** `FilterPolicyScope=MessageBody` for
-  payload-based subscription filtering. Requires JSON message bodies.
-- **SNS message data protection (2024):** Detect and block sensitive data
-  (PII, financial) in published messages. Per-topic deny/redact actions.
-- **FIFO topic delivery status logging (2024-2025):** Enhanced per-protocol
-  failure logging for FIFO topics.
-- **SNS-to-SQS SSE-KMS consistency (2024):** Topic KMS key policy must grant
-  `kms:Decrypt` to the SQS queue's consumer role.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#latest-sns-features-2024-2026).
+> Message archiving, SNS-to-EventBridge, MessageBody filter GA, message data protection, FIFO delivery logging, SSE-KMS consistency.
 
 ## Workload-specific deployment matrix
 
-| Workload | Topic type | Encryption | Subscribers | Filter | DLQ | Delivery logging |
-|---|---|---|---|---|---|---|
-| **Event fan-out** | Standard | AWS-managed | SQS (multiple) | Per-service attributes | Per-subscription | SQS failure |
-| **Ordered processing** | FIFO | AWS-managed | SQS FIFO | N/A | Per-subscription | SQS failure |
-| **Webhook delivery** | Standard | AWS-managed | HTTP/HTTPS | N/A | Per-subscription | HTTP failure (REQUIRED) |
-| **Cross-account fan-out** | Standard | Customer CMK | SQS (cross-account) | MessageAttributes | Per-subscription | SQS failure |
-| **Mobile push** | Standard | AWS-managed | Application | N/A | Per-subscription | Application failure |
-| **S3 Event fan-out** | Standard | AWS-managed | SQS, Lambda | Per-event-type | Per-subscription | SQS failure |
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#workload-specific-deployment-matrix).
+> Six workload rows (event fan-out, ordered, webhook, cross-account, mobile push, S3 event) with topic-type, encryption, subscriber, filter, DLQ, and logging defaults.
 
 ## NEVER (things to never do)
 
@@ -398,36 +350,14 @@ are in `references/troubleshooting-and-error-handling.md`.
 
 ## Error-handling branches
 
-| Error | Cause | Fix |
-|---|---|---|
-| `InvalidParameter: FIFO topic name must end with .fifo` | FIFO without suffix | Rename with `.fifo` |
-| `InvalidParameter: Subscription to FIFO topic requires FIFO SQS queue` | Non-SQS endpoint on FIFO | Use SQS FIFO queue, or Standard topic |
-| `KMSAccessDeniedException` | Subscriber lacks `kms:Decrypt` on CMK | Add `kms:Decrypt` + `kms:GenerateDataKey*` to subscriber key policy |
-| `AuthorizationError: sns:Subscribe` | Topic policy blocks cross-account | Add foreign account to topic policy |
-| Messages not delivered to cross-account SQS | AWS-managed key blocks decrypt | Switch to customer-managed CMK |
-| HTTP subscription in `PendingConfirmation` | Endpoint did not confirm within 3 days | Re-subscribe; endpoint must GET SubscribeURL |
-| Filter policy silently dropping messages | Non-JSON body with `FilterPolicyScope=MessageBody` | Ensure JSON bodies, or use MessageAttributes |
-| Delivery logs not in CloudWatch | Missing CloudWatch Logs resource policy | Add resource policy granting SNS logs permissions |
 
 Full subscription troubleshooting decision tree, per-protocol retry/dead-letter
 behavior, and edge-case handling are in `references/troubleshooting-and-error-handling.md`.
 
 ## Pre-flight safety checks (run before any deployment CLI)
 
-- **Confirm the topic name is available:** `create-topic` is idempotent —
-  returns the ARN if it exists.
-- **For FIFO topics, confirm name ends in `.fifo`.** Suffix is permanent.
-- **For SSE-KMS, confirm the KMS key exists** and the policy grants
-  subscriber access: `aws kms describe-key` + `aws kms get-key-policy`.
-- **For cross-account topics, confirm BOTH** topic policy AND subscriber
-  IAM/key policies allow access (intersection required).
-- **For delivery logging, confirm the CloudWatch IAM role exists** with
-  trust policy for `sns.amazonaws.com`.
-- **For mobile push, confirm the platform application exists:**
-  `aws sns list-platform-applications`.
-- **Capture existing configuration for rollback** (if updating):
-  `aws sns get-topic-attributes --topic-arn <arn> --output json > backup.json`.
-  Topic attributes are not versioned — no undo without backup.
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#pre-flight-safety-checks-run-before-any-deployment-cli).
+> Topic-name availability, FIFO suffix, KMS key policy, cross-account both-sides, CloudWatch role, platform app, and rollback-backup checks with verify commands.
 
 ## Output format — MANDATORY literal labels
 
@@ -471,26 +401,8 @@ Self-check EVERY emitted block before returning.
 
 ### Required output structure
 
-Every response MUST be the checklist block below — nothing before it,
-nothing after `VERIFICATION_COMMANDS`. The labels are case-sensitive
-all-caps keywords.
-
-```text
-TOPIC: <topic-name>
-VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
-CHECKLIST:
-  [✓|✗|OPTIONAL]      Topic type — Standard | FIFO
-  [✓|✗]               Encryption — SSE-KMS (key, same-account | cross-account)
-  [✓|✗]               Access policy — <pattern: S3 notification | cross-account | IAM-only>
-  [✓|✗]               Subscriptions — <count> active (<protocols>)
-  [✓|✗]               Delivery logging — <protocols> failure (role: <role-arn>)
-  [✓|✗|OPTIONAL]      Filter policy — <summary> | N/A
-  [✓|✗|OPTIONAL]      Subscription DLQ — <dlq-arn> | N/A
-  [✓|✗|OPTIONAL]      FIFO dedup — ContentBasedDeduplication=<true|false> | N/A
-  [✓|✗|OPTIONAL]      Mobile push — <platform ARNs> | N/A
-VERIFICATION_COMMANDS:
-  <one command per [✓] item>
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#required-output-structure).
+> The literal TOPIC/VERDICT/CHECKLIST/VERIFICATION_COMMANDS template — identical in shape to the Output format section above.
 
 ### FORBIDDEN output patterns
 
@@ -549,34 +461,11 @@ VERIFICATION_COMMANDS:
 
 ### Perfect example output — PREREQUISITES_MISSING
 
-```text
-TOPIC: order-events-cross-account
-VERDICT: PREREQUISITES_MISSING
-CHECKLIST:
-  [✓]      Topic type — Standard (cross-account fan-out, no ordering requirement)
-  [✗]      Encryption — alias/aws/sns selected but cross-account subscriber in account 222222222222 needs kms:Decrypt — supply customer-managed CMK with cross-account key policy
-  [✓]      Access policy — Cross-account publisher (Principal: account 222222222222, Action: sns:Publish)
-  [✗]      Subscriptions — 0 active: SQS queue arn in account 222222222222 not yet subscribed — subscribe the cross-account queue and confirm from the subscriber account
-  [✗]      Delivery logging — CloudWatch role SNSDeliveryFeedback not found — create IAM role with trust policy for sns.amazonaws.com + logs:PutLogEvents
-  [OPTIONAL] Filter policy — N/A (no filtering needed)
-  [OPTIONAL] Subscription DLQ — N/A (SQS has own DLQ)
-  [OPTIONAL] FIFO dedup — N/A (Standard topic)
-  [OPTIONAL] Mobile push — N/A (no mobile subscribers)
-VERIFICATION_COMMANDS:
-  aws kms describe-key --key-id alias/my-sns-cross-account-key
-  aws kms get-key-policy --key-id alias/my-sns-cross-account-key --policy-name default
-  aws sns list-subscriptions-by-topic --topic-arn arn:aws:sns:us-east-1:111111111111:order-events-cross-account
-  aws iam get-role --role-name SNSDeliveryFeedback
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#perfect-example-output--prerequisites_missing).
+> PREREQUISITES_MISSING example with [✗] encryption (AWS-managed key + cross-account subscriber), unsubscribed queue, and missing delivery-logging role citations.
 
-**Self-check before emit:**
-- [ ] All 9 checklist rows present (REQUIRED + OPTIONAL)?
-- [ ] Cross-account topic uses customer-managed CMK (not alias/aws/sns)?
-- [ ] Delivery logging cites BOTH role ARN AND CW Logs resource policy?
-- [ ] No subscription in PendingConfirmation marked as active?
-- [ ] FIFO topic has `.fifo` suffix and only SQS FIFO subscribers?
-- [ ] Every `[✗]` cites the specific gap and what the operator must provide?
-- [ ] Literal labels used exactly (no markdown variants)?
+> Moved to [references/worked-examples.md](references/worked-examples.md#self-check-before-emit).
+> Eight-item emit self-check: all rows present, customer-managed CMK, logging citations, no pending subscriptions, FIFO suffix and SQS FIFO subscribers, gap citations, literal labels.
 
 ## References
 
@@ -592,6 +481,16 @@ VERIFICATION_COMMANDS:
   FIFO compatibility).
 - `references/worked-example-multi-protocol.md` — step-by-step multi-protocol
   topic configuration (HTTPS + SQS + cross-account Lambda + mobile push).
+
+## References (load on demand)
+
+- [advanced-patterns](references/advanced-patterns.md) — Latest SNS features (2024-2026) and the workload-specific deployment matrix moved from SKILL.md
+- [deployment-cli-commands](references/deployment-cli-commands.md) — full copy-pasteable CLI sequence for all 10 deployment steps, including Terraform equivalents
+- [diagnostic-commands](references/diagnostic-commands.md) — pre-flight safety checks and rollback capture moved from SKILL.md
+- [topic-configuration-guide](references/topic-configuration-guide.md) — topic type internals, filter operators, cross-account KMS key policy, mobile push message formats
+- [troubleshooting-and-error-handling](references/troubleshooting-and-error-handling.md) — subscription troubleshooting decision tree, per-protocol error handling, and the error-handling branches table moved from SKILL.md
+- [worked-example-multi-protocol](references/worked-example-multi-protocol.md) — step-by-step multi-protocol topic configuration walkthrough
+- [worked-examples](references/worked-examples.md) — required output structure template, PREREQUISITES_MISSING example, and emit self-check moved from SKILL.md
 
 ## Domain
 

@@ -245,3 +245,18 @@ aws sns set-topic-attributes \
 
 The topic policy MUST grant Service Catalog publish rights; otherwise
 notifications silently fail.
+
+### Step 5 — Configure constraints (creation CLI)
+
+```bash
+# Create the launch role first (Step 5 prereq)
+aws iam create-role --role-name sc-launch-s3-role --assume-role-policy-document file://trust-policy.json
+aws iam put-role-policy --role-name sc-launch-s3-role --policy-name s3-only --policy-document file://s3-only-policy.json
+
+# Create the LAUNCH constraint
+aws servicecatalog create-constraint \
+  --portfolio-id $PORTFOLIO_ID \
+  --product-id $PRODUCT_ID \
+  --parameters '{"RoleArn":"arn:aws:iam::111111111111:role/sc-launch-s3-role","LocalRoleName":"sc-launch-s3-role"}' \
+  --type LAUNCH
+```

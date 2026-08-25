@@ -221,3 +221,27 @@ aws snowball create-job \
 
 For continuous edge computing lasting > 6 months, long-term rental
 is more cost-effective than repeated on-demand jobs.
+
+## Expert heuristic: cluster mode for resiliency
+
+Cluster mode connects 5-10 Snowball Edge devices into a single logical
+entity for COMPUTE resiliency (not storage aggregation). If one device
+fails, the cluster continues operating.
+
+```text
+Cluster mode decision tree:
+  ├── Need edge compute with HA? → cluster mode (min 5 nodes)
+  │     All nodes same device type, same network
+  │     Quorum: 5-node cluster tolerates 2 node failures
+  │     Use case: IoT processing, ML inference at edge
+  ├── Need just data transfer? → single device (no cluster)
+  │     One device, one job, return when done
+  ├── Need EKS Anywhere? → cluster mode (5 nodes minimum)
+  │     EKS Anywhere requires persistent cluster
+  └── Need more than 210 TB transfer? → multiple single-device jobs
+        NOT cluster mode (cluster is for compute, not storage pooling)
+```
+
+**Key implication:** cluster mode is for compute resiliency, not for
+aggregating storage. For large data transfers, use multiple
+single-device jobs, not a cluster.

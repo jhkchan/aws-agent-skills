@@ -387,3 +387,33 @@ APIs (default 3 retries with exponential backoff = ~20s for AWS SDK v2),
 the gap: `VisibilityTimeout <N>s is below 6x p99 (<M>s). Set
 VisibilityTimeout >= <6xp99>s on the event source mapping OR reduce
 Lambda concurrency/timeout.`
+
+## Expert heuristic: visibility timeout race condition
+
+The single most common cause of duplicate processing in SQS + Lambda
+pipelines is a visibility timeout shorter than the consumer's actual
+processing time under load.
+
+**The rule (paste into the checklist):**
+
+> Visibility timeout >= 6x expected p99 processing time.
+> For Lambda event source mappings, set it on the mapping
+> (`VisibilityTimeout`), NOT just the queue — the mapping value
+> OVERRIDES the queue value.
+
+| Lambda p99 processing | Minimum visibility timeout |
+|---|---|
+| 1s | 6s (default 30s is fine) |
+| 5s | 30s |
+| 30s | 180s (most queue defaults are wrong here) |
+| 60s | 360s |
+| 300s | 1800s |
+| 900s (Lambda max) | 5400s (90 min) |
+
+**Why 6x:** absorbs cold-start delay (up to 5s for VPC-attached), SDK
+retry backoff (~20s for AWS SDK v2), and one visibility-timeout extension.
+
+**Detection post-deploy:** if CloudWatch `ApproximateNumberOfMessagesVisible`
+is steady/rising while `NumberOfMessagesReceived` is high, the queue is
+re-delivering. Cross-reference with Lambda `Duration` p99 — if p99 x 6 >
+VisibilityTimeout, this race is the root cause.

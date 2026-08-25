@@ -84,46 +84,7 @@ with a specific gap citation in the checklist (marked `[x]`), and
 
 ## Mindset
 
-**One-line takeaway:** An SQS FIFO queue guarantees first-in-first-out
-ordering within a message group. The message group ID is the
-partitioning key — messages with the same group ID are processed in
-order; messages with different group IDs are processed in parallel.
-Deduplication prevents duplicate messages within the 5-minute
-deduplication window, either by content hash (content-based) or by
-explicit deduplication ID. High-throughput FIFO mode increases the
-queue's throughput by decoupling deduplication from the queue level,
-enabling per-message-group deduplication.
-
-Three misconceptions dominate SQS FIFO misdesign at provisioning time:
-
-- **"FIFO queues are just like Standard queues with ordering."** They
-  are fundamentally different. FIFO queues require the `.fifo` suffix
-  in the queue name. They require FifoQueue=true at creation (immutable
-  attribute — a Standard queue CANNOT be converted to FIFO). They
-  enforce per-message-group ordering. They have lower throughput than
-  Standard queues (3,000 messages/second with batching, or 300 TPS
-  per API action) unless high-throughput mode is enabled. They support
-  deduplication. Standard queues support none of these.
-
-- **"Message group ID is just a label."** It is the ordering partition.
-  Messages within the same group ID are strictly ordered. Messages
-  with different group IDs can be processed in parallel, enabling
-  throughput scaling. The number of in-flight message groups directly
-  determines the achievable parallelism. A single message group ID
-  serializes ALL messages through one consumer. Choosing the right
-  partitioning key (like a database entity ID) is critical for both
-  correctness (ordering) and performance (parallelism).
-
-- **"Deduplication and high-throughput mode are independent."** They
-  are coupled. Content-based deduplication hashes the message body to
-  generate a deduplication ID. This works at the QUEUE level — all
-  messages, regardless of group, share the deduplication window.
-  High-throughput FIFO mode (DeduplicationScope=messageGroup,
-  ThroughputLimit=messagesPerGroupId) moves deduplication to the
-  MESSAGE GROUP level, enabling 300 TPS per API action per message
-  group (instead of per queue). Enabling high-throughput mode without
-  understanding the deduplication scope change can cause unexpected
-  duplicate messages.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — the three-misconception mindset behind every FIFO provisioning decision.
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -172,126 +133,15 @@ explicit decision on each.
 
 ## Expert heuristic: message group ID partitioning for parallelism
 
-A baseline model says "create a FIFO queue." The correct heuristic
-recognizes that the message group ID is the parallelism lever.
-
-```text
-FIFO queue throughput:
-  Standard FIFO queue (perQueue):  3,000 messages/sec with batching
-                                    300 transactions/sec per API action
-                                    (shared across ALL message groups)
-
-  High-throughput FIFO (perGroupId):
-                                    300 TPS per API action PER message group
-                                    With N message groups: up to N * 300 TPS
-                                    Scales linearly with group count
-
-Message group ID as partitioning key:
-  Single group ID (e.g., "all-messages"):
-    → ALL messages serialized through one stream
-    → Only ONE consumer can process at a time
-    → Maximum throughput: 300 TPS (one consumer)
-    → Use when: global ordering is required
-
-  Per-entity group ID (e.g., order-123, order-456):
-    → Each entity gets its own ordered stream
-    → Multiple consumers process different entities in parallel
-    → Throughput scales with the number of active groups
-    → Use when: per-entity ordering is sufficient (most common)
-
-Key implication: choosing a coarse group ID (e.g., "all") serializes
-everything. Choosing a fine-grained group ID (e.g., customer-123)
-maximizes parallelism while preserving per-entity ordering.
-```
-
-**Key implication:** the #1 cause of "my FIFO queue is slow" is a
-single message group ID serializing all messages. Use per-entity
-group IDs to scale parallelism.
+→ Moved to [references/deduplication-and-ordering.md](references/deduplication-and-ordering.md) — the group-ID partitioning/parallelism model.
 
 ## Expert heuristic: deduplication ID management
 
-Deduplication prevents duplicate processing within a 5-minute window.
-The deduplication strategy determines how dedup IDs are generated.
-
-```text
-Deduplication strategies:
-
-1. Content-based (ContentBasedDeduplication=true):
-   → SQS generates dedup ID = SHA-256 hash of message body
-   → No producer-side dedup ID needed
-   → Caveat: two messages with DIFFERENT bodies but SAME logical
-     content are NOT deduplicated
-   → Use when: message body uniquely identifies the message
-
-2. Explicit (MessageDeduplicationId):
-   → Producer sends a dedup ID with each message
-   → Producer controls dedup semantics (can use business key,
-     event ID, or composite key)
-   → Overrides content-based dedup if both are present
-   → Use when: message body may vary but logical content is the same
-     (e.g., retry with updated timestamp but same order ID)
-
-3. High-throughput mode (DeduplicationScope=messageGroup):
-   → Dedup window is per message group, not per queue
-   → Same dedup ID in DIFFERENT groups does NOT deduplicate
-   → Enables per-group throughput scaling
-   → Use when: high throughput is needed AND per-group dedup is
-     semantically correct
-
-Dedup window: 5 minutes from first receipt.
-  → Same dedup ID within 5 min: SQS accepts the message but does NOT
-    enqueue it again (producer gets a success response).
-  → Same dedup ID after 5 min: SQS enqueues as a new message.
-```
-
-**Key implication:** the deduplication strategy must align with the
-business semantics. Content-based dedup fails when the same logical
-message has different bodies. Explicit dedup fails when the producer
-generates inconsistent dedup IDs. High-throughput mode changes the
-dedup scope from queue-level to group-level.
+→ Moved to [references/deduplication-and-ordering.md](references/deduplication-and-ordering.md) — content-based vs explicit vs per-group dedup strategies and the 5-minute window.
 
 ## Expert heuristic: high-throughput FIFO quota caveats
 
-High-throughput FIFO mode removes the per-queue throughput limit but
-introduces new constraints that are often missed.
-
-```text
-High-throughput FIFO requirements:
-  DeduplicationScope = messageGroup
-  ThroughputLimit    = messagesPerGroupId
-
-  Both must be set together. Setting only one → API error.
-
-Throughput:
-  Up to 300 TPS per API action per message group
-  With 10 active groups: up to 3,000 TPS (vs 300 TPS for standard FIFO)
-  With 100 active groups: up to 30,000 TPS
-
-Caveats:
-  1. Dedup scope change: dedup is now per-group. The same dedup ID
-     in two different groups will NOT be deduplicated. If your dedup
-     logic assumed queue-level scope, this changes behavior.
-
-  2. Account-level quota: high-throughput FIFO queues count against
-     a separate quota. The default is 100 high-throughput FIFO queues
-     per account (soft limit). Request a quota increase if needed.
-
-  3. Cost: high-throughput FIFO has a different pricing tier than
-     standard FIFO. API requests are billed at a higher rate. Monitor
-     costs when switching from standard to high-throughput.
-
-  4. No rollback: once a queue is configured for high-throughput, the
-     DeduplicationScope and ThroughputLimit CAN be changed back, but
-     in-flight messages may be affected during the transition.
-
-  5. Message group behavior: with high-throughput mode, the number of
-     active message groups directly determines throughput. Too few
-     groups = low throughput. Too many groups = more overhead.
-```
-
-**Key implication:** high-throughput FIFO is NOT a free throughput
-upgrade. It changes deduplication semantics, billing, and quota
-allocation. Evaluate all three before enabling.
+→ Moved to [references/dlq-and-throughput.md](references/dlq-and-throughput.md) — dedup-scope, quota, cost, and rollback caveats.
 
 ## Prerequisites (verify before provisioning)
 
@@ -537,36 +387,7 @@ access policy example with Terraform.
 
 ## Step 11 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **High-throughput FIFO mode (2023-2024):** AWS introduced
-  DeduplicationScope and ThroughputLimit attributes, enabling per-
-  message-group throughput scaling. This removed the per-queue 300 TPS
-  bottleneck for FIFO queues.
-
-- **StartMessageMoveTask API (2023-2024):** The modern API for moving
-  messages from a DLQ back to the source queue, replacing the custom
-  Lambda-based redrive patterns. Preserves message attributes and
-  supports partial moves.
-
-- **SSE-KMS for SQS (maturity 2023-2024):** Full SSE-KMS support for
-  FIFO queues, including cross-account KMS key usage and
-  KmsDataKeyReusePeriodSeconds tuning.
-
-- **FIFO queue visibility timeout per-message (2023-2024):**
-  Enhanced ChangeMessageVisibility API for per-message timeout
-  adjustments, enabling dynamic timeout based on message processing
-  complexity.
-
-- **Terraform provider improvements (2023-2024):** The Terraform
-  `aws_sqs_queue` resource now supports DeduplicationScope,
-  ThroughputLimit, KmsMasterKeyId, and redrive_policy attributes with
-  full lifecycle management.
-
-- **Cross-account DLQ redrive (2024-2025):** AWS enhanced the
-  StartMessageMoveTask to support cross-account DLQ redrive, allowing
-  DLQs in one account to redrive to source queues in another account
-  with proper IAM permissions.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — recent AWS features (2023-2026).
 
 ## NEVER do these things
 
@@ -673,20 +494,14 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-- **Message not delivered:** ensure `MessageGroupId` is included on
-  every send. If `ContentBasedDeduplication=false`, ensure
-  `MessageDeduplicationId` is also included.
-- **Duplicate processing:** visibility timeout may be too short —
-  increase to at least 2x processing time. Or content-based dedup is
-  not catching logical duplicates — switch to explicit dedup ID.
-- **Throughput limit hit:** standard FIFO is limited to 300 TPS per
-  API action. Enable high-throughput mode or distribute message groups.
-- **DLQ attachment fails:** the DLQ must be a FIFO queue. Standard
-  DLQs are rejected for FIFO main queues.
-- **Cross-account delivery fails:** verify both the queue access policy
-  grants `sqs:SendMessage` to the producer account AND the producer's
-  IAM role permits it. If SSE-KMS, the key policy must allow the
-  producer account.
+→ Moved to [references/error-handling.md](references/error-handling.md) — symptom → cause → fix for delivery, duplicate processing, throughput, DLQ, and cross-account failures.
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Mindset (three FIFO misconceptions) and recent AWS features (2023-2026).
+- [references/error-handling.md](references/error-handling.md) — error-handling deep dive: message delivery, duplicate processing, throughput limits, DLQ attachment, cross-account failures.
+- [references/deduplication-and-ordering.md](references/deduplication-and-ordering.md) — pre-existing; extended with the message-group-ID partitioning and deduplication-ID management heuristics moved from SKILL.md.
+- [references/dlq-and-throughput.md](references/dlq-and-throughput.md) — pre-existing; extended with the high-throughput FIFO quota caveats moved from SKILL.md.
 
 ## Domain
 

@@ -81,191 +81,28 @@ with a specific gap citation in the checklist (marked `[✗]`), and
 
 ## Mindset
 
-**One-line takeaway:** IoT SiteWise models physical industrial assets
-as digital asset models. Each model has four property types:
-measurement (raw sensor data), transform (formula-based derived
-values), metric (aggregated computations), and attribute (static
-metadata). Models are composed into hierarchies for parent-child
-relationships (e.g., a factory contains production lines, each line
-contains machines). Data flows from OPC-UA sources through a gateway
-(or via direct BatchPutAssetPropertyValue API calls) to asset
-properties, which are then visualized in dashboards and monitored by
-alarms.
-
-Three misconceptions dominate SiteWise misdesign at provisioning time:
-
-- **"All properties are the same."** They are not. Measurement
-  properties capture raw sensor data (temperature, pressure, RPM) and
-  are the ONLY property type that receives external data directly.
-  Transform properties apply formulas to measurements in near-real-time
-  (e.g., Celsius-to-Fahrenheit, efficiency calculations). Metric
-  properties aggregate data over time windows (e.g., hourly average,
-  daily total). Attribute properties store static metadata (serial
-  number, manufacturer, location). Using the wrong property type breaks
-  data flow: you cannot ingest data into a transform or metric, and
-  attributes do not support time series at all.
-
-- **"The gateway can collect from any source without configuration."**
-  It cannot. A SiteWise Edge gateway running on IoT Greengrass
-  requires explicit OPC-UA source configuration: the server endpoint,
-  node ID paths (NamePath or NodeName), and the mapping of each OPC-UA
-  node to a specific asset model property. Without the node-to-property
-  mapping, the gateway connects to the OPC-UA server but ingests
-  nothing. The mapping is the #1 cause of "my gateway is connected but
-  no data appears" tickets.
-
-- **"Asset property aliases are optional."** They are required for the
-  direct ingestion path. BatchPutAssetPropertyValue can ingest data
-  using either a property ID or an alias. Aliases are the ONLY way to
-  ingest data into a property without first resolving the property ID
-  (critical for high-throughput external ingestion from IoT Core rules
-  or Lambda functions). Without aliases, external ingestion requires a
-  prior DescribeAsset lookup to get the property ID — an extra API call
-  per asset that throttles at scale.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md#mindset) — the three misconceptions (property types, gateway mapping, alias necessity).
+Load that reference on demand before executing this section.
 
 ## Configuration dependency graph (novel heuristic)
 
-SiteWise configurations are NOT independent. The asset model must exist
-before assets. The gateway must exist before OPC-UA source
-configuration. Aliases must be set before external ingestion. Dashboards
-need projects; portals need projects. Use this graph to sequence
-provisioning.
-
-| Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| Asset model | None (standalone definition) | model status must be ACTIVE before asset creation; a model in CREATING state blocks asset creation | assets and hierarchies |
-| Asset (from model) | asset model must be ACTIVE | asset status must be ACTIVE before data ingestion or alias operations | data ingestion, aliases, dashboards |
-| Asset hierarchy | parent and child asset models both exist; hierarchy definition is IN the model (not the asset) | hierarchy child model must be specified in the parent model's hierarchy definitions; adding a hierarchy AFTER model creation requires a model update or new version | parent-child composition |
-| Gateway (Edge on Greengrass) | Greengrass core device exists; gateway platform is IoT Greengrass V2 | gateway must be in SYNCING or RUNNING state before source configuration | OPC-UA source configuration |
-| OPC-UA source | gateway exists and is active | source must be DISCONNECTED to modify; NamePath/NodeName mapping must reference valid OPC-UA node IDs; incorrect mappings silently ingest nothing | data flow to asset properties |
-| Asset property alias | asset and property exist | alias must be unique within the AWS account; format convention is `/company/site/asset/property` | external ingestion via BatchPutAssetPropertyValue without property ID lookup |
-| Dashboard project | None (standalone) | project must exist before creating dashboards or portals within it | dashboards and portals |
-| Dashboard | project exists; asset exists (for data binding) | dashboard widgets bind to asset property IDs; broken bindings show no data | visualization |
-| Portal | project exists; Identity Center store configured | portal requires Identity Center (SSO) — without it, portal creation fails; portal access requires per-user project role assignment | web-based visualization access |
-| Alarm (threshold) | asset and property exist; alarm is defined at the MODEL level (propagates to assets) | alarm state changes are detected by comparing the property value against threshold rules; alarm must be enabled on the specific asset instance | operational alerting |
-
-**The hierarchy-in-the-model row is the one a baseline model misses.**
-Asset hierarchies are defined in the parent asset MODEL, not in the
-asset instance. You cannot create a parent-child relationship between
-two arbitrary assets at runtime — the relationship must be declared in
-the model's `assetModelHierarchies` array. This means changing the
-hierarchy structure requires a new model version. The procedure below
-forces an explicit hierarchy design decision at model creation time.
-
-**Cross-dependency gotchas:**
-- A model must be in ACTIVE status before you can create an asset from
-  it. Model creation is asynchronous; poll `describe-asset-model` until
-  status is ACTIVE.
-- Hierarchy definitions are in the parent model. If you discover a new
-  parent-child relationship after assets are created, you must create a
-  new model version with the hierarchy, then update assets to the new
-  version.
-- OPC-UA source configuration maps OPC-UA nodes to asset model
-  PROPERTIES (not assets). The property must exist in the model
-  referenced by the gateway's capability configuration.
-- Aliases must be unique across the entire AWS account. Duplicate
-  aliases cause BatchPutAssetPropertyValue to write to the wrong asset.
-- Alarms are defined at the MODEL level. Each asset created from the
-  model inherits the alarm definition, but the alarm must be ENABLED
-  per-asset (default state is enabled, but can be overridden).
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md#configuration-dependency-graph-novel-heuristic) — 10-row dependency table, hierarchy-in-the-model rule, cross-dependency gotchas.
+Load that reference on demand before executing this section.
 
 ## Expert heuristic: asset model inheritance for standardization
 
-A baseline model says "create one model per asset." The correct
-heuristic recognizes that SiteWise's power comes from model reuse —
-define a model once, create many assets from it, and every asset
-inherits the same properties, transforms, metrics, and alarm
-definitions.
-
-```text
-Standardization model:
-  Wind Turbine Model (defined once)
-    ├── measurement: WindSpeed (m/s), RPM, PowerOutput (kW), Temperature (C)
-    ├── transform: TemperatureF = Temperature * 9/5 + 32
-    ├── transform: Efficiency = PowerOutput / (WindSpeed^3 * 0.5 * rho * A)
-    ├── metric: HourlyAvgPower = AVG(PowerOutput, 1h)
-    ├── metric: DailyTotalEnergy = SUM(PowerOutput, 24h)
-    ├── attribute: Manufacturer, SerialNumber, RatedCapacity
-    ├── alarm: HighTemp (Temperature > 80C for 5 minutes)
-    └── alarm: LowEfficiency (Efficiency < 0.3 for 15 minutes)
-
-  Assets created from the model:
-    ├── Wind Turbine #1 (WT-001) — inherits all properties, transforms, metrics, alarms
-    ├── Wind Turbine #2 (WT-002) — inherits all properties, transforms, metrics, alarms
-    └── Wind Turbine #3 (WT-003) — inherits all properties, transforms, metrics, alarms
-
-  Hierarchy:
-    Wind Farm Model (parent)
-      └── hierarchy: "contains" → Wind Turbine Model (child)
-
-    Wind Farm Asset (WF-North)
-      └── children: WT-001, WT-002, WT-003
-```
-
-**Key implication:** model inheritance ensures every asset has the
-same property definitions, derived calculations, and alarm rules. This
-eliminates drift between assets of the same type and enables fleet-wide
-aggregation metrics at the hierarchy level.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-asset-model-inheritance-for-standardization) — wind-turbine standardization model and fleet inheritance pattern.
+Load that reference on demand before executing this section.
 
 ## Expert heuristic: OPC-UA data flow to asset properties
 
-The data flow from an OPC-UA source to a SiteWise asset property
-traverses multiple components. Understanding this path is essential for
-troubleshooting "no data" issues.
-
-```text
-OPC-UA data flow:
-  1. OPC-UA server (industrial PLC, SCADA, or gateway device)
-     → exposes a node tree: Objects/Device/Temperature = 72.5
-  2. SiteWise Edge gateway (on Greengrass core device)
-     → connects to OPC-UA server via endpoint (opc.tcp://...)
-     → OPC-UA source configuration maps:
-       NodeName "Objects/Device/Temperature" → property "Temperature"
-       (in asset model referenced by gateway's capability)
-  3. Gateway reads the OPC-UA node value
-     → writes to SiteWise via BatchPutAssetPropertyValue
-     → targets the property via the alias or property ID
-  4. SiteWise stores the data point in the time series
-     → property is a measurement → stores raw value with timestamp
-     → transform/metric properties derive from measurements
-  5. Dashboard widgets bound to the property display the value
-     → alarm rules evaluate the property value against thresholds
-```
-
-**Key implication:** the OPC-UA node-to-property mapping is the critical
-link. If the mapping references the wrong node path, the gateway reads
-a value but writes it to the wrong property (or fails silently). Always
-verify the NamePath/NodeName matches the OPC-UA server's address space.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-opc-ua-data-flow-to-asset-properties) — five-hop OPC-UA to gateway to property to dashboard data-flow trace.
+Load that reference on demand before executing this section.
 
 ## Expert heuristic: transform expressions for derived metrics
 
-Transform properties use SQL-like expressions to derive values from
-measurement properties in near-real-time. The expression syntax follows
-specific rules that differ from standard SQL.
-
-```text
-Transform expression syntax:
-  - References to measurement properties use their property IDs or names
-  - Supports: arithmetic (+, -, *, /), math functions (max, min, avg, sum,
-    abs, sqrt, exp, ln, log, pow, round, ceil, floor), trigonometry (sin,
-    cos, tan, asin, acos, atan), conditional (if, case)
-  - Supports time-series functions: earliest, latest, deref (for multi-
-    data type handling)
-  - NO direct SQL queries; the expression operates on the current value
-    of the referenced properties
-
-Examples:
-  TemperatureF = Temperature * 9/5 + 32
-  Efficiency = PowerOutput / (max(WindSpeed * WindSpeed * WindSpeed, 0.1) * 0.5 * 1.225 * 7853)
-  Status = if(Temperature > 80, 'OVERHEATING', if(Temperature > 60, 'WARNING', 'NORMAL'))
-  QualityAdjustedPower = PowerOutput * if(Quality == 'GOOD', 1.0, 0.5)
-```
-
-**Key implication:** transforms compute on each incoming data point
-(near-real-time). For time-windowed aggregations (hourly average, daily
-total), use METRIC properties instead — they use the same expression
-syntax but aggregate over a specified time interval and processing
-configuration.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-transform-expressions-for-derived-metrics) — transform expression syntax, supported functions, and worked formulas.
+Load that reference on demand before executing this section.
 
 ## Prerequisites (verify before provisioning)
 
@@ -316,130 +153,18 @@ number, location, rated capacity). They do NOT have time series data.
 
 ## Step 2 — Asset hierarchy (parent-child)
 
-Asset hierarchies define parent-child relationships between assets.
-Hierarchies are defined in the PARENT asset model, not in the asset
-instance.
-
-**Hierarchy definition in the parent model:**
-
-```bash
-# Create parent model with hierarchy definition
-aws iotsitewise create-asset-model \
-  --asset-model-name "Wind Farm" \
-  --asset-model-properties file://wind-farm-properties.json \
-  --asset-model-hierarchies '[
-    {
-      "name": "Contains Turbines",
-      "childAssetModelId": "wind-turbine-model-id"
-    }
-  ]'
-```
-
-**Create parent asset and associate children:**
-
-```bash
-# Create the parent asset (from parent model)
-FARM_ID=$(aws iotsitewise create-asset \
-  --asset-name "Wind Farm North" \
-  --asset-model-id "$FARM_MODEL_ID" \
-  --query 'assetId' --output text)
-
-# Wait for asset to become ACTIVE (poll describe-asset)
-aws iotsitewise wait asset-active --asset-id "$FARM_ID"
-
-# Associate child assets via the hierarchy
-aws iotsitewise associate-assets \
-  --asset-id "$FARM_ID" \
-  --hierarchy-id "$HIERARCHY_ID" \
-  --child-asset-id "$TURBINE_1_ID"
-
-aws iotsitewise associate-assets \
-  --asset-id "$FARM_ID" \
-  --hierarchy-id "$HIERARCHY_ID" \
-  --child-asset-id "$TURBINE_2_ID"
-```
-
-**Critical:** the hierarchy definition (name + child model ID) lives in
-the parent model. You cannot create a hierarchy relationship between
-arbitrary assets at runtime — the parent model must declare which child
-model it accepts.
+→ Moved to [references/asset-models-and-properties.md](references/asset-models-and-properties.md#step-2--asset-hierarchy-parent-child) — parent-model hierarchy CLI, create-asset, wait asset-active, associate-assets.
+Load that reference on demand before executing this section.
 
 ## Step 3 — Gateway and SiteWise Edge
 
-SiteWise Edge gateway runs on IoT Greengrass V2 and collects data from
-industrial sources (OPC-UA, Modbus) at the edge, then forwards to
-SiteWise in the cloud.
-
-**Create a gateway:**
-
-```bash
-GATEWAY_ID=$(aws iotsitewise create-gateway \
-  --gateway-name "Factory Floor Gateway" \
-  --gateway-platform greengrassV2CoreDevice=MyGreengrassCoreDevice \
-  --query 'gatewayId' --output text)
-```
-
-**Gateway states:**
-- `PENDING` — created, not yet syncing
-- `SYNCING` — downloading configuration from SiteWise
-- `RUNNING` — active, collecting and forwarding data
-- `ERROR` — check gateway logs on the Greengrass core device
-
-**Gateway capability:** the gateway runs the "SiteWise Edge" IoT
-Greengrass component (`aws.iotsitewise.EdgeConnector`), which is
-auto-deployed to the Greengrass core device when the gateway is
-created.
+→ Moved to [references/gateway-and-ingestion.md](references/gateway-and-ingestion.md#step-3--gateway-and-sitewise-edge) — create-gateway CLI, gateway states, Edge connector component.
+Load that reference on demand before executing this section.
 
 ## Step 4 — OPC-UA source configuration
 
-OPC-UA sources are configured per-gateway. Each source connects to an
-OPC-UA server and maps its nodes to asset model properties.
-
-**Create an OPC-UA source:**
-
-```bash
-SOURCE_ID=$(aws iotsitewise create-gateway \
-  --gateway-id "$GATEWAY_ID" \
-  --gateway-capability-namespace "iotsitewise:opcuacollector:1" \
-  --gateway-capability-configuration file://opcua-source-config.json \
-  --query 'gatewayCapabilitySummaries[0].capabilitySyncStatus' --output text)
-```
-
-**OPC-UA source configuration JSON structure:**
-
-```json
-{
-  "sources": [
-    {
-      "name": "PLC-Primary",
-      "endpoint": {
-        "certificateTrust": {
-          "type": "TrustAny"
-        },
-        "endpointUri": "opc.tcp://192.168.1.100:4840",
-        "securityPolicy": "BASIC256",
-        "messageSecurityMode": "SIGN_AND_ENCRYPT"
-      },
-      "nodePathMappings": [
-        {
-          "assetPropertyAlias": "/factory/line1/turbine1/temperature",
-          "nodePath": "Objects/Device/Temperature"
-        },
-        {
-          "assetPropertyAlias": "/factory/line1/turbine1/rpm",
-          "nodePath": "Objects/Device/RPM"
-        }
-      ],
-      "measurementDataStreamPrefix": "/factory/line1"
-    }
-  ]
-}
-```
-
-**Critical:** the `nodePathMappings` array maps OPC-UA node paths to
-asset property aliases. Each alias must match an alias set on an asset
-property (Step 6). The gateway reads the OPC-UA node and writes the
-value to the matching alias.
+→ Moved to [references/gateway-and-ingestion.md](references/gateway-and-ingestion.md#step-4--opc-ua-source-configuration) — capability configuration CLI and the full OPC-UA source JSON with nodePathMappings.
+Load that reference on demand before executing this section.
 
 ## Step 5 — Data ingestion (BatchPutAssetPropertyValue)
 
@@ -517,48 +242,8 @@ wrong asset property.
 
 ## Step 7 — Dashboards (project and portal)
 
-SiteWise dashboards visualize asset property data. Dashboards live in
-projects. Portals aggregate projects and provide web-based access.
-
-**Create a project:**
-
-```bash
-PROJECT_ID=$(aws iotsitewise create-project \
-  --project-name "Wind Farm Monitoring" \
-  --portal-id "$PORTAL_ID" \
-  --query 'projectId' --output text)
-```
-
-**Create a dashboard:**
-
-```bash
-DASHBOARD_ID=$(aws iotsitewise create-dashboard \
-  --dashboard-name "Turbine WT-001 Overview" \
-  --project-id "$PROJECT_ID" \
-  --dashboard-definition file://dashboard-definition.json \
-  --query 'dashboardId' --output text)
-```
-
-**Dashboard definition JSON** contains widget configurations (line
-charts, bar charts, KPIs, status grids) bound to asset property IDs.
-
-**Create a portal (requires Identity Center):**
-
-```bash
-PORTAL_ID=$(aws iotsitewise create-portal \
-  --portal-name "Acme Wind Farm Portal" \
-  --portal-contact-email "ops@acme.com" \
-  --role-arn "$PORTAL_ROLE_ARN" \
-  --portal-auth-mode "IAM" \
-  --alarms-enabled \
-  --query 'portalId' --output text)
-```
-
-**Critical:** portal creation requires an IAM role that SiteWise
-assumes to read asset data on behalf of portal users. The role must
-have `iotsitewise:BatchGetAssetPropertyAggregates`,
-`iotsitewise:BatchGetAssetPropertyValue`, and
-`iotsitewise:BatchGetAssetPropertyValueHistory` permissions.
+→ Moved to [references/portals-dashboards-and-access.md](references/portals-dashboards-and-access.md#step-7--dashboards-project-and-portal) — create-project / create-dashboard / create-portal CLI and the portal IAM role.
+Load that reference on demand before executing this section.
 
 ## Step 8 — Alarms (threshold rules)
 
@@ -603,101 +288,18 @@ state change events), or portal notifications.
 
 ## Step 9 — Time series storage and CloudWatch integration
 
-SiteWise stores measurement data in its own time series storage (the
-SiteWise warm tier). Data is queryable via
-`BatchGetAssetPropertyValueHistory` (historical) and
-`BatchGetAssetPropertyAggregates` (aggregated).
-
-**Storage configuration:**
-
-```bash
-aws iotsitewise put-storage-configuration \
-  --storage-type "SITE_WISE" \
-  --disassociated-data-storage "ENABLED" \
-  --retention-period "{\"warmRetentionInDays\": 365}"
-```
-
-**Warm tier:** stores the last N days of data (configurable, default
-depends on tier). Cold storage (SiteWise Edge or S3 export) is used
-for longer retention.
-
-**CloudWatch integration:** SiteWise publishes operational metrics to
-CloudWatch, including:
-- Ingestion metrics: `IngestionState` (Active/ActiveWithFailures),
-  `AssetPropertyReportedValueCount`.
-- Gateway metrics: `GatewayConnectivity`, `GatewayDataIngress`.
-
-These metrics enable CloudWatch alarms for ingestion health monitoring.
+→ Moved to [references/gateway-and-ingestion.md](references/gateway-and-ingestion.md#step-9--time-series-storage-and-cloudwatch-integration) — put-storage-configuration, warm tier, ingestion and gateway CloudWatch metrics.
+Load that reference on demand before executing this section.
 
 ## Step 10 — Identity Center for portal access
 
-SiteWise portals use Identity Center (SSO) for user authentication when
-`portalAuthMode` is `SSO`.
-
-**Configure Identity Center for portal:**
-
-```bash
-# Portal with SSO auth mode
-PORTAL_ID=$(aws iotsitewise create-portal \
-  --portal-name "Acme Wind Farm Portal" \
-  --portal-contact-email "ops@acme.com" \
-  --role-arn "$PORTAL_ROLE_ARN" \
-  --portal-auth-mode "SSO" \
-  --query 'portalId' --output text)
-```
-
-**Assign users/groups to portal projects:**
-
-```bash
-# Assign a user or group to a project with a role
-aws iotsitewise create-access-policy \
-  --access-policy-identity '{
-    "iam": {"arn": "arn:aws:iam::123456789012:role/SiteWisePortalViewer"}
-  }' \
-  --access-policy-permission '{
-    "project": {"permission": "VIEWER", "projectId": "'"$PROJECT_ID"'"}
-  }' \
-  --access-policy-resource '{
-    "portal": {"id": "'"$PORTAL_ID"'"}
-  }'
-```
-
-**Project roles:** `ADMINISTRATOR` (full control), `EDITOR` (create/edit
-dashboards), `VIEWER` (read-only).
-
-**Critical:** portal access requires both an Identity Center user AND
-an access policy. Without the access policy, the user can authenticate
-but sees no projects.
+→ Moved to [references/portals-dashboards-and-access.md](references/portals-dashboards-and-access.md#step-10--identity-center-for-portal-access) — SSO portal creation, create-access-policy CLI, project roles.
+Load that reference on demand before executing this section.
 
 ## Step 11 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Asset model composite models (2023-2024):** Composite models enable
-  grouping related properties and alarms into reusable units. A
-  composite model can be included in multiple asset models, enabling
-  modular model composition (e.g., an "ElectricalModule" with voltage,
-  current, power measurements used across multiple asset types).
-
-- **SiteWise Edge Modbus support (2023-2024):** In addition to OPC-UA,
-  SiteWise Edge gateways now support Modbus TCP sources, broadening
-  industrial protocol coverage for legacy devices.
-
-- **BatchPutAssetPropertyValue performance improvements (2023-2024):**
-  Increased throughput limits for BatchPutAssetPropertyValue, supporting
-  higher data ingestion rates for large-scale industrial deployments.
-
-- **Dashboard governance (2024-2025):** Dashboard definitions now
-  support versioning, enabling controlled updates to production
-  dashboards without disrupting viewers.
-
-- **Alarm advanced parameters (2024-2025):** Alarms now support
-  hysteresis thresholds (different thresholds for alarm set and alarm
-  clear), reducing alarm flapping for noisy signals.
-
-- **Identity Center integration maturity (2024-2025):** Simplified
-  portal SSO setup with automatic Identity Center group synchronization
-  for project access policies.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-11--recent-features) — composite models, Modbus, ingestion throughput, dashboard versioning, alarm hysteresis, IdC maturity.
+Load that reference on demand before executing this section.
 
 ## NEVER do these things
 
@@ -850,54 +452,9 @@ VERIFICATION_COMMANDS:
   aws iotsitewise list-assets --filter TOPLEVEL --region us-east-1
 ```
 
-Deploy commands:
 
-```bash
-# 1. Create the asset model with all four property types
-aws iotsitewise create-asset-model \
-  --asset-model-name "Pump-Motor Model" \
-  --asset-model-properties '[
-    {"name":"Temperature","dataType":"DOUBLE","type":{"measurement":{}}},
-    {"name":"MotorPower","dataType":"DOUBLE","type":{"measurement":{}}},
-    {"name":"ShaftFrequency","dataType":"DOUBLE","type":{"measurement":{}}},
-    {"name":"RPM","dataType":"DOUBLE","type":{"transform":{"expression":"ShaftFrequency * 60","variables":[{"name":"ShaftFrequency","value":{"propertyId":"<shaft-freq-prop-id>"}}]}}},
-    {"name":"TempF","dataType":"DOUBLE","type":{"transform":{"expression":"Temperature * 9 / 5 + 32","variables":[{"name":"Temperature","value":{"propertyId":"<temp-prop-id>"}}]}}},
-    {"name":"HourlyAvgEfficiency","dataType":"DOUBLE","type":{"metric":{"expression":"avg(RPM / MotorPower)","variables":[{"name":"RPM","value":{"propertyId":"<rpm-prop-id>"}},{"name":"MotorPower","value":{"propertyId":"<motorpower-prop-id>"}}],"window":{"tumbling":{"interval":"1h"}}}}},
-    {"name":"SerialNumber","dataType":"STRING","type":{"attribute":{}}},
-    {"name":"Manufacturer","dataType":"STRING","type":{"attribute":{}}}
-  ]'
-
-# 2. Wait for model ACTIVE, then create asset
-aws iotsitewise wait asset-model-active --asset-model-id model-pm7a3x9
-aws iotsitewise create-asset --asset-name "PM-001" --asset-model-id model-pm7a3x9
-
-# 3. Set aliases on measurement properties for OPC-UA ingestion
-aws iotsitewise update-asset-property \
-  --asset-id asset-pm8b4y2 \
-  --property-id <temperature-prop-id> \
-  --property-alias "/acme/plant1/pumpstation1/pm001/temperature"
-
-# 4. Configure OPC-UA source on gateway with nodePathMappings
-aws iotsitewise put-gateway-capability-configuration \
-  --gateway-id gw-3c7d8e1 \
-  --capability-namespace "iotsitewise:opcuacollector:1" \
-  --capability-configuration '{
-    "sources": [{
-      "name": "PLC-MotorController",
-      "endpoint": {
-        "certificateTrust": {"type": "TrustAny"},
-        "endpointUri": "opc.tcp://10.20.30.40:4840",
-        "securityPolicy": "BASIC256",
-        "messageSecurityMode": "SIGN_AND_ENCRYPT"
-      },
-      "nodePathMappings": [
-        {"assetPropertyAlias": "/acme/plant1/pumpstation1/pm001/temperature", "nodePath": "Objects/PumpMotor/Temperature"},
-        {"assetPropertyAlias": "/acme/plant1/pumpstation1/pm001/motorpower", "nodePath": "Objects/PumpMotor/Power"},
-        {"assetPropertyAlias": "/acme/plant1/pumpstation1/pm001/shaftfrequency", "nodePath": "Objects/PumpMotor/Frequency"}
-      ]
-    }]
-  }'
-```
+→ Deploy commands for this worked example moved to [references/worked-examples.md](references/worked-examples.md#worked-example-deploy-commands--pump-motor-model) — create-asset-model with all four property types, wait + create-asset, alias setup, put-gateway-capability-configuration with nodePathMappings.
+Load that reference on demand before executing this section.
 
 ### Decision tree
 
@@ -928,37 +485,18 @@ Model stuck in CREATING?
 
 ## Error handling
 
-### Asset model stuck in CREATING state
-- The model is being validated. If it stays in CREATING for more than a
-  minute, check for invalid transform/metric expressions or circular
-  property references. A model in CREATING for several minutes likely
-  has a validation error — check `describe-asset-model` for error
-  details.
+→ Moved to [references/error-handling.md](references/error-handling.md#error-handling) — five failure deep dives (CREATING stall, gateway ERROR, empty dashboards, portal role, alarm never fires).
+Load that reference on demand before executing this section.
 
-### Gateway shows ERROR state
-- Check the Greengrass core device logs on the edge device. Common
-  causes: OPC-UA server unreachable, certificate trust failure,
-  insufficient Greengrass permissions, or the core device is offline.
 
-### No data appears in dashboards despite ingestion
-- Verify the asset property alias matches the alias used in the
-  ingestion call (or the OPC-UA nodePathMapping). Check
-  BatchPutAssetPropertyValue error entries. Confirm the property is a
-  measurement (transforms/metrics derive from measurements, not from
-  external data). Verify the asset status is ACTIVE.
+## References (load on demand)
 
-### Portal dashboards show no data
-- The portal IAM role lacks permissions to read asset data. Verify the
-  role has `iotsitewise:BatchGetAssetPropertyAggregates`,
-  `BatchGetAssetPropertyValue`, and `BatchGetAssetPropertyValueHistory`
-  on the relevant assets. Also check that the access policy assigns
-  the user/group to the correct project.
-
-### Alarm never fires despite threshold breach
-- The alarm duration (`durationInMinutes`) may be too long for the data
-  frequency. If data arrives every 60 seconds but the duration is 10
-  minutes, the alarm needs 10 minutes of sustained breach. Also verify
-  the alarm references the correct property ID and comparison operator.
+- [references/asset-models-and-properties.md](references/asset-models-and-properties.md) — property-type semantics and asset-model design detail, incl. Step 2 hierarchy CLI (create-asset-model with assetModelHierarchies, associate-assets).
+- [references/gateway-and-ingestion.md](references/gateway-and-ingestion.md) — gateway architecture, OPC-UA and ingestion detail, incl. Step 3 gateway creation, Step 4 OPC-UA source JSON, Step 9 storage / CloudWatch CLI.
+- [references/portals-dashboards-and-access.md](references/portals-dashboards-and-access.md) — Step 7 dashboard / portal creation CLI and Step 10 Identity Center SSO + access-policy wiring.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — mindset (three misconceptions), configuration dependency graph, expert heuristics (model inheritance, OPC-UA data flow, transform expressions), Step 11 recent features.
+- [references/worked-examples.md](references/worked-examples.md) — worked-example deploy commands (Pump-Motor Model: create-asset-model with all four property types, aliases, put-gateway-capability-configuration).
+- [references/error-handling.md](references/error-handling.md) — failure deep dives (model stuck CREATING, gateway ERROR, no dashboard data, portal role gaps, alarm never fires).
 
 ## Domain
 

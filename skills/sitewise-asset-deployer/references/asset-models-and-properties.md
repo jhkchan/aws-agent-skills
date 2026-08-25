@@ -246,3 +246,56 @@ resource "aws_iotsitewise_asset_model" "turbine" {
   }
 }
 ```
+
+---
+
+## Step 2 — Asset hierarchy (parent-child)
+
+Asset hierarchies define parent-child relationships between assets.
+Hierarchies are defined in the PARENT asset model, not in the asset
+instance.
+
+**Hierarchy definition in the parent model:**
+
+```bash
+# Create parent model with hierarchy definition
+aws iotsitewise create-asset-model \
+  --asset-model-name "Wind Farm" \
+  --asset-model-properties file://wind-farm-properties.json \
+  --asset-model-hierarchies '[
+    {
+      "name": "Contains Turbines",
+      "childAssetModelId": "wind-turbine-model-id"
+    }
+  ]'
+```
+
+**Create parent asset and associate children:**
+
+```bash
+# Create the parent asset (from parent model)
+FARM_ID=$(aws iotsitewise create-asset \
+  --asset-name "Wind Farm North" \
+  --asset-model-id "$FARM_MODEL_ID" \
+  --query 'assetId' --output text)
+
+# Wait for asset to become ACTIVE (poll describe-asset)
+aws iotsitewise wait asset-active --asset-id "$FARM_ID"
+
+# Associate child assets via the hierarchy
+aws iotsitewise associate-assets \
+  --asset-id "$FARM_ID" \
+  --hierarchy-id "$HIERARCHY_ID" \
+  --child-asset-id "$TURBINE_1_ID"
+
+aws iotsitewise associate-assets \
+  --asset-id "$FARM_ID" \
+  --hierarchy-id "$HIERARCHY_ID" \
+  --child-asset-id "$TURBINE_2_ID"
+```
+
+**Critical:** the hierarchy definition (name + child model ID) lives in
+the parent model. You cannot create a hierarchy relationship between
+arbitrary assets at runtime — the parent model must declare which child
+model it accepts.
+

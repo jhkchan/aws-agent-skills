@@ -234,35 +234,8 @@ GAP: Re-supply get-findings output with Resources[] populated.
 
 ### Step 0: Expert knowledge — non-obvious Security Hub behaviors
 
-- **Finding events use `detail-type: "Security Hub Findings - Imported"`.**
-  NOT "Custom Action". Confusing the two is the most common automation
-  failure.
-
-- **`batch-update-findings` requires BOTH `Id` and `ProductArn`.** Missing
-  either produces `InvalidInput`.
-
-- **Security Hub deduplicates findings by generator ID + resource.** The
-  finding ID stays constant across re-evaluations. Key idempotency on
-  finding `Id`, not `UpdatedAt`.
-
-- **Control standards take 5-30 minutes to fully enable.** Wait for
-  `STANDARD_REGISTRATION_COMPLETE` before wiring EventBridge rules.
-
-- **Suppressed findings can be un-suppressed by re-evaluation.** If the
-  control regenerates with a new finding ID, the old suppression does
-  NOT apply. The suppression evaluator must check by generator ID.
-
-- **The delegated administrator cannot create custom actions on behalf
-  of members.** Custom actions are per-account. Use CloudFormation
-  StackSets for bulk deployment.
-
-- **EventBridge target needs an input transformer.** The finding is
-  nested in `detail.findings[0]`. Without a transformer, the Lambda
-  receives the full envelope and must parse manually.
-
-- **`WorkflowStatus: RESOLVED` does NOT prevent re-opening.** If the
-  control re-evaluates and the resource is still non-compliant, the
-  finding re-opens with NEW. Always verify the fix before closing.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-0-expert-knowledge--non-obvious-security-hub-behaviors).
+> Eight non-obvious behaviors: Imported-vs-Custom-Action detail-type, batch-update-findings Id+ProductArn, dedup by generator ID, standard enable delay, suppression re-eval, per-account custom actions, EventBridge input transformer, RESOLVED re-open.
 
 ### Step 1: Verify Security Hub and standards are active
 
@@ -344,53 +317,8 @@ aws events put-targets \
 
 ### Step 6: Build the Lambda remediation dispatcher
 
-```python
-import boto3
-ssm = boto3.client('ssm')
-hub = boto3.client('securityhub')
-sns = boto3.client('sns')
-
-RUNBOOK_MAP = {
-    'S3.1':  {'runbook': 'AWS-DisableS3BucketPublicAccess', 'param': 'S3BucketName'},
-    'S3.4':  {'runbook': 'AWS-EnableS3BucketEncryption', 'param': 'S3BucketName'},
-    'IAM.3': {'runbook': 'AWS-IAMRevokeUnusedAccessKey', 'param': 'UserName'},
-}
-
-def lambda_handler(event, context):
-    finding = event['finding']
-    fid = finding['Id']
-    parn = finding['ProductArn']
-    resource = finding['Resources'][0]
-    ctrl = finding.get('GeneratorId', '').split('/')[-1]
-
-    if ctrl in RUNBOOK_MAP:
-        m = RUNBOOK_MAP[ctrl]
-        param_val = resource['Id'].split(':')[-1].split('/')[-1]
-        try:
-            resp = ssm.start_automation_execution(
-                DocumentName=m['runbook'],
-                Parameters={m['param']: [param_val],
-                    'AutomationAssumeRole': ['arn:aws:iam::111111111111:role/aws-service-role/AmazonSSMAutomationRole/AWS-SSM-AutomationExecutionRole']}
-            )
-            hub.batch_update_findings(
-                FindingIdentifiers=[{'Id': fid, 'ProductArn': parn}],
-                Workflow={'Status': 'NOTIFIED'},
-                Note={'Text': f'Remediation executed: {resp["AutomationExecutionId"]}', 'UpdatedBy': 'dispatcher'})
-            return {'status': 'remediated'}
-        except Exception as e:
-            hub.batch_update_findings(
-                FindingIdentifiers=[{'Id': fid, 'ProductArn': parn}],
-                Note={'Text': f'Remediation FAILED: {e}', 'UpdatedBy': 'dispatcher'})
-            raise
-    else:
-        sns.publish(TopicArn='arn:aws:sns:us-east-1:111111111111:security-alerts',
-            Message=f'No auto-remediation for {ctrl}. Manual triage.\nFinding: {fid}')
-        hub.batch_update_findings(
-            FindingIdentifiers=[{'Id': fid, 'ProductArn': parn}],
-            Workflow={'Status': 'NOTIFIED'},
-            Note={'Text': f'No runbook for {ctrl}. Notified.', 'UpdatedBy': 'dispatcher'})
-        return {'status': 'notified'}
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#step-6-build-the-lambda-remediation-dispatcher).
+> Full Lambda dispatcher reference implementation: RUNBOOK_MAP, start-automation-execution, batch-update-findings NOTIFIED/FAILED notes, SNS fallback.
 
 ### Step 7: Configure suppression rules for accepted risks
 
@@ -451,59 +379,13 @@ aws securityhub create-members \
 
 ### Literal output labels
 
-Every remediation design MUST emit exactly one block per finding type using
-the labels `FINDING_ID:`, `FINDING_TYPE:`, `VERDICT:`, `CHECKLIST:`, `GAP:`,
-and `TEMPLATE:`. Do NOT preface with prose.
-
-```text
-FINDING_ID: <finding Id — arn:aws:securityhub:us-east-1:ACCT:subscription/...>
-FINDING_TYPE: <Security Hub finding type>
-STANDARD: <CIS | PCI | FSBP | Custom | N/A>
-VERDICT: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
-CHECKLIST:
-  [✓|✗] Severity route: CRITICAL_AUTO | HIGH_AUTO | MEDIUM_NOTIFY | LOW_NOTIFY
-  [✓|✗] EventBridge rule: <rule name + pattern>
-  [✓|✗] SSM runbook / Lambda fixer: <name | ARN | NONE>
-  [✓|✗] batch-update-findings: wired
-  [✓|✗] SQS DLQ: <ARN>
-  [✓|✗] Suppression: <NONE | rule+expiration>
-  [✓|✗] Insight: <ARN | TBD>
-  [✓|✗] Safety gate: <validated>
-GAP: <specific missing piece or None>
-TEMPLATE: <CLI snippet or IaC>
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#literal-output-labels).
+> Literal output-label contract restated: FINDING_ID/VERDICT/CHECKLIST/GAP/TEMPLATE block, no prose preface.
 
 ### FORBIDDEN — NEVER do these
 
-1. NEVER wire an EventBridge rule on `aws.securityhub` without a
-   `Severity.Label` filter. Without it the rule fires on EVERY finding
-   including LOW and INFORMATIONAL, overwhelming Lambda concurrency and
-   spiking costs.
-
-2. NEVER use `update-findings` (deprecated). Use `batch-update-findings`
-   which accepts up to 100 findings per call and is the forward-compatible
-   API.
-
-3. NEVER suppress a finding without an expiration date in the Note.
-   Permanent suppression violates PCI DSS, SOC 2, ISO 27001. Always set
-   "Suppressed until YYYY-MM-DD" and run a daily evaluator Lambda.
-
-4. NEVER auto-remediate without calling `batch-update-findings` afterward.
-   A remediation that fixes the resource but leaves the finding in NEW
-   status triggers duplicate remediation and corrupts dashboards.
-
-5. NEVER deploy a Lambda remediation function without an SQS DLQ on the
-   EventBridge target. Failed invocations are silently dropped without a
-   DLQ; the finding stays open and no one knows.
-
-6. NEVER confuse `detail-type: "Security Hub Findings - Imported"` with
-   `"Security Hub Findings - Custom Action"`. The former is for
-   automation (fires on ingestion); the latter fires on human console
-   click.
-
-7. NEVER key remediation idempotency on `UpdatedAt`. Security Hub
-   re-evaluates controls periodically, changing `UpdatedAt` without
-   changing the finding state. Key on finding `Id`.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#forbidden--never-do-these).
+> Seven forbidden patterns: severity filter, deprecated update-findings, suppression expiration, close-after-remediate, SQS DLQ, detail-type confusion, UpdatedAt idempotency.
 
 ### Worked example — Critical S3 public-access finding, auto-remediated
 
@@ -551,23 +433,8 @@ Severity routing summary (how each tier is handled):
 
 ### Worked example — REVIEW_REQUIRED, no runbook mapped
 
-```text
-FINDING_ID: arn:aws:securityhub:us-east-1:111111111111:subscription/custom/lambda-cred-exposure/finding/02b34567
-FINDING_TYPE: Software and Configuration Checks/Custom/ExposedCredentialsInLambda
-STANDARD: Custom
-VERDICT: REVIEW_REQUIRED
-CHECKLIST:
-  [✗] Severity route: HIGH_AUTO — no runbook available
-  [✓] EventBridge rule: securityhub-high-auto-remediation (configured)
-  [✗] SSM runbook / Lambda fixer: NONE — no managed runbook for Lambda env-var credential exposure
-  [✓] batch-update-findings: NOTIFIED (SNS to security channel)
-  [✓] SQS DLQ: arn:aws:sqs:us-east-1:111111111111:securityhub-remediation-dlq
-  [✓] Suppression: NONE
-  [✗] Insight: TBD — create insight for tracking
-  [✗] Safety gate: not yet built
-GAP: No managed runbook exists. Build a custom Lambda that (1) reads the finding, (2) rotates the credential via Secrets Manager, (3) updates the environment variable, (4) calls batch-update-findings RESOLVED. Then wire the EventBridge rule.
-TEMPLATE: (custom Lambda — see Step 6 pattern in skill body)
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#worked-example--review_required-no-runbook-mapped).
+> REVIEW_REQUIRED block: custom Lambda credential-exposure finding with no managed runbook, gap and build plan cited.
 
 ### Decision tree
 
@@ -589,36 +456,8 @@ Is the finding an accepted risk?
 
 ## Anti-Patterns — NEVER do these things
 
-- NEVER wire an EventBridge rule on `aws.securityhub` without a
-  `Severity.Label` filter. The rule fires on EVERY finding, including
-  LOW, producing cost spikes and Lambda concurrency exhaustion.
-
-- NEVER use `update-findings` (deprecated). Use `batch-update-findings`
-  for all workflow status changes. The old API is single-finding and
-  does not support batch updates.
-
-- NEVER suppress a finding without an expiration date. Permanent
-  suppression violates PCI DSS, SOC 2, ISO 27001. Always include
-  "Suppressed until YYYY-MM-DD" and run the daily evaluator Lambda.
-
-- NEVER auto-remediate without calling `batch-update-findings`
-  afterward. A remediation that fixes the resource but leaves the
-  finding in NEW status triggers duplicate remediation.
-
-- NEVER deploy a Lambda remediation function without an SQS DLQ on
-  the EventBridge target. Failed invocations are silently dropped.
-
-- NEVER enable a compliance standard in production without staging
-  validation. Standards generate findings immediately — hundreds in
-  minutes in an unprepared account.
-
-- NEVER confuse `detail-type: "Security Hub Findings - Imported"`
-  with `"Security Hub Findings - Custom Action"`. The former is for
-  automation; the latter fires on human console click.
-
-- NEVER key idempotency on `UpdatedAt`. Security Hub re-evaluates
-  periodically, changing `UpdatedAt` without changing state. Key on
-  finding `Id` for deduplication.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#anti-patterns--never-do-these-things).
+> Anti-pattern catalog: unfiltered EventBridge rules, update-findings, permanent suppression, unclosed findings, missing DLQ, unvalidated standards, detail-type confusion, UpdatedAt keying.
 
 ## Pre-flight safety checks
 
@@ -635,51 +474,30 @@ Is the finding an accepted risk?
 
 ## Appendix A — Common finding-to-runbook mappings
 
-| Standard | Control | Finding type | Runbook | Strategy |
-|---|---|---|---|---|
-| FSBP | S3.1 | S3 public access | `AWS-DisableS3BucketPublicAccess` | Auto |
-| FSBP | S3.4 | S3 missing encryption | `AWS-EnableS3BucketEncryption` | Auto |
-| FSBP | IAM.3 | IAM unused key | `AWS-IAMRevokeUnusedAccessKey` | Auto (caveat) |
-| FSBP | CloudTrail.1 | Trail disabled | `AWS-EnableCloudTrailLogging` | Auto |
-| CIS | 4.1 | SG open to 0.0.0.0/0 | Custom Lambda | REVIEW_REQUIRED |
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#appendix-a--common-finding-to-runbook-mappings).
+> Finding-to-runbook mapping table: FSBP S3.1/S3.4/IAM.3/CloudTrail.1 auto runbooks, CIS 4.1 custom Lambda.
 
 ## Appendix B — Decision tree
 
-```
-Managed SSM runbook for the finding type?
-+-- Yes -> Severity CRITICAL or HIGH?
-|         +-- Yes -> AUTOMATION_DEPLOYED
-|         +-- No  -> MEDIUM_NOTIFY or LOW_NOTIFY
-+-- No  -> Custom Lambda feasible?
-          +-- Yes -> Build + test -> AUTOMATION_DEPLOYED
-          +-- No  -> REVIEW_REQUIRED (gap cited)
-```
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#appendix-b--decision-tree).
+> Compact decision tree: managed runbook → severity route → verdict; custom-Lambda feasibility branch.
 
 ## Recent AWS features (2024-2026)
 
-- **Security Hub centralized configuration (2024):** Delegated admin can
-  push policies and control enablements across all members centrally.
-- **Finding aggregation across regions (2024-2025):** Single region
-  aggregates findings from all enabled regions, simplifying rule design.
-- **SSM runbook native finding updates (2025):** SSM `aws:updateSecurityHubFinding`
-  action eliminates the need for a separate Lambda to close findings.
-- **Controls for new services (2025-2026):** FSBP controls for Amazon Q,
-  Bedrock, and GenAI services. Remediation runbooks shipping incrementally.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#recent-aws-features-2024-2026).
+> Centralized configuration, cross-region finding aggregation, SSM native finding updates, new-service FSBP controls.
 
 ## Expert heuristic: blast radius of auto-remediation
 
-> ALWAYS validate the EventBridge severity filter and Lambda dispatch
-> table in a non-production account first. Deploy with a dry-run flag
-> in the Lambda for 48 hours: log what it WOULD do without calling SSM.
-> Then enable live execution after verifying zero false positives.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-blast-radius-of-auto-remediation).
+> Pre-production validation protocol: staging deploy with planted findings, 48h dry-run, live enable, production promotion.
 
-**Pre-production validation protocol:**
+## References (load on demand)
 
-1. Deploy EventBridge rule + Lambda in staging. Plant 5 deliberate findings.
-2. Run Lambda in dry-run mode 48 hours. Verify mapping correctness.
-3. Enable live execution. Verify all 5 remediated AND closed via
-   `batch-update-findings`.
-4. Promote to production with severity filter active.
+- [advanced-patterns](references/advanced-patterns.md) — Step 0 non-obvious behaviors, FORBIDDEN and Anti-Pattern catalogs, Appendix A runbook mappings, Appendix B compact decision tree, blast-radius validation protocol, recent AWS features
+- [worked-examples](references/worked-examples.md) — Step 6 Lambda dispatcher reference implementation, literal output-label contract, REVIEW_REQUIRED worked example
+- [eventbridge-finding-patterns](references/eventbridge-finding-patterns.md) — EventBridge rule patterns, severity filters, input transformers, custom-action wiring
+- [ssm-runbook-templates](references/ssm-runbook-templates.md) — SSM Automation runbook YAML templates and severity-based SLA table
 
 ## Domain
 

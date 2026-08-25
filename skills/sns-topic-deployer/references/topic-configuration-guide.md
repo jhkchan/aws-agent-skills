@@ -350,3 +350,45 @@ resource "aws_sns_topic_policy" "events" {
   })
 }
 ```
+
+## Cross-account KMS key policy requirement
+
+Cross-account KMS key policy requirement:
+```json
+{
+  "Sid": "Allow cross-account SNS subscribers",
+  "Effect": "Allow",
+  "Principal": { "AWS": "arn:aws:iam::222222222222:root" },
+  "Action": ["kms:Decrypt", "kms:GenerateDataKey*"],
+  "Resource": "*",
+  "Condition": { "StringEquals": { "kms:ViaService": "sns.us-east-1.amazonaws.com" } }
+}
+```
+
+## Mobile push notifications (Step 9)
+
+```bash
+# Create platform application
+aws sns create-platform-application \
+  --name MyAppAPNS --platform APNS \
+  --attributes PlatformCredential=<private-key>,PlatformPrincipal=<certificate>
+
+# Register device endpoint
+aws sns create-platform-endpoint \
+  --platform-application-arn arn:aws:sns:us-east-1:111111111111:app/APNS/MyAppAPNS \
+  --token <device-token> \
+  --custom-user-data '{"userId": "12345"}'
+
+# Publish to mobile endpoint (use --message-structure json with default key)
+aws sns publish \
+  --target-arn <endpoint-arn> \
+  --message-structure json \
+  --message '{"default": "...", "APNS": "{\"aps\":{\"alert\":\"Order shipped\"}}", "FCM": "{\"notification\":{\"title\":\"Order shipped\"}}"}'
+```
+
+| Platform | Key | Format |
+|---|---|---|
+| APNS | `APNS` | `{"aps":{"alert":"message"}}` |
+| FCM (Android) | `FCM`/`GCM` | `{"notification":{"title":"...","body":"..."}}` |
+| Baidu | `Baidu` | `{"title":"...","description":"..."}` |
+| Default | `default` | Fallback for all platforms |

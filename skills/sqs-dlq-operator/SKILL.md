@@ -133,49 +133,8 @@ operation.
 
 ### Step 0: Expert knowledge — non-obvious SQS DLQ behaviors
 
-- **Type mismatch is SILENT.** A Standard source with a FIFO DLQ (or
-  vice versa) does NOT error at redrive-policy set time. SQS silently
-  drops the redriven messages. Always verify the DLQ's `FifoQueue`
-  attribute matches the source.
-- **`maxReceiveCount` counts per ReceiveMessage, not per consumer.**
-  With 10 consumers polling, maxReceiveCount of 5 means ~0.5 effective
-  retries per consumer. A burst of consumers can exhaust the count
-  without any single consumer actually failing.
-- **VisibilityTimeout < consumer p99 = false-positive DLQ entries.**
-  The message returns to the queue before processing completes; SQS
-  re-delivers; receive count increments; eventually redrives. The
-  consumer never threw an exception.
-- **Lambda event source mapping `VisibilityTimeout` OVERRIDES the queue
-  value.** Setting `VisibilityTimeout` on the queue alone is
-  insufficient — the Lambda mapping value wins. Check both.
-- **Without `ReportBatchItemFailures`, a single failed message retries
-  the ENTIRE batch.** If Lambda processes 9 of 10 successfully and 1
-  throws, all 10 are returned to the queue. Each receives a new
-  receive count. After `maxReceiveCount` cycles, all 10 redrive —
-  including the 9 that succeeded (now duplicated).
-- **`StartMessageMoveTask` is the 2022+ replacement for the deprecated
-  `Redrive` API.** The legacy `Redrive` API is gone; use
-  `start-message-move-task`. It is asynchronous, supports filtering via
-  `MaxNumberOfMessagesPerSecond`, and is idempotent per task ID.
-- **`StartMessageMoveTask` on a FIFO DLQ preserves `MessageGroupId` and
-  `MessageDeduplicationId`.** Deduplication applies — if the original
-  `MessageDeduplicationId` is within the 5-min window, the redriven
-  message is silently dropped.
-- **`purge-queue` deletes ALL messages and cannot be scoped.** Never
-  use it as remediation for poison-pill messages — it destroys evidence
-  and all in-flight messages. Use `receive-message` + `delete-message`
-  for selective removal, or `StartMessageMoveTask` for replay.
-- **DLQ retention default is 4 days, not 14.** The 4-day default is too
-  short for weekend/holiday coverage. Always set to 14 days
-  (1209600s) — the maximum.
-- **`RedriveAllowPolicy` controls cross-account redrive.** Without it,
-  the DLQ defaults to allowing redrive only from the owning account.
-  For cross-account source queues, add an allowlist.
-- **A DLQ should NOT have its own redrive policy.** That creates an
-  infinite redrive chain. The DLQ is terminal.
-- **`ApproximateNumberOfMessagesVisible` is approximate.** It lags by
-  up to 60s. For exact counts, use `receive-message` with
-  `MessageAttributeNames.1=All` and iterate.
+Full catalog (silent type mismatch, per-ReceiveMessage counting, VT<p99 false
+positives, ESM override, batch retry, v2 API, dedup, purge, retention): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
@@ -256,124 +215,8 @@ If ANY verification fails, emit `VERDICT: ERROR` — do not claim COMPLETED.
 
 ## Common DLQ patterns (boilerplate)
 
-### Create Standard DLQ + wire redrive policy
-
-```bash
-# 1. Create the DLQ (Standard, 14-day retention, SSE-SQS)
-aws sqs create-queue \
-  --queue-name prod-orders-dlq \
-  --attributes MessageRetentionPeriod=1209600,SqsManagedSseEnabled=true
-
-DLQ_URL=$(aws sqs get-queue-url --queue-name prod-orders-dlq --query 'QueueUrl' --output text)
-DLQ_ARN=$(aws sqs get-queue-attributes --queue-url "$DLQ_URL" \
-  --attribute-names QueueArn --query 'Attributes.QueueArn' --output text)
-
-# 2. Wire the redrive policy on the SOURCE queue
-SOURCE_URL=$(aws sqs get-queue-url --queue-name prod-orders --query 'QueueUrl' --output text)
-aws sqs set-queue-attributes \
-  --queue-url "$SOURCE_URL" \
-  --attributes RedrivePolicy="{\"deadLetterTargetArn\":\"$DLQ_ARN\",\"maxReceiveCount\":\"5\"}"
-```
-
-### Create FIFO DLQ (for FIFO source)
-
-```bash
-# FIFO DLQ — name MUST end in .fifo
-aws sqs create-queue \
-  --queue-name prod-orders-dlq.fifo \
-  --attributes FifoQueue=true,MessageRetentionPeriod=1209600,SqsManagedSseEnabled=true
-
-# Verify the DLQ ARN ends in .fifo before wiring the source
-DLQ_ARN=$(aws sqs get-queue-attributes --queue-url "$DLQ_URL" \
-  --attribute-names QueueArn --query 'Attributes.QueueArn' --output text)
-# DLQ_ARN should be: arn:aws:sqs:us-east-1:111111111111:prod-orders-dlq.fifo
-```
-
-### Tune maxReceiveCount
-
-```bash
-# Snapshot first
-aws sqs get-queue-attributes --queue-url "$SOURCE_URL" \
-  --attribute-names RedrivePolicy --output json > /tmp/source-redrive-backup-$(date +%s).json
-
-# Update with new maxReceiveCount (preserving the DLQ ARN)
-aws sqs set-queue-attributes \
-  --queue-url "$SOURCE_URL" \
-  --attributes RedrivePolicy="{\"deadLetterTargetArn\":\"$DLQ_ARN\",\"maxReceiveCount\":\"10\"}"
-```
-
-### Analyze DLQ messages (receive without deleting)
-
-```bash
-# Receive up to 10 messages from the DLQ for inspection (DO NOT delete yet)
-aws sqs receive-message \
-  --queue-url "$DLQ_URL" \
-  --max-number-of-messages 10 \
-  --visibility-timeout 300 \
-  --attribute-names All \
-  --message-attribute-names All \
-  --output json
-
-# Key attributes to inspect:
-# - ApproximateReceiveCount: how many times the source redelivered before DLQ
-# - ApproximateFirstReceiveTimestamp: when the message first entered the DLQ
-# - MessageDeduplicationId (FIFO): for dedup analysis
-# - Body: parse for poison-pill indicators (malformed JSON, missing fields)
-```
-
-### Replay via StartMessageMoveTask (2022+ API)
-
-```bash
-# Pre-replay snapshot of DLQ depth
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/SQS --metric-name ApproximateNumberOfMessagesVisible \
-  --dimensions Name=QueueName,Value=prod-orders-dlq \
-  --start-time 2026-08-11T00:00:00Z --end-time 2026-08-11T01:00:00Z \
-  --period 300 --statistics Average
-
-# Start the move task (asynchronous)
-TASK_ID=$(aws sqs start-message-move-task \
-  --source-arn "$DLQ_ARN" \
-  --destination-arn "$SOURCE_ARN" \
-  --max-number-of-messages-per-second 100 \
-  --query 'TaskHandle' --output text)
-
-# Poll task status (initial: RUNNING, final: COMPLETED or FAILED)
-aws sqs list-message-move-tasks \
-  --source-arn "$DLQ_ARN" \
-  --max-results 10
-
-# Post-replay: verify DLQ depth returned to zero
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/SQS --metric-name ApproximateNumberOfMessagesVisible \
-  --dimensions Name=QueueName,Value=prod-orders-dlq \
-  --start-time $(date -u -d '15 min ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 60 --statistics Average
-```
-
-**`MaxNumberOfMessagesPerSecond`:** set to a value the consumer can
-sustain. Default is unlimited — for a DLQ with 100k messages and a
-Lambda consumer with 50 concurrent executions, unlimited replay will
-throttle the consumer and re-trigger the original failure mode. Start
-with `100` (360k/hour) and increase if the consumer keeps up.
-
-### Enable partial batch responses (prevent false-positive DLQ)
-
-```bash
-# Update the Lambda event source mapping to report per-message failures
-aws lambda update-event-source-mapping \
-  --uuid <mapping-uuid> \
-  --function-response-types ReportBatchItemFailures
-
-# Verify
-aws lambda get-event-source-mapping \
-  --uuid <mapping-uuid> \
-  --query 'FunctionResponseTypes'
-```
-
-Without `ReportBatchItemFailures`, a single failed message in a batch
-of 10 causes all 10 to retry. With it, only the failed message retries.
+Boilerplate command sequences (create Standard/FIFO DLQ + redrive wiring, tune
+maxReceiveCount, analyze DLQ, replay via StartMessageMoveTask, partial batch): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ## STRICT output contract
 
@@ -518,53 +361,13 @@ DLQ depth > 0 (ApproximateNumberOfMessagesVisible > 0)
 
 ## Edge-case handling
 
-- **FIFO DLQ replay drops messages silently.** `StartMessageMoveTask`
-  preserves the original `MessageDeduplicationId`. If the original ID
-  is within the 5-min dedup window on the source, the redriven message
-  is silently dropped. Detect by comparing DLQ depth before replay vs
-  source depth after — if source does not increase, dedup is the cause.
-- **Cross-account DLQ redrive.** The DLQ's `RedriveAllowPolicy` must
-  allowlist the source account. Without it, `StartMessageMoveTask`
-  from a cross-account source returns `AccessDenied`. Set:
-  `RedriveAllowPolicy={"redrivePermission":"allowList","sourceQueueArns":["arn:aws:sqs:us-east-1:222222222222:source"]}`.
-- **DLQ has its own DLQ (infinite chain).** A redrive policy on the DLQ
-  pointing to another DLQ creates an infinite chain. The DLQ should be
-  terminal — no redrive policy on the DLQ itself.
-- **`purge-queue` during replay.** If an operator runs `purge-queue` on
-  the DLQ while a `StartMessageMoveTask` is RUNNING, the task fails
-  with `PurgeQueueInProgress`. Wait 60s after purge before retrying.
-- **Lambda event source mapping `VisibilityTimeout` overrides queue.**
-  Setting `VisibilityTimeout` on the queue alone does not fix the race
-  if a Lambda mapping exists — the mapping value wins. Update both.
-- **DLQ depth metric lag.** `ApproximateNumberOfMessagesVisible` lags
-  by up to 60s. For real-time monitoring, use CloudWatch alarm with
-  period 60s and DatapointsToAlarm 2 to avoid flapping on lag spikes.
+Edge-case catalog (FIFO replay dedup drops, cross-account RedriveAllowPolicy,
+infinite DLQ chain, purge during replay, ESM VT override, metric lag): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Recent AWS features (2024-2026)
 
-- **StartMessageMoveTask (2022+, GA 2024-2026):** The current API for
-  redriving from DLQ back to source. Replaced the deprecated legacy
-  `Redrive` API. Asynchronous, supports `MaxNumberOfMessagesPerSecond`
-  throttling, idempotent per task handle. Use this for ALL replay
-  operations.
-- **SQS partial batch responses (Lambda):** `ReportBatchItemFailures`
-  on the event source mapping lets Lambda report which messages in a
-  batch failed, so only those are retried. Without it, the entire batch
-  retries — the #1 cause of false-positive DLQ entries for Lambda
-  consumers.
-- **RedriveAllowPolicy (cross-account redrive):** Controls which source
-  accounts can redrive to a DLQ. Default: only the DLQ's owning account.
-  Set to `allowList` for cross-account source queues.
-- **Message retention max 14 days:** More prominently used for DLQs
-  (4-day default is too short for weekend/holiday coverage).
-- **SSE-SQS (SqsManagedSseEnabled):** Free, FIPS-validated AES-256-GCM.
-  Recommended default for DLQs (no key policy to manage).
-- **No-SQL payload in message attributes:** Structured attributes for
-  filtering without parsing the body — useful for DLQ analysis (tag
-  poison-pill messages with an attribute for selective replay).
-- **ApproximateNumberOfMessagesVisible CloudWatch metric:** The primary
-  DLQ-depth signal. Alarm at threshold > 0 for immediate detection, or
-  > N for batch-oriented analysis windows.
+Recent AWS features (StartMessageMoveTask GA, ReportBatchItemFailures,
+RedriveAllowPolicy, 14-day retention, SSE-SQS, message attributes): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Output format (per operation)
 
@@ -618,32 +421,15 @@ NOTES:
 
 ### Worked example — replay via StartMessageMoveTask (COMPLETED)
 
-```text
-OPERATION: replay
-VERDICT: COMPLETED
-TARGET: prod-orders-dlq -> prod-orders (replay)
-PRE_CHECKS:
-  - [PASS] DLQ prod-orders-dlq exists, depth was 1247 messages
-  - [PASS] Source prod-orders exists, listed via list-dead-letter-source-queues
-  - [PASS] Source has active Lambda consumer (mapping uuid a1b2c3d4, BatchSize=10)
-  - [PASS] Root cause fixed: consumer patched to handle malformed-JSON payload gracefully (deploy v1.4.2)
-  - [PASS] VisibilityTimeout 60s >= Lambda p99 8s — no race
-  - [PASS] ReportBatchItemFailures enabled on mapping
-STEPS:
-  1. Snapshot: aws cloudwatch get-metric-statistics (DLQ depth before replay: 1247)
-  2. aws sqs start-message-move-task --source-arn arn:aws:sqs:us-east-1:111111111111:prod-orders-dlq --destination-arn arn:aws:sqs:us-east-1:111111111111:prod-orders --max-number-of-messages-per-second 100
-  3. Poll: aws sqs list-message-move-tasks --source-arn arn:aws:sqs:us-east-1:111111111111:prod-orders-dlq
-POST_VERIFY:
-  - [PASS] list-message-move-tasks Status: COMPLETED, FilesMoved: 1247, FilesFailed: 0
-  - [PASS] DLQ depth returned to 0 (ApproximateNumberOfMessagesVisible: 0)
-  - [PASS] Source queue NumberOfMessagesReceived increased by ~1247 over replay window
-  - [PASS] Consumer logs show no errors on replayed messages (patch confirmed working)
-STATE: DLQ depth 0, source depth normal, replay task COMPLETED
-NOTES:
-  - Throttled to 100 msg/s (12.5s total) to avoid overwhelming Lambda concurrency.
-  - FIFO dedup did not apply (Standard queue, no MessageDeduplicationId).
-  - Monitor DLQ depth over next 24h — if messages re-accumulate, root cause was not fully fixed.
-```
+Full worked example (replay of 1247 messages at 100 msg/s; all POST_VERIFY
+PASS): [references/worked-examples.md](references/worked-examples.md).
+
+## References (load on demand)
+
+- [Diagnostic commands](references/diagnostic-commands.md) — the Common DLQ patterns boilerplate command sequences moved from SKILL.md
+- [Worked examples](references/worked-examples.md) — full replay walkthrough (COMPLETED) moved from SKILL.md
+- [Advanced patterns](references/advanced-patterns.md) — Step 0 expert knowledge, edge-case catalog, recent AWS features moved from SKILL.md
+- [DLQ operations reference](references/dlq-operations-reference.md) — pre-existing operation decision tree, procedures, cost reference, and worked examples
 
 ## Domain
 

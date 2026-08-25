@@ -217,147 +217,18 @@ aws sesv2 get-email-identity --email-identity example.com --region us-east-1
 
 ### Step 3: Configure the MAIL FROM domain (SPF alignment)
 
-The custom MAIL FROM domain (`mail.example.com`) replaces the
-default `amazonses.com` envelope sender, enabling SPF alignment.
-
-```bash
-aws sesv2 put-email-identity-mail-from-domain \
-  --email-identity example.com \
-  --mail-from-domain mail.example.com \
-  --behavior-on-mx-failure UseDefaultValue \
-  --region us-east-1
-```
-
-Publish the MX and SPF TXT records:
-
-```bash
-cat > /tmp/mailfrom-change.json <<'EOF'
-{
-  "Changes": [
-    {
-      "Action": "CREATE",
-      "ResourceRecordSet": {
-        "Name": "mail.example.com",
-        "Type": "MX",
-        "TTL": 600,
-        "ResourceRecords": [{ "Value": "10 feedback-smtp.us-east-1.amazonses.com" }]
-      }
-    },
-    {
-      "Action": "CREATE",
-      "ResourceRecordSet": {
-        "Name": "mail.example.com",
-        "Type": "TXT",
-        "TTL": 600,
-        "ResourceRecords": [{ "Value": "\"v=spf1 include:amazonses.com ~all\"" }]
-      }
-    }
-  ]
-}
-EOF
-
-aws route53 change-resource-record-sets \
-  --hosted-zone-id $HOSTED_ZONE_ID \
-  --change-batch file:///tmp/mailfrom-change.json
-```
-
-The MX record Region endpoint varies: `feedback-smtp.us-east-1.
-amazonses.com` for us-east-1; check the SES docs for other
-Regions.
+→ Moved to [references/deployment-cli-commands.md](references/deployment-cli-commands.md#step-3-configure-the-mail-from-domain-spf-alignment) — put-email-identity-mail-from-domain + Route 53 MX / SPF TXT change batch.
+Load that reference on demand before executing this section.
 
 ### Step 4: Publish the DMARC record
 
-DMARC is published by the domain owner as a TXT record at
-`_dmarc.example.com`. SES does not manage DMARC; the operator
-publishes it.
-
-```bash
-cat > /tmp/dmarc-change.json <<'EOF'
-{
-  "Changes": [
-    {
-      "Action": "CREATE",
-      "ResourceRecordSet": {
-        "Name": "_dmarc.example.com",
-        "Type": "TXT",
-        "TTL": 600,
-        "ResourceRecords": [{ "Value": "\"v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com; pct=100; adkim=s; aspf=s\"" }]
-      }
-    }
-  ]
-}
-EOF
-
-aws route53 change-resource-record-sets \
-  --hosted-zone-id $HOSTED_ZONE_ID \
-  --change-batch file:///tmp/dmarc-change.json
-```
-
-Start with `p=quarantine`; escalate to `p=reject` once alignment
-is verified. `adkim=s` / `aspf=s` enforce strict alignment.
+→ Moved to [references/deployment-cli-commands.md](references/deployment-cli-commands.md#step-4-publish-the-dmarc-record) — _dmarc TXT change batch and p=quarantine to p=reject escalation.
+Load that reference on demand before executing this section.
 
 ### Step 5: Create the configuration set with event publishing
 
-The configuration set is the unit of event publishing. Create it
-with the event destinations (CloudWatch, SNS, Firehose,
-EventBridge).
-
-```bash
-aws sesv2 create-configuration-set \
-  --configuration-set-name transactional-cs \
-  --tracking-options '{"CustomRedirectDomain": "click.example.com"}' \
-  --region us-east-1
-
-# Attach CloudWatch event destination
-cat > /tmp/cw-destination.json <<'EOF'
-{
-  "ConfigurationSetName": "transactional-cs",
-  "EventDestinationName": "cloudwatch-events",
-  "EventDestination": {
-    "Enabled": true,
-    "MatchingEventTypes": ["SEND", "DELIVERY", "BOUNCE", "COMPLAINT", "OPEN", "CLICK"],
-    "CloudWatchDestination": {
-      "DimensionConfigurations": [
-        {
-          "DimensionName": "Campaign",
-          "DimensionValueSource": "EMAIL_HEADER",
-          "DefaultDimensionValue": "transactional"
-        }
-      ]
-    }
-  }
-}
-EOF
-
-aws sesv2 create-configuration-set-event-destination \
-  --cli-input-json file:///tmp/cw-destination.json \
-  --region us-east-1
-
-# Attach SNS destination for bounce / complaint
-cat > /tmp/sns-destination.json <<'EOF'
-{
-  "ConfigurationSetName": "transactional-cs",
-  "EventDestinationName": "sns-feedback",
-  "EventDestination": {
-    "Enabled": true,
-    "MatchingEventTypes": ["BOUNCE", "COMPLAINT"],
-    "SnsDestination": {
-      "TopicArn": "arn:aws:sns:us-east-1:111122223333:ses-feedback"
-    }
-  }
-}
-EOF
-
-aws sesv2 create-configuration-set-event-destination \
-  --cli-input-json file:///tmp/sns-destination.json \
-  --region us-east-1
-```
-
-`MatchingEventTypes` controls which events publish: `SEND`,
-`DELIVERY`, `BOUNCE`, `COMPLAINT`, `OPEN`, `CLICK`,
-`REJECT`, `RENDERING_FAILURE`, `DELIVERYDELAY`, `SUBSCRIPTION`.
-For bounce / complaint processing, always include `BOUNCE` and
-`COMPLAINT`.
+→ Moved to [references/deployment-cli-commands.md](references/deployment-cli-commands.md#step-5-create-the-configuration-set-with-event-publishing) — create-configuration-set + CloudWatch and SNS event destinations, MatchingEventTypes.
+Load that reference on demand before executing this section.
 
 ### Step 6: Create the dedicated IP pool with warmup
 
@@ -506,69 +377,13 @@ sending pipeline.
 
 ## Edge-case handling
 
-- **Domain identity stuck in Pending:** DKIM CNAME records not
-  published or not propagated. Verify with `dig CNAME
-  abc123._domainkey.example.com`. Third-party DNS may take longer.
-- **DKIM verification fails after CNAME published:** the CNAME
-  record name may have `_domainkey` doubled. SES auto-appends the
-  domain; do not double it.
-- **SPF alignment fails:** the MAIL FROM TXT is missing
-  `include:amazonses.com` or `~all` is too strict (`-all` hard
-  fails on forwarded mail).
-- **DMARC reports show misalignment:** the MAIL FROM domain does
-  not match the `From:` header domain. Use the same org domain,
-  or set `adkim=r; aspf=r` (relaxed).
-- **Bounce notifications not arriving in SNS:** the configuration
-  set is not associated with the send (`--configuration-set-name`
-  omitted), or the SNS destination is disabled.
-- **Dedicated IP throttled:** warmup was skipped or disabled.
-  Re-enable automatic warmup and reduce send volume.
-- **Template variables not rendering:** `TemplateData` is a JSON
-  string, not a JSON object. `{{varName}}` keys must match exactly.
-- **Sandbox limit (ThrottlingException):** account is still in
-  sandbox. Request production access via the SES console.
-- **VPC endpoint private DNS not resolving:** the VPC
-  `enableDnsHostnames` and `enableDnsSupport` must both be `true`.
-- **Mail Manager ingress not receiving:** the MX record for the
-  ingress domain must point at the Mail Manager ingress endpoint,
-  NOT the standard SES feedback endpoint.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md#edge-case-handling) — 10-item edge-case catalog (Pending identity, DKIM doubling, SPF/DMARC misalignment, throttling, VPC DNS).
+Load that reference on demand before executing this section.
 
 ## Recent AWS features (2024-2026)
 
-- **SES Mail Manager (2024-2025):** a separate SES feature for
-  inbound email analysis and egress rule management. Distinct from
-  the standard SES sending pipeline. Use `sesv2
-  create-email-traffic-policy` and `create-ingress-point`.
-
-- **SES VPC endpoint for sesv2 (2024-2025):** interface VPC
-  endpoints support the sesv2 API with private DNS. Enables
-  private SES API access from VPCs without internet egress.
-
-- **Virtual Deliverability Manager (2024-2025):** VDM options on
-  the configuration set (`VdmOptions`) provide engagement tracking
-  and optimized delivery recommendations per-configuration-set.
-
-- **Dedicated IP automatic warmup enhancements (2024-2025):**
-  per-IP stage visibility via `get-dedicated-ip` (`WarmupStatus`,
-  `WarmupPercentage`). The ramp schedule is tunable.
-
-- **Suppression list account-level management (2024-2025):**
-  `put-suppression-attributes` toggles `BOUNCE` / `COMPLAINT`
-  suppression at the account level. Per-address management via
-  `put-suppressed-destination` / `delete-suppressed-destination`.
-
-- **SES template Handlebars enhancements (2024-2025):** template
-  variables support `{{#if}}`, `{{#each}}`, and helpers. Template
-  size limit raised to 500 KB (HTML + text).
-
-- **EventBridge integration for SES events (2024-2025):** SES
-  event publishing natively supports EventBridge as a destination
-  (`EventBridgeDestination`), alongside CloudWatch, SNS, Firehose.
-
-- **SES v2 API as canonical surface (2024-2025):** the v1 SES API
-  (`ses`) is in maintenance mode. All new features ship on
-  `sesv2`. Migrate from v1 to v2 for configuration sets,
-  templates, and suppression list management.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md#recent-aws-features-2024-2026) — Mail Manager, sesv2 VPC endpoints, VDM, warmup enhancements, EventBridge destination, v2-as-canonical.
+Load that reference on demand before executing this section.
 
 ## NEVER (top 5 — full list in references)
 
@@ -589,46 +404,13 @@ sending pipeline.
 
 ## Expert heuristic — designing SES infrastructure
 
-- **One configuration set per workload type.** Transactional,
-  marketing, and onboarding emails have different deliverability
-  profiles. Separate sets isolate sender reputation and event
-  routing.
-- **Dedicated IPs for high volume ( > 100K/day); shared pool for
-  low volume.** Dedicated IPs give predictable reputation but
-  require warmup. Shared pool is fine for low-volume transactional.
-- **Always set a custom MAIL FROM domain.** The default
-  `amazonses.com` envelope sender breaks SPF alignment with your
-  `From:` header. Custom MAIL FROM enables alignment and improves
-  deliverability.
-- **DMARC monitoring first, enforcement later.** Publish
-  `p=none` with `rua=mailto:...` for 2-4 weeks. Review reports.
-  Escalate to `p=quarantine` then `p=reject`.
-- **Suppression list on BOUNCE and COMPLAINT.** Suppressing on
-  both protects sender reputation. Manual suppression for spam
-  traps.
-- **Warmup is non-negotiable for dedicated IPs.** Even if you
-  migrate an existing workload, the IP is new and needs warmup.
-- **SES v2 API is the canonical surface.** All new features ship
-  on v2. Migrate from v1 for any new provisioning.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic--designing-ses-infrastructure) — seven design heuristics (per-workload config sets, dedicated-IP thresholds, MAIL FROM, DMARC staging).
+Load that reference on demand before executing this section.
 
 ## Pre-flight safety checks (run before any SES CLI)
 
-- **Confirm the account is out of sandbox:** `aws sesv2
-  get-account` (`EnforcementStatus` = `PRODUCTION`).
-- **Confirm domain ownership / DNS access:** `aws route53
-  list-hosted-zones`. DKIM, MAIL FROM, DMARC must be publishable.
-- **Confirm the dedicated IP quota:** `aws service-quotas
-  get-service-quota --service-code ses --quota-code L-1BCE5A11`.
-- **Confirm the SNS topic exists for bounce / complaint:** `aws
-  sns list-topics`. Create one if missing (sns-topic-deployer).
-- **Confirm IAM permissions:** caller needs
-  `sesv2:CreateEmailIdentity`,
-  `sesv2:CreateConfigurationSet`,
-  `sesv2:CreateDedicatedIpPool`,
-  `sesv2:CreateEmailTemplate`,
-  `route53:ChangeResourceRecordSets`.
-- **Confirm VPC settings (if VPC endpoint desired):**
-  `enableDnsHostnames` and `enableDnsSupport` must both be `true`.
+→ Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#pre-flight-safety-checks-run-before-any-ses-cli) — sandbox / DNS / quota / SNS / IAM / VPC DNS pre-flight gate.
+Load that reference on demand before executing this section.
 
 ## Output format — MANDATORY literal labels
 
@@ -678,6 +460,14 @@ is missing (domain identity not verified, DKIM records not
 published, account in sandbox, SPF / DMARC records missing), the
 verdict is `PREREQUISITES_MISSING` with each gap listed and a
 `REMEDIATION:` line per gap.
+
+
+## References (load on demand)
+
+- [references/deployment-cli-commands.md](references/deployment-cli-commands.md) — full copy-pasteable CLI sequence for all 10 provisioning steps (incl. Step 3 MAIL FROM, Step 4 DMARC, Step 5 configuration set + event destinations), Terraform equivalents, per-Region MX endpoints.
+- [references/dns-and-deliverability-guide.md](references/dns-and-deliverability-guide.md) — DKIM CNAME layout, MAIL FROM MX + SPF per Region, DMARC policy stages, dedicated IP warmup schedule, full NEVER list, extended edge cases.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — edge-case catalog, expert heuristic for designing SES infrastructure, recent AWS features (2024-2026).
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight safety checks to run before any SES CLI.
 
 ## Domain
 

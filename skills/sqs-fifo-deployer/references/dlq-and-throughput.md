@@ -254,3 +254,46 @@ resource "aws_sqs_queue_policy" "main" {
   policy    = data.aws_iam_policy_document.queue_policy.json
 }
 ```
+
+## Expert heuristic: high-throughput FIFO quota caveats
+
+High-throughput FIFO mode removes the per-queue throughput limit but
+introduces new constraints that are often missed.
+
+```text
+High-throughput FIFO requirements:
+  DeduplicationScope = messageGroup
+  ThroughputLimit    = messagesPerGroupId
+
+  Both must be set together. Setting only one → API error.
+
+Throughput:
+  Up to 300 TPS per API action per message group
+  With 10 active groups: up to 3,000 TPS (vs 300 TPS for standard FIFO)
+  With 100 active groups: up to 30,000 TPS
+
+Caveats:
+  1. Dedup scope change: dedup is now per-group. The same dedup ID
+     in two different groups will NOT be deduplicated. If your dedup
+     logic assumed queue-level scope, this changes behavior.
+
+  2. Account-level quota: high-throughput FIFO queues count against
+     a separate quota. The default is 100 high-throughput FIFO queues
+     per account (soft limit). Request a quota increase if needed.
+
+  3. Cost: high-throughput FIFO has a different pricing tier than
+     standard FIFO. API requests are billed at a higher rate. Monitor
+     costs when switching from standard to high-throughput.
+
+  4. No rollback: once a queue is configured for high-throughput, the
+     DeduplicationScope and ThroughputLimit CAN be changed back, but
+     in-flight messages may be affected during the transition.
+
+  5. Message group behavior: with high-throughput mode, the number of
+     active message groups directly determines throughput. Too few
+     groups = low throughput. Too many groups = more overhead.
+```
+
+**Key implication:** high-throughput FIFO is NOT a free throughput
+upgrade. It changes deduplication semantics, billing, and quota
+allocation. Evaluate all three before enabling.
