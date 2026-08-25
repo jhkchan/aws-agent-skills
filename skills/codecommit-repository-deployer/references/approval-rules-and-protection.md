@@ -192,3 +192,25 @@ resource "aws_iam_policy" "deny_push_main" {
   })
 }
 ```
+
+---
+
+## Expert heuristic — approval rule template scope
+
+Approval rule templates enforce that specific principals (or a number of
+approvals) must approve a pull request BEFORE merge. Templates are
+SEPARATE from repositories and must be explicitly ASSOCIATED.
+
+```text
+Approval rule template lifecycle:
+  1. Create template (define approvals needed + approver pool)
+  2. Associate template to repository (separate API call)
+     → After association, rule is applied to ALL pull requests
+  3. Pull request creation → merge BLOCKED until approvals met
+  4. Override → principal with OverridePullRequestApprovalRules can bypass
+```
+
+**Branch protection is separate from approval rules.** Approval rules
+govern PR merges. Branch protection (IAM policy denying
+`codecommit:GitPush` to specific branches) governs direct pushes. For
+full protection, you need BOTH.

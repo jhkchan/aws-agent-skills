@@ -131,145 +131,8 @@ REMEDIATION: Re-fetch with `aws logs describe-log-groups --log-group-name-prefix
 
 ### Step 0: Expert knowledge — non-obvious CloudWatch Logs behaviors
 
-These behaviors change a verdict if ignored. Each is load-bearing:
-
-- **`retentionInDays` absence is the default for new log groups.**
-  Unlike S3 lifecycle rules or CloudTrail retention, CloudWatch Logs
-  does NOT apply a default retention. New groups remain Never-expire
-  until you explicitly call `PutRetentionPolicy`. Operators assume a
-  "default sane retention" exists — it does not.
-
-- **Retention changes apply only to NEW events.** Setting retention
-  from Never to 30 days does NOT immediately delete existing logs.
-  Existing events expire on the schedule they were originally written
-  under; only events received AFTER the `PutRetentionPolicy` call are
-  bound by the new retention. For incident response, shortening
-  retention does not cleanse historical data — you must delete log
-  streams or the log group itself.
-
-- **SSE-KMS CMK is a paid feature with hidden cost.** Associating a
-  CMK via `AssociateKmsKey` causes every `PutLogEvents` batch to
-  trigger a `kms:GenerateDataKey` call. At $0.03 per 10,000 KMS
-  requests, a high-volume group emitting 1,000 batches/sec accrues
-  ~$8,000/month in KMS charges alone — frequently more than the
-  CloudWatch Logs ingestion charge itself.
-
-- **The default service-managed SSE is NOT `aws/logs` AWS-managed.**
-  Unlike S3 (`aws/s3`) or EBS (`aws/ebs`), CloudWatch Logs does not
-  expose an AWS-managed CMK in the customer account. The default is
-  a CloudWatch-internal service key that never appears in
-  `aws kms list-keys`. Therefore "no `kmsKeyId`" cannot be remediated
-  by "switch to AWS-managed key" — the only CMK path is customer-
-  managed.
-
-- **Subscription filter quota is 2, not unlimited.** A common
-  misconfiguration chains Logs → Lambda → Logs (cross-region) →
-  Firehose → S3, where each hop consumes a slot. The third filter on
-  the same source fails at `PutSubscriptionFilter` time, but producers
-  continue writing logs unaware the fan-out is silently incomplete.
-
-- **Metric filters do not backfill.** A filter processes only events
-  received AFTER creation. Adding an "ERROR" counter today produces
-  no historical baseline. Always pair with a CloudWatch Logs Anomaly
-  Detector if retroactive signal is needed.
-
-- **Metric filter pattern syntax is CloudSearch-style, not regex.**
-  Complex patterns cost more per-GB to evaluate. The cheapest pattern
-  is a literal token (`"ERROR"`); multi-field `[..., ...]` patterns
-  with anchoring/alternation are most expensive. For high-volume
-  groups, prefer two cheap filters over one complex filter.
-
-- **Anomaly Detectors require a 2-week baseline.** A newly-created
-  detector returns `Status: TRAINING` for ~14 days, during which it
-  produces no findings. A less-than-2-week-old group has no meaningful
-  anomaly detection even with a detector configured. Treat as
-  CONFIG_GAP, not OK.
-
-- **Cross-account subscription filters use a destination, not the
-  filter itself.** The recipient account creates a
-  `aws logs put-destination` + destination policy; the sender's filter
-  targets the destination ARN. The destination policy IS the security
-  boundary — a permissive policy allows any sender account to write
-  to the recipient's Kinesis/Lambda. Always audit destination
-  policies alongside subscription filters.
-
-- **`describe-log-groups --log-group-name-prefix` is a PREFIX match,
-  not a wildcard.** `/aws/lambda` matches `/aws/lambdaFoo` and
-  `/aws/lambda-prod`. For exact-match, omit `--log-group-name-prefix`
-  and pass `--log-group-name` (CLI v2 only).
-
-- **`storedBytes` is monotonic.** Never decreases — not on retention
-  expiry, not on `DeleteLogStream`. The only reset is `DeleteLogGroup`.
-
-- **Insights queries bill per-GB-scanned, not per-query.** A
-  `fields @timestamp, @message | filter level == "ERROR"` query on a
-  100 GB group costs the same as a `stats count(*)` query — both scan
-  the full time-range selection. Long retention + high volume =
-  compounding query cost.
-
-- **PutLogEvents batch limits: 1 MB and 10,000 events per batch.**
-  Producers exceeding these limits receive
-  `DataAlreadyAcceptedException` or throttling. Not a verdict driver,
-  but high `storedBytes` growth with these errors suggests the
-  producer needs better batching or stream sharding.
-
-- **Log group KMS key region must match the log group region.**
-  Multi-Region KMS keys are supported, but the in-region replica ARN
-  must be referenced — the primary ARN from another region is
-  rejected at `AssociateKmsKey` time.
-
-- **Log group names cannot be renamed.** "Renaming" requires creating
-  a new group, re-pointing the producer, and accepting that historical
-  logs remain under the old name. A Never-expire group with a misnamed
-  producer is doubly expensive — you cannot migrate cheaply.
-
-- **Log group ARN suffix `:*` is required for resource-level IAM
-  permissions.** `arn:aws:logs:<region>:<account>:log-group:<name>:*`
-  matches stream-scoped actions (PutLogEvents, GetLogEvents,
-  DeleteLogStream). Without `:*`, identity-based policies targeting
-  the ARN will NOT match — the most common IAM policy error for
-  CloudWatch Logs.
-
-- **`AssociateKmsKey` is NOT retroactive.** When you associate a CMK
-  on an existing log group, only events received AFTER the association
-  are encrypted with the CMK. Existing events remain under the prior
-  service-managed key — there is no re-encryption API. For
-  compliance-mandated CMK coverage, you must rotate the underlying
-  data (delete log streams after verifying CMK coverage is in place
-  for new events) or migrate to a new CMK-associated group.
-
-- **CloudFormation `AWS::Logs::LogGroup` without `RetentionInDays`
-  creates a Never-expire group silently.** Unlike console-created
-  groups (which at least surface the retention field), IaC templates
-  that omit the property produce no warning — the stack succeeds and
-  the group begins accumulating immediately. This is the dominant
-  source of Never-expire groups in IaC-managed accounts. Always
-  require `RetentionInDays` as a stack-level parameter or use a
-  CloudFormation hook (rule `cloudwatch-logs-retention-set`) to fail
-  the stack on omission.
-
-- **`PutRetentionPolicy` is throttled at 5 requests/sec/account.**
-  Bulk remediation across thousands of groups needs exponential
-  backoff or the CLI returns `ThrottlingException`. The same cap
-  applies to `AssociateKmsKey`, `PutMetricFilter`, and
-  `PutSubscriptionFilter` — all control-plane mutations share the
-  CloudWatch Logs account-level rate limit.
-
-- **Lambda subscription filters without `DeadLetterConfig` silently
-  drop failed invocations.** A Lambda fan-out that errors (exception,
-  timeout, payload-too-large) is retried twice then dropped — without
-  a DLQ, the drop has no metric and no alarm. For audit trails that
-  must not lose events, always pair the subscription filter with a
-  DeadLetterConfig (an SQS ARN); treat its absence as an additive
-  finding when the subscription filter is on a security-relevant
-  group.
-
-- **CloudWatch Logs Anomaly Detectors bill per-detector-hour
-  (~$0.15/detector/day, ~$4.50/detector/month at ONE_MIN frequency).**
-  Adding a detector to every group in a 1,000-group account accrues
-  ~$4,500/month in detector charges alone — sometimes more than the
-  logs themselves. Reserve anomaly detectors for groups with
-  operational or security signal, not for low-volume debug groups.
+Step 0 expert-knowledge deep dive (no default retention, new-events-only retention changes, CMK KMS-request cost, no AWS-managed key path, 2-filter subscription quota, metric-filter no-backfill, anomaly 14-day baseline, cross-account destinations, prefix-vs-exact matching, storedBytes monotonicity, Insights per-GB billing, PutLogEvents batch limits, KMS region match, no rename, ARN :* suffix, non-retroactive AssociateKmsKey, IaC silent Never-expire, 5 TPS control-plane throttle, DLQ-less fan-out, per-detector cost) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it before classifying edge-case inputs or pricing a CMK recommendation.
 
 ### Step 1: Never-expire retention (highest priority — silent infinite cost)
 
@@ -401,54 +264,13 @@ REMEDIATION:
 
 ### Worked example — malformed input (ERROR path)
 
-When `describe-log-groups` output is truncated or missing required
-fields, the audit cannot proceed deterministically. Emit ERROR and stop —
-do NOT fabricate a verdict from partial data.
-
-```text
-LOG_GROUP: /aws/lambda/checkout-api
-VERDICT: ERROR
-REASON: Log group metadata is malformed — required field 'retentionInDays'
-missing AND 'storedBytes' missing. Cannot classify retention (Step 1) or
-cost-risk (Step 3) without one of these.
-REMEDIATION: Re-fetch with `aws logs describe-log-groups --log-group-name
-/aws/lambda/checkout-api --output json` and re-audit. If the field
-genuinely is absent in fresh output, that absence IS the signal — apply
-Step 1 (NO_RETENTION) once the data is confirmed.
-```
+Worked example — malformed input (ERROR path) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load it when describe-log-groups output is truncated or required fields are missing.
 
 ## Edge-case handling
 
-- **`retentionInDays: 0` literal.** The API never returns 0; absence is
-  the Never-expire signal. If a snapshot shows `retentionInDays: 0`, the
-  snapshot is hand-edited or stale — treat as NO_RETENTION and note.
-
-- **AWS service-created log groups** (`/aws/lambda/<function>`,
-  `/ecs/<cluster>/<task>`, `AWSChatBot/<account>`). AWS services
-  auto-create these on first PutLogEvents with NO retention. They
-  silently accumulate until audited. Apply the same Step 1 logic —
-  origin does not exempt them.
-
-- **OpenSearch subscription filter (formerly Elasticsearch).** The
-  subscription-to-OpenSearch integration can bypass the 2-per-group
-  quota rule in some legacy configurations — flag any group with > 2
-  subscription filters as an anomaly.
-
-- **`kmsKeyId` referencing a deleted key.** If the CMK is in
-  `PendingDeletion` state, PutLogEvents fails immediately. Treat as
-  NO_ENCRYPTION (effectively unusable) and note the deleted-key state.
-
-- **Metric filter with pattern `""` (empty).** Matches every event —
-  effectively a no-op that inflates metric count. Flag as a CONFIG_GAP
-  sub-finding (filter exists but is non-functional).
-
-- **Subscription filter on a Never-retention group.** Double cost driver
-  (storage + Lambda invocation). First-fail-wins verdict is still
-  NO_RETENTION; surface the Lambda fan-out as an additive HIGH finding.
-
-- **Anomaly Detector in `TRAINING` status.** Treat the group as not-yet-
-  observable for anomaly purposes — verdict CONFIG_GAP with REMEDIATION
-  noting "wait 14 days for baseline".
+Edge-case catalog (`retentionInDays: 0` literal, AWS service-created groups, OpenSearch filter quota bypass, kmsKeyId referencing a deleted key, empty metric-filter pattern, subscription filter on a Never-expire group, TRAINING anomaly detector) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when the audit input does not match the mainline Step 1-5 paths.
 
 ## Anti-Patterns — NEVER
 
@@ -521,40 +343,8 @@ Step 1 (NO_RETENTION) once the data is confirmed.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`PutRetentionPolicy`, `AssociateKmsKey`, `DeleteLogGroup`,
-  `PutMetricFilter`, `PutSubscriptionFilter`, `DeleteMetricFilter`,
-  `DeleteSubscriptionFilter`, `PutAnomalyDetector`), the auditor MUST
-  emit:
-  `CONFIRM: About to <action> on log group <name> in account
-  <account>. This affects <consequence>. Proceed? (yes/no)`.
-  Do NOT execute the CLI command until the operator confirms.
-- **Back up filters before modification.** Capture
-  `aws logs describe-metric-filters --log-group-name <name> --output json`
-  and `aws logs describe-subscription-filters --log-group-name <name>
-  --output json` BEFORE any change — filters are not versioned.
-- **Verify retention value is in the allowed list** (1, 3, 5, 7, 14,
-  30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 2192, 2557,
-  2922, 3288, 3653). `PutRetentionPolicy` with any other value returns
-  `InvalidParameterException` without changing state.
-- **Verify CMK region and policy before `AssociateKmsKey`.** Region
-  must match; key policy must permit `logs.<region>.amazonaws.com` to
-  call `kms:GenerateDataKey` + `kms:Decrypt`. Without this, PutLogEvents
-  and GetLogEvents fail immediately.
-- **Confirm KMS-request cost tolerance** before CMK association.
-  Estimate PutLogEvents batches/sec and project monthly KMS cost at
-  $0.03 per 10,000 GenerateDataKey calls.
-- **For `DeleteLogGroup`:** incident-response-only. Irreversible;
-  deletes all streams and stored events; breaks producers until they
-  recreate the group. Verify by checking CloudTrail for recent
-  `PutLogEvents` before deletion.
-- **For cross-account subscription filter changes:** audit the
-  destination policy in the recipient account BEFORE modifying the
-  sender's filter. Fixing the sender side does not close the boundary.
-- **Prefer additive over destructive changes.** Add filters / detectors
-  / alarms (do not break existing access). Removing a subscription
-  filter or shortening retention can break downstream consumers —
-  capture backup and coordinate with owners first.
+Pre-flight safety checks (CONFIRMATION GATE, filter backup, allowed retention values, CMK region/policy verification, KMS cost tolerance, DeleteLogGroup guard, destination-policy audit, additive-first) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load it before emitting any remediation CLI.
 
 ## Remediation guidance
 
@@ -668,10 +458,14 @@ Step 1 (NO_RETENTION) once the data is confirmed.
 
 ## Recent AWS features (2024-2026)
 
-- **CloudWatch Logs Infrequent Access log class (2024):** Logs now supports an `STANDARD` vs `INFREQUENT_ACCESS` log class. Auditors should verify that high-volume, low-query log groups (e.g., VPC Flow Logs, audit trails) are assigned to the Infrequent Access class for cost optimization, and that the log class is intentional — not silently defaulted.
-- **Account-level data protection policies (2024):** CloudWatch Logs now supports account-level data protection policies that mask sensitive data (PII, credentials) in log events. Auditors should verify that data protection policies are enabled, especially for log groups ingesting application logs that may contain PII.
-- **CloudWatch Logs data lifecycle (2025):** Integrated lifecycle management that can transition logs to S3, Glacier, or delete based on policies. Auditors should check whether the lifecycle policy aligns with compliance retention requirements.
-- **Subscription filter improvements (2024):** Enhanced subscription filter support with Kinesis Data Firehose destination and cross-account delivery. Auditors should verify that subscription filter fan-out does not create silent data-loss vectors when destinations are misconfigured.
+Recent AWS features 2024-2026 (Infrequent Access log class, account-level data protection policies, data lifecycle to S3/Glacier, subscription filter improvements) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when auditing log class, data protection, or lifecycle posture.
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 expert-knowledge deep dive, edge-case catalog, and 2024-2026 AWS features moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight safety checks (confirmation gate, filter backups, KMS cost tolerance) moved from SKILL.md
+- [references/worked-examples.md](references/worked-examples.md) — malformed-input ERROR worked example moved from SKILL.md; the primary Never-expire example stays in SKILL.md
 
 ## Domain
 

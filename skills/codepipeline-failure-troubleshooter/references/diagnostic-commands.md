@@ -237,3 +237,76 @@ aws codestar-connections create-connection \
 
 After the migration, credential rotation is handled by the CodeStar
 connection, eliminating the PAT-expiry failure mode.
+
+---
+
+## Source-stage diagnostic commands (SOURCE_STAGE_FAILED)
+
+**Diagnostic commands:**
+
+```bash
+# Identify the most recent failed execution:
+aws codepipeline list-pipeline-executions --pipeline-name <name> \
+  --query 'pipelineExecutionSummaries[?status==`Failed`].{id:pipelineExecutionId,start:startTime,summary:summary}' \
+  --output table
+
+# List the failed actions in that execution:
+aws codepipeline list-action-executions --pipeline-name <name> \
+  --filter '{pipelineExecutionId: "<id>"}' \
+  --query 'actionExecutionDetails[?status==`Failed`].{stage:stageName,action:actionName,status:status,reason:lastStatusChangeReason,external:externalExecutionSummary}' \
+  --output table
+
+# Read the pipeline definition's Source action configuration:
+aws codepipeline get-pipeline --name <name> \
+  --query 'pipeline.stages[?name==`Source`].actions[0].{type:actionTypeId,config:configuration,role:roleArn}' \
+  --output json
+```
+
+## Build-stage diagnostic walk (BUILD_STAGE_FAILED)
+
+**Diagnostic walk:**
+
+1. **Read the CodeBuild build ID** from
+   `list-action-executions` `externalExecutionId`.
+2. **Run `batch-get-builds`:**
+
+   ```bash
+   aws codebuild batch-get-builds --ids <build-id> \
+     --query 'builds[0].{status:buildStatus,phases:phases[*].{type:phaseType,status:phaseStatus,duration:durationInSeconds,reason:phaseFailureReason},env:environment,artifacts:artifacts,logs:logs}'
+   ```
+3. **Read the failing phase's logs:**
+
+   ```bash
+   aws logs get-log-events \
+     --log-group-name /aws/codebuild/<project-name> \
+     --log-stream-name <stream> \
+     --start-from-head
+   ```
+
+## Cross-account diagnostic walk (CROSS_ACCOUNT_ROLE_FAILED)
+
+**Diagnostic walk:**
+
+1. **Identify the cross-account role** from `get-pipeline` action
+   `roleArn` for the Deploy action.
+2. **Read the trust policy:**
+
+   ```bash
+   aws iam get-role --role-name <role-name> \
+     --query 'Role.AssumeRolePolicyDocument' --output json | jq
+   ```
+3. **Verify the pipeline service role ARN appears in
+   `Statement.Principal.AWS`:**
+   ```bash
+   aws codepipeline get-pipeline --name <name> \
+     --query 'metadata.pipelineExecutionRole' --output text
+   ```
+4. **For KMS-denied, read the KMS key policy** covering the artifact
+   bucket:
+
+   ```bash
+   aws s3api get-bucket-location --bucket <artifact-bucket>
+   aws kms describe-key --key-id alias/aws/s3 \
+     --query 'KeyMetadata.Arn'
+   aws kms get-key-policy --key-id <key-id> --policy-name default
+   ```

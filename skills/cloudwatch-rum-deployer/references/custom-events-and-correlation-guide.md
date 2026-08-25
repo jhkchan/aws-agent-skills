@@ -340,3 +340,85 @@ The SDK records a page view on initial load only. SPA route
 changes do NOT trigger a page view unless you call
 `awsRum.recordPageView(path)` explicitly in the router hook.
 See the deployment CLI reference for per-framework patterns.
+
+## Step 5 — X-Ray trace correlation (header propagation + sampling) (moved from SKILL.md)
+
+When `enableXRay: true` (or `EnableXRay: true` on the app monitor),
+the RUM SDK generates a client-side X-Ray trace ID at session
+start, attaches it to every `PutRumEvents` batch, and emits a
+client-side segment via `PutTraceSegments`.
+
+For server-side correlation, the **server must propagate the same
+trace ID** by reading the `X-Amzn-Trace-Id` request header:
+
+```http
+X-Amzn-Trace-Id: Root=1-<8hex>-<24hex>;Parent=<16hex>;Sampled=1
+```
+
+The server's X-Ray SDK reads the header and joins the trace. The
+result: the X-Ray service map shows the client-side segment
+(browser) connecting to the server segment (app), and the RUM
+dashboard shows the linked server-side traces.
+
+Without server-side header propagation, RUM still captures
+client-side traces but they do NOT link to the server — the
+X-Ray trace stops at the browser.
+
+**Sampling rule on the server** — the server-side X-Ray sampling
+rule must sample the trace ID. A 0% sampling rule on the server
+blanks the correlation. Use the default 5% rule, or a higher rate
+for low-traffic endpoints.
+
+## Step 6 — Record custom events (CDN + npm patterns) (moved from SKILL.md)
+
+Custom events extend RUM beyond auto-captured errors, performance,
+and HTTP. Use them for funnel tracking, feature adoption, business
+events:
+
+```typescript
+// CDN pattern
+cwr('recordEvent', {
+  type: 'checkout_complete',
+  data: {
+    cartValue: 142.50,
+    itemCount: 3,
+    paymentMethod: 'card'
+  }
+});
+
+// npm pattern
+awsRum?.recordEvent({
+  type: 'checkout_complete',
+  data: { cartValue: 142.50, itemCount: 3, paymentMethod: 'card' }
+});
+```
+
+Event `type` is a free-form string but **must** be alphanumeric +
+underscore (RUM rejects special characters in event types). Event
+`data` is an arbitrary JSON object (max 64 KB after serialization).
+
+## Step 7 — RUM custom metrics (put-metrics-destination) (moved from SKILL.md)
+
+Custom events become CloudWatch custom metrics in the `AWS/RUM`
+namespace automatically when you define a metric on the app
+monitor:
+
+```bash
+aws rum put-metrics-destination \
+  --app-monitor-name checkout-web-prod \
+  --metric-definition-namespace AWS/RUM \
+  --metric-definition-name CartValueTotal \
+  --metric-definition-value-key '$.event.data.cartValue' \
+  --region us-east-1
+```
+
+The metric appears in CloudWatch as
+`AWS/RUM > ApplicationName=checkout-web-prod, RumEventName=checkout_complete`
+with the value extracted from `event.data.cartValue` for every
+event of type `checkout_complete`. Use this to build alarms and
+dashboards on RUM-derived business metrics.
+
+**Metric extraction limits:**
+- One value per event (the `valueKey` JSON path).
+- Up to 100 metric definitions per app monitor.
+- Dimensions are fixed: `ApplicationName` and `RumEventName`.

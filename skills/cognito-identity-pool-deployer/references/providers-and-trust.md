@@ -226,3 +226,106 @@ no user can get credentials. Verify the pool ID matches exactly.
 
 SAML provider metadata can become stale if the IdP rotates keys.
 Re-import the metadata XML when the IdP changes its certificates.
+
+## Step 2 - create identity pool with Cognito User Pool provider (moved from SKILL.md)
+
+**Create an identity pool with a Cognito User Pool provider:**
+
+```bash
+aws cognito-identity create-identity-pool \
+  --identity-pool-name "app-identity-pool" \
+  --allow-unauthenticated-identities \
+  --cognito-identity-providers \
+    ProviderName=cognito-idp.us-east-1.amazonaws.com/us-east-1_AbCdEf123, \
+    ClientId=abc123def456, \
+    ServerSideTokenCheck=true
+```
+
+## Step 3 - authenticated role trust policy (moved from SKILL.md)
+
+**Authenticated role trust policy:**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "cognito-identity.amazonaws.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "cognito-identity.amazonaws.com:aud": "us-east-1:abcdef-1234"
+        },
+        "ForAnyValue:StringLike": {
+          "cognito-identity.amazonaws.com:amr": "authenticated"
+        }
+      }
+    }
+  ]
+}
+```
+
+## Step 3 - unauthenticated role trust policy (moved from SKILL.md)
+
+**Unauthenticated role trust policy:**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "cognito-identity.amazonaws.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "cognito-identity.amazonaws.com:aud": "us-east-1:abcdef-1234"
+        },
+        "ForAnyValue:StringLike": {
+          "cognito-identity.amazonaws.com:amr": "unauthenticated"
+        }
+      }
+    }
+  ]
+}
+```
+
+## Step 6 - SAML authenticated role trust policy (moved from SKILL.md)
+
+**SAML authenticated role trust policy:**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::123456789012:saml-provider/CorpIdP"
+      },
+      "Action": "sts:AssumeRoleWithSAML",
+      "Condition": {
+        "StringEquals": {
+          "SAML:aud": "https://signin.aws.amazon.com/saml"
+        }
+      }
+    }
+  ]
+}
+```
+
+## Step 6 - create IAM SAML provider (moved from SKILL.md)
+
+**Create IAM SAML provider:**
+
+```bash
+aws iam create-saml-provider \
+  --saml-provider-name "CorpIdP" \
+  --saml-metadata-document file://saml-metadata.xml
+```
+

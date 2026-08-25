@@ -271,3 +271,41 @@ month even though no one is consuming the data.
 **Fix:** set up a billing alarm on CloudWatch metric stream costs.
 Use `StopMetricStreams` to pause streams not in active use. Tag
 streams with `Temporary=true` and audit them regularly.
+
+## Step 3 — Namespace filter CLI (include / exclude) (moved from SKILL.md)
+
+**Include filter (recommended):**
+
+```bash
+aws cloudwatch put-metric-stream \
+  --name "ProductionMetricStream" \
+  --firehose-arn "arn:aws:firehose:us-east-1:123456789012:deliverystream/cw-metrics-to-s3" \
+  --role-arn "arn:aws:iam::123456789012:role/CWMetricStreamRole" \
+  --output-format "json" \
+  --include-filters '[{"Namespace":"AWS/EC2"},{"Namespace":"AWS/Lambda"},{"Namespace":"AWS/RDS"}]' \
+  --region us-east-1
+```
+
+**Exclude filter (stream everything except):**
+
+```bash
+aws cloudwatch put-metric-stream \
+  --name "ProductionMetricStream" \
+  --firehose-arn "arn:aws:firehose:us-east-1:123456789012:deliverystream/cw-metrics-to-s3" \
+  --role-arn "arn:aws:iam::123456789012:role/CWMetricStreamRole" \
+  --output-format "json" \
+  --exclude-filters '[{"Namespace":"AWS/Logs"}]' \
+  --region us-east-1
+```
+
+## Step 4 — Statistics selection CLI (moved from SKILL.md)
+
+```bash
+aws cloudwatch put-metric-stream \
+  --name "ProductionMetricStream" \
+  --firehose-arn "..." \
+  --role-arn "..." \
+  --output-format "json" \
+  --statistics "Average Sum SampleCount Min Max" \
+  --region us-east-1
+```

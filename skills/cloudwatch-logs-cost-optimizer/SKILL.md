@@ -83,31 +83,8 @@ commands or infrastructure-as-code snippets.
 
 ## Mindset
 
-CloudWatch Logs cost optimization is a volume-and-retention exercise,
-not a performance tuning problem. The goal is to ingest only the bytes
-that have operational or compliance value, retain them only as long as
-required, and move long-term archives to the cheapest compatible tier
-(S3 lifecycle-managed storage instead of CloudWatch Logs storage).
-
-Four principles guide every recommendation:
-
-- **Ingestion is the dominant cost term.** At $0.50/GB ingested, every
-  GB avoided is $0.50 saved permanently (plus the downstream storage
-  multiplier over the retention window). Filter at the source (agent
-  level, log level) rather than at the destination.
-- **Retention multiplies ingestion cost.** A GB ingested and retained
-  for 90 days costs $0.50 (ingest) + $0.09 (3 months × $0.03) = $0.59.
-  Retained for 3 years it costs $0.50 + $1.08 = $1.58 — over 3x the
-  ingestion cost. Tight retention is the second-highest lever.
-- **Cold storage belongs in S3, not CloudWatch Logs.** S3 Standard is
-  $0.023/GB-month vs CloudWatch Logs storage at $0.03/GB-month. With
-  S3 lifecycle policies (Glacier Instant Retrieval at $0.012/GB-month,
-  Deep Archive at $0.00099/GB-month), long-term log archival in S3 is
-  30-100x cheaper than CloudWatch Logs retention beyond 90 days.
-- **Query patterns are a hidden cost.** Logs Insights at $0.005/GB
-  scanned compounds rapidly: a daily dashboard query scanning 200 GB
-  costs $36.50/month. Metric filters — which compute the same values
-  at ingestion time for free — eliminate this entirely.
+Mindset framing and the four cost principles (ingestion dominant, retention multiplier, S3 cold storage, hidden query cost) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand to understand why retention is the #1 lever.
 
 ## Quick reference — verdict thresholds
 
@@ -126,90 +103,20 @@ Four principles guide every recommendation:
 
 ## Pre-flight: data gate (run before any optimization decision)
 
-Optimization decisions are only as good as the underlying data. Pull
-these metrics before any recommendation. Full CLI sequences are in
-`references/cloudwatch-logs-pricing-and-retention.md`.
-
-**Required data sources** (summarized — see reference for full CLI):
-1. Log group configuration + retention: `aws logs describe-log-groups`
-2. Ingestion volume (14-30 day window): `aws cloudwatch get-metric-statistics --namespace AWS/Logs --metric-name IncomingBytes`
-3. PutLogEvents request count: `aws cloudwatch get-metric-statistics --namespace AWS/Logs --metric-name IncomingLogEvents`
-4. Metric filters: `aws logs describe-metric-filters --log-group-name <name>`
-5. Subscription filters: `aws logs describe-subscription-filters --log-group-name <name>`
-6. Logs Insights query volume (CloudTrail): `aws cloudtrail lookup-events --lookup-attributes AttributeKey=EventName,AttributeValue=StartQuery`
-7. Cost Explorer breakdown: `aws ce get-cost-and-usage --service AmazonCloudWatch`
-
-### Data-quality short-circuits
-
-| Condition | Effect on optimization |
-|---|---|
-| `IncomingBytes` metric absent (log group never received data) | **NEED_MORE_INFO**. Verify agent/SDK wiring; skip until ingestion exists. |
-| `IncomingBytes` Sum = 0 over 14 days | Emit **OPTIMIZED** with note "dormant log group." |
-| Observation window < 14 days | **NEED_MORE_INFO**. Minimum 14 days; 30 days preferred. |
-| `StoredBytes` absent or stale | Fall back to `IncomingBytes × retention_days` estimate; mark retention finding MEDIUM confidence. |
-| Cost Explorer `AmazonCloudWatch` usage type breakdown absent | Proceed with metric-based estimate; mark dollar figure MEDIUM confidence. |
-| CloudTrail `StartQuery` events absent for Logs Insights analysis | Cannot assess query cost; skip Step 2, surface as data gap. |
-
-When CloudWatch metrics and Cost Explorer disagree, Cost Explorer is the
-ground truth for actual charges — metrics inform the optimization lever,
-Cost Explorer confirms the dollar impact.
+Data-gate prose, the required data-source list (describe-log-groups, IncomingBytes/IncomingLogEvents, metric/subscription filters, CloudTrail StartQuery, Cost Explorer), the metrics-vs-Cost-Explorer ground-truth rule moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md); the data-quality short-circuit table moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before pulling metrics for an optimization decision.
 
 ## Process — Optimization logic (apply in order)
 
 ### Step 0: Non-obvious behaviours that change the recommendation
 
-These billing-model and operational gotchas route a recommendation away
-from the obvious choice:
-
-- **`RetentionInDays = 0` means Never expire, not 0 days.** This is the
-  single most common misunderstanding. A value of 0 (or the field
-  absent) means logs are retained forever. Always check for this in
-  `describe-log-groups` output.
-- **Retention changes are NOT retroactive for already-deleted events but
-  ARE retroactive for existing stored logs.** Setting retention from
-  Never to 30 days will delete logs older than 30 days within hours.
-  This is desired for cost savings but can surprise operators expecting
-  a "going forward only" change.
-- **Logs Insights charges per GB SCANNED, not per GB returned.** A query
-  with `filter` after `stats` still scans the full log group for the
-  time window. Push filters early in the query pipeline.
-- **Metric filters are free but compute at ingestion time.** A metric
-  filter extracts values as logs arrive — no scan cost. Tradeoff: limited
-  syntax (CWL metric filter pattern language). Complex aggregations may
-  still require Insights.
-- **Embedded Metric Format (EMF) is free for metric extraction but the
-  log event itself still incurs ingestion + storage cost.** EMF does not
-  reduce Logs spend — it adds structured metrics without PutMetricData.
-- **PutLogEvents charges per request, not per event.** The CloudWatch
-  agent and SDKs batch events. Default agent `batch_count` = 1000 and
-  `batch_size` = 1,048,576 bytes. Increasing `batch_count` to 10000
-  reduces PutLogEvents requests by 10x, saving $0.40 per million
-  requests eliminated.
-- **Firehose delivery to S3 incurs its own charges** ($0.029/GB plus
-  S3 storage) but is far cheaper than CloudWatch Logs retention beyond
-  ~60 days. The crossover: CloudWatch Logs storage ($0.03/GB-month) +
-  ongoing ingestion ($0.50/GB) vs Firehose ($0.029/GB one-time delivery)
-  + S3 Standard ($0.023/GB-month). For retention > 90 days, S3 wins.
-- **VPC Flow Logs to CloudWatch Logs incurs ingestion + storage.**
-  Direct-to-S3 delivery (via Firehose or the native `DeliverLogsPermissionArn`
-  to S3) avoids the $0.50/GB ingestion fee entirely. For high-volume
-  VPC Flow Logs, S3 is almost always the right destination.
-- **Subscription filters fan out at ingestion cost.** Each subscription
-  filter delivers a COPY of the log events to its destination (Lambda,
-  Kinesis, Firehose). The destination's ingestion is billed separately.
-  Cross-account aggregation via subscription filters doubles the
-  effective ingestion cost if the destination is another CloudWatch
-  Logs group.
-- **Account-level data protection policies mask PII at ingestion.** This
-  reduces stored bytes (masked fields are shorter) and reduces risk,
-  but does NOT reduce ingestion cost (the full event is received before
-  masking). The saving is on storage and downstream query processing.
+Step 0 non-obvious behaviours (Never-expire semantics, retroactive retention, per-GB-scanned Insights, free metric filters, EMF tradeoff, PutLogEvents batching, Firehose crossover, vended-log destinations, subscription fan-out, data-protection masking) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand — each gotcha routes the recommendation away from the obvious choice.
 
 ### Step 1: Log group retention (the #1 lever)
 
-Retention is the primary cost lever because CloudWatch Logs storage
-accumulates at $0.03/GB-month with no automatic cap. Never-expire
-groups are the dominant source of unintended spend.
+Retention-sweep rationale moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md); the never-expire jq sweep and put-retention-policy CLI moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when executing the retention sweep; the tier matrix and decision gate stay inline below.
 
 **Retention tier decision matrix:**
 
@@ -223,19 +130,6 @@ groups are the dominant source of unintended spend.
 | API Gateway access logs | 7-30 days | Operational debugging; use Athena on S3 for long-term |
 | Container logs (ECS/EKS via Firelens) | 7-14 days | Use a dedicated log aggregator for longer retention |
 
-**The retention sweep CLI:**
-```bash
-# List all log groups with Never expire (RetentionInDays absent or null)
-aws logs describe-log-groups --output json | \
-  jq '.logGroups[] | select(.retentionInDays == null or .retentionInDays == 0) |
-      {logGroupName, storedBytes}'
-
-# Set retention to 30 days
-aws logs put-retention-policy \
-  --log-group-name /aws/lambda/order-processor-prod \
-  --retention-in-days 30
-```
-
 **Decision gate after retention audit:**
 
 | Current retention | StoredBytes | Verdict | Action |
@@ -248,9 +142,8 @@ aws logs put-retention-policy \
 
 ### Step 2: Logs Insights queries vs metric filters
 
-Logs Insights charges $0.005 per GB scanned. Frequent queries on large
-log groups are a hidden cost center. Metric filters extract the same
-time-series values at ingestion time for free.
+Step 2 rationale moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md); the Logs Insights cost-estimation math moved to [references/worked-examples.md](references/worked-examples.md); the put-metric-filter CLI moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when converting frequent queries to metric filters; the migration-candidate matrix stays inline below.
 
 **When to migrate a query to a metric filter:**
 
@@ -262,55 +155,10 @@ time-series values at ingestion time for free.
 | `filter @message like /timeout/ \| stats count()` run hourly | YES — scheduled aggregation | Metric filter counting timeout occurrences |
 | Complex multi-line query with joins/regex | NO — exceeds filter syntax | Keep as Insights; consider precomputing via EMF |
 
-**Logs Insights cost estimation:**
-```
-insights_monthly_cost = queries_per_month × avg_GB_scanned_per_query × $0.005
-
-Example: 450 queries/month × 120 GB/query × $0.005 = $270.00/month
-         Converting to 5 metric filters: $0.00/month (metric filters are free)
-         Net saving: $270.00/month
-```
-
-**Creating a metric filter:**
-```bash
-aws logs put-metric-filter \
-  --log-group-name /aws/lambda/order-processor-prod \
-  --filter-name ErrorCount \
-  --filter-pattern '"ERROR"' \
-  --metric-transformations \
-    metricName=ErrorCount,metricNamespace=AppMetrics,metricValue=1,defaultValue=0
-```
-
 ### Step 3: CloudWatch agent buffer tuning
 
-The CloudWatch agent batches log events before calling PutLogEvents.
-PutLogEvents charges $0.40 per million requests. Default agent settings
-(`batch_count` = 1000, `batch_size` = 1,048,576 bytes) generate excess
-requests on high-volume hosts.
-
-**Agent configuration (JSON snippet):**
-```json
-{
-  "logs": {
-    "logs_collected": {
-      "files": {
-        "collect_list": [
-          {
-            "file_path": "/var/log/app/application.log",
-            "log_group_name": "/app/application",
-            "log_stream_name": "{instance_id}",
-            "retention_in_days": 30
-          }
-        ]
-      }
-    },
-    "log_stream_name": "{instance_id}",
-    "batch_count": 10000,
-    "batch_size": 1048576,
-    "batch_wait_time": 60
-  }
-}
-```
+Step 3 rationale and the data-loss caveat moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md); the agent configuration JSON moved to [references/diagnostic-commands.md](references/diagnostic-commands.md); the PutLogEvents request-saving math moved to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when tuning agent buffers; the parameter table stays inline below.
 
 | Parameter | Default | Recommended (high-volume) | Effect |
 |---|---|---|---|
@@ -318,57 +166,10 @@ requests on high-volume hosts.
 | `batch_size` | 1,048,576 (1 MB) | 1,048,576 (max) | Already at max; do not reduce |
 | `batch_wait_time` | 5 (seconds, not in older configs) | 30-60 | Longer wait allows larger batches |
 
-**PutLogEvents request saving from buffer tuning:**
-```
-old_requests = log_events_per_hour / old_batch_count
-new_requests = log_events_per_hour / new_batch_count
-monthly_saving = (old_requests - new_requests) × 730 × $0.40/1,000,000
-
-Example: 12M events/hour, batch_count 1000 → 10000:
-  old_requests: 12,000/hour; new_requests: 1,200/hour
-  Monthly saving: (12,000 - 1,200) × 730 × $0.40/1M = $3.16/host/month
-  For a fleet of 100 hosts: $316/month
-```
-
-Caveat: larger batches increase the risk of losing buffered events if
-the agent crashes. For mission-critical logs, balance batch_count against
-acceptable data-loss exposure. The tradeoff: 10x cost reduction vs up to
-60 seconds of buffered data at risk on agent failure.
-
 ### Step 4: Firehose S3 export for cold storage (compliance archives)
 
-For log groups requiring long retention (180+ days) for compliance
-(SOC2, HIPAA, PCI-DSS, financial regulations), CloudWatch Logs storage
-is the wrong tier. Firehose delivers to S3, where lifecycle policies
-provide 30-100x cheaper long-term storage.
-
-**Architecture: Log source → Firehose → S3 (with lifecycle to Glacier)**
-
-**Cost comparison (500 GB/month ingested, 2-year retention):**
-```
-CloudWatch Logs only:
-  Ingestion:   500 GB × $0.50 = $250.00/month
-  Storage:     500 × 24 months × $0.03 = $360.00/month (grows over time)
-  Total at 24 months: ~$610/month → $14,640 over 2 years
-
-Firehose → S3 (Glacier Instant Retrieval after 90 days):
-  Firehose:    500 GB × $0.029 = $14.50/month
-  S3 Standard:  500 GB × $0.023 = $11.50/month (first 90 days)
-  S3 GIR:       500 GB × $0.012 = $6.00/month (after 90 days)
-  Athena (queries on demand): ~$5.00/month
-  Total steady-state: ~$37/month → $888 over 2 years
-  Saving: $13,752 over 2 years (94% reduction)
-```
-
-**Firehose delivery stream for log archival:**
-```bash
-aws firehose create-delivery-stream \
-  --delivery-stream-name log-archive-stream \
-  --s3-destination-configuration \
-    RoleARN=arn:aws:iam::<acct>:role/firehose-s3-role,\
-    BucketARN=arn:aws:s3:::log-archive-bucket,\
-    Prefix=logs/,!BufferingSize=5,!BufferingInterval=300
-```
+Step 4 rationale and architecture moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md); the 500 GB 2-year Logs-vs-Firehose-S3 cost comparison moved to [references/worked-examples.md](references/worked-examples.md); the create-delivery-stream CLI moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when planning a compliance-archive pipeline; the cold-storage decision gate stays inline below.
 
 **Decision gate for cold storage migration:**
 
@@ -381,9 +182,8 @@ aws firehose create-delivery-stream \
 
 ### Step 5: Subscription filter and cross-account aggregation
 
-Subscription filters deliver log events to Lambda, Kinesis Data Streams,
-or Firehose for cross-account or cross-region aggregation. Each
-subscription filter destination incurs its own ingestion/processing cost.
+Step 5 rationale and the double-ingestion anti-pattern note moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for cross-account aggregation; the cost-aware pattern table stays inline below.
 
 **Cost-aware aggregation patterns:**
 
@@ -394,16 +194,10 @@ subscription filter destination incurs its own ingestion/processing cost.
 | CW Logs → subscription filter → Kinesis Data Streams | Kinesis shard cost + ingestion | Real-time processing pipeline |
 | VPC Flow Logs → directly to S3 (no CW Logs) | S3 only ($0.023/GB-month) | Best for pure archival |
 
-**Subscription filter anti-pattern — double ingestion:** If a subscription
-filter delivers to a Lambda that writes to ANOTHER CloudWatch Logs group,
-the events are ingested TWICE ($1.00/GB total). Use Firehose as the
-destination for cross-account aggregation, not another CW Logs group.
-
 ### Step 6: Vended log destinations (VPC Flow Logs, Route53 Resolver)
 
-Vended log sources (VPC Flow Logs, Route53 Resolver query logs, WAF
-logs) can publish directly to S3, bypassing CloudWatch Logs entirely.
-This eliminates the $0.50/GB ingestion fee.
+Step 6 rationale and the >10 GB/day S3 guidance moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when placing vended logs; the destination decision table stays inline below.
 
 **VPC Flow Logs destination decision:**
 
@@ -413,66 +207,15 @@ This eliminates the $0.50/GB ingestion fee.
 | Post-hoc querying via Athena | S3 (via Firehose or direct) | $0.023/GB-month + Athena scan cost |
 | Compliance archive only | S3 → Glacier | $0.012/GB-month (GIR) or $0.00099 (Deep Archive) |
 
-For VPC Flow Logs above ~10 GB/day, S3 is almost always cheaper than
-CloudWatch Logs. Route53 Resolver query logs are high-volume and rarely
-queried in real time — default to S3 delivery, use Athena when needed.
-
 ### Step 7: Account-level data protection policy (PII reduction)
 
-Account-level data protection policies mask sensitive data (PII, credit
-card numbers, API keys) in CloudWatch Logs at ingestion time. This
-reduces stored bytes (masked fields are shorter) and reduces risk.
-
-**Cost nuance:** Data protection policies do NOT reduce ingestion cost
-— the full event is received before masking. The saving is on storage
-(masked fields use fewer bytes) and on reducing the blast radius of
-accidental PII logging.
-
-**When to enable data protection:** Application logs with known PII fields
-(user emails, phone numbers), services handling payment data (PCI scope
-reduction), or audit logs that may capture sensitive headers.
-
-**CLI to create a data protection policy:**
-```bash
-aws logs put-account-policy \
-  --policy-name pii-protection-policy \
-  --policy-type DATA_PROTECTION_POLICY \
-  --policy-document '{
-    "Name": "pii-protection",
-    "Version": "2021-08-01",
-    "Identifiers": [
-      {"Type": "EmailAddress"},
-      {"Type": "Phone"},
-      {"Type": "CreditCard"}
-    ],
-    "DeletionProtection": false
-  }'
-```
+Step 7 rationale, the cost nuance (masking saves storage, not ingestion), and when-to-enable guidance moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md); the put-account-policy CLI moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when enabling PII masking.
 
 ### Step 8: Impact estimation
 
-Compute the monthly savings for each recommendation:
-
-```
-current_monthly_cost =
-  (monthly_ingested_GB × $0.50)
-  + (monthly_stored_GB × $0.03)
-  + (monthly_putlogevents_requests / 1M × $0.40)
-  + (monthly_insights_GB_scanned × $0.005)
-
-projected_monthly_cost =
-  (projected_ingested_GB × $0.50)
-  + (projected_stored_GB × $0.03)
-  + (projected_putlogevents_requests / 1M × $0.40)
-  + (projected_insights_GB_scanned × $0.005)
-  + (firehose_GB × $0.029 if S3 export added)
-  + (s3_stored_GB × $0.023 if S3 export added)
-
-monthly_saving = current_monthly_cost - projected_monthly_cost
-```
-
-Always state assumptions: monthly ingestion volume, current vs projected
-retention, Logs Insights query volume, pricing region, agent fleet size.
+The full impact-estimation formula block (current/projected monthly cost, monthly saving) moved verbatim to [references/worked-examples.md](references/worked-examples.md); the memorised cost formula remains in Quick start.
+Load on demand when computing ESTIMATED_SAVINGS.
 
 ### Step 9: Final verdict
 
@@ -488,26 +231,8 @@ every `NEED_MORE_INFO`/`BLOCKED` gate.
 
 ## Output format
 
-```text
-TARGET: <log-group-name or account-level>
-VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-REASON: <1-2 sentences naming the recommendation and the supporting data>
-RECOMMENDATION:
-  Current: <retention> days, <ingested GB>/month, <Insights queries>/month, <agent batch_count>
-  Proposed: <retention> days, <ingested GB>/month, <Insights queries>/month, <agent batch_count>
-  Dimensions changed: <retention | queries | agent | cold-storage | subscription | destination | data-protection>
-  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
-ESTIMATED_SAVINGS:
-  Monthly: $<amount>
-  Annual: $<amount>
-  Assumptions: <list (ingestion volume, pricing region, etc.)>
-MIGRATION_STEPS:
-  1. <specific action with CLI command>
-  2. <verification step>
-CONFIRM: Before executing any state-changing CLI, emit and await operator
-  approval: "CONFIRM: About to <action> on <log-group-name> in <region>.
-  Proceed? (yes/no)"
-```
+The minimal output template fence moved verbatim to [references/worked-examples.md](references/worked-examples.md); the authoritative STRICT output contract with the perfect example remains inline below.
+Load on demand for the short-form template.
 
 Full worked examples (retention sweep, query migration, Firehose cold
 storage, agent buffer tuning, already-optimized, NEED_MORE_INFO) are in
@@ -736,49 +461,13 @@ Extended anti-patterns in `references/cloudwatch-logs-pricing-and-retention.md`.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation,
-  emit and await operator approval. Do NOT execute until confirmed.
-- **Retention changes delete data.** Setting retention from Never to 30
-  days will delete logs older than 30 days within hours. Confirm the
-  operator has verified no compliance or investigation need for older
-  logs.
-- **Metric filter creation is immediate.** Filters start processing new
-  log events within seconds. Historical events are NOT backfilled.
-- **Firehose delivery stream takes 5-10 minutes to become active.**
-  Verify the stream is `ACTIVE` before relying on it for log delivery.
-- **Subscription filter changes can break downstream consumers.**
-  Removing a subscription filter stops delivery to Lambda/Kinesis. Verify
-  no downstream service depends on the filter before modifying.
-- **Data protection policy changes apply to NEW log events only.** Existing
-  stored events are not retroactively masked.
-- **Agent buffer changes require agent restart.** Update the agent config
-  file, then `systemctl restart amazon-cloudwatch-agent`. Existing log
-  streams are not interrupted.
-- **VPC Flow Log destination changes are not retroactive.** New logs go
-  to the new destination; existing logs remain in the old destination
-  until their retention expires.
-- **Bulk-operation limit:** Process at most 10 log groups per batch.
-  Sort by `StoredBytes` (largest first), verify each batch before
-  proceeding. Abort if any log group shows a spike in errors or missing
-  data post-change.
+Pre-flight safety checks (CONFIRM gate, retention-deletes-data warning, metric-filter immediacy, Firehose activation wait, subscription-filter downstream consumers, masking scope, agent restart, VPC Flow non-retroactivity, 10-group batch limit) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before executing any remediation CLI.
 
 ## Recent AWS features (2024-2026)
 
-- **Account-level data protection policy (2024 GA):** Masks PII at
-  ingestion across all log groups in the account.
-- **CloudWatch Logs Insights query optimization (2024-2025):** Query
-  engine improvements reduce scan volume for well-structured queries.
-- **VPC Flow Logs to S3 via Firehose (2024):** Native delivery to S3
-  without a Lambda intermediary, eliminating processing cost.
-- **CloudWatch Logs subscription filter to Firehose (enhanced 2024):**
-  Direct subscription to Firehose without a Lambda intermediary.
-- **S3 Tables for log analytics (2025):** Iceberg-backed tables in S3
-  for structured log data. Cheaper than Athena-on-raw-S3 for recurring
-  analytical queries.
-- **CloudWatch Logs batch ingestion throughput improvements (2025):**
-  Higher PutLogEvents throughput per stream; reduces throttling.
-- **Graviton-based CloudWatch agent (2024):** Lower CPU usage on
-  Graviton instances for the same log throughput.
+Recent AWS features (2024-2026) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when choosing between data-protection policies, Firehose delivery, S3 Tables, or the Graviton agent.
 
 ## References
 
@@ -790,6 +479,13 @@ Extended anti-patterns in `references/cloudwatch-logs-pricing-and-retention.md`.
   sweep, Insights-to-metric-filter migration, Firehose cold-storage
   pipeline, agent buffer tuning, already-optimized, NEED_MORE_INFO,
   end-to-end walkthrough).
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Mindset principles, Step 0 non-obvious behaviours, step rationale/nuance prose, data-quality short-circuits, and Recent AWS features (2024-2026) moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — data-gate data sources, step CLI listings (retention sweep, metric filter, agent config, Firehose, data protection), and pre-flight safety checks moved from SKILL.md
+- [references/worked-examples.md](references/worked-examples.md) — now also holds step cost math (Insights estimation, buffer savings, cold-storage comparison, impact formula) and the minimal output template moved from SKILL.md
+- [references/cloudwatch-logs-pricing-and-retention.md](references/cloudwatch-logs-pricing-and-retention.md) — pricing tables, retention tiers, regional multipliers (pre-existing)
 
 ## Domain
 

@@ -350,3 +350,104 @@ CONFIRM: About to put-retention-policy (Never → 30 days) and create 4
   metric filters on /app/api-gateway-access-logs. Saving $526.80/month
   (54.2%). Proceed? (yes/no)
 ```
+
+---
+
+## Logs Insights cost estimation (moved from SKILL.md Step 2)
+
+**Logs Insights cost estimation:**
+```
+insights_monthly_cost = queries_per_month × avg_GB_scanned_per_query × $0.005
+
+Example: 450 queries/month × 120 GB/query × $0.005 = $270.00/month
+         Converting to 5 metric filters: $0.00/month (metric filters are free)
+         Net saving: $270.00/month
+```
+
+---
+
+## PutLogEvents request saving from buffer tuning (moved from SKILL.md Step 3)
+
+**PutLogEvents request saving from buffer tuning:**
+```
+old_requests = log_events_per_hour / old_batch_count
+new_requests = log_events_per_hour / new_batch_count
+monthly_saving = (old_requests - new_requests) × 730 × $0.40/1,000,000
+
+Example: 12M events/hour, batch_count 1000 → 10000:
+  old_requests: 12,000/hour; new_requests: 1,200/hour
+  Monthly saving: (12,000 - 1,200) × 730 × $0.40/1M = $3.16/host/month
+  For a fleet of 100 hosts: $316/month
+```
+
+---
+
+## Firehose S3 vs CloudWatch Logs cost comparison (moved from SKILL.md Step 4)
+
+**Cost comparison (500 GB/month ingested, 2-year retention):**
+```
+CloudWatch Logs only:
+  Ingestion:   500 GB × $0.50 = $250.00/month
+  Storage:     500 × 24 months × $0.03 = $360.00/month (grows over time)
+  Total at 24 months: ~$610/month → $14,640 over 2 years
+
+Firehose → S3 (Glacier Instant Retrieval after 90 days):
+  Firehose:    500 GB × $0.029 = $14.50/month
+  S3 Standard:  500 GB × $0.023 = $11.50/month (first 90 days)
+  S3 GIR:       500 GB × $0.012 = $6.00/month (after 90 days)
+  Athena (queries on demand): ~$5.00/month
+  Total steady-state: ~$37/month → $888 over 2 years
+  Saving: $13,752 over 2 years (94% reduction)
+```
+
+---
+
+## Impact estimation formula (moved from SKILL.md Step 8)
+
+Compute the monthly savings for each recommendation:
+
+```
+current_monthly_cost =
+  (monthly_ingested_GB × $0.50)
+  + (monthly_stored_GB × $0.03)
+  + (monthly_putlogevents_requests / 1M × $0.40)
+  + (monthly_insights_GB_scanned × $0.005)
+
+projected_monthly_cost =
+  (projected_ingested_GB × $0.50)
+  + (projected_stored_GB × $0.03)
+  + (projected_putlogevents_requests / 1M × $0.40)
+  + (projected_insights_GB_scanned × $0.005)
+  + (firehose_GB × $0.029 if S3 export added)
+  + (s3_stored_GB × $0.023 if S3 export added)
+
+monthly_saving = current_monthly_cost - projected_monthly_cost
+```
+
+Always state assumptions: monthly ingestion volume, current vs projected
+retention, Logs Insights query volume, pricing region, agent fleet size.
+
+---
+
+## Minimal output template (moved from SKILL.md Output format)
+
+```text
+TARGET: <log-group-name or account-level>
+VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
+REASON: <1-2 sentences naming the recommendation and the supporting data>
+RECOMMENDATION:
+  Current: <retention> days, <ingested GB>/month, <Insights queries>/month, <agent batch_count>
+  Proposed: <retention> days, <ingested GB>/month, <Insights queries>/month, <agent batch_count>
+  Dimensions changed: <retention | queries | agent | cold-storage | subscription | destination | data-protection>
+  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
+ESTIMATED_SAVINGS:
+  Monthly: $<amount>
+  Annual: $<amount>
+  Assumptions: <list (ingestion volume, pricing region, etc.)>
+MIGRATION_STEPS:
+  1. <specific action with CLI command>
+  2. <verification step>
+CONFIRM: Before executing any state-changing CLI, emit and await operator
+  approval: "CONFIRM: About to <action> on <log-group-name> in <region>.
+  Proceed? (yes/no)"
+```

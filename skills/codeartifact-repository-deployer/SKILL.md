@@ -172,11 +172,7 @@ cross-account shares, or packages that cannot be published:
 A domain is the unit of organization, sharing, and policy inheritance.
 Create the domain in the owner account:
 
-```bash
-aws codeartifact create-domain \
-  --domain shared \
-  --encryption-key arn:aws:kms:us-east-1:123456789012:key/<cmk-id>  # optional
-```
+create-domain command (optional CMK): [Diagnostic commands](references/diagnostic-commands.md)
 
 Domain naming rules:
 
@@ -195,13 +191,7 @@ repositories are format-aware — the format is implied by the endpoint
 used (`npm`, `pip`, `maven`, `nuget`, `cargo`, `rubygems`, `swift`,
 `generic`).
 
-```bash
-aws codeartifact create-repository \
-  --domain shared \
-  --repository shared-npm \
-  --description "Shared npm packages with npmjs public upstream" \
-  --tags '[{"Key":"Environment","Value":"production"},{"Key":"Format","Value":"npm"}]'
-```
+create-repository command with tags: [Diagnostic commands](references/diagnostic-commands.md)
 
 Repository naming rules:
 
@@ -229,12 +219,7 @@ registries. Available external connections:
 
 Associate an external connection with a repository:
 
-```bash
-aws codeartifact associate-external-connection \
-  --domain shared \
-  --repository shared-npm \
-  --external-connection public:npmjs
-```
+associate-external-connection command: [Diagnostic commands](references/diagnostic-commands.md)
 
 Once associated, the external connection appears in the repository's
 `externalConnections` list. The repository can resolve packages from
@@ -245,23 +230,11 @@ the public registry without further configuration.
 Upstream repositories chain internal repos + external connections.
 Resolution walks the chain left-to-right; the first match wins.
 
-```bash
-# shared-npm points at shared-internal (a curated internal mirror)
-# which in turn points at the public:npmjs external connection
-aws codeartifact update-repository \
-  --domain shared \
-  --repository shared-npm \
-  --upstreams repository=shared-internal
-```
+update-repository single-upstream command: [Diagnostic commands](references/diagnostic-commands.md)
 
 For multi-hop chains:
 
-```bash
-aws codeartifact update-repository \
-  --domain shared \
-  --repository team-payments-npm \
-  --upstreams repository=team-payments-internal,repository=shared-npm
-```
+Multi-hop chain command: [Diagnostic commands](references/diagnostic-commands.md)
 
 Resolution order for `team-payments-npm`:
 1. `team-payments-npm` itself (first-party packages)
@@ -279,75 +252,7 @@ creating a supply-chain risk.
 CodeArtifact IAM is resource-scoped (the domain). A repository policy
 is OPTIONAL and supplements the domain policy. Two patterns:
 
-**Domain owner admin policy (apply to a DevOps admin role):**
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "DomainAdmin",
-      "Effect": "Allow",
-      "Action": ["codeartifact:*"],
-      "Resource": "arn:aws:codeartifact:us-east-1:123456789012:domain/shared"
-    },
-    {
-      "Sid": "RepositoryAdmin",
-      "Effect": "Allow",
-      "Action": ["codeartifact:*"],
-      "Resource": "arn:aws:codeartifact:us-east-1:123456789012:repository/shared/*"
-    }
-  ]
-}
-```
-
-**CI build consume policy (apply to a CI role):**
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "Login",
-      "Effect": "Allow",
-      "Action": ["codeartifact:GetAuthorizationToken", "codeartifact:ReadFromRepository"],
-      "Resource": "arn:aws:codeartifact:us-east-1:123456789012:domain/shared"
-    },
-    {
-      "Sid": "ReadPackages",
-      "Effect": "Allow",
-      "Action": [
-        "codeartifact:ReadFromRepository",
-        "codeartifact:GetPackageVersionAsset",
-        "codeartifact:ListPackageVersionAssets",
-        "codeartifact:DescribePackageVersion"
-      ],
-      "Resource": "arn:aws:codeartifact:us-east-1:123456789012:repository/shared/shared-npm/*"
-    }
-  ]
-}
-```
-
-**Release pipeline publish policy (apply to a release role):**
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "Publish",
-      "Effect": "Allow",
-      "Action": [
-        "codeartifact:PublishPackageVersion",
-        "codeartifact:PutPackageMetadata",
-        "codeartifact:UpdatePackageVersionsStatus",
-        "codeartifact:ReadFromRepository"
-      ],
-      "Resource": "arn:aws:codeartifact:us-east-1:123456789012:repository/shared/shared-npm/*"
-    }
-  ]
-}
-```
+The three IAM policy JSON patterns (domain-owner admin, CI consume, release publish): [Diagnostic commands](references/diagnostic-commands.md)
 
 Apply a repository policy via `put-repository-permissions-policy` or
 attach the policy to the IAM role. The role-based pattern is
@@ -360,56 +265,7 @@ token and configures the local package manager. The caller IAM must
 allow `codeartifact:GetAuthorizationToken` and
 `codeartifact:ReadFromRepository`.
 
-**npm:**
-
-```bash
-aws codeartifact login \
-  --tool npm \
-  --domain shared \
-  --domain-owner 123456789012 \
-  --repository shared-npm
-
-# Updates ~/.npmrc with:
-# registry=https://shared-123456789012.d.codeartifact.us-east-1.amazonaws.com/npm/shared-npm/
-# always-auth=true
-# //shared-123456789012.d.codeartifact.us-east-1.amazonaws.com/npm/shared-npm/:_authToken=<token>
-```
-
-**pip:**
-
-```bash
-aws codeartifact login \
-  --tool pip \
-  --domain shared \
-  --domain-owner 123456789012 \
-  --repository shared-pip
-
-# Configures pip index-url in ~/.config/pip/pip.conf or ~/.pip/pip.conf
-```
-
-**maven:**
-
-```bash
-aws codeartifact login \
-  --tool mvn \
-  --domain shared \
-  --domain-owner 123456789012 \
-  --repository shared-maven
-
-# Updates ~/.m2/settings.xml with <server> credentials and mirror config
-```
-
-**nuget:**
-
-```bash
-aws codeartifact login \
-  --tool nuget \
-  --domain shared \
-  --domain-owner 123456789012 \
-  --repository shared-nuget
-
-# Adds a package source to nuget.config
-```
+Login CLI blocks for npm, pip, maven, and nuget: [Diagnostic commands](references/diagnostic-commands.md)
 
 Token lifetime defaults to 12 hours (max 12 hours, configurable via
 `--duration-seconds`). For CI pipelines, run `codeartifact login` at
@@ -419,37 +275,7 @@ the start of each build.
 
 To share a domain with another AWS account:
 
-```bash
-# Owner account — attach a domain permissions policy
-cat > /tmp/domain-policy.json <<'EOF'
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "ConsumerAccountRead",
-      "Effect": "Allow",
-      "Principal": {
-        "AWS": "arn:aws:iam::<consumer-account-id>:root"
-      },
-      "Action": [
-        "codeartifact:DescribeDomain",
-        "codeartifact:DescribeRepository",
-        "codeartifact:GetAuthorizationToken",
-        "codeartifact:ReadFromRepository",
-        "codeartifact:ListRepositoriesInDomain"
-      ],
-      "Resource": "arn:aws:codeartifact:us-east-1:123456789012:domain/shared"
-    }
-  ]
-}
-EOF
-
-aws codeartifact put-domain-permissions-policy \
-  --domain shared \
-  --domain-owner 123456789012 \
-  --policy-revision <current-revision> \
-  --policy-document file:///tmp/domain-policy.json
-```
+Domain-policy heredoc and put-domain-permissions-policy command: [Diagnostic commands](references/diagnostic-commands.md)
 
 Then the consumer account grants its principals
 `codeartifact:GetAuthorizationToken` and
@@ -459,12 +285,7 @@ account ID embedded in the ARN).
 **Cross-account RAM resource share (alternative):** for multi-account
 sharing with Organizations or OUs, use a RAM resource share:
 
-```bash
-aws ram create-resource-share \
-  --name codeartifact-shared-domain \
-  --principals arn:aws:iam::<consumer-account-id>:root \
-  --resource-arns arn:aws:codeartifact:us-east-1:123456789012:domain/shared
-```
+ram create-resource-share command: [Diagnostic commands](references/diagnostic-commands.md)
 
 RAM-based sharing is the recommended pattern for Organizations-based
 multi-account setups. Full reference in
@@ -475,15 +296,7 @@ multi-account setups. Full reference in
 To mirror a specific package version from upstream into the local
 repository (e.g., to pin a version or air-gap):
 
-```bash
-aws codeartifact copy-package-versions \
-  --domain shared \
-  --repository shared-npm \
-  --source-repository shared-upstream-mirror \
-  --format npm \
-  --package lodash \
-  --versions 4.17.21
-```
+copy-package-versions ingest command: [Diagnostic commands](references/diagnostic-commands.md)
 
 For air-gapped environments, `copy-package-versions` can pull from an
 external-connection repository into an internal-only repository.
@@ -498,49 +311,11 @@ for the full policy JSON schema and CLI surface.
 
 ### Step 10: Tag, verify, and test the login
 
-```bash
-aws codeartifact list-repositories-in-domain --domain shared
-aws codeartifact describe-repository --domain shared --repository shared-npm
-aws codeartifact get-repository-endpoint \
-  --domain shared --repository shared-npm --format npm
-aws codeartifact list-packages --domain shared --repository shared-npm
-
-# Smoke test: login and install a package
-aws codeartifact login --tool npm \
-  --domain shared --domain-owner 123456789012 --repository shared-npm
-npm install lodash
-```
+Verification and login smoke-test commands: [Diagnostic commands](references/diagnostic-commands.md)
 
 ## Edge-case handling
 
-- **`npm install` returns `ENEEDAUTH` after `codeartifact login`:**
-  the authorization token expired (default 12h), or the CI runner is
-  not using the same IAM role that has `GetAuthorizationToken`. Run
-  `codeartifact login` at the start of each build.
-- **Repository resolves from public registry instead of internal:** the
-  external connection is upstream of the internal mirror in the chain.
-  Reorder upstreams — internal mirrors FIRST, external connection LAST.
-- **Cross-account consumer gets `AccessDeniedException`:** the domain
-  permissions policy in the owner account does not include the consumer
-  account root, OR the consumer account's IAM role lacks
-  `codeartifact:ReadFromRepository`. Verify both sides.
-- **`PublishPackageVersion` rejected with `VersionConflictException`:**
-  the package version already exists (versions are immutable). Bump the
-  version or use `--revision` to override (rare).
-- **External connection missing for Swift / Cargo:** Swift and Cargo
-  external connections are not available in all Regions. Verify with
-  `list-external-connections`; for unsupported Regions, use a
-  `generic`-format repository and `copy-package-versions`.
-- **Private network (no internet egress):** CodeArtifact interface VPC
-  endpoints (`codeartifact.api` and `codeartifact.repositories`) keep
-  client-to-CodeArtifact traffic private. External connections still
-  fetch from the public registry server-side.
-- **Token expiry in CI pipelines:** the `codeartifact login` token
-  expires in 12h. Refresh via `codeartifact login` at the start of each
-  build. Do NOT store long-lived tokens in CI secrets.
-- **Domain ownership transfer:** CodeArtifact domains cannot be
-  transferred between accounts. Migrate by creating a new domain and
-  `copy-package-versions` from the old domain.
+All eight edge cases (ENEEDAUTH, public-registry shadowing, cross-account AccessDenied, VersionConflict, Swift/Cargo Region gaps, private networks, token expiry, domain ownership transfer): [Error handling](references/error-handling.md).
 
 ## Workload matrix
 
@@ -557,40 +332,7 @@ npm install lodash
 
 ## Recent AWS features (2024-2026)
 
-- **CodeArtifact for Swift (2024-2025):** Swift package format support
-  GA, with SwiftPM integration. External connection availability is
-  Region-dependent; verify via `list-external-connections`.
-
-- **`codeartifact login` for Maven and NuGet (2024-2025):** the login
-  CLI now natively writes `~/.m2/settings.xml` (Maven) and
-  `nuget.config` (NuGet), removing the need for manual XML editing.
-
-- **Package version immutability enforcement (2024-2025):**
-  `PublishPackageVersion` with an existing version+revision is
-  explicitly rejected with `VersionConflictException`. Use unique
-  versions or `--revision` overrides for legitimate re-publishes.
-
-- **Domain permissions policy revision tracking (2024):**
-  `put-domain-permissions-policy` accepts `--policy-revision` to
-  prevent concurrent-update drift. Capture the current revision via
-  `get-domain-permissions-policy` before updating.
-
-- **Cross-account via RAM GA (2024-2025):** CodeArtifact domains can
-  be shared via RAM resource shares, including with Organizations OUs.
-  The legacy `put-domain-permissions-policy` flow remains but RAM is
-  recommended for multi-account setups.
-
-- **VPC endpoints for CodeArtifact (2024-2025):** interface VPC
-  endpoints for both the API and repositories keep client traffic off
-  the public internet. Required for air-gapped or regulated
-  environments.
-
-- **Lifecycle policies (2024-2025):** repository lifecycle policies
-  support `retain` and `delete` actions scoped by version count or
-  age. Useful for high-velocity internal packages.
-
-- **`copy-package-versions` batch (2025):** batch ingestion from
-  upstream supports up to 100 versions per call, simplifying air-gap
+2024-2026 feature notes (Swift GA, Maven/NuGet login, immutability enforcement, policy-revision tracking, RAM GA, VPC endpoints, lifecycle, batch copy): [Advanced patterns](references/advanced-patterns.md).
   mirroring workflows.
 
 ## NEVER (top 5 — full list in references)
@@ -615,52 +357,11 @@ npm install lodash
 
 ## Expert heuristic — designing domains, repositories, and upstreams
 
-- **One domain per organization.** Domains are the unit of sharing and
-  billing. Multi-domain orgs fragment governance. Use
-  `<companyname>` or `shared`.
-- **One repository per format.** `shared-npm`, `shared-pip`,
-  `shared-maven` keeps format-specific tooling isolated.
-- **Upstream chain: internal-first, external-last.** The order is
-  `team-internal -> org-shared -> external-connection`. This catches
-  supply-chain attacks (a public package with the same name as an
-  internal one resolves to the internal version).
-- **External connection per repository.** Associate
-  `public:npmjs` with `shared-npm`, not with the org-wide repo
-  directly. This lets each format's external connection be removed
-  independently if a public registry is compromised.
-- **Cross-account via RAM, not policy-only.** RAM resource shares
-  integrate with Organizations and OU-based governance. Policy-only
-  sharing (`put-domain-permissions-policy`) is fine for one-off
-  account pairs but does not scale.
-- **CI: `codeartifact login` at the start of every build.** The token
-  is 12h max. Caching the token across builds risks expiry-related
-  build failures.
-- **Publish via release pipeline, not developer machines.** Only the
-  release-pipeline role should have `PublishPackageVersion`. Developer
-  machines consume via `ReadFromRepository`.
-- **Lifecycle policies for internal high-velocity packages.** Retain
-  the last 100 versions; old versions accumulate storage cost without
-  value.
-- **VPC endpoints for regulated environments.** Both the API and
-  repositories endpoints are available as interface VPC endpoints.
+The nine design heuristics (one domain per org, one repository per format, internal-first cascade, per-format external connections, RAM over policy-only, login at build start, release-pipeline publishing, lifecycle retention, VPC endpoints): [Advanced patterns](references/advanced-patterns.md).
 
 ## Pre-flight safety checks (run before any provisioning CLI)
 
-- **Confirm the domain owner account ID:**
-  `aws sts get-caller-identity --query Account --output text`
-- **Confirm the domain exists or is being created:**
-  `aws codeartifact describe-domain --domain <name>` (or create in
-  the same stack).
-- **Confirm external connections available in the Region:**
-  `aws codeartifact list-external-connections --domain <name>`
-- **Confirm the CI role exists:**
-  `aws iam get-role --role-name ci-build`
-- **For cross-account:** confirm the consumer account ID and that the
-  consumer account root is referenced in the domain permissions policy.
-- **For VPC endpoints:** confirm `codeartifact.api` and
-  `codeartifact.repositories` endpoints exist in the VPC.
-- **For KMS-encrypted domains:** confirm the CMK policy grants
-  CodeArtifact service access.
+Pre-flight confirmation commands (owner account, domain, external connections, CI role, cross-account, VPC endpoints, KMS): [Diagnostic commands](references/diagnostic-commands.md)
 
 ## Output format — MANDATORY literal labels
 
@@ -705,6 +406,14 @@ VERIFICATION_COMMANDS:
 missing (parent domain, external connection unavailable in Region,
 CI role ARN, KMS key for encrypted domain), the verdict is
 `PREREQUISITES_MISSING` with each gap listed.
+
+## References (load on demand)
+
+- [Diagnostic commands](references/diagnostic-commands.md) — per-step deployment commands and IAM policy JSON (Steps 1-10), plus pre-flight checks
+- [Error handling](references/error-handling.md) — edge-case handling
+- [Advanced patterns](references/advanced-patterns.md) — expert design heuristics and recent AWS features
+- [Deployment CLI commands](references/deployment-cli-commands.md) — full copy-pasteable CLI sequence with Terraform equivalents
+- [Upstreams and cross-account guide](references/upstreams-and-cross-account-guide.md) — upstream chaining, domain sharing, IAM patterns, full NEVER list
 
 ## Domain
 

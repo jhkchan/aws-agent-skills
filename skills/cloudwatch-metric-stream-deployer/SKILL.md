@@ -89,30 +89,8 @@ calls with a push-based pipeline. The namespace filter controls cost
 (only stream the namespaces you need). Firehose buffering adds 1-5
 minutes of delivery delay.
 
-Three misconceptions dominate metric stream misdesign at provisioning
-time:
-
-- **"Metric streams and GetMetricData polling are interchangeable."**
-  They are not. GetMetricData is a pull-based API with per-call
-  pricing — cost scales linearly with the number of API calls needed
-  to retrieve all metrics. Metric streams are push-based with per-
-  metric pricing — cost scales with the number of unique metrics
-  streamed. For >1000 metrics, metric streams are almost always
-  cheaper. For <100 metrics queried occasionally, GetMetricData may be
-  cheaper.
-
-- **"The namespace filter is a convenience, not a cost control."** It
-  IS the primary cost control. Metric streams charge per metric per
-  month. Streaming every namespace in a busy account can mean hundreds
-  of thousands of metrics. Use the include filter to stream only the
-  namespaces you actually export to S3 (e.g., `AWS/EC2`, `AWS/Lambda`,
-  `ApplicationMetrics`).
-
-- **"Firehose delivers metrics in real-time."** It does not. Firehose
-  buffers data based on buffer size (1-128 MB) and buffer interval
-  (60-900 seconds). The default buffering adds 1-5 minutes of latency.
-  For real-time alerting, use CloudWatch alarms directly — do NOT pipe
-  a metric stream into an alerting pipeline.
+Provisioning-time misconceptions (metric streams vs GetMetricData interchangeability, namespace filter as the primary cost control, Firehose is not real-time) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when weighing polling vs streaming, filter scope, or latency expectations.
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -260,63 +238,16 @@ format.
 The metric stream targets a Firehose delivery stream ARN. The Firehose
 must already exist and be configured with an S3 destination.
 
-```bash
-# Create the Firehose delivery stream (if not already existing)
-aws firehose create-delivery-stream \
-  --delivery-stream-name "cw-metrics-to-s3" \
-  --delivery-stream-type DirectPut \
-  --s3-destination-configuration '{
-    "RoleARN": "arn:aws:iam::123456789012:role/FirehoseS3Role",
-    "BucketARN": "arn:aws:s3:::my-cloudwatch-metrics",
-    "Prefix": "cloudwatch-metrics/",
-    "BufferingHints": {"SizeInMBs": 5, "IntervalInSeconds": 300},
-    "CompressionFormat": "GZIP",
-    "EncryptionConfiguration": {"KMSEncryptionConfig": {"AWSKMSKeyARN": "arn:aws:kms:us-east-1:123456789012:key/abc123"}}
-  }' \
-  --region us-east-1
-```
-
-**Create the metric stream referencing the Firehose:**
-
-```bash
-aws cloudwatch put-metric-stream \
-  --name "ProductionMetricStream" \
-  --firehose-arn "arn:aws:firehose:us-east-1:123456789012:deliverystream/cw-metrics-to-s3" \
-  --role-arn "arn:aws:iam::123456789012:role/CWMetricStreamRole" \
-  --output-format "json" \
-  --include-filters '[{"Namespace":"AWS/EC2"},{"Namespace":"AWS/Lambda"}]' \
-  --statistics "Average Sum SampleCount" \
-  --region us-east-1
-```
+Firehose delivery-stream creation and the put-metric-stream binding CLI moved verbatim to [references/firehose-and-output-formats.md](references/firehose-and-output-formats.md).
+Load it when emitting the Step 2 provisioning commands.
 
 ## Step 3 — Namespace filter (include/exclude)
 
 The namespace filter is the PRIMARY cost control. Use it to stream
 only the namespaces you need.
 
-**Include filter (recommended):**
-
-```bash
-aws cloudwatch put-metric-stream \
-  --name "ProductionMetricStream" \
-  --firehose-arn "arn:aws:firehose:us-east-1:123456789012:deliverystream/cw-metrics-to-s3" \
-  --role-arn "arn:aws:iam::123456789012:role/CWMetricStreamRole" \
-  --output-format "json" \
-  --include-filters '[{"Namespace":"AWS/EC2"},{"Namespace":"AWS/Lambda"},{"Namespace":"AWS/RDS"}]' \
-  --region us-east-1
-```
-
-**Exclude filter (stream everything except):**
-
-```bash
-aws cloudwatch put-metric-stream \
-  --name "ProductionMetricStream" \
-  --firehose-arn "arn:aws:firehose:us-east-1:123456789012:deliverystream/cw-metrics-to-s3" \
-  --role-arn "arn:aws:iam::123456789012:role/CWMetricStreamRole" \
-  --output-format "json" \
-  --exclude-filters '[{"Namespace":"AWS/Logs"}]' \
-  --region us-east-1
-```
+Include-filter and exclude-filter put-metric-stream CLI moved verbatim to [references/filters-and-cost.md](references/filters-and-cost.md).
+Load it when emitting filter-scoped provisioning commands.
 
 **Critical:** omitting both filters streams ALL namespaces — the most
 expensive option. Always start with an include filter.
@@ -328,15 +259,8 @@ emitted per metric. Available statistics: `Average`, `Sum`,
 `SampleCount`, `Min`, `Max`, and percentiles (`p99`, `p95`, `p50`,
 etc.).
 
-```bash
-aws cloudwatch put-metric-stream \
-  --name "ProductionMetricStream" \
-  --firehose-arn "..." \
-  --role-arn "..." \
-  --output-format "json" \
-  --statistics "Average Sum SampleCount Min Max" \
-  --region us-east-1
-```
+Statistics-selection put-metric-stream CLI moved verbatim to [references/filters-and-cost.md](references/filters-and-cost.md).
+Load it when emitting statistics-scoped provisioning commands.
 
 **Critical:** omitting `--statistics` defaults to ALL statistics,
 which multiplies the output volume per metric. Only request the
@@ -354,23 +278,8 @@ aggregation — it is handled by CloudWatch.
 | `json` | CloudWatch JSON format (embedded JSON in Firehose records) | AWS-native tools, Athena queries, custom processing |
 | `opentelemetry` | OpenTelemetry 1.1.0 format | Third-party tools (Datadog, NewRelic, Grafana, Splunk) |
 
-**JSON output example:**
-
-```json
-{
-  "metric_stream_name": "ProductionMetricStream",
-  "namespace": "AWS/EC2",
-  "metric_name": "CPUUtilization",
-  "dimensions": {"InstanceId": "i-aaa111bb222"},
-  "timestamp": 1716000000,
-  "value": 42.5,
-  "unit": "Percent"
-}
-```
-
-**OpenTelemetry output:** metrics are encoded as OTLP gauge / sum
-data points. Choose this when forwarding to OpenTelemetry-compatible
-backends.
+JSON record example and OpenTelemetry output notes moved verbatim to [references/firehose-and-output-formats.md](references/firehose-and-output-formats.md).
+Load it when choosing json vs opentelemetry for the downstream consumer.
 
 ## Step 6 — IAM role permissions
 
@@ -466,18 +375,8 @@ Compare to GetMetricData polling:
 
 Firehose buffers data before writing to S3. This adds delivery delay.
 
-```bash
-# Configure buffering (lower interval = faster delivery, more PUTs)
-aws firehose update-destination \
-  --delivery-stream-name "cw-metrics-to-s3" \
-  --current-delivery-stream-version-id "1" \
-  --destination-id "destinationId-000000000001" \
-  --s3-destination-update '{
-    "BufferingHints": {"SizeInMBs": 5, "IntervalInSeconds": 60},
-    "CompressionFormat": "GZIP"
-  }' \
-  --region us-east-1
-```
+Firehose update-destination buffering CLI moved verbatim to [references/firehose-and-output-formats.md](references/firehose-and-output-formats.md).
+Load it when tuning delivery latency vs S3 PUT volume.
 
 **Tradeoff:**
 - Lower interval (60s): faster delivery, more S3 PUT requests, smaller
@@ -490,46 +389,13 @@ long-term archival, use 300-900 seconds.
 
 ## Step 10 — CloudWatch API operations
 
-| API | Purpose |
-|---|---|
-| `PutMetricStream` | Create a new metric stream |
-| `GetMetricStream` | Retrieve a metric stream's configuration |
-| `ListMetricStreams` | List all metric streams in the region |
-| `DeleteMetricStream` | Delete a metric stream |
-| `StartMetricStreams` | Resume a stopped stream |
-| `StopMetricStreams` | Temporarily stop a stream (billing pauses) |
-
-```bash
-# Get stream configuration
-aws cloudwatch get-metric-stream --name "ProductionMetricStream" --region us-east-1
-
-# List all streams
-aws cloudwatch list-metric-streams --region us-east-1
-
-# Stop a stream (pause billing)
-aws cloudwatch stop-metric-streams --names "ProductionMetricStream" --region us-east-1
-
-# Delete a stream
-aws cloudwatch delete-metric-stream --name "ProductionMetricStream" --region us-east-1
-```
+Metric stream lifecycle API table and get/list/stop/delete CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load it when inspecting, pausing, or removing a stream.
 
 ## Step 11 — Recent features
 
-- **OpenTelemetry 1.1.0 output format (2023-2024):** metric streams
-  now support OpenTelemetry output for direct integration with third-
-  party observability platforms (Datadog, NewRelic, Grafana, Splunk).
-- **Cross-account metric streaming (2023-2024):** metric streams can
-  deliver to Firehose delivery streams in different accounts, enabling
-  centralized observability without per-account S3 buckets.
-- **Percentile statistics (2023-2024):** metric streams now support
-  percentile statistics (p99, p95, p50) in addition to standard
-  statistics.
-- **Statistics filtering (2024-2025):** the `--statistics` parameter
-  now allows selecting specific statistics, reducing output volume per
-  metric.
-- **Terraform provider (2024-2025):** the `aws_cloudwatch_metric_stream`
-  Terraform resource now supports `include_filter`, `exclude_filter`,
-  `statistics`, and `output_format`.
+Recent features (OpenTelemetry 1.1.0 output, cross-account streaming, percentile statistics, statistics filtering, Terraform resource parity) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when advising on 2023-2025 feature availability.
 
 ## NEVER do these things
 
@@ -621,24 +487,16 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-- **Stream shows "running" but no data in S3:** the IAM role trust
-  policy does not include `cloudwatch.amazonaws.com`, or the role
-  lacks `firehose:PutRecord` permission. Verify the trust policy and
-  permissions. Check CloudTrail for `AccessDenied` from
-  `cloudwatch.amazonaws.com`.
-- **Data delayed by >5 minutes:** Firehose buffer interval is set too
-  high (e.g., 900 seconds), or the metric stream is low-traffic (buffer
-  size not reached, so interval dominates). Reduce buffer interval.
-- **Stream cost higher than expected:** no namespace filter (streaming
-  ALL metrics), or too many statistics requested. Add an include
-  filter and reduce the statistics list.
-- **Firehose not delivering to S3:** Firehose role lacks
-  `s3:PutObject` on the bucket, or KMS key policy lacks
-  `kms:GenerateDataKey` for the Firehose role. Check Firehose
-  CloudWatch metrics (`DeliveryToS3.Success`).
-- **GetMetricData throttling when migrating:** if migrating from
-  GetMetricData polling, the old polling may still be running. Disable
-  the old polling jobs after the metric stream is verified.
+Silent-failure and cost-surprise error handling (running-but-empty stream, >5-minute delay, cost overruns, Firehose not delivering, GetMetricData throttling during migration) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load it when a deployed stream misbehaves.
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — provisioning-time misconceptions and 2023-2025 feature changes moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — metric stream lifecycle API table and get/list/stop/delete CLI moved from SKILL.md
+- [references/error-handling.md](references/error-handling.md) — silent-failure and cost-surprise error table moved from SKILL.md
+- [references/firehose-and-output-formats.md](references/firehose-and-output-formats.md) — Firehose + metric stream creation CLI, output format examples, buffering config moved from SKILL.md
+- [references/filters-and-cost.md](references/filters-and-cost.md) — include/exclude filter CLI and statistics selection CLI moved from SKILL.md
 
 ## Domain
 

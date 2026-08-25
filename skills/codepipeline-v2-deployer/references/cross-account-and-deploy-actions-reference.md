@@ -260,3 +260,33 @@ Configuration:
 - **CodeDeploy deploy action reference** — https://docs.aws.amazon.com/codepipeline/latest/userguide/action-reference-CodeDeploy.html
 - **CodeConnections** — https://docs.aws.amazon.com/codeconnections/latest/userguide/welcome.html
 - **KMS key policies for cross-account** — https://docs.aws.amazon.com/kms/latest/developerguide/key-policies.html
+
+## Step 8 - Cross-account deployment (moved from SKILL.md)
+
+Cross-account requires three coordinated resources:
+
+1. **KMS key in source account** with a key policy granting the
+   target account's deployment role `kms:Decrypt` and
+   `kms:GenerateDataKey`.
+2. **Cross-account IAM role in target account** that CloudFormation
+   (or ECS / CodeDeploy) assumes. Trust policy allows the pipeline
+   role from the source account.
+3. **Artifact bucket policy** granting the target account's role
+   `s3:GetObject` on the encrypted artifacts.
+
+```bash
+aws kms create-key --policy file://kms-key-policy.json
+# Key policy grants: pipeline role (kms:GenerateDataKey, kms:Decrypt);
+#                    target account deployment role (kms:Decrypt).
+
+aws iam create-role --role-name CrossAccountCFNExecution \
+  --assume-role-policy-document file://trust-policy.json
+# Trust policy principal: arn:aws:iam::<source-account>:role/<pipeline-role>
+```
+
+**Anti-pattern:** sharing the artifact bucket without KMS. S3 bucket
+policies alone do NOT grant cross-account access to encrypted objects
+— the KMS key policy must also grant the target role. A bucket policy
+without KMS policy produces "Access Denied" errors in the deploy
+action that look like S3 issues but are actually KMS issues.
+

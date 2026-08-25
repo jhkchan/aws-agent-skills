@@ -119,24 +119,8 @@ MISSING:
 If the user reports "my query is broken" but does not know the query
 text, ask for it. Then verify the log group exists:
 
-```bash
-# List log groups to confirm the name (and find the right one):
-aws logs describe-log-groups \
-  --log-group-name-prefix <prefix> \
-  --query 'logGroups[*].{name:logGroupName,arn:arn,storedBytes:storedBytes,retention:retentionInDays}'
-
-# Check recent ingestion (does the log group have data at all?):
-aws logs describe-log-streams \
-  --log-group-name <log-group> \
-  --order-by LastEventTime \
-  --descending \
-  --limit 5 \
-  --query 'logStreams[*].{name:logStreamName,lastEvent:lastIngestionTime,firstEvent:firstEventTimestamp}'
-```
-
-The `lastIngestionTime` confirms whether the log group has received
-data recently. A log group with no recent streams will return no
-results regardless of the query.
+Step 0 log-group verification commands (describe-log-groups, describe-log-streams with the lastIngestionTime staleness note) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when verifying the log group exists and has recent data.
 
 ### Step 1: Identify the symptom category
 
@@ -160,11 +144,8 @@ fixing the query will not help.
 
 ### Step 2: NO_RESULTS diagnostic (query returns 0 rows)
 
-A query that completes with zero rows means the query ran but matched
-nothing. The cause is almost always one of: wrong log group, time
-range outside the ingestion window, filter pattern too restrictive,
-or field name mismatch (the `filter` references a field that does not
-exist in the log payload).
+Step 2 rationale and common fix patterns moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md); the NO_RESULTS diagnostic command listing (describe-log-groups, describe-log-streams, start-query, get-query-results) moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when running the NO_RESULTS walk; the sub-symptom table, diagnostic walk, and probes stay inline below.
 
 | Sub-symptom | Root cause | Probe |
 |---|---|---|
@@ -196,52 +177,10 @@ exist in the log payload).
    `filter @message like "ERROR*"` treats `*` as a regex quantifier,
    not a wildcard. Use `/ERROR.*/` or `strcontains(@message, "ERROR")`.
 
-**Diagnostic commands:**
-
-```bash
-# Confirm the log group exists and has recent data:
-aws logs describe-log-groups \
-  --log-group-name-prefix <prefix> \
-  --query 'logGroups[*].{name:logGroupName,arn:arn,storedBytes:storedBytes}'
-
-# Check the most recent ingestion timestamp:
-aws logs describe-log-streams \
-  --log-group-name <log-group> \
-  --order-by LastEventTime \
-  --descending \
-  --limit 1 \
-  --query 'logStreams[0].{stream:logStreamName,lastEvent:lastIngestionTime,firstEvent:firstEventTimestamp}'
-
-# Start a minimal query to confirm data presence (1-minute window):
-QUERY_ID=$(aws logs start-query \
-  --log-group-name <log-group> \
-  --start-time $(date -d '5 minutes ago' +%s) \
-  --end-time $(date +%s) \
-  --query-string 'fields @timestamp, @message | sort @timestamp desc | limit 10' \
-  --query 'queryId')
-
-# Poll for results:
-aws logs get-query-results --query-id "$QUERY_ID"
-```
-
-**Common fix patterns:**
-
-- **Wrong log group:** correct the name; verify with
-  `describe-log-groups`.
-- **Time range outside ingestion:** widen to include
-  `lastIngestionTime`, or confirm the app is emitting logs.
-- **Filter too restrictive:** run without filter first to confirm
-  data, then add filters back one at a time.
-- **Case sensitivity:** use `(?i)` in regex or `strcontains`.
-- **Field name mismatch:** inspect `@message`; use `parse` to extract
-  fields from non-JSON logs before filtering.
-
 ### Step 3: TIMEOUT diagnostic (query cancelled or timed out)
 
-A query that times out or is cancelled scanned too much data. Logs
-Insights enforces a limit on the volume of data scanned per query.
-The fix is always to reduce the data scanned — not to "make the query
-faster."
+Step 3 rationale moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md); the before-and-after query example moved to [references/worked-examples.md](references/worked-examples.md); the TIMEOUT diagnostic command listing (describe-queries, IncomingBytes) moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when optimizing a timed-out query; the sub-symptom table and data-scan reduction hierarchy stay inline below.
 
 | Sub-symptom | Root cause | Probe |
 |---|---|---|
@@ -267,56 +206,10 @@ faster."
 5. **Reduce the number of log groups.** Querying across many log
    groups multiplies the scan. Split into per-group queries.
 
-**Before-and-after example:**
-
-```text
-# BEFORE — times out (scans everything, sorts everything, then limits):
-fields @timestamp, @message, level, service
-| parse @message "* * * *" as timestamp, level, service, msg
-| sort @timestamp desc
-| limit 1000
-
-# AFTER — completes in seconds (filter first, aggregate, sort last):
-filter @message like /ERROR/
-| parse @message "* * * *" as timestamp, level, service, msg
-| stats count() as errorCount by service
-| sort errorCount desc
-| limit 20
-```
-
-**Diagnostic commands:**
-
-```bash
-# Check the status of the most recent queries (find timeouts):
-aws logs describe-queries \
-  --log-group-name <log-group> \
-  --status Cancelled \
-  --max-results 10 \
-  --query 'queries[*].{id:queryId,status:status,created:createTime,queryString:queryString}'
-
-# Also check Failed queries:
-aws logs describe-queries \
-  --log-group-name <log-group> \
-  --status Failed \
-  --max-results 10
-
-# Check ingestion volume (is a spike causing the timeout?):
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/Logs \
-  --metric-name IncomingBytes \
-  --dimensions Name=LogGroupName,Value=<log-group> \
-  --start-time $(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 3600 \
-  --statistics Sum \
-  --query 'Datapoints[*].{time:Timestamp,bytes:Sum}'
-```
-
 ### Step 4: SYNTAX_ERROR diagnostic
 
-Logs Insights uses a pipe-delimited query language. Syntax errors
-typically involve quoting, the `stats` aggregation syntax, the
-`parse` pattern, or the `sort`/`limit` placement.
+Step 4 rationale moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md); the WRONG/RIGHT syntax-error pattern pairs moved to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when correcting a syntax error; the error-message table, command ordering rules, and diagnostic walk stay inline below.
 
 | Error message sub-string | Root cause | Fix |
 |---|---|---|
@@ -350,35 +243,6 @@ fields <field-list>
 - `display` reorders/renames columns; runs after `stats`.
 - `limit` must be the LAST command.
 
-**Common syntax-error patterns:**
-
-```text
-# WRONG — limit before sort:
-fields @timestamp, @message | limit 10 | sort @timestamp desc
-# RIGHT:
-fields @timestamp, @message | sort @timestamp desc | limit 10
-
-# WRONG — stats without aggregation function:
-fields duration | stats by service
-# RIGHT:
-fields duration | stats avg(duration) as avgDuration by service
-
-# WRONG — filter referencing a parsed field before parse:
-filter parsedLevel = "ERROR" | parse @message "* *" as ts, parsedLevel
-# RIGHT:
-parse @message "* *" as ts, parsedLevel | filter parsedLevel = "ERROR"
-
-# WRONG — regex in like without slashes:
-filter @message like "ERROR\s\d+"
-# RIGHT (regex must be in /.../):
-filter @message like /ERROR\s\d+/
-
-# WRONG — glob wildcard in like (treated as regex quantifier):
-filter @message like "ERROR*"
-# RIGHT (use regex .*) or use strcontains:
-filter @message like /ERROR.*/  |  filter strcontains(@message, "ERROR")
-```
-
 **Diagnostic walk:**
 
 1. **Read the exact error message.** Logs Insights reports the
@@ -395,11 +259,8 @@ filter @message like /ERROR.*/  |  filter strcontains(@message, "ERROR")
 
 ### Step 5: CONTRIBUTOR_INSIGHTS diagnostic (empty / blank)
 
-Contributor Insights is a SEPARATE feature from Logs Insights. It
-runs pre-defined rules that aggregate log data into top-N contributor
-reports (top source IPs, top user agents, etc.). It does NOT use Logs
-Insights query syntax, and enabling Logs Insights does NOT enable
-Contributor Insights.
+Step 5 rationale and common fix patterns moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md); the Contributor Insights diagnostic command listing (describe-contributor-insights, put-insight-rule) moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when checking a rule; the sub-symptom table stays inline below.
 
 | Sub-symptom | Root cause | Probe |
 |---|---|---|
@@ -409,38 +270,10 @@ Contributor Insights.
 | Rule works for one log group but not another | Each log group needs its OWN Contributor Insights rule | Create a rule per log group; rules do not cascade |
 | User expects Logs Insights query to populate Contributor Insights | Conceptual mismatch — Logs Insights and Contributor Insights are independent | Clarify the two features; create a Contributor Insights rule separately |
 
-**Diagnostic commands:**
-
-```bash
-# Check if a Contributor Insights rule exists and its status:
-aws logs describe-contributor-insights \
-  --log-group-name <log-group> \
-  --query '{status: status, ruleName: contributionLogGroupMetrics[0].name}'
-
-# List ALL Contributor Insights rules (find a missing one):
-aws logs describe-contributor-insights
-
-# Create a rule (if missing):
-aws logs put-insight-rule \
-  --rule-name my-rule \
-  --rule-state Enabled \
-  --rule-definition '{"Schema":{"Name":"ContributorInsights","Version":1},"LogGroupNames":["<log-group>"],"LogFormat":"JSON","Fields":["sourceIp","userAgent"]}'
-```
-
-**Common fix patterns:**
-
-- **No rule exists:** create one via `put-insight-rule`. Each log group
-  needs its own rule.
-- **Rule is `DISABLED`:** re-enable with `--rule-state Enabled`.
-- **Wrong log group:** the `LogGroupNames` array must include the exact
-  log group name.
-- **Log format changed:** update the rule's `LogFormat` (`JSON` vs
-  `CLF`/custom) if the app switched log formats.
-
 ### Step 6: METRIC_FILTER_CONFUSION diagnostic
 
-Metric filters and Logs Insights are different features with different
-purposes:
+Step 6 rationale and common fix patterns moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md); the metric-filter diagnostic command listing (describe-metric-filters, test-metric-filter) moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when testing filter patterns; the feature comparison and sub-symptom tables stay inline below.
 
 | Feature | Purpose | Output | Syntax |
 |---|---|---|---|
@@ -454,25 +287,6 @@ purposes:
 | User expects a metric alarm but is running Logs Insights | Logs Insights does not emit metrics; metric filters do | Create a metric filter with the right filter pattern; set an alarm on the emitted metric |
 | User has a metric filter but sees no metric data | Filter pattern does not match log format, or metric namespace/name is wrong | Test the filter pattern with `test-metric-filter`; verify the metric namespace and name |
 | User pastes a JSON token filter pattern into Logs Insights | JSON token patterns are metric-filter syntax, not Logs Insights | Convert to Logs Insights `filter` syntax |
-
-**Diagnostic commands:**
-
-```bash
-# List metric filters for a log group:
-aws logs describe-metric-filters \
-  --log-group-name <log-group> \
-  --query 'metricFilters[*].{name:filterName,pattern:filterPattern,namespace:metricTransformations[0].metricNamespace}'
-
-# Test a metric filter pattern against sample log data:
-aws logs test-metric-filter \
-  --filter-pattern '{ $.level = "ERROR" }' \
-  --log-event-messages '{"level":"ERROR","msg":"disk full"}'
-```
-
-**Common fix patterns:** use metric filters for metrics + alarms, Logs
-Insights for ad-hoc queries. Test patterns with `test-metric-filter`.
-Verify the alarm references the same namespace and metric name as the
-filter's `metricTransformations`.
 
 ### Step 7: PATTERN_ANOMALY diagnostic (pattern command + anomaly detection)
 
@@ -488,20 +302,8 @@ content patterns.
 | Anomaly detection shows no anomalies | Baseline window too short (needs sufficient data) | Anomaly detection requires a baseline; widen the time range to build a baseline |
 | Anomaly detection shows everything as anomalous | Baseline window includes the anomaly itself | Use a longer time range so the anomaly is a small portion of the baseline |
 
-**`pattern` command usage:**
-
-```text
-# Auto-detect patterns in raw log messages:
-fields @timestamp, @message
-| pattern @message
-| limit 20
-
-# Pattern detection with a filter (recommended):
-filter level = "ERROR"
-| pattern @message
-| display @pattern, @sampleCount, @representation
-| limit 20
-```
+The `pattern` command usage examples moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when troubleshooting pattern output; the sub-symptom table and pattern/anomaly semantics stay inline below.
 
 The `pattern` command outputs `@pattern` (detected pattern with
 wildcards), `@sampleCount` (number of matching events), and
@@ -676,24 +478,8 @@ else. They are the single most effective fix.
 
 ## Recent AWS features (2024-2026)
 
-- **Logs Insights `pattern` command (2024 GA):** auto-detects and
-  clusters log patterns. Usage: `fields @timestamp, @message | pattern
-  @message | limit 20`. Outputs `@pattern`, `@sampleCount`,
-  `@representation`. Troubleshoot empty results by ensuring
-  `@message` is available (not consumed by a prior `parse`).
-- **Logs Insights anomaly detection (2024-2025):** the console
-  anomaly view compares recent log volumes to a historical baseline.
-  Requires 2+ weeks of data. Troubleshoot by verifying
-  `stats count() by bin(5m)` produces the time series and the
-  grouping field exists.
-- **CloudWatch Logs integrated query experience (2025):** the unified
-  console merges Logs Insights, Contributor Insights, and metric
-  filters into one "Logs" tab — making METRIC_FILTER_CONFUSION more
-  common. Verify which sub-feature the user is actually using.
-- **CloudWatch Logs data protection (2024-2026):** data protection
-  policies mask sensitive fields in `@message` (replaced with `***`).
-  If a previously-working filter stops matching, check the log
-  group's data protection policy.
+Recent AWS features (2024-2026) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when a previously-working filter stops matching (data protection) or the console shows the unified Logs experience (2025).
 
 ## References
 
@@ -702,6 +488,14 @@ command reference (fields, filter, parse, stats, sort, display, limit,
 pattern) with syntax diagrams and examples, and
 `references/diagnostic-decision-tree.md` for the complete
 symptom-to-cause walk with worked examples per category.
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — step rationale, common fix patterns, and Recent AWS features (2024-2026) moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 0-6 diagnostic command listings moved from SKILL.md
+- [references/worked-examples.md](references/worked-examples.md) — before/after timeout example, syntax-error WRONG/RIGHT pairs, and pattern-command usage moved from SKILL.md
+- [references/query-syntax-reference.md](references/query-syntax-reference.md) — full Logs Insights command reference (pre-existing)
+- [references/diagnostic-decision-tree.md](references/diagnostic-decision-tree.md) — complete symptom-to-cause walk with worked examples per category (pre-existing)
 
 ## Domain
 

@@ -76,34 +76,8 @@ escalate to the application.
 
 ## Philosophy
 
-Four behaviours separate a senior CloudWatch engineer from a generalist:
-
-- **The sequence token is per-stream and per-call.** Each PutLogEvents
-  call (after the first) must include the `sequenceToken` returned by
-  the previous successful call to the same log stream. The token
-  serialises writes; two concurrent emitters writing to the same
-  stream will collide, each seeing the other's token as stale. The
-  fix is one writer per stream, or per-stream tokens refreshed before
-  every write.
-- **The Lambda log group is auto-created on first invocation — but
-  only if the execution role allows `logs:CreateLogGroup`.** If the
-  role lacks `logs:CreateLogGroup`, the first invocation silently
-  drops logs (the function runs, but no log group is created and no
-  error is surfaced in the function response). Operators who "see no
-  Lambda logs" on a newly-deployed function almost always have a
-  role missing `logs:CreateLogGroup` or `logs:CreateLogStream`.
-- **Retention expires log streams silently.** A retention policy of
-  `7 days` deletes log streams older than 7 days without a CloudTrail
-  event (the deletion is internal to CloudWatch). Operators who "lost
-  last week's logs" almost always had a retention policy shorter than
-  they thought, or someone lowered the retention window.
-- **Cross-account delivery is gated by the destination's resource
-  policy, not by the source's IAM.** The source account's emitter
-  needs `logs:PutLogEvents` in its IAM policy, but the destination
-  account's log group must also have a resource-based policy
-  permitting the source account. Operators who "added IAM on the
-  source" but still see cross-account delivery fail always missed
-  the destination-side policy.
+The four senior-operator behaviours (per-stream sequence tokens, Lambda auto-create IAM gating, silent retention expiry, destination-gated cross-account delivery) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for the reasoning behind the diagnostic order.
 
 ## Quick reference — symptom triage table
 
@@ -125,32 +99,8 @@ Four behaviours separate a senior CloudWatch engineer from a generalist:
 
 ### Account-wide pre-flight commands
 
-```bash
-# 1. Log group configuration (retention, kmsKeyId, dataProtectionPolicy)
-aws logs describe-log-groups --log-group-name-prefix <prefix> --output json
-
-# 2. Latest log streams (is anything arriving?)
-aws logs describe-log-streams --log-group-name <group> \
-  --order-by LastEventTime --descending --limit 5 --output json
-
-# 3. Recent ingested events (if any)
-aws logs get-log-events --log-group-name <group> \
-  --log-stream-name <stream> --limit 10 --output json
-
-# 4. Subscription filters (fan-out that consumes Lambda concurrency)
-aws logs describe-subscription-filters --log-group-name <group> --output json
-
-# 5. Metric filters (pattern may not match the application log format)
-aws logs describe-metric-filters --log-group-name <group> --output json
-
-# 6. Data protection policy (account-level content blocking)
-aws logs get-data-protection-policy --log-group-name <group> --output json 2>/dev/null || \
-  echo "No data protection policy"
-
-# 7. AWS Health (regional CloudWatch Logs events)
-aws health describe-events --filter eventStatusCodes=OPEN,UPCOMING \
-  --region us-east-1 --output json
-```
+Account-wide pre-flight command listing (describe-log-groups, describe-log-streams, get-log-events, describe-subscription-filters, describe-metric-filters, get-data-protection-policy, health describe-events) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before live-account diagnosis.
 
 ### Log-group-state short-circuit
 
@@ -183,51 +133,8 @@ REMEDIATION: Re-prompt the operator for: (1) the exact error string or
 
 ### Step 0: Non-obvious behaviours that change diagnosis
 
-- **The sequence token must come from the previous PutLogEvents
-  response.** Each call (after the first) must include the
-  `sequenceToken` returned by the prior successful call to the same
-  log stream. A stale or cached token produces
-  `InvalidSequenceTokenException`. The token serialises writes; two
-  concurrent emitters writing to the same stream will collide.
-- **Lambda auto-creates the log group on first invocation only if the
-  role allows it.** The Lambda service principal attempts to create
-  `/aws/lambda/<name>` on the first invocation. If the execution role
-  lacks `logs:CreateLogGroup`, the creation silently fails (no error
-  in the function response) and subsequent invocations continue to
-  drop logs.
-- **Retention deletes log streams silently, without a CloudTrail
-  event.** The deletion is internal to CloudWatch Logs; CloudTrail
-  does not record individual stream expirations. Operators who "lost
-  logs but see no DeleteLogStream event" almost always had retention
-  expiry, not a malicious deletion.
-- **Subscription filters share the account's Lambda concurrency
-  budget.** Each subscription invokes its Lambda destination once per
-  batch. Lambda subscriptions are subject to a per-account reservation
-  of up to 2x the account's concurrent-invocations quota for
-  subscription deliveries; a fan-out across several filters can
-  exhaust the budget and silently drop batches.
-- **Cross-account delivery needs a resource policy on the destination
-  log group.** The destination account must attach a resource-based
-  policy to the destination log group (or use a CloudWatch Logs
-  destination with `put-destination-policy`) granting the source
-  account `logs:PutLogEvents`. IAM alone on the source side is not
-  sufficient.
-- **Metric filter patterns are tested against the raw event message,
-  not JSON.** A metric filter pattern like `{ $.status = 500 }` only
-  matches if the log event is valid JSON with a `status` field. A
-  text-formatted log line (`[ERROR] 500 ...`) will not match; the
-  filter silently produces zero metric points.
-- **Data protection policies redact at ingestion time.** An account-
-  level data protection policy on the log group replaces sensitive
-  data patterns (e.g., AWS access keys, email addresses) with
-  `{{REDACTED}}` as events are ingested. Operators who "see
-  `{{REDACTED}}` in CloudWatch Logs" almost always have a data
-  protection policy active on the group.
-- **CloudWatch agent `log_stream_name` defaults to `{instance_id}`.**
-  A wrong `log_stream_name` template (e.g., a hardcoded string
-  shared across hosts) causes concurrent writes to the same stream
-  and sequence-token collisions. Use `{instance_id}` or `{hostname}`
-  for one-stream-per-host.
+Step 0 non-obvious behaviours (sequence-token serialization, Lambda auto-create gating, silent retention deletion, subscription concurrency budget, destination resource policies, metric-filter raw-message matching, ingestion-time redaction, agent log_stream_name defaults) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand — each behaviour changes which layer the symptom routes to.
 
 ### Step 1: Symptom entry
 
@@ -249,12 +156,8 @@ REMEDIATION: Re-prompt the operator for: (1) the exact error string or
 
 Symptom: logs not appearing where the operator expects them.
 
-```bash
-aws logs describe-log-groups --log-group-name-prefix <expected-prefix> --output json
-aws logs describe-log-streams --log-group-name <group> \
-  --order-by LastEventTime --descending --limit 5 --output json
-```
-
+LOG_GROUP_NAMING probe commands (describe-log-groups / describe-log-streams by prefix) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when executing this layer's probe.
 Common naming mismatches:
 
 | Source | Expected log group | Common mistake |
@@ -274,15 +177,8 @@ group name with what the operator expects to query.
 Symptom: `AccessDenied ... is not authorized to perform:
 logs:PutLogEvents` or `logs:CreateLogStream`.
 
-```bash
-aws iam simulate-principal-policy \
-  --policy-source-arn <emitter-arn> \
-  --action-names logs:CreateLogGroup logs:CreateLogStream \
-                logs:PutLogEvents logs:DescribeLogStreams \
-  --resource-arns arn:aws:logs:<region>:<account>:log-group:<group>:* \
-  --output json --profile <p>
-```
-
+IAM_PERMISSIONS probe (simulate-principal-policy for logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents, logs:DescribeLogStreams) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when executing this layer's probe.
 For an emitter to write to CloudWatch Logs, it needs at minimum:
 
 | Action | When |
@@ -304,12 +200,8 @@ detached, Lambda logs silently fail.
 Symptom: `InvalidSequenceTokenException: The given sequenceToken is
 invalid. The next expected sequenceToken is: <token>`.
 
-```bash
-aws logs describe-log-streams --log-group-name <group> \
-  --log-stream-name-prefix <stream> --output json | \
-  jq '.logStreams[0] | {logStreamName, uploadSequenceToken}'
-```
-
+SEQUENCE_TOKEN probe (describe-log-streams uploadSequenceToken via jq) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when executing this layer's probe.
 The `uploadSequenceToken` returned by `describe-log-streams` is the
 token the next PutLogEvents call must include. Common causes:
 
@@ -330,16 +222,8 @@ response's `nextSequenceToken`) before every write.
 Symptom: agent is running (`status: running`) but no logs appear in
 CloudWatch.
 
-```bash
-# Agent status
-/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
-  -a status 2>/dev/null || \
-  systemctl status amazon-cloudwatch-agent 2>/dev/null
-
-# Agent configuration
-cat /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json | jq .logs
-```
-
+AGENT_MISCONFIG probes (agent status via amazon-cloudwatch-agent-ctl, config jq) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when executing this layer's probe.
 Common misconfigurations:
 
 | Pattern | Cause |
@@ -361,11 +245,8 @@ agent, verify with `get-log-events`.
 
 Symptom: VPC Flow Logs are enabled but the log group is empty.
 
-```bash
-aws ec2 describe-flow-logs --filter Name=log-group-name,Values=<group> \
-  --output json --profile <p>
-```
-
+VPC_FLOW_LOGS_DELIVERY probe (ec2 describe-flow-logs) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when executing this layer's probe.
 | `describe-flow-logs` field | Effect |
 |---|---|
 | Flow log missing | No flow log is configured for the VPC/ENI/Subnet — create one |
@@ -385,17 +266,8 @@ the issue, **ROOT_CAUSE_IDENTIFIED** with
 Symptom: newly-deployed Lambda function runs successfully but no logs
 appear in CloudWatch.
 
-```bash
-aws lambda get-function-configuration --function-name <name> --output json | \
-  jq '.Role'
-
-aws iam simulate-principal-policy \
-  --policy-source-arn <role-arn> \
-  --action-names logs:CreateLogGroup logs:CreateLogStream logs:PutLogEvents \
-  --resource-arns "arn:aws:logs:<region>:<account>:log-group:*" \
-  --output json --profile <p>
-```
-
+LAMBDA_AUTO_CREATE probes (lambda get-function-configuration + simulate-principal-policy) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when executing this layer's probe.
 If the execution role lacks `logs:CreateLogGroup`, the Lambda service
 cannot create `/aws/lambda/<name>` on the first invocation and logs
 are silently dropped. If `logs:CreateLogGroup` returns `implicitDeny`,
@@ -408,11 +280,8 @@ attach `AWSLambdaBasicExecutionRole` (or add the missing
 Symptom: old log streams are vanishing; the log group has only recent
 streams.
 
-```bash
-aws logs describe-log-groups --log-group-name-prefix <group> --output json | \
-  jq '.logGroups[0].retentionInDays'
-```
-
+RETENTION_EXPIRED probe (describe-log-groups retentionInDays via jq) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when executing this layer's probe.
 If `retentionInDays` is shorter than expected (e.g., `1` when the
 operator thought it was `Never expire`), **ROOT_CAUSE_IDENTIFIED** with
 `LAYER: RETENTION_EXPIRED`. Fix: raise the retention with
@@ -425,19 +294,8 @@ Symptom: the subscription destination (Lambda / Kinesis) is starved or
 dropping batches; CloudWatch Logs shows the source log group receiving
 events but the downstream is not processing all of them.
 
-```bash
-aws logs describe-subscription-filters --log-group-name <group> --output json
-
-# Lambda concurrency utilisation for the destination
-aws cloudwatch get-metric-statistics --namespace AWS/Lambda \
-  --metric-name ConcurrentExecutions \
-  --dimensions Name=FunctionName,Value=<dest-function> \
-  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Maximum --output json
-
-aws lambda get-account-settings --output json | jq '.AccountLimit.ConcurrentExecutions'
-```
-
+SUBSCRIPTION_FILTER_CAPACITY probes (describe-subscription-filters, ConcurrentExecutions metrics, account limits) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when executing this layer's probe.
 Subscription filters deliver to Lambda at up to 2x the account's
 concurrent-invocations quota (a per-account subscription budget). A
 fan-out across several high-volume log groups can exhaust this budget
@@ -452,16 +310,8 @@ as the destination (higher throughput).
 Symptom: the log group is receiving events but the metric alarm is not
 firing.
 
-```bash
-aws logs describe-metric-filters --log-group-name <group> --output json | \
-  jq '.metricFilters[] | {filterName, filterPattern, metricTransformations}'
-
-# Test the pattern against actual log events
-aws logs filter-log-events --log-group-name <group> \
-  --filter-pattern '<pattern>' \
-  --start-time $(date -d '-1 hour' +%s)000 --output json | jq '.events | length'
-```
-
+METRIC_FILTER_PATTERN probes (describe-metric-filters, filter-log-events pattern test) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when executing this layer's probe.
 Common pattern issues:
 
 | Pattern | Issue |
@@ -480,10 +330,8 @@ the log format; verify with `filter-log-events`.
 Symptom: log events appear but contain `{{REDACTED}}` where sensitive
 data was expected.
 
-```bash
-aws logs get-data-protection-policy --log-group-name <group> --output json --profile <p>
-```
-
+DATA_PROTECTION_BLOCKING probe (get-data-protection-policy) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when executing this layer's probe.
 An account-level or log-group-level data protection policy replaces
 sensitive data patterns (AWS access keys, email addresses, credit card
 numbers) with `{{REDACTED}}` at ingestion time. If a data protection
@@ -497,14 +345,8 @@ owner.
 Symptom: source account A's logs are not arriving in destination
 account B's log group.
 
-```bash
-# Destination side: is there a destination resource policy?
-aws logs describe-resource-policies --output json --profile <dest-profile>
-
-# Or for put-destination (cross-account delivery via destination):
-aws logs describe-destinations --output json --profile <dest-profile>
-```
-
+CROSS_ACCOUNT_POLICY probes (describe-resource-policies, describe-destinations) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when executing this layer's probe.
 Cross-account log delivery requires a resource-based policy on the
 destination (account B) granting the source account (account A)
 `logs:PutLogEvents` (or `logs:PutSubscriptionFilter` for the
@@ -579,33 +421,8 @@ REMEDIATION:
 
 ### Worked example — SEQUENCE_TOKEN collision
 
-```text
-TARGET: /ecs/app
-VERDICT: ROOT_CAUSE_IDENTIFIED
-REASON: Two ECS tasks share the same log_stream_name ("app") in the
-  firelensConfiguration; each task's PutLogEvents call uses a token
-  from the previous successful call by either task, producing
-  InvalidSequenceTokenException on every other call.
-LAYER: SEQUENCE_TOKEN
-EVIDENCE:
-  - Symptom: approximately 50% of PutLogEvents calls from the ECS
-    tasks return InvalidSequenceTokenException; the other half
-    succeed.
-  - Probe: aws logs describe-log-streams --log-group-name /ecs/app
-    shows a single stream "app" with rapidly-changing
-    uploadSequenceToken.
-  - Probe: the ECS task definition's firelensConfiguration uses a
-    hardcoded log_stream_name "app" with no task-id suffix.
-  - Passing: the ECS task role has logs:PutLogEvents allowed (not an
-    IAM issue); retention is Never expire (not a retention issue).
-REMEDIATION:
-  1. Change the firelensConfiguration log_stream_name to include the
-     task id (e.g., "app-{task_id}") so each task writes to its own
-     stream.
-  2. Redeploy the task definition.
-  3. Verify with describe-log-streams — there should be N streams
-     (one per running task) and no InvalidSequenceTokenException.
-```
+Worked example — SEQUENCE_TOKEN collision (ECS firelens shared stream) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when diagnosing token collisions; the primary IAM_PERMISSIONS worked example stays inline above.
 
 ## Anti-Patterns — NEVER
 
@@ -650,56 +467,26 @@ REMEDIATION:
 
 ## Pre-flight safety checks (run before any state-changing CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`put-retention-policy`, `put-subscription-filter`,
-  `delete-subscription-filter`, `put-data-protection-policy`,
-  `put-resource-policy`, `put-destination-policy`, `associate-kms-key`),
-  emit and await operator approval.
-- **Read-only first.** Every probe is read-only (`describe-*`, `get-*`,
-  `simulate-principal-policy`, `lookup-events`). Do not perform
-  state-changing operations as diagnostic probes.
-- **`put-retention-policy`** is reversible but lowering the retention
-  permanently deletes streams older than the new window. Always raise
-  first, never lower, without explicit confirmation.
-- **`put-subscription-filter`** replaces the filter for the
-  destination; a wrong filter silently drops batches. Test with
-  `filter-log-events` first.
-- **`put-resource-policy`** changes who can write to the log group.
-  A too-broad principal leaks logs to unintended accounts.
-- **`associate-kms-key`** re-encrypts with the new key; existing
-  events remain under the prior key until expiry. Verify readers have
-  `kms:Decrypt` on the new key before switching.
-- **Bulk remediation batch limit.** Batch into groups of at most 5 log
-  groups, emit a single CONFIRM per batch, and verify between batches.
+Pre-flight safety checks (CONFIRM gate, read-only-first rule, retention/subscription/resource-policy/KMS warnings, batch limits) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before executing any state-changing CLI.
 
 ## Remediation guidance
 
-Each layer's fix is summarised below; the step sections above carry
-the full probe commands and worked examples.
-
-| Layer | Fix |
-|---|---|
-| LOG_GROUP_NAMING | Align the source's configured log group name with what the operator queries. Lambda: `/aws/lambda/<name>`. API Gateway: `API-Gateway-Execution-Logs_<id>/<stage>`. Agent: as configured in `logs.log_group_name`. |
-| LOG_STREAM_NAMING | Use `{instance_id}` or `{hostname}` for one-stream-per-host; include `{task_id}` for ECS tasks. Never share a stream across concurrent writers. |
-| IAM_PERMISSIONS | Add the missing action on the log group ARN: `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`. For Lambda, attach `AWSLambdaBasicExecutionRole`. |
-| SEQUENCE_TOKEN | One writer per stream; refresh the token from `describe-log-streams` (or the prior PutLogEvents `nextSequenceToken`) before every write. |
-| AGENT_MISCONFIG | Correct `logs_create_log_stream`, `log_stream_name`, `file_path`, `multi_line_start_pattern`. Restart the agent (`amazon-cloudwatch-agent-ctl -a start`). Verify the agent IAM role has `CloudWatchAgentServerPolicy`. |
-| VPC_FLOW_LOGS_DELIVERY | Verify `describe-flow-logs` shows `FlowLogStatus: ACTIVE`; check the `DeliverLogsPermissionArn` role has `logs:PutLogEvents`. Account for the 10-minute aggregation window. |
-| LAMBDA_AUTO_CREATE | Attach `AWSLambdaBasicExecutionRole` (or add `logs:CreateLogGroup`) to the execution role. Re-invoke to trigger auto-creation. |
-| RETENTION_EXPIRED | Raise retention: `aws logs put-retention-policy --log-group-name <group> --retention-in-days <new>`. Expired logs are not recoverable. |
-| SUBSCRIPTION_FILTER_CAPACITY | Provision reserved concurrency for the Lambda destination; reduce fan-out; or switch the destination to Kinesis for higher throughput. |
-| METRIC_FILTER_PATTERN | Correct the pattern to match the log format. JSON events: `{ $.status = 500 }`. Text events: `ERROR 500` (term-based). Verify with `filter-log-events`. |
-| RESOURCE_POLICY_CONFLICT | Resolve conflicts between resource policies on the log group (e.g., explicit deny overriding allow). Read with `describe-resource-policies`; merge carefully. |
-| DATA_PROTECTION_BLOCKING | Surface the policy; coordinate with the security owner before disabling or narrowing the pattern set. |
-| CROSS_ACCOUNT_POLICY | Add a resource-based policy on the destination log group granting the source account `logs:PutLogEvents`; or use `put-destination` / `put-destination-policy` for the destination pattern. |
+The per-layer remediation summary table moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when writing REMEDIATION; each step section above already carries its inline fix.
 
 ## Recent AWS features (2024-2026)
 
-- **CloudWatch Logs data protection (2024-2025):** Account-level and log-group-level data protection policies redact sensitive patterns at ingestion. Operators may see `{{REDACTED}}` and mistake it for a formatting bug; check `get-data-protection-policy`.
-- **Subscription filter account-concurrency budget (2024-2025):** Lambda subscription deliveries are capped at 2x the account's concurrent-invocations quota. A fan-out across several filters can silently drop batches under sustained load.
-- **CloudWatch agent unified config (2024):** The agent's JSON config now supports `multi_line_start_pattern` with regex; older literal patterns silently break on stack traces.
-- **VPC Flow Logs aggregation intervals (2024):** 1-minute intervals are now generally available; the default remains 10 minutes. Operators who "see no flow logs for 10 minutes" may be on the default.
-- **CloudWatch Logs KMS-by-customer-key enforcement (2024-2025):** Some accounts have SCPs requiring CMK encryption for log groups; `associate-kms-key` must run at creation or before the first write.
+Recent AWS features (2024-2026) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when redaction, subscription budgets, or aggregation intervals are in play.
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Philosophy behaviours, Step 0 non-obvious behaviours, remediation summary table, and Recent AWS features (2024-2026) moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — account-wide pre-flight commands, Step 2-12 probe commands, and pre-flight safety checks moved from SKILL.md
+- [references/worked-examples.md](references/worked-examples.md) — SEQUENCE_TOKEN collision worked example moved from SKILL.md (primary IAM_PERMISSIONS example stays inline)
+- [references/cwl-ingestion-and-iam-reference.md](references/cwl-ingestion-and-iam-reference.md) — ingestion and IAM reference (pre-existing)
+- [references/cwl-filters-and-cross-account-reference.md](references/cwl-filters-and-cross-account-reference.md) — filter patterns and cross-account delivery reference (pre-existing)
 
 ## Domain
 

@@ -366,3 +366,128 @@ Setting `cookieDomain: '.com'` (or any public suffix) corrupts
 session counts across unrelated sites and risks cross-customer
 contamination. Use the parent organizational domain (e.g.,
 `.example.com`) or omit to default to the current host.
+
+## Step 1 — Create the app monitor (CLI) (moved from SKILL.md)
+
+```bash
+aws rum create-app-monitor \
+  --name checkout-web-prod \
+  --app-monitor-configuration '{
+    "AllowList": ["checkout.example.com"],
+    "SessionSampleRate": 1.0,
+    "Telemetries": ["errors", "performance", "http"],
+    "EnableXRay": true
+  }' \
+  --cw-log-group-name /aws/rum/checkout-web-prod \
+  --domain checkout.example.com \
+  --region us-east-1
+```
+
+## Step 2 — Anonymous guest IAM role (trust + permission policy CLI) (moved from SKILL.md)
+
+```bash
+# Trust policy for Cognito identity pool
+cat > /tmp/guest-trust.json <<'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": { "Federated": "cognito-identity.amazonaws.com" },
+    "Action": "sts:AssumeRoleWithWebIdentity",
+    "Condition": {
+      "StringEquals": {
+        "cognito-identity.amazonaws.com:aud": "us-east-1:abcd1234-efgh-5678"
+      },
+      "ForAnyValue:StringLike": {
+        "cognito-identity.amazonaws.com:amr": "unauth"
+      }
+    }
+  }]
+}
+EOF
+
+aws iam create-role \
+  --role-name checkout-web-rum-guest \
+  --assume-role-policy-document file:///tmp/guest-trust.json
+
+cat > /tmp/guest-permission.json <<'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": "rum:PutRumEvents",
+    "Resource": "arn:aws:rum:us-east-1:111122223333:appmonitor/checkout-web-prod"
+  }]
+}
+EOF
+
+aws iam put-role-policy \
+  --role-name checkout-web-rum-guest \
+  --policy-name CheckoutWebRUMPutEvents \
+  --policy-document file:///tmp/guest-permission.json
+```
+
+## Step 3 — RUM SDK CDN injection snippet (moved from SKILL.md)
+
+```html
+<script>
+  (function(n,i,v,r,s,c,x,z,h){var p=function(){var a=
+  Array.prototype.slice.call(arguments);return new (Function.
+  prototype.bind.apply(cwr,(a).concat(p.args)))},q=p.args=
+  Array.prototype.slice.call(arguments);(cwr=a=cwr||function(){
+  (cwr.q=cwr.q||[]).push(arguments)}).l=+new Date;cwr('init',
+  {clientConfig:{applicationId:'checkout-web-prod',
+  region:'us-east-1',version:'1.0.0',
+  guestRoleArn:'arn:aws:iam::111122223333:role/checkout-web-rum-guest',
+  identityPoolId:'us-east-1:abcd1234-efgh-5678'},
+  telemetries:['errors','performance','http'],
+  sessionSampleRate:1.0,
+  sessionEventUrl:'https://dataplane.rum.us-east-1.amazonaws.com',
+  cookieDomain:'.example.com',
+  enableXRay:true});cwr('load')})()
+</script>
+<script async src="https://client.rum.us-east-1.amazonaws.com/1.18.0/aws-rum-web.min.js"
+        integrity="sha384-<hash>"
+        crossorigin="anonymous"></script>
+```
+
+## Step 3b — RUM SDK npm injection snippet (aws-rum-web) (moved from SKILL.md)
+
+```typescript
+import { AwsRum, AwsRumConfig } from 'aws-rum-web';
+
+const config: AwsRumConfig = {
+  sessionSampleRate: 1.0,
+  guestRoleArn: 'arn:aws:iam::111122223333:role/checkout-web-rum-guest',
+  identityPoolId: 'us-east-1:abcd1234-efgh-5678',
+  endpoint: 'https://dataplane.rum.us-east-1.amazonaws.com',
+  telemetries: ['errors', 'performance', 'http'],
+  allowCookies: true,
+  cookieDomain: '.example.com',
+  enableXRay: true
+};
+
+export const awsRum = new AwsRum(
+  'checkout-web-prod', '1.0.0', 'us-east-1', config
+);
+```
+
+## Step 10 — Tag and alarm (tag-resource + put-metric-alarm CLI) (moved from SKILL.md)
+
+Tag the app monitor for cost allocation; alarm on session drops
+and error spikes:
+
+```bash
+aws rum tag-resource \
+  --resource-arn arn:aws:rum:us-east-1:111122223333:appmonitor/checkout-web-prod \
+  --tags team=payments,env=prod
+
+aws cloudwatch put-metric-alarm \
+  --alarm-name checkout-web-rum-error-spike \
+  --namespace AWS/RUM \
+  --metric-name Errors \
+  --dimensions Name=ApplicationName,Value=checkout-web-prod \
+  --period 300 --evaluation-periods 2 \
+  --threshold 50 --comparison-operator GreaterThanThreshold \
+  --alarm-actions arn:aws:sns:us-east-1:111122223333:oncall
+```

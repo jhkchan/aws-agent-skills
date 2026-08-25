@@ -327,3 +327,69 @@ resource "aws_cloudwatch_metric_stream" "main" {
   }
 }
 ```
+
+## Step 2 — Firehose ARN configuration CLI (create Firehose + put-metric-stream) (moved from SKILL.md)
+
+```bash
+# Create the Firehose delivery stream (if not already existing)
+aws firehose create-delivery-stream \
+  --delivery-stream-name "cw-metrics-to-s3" \
+  --delivery-stream-type DirectPut \
+  --s3-destination-configuration '{
+    "RoleARN": "arn:aws:iam::123456789012:role/FirehoseS3Role",
+    "BucketARN": "arn:aws:s3:::my-cloudwatch-metrics",
+    "Prefix": "cloudwatch-metrics/",
+    "BufferingHints": {"SizeInMBs": 5, "IntervalInSeconds": 300},
+    "CompressionFormat": "GZIP",
+    "EncryptionConfiguration": {"KMSEncryptionConfig": {"AWSKMSKeyARN": "arn:aws:kms:us-east-1:123456789012:key/abc123"}}
+  }' \
+  --region us-east-1
+```
+
+**Create the metric stream referencing the Firehose:**
+
+```bash
+aws cloudwatch put-metric-stream \
+  --name "ProductionMetricStream" \
+  --firehose-arn "arn:aws:firehose:us-east-1:123456789012:deliverystream/cw-metrics-to-s3" \
+  --role-arn "arn:aws:iam::123456789012:role/CWMetricStreamRole" \
+  --output-format "json" \
+  --include-filters '[{"Namespace":"AWS/EC2"},{"Namespace":"AWS/Lambda"}]' \
+  --statistics "Average Sum SampleCount" \
+  --region us-east-1
+```
+
+## Step 5 — Output format examples (JSON record, OpenTelemetry) (moved from SKILL.md)
+
+**JSON output example:**
+
+```json
+{
+  "metric_stream_name": "ProductionMetricStream",
+  "namespace": "AWS/EC2",
+  "metric_name": "CPUUtilization",
+  "dimensions": {"InstanceId": "i-aaa111bb222"},
+  "timestamp": 1716000000,
+  "value": 42.5,
+  "unit": "Percent"
+}
+```
+
+**OpenTelemetry output:** metrics are encoded as OTLP gauge / sum
+data points. Choose this when forwarding to OpenTelemetry-compatible
+backends.
+
+## Step 9 — Firehose buffering update CLI (update-destination) (moved from SKILL.md)
+
+```bash
+# Configure buffering (lower interval = faster delivery, more PUTs)
+aws firehose update-destination \
+  --delivery-stream-name "cw-metrics-to-s3" \
+  --current-delivery-stream-version-id "1" \
+  --destination-id "destinationId-000000000001" \
+  --s3-destination-update '{
+    "BufferingHints": {"SizeInMBs": 5, "IntervalInSeconds": 60},
+    "CompressionFormat": "GZIP"
+  }' \
+  --region us-east-1
+```

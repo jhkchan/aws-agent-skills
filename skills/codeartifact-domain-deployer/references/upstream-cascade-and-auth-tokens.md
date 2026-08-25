@@ -325,3 +325,70 @@ resource "aws_codeartifact_repository_permissions_policy" "cross_account" {
   })
 }
 ```
+---
+
+## Expert heuristic — the upstream and external-connection cascade (moved from SKILL.md)
+
+A baseline model says "connect to npmjs.com." The correct heuristic
+recognizes that dependency resolution follows a cascade chain and the
+order is significant.
+
+```text
+Package request (e.g., npm install lodash):
+
+  1. Local repository (my-team-packages)
+     → found? return. not found? continue.
+
+  2. Upstream repository 1 (shared-team-packages)
+     → found? return. not found? continue.
+
+  3. Upstream repository 2 (company-approved-packages)
+     → found? return. not found? continue.
+
+  4. External connection (npmjs.com)
+     → found? return from public registry. not found? 404.
+
+Cascade configuration:
+  aws codeartifact update-repository \
+    --repository my-team-packages \
+    --domain my-domain \
+    --upstreams repository=shared-team-packages \
+    --upstreams repository=company-approved-packages \
+    --upstreams external-connection=npmjs
+
+Order matters: the first match wins. Put internal repos before public.
+```
+
+**Key implication:** the cascade is a supply-chain security control.
+Putting internal repos before the external connection ensures that
+internal (vetted) packages take precedence over public ones. This
+prevents dependency confusion attacks where a malicious package on
+npmjs.com shadows an internal package name.
+
+## Expert heuristic — the 12-hour authorization token (moved from SKILL.md)
+
+CodeArtifact authorization tokens expire. A baseline model generates
+the token once and assumes it is permanent. The correct heuristic
+recognizes the 12-hour expiry and builds refresh into the pipeline.
+
+```text
+Token lifecycle:
+  aws codeartifact login --tool npm --domain my-domain --domain-owner 123456789012
+  → writes .npmrc with: //my-domain-123456789012.d.codeartifact.us-east-1.amazonaws.com/npm/my-repo/:_authToken=<token>
+  → token expires in 12 hours
+
+CI/CD implication:
+  ├── Pipeline MUST run `aws codeartifact login` before every build
+  ├── Caching the token across runs > 12 hours = SILENT FAILURE
+  └── Alternative: generate a short-lived token via GetAuthorizationToken API
+      and inject as an environment variable
+
+Token scope:
+  ├── Domain-scoped: access ALL repositories in the domain
+  └── Repository-scoped: access only ONE repository (more restrictive)
+```
+
+**Key implication:** CI/CD pipelines that cache the `.npmrc` or
+`pip.conf` with the auth token will break after 12 hours. The login
+command must be part of the build step, not a one-time setup.
+

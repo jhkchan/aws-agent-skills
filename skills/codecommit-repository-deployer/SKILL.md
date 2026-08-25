@@ -131,115 +131,23 @@ requires the key policy to grant CodeCommit (`kms:GenerateDataKey` and
 reviewers on pull requests BEFORE merge — branch protection prevents
 direct pushes to protected branches.
 
-Three misconceptions dominate CodeCommit misconfiguration at provisioning
-time:
-
-- **"Creating the repository is enough to push code."** It is not. The
-  default branch (e.g., `main`) does NOT exist until the first commit is
-  pushed. If branch protection or approval rules are configured before
-  the initial commit, the operator must push via an unprotected path
-  first.
-
-- **"KMS encryption just needs the key ARN."** It does not. CodeCommit
-  must be a principal in the KMS key policy with `kms:Encrypt`,
-  `kms:Decrypt`, `kms:ReEncrypt*`, `kms:GenerateDataKey*`, and
-  `kms:DescribeKey`. A missing key policy grant is a silent failure
-  (repository creates, push/pull fails with AccessDenied).
-
-- **"git-remote-codecommit (GRC) is the same as git credentials."** It
-  is not. GRC uses the AWS signer to generate a session token from IAM
-  credentials — no static credentials to rotate, no SSH keys to manage.
-  GRC is the recommended auth method for federated/IAM-role-based
-  environments.
+Three misconceptions (default branch does not exist until first push; KMS key policy grant; GRC vs git credentials) — full text: [Advanced patterns](references/advanced-patterns.md).
 
 ## Configuration dependency graph (novel heuristic)
 
-CodeCommit configurations are NOT independent. The repository must exist
-before KMS encryption, approval rules, notification rules, triggers, and
-resource policies can be attached. The default branch must exist (first
-push) before branch-level protection is effective. KMS key policy must
-grant CodeCommit before the repository can encrypt.
-
-| Configuration | Hard dependencies | Silent failure | Enables downstream |
-|---|---|---|---|
-| Repository | AWS account in a supported region | `defaultBranchName` set at creation but branch does NOT exist until first push | the repository ARN |
-| KMS encryption | KMS key exists; key policy grants CodeCommit | repo creates fine WITHOUT valid key grant; push/pull fails at encryption time | at-rest encryption |
-| Default branch | repository exists; first commit pushed | branch does not exist until `git push` succeeds; approval rules have nothing to protect | branch-level protection |
-| Approval rule template | repository exists; approver pool known | template must be ASSOCIATED via associate call — creating alone does nothing | required-reviewer enforcement |
-| Notification rule | SNS topic exists; topic policy grants CodeStar | rule creates but no notifications fire if topic policy missing | event-driven notifications |
-| Cross-account resource policy | repository exists; cross-account principal identified | resource policy grants GitPull/Push but KMS key policy must ALSO grant cross-account | cross-account Git access |
-| Repository trigger | repository exists; Lambda/SNS target exists | trigger creates but never fires if target resource policy missing CodeCommit | push/PR event automation |
-
-**The KMS-key-policy row is the one a baseline model misses.** Creating
-the repository with a KMS key ID succeeds even if the key policy does
-not grant CodeCommit. The failure surfaces only at push/pull time.
+Full dependency table (repository, KMS encryption, default branch, approval rule template, notification rule, cross-account resource policy, repository trigger) with silent-failure modes: [Advanced patterns](references/advanced-patterns.md).
 
 ## Expert heuristic: git-remote-codecommit for IAM auth
 
-A baseline model says "generate git credentials in the IAM console." The
-correct heuristic recognizes three auth methods with different
-operational profiles, and GRC is preferred for IAM-role-based
-environments.
-
-```text
-CodeCommit authentication methods:
-  ├── git-remote-codecommit (GRC) — RECOMMENDED for IAM-role environments
-  │     AWS signer generates SigV4 session token from IAM credentials.
-  │     URL: codecommit://<region>@<repo-name>
-  │     Install: pip install git-remote-codecommit
-  │     Pros: no static credentials; works with SSO, assumed roles, EC2.
-  │
-  ├── IAM git credentials (service-specific credentials)
-  │     Per-IAM-user static username + HTTPS password.
-  │     URL: https://git-codecommit.<region>.amazonaws.com/...
-  │     Pros: works with any Git client. Cons: static; manual rotation.
-  │
-  └── SSH keys
-        Per-IAM-user public SSH key uploaded to IAM.
-        URL: ssh://git-codecommit.<region>.amazonaws.com/...
-        Pros: familiar. Cons: per-IAM-user; key rotation manual.
-```
+Auth-method decision tree (GRC vs IAM git credentials vs SSH): [Auth and cross-account](references/auth-and-cross-account.md).
 
 ## Expert heuristic: approval rule template scope
 
-Approval rule templates enforce that specific principals (or a number of
-approvals) must approve a pull request BEFORE merge. Templates are
-SEPARATE from repositories and must be explicitly ASSOCIATED.
-
-```text
-Approval rule template lifecycle:
-  1. Create template (define approvals needed + approver pool)
-  2. Associate template to repository (separate API call)
-     → After association, rule is applied to ALL pull requests
-  3. Pull request creation → merge BLOCKED until approvals met
-  4. Override → principal with OverridePullRequestApprovalRules can bypass
-```
-
-**Branch protection is separate from approval rules.** Approval rules
-govern PR merges. Branch protection (IAM policy denying
-`codecommit:GitPush` to specific branches) governs direct pushes. For
-full protection, you need BOTH.
+Approval rule template lifecycle and the approval-rules vs branch-protection split: [Approval rules and protection](references/approval-rules-and-protection.md).
 
 ## Expert heuristic: KMS key policy cross-account grant
 
-For cross-account repository access, the repository resource policy
-grants the cross-account principal `codecommit:GitPull/GitPush`. But if
-the repository is encrypted with a customer-managed KMS key, the key
-policy must ALSO grant the cross-account principal.
-
-```text
-Cross-account CodeCommit access (encrypted repository):
-  Repository resource policy:
-    Principal: arn:aws:iam::<cross-acct>:root
-    Actions: codecommit:GitPull, codecommit:GitPush
-
-  KMS key policy (ALSO required):
-    Principal: arn:aws:iam::<cross-acct>:root
-    Actions: kms:Decrypt, kms:Encrypt, kms:ReEncrypt*,
-             kms:GenerateDataKey*, kms:DescribeKey
-
-  MISSING EITHER = AccessDenied on push/pull.
-```
+Cross-account resource policy + KMS key policy grant pair (missing either = AccessDenied): [Auth and cross-account](references/auth-and-cross-account.md).
 
 ## Prerequisites (verify before provisioning)
 
@@ -437,20 +345,7 @@ aws lambda add-permission \
 | IAM git credentials | CI/CD pipelines with fixed identity | Static username + password | Manual |
 | SSH keys | Developers preferring key-based auth | Per-IAM-user SSH key | Manual |
 
-**GRC setup for developers:**
-
-```bash
-pip install git-remote-codecommit
-git clone codecommit://us-east-1@my-app-repo
-```
-
-**IAM git credentials setup (for CI):**
-
-```bash
-aws iam create-service-specific-credential \
-  --user-name "ci-codecommit-user" \
-  --service-name "codecommit.amazonaws.com" --region us-east-1
-```
+GRC and IAM git-credential setup commands: [Auth and cross-account](references/auth-and-cross-account.md).
 
 ## Step 9 — Migration from external Git
 
@@ -593,44 +488,19 @@ VERIFICATION_COMMANDS:
 
 ### Worked example — PREREQUISITES_MISSING (KMS key policy not granted)
 
-```text
-CODECOMMIT_REPO: my-new-repo (arn:aws:codecommit:us-east-1:123456789012:my-new-repo)
-VERDICT: PREREQUISITES_MISSING
-CHECKLIST:
-  [✓] Repository name: my-new-repo (unique in account 123456789012, us-east-1)
-  [✓] Default branch: main (will be created at first push)
-  [✗] KMS encryption: customer-managed key arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4 — KEY POLICY DOES NOT GRANT codecommit.amazonaws.com. Push/pull will fail with AccessDenied. Add kms:Encrypt, Decrypt, ReEncrypt*, GenerateDataKey*, DescribeKey to the key policy for principal codecommit.amazonaws.com before proceeding.
-  [✗] KMS key policy cross-account: blocked by missing CodeCommit grant (fix above first)
-  [✓] Approval rule template: require-two-reviewers (associated, 2 approvals needed)
-  [✓] Branch protection: IAM policy DenyDirectPushToMain configured
-  [✓] Auth method: git-remote-codecommit (GRC) — clone URL: codecommit://us-east-1@my-new-repo
-VERIFICATION_COMMANDS:
-  aws kms get-key-policy --key-id arn:aws:kms:us-east-1:123456789012:key/a1b2c3d4 --policy-name default --region us-east-1
-  # Verify the key policy includes a statement with Principal codecommit.amazonaws.com before deploying
-```
+Full checklist block: [Worked examples](references/worked-examples.md).
 
 ## Error handling
 
-### Push/pull fails with AccessDenied despite correct IAM permissions
-- The repository is KMS-encrypted and the KMS key policy does not grant
-  the principal. Verify the key policy includes `kms:Decrypt`,
-  `kms:Encrypt`, `kms:GenerateDataKey*`.
+Symptom fixes (KMS AccessDenied, cross-account AccessDenied, silent notifications, trigger not firing, approval rule not enforced): [Error handling](references/error-handling.md).
 
-### Cross-account access fails with AccessDenied
-- Repository resource policy OR KMS key policy is missing the
-  cross-account principal. Verify BOTH policies.
+## References (load on demand)
 
-### Notification rule created but no notifications fire
-- SNS topic policy does not grant `codestar-notifications.amazonaws.com`
-  `sns:Publish`. Apply the topic policy and re-test.
-
-### Repository trigger created but Lambda never invoked
-- Lambda resource policy does not grant `codecommit.amazonaws.com`
-  `lambda:InvokeFunction`. Add the permission.
-
-### Approval rule template created but not enforced on PRs
-- Template was not ASSOCIATED with the repository. Run
-  `associate-approval-rule-template-with-repository`.
+- [Advanced patterns](references/advanced-patterns.md) — three-misconception deep dive, configuration dependency graph
+- [Worked examples](references/worked-examples.md) — PREREQUISITES_MISSING (KMS key policy not granted) checklist
+- [Error handling](references/error-handling.md) — provisioning failure symptom fixes
+- [Approval rules and protection](references/approval-rules-and-protection.md) — approval rule template lifecycle and scope
+- [Auth and cross-account](references/auth-and-cross-account.md) — GRC heuristic, KMS cross-account grants, GRC/SSH/credential setup
 
 ## Domain
 

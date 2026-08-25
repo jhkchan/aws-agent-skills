@@ -218,3 +218,154 @@ If step 3 is skipped, the TOTP is not active and MFA prompts will fail.
 
 Password policy changes apply immediately to new sign-ups and password
 resets. Existing passwords are NOT invalidated.
+
+## Step 3 - Auth flow: wrong or missing flow (moved from SKILL.md)
+
+Symptom: `NotAuthorizedException` with `error: invalid_grant` or a
+flow-specific error on `InitiateAuth` / `AdminInitiateAuth`.
+
+```bash
+aws cognito-idp describe-user-pool-client \
+  --user-pool-id <pool-id> --client-id <client-id> --output json | \
+  jq '.ExplicitAuthFlows'
+```
+
+Common flow errors:
+
+| SDK call | Required `ExplicitAuthFlows` entry | Error if missing |
+|---|---|---|
+| `AdminInitiateAuth` with `AuthFlow: ADMIN_USER_PASSWORD_AUTH` | `ALLOW_ADMIN_USER_PASSWORD_AUTH` | `NotAuthorizedException: Invalid authentication flow` |
+| `InitiateAuth` with `AuthFlow: USER_PASSWORD_AUTH` | `ALLOW_USER_PASSWORD_AUTH` | `NotAuthorizedException: Invalid authentication flow` |
+| `InitiateAuth` with `AuthFlow: USER_SRP_AUTH` | `ALLOW_USER_SRP_AUTH` | `NotAuthorizedException: Invalid authentication flow` |
+| `InitiateAuth` with `AuthFlow: REFRESH_TOKEN_AUTH` | `ALLOW_REFRESH_TOKEN_AUTH` | `NotAuthorizedException: Invalid authentication flow` |
+| `InitiateAuth` with `AuthFlow: CUSTOM_AUTH` | `ALLOW_CUSTOM_AUTH` | `NotAuthorizedException: Invalid authentication flow` |
+
+**Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: AUTH_FLOW`. Fix: add the
+required flow to `ExplicitAuthFlows` via
+`update-user-pool-client --explicit-auth-flows`.
+
+
+## Step 5 - Token refresh failure (moved from SKILL.md)
+
+Symptom: `InitiateAuth` with `REFRESH_TOKEN_AUTH` returns
+`NotAuthorizedException` or `InvalidGrantException`. The user's access
+token expired, and the refresh token exchange fails.
+
+```bash
+aws cognito-idp describe-user-pool-client \
+  --user-pool-id <pool-id> --client-id <client-id> --output json | \
+  jq '{RefreshTokenValidity, TokenValidityUnits}'
+
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=EventName,AttributeValue=InitiateAuth \
+  --start-time $(date -d '-1 hour' +%s) --end-time $(date +%s) \
+  --output json | jq '.Events[] | select(.CloudTrailEvent | contains("REFRESH_TOKEN"))'
+```
+
+| Cause | Diagnosis | Fix |
+|---|---|---|
+| Refresh token expired (beyond `RefreshTokenValidity`) | Compare issuance timestamp to current time | Re-authenticate the user; consider raising `RefreshTokenValidity` (1-3650 days). |
+| Global sign-out or token revocation | CloudTrail shows `GlobalSignOut` or `RevokeToken` for the user | Re-authenticate; the old refresh token is permanently invalid. |
+| Wrong `ClientSecret` on a CONFIDENTIAL client during refresh | `NotAuthorizedException` on refresh specifically | Same as Step 2 — include the correct secret. |
+| `RefreshTokenValidity` in the wrong unit | `TokenValidityUnits.RefreshToken` is `days` by default but may be `hours`, `minutes`, or `seconds` | Verify the unit; a value of `30` with unit `hours` is 30 hours, not 30 days. |
+| Device tracking / remember-device mismatch | `DeviceConfiguration` enabled but client does not send device key | Configure device tracking or disable `DeviceOnlyRememberedOnUserPrompt`. |
+
+**Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: TOKEN_REFRESH` (expiry) or
+`TOKEN_REVOCATION` (global sign-out / revoke).
+
+
+## Deep reference: Cognito authentication layer model (moved from SKILL.md)
+
+### Symptom -> layer decision matrix (offline classification)
+
+```
+Error string                                   → Layer
+NotAuthorizedException + invalid_client         → APP_CLIENT_SECRET
+NotAuthorizedException + invalid_grant          → TOKEN_REFRESH / AUTH_FLOW
+redirect_mismatch / invalid_redirect_uri        → HOSTED_UI_REDIRECT
+UserLambdaValidationException                   → PRE_TOKEN_GEN_LAMBDA / CUSTOM_SENDER_LAMBDA
+GetCredentialsForIdentity NotAuthorizedException → IDENTITY_POOL_ROLE / IDENTITY_POOL_TRUST
+Social login blank page                         → SOCIAL_PROVIDER / SOCIAL_REDIRECT
+SAMLResponseDoesNotMatch                        → SAML_CERTIFICATE
+InvalidPasswordException                        → PASSWORD_POLICY
+MFAMethodNotFoundException                      → MFA_CONFIG
+DomainAlreadyExistsException                    → DOMAIN_PREFIX
+NET::ERR_CERT_COMMON_NAME_INVALID               → TLS_CERTIFICATE
+```
+
+### Token lifecycle reference
+
+| Token | Default validity | Configurable via | Used for |
+|---|---|---|---|
+| Access token | 1 hour | `AccessTokenValidity` + `TokenValidityUnits.AccessToken` | API authorization (Bearer token) |
+| ID token | 1 hour | `IdTokenValidity` + `TokenValidityUnits.IdToken` | User identity claims (OIDC) |
+| Refresh token | 30 days | `RefreshTokenValidity` + `TokenValidityUnits.RefreshToken` | Minting new access/ID tokens without re-auth |
+
+### Auth flow reference
+
+| Flow | SDK API | Use case |
+|---|---|---|
+| `USER_PASSWORD_AUTH` | `InitiateAuth` | Direct username/password (insecure; use only over TLS) |
+| `USER_SRP_AUTH` | `InitiateAuth` + `RespondToAuthChallenge` | Secure Remote Password (no password sent over wire) |
+| `ADMIN_USER_PASSWORD_AUTH` | `AdminInitiateAuth` | Server-side admin login (requires `cognito-idp:AdminInitiateAuth`) |
+| `REFRESH_TOKEN_AUTH` | `InitiateAuth` | Refresh expired access/ID tokens |
+| `CUSTOM_AUTH` | `InitiateAuth` + `RespondToAuthChallenge` | Custom challenge (OTP, CAPTCHA, etc.) |
+| `ALLOW_ADMIN_NO_SRP_AUTH` | Deprecated | Use `ADMIN_USER_PASSWORD_AUTH` instead |
+
+### Identity pool role trust policy templates
+
+Authenticated role:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": {"Federated": "cognito-identity.amazonaws.com"},
+    "Action": "sts:AssumeRoleWithWebIdentity",
+    "Condition": {
+      "StringEquals": {"cognito-identity.amazonaws.com:aud": "<identity-pool-id>"},
+      "ForAnyValue:StringLike": {"cognito-identity.amazonaws.com:amr": "authenticated"}
+    }
+  }]
+}
+```
+
+Unauthenticated role:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": {"Federated": "cognito-identity.amazonaws.com"},
+    "Action": "sts:AssumeRoleWithWebIdentity",
+    "Condition": {
+      "StringEquals": {"cognito-identity.amazonaws.com:aud": "<identity-pool-id>"},
+      "ForAnyValue:StringLike": {"cognito-identity.amazonaws.com:amr": "unauth"}
+    }
+  }]
+}
+```
+
+### Lambda trigger response size limits
+
+| Trigger | Response size limit | Timeout |
+|---|---|---|
+| PreTokenGeneration | 100 KB total response | 5 seconds |
+| PreSignUp | N/A (boolean response) | 5 seconds |
+| PostConfirmation | N/A (void response) | 5 seconds |
+| CustomMessage | Email subject + body | 5 seconds |
+| DefineAuthChallenge | Challenge response | 5 seconds |
+| CustomEmailSender / CustomSMSSender | Encrypted message | 5 seconds |
+
+### Social provider redirect URI matrix
+
+| Provider | Authorized redirect URI (at provider) |
+|---|---|
+| Google | `https://<user-pool-domain>/oauth2/idpresponse` |
+| Facebook | `https://<user-pool-domain>/oauth2/idpresponse` |
+| SignInWithApple | `https://<user-pool-domain>/oauth2/idpresponse` |
+| LoginWithAmazon | `https://<user-pool-domain>/oauth2/idpresponse` |
+
+

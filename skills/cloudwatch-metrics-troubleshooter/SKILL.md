@@ -44,33 +44,8 @@ Insights not working", "CloudWatch RUM not collecting".
 dimension, or statistic mismatch — NOT a CloudWatch service outage.
 Diagnose the query first, the emitter second, the service last.
 
-Three facts make CloudWatch metrics troubleshooting different from
-generic service debugging:
-
-- **`get-metric-statistics` returns empty for many reasons, only one
-  of which is "metric doesn't exist."** The metric may exist with
-  different dimensions, a different namespace, or only at a coarser
-  period. `list-metrics` is the source of truth for what exists;
-  `get-metric-statistics` returns what is queryable for a specific
-  (Namespace, MetricName, Dimensions, Period, Statistics) tuple. An
-  empty `get-metric-statistics` response does NOT mean the metric does
-  not exist — it means the query did not match.
-
-- **Statistics transform the underlying data points.** A metric
-  collected at 1-minute resolution as `Sum` can be queried as `Sum`,
-  `Average`, `Maximum`, `Minimum`, or `SampleCount` — but only if the
-  underlying `PutMetricData` calls supplied `Value` (single) or
-  `Values` + `Counts` (multi). Statistic mismatch is the most common
-  "unexpected value" cause: an operator expects the average of `Sum`
-  data and queries `Sum` against an aggregated period.
-
-- **Custom metrics have three independent failure modes: emission
-  failure, ingestion denial, and parsing failure.** The CloudWatch
-  agent may not emit (config error), the IAM role may deny
-  `cloudwatch:PutMetricData`, or the Embedded Metric Format (EMF) blob
-  may be malformed and silently dropped. Each failure mode has a
-  different diagnostic path — the symptom ("metric not arriving") is
-  the same.
+Mindset deep dive (empty get-metric-statistics has many causes, statistics transform underlying data points, custom metrics have three independent failure modes) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when explaining a verdict or briefing the operator.
 
 ## Quick reference — symptom to failure category
 
@@ -213,25 +188,8 @@ does not exist (emission-side failure).
 | Metric exists with `Unit` other than the query's `Unit` | Query filtered by `Unit` mismatch | Drop `--unit` from the query; align units |
 | Cross-region metric | Query in wrong region | Verify the resource's region; re-query |
 
-**Diagnostic walk:**
-
-1. **Run `list-metrics` for the namespace + metric name:**
-   ```bash
-   aws cloudwatch list-metrics --namespace <ns> --metric-name <m>
-   ```
-   If empty, broaden: drop `--namespace`, then drop `--metric-name`,
-   to discover the actual namespace or name.
-2. **Compare the returned dimensions** against the operator's query.
-   A common mismatch: `list-metrics` returns `ClusterName + ServiceName`
-   for `ECS/ContainerInsights` CPUUtilization, but the operator queried
-   with only `ClusterName`.
-3. **Verify the resource exists and is in a state that emits.** A
-   stopped EC2 instance emits no `CPUUtilization`. An ECS service with
-   `desiredCount: 0` emits no service-level metrics.
-4. **For storage resolution:** high-resolution metrics
-   (`StorageResolution: 1`) are queryable at Period 1; standard metrics
-   are queryable at Period 60 or higher. A Period-1 query on a standard
-   metric returns empty.
+Step 2 diagnostic walk (list-metrics broaden, dimension compare, resource-state verify, storage-resolution period check) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load it when executing the Step 2 walk.
 
 **Common fix patterns:**
 
@@ -255,23 +213,8 @@ the values are off from the operator's expectation.
 | Aggregated value drops spikes | Period too coarse — Period 300 averages over 5 minutes and hides 1-minute spikes | Re-query at Period 60 or finer |
 | Cross-account value mismatch | Cross-account metric sharing (cross-account observability) not enabled | Verify the source account's metric sharing configuration |
 
-**Diagnostic walk:**
-
-1. **Try every statistic** on the same (Namespace, MetricName,
-   Dimensions, Period):
-   ```bash
-   for stat in Sum Average Maximum Minimum SampleCount; do
-     aws cloudwatch get-metric-statistics --namespace <ns> \
-       --metric-name <m> --dimensions <dims> \
-       --start-time <iso> --end-time <iso> --period <p> \
-       --statistics $stat --query 'Datapoints[*].{ts:Timestamp,value:'$stat'}'
-   done
-   ```
-2. **Inspect the metric math definition** (if used). Each `Id` in the
-   `metrics` array must return data; an empty input produces null.
-3. **Verify the expected value's source.** A common mismatch: the
-   operator expects the "request rate" but is looking at `RequestCount`
-   (a count) without dividing by the Period in seconds.
+Step 3 diagnostic walk (try-every-statistic loop, metric-math input check, expected-value source verify) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load it when executing the Step 3 walk.
 
 **Common fix patterns:**
 
@@ -296,23 +239,8 @@ points — NOT that the metric is broken.
 | Cross-account or cross-region alarm | Source metric is in a different account or region; sharing not configured | Verify cross-account observability configuration |
 | Sparse custom metric (e.g., error count of 0 most minutes) | Metric legitimately emits 0 data points when there is nothing to count; alarm never sees enough data | Use a missing-data strategy: `TreatMissingData: breaching` or `notBreaching` |
 
-**Diagnostic walk:**
-
-1. **Read `describe-alarms` for the alarm config:**
-   ```bash
-   aws cloudwatch describe-alarms --alarm-names <alarm> \
-     --query 'MetricAlarms[0].{Namespace:Namespace,MetricName:MetricName,Dimensions:Dimensions,Period:Period,EvaluationPeriods:EvaluationPeriods,Statistic:Statistic,ComparisonOperator:ComparisonOperator,Threshold:Threshold,TreatMissingData:TreatMissingData}'
-   ```
-2. **Re-run `get-metric-statistics` with the alarm's exact
-   (Namespace, MetricName, Dimensions, Period, Statistics) over the
-   last 3 × EvaluationPeriods windows.**
-3. **Compare data point count against EvaluationPeriods.** If the
-  count is below EvaluationPeriods in any window, the alarm correctly
-  reports INSUFFICIENT_DATA — the fix is alarm config, not the metric.
-4. **For sparse metrics (error rates, rare events):** set
-   `TreatMissingData: notBreaching` (or `breaching`, depending on
-   semantics) so the alarm treats absent data as "not breaching"
-   instead of INSUFFICIENT_DATA.
+Step 4 diagnostic walk (describe-alarms read, re-run get-metric-statistics over 3x windows, datapoint-count compare, TreatMissingData for sparse metrics) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load it when executing the Step 4 walk.
 
 **Common fix patterns:**
 
@@ -341,45 +269,8 @@ Metric Format (EMF) via CloudWatch Logs. Each has its own failure mode.
 | High-resolution metric absent | API or EMF | `StorageResolution: 1` not set; or set but custom namespace has rate limits | Drop `StorageResolution` and re-query at Period 60 |
 | Metric in wrong region | All | Emitter uses a different region from the consumer | Verify the emitter's configured region |
 
-**Diagnostic walk:**
-
-1. **Identify the emission path** (PutMetricData / agent / EMF).
-2. **For PutMetricData:**
-   ```bash
-   aws cloudtrail lookup-events --lookup-attributes AttributeKey=EventName,AttributeValue=PutMetricData \
-     --start-time <iso> --end-time <iso>
-   ```
-   Look for `errorCode: "AccessDenied"` or validate the request
-   parameters.
-3. **For the CloudWatch agent:** read the agent log
-   `/opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log`
-   on the host. Look for errors like "Failed to send metric data" or
-   "AccessDeniedException". Verify the agent config has a `metrics`
-   section.
-4. **For EMF:** locate the log group where EMF blobs are written.
-   Filter for the application's logs and inspect the JSON structure:
-   ```bash
-   aws logs filter-log-events \
-     --log-group-name <emf-log-group> \
-     --filter-pattern '{ $.LogGroup = "<emf-log-group>" }' \
-     --start-time <epoch-ms> --limit 10
-   ```
-   A valid EMF blob has:
-   ```json
-   {
-     "_aws": {
-       "CloudWatchMetrics": [
-         { "Namespace": "MyApp", "Dimensions": [["InstanceId"]], "Metrics": [{"Name": "Latency"}] }
-       ],
-       "Timestamp": <epoch-ms>
-     },
-     "InstanceId": "i-abc",
-     "Latency": 42
-   }
-   ```
-   Missing `_aws`, `CloudWatchMetrics`, `Dimensions`, or `Metrics`
-   invalidates the blob — CloudWatch Logs silently drops the metric
-   extraction while still ingesting the log line.
+Step 5 diagnostic walk (path identify, CloudTrail PutMetricData lookup, agent log read, EMF blob locate + validate with canonical JSON) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load it when executing the Step 5 walk.
 
 **Common fix patterns:**
 
@@ -406,35 +297,8 @@ the cluster is not sending data.
 | Some metrics present, others absent | Partial agent failure; or metrics aggregation interval not elapsed (Container Insights aggregates per minute) | Wait 3-5 minutes; check agent pod health |
 | Container Insights in a new region | Region-specific enablement | Re-run `update-cluster-settings` in the target region |
 
-**Diagnostic walk:**
-
-1. **For ECS:** verify Container Insights is enabled:
-   ```bash
-   aws ecs describe-cluster --cluster <name> \
-     --query 'clusters[0].settings[?name==`containerInsights`].value'
-   ```
-   If not `enabled`, enable it:
-   ```bash
-   aws ecs update-cluster-settings --cluster <name> \
-     --settings name=containerInsights,value=enabled
-   ```
-   New metrics take 3-5 minutes to appear.
-2. **For EKS:** verify the agent is installed:
-   ```bash
-   kubectl get ds -n amazon-cloudwatch
-   kubectl get pods -n amazon-cloudwatch
-   ```
-   If absent, install the CloudWatch agent DaemonSet and the
-   `kiam` / IRSA role for the agent.
-3. **For EKS with agent present:** read the agent config map and the
-   agent logs:
-   ```bash
-   kubectl get cm cloudwatch-agent-config -n amazon-cloudwatch -o yaml
-   kubectl logs -n amazon-cloudwatch -l app=cloudwatch-agent --tail=100
-   ```
-4. **Verify cluster activity:** an idle cluster with zero running
-   tasks / pods emits no Container Insights metrics even when correctly
-   configured.
+Step 6 diagnostic walk (ECS settings check + enable, EKS DaemonSet check, agent config-map and logs read, cluster-activity verify) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load it when executing the Step 6 walk.
 
 ### Step 7: RUM_NOT_COLLECTING diagnostic
 
@@ -450,17 +314,8 @@ under the `AWS/RUM` namespace (and integrates with CloudWatch Logs).
 | `ApplicationMetrics` absent | Custom application metrics require a `dispatch` call | Verify the web app calls `AwsRum.dispatch('metricName', value)` |
 | Errors in CloudTrail for `PutRumAppEvents` | IAM role for the app monitor's ingest denied | Verify the app monitor's `appMonitorId` and the ingest role |
 
-**Diagnostic walk:**
-
-1. **List app monitors:**
-   ```bash
-   aws rum list-app-monitors --query 'AppMonitorSummaries[*].{name:Name,id:Id,state:State}'
-   ```
-2. **Verify the web app includes the RUM snippet** with the correct
-   `applicationId` and region.
-3. **Verify the browser console** for blocked requests or JS errors in
-   the RUM snippet loader.
-4. **For custom application metrics**, verify the `dispatch` call.
+Step 7 diagnostic walk (list-app-monitors, snippet + applicationId verify, browser-console check, dispatch verify) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load it when executing the Step 7 walk.
 
 ### Step 8: Map to root-cause catalog
 
@@ -479,19 +334,8 @@ under the `AWS/RUM` namespace (and integrates with CloudWatch Logs).
 
 ### Step 9: Verify the fix
 
-Before applying, validate the proposed fix with one of:
-
-- **For query fixes (namespace, dimension, statistic):** re-run
-  `get-metric-statistics` with the corrected parameters and confirm
-  non-empty datapoints.
-- **For IAM fixes:** re-run `aws iam simulate-principal-policy` with
-  the updated policy source; expect `allowed`.
-- **For alarm config fixes:** call `describe-alarms` after the update
-  to confirm Period / EvaluationPeriods / TreatMissingData reflect the
-  new values; monitor the alarm state over 2-3 evaluation windows.
-- **For Container Insights enablement:** wait 3-5 minutes, then re-run
-  `list-metrics --namespace ECS/ContainerInsights` (or `ContainerInsights`
-  for EKS).
+Step 9 fix-verification probes (query fixes, IAM simulate-principal-policy, alarm config re-read, Container Insights wait + re-list) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load it before declaring a fix applied.
 
 ### Step 10: Decide — ROOT_CAUSE_FOUND vs NEED_MORE_INFO vs ESCALATE
 
@@ -571,128 +415,13 @@ REMEDIATION:
 
 ## Expert edge cases
 
-These patterns represent genuine, non-obvious CloudWatch metrics
-failure modes that a senior operator would catch but a generalist
-would miss.
-
-### `list-metrics` pagination hides dimensions
-
-`list-metrics` paginates. A `--namespace <ns> --metric-name <m>` query
-may return dimensions that fit in the first page, but the operator's
-specific dimension combination is on a later page. Always page through
-with `--next-token` or filter further. Conversely, `list-metrics` may
-return a dimension combination that has no data points because the
-emitter stopped using that dimension — `list-metrics` reflects the
-metric registry, not recent data.
-
-### EMF silent-drop is invisible without raw log inspection
-
-When an EMF blob is malformed, CloudWatch Logs ingests the log line
-(the blob appears in `filter-log-events`) but does NOT extract a
-metric. There is no error event, no CloudTrail entry, no metric in
-`PutMetricData`-denied class. The only diagnostic is to read the
-actual blob and validate the `_aws.CloudWatchMetrics` structure
-manually. Operators often spend hours looking for an IAM denial that
-does not exist.
-
-### High-resolution metrics have a 1-second floor and quota limits
-
-`StorageResolution: 1` emits a high-resolution metric queryable at
-Period 1. But the `PutMetricData` API has a separate quota for
-high-resolution data points per second. A workload bursting thousands
-of high-resolution metrics per second will silently drop data points
-without an error event. The diagnostic is the `ThrottledRequests`
-metric in `AWS/CloudWatch` for the emitter's account.
-
-### Cross-account observability requires both sides
-
-Cross-account CloudWatch (the "monitoring account" / "source account"
-pattern) requires configuration on BOTH accounts: the source account
-must enable metric sharing, and the monitoring account must have a
-link to the source. Operators often configure only one side and see
-empty metrics in the monitoring account. The diagnostic is
-`aws cloudwatch list-metric-streams` and the source account's
-`PutMetricData`-sharing setting.
-
-### `TreatMissingData` defaults to `missing`
-
-If an alarm has no explicit `TreatMissingData` setting, it defaults to
-`missing` — the alarm stays in INSUFFICIENT_DATA indefinitely for
-sparse metrics. This is the most common cause of permanently
-INSUFFICIENT_DATA alarms for legitimate "absence is good" metrics like
-error counts. The fix is to set `TreatMissingData: notBreaching`
-explicitly.
-
-### Container Insights metrics have a 60-second aggregation delay
-
-Container Insights aggregates per minute. Even after enabling, metrics
-take 3-5 minutes to appear. Operators often re-enable repeatedly,
-assuming the first enable failed. The diagnostic is patience plus
-verifying `runningTasksCount` / pod count > 0 on the cluster.
-
-### Metric math `ID` collisions produce silent nulls
-
-In a metric math expression, each `Id` must be unique within the
-dashboard / alarm. A duplicate `Id` causes one branch to silently
-overwrite the other, producing a null in the math result. The
-diagnostic is to read the alarm / dashboard definition and verify
-uniqueness.
-
-### CloudWatch agent `metrics` section is required even if logs work
-
-A common confusion: the CloudWatch agent is running, logs are
-arriving in CloudWatch Logs, but no metrics appear. The agent has two
-independent sections in its config: `logs` (which produces log events)
-and `metrics` (which produces custom metrics). Working logs do NOT
-imply working metrics — the `metrics` section may be missing or
-misconfigured. Always read both sections of `amazon-cloudwatch-agent.json`.
-
-### Period alignment can shift values across the boundary
-
-`get-metric-statistics` aligns Period buckets to wall-clock boundaries
-(Period 300 aligns to 5-minute bucket edges). A metric emitted at
-14:02:30 falls in the 14:00–14:05 bucket. An operator comparing the
-metric to a chart with 14:00 / 14:05 / 14:10 ticks sees the value at
-14:00, not 14:02. This is the bucket-edge alignment gotcha.
+Expert edge-case catalog (list-metrics pagination hides dimensions, EMF silent-drop invisible without raw log inspection, high-resolution 1-second floor + quota, cross-account needs both sides, TreatMissingData defaults to missing, Container Insights 60-second aggregation delay, metric-math ID collisions, agent metrics section required even if logs work, period bucket-edge alignment) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when the mainline Step 2-7 tables do not explain the symptom.
 
 ## Expert heuristic — "Run list-metrics before get-metric-statistics"
 
-The single most common diagnostic mistake is running
-`get-metric-statistics`, getting an empty response, and concluding
-"the metric is broken." An empty response means the query did not
-match — the metric may exist with different dimensions, namespace, or
-at a coarser period.
-
-Always run `list-metrics` FIRST:
-
-```bash
-aws cloudwatch list-metrics --namespace <ns> --metric-name <m>
-```
-
-- If `list-metrics` returns the metric with the exact dimensions:
-  the query-side parameters are correct — investigate Period,
-  Statistic, time window, and `Unit`.
-- If `list-metrics` returns the metric with DIFFERENT dimensions or
-  namespace: the operator's query is wrong — align it.
-- If `list-metrics` returns NOTHING for the namespace + metric name:
-  the emitter is not emitting — investigate the emission path.
-
-Quick reference for "where does my metric live":
-
-| Symptom | Likely namespace | Likely dimensions |
-|---|---|---|
-| EC2 instance CPU | AWS/EC2 | InstanceId |
-| ECS service CPU | AWS/ECS or ECS/ContainerInsights | ClusterName + ServiceName |
-| EKS pod CPU | ContainerInsights | ClusterName + Namespace + PodName (via agent) |
-| Lambda function errors | AWS/Lambda | FunctionName |
-| DynamoDB throttling | AWS/DynamoDB | TableName |
-| S3 bucket size | AWS/S3 | BucketName + StorageType |
-| ALB 5xx | AWS/ApplicationELB | LoadBalancer + TargetGroup |
-| API Gateway 4xx | AWS/ApiGateway | ApiName + Stage |
-| Custom application | (user-defined) | (user-defined) |
-
-When in doubt, run `list-metrics --metric-name <m>` WITHOUT
-`--namespace` to discover every namespace that publishes the metric.
+List-metrics-first heuristic deep dive (three outcome branches: exact dimensions, different dimensions/namespace, nothing returned) and the where-does-my-metric-live namespace/dimension lookup table moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when mapping a metric name to its likely namespace and dimensions.
 
 ## Anti-Patterns — NEVER
 
@@ -756,39 +485,21 @@ When in doubt, run `list-metrics --metric-name <m>` WITHOUT
 
 ## Recent AWS features (2024-2026)
 
-- **Cross-account observability (2024 GA):** a monitoring account can
-  query metrics, logs, and traces from source accounts. Requires
-  configuration on BOTH sides. Troubleshoot with
-  `aws cloudwatch list-metric-streams` and the source account's
-  sharing setting.
-- **CloudWatch Metric Streams (2024 enhancements):** stream metrics
-  to Kinesis Data Firehose (and downstream to S3, Datadog, etc.).
-  Troubleshoot via the metric stream's `LastFailureCode` and
-  `LastFailureMessage`.
-- **CloudWatch agent unified telemetry (2024-2025):** the agent now
-  supports OpenTelemetry-format metrics in addition to StatsD. The
-  agent config section determines which format is emitted; mixed
-  configs can produce duplicate metrics.
-- **Embedded Metric Format (EMF) for Lambda (2024 GA):** Lambda
-  extensions can emit EMF blobs directly via the runtime API.
-  Troubleshoot via the Lambda extension logs and the EMF blob
-  structure.
-- **Container Insights Enhanced (EKS, 2024-2025):** a newer
-  observability mode that emits per-pod metrics without the classic
-  agent. Troubleshoot via the Amazon CloudWatch Observability EKS
-  add-on.
-- **RUM custom events (2024-2025):** RUM supports richer custom
-  events via `dispatch`. Troubleshoot via the app monitor's ingest
-  role and the `PutRumAppEvents` CloudTrail events.
-- **High-resolution metric quota (2025):** the per-account
-  PutMetricData quota for high-resolution metrics was raised. Verify
-  via Service Quotas `cloudwatch.PutMetricData` (high resolution).
+Recent AWS features 2024-2026 (cross-account observability GA, Metric Streams enhancements, agent unified telemetry/OTel, EMF for Lambda, Container Insights Enhanced for EKS, RUM custom events, high-resolution quota raise) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when the symptom involves a 2024-2026 feature path.
 
 ## References
 
 See `references/diagnostic-decision-trees.md` for the full per-category
 walk with worked examples, and `references/emf-and-agent-validation.md`
 for canonical EMF blob validation and CloudWatch agent config snippets.
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert edge cases, list-metrics-first heuristic + namespace lookup table, and 2024-2026 AWS features moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — per-step diagnostic walks (Steps 2-7) and Step 9 fix-verification probes moved from SKILL.md
+- [references/diagnostic-decision-trees.md](references/diagnostic-decision-trees.md) — full per-category walk with worked examples
+- [references/emf-and-agent-validation.md](references/emf-and-agent-validation.md) — canonical EMF blob validation and CloudWatch agent config snippets
 
 ## Domain
 

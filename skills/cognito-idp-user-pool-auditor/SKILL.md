@@ -295,159 +295,18 @@ apply to all clients.
 
 ## Auth-flow strength matrix
 
-> **Reference material** — consult this matrix when an app client's
-> `ExplicitAuthFlows` contains flows beyond the standard SRP + refresh
-> pair. The quick-reference summary and Steps 1-2 cover the common cases;
-> this matrix provides the depth for edge-case flows.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
-When evaluating `ExplicitAuthFlows`, classify each flow to determine whether
-the client uses the strongest available credential path:
-
-**STRONG flows (do not affect verdict):**
-- `ALLOW_USER_SRP_AUTH` — SRP (Secure Remote Password) protocol. The
-  password is never transmitted. Uses a zero-knowledge proof: the client
-  derives a verifier from the password and proves knowledge of the password
-  without revealing it. Immune to replay attacks and TLS interception at
-  the application layer.
-- `ALLOW_REFRESH_TOKEN_AUTH` — exchanges a refresh token for new access/id
-  tokens. No password involved. Safe as long as the refresh token is stored
-  securely (HttpOnly cookie for web, Keychain/Keystore for mobile).
-
-**MODERATE flows (Rule 3d if SRP is also present, Rule 2d if not):**
-- `ALLOW_USER_PASSWORD_AUTH` — sends the username and password directly to
-  the `InitiateAuth` API. The password travels over TLS (transport-level
-  protection) but is exposed to the application layer (API logs, WAF
-  inspection, TLS-terminating proxies). Required by some legacy SDKs and
-  migration scenarios.
-
-**WEAK flows (Rule 2g if confidential client, Rule 1d if public client):**
-- `ALLOW_ADMIN_USER_PASSWORD_AUTH` (legacy name: `ADMIN_NO_SRP_AUTH`) —
-  sends the username and password to `AdminInitiateAuth`, which requires
-  AWS credentials (SigV4-signed request). Bypasses SRP entirely. The
-  required AWS credentials expand the attack surface — if those credentials
-  are in a Lambda function, ECS task, or EC2 instance that is compromised,
-  the attacker can authenticate as any user. Acceptable only on a dedicated
-  backend service client with `GenerateSecret: true`.
-
-**VARIABLE flows (evaluate context):**
-- `ALLOW_CUSTOM_AUTH` — uses Lambda triggers for custom authentication
-  logic. Security depends entirely on the Lambda implementation. Flag for
-  manual review of the trigger code.
 
 ## OAuth flow strength matrix
 
-When evaluating `AllowedOAuthFlows`, classify the OAuth grant type:
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
-**STRONG:**
-- `code` (authorization code flow) with PKCE — the authorization code is
-  returned via the URL query string and exchanged for tokens via a
-  back-channel request. PKCE (Proof Key for Code Exchange) prevents
-  authorization-code interception by requiring the client to prove it
-  possesses the code verifier. PKCE is mandatory for public clients (mobile,
-  SPA) per OAuth 2.1.
-
-**MODERATE:**
-- `code` without PKCE — the authorization code is still exchanged
-  server-side (safer than implicit), but without PKCE the code can be
-  intercepted by a malicious app on the same device (mobile) or via a
-  redirect-uri collision (web). Cognito does not have a separate PKCE
-  setting — PKCE usage depends on the client SDK. Flag as ADEQUATE and
-  recommend confirming PKCE is used by the client.
-
-**WEAK (Rule 1b — INSECURE):**
-- `implicit` — the access token (and optionally the ID token) is returned
-  directly in the URL fragment. No back-channel exchange. The token is
-  exposed via browser history, Referer headers, and any script on the
-  callback page. OAuth 2.1 removes implicit flow entirely.
-
-**NOT APPLICABLE (evaluate separately):**
-- `client_credentials` — machine-to-machine authentication (no user
-  involved). Not a user-authentication flow. If the app client is supposed
-  to authenticate users and only has `client_credentials`, the
-  configuration is broken (flag as ERROR). If the client is a dedicated
-  service-to-service client, `client_credentials` is correct and does not
-  affect the verdict.
 
 ## Multi-client and edge-case handling
 
-- **Hosted UI domain.** The Cognito Hosted UI (`<domain>.auth.<region>.
-  amazoncognito.com` or a custom domain) is the pre-built login page for
-  OAuth flows. If the Hosted UI is enabled, evaluate the `CallbackURLs` and
-  `LogoutURLs` for HTTPS-only, no wildcards. A Hosted UI with HTTP callbacks
-  leaks the authorization code over an unencrypted connection.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
-- **Legacy pool defaults.** Cognito pools created before February 2020
-  default to `PreventUserExistenceErrors: LEGACY`. Pools created after
-  default to `ENABLED`. Always verify the actual value — do not assume
-  based on pool age.
-
-- **EnabledMfas vs MfaConfiguration.** `MfaConfiguration` controls whether
-  MFA is required (`ON`), optional (`OPTIONAL`), or disabled (`OFF`).
-  `EnabledMfas` controls which MFA methods are available. A pool with
-  `MfaConfiguration: ON` but `EnabledMfas: []` is a broken configuration —
-  MFA is required but no methods are configured, so no user can authenticate.
-  Flag as ERROR.
-
-- **Token validity units.** `TokenValidityUnits` specifies the time unit
-  (hours, days) for each token type. `RefreshTokenValidity: 30` with
-  `TokenValidityUnits.RefreshToken: "days"` = 30 days. The same value with
-  `"hours"` = 30 hours (under 2 days — likely a misconfiguration). Always
-  check the unit alongside the value. A common Terraform misconfiguration is
-  setting `refresh_token_validity = 1` expecting 1 day, but the default unit
-  is `"days"` — if the provider sends `"hours"`, the refresh token expires in
-  1 hour, causing constant re-authentication.
-
-- **Token revocation mechanics.** `EnableTokenRevocation: true` adds two
-  claims to issued JWTs: `jti` (a unique token ID) and `origin_jti` (the ID
-  of the originating token in the session chain). When a token is revoked
-  via `GlobalSignOut` or `RevokeToken`, Cognito adds the `jti` to a
-  revocation list. Subsequent requests with that `jti` are rejected.
-  Without `EnableTokenRevocation`, a stolen access token is valid until its
-  `AccessTokenValidity` expires (typically 1 hour) and a stolen refresh
-  token is valid until `RefreshTokenValidity` expires (can be days or
-  weeks). The revocation list is eventually consistent — there is a brief
-  window (seconds) between revocation and enforcement.
-
-- **Cognito refresh token rotation limitation.** Unlike some OAuth providers
-  (Auth0, Okta), Cognito does NOT support refresh token rotation — each
-  use of a refresh token returns the SAME refresh token (not a new one),
-  and the token remains valid until `RefreshTokenValidity` expires. This
-  means a stolen refresh token cannot be detected via rotation anomaly.
-  The only mitigations are: (1) short `RefreshTokenValidity`, and (2)
-  `EnableTokenRevocation: true` so the token can be revoked if theft is
-  detected. Flag pools with `RefreshTokenValidity` > 30 days AND
-  `EnableTokenRevocation: false` as especially vulnerable to persistent
-  token theft.
-
-- **Legacy pool defaults.** Cognito pools created before February 2020
-  default to `PreventUserExistenceErrors: LEGACY` (user enumeration risk).
-  Pools created after default to `ENABLED`. Similarly, `EnableTokenRevocation`
-  defaults to `false` on pools created before March 2021 and `true` after.
-  Always verify the actual configured values — do not assume based on pool
-  age. Run `aws cognito-idp describe-user-pool-client` to confirm.
-
-- **Account recovery.** `AccountRecoverySetting.RecoveryMechanisms` with
-  only `verified_email` means a compromised email account enables account
-  takeover. `verified_email_and_phone` (email + SMS) provides defense in
-  depth. Flag single-factor recovery as WEAK if the pool otherwise qualifies
-  for ADEQUATE.
-
-- **AdminCreateUserConfig.AllowAdminCreateUserOnly.** When `true`, only
-  administrators can create user accounts (no self-signup). This is a
-  security control for B2B or internal applications. When `false`, users
-  can self-register — evaluate whether this is appropriate for the
-  application's threat model.
-
-- **Lambda triggers.** Security-relevant Lambda triggers:
-  - `PreAuthentication` — can block logins based on custom conditions
-    (e.g., IP allowlist).
-  - `PostAuthentication` — runs after successful auth (e.g., audit logging).
-  - `PreSignUp` — can validate or block registrations.
-  - `DefineAuthChallenge` / `CreateAuthChallenge` / `VerifyAuthChallenge`
-    — custom auth flow logic (`ALLOW_CUSTOM_AUTH`).
-  Flag the presence of `ALLOW_CUSTOM_AUTH` without reviewing the Lambda
-  implementation — the custom challenge logic may be weaker than the
-  standard SRP flow.
 
 ## Output format (per user pool)
 
@@ -576,146 +435,18 @@ REMEDIATION: Evaluate whether the 'legacy-backend' client still needs the
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- Confirm the pool exists and capture its current state for rollback:
-  ```bash
-  aws cognito-idp describe-user-pool \
-    --user-pool-id <pool-id> \
-    --output json > /tmp/<pool-id>-backup-$(date +%s).json
-  aws cognito-idp list-user-pool-clients \
-    --user-pool-id <pool-id> \
-    --output json > /tmp/<pool-id>-clients-backup-$(date +%s).json
-  aws cognito-idp describe-user-pool-client \
-    --user-pool-id <pool-id> --client-id <client-id> \
-    --output json > /tmp/<client-id>-backup-$(date +%s).json
-  ```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
-- Prefer additive changes over destructive changes:
-  - Enabling `PreventUserExistenceErrors: ENABLED` is additive (more secure,
-    no client-side impact).
-  - Enabling `EnableTokenRevocation: true` is additive (adds `jti` claim to
-    new tokens; existing tokens are unaffected until they expire).
-  - Removing an auth flow from `ExplicitAuthFlows` is potentially
-    destructive (breaks clients that depend on it). Test first.
-  - Changing `MfaConfiguration` from `OFF`/`OPTIONAL` to `ON` is potentially
-    destructive (locks out users without an enrolled MFA factor).
-
-- For INSECURE pools (OAuth implicit flow, admin auth on public client),
-  treat as incident response:
-  1. Disable the vulnerable app client immediately (set the auth flow or
-     OAuth flow to the secure alternative, or if unsure, delete and
-     recreate the client with correct settings).
-  2. Audit CloudTrail for `AdminInitiateAuth` and `InitiateAuth` events on
-     the affected client during the exposure window.
-  3. Force password reset for users who authenticated via the vulnerable
-     flow during the exposure window (breached credentials may have been
-     captured).
-
-- For token-related changes (`RefreshTokenValidity`,
-  `AccessTokenValidity`, `IdTokenValidity`): existing tokens remain valid
-  until they expire. The new validity applies only to tokens issued after
-  the change. No immediate user impact, but monitor for session-extension
-  failures if validity was shortened.
 
 ## Remediation guidance
 
-### For INSECURE pools
+Moved verbatim to [references/error-handling.md](references/error-handling.md) - load on demand (see References below).
 
-**Rule 1a (no MFA + weak password):**
-1. Strengthen the password policy immediately:
-   ```bash
-   aws cognito-idp update-user-pool \
-     --user-pool-id <pool-id> \
-     --policies '{
-       "PasswordPolicy": {
-         "MinimumLength": 12,
-         "RequireUppercase": true,
-         "RequireLowercase": true,
-         "RequireNumbers": true,
-         "RequireSymbols": true,
-         "TemporaryPasswordValidityDays": 7
-       }
-     }'
-   ```
-2. Enable MFA in a phased rollout: set `MfaConfiguration: OPTIONAL` first,
-   communicate to users, monitor enrollment, then transition to `ON` when
-   enrollment exceeds 90%.
-3. Enable `AdvancedSecurityMode: ENFORCED` to add compromised-credential
-   detection.
-
-**Rule 1b (OAuth implicit flow):**
-1. Switch `AllowedOAuthFlows` to `["code"]` only:
-   ```bash
-   aws cognito-idp update-user-pool-client \
-     --user-pool-id <pool-id> \
-     --client-id <client-id> \
-     --allowed-o-auth-flows code
-   ```
-2. Ensure the client SDK uses PKCE (Amazon Cognito Amplify v6+ uses PKCE
-   by default for the authorization code flow).
-3. If the application architecture requires implicit (e.g., a legacy SPA
-   that cannot perform a back-channel token exchange), migrate to a
-   backend-for-frontend (BFF) pattern or a server-side OAuth library.
-
-**Rule 1c (PreventUserExistenceErrors LEGACY):**
-1. Update the app client:
-   ```bash
-   aws cognito-idp update-user-pool-client \
-     --user-pool-id <pool-id> \
-     --client-id <client-id> \
-     --prevent-user-existence-errors ENABLED
-   ```
-2. This is an additive change — no client-side impact. Error messages
-   change from specific (`UserNotFoundException`) to generic
-   (`NotAuthorizedException`) for all auth failures.
-
-**Rule 1d/1e:** See Rule 1a for MFA/ASF remediation. For admin auth on
-public client (Rule 1d), remove `ALLOW_ADMIN_USER_PASSWORD_AUTH` from
-`ExplicitAuthFlows` and replace with `ALLOW_USER_SRP_AUTH` +
-`ALLOW_REFRESH_TOKEN_AUTH`.
-
-### For WEAK pools
-
-- **Rule 2a (MFA optional):** Transition to `MfaConfiguration: ON` after
-  a communication and enrollment campaign. Provide a self-service MFA
-  setup flow to maximize enrollment before enforcement.
-- **Rule 2d (non-SRP auth):** Remove `ALLOW_USER_PASSWORD_AUTH` if the
-  client SDK supports SRP. For Amazon Cognito Amplify v6+, SRP is the
-  default. Test in staging first.
-- **Rule 2e (long refresh token):** Reduce `RefreshTokenValidity` to 7-30
-  days depending on sensitivity. For financial/healthcare apps, use 1-7
-  days.
-- **Rule 2f (ASF not enforced):** Transition `AdvancedSecurityMode` from
-  `AUDIT` to `ENFORCED` after reviewing the audit logs for false positives
-  (typically 1-2 weeks of monitoring).
-
-### For ADEQUATE pools
-
-- **Rule 3a (ASF audit mode):** Set a timeline for transitioning to
-  `ENFORCED`. Review ASF audit findings for false-positive patterns.
-- **Rule 3e (SMS-only MFA):** Enable TOTP:
-  ```bash
-  aws cognito-idp update-user-pool \
-    --user-pool-id <pool-id> \
-    --mfa-configuration ON \
-    --sms-configuration ... \
-    --software-token-mfa-configuration Enabled=true
-  ```
-  Users can then choose TOTP (recommended) or SMS.
-
-### For OK pools
-
-- No remediation required.
-- Periodically review ASF findings and CloudTrail for suspicious auth
-  patterns.
-- Review app-client inventory for unused clients (delete clients that are
-  no longer in use to reduce attack surface).
 
 ## Recent AWS features (2024-2026)
 
-- **Passwordless authentication with WebAuthn / PASSKEY_DEFAULT (2024-2025):** Cognito now supports passwordless authentication via WebAuthn (passkeys) and PASSKEY_DEFAULT sign-in mode. Auditors should verify that user pools handling sensitive data have passkey-based MFA or passwordless enabled as a stronger alternative to SMS/TOTP MFA.
-- **Token revocation and refresh token rotation (2024):** Enhanced token lifecycle management with token revocation API and refresh token rotation. Auditors should verify that `RefreshTokenValidity` is not excessively long and that token revocation is wired into the application's logout flow.
-- **Advanced Security Features (ASF) updates (2024):** ASF now includes improved WAF integration and adaptive authentication. Auditors should verify that `AdvancedSecurityMode` is set to `ENFORCED` (not `AUDIT`) for production pools — AUDIT mode only logs threats without blocking.
-- **Hosted UI custom domain SNI:** Enhanced custom domain support for the hosted UI. No new audit-surface fields, but auditors should verify that custom domains have valid ACM certificates and TLS configuration.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
+
 
 ## References
 
@@ -727,6 +458,12 @@ See the AWS Cognito Identity Provider documentation for:
 - Advanced Security Features (ASF) modes and capabilities.
 - NIST SP 800-63B (password guidance) and OAuth 2.1 (implicit flow
   deprecation).
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) - auth-flow / OAuth strength matrices, multi-client edge cases, recent AWS features
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) - pre-flight safety checks before remediation CLIs
+- [references/error-handling.md](references/error-handling.md) - remediation guidance per risk tier
 
 ## Domain
 

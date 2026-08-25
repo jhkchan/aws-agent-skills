@@ -242,3 +242,69 @@ resource "aws_kms_key" "codecommit" {
   })
 }
 ```
+
+---
+
+## Expert heuristic — git-remote-codecommit for IAM auth
+
+A baseline model says "generate git credentials in the IAM console." The
+correct heuristic recognizes three auth methods with different
+operational profiles, and GRC is preferred for IAM-role-based
+environments.
+
+```text
+CodeCommit authentication methods:
+  ├── git-remote-codecommit (GRC) — RECOMMENDED for IAM-role environments
+  │     AWS signer generates SigV4 session token from IAM credentials.
+  │     URL: codecommit://<region>@<repo-name>
+  │     Install: pip install git-remote-codecommit
+  │     Pros: no static credentials; works with SSO, assumed roles, EC2.
+  │
+  ├── IAM git credentials (service-specific credentials)
+  │     Per-IAM-user static username + HTTPS password.
+  │     URL: https://git-codecommit.<region>.amazonaws.com/...
+  │     Pros: works with any Git client. Cons: static; manual rotation.
+  │
+  └── SSH keys
+        Per-IAM-user public SSH key uploaded to IAM.
+        URL: ssh://git-codecommit.<region>.amazonaws.com/...
+        Pros: familiar. Cons: per-IAM-user; key rotation manual.
+```
+
+## Expert heuristic — KMS key policy cross-account grant
+
+For cross-account repository access, the repository resource policy
+grants the cross-account principal `codecommit:GitPull/GitPush`. But if
+the repository is encrypted with a customer-managed KMS key, the key
+policy must ALSO grant the cross-account principal.
+
+```text
+Cross-account CodeCommit access (encrypted repository):
+  Repository resource policy:
+    Principal: arn:aws:iam::<cross-acct>:root
+    Actions: codecommit:GitPull, codecommit:GitPush
+
+  KMS key policy (ALSO required):
+    Principal: arn:aws:iam::<cross-acct>:root
+    Actions: kms:Decrypt, kms:Encrypt, kms:ReEncrypt*,
+             kms:GenerateDataKey*, kms:DescribeKey
+
+  MISSING EITHER = AccessDenied on push/pull.
+```
+
+## Step 8 setup — GRC and IAM git credentials
+
+**GRC setup for developers:**
+
+```bash
+pip install git-remote-codecommit
+git clone codecommit://us-east-1@my-app-repo
+```
+
+**IAM git credentials setup (for CI):**
+
+```bash
+aws iam create-service-specific-credential \
+  --user-name "ci-codecommit-user" \
+  --service-name "codecommit.amazonaws.com" --region us-east-1
+```

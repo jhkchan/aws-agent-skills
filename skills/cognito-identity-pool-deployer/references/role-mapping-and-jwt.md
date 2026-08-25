@@ -259,3 +259,119 @@ resource "aws_cognito_identity_pool_roles" "main" {
   }
 }
 ```
+
+## Step 4 - rules-based role mapping example (moved from SKILL.md)
+
+```bash
+aws cognito-identity set-identity-pool-roles \
+  --identity-pool-id us-east-1:abcdef-1234 \
+  --roles authenticated=arn:aws:iam::123456789012:role/AppDefaultRole \
+  --role-mappings '{
+    "cognito-idp.us-east-1.amazonaws.com/us-east-1_AbCdEf123": {
+      "Type": "Rules",
+      "AmbiguousRoleResolution": "AuthenticatedRole",
+      "RulesConfiguration": {
+        "Rules": [
+          {
+            "Claim": "cognito:groups",
+            "MatchType": "Contains",
+            "Value": "admins",
+            "RoleARN": "arn:aws:iam::123456789012:role/AppAdminRole"
+          },
+          {
+            "Claim": "cognito:groups",
+            "MatchType": "Contains",
+            "Value": "readers",
+            "RoleARN": "arn:aws:iam::123456789012:role/AppReaderRole"
+          }
+        ]
+      }
+    }
+  }'
+```
+
+## Step 5 - principal tag attribute mapping example (moved from SKILL.md)
+
+**Enable principal tag mapping via role mapping:**
+
+```bash
+aws cognito-identity set-identity-pool-roles \
+  --identity-pool-id us-east-1:abcdef-1234 \
+  --roles authenticated=arn:aws:iam::123456789012:role/AppABACRole \
+  --role-mappings '{
+    "cognito-idp.us-east-1.amazonaws.com/us-east-1_AbCdEf123": {
+      "Type": "Token",
+      "AmbiguousRoleResolution": "AuthenticatedRole"
+    }
+  }'
+```
+
+For ABAC, the IAM role's trust policy must include tag conditions:
+
+```json
+{
+  "Condition": {
+    "StringEquals": {
+      "aws:RequestTag/Department": "${cognito-identity.amazonaws.com:groups}"
+    }
+  }
+}
+```
+
+## Step 8 - User Pool groups setup (moved from SKILL.md)
+
+**User Pool groups setup:**
+
+```bash
+# Create groups in the User Pool
+aws cognito-idp create-group \
+  --user-pool-id us-east-1_AbCdEf123 \
+  --group-name "admins"
+
+aws cognito-idp create-group \
+  --user-pool-id us-east-1_AbCdEf123 \
+  --group-name "readers"
+
+# Add users to groups
+aws cognito-idp admin-add-user-to-group \
+  --user-pool-id us-east-1_AbCdEf123 \
+  --username "user@example.com" \
+  --group-name "admins"
+```
+
+## Step 8 - extracting JWT claims (moved from SKILL.md)
+
+**Extracting JWT claims:**
+
+The JWT ID token contains claims that can be decoded (base64) to
+extract user attributes:
+
+```bash
+# Decode the JWT payload (middle segment)
+echo "<id-token-jwt>" | cut -d'.' -f2 | base64 -d | jq .
+```
+
+## Step 9 - cross-account role trust policy (moved from SKILL.md)
+
+**Cross-account role trust policy (in Account B):**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::123456789012:root"
+      },
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringEquals": {
+          "sts:ExternalId": "us-east-1:abcdef-1234"
+        }
+      }
+    }
+  ]
+}
+```
+

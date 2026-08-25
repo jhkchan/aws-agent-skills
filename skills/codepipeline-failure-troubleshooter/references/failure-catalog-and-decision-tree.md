@@ -336,3 +336,58 @@ succeeded Source action, you must start a new execution, not retry.
 CodeBuild has its own `timeoutInMinutes` (default 60, max 480). The
 pipeline stage does not have a separate timeout. Look at the
 CodeBuild project setting.
+
+---
+
+## Common fix patterns — SOURCE_STAGE_FAILED
+
+**Common fix patterns:**
+
+- **CodeCommit branch deleted:** recreate the branch, or update the
+  pipeline's `BranchName` to a branch that exists.
+- **S3 source key missing:** upload the source object; verify the
+  pipeline's `S3Bucket` and `S3ObjectKey` configuration.
+- **GitHub v1 token expired:** rotate the PAT in GitHub; update the
+  secret; use `update-pipeline` to re-store the token structure.
+  Prefer migrating to a CodeStar connection (GitHub v2 action) for
+  OAuth-rotated credentials.
+- **CodeStar connection pending:** complete the connection handshake
+  in the console; the connection ARN stays the same.
+- **Polling source silent:** set `PollForSourceChanges: true`, or
+  migrate to event-driven detection via CloudWatch Events rule
+  targeting `codepipeline StartPipelineExecution`.
+
+## Common fix patterns — BUILD_STAGE_FAILED
+
+**Common fix patterns:**
+
+- **`buildspec` missing:** verify `buildspec.yml` exists at the
+  configured path; if using a non-default path, set it in the
+  CodeBuild project.
+- **KMS denied:** add the CodeBuild service role to the KMS key
+  policy's `Statement.Principal.AWS` with `kms:Decrypt` (for source
+  artifact) and `kms:Encrypt` / `kms:GenerateDataKey` (for output
+  artifact).
+- **Image pull failure:** for Docker Hub, use the public ECR mirror
+  (`public.ecr.aws/docker/library/<image>`) or store the image in a
+  private ECR with the CodeBuild role granted `ecr:BatchGetImage`.
+- **VPC config wrong:** update the CodeBuild project's `vpcConfig`
+  with valid subnet IDs and security group IDs.
+- **Timeout:** raise `timeoutInMinutes`; consider enabling S3 cache
+  for dependencies.
+
+## Common fix patterns — CROSS_ACCOUNT_ROLE_FAILED
+
+**Common fix patterns:**
+
+- **Trust policy missing pipeline role:** add a statement allowing
+  `sts:AssumeRole` from the pipeline service role ARN.
+- **KMS key policy missing customer role:** add the customer role to
+  the KMS key policy with `kms:Decrypt`, `kms:Encrypt`,
+  `kms:GenerateDataKey*`, `kms:DescribeKey`.
+- **Artifact bucket policy missing customer role:** add the customer
+  role to the bucket policy with `s3:GetObject`, `s3:PutObject`,
+  `s3:ListBucket` on the artifact bucket and its objects.
+- **External ID condition:** verify the customer role's trust policy
+  `Condition.sts:ExternalId` matches the pipeline's configured
+  external ID (if used).

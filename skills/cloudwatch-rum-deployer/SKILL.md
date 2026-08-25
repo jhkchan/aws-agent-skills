@@ -178,29 +178,8 @@ VERIFICATION_COMMANDS:
 
 ### Perfect example — PREREQUISITES_MISSING
 
-```text
-RUM_APP: checkout-web
-VERDICT: PREREQUISITES_MISSING
-CHECKLIST:
-  [✓]      App monitor name — checkout-web-prod (created in us-east-1)
-  [✓]      Domain (AllowedOrigins) — https://checkout.example.com
-  [✓]      Sampling rate — current: 1.0   recommended: 1.0
-  [✗]      Cookie domain — current: .com   recommended: .example.com (REJECT TLD; cookie leaks across all .com sites)
-  [✓]      Telemetries — current: errors, performance, http   recommended: errors, performance, http
-  [✗]      Guest role — MISSING: no IAM role with rum:PutRumEvents found (run `aws iam list-roles --query 'Roles[?contains(RoleName,`rum`)]'`)
-  [INPUT NEEDED] Identity pool — operator must provide Cognito unauth pool ID, or skill must create one
-  [✗]      X-Ray tracing — current: enableXRay=true   BLOCKED: server sampling rule FixedRate=0.0; raise to >=0.01 (aws xray update-sampling-rule)
-  [✗]      Application Signals correlation — BLOCKED on X-Ray sampling rule above
-  [✗]      XSS sanitization — JS_SNIPPET withheld: SRI hash missing until SDK version pinned
-  [✗]      Custom metrics — BLOCKED: no put-metrics-destination configured
-  [✗]      CloudWatch metrics emitted — none yet (deployment not live)
-JS_SNIPPET: (withheld — resolve the 4 BLOCKED rows above, then re-invoke)
-VERIFICATION_COMMANDS:
-  aws iam list-roles --query 'Roles[?contains(RoleName,`rum`)]' --output text
-  aws xray get-sampling-rules --region us-east-1
-  aws cognito-identity list-identity-pools --max-results 10 --region us-east-1
-  aws rum get-app-monitor --name checkout-web-prod --region us-east-1
-```
+Worked example — PREREQUISITES_MISSING (blocked cookie domain, missing guest role, zero X-Ray sampling, withheld JS_SNIPPET) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load it when any required prerequisite fails; the primary READY_TO_DEPLOY example stays above.
 
 ## Reasoning framework (why the provisioning order matters)
 
@@ -262,19 +241,8 @@ The app monitor provisions the telemetry sink. Provide a globally
 unique name (within the account-Region), the domain allow-list, and
 the sample rate:
 
-```bash
-aws rum create-app-monitor \
-  --name checkout-web-prod \
-  --app-monitor-configuration '{
-    "AllowList": ["checkout.example.com"],
-    "SessionSampleRate": 1.0,
-    "Telemetries": ["errors", "performance", "http"],
-    "EnableXRay": true
-  }' \
-  --cw-log-group-name /aws/rum/checkout-web-prod \
-  --domain checkout.example.com \
-  --region us-east-1
-```
+App-monitor creation CLI (name, AllowList, SessionSampleRate, Telemetries, EnableXRay, cw-log-group) moved verbatim to [references/deployment-cli-commands.md](references/deployment-cli-commands.md).
+Load it when emitting the create-app-monitor command.
 
 The app monitor name (`checkout-web-prod`) appears in the ARN and
 every metric dimension. The `AllowList` enforces which origins
@@ -302,47 +270,8 @@ The SDK needs credentials with `rum:PutRumEvents` on the app
 monitor. For browser-based apps, use an anonymous guest role
 (Cognito identity pool) — never embed long-lived AWS keys in JS.
 
-```bash
-# Trust policy for Cognito identity pool
-cat > /tmp/guest-trust.json <<'EOF'
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": { "Federated": "cognito-identity.amazonaws.com" },
-    "Action": "sts:AssumeRoleWithWebIdentity",
-    "Condition": {
-      "StringEquals": {
-        "cognito-identity.amazonaws.com:aud": "us-east-1:abcd1234-efgh-5678"
-      },
-      "ForAnyValue:StringLike": {
-        "cognito-identity.amazonaws.com:amr": "unauth"
-      }
-    }
-  }]
-}
-EOF
-
-aws iam create-role \
-  --role-name checkout-web-rum-guest \
-  --assume-role-policy-document file:///tmp/guest-trust.json
-
-cat > /tmp/guest-permission.json <<'EOF'
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Action": "rum:PutRumEvents",
-    "Resource": "arn:aws:rum:us-east-1:111122223333:appmonitor/checkout-web-prod"
-  }]
-}
-EOF
-
-aws iam put-role-policy \
-  --role-name checkout-web-rum-guest \
-  --policy-name CheckoutWebRUMPutEvents \
-  --policy-document file:///tmp/guest-permission.json
-```
+Guest-role creation CLI (Cognito-federated trust policy with aud/amr conditions, create-role, PutRumEvents permission scoped to the app monitor ARN) moved verbatim to [references/deployment-cli-commands.md](references/deployment-cli-commands.md).
+Load it when emitting the guest-role commands.
 
 Resource-lock the policy to **this** app monitor ARN. A wildcard
 (`rum:PutRumEvents: *`) lets any malicious script send events to
@@ -353,27 +282,8 @@ any app monitor in the account.
 The CDN pattern loads the SDK via a script tag and configures it
 with the app monitor identity, guest role, and cookie domain:
 
-```html
-<script>
-  (function(n,i,v,r,s,c,x,z,h){var p=function(){var a=
-  Array.prototype.slice.call(arguments);return new (Function.
-  prototype.bind.apply(cwr,(a).concat(p.args)))},q=p.args=
-  Array.prototype.slice.call(arguments);(cwr=a=cwr||function(){
-  (cwr.q=cwr.q||[]).push(arguments)}).l=+new Date;cwr('init',
-  {clientConfig:{applicationId:'checkout-web-prod',
-  region:'us-east-1',version:'1.0.0',
-  guestRoleArn:'arn:aws:iam::111122223333:role/checkout-web-rum-guest',
-  identityPoolId:'us-east-1:abcd1234-efgh-5678'},
-  telemetries:['errors','performance','http'],
-  sessionSampleRate:1.0,
-  sessionEventUrl:'https://dataplane.rum.us-east-1.amazonaws.com',
-  cookieDomain:'.example.com',
-  enableXRay:true});cwr('load')})()
-</script>
-<script async src="https://client.rum.us-east-1.amazonaws.com/1.18.0/aws-rum-web.min.js"
-        integrity="sha384-<hash>"
-        crossorigin="anonymous"></script>
-```
+CDN injection snippet (cwr init config + SRI-pinned async loader) moved verbatim to [references/deployment-cli-commands.md](references/deployment-cli-commands.md).
+Load it when wiring the CDN script tag; the annotated config attributes stay below.
 
 Key config attributes: `applicationId` (must EXACTLY match the app
 monitor name), `guestRoleArn` + `identityPoolId` (guest role from
@@ -385,24 +295,8 @@ field), `sessionSampleRate`, and `cookieDomain` (see Step 4).
 For SPA frameworks (React, Vue, Angular, Next.js), install
 `aws-rum-web` via npm and construct the client:
 
-```typescript
-import { AwsRum, AwsRumConfig } from 'aws-rum-web';
-
-const config: AwsRumConfig = {
-  sessionSampleRate: 1.0,
-  guestRoleArn: 'arn:aws:iam::111122223333:role/checkout-web-rum-guest',
-  identityPoolId: 'us-east-1:abcd1234-efgh-5678',
-  endpoint: 'https://dataplane.rum.us-east-1.amazonaws.com',
-  telemetries: ['errors', 'performance', 'http'],
-  allowCookies: true,
-  cookieDomain: '.example.com',
-  enableXRay: true
-};
-
-export const awsRum = new AwsRum(
-  'checkout-web-prod', '1.0.0', 'us-east-1', config
-);
-```
+npm injection snippet (AwsRum constructor + AwsRumConfig for SPA frameworks) moved verbatim to [references/deployment-cli-commands.md](references/deployment-cli-commands.md).
+Load it when wiring React/Vue/Angular/Next.js integration.
 
 The npm pattern is required for tree-shaking, build-time bundling,
 or typed event records. The CDN pattern is fine for static
@@ -430,85 +324,18 @@ the domain explicitly.
 
 ### Step 5: Configure X-Ray trace correlation
 
-When `enableXRay: true` (or `EnableXRay: true` on the app monitor),
-the RUM SDK generates a client-side X-Ray trace ID at session
-start, attaches it to every `PutRumEvents` batch, and emits a
-client-side segment via `PutTraceSegments`.
-
-For server-side correlation, the **server must propagate the same
-trace ID** by reading the `X-Amzn-Trace-Id` request header:
-
-```http
-X-Amzn-Trace-Id: Root=1-<8hex>-<24hex>;Parent=<16hex>;Sampled=1
-```
-
-The server's X-Ray SDK reads the header and joins the trace. The
-result: the X-Ray service map shows the client-side segment
-(browser) connecting to the server segment (app), and the RUM
-dashboard shows the linked server-side traces.
-
-Without server-side header propagation, RUM still captures
-client-side traces but they do NOT link to the server — the
-X-Ray trace stops at the browser.
-
-**Sampling rule on the server** — the server-side X-Ray sampling
-rule must sample the trace ID. A 0% sampling rule on the server
-blanks the correlation. Use the default 5% rule, or a higher rate
-for low-traffic endpoints.
+X-Ray correlation deep dive (client trace-ID attach, X-Amzn-Trace-Id header propagation format, server SDK join, >0% sampling-rule requirement) moved verbatim to [references/custom-events-and-correlation-guide.md](references/custom-events-and-correlation-guide.md).
+Load it when enabling client-to-server trace correlation.
 
 ### Step 6: Record custom events
 
-Custom events extend RUM beyond auto-captured errors, performance,
-and HTTP. Use them for funnel tracking, feature adoption, business
-events:
-
-```typescript
-// CDN pattern
-cwr('recordEvent', {
-  type: 'checkout_complete',
-  data: {
-    cartValue: 142.50,
-    itemCount: 3,
-    paymentMethod: 'card'
-  }
-});
-
-// npm pattern
-awsRum?.recordEvent({
-  type: 'checkout_complete',
-  data: { cartValue: 142.50, itemCount: 3, paymentMethod: 'card' }
-});
-```
-
-Event `type` is a free-form string but **must** be alphanumeric +
-underscore (RUM rejects special characters in event types). Event
-`data` is an arbitrary JSON object (max 64 KB after serialization).
+Custom-event recording snippets (cwr recordEvent and awsRum.recordEvent, snake_case type rule, 64 KB data limit) moved verbatim to [references/custom-events-and-correlation-guide.md](references/custom-events-and-correlation-guide.md).
+Load it when recording funnel or business events.
 
 ### Step 7: Configure RUM custom metrics
 
-Custom events become CloudWatch custom metrics in the `AWS/RUM`
-namespace automatically when you define a metric on the app
-monitor:
-
-```bash
-aws rum put-metrics-destination \
-  --app-monitor-name checkout-web-prod \
-  --metric-definition-namespace AWS/RUM \
-  --metric-definition-name CartValueTotal \
-  --metric-definition-value-key '$.event.data.cartValue' \
-  --region us-east-1
-```
-
-The metric appears in CloudWatch as
-`AWS/RUM > ApplicationName=checkout-web-prod, RumEventName=checkout_complete`
-with the value extracted from `event.data.cartValue` for every
-event of type `checkout_complete`. Use this to build alarms and
-dashboards on RUM-derived business metrics.
-
-**Metric extraction limits:**
-- One value per event (the `valueKey` JSON path).
-- Up to 100 metric definitions per app monitor.
-- Dimensions are fixed: `ApplicationName` and `RumEventName`.
+Custom-metric extraction CLI (put-metrics-destination, value-key JSON path, ApplicationName + RumEventName dimensions, 100-definition limit) moved verbatim to [references/custom-events-and-correlation-guide.md](references/custom-events-and-correlation-guide.md).
+Load it when turning custom events into CloudWatch metrics.
 
 ### Step 8: Wire Application Signals client-side correlation
 
@@ -537,48 +364,13 @@ If the namespace stays empty, the cause is almost always:
 
 ### Step 9: Verify telemetry is flowing
 
-Within 1-5 minutes of the first user visiting the page, telemetry
-should appear:
-
-```bash
-aws cloudwatch list-metrics --namespace AWS/RUM \
-  --dimensions Name=ApplicationName,Value=checkout-web-prod
-
-aws logs describe-log-streams \
-  --log-group-name /aws/rum/checkout-web-prod \
-  --limit 1 --order-by LastEventTime --descending
-
-aws xray get-trace-summaries \
-  --start-time $(date -u +%s --date='10 min ago') \
-  --end-time $(date -u +%s) \
-  --filter-expression 'service.id = "checkout-web-prod"'
-```
-
-If metrics do not appear within 15 minutes, the cause is almost
-always:
-- Domain not in `AllowedOrigins` (silent drop).
-- Guest role lacks `rum:PutRumEvents` on the app monitor ARN.
-- Browser ad blocker suppressing the RUM CDN script.
+Telemetry-flow verification commands (list-metrics AWS/RUM, describe-log-streams, xray get-trace-summaries) and the three silent-drop causes moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load it after deployment to confirm data is arriving.
 
 ### Step 10: Tag, alarm, and visualize
 
-Tag the app monitor for cost allocation; alarm on session drops
-and error spikes:
-
-```bash
-aws rum tag-resource \
-  --resource-arn arn:aws:rum:us-east-1:111122223333:appmonitor/checkout-web-prod \
-  --tags team=payments,env=prod
-
-aws cloudwatch put-metric-alarm \
-  --alarm-name checkout-web-rum-error-spike \
-  --namespace AWS/RUM \
-  --metric-name Errors \
-  --dimensions Name=ApplicationName,Value=checkout-web-prod \
-  --period 300 --evaluation-periods 2 \
-  --threshold 50 --comparison-operator GreaterThanThreshold \
-  --alarm-actions arn:aws:sns:us-east-1:111122223333:oncall
-```
+Tagging and alarm CLI (tag-resource, put-metric-alarm on AWS/RUM Errors with SNS action) moved verbatim to [references/deployment-cli-commands.md](references/deployment-cli-commands.md).
+Load it when emitting the tagging and alarm setup commands.
 
 Open the CloudWatch console → RUM → Application list to confirm
 the application shows session count, page load times, and Web
@@ -598,72 +390,13 @@ Vitals (LCP, FID, CLS, INP) populated.
 
 ## Edge-case handling
 
-- **Sessions not appearing in dashboard:** the domain in
-  `AllowedOrigins` is missing scheme or port. RUM matches scheme +
-  host + port exactly; `https://checkout.example.com` differs from
-  `checkout.example.com`. Always include `https://`.
-- **Browser console `AccessDenied` on `PutRumEvents`:** the guest
-  role lacks the permission, or the resource ARN in the policy
-  does not match the app monitor ARN. Check `iam get-role-policy`.
-- **X-Ray traces not correlating:** server-side sampling rule is
-  0%, or the server's X-Ray SDK is not propagating the
-  `X-Amzn-Trace-Id` header. Inspect server-side X-Ray SDK config.
-- **Custom events rejected:** event `type` contains a hyphen or
-  special character. Use snake_case (`checkout_complete`, not
-  `checkout-complete`).
-- **Cookie domain rejected:** the cookie domain does not match the
-  page URL host. The browser ignores the cookie and session
-  stitching breaks. Verify the domain with `document.cookie` in
-  DevTools.
-- **Ad blockers suppressing telemetry:** uBlock Origin and
-  similar block the RUM CDN script. RUM cannot bypass this;
-  expect 5-15% session under-count in adblock-heavy audiences.
-  Document the limitation; do not attempt to evade adblockers.
-- **Application Signals correlation empty:** the server workload
-  is not enabled for Application Signals, or the RUM domain does
-  not match the server's `AWS_SERVICE_NAME`-derived endpoint.
-- **Multi-Region apps:** RUM does not merge across Regions. Plan
-  per-Region app monitors and per-Region dashboards.
+Edge-case catalog (scheme+host+port origin matching, guest-role AccessDenied, X-Ray correlation failures, rejected event types, cookie-domain mismatch, ad blockers, empty Application Signals, multi-Region) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when the dashboard stays empty or events are rejected.
 
 ## Recent AWS features (2024-2026)
 
-- **RUM Application Signals correlation (2025):** the
-  `AWS/ApplicationSignalsClient` namespace auto-populates when both
-  Application Signals (server) and RUM (client) cover the same
-  service endpoint. Surfaced as a client node in the service map.
-
-- **RUM custom metrics (2024-2025):** `put-metrics-destination` on
-  the app monitor emits CloudWatch custom metrics from custom
-  event data. Up to 100 metric definitions per app monitor.
-
-- **Web Vitals INP (Interaction to Next Paint) GA (2024-2025):**
-  RUM captures INP as the successor to FID. The dashboard surfaces
-  both during the transition period.
-
-- **Extended SDK versioning (2024-2025):** the SDK is versioned
-  independently of the service. Pin the version in the CDN script
-  tag (`aws-rum-web@1.18.0`) — auto-upgrades can break event
-  schemas.
-
-- **RUM with Application Signals SLOs (2025):** Application
-  Signals SLOs can reference client-side metrics (Latency,
-  Availability) sourced from RUM via the
-  `AWS/ApplicationSignalsClient` namespace. Client-side SLOs are
-  now first-class.
-
-- **Cookie domain strict validation (2024-2025):** cookie domains
-  must match the page URL host exactly or be a parent domain.
-  Invalid cookie domains are silently dropped (no error in the
-  SDK; sessions just don't persist across navigation).
-
-- **Session event batching (2024-2025):** the SDK batches events
-  up to 3 MB before calling `PutRumEvents`. Tunable via
-  `batchLimitMB`. Lower for low-bandwidth mobile; raise for high-
-  bandwidth desktop.
-
-- **CORS strict origin matching (2024-2025):** the allow-list
-  matches scheme + host + port exactly. Wildcards are not
-  supported; explicit subdomain entries are required.
+Recent AWS features 2024-2026 (Application Signals correlation, custom metrics via put-metrics-destination, Web Vitals INP GA, SDK version pinning, client-side SLOs, strict cookie-domain validation, 3 MB event batching, strict CORS matching) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when advising on 2024-2026 RUM capabilities.
 
 ## NEVER (top 5 — full list in references)
 
@@ -688,48 +421,13 @@ Vitals (LCP, FID, CLS, INP) populated.
 
 ## Expert heuristic — enabling RUM and choosing config
 
-- **Sample rate vs. cost.** RUM charges per `PutRumEvents` call.
-  At 100% sample rate and 1M daily sessions, expect ~$300/month
-  per app monitor. Drop to 10% for high-traffic sites; raise to
-  100% for low-traffic beta deploys.
-- **Cookie domain defaults to the current host.** This is correct
-  for single-subdomain apps; multi-subdomain apps must set the
-  parent domain explicitly. When in doubt, omit and observe
-  session continuity.
-- **Telemetries: declare all three at init.** errors, performance,
-  http. Adding telemetry later requires a code change. Removing
-  one (e.g., `http` for privacy) is a deliberate choice.
-- **Custom event types: snake_case only.** Hyphens and special
-  characters are rejected silently. Establish a naming convention
-  (`<domain>_<action>`, e.g., `checkout_complete`).
-- **Guest role ARN resource lock.** Scope `rum:PutRumEvents` to
-  the specific app monitor ARN. Wildcard policies let any
-  malicious script write events to any app monitor in the
-  account.
-- **X-Ray correlation needs server-side header propagation.**
-  Confirm the server reads `X-Amzn-Trace-Id` and joins the trace.
-  Without propagation, RUM captures client-side traces only.
-- **Ad blockers cannot be bypassed.** Expect 5-15% under-count in
-  adblock-heavy audiences. Document the limitation; do not
-  attempt to evade.
+Config-choice heuristics (sample rate vs PutRumEvents cost, cookie-domain default, declare-all-telemetries-at-init, snake_case event types, guest-role ARN resource lock, X-Ray header propagation, adblocker under-count) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load it when tuning sample rate, cookie domain, or telemetry selection.
 
 ## Pre-flight safety checks (run before any enablement CLI)
 
-- **Confirm RUM is available in the Region:** `aws rum
-  list-app-monitors --region <r>` (no error = available).
-- **Confirm the guest role:** `aws iam list-attached-role-policies
-  --role-name <guest-role>` (must include a policy with
-  `rum:PutRumEvents` on the planned app monitor ARN).
-- **Confirm X-Ray sampling default exists (if X-Ray enabled):**
-  `aws xray get-sampling-rules` (must list a `Default` rule with
-  `FixedRate > 0`).
-- **Confirm Application Signals is enabled on the server (if
-  client correlation desired):** `aws application-signals
-  list-services` (server workload appears).
-- **Confirm the domain allow-list:** every origin (scheme + host
-  + port) the web app is served from must be in `AllowedOrigins`.
-- **Confirm the cookie domain** matches the deployment's parent
-  domain or the exact host.
+Pre-flight safety checks (region availability, guest-role policy, X-Ray Default sampling rule >0, Application Signals enabled, domain allow-list, cookie-domain match) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load it before emitting any enablement CLI.
 
 ## Output format — MANDATORY literal labels
 
@@ -759,6 +457,14 @@ is missing (domain not in `AllowedOrigins`, guest role ARN, X-Ray
 sampling rule when correlation enabled), the verdict is
 `PREREQUISITES_MISSING` with each gap listed in CHECKLIST as `[✗]`
 and `JS_SNIPPET:` withheld until every BLOCKED row is resolved.
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — edge-case catalog, config-choice heuristics, and 2024-2026 feature changes moved from SKILL.md
+- [references/deployment-cli-commands.md](references/deployment-cli-commands.md) — full CLI sequence; app-monitor, guest-role, SDK-injection, and alarm CLI moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — telemetry-flow verification and pre-flight safety checks moved from SKILL.md
+- [references/custom-events-and-correlation-guide.md](references/custom-events-and-correlation-guide.md) — custom events, custom metrics, X-Ray correlation internals moved from SKILL.md
+- [references/worked-examples.md](references/worked-examples.md) — PREREQUISITES_MISSING worked example moved from SKILL.md; the primary READY_TO_DEPLOY example stays in SKILL.md
 
 ## Domain
 

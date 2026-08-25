@@ -97,72 +97,11 @@ FAILED state alone is insufficient to distinguish them. The diagnostic
 walk combines the run report error, the canary type, the target endpoint
 status, Visual Monitoring baseline state, and CloudWatch metrics.
 
-Three facts make Synthetics canary diagnosis different from generic
-uptime monitoring:
-
-- **A canary failure is often a canary-side problem.** The canary
-  script, credentials, execution role, artifact bucket, and Visual
-  Monitoring baseline can each cause FAILED even when the target is
-  healthy. Operators who treat every canary failure as "endpoint down"
-  waste incident-response time on the wrong target.
-
-- **Visual Monitoring failures are NOT functional failures.** A
-  `VisualMonitoringBaselineMismatch` means the screenshot differs from
-  the baseline beyond tolerance. This can be a real UI break, a
-  legitimate CSS change, a dynamic banner, a cookie popup, or a
-  timezone-dependent clock. Treat Visual Monitoring failures as a
-  separate triage path.
-
-- **Canary timeout is the most over-diagnosed failure type.** A canary
-  hitting `TimeoutInSeconds` may be slow because the target is slow,
-  the script waits for a removed selector, the VPC networking is
-  constrained, or the run frequency causes overlapping runs. "Raise
-  the timeout" is the wrong first instinct.
+Three-facts deep-dive (canary-side problems, Visual Monitoring vs functional failures, over-diagnosed timeout): [Advanced patterns](references/advanced-patterns.md).
 
 ## Expert heuristic — non-obvious canary failure behaviours
 
-- **Shared execution role across canaries.** A misconfigured IAM policy
-  on the canary role can cause ALL canaries using that role to fail
-  simultaneously. If multiple canaries fail at once, suspect the shared
-  role, not each target endpoint.
-
-- **Visual Monitoring baselines do not auto-update.** After a UI
-  deployment, the baseline must be explicitly updated. A post-deploy
-  canary failure with Visual Monitoring is expected behaviour, not a
-  production incident.
-
-- **VPC canaries route through the VPC, not the public internet.** A
-  VPC-based canary that cannot reach a public endpoint likely has a VPC
-  networking issue (NAT gateway, route table, security group), not an
-  endpoint issue.
-
-- **Canary run frequency causes overlap failures.** A canary running
-  every minute that takes 90 seconds will overlap runs and consume
-  concurrent slots. The service may fail overlapping runs with no clear
-  error.
-
-- **`describe-canary` does NOT include last run error details.** Use
-  `describe-canary-runs` or `get-canary-runs` to retrieve the run
-  report with error messages. Operators who only check
-  `describe-canary` miss the diagnostic detail.
-
-- **Blue/green canary deployments use a separate artifact bucket.** A
-  misconfigured bucket policy or IAM role causes the canary to pull
-  stale or missing artifacts, appearing as a runtime exception or
-  "module not found."
-
-- **Node.js canaries can swallow exceptions via unhandled promise
-  rejections.** An un-awaited async call produces a generic
-  `RUNTIME_ERROR` without a clear stack trace. Check for missing
-  `.catch()` handlers.
-
-- **Broken-link checker failures include third-party links.** A failing
-  footer link (social media, analytics pixel) causes FAILED even though
-  the application is fully functional. Filter third-party domains.
-
-- **Canary recording (2025) captures HAR and screenshots for every
-  run.** Failed runs include downloadable artifacts — always check the
-  S3 artifacts before debugging the script.
+All nine non-obvious behaviours (shared execution role, baseline auto-update, VPC routing, run-frequency overlap, describe-canary limits, blue/green artifacts, unhandled promise rejections, third-party links, canary recording): [Advanced patterns](references/advanced-patterns.md).
 
 ## Process — Diagnostic decision tree (apply in order)
 
@@ -226,21 +165,7 @@ question: is the slowness target-side, script-side, or network-side?
 | Broken-link checker | 10-60s | 120s | Third-party link response |
 | Multi-step | 20-90s | 120s | Step 2+ after login |
 
-```bash
-# Canary config including timeout.
-aws synthetics describe-canary --name <canary> \
-  --query 'Canary.{type:Type,runtime:RuntimeVersion,timeout:RunConfig.TimeoutInSeconds,schedule:Schedule.Expression}'
-
-# Last 5 runs with duration and status.
-aws synthetics get-canary-runs --name <canary> --max-results 5 \
-  --query 'CanaryRuns[*].{status:Status,state:State,duration:Timing.Duration}'
-
-# Duration metric trend.
-aws cloudwatch get-metric-statistics --namespace CloudWatchSynthetics \
-  --metric-name Duration --dimensions Name=CanaryName,Value=<canary> \
-  --start-time $(date -u -v-1H +%Y-%m-%dT%H:%M:%SZ) --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 300 --statistics Average Maximum --output json
-```
+Probes (canary config with timeout, last 5 runs with duration, Duration metric trend): [Diagnostic commands](references/diagnostic-commands.md).
 
 | Sub-symptom | Root cause | Probe |
 |---|---|---|
@@ -268,21 +193,7 @@ testing authenticated endpoints.
    changed, or MFA policy changed.
 4. **Auth service:** Cognito, Auth0, or internal IdP may be down.
 
-```bash
-# Check canary log for auth errors.
-aws logs start-query --log-group-name /aws/lambda/cwsyn-<canary-name> \
-  --start-time $(date -u -v-1H +%s) --end-time $(date -u +%s) \
-  --query-string 'fields @timestamp, @message | filter @message like /40[13]/ or @message like /Unauthorized/ or @message like /token/ | sort @timestamp desc | limit 20'
-
-# Check Secrets Manager rotation history.
-aws secretsmanager describe-secret --secret-id <secret-id> \
-  --query '{name:Name,rotated:LastRotatedDate,changed:LastChangedDate}'
-
-# Simulate canary role's secret access.
-aws iam simulate-principal-policy --policy-source-arn <canary-role-arn> \
-  --action-names secretsmanager:GetSecretValue \
-  --resource-arns arn:aws:secretsmanager:<region>:<account>:secret:<secret-id>
-```
+Probes (canary-log auth-error query, Secrets Manager rotation history, canary-role secret-access simulation): [Diagnostic commands](references/diagnostic-commands.md).
 
 | Sub-symptom | Root cause | Fix |
 |---|---|---|
@@ -305,16 +216,7 @@ comparison flagged a delta.
 4. **Check capture timing:** anti-flicker or loading-state may cause
    inconsistent screenshots.
 
-```bash
-# Visual Monitoring configuration.
-aws synthetics describe-canary --name <canary> --query 'Canary.RunConfig'
-
-# List artifacts for the failed run.
-aws s3 ls s3://<artifact-bucket>/canary/<canary-name>/<run-id>/ --recursive --human-readable
-
-# Download screenshots for comparison.
-aws s3 cp s3://<artifact-bucket>/canary/<canary-name>/<run-id>/screenshots/ /tmp/canary-screenshots/ --recursive
-```
+Probes (Visual Monitoring config, failed-run artifact listing, screenshot download): [Diagnostic commands](references/diagnostic-commands.md).
 
 | Sub-symptom | Root cause | Fix |
 |---|---|---|
@@ -337,19 +239,7 @@ stack trace or error string from the Node.js or Python runtime.
 | Python | `TimeoutException` (WebDriverWait) | Element did not appear within wait |
 | Python | `ImportError: No module named` | Missing dependency in artifact zip |
 
-```bash
-# Query canary log for errors and stack traces.
-aws logs start-query --log-group-name /aws/lambda/cwsyn-<canary-name> \
-  --start-time $(date -u -v-1H +%s) --end-time $(date -u +%s) \
-  --query-string 'fields @timestamp, @message | filter @message like /Error/ or @message like /Exception/ or @message like /TypeError/ | sort @timestamp desc | limit 30'
-
-# Check runtime version.
-aws synthetics describe-canary --name <canary> --query 'Canary.RuntimeVersion'
-
-# List available runtime versions.
-aws synthetics describe-runtime-versions --max-results 10 \
-  --query 'RuntimeVersionList[*].{version:VersionName,deprecation:DeprecationDate}'
-```
+Probes (canary-log error/stack-trace query, runtime version, available runtime versions): [Diagnostic commands](references/diagnostic-commands.md).
 
 **Fix patterns:** DOM change (update selectors, correlate with
 deployment), unhandled promise (add `.catch()`, `await` all async calls),
@@ -366,23 +256,7 @@ Target is genuinely unreachable or returning errors.
 3. **Check ALB / CloudFront** target health and distribution status.
 4. **Check AWS Health Dashboard** for regional degradation.
 
-```bash
-# Independent endpoint check.
-curl -sI -o /dev/null -w "%{http_code} %{time_total}s\n" https://<target-url>
-
-# Route 53 DNS answer.
-aws route53 test-dns-answer --hosted-zone-id <zone-id> --record-name <record> --record-type A
-
-# ALB target health.
-aws elbv2 describe-target-health --target-group-arn <tg-arn> \
-  --query 'TargetHealthDescriptions[*].{target:Target.Id,health:TargetHealth.State,reason:TargetHealth.Reason}'
-
-# SuccessPercent trend — sustained 0% confirms target down.
-aws cloudwatch get-metric-statistics --namespace CloudWatchSynthetics \
-  --metric-name SuccessPercent --dimensions Name=CanaryName,Value=<canary> \
-  --start-time $(date -u -v-1H +%Y-%m-%dT%H:%M:%SZ) --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 300 --statistics Average --output json
-```
+Probes (independent curl check, Route 53 test-dns-answer, ALB target health, SuccessPercent trend): [Diagnostic commands](references/diagnostic-commands.md).
 
 **Fix patterns:** Application failure (escalate to app team), DNS
 failure (fix Route 53 record/health check), network path (fix VPC
@@ -394,19 +268,7 @@ support).
 Canary cannot access its artifact bucket, execution role, or
 dependencies. Canary-side configuration failure.
 
-```bash
-# Canaries execution role and artifact location.
-aws synthetics describe-canary --name <canary> \
-  --query 'Canary.{role:ExecutionRoleArn,artifact:ArtifactS3Location,code:Code.Location}'
-
-# Simulate canary role permissions.
-aws iam simulate-principal-policy --policy-source-arn <canary-role-arn> \
-  --action-names s3:GetObject s3:ListBucket logs:CreateLogStream \
-  --resource-arns arn:aws:s3:::<artifact-bucket> arn:aws:s3:::<artifact-bucket>/*
-
-# Verify artifact zip exists.
-aws s3 ls s3://<artifact-bucket>/canary/<canary-name>/
-```
+Probes (execution role and artifact location, IAM permission simulation, artifact zip existence): [Diagnostic commands](references/diagnostic-commands.md).
 
 | Sub-symptom | Root cause | Fix |
 |---|---|---|
@@ -420,15 +282,7 @@ aws s3 ls s3://<artifact-bucket>/canary/<canary-name>/
 Network-level failures distinct from target endpoint failures. The
 target may be healthy but the canary's network path is blocked.
 
-```bash
-# Check canary logs for network errors.
-aws logs start-query --log-group-name /aws/lambda/cwsyn-<canary-name> \
-  --start-time $(date -u -v-1H +%s) --end-time $(date -u +%s) \
-  --query-string 'fields @timestamp, @message | filter @message like /ECONNREFUSED/ or @message like /ENOTFOUND/ or @message like /429/ | sort @timestamp desc | limit 20'
-
-# VPC config for VPC canaries.
-aws synthetics describe-canary --name <canary> --query 'Canary.VpcConfig'
-```
+Probes (canary-log network-error query, VPC config): [Diagnostic commands](references/diagnostic-commands.md).
 
 | Sub-symptom | Root cause | Fix |
 |---|---|---|
@@ -492,49 +346,9 @@ REMEDIATION:
   4. Monitor SuccessPercent for 10 minutes; expect return to 100%.
 ```
 
-### Worked example — auth failure from secret rotation
+Worked example — auth failure from secret rotation (ROOT_CAUSE_FOUND, catalog #3): [Worked examples](references/worked-examples.md).
 
-```text
-CANARY: api-health-canary in us-east-1
-VERDICT: ROOT_CAUSE_FOUND
-ROOT_CAUSE: AUTH_FAILURE — the canary reads an OAuth client secret from
-  Secrets Manager. The secret was auto-rotated at 2026-08-09T03:00Z.
-  The canary script caches the token in module scope across warm Lambda
-  invocations, sending the old secret and producing 401 invalid_client.
-FAILURE_TYPE: AUTH_FAILURE
-EVIDENCE:
-  - Run report: 401 Unauthorized — {"error": "invalid_client"}
-  - CloudWatch SuccessPercent: dropped to 0% at 2026-08-09T03:01Z
-  - Secrets Manager: LastRotatedDate 2026-08-09T03:00:12Z
-  - Canary log: "Using cached token" on subsequent runs
-ROOT_CAUSE_CATALOG: #3
-REMEDIATION:
-  1. Immediate: force a cold start:
-      aws lambda update-function-configuration --function-name cwsyn-api-health-canary \
-        --environment Variables={FORCE_REFRESH=true}
-      aws synthetics start-canary --name api-health-canary
-  2. Permanent: modify script to fetch secret on EVERY run:
-      const secret = await secretsmanager.getSecretValue(
-        {SecretId: process.env.CLIENT_SECRET_ID}).promise();
-  3. Monitor SuccessPercent for 10 minutes; expect return to 100%.
-```
-
-### Worked example — insufficient context
-
-```text
-CANARY: unknown
-VERDICT: NEED_MORE_INFO
-ROOT_CAUSE: UNKNOWN — cannot diagnose without the canary name
-FAILURE_TYPE: UNKNOWN
-EVIDENCE:
-  - Run report: not available
-ROOT_CAUSE_CATALOG: #0
-MISSING:
-  - Canary name + region
-  - The run report error string
-  - The canary type
-  - The CloudWatch SuccessPercent / Duration pattern
-```
+Worked example — insufficient context (NEED_MORE_INFO): [Worked examples](references/worked-examples.md).
 
 ## Anti-Patterns — NEVER (top 5)
 
@@ -569,104 +383,15 @@ MISSING:
 
 ## Remediation guidance
 
-### TIMEOUT
-1. Identify the slow step from the canary log (last logged action).
-2. Check target endpoint response time independently.
-3. If target is slow, escalate to the application team.
-4. If script waits for a missing element, update selectors.
-5. If VPC networking is constrained, check NAT gateway and route tables.
-
-### AUTH_FAILURE
-1. Check Secrets Manager `LastRotatedDate` vs failure start time.
-2. Verify canary role can read the secret (`simulate-principal-policy`).
-3. Check script for token caching across runs.
-4. Verify the test account is not locked or expired.
-
-### VISUAL_MONITORING_MISMATCH
-1. Correlate failure start time with UI deployments.
-2. Download screenshot and baseline; compare visually.
-3. If legitimate UI change, update the baseline.
-4. If dynamic content, add ignore regions or increase tolerance.
-5. If real break, escalate to the application team.
-
-### RUNTIME_EXCEPTION
-1. Identify exception type and line number from the canary log.
-2. Correlate with target-side deployments.
-3. If DOM changed, update selectors and redeploy.
-4. If unhandled promise, add error handling.
-5. If post-runtime-upgrade, pin version or fix script.
-
-### TARGET_ENDPOINT_DOWN
-1. Verify target unreachable from a different vantage point.
-2. Check Route 53, ALB, CloudFront, AWS Health Dashboard.
-3. Escalate to application team with canary evidence.
+Per-failure-type remediation sequences (TIMEOUT, AUTH_FAILURE, VISUAL_MONITORING_MISMATCH, RUNTIME_EXCEPTION, TARGET_ENDPOINT_DOWN): [Error handling](references/error-handling.md).
 
 ## Diagnostic command reference
 
-```bash
-# 1. List all canaries with current state.
-aws synthetics describe-canaries \
-  --query 'Canaries[*].{name:Name,state:State,type:Type}' --output table
-
-# 2. Canary configuration.
-aws synthetics describe-canary --name <canary> \
-  --query 'Canary.{name:Name,state:State,type:Type,runtime:RuntimeVersion,role:ExecutionRoleArn,timeout:RunConfig.TimeoutInSeconds,schedule:Schedule.Expression,vpc:VpcConfig,artifact:ArtifactS3Location}'
-
-# 3. Recent runs with status and timing.
-aws synthetics get-canary-runs --name <canary> --max-results 10 \
-  --query 'CanaryRuns[*].{status:Status,state:State,duration:Timing.Duration,start:Timing.Started}'
-
-# 4. SuccessPercent metric.
-aws cloudwatch get-metric-statistics --namespace CloudWatchSynthetics \
-  --metric-name SuccessPercent --dimensions Name=CanaryName,Value=<canary> \
-  --start-time $(date -u -v-1H +%Y-%m-%dT%H:%M:%SZ) --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 300 --statistics Average --output json
-
-# 5. Canary log query for errors.
-aws logs start-query --log-group-name /aws/lambda/cwsyn-<canary-name> \
-  --start-time $(date -u -v-1H +%s) --end-time $(date -u +%s) \
-  --query-string 'fields @timestamp, @message | filter @message like /Error/ or @message like /Exception/ | sort @timestamp desc | limit 30'
-
-# 6. List canary artifacts (screenshots, HAR).
-aws s3 ls s3://<artifact-bucket>/canary/<canary-name>/ --recursive --human-readable
-
-# 7. Trigger a manual canary run.
-aws synthetics start-canary --name <canary>
-
-# 8. IAM permission simulation.
-aws iam simulate-principal-policy --policy-source-arn <canary-role-arn> \
-  --action-names s3:GetObject logs:CreateLogStream secretsmanager:GetSecretValue \
-  --resource-arns arn:aws:s3:::<bucket> arn:aws:s3:::<bucket>/* "*"
-```
+The eight numbered reference commands (list canaries, canary config, recent runs, SuccessPercent, log query, artifacts, manual run, IAM simulation): [Diagnostic commands](references/diagnostic-commands.md).
 
 ## Recent AWS features (2024-2026)
 
-- **Canary recording (2025):** failed and successful runs capture a HAR
-  file and per-step screenshots by default. Always download and inspect
-  artifacts from the S3 bucket before debugging the script.
-
-- **Visual Monitoring enhancements (2024-2025):** improved screenshot
-  comparison with configurable tolerance (percentage-based), ignore
-  regions, and per-step baseline management. Baselines can be updated
-  from any run via console or CLI.
-
-- **Python runtime canaries (2024 GA):** `synthetics-python` runtime
-  supports all five canary types. The Python `synthetics` module may
-  lag the Node.js version — check `describe-runtime-versions` before
-  suspecting a script bug.
-
-- **VPC canary improvements (2024):** canaries can use VPC endpoints
-  for AWS service targets, bypassing NAT gateway. Reduces NAT costs
-  and eliminates NAT-related timeout failures.
-
-- **Runtime version lifecycle (2024-2025):** runtime versions now have
-  explicit deprecation dates. Plan upgrades before deprecation to avoid
-  forced upgrades that break canary scripts.
-
-- **Blue/green canary deployments (2025):** canaries support blue/green
-  artifact deployment with active and standby in separate S3 paths.
-  Misconfigured bucket policy or IAM role causes wrong/missing
-  artifact pulls.
+2024-2026 feature notes (canary recording, Visual Monitoring enhancements, Python runtime GA, VPC canary improvements, runtime lifecycle, blue/green deployments): [Advanced patterns](references/advanced-patterns.md).
 
 ## References
 
@@ -674,6 +399,13 @@ See `references/canary-type-reference.md` for full canary type
 specifications (script templates, default timeout, common failure modes
 per type), and `references/visual-monitoring-guide.md` for Visual
 Monitoring configuration, tolerance tuning, and baseline management.
+
+## References (load on demand)
+
+- [Diagnostic commands](references/diagnostic-commands.md) — per-step probe commands (Steps 2-8) and the eight numbered reference commands
+- [Error handling](references/error-handling.md) — remediation guidance by failure type
+- [Worked examples](references/worked-examples.md) — auth-failure and insufficient-context worked examples
+- [Advanced patterns](references/advanced-patterns.md) — mindset facts, expert heuristics, recent AWS features
 
 ## Domain
 

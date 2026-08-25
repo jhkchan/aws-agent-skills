@@ -95,29 +95,7 @@ through the upstream chain to public registries. The authorization
 token from `aws codeartifact login` expires every 12 hours and MUST
 be refreshed by CI/CD pipelines.
 
-Three misconceptions dominate CodeArtifact domain misdesign at
-provisioning time:
-
-- **"The repository is the boundary."** It is NOT. The domain is the
-  boundary. The domain owns the KMS encryption key, the domain
-  permissions policy controls who can administer it, and the domain
-  owner account pays for all storage. Repositories within the domain
-  inherit the domain's encryption and are governed by repository-level
-  policies for read/write — but the domain is the immutable container.
-
-- **"Upstream and external connection are the same thing."** They are
-  NOT. An upstream repository is another CodeArtifact repository
-  (internal or shared). An external connection is a link to a PUBLIC
-  registry (npmjs.com, pypi.org, mavencentral, nuget.org). The cascade
-  order matters: local repo first, then upstream repos in order, then
-  external connection last. A package request traverses this chain
-  until a match is found.
-
-- **"The auth token is permanent."** It is NOT. The token from
-  `aws codeartifact login` expires after 12 hours. CI/CD pipelines
-  MUST regenerate it on every run (or at least every 12 hours). A
-  common failure is a pipeline that caches the token and breaks
-  silently after expiry.
+The three-misconception deep-dive (repository-is-NOT-the-boundary, upstream vs external connection, token permanence): [Advanced patterns](references/advanced-patterns.md).
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -162,99 +140,15 @@ the domain boundary first.
 
 ## Expert heuristic: the upstream and external-connection cascade
 
-A baseline model says "connect to npmjs.com." The correct heuristic
-recognizes that dependency resolution follows a cascade chain and the
-order is significant.
-
-```text
-Package request (e.g., npm install lodash):
-
-  1. Local repository (my-team-packages)
-     → found? return. not found? continue.
-
-  2. Upstream repository 1 (shared-team-packages)
-     → found? return. not found? continue.
-
-  3. Upstream repository 2 (company-approved-packages)
-     → found? return. not found? continue.
-
-  4. External connection (npmjs.com)
-     → found? return from public registry. not found? 404.
-
-Cascade configuration:
-  aws codeartifact update-repository \
-    --repository my-team-packages \
-    --domain my-domain \
-    --upstreams repository=shared-team-packages \
-    --upstreams repository=company-approved-packages \
-    --upstreams external-connection=npmjs
-
-Order matters: the first match wins. Put internal repos before public.
-```
-
-**Key implication:** the cascade is a supply-chain security control.
-Putting internal repos before the external connection ensures that
-internal (vetted) packages take precedence over public ones. This
-prevents dependency confusion attacks where a malicious package on
-npmjs.com shadows an internal package name.
+Full cascade heuristic with the package-resolution walk and the supply-chain-security implication: [Upstream cascade and auth tokens](references/upstream-cascade-and-auth-tokens.md).
 
 ## Expert heuristic: the 12-hour authorization token
 
-CodeArtifact authorization tokens expire. A baseline model generates
-the token once and assumes it is permanent. The correct heuristic
-recognizes the 12-hour expiry and builds refresh into the pipeline.
-
-```text
-Token lifecycle:
-  aws codeartifact login --tool npm --domain my-domain --domain-owner 123456789012
-  → writes .npmrc with: //my-domain-123456789012.d.codeartifact.us-east-1.amazonaws.com/npm/my-repo/:_authToken=<token>
-  → token expires in 12 hours
-
-CI/CD implication:
-  ├── Pipeline MUST run `aws codeartifact login` before every build
-  ├── Caching the token across runs > 12 hours = SILENT FAILURE
-  └── Alternative: generate a short-lived token via GetAuthorizationToken API
-      and inject as an environment variable
-
-Token scope:
-  ├── Domain-scoped: access ALL repositories in the domain
-  └── Repository-scoped: access only ONE repository (more restrictive)
-```
-
-**Key implication:** CI/CD pipelines that cache the `.npmrc` or
-`pip.conf` with the auth token will break after 12 hours. The login
-command must be part of the build step, not a one-time setup.
+Token lifecycle, CI/CD implication, and domain- vs repository-scoped tokens: [Upstream cascade and auth tokens](references/upstream-cascade-and-auth-tokens.md).
 
 ## Expert heuristic: domain owner vs repository admin
 
-The domain owner account is the account that created the domain. This
-account pays for all storage and data transfer. Repository admins can
-be different accounts (via cross-account repository policies), but
-they do NOT pay for storage — the domain owner does.
-
-```text
-Account topology:
-  Domain owner account (123456789012)
-    ├── Created the domain → owns it → pays for ALL storage
-    ├── Can set domain permissions policy (who can create repos)
-    └── Can delete the domain (destroys ALL repos)
-
-  Repository admin account (999999999999)
-    ├── Has repository policy granting codeartifact:ReadFromRepository
-    ├── Can consume packages from the repository
-    └── Does NOT pay for storage (domain owner pays)
-
-Cross-account sharing flow:
-  1. Domain owner creates domain + repository
-  2. Domain owner puts repository policy granting access to account 999999999999
-  3. Consumer account uses `aws codeartifact login` with the domain owner's
-     domain-owner ID to get an auth token
-  4. Consumer installs packages (npm install, pip install)
-```
-
-**Key implication:** the domain owner is the cost center. If multiple
-teams share a domain, the domain owner account bears all storage costs.
-Plan cost allocation accordingly (tags, billing alerts).
+Account topology and cross-account sharing flow (the domain owner pays for all storage): [Advanced patterns](references/advanced-patterns.md).
 
 ## Prerequisites (verify before provisioning)
 
@@ -292,27 +186,11 @@ within it. The domain cannot be renamed or moved — it is immutable.
 
 **Create a domain:**
 
-```bash
-# Domain with default AWS-managed encryption key
-aws codeartifact create-domain \
-  --domain my-domain \
-  --region us-east-1
-
-# Domain with custom KMS CMK (IMMUTABLE — cannot change later)
-aws codeartifact create-domain \
-  --domain my-domain \
-  --encryption-key arn:aws:kms:us-east-1:123456789012:key/abcd1234-... \
-  --region us-east-1
-```
+Create-domain commands (AWS-managed key and custom CMK — encryption is immutable at creation): [Diagnostic commands](references/diagnostic-commands.md).
 
 **Domain permissions policy (controls who can administer the domain):**
 
-```bash
-aws codeartifact put-domain-permissions-policy \
-  --domain my-domain \
-  --policy-document file://domain-policy.json \
-  --region us-east-1
-```
+put-domain-permissions-policy command: [Diagnostic commands](references/diagnostic-commands.md).
 
 Where `domain-policy.json` grants domain administration to specific
 principals.
@@ -322,13 +200,7 @@ principals.
 Repositories are created within a domain. Each repository has a
 package format (npm, pip, maven, nuget, etc.) and can have upstreams.
 
-```bash
-aws codeartifact create-repository \
-  --domain my-domain \
-  --repository my-team-packages \
-  --description "Internal npm packages for my team" \
-  --region us-east-1
-```
+create-repository command: [Diagnostic commands](references/diagnostic-commands.md).
 
 **Repository description** is mutable. **Repository name** is immutable.
 
@@ -338,15 +210,7 @@ Upstream repositories form the dependency resolution chain. When a
 package is requested from a repository, CodeArtifact searches the
 local repository first, then traverses upstreams in order.
 
-```bash
-# Set upstreams (order matters — first match wins)
-aws codeartifact update-repository \
-  --domain my-domain \
-  --repository my-team-packages \
-  --upstreams repository=shared-team-packages \
-  --upstreams repository=company-approved-packages \
-  --region us-east-1
-```
+update-repository upstreams command (order matters — first match wins): [Diagnostic commands](references/diagnostic-commands.md).
 
 **Cascade order is a security control.** Internal repositories should
 come before external connections to prevent dependency confusion
@@ -358,30 +222,12 @@ External connections link the domain to a PUBLIC package registry.
 They are created at the DOMAIN level and referenced by repositories
 as upstreams.
 
-```bash
-# Check available external connections
-aws codeartifact list-external-connections \
-  --region us-east-1
-
-# Common external connections:
-#   npmjs         → npmjs.com
-#   pypi          → pypi.org
-#   mavencentral  → search.maven.org
-#   nuget-org     → nuget.org
-```
+list-external-connections command and the common external connections: [Diagnostic commands](references/diagnostic-commands.md).
 
 External connections do NOT require creation — they are pre-provisioned
 by AWS. You reference them as an upstream:
 
-```bash
-# Add external connection as the LAST upstream (after internal repos)
-aws codeartifact update-repository \
-  --domain my-domain \
-  --repository my-team-packages \
-  --upstreams repository=shared-team-packages \
-  --upstreams external-connection=npmjs \
-  --region us-east-1
-```
+update-repository with external-connection upstream (LAST in the cascade): [Diagnostic commands](references/diagnostic-commands.md).
 
 **Key rule:** only ONE external connection per public source per
 domain. You cannot have two npmjs connections in the same domain.
@@ -392,31 +238,7 @@ Package consumption requires an authorization token. The `aws
 codeartifact login` command generates a token (valid for 12 hours)
 and configures the package manager.
 
-```bash
-# npm login (writes .npmrc)
-aws codeartifact login \
-  --tool npm \
-  --domain my-domain \
-  --domain-owner 123456789012 \
-  --repository my-team-packages \
-  --region us-east-1
-
-# pip login (writes pip.conf under codeartifact directory)
-aws codeartifact login \
-  --tool pip \
-  --domain my-domain \
-  --domain-owner 123456789012 \
-  --repository my-team-packages \
-  --region us-east-1
-
-# Alternative: generate token via API (for CI/CD)
-TOKEN=$(aws codeartifact get-authorization-token \
-  --domain my-domain \
-  --domain-owner 123456789012 \
-  --query authorizationToken --output text \
-  --region us-east-1)
-# Token expires in 12 hours — MUST be refreshed
-```
+Login commands (npm, pip) and the get-authorization-token CI/CD pattern (12-hour expiry): [Diagnostic commands](references/diagnostic-commands.md).
 
 **Critical:** the token expires after 12 hours. CI/CD pipelines MUST
 run `aws codeartifact login` (or call `get-authorization-token`) on
@@ -429,25 +251,11 @@ copied from upstream repositories.
 
 **Direct publish (npm):**
 
-```bash
-# After aws codeartifact login --tool npm ...
-cd my-package/
-npm publish
-```
+npm publish sequence after login: [Diagnostic commands](references/diagnostic-commands.md).
 
 **Copy from upstream (ingest from public without consuming in CI):**
 
-```bash
-aws codeartifact copy-package-versions \
-  --domain my-domain \
-  --repository my-team-packages \
-  --source-repository shared-team-packages \
-  --format npm \
-  --namespace lodash \
-  --package lodash \
-  --versions 4.17.21 \
-  --region us-east-1
-```
+copy-package-versions ingest command: [Diagnostic commands](references/diagnostic-commands.md).
 
 **Package version immutability:** once a package version is published,
 it CANNOT be overwritten. A new version number is required for updates.
@@ -459,44 +267,11 @@ Repository policies grant cross-account access to specific repositories.
 The domain owner account sets the policy; the consumer account uses the
 token to access.
 
-```bash
-# Domain owner grants read access to consumer account 999999999999
-aws codeartifact put-repository-permissions-policy \
-  --domain my-domain \
-  --repository my-team-packages \
-  --policy-revision 1 \
-  --policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Effect": "Allow",
-        "Principal": {
-          "AWS": "arn:aws:iam::999999999999:root"
-        },
-        "Action": [
-          "codeartifact:ReadFromRepository",
-          "codeartifact:GetAuthorizationToken",
-          "codeartifact:GetRepositoryEndpoint"
-        ],
-        "Resource": "*"
-      }
-    ]
-  }' \
-  --region us-east-1
-```
+put-repository-permissions-policy cross-account policy command: [Diagnostic commands](references/diagnostic-commands.md).
 
 **Consumer account access flow:**
 
-```bash
-# Consumer account gets auth token from the DOMAIN OWNER's domain
-aws codeartifact login \
-  --tool npm \
-  --domain my-domain \
-  --domain-owner 123456789012 \
-  --repository my-team-packages \
-  --region us-east-1
-# Consumer can now npm install from the repository
-```
+Consumer-account login command (uses the DOMAIN OWNER's --domain-owner): [Diagnostic commands](references/diagnostic-commands.md).
 
 **Key distinction:** domain permissions policy controls who can
 administer the domain (create/delete repos). Repository policy controls
@@ -509,27 +284,7 @@ By default, CodeArtifact is accessed over the public internet. For
 network isolation, a VPC interface endpoint routes traffic through
 AWS PrivateLink.
 
-```bash
-# Create VPC interface endpoint for CodeArtifact
-aws ec2 create-vpc-endpoint \
-  --vpc-id vpc-aaa11122 \
-  --vpc-endpoint-type Interface \
-  --service-name com.amazonaws.us-east-1.codeartifact.repositories \
-  --subnet-ids subnet-aaa111 subnet-bbb222 \
-  --security-group-ids sg-priv-1 \
-  --private-dns-enabled \
-  --region us-east-1
-
-# Also create endpoint for the API (codeartifact.api)
-aws ec2 create-vpc-endpoint \
-  --vpc-id vpc-aaa11122 \
-  --vpc-endpoint-type Interface \
-  --service-name com.amazonaws.us-east-1.codeartifact.api \
-  --subnet-ids subnet-aaa111 subnet-bbb222 \
-  --security-group-ids sg-priv-1 \
-  --private-dns-enabled \
-  --region us-east-1
-```
+VPC interface-endpoint creation commands (both endpoints, --private-dns-enabled required): [Diagnostic commands](references/diagnostic-commands.md).
 
 **Critical:** `--private-dns-enabled` is REQUIRED for the endpoint to
 intercept the default CodeArtifact hostname. Without it, the package
@@ -547,19 +302,7 @@ DOMAIN CREATION and is IMMUTABLE.
 | Default (AWS-managed) | CodeArtifact uses an AWS-managed KMS key | Simple setups, no key rotation control needed |
 | Customer-managed key (CMK) | Domain created with a specific KMS CMK ARN | Enterprise compliance, key rotation control, cross-account key access |
 
-```bash
-# Create a CMK for CodeArtifact
-KMS_KEY_ID=$(aws kms create-key \
-  --description "CodeArtifact domain encryption key" \
-  --query 'KeyMetadata.KeyId' --output text \
-  --region us-east-1)
-
-# Create domain with CMK (IMMUTABLE — cannot change later)
-aws codeartifact create-domain \
-  --domain my-domain \
-  --encryption-key arn:aws:kms:us-east-1:123456789012:key/$KMS_KEY_ID \
-  --region us-east-1
-```
+CMK creation and CMK-encrypted domain creation commands (immutable at creation): [Diagnostic commands](references/diagnostic-commands.md).
 
 **Key policy for the CMK** must allow CodeArtifact service to use the
 key (kms:Encrypt, kms:Decrypt, kms:ReEncrypt, kms:GenerateDataKey,
@@ -571,27 +314,7 @@ Lifecycle policies automate package version retention. Package versions
 are immutable once published — lifecycle policies are the only way to
 remove old versions.
 
-```bash
-# Apply lifecycle policy (retain last 50 versions, delete older)
-aws codeartifact put-lifecycle-configuration \
-  --domain my-domain \
-  --repository my-team-packages \
-  --lifecycle-configuration '{
-    "rules": [
-      {
-        "rulePriority": 1,
-        "description": "Keep last 50 versions",
-        "actions": [
-          {
-            "type": "retention",
-            "maxVersions": 50
-          }
-        ]
-      }
-    ]
-  }' \
-  --region us-east-1
-```
+put-lifecycle-configuration command (retain last 50 versions): [Diagnostic commands](references/diagnostic-commands.md).
 
 **Immutability guarantee:** published package versions CANNOT be
 overwritten, modified, or selectively deleted (only lifecycle policies
@@ -607,53 +330,14 @@ CodeArtifact emits CloudWatch metrics for monitoring:
 | `PublishPackageVersion` | Number of package version publishes |
 | `AssetSizeBytes` | Storage consumed by assets |
 
-```bash
-# Monitor download/publish rates
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/CodeArtifact \
-  --metric-name PublishPackageVersion \
-  --start-time 2026-08-01T00:00:00Z \
-  --end-time 2026-08-11T00:00:00Z \
-  --period 86400 \
-  --statistics Sum \
-  --dimensions Name=DomainName,Value=my-domain \
-  --region us-east-1
-```
+CloudWatch get-metric-statistics monitoring command: [Diagnostic commands](references/diagnostic-commands.md).
 
 Set CloudWatch alarms for abnormal publish/download patterns (security
 monitoring for supply-chain anomalies).
 
 ## Step 12 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Swift package support (2023-2024):** CodeArtifact added Swift
-  package format support, enabling iOS/macOS development teams to use
-  CodeArtifact as a package registry.
-
-- **Cargo package support (2023-2024):** Rust Cargo package format
-  support was added, rounding out the major ecosystem coverage.
-
-- **Lifecycle policy GA (2023-2024):** Lifecycle policies graduated
-  from preview, enabling automated package version retention and
-  cleanup to control storage costs.
-
-- **Cross-region replication improvements (2024-2025):** Enhanced
-  cross-region package replication for DR scenarios, reducing latency
-  for geographically distributed development teams.
-
-- **VPC endpoint private DNS enhancements (2024-2025):** Improved
-  private DNS resolution for CodeArtifact VPC endpoints, simplifying
-  network isolation setups.
-
-- **Package origin controls (2024-2025):** Package origin controls
-  allow administrators to restrict whether a package can be published
-  directly, pulled from upstream, or both — a key supply-chain security
-  feature preventing dependency confusion.
-
-- **Terraform provider maturity (2024-2025):** The Terraform provider
-  added full support for lifecycle configurations, package origin
-  controls, and domain permissions policies.
+Swift/Cargo support, lifecycle GA, cross-region replication, VPC endpoint private DNS, package origin controls, Terraform maturity: [Advanced patterns](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -760,36 +444,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Domain creation fails with encryption key error
-- The KMS key ARN is invalid or the caller does not have
-  `kms:CreateGrant` on the key. Verify the key exists and the key
-  policy allows CodeArtifact to use it. The encryption key is immutable
-  — you cannot change it after domain creation.
+Deep dives (domain-creation encryption-key error, CI/CD token expiry, cross-account access denied, package not found despite upstream, VPC endpoint not intercepting): [Error handling](references/error-handling.md).
 
-### Auth token expired in CI/CD
-- The token from `aws codeartifact login` expires after 12 hours. The
-  pipeline MUST run `login` before every build (or call
-  `get-authorization-token`). Check the pipeline logs for 401/403
-  errors that start appearing 12 hours after the last successful login.
+## References (load on demand)
 
-### Cross-account access denied
-- The repository policy does not grant the consumer account access, or
-  the consumer is using the wrong `--domain-owner` value. The consumer
-  must specify the DOMAIN OWNER account ID in the `login` command.
-  Verify the repository policy includes the consumer account.
-
-### Package not found despite upstream configured
-- The upstream cascade order may be wrong, or the external connection
-  is not set. Verify the upstream chain with `describe-repository` and
-  confirm the external connection exists in the domain. Also verify
-  the package format matches (an npm upstream will not resolve pip
-  packages).
-
-### VPC endpoint not intercepting traffic
-- Private DNS is not enabled. Recreate the endpoint with
-  `--private-dns-enabled`, or verify that the VPC's DNS resolution
-  supports private hosted zones. Also verify BOTH endpoints (api and
-  repositories) exist.
+- [Diagnostic commands](references/diagnostic-commands.md) — per-step provisioning commands (Steps 1-11)
+- [Error handling](references/error-handling.md) — error-handling deep dives
+- [Advanced patterns](references/advanced-patterns.md) — mindset misconceptions, domain-owner vs repository-admin heuristic, recent AWS features
+- [Upstream cascade and auth tokens](references/upstream-cascade-and-auth-tokens.md) — full upstream/token reference, plus the cascade and token heuristics moved from this SKILL.md
+- [Encryption, VPC endpoint, and metrics](references/encryption-vpc-endpoint-and-metrics.md) — KMS, VPC endpoint, lifecycle, and metrics detail
 
 ## Domain
 

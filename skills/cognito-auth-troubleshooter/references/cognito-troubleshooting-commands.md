@@ -300,3 +300,84 @@ aws cognito-idp admin-reset-user-password \
   --username <username> \
   --profile <p>
 ```
+
+## Account-wide pre-flight commands (moved from SKILL.md)
+
+```bash
+# 1. User Pool configuration (Policies, MfaConfiguration,
+#    AdminCreateUserConfig, SchemaAttributes, LambdaConfig, Domain)
+aws cognito-idp describe-user-pool \
+  --user-pool-id <pool-id> --output json
+
+# 2. App Client configuration (ExplicitAuthFlows, CallbackURLs,
+#    LogoutURLs, SupportedIdentityProviders, ClientSecret,
+#    RefreshTokenValidity, AccessTokenValidity, IdTokenValidity,
+#    AllowedOAuthFlows, AllowedOAuthScopes)
+aws cognito-idp describe-user-pool-client \
+  --user-pool-id <pool-id> --client-id <client-id> --output json
+
+# 3. Identity Pool configuration + role mappings
+aws cognito-identity describe-identity-pool \
+  --identity-pool-id <identity-pool-id> --output json
+
+aws cognito-identity get-identity-pool-roles \
+  --identity-pool-id <identity-pool-id> --output json
+
+# 4. Trigger Lambda CloudWatch Logs (pre-token-generation, etc.)
+aws logs filter-log-events \
+  --log-group-name /aws/lambda/<trigger-lambda-name> \
+  --start-time $(date -d '-30 minutes' +%s)000 \
+  --filter-pattern '"ERROR" OR "Exception" OR "timeout"' \
+  --output json
+
+# 5. CloudTrail lookup for Cognito API errors
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=EventSource,AttributeValue=cognito-idp.amazonaws.com \
+  --start-time $(date -d '-1 hour' +%s) --end-time $(date +%s) \
+  --output json
+
+# 6. AWS Health (regional events)
+aws health describe-events --filter eventStatusCodes=OPEN,UPCOMING \
+  --region us-east-1 --output json
+```
+
+
+## Pre-flight safety checks - run before any state-changing CLI (moved from SKILL.md)
+
+- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
+  (`update-user-pool-client`, `update-user-pool`, `update-identity-pool`,
+  `update-assume-role-policy`, `set-identity-pool-roles`,
+  `admin-set-user-mfa-preference`, `admin-reset-user-password`), emit
+  and await operator approval. Do NOT execute the CLI until the
+  operator confirms.
+
+- **Read-only first.** Every probe in the diagnostic tree is
+  read-only (`describe-user-pool`, `describe-user-pool-client`,
+  `describe-identity-provider`, `get-identity-pool-roles`,
+  `describe-user-pool-domain`, `filter-log-events`,
+  `lookup-events`, `get-role`, `describe-certificate`). Do not perform
+  state-changing operations as diagnostic probes.
+
+- **`update-user-pool-client`** changes the app client config. Some
+  fields (like `CallbackURLs` and `ExplicitAuthFlows`) are safe to
+  update; others (like `GenerateClientSecret`) require recreating the
+  client. Always confirm before updating.
+
+- **`update-user-pool`** changes the pool-level config (MFA, password
+  policy, Lambda triggers). Changes propagate within seconds but affect
+  all users immediately. Confirm before applying.
+
+- **`update-assume-role-policy`** on the identity pool role trust policy
+  can break ALL authentication if the policy is malformed. Always
+  validate the JSON syntax before applying. Use
+  `iam simulate-principal-policy` to verify after the change.
+
+- **`admin-reset-user-password`** sends a reset code to the user. Do
+  NOT use this as a diagnostic probe; it has user-visible side effects.
+
+- **Bulk remediation batch limit.** If the diagnosis identifies the
+  same root cause across multiple app clients or pools, batch
+  remediation into groups of at most 5 resources, emit a single
+  CONFIRM per batch, and verify between batches.
+
+
