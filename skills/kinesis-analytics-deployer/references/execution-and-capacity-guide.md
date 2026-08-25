@@ -258,3 +258,145 @@ aws glue get-schema-version --schema-id '{"SchemaName":"<name>","RegistryName":"
 # Service quota
 aws service-quotas get-service-quota --service-code kinesisanalytics --quota-code L-XXXXXXXX
 ```
+
+## Step 7: Checkpointing (Flink stateful recovery) (moved from SKILL.md)
+
+Checkpointing persists Flink operator state to S3 so the application
+can recover from failures without losing in-flight data.
+
+| Parameter | Default | Production | Why |
+|---|---|---|---|
+| `CheckpointingEnabled` | true | true | Stateful recovery. NEVER disable in production. |
+| `CheckpointInterval` | 60000 ms | 30000-120000 ms | Shorter = faster recovery but more overhead. |
+| `MinPauseBetweenCheckpoints` | 5000 ms | 5000-10000 ms | Ensures checkpoints complete before the next starts. |
+| `ConfigurationType` | DEFAULT | CUSTOM | CUSTOM lets you override intervals. |
+
+Rules:
+- **NEVER disable checkpointing in production.** A failure means full
+  state loss and replay from the earliest unprocessed record.
+- **Pair with snapshots** for planned stop/start. Snapshots are
+  user-triggered; checkpoints are automatic.
+- **`AllowNonRestoredState: false`** — set on start to fail fast if
+  the code change removed an operator. Set to `true` only during
+  breaking changes with manual verification.
+
+## Step 8: Parallelism tuning (moved from SKILL.md)
+
+Parallelism controls how many Flink subtasks process the stream
+concurrently. KPUs (Kinesis Processing Units) are the billing unit
+(1 KPU = 1 vCPU, 4 GB memory).
+
+| Parameter | Default | Production | Why |
+|---|---|---|---|
+| `Parallelism` | 1 | 2-8 (tune to shard count) | Must be >= source shard count for full parallelism. |
+| `ParallelismPerKPU` | 1 | 1 (default) | Lower = more KPUs per subtask (more memory). Higher = denser packing. |
+| Total KPUs | parallelism + 1 (JobManager) | auto | Billed per-second. Tune to workload. |
+
+Rules:
+- **Match parallelism to source shards.** If the source Kinesis stream
+  has 4 shards, set `Parallelism: 4`. Sub-parallelism wastes KPUs.
+- **ParallelismPerKPU > 1** densifies subtasks onto fewer KPUs —
+  useful for CPU-light workloads. Default 1 for memory-heavy.
+- **JobManager overhead** — KDA reserves 1 KPU for the JobManager.
+  Total KPUs = parallelism + 1 (when ParallelismPerKPU = 1).
+
+## Step 9: Studio notebook (Zeppelin, interactive analysis) (moved from SKILL.md)
+
+Studio notebooks provide an interactive Apache Zeppelin environment
+connected to live Kinesis streams for exploratory analysis. They
+share the same KDA application runtime.
+
+```bash
+aws kinesisanalyticsv2 create-application \
+  --application-name fraud-explore-notebook \
+  --runtime-environment ZEPPELIN-FLINK-1_0 \
+  --service-execution-role arn:aws:iam::123456789012:role/KDAExecutionRole \
+  --application-configuration '{
+    "ZeppelinApplicationConfiguration": {
+      "MonitoringConfiguration": {
+        "LogLevel": "INFO"
+      },
+      "CatalogConfiguration": {
+        "GlueDataCatalogConfiguration": {
+          "DatabaseARN": "arn:aws:glue:us-east-1:123456789012:database/default"
+        }
+      },
+      "CustomArtifactsConfiguration": [
+        {"ArtifactType": "UDF", "S3ContentLocation": {"BucketARN": "arn:aws:s3:::kda-apps", "FileKey": "custom-udf-1.0.0.jar"}, "MavenReference": {"ArtifactId": "", "GroupId": "", "Version": ""}}
+      ],
+      "DeployAsApplicationConfiguration": {
+        "CreateApplicationAsReadyForDeployment": true
+      }
+    }
+  }' \
+  --tags Environment=dev,Application=fraud-explore
+```
+
+Rules:
+- **Studio notebooks are for exploration** — NOT production pipelines.
+  Deploy production Flink code as a STREAMING application, not a
+  Zeppelin notebook.
+- **Zeppelin paragraphs persist** — notebooks can be saved to S3 for
+  team sharing.
+- **`DeployAsApplicationConfiguration`** — promotes a notebook to a
+  production STREAMING application once exploration is complete.
+
+## Step 10: Application snapshots (stateful recovery) (moved from SKILL.md)
+
+```bash
+# Create a snapshot before a code update
+aws kinesisanalyticsv2 create-application-snapshot \
+  --application-name fraud-detection-flink \
+  --snapshot-name pre-update-2026-08-11
+
+# List snapshots
+aws kinesisanalyticsv2 list-application-snapshots \
+  --application-name fraud-detection-flink
+
+# Update application code, then start from snapshot
+aws kinesisanalyticsv2 start-application \
+  --application-name fraud-detection-flink \
+  --run-configuration '{
+    "ApplicationRestoreConfiguration": {
+      "RestoreType": "RESTORE_FROM_CUSTOM_SNAPSHOT",
+      "SnapshotName": "pre-update-2026-08-11"
+    }
+  }'
+```
+
+## Expert heuristic — parallelism, checkpoints, and SQL-vs-Flink strategy (moved from SKILL.md)
+
+- **SQL-vs-Flink decision:** use SQL for simple stateless
+  transformations, windowed aggregates, and lambdas. Use Flink for
+  complex stateful processing, custom operators, CEP (complex event
+  processing), and ML inference. SQL is faster to deploy; Flink is
+  more expressive.
+- **Session windows in SQL:** the `SESSION(window_col, INTERVAL 'N'
+  SECONDS)` function groups events into sessions with inactivity gaps.
+  Use for user behavior analytics. Tune the gap (default 60s) to the
+  domain — 30 min for web sessions, 5 min for mobile.
+- **Parallelism sizing:** set `Parallelism` to the source shard count.
+  For CPU-heavy processing, increase `ParallelismPerKPU` to densify.
+  For memory-heavy processing, keep `ParallelismPerKPU = 1` (1 KPU per
+  subtask, 4 GB memory each).
+- **Checkpoint interval tuning:** 60s is the default. For low-latency
+  apps (sub-second processing), use 30s. For high-throughput batch-like
+  processing, 120s reduces overhead. NEVER set below 5s — checkpoint
+  storms destabilize the JobManager.
+- **Snapshot before code updates:** ALWAYS create a snapshot before
+  updating application code. Start the updated app with
+  `RESTORE_FROM_CUSTOM_SNAPSHOT` to preserve state. Without this, a
+  code update loses all in-flight state.
+- **Studio notebook promotion:** explore in a Zeppelin notebook, then
+  promote to a STREAMING application via
+  `DeployAsApplicationConfiguration`. NEVER run production traffic
+  through a notebook — they are billed per-second and lack checkpoint
+  guarantees.
+- **Firehose destination vs Kinesis stream destination:** use Firehose
+  for S3/Redshift/OpenSearch delivery (batched, at-least-once). Use a
+  Kinesis stream for downstream real-time consumers (sub-second,
+  exactly-once with Flink sinks).
+- **Log retention:** set CloudWatch Logs retention to 14-30 days.
+  NEVER leave at default (Never Expire) — Flink framework logs are
+  verbose and costs balloon.
+

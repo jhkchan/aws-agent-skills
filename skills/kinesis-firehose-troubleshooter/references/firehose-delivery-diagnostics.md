@@ -311,3 +311,85 @@ If all five layers pass, the issue is configuration-specific
 If any layer fails, fix the layer first. Most "delivery fails"
 tickets close when logging, IAM, KMS, or destination reachability
 is restored.
+
+## Step 8: Diagnose latest destinations (Snowflake / HTTP / Splunk) (moved from SKILL.md)
+
+**Symptom:** Firehose to Snowflake / HTTP endpoint / Splunk returns
+errors; `DeliveryTo*.Success` drops.
+
+```bash
+aws firehose describe-delivery-stream --delivery-stream-name <stream-name> \
+  --query 'DeliveryStreamDescription.Destinations[0].[SnowflakeDestinationDescription,HttpEndpointDestinationDescription,SplunkDestinationDescription]' --output table
+aws logs filter-log-events --log-group-name /aws/kinesisfirehose/<stream-name> \
+  --filter-pattern "ERROR" --output table
+```
+
+#### Snowflake destination
+
+| Cause | Diagnostic signal | Fix |
+|---|---|---|
+| PrivateLink VPC endpoint unreachable | Firehose log: `Connection timed out` to Snowflake VPCe | Verify the `PrivateLinkVPCEId`; ensure Firehose VPC can route to it |
+| Snowflake integration not granted | Snowflake `SHOW INTEGRATIONS` shows the Firehose integration as not granted to the user / role | `GRANT USAGE ON INTEGRATION <name> TO ROLE <role>;` in Snowflake |
+| Snowflake user / role mismatch | `AccountName` / `UserRole` in Firehose config does not match Snowflake | Update `update-destination --snowflake-destination-configuration` |
+| Key-pair auth invalid | Snowflake log: `JWT token invalid` | Rotate the key pair; update Secrets Manager |
+| Staging bucket (Snowflake) deleted | Firehose log: `Access Denied` on internal staging | Recreate the staging bucket (Firehose-managed) |
+| `CustomSql` rejected by Snowflake | Firehose log: `SQL compilation error` | Fix the `CustomSql` MERGE / COPY statement |
+
+#### HTTP endpoint destination
+
+| Cause | Diagnostic signal | Fix |
+|---|---|---|
+| Endpoint returns non-200 | Firehose log: `Endpoint returned 500` / `401` / `403` | Fix the endpoint; verify auth header |
+| Endpoint timeout | Firehose log: `Request timed out after X ms` | Raise the `EndpointConfiguration.AccessKey` and endpoint timeout; or scale the endpoint |
+| Endpoint URL unreachable | Firehose log: `Connection refused` / DNS resolution failed | If endpoint is private, put Firehose in a VPC with route to it |
+| Access key mismatch | Firehose sends wrong access key; endpoint returns 401 | Update `AccessKey` in `update-destination` |
+| Buffer / retry exhaustion | Firehose log: `Max retries exhausted` | Raise retries; investigate endpoint health |
+| Malformed request | Firehose log: `400 Bad Request` | Match the endpoint's expected schema (the Firehose HTTP record format) |
+
+#### Splunk destination
+
+| Cause | Diagnostic signal | Fix |
+|---|---|---|
+| HEC token invalid / expired | Firehose log: `403 Forbidden` from Splunk | Rotate the token; update Secrets Manager |
+| Secrets Manager access denied | Firehose log: `AccessDenied` on `secretsmanager:GetSecretValue` | Add `secretsmanager:GetSecretValue` on the secret to the Firehose role |
+| HEC endpoint unreachable | Firehose log: `Connection refused` | Verify Splunk HEC URL; if Splunk is private, put Firehose in a VPC |
+| Splunk indexer queue full | Firehose log: `503 Service Unavailable` | Scale Splunk indexers; raise HEC `maxThreads` |
+| HEC ACK disabled | Splunk `inputs.conf` has `ack = 0`; Firehose retries never confirm | Enable HEC ack on the Splunk side |
+| SSL / TLS mismatch | Firehose log: `SSL handshake failed` | Verify Splunk certificate chain; or set `S3BackupMode` for retry |
+
+**VERDICT:** ROOT_CAUSE_FOUND when Firehose log + destination
+check identifies a specific cause; NEED_MORE_INFO when the
+endpoint accepts but reports no data (sample the payload from
+S3 backup).
+
+## Appendix A - Symptom-to-cause map (quick reference) (moved from SKILL.md)
+
+| Symptom | Most common root cause | Verify via |
+|---|---|---|
+| DeliveryToS3Fails - bucket deleted | `head-bucket` 404 | `s3api head-bucket` |
+| DeliveryToS3Fails - bucket region mismatch | `get-bucket-location` different region | `s3api get-bucket-location` |
+| DeliveryToS3Fails - KMS denied | CloudTrail `kms:GenerateDataKey` AccessDenied | `kms get-key-policy` |
+| DeliveryToS3Fails - bucket policy | Firehose role lacks `s3:PutObject` | `simulate-principal-policy` |
+| LambdaFails - timeout | Lambda log "Task timed out"; Duration ~ Timeout | CloudWatch Lambda metrics + logs |
+| LambdaFails - exception | Lambda `Errors > 0`; stack trace in logs | `filter-log-events "ERROR"` |
+| LambdaFails - 6 MB cap | S3 backup gets full batches; "response payload exceeds 6 MB" | Firehose logs |
+| LambdaFails - resource policy | Firehose cannot invoke Lambda | `lambda get-policy` |
+| DeliveryLag - buffering | `BufferingHints` 128MB / 900s on low-traffic stream | `describe-delivery-stream` |
+| DeliveryLag - Lambda slow | Lambda Duration > buffer flush interval | Lambda Insights |
+| DeliveryLag - OpenSearch 429 | Circuit breaker engaged; `429` count | Firehose logs + OpenSearch metrics |
+| DeliveryLag - KMS throttling | KMS `ThrottledRequests > 0` | KMS metrics |
+| FormatConversionFails - non-JSON | Firehose log "Input record is not valid JSON" | Firehose logs |
+| FormatConversionFails - schema mismatch | Glue columns do not match JSON keys | `glue get-table` |
+| FormatConversionFails - 0 bytes | `head-object ContentLength: 0` | `s3api head-object` |
+| OpenSearchFails - auth | OpenSearch access policy lacks Firehose role | OpenSearch access policy |
+| OpenSearchFails - 429 | OpenSearch throttling; circuit breaker | Firehose logs |
+| OpenSearchFails - cluster red | `describe-domain-health` Red | OpenSearch API |
+| RedshiftFails - COPY | `stl_load_errors` shows column / format | Redshift SQL |
+| RedshiftFails - staging IAM | Cluster role lacks `s3:GetObject` | `iam simulate-principal-policy` |
+| Snowflake - PrivateLink | Firehose log "Connection timed out" | Firehose logs + Snowflake `SHOW INTEGRATIONS` |
+| Snowflake - integration not granted | `GRANT USAGE ON INTEGRATION` missing | Snowflake SQL |
+| HTTP - non-200 | Firehose log "Endpoint returned 500/401/403" | Firehose logs |
+| HTTP - timeout | Firehose log "Request timed out" | Firehose logs + endpoint metrics |
+| Splunk - HEC token | `403 Forbidden` from Splunk; Secrets Manager access denied | Firehose logs + Splunk indexer metrics |
+| Splunk - indexer queue | `503 Service Unavailable`; HEC `maxThreads` exhausted | Splunk metrics |
+

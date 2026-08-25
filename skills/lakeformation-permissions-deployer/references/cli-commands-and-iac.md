@@ -354,3 +354,16 @@ Resources:
               TagValues:
                 - finance
 ```
+
+## Step 10 — Verification commands, account-specific variant (moved from SKILL.md)
+
+```bash
+aws lakeformation list-permissions --principal arn:aws:iam::123456789012:role/AnalyticsTeamRole
+aws lakeformation list-lf-tags
+aws lakeformation get-resource-lf-tags --resource '{"Database": {"Name": "analytics_db"}}'
+aws lakeformation get-resource-lf-tags --resource '{"Table": {"DatabaseName": "analytics_db", "Name": "transactions"}}'
+aws lakeformation list-resources
+aws lakeformation describe-resource --resource-arn arn:aws:glue:us-east-1:123456789012:table/analytics_db/transactions
+aws glue get-database --name analytics_db
+aws iam get-role --role-name LFDataLakeAdmin
+```

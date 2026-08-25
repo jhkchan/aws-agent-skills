@@ -145,35 +145,8 @@ Driven by three KMS realities:
 
 Run before classification. Misclassifying these produces wrong plans.
 
-**Pagination:** `list-keys` paginates at 100/page — drain
-`--marker`/`--next-marker` to completion. `list-grants` paginates at
-50/page. `list-aliases` paginates at 100/page.
-
-**Live-account pre-flight (skip if offline plan audit):**
-1. `aws kms describe-key --key-id <id>` — capture `KeyState`,
-   `Enabled`, `KeyUsage`, `KeySpec`, `Origin`,
-   `MultiRegionConfiguration`, `CreationDate`, `Description`,
-   `DeletionDate` (if pending).
-2. `aws kms get-key-rotation-status --key-id <id>` — capture
-   `Enabled` (rotation status), `RotationPeriodInSeconds`,
-   `NextRotationDate` (if enabled).
-3. `aws kms get-key-policy --key-id <id> --policy-name default` —
-   capture the policy; verify the caller's role has
-   `kms:EnableKeyRotation` or that the caller is the root admin.
-4. `aws kms list-grants --key-id <id>` — capture all grants.
-   Rotation does not invalidate grants, but verify there are no
-   ` retiring` grants that could affect behavior.
-5. `aws kms list-aliases --key-id <id>` — capture aliases pointing
-   to this key. Aliases are the application-facing name; rotation
-   does not affect aliases.
-6. `aws cloudtrail lookup-events --lookup-attributes
-   AttributeKey=ResourceName,AttributeValue=<key-arn>
-   --attribute-key EventSource --attribute-value kms.amazonaws.com
-   --max-results 20` — capture recent `EnableKeyRotation`,
-   `DisableKeyRotation`, `RotateKey` (manual) events.
-7. For custom key stores: `aws kms describe-custom-key-stores` —
-   verify the CloudHSM cluster state is `ACTIVE` and the key store
-   `ConnectionState: CONNECTED`.
+Pagination + live-account pre-flight commands moved verbatim to
+`references/diagnostic-commands.md` (load on demand).
 
 **Malformed input:** if the input JSON is invalid or missing required
 fields, emit `VERDICT: ERROR` with `REASON: Key configuration is not
@@ -200,106 +173,8 @@ json and re-plan.`
 
 ### Step 0: Expert knowledge — non-obvious KMS behaviors
 
-These behaviors are easy to misjudge without operational rotation
-experience. Each changes a plan if ignored:
-
-- **The key ID and ARN do NOT change after rotation.** A KMS key is
-  a logical construct. Automatic rotation swaps the backing
-  cryptographic material under the same key ID. Applications that
-  reference the key by ID, ARN, or alias see no change. This is the
-  single most important fact — rotation is invisible to callers.
-
-- **Old backing material is retained for decrypt.** KMS tracks which
-  backing material produced each ciphertext (via an internal
-  material-id embedded in the ciphertext blob). When you decrypt, KMS
-  selects the correct material automatically. You NEVER need to
-  "re-encrypt after rotation" — existing ciphertext remains
-  decryptable forever (or until the key is deleted).
-
-- **New `Encrypt` calls always use the newest material.** After a
-  rotation, every new `Encrypt` operation uses the new backing key
-  material. Old ciphertext is unaffected. There is no gradual
-  rollout — the switch is immediate for new operations.
-
-- **Rotation does NOT modify the key policy.** The key's resource-
-  based policy is independent of the backing material. Grants,
-  aliases, and IAM permissions all survive rotation unchanged. Do not
-  expect a policy diff after `EnableKeyRotation`.
-
-- **`RotationPeriodInSeconds` is configurable (2024+).** The default
-  is 365 days (annual). You can set 7-365 days via
-  `enable-key-rotation --rotation-period-in-days N`. Shorter periods
-  increase cryptographic agility but do not change cost.
-
-- **`NextRotationDate` is computed by KMS.** After enabling,
-  `get-key-rotation-status` returns `NextRotationDate`. KMS performs
-  the actual material swap within 24 hours of this date (typically
-  within minutes). The exact rotation moment is not user-controlled.
-
-- **Asymmetric keys (RSA/ECDSA) do NOT support automatic rotation.**
-  This is a hard limitation. The plan for an asymmetric key MUST be a
-  manual rotation: (1) create a new key with the same
-  `KeySpec`/`KeyUsage`, (2) update all callers (aliases are easiest
-  — `update-alias` to point to the new key), (3) optionally
-  re-encrypt old data with the new key.
-
-- **HMAC keys do NOT support automatic rotation.** Same as
-  asymmetric. HMAC keys (`KeyUsage: GENERATE_VERIFY_MAC`) require
-  manual rotation. Update all MAC verifiers to use the new key.
-
-- **Multi-Region replica keys inherit rotation from the primary.**
-  Calling `EnableKeyRotation` on a replica returns
-  `InvalidOperationException: You cannot manage key rotation on a
-  replica key. Manage key rotation on the primary key instead.` The
-  primary's rotation status propagates to all replicas via the
-  Multi-Region key infrastructure.
-
-- **Custom key store (CloudHSM) keys support automatic rotation.**
-  For `Origin: AWS_CLOUDHSM`, `enable-key-rotation` rotates the
-  backing key in the CloudHSM cluster. The cluster must be `ACTIVE`
-  and `ConnectionState: CONNECTED`. If the cluster is disconnected,
-  rotation is deferred.
-
-- **External key material (`Origin: EXTERNAL`) does NOT support
-  automatic rotation.** You imported the material; you must re-import
-  new material to rotate. Use `import-key-material` with a new public
-  key from `get-parameters-for-import`.
-
-- **Grants survive rotation.** A grant is per-key-ID, not per-
-  backing-material. After rotation, all existing grants continue to
-  work on both old (decrypt) and new (encrypt) operations. Do NOT
-  re-create grants after rotation.
-
-- **CloudTrail logs `EnableKeyRotation` and `DisableKeyRotation` as
-  management events.** The actual material rotation is logged as an
-  internal KMS event — NOT a separate CloudTrail event. The proof
-  that rotation occurred is `NextRotationDate` advancing and
-  `LastRotationDate` (if exposed) updating in `get-key-rotation-
-  status`.
-
-- **Aliases are the rotation-friendly reference.** If applications
-  reference the key by alias (`alias/my-app-key`), manual rotation is
-  a one-line `update-alias` — callers see no change. If applications
-  hard-code the key ARN, manual rotation requires updating every
-  caller. Always prefer aliases for application-facing key references.
-
-- **`schedule-key-deletion` cancels rotation implicitly.** When a key
-  enters `PendingDeletion`, its rotation schedule is cancelled. If
-  you later `cancel-key-deletion`, you must re-enable rotation
-  explicitly — it does not resume automatically.
-
-- **`kms:EnableKeyRotation` requires the key policy to allow the
-  caller.** The root account always has access. For non-root callers,
-  the key policy must include `kms:EnableKeyRotation` (and
-  `kms:GetKeyRotationStatus` for verification) on the key ARN. The
-  default managed policy `AWSKeyManagementServicePowerUser` does NOT
-  include rotation actions.
-
-- **AWS-managed keys (`aws/s3`, `aws/rds`, etc.) rotate automatically
-  every 3 years (not annually).** You CANNOT enable, disable, or
-  configure rotation on AWS-managed keys. The rotation cadence is
-  fixed by AWS. Customer-managed keys support the configurable
-  annual cadence.
+Step-0 expert behaviors moved verbatim to `references/advanced-patterns.md`
+(backing material, rotation period, aliases, grants, AWS-managed keys, more).
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
@@ -355,19 +230,8 @@ is BLOCKED with the failed checks in PRE_CHECKS. Do NOT execute.
 
 **Rotation failure-mode table (use during diagnose-rotation):**
 
-| Symptom | Root cause | Fix |
-|---|---|---|
-| `enable-key-rotation` returns `InvalidOperationException: ... cannot be performed on a key with KeyUsage SIGN_VERIFY` | Asymmetric key — automatic rotation not supported | Plan manual rotation (create new key + update aliases + re-sign) |
-| `enable-key-rotation` returns `InvalidOperationException: ... cannot be performed on a key with Origin EXTERNAL` | Imported key material — KMS cannot rotate | Re-import new material via `get-parameters-for-import` + `import-key-material` |
-| `enable-key-rotation` returns `AccessDeniedException` | Key policy denies caller `kms:EnableKeyRotation`, or caller's identity-based policy lacks it | Add `kms:EnableKeyRotation` to the key policy for the caller's role, or call from an authorized role |
-| `enable-key-rotation` returns `KMSInvalidStateException: Key is in Disabled state` | Key is `Disabled` | `aws kms enable-key --key-id <id>` first, then enable rotation |
-| `enable-key-rotation` returns `KMSInvalidStateException: Key is in PendingDeletion state` | Key scheduled for deletion | `cancel-key-deletion --key-id <id>`, then `enable-key`, then `enable-key-rotation` |
-| `enable-key-rotation` returns `InvalidOperationException: ... replica key` | Multi-Region replica — rotation controlled by primary | Call `enable-key-rotation` on the primary key ARN (cross-region if needed) |
-| `enable-key-rotation` returns `CloudHsmClusterNotActiveException` | Custom key store's CloudHSM cluster is not `ACTIVE` | Restore the CloudHSM cluster to `ACTIVE`; reconnect the key store |
-| `get-key-rotation-status.Enabled: true` but `NextRotationDate` is in the past | Rotation deferred due to KMS internal scheduling or a transient issue | Wait 24 hours; if still overdue, open AWS support |
-| `get-key-rotation-status` returns `AccessDeniedException` | Key policy denies caller `kms:GetKeyRotationStatus` | Add `kms:GetKeyRotationStatus` to the key policy for the caller's role |
-| CloudTrail shows no `EnableKeyRotation` event but status shows enabled | Rotation was enabled via the console (still logs as `EnableKeyRotation`) or before the trail was created | Verify via `get-key-rotation-status` directly; CloudTrail history is bounded by the trail's retention |
-| Applications break after manual rotation (alias updated) | The old key was disabled or deleted before ciphertext was re-encrypted | Re-enable the old key; applications decrypting old ciphertext need the old key `Enabled` |
+Rotation failure-mode table (API errors -> fixes) moved verbatim to
+`references/error-handling.md` (load on demand).
 
 ### Step 2: READY — emit operation plan
 
@@ -497,92 +361,13 @@ NOTES:
 
 ### Worked example — plan-manual-rotation (asymmetric RSA key)
 
-```text
-OPERATION: plan-manual-rotation
-VERDICT: READY
-TARGET: arn:aws:kms:us-east-1:111111111111:key/rsa12345-... (alias:
-        alias/prod-signing-key, account 111111111111, region
-        us-east-1)
-PRE_CHECKS:
-  - [PASS] Key exists, KeyState: Enabled
-  - [PASS] Not PendingDeletion
-  - [INFO] KeySpec: RSA_2048, KeyUsage: SIGN_VERIFY — automatic
-    rotation NOT supported (hard KMS limitation)
-  - [PASS] Operator has kms:CreateKey permission
-  - [PASS] Alias alias/prod-signing-key points to this key — callers
-    using the alias will follow the update-alias cutover transparently
-  - [INFO] 3 CloudTrail-observed callers in the last 30 days:
-    prod-orders-service (uses alias), prod-payments-service (uses
-    alias), prod-web-app (uses key ARN — MUST be updated manually)
-STEPS:
-  1. CONFIRM: About to perform a MANUAL rotation on RSA signing key
-     alias/prod-signing-key. This involves: (a) creating a new RSA_2048
-     key, (b) updating alias/prod-signing-key to point to the new key,
-     (c) updating prod-web-app to use the new key ARN. Old signatures
-     remain verifiable against the old key (which stays Enabled).
-     Proceed? (yes/no)
-  2. Create the new key:
-     aws kms create-key \
-       --description "prod-signing-key rotation 2026-08" \
-       --key-usage SIGN_VERIFY \
-       --key-spec RSA_2048 \
-       --policy file://new-key-policy.json
-     # Capture the new KeyId from the response.
-  3. Update the alias (atomic cutover for alias-referencing callers):
-     aws kms update-alias \
-       --alias-name alias/prod-signing-key \
-       --target-key-id <new-key-id>
-  4. Update prod-web-app (hard-coded ARN caller):
-     # Update the application configuration / environment variable to
-     # the new key ARN. Deploy. Verify signatures validate with the
-     # new key.
-  5. (Optional) Re-sign critical artifacts with the new key. Old
-     signatures remain valid as long as the old key is Enabled.
-POST_VERIFY:
-  - (pending execution)
-NOTES:
-  - The old key (rsa12345-...) MUST remain Enabled for as long as any
-    signature produced with it needs to be verified. Disabling or
-    deleting the old key breaks signature verification for all
-    artifacts signed by it.
-  - Schedule a review in 90 days: if all observed verifications use
-    the new key, consider scheduling the old key for deletion (after
-    compliance approval).
-  - For compliance evidence, document the manual rotation with a
-    ticket reference and the CloudTrail CreateKey + UpdateAlias
-    events.
-```
+Full plan-manual-rotation worked example moved verbatim to
+`references/worked-examples.md` (load on demand).
 
 ### Worked example — diagnose-rotation (BLOCKED with remediation)
 
-```text
-OPERATION: diagnose-rotation
-VERDICT: BLOCKED
-TARGET: arn:aws:kms:us-east-1:111111111111:key/multi-replica-... (alias:
-        alias/prod-dr-key, account 111111111111, region us-east-1)
-PRE_CHECKS:
-  - [PASS] Key exists
-  - [INFO] KeyState: Enabled
-  - [FAIL] MultiRegionConfiguration.MultiRegionKeyType: REPLICA
-    (primary: arn:aws:kms:eu-west-1:111111111111:key/multi-primary-...)
-    — EnableKeyRotation cannot be called on a replica key. Rotation
-    must be enabled on the primary in eu-west-1.
-STEPS: (none — wrong key target)
-POST_VERIFY: (none)
-NOTES:
-  - Root cause: the operator is trying to enable rotation on a Multi-
-    Region REPLICA key. KMS returns InvalidOperationException for
-    this case. Rotation is controlled by the primary key.
-  - Fix: call enable-key-rotation on the PRIMARY key in eu-west-1:
-    aws kms enable-key-rotation \
-      --key-id arn:aws:kms:eu-west-1:111111111111:key/multi-primary-... \
-      --region eu-west-1
-    The primary's rotation status propagates to all replicas
-    automatically. Verify on the replica after the primary's
-    NextRotationDate:
-    aws kms get-key-rotation-status \
-      --key-id arn:aws:kms:us-east-1:111111111111:key/multi-replica-...
-```
+Full diagnose-rotation worked example moved verbatim to
+`references/worked-examples.md` (load on demand).
 
 ## Anti-Patterns — NEVER
 
@@ -667,84 +452,23 @@ NOTES:
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`enable-key-rotation`, `disable-key-rotation`, `enable-key`,
-  `disable-key`, `schedule-key-deletion`, `cancel-key-deletion`,
-  `create-key`, `update-alias`, `rotate-key-on-demand`), emit:
-  `CONFIRM: About to <operation> on KMS key <key-id> in account
-  <account> region <region>. This will <consequence>. Proceed?
-  (yes/no)`. Do NOT execute until the operator confirms.
-
-- **Capture pre-state for audit.** Before any rotation operation:
-  `aws kms describe-key --key-id <id> --output json > /tmp/<id>-
-  describe-pre-$(date +%s).json` AND `aws kms get-key-rotation-status
-  --key-id <id> --output json > /tmp/<id>-rotation-pre-$(date
-  +%s).json`. These captures are critical for compliance evidence and
-  for diagnosing any post-change anomaly.
-
-- **Verify the key policy is unchanged after rotation.** `get-key-
-  policy --key-id <id> --policy-name default` — diff against pre-state.
-  Rotation must not modify the policy. A policy change indicates a
-  concurrent modification by another process.
-
-- **Verify grants are unchanged.** `list-grants --key-id <id>` — diff
-  against pre-state. Rotation does not affect grants.
-
-- **Verify CloudTrail is logging the event.** If the account's
-  CloudTrail trail is paused or misconfigured, the `EnableKeyRotation`
-  event will not be captured. Compliance evidence depends on the
-  trail being active.
-
-- **Prefer additive changes over destructive ones.** Enabling
-  rotation is safe and reversible. Disabling rotation, disabling a
-  key, or scheduling deletion is consequential — confirm intent
-  explicitly.
+Pre-flight safety checks moved verbatim to
+`references/diagnostic-commands.md` (load on demand).
 
 ## Recent AWS features (2024-2026)
 
-- **`rotate-key-on-demand` (2024):** Immediate backing-key material
-  rotation on symmetric CMKs, separate from the scheduled rotation.
-  Useful for incident response (suspected compromise). The on-demand
-  rotation does not affect the scheduled `NextRotationDate`. Costs
-  nothing extra.
+Recent-feature details moved verbatim to
+`references/advanced-patterns.md` (load on demand).
 
-- **Configurable `RotationPeriodInSeconds` (2024):** The rotation
-  period is now 7-365 days, set via `enable-key-rotation --rotation-
-  period-in-days N` (or `--rotation-period-in-seconds`). Previously
-  fixed at 365 days.
 
-- **HMAC keys (`GENERATE_VERIFY_MAC`, 2022 GA, 2024 hardening):** Do
-  NOT support automatic rotation. Manual rotation required. Plan a
-  new HMAC key + update callers + retire old key.
+## References (load on demand)
 
-- **Multi-Region keys GA (2023-2024):** Primary key controls rotation.
-  Replicas inherit. A replica's `get-key-rotation-status` reflects the
-  primary's setting. `EnableKeyRotation` on a replica fails.
-
-- **Custom key store (CloudHSM) rotation (2024):** Symmetric keys in
-  a custom key store support automatic rotation. KMS rotates the
-  backing key material within the CloudHSM cluster. The cluster must
-  be `ACTIVE` and `CONNECTED`.
-
-- **Asymmetric RSA and ECDSA keys (no auto-rotation, 2024-2026):**
-  Still no automatic rotation support. Manual rotation is the only
-  option. AWS roadmap items have been discussed but no GA feature as
-  of 2026.
-
-- **`XksProxyUriEndpoint` for external key stores (2024-2025):**
-  External key stores (XKS) allow BYOK with an external HSM via the
-  KMS XKS proxy. Keys in an XKS do NOT support automatic rotation;
-  rotation is managed by the external HSM.
-
-- **CloudTrail data event logging for KMS (2025):** CloudTrail now
-  supports data-event logging for `Decrypt`, `Encrypt`, and
-  `GenerateDataKey`. Useful for auditing which ciphertext was
-  decrypted by whom — but management events (`EnableKeyRotation`)
-  are always logged without data-event configuration.
-
-- **KMS key aliases as CloudFormation resources (2024):**
-  `AWS::KMS::Alias` is now fully supported in CloudFormation, making
-  alias-based manual rotation automation-friendly.
+- [`references/worked-examples.md`](references/worked-examples.md) — secondary worked examples: plan-manual-rotation (asymmetric RSA), diagnose-rotation (BLOCKED replica key).
+- [`references/advanced-patterns.md`](references/advanced-patterns.md) — Step-0 expert KMS rotation behaviors, recent AWS features 2024-2026.
+- [`references/error-handling.md`](references/error-handling.md) — rotation failure-mode table (symptom / root cause / fix).
+- [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — sweep pagination, live-account pre-flight command listing, pre-flight safety checks.
+- [`references/key-type-and-rotation-matrix.md`](references/key-type-and-rotation-matrix.md) — key type rotation support matrix and procedures.
+- [`references/manual-rotation-procedures.md`](references/manual-rotation-procedures.md) — manual rotation procedures (caller identification, cutover).
 
 ## Domain
 

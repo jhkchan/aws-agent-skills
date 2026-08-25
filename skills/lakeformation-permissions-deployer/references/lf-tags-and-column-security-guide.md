@@ -266,3 +266,34 @@ aws sso-admin list-instances --query 'Instances[*].InstanceArn'
 # DataZone domain (if DataZone)
 aws datazone list-domains --query 'items[*].id'
 ```
+
+## Edge-case handling
+
+- **Cross-account LF-tag grants:** use RAM resource shares to share
+  LF-tag-based permissions across accounts. The receiving account
+  must accept the RAM invitation before grants take effect.
+- **LF-tag on partitioned tables:** LF-tags on partitioned tables
+  apply to all partitions. Column-level LF-tags apply to partition
+  columns too — ensure partition columns (e.g., `dt`, `region`) have
+  appropriate tags.
+- **Governed Tables and Lake Formation:** Governed Tables are
+  managed entirely by Lake Formation — IAM table policies are
+  ignored. Ensure all access is via Lake Formation grants.
+- **Hybrid access mode conflicts:** when both IAM and Lake Formation
+  permissions exist, Lake Formation is the effective permission
+  layer. IAM policies that conflict with Lake Formation are silently
+  overridden. Test before production migration.
+- **Data cells filter performance:** complex filter expressions add
+  query overhead. Use simple equality filters (`region = 'us-east-1'`)
+  for high-throughput tables. Avoid `IN` lists with > 100 values.
+- **Resource link and LF-tag interaction:** resource links do not
+  inherit LF-tags from the source table. The principal needs access
+  to BOTH the link (DESCRIBE) and the target table (SELECT via
+  LF-tag or named resource).
+- **Identity Center session duration:** Identity Center sessions
+  expire after the configured duration (default 8 hours). Long-running
+  queries may fail at session expiry. Use service roles for ETL
+  pipelines instead of Identity Center sessions.
+- **DataZone subscription approval:** DataZone subscriptions require
+  approval from the data owner. Configure auto-approval for trusted
+  projects or manual approval for sensitive data.

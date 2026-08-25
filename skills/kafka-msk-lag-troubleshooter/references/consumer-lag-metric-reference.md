@@ -160,3 +160,41 @@ Interpretation:
 | `compression.type` | none | Batch compression | Set to `lz4` or `zstd` for network/disk efficiency |
 | `buffer.memory` | 33554432 (32 MB) | Producer send buffer | Raise if producer blocks on max.block.ms |
 | `max.in.flight.requests.per.connection` | 5 | Concurrent unacknowledged batches | Keep ≤ 5 with idempotence; higher risks reordering without idempotence |
+
+## Deep reference — CloudWatch metrics, MSK Connect metrics, fetch tuning matrix (moved from SKILL.md)
+
+### CloudWatch metrics (AWS/Kafka namespace)
+
+| Metric | What it measures | Diagnostic use |
+|---|---|---|
+| `RecordsLagMax` | Max records-lag across all partitions in a consumer group | Primary lag signal; climbing = consumer behind |
+| `BytesInPerSec` | Producer write rate (bytes/sec) | Compare to BytesOutPerSec; if In > Out, consumer lags |
+| `BytesOutPerSec` | Consumer read rate (bytes/sec) | Consumer throughput; compare to BytesInPerSec |
+| `ConsumedReadThroughput` | MSK Serverless read CU consumed | Serverless throttle detection |
+| `MessagesInPerSec` | Messages/sec written | Producer message rate (not bytes) |
+| `UnderReplicatedPartitions` | Partitions with ISR < replication factor | ISR health; > 0 = replica degradation |
+| `OfflinePartitions` | Partitions with no available leader | Cluster outage; > 0 = immediate escalation |
+| `ISRShrink` / `ISRExpand` | ISR membership changes | ISR instability; correlate with broker health |
+| `CpuUser` | Broker CPU user time (%) | Broker saturation; > 80% sustained = scale |
+| `DiskKBReadPerSec` / `DiskKBWrttnPerSec` | Broker disk I/O | I/O-bound saturation |
+| `NetworkProcessorAvgIdlePercent` | Broker network thread idle (%) | < 0.3 = network thread saturation |
+| `RebalanceRate` | Consumer group rebalance events/sec | Rebalance storm detection |
+| `ZooKeeperRequestLatencyMs` | ZK request latency (ZK clusters only) | ZK instability |
+| `Throttle` | Serverless CU throttle count | Serverless partition throttle |
+
+### MSK Connect metrics (AWS/MSKConnect namespace)
+
+| Metric | What it measures |
+|---|---|
+| `RecordLag` | Connector lag (records) |
+| `SourceTaskRecordPollRate` | Source connector poll rate |
+| `SinkTaskRecordSendRate` | Sink connector send rate to destination |
+| `TaskStartUps` / `TaskFailures` | Connector task lifecycle |
+
+### Consumer fetch tuning matrix
+
+| Topic volume | fetch.min.bytes | fetch.max.wait.ms | Effect |
+|---|---|---|---|
+| Low (< 1 MB/s) | 1 (default) | 100 | Immediate fetch; no artificial latency |
+| Medium (1-10 MB/s) | 1024-65536 | 500 (default) | Minor batching; balances latency and overhead |
+| High (> 10 MB/s) | 1048576 (1 MB)+ | 500 (default) | Large batches; network-efficient |

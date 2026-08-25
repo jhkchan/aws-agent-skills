@@ -302,3 +302,112 @@ created do not receive the job.
 **Fix:** for continuous jobs (not snapshot), things added later WILL
 receive the job. For snapshot jobs, add things to the group first,
 then create the job.
+
+## Expert heuristic: topic rule SQL evaluates against message payload (moved from SKILL.md)
+
+A baseline model writes topic rule SQL like database SQL. The correct
+heuristic recognizes that the rules engine SQL operates on MQTT message
+payloads (JSON), not tables.
+
+```text
+Incoming MQTT message:
+  Topic: 'device/sensor-001/telemetry'
+  Payload: {"temperature": 35.5, "humidity": 60, "device_id": "sensor-001"}
+
+SQL: SELECT temperature, device_id FROM 'device/+/telemetry'
+       WHERE temperature > 30
+
+Result (when temperature > 30):
+  {"temperature": 35.5, "device_id": "sensor-001"}
+
+Rule action: republish to 'device/alerts'
+OR: invoke Lambda, write to S3/SQS/DynamoDB/Timestream
+
+Key: SQL runs on the PAYLOAD, not any database.
+Wildcards: + = single level, # = multi level in topic filter.
+```
+
+## Expert heuristic: device shadow delta state (moved from SKILL.md)
+
+```text
+Shadow state machine:
+  Reported (device → cloud):  device reports actual state
+  Desired (cloud → device):   cloud tells device target state
+  Delta:                       desired != reported
+
+  When desired != reported → delta non-empty → device notified
+  When device updates reported to match → delta empty → sync done
+
+  Classic: $aws/things/<thing>/shadow/update
+  Named:   $aws/things/<thing>/shadow/name/<name>/update
+```
+
+**Key implication:** the delta state is the sync mechanism. The device
+must subscribe to the delta topic and update reported to clear it.
+
+## Step 5 — Topic rule (SQL SELECT, republish) CLI (moved from SKILL.md)
+
+```bash
+aws iot create-topic-rule \
+  --rule-name "telemetry-to-timestream" \
+  --topic-rule-payload '{
+    "sql": "SELECT temperature, humidity, device_id FROM '\''device/+/telemetry'\'' WHERE temperature > 30",
+    "ruleDisabled": false,
+    "awsIotSqlVersion": "2016-03-23",
+    "actions": [
+      {"timestream": {
+        "roleArn": "arn:aws:iam::123456789012:role/IoTTopicRuleRole",
+        "databaseName": "sensors", "tableName": "telemetry",
+        "dimensions": [{"name":"device_id","value":"${device_id}"}]
+      }},
+      {"republish": {
+        "roleArn": "arn:aws:iam::123456789012:role/IoTTopicRuleRole",
+        "topic": "device/alerts", "qos": 1
+      }}
+    ],
+    "errorAction": {
+      "republish": {
+        "roleArn": "arn:aws:iam::123456789012:role/IoTTopicRuleRole",
+        "topic": "device/errors", "qos": 1
+      }
+    }
+  }' --region us-east-1
+```
+
+**Available actions:** republish, Lambda, S3, SQS, DynamoDB, Timestream,
+SNS, Kinesis Firehose, CloudWatch Alarm/Logs, Elasticsearch, Step
+Functions, IoT Events, IoT Analytics.
+
+**Topic rule IAM role** needs trust policy for `iot.amazonaws.com` and
+permissions for each downstream action (e.g., `timestream:WriteRecords`,
+`iot:Publish`, `lambda:InvokeFunction`).
+
+## Step 6 — Device shadow (classic vs named) (moved from SKILL.md)
+
+**Classic shadow** — one shadow per thing:
+
+```text
+Topics: $aws/things/<thing>/shadow/update | /get | /delete
+```
+
+**Named shadow** — multiple shadows per thing:
+
+```text
+Topics: $aws/things/<thing>/shadow/name/<name>/update | /get | /delete
+```
+
+**Shadow document:**
+
+```json
+{
+  "state": {
+    "desired": { "led": "on", "threshold": 30 },
+    "reported": { "led": "off", "threshold": 25 }
+  },
+  "version": 3, "timestamp": 1630000000
+}
+```
+
+**Delta:** when desired != reported, the delta is non-empty. Devices
+subscribe to `.../shadow/update/delta` to receive notifications and
+update reported to clear the delta.

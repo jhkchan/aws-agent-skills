@@ -343,108 +343,23 @@ aws kinesisanalyticsv2 describe-application \
 
 ### Step 7: Checkpointing (Flink stateful recovery)
 
-Checkpointing persists Flink operator state to S3 so the application
-can recover from failures without losing in-flight data.
-
-| Parameter | Default | Production | Why |
-|---|---|---|---|
-| `CheckpointingEnabled` | true | true | Stateful recovery. NEVER disable in production. |
-| `CheckpointInterval` | 60000 ms | 30000-120000 ms | Shorter = faster recovery but more overhead. |
-| `MinPauseBetweenCheckpoints` | 5000 ms | 5000-10000 ms | Ensures checkpoints complete before the next starts. |
-| `ConfigurationType` | DEFAULT | CUSTOM | CUSTOM lets you override intervals. |
-
-Rules:
-- **NEVER disable checkpointing in production.** A failure means full
-  state loss and replay from the earliest unprocessed record.
-- **Pair with snapshots** for planned stop/start. Snapshots are
-  user-triggered; checkpoints are automatic.
-- **`AllowNonRestoredState: false`** — set on start to fail fast if
-  the code change removed an operator. Set to `true` only during
-  breaking changes with manual verification.
+> **Moved verbatim** → [references/execution-and-capacity-guide.md](references/execution-and-capacity-guide.md) § "Step 7: Checkpointing (Flink stateful recovery)".
+> Load when: configuring Flink checkpointing — interval, min pause, AllowNonRestoredState rules.
 
 ### Step 8: Parallelism tuning
 
-Parallelism controls how many Flink subtasks process the stream
-concurrently. KPUs (Kinesis Processing Units) are the billing unit
-(1 KPU = 1 vCPU, 4 GB memory).
-
-| Parameter | Default | Production | Why |
-|---|---|---|---|
-| `Parallelism` | 1 | 2-8 (tune to shard count) | Must be >= source shard count for full parallelism. |
-| `ParallelismPerKPU` | 1 | 1 (default) | Lower = more KPUs per subtask (more memory). Higher = denser packing. |
-| Total KPUs | parallelism + 1 (JobManager) | auto | Billed per-second. Tune to workload. |
-
-Rules:
-- **Match parallelism to source shards.** If the source Kinesis stream
-  has 4 shards, set `Parallelism: 4`. Sub-parallelism wastes KPUs.
-- **ParallelismPerKPU > 1** densifies subtasks onto fewer KPUs —
-  useful for CPU-light workloads. Default 1 for memory-heavy.
-- **JobManager overhead** — KDA reserves 1 KPU for the JobManager.
-  Total KPUs = parallelism + 1 (when ParallelismPerKPU = 1).
+> **Moved verbatim** → [references/execution-and-capacity-guide.md](references/execution-and-capacity-guide.md) § "Step 8: Parallelism tuning".
+> Load when: sizing parallelism and KPUs — matching parallelism to shard count, ParallelismPerKPU, JobManager overhead.
 
 ### Step 9: Studio notebook (Zeppelin, interactive analysis)
 
-Studio notebooks provide an interactive Apache Zeppelin environment
-connected to live Kinesis streams for exploratory analysis. They
-share the same KDA application runtime.
-
-```bash
-aws kinesisanalyticsv2 create-application \
-  --application-name fraud-explore-notebook \
-  --runtime-environment ZEPPELIN-FLINK-1_0 \
-  --service-execution-role arn:aws:iam::123456789012:role/KDAExecutionRole \
-  --application-configuration '{
-    "ZeppelinApplicationConfiguration": {
-      "MonitoringConfiguration": {
-        "LogLevel": "INFO"
-      },
-      "CatalogConfiguration": {
-        "GlueDataCatalogConfiguration": {
-          "DatabaseARN": "arn:aws:glue:us-east-1:123456789012:database/default"
-        }
-      },
-      "CustomArtifactsConfiguration": [
-        {"ArtifactType": "UDF", "S3ContentLocation": {"BucketARN": "arn:aws:s3:::kda-apps", "FileKey": "custom-udf-1.0.0.jar"}, "MavenReference": {"ArtifactId": "", "GroupId": "", "Version": ""}}
-      ],
-      "DeployAsApplicationConfiguration": {
-        "CreateApplicationAsReadyForDeployment": true
-      }
-    }
-  }' \
-  --tags Environment=dev,Application=fraud-explore
-```
-
-Rules:
-- **Studio notebooks are for exploration** — NOT production pipelines.
-  Deploy production Flink code as a STREAMING application, not a
-  Zeppelin notebook.
-- **Zeppelin paragraphs persist** — notebooks can be saved to S3 for
-  team sharing.
-- **`DeployAsApplicationConfiguration`** — promotes a notebook to a
-  production STREAMING application once exploration is complete.
+> **Moved verbatim** → [references/execution-and-capacity-guide.md](references/execution-and-capacity-guide.md) § "Step 9: Studio notebook (Zeppelin, interactive analysis)".
+> Load when: creating a Studio notebook — Zeppelin application config, custom artifacts, promotion to a production app.
 
 ### Step 10: Application snapshots (stateful recovery)
 
-```bash
-# Create a snapshot before a code update
-aws kinesisanalyticsv2 create-application-snapshot \
-  --application-name fraud-detection-flink \
-  --snapshot-name pre-update-2026-08-11
-
-# List snapshots
-aws kinesisanalyticsv2 list-application-snapshots \
-  --application-name fraud-detection-flink
-
-# Update application code, then start from snapshot
-aws kinesisanalyticsv2 start-application \
-  --application-name fraud-detection-flink \
-  --run-configuration '{
-    "ApplicationRestoreConfiguration": {
-      "RestoreType": "RESTORE_FROM_CUSTOM_SNAPSHOT",
-      "SnapshotName": "pre-update-2026-08-11"
-    }
-  }'
-```
+> **Moved verbatim** → [references/execution-and-capacity-guide.md](references/execution-and-capacity-guide.md) § "Step 10: Application snapshots (stateful recovery)".
+> Load when: using snapshots for stateful recovery — create/list snapshots and RESTORE_FROM_CUSTOM_SNAPSHOT starts.
 
 ### Step 11: Verification
 
@@ -459,31 +374,8 @@ aws kinesisanalyticsv2 list-application-snapshots --application-name fraud-detec
 
 ## Recent AWS features (2024-2026)
 
-- **Studio notebooks with Zeppelin (2024-2026):** interactive Apache
-  Zeppelin notebooks connected to live Kinesis streams. Provides
-  exploratory Flink/SQL analysis without deploying a full application.
-  Notebooks can be promoted to production STREAMING applications.
-- **Session windows SQL (2024-2026):** native `SESSION()` window
-  function in KDA SQL for sessionization use cases (user sessions
-  with inactivity gaps). Replaces workarounds using hopping windows.
-- **Application snapshots (2024-2026):** user-triggered snapshots of
-  application state for planned stop/start, code updates with state
-  preservation, and blue/green deployments.
-- **Custom application code via S3 (2024-2026):** Flink applications
-  can load custom JARs/Python packages from S3 with versioned keys
-  for reproducible deployments.
-- **Flink 1.19 runtime (2025-2026):** FLINK-1_19 runtime with
-  adaptive batch scheduling, improved connector lifecycle, and Python
-  UDF performance improvements. Use the latest stable runtime.
-- **Glue Data Catalog integration (2024-2026):** Studio notebooks and
-  Flink apps can read table schemas directly from the Glue Data
-  Catalog via `CatalogConfiguration`.
-- **VPC support for private sources (2024-2026):** KDA applications
-  can connect to private MSK, private OpenSearch, and private RDS via
-  VPC subnets and security groups.
-- **Schema Registry for Avro/Protobuf (2024-2025):** AWS Glue Schema
-  Registry integration for type-safe stream deserialization. The
-  execution role needs `glue:GetSchemaVersion`.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Recent AWS features (2024-2026)".
+> Load when: checking 2024-2026 feature availability — session windows, snapshots, Flink 1.19, Glue Catalog, VPC sources.
 
 ## Workload matrix
 
@@ -521,57 +413,13 @@ aws kinesisanalyticsv2 list-application-snapshots --application-name fraud-detec
 
 ## Expert heuristic — parallelism, checkpoints, and SQL-vs-Flink strategy
 
-- **SQL-vs-Flink decision:** use SQL for simple stateless
-  transformations, windowed aggregates, and lambdas. Use Flink for
-  complex stateful processing, custom operators, CEP (complex event
-  processing), and ML inference. SQL is faster to deploy; Flink is
-  more expressive.
-- **Session windows in SQL:** the `SESSION(window_col, INTERVAL 'N'
-  SECONDS)` function groups events into sessions with inactivity gaps.
-  Use for user behavior analytics. Tune the gap (default 60s) to the
-  domain — 30 min for web sessions, 5 min for mobile.
-- **Parallelism sizing:** set `Parallelism` to the source shard count.
-  For CPU-heavy processing, increase `ParallelismPerKPU` to densify.
-  For memory-heavy processing, keep `ParallelismPerKPU = 1` (1 KPU per
-  subtask, 4 GB memory each).
-- **Checkpoint interval tuning:** 60s is the default. For low-latency
-  apps (sub-second processing), use 30s. For high-throughput batch-like
-  processing, 120s reduces overhead. NEVER set below 5s — checkpoint
-  storms destabilize the JobManager.
-- **Snapshot before code updates:** ALWAYS create a snapshot before
-  updating application code. Start the updated app with
-  `RESTORE_FROM_CUSTOM_SNAPSHOT` to preserve state. Without this, a
-  code update loses all in-flight state.
-- **Studio notebook promotion:** explore in a Zeppelin notebook, then
-  promote to a STREAMING application via
-  `DeployAsApplicationConfiguration`. NEVER run production traffic
-  through a notebook — they are billed per-second and lack checkpoint
-  guarantees.
-- **Firehose destination vs Kinesis stream destination:** use Firehose
-  for S3/Redshift/OpenSearch delivery (batched, at-least-once). Use a
-  Kinesis stream for downstream real-time consumers (sub-second,
-  exactly-once with Flink sinks).
-- **Log retention:** set CloudWatch Logs retention to 14-30 days.
-  NEVER leave at default (Never Expire) — Flink framework logs are
-  verbose and costs balloon.
+> **Moved verbatim** → [references/execution-and-capacity-guide.md](references/execution-and-capacity-guide.md) § "Expert heuristic — parallelism, checkpoints, and SQL-vs-Flink strategy".
+> Load when: tuning strategy — SQL-vs-Flink selection, session-window gaps, parallelism sizing, checkpoint intervals, log retention.
 
 ## Pre-flight safety checks (run before any deployment CLI)
 
-- **Confirm execution role exists and trusts
-  `kinesisanalytics.amazonaws.com`.**
-- **Confirm source Kinesis stream (or Firehose) exists and is ACTIVE.**
-- **Confirm destination resource exists (Kinesis stream, Firehose, or
-  S3 bucket).**
-- **Confirm S3 code bucket has the pinned application code object.**
-- **Confirm runtime environment is the latest stable Flink.**
-- **Confirm service quota for KPUs is sufficient.**
-- **Confirm CloudWatch log group exists (or will be created by KDA).**
-- **Confirm VPC subnets exist (if private sources like MSK).**
-- **Confirm Glue schema registry has the schema (if Avro/Protobuf).**
-- **For existing applications, create a snapshot before code updates.**
-
-Full CLI sequences for all checks in
-`references/execution-and-capacity-guide.md`.
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Pre-flight safety checks (run before any deployment CLI)".
+> Load when: about to run any deployment CLI — the confirmation checklist covering role, streams, code object, quota, log group.
 
 ## Output format — MANDATORY literal labels
 
@@ -612,45 +460,21 @@ VERIFICATION_COMMANDS:
 missing (execution role, source stream, destination resource, S3 code
 object for Flink apps), the verdict is `PREREQUISITES_MISSING`.
 
+## References (load on demand)
+
+- [references/cli-commands-and-iac.md](references/cli-commands-and-iac.md) — full copy-pasteable CLI sequence for all 11 deployment steps with Terraform / CloudFormation equivalents (existing)
+- [references/execution-and-capacity-guide.md](references/execution-and-capacity-guide.md) — checkpointing, parallelism and KPU tuning, Studio notebook setup, application snapshots, expert SQL-vs-Flink heuristics (moved verbatim; existing deep reference)
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight safety checks to run before any deployment CLI
+- [references/advanced-patterns.md](references/advanced-patterns.md) — edge-case handling (cross-account sources, schema evolution, VPC sources) and recent AWS features 2024-2026
+
 ## Domain
 
 AWS CloudOps / Kinesis Data Analytics Streaming Compute Provisioning.
 
 ## Edge-case handling
 
-- **Cross-account Kinesis source:** the execution role needs
-  `kinesis:GetRecords` on the cross-account stream AND the stream
-  policy in the other account must grant your execution role. KDA
-  does NOT support cross-account role assumption within an application.
-- **Schema evolution (Avro/Protobuf):** when the source schema changes,
-  update the Glue Schema Registry with a backward-compatible version.
-  KDA Flink apps automatically use the latest schema version. NEVER
-  make breaking schema changes without an application update.
-- **Snapshot restore with code changes:** if the new code removed a
-  Flink operator, restore fails with `AllowNonRestoredState: false`.
-  Set `AllowNonRestoredState: true` only during verified breaking
-  changes — otherwise you silently drop state.
-- **VPC source (private MSK):** KDA applications can connect to
-  private MSK via VPC configuration. The execution role needs
-  `ec2:CreateNetworkInterface`,
-  `ec2:DescribeNetworkInterfaces`, and `ec2:DeleteNetworkInterface`.
-- **Firehose source with transformation:** Firehose can apply Lambda
-  transformation before KDA reads. The KDA app sees the transformed
-  record. Ensure the transformation is idempotent — KDA may replay
-  records on failure.
-- **SQL app with multiple inputs:** SQL apps can read from multiple
-  Kinesis streams via multiple `Inputs` entries. Each input needs its
-  own schema and `NamePrefix`. JOINs across streams require aligned
-  event-time watermarks.
-- **Studio notebook to production:** when promoting a Zeppelin
-  notebook to a STREAMING application, the notebook's paragraphs are
-  compiled into a Flink JAR. Test the promoted app separately —
-  notebook behavior may differ in a deployed context (e.g., parallel
-  paragraph execution).
-- **Parallelism change with state:** increasing `Parallelism` requires
-  a snapshot restore — Flink redistributes operator state across the
-  new subtasks. NEVER change parallelism without a snapshot if the app
-  is stateful.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Edge-case handling".
+> Load when: hitting an edge case — cross-account sources, schema evolution, snapshot restore with code changes, VPC/private MSK sources.
 
 ## AWS documentation
 

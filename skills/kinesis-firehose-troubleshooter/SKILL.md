@@ -121,68 +121,15 @@ ESCALATION_PATH: <if ESCALATE, the recommended path>
 
 ## Pre-flight: data requirements
 
-| Input | Source | Why |
-|---|---|---|
-| Delivery-stream-name | Console / `list-delivery-streams` | Drives `describe-delivery-stream` |
-| Observed symptom | Console / CloudWatch alarm | Routes to the right diagnostic branch |
-| Destination type | Console / `describe-delivery-stream` | Routes to per-destination Step |
-| Region | Console | Required for all CLI calls |
-| CloudWatch metric namespace | `AWS/Firehose` | For `get-metric-statistics` |
-| Lambda function name (if transform) | `describe-delivery-stream` | For Lambda-layer diagnosis |
-| Glue database/table (if format conversion) | `describe-delivery-stream` | For convert-layer diagnosis |
-| Destination endpoint (OpenSearch / Redshift / Snowflake / Splunk) | `describe-delivery-stream` | For deliver-layer diagnosis |
-| Recent CLI output (if any) | `describe-delivery-stream`, metric queries | Speeds up diagnosis |
-| CloudWatch Logs excerpt (if any) | Firehose / Lambda log groups | For per-record errors |
-
-**If the input is malformed** (no delivery-stream-name, ambiguous
-symptom), emit:
-
-```text
-DIAGNOSIS: <reference>
-DELIVERY_STREAM: unknown
-DESTINATION: unknown
-SYMPTOM: unknown
-ROOT_CAUSE: Pending diagnosis - required inputs missing.
-EVIDENCE:
-  - No delivery-stream-name supplied.
-LAYER_CHECK:
-  - Source: unknown
-  - Transform: unknown
-  - Convert: unknown
-  - Deliver: unknown
-  - Observability: unknown
-FIX: (pending inputs)
-VERIFICATION: (pending fix)
-VERDICT: NEED_MORE_INFO
-NEXT_STEP: Re-supply: delivery-stream-name, the observed
-  symptom (delivery-to-s3-fails / lambda-fails / delivery-lag
-  / format-conversion-fails / opensearch-fails / redshift-fails
-  / latest-destination-fails), the destination type, and the
-  region.
-ESCALATION_PATH: None
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Pre-flight: data requirements".
+> Load when: starting a diagnosis — the required-inputs table and the malformed-input NEED_MORE_INFO block.
 
 ## Process - Diagnostic decision tree (apply in order)
 
 ### Step 0: Expert knowledge - non-obvious Firehose behaviors
 
-- **`describe-delivery-stream` returns the live config including all destination sub-fields.** The console collapses sub-config; the API returns `S3DestinationUpdate`, `ExtendedS3DestinationUpdate`, `RedshiftDestinationUpdate`, `ElasticsearchDestinationUpdate`, `AmazonopensearchserviceDestinationUpdate`, `SnowflakeDestinationUpdate`, `HttpEndpointDestinationUpdate`, `SplunkDestinationUpdate` as separate blocks.
-- **Firehose never silently drops records without leaving a trace.** Failed records go to S3 backup (if enabled) or surface as `DeliveryTo*.Success < 100`. Always enable CloudWatch logging + S3 backup before debugging.
-- **Lambda transforms are invoked with buffered batches, not single records.** Buffering hints control cadence: 1-3 MB or 60-900 sec. A Lambda slower than the buffer cadence produces backpressure, not single-record failures.
-- **Lambda transform output is capped at 6 MB per invocation.** Records that grow during enrichment (JSON expansion, join with reference data) can exceed this cap. The entire batch is dropped to S3 backup if the response exceeds 6 MB.
-- **Data format conversion uses Glue Data Catalog schema.** If the Glue table schema does not match the input JSON, conversion produces 0-byte Parquet/ORC objects that look successful on `DeliveryToS3.Success` but are unreadable by Athena or other engines.
-- **Parquet/ORC conversion requires the input to be valid JSON.** CSV or raw text input to a conversion-enabled stream is rejected; the records go to S3 error backup. The `InputFormatConfiguration.Deserializer` must be a `OpenXJsonSerDe` or `HiveJsonSerDe`.
-- **OpenSearch destination uses a circuit breaker.** If Firehose receives 429 (Too Many Requests) from OpenSearch for sustained periods, it engages a circuit breaker that pauses delivery for a sliding window. Default circuit breaker: `5 minutes` of sustained failures; recovery requires sustained success.
-- **OpenSearch auth uses either IAM signing or basic auth (master user).** Mixed-mode failures are common: the Firehose role has IAM signing but the domain uses fine-grained access control with a master user - Firehose needs both.
-- **Redshift destination uses a staging S3 bucket + COPY command.** The COPY runs as the Redshift cluster's IAM role, not Firehose's. The cluster role must have `s3:GetObject` on the staging bucket. Most Redshift delivery failures are staging-bucket IAM or COPY column mismatches.
-- **KMS key policy must grant the Firehose service principal.** `delivery.stream.amazonaws.com` needs `kms:GenerateDataKey` and `kms:Decrypt` on the key. A key policy that allows only the customer account root will deny Firehose even though the key is "enabled."
-- **S3 bucket region must match the Firehose region.** Cross-region buckets are not supported by Firehose (with the explicit exception of S3 backup with a separate bucket). A bucket-region mismatch produces `AccessDenied` on `PutObject`.
-- **Firehose to Snowflake uses a private Snowflake endpoint, not the public account URL.** Verify the `SnowflakeDestinationConfiguration.PrivateLinkVPCEId` and the Snowflake integration grant. Most Snowflake destination failures are private-link unreachable or integration not granted.
-- **HTTP endpoint delivery retries with exponential backoff.** After the configured max retries, records go to S3 error backup. The endpoint must return HTTP 200 within the configured timeout.
-- **Splunk destination uses HEC (HTTP Event Collector) tokens.** The token is stored in Secrets Manager; the Firehose role must have `secretsmanager:GetSecretValue`. An expired or rotated token produces 403 from Splunk.
-- **Buffering hints affect both latency and cost.** Larger buffers (e.g., 128 MB / 900 sec) reduce S3 PUT costs but increase `DataFreshness`. Smaller buffers reduce latency but multiply S3 requests. Always tune for the workload, not the defaults.
-- **Firehose does not support in-place config edits to a destination.** Use `update-destination` with the current version ID; concurrent updates conflict with `VersionId does not match`.
-- **Dynamic partitioning (2024) uses Lambda-derived partition keys.** A Lambda that returns no partition key causes records to route to the default prefix only. Verify the `DynamicPartitioningConfiguration` and the Lambda metadata returned.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Step 0: Expert knowledge - non-obvious Firehose behaviors".
+> Load when: a behavior seems non-obvious — buffered Lambda invocation, 6 MB response cap, OpenSearch circuit breaker, staging-bucket IAM, update-destination VersionId.
 
 ### Step 1: The 5-layer Firehose health check (run FIRST)
 
@@ -468,53 +415,8 @@ transaction commits).
 
 ### Step 8: Diagnose latest destinations (Snowflake / HTTP / Splunk)
 
-**Symptom:** Firehose to Snowflake / HTTP endpoint / Splunk returns
-errors; `DeliveryTo*.Success` drops.
-
-```bash
-aws firehose describe-delivery-stream --delivery-stream-name <stream-name> \
-  --query 'DeliveryStreamDescription.Destinations[0].[SnowflakeDestinationDescription,HttpEndpointDestinationDescription,SplunkDestinationDescription]' --output table
-aws logs filter-log-events --log-group-name /aws/kinesisfirehose/<stream-name> \
-  --filter-pattern "ERROR" --output table
-```
-
-#### Snowflake destination
-
-| Cause | Diagnostic signal | Fix |
-|---|---|---|
-| PrivateLink VPC endpoint unreachable | Firehose log: `Connection timed out` to Snowflake VPCe | Verify the `PrivateLinkVPCEId`; ensure Firehose VPC can route to it |
-| Snowflake integration not granted | Snowflake `SHOW INTEGRATIONS` shows the Firehose integration as not granted to the user / role | `GRANT USAGE ON INTEGRATION <name> TO ROLE <role>;` in Snowflake |
-| Snowflake user / role mismatch | `AccountName` / `UserRole` in Firehose config does not match Snowflake | Update `update-destination --snowflake-destination-configuration` |
-| Key-pair auth invalid | Snowflake log: `JWT token invalid` | Rotate the key pair; update Secrets Manager |
-| Staging bucket (Snowflake) deleted | Firehose log: `Access Denied` on internal staging | Recreate the staging bucket (Firehose-managed) |
-| `CustomSql` rejected by Snowflake | Firehose log: `SQL compilation error` | Fix the `CustomSql` MERGE / COPY statement |
-
-#### HTTP endpoint destination
-
-| Cause | Diagnostic signal | Fix |
-|---|---|---|
-| Endpoint returns non-200 | Firehose log: `Endpoint returned 500` / `401` / `403` | Fix the endpoint; verify auth header |
-| Endpoint timeout | Firehose log: `Request timed out after X ms` | Raise the `EndpointConfiguration.AccessKey` and endpoint timeout; or scale the endpoint |
-| Endpoint URL unreachable | Firehose log: `Connection refused` / DNS resolution failed | If endpoint is private, put Firehose in a VPC with route to it |
-| Access key mismatch | Firehose sends wrong access key; endpoint returns 401 | Update `AccessKey` in `update-destination` |
-| Buffer / retry exhaustion | Firehose log: `Max retries exhausted` | Raise retries; investigate endpoint health |
-| Malformed request | Firehose log: `400 Bad Request` | Match the endpoint's expected schema (the Firehose HTTP record format) |
-
-#### Splunk destination
-
-| Cause | Diagnostic signal | Fix |
-|---|---|---|
-| HEC token invalid / expired | Firehose log: `403 Forbidden` from Splunk | Rotate the token; update Secrets Manager |
-| Secrets Manager access denied | Firehose log: `AccessDenied` on `secretsmanager:GetSecretValue` | Add `secretsmanager:GetSecretValue` on the secret to the Firehose role |
-| HEC endpoint unreachable | Firehose log: `Connection refused` | Verify Splunk HEC URL; if Splunk is private, put Firehose in a VPC |
-| Splunk indexer queue full | Firehose log: `503 Service Unavailable` | Scale Splunk indexers; raise HEC `maxThreads` |
-| HEC ACK disabled | Splunk `inputs.conf` has `ack = 0`; Firehose retries never confirm | Enable HEC ack on the Splunk side |
-| SSL / TLS mismatch | Firehose log: `SSL handshake failed` | Verify Splunk certificate chain; or set `S3BackupMode` for retry |
-
-**VERDICT:** ROOT_CAUSE_FOUND when Firehose log + destination
-check identifies a specific cause; NEED_MORE_INFO when the
-endpoint accepts but reports no data (sample the payload from
-S3 backup).
+> **Moved verbatim** → [references/firehose-delivery-diagnostics.md](references/firehose-delivery-diagnostics.md) § "Step 8: Diagnose latest destinations (Snowflake / HTTP / Splunk)".
+> Load when: diagnosing Snowflake, HTTP endpoint, or Splunk destinations — per-destination cause/signal/fix tables.
 
 ## Output format
 
@@ -555,84 +457,13 @@ ESCALATION_PATH: None
 
 ### Worked example - NEED_MORE_INFO, DeliveryLag (intermittent)
 
-```text
-DIAGNOSIS: prod-firehose-lag
-DELIVERY_STREAM: prod-events-delivery
-DESTINATION: s3
-SYMPTOM: DeliveryLag
-ROOT_CAUSE: Pending diagnosis - DataFreshnessSec spikes at
-            irregular intervals. Buffering hints are 64 MB /
-            900 sec which is reasonable for the traffic level.
-            Need per-stage timing in the Lambda transform to
-            identify whether the lag is Lambda-bound or
-            destination-bound.
-EVIDENCE:
-  - get-metric-statistics DeliveryToS3.DataFreshnessSec: spikes to 600-900 sec every ~30 min
-  - BufferingHints: SizeInMBs=64, IntervalInSeconds=900
-  - DeliveryToS3.Success: 100% (no drops)
-  - Lambda Errors metric: 0
-LAYER_CHECK:
-  - Source: PASS - IncomingBytes steady
-  - Transform: PASS (no errors) - but duration distribution unknown
-  - Convert: N/A
-  - Deliver: PASS - Success 100%
-  - Observability: PASS
-FIX: (pending root cause)
-VERIFICATION: (pending fix)
-VERDICT: NEED_MORE_INFO
-NEXT_STEP: Enable Lambda Insights and capture per-invocation
-  duration distribution:
-    aws logs filter-log-events --log-group-name /aws/lambda/<fn> --filter-pattern "REPORT"
-  Concurrently, query for KMS throttling:
-    aws cloudwatch get-metric-statistics --namespace AWS/KMS --metric-name ThrottledRequests --dimensions Name=KeyId,Value=<key-id> --start-time $(date -u -v-3H +%Y-%m-%dT%H:%M:%S) --end-time $(date -u +%Y-%m-%dT%H:%M:%S) --period 300 --statistics Sum --output table
-  If duration spikes correlate with the DataFreshness spikes, the
-  Lambda is the bottleneck. If KMS ThrottledRequests spikes, the
-  limit is the bottleneck.
-ESCALATION_PATH: If timing does not correlate with any single
-  metric, escalate to AWS Support with the delivery-stream-name
-  and the DataFreshness spike timestamps.
-```
+> **Moved verbatim** → [references/worked-examples.md](references/worked-examples.md) § "Worked example - NEED_MORE_INFO, DeliveryLag (intermittent)".
+> Load when: emitting a NEED_MORE_INFO verdict — intermittent DeliveryLag example with per-stage timing next steps.
 
 ### Worked example - ESCALATE, OpenSearchFails (cluster red)
 
-```text
-DIAGNOSIS: prod-firehose-opensearch
-DELIVERY_STREAM: prod-events-to-opensearch
-DESTINATION: opensearch
-SYMPTOM: OpenSearchFails
-ROOT_CAUSE: OpenSearch domain prod-events-search is in RED
-            cluster health. Shard allocation is failing because
-            two data nodes are out of disk (free storage below
-            the watermark). Firehose cannot deliver until the
-            cluster returns to GREEN or YELLOW.
-EVIDENCE:
-  - describe-domain-health: ClusterHealth=Red
-  - OpenSearch ClusterStatus shows 2/5 nodes with free_storage_below_watermark
-  - DeliveryToOpenSearch.Success: 0% for the last 45 minutes
-  - Firehose log: circuit breaker engaged after 5 minutes of sustained 429
-LAYER_CHECK:
-  - Source: PASS - IncomingBytes steady
-  - Transform: N/A
-  - Convert: N/A
-  - Deliver: FAIL - OpenSearch cluster red, Firehose circuit breaker engaged
-  - Observability: PASS
-FIX: Cannot remediate from Firehose side alone - the OpenSearch
-  cluster needs disk cleanup, node expansion, or index lifecycle
-  action. The Firehose circuit breaker will recover automatically
-  once OpenSearch returns to sustained success, but the cluster
-  state change requires OpenSearch admin action.
-VERIFICATION: After OpenSearch returns to GREEN:
-  aws opensearch describe-domain-health --domain-name prod-events-search --query 'DomainStatus.ClusterHealth' --output text --profile opensearch-admin
-  Expect: Green. Then Firehose circuit breaker will reset within the configured window.
-VERDICT: ESCALATE
-NEXT_STEP: Provide the OpenSearch admin with this remediation:
-  1. Identify oversized indices: GET _cat/indices?v&s=store.size:desc
-  2. Delete or snapshot old indices via the Index State Management policy
-  3. Add EBS storage or instance count to free disk above the watermark
-ESCALATION_PATH: OpenSearch domain administrator must restore
-  prod-events-search to GREEN. Firehose will resume automatically
-  once the circuit breaker window clears.
-```
+> **Moved verbatim** → [references/worked-examples.md](references/worked-examples.md) § "Worked example - ESCALATE, OpenSearchFails (cluster red)".
+> Load when: emitting an ESCALATE verdict — OpenSearch cluster-red example with out-of-band remediation.
 
 ## Anti-Patterns - NEVER do these things
 
@@ -644,52 +475,18 @@ ESCALATION_PATH: OpenSearch domain administrator must restore
 
 ## Pre-flight safety checks
 
-- **MANDATORY CONFIRMATION GATE** before any state-changing operation (`update-destination`, `start-delivery-stream-encryption`, `stop-delivery-stream-encryption`, `create-delivery-stream`, `delete-delivery-stream`).
-- **`update-destination` blast radius:** the change applies to all in-flight records; snapshot `describe-delivery-stream --output json` BEFORE the update.
-- **KMS key policy changes:** always print the existing policy first (`get-key-policy --output json`); never overwrite without a backup.
-- **OpenSearch / Redshift / Snowflake / Splunk destination changes:** these credentials live in Secrets Manager; verify the secret ARN and rotation state before `update-destination`.
-- **Cross-account work:** confirm the Firehose role has the cross-account trust and the destination account has the resource policy before diagnosing the destination side.
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Pre-flight safety checks".
+> Load when: before any state-changing operation — confirmation gate, update-destination blast radius, KMS policy backup.
 
 ## Appendix A - Symptom-to-cause map (quick reference)
 
-| Symptom | Most common root cause | Verify via |
-|---|---|---|
-| DeliveryToS3Fails - bucket deleted | `head-bucket` 404 | `s3api head-bucket` |
-| DeliveryToS3Fails - bucket region mismatch | `get-bucket-location` different region | `s3api get-bucket-location` |
-| DeliveryToS3Fails - KMS denied | CloudTrail `kms:GenerateDataKey` AccessDenied | `kms get-key-policy` |
-| DeliveryToS3Fails - bucket policy | Firehose role lacks `s3:PutObject` | `simulate-principal-policy` |
-| LambdaFails - timeout | Lambda log "Task timed out"; Duration ~ Timeout | CloudWatch Lambda metrics + logs |
-| LambdaFails - exception | Lambda `Errors > 0`; stack trace in logs | `filter-log-events "ERROR"` |
-| LambdaFails - 6 MB cap | S3 backup gets full batches; "response payload exceeds 6 MB" | Firehose logs |
-| LambdaFails - resource policy | Firehose cannot invoke Lambda | `lambda get-policy` |
-| DeliveryLag - buffering | `BufferingHints` 128MB / 900s on low-traffic stream | `describe-delivery-stream` |
-| DeliveryLag - Lambda slow | Lambda Duration > buffer flush interval | Lambda Insights |
-| DeliveryLag - OpenSearch 429 | Circuit breaker engaged; `429` count | Firehose logs + OpenSearch metrics |
-| DeliveryLag - KMS throttling | KMS `ThrottledRequests > 0` | KMS metrics |
-| FormatConversionFails - non-JSON | Firehose log "Input record is not valid JSON" | Firehose logs |
-| FormatConversionFails - schema mismatch | Glue columns do not match JSON keys | `glue get-table` |
-| FormatConversionFails - 0 bytes | `head-object ContentLength: 0` | `s3api head-object` |
-| OpenSearchFails - auth | OpenSearch access policy lacks Firehose role | OpenSearch access policy |
-| OpenSearchFails - 429 | OpenSearch throttling; circuit breaker | Firehose logs |
-| OpenSearchFails - cluster red | `describe-domain-health` Red | OpenSearch API |
-| RedshiftFails - COPY | `stl_load_errors` shows column / format | Redshift SQL |
-| RedshiftFails - staging IAM | Cluster role lacks `s3:GetObject` | `iam simulate-principal-policy` |
-| Snowflake - PrivateLink | Firehose log "Connection timed out" | Firehose logs + Snowflake `SHOW INTEGRATIONS` |
-| Snowflake - integration not granted | `GRANT USAGE ON INTEGRATION` missing | Snowflake SQL |
-| HTTP - non-200 | Firehose log "Endpoint returned 500/401/403" | Firehose logs |
-| HTTP - timeout | Firehose log "Request timed out" | Firehose logs + endpoint metrics |
-| Splunk - HEC token | `403 Forbidden` from Splunk; Secrets Manager access denied | Firehose logs + Splunk indexer metrics |
-| Splunk - indexer queue | `503 Service Unavailable`; HEC `maxThreads` exhausted | Splunk metrics |
+> **Moved verbatim** → [references/firehose-delivery-diagnostics.md](references/firehose-delivery-diagnostics.md) § "Appendix A - Symptom-to-cause map (quick reference)".
+> Load when: mapping a symptom to its most common root cause and the command that verifies it.
 
 ## Recent AWS features (2024-2026)
 
-- **Firehose to Snowflake (GA 2024):** Native destination supporting Snowflake PrivateLink VPC endpoints and key-pair auth via Secrets Manager. Verify `SnowflakeDestinationConfiguration.PrivateLinkVPCEId` and the Snowflake integration grant. Most failures are private-link unreachable or integration not granted.
-- **HTTP endpoint delivery (expanded 2024-2025):** Generic HTTP endpoint destination now supports custom headers, retry policy, and per-record success/failure reporting. Verify the endpoint returns 200 within the configured timeout; retries back up to S3 error backup after exhaustion.
-- **Splunk delivery enhancements (2024-2025):** HEC ack support, buffered retry, and Secrets Manager token rotation. Verify HEC `ack = 1` on the Splunk side; Firehose relies on ack to confirm writes.
-- **Dynamic partitioning (2024-2025):** Lambda-derived partition keys enable S3 partition-on-the-fly. A Lambda that returns no partition key routes all records to the default prefix; verify `DynamicPartitioningConfiguration.RetryDuration`.
-- **Parquet / ORC conversion via Glue (2024-2026):** Improved SerDe support including `OpenXJsonSerDe` case-insensitivity, `TimestampFormats`, and nested struct handling. Verify the Glue table schema matches the producer JSON exactly.
-- **Firehose within a VPC (2024-2025):** Firehose can now deliver to private destinations (OpenSearch in VPC, private HTTP endpoints, Snowflake PrivateLink) without a NAT gateway. Verify the Firehose VPC config and the destination security group allows Firehose subnets.
-- **Multi-AZ delivery + enhanced CloudWatch metrics (2025-2026):** Multi-AZ delivery for high-throughput streams; per-destination `DataFreshness`, `ThrottledRecords`, and per-Lambda-invocation duration are now available. Verify the dashboard uses the correct per-destination metric.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Recent AWS features (2024-2026)".
+> Load when: checking 2024-2026 feature availability — Snowflake GA, dynamic partitioning, Firehose-in-VPC, multi-AZ delivery.
 
 ## AWS documentation
 
@@ -704,3 +501,10 @@ ESCALATION_PATH: OpenSearch domain administrator must restore
 - **Firehose IAM roles** - https://docs.aws.amazon.com/firehose/latest/dev/controlling-access.html
 - **API Reference** - https://docs.aws.amazon.com/firehose/latest/APIReference/
 - **CLI Reference** - https://docs.aws.amazon.com/cli/latest/reference/firehose/
+
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples: NEED_MORE_INFO (intermittent DeliveryLag) and ESCALATE (OpenSearch cluster red) full DIAGNOSIS blocks
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight data requirements (inputs + malformed-input block) and pre-flight safety checks
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 non-obvious Firehose behaviors and recent AWS features 2024-2026
+- [references/firehose-delivery-diagnostics.md](references/firehose-delivery-diagnostics.md) — diagnostic command quick lookup, per-destination CloudWatch metrics, Step 8 latest-destination cause tables, Appendix A symptom-to-cause map (moved verbatim; existing deep reference)

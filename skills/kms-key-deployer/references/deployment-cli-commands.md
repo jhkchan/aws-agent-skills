@@ -340,3 +340,18 @@ resource "aws_kms_grant" "service_integration" {
   `PendingWindowInDays`.
 - `AWS::KMS::Key` (custom key store) — `CustomKeyStoreId`, `Origin:
   AWS_CLOUDHSM`.
+
+## Pre-flight safety checks (from SKILL.md)
+
+- **Confirm the AWS account ID** for root break-glass:
+  `aws sts get-caller-identity --query Account --output text`
+- **Confirm the key administrator role exists:**
+  `aws iam get-role --role-name <admin-role>`
+- **Confirm the application (key user) role exists:**
+  `aws iam get-role --role-name <app-role>`
+- **Confirm the alias is available:**
+  `aws kms list-aliases --query 'Aliases[?AliasName==`alias/<name>`]'`
+- **For custom key store:** confirm CloudHSM cluster ACTIVE with >= 2 HSMs.
+- **For existing keys:** capture current policy for rollback:
+  `aws kms get-key-policy --key-id <key-id> --policy-name default --output text > /tmp/<key-id>-policy-backup.json`
+

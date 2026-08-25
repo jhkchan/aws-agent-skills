@@ -164,81 +164,18 @@ below forces an explicit schema review before creation.
 
 ## Expert heuristic: partition key cardinality for distribution
 
-A baseline model says "pick a primary key." The correct heuristic
-recognizes that in Cassandra (and Keyspaces), the partition key is the
-distribution mechanism. Low cardinality = hot partitions = throttling.
-
-```text
-Table: user_events
-  Option A (BAD):  PARTITION KEY (event_type)     → 3 partitions (LOGIN, LOGOUT, PURCHASE)
-                   → ALL events hash into 3 partitions → extreme hotspots
-  Option B (GOOD): PARTITION KEY (user_id)          → millions of partitions
-                   → events distributed evenly across storage nodes
-  Option C (BEST): PARTITION KEY (user_id, event_date)  → time-bucketed partitioning
-                   → prevents unbounded partition growth
-                   → enables efficient time-range queries within a user
-```
-
-**Key implication:** always evaluate partition key cardinality. If the
-number of distinct partition key values is small (< 1000), the table
-will have hot partitions. Aim for high-cardinality partition keys. For
-time-series data, composite partition keys (user_id + date_bucket)
-prevent unbounded partition growth and enable efficient time-range
-queries.
+> **Moved verbatim** → [references/schema-and-encryption.md](references/schema-and-encryption.md) § "Expert heuristic: partition key cardinality for distribution".
+> Load when: designing the table schema — why low-cardinality partition keys create hot partitions; composite time-bucketed keys.
 
 ## Expert heuristic: clustering key for sort order
 
-The clustering key determines the sort order of rows WITHIN a partition.
-It is the mechanism for range queries and time-ordered retrieval.
-
-```text
-Table: sensor_readings
-  PARTITION KEY (sensor_id)          → distributes readings across nodes
-  CLUSTERING KEY (reading_time DESC) → newest readings first within each sensor
-
-Query: SELECT * FROM sensor_readings
-       WHERE sensor_id = 'sensor-42'
-       AND reading_time >= '2026-08-01'
-       AND reading_time <= '2026-08-05';
-
-→ Efficient: single partition scan, ordered retrieval, no full-table scan.
-```
-
-**Key implication:** the clustering key must align with the dominant
-query pattern. If the most common query is "get the last 10 readings
-for sensor X," then (sensor_id, reading_time DESC) is the correct
-clustering key. If the query is "get all readings of type
-'temperature'," then the clustering key or partition key must include
-reading_type. Mismatched clustering keys cause full-partition scans.
+> **Moved verbatim** → [references/schema-and-encryption.md](references/schema-and-encryption.md) § "Expert heuristic: clustering key for sort order".
+> Load when: choosing the clustering key — sort order within a partition and range-query alignment.
 
 ## Expert heuristic: on-demand vs provisioned RU crossover
 
-The capacity mode decision is the primary cost lever. The crossover
-point where provisioned becomes cheaper than on-demand depends on
-workload predictability.
-
-```text
-Workload profile analysis:
-  ├── Unpredictable / spiky / new workload → on-demand (no capacity planning)
-  │     on-demand: $1.25 per million read RUs, $2.50 per million write RUs
-  │
-  ├── Steady, predictable traffic → provisioned with auto-scaling
-  │     provisioned: $0.0001484 per read capacity unit-hour
-  │                 $0.0002968 per write capacity unit-hour
-  │     → crossover at ~10-15% sustained utilization of provisioned capacity
-  │
-  └── Hybrid: start on-demand, switch to provisioned after traffic stabilizes
-        → on-demand for first 1-2 months (understand traffic)
-        → switch to provisioned with auto-scaling once patterns emerge
-```
-
-**Key implication:** the crossover is roughly at 10-15% sustained
-utilization. If provisioned capacity units are utilized more than 15%
-of the time on average, provisioned is cheaper. Below 15%, on-demand is
-cheaper. For new workloads with unknown traffic, start on-demand and
-switch to provisioned after 1-2 months once traffic patterns stabilize.
-Monitor `ConsumedReadCapacityUnits` and `ConsumedWriteCapacityUnits` to
-make the data-driven switch.
+> **Moved verbatim** → [references/capacity-and-cost.md](references/capacity-and-cost.md) § "Expert heuristic: on-demand vs provisioned RU crossover".
+> Load when: choosing capacity mode — on-demand vs provisioned cost crossover math and workload profiles.
 
 ## Prerequisites (verify before provisioning)
 
@@ -378,275 +315,43 @@ default (as in DynamoDB). In Keyspaces, it is OFF by default.
 
 ## Step 5 — TTL (time-to-live)
 
-TTL allows automatic row expiry. It is set at the column level via CQL
-INSERT/UPDATE, or as a table default via the schema.
-
-```sql
--- Set TTL at insert time (row expires after 86400 seconds = 24 hours)
-INSERT INTO my_app_keyspace.user_events
-  (user_id, event_date, event_time, event_type, payload)
-VALUES (
-  550e8400-e29b-41d4-a716-446655440000,
-  '2026-08-05',
-  '2026-08-05 10:00:00',
-  'LOGIN',
-  textAsBlob('user logged in')
-)
-USING TTL 86400;
-
--- Default TTL for the table (all rows expire after N seconds unless overridden)
--- This is set at table creation or via ALTER TABLE (CQL)
-ALTER TABLE my_app_keyspace.user_events WITH default_time_to_live = 604800;
-```
-
-**Note:** TTL is a CQL-level feature, not a Keyspaces API parameter.
-The Keyspaces API does not have a TTL parameter for `create-table` or
-`update-table`. TTL is managed through CQL statements executed via the
-Cassandra driver.
+> **Moved verbatim** → [references/schema-and-encryption.md](references/schema-and-encryption.md) § "Step 5 — TTL (time-to-live)".
+> Load when: configuring TTL — CQL USING TTL inserts and default_time_to_live.
 
 ## Step 6 — Encryption at rest (KMS)
 
-Keyspaces encrypts all data at rest by default using AWS-owned KMS
-keys. For granular control (e.g., per-table keys, key rotation, Cloud-
-Trail audit), use a customer-managed key (CMK).
-
-```bash
-# Create or identify a KMS CMK
-KMS_KEY_ID=$(aws kms create-key \
-  --description "Keyspaces encryption key for my_app_keyspace" \
-  --query 'KeyMetadata.KeyId' --output text)
-
-# Set the CMK on the table (at creation time)
-aws keyspaces create-table \
-  --keyspace-name my_app_keyspace \
-  --table-name user_events \
-  --schema-definition '{...}' \
-  --encryption-spec '{
-    "type": "CUSTOMER_MANAGED_KEYS",
-    "kmsKeyIdentifier": "'"$KMS_KEY_ID"'"
-  }'
-
-# Update encryption on an existing table
-aws keyspaces update-table \
-  --keyspace-name my_app_keyspace \
-  --table-name user_events \
-  --encryption-spec '{
-    "type": "CUSTOMER_MANAGED_KEYS",
-    "kmsKeyIdentifier": "'"$KMS_KEY_ID"'"
-  }'
-```
-
-**Key distinction:** AWS-owned key (default, no charge, no CloudTrail)
-vs AWS-managed key (free rotation, CloudTrail) vs customer-managed key
-($1/month + per-use, full control, CloudTrail audit, cross-account).
+> **Moved verbatim** → [references/schema-and-encryption.md](references/schema-and-encryption.md) § "Step 6 — Encryption at rest (KMS)".
+> Load when: configuring encryption at rest — AWS-owned vs AWS-managed vs customer-managed KMS, CMK create/set commands.
 
 ## Step 7 — Client-side encryption (KMS envelope)
 
-Client-side encryption uses envelope encryption via KMS. The application
-generates a data encryption key (DEK) using the KMS CMK, encrypts the
-payload with the DEK, and stores the encrypted DEK + ciphertext in
-Keyspaces. Keyspaces sees only ciphertext.
-
-```python
-# Python example: client-side envelope encryption with KMS + Cassandra driver
-import boto3
-from cassandra.cluster import Cluster
-from cassandra.sigv4.auth import SigV4AuthProvider
-from cryptography.fernet import Fernet  # or use AWS Encryption SDK
-
-kms = boto3.client('kms')
-
-# Generate a data encryption key (DEK) via KMS
-response = kms.generate_data_key(
-    KeyId='alias/keyspaces-client-encryption',
-    KeySpec='AES_256'
-)
-dek_plaintext = response['Plaintext']
-dek_ciphertext = response['CiphertextBlob']
-
-# Encrypt the payload with the DEK
-fernet = Fernet(base64.urlsafe_b64encode(dek_plaintext))
-encrypted_payload = fernet.encrypt(b'{"event": "user_login", "ip": "10.0.1.5"}')
-
-# Store encrypted DEK + encrypted payload in Keyspaces
-session.execute(
-    "INSERT INTO my_app_keyspace.user_events "
-    "(user_id, event_date, event_time, event_type, payload, encrypted_dek) "
-    "VALUES (?, ?, ?, ?, ?, ?)",
-    (user_id, event_date, event_time, event_type, encrypted_payload, dek_ciphertext)
-)
-```
-
-**Critical:** client-side encryption is transparent to Keyspaces.
-Server-side CQL queries (WHERE clauses) on encrypted columns compare
-ciphertext, NOT plaintext. Design the schema so encrypted columns are
-NOT used in WHERE clauses or secondary indexes.
-
-**Recommended approach:** use the AWS Encryption SDK for envelope
-encryption. It handles DEK generation, caching, and rotation
-automatically.
+> **Moved verbatim** → [references/schema-and-encryption.md](references/schema-and-encryption.md) § "Step 7 — Client-side encryption (KMS envelope)".
+> Load when: configuring client-side envelope encryption — KMS DEK generation plus the Cassandra driver Python example.
 
 ## Step 8 — Connectivity (Cassandra driver + SigV4)
 
-Keyspaces supports CQL via the open-source DataStax Cassandra driver
-with AWS SigV4 authentication. No passwords needed — IAM credentials
-provide authentication.
-
-```python
-from cassandra.cluster import Cluster
-from cassandra.sigv4.auth import SigV4AuthProvider
-import boto3
-
-# Create a SigV4 auth provider using AWS credentials
-session_credentials = boto3.Session().get_credentials()
-auth_provider = SigV4AuthProvider(
-    credentials=session_credentials,
-    region_name='us-east-1'
-)
-
-# Connect to Keyspaces using the Cassandra driver
-cluster = Cluster(
-    ['cassandra.us-east-1.amazonaws.com'],
-    port=9142,
-    auth_provider=auth_provider,
-    ssl_options={'ca_certs': '/path/to/AmazonRootCA1.pem'},
-    protocol_version=4,
-    load_balancing_policy=DCAwareRoundRobinPolicy(local_dc='us-east-1')
-)
-
-session = cluster.connect()
-session.execute("SELECT * FROM my_app_keyspace.user_events LIMIT 10")
-```
-
-**Connection requirements:**
-- SSL/TLS is mandatory (port 9142, not 9042).
-- SigV4 authentication (no username/password; IAM credentials).
-- Protocol version 4.
-- Driver: DataStax cassandra-driver >= 3.24 (or cassandra-driver 4.x).
-- CA certificate: AmazonRootCA1.pem (download from AWS).
+> **Moved verbatim** → [references/schema-and-encryption.md](references/schema-and-encryption.md) § "Step 8 — Connectivity (Cassandra driver + SigV4)".
+> Load when: connecting via CQL — SigV4 auth provider, port 9142, SSL, and driver requirements.
 
 ## Step 9 — VPC endpoint for private access
 
-For private network access (no internet traversal), create an interface
-VPC endpoint for Keyspaces using AWS PrivateLink.
-
-```bash
-# Create an interface VPC endpoint for Keyspaces
-VPCE_ID=$(aws ec2 create-vpc-endpoint \
-  --vpc-id vpc-aaa11122 \
-  --service-name com.amazonaws.us-east-1.cassandra \
-  --subnet-ids subnet-aaa111 subnet-bbb222 \
-  --security-group-ids sg-keyspaces-client \
-  --vpc-endpoint-type Interface \
-  --private-dns-enabled \
-  --query 'VpcEndpoints[0].VpcEndpointId' --output text)
-
-echo "VPC Endpoint: $VPCE_ID"
-```
-
-**Critical:** `--private-dns-enabled` is REQUIRED for the Cassandra
-driver to resolve the Keyspaces endpoint to the private IP. Without it,
-the driver resolves to the public IP and traffic traverses the internet.
-
-**Security group:** the VPC endpoint security group must allow inbound
-TCP 9142 from the application subnets.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Step 9 — VPC endpoint for private access".
+> Load when: creating the interface VPC endpoint — PrivateLink, --private-dns-enabled, security group TCP 9142.
 
 ## Step 10 — CloudWatch metrics and observability
 
-Keyspaces emits CloudWatch metrics automatically (no enable needed).
-Key metrics for monitoring and auto-scaling:
-
-| Metric | Description | Use case |
-|---|---|---|
-| `ConsumedReadCapacityUnits` | RUs consumed by reads | Capacity planning, auto-scaling trigger |
-| `ConsumedWriteCapacityUnits` | RUs consumed by writes | Capacity planning, auto-scaling trigger |
-| `ProvisionedReadCapacityUnits` | Configured read capacity | Provisioned mode monitoring |
-| `ProvisionedWriteCapacityUnits` | Configured write capacity | Provisioned mode monitoring |
-| `Storage` | Total table storage (bytes) | Cost monitoring |
-| `SystemErrors` | Server-side errors | Error monitoring |
-| `UserErrors` | Client-side errors (bad CQL) | Application debugging |
-| `ConnectionAttempts` | CQL connection attempts | Connectivity monitoring |
-| `SuccessfulRequestCount` | Successful CQL requests | Throughput monitoring |
-| `SuccessfulConnectionCount` | Established CQL connections | Pool monitoring |
-
-```bash
-# Monitor consumed write capacity (last hour)
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/Cassandra \
-  --metric-name ConsumedWriteCapacityUnits \
-  --dimensions Name=Keyspace,Value=my_app_keyspace Name=TableName,Value=user_events \
-  --start-time $(date -u -v-1H +%Y-%m-%dT%H:%M:%S) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
-  --period 300 \
-  --statistics Sum Average \
-  --region us-east-1
-```
+> **Moved verbatim** → [references/capacity-and-cost.md](references/capacity-and-cost.md) § "Step 10 — CloudWatch metrics and observability".
+> Load when: setting up observability — the CloudWatch metric table and get-metric-statistics examples.
 
 ## Step 11 — Auto-scaling for provisioned mode
 
-For provisioned capacity tables, auto-scaling adjusts capacity units
-based on utilization. Target tracking scales based on a target
-utilization percentage of consumed vs provisioned RUs.
-
-```bash
-# Enable auto-scaling on write capacity (target 70% utilization)
-aws application-autoscaling register-scalable-target \
-  --service-namespace cassandra \
-  --resource-id keyspace/my_app_keyspace/table/user_events \
-  --scalable-dimension cassandra:table:WriteCapacityUnits \
-  --min-capacity 100 \
-  --max-capacity 5000
-
-aws application-autoscaling put-scaling-policy \
-  --policy-name user-events-write-autoscaling \
-  --service-namespace cassandra \
-  --resource-id keyspace/my_app_keyspace/table/user_events \
-  --scalable-dimension cassandra:table:WriteCapacityUnits \
-  --policy-type TargetTrackingScaling \
-  --target-tracking-scaling-policy-configuration '{
-    "TargetValue": 70.0,
-    "PredefinedMetricSpecification": {
-      "PredefinedMetricType": "CassandraWriteCapacityUtilization"
-    },
-    "ScaleInCooldown": 300,
-    "ScaleOutCooldown": 60
-  }'
-
-# Repeat for read capacity (scalable-dimension: ReadCapacityUnits)
-```
-
-**Scale-in vs scale-out cooldowns:** scale-out (60s) is faster than
-scale-in (300s) to handle bursts quickly while avoiding flapping during
-traffic dips.
+> **Moved verbatim** → [references/capacity-and-cost.md](references/capacity-and-cost.md) § "Step 11 — Auto-scaling for provisioned mode".
+> Load when: enabling auto-scaling on provisioned tables — register-scalable-target and the target tracking policy.
 
 ## Step 12 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Client-side encryption support (2023-2024):** AWS published the
-  Amazon Keyspaces client-side encryption library, providing envelope
-  encryption via KMS for field-level encryption transparent to the
-  Keyspaces service.
-
-- **Auto-scaling improvements (2023-2024):** Enhanced auto-scaling for
-  provisioned tables with faster scale-out (60s cooldown) and more
-  responsive target tracking.
-
-- **VPC endpoint private DNS (2023-2024):** Private DNS for Keyspaces
-  VPC endpoints is now generally available, enabling seamless private
-  access without certificate changes.
-
-- **Schema management API (2024-2025):** The Keyspaces API now supports
-  full table schema management (create, update, delete) without
-  requiring CQL access, simplifying infrastructure-as-code workflows.
-
-- **Multi-region replication (2024-2025):** Keyspaces multi-region
-  replication (similar to DynamoDB Global Tables) became available in
-  select regions, enabling cross-region active-active deployments.
-
-- **Cost optimization for on-demand (2025-2026):** Tiered pricing for
-  on-demand capacity at high volumes, reducing per-RU cost for
-  workloads exceeding 1 billion RUs per month.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Step 12 — Recent features".
+> Load when: checking 2023-2026 feature availability — client-side encryption library, multi-region replication, tiered on-demand pricing.
 
 ## NEVER do these things
 
@@ -751,36 +456,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Table creation fails with "ValidationException"
-- The schema definition is malformed. Verify the partition key columns
-  match columns in `allColumns`. Verify column types are valid CQL
-  types. Verify clustering key `orderBy` is ASC or DESC.
+> **Moved verbatim** → [references/error-handling.md](references/error-handling.md) § "Error handling".
+> Load when: a create/connect/restore call fails — ValidationException, SSL handshake, SigV4 auth, throttling, VPC endpoint, PITR restore.
 
-### Connection fails with "SSL handshake error"
-- Port mismatch: Keyspaces requires port 9142 (not 9042). Verify the
-  driver connects to `cassandra.<region>.amazonaws.com:9142` with SSL
-  enabled and the AmazonRootCA1.pem certificate.
+## References (load on demand)
 
-### Connection fails with "Authentication failed"
-- SigV4 authentication error: verify IAM credentials are valid and the
-  IAM policy includes `cassandra:Select` (for reads) and
-  `cassandra:Modify` (for writes) on the keyspace/table resource.
-
-### Throttling (WriteTimeout/ReadTimeout)
-- Provisioned capacity is too low. Enable auto-scaling (Step 11) or
-  switch to on-demand capacity. Monitor `ConsumedWriteCapacityUnits` and
-  `ConsumedReadCapacityUnits` to right-size.
-
-### VPC endpoint connection fails
-- Private DNS not enabled: verify `--private-dns-enabled` on the VPC
-  endpoint. Security group: verify inbound TCP 9142 from the
-  application subnets. Subnet: verify the endpoint is in the correct
-  subnets.
-
-### PITR restore fails
-- PITR was not enabled on the table. Verify PITR status with
-  `get-table`. PITR must have been enabled for at least 5 minutes
-  before the restore point.
+- [references/schema-and-encryption.md](references/schema-and-encryption.md) — partition-key cardinality and clustering-key heuristics, TTL, at-rest and client-side KMS encryption, Cassandra driver + SigV4 connectivity (moved verbatim; existing deep reference)
+- [references/capacity-and-cost.md](references/capacity-and-cost.md) — on-demand vs provisioned RU crossover heuristic, CloudWatch metrics, provisioned auto-scaling (moved verbatim; existing deep reference)
+- [references/advanced-patterns.md](references/advanced-patterns.md) — VPC endpoint private access and recent AWS features (2023-2026)
+- [references/error-handling.md](references/error-handling.md) — ValidationException, SSL/SigV4 connection failures, throttling, VPC endpoint failures, PITR restore failures
 
 ## Domain
 

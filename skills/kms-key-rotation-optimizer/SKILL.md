@@ -77,29 +77,8 @@ priority order. Always pairs the recommendation with exact CLI commands.
 
 ## Mindset
 
-KMS cost optimization is an inventory and API-call-volume exercise. The
-goal is to eliminate keys that no longer encrypt or decrypt data, and to
-consolidate keys where fine-grained separation is unnecessary — not to
-weaken encryption posture.
-
-Four principles guide every recommendation:
-
-- **Keys are the fixed cost.** Every customer-managed key bills $1/month
-  regardless of API call volume. The highest-leverage action is inventory
-  reduction: delete unused keys and consolidate low-usage keys where
-  access policy boundaries allow.
-- **API calls are the variable cost.** KMS charges $0.03 per 10,000
-  requests for customer-managed keys. High-volume Decrypt/Encrypt
-  patterns (e.g., per-record encryption) drive cost. AWS managed keys
-  include a free tier of requests.
-- **Rotation is free, not a cost lever.** Enabling rotation has no
-  billing impact. The optimization is about ensuring rotation is ENABLED
-  for compliance, not about reducing rotation cost.
-- **Grants accumulate silently.** Each grant has a lifecycle. Expired
-  grants that are not retired remain in the key's grant list, adding
-  latency to authorization checks and complicating audits. Grant cleanup
-  is a hygiene issue, not a direct cost issue — but it prevents key
-  bloat that leads to duplicate key creation.
+Full mindset and four-principles framing moved verbatim to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Quick reference — verdict thresholds
 
@@ -115,24 +94,6 @@ Four principles guide every recommendation:
 | All dimensions verified AND a change was applied and confirmed this session | **OPTIMIZED** | Emit post-state verification |
 | All keys active, rotation enabled, grants clean, no orphaned replicas | **ALREADY_OPTIMAL** | None — continue monitoring |
 
-## Configuration dependency graph
-
-```
-KMS Key ─┬─ Rotation ──── Automatic (annual, free, transparent)
-         │                Manual (alias reassignment, new key)
-         ├─ Grants ────── Active grants (authorization delegation)
-         │                Expired grants (should be retired)
-         ├─ Alias ─────── Stable reference (survives rotation)
-         ├─ KeyPolicy ─── Access control (principal-based)
-         ├─ MultiRegion ─ Primary key ($1/month)
-         │                Replica keys ($1/month per region)
-         ├─ Tags ──────── Cost allocation tracking
-         └─ Deletion ──── PendingWindow (7-30 days)
-                          Disabled (billing stops after deletion)
-```
-
-Each edge in this graph is a potential cost or hygiene lever. Walk every
-node before emitting a verdict.
 
 ## Pre-flight: data gate (run before any optimization decision)
 
@@ -141,13 +102,8 @@ these metrics before any recommendation. Full CLI sequences are in
 `references/kms-pricing-and-lifecycle.md`.
 
 **Required data sources** (summarized — see reference for full CLI):
-1. Key inventory: `aws kms list-keys` + `aws kms describe-key` per key
-2. Rotation status: `aws kms get-key-rotation-status`
-3. Alias inventory: `aws kms list-aliases`
-4. Grant inventory: `aws kms list-grants --key-id <id>`
-5. Resource tags: `aws kms list-resource-tags --key-id <id>`
-6. API call volume (14-30 day): `aws cloudtrail lookup-events` (Decrypt, Encrypt, GenerateDataKey)
-7. Cost Explorer breakdown: `aws ce get-cost-and-usage --filter "Service=KeyManagementService"`
+Numbered data-source CLI list moved verbatim to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### Data-quality short-circuits
 
@@ -166,53 +122,8 @@ these metrics before any recommendation. Full CLI sequences are in
 
 ### Step 0: Non-obvious behaviours that change the recommendation
 
-These operational gotchas route a recommendation away from the obvious
-choice:
-
-- **Automatic rotation preserves the key ARN.** When annual rotation
-  fires, AWS generates new backing key material under the SAME key ARN.
-  All aliases, key policies, grants, and application references continue
-  to work. No code changes needed. This is why rotation is free and
-  transparent.
-- **Manual rotation creates a NEW key.** Manual rotation means creating
-  a new key, updating the alias to point at it, and eventually deleting
-  the old key. This is necessary only for custom rotation cadences or
-  when key material must change immediately. It costs $1/month for each
-  key during the overlap period.
-- **Cross-account grant tokens are ephemeral.** When a principal in
-  account B uses a key in account A, a grant is created with a grant
-  token. The grant token must be passed with the API call. If the grant
-  expires or is revoked, the cross-account call fails immediately. Grant
-  lifecycle management is critical for cross-account encryption.
-- **Scheduled key deletion has a 7-30 day window.** After `schedule-key-
-  deletion`, the key enters `PendingDeletion` state and stops accepting
-  Decrypt/Encrypt requests. The $1/month billing continues until the
-  window expires and the key is permanently deleted. The minimum window
-  is 7 days; maximum is 30 days (120 days extended via support case).
-- **Deleting a key that encrypts active data makes that data permanently
-  unrecoverable.** Unlike most AWS resources, KMS key deletion is
-  IRREVERSIBLE. Data encrypted under the key can never be decrypted.
-  Always verify no encrypted resources depend on the key before deletion.
-- **Multi-region keys have independent replica lifecycles.** Each replica
-  key bills $1/month per region. A replica can be deleted independently
-  of the primary key. Deleting a replica does not affect the primary or
-  other replicas.
-- **Grants do not expire automatically.** A grant with no `Constraints`
-  or `ExpiryDate` persists until explicitly retired. Long-lived grants
-  accumulate and complicate key policy audits. Retire grants when the
-  delegated permission is no longer needed.
-- **AWS managed keys rotate annually by default.** You cannot disable
-  rotation on AWS managed keys. They are free ($0/month) and include a
-  generous free request tier. Prefer AWS managed keys when fine-grained
-  key separation is not required.
-- **The $1/month per key is prorated.** A key created mid-month and
-  deleted mid-month still incurs partial charges. The billing is not
-  per-day but per-month with proration for partial months.
-- **GenerateDataKey calls are billed as requests even though the data
-  key is generated client-side.** Each `GenerateDataKey` API call counts
-  as one request at $0.03/10K for customer-managed keys. High-frequency
-  envelope encryption patterns should cache data keys to reduce API
-  volume.
+The ten non-obvious behaviours moved verbatim to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 1: Key inventory audit (the #1 lever)
 
@@ -220,30 +131,12 @@ Every customer-managed key bills $1/month regardless of usage volume.
 Key reduction is the highest-leverage cost action.
 
 **Unused key detection:**
-```
-For each customer-managed key:
-  1. CloudTrail lookup-events for Decrypt, Encrypt, GenerateDataKey (30 days)
-  2. If total events == 0 → candidate for deletion
-  3. Cross-check resource associations:
-     - S3 bucket default encryption configs
-     - EBS volume encryption
-     - RDS encryption at rest
-     - Secrets Manager
-     - Lambda environment encryption
-  4. If no resource associations AND 0 API calls → schedule deletion
-```
+Unused-key detection procedure moved verbatim to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Key consolidation:**
-```
-For keys serving the same application or environment:
-  1. Identify keys with < 100 API calls/month
-  2. Check if key policies are identical or overlapping
-  3. If two keys serve the same app with the same access pattern:
-     → Consolidate into a single key (update resource configs)
-     → Re-encrypt data under the surviving key (optional)
-     → Schedule deletion of the redundant key
-     → Saving: $1/month per eliminated key
-```
+Key consolidation procedure moved verbatim to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Decision gate:**
 
@@ -287,17 +180,8 @@ Grants delegate specific permissions on a key to principals. Expired or
 stale grants accumulate and should be retired.
 
 **Grant audit:**
-```
-For each key with grants:
-  1. aws kms list-grants --key-id <id>
-  2. For each grant:
-     - Check ExpiryDate (if past → retire)
-     - Check GranteePrincipal (if deleted IAM role → retire)
-     - Check last CloudTrail usage (if no Decrypt/Encrypt under the
-       grant in 30 days → candidate for retirement)
-  3. Retire expired grants:
-     aws kms retire-grant --key-id <id> --grant-id <grant-id>
-```
+Grant audit procedure moved verbatim to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Grant hygiene rules:**
 - Grants do NOT auto-expire unless `ExpiryDate` is set at creation.
@@ -312,14 +196,8 @@ Aliases provide a stable name that survives key rotation and replacement.
 Applications should reference aliases, not key IDs or ARNs.
 
 **Alias audit:**
-```
-For each key referenced by applications:
-  1. Check if the key has an alias (aws kms list-aliases --key-id <id>)
-  2. If no alias → create one:
-     aws kms create-alias --alias-name alias/<app-name> --target-key-id <id>
-  3. Audit application code for hardcoded key ARNs or IDs
-  4. Recommend alias-based references everywhere
-```
+Alias audit procedure moved verbatim to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Alias optimization:**
 - An alias is free. There is no cost benefit to reducing aliases.
@@ -337,16 +215,8 @@ cost optimization focuses on ensuring the key is not duplicated across
 accounts unnecessarily.
 
 **Cross-account audit:**
-```
-For each customer-managed key:
-  1. Check key policy for cross-account principals
-  2. If cross-account access exists:
-     - Verify grants are active and not expired
-     - Verify the consuming account actually uses the key
-     - If the consuming account has its own duplicate key:
-       → Consolidate (use one key cross-account OR let each account
-         use its own AWS-managed key)
-```
+Cross-account audit procedure moved verbatim to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Decision: shared key vs per-account keys:**
 - A shared cross-account key costs $1/month total.
@@ -360,28 +230,12 @@ Multi-region keys have a primary key and optional replica keys. Each
 replica bills $1/month per region.
 
 **Multi-region audit:**
-```
-For each multi-region key:
-  1. List all replicas (describe-key, filter MultiRegion=true)
-  2. For each replica:
-     - CloudTrail lookup-events in the replica's region (30 days)
-     - If 0 API calls → delete the replica
-  3. If replicas exist only for DR but DR has never been tested:
-     - Evaluate whether the replica is justified by compliance
-     - If not, delete the replica and recreate during DR drill
-```
+Multi-region audit procedure moved verbatim to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Multi-region cost:**
-```
-Primary key:       $1/month
-Each replica:      $1/month per region
-API calls:         $0.03 per 10K per region (billed in-region)
-
-A 5-region multi-region key with no DR traffic costs $6/month.
-If only us-east-1 and eu-west-1 have real traffic:
-  → Delete replicas in the 3 unused regions
-  → Saving: $3/month ($36/year)
-```
+Multi-region cost math moved verbatim to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### Step 7: Deletion window management
 
@@ -397,14 +251,8 @@ permanently removed.
 | Key is in PendingDeletion, operator wants to accelerate | Reduce to 7 days | `aws kms schedule-key-deletion --key-id <id> --pending-window-in-days 7` |
 
 **PendingDeletion audit:**
-```
-For keys in PendingDeletion state:
-  1. Check remaining days until deletion
-  2. If billing continues (it does until permanent deletion):
-     → No optimization possible; wait for window to expire
-  3. If the key was scheduled by mistake:
-     → Cancel deletion: aws kms cancel-key-deletion --key-id <id>
-```
+PendingDeletion audit procedure moved verbatim to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### Step 8: Impact estimation
 
@@ -435,29 +283,8 @@ every data-gate check.
 
 ## Output format
 
-```text
-TARGET: <key-id or key-alias>
-VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-REASON: <1-2 sentences naming the recommendation and the supporting data>
-RECOMMENDATION:
-  Current: <key/config description>
-  Proposed: <key/config description>
-  Dimensions changed: <inventory | rotation | grants | aliases | cross_account | multi_region | deletion>
-  Dimensions checked: <list ALL seven, each ✓ (no finding) or → (finding)>
-  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
-ESTIMATED_SAVINGS:
-  Current monthly: $<amount>
-  Projected monthly: $<amount>
-  Monthly saving: $<amount>
-  Annual saving: $<amount>
-  Assumptions: <list (key count, API volume, pricing region, etc.)>
-REMEDIATION_STEPS:
-  1. <specific action with CLI command>
-  2. <verification step>
-CONFIRM: Before executing any state-changing CLI, emit and await operator
-  approval: "CONFIRM: About to <action> on <target> in <region>. Proceed?
-  (yes/no)"
-```
+Template block moved verbatim to [references/worked-examples.md](references/worked-examples.md) —
+the STRICT output contract below is authoritative.
 
 Full worked examples are in `references/worked-examples.md`.
 
@@ -576,63 +403,6 @@ CONFIRM: About to retire 3 grants, enable rotation, and schedule
   $1.00 ($12.00/year). Key deletion is IRREVERSIBLE. Proceed? (yes/no)
 ```
 
-### Worked example — customer-managed key: rotation enablement + unused replica deletion
-
-This example covers the rotation-enablement dimension specifically: a
-customer-managed multi-region key with rotation `Disabled` and an unused
-eu-west-1 replica. Rotation enablement is free (same key ARN); the
-savings come from the replica deletion. Both actions are paired in a
-single remediation plan.
-
-```text
-TARGET: alias/app-data-encryption
-VERDICT: FURTHER_OPTIMIZATION_AVAILABLE
-REASON: Customer-managed multi-region key with rotation Disabled and an
-  unused eu-west-1 replica (0 API calls in 30 days via CloudTrail).
-  Primary key in us-east-1 has 3,200 Decrypt/GenerateDataKey calls in
-  30 days (active workload). Rotation enablement is free and transparent
-  (same key ARN, compliance improvement). Replica deletion saves
-  $1/month.
-RECOMMENDATION:
-  Current: 1 primary (us-east-1) + 1 replica (eu-west-1), rotation
-    Disabled, 4 active grants, 3,200 API calls/30 days (us-east-1 only)
-  Proposed: 1 primary only, rotation Enabled (annual, automatic)
-  Dimensions changed: rotation (enable) + multi_region (delete replica)
-  Dimensions checked: inventory ✓ (active, 3,200 calls)  rotation → (enable)
-    grants ✓ (4 active, 0 expired)  aliases ✓ (alias/app-data-encryption)
-    cross_account ✓ (none)  multi_region → (delete eu-west-1 replica)
-    deletion ✓ (not applicable)
-  Confidence: HIGH — CloudTrail confirms zero replica usage; rotation
-    has no regulatory prohibition; automatic rotation preserves key ARN.
-ESTIMATED_SAVINGS:
-  Current monthly: $2.01
-    key: 2 × $1.00 = $2.00 (primary + replica)
-    api: 3,200 calls × $0.03/10K = $0.01
-  Projected monthly: $1.01
-    key: 1 × $1.00 = $1.00 (primary only, rotation is free)
-    api: 3,200 calls × $0.03/10K = $0.01
-  Monthly saving: $1.00
-    ($2.01 − $1.01 = $1.00 ✓)
-  Annual saving: $12.00
-REMEDIATION_STEPS:
-  1. Enable automatic annual rotation on the primary key:
-     aws kms enable-key-rotation --key-id alias/app-data-encryption
-  2. Verify rotation status changed to Enabled:
-     aws kms get-key-rotation-status --key-id alias/app-data-encryption
-  3. Confirm key ARN is unchanged (rotation is transparent):
-     aws kms describe-key --key-id alias/app-data-encryption \
-       --query 'KeyMetadata.Arn'
-  4. Verify no encrypted resources in eu-west-1 depend on the replica:
-     aws ec2 describe-volumes --region eu-west-1 \
-       --query 'Volumes[?KmsKeyId==`<replica-key-id>`]'
-  5. Delete the unused eu-west-1 replica (7-day window):
-     aws kms schedule-key-deletion --key-id <replica-key-id> \
-       --pending-window-in-days 7 --region eu-west-1
-CONFIRM: About to enable rotation on alias/app-data-encryption and
-  delete the unused eu-west-1 replica (7-day window). Monthly saving
-  $1.00 ($12.00/year). Replica deletion is IRREVERSIBLE. Proceed?
-  (yes/no)
-```
 
 **Self-check before emit:**
 - [ ] `Current monthly − Projected monthly == Monthly saving` (2 decimals)?
@@ -684,38 +454,6 @@ REASON, not as a dollar saving.
 
 Extended anti-patterns in `references/kms-pricing-and-lifecycle.md`.
 
-## Expert heuristic (domain expert rules of thumb)
-
-Three rules that a KMS cost expert applies instinctively:
-
-1. **Automatic rotation transparency (same key ARN, new backing key).**
-   When annual automatic rotation fires on a customer-managed key, AWS
-   generates new backing key material under the SAME key ARN. Every
-   alias, policy, grant, and application reference continues to work
-   without any change. This is fundamentally different from manual
-   rotation, which creates a new key ARN. The expert takeaway: always
-   prefer automatic rotation — it is free, transparent, and requires
-   zero code changes. Manual rotation is only for custom cadences or
-   compromise response.
-
-2. **Cross-account grant token lifecycle.** When account B uses a key in
-   account A, a grant is created with a unique grant token. The grant
-   token must be passed with each API call. Grants do NOT auto-expire
-   unless an ExpiryDate is set at creation. This means cross-account
-   grants accumulate silently. The expert practice: always set
-   ExpiryDate on cross-account grants and implement a grant-refresh
-   mechanism in the consuming account. Never create open-ended grants
-   for cross-account access.
-
-3. **Scheduled key deletion 7-30 day window.** After scheduling deletion,
-   the key enters PendingDeletion and stops accepting API requests, but
-   the $1/month billing continues until the window expires and the key
-   is permanently deleted. The minimum is 7 days, maximum is 30 days
-   standard (120 days via support case). The expert practice: for keys
-   with no encrypted data, use 7 days to minimize billing. For keys that
-   may encrypt historical data, use 30 days as a safety buffer for
-   discovering missed associations. Never use the extended 120-day window
-   unless regulatory mandates require it.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
@@ -746,26 +484,6 @@ Three rules that a KMS cost expert applies instinctively:
   Verify each batch before proceeding. Abort if any key is found to
   encrypt active data.
 
-## Recent AWS features (2024-2026)
-
-- **Automatic key rotation for customer-managed keys (2022-2024 GA):**
-  Annual automatic rotation is available for all symmetric customer-
-  managed keys. Rotation is transparent — same key ARN, new backing key.
-  Enabled via `aws kms enable-key-rotation`.
-- **Key rotation transparency (2024-2025):** AWS published detailed
-  documentation confirming that automatic rotation preserves all key
-  metadata (ARN, alias, policy, grants). No application changes needed.
-- **Multi-region key replicas (2024):** GA support for multi-region
-  keys. Each replica is independently billable at $1/month per region.
-- **Grant limits increase (2024-2025):** Per-key grant limit increased
-  to ~2500 grants. Grant bloat still degrades evaluation latency.
-- **Cost Optimization Hub KMS recommendations (2025-2026):** Automated
-  detection of unused customer-managed keys. Use as input to this skill.
-- **CloudTrail KMS event filtering (2024):** Enhanced CloudTrail
-  lookup-events supports filtering by KMS event name (Decrypt, Encrypt,
-  GenerateDataKey) for efficient API call volume analysis.
-- **KMS key tags for cost allocation (2024):** Tags on KMS keys flow
-  through to Cost Explorer for per-application cost attribution.
 
 ## References
 
@@ -775,6 +493,13 @@ Three rules that a KMS cost expert applies instinctively:
 - `references/worked-examples.md` — full worked examples (unused key
   deletion, grant cleanup, multi-region replica removal, rotation
   enablement, already-optimal, end-to-end walkthrough).
+
+## References (load on demand)
+
+- [references/kms-pricing-and-lifecycle.md](references/kms-pricing-and-lifecycle.md) — pricing tables, key types, rotation configuration, grant lifecycle, multi-region setup, deletion window management, CLI reference, anti-pattern catalog.
+- [references/worked-examples.md](references/worked-examples.md) — full worked examples (unused key deletion, grant cleanup, multi-region replica removal, rotation enablement, already-optimal, end-to-end walkthrough); now also the secondary worked example (rotation enablement + unused replica deletion) and the Output format template moved from SKILL.md.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Mindset framing, configuration dependency graph, Step 0 non-obvious behaviours, expert heuristics, and Recent AWS features moved from SKILL.md.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight data-source CLI list and the Step 1-7 audit/consolidation/cost/deletion procedures moved from SKILL.md.
 
 ## Domain
 

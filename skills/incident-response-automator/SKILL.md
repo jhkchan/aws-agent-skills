@@ -66,31 +66,7 @@ blast radius — a fast wrong action is worse than a slow right one. The
 workflow's job is to reduce attacker dwell time; the safety gate's job is
 to ensure the automation does not amplify the damage.
 
-Three facts shape every IR automation decision:
-
-- **Detection-to-action latency is the metric that matters.** GuardDuty
-  finds an EC2 instance probing internal ports. The mean time to
-  containment (MTTC) is the time between GuardDuty emitting the finding
-  and the instance being moved to a quarantine security group. Manual MTTC
-  is hours (analyst sees alert, investigates, runs CLI). Automated MTTC is
-  seconds. But automated MTTC is irrelevant if the workflow also quarantines
-  the CEO's laptop during a false positive. Speed requires precision.
-
-- **Containment is reversible; destruction is not.** Moving an EC2 instance
-  to a quarantine SG is reversible (move it back). Disabling an IAM access
-  key is reversible (re-enable). Deleting the IAM user is NOT reversible
-  (history is lost, forensics are harder). Auto-deletion of any resource
-  during incident response is forbidden — capture state, contain, and
-  escalate to a human for the destructive action.
-
-- **The kill-switch is more important than the trigger.** A workflow that
-  fires on every GuardDuty finding of severity >= 7 is fine if it is
-  correctly scoped. The same workflow without a kill-switch is an outage
-  waiting to happen — a misconfigured detector, a false-positive storm, or
-  a planned red-team exercise can trigger hundreds of containment actions
-  per minute. The kill-switch MUST be a one-command disable: a feature
-  flag on a Parameter Store value, a kill-switch Lambda that the EventBridge
-  rule checks first, or a Step Functions `Choice` state that reads a flag.
+→ Extended Mindset rationale moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Pre-flight: IR spec gate (run before generation)
 
@@ -123,15 +99,7 @@ REMEDIATION: Provide both finding_source and response_scope. Example:
   finding_source=guardduty, response_scope=isolate, severity_threshold=7.0.
 ```
 
-**Live-account pre-flight checks (skip for offline authoring):**
-1. Verify GuardDuty detector is enabled: `aws guardduty list-detectors --query 'DetectorIds'`.
-2. Verify Security Hub is enabled: `aws securityhub get-enabled-standards`.
-3. Verify EventBridge and Step Functions IAM roles exist (or are in the
-   template to be created).
-4. Verify SSM Automation service-linked role exists:
-   `aws iam get-role --role-name AWSServiceRoleForSSM`.
-5. Verify Incident Manager is available in the region (not all regions
-   support it — check the AWS regional services list).
+→ Live-account pre-flight command listing moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ## Decision tree — workflow selection
 
@@ -156,87 +124,19 @@ START
   └─ (unrecognized scope) ─────────────────────► MANUAL_STEP_REQUIRED with mapping hint
 ```
 
-**Orchestration surface selection:**
-- **Lambda-only:** for single-action responses that complete in <15 minutes
-  (Lambda max). Example: disable one IAM key, block one IP in WAF.
-- **Step Functions:** for multi-phase, parallel, or human-approval-gated
-  responses. Example: EC2 isolation + EBS snapshot + SNS notification +
-  wait for approval + recovery. Step Functions supports up to 1-year
-  executions.
-- **SSM Automation:** for AWS-curated playbooks with built-in error
-  handling. Use managed documents when available; write custom when not.
-- **Incident Manager:** when human coordination is core to the response
-  (chat channel, on-call page, post-incident timeline). Always layer on
-  top of an automated workflow — Incident Manager coordinates humans, it
-  does not contain resources.
+→ Orchestration-surface selection notes moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Step 0: Expert knowledge — non-obvious IR behaviors
 
-These behaviors change the generated workflow if ignored:
-
-- **GuardDuty finding severity is on a 0-10 scale; Security Hub is 0-100.** A GuardDuty severity 7.0 corresponds to Security Hub severity 70. EventBridge event patterns must use the correct scale — a pattern filtering `Severity: [ { Numeric: [ ">=", 7 ] } ]` works for GuardDuty but catches nothing from Security Hub (which uses 0-100). Always check `source` field: `aws.guardduty` vs `aws.securityhub`.
-
-- **EC2 quarantine via security group works only if the instance is in a VPC with the quarantine SG pre-provisioned.** `AWS-IsolateEC2Instance` swaps the instance's SGs to a pre-created quarantine SG ID. If the quarantine SG does not exist, the automation fails silently (the SSM document errors but the finding remains). Pre-provision the quarantine SG in every VPC where IR automation runs.
-
-- **`update-access-key --status Inactive` revokes the key but does NOT invalidate active sessions.** The IAM user's existing STS sessions continue until they expire (up to 12 hours by default, up to 36 hours with role chaining). To kill active sessions, also call `aws iam put-user-policy` with an explicit Deny on all actions — this forces session re-evaluation and effectively ends them within minutes. SSM document `AWS-RevokeSession` automates this.
-
-- **EBS snapshots are point-in-time, not live.** A snapshot of a running EC2 instance's EBS volume captures the disk state at the moment the snapshot starts. If the attacker is currently writing to disk, those writes may or may not be captured. For forensic integrity, snapshot FIRST (capture state), then isolate (stop writes). Reversing the order loses evidence.
-
-- **Memory capture requires SSM Run Command, not EBS snapshot.** EBS captures disk; it does not capture RAM. Live malware often lives only in memory (fileless). Use `aws ssm send-command` with `AWS-RunPowerShellScript` (Windows) or a custom document (Linux) to dump memory to an S3 bucket BEFORE isolating the instance.
-
-- **GuardDuty Runtime Monitoring (ECS/EKS) (2024-2025) detects container-level threats.** Findings have a `Resource.EksClusterDetails` or `Resource.EcsClusterDetails` block. Containment for container findings is different from EC2 — you cannot "quarantine SG" a running task. The correct containment for ECS is task stop + task definition revert; for EKS it is pod eviction + network policy. Verify the finding type before generating containment actions.
-
-- **EventBridge event patterns support `exists` and `prefix` filters.** A common mistake: filtering only on `detail.type` and missing the `detail.severity` field. Use a `Numeric` comparison on severity to avoid triggering on informational findings. Always include `detail.service.serviceName` to scope to one detector (multi-account aggregations have multiple detectors).
-
-- **Step Functions `Wait` state for human approval can run up to 1 year.** But the Step Functions console shows "Running" the entire time, cluttering the dashboard. Use a `Task` state with `Resource: arn:aws:states:::sqs:sendMessage.waitForTaskToken` for a callback pattern — the workflow pauses until a human approves via an SQS message, instead of polling on a fixed timer.
-
-- **Lambda execution role for IR actions needs cross-service IAM.** A Lambda that calls `ec2:ModifyInstanceAttribute` AND `iam:UpdateAccessKey` AND `sns:Publish` needs all three permissions. Operators often grant only one and the workflow fails on the second action. Use the IAM Policy Simulator with the specific action sequence to verify.
-
-- **SNS subscription must be confirmed before notifications flow.** A new SNS topic with an email or HTTPS subscription does not deliver until the endpoint confirms. A common IR automation failure: incidents happen, SNS fires, but nobody receives the page because the subscription was never confirmed. Always send a test message after creating the topic.
-
-- **Slack/Teams notifications require an incoming webhook URL or a Lambda with the Slack API token.** SNS does not natively post to Slack. The pattern: SNS topic -> Lambda subscription -> Lambda formats and POSTs to the Slack/Teams webhook. Store the webhook URL in Parameter Store (or Secrets Manager for tokens) — never hardcode in the Lambda.
-
-- **AWS Health events for security are NOT the same as GuardDuty findings.** Health events cover account-level issues (compromised root credentials, exposed access keys detected by AWS). They do NOT cover resource-level threats (malicious EC2, anomalous API calls). Use Health for account-level incidents; GuardDuty for resource-level.
-
-- **`aws ssm-incidents start-incident` creates an incident record but does NOT take containment actions.** Incident Manager coordinates the response (chat channel, timeline, runbook steps). To actually contain, wire Incident Manager to a Step Functions execution or SSM Automation via the response plan's `action` members.
-
-- **CloudTrail logs delivery latency is 3-15 minutes.** A workflow that triggers on a CloudTrail API call via EventBridge has built-in 3-15 min latency. For near-real-time detection, use GuardDuty / Security Hub / CloudWatch alarms — these have their own delivery paths (GuardDuty ~5 min, Security Hub ~5-30 min).
-
-- **Cross-account containment requires a hub-and-spoke IAM role.** A Lambda in the security (audit) account cannot directly call `ec2:ModifyInstanceAttribute` in a member account. The pattern: deploy an `IncidentResponseRole` in every member account with a trust policy allowing the security account's Lambda role to assume it. The Lambda assumes the member role, then runs the containment action.
-
-- **SSM Automation documents have a hard 1-hour default timeout per step.** Long-running steps (large EBS snapshot, slow memory dump) silently fail at 1 hour. Override with `"TimeoutSeconds": 3600` maximum, or split into chunks. For memory dumps >1h, use multiple snapshots or a custom SSM document with chunked execution.
-
-- **`aws ssm create-association` on the Quarantine SG association is NOT instant.** SSM association execution has its own schedule (rate-based or cron). For immediate containment, use `aws ssm start-automation-execution` (one-shot) instead of `create-association` (scheduled).
-
-- **GuardDuty finding `id` is unique per finding, but `service.action.additionalInfo` contains the API calls that triggered it.** The finding ID alone is not enough context — include the full `service.action` block in the IR ticket / Slack message so responders know what happened.
+→ Step-0 expert-knowledge deep dive moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Detection sources
 
 ### GuardDuty (preferred for resource-level threats)
 
-```bash
-# Verify detector is enabled
-aws guardduty list-detectors --query 'DetectorIds'
+→ GuardDuty detector/filter CLI commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
-# Create a filter for high-severity findings
-aws guardduty create-filter \
-  --detector-id <id> \
-  --name high-severity-only \
-  --finding-criteria '{"Criterion": {"severity": {"Gte": 7}}}'
-```
-
-**EventBridge event pattern for GuardDuty severity >= 7:**
-
-```json
-{
-  "source": ["aws.guardduty"],
-  "detail-type": ["GuardDuty Finding"],
-  "detail": {
-    "severity": [{"numeric": [">=", 7]}],
-    "service.serviceName": ["guardduty"]
-  }
-}
-```
+→ GuardDuty EventBridge event pattern moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 **Finding types worth automating on:**
 - `UnauthorizedAccess:EC2/SSHBruteForce` — auto-block source IP in WAF/NACL.
@@ -248,22 +148,7 @@ aws guardduty create-filter \
 
 ### Security Hub (preferred for aggregated multi-detector findings)
 
-```json
-{
-  "source": ["aws.securityhub"],
-  "detail-type": ["Security Hub Findings - Imported"],
-  "detail": {
-    "findings": {
-      "Severity": {
-        "Label": ["CRITICAL", "HIGH"]
-      },
-      "Types": [{
-        "prefix": ["TTPs/"]
-      }]
-    }
-  }
-}
-```
+→ Security Hub EventBridge event pattern moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 **Custom actions:** Security Hub supports custom actions triggered from
 the console or API. Wire a custom action to an EventBridge rule for
@@ -271,16 +156,7 @@ analyst-initiated containment (no auto-trigger).
 
 ### CloudWatch alarms
 
-```json
-{
-  "source": ["aws.cloudwatch"],
-  "detail-type": ["CloudWatch Alarm State Change"],
-  "detail": {
-    "stateName": ["ALARM"],
-    "previousState": { "value": ["OK"] }
-  }
-}
-```
+→ CloudWatch alarm EventBridge event pattern moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 Use for threshold-based detection: anomalous API call volume, unusual
 egress traffic, spike in failed logins.
@@ -293,16 +169,7 @@ Hub finding type: a custom event from a Lambda or ECS task indicating
 
 ### AWS Health events
 
-```json
-{
-  "source": ["aws.health"],
-  "detail-type": ["AWS Health Event"],
-  "detail": {
-    "service": ["iam"],
-    "eventTypeCategory": ["issue", "accountNotification"]
-  }
-}
-```
+→ AWS Health EventBridge event pattern moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 Use for AWS-detected account-level incidents (exposed access keys,
 compromised root credentials).
@@ -311,378 +178,37 @@ compromised root credentials).
 
 ### 1. Isolate compromised resource
 
-**EC2 instance quarantine via security group:**
-
-```bash
-# Pre-provision the quarantine SG (one-time per VPC)
-QUARANTINE_SG=$(aws ec2 create-security-group \
-  --group-name quarantine-sg \
-  --description "Isolated instances under investigation - no inbound, no outbound" \
-  --vpc-id <vpc-id> --query 'GroupId' --output text)
-
-# Strip ALL inbound and outbound rules (deny-all)
-aws ec2 revoke-security-group-ingress --group-id $QUARANTINE_SG --ip-permissions $(...)
-aws ec2 revoke-security-group-egress --group-id $QUARANTINE_SG --ip-permissions [...]
-
-# Add a single deny-all egress (SG default is allow-all-egress)
-aws ec2 authorize-security-group-egress \
-  --group-id $QUARANTINE_SG \
-  --ip-permissions '[{"IpProtocol":"-1","IpRanges":[{"CidrIp":"0.0.0.0/0"}]}]'
-
-# Wait, the above ADDS allow-all. Revoke it instead:
-aws ec2 revoke-security-group-egress --group-id $QUARANTINE_SG \
-  --ip-permissions '[{"IpProtocol":"-1","IpRanges":[{"CidrIp":"0.0.0.0/0"}]}]'
-# Now the SG has NO egress rules - effectively a deny-all.
-```
-
-**OR use the SSM managed document:**
-
-```bash
-aws ssm start-automation-execution \
-  --document-name AWS-IsolateEC2Instance \
-  --document-version 1 \
-  --parameters "InstanceId=i-0abc12345,SubnetId=subnet-xxx"
-```
-
-`AWS-IsolateEC2Instance` moves the instance to a quarantine VPC subnet
-where it can be investigated but cannot reach the internet or other
-internal resources.
-
-**IAM credential revocation:**
-
-```bash
-# Deactivate the access key
-aws iam update-access-key \
-  --user-name <user> \
-  --access-key-id <AKIA...> \
-  --status Inactive
-
-# Revoke active sessions (forces re-auth, killing existing STS sessions)
-aws iam put-user-policy \
-  --user-name <user> \
-  --policy-name RevokeSessions \
-  --policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [{
-      "Effect": "Deny",
-      "Action": "*",
-      "Resource": "*"
-    }]
-  }'
-
-# OR use the SSM managed document (one-shot):
-aws ssm start-automation-execution \
-  --document-name AWS-RevokeSession \
-  --parameters "RoleName=<role>"
-```
-
-**EKS pod isolation (2024-2025 — Runtime Monitoring):**
-
-EKS pods cannot be "isolated via SG" directly. Use a network policy to
-deny all egress from the compromised pod, or evict the pod and revert
-the deployment. Calico or Cilium network policies provide the deny-all
-mechanism.
+→ Response-pattern 1 implementation commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### 2. Forensic preservation
 
-**EBS snapshot for disk forensics:**
-
-```bash
-# Snapshot ALL volumes attached to the instance (not just root)
-VOLUME_IDS=$(aws ec2 describe-instances --instance-ids i-0abc12345 \
-  --query 'Reservations[0].Instances[0].BlockDeviceMappings[*].Ebs.VolumeId' \
-  --output text)
-
-for VOL in $VOLUME_IDS; do
-  aws ec2 create-snapshot \
-    --volume-id $VOL \
-    --description "Forensic snapshot $(date -u +%Y-%m-%dT%H:%M:%SZ) - $VOL" \
-    --tag-specifications "ResourceType=snapshot,Tags=[{Key=IncidentId,Value=<id>},{Key=Preserve,Value=true}]"
-done
-```
-
-**Memory capture via SSM Run Command (Linux):**
-
-```bash
-# Requires the SSM agent and a memory-capture utility (e.g., LiME)
-aws ssm send-command \
-  --document-name "AWS-RunShellScript" \
-  --instance-ids i-0abc12345 \
-  --parameters 'commands=["insmod lime.ko \"path=/tmp/mem.lime format=lime\"", "aws s3 cp /tmp/mem.lime s3://forensic-bucket/<incident-id>/"]' \
-  --comment "Memory capture for incident <id>"
-```
-
-**Preserve CloudTrail / Lake data:**
-
-```bash
-# Export relevant CloudTrail events to S3 for the investigation window
-aws cloudtrail lookup-events \
-  --start-time 2026-08-01T00:00:00Z \
-  --end-time 2026-08-05T00:00:00Z \
-  --attribute-key EventName --attribute-value AssumeRole \
-  --output json > /tmp/incident-events.json
-
-# For long windows, use Athena on the CloudTrail S3 bucket or CloudTrail Lake.
-```
+→ Response-pattern 2 implementation commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### 3. Containment (block attacker)
 
-**Block source IP in WAF:**
-
-```bash
-# Add the attacker IP to an IP set
-aws wafv2 update-ip-set \
-  --ip-set-id <id> \
-  --scope REGIONAL \
-  --addresses "$(jq -r '.detail.service.action.remoteIpDetails.ipAddressV4' <event>)/32" \
-  --lock-token <token>
-```
-
-**Block source IP in NACL (immediate, VPC-scoped):**
-
-```bash
-# Add a DENY rule for the source IP at the top of the NACL
-aws ec2 create-network-acl-entry \
-  --network-acl-id <acl-id> \
-  --rule-number 10 \
-  --protocol "-1" \
-  --rule-action deny \
-  --cidr-block <source-ip>/32 \
-  --port-range From=0,To=65535
-```
-
-**Rotate exposed secrets:**
-
-```bash
-# Force immediate rotation
-aws secretsmanager rotate-secret \
-  --secret-id <arn> \
-  --rotation-rule-type IMMEDIATE
-
-# If rotation Lambda is broken, manually update the secret value
-aws secretsmanager put-secret-value \
-  --secret-id <arn> \
-  --secret-string '<new-value>'
-```
+→ Response-pattern 3 implementation commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### 4. Notification
 
-**SNS -> Lambda -> Slack:**
-
-```python
-# Lambda subscribed to SNS, posts to Slack incoming webhook
-import json, urllib.request, os
-
-def lambda_handler(event, context):
-    webhook = os.environ['SLACK_WEBHOOK_URL']  # from Parameter Store
-    finding = json.loads(event['Records'][0]['Sns']['Message'])
-    msg = {
-        'text': f":rotating_light: *IR Alert* — {finding['title']}\n"
-                f"Severity: {finding['severity']}\n"
-                f"Resource: {finding['resource']}\n"
-                f"Finding ID: {finding['id']}"
-    }
-    urllib.request.urlopen(
-        urllib.request.Request(webhook, json.dumps(msg).encode(), {'Content-Type': 'application/json'})
-    )
-```
-
-**EventBridge -> SNS for paging (e.g., PagerDuty via SNS webhook):**
-
-```bash
-# EventBridge rule -> SNS topic -> PagerDuty SNS integration
-aws sns subscribe \
-  --topic-arn <arn> \
-  --protocol https \
-  --notification-endpoint https://events.pagerduty.com/integration/.../enqueue
-```
-
-**Create Jira ticket via Lambda:**
-
-Lambda calls Jira REST API with finding details. Store Jira API token in
-Secrets Manager; never hardcode.
+→ Response-pattern 4 implementation commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### 5. Recovery
 
-**Restore RDS from point-in-time:**
-
-```bash
-aws rds restore-db-instance-to-point-in-time \
-  --source-db-instance-identifier <compromised-db> \
-  --target-db-instance-identifier <compromised-db-recovered \
-  --restore-time 2026-08-04T12:00:00Z \
-  --no-deletion-protection
-```
-
-**Redeploy from clean AMI:**
-
-```bash
-# Launch a fresh instance from a known-good AMI (from the golden AMI pipeline)
-aws ec2 run-instances \
-  --image-id <clean-ami> \
-  --instance-type <type> \
-  --subnet-id <subnet> \
-  --security-group-ids <prod-sg> \
-  --tag-specifications "ResourceType=instance,Tags=[{Key=RestoredFrom,Value=<incident-id>}]"
-```
-
-**Verify integrity post-recovery:**
-
-```bash
-# Verify file hashes against known-good baseline
-aws ssm send-command \
-  --document-name AWS-RunShellScript \
-  --instance-ids <restored-id> \
-  --parameters 'commands=["sha256sum /usr/bin/* /opt/app/bin/* | diff - baseline.txt"]'
-```
+→ Response-pattern 5 implementation commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ## Step Functions orchestration
 
 For full-playbook IR (multi-phase, parallel, human-approval), use Step
 Functions. The state machine below orchestrates the canonical pattern:
 
-```json
-{
-  "Comment": "Incident Response: detect -> isolate -> snapshot -> notify -> wait -> recover",
-  "StartAt": "CheckKillSwitch",
-  "States": {
-    "CheckKillSwitch": {
-      "Comment": "Read kill-switch from Parameter Store; abort if disabled",
-      "Type": "Task",
-      "Resource": "arn:aws:states:::ssm:get-parameter",
-      "Parameters": {
-        "Name": "/ir/kill-switch"
-      },
-      "Next": "KillSwitchChoice"
-    },
-    "KillSwitchChoice": {
-      "Type": "Choice",
-      "Choices": [{
-        "Variable": "$.Parameter.Value",
-        "StringEquals": "disabled",
-        "Next": "AbortWorkflow"
-      }],
-      "Default": "ParseFinding"
-    },
-    "AbortWorkflow": {
-      "Type": "Succeed",
-      "Comment": "Kill-switch tripped — no actions taken"
-    },
-    "ParseFinding": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:<region>:<account>:function:ir-parse-finding",
-      "Next": "ParallelResponse"
-    },
-    "ParallelResponse": {
-      "Type": "Parallel",
-      "Next": "NotifyComplete",
-      "Branches": [
-        {
-          "StartAt": "IsolateEC2",
-          "States": {
-            "IsolateEC2": {
-              "Type": "Task",
-              "Resource": "arn:aws:states:::ssm:start-automation-execution:waitForTaskToken",
-              "Parameters": {
-                "DocumentName": "AWS-IsolateEC2Instance",
-                "Parameters": {
-                  "InstanceId.$": "$.instanceId"
-                }
-              },
-              "End": true
-            }
-          }
-        },
-        {
-          "StartAt": "SnapshotVolumes",
-          "States": {
-            "SnapshotVolumes": {
-              "Type": "Task",
-              "Resource": "arn:aws:lambda:<region>:<account>:function:ir-snapshot-volumes",
-              "End": true
-            }
-          }
-        },
-        {
-          "StartAt": "NotifySlack",
-          "States": {
-            "NotifySlack": {
-              "Type": "Task",
-              "Resource": "arn:aws:lambda:<region>:<account>:function:ir-notify-slack",
-              "End": true
-            }
-          }
-        }
-      ]
-    },
-    "NotifyComplete": {
-      "Type": "Task",
-      "Resource": "arn:aws:sns:<region>:<account>:ir-notifications",
-      "Next": "WaitForHumanApproval"
-    },
-    "WaitForHumanApproval": {
-      "Comment": "Human callback via SQS + task token — no fixed timeout",
-      "Type": "Task",
-      "Resource": "arn:aws:states:::sqs:sendMessage.waitForTaskToken",
-      "Parameters": {
-        "QueueUrl": "https://sqs.<region>.amazonaws.com/<account>/ir-approval",
-        "MessageBody": {
-          "instanceId.$": "$.instanceId",
-          "incidentId.$": "$.incidentId",
-          "taskToken.$": "$$.Task.Token"
-        }
-      },
-      "Next": "RecoverOrClose"
-    },
-    "RecoverOrClose": {
-      "Type": "Choice",
-      "Choices": [{
-        "Variable": "$.decision",
-        "StringEquals": "recover",
-        "Next": "RecoverFromBackup"
-      }],
-      "Default": "CloseIncident"
-    },
-    "RecoverFromBackup": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:<region>:<account>:function:ir-recover",
-      "Next": "CloseIncident"
-    },
-    "CloseIncident": {
-      "Type": "Succeed",
-      "Comment": "Incident resolved — full audit trail in execution history"
-    }
-  }
-}
-```
+→ Full-playbook ASL state machine moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Map state for parallel containment across multiple resources
 
 When a single finding affects multiple resources (e.g., a compromised AMI
 across 20 EC2 instances), use `Map` state:
 
-```json
-"QuarantineAllInstances": {
-  "Type": "Map",
-  "ItemsPath": "$.instanceIds",
-  "MaxConcurrency": 10,
-  "Iterator": {
-    "StartAt": "QuarantineOne",
-    "States": {
-      "QuarantineOne": {
-        "Type": "Task",
-        "Resource": "arn:aws:states:::ssm:start-automation-execution:waitForTaskToken",
-        "Parameters": {
-          "DocumentName": "AWS-IsolateEC2Instance",
-          "Parameters": { "InstanceId.$": "$" }
-        },
-        "End": true
-      }
-    }
-  },
-  "Next": "NotifyComplete"
-}
-```
+→ Map-state parallel containment pattern moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Wait state vs task token
 
@@ -708,43 +234,11 @@ cleanest pattern in Step Functions.
 | `AWS-CreateManagedLinuxInstance` | Launches a managed forensic analysis instance |
 | `AWSSupport-ExecuteEC2Rescue` | Runs EC2 Rescue on a compromised instance |
 
-**Invoke via:**
-
-```bash
-aws ssm start-automation-execution \
-  --document-name AWS-IsolateEC2Instance \
-  --parameters InstanceId=i-0abc12345,SubnetId=subnet-xxx \
-  --output json
-```
+→ AWS-managed document invoke commands moved verbatim to [references/ssm-automation-catalog.md](references/ssm-automation-catalog.md).
 
 ### Custom document example (memory capture)
 
-```yaml
-schemaVersion: '0.3'
-description: Capture memory from a Linux EC2 instance for forensics
-assumeRole: '{{ AutomationAssumeRole }}'
-parameters:
-  InstanceId:
-    type: String
-  S3Bucket:
-    type: String
-mainSteps:
-  - name: CaptureMemory
-    action: aws:runCommand
-    inputs:
-      DocumentName: AWS-RunShellScript
-      InstanceIds:
-        - '{{ InstanceId }}'
-      Parameters:
-        commands:
-          - set -euo pipefail
-          - insmod /opt/lime/lime.ko "path=/tmp/mem.lime format=lime"
-          - aws s3 cp /tmp/mem.lime s3://{{ S3Bucket }}/forensic/$(date +%s)-mem.lime
-          - rm /tmp/mem.lime
-    timeoutSeconds: 3600
-outputs:
-  - CaptureMemory.Output
-```
+→ Custom memory-capture SSM document moved verbatim to [references/ssm-automation-catalog.md](references/ssm-automation-catalog.md).
 
 ## Systems Manager Incident Manager
 
@@ -752,39 +246,7 @@ Incident Manager coordinates humans during a major incident — chat
 channel, on-call page, timeline, post-incident report. Layer it on top
 of an automated workflow (EventBridge + Step Functions) for full coverage.
 
-### Create a response plan
-
-```bash
-aws ssm-incidents create-response-plan \
-  --name prod-ir-plan \
-  --display-name "Production IR Response Plan" \
-  --incident-template '{
-    "title": "Production security incident",
-    "impact": 5,
-    "summary": "Triggered by GuardDuty severity >= 7",
-    "notificationTargets": [{
-      "snsTopicArn": "arn:aws:sns:us-east-1:111111111111:ir-incident"
-    }]
-  }' \
-  --engagements arn:aws:ssm-contacts:us-east-1:111111111111:contact/oncall \
-  --chat-channel '{"chatbotSns": ["arn:aws:sns:us-east-1:111111111111:slack-chatbot"]}' \
-  --actions '[{
-    "ssmAutomation": {
-      "documentName": "AWS-IsolateEC2Instance",
-      "roleArn": "arn:aws:iam::111111111111:role/IR-Automation"
-    }
-  }]'
-```
-
-### Trigger an incident
-
-```bash
-# Manual trigger from the console or CLI
-aws ssm-incidents start-incident \
-  --response-plan-arn arn:aws:ssm-incidents::111111111111:response-plan/prod-ir-plan \
-  --title "EC2 malware detected by GuardDuty" \
-  --impact 5
-```
+→ Incident Manager response-plan + trigger CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Auto-trigger from EventBridge:** wire the EventBridge rule target to an
 SSM Automation that calls `start-incident`. Or use Chatbot to forward
@@ -821,24 +283,7 @@ Every IR automation MUST include:
    (e.g., check if the instance is already in the quarantine SG before
    moving it again).
 
-### Kill-switch Parameter Store pattern
-
-```bash
-# Create the kill-switch parameter (default: enabled)
-aws ssm put-parameter \
-  --name /ir/kill-switch \
-  --value "enabled" \
-  --type String
-
-# Disable the workflow in one command
-aws ssm put-parameter \
-  --name /ir/kill-switch \
-  --value "disabled" \
-  --type String \
-  --overwrite
-
-# Workflow checks this FIRST; if "disabled", exits without action.
-```
+→ Kill-switch Parameter Store CLI pattern moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ## Audit logging
 
@@ -857,17 +302,7 @@ Every IR action MUST be auditable. Three audit surfaces:
    duration. Accessible via
    `aws ssm get-automation-execution --automation-execution-id <id>`.
 
-**Audit checklist for every workflow:**
-
-- [ ] CloudTrail covers the account/region where the workflow runs.
-- [ ] Step Functions execution history retention >= 90 days.
-- [ ] SSM Automation outputs include the finding ID and incident ID.
-- [ ] Every containment action includes a tag or annotation with the
-      incident ID (`IncidentId=<id>`).
-- [ ] Notification messages include the Step Functions execution ARN for
-      traceability.
-- [ ] Post-incident, an Athena query against CloudTrail can reconstruct
-      the full action timeline.
+→ Audit checklist moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ## Output format (per workflow)
 
@@ -936,33 +371,7 @@ REMEDIATION: Deploy via:
 
 ### Worked example — MANUAL_STEP_REQUIRED (missing kill-switch)
 
-```text
-FINDING_SOURCE: guardduty
-RESPONSE_SCOPE: full-playbook
-VERDICT: MANUAL_STEP_REQUIRED
-WORKFLOW: (partial — generated but blocked)
-SAFETY:
-  - [FAIL] No kill-switch — workflow proceeds unconditionally on every finding
-  - [PASS] Tested in security-test account
-  - [FAIL] No manual approval gate — runs to completion without human check
-  - [WARN] Lambda role has ec2:* on Resource:* (too broad)
-AUDIT:
-  - [PASS] CloudTrail covers the account
-  - [FAIL] SSM Automation outputs do not include incident ID
-FINDINGS:
-  - [CRITICAL] No kill-switch: a misconfigured GuardDuty detector can trigger
-    hundreds of containment actions per minute. A false-positive storm during
-    a red-team exercise could quarantine every EC2 instance in the account.
-  - [CRITICAL] No manual approval gate: the workflow runs EC2 quarantine +
-    IAM key revocation + recovery automatically, with no human checkpoint
-    between containment and recovery.
-  - [HIGH] Lambda role grants ec2:* on Resource:* — least-privilege violation.
-REMEDIATION:
-  1. Add a kill-switch: Step Functions Choice state reading Parameter Store /ir/kill-switch
-  2. Add a manual approval gate: SQS task-token callback before recovery
-  3. Scope the Lambda role to ec2:ModifyInstanceAttribute on specific instance ARNs
-  4. Tag SSM Automation outputs with the incident ID via tag-specifications
-```
+→ Secondary worked example moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 ## NEVER (these things)
 
@@ -1064,77 +473,11 @@ REMEDIATION:
 
 ## Pre-flight safety checks (run before any deploy)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`cloudformation deploy`, `stepfunctions update-state-machine`,
-  `events put-rule`, `ssm create-document`), the automator MUST emit:
-  `CONFIRM: About to <action> for <workflow> in account <account>. This
-  affects <consequence>. Proceed? (yes/no)` and wait for explicit `yes`.
-
-- **Dry-run the EventBridge rule.** Before enabling the rule that
-  triggers the workflow, run with the rule in `DISABLED` state, send a
-  test event via `aws events put-events`, and verify the Step Functions
-  execution starts. Then enable the rule for production findings.
-
-- **Validate the kill-switch first.** Before wiring the EventBridge rule
-  to a real detector, set `/ir/kill-switch` to "disabled" and verify a
-  test finding does NOT trigger containment. Then flip to "enabled" and
-  verify it does.
-
-- **Capture the existing state.** Before deploying a workflow that
-  modifies resources, snapshot the existing state:
-  `aws ec2 describe-security-groups --group-ids <quarantine-sg>` and
-  `aws guardduty list-detectors` to a backup file. If the workflow
-  misbehaves, you have a rollback baseline.
-
-- **Verify Slack/Teams webhook.** Send a test message to the configured
-  webhook URL before relying on it for incident notifications. A
-  misconfigured webhook URL silently drops messages.
-
-- **Test in security-test account FIRST.** Run the full workflow end-to-
-  end (trigger finding -> workflow runs -> resources contained) in a
-  dedicated test account. Use AWS Factory or a non-prod account. Do not
-  deploy to prod without a passing test run.
-
-- **Verify incident ID propagation.** Every action, snapshot, SSM
-  execution, and notification must include the incident ID. Verify by
-  inspecting the Step Functions execution output and the S3 forensic
-  bucket tags after a test run.
+→ Pre-flight safety checks moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ## Edge-case handling
 
-- **Finding for a missing resource.** GuardDuty may emit a finding for an
-  EC2 instance that was terminated between detection and containment. The
-  Lambda must handle `InvalidInstanceID.NotFound` gracefully — log it and
-  move on. Do not retry the failed action; the resource is gone.
-
-- **Workflow triggered during deployment.** A deployment that updates the
-  IR workflow may trigger it on a stale EventBridge event. Use versioned
-  state machine ARNs (`stateMachine:ir-full-playbook:3`) and only point
-  EventBridge at the latest version after deployment completes.
-
-- **Cross-region incident.** A compromise in us-east-1 may affect
-  resources in eu-west-1. The EventBridge rule must either be deployed
-  in every region, or use EventBridge global endpoint bus to forward
-  findings to a central region for processing.
-
-- **Red-team exercise.** During a planned red-team exercise, the IR
-  workflow will fire on red-team activity. The kill-switch exists for
-  this scenario — disable it before the exercise, re-enable after.
-  Communicate the disable window to the on-call.
-
-- **Quarantine SG deletion.** If someone deletes the quarantine SG
-  (intentionally or accidentally), `AWS-IsolateEC2Instance` fails. Set
-  `DeletionProtection` (via CloudFormation `DeletionPolicy: Retain`) on
-  the quarantine SG. Monitor for deletion attempts via Config rule.
-
-- **Slack/Teams webhook rotation.** Webhook URLs expire or are rotated.
-  Store in Parameter Store with a `LastRotated` tag; alert if >90 days.
-
-- **Multi-account aggregate finding.** A finding from a member account
-  arrives at the management account's GuardDuty aggregator. The
-  `accountId` field in the finding identifies the source. The workflow
-  must use that `accountId` to assume the member's `IncidentResponseRole`
-  before containment.
+→ Edge-case catalog moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Reference — IR orchestration comparison
 
@@ -1150,40 +493,14 @@ REMEDIATION:
 
 ## Recent AWS features (2024-2026)
 
-- **GuardDuty Runtime Monitoring for ECS/EKS (2024-2025):** Detects
-  container-level threats (malicious process execution, reverse shell,
-  cryptocurrency mining inside a container). Findings include
-  `ContainerDetails` block. Containment pattern: stop the ECS task or
-  evict the EKS pod, NOT quarantine SG (pods do not have SGs directly).
-- **Security Hub custom actions (2024-2025):** Custom actions can now be
-  triggered from the Security Hub console or API, forwarding findings to
-  EventBridge for analyst-initiated containment. Useful for "right-click
-  and isolate this EC2" workflows.
-- **Incident Manager chat (2024-2025):** AWS Chatbot integration with
-  Incident Manager auto-creates a Slack/Chime channel per incident,
-  inviting the on-call. Hand-offs and timeline updates post to the
-  channel automatically. Configure via
-  `aws chatbot create-slack-channel-configuration`.
-- **Step Functions Distributed Map (2024-2025):** Map state can now
-  iterate over large datasets (S3 listing, DynamoDB scan) for parallel
-  processing. Use for "isolate every EC2 instance matching this tag"
-  workflows.
-- **SSM Automation AWS-ValidateQuarantineSG (2024):** New managed
-  document that pre-validates the quarantine SG configuration before
-  `AWS-IsolateEC2Instance` runs. Catches the "SG was deleted" failure
-  mode before the actual isolation.
-- **EventBridge global endpoints (2024-2025):** Multi-region event bus
-  failover. Use for cross-region IR — a primary event bus in us-east-1
-  with a failover to us-west-2 ensures IR triggers continue during a
-  regional event.
-- **GuardDuty Malware Protection for S3 (2024-2025):** Scans S3 objects
-  for malware on upload. Findings have `Service.AdditionalInfo.MalwareScan`.
-  Use for IR workflows that quarantine S3 objects (move to isolated
-  bucket, deny public access).
-- **Security Hub Automated Security Response on AWS (ASR) (2024-2025):**
-  AWS-published solution with pre-built EventBridge-to-SSM-remediation
-  playbooks for common Security Hub findings. Deploy as a starting point
-  for org-wide IR automation; customize per-resource.
+→ Recent AWS features catalog moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked example: MANUAL_STEP_REQUIRED verdict (missing kill-switch).
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — live-account pre-flight checks; response-pattern implementation commands (isolate / snapshot / contain / notify / recover); Incident Manager and kill-switch CLI; pre-flight safety checks; audit checklist.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — extended Mindset rationale; Step-0 expert knowledge; orchestration-surface notes; detection-source EventBridge patterns; full-playbook ASL state machine and Map state; edge cases; recent AWS features.
+- [references/ssm-automation-catalog.md](references/ssm-automation-catalog.md) — extended: AWS-managed document invoke commands and the custom memory-capture document.
 
 ## Domain
 

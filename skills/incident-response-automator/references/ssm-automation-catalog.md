@@ -297,3 +297,43 @@ Before relying on any SSM Automation document in production:
    ```
    PingStatus must be `Connection Lost` or `Online`. `NotConnected` means
    the agent is offline and SSM actions will fail.
+
+## Invoking AWS-managed documents (moved from SKILL.md)
+
+**Invoke via:**
+
+```bash
+aws ssm start-automation-execution \
+  --document-name AWS-IsolateEC2Instance \
+  --parameters InstanceId=i-0abc12345,SubnetId=subnet-xxx \
+  --output json
+```
+
+## Custom SSM Automation document — memory capture (moved from SKILL.md)
+
+```yaml
+schemaVersion: '0.3'
+description: Capture memory from a Linux EC2 instance for forensics
+assumeRole: '{{ AutomationAssumeRole }}'
+parameters:
+  InstanceId:
+    type: String
+  S3Bucket:
+    type: String
+mainSteps:
+  - name: CaptureMemory
+    action: aws:runCommand
+    inputs:
+      DocumentName: AWS-RunShellScript
+      InstanceIds:
+        - '{{ InstanceId }}'
+      Parameters:
+        commands:
+          - set -euo pipefail
+          - insmod /opt/lime/lime.ko "path=/tmp/mem.lime format=lime"
+          - aws s3 cp /tmp/mem.lime s3://{{ S3Bucket }}/forensic/$(date +%s)-mem.lime
+          - rm /tmp/mem.lime
+    timeoutSeconds: 3600
+outputs:
+  - CaptureMemory.Output
+```

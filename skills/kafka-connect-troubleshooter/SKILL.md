@@ -109,76 +109,20 @@ Kafka Connect diagnosis requires three data sources: connector
 status (state, trace, worker_id), CloudWatch Logs excerpt, and the
 cluster's bootstrap / IAM configuration.
 
-```bash
-# 1. Connector status (MSK Connect)
-CONNECTOR_ARN=arn:aws:kafkaconnect:us-east-1:111122223333:connector/my-connector/abc-123
-aws kafkaconnect describe-connector --connector-arn $CONNECTOR_ARN \
-  --output json > connector.json
-# OR via REST API (self-managed)
-curl -s http://<connect-worker>:8083/connectors/my-connector/status | jq .
-
-# 2. CloudWatch Logs
-aws logs filter-log-events \
-  --log-group-name /aws/kafkaconnect/my-connector \
-  --filter-pattern "ERROR" --output json > connector-errors.json
-
-# 3. MSK cluster bootstrap and auth
-aws kafka get-bootstrap-brokers --cluster-arn $CLUSTER_ARN > bootstrap.json
-aws kafka describe-cluster --cluster-arn $CLUSTER_ARN \
-  --query 'ClusterInfo.ClientAuthentication' > auth.json
-```
+Data-gathering commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before probing a live connector.
 
 ### Data-quality short-circuits
 
-| Condition | Effect on diagnosis |
-|---|---|
-| `describe-connector` returns `Connector not found` | Wrong ARN or region; verify via `list-connectors`. |
-| CloudWatch log group missing | Logging not configured; cannot diagnose task exceptions. NEED_MORE_INFO. |
-| Connector still `CREATING` or `UPDATING` | Not a failure — wait for state transition. |
-| `RUNNING` but throughput zero | Diagnose as SOURCE_LAG or SINK_DLQ. |
-| `trace` empty but task FAILED | Logs are the only source; NEED_MORE_INFO if logs missing. |
+Short-circuit table moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when the input data itself is suspect.
 
 ## Process — Diagnostic decision tree (apply in order)
 
 ### Step 0: Non-obvious behaviours
 
-- **Task `trace` is frequently empty even when the task threw.** MSK
-  Connect sometimes returns empty trace; the exception is only in
-  CloudWatch Logs. Always check both.
-- **A connector can be `RUNNING` while all its tasks are `FAILED`.**
-  Connector state reflects the framework; task state reflects the
-  actual work. Always inspect `tasks[].state`.
-- **Worker rebalance is normal on deploy; pathological on a 5-min
-  cadence.** Every 30+ min is fine. Every 2-5 min is a
-  `session.timeout.ms` / heartbeat mismatch or over-subscribed worker.
-- **Source LagMax is a consumer-group metric, not a connector
-  metric.** The source connector creates a consumer group (often
-  `connect-${connectorName}`); if the group is missing, `group.id`
-  is wrong.
-- **Sink DLQ is opt-in.** Without `errors.deadletterqueue.topic.name`
-  and `errors.tolerance=all`, errors stop the task. A failed sink
-  task with no DLQ is default behavior, not a bug.
-- **Schema registry URL must be reachable from the Connect worker,
-  not the operator.** For MSK Connect, the registry (Confluent,
-  Glue, Apicurio) must be reachable from the worker VPC.
-- **MSK IAM auth requires `kafka-cluster` resource in the policy.**
-  Must grant `kafka-cluster:Connect`, `DescribeCluster`, `ReadData`,
-  `WriteData` on the cluster ARN. `kafka:*` on `*` is insufficient
-  if the ARN does not match.
-- **MSK Connect custom plugin must be uploaded to S3 first.** A
-  `ClassNotFoundException` on a Debezium connector usually means the
-  plugin was uploaded without all transitive dependencies (Debezium
-  bundles are fat JARs).
-- **Converters must match on key and value.** A common error:
-  `value.converter=AvroConverter` but
-  `key.converter=StringConverter`. If the producer writes Avro keys,
-  the connector fails on the first record.
-- **Debezium `history.internal.kafka.topic` must exist.** Debezium
-  stores DB schema history in a Kafka topic; if the connector cannot
-  produce to it, it fails on startup.
-- **MSK Connect workers have a fixed set of SGs and subnets.** The
-  connector inherits these from the worker config; you cannot
-  override per-connector.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for the full gotcha catalog.
 
 ### Step 1: Task failure (TASK_EXCEPTION)
 
@@ -424,97 +368,23 @@ REMEDIATION:
 
 ### Worked example — IAM auth missing on MSK
 
-```text
-TARGET: postgres-source-connector
-VERDICT: ROOT_CAUSE_FOUND
-REASON: Connector cannot produce to MSK; logs show SASL_NOT_LOGGED_IN.
-  MSK ClientAuthentication.Sasl.Iam is disabled; connector uses sasl.iam.
-CATEGORY: IAM_AUTH
-EVIDENCE:
-  - connector FAILED, tasks[0] FAILED
-  - CloudWatch: "ClusterAuthorizationException: SASL_NOT_LOGGED_IN"
-  - Failing probe:
-    aws kafka describe-cluster --cluster-arn $CLUSTER_ARN
-      --query 'ClusterInfo.ClientAuthentication.Sasl'
-    → returns {} (Iam not enabled)
-  - Passing probes: SG egress to 9094 OK; role has kafka-cluster:* Allow
-REMEDIATION:
-  1. Enable IAM auth via cluster configuration update:
-     aws kafka update-configuration --cluster-arn $CLUSTER_ARN \
-       --configuration-info '{"RevisionId":2,"Arn":"<config-arn>"}'
-  2. Wait for APPLY_CONFIGURATION (~10-15 min).
-  3. Restart the connector.
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when formatting an IAM_AUTH verdict.
 
 ### Worked example — source lag with hot partition
 
-```text
-TARGET: events-stream-source
-VERDICT: ROOT_CAUSE_FOUND
-REASON: LagMax grows on partition 7 only. Producer key-based
-  partitioner concentrates 60% of records ("ACME-001") on
-  partition 7; throughput is bottlenecked on one task.
-CATEGORY: SOURCE_LAG
-EVIDENCE:
-  - LagMax=480,000 on partition 7; <2,000 on others
-  - Partition 7 task: 5 records/s vs 200/s on others
-  - Passing probes: no rebalance; source DB healthy
-REMEDIATION:
-  1. Salt the producer's hot key: key = original + ":" + (rand() % 8)
-  2. OR raise connector tasks.max to match partition count (default 1).
-  3. Deploy and verify LagMax falls over 10 minutes.
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when formatting a SOURCE_LAG verdict.
 
 ### Worked example — plugin missing (Debezium)
 
-```text
-TARGET: debezium-mysql-source
-VERDICT: ROOT_CAUSE_FOUND
-REASON: Connector fails on creation with ClassNotFoundException.
-  Custom plugin ARN references a fat JAR missing the Debezium MySQL
-  module; plugin state is FAILED.
-CATEGORY: PLUGIN_MISSING
-EVIDENCE:
-  - connector FAILED, no tasks running
-  - CloudWatch: "ClassNotFoundException:
-    io.debezium.connector.mysql.MySqlConnector"
-  - Failing probe:
-    aws kafkaconnect describe-custom-plugin --custom-plugin-arn $ARN
-    → state=FAILED, "missing manifest dependencies"
-  - Passing probes: connector.class matches intended class; MSK reachable
-REMEDIATION:
-  1. Build a complete Debezium plugin ZIP:
-     unzip debezium-connector-mysql-2.5.tar.gz
-     zip -r debezium-plugin.zip debezium-connector-mysql
-     aws s3 cp debezium-plugin.zip s3://plugins/
-  2. Create new plugin:
-     aws kafkaconnect create-custom-plugin \
-       --content-location s3://plugins/debezium-plugin.zip \
-       --content-type ZIP --name debezium-mysql-2.5
-  3. Recreate the connector referencing the new plugin ARN.
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when formatting a PLUGIN_MISSING verdict.
 
 ### Worked example — NEED_MORE_INFO
 
-```text
-TARGET: jdbc-sink-connector
-VERDICT: NEED_MORE_INFO
-REASON: Connector state=FAILED, trace empty, and CloudWatch logging
-  is not configured. Cannot determine the failing category without
-  logs.
-CATEGORY: UNKNOWN
-EVIDENCE:
-  - connector FAILED, tasks[0] FAILED, trace=""
-  - aws logs describe-log-groups --log-group-name-prefix
-    /aws/kafkaconnect/jdbc-sink → empty
-  - Plugin ACTIVE; MSK reachable
-REMEDIATION:
-  1. Update the connector with log delivery:
-     aws kafkaconnect update-connector --connector-arn $ARN \
-       --log-delivery '{"workerLogDelivery":{"cloudWatchLogs":{"enabled":true,"logGroup":"/aws/kafkaconnect/jdbc-sink"}}}'
-  2. Wait for the connector to fail again (or trigger a restart).
-  3. Re-invoke this skill with the new logs available.
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when logs are unavailable.
 
 ## NEVER do these things
 
@@ -611,28 +481,16 @@ next step is to enable CloudWatch logging and re-run.
 
 ## Recent AWS features (2024-2026)
 
-- **MSK Connect custom plugins (2024-2025):** `create-custom-plugin`
-  now supports ZIP archives up to 50 MB. Debezium 2.x and 3.x bundles
-  are supported. Lifecycle: `CREATING` → `ACTIVE` → (optionally)
-  `FAILED`.
-- **Debezium 2.5+ on MSK Connect (2024-2025):** Incremental snapshot
-  via `signal.data.collection`; improved PostgreSQL logical
-  replication slot handling; new MongoDB source connector.
-- **MSK Connect capacity auto-scaling (2024-2025):** Worker capacity
-  can auto-scale on CPU utilization. Reduces over-provisioning.
-- **MSK IAM auth v2 (2024-2025):** Stricter policy evaluation —
-  `kafka-cluster:WriteDataIdempotently` and
-  `DescribeClusterDynamicConfiguration` are separate actions. Update
-  IAM policies if the connector uses idempotent producers.
-- **SMT predicates (2024-2025):** Connect 3.x supports `predicates`
-  on SMTs, allowing conditional transforms (e.g., apply `Cast` only
-  if topic matches a regex).
-- **MSK Tiered Storage (2024-2025):** Topic data offloaded to S3.
-  Source connectors reading tiered topics must use a broker that
-  supports tiered fetch.
-- **CloudWatch Logs for MSK Connect (2024-2025):** Log delivery to
-  CloudWatch, S3, or Firehose is now connector-level. Always enable
-  `workerLogDelivery.cloudWatchLogs.enabled=true` on production.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand to check what changed in the last 24 months.
+
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples moved from this SKILL.md
+- [references/error-handling.md](references/error-handling.md) — data-quality short-circuits moved from this SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight data-gathering commands moved from this SKILL.md
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step-0 non-obvious behaviours and recent AWS features moved from this SKILL.md
+- [references/msk-connect-config-reference.md](references/msk-connect-config-reference.md) — connector config keys, lifecycle states, and failure modes
 
 ## Domain
 
@@ -650,3 +508,4 @@ diagnosis.
 - **Debezium documentation** — https://debezium.io/documentation/
 - **Kafka Connect REST API** — https://kafka.apache.org/documentation/#connect_rest
 - **AWS Health** — https://health.aws.amazon.com/health/status
+

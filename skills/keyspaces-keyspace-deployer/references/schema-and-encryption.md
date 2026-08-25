@@ -377,3 +377,202 @@ curl https://www.amazontrust.com/repository/AmazonRootCA1.pem -o AmazonRootCA1.p
 # Verify the certificate fingerprint
 openssl x509 -in AmazonRootCA1.pem -fingerprint -sha256 -noout
 ```
+
+## Expert heuristic: partition key cardinality for distribution (moved from SKILL.md)
+
+A baseline model says "pick a primary key." The correct heuristic
+recognizes that in Cassandra (and Keyspaces), the partition key is the
+distribution mechanism. Low cardinality = hot partitions = throttling.
+
+```text
+Table: user_events
+  Option A (BAD):  PARTITION KEY (event_type)     → 3 partitions (LOGIN, LOGOUT, PURCHASE)
+                   → ALL events hash into 3 partitions → extreme hotspots
+  Option B (GOOD): PARTITION KEY (user_id)          → millions of partitions
+                   → events distributed evenly across storage nodes
+  Option C (BEST): PARTITION KEY (user_id, event_date)  → time-bucketed partitioning
+                   → prevents unbounded partition growth
+                   → enables efficient time-range queries within a user
+```
+
+**Key implication:** always evaluate partition key cardinality. If the
+number of distinct partition key values is small (< 1000), the table
+will have hot partitions. Aim for high-cardinality partition keys. For
+time-series data, composite partition keys (user_id + date_bucket)
+prevent unbounded partition growth and enable efficient time-range
+queries.
+
+## Expert heuristic: clustering key for sort order (moved from SKILL.md)
+
+The clustering key determines the sort order of rows WITHIN a partition.
+It is the mechanism for range queries and time-ordered retrieval.
+
+```text
+Table: sensor_readings
+  PARTITION KEY (sensor_id)          → distributes readings across nodes
+  CLUSTERING KEY (reading_time DESC) → newest readings first within each sensor
+
+Query: SELECT * FROM sensor_readings
+       WHERE sensor_id = 'sensor-42'
+       AND reading_time >= '2026-08-01'
+       AND reading_time <= '2026-08-05';
+
+→ Efficient: single partition scan, ordered retrieval, no full-table scan.
+```
+
+**Key implication:** the clustering key must align with the dominant
+query pattern. If the most common query is "get the last 10 readings
+for sensor X," then (sensor_id, reading_time DESC) is the correct
+clustering key. If the query is "get all readings of type
+'temperature'," then the clustering key or partition key must include
+reading_type. Mismatched clustering keys cause full-partition scans.
+
+## Step 5 — TTL (time-to-live) (moved from SKILL.md)
+
+TTL allows automatic row expiry. It is set at the column level via CQL
+INSERT/UPDATE, or as a table default via the schema.
+
+```sql
+-- Set TTL at insert time (row expires after 86400 seconds = 24 hours)
+INSERT INTO my_app_keyspace.user_events
+  (user_id, event_date, event_time, event_type, payload)
+VALUES (
+  550e8400-e29b-41d4-a716-446655440000,
+  '2026-08-05',
+  '2026-08-05 10:00:00',
+  'LOGIN',
+  textAsBlob('user logged in')
+)
+USING TTL 86400;
+
+-- Default TTL for the table (all rows expire after N seconds unless overridden)
+-- This is set at table creation or via ALTER TABLE (CQL)
+ALTER TABLE my_app_keyspace.user_events WITH default_time_to_live = 604800;
+```
+
+**Note:** TTL is a CQL-level feature, not a Keyspaces API parameter.
+The Keyspaces API does not have a TTL parameter for `create-table` or
+`update-table`. TTL is managed through CQL statements executed via the
+Cassandra driver.
+
+## Step 6 — Encryption at rest (KMS) (moved from SKILL.md)
+
+Keyspaces encrypts all data at rest by default using AWS-owned KMS
+keys. For granular control (e.g., per-table keys, key rotation, Cloud-
+Trail audit), use a customer-managed key (CMK).
+
+```bash
+# Create or identify a KMS CMK
+KMS_KEY_ID=$(aws kms create-key \
+  --description "Keyspaces encryption key for my_app_keyspace" \
+  --query 'KeyMetadata.KeyId' --output text)
+
+# Set the CMK on the table (at creation time)
+aws keyspaces create-table \
+  --keyspace-name my_app_keyspace \
+  --table-name user_events \
+  --schema-definition '{...}' \
+  --encryption-spec '{
+    "type": "CUSTOMER_MANAGED_KEYS",
+    "kmsKeyIdentifier": "'"$KMS_KEY_ID"'"
+  }'
+
+# Update encryption on an existing table
+aws keyspaces update-table \
+  --keyspace-name my_app_keyspace \
+  --table-name user_events \
+  --encryption-spec '{
+    "type": "CUSTOMER_MANAGED_KEYS",
+    "kmsKeyIdentifier": "'"$KMS_KEY_ID"'"
+  }'
+```
+
+**Key distinction:** AWS-owned key (default, no charge, no CloudTrail)
+vs AWS-managed key (free rotation, CloudTrail) vs customer-managed key
+($1/month + per-use, full control, CloudTrail audit, cross-account).
+
+## Step 7 — Client-side encryption (KMS envelope) (moved from SKILL.md)
+
+Client-side encryption uses envelope encryption via KMS. The application
+generates a data encryption key (DEK) using the KMS CMK, encrypts the
+payload with the DEK, and stores the encrypted DEK + ciphertext in
+Keyspaces. Keyspaces sees only ciphertext.
+
+```python
+# Python example: client-side envelope encryption with KMS + Cassandra driver
+import boto3
+from cassandra.cluster import Cluster
+from cassandra.sigv4.auth import SigV4AuthProvider
+from cryptography.fernet import Fernet  # or use AWS Encryption SDK
+
+kms = boto3.client('kms')
+
+# Generate a data encryption key (DEK) via KMS
+response = kms.generate_data_key(
+    KeyId='alias/keyspaces-client-encryption',
+    KeySpec='AES_256'
+)
+dek_plaintext = response['Plaintext']
+dek_ciphertext = response['CiphertextBlob']
+
+# Encrypt the payload with the DEK
+fernet = Fernet(base64.urlsafe_b64encode(dek_plaintext))
+encrypted_payload = fernet.encrypt(b'{"event": "user_login", "ip": "10.0.1.5"}')
+
+# Store encrypted DEK + encrypted payload in Keyspaces
+session.execute(
+    "INSERT INTO my_app_keyspace.user_events "
+    "(user_id, event_date, event_time, event_type, payload, encrypted_dek) "
+    "VALUES (?, ?, ?, ?, ?, ?)",
+    (user_id, event_date, event_time, event_type, encrypted_payload, dek_ciphertext)
+)
+```
+
+**Critical:** client-side encryption is transparent to Keyspaces.
+Server-side CQL queries (WHERE clauses) on encrypted columns compare
+ciphertext, NOT plaintext. Design the schema so encrypted columns are
+NOT used in WHERE clauses or secondary indexes.
+
+**Recommended approach:** use the AWS Encryption SDK for envelope
+encryption. It handles DEK generation, caching, and rotation
+automatically.
+
+## Step 8 — Connectivity (Cassandra driver + SigV4) (moved from SKILL.md)
+
+Keyspaces supports CQL via the open-source DataStax Cassandra driver
+with AWS SigV4 authentication. No passwords needed — IAM credentials
+provide authentication.
+
+```python
+from cassandra.cluster import Cluster
+from cassandra.sigv4.auth import SigV4AuthProvider
+import boto3
+
+# Create a SigV4 auth provider using AWS credentials
+session_credentials = boto3.Session().get_credentials()
+auth_provider = SigV4AuthProvider(
+    credentials=session_credentials,
+    region_name='us-east-1'
+)
+
+# Connect to Keyspaces using the Cassandra driver
+cluster = Cluster(
+    ['cassandra.us-east-1.amazonaws.com'],
+    port=9142,
+    auth_provider=auth_provider,
+    ssl_options={'ca_certs': '/path/to/AmazonRootCA1.pem'},
+    protocol_version=4,
+    load_balancing_policy=DCAwareRoundRobinPolicy(local_dc='us-east-1')
+)
+
+session = cluster.connect()
+session.execute("SELECT * FROM my_app_keyspace.user_events LIMIT 10")
+```
+
+**Connection requirements:**
+- SSL/TLS is mandatory (port 9142, not 9042).
+- SigV4 authentication (no username/password; IAM credentials).
+- Protocol version 4.
+- Driver: DataStax cassandra-driver >= 3.24 (or cassandra-driver 4.x).
+- CA certificate: AmazonRootCA1.pem (download from AWS).
+

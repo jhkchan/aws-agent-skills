@@ -192,3 +192,118 @@ aws ssm create-maintenance-window \
 
 Add targets (instance IDs or resource groups) and register the
 `AWS-RunPatchBaseline` runbook as a task.
+
+## Step 6 — SSM patch baseline for OS findings (moved from SKILL.md)
+
+```bash
+# Create a patch baseline aligned to Amazon Linux 2
+aws ssm create-patch-baseline \
+  --name "al2-critical-patches" \
+  --operating-system AMAZON_LINUX_2 \
+  --patch-groups "critical-patch-group" \
+  --approval-rules '{
+    "PatchRules": [{
+      "PatchFilterGroup": {
+        "PatchFilters": [{
+          "Key": "CLASSIFICATION",
+          "Values": ["Security"]
+        }, {
+          "Key": "SEVERITY",
+          "Values": ["Critical", "Important"]
+        }]
+      },
+      "ApproveAfterDays": 0,
+      "ComplianceLevel": "CRITICAL"
+    }]
+  }'
+```
+
+Register the baseline as the default for the OS:
+
+```bash
+aws ssm register-patch-baseline-for-patches \
+  --baseline-id "pb-abc123def456" \
+  --operating-systems AMAZON_LINUX_2
+```
+
+**Patch baseline gotchas:**
+- `ApproveAfterDays: 0` auto-approves immediately. Use 7 days for
+  High, 30 for Medium to allow soak time.
+- `ComplianceLevel: CRITICAL` flags non-compliant instances as
+  "Critical" in the SSM compliance dashboard.
+- Patch groups are tags (`Patch Group: critical-patch-group`).
+  Instances must be tagged to receive patches from this baseline.
+
+## Step 7 — SSM Automation runbook for patching (moved from SKILL.md)
+
+```bash
+aws ssm start-automation-execution \
+  --document-name AWS-RunPatchBaseline \
+  --document-version "1" \
+  --parameters '{
+    "InstanceId": ["i-0abc123def456"],
+    "Operation": ["Install"],
+    "RebootOption": ["RebootIfNeeded"],
+    "SnapshotId": [""]
+  }' \
+  --mode Auto
+```
+
+For fleet-wide patching with approval:
+
+```yaml
+# Custom SSM Automation runbook
+---
+schemaVersion: '0.3'
+assumeRole: '{{ AutomationAssumeRole }}'
+description: 'Patch EC2 instances flagged by Inspector Critical findings'
+parameters:
+  InstanceIds:
+    type: StringList
+    description: 'List of instance IDs to patch'
+  AutomationAssumeRole:
+    type: String
+mainSteps:
+  - name: CreateSnapshot
+    action: aws:createImage
+    inputs:
+      InstanceId: '{{ InstanceIds[0] }}'
+      ImageName: 'pre-patch-snapshot-{{ global:DATE_TIME }}'
+      NoReboot: true
+    outputs:
+      - Name: ImageId
+        Selector: '$.ImageId'
+        Type: String
+  - name: PatchInstances
+    action: aws:runCommand
+    inputs:
+      DocumentName: AWS-RunPatchBaseline
+      InstanceIds: '{{ InstanceIds }}'
+      Parameters:
+        Operation: Install
+        RebootOption: RebootIfNeeded
+    isCritical: true
+    onFailure: abort
+  - name: VerifyPatch
+    action: aws:waitForAwsResourceProperty
+    inputs:
+      Service: ssm
+      Api: DescribeInstancePatches
+      InstanceId: '{{ InstanceIds[0] }}'
+      PropertySelector: '$.Patches[?(@.State=="Installed")].State'
+      DesiredValues: ['Installed']
+      Waiter: 'InstancePatchesState'
+```
+
+## Step 14 — Patch baseline association to instances (moved from SKILL.md)
+
+```bash
+# Tag instances for patch group
+aws ec2 create-tags \
+  --resources i-0abc123def456 i-0def456ghi789 \
+  --tags Key=Patch Group,Value=critical-patch-group
+
+# Verify patch baseline association
+aws ssm describe-effective-patch-instances \
+  --instance-id i-0abc123def456
+```

@@ -380,20 +380,8 @@ actions. A missing key policy statement fails silently with
 
 ## Edge-case handling
 
-- **Accidental lockout:** if a key policy excludes root, recovery is
-  impossible. Always validate with IAM policy simulator before applying.
-- **CMK in PendingDeletion:** cannot Encrypt/GenerateDataKey, CAN Decrypt
-  (allows data migration). Cancel with `CancelKeyDeletion`.
-- **Asymmetric key rotation:** manual — create new key, update alias,
-  re-encrypt on next access. Old key must remain for historical decrypt.
-- **Multi-Region replica policy drift:** each replica has independent policy.
-  Automate sync via CloudFormation StackSets or Terraform `for_each`.
-- **Custom key store disconnect:** CloudHSM cluster unhealthy or `kmsuser`
-  password rotated → key store disconnects, all Encrypt/Decrypt fails.
-  Monitor health, set CloudWatch alarm.
-- **Quota limits:** each CMK supports 50,000 RPS for `GenerateDataKey`
-  (Region-wide). For higher throughput, use envelope encryption with data
-  key caching.
+Edge-case quick list moved verbatim to
+`references/key-policy-and-multiregion-guide.md` (load on demand).
 
 ## Workload matrix
 
@@ -410,32 +398,8 @@ actions. A missing key policy statement fails silently with
 
 ## Recent AWS features (2024-2026)
 
-- **On-demand key rotation (2024-2025):** `kms:RotateKeyOnDemand`
-  triggers immediate rotation for eligible symmetric CMKs, bypassing
-  the annual schedule. Use for incident response (suspected key
-  compromise). The key ARN and policy do not change.
-
-- **Key spec HMAC_256 GA (2024):** HMAC keys for message authentication
-  (JWT signing, API tokens). `KeyUsage=GENERATE_VERIFY_MAC`. Does NOT
-  support automatic rotation.
-
-- **CloudHSM custom key store rotation (2024-2025):** custom key store
-  keys now support automatic rotation in more Regions.
-
-- **ECDH key agreement (2024-2025):** `ECC_NIST_P256`/`P384` with
-  `KeyUsage=KEY_AGREEMENT` for mTLS and hybrid post-quantum schemes.
-
-- **Key policy hash check (2024):** `DescribeKey` returns a hash of
-  the key policy, enabling drift detection in CI.
-
-- **XKS (External Key Store) GA (2024-2025):** for workloads needing
-  key material outside AWS entirely (external HSM over a standard API).
-
-- **VPC endpoint policy support (2024):** KMS interface VPC endpoints
-  now support endpoint policies — control which CMKs are reachable.
-
-- **MAC algorithms expanded (2025):** HMAC keys support additional MAC
-  algorithm options via KeySpec.
+2024-2026 feature details moved verbatim to
+`references/advanced-patterns.md` (load on demand).
 
 ## NEVER (top 5 — full list of 13 anti-patterns in references)
 
@@ -469,17 +433,8 @@ actions. A missing key policy statement fails silently with
 
 ## Pre-flight safety checks (run before any provisioning CLI)
 
-- **Confirm the AWS account ID** for root break-glass:
-  `aws sts get-caller-identity --query Account --output text`
-- **Confirm the key administrator role exists:**
-  `aws iam get-role --role-name <admin-role>`
-- **Confirm the application (key user) role exists:**
-  `aws iam get-role --role-name <app-role>`
-- **Confirm the alias is available:**
-  `aws kms list-aliases --query 'Aliases[?AliasName==`alias/<name>`]'`
-- **For custom key store:** confirm CloudHSM cluster ACTIVE with >= 2 HSMs.
-- **For existing keys:** capture current policy for rollback:
-  `aws kms get-key-policy --key-id <key-id> --policy-name default --output text > /tmp/<key-id>-policy-backup.json`
+Pre-flight command listing moved verbatim to
+`references/deployment-cli-commands.md` (load on demand).
 
 ## Output format — MANDATORY literal labels
 
@@ -522,6 +477,12 @@ VERIFICATION_COMMANDS:
 **PREREQUISITES_MISSING verdict:** if any REQUIRED prerequisite is missing
 (administrator role ARN, application role ARN, CloudHSM cluster), the
 verdict is `PREREQUISITES_MISSING` with each gap listed.
+
+## References (load on demand)
+
+- [`references/deployment-cli-commands.md`](references/deployment-cli-commands.md) — full copy-pasteable CLI sequence for all 10 provisioning steps, Terraform/CloudFormation equivalents, pre-flight safety checks.
+- [`references/key-policy-and-multiregion-guide.md`](references/key-policy-and-multiregion-guide.md) — key policy structure, grants, multi-Region, CloudHSM, envelope encryption, cross-account, edge-case handling.
+- [`references/advanced-patterns.md`](references/advanced-patterns.md) — recent AWS features 2024-2026 (on-demand rotation, HMAC GA, ECDH, XKS, VPC endpoint policies).
 
 ## Domain
 

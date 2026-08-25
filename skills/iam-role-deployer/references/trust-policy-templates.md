@@ -335,3 +335,71 @@ Without it, the condition silently fails for ALL requests.
   ]
 }
 ```
+
+## Additional trust policy templates — MFA, OIDC, SAML (moved from SKILL.md)
+
+**Template — cross-account role with MFA:**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {"AWS": "arn:aws:iam::222222222222:role/devops-admin"},
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "Bool": {"aws:MultiFactorAuthPresent": "true"},
+        "NumericLessThan": {"aws:MultiFactorAuthAge": "3600"}
+      }
+    }
+  ]
+}
+```
+
+**Template — OIDC (GitHub Actions):**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::111111111111:oidc-provider/token.actions.githubusercontent.com"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+        },
+        "StringLike": {
+          "token.actions.githubusercontent.com:sub": "repo:my-org/my-repo:ref:refs/heads/main"
+        }
+      }
+    }
+  ]
+}
+```
+
+**Template — SAML (Okta/Azure AD):**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::111111111111:saml-provider/okta-idp"
+      },
+      "Action": "sts:AssumeRoleWithSAML",
+      "Condition": {
+        "StringEquals": {
+          "SAML:aud": "https://signin.aws.amazon.com/saml"
+        }
+      }
+    }
+  ]
+}
+```

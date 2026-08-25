@@ -38,18 +38,7 @@ in ANY stage produces silent exposure: the CVE is found, but the
 Lambda function never gets rebuilt, or the patch runs but the
 finding stays OPEN because the instance was never rescanned.
 
-- **Detection** without **EventBridge routing** is a dashboard, not
-  automation. The Inspector console shows findings; nobody looks
-  unless paged.
-- **Severity-based response** is the operational backbone:
-  Critical findings get SSM-driven patching within hours; High gets
-  Slack notification within a day; Medium/Low get queued for the
-  next patch window. Treating all severities the same burns out the
-  on-call.
-- **Verification is the closing gate.** Inspector findings have a
-  lifecycle (OPEN → SUPPRESSED or CLOSED). A patch that succeeds
-  at the OS level but leaves the finding OPEN means the rescan
-  never ran, or the finding is suppressed-but-not-resolved.
+→ Extended Mindset bullets moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Quick navigation
 
@@ -129,73 +118,7 @@ GAP: Re-supply the Inspector finding ARN or finding type plus target resource id
 
 These behaviors change the workflow design if ignored:
 
-- **Inspector ECR scans run automatically on push when scanning is
-  enabled.** A repo with `scanOnPush: true` scans each new image
-  within minutes. A repo with `scanOnPush: false` requires manual
-  `start-image-scan`. The default for new repos depends on account
-  settings — verify per repo.
-
-- **Inspector rescan for ECR is NOT automatic when new CVEs are
-  published.** An image scanned at push-time is "scanned for life"
-  unless explicitly rescanned. New CVE databases do NOT trigger
-  re-evaluation. For production repos, schedule weekly rescans via
-  EventBridge → Lambda → `start-image-scan`.
-
-- **Inspector Lambda code scans run on function UPDATE, not
-  continuously.** A function deployed with a vulnerable package
-  stays "vulnerable" in Inspector until the function is updated
-  with a patched version. New CVEs against the deployed version
-  are detected on the next rescan cycle (Inspector rescans Lambda
-  functions every few days automatically).
-
-- **Inspector does NOT detect vulnerabilities in Lambda layers
-  directly.** The layer's package is attributed to the function.
-  A shared vulnerable layer triggers findings on every function
-  that consumes it — useful for blast-radius analysis.
-
-- **Inspector finding severity is NOT configurable.** Severity
-  comes from the CVE database (CVSS score). A "Critical" CVE stays
-  Critical regardless of business context. Use the
-  `ResourceTag` filter or finding suppression to override triage
-  for accepted-risk resources.
-
-- **SSM patch baseline with `Operation: Scan` does NOT modify the
-  instance.** It populates the SSM patch compliance dashboard. Use
-  `Operation: Install` to apply patches. Wire Scan first
-  (low-risk), then Install (state-changing).
-
-- **Inspector → Security Hub integration is one-way.** Inspector
-  forwards findings to Security Hub automatically when integration
-  is enabled. Closing a finding in Inspector closes it in Security
-  Hub (within ~5 minutes). Closing in Security Hub does NOT close
-  in Inspector.
-
-- **Inspector delegated admin requires an Organizational unit
-  scope.** The delegated admin account manages Inspector for all
-  member accounts in the Organization. Member accounts cannot
-  disable Inspector or modify configurations.
-
-- **Inspector findings have `Title`, `Description`, and `Remediation`
-  fields.** The `Remediation.Recommendation.Text` field contains
-  vendor-specific guidance (e.g., "Update package `openssl` to
-  version 1.1.1n"). Parse this to drive the SSM Automation
-  parameters dynamically.
-
-- **`AWS-RunPatchBaseline` patches only packages in the approved
-  patch baseline.** A CVE affecting a package NOT in the baseline
-  (e.g., a third-party repo) is not patched by SSM. The CVE will
-  re-appear in Inspector after rescan. Extend the patch baseline
-  with the required source repository.
-
-- **Inspector cannot scan an EC2 instance without SSM agent
-  running.** Inspector relies on SSM for both scanning and patching.
-  An instance without SSM agent appears in `list-coverage` as
-  `NOT_DETECTED` — no findings will ever surface.
-
-- **Container image rebuild requires CI/CD pipeline access.**
-  Inspector detects the vulnerable image; CodeBuild (or equivalent)
-  rebuilds it from a patched base image. The pipeline trigger is
-  typically EventBridge → CodeBuild `start-build`.
+→ Step-0 expert-knowledge deep dive moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 1: Classify the finding source
 
@@ -214,35 +137,7 @@ If the source is ECR, the remediation is "rebuild the image" not
 
 ### Step 2: Enable Inspector (EC2 / ECR / Lambda)
 
-```bash
-aws inspector2 enable \
-  --account-ids 111111111111 \
-  --client-token $(uuidgen) \
-  --ec2 \
-  --ecr \
-  --lambda
-```
-
-Verify coverage:
-
-```bash
-aws inspector2 list-coverage \
-  --filter-criteria accountId=111111111111
-```
-
-For multi-account via delegated admin:
-
-```bash
-# In the management account
-aws inspector2 enable \
-  --account-ids 111111111111 222222222222 333333333333 \
-  --ec2 --ecr --lambda
-
-# Designate delegated admin
-aws organizations register-delegated-administrator \
-  --account-id 111111111111 \
-  --service-principal inspector2.amazonaws.com
-```
+→ Inspector enable + delegated-admin CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Common pitfall:** the delegated admin account must be a member of
 the Organization, and Inspector must be enabled in the management
@@ -279,271 +174,26 @@ in production.
 
 ### Step 5: Wire EventBridge rule for findings
 
-```bash
-aws events put-rule \
-  --name inspector-critical-auto-patch \
-  --event-pattern '{
-    "source": ["aws.inspector2"],
-    "detail-type": ["Inspector Finding"],
-    "detail": {
-      "severity": ["CRITICAL"],
-      "status": ["OPEN"]
-    }
-  }'
-
-aws events put-targets \
-  --rule inspector-critical-auto-patch \
-  --targets '[{"Id":"inspector-patch-ssm","Arn":"arn:aws:ssm:us-east-1:111111111111:automation-definition/AWS-RunPatchBaseline","RoleArn":"arn:aws:iam::111111111111:role/service-role/AmazonInspectorEventBridgeInvokeSSM"}]'
-```
-
-Or route to Lambda for triage logic:
-
-```bash
-aws events put-targets \
-  --rule inspector-critical-auto-patch \
-  --targets '[{"Id":"inspector-triage-lambda","Arn":"arn:aws:lambda:us-east-1:111111111111:function:inspector-finding-triage","DeadLetterConfig":{"Arn":"arn:aws:sqs:us-east-1:111111111111:inspector-finding-dlq"}}]'
-```
-
-Lambda handler:
-
-```python
-import boto3, json
-ssm = boto3.client('ssm')
-inspector = boto3.client('inspector2')
-
-def lambda_handler(event, context):
-    finding = event['detail']
-    finding_arn = finding['findingArn']
-    severity = finding['severity']
-    resource = finding['resources'][0]
-
-    if resource['type'] == 'AWS_EC2_INSTANCE':
-        instance_id = resource['details']['awsEc2Instance']['instanceId']
-
-        if severity == 'CRITICAL':
-            # Auto-patch
-            ssm.start_automation_execution(
-                DocumentName='AWS-RunPatchBaseline',
-                DocumentVersion='1',
-                Parameters={
-                    'InstanceId': [instance_id],
-                    'Operation': ['Install'],
-                    'RebootOption': ['RebootIfNeeded']
-                },
-                Mode='Auto'
-            )
-            return {'statusCode': 200, 'body': f'Started patch for {instance_id}'}
-
-    elif resource['type'] == 'AWS_ECR_CONTAINER_IMAGE':
-        # Trigger rebuild via CodeBuild
-        cb = boto3.client('codebuild')
-        cb.start_build(
-            projectName='container-rebuild-pipeline',
-            environmentVariablesOverride=[{
-                'name': 'VULNERABLE_IMAGE',
-                'value': resource['details']['awsEcrContainerImage']['imageName']
-            }]
-        )
-
-    return {'statusCode': 200, 'body': 'No action'}
-```
+→ EventBridge rule wiring + triage Lambda handler moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### Step 6: SSM patch baseline for OS findings
 
-```bash
-# Create a patch baseline aligned to Amazon Linux 2
-aws ssm create-patch-baseline \
-  --name "al2-critical-patches" \
-  --operating-system AMAZON_LINUX_2 \
-  --patch-groups "critical-patch-group" \
-  --approval-rules '{
-    "PatchRules": [{
-      "PatchFilterGroup": {
-        "PatchFilters": [{
-          "Key": "CLASSIFICATION",
-          "Values": ["Security"]
-        }, {
-          "Key": "SEVERITY",
-          "Values": ["Critical", "Important"]
-        }]
-      },
-      "ApproveAfterDays": 0,
-      "ComplianceLevel": "CRITICAL"
-    }]
-  }'
-```
-
-Register the baseline as the default for the OS:
-
-```bash
-aws ssm register-patch-baseline-for-patches \
-  --baseline-id "pb-abc123def456" \
-  --operating-systems AMAZON_LINUX_2
-```
-
-**Patch baseline gotchas:**
-- `ApproveAfterDays: 0` auto-approves immediately. Use 7 days for
-  High, 30 for Medium to allow soak time.
-- `ComplianceLevel: CRITICAL` flags non-compliant instances as
-  "Critical" in the SSM compliance dashboard.
-- Patch groups are tags (`Patch Group: critical-patch-group`).
-  Instances must be tagged to receive patches from this baseline.
+→ SSM patch baseline creation CLI + gotchas moved verbatim to [references/ssm-patch-baselines.md](references/ssm-patch-baselines.md).
 
 ### Step 7: SSM Automation runbook for patching
 
-```bash
-aws ssm start-automation-execution \
-  --document-name AWS-RunPatchBaseline \
-  --document-version "1" \
-  --parameters '{
-    "InstanceId": ["i-0abc123def456"],
-    "Operation": ["Install"],
-    "RebootOption": ["RebootIfNeeded"],
-    "SnapshotId": [""]
-  }' \
-  --mode Auto
-```
-
-For fleet-wide patching with approval:
-
-```yaml
-# Custom SSM Automation runbook
----
-schemaVersion: '0.3'
-assumeRole: '{{ AutomationAssumeRole }}'
-description: 'Patch EC2 instances flagged by Inspector Critical findings'
-parameters:
-  InstanceIds:
-    type: StringList
-    description: 'List of instance IDs to patch'
-  AutomationAssumeRole:
-    type: String
-mainSteps:
-  - name: CreateSnapshot
-    action: aws:createImage
-    inputs:
-      InstanceId: '{{ InstanceIds[0] }}'
-      ImageName: 'pre-patch-snapshot-{{ global:DATE_TIME }}'
-      NoReboot: true
-    outputs:
-      - Name: ImageId
-        Selector: '$.ImageId'
-        Type: String
-  - name: PatchInstances
-    action: aws:runCommand
-    inputs:
-      DocumentName: AWS-RunPatchBaseline
-      InstanceIds: '{{ InstanceIds }}'
-      Parameters:
-        Operation: Install
-        RebootOption: RebootIfNeeded
-    isCritical: true
-    onFailure: abort
-  - name: VerifyPatch
-    action: aws:waitForAwsResourceProperty
-    inputs:
-      Service: ssm
-      Api: DescribeInstancePatches
-      InstanceId: '{{ InstanceIds[0] }}'
-      PropertySelector: '$.Patches[?(@.State=="Installed")].State'
-      DesiredValues: ['Installed']
-      Waiter: 'InstancePatchesState'
-```
+→ SSM Automation patch runbook moved verbatim to [references/ssm-patch-baselines.md](references/ssm-patch-baselines.md).
 
 ### Step 8: ECR image scan on push + rebuild trigger
 
-Enable scan-on-push per repository:
-
-```bash
-aws ecr put-image-scanning-configuration \
-  --repository-name prod-app \
-  --image-scanning-configuration scanOnPush=true
-```
-
-For scheduled rescan of existing images:
-
-```bash
-# EventBridge cron rule: weekly rescan
-aws events put-rule \
-  --name ecr-weekly-rescan \
-  --schedule-expression "cron(0 6 ? * MON *)" \
-  --state ENABLED
-
-aws events put-targets \
-  --rule ecr-weekly-rescan \
-  --targets '[{"Id":"ecr-rescan-lambda","Arn":"arn:aws:lambda:us-east-1:111111111111:function:ecr-batch-rescan"}]'
-```
-
-Lambda handler:
-
-```python
-import boto3
-ecr = boto3.client('ecr')
-
-def lambda_handler(event, context):
-    repos = ecr.describe_repositories(maxResults=50)
-    for repo in repos['repositories']:
-        images = ecr.list_images(repositoryName=repo['repositoryName'], maxResults=100)
-        for img in images['imageIds']:
-            try:
-                ecr.start_image_scan(
-                    repositoryName=repo['repositoryName'],
-                    imageId={'imageDigest': img['imageDigest']}
-                )
-            except Exception as e:
-                print(f'Skip {img}: {e}')
-    return {'statusCode': 200}
-```
-
-Container rebuild trigger via CodeBuild:
-
-```bash
-aws events put-rule \
-  --name inspector-ecr-rebuild-trigger \
-  --event-pattern '{
-    "source": ["aws.inspector2"],
-    "detail-type": ["Inspector Finding"],
-    "detail": {
-      "severity": ["CRITICAL"],
-      "status": ["OPEN"],
-      "resources": {
-        "type": ["AWS_ECR_CONTAINER_IMAGE"]
-      }
-    }
-  }'
-
-aws events put-targets \
-  --rule inspector-ecr-rebuild-trigger \
-  --targets '[{"Id":"codebuild-rebuild","Arn":"arn:aws:codebuild:us-east-1:111111111111:project/container-rebuild-pipeline","RoleArn":"arn:aws:iam::111111111111:role/service-role/CodeBuildEventBridgeInvoke"}]'
-```
+→ ECR scan-on-push, rescan, rebuild-trigger implementation moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### Step 9: Lambda code scan finding handling
 
 Lambda findings require function code update — there is no in-place
 patch. The workflow:
 
-```python
-# Lambda triggered by EventBridge on Lambda code scan finding
-import boto3, os
-lambda_client = boto3.client('lambda')
-sns = boto3.client('sns')
-
-def lambda_handler(event, context):
-    finding = event['detail']
-    function_arn = finding['resources'][0]['details']['awsLambdaFunction']['functionArn']
-    function_name = function_arn.split(':')[-1] if ':' in function_arn else function_arn
-
-    # Notify — Lambda patches require code redeploy
-    sns.publish(
-        TopicArn=os.environ['NOTIFY_TOPIC'],
-        Message=f'Inspector finding on Lambda {function_name}: {finding["title"]}\n\n'
-                f'Remediation: {finding.get("remediation", {}).get("recommendation", {}).get("text", "n/a")}\n'
-                f'Redeploy required: update dependency in build pipeline.'
-    )
-
-    # Optional: create a ticket via Jira/ServiceNow API
-    return {'statusCode': 200}
-```
+→ Lambda code-scan finding handler moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Lambda finding gotchas:**
 - Code scan findings are NOT auto-remediable via SSM.
@@ -553,25 +203,7 @@ def lambda_handler(event, context):
 
 ### Step 10: Inspector to Security Hub forwarding
 
-Enable integration:
-
-```bash
-aws inspector2 batch-update-configuration \
-  --ec2-configuration '[]' \
-  --ecr-configuration '[]' \
-  --lambda-configuration '[]'
-
-# Security Hub integration is enabled by default when both are active
-aws securityhub describe-hub  # verify Security Hub is enabled
-```
-
-Verify findings are forwarding:
-
-```bash
-aws securityhub get-findings \
-  --filters 'GeneratorId=[{"Value":"aws-inspector","Comparison":"PREFIX"}]' \
-  --query 'Findings[0].[Id,Severity,GeneratorId]' --output json
-```
+→ Security Hub forwarding enable/verify CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Integration rules:**
 - Closing an Inspector finding closes the Security Hub finding
@@ -586,16 +218,7 @@ aws securityhub get-findings \
 For findings on resources where remediation is not feasible (e.g.,
 legacy system with no patch available):
 
-```bash
-aws inspector2 update-finding \
-  --finding-arn arn:aws:inspector2:us-east-1:111111111111:finding/abc123 \
-  --status SUPPRESSED
-
-# Or batch update
-aws inspector2 batch-update-findings \
-  --finding-arns arn:aws:inspector2:us-east-1:111111111111:finding/abc123 arn:aws:inspector2:us-east-1:111111111111:finding/def456 \
-  --suppression-reason "Legacy system decommission scheduled 2027-Q1"
-```
+→ Finding suppression CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Suppression rules:**
 - Suppressed findings stay in Inspector with `status: SUPPRESSED`.
@@ -603,47 +226,11 @@ aws inspector2 batch-update-findings \
 - They re-open if the finding changes (e.g., new evidence).
 - Document suppression rationale in `suppressionReason` for audit.
 
-For automated suppression (accepted-risk list):
-
-```python
-import boto3
-inspector = boto3.client('inspector2')
-
-ACCEPTED_RISKS = {
-    'arn:aws:inspector2:us-east-1:111111111111:finding/abc123': 'Legacy CVE, decommission scheduled',
-    # ... loaded from DynamoDB
-}
-
-def lambda_handler(event, context):
-    for arn, reason in ACCEPTED_RISKS.items():
-        inspector.update_finding(
-            findingArn=arn,
-            status='SUPPRESSED',
-            suppressionReason=reason
-        )
-    return {'statusCode': 200}
-```
+→ Automated suppression Lambda moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### Step 12: Multi-account via delegated admin
 
-```bash
-# In the management account — designate delegated admin
-aws organizations register-delegated-administrator \
-  --account-id 111111111111 \
-  --service-principal inspector2.amazonaws.com
-
-# In the delegated admin account — enable for all member accounts
-aws inspector2 enable \
-  --account-ids $(aws organizations list-accounts --query 'Accounts[].Id' --output text | tr '\t' ' ') \
-  --ec2 --ecr --lambda
-```
-
-Verify member account coverage:
-
-```bash
-aws inspector2 list-coverage \
-  --filter-criteria accountId=222222222222
-```
+→ Multi-account delegated-admin CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Multi-account gotchas:**
 - Member accounts cannot disable Inspector once the delegated admin
@@ -665,50 +252,11 @@ OPEN → (suppressed for accepted risk) → SUPPRESSED → (re-opens if finding 
 
 SLA enforcement via scheduled Lambda:
 
-```python
-import boto3, os
-from datetime import datetime, timedelta
-inspector = boto3.client('inspector2')
-sns = boto3.client('sns')
-
-SLA = {
-    'CRITICAL': 1,   # days
-    'HIGH': 7,
-    'MEDIUM': 30,
-    'LOW': 90,
-}
-
-def lambda_handler(event, context):
-    now = datetime.utcnow()
-    for severity, sla_days in SLA.items():
-        cutoff = (now - timedelta(days=sla_days)).isoformat()
-        resp = inspector.list_findings(
-            filterCriteria={
-                'severity': [{'comparison': 'EQUALS', 'value': severity}],
-                'status': [{'comparison': 'EQUALS', 'value': 'OPEN'}],
-                'updatedAt': [{'comparison': 'LESS_THAN', 'value': cutoff}]
-            }
-        )
-        for finding in resp['findings']:
-            sns.publish(
-                TopicArn=os.environ['SLA_TOPIC'],
-                Message=f'SLA breached: {severity} finding {finding["findingArn"]} open for > {sla_days} days'
-            )
-    return {'statusCode': 200}
-```
+→ SLA enforcement Lambda moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### Step 14: Patch baseline association to instances
 
-```bash
-# Tag instances for patch group
-aws ec2 create-tags \
-  --resources i-0abc123def456 i-0def456ghi789 \
-  --tags Key=Patch Group,Value=critical-patch-group
-
-# Verify patch baseline association
-aws ssm describe-effective-patch-instances \
-  --instance-id i-0abc123def456
-```
+→ Patch-group tagging + baseline association CLI moved verbatim to [references/ssm-patch-baselines.md](references/ssm-patch-baselines.md).
 
 **Patch group gotchas:**
 - An instance can be in only one patch group per OS.
@@ -765,24 +313,7 @@ TEMPLATE:
 
 ### Worked example — REVIEW_REQUIRED, missing delegated admin
 
-```text
-FINDING: multiaccount-finding-triage
-SEVERITY: HIGH
-DETECTION:
-  - Source: aws.inspector2 in management account
-  - Resource: AWS_ECR_CONTAINER_IMAGE across 15 member accounts
-  - CVE: CVE-2026-5678 on log4j in shared service image
-RESPONSE:
-  - Action: notify + rebuild trigger
-  - SLA: 7 days
-  - Automation: blocked (delegated admin not configured)
-SSM_RUNBOOK: n/a (container finding — CodeBuild rebuild)
-VERIFICATION: blocked
-MULTI_ACCOUNT: REVIEW_REQUIRED — delegated admin not yet configured
-VERDICT: REVIEW_REQUIRED
-GAP: Inspector delegated admin not configured. Without delegated admin, findings must be queried per-member-account individually. Configure via aws organizations register-delegated-administrator --account-id 111111111111 --service-principal inspector2.amazonaws.com before enabling fleet-wide automation.
-TEMPLATE: (blocked until delegated admin configured)
-```
+→ Secondary worked example moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 ## Anti-Patterns — NEVER do these things
 
@@ -874,29 +405,7 @@ TEMPLATE: (blocked until delegated admin configured)
 
 ## Pre-flight safety checks (run before applying any Inspector CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing
-  operation (`inspector2 enable`, `disable`, `update-finding`,
-  custom SSM `start-automation-execution`, suppressing findings),
-  emit:
-  `CONFIRM: About to <action> for finding/coverage <id> in account
-  <account>. This affects <consequence>. Proceed? (yes/no)`
-
-- **Snapshot the target EC2 instances** before any patching:
-  `aws ec2 create-image --instance-id i-0abc123 --name "pre-inspector-patch-$(date +%s)" --no-reboot`
-
-- **Before auto-patching Critical findings in production**, run
-  the patch baseline in `Operation: Scan` mode for 1 week in
-  pre-prod to validate the baseline contents. Then promote to
-  `Install` mode.
-
-- **Before deploying Inspector multi-account**, verify the
-  delegated admin account is correctly designated via
-  `aws inspector2 list-delegated-admin-accounts`.
-
-- **For container rebuild automation**, dry-run the CodeBuild
-  project manually with a test finding payload to verify the
-  build pipeline produces a patched image without exhausting
-  concurrent build limits.
+→ Pre-flight safety checks moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ## Appendix A — Common Inspector automation patterns (summary)
 
@@ -938,36 +447,7 @@ Is the finding on EC2, ECR, or Lambda?
 
 ## Recent AWS features (2024-2026)
 
-- **Inspector Lambda code scans GA (2024):** Static analysis on
-  Lambda deployment packages covering dependency CVEs. NOT runtime
-  analysis. Limited to functions updated after Inspector Lambda
-  coverage was enabled.
-
-- **Inspector ECR automated re-scan (2024):** Inspector automatically
-  rescans ECR images when the CVE database is updated (within 24
-  hours of a new CVE publication). Previously required manual
-  `start-image-scan`. Verify with `aws ecr describe-image-scan-findings`
-  post-CVE release.
-
-- **Inspector delegated admin enhancements (2024-2025):** Multi-account
-  coverage reporting via `list-coverage` aggregated across all member
-  accounts. Faster propagation of coverage changes (5-15 minutes).
-
-- **Inspector finding aggregation in Security Hub (2025):** Improved
-  finding correlation — Inspector findings now include
-  `RelatedFindings` linking network reachability findings to
-  CVE-based findings on the same instance.
-
-- **Inspector Lambda runtime monitoring preview (2025-2026):**
-  Limited preview of runtime behavior analysis for Lambda
-  functions, complementing the static code scan. Check regional
-  availability before designing workflows that depend on it.
-
-- **SSM patch baseline integration with Inspector (2025):**
-  `AWS-RunPatchBaseline` now reads Inspector finding metadata to
-  prioritize patches. The patch document parameter
-  `IncludeInspectorFindings: true` filters the patch operation to
-  only Inspector-flagged packages.
+→ Recent AWS features catalog moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Expert heuristic: automation blast radius
 
@@ -990,105 +470,7 @@ across an account in minutes). EventBridge → SSM automation can
 patch all of them concurrently, exceeding instance capacity for
 reboot or applying a bad patch before operators notice.
 
-**Concrete scoping techniques:**
-
-| Technique | Mechanism | Blast-radius limit |
-|---|---|---|
-| Tag-based patch groups | `Patch Group: critical-prod-canary` tag | Restricts patch to canary instances |
-| Non-prod OU promotion | Deploy in non-prod OU first, promote after soak | Zero prod exposure until validated |
-| `Operation: Scan` before `Install` | SSM patch baseline mode | Validates baseline contents without state change |
-| Rate-limit via SQS | EventBridge → SQS → Lambda → SSM | Caps concurrent patch executions |
-| Maintenance window gate | Route Critical findings into the next window | Human gate per cycle |
-| Snapshot gate | `aws:createImage` as first runbook step | Recovery path within minutes |
-
-**Pre-production validation protocol (3-cycle rule):**
-
-1. **Cycle 1 — SCAN-ONLY in non-prod:** Deploy Inspector + patch
-   baseline in `Operation: Scan` mode. Monitor the SSM patch
-   compliance dashboard for 1 week. Verify findings correlate with
-   Inspector output.
-
-2. **Cycle 2 — INSTALL in non-prod:** Promote baseline to `Install`.
-   Plant a known-vulnerable instance. Verify the patch runs, the
-   instance reboots, the Inspector finding transitions to CLOSED
-   within 24 hours, and Security Hub reflects the closure.
-
-3. **Cycle 3 — SCAN-ONLY in prod:** Deploy the validated baseline to
-   production in `Operation: Scan` mode. Monitor for 1 week.
-   Verify no false-positive patch compliance flags. Then promote
-   to `Install` with snapshot gate enabled.
-
-**CloudFormation scoping pattern (recommended for fleet rollout):**
-
-```yaml
-# Inspector-driven patching with snapshot gate and non-prod soak
-Resources:
-  PatchBaseline:
-    Type: AWS::SSM::PatchBaseline
-    Properties:
-      Name: inspector-critical-patches
-      OperatingSystem: AMAZON_LINUX_2
-      ApprovalRules:
-        PatchRules:
-          - PatchFilterGroup:
-              PatchFilters:
-                - Key: CLASSIFICATION
-                  Values: [Security]
-                - Key: SEVERITY
-                  Values: [Critical]
-            ApproveAfterDays: 0
-            ComplianceLevel: CRITICAL
-      PatchGroups:
-        - critical-patch-group
-
-  PatchAutomationRunbook:
-    Type: AWS::SSM::Document
-    Properties:
-      DocumentType: Automation
-      Content:
-        schemaVersion: '0.3'
-        mainSteps:
-          - name: Snapshot
-            action: aws:createImage
-            inputs:
-              InstanceId: '{{ InstanceId }}'
-              ImageName: 'pre-inspector-patch-{{ global:DATE_TIME }}'
-              NoReboot: true
-          - name: Patch
-            action: aws:runCommand
-            inputs:
-              DocumentName: AWS-RunPatchBaseline
-              InstanceIds: ['{{ InstanceId }}']
-              Parameters:
-                Operation: Install
-                RebootOption: RebootIfNeeded
-
-  EventBridgeRule:
-    Type: AWS::Events::Rule
-    Properties:
-      Name: inspector-critical-auto-patch
-      EventPattern:
-        source: [aws.inspector2]
-        detail-type: [Inspector Finding]
-        detail:
-          severity: [CRITICAL]
-          status: [OPEN]
-          resources:
-            type: [AWS_EC2_INSTANCE]
-      State: ENABLED  # Flip to ENABLED only after Cycle 2 validation
-      Targets:
-        - Arn: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:automation-definition/AWS-RunPatchBaseline'
-          RoleArn: !GetAtt EventBridgeInvokeSSMRole.Arn
-```
-
-**Detection of blast-radius breach post-deploy:** CloudWatch alarm on
-`SSM > CommandInvocationCount > N in 5 minutes` (suggests a bad
-EventBridge rule firing on a burst of findings). Also alarm on
-`SSM > InstancePatchCompliance > NonCompliantCount > N` in 24 hours
-(suggests a bad patch baseline applied account-wide). Both alarms
-should page the on-call security team and trigger an EventBridge
-rule that disables the Inspector auto-patch rule via
-`aws events disable-rule`.
+→ Blast-radius scoping techniques + 3-cycle protocol + CFN pattern moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 **Surface in the output:** for any recommended automation, include
 `BLAST_RADIUS: <scope>` (e.g., `OU-wide`,
@@ -1096,6 +478,13 @@ rule that disables the Inspector auto-patch rule via
 `VALIDATION_STATUS: <scan-non-prod | install-non-prod | scan-prod |
 install-prod>`. If `VALIDATION_STATUS` is not `install-prod`, do
 NOT mark the auto-patch recommendation as deployable.
+
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked example: REVIEW_REQUIRED (missing delegated admin).
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — enable/coverage CLI (Steps 2, 12); EventBridge wiring + triage Lambda (Step 5); ECR scan/rescan/rebuild (Step 8); Lambda, Security Hub, suppression and SLA handlers (Steps 9-11, 13); pre-flight safety checks.
+- [references/ssm-patch-baselines.md](references/ssm-patch-baselines.md) — extended: patch baseline creation, patch runbooks, patch-group tagging (Steps 6, 7, 14).
+- [references/advanced-patterns.md](references/advanced-patterns.md) — extended Mindset bullets; Step-0 expert knowledge; recent AWS features; blast-radius scoping techniques, 3-cycle validation protocol, CloudFormation pattern.
 
 ## Domain
 

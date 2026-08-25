@@ -125,81 +125,20 @@ Three Inspector v2 realities drive every operation:
 state including `autoEnable`, `maxAccountLimitReached`, and the
 delegated admin account ID.
 
-**Live-account pre-flight (skip if offline plan):**
-1. `inspector2 describe-organization-configuration` — capture
-   `autoEnable.ec2/ecr/lambda`, `maxAccountLimitReached`.
-2. `inspector2 list-delegated-admin-accounts` — capture delegated
-   admin account ID(s).
-3. `inspector2 list-members --only-associated` — capture members
-   with `relationshipStatus: ENABLED`.
-4. `inspector2 list-coverage` — coverage report per region.
-5. `ec2 describe-instances --filters "Name=instance-state-name,Values=running"`
-   — running instances for EC2 gap analysis.
-6. `ssm describe-instance-information` — SSM agent `PingStatus:
-  Online` (deep inspection requires online SSM).
-7. `ecr describe-repositories` + `ecr put-image-scanning-configuration`
-   — rescan-on-push state per repository.
-8. `lambda list-functions` — runtime for Lambda scan eligibility.
+Probe commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before live-account execution.
 
 **Malformed input:** emit `VERDICT: ERROR` with reason and remediation.
 
-| Attribute | Effect on operation |
-|---|---|
-| `autoEnable.ec2: false` at org level | New members do NOT auto-enable EC2. Update org config or enable per-member. |
-| `maxAccountLimitReached: true` | Org hit the member cap (default 1000). BLOCKED until members disassociated. |
-| Delegated admin mismatch | `enable-delegated-admin-account` for a non-delegated account returns `ConflictException`. BLOCKED. |
-| `relationshipStatus: DISABLED` for a member | Member in the org but Inspector disabled. ENABLE required via delegated admin. |
-| `PingStatus: ConnectionLost` (EC2) | Deep inspection cannot scan. BLOCKED for deep-inspection operations. |
-| `scanOnPush: false` (ECR) | Images scanned only on manual `start-image-scan`. INFO. |
-| Lambda runtime `provided.al2023` | Supported but custom layers may need explicit `lambda:GetLayerVersion` grant. INFO. |
+Moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when a pre-check fails or a resource shows a coverage gap.
 
 ## Process — operation planning (apply in order)
 
 ### Step 0: Expert knowledge — non-obvious Inspector behaviors
 
-- **Org-mode enable is one-way for member accounts.** Once a member
-  is associated (`relationshipStatus: ENABLED`), the member CANNOT
-  self-disable; only the delegated admin can disassociate it.
-- **Auto-enable only applies to NEW member accounts.** When the org
-  is configured with `autoEnable`, existing members keep their
-  pre-existing state. Audit each member via
-  `batch-get-member-ec2-deep-inspection-state` and `list-members`.
-- **EC2 deep inspection is opt-in on top of standard scanning.**
-  Standard covers network reachability and OS-level CVEs; deep adds
-  package inventory via the SSM association
-  `AmazonInspector-ManageAWSAgent`. Instances opt out via
-  `batch-update-ec2-deep-inspection-state`.
-- **ECR rescan-on-push is configured at the repository.** Update
-  ECR `put-image-scanning-configuration` with `scanOnPush: true`.
-  `ecr-enhanced` pulls the Inspector agent for deep package
-  inventory; `basic` uses the native ECR CVE list.
-- **Lambda code vulnerability scanning requires runtime support.**
-  Supported (2026): `python3.x`, `nodejs.x`, `java11/17/21`,
-  `provided.al2023`. Unsupported (`dotnet`, `ruby`, `go` on
-  `provided.al2`) are silently skipped. Inspector needs
-  `lambda:GetLayerVersion` to scan layers.
-- **SBOM export targets S3 with a KMS key.** Asynchronous:
-  `start-sbom-export` returns a `reportId`; completion lands in the
-  bucket. The bucket policy must grant `s3:PutObject` and KMS key
-  must grant `kms:GenerateDataKey` to the Inspector service
-  principal.
-- **Coverage gap analysis is region-by-region.** A resource appears
-  in `list-coverage` for the region scanned. Cross-region
-  aggregation requires AWS Security Hub or a custom aggregator.
-- **Inspector charges by scan per resource per region.** Disabling
-  unused regions avoids cost. Surface expected cost in NOTES.
-- **Delegated admin must be in the same Organizations root.** OU
-  moves do not revoke delegation — disassociation requires explicit
-  `disable-delegated-admin-account` from the management account.
-- **Network reachability scans run from AWS.** Inspector analyzes
-  Security Groups and route tables for internet exposure. Host-agent
-  scanning (standard + deep) requires the Inspector agent via SSM.
-- **Lambda scanning is per version, not per alias.** `$LATEST` is
-  scanned; published versions scanned once. For continuous coverage,
-  re-publish on changes.
-- **ECR enhanced scan is rate-limited per repository.** Concurrent
-  `start-image-scan` calls are serialized. Use `scanOnPush: true`
-  rather than batched manual scans for high-volume registries.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for expert behaviors, edge cases, and recent features.
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
@@ -313,156 +252,13 @@ If ANY verification fails, emit `VERDICT: ERROR` — do not claim COMPLETED.
 
 ## Common patterns (boilerplate)
 
-### Enable Inspector for EC2 + ECR + Lambda (standalone account)
-
-```bash
-aws inspector2 enable \
-  --account-ids 111111111111 \
-  --client-token "$(date +%s)" \
-  --resource-types EC2 ECR LAMBDA \
-  --region us-east-1
-```
-
-Lambda code vulnerability scanning is enabled alongside LAMBDA;
-no separate flag needed.
-
-### Configure delegated admin for Organizations-wide coverage
-
-```bash
-# From the Organizations MANAGEMENT account
-aws inspector2 enable-delegated-admin-account \
-  --delegated-admin-account-id 222222222222 \
-  --client-token "$(date +%s)"
-
-# From the DELEGATED ADMIN account, set auto-enable defaults
-aws inspector2 update-organization-configuration \
-  --auto-enable '{ec2: true, ecr: true, lambda: true}' \
-  --client-token "$(date +%s)"
-```
-
-`autoEnable` applies ONLY to NEW member accounts. Existing members
-keep their pre-config state.
-
-### Associate a member account (from delegated admin)
-
-```bash
-aws inspector2 associate-member \
-  --account-id 333333333333 \
-  --client-token "$(date +%s)"
-```
-
-The member must already be in the org. After association,
-`list-members` returns `relationshipStatus: ENABLED`.
-
-### Enable EC2 deep inspection (org-level default)
-
-```bash
-# From the delegated admin
-aws inspector2 update-organization-configuration \
-  --auto-enable '{ec2: true, ecr: true, lambda: true}' \
-  --ec2-deep-inspection-configuration '{
-    "enabled": true,
-    "packageNameFilters": ["kernel", "openssl"]
-  }'
-```
-
-Instances opt in/out via `batch-update-ec2-deep-inspection-state
---instance-ids i-aaa i-bbb --scan-state ENABLED`. The SSM
-association `AmazonInspector-ManageAWSAgent` must be `ACTIVE`.
-
-### Enable ECR rescan-on-push for a repository
-
-```bash
-aws ecr put-image-scanning-configuration \
-  --repository-name prod-app \
-  --image-scanning-configuration scanOnPush=true \
-  --region us-east-1
-```
-
-Inspector uses this setting. Without `scanOnPush: true`, Inspector
-scans only on `start-image-scan`. Enhanced scans (`ecr-enhanced`)
-pull the Inspector agent for deep package inventory.
-
-### Verify Lambda code vulnerability scanning is active
-
-```bash
-aws inspector2 list-coverage \
-  --filter-criteria 'RESOURCE_TYPE=_EQUALS=LAMBDA_FUNCTION' \
-  --region us-east-1 \
-  --output table
-```
-
-Coverage rows with `scanType: LAMBDA_CODE` are scanned. Functions
-in unsupported runtimes (`dotnet6`, `ruby`) are absent — surface as
-a gap.
-
-### Start SBOM export (CycloneDX format)
-
-```bash
-aws inspector2 start-sbom-export \
-  --report-format CYCLONEDX_1_5 \
-  --s3-destination '{
-    "bucketName": "inspector-sbom-prod",
-    "kmsKeyArn": "arn:aws:kms:us-east-1:111111111111:key/abcd1234",
-    "keyPrefix": "sbom/us-east-1/"
-  }' \
-  --resource-filter-criteria '{
-    "accountId": [{"comparison": "EQUALS", "value": "111111111111"}],
-    "resourceType": [{"comparison": "EQUALS", "value": "AWS_ECR_CONTAINER_IMAGE"}]
-  }' \
-  --client-token "$(date +%s)"
-```
-
-Returns a `reportId`. Poll via `list-sbom-export --report-id <id>`
-until `status: COMPLETED`. The S3 object appears at
-`s3://<bucket>/<keyPrefix><reportId>.json`.
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when formatting a secondary example or CLI pattern.
 
 ## Diagnostic flows
 
-### EC2 instance shows 0% coverage
-
-1. `inspector2 list-coverage --filter-criteria
-   'RESOURCE_ID=_EQUALS=i-0123456789abcdef0'` — capture `scanStatus`,
-   `scanType`, `errorMessage`.
-2. Common failures:
-   - `AGENT_NOT_INSTALLED`: install the SSM agent; wait 15-30 min.
-   - `AGENT_OFFLINE`: SSM agent `PingStatus: ConnectionLost`. Reboot
-     the agent or instance.
-   - `DEEP_INSPECTION_NOT_ACTIVE`: SSM association
-     `AmazonInspector-ManageAWSAgent` missing or `Associated: false`.
-     Create the association via SSM State Manager.
-   - `UNSUPPORTED_OS`: rare with 2026 coverage; check release notes.
-3. Remediation: install SSM agent / create association / update OS.
-   Re-scan is automatic after the next scan window.
-
-### ECR repository shows no scans
-
-1. `ecr describe-image-scanning-configuration --repository-name <name>`
-   — capture `scanOnPush`.
-2. `ecr describe-images --repository-name <name> --image-ids
-   imageTag=latest --query 'imageDetails[0].imageScanStatus'`.
-3. Common failures:
-   - `scanOnPush: false` and no manual `start-image-scan`: enable
-     `scanOnPush` or run `start-image-scan`.
-   - `imageScanStatus: FAILED`: image size or manifest error.
-   - Region does not support `ecr-enhanced`: fall back to `basic`.
-4. Remediation: `put-image-scanning-configuration` /
-   `start-image-scan` / move the repository to a supported region.
-
-### Lambda function not scanned
-
-1. `inspector2 list-coverage --filter-criteria
-   'RESOURCE_TYPE=_EQUALS=LAMBDA_FUNCTION'` — check if the function
-   appears.
-2. `lambda get-function-configuration --function-name <name>` —
-   capture `runtime`.
-3. Common failures:
-   - Unsupported runtime (`dotnet6`, `ruby`): Inspector skips.
-   - Layers lacking Inspector principal: add `lambda:GetLayerVersion`
-     to the layer policy.
-   - Function is a published version only: scan applies to `$LATEST`.
-4. Remediation: switch runtime (if feasible), add layer permission,
-   or accept as a known gap.
+Moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when a pre-check fails or a resource shows a coverage gap.
 
 ## Output format (per operation)
 
@@ -527,62 +323,13 @@ NOTES:
 
 ### Worked example — enable delegated admin (READY)
 
-```text
-OPERATION: enable-delegated-admin
-VERDICT: READY
-TARGET: delegated-admin-account-id 222222222222
-PRE_CHECKS:
-  - [PASS] Caller is the Organizations management account 111111111111
-  - [PASS] list-delegated-admin-accounts returns no existing
-    delegated admin for Inspector
-  - [PASS] Target account 222222222222 is a member of the org in
-    the same root
-STEPS:
-  1. CONFIRM: About to enable-delegated-admin-account setting
-     account 222222222222 as the delegated admin. Only the
-     delegated admin can manage member enable/disable afterwards.
-     Proceed? (yes/no)
-  2. aws inspector2 enable-delegated-admin-account \
-       --delegated-admin-account-id 222222222222 \
-       --client-token 1723305600
-POST_VERIFY:
-  - list-delegated-admin-accounts returns 222222222222 with
-    status: ENABLED
-  - describe-organization-configuration succeeds from the delegated
-    admin account
-STATE: pending — delegated admin ACTIVE within ~30 seconds
-NOTES:
-  - Org-mode is one-way: member accounts cannot self-disable.
-  - Run update-organization-configuration separately to set
-    autoEnable defaults for new member accounts.
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when formatting a secondary example or CLI pattern.
 
 ### Worked example — diagnose EC2 coverage gap (BLOCKED)
 
-```text
-OPERATION: diagnose-coverage
-VERDICT: BLOCKED
-TARGET: account 111111111111 region us-east-1 EC2
-PRE_CHECKS:
-  - [PASS] batch-get-account-status returns state: ENABLED for EC2
-    in us-east-1
-  - [FAIL] 3 of 12 instances report AGENT_OFFLINE in list-coverage
-    (i-aaa, i-bbb, i-ccc). SSM PingStatus ConnectionLost. Inspector
-    requires the SSM agent online; deep inspection requires
-    AmazonInspector-ManageAWSAgent ACTIVE.
-  - [PASS] 9 of 12 instances report COMPLETED scan in last 24h
-STEPS: (none — pre-checks failed; this is a diagnosis)
-POST_VERIFY: (none)
-STATE: FAILED — 3 instances offline for Inspector scanning
-NOTES:
-  - Remediation: install/restart the SSM agent on i-aaa, i-bbb,
-    i-ccc. Verify the instance profile includes
-    AmazonSSMManagedInstanceCore. Re-scan is automatic once
-    PingStatus returns Online.
-  - For deep inspection, verify the
-    AmazonInspector-ManageAWSAgent SSM association is Associated:
-    true on each instance.
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when formatting a secondary example or CLI pattern.
 
 ## STRICT output contract
 
@@ -674,29 +421,17 @@ coverage is at 100%, missing the SSM-agent-offline instances.
 
 ## Recent AWS features (2024-2026)
 
-- **Lambda code vulnerability scanning (2025)**: Inspector scans
-  Lambda function code (Python, Node.js, Java) for CVEs in
-  application dependencies; enabled via `enable --resource-types
-  LAMBDA`. No separate flag is needed.
-- **Inspector SBOM export (2024)**: export CycloneDX 1.5 or SPDX 2.3
-  SBOM per account/region to a customer-owned S3 bucket with KMS
-  encryption; `start-sbom-export` is asynchronous, status via
-  `list-sbom-export`.
-- **EC2 deep inspection (2024, refined 2025)**: package-level
-  inventory scanning via the SSM association
-  `AmazonInspector-ManageAWSAgent`; supports `packageNameFilters`.
-  Instances opt in/out via `batch-update-ec2-deep-inspection-state`.
-- **ECR enhanced scan (2024)**: deep package inventory beyond the
-  native ECR CVE list; enabled via `ecr-enhanced` scan type.
-- **Inspector for AWS Organizations (2023, refined 2024)**:
-  delegated-admin model with `autoEnable` defaults; org-level
-  member limit (default 1000 member accounts).
-- **Inspector integration with AWS Security Hub (2025)**: findings
-  auto-publish to Security Hub for cross-region and cross-account
-  aggregation.
-- **Inspector Network Reachability (2024)**: analyzes Security
-  Group and route table state for internet exposure; no agent
-  required.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for expert behaviors, edge cases, and recent features.
+
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples and CLI boilerplate patterns moved from this SKILL.md
+- [references/error-handling.md](references/error-handling.md) — pre-flight attribute effects and per-resource diagnostic flows moved from this SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — live-account pre-flight command listing moved from this SKILL.md
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step-0 expert knowledge and recent AWS features moved from this SKILL.md
+- [references/ecr-ec2-lambda-coverage-guide.md](references/ecr-ec2-lambda-coverage-guide.md) — per-resource-type scan mechanics and coverage gaps
+- [references/org-mode-and-delegated-admin-guide.md](references/org-mode-and-delegated-admin-guide.md) — org-mode enablement and delegated admin semantics
 
 ## Domain
 
@@ -715,3 +450,4 @@ AWS CloudOps / Amazon Inspector v2 Coverage and Enablement Operations.
 - **API Reference** — https://docs.aws.amazon.com/inspector/latest/user/inspector-v2-api.html
 - **AWS CLI inspector2 reference** — https://docs.aws.amazon.com/cli/latest/reference/inspector2/
 - **Inspector Pricing** — https://aws.amazon.com/inspector/pricing/
+

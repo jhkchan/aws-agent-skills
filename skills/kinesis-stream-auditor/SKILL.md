@@ -70,145 +70,15 @@ throughput math, iterator-age data-loss path) are in the
 
 ## Pre-flight: stream metadata gate (run before classification)
 
-Before evaluating dimensions, classify the stream itself. Several attributes
-short-circuit the audit.
-
-**Multi-stream / account-wide sweep note (pagination):** when auditing every
-stream in an account, `aws kinesis list-streams` returns at most 100 per page
-(use `--next-token`). For each stream, also call `list-stream-consumers` (caps
-at 100 per page) and `list-shards` (caps at 1,000 per page, use
-`--next-token`). Always drain `NextToken` to completion — the long tail of
-streams is where stale, unencrypted, or over-retained streams hide.
-
-**Live-account pre-flight checks (skip if doing offline config audit):**
-1. Verify the caller's identity can run `kinesis:UpdateStreamMode` /
-   `StartStreamEncryption` if remediation is intended — most read-only auditor
-   roles CANNOT, and remediation commands will fail with `AccessDenied`.
-2. Verify CloudWatch has the `AWS/Kinesis` namespace ingesting — without it,
-   `GetRecords.IteratorAgeMilliseconds` (the stream-level consumer-lag metric)
-   has no data and the audit cannot assess consumer health.
-3. Snapshot `aws kinesis list-stream-consumers --stream-arn <arn>` BEFORE any
-   mode or encryption change — consumers are not migrated automatically when
-   switching from KMS to NONE; they continue to decrypt with the old key until
-   they re-read from `TRIM_HORIZON`.
-
-| Attribute | Value | Effect on audit |
-|---|---|---|
-| `StreamStatus` | `ACTIVE` | Normal operation. Proceed with full audit. |
-| `StreamStatus` | `CREATING` | Stream not yet available. Note as operational: `PutRecord`/`GetRecords` fail. Classify metadata but mark transitional. |
-| `StreamStatus` | `UPDATING` | Resharding or encryption change in progress. `UpdateShardCount` is blocked until ACTIVE. Note but do not block classification. |
-| `StreamStatus` | `DELETING` | Stream being deleted — irrecoverable. Output ERROR: stream is being deleted. |
-| `StreamMode` | `PROVISIONED` | Shard count is customer-managed. Evaluate shard cost, quota, and capacity. |
-| `StreamMode` | `ON_DEMAND` | Shard count is auto-managed. Skip shard-count quota check. Evaluate per-stream-hour cost vs data volume. |
-
-**If the stream configuration is malformed** (missing required fields,
-unparseable), output:
-
-```text
-STREAM: <stream-name>
-VERDICT: ERROR
-REASON: Stream configuration is incomplete or malformed — cannot classify.
-REMEDIATION: Retrieve the canonical summary with aws kinesis describe-stream-summary --stream-name <name> and re-audit.
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Pre-flight: stream metadata gate (run before classification)".
+> Load when: classifying a stream — StreamStatus/StreamMode gate table, account-wide sweep pagination, malformed-config ERROR block.
 
 ## Process — Classification logic (apply in order, aggregate worst)
 
 ### Step 0: Expert knowledge — non-obvious Kinesis behaviors that change classification
 
-These behaviors are easy to misjudge without operational Kinesis experience.
-Each changes a verdict if ignored:
-
-- **Retention cost is billed SEPARATELY from shard cost.** The per-shard-hour
-  fee (~$0.015/hr in us-east-1 = ~$11/shard/month) covers the shard's compute
-  capacity for 24 hours of retention. Each hour beyond 24 incurs an
-  ADDITIONAL extended-retention charge per GB of data stored. A 10-shard
-  stream at 1 MB/s/shard (10 MB/s = 864 GB/day) with 720-hour (30-day)
-  retention stores ~25 TB of extended-retention data — the retention fee can
-  EXCEED the shard fee. Always evaluate retention as an independent cost
-  dimension.
-
-- **On-demand per-stream-hour floor.** On-demand mode charges
-  ~$0.04/stream-hour (~$29/month) plus per-GB-ingested and per-GB-retrieved
-  fees, REGARDLESS of data volume. A stream ingesting 50 MB/day costs ~$30/month
-  in on-demand mode vs ~$11/month for a 1-shard provisioned stream at the same
-  volume. The crossover: below ~200 MB/day of ingest, provisioned is cheaper;
-  above ~1 GB/day with bursty patterns, on-demand is cheaper. A steady-state
-  high-throughput workload is ALWAYS cheaper on provisioned.
-
-- **Classic consumers SHARE 2 MB/s read throughput per shard.** All consumers
-  using `GetRecords` (polling) compete for a single 2 MB/s read budget per
-  shard. Three classic consumers on one shard each get ~0.67 MB/s. Enhanced
-  fan-out consumers (`RegisterStreamConsumer`) get 2 MB/s EACH, independently.
-  The threshold: if `ConsumerCount > 2` and no enhanced fan-out consumers are
-  registered, read throughput is the bottleneck — flag as CONFIG_GAP.
-
-- **WriteProvisionedThroughputExceeded is per-SHARD, not per-stream.** Write
-  throttling is enforced at the shard level (1 MB/s or 1,000 records/s per
-  shard). A 4-shard stream with uneven partition-key distribution can throttle
-  on one shard while three are idle. The fix is a better partition key
-  strategy, not more shards. Without `WriteProvisionedThroughputExceeded` in
-  enhanced monitoring, you cannot identify WHICH shard is throttling.
-
-- **Shard quota is account-region, not per-stream.** The default
-  per-account-per-region quota for provisioned shards is 500 (Service Quotas:
-  "Shards per Region"). A single stream with 450 shards leaves only 50 for
-  ALL other streams. On-demand streams do NOT count against this quota (they
-  have a separate 50-stream-per-region on-demand quota). Always evaluate
-  shard count against the account-level quota, not in isolation.
-
-- **UpdateShardCount blocks during UPDATING.** Resharding
-  (`UpdateShardCount` or `SplitShard`/`MergeShards`) transitions the stream to
-  `UPDATING` state. No further resharding calls are accepted until the stream
-  returns to `ACTIVE` (seconds to minutes). `UpdateShardCount` can scale up to
-  10x per call; multiple calls are needed for large jumps. A stream stuck in
-  `UPDATING` for more than a few minutes indicates a stuck reshard — contact
-  AWS support.
-
-- **Encryption switch is NOT a one-way door, but it has quirks.** You CAN
-  switch from `NONE` to `KMS` (`StartStreamEncryption`) and from `KMS` back
-  to `NONE` (`StopStreamEncryption`). However, switching the KMS KEY requires
-  `StopStreamEncryption` then `StartStreamEncryption` with the new key — there
-  is no direct "update key" API. During the transition, the stream is in
-  `UPDATING` state. Existing records are re-encrypted lazily on read, not
-  retroactively.
-
-- **AWS-managed key (`alias/aws/kinesis`) is shared and non-customizable.**
-  This key is used by ALL Kinesis streams in the account that select
-  `EncryptionType: KMS` without specifying a CMK. Its key policy is managed by
-  AWS — you CANNOT add conditions, restrict principals, or enable
-  customer-managed rotation scheduling. For compliance frameworks requiring
-  customer-controlled key policies (PCI-DSS 3.4, HIPAA, FedRAMP), a
-  customer-managed CMK is mandatory. Flag the AWS-managed key as a compliance
-  note, not a hard finding — encryption IS present, just not customer-governed.
-
-- **IteratorAgeMilliseconds approaching retention = silent data loss.** If
-  `GetRecords.IteratorAgeMilliseconds` (stream-level, always available without
-  enhanced monitoring) approaches `RetentionPeriodHours * 3,600,000`, the
-  consumer is falling behind and records will expire from the retention window
-  before being read. This is a silent data-loss path that does NOT trigger any
-  CloudWatch alarm by default. An alarm on `GetRecords.IteratorAgeMilliseconds
-  > RetentionPeriodHours * 3,600,000 * 0.8` (80% of retention) is the
-  standard defence.
-
-- **Closed shards after resharding.** After `SplitShard` or `MergeShards`,
-  parent shards are CLOSED (`SequenceNumberRange.EndingSequenceNumber` is set).
-  Consumers reading from a closed shard receive no new data and must discover
-  child shards via `ListShards`. The KCL (Kinesis Client Library) handles this
-  automatically, but a custom consumer that does not call `ListShards` after
-  detecting a closed shard will stall silently — appearing healthy while
-  processing zero records.
-
-- **Enhanced fan-out consumer limit: 20 per stream.** Each enhanced fan-out
-  consumer gets dedicated 2 MB/s per shard. The default quota is 20 consumers
-  per stream. Beyond 20, `RegisterStreamConsumer` fails with
-  `LimitExceededException`. Do not recommend adding enhanced fan-out consumers
-  indiscriminately on streams with many consumers.
-
-- **On-demand cooldown after scale-up.** On-demand mode scales up immediately
-  when a write is throttled, but does NOT scale down for 15 minutes after
-  the last throttle. During bursty workloads, you pay for peak capacity during
-  the cooldown even if traffic drops to near-zero. This makes on-demand
-  expensive for spiky-but-low-volume workloads that burst frequently.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Step 0: Expert knowledge — non-obvious Kinesis behaviors that change classification".
+> Load when: a behavior seems non-obvious — retention cost coupling, on-demand per-stream-hour floor, shared classic-consumer throughput, shard quota scope.
 
 ### Step 1: Encryption evaluation (highest priority — security-critical)
 
@@ -374,35 +244,8 @@ REMEDIATION:
 
 ## Edge-case handling
 
-- **StreamStatus: UPDATING during audit.** If the stream is transitioning
-  (resharding or encryption change), classify the metadata as-is — the
-  post-transition state will differ. Emit a NOTE: "Stream is in UPDATING state
-  (resharding or encryption change in progress). Re-audit after the stream
-  returns to ACTIVE."
-
-- **On-demand stream with high OpenShardCount.** On-demand mode manages shard
-  count automatically. A high `OpenShardCount` on an on-demand stream reflects
-  recent traffic, not a quota risk. Do NOT flag on-demand shard count against
-  the 500-shard provisioned quota — on-demand streams have a separate quota.
-
-- **RetentionPeriodHours = 24 (default).** 24 hours is the included retention
-  — no extended-retention charges. This is OK for the cost dimension.
-
-- **RetentionPeriodHours < 24.** Rare but valid for cost-sensitive workloads
-  where consumers read within minutes. No cost finding. Note: lowering below
-  24h requires `DecreaseStreamRetentionPeriod` and is bounded by the current
-  minimum (1 hour).
-
-- **EnhancedMonitoring with ALL metrics.** Some operators enable all
-  shard-level metrics on large streams. The CloudWatch cost scales with
-  shard_count x metric_count. For a 100-shard stream with 8 metrics, that is
-  800 custom metrics/month (~$40 in CloudWatch charges). Not a verdict driver
-  but note if shard count is high.
-
-- **EncryptionType: KMS but KeyId is empty or null.** This indicates a
-  malformed configuration — KMS encryption requires a KeyId. Treat as
-  CONFIG_GAP: "EncryptionType is KMS but KeyId is not specified — the stream
-  cannot encrypt new records. Verify with describe-stream-summary."
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Edge-case handling".
+> Load when: an edge case appears — UPDATING streams, on-demand shard counts, sub-24h retention, all-metrics monitoring cost.
 
 ## Anti-Patterns — NEVER
 
@@ -471,238 +314,29 @@ REMEDIATION:
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`StartStreamEncryption`, `StopStreamEncryption`, `UpdateShardCount`,
-  `IncreaseStreamRetentionPeriod`, `DecreaseStreamRetentionPeriod`,
-  `UpdateStreamMode`), the auditor MUST emit:
-  `CONFIRM: About to <action> on stream <name> in account <account>. This
-  affects <consequence>. Proceed? (yes/no)`
-  Do NOT execute the CLI command until the operator confirms.
-
-- **StartStreamEncryption key-id validation.** When emitting a
-  `StartStreamEncryption` command, verify the KeyId exists and the KMS key is
-  ENABLED: `aws kms describe-key --key-id <id>`. A key in `Disabled` or
-  `PendingDeletion` state will cause `StartStreamEncryption` to fail with
-  `KMSDisabledException`.
-
-- **Retention decrease is irreversible for expired data.** When emitting
-  `DecreaseStreamRetentionPeriod`, note that records older than the new
-  retention period are immediately deleted and unrecoverable. Confirm no
-  consumer needs the older data before decreasing.
-
-- **UpdateStreamMode is one-way for on-demand to provisioned.** Switching
-  from ON_DEMAND to PROVISIONED sets the shard count based on the current
-  on-demand capacity. Verify the resulting shard count is within budget
-  before switching. Switching back to ON_DEMAND is possible but takes effect
-  immediately.
-
-- **Enhanced fan-out consumer registration cost.** Each enhanced fan-out
-  consumer incurs per-consumer-AU-hour charges (~$0.028/consumer-AU-hour in
-  us-east-1). Confirm the consumer is needed before recommending
-  `RegisterStreamConsumer`.
-
-- **Capture pre-change state for rollback.** Before any modification, capture:
-  `aws kinesis describe-stream-summary --stream-name <name> --output json >
-  /tmp/<name>-backup-$(date +%s).json`. There is no undo for retention
-  decreases or encryption-key changes.
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Pre-flight safety checks (run before any remediation CLI)".
+> Load when: before any remediation CLI — confirmation gate, KMS key validation, irreversible retention decrease, rollback snapshot.
 
 ## Remediation guidance
 
-### For NO_ENCRYPTION — EncryptionType: NONE
-
-1. **Enable KMS encryption** immediately. Use a customer-managed CMK for
-   compliance-sensitive workloads:
-   ```bash
-   aws kinesis start-stream-encryption \
-     --stream-name <name> \
-     --encryption-type KMS \
-     --key-id arn:aws:kms:us-east-1:111111111111:key/<cmk-id>
-   ```
-   Or with the AWS-managed key (minimum viable):
-   ```bash
-   aws kinesis start-stream-encryption \
-     --stream-name <name> \
-     --encryption-type KMS \
-     --key-id alias/aws/kinesis
-   ```
-2. **Note:** existing plaintext records are NOT retroactively encrypted. Only
-   new records are encrypted. Old records expire from the retention window
-   naturally. If immediate encryption of all data is required, create a new
-   encrypted stream and migrate producers.
-3. **Verify:** `aws kinesis describe-stream-summary --stream-name <name>` and
-   confirm `EncryptionType: KMS`.
-
-### For COST_RISK — Extended retention (> 168 hours)
-
-1. **Reduce retention** to the minimum consumers need for replay:
-   ```bash
-   aws kinesis decrease-stream-retention-period \
-     --stream-name <name> \
-     --retention-period-hours 24
-   ```
-2. **Verify** no consumer requires the extended replay window before
-   decreasing. Records older than the new retention period are deleted
-   immediately and irreversibly.
-3. **Calculate savings:** extended retention charges are proportional to
-   (retention_hours - 24) x shard_count x average_data_rate. Reducing from
-   720h to 24h on a 10-shard stream at 1 MB/s/shard saves ~25 TB of
-   extended-retention storage per month.
-
-### For COST_RISK — On-demand at low volume (< 200 MB/day)
-
-1. **Switch to provisioned mode:**
-   ```bash
-   aws kinesis update-stream-mode \
-     --stream-arn arn:aws:kinesis:us-east-1:111111111111:stream/<name> \
-     --stream-mode PROVISIONED
-   ```
-2. **Set shard count** to match peak throughput:
-   ```bash
-   aws kinesis update-shard-count \
-     --stream-name <name> \
-     --target-shard-count 1 \
-     --scaling-type UNIFORM_SCALING
-   ```
-3. **Savings:** on-demand per-stream-hour (~$29/month) + per-GB charges
-   vs provisioned 1-shard (~$11/month). For < 200 MB/day, provisioned is
-   cheaper.
-
-### For COST_RISK — Provisioned approaching shard quota (> 400 shards)
-
-1. **Evaluate partition-key distribution.** Uneven distribution causes hot
-   shards, which forces over-provisioning. Fix the partition key strategy
-   before reducing shards.
-2. **Reduce shard count** if throughput allows:
-   ```bash
-   aws kinesis update-shard-count \
-     --stream-name <name> \
-     --target-shard-count 200 \
-     --scaling-type UNIFORM_SCALING
-   ```
-3. **Request a quota increase** if the shard count is justified:
-   ```bash
-   aws service-quotas request-service-quota-increase \
-     --service-code kinesis \
-     --quota-code L-7B8615C9 \
-     --desired-value 1000
-   ```
-
-### For CONFIG_GAP — Missing enhanced-monitoring metrics
-
-1. **Enable essential shard-level metrics:**
-   ```bash
-   aws kinesis enable-enhanced-monitoring \
-     --stream-name <name> \
-     --shard-level-metrics IteratorAgeMilliseconds WriteProvisionedThroughputExceeded
-   ```
-2. **Set a CloudWatch alarm** on iterator age approaching retention:
-   ```bash
-   aws cloudwatch put-metric-alarm \
-     --alarm-name kinesis-<name>-iterator-age \
-     --namespace AWS/Kinesis \
-     --metric-name GetRecords.IteratorAgeMilliseconds \
-     --dimensions Name=StreamName,Value=<name> \
-     --threshold <RetentionPeriodHours * 3600000 * 0.8> \
-     --comparison-operator GreaterThanThreshold \
-     --evaluation-periods 1 \
-     --period 300
-   ```
-
-### For CONFIG_GAP — No consumers (ConsumerCount: 0)
-
-1. **Register a consumer** or verify a Kinesis Firehose is attached:
-   ```bash
-   aws kinesis register-stream-consumer \
-     --stream-arn arn:aws:kinesis:us-east-1:111111111111:stream/<name> \
-     --consumer-name my-consumer
-   ```
-2. If no consumer is needed yet, set a CloudWatch alarm on
-   `GetRecords.IteratorAgeMilliseconds` to alert when data is at risk of
-   expiring unread.
-
-### For OK
-
-1. No remediation required.
-2. Recommend a CloudWatch alarm on `GetRecords.IteratorAgeMilliseconds`
-   approaching the retention threshold (defense-in-depth).
-3. For provisioned streams, recommend periodic shard-utilization review to
-   catch partition-key hot spots before they cause throttling.
+> **Moved verbatim** → [references/error-handling.md](references/error-handling.md) § "Remediation guidance".
+> Load when: the verdict is known — per-verdict fix procedures with exact CLI for NO_ENCRYPTION, COST_RISK, and CONFIG_GAP findings.
 
 ## Deep reference: Kinesis Data Streams internals
 
-### Shard capacity and throughput math
-
-Each provisioned shard provides:
-- **Write:** 1 MB/sec OR 1,000 records/sec (whichever is hit first)
-- **Read (classic):** 2 MB/sec shared across ALL `GetRecords` consumers on
-  that shard, with a max of 5 `GetRecords` calls/sec per shard
-- **Read (enhanced fan-out):** 2 MB/sec PER consumer, independently
-
-On-demand mode provides capacity in units:
-- Each on-demand unit = 10,000 records/sec write, 2 MB/sec write, 2 MB/sec
-  read
-- Default: 4 units (40,000 records/sec, 8 MB/sec write)
-- Scales automatically; minimum after scale-down is 4 units (the floor)
-
-### Resharding mechanics
-
-`UpdateShardCount` (recommended for provisioned scaling):
-- Can scale UP or DOWN
-- Max scaling: 10x per call (can make multiple calls)
-- Minimum target: 1 shard (absolute floor)
-- Stream enters `UPDATING` state during the operation
-- Existing shards are closed; new shards are created
-- Consumers must discover child shards via `ListShards`
-
-`SplitShard` / `MergeShards` (manual resharding):
-- `SplitShard`: splits one shard into two (doubles capacity for that hash key
-  range)
-- `MergeShards`: merges two adjacent shards into one (halves capacity)
-- More granular than `UpdateShardCount` but requires hash-key-range knowledge
-- Both transition the stream to `UPDATING`
-
-### Enhanced fan-out vs classic consumer throughput
-
-| Aspect | Classic (GetRecords) | Enhanced Fan-Out (SubscribeToShard) |
-|---|---|---|
-| Throughput per consumer | Shared 2 MB/s/shard | Dedicated 2 MB/s/shard |
-| Latency | Poll-interval (configurable, typically 1s) | ~70ms (HTTP/2 push) |
-| Max consumers | Unlimited (but throughput is shared) | 20 per stream (quota) |
-| Cost | Included in shard-hour fee | Per-consumer-AU-hour (~$0.028/hr) |
-| API | `GetRecords` (polling) | `SubscribeToShard` (streaming) |
-
-### Iterator-age data-loss path
-
-Records in Kinesis expire from the stream after `RetentionPeriodHours`. If a
-consumer's `IteratorAgeMilliseconds` (time between record write and record
-read) approaches the retention period, records are at risk of expiring before
-being read. This is silent — no error is thrown, no alarm fires by default.
-
-The standard defence is a CloudWatch alarm on:
-`GetRecords.IteratorAgeMilliseconds > RetentionPeriodHours * 3,600,000 * 0.8`
-
-This gives a 20% buffer before data loss begins.
-
-### Encryption internals
-
-- `StartStreamEncryption` transitions the stream to `UPDATING`. New records
-  are encrypted with the specified key. Existing records are NOT re-encrypted
-  — they remain in their original form until they expire from the retention
-  window.
-- `StopStreamEncryption` sets `EncryptionType` back to `NONE`. New records are
-  plaintext. Existing encrypted records can still be read (the key must remain
-  accessible).
-- Switching the CMK requires `StopStreamEncryption` then
-  `StartStreamEncryption` with the new key — there is no direct update.
-- The AWS-managed key (`alias/aws/kinesis`) rotates automatically (annual,
-  managed by AWS). Customer-managed CMKs support rotation via
-  `aws kms enable-key-rotation`.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Deep reference: Kinesis Data Streams internals".
+> Load when: you need the internals — shard capacity math, resharding mechanics, fan-out vs classic throughput, iterator-age data-loss path.
 
 ## Recent AWS features (2024-2026)
 
-- **On-demand capacity mode updates (2024-2025):** On-demand streams now support higher throughput limits and automatic capacity adaptation. Auditors should verify that on-demand streams are not over-provisioned for workloads that have steady, predictable throughput (provisioned mode would be cheaper).
-- **Enhanced fan-out consumer improvements (2024):** Enhanced fan-out now supports more consumers per stream (up to 20). Auditors should verify that consumer count is within limits and that consumers have appropriate CloudWatch alarms on `IteratorAgeMilliseconds`.
-- **Stream consumer checkpointing via KCL:** Enhanced Kinesis Client Library (KCL) support for checkpointing. No new audit-surface fields, but auditors should verify that consumers have proper checkpoint strategies to avoid data reprocessing.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Recent AWS features (2024-2026)".
+> Load when: checking 2024-2026 feature availability — on-demand capacity updates, fan-out consumer limits, KCL checkpointing.
+
+## References (load on demand)
+
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight stream metadata gate (status/mode table, sweep pagination, malformed-config ERROR block) and pre-flight safety checks before remediation CLIs
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 non-obvious Kinesis behaviors, edge-case handling, Kinesis internals deep reference (shard math, resharding, fan-out, iterator-age loss path), recent AWS features 2024-2026
+- [references/error-handling.md](references/error-handling.md) — remediation guidance per verdict (NO_ENCRYPTION, COST_RISK, CONFIG_GAP, OK)
 
 ## Domain
 

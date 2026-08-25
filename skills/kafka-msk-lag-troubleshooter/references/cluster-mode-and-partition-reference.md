@@ -197,3 +197,32 @@ count and will not add capacity under load.
 On KRaft-mode clusters, the ZK metrics do not exist. Do not attempt to
 diagnose ZK issues on a KRath cluster; route to BROKER_SATURATION or
 controller metrics instead.
+
+## Deep reference — producer acks, ISR/min.insync.replicas, Provisioned vs Serverless throttle model (moved from SKILL.md)
+
+### Producer acks matrix
+
+| acks | Durability | Throughput | Latency | Use case |
+|---|---|---|---|---|
+| 0 | Lowest (data loss on failure) | Highest | Lowest | Fire-and-forget telemetry |
+| 1 | Medium (leader write only) | Medium | Medium | Balanced latency/durability |
+| all (or -1) | Highest (ISR write) | Lowest | Highest | Financial, transactional |
+
+### ISR and min.insync.replicas matrix
+
+| Cluster RF | min.insync.replicas | acks | Tolerates | Write fails when |
+|---|---|---|---|---|
+| 3 | 2 | all | 1 broker failure | 2+ brokers fail (ISR < 2) |
+| 3 | 1 | all | 2 broker failures | All replicas fail (data loss risk) |
+| 2 | 2 | all | 0 broker failures | 1 broker fails (no tolerance) |
+| 2 | 1 | all | 1 broker failure | Both fail |
+
+### MSK Provisioned vs Serverless throttle model
+
+| Dimension | Provisioned | Serverless |
+|---|---|---|
+| Throttle basis | Broker resource (CPU, disk, network) | Per-partition CU (write, read) |
+| Scale | Add brokers, scale broker type | Auto-scales partitions (up to 12,000) |
+| Partition CU cap | n/a | Per-partition hard cap (region-specific) |
+| ZooKeeper | ZK-based (2.x/3.x) or KRaft (3.5+) | KRaft only (no ZK) |
+| Diagnostic focus | Broker-level CloudWatch | Partition-level CU throttle |

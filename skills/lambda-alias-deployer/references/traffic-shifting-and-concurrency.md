@@ -175,3 +175,78 @@ During a traffic shift, monitor these CloudWatch metrics:
 **Recommendation:** use alias routing config for most deployments.
 Use CodeDeploy when you need automatic alarm-based rollback and
 pre-traffic validation hooks.
+
+## Expert heuristic: weighted traffic shifting lifecycle
+
+Traffic shifting is NOT a single API call. It is a progressive
+rollout that shifts weight from one version to another over time.
+A baseline model says "update the alias"; this heuristic explains
+the full lifecycle.
+
+```text
+Publish version N (new code)
+  → aws lambda publish-version
+  → Version N is now immutable and has a version number
+
+Alias currently points 100% to version N-1
+  → Create/update alias to shift 10% to version N (canary)
+  → aws lambda update-alias --routing-config AdditionalVersionWeights={"N":0.1}
+  → 90% traffic → version N-1, 10% → version N
+
+Monitor CloudWatch alarms for version N (Errors, Throttles, Duration)
+  → If healthy: progressively shift 25% → 50% → 100% to version N
+  → If unhealthy: rollback by shifting 100% back to version N-1
+
+Final state: alias points 100% to version N
+  → aws lambda update-alias --function-version N --routing-config {}
+  → Remove routing config; alias is now a simple pointer to N
+```
+
+**Key implication:** Traffic shifting requires TWO published
+versions. You cannot shift traffic to `$LATEST` — only to a
+published version. This is the #1 cause of "why can't I set a
+weight?" errors: the target version does not exist.
+
+**Canary vs linear:**
+- **Canary:** small initial burst (e.g., 10%) then jump to 100%.
+  Good for fast validation with rollback safety.
+- **Linear:** gradual increment (e.g., 10% every 5 minutes) until
+  100%. Good for high-traffic functions where a sudden 10% shift
+  is significant.
+- **All-at-once (no shifting):** alias directly points 100% to the
+  new version. No safety net. Not recommended for production.
+
+**Rollback:** to rollback, set the weight back to the old version.
+This is instant — no redeployment needed. This is the primary
+advantage of alias-based traffic shifting over CodeDeploy-based
+deployments.
+
+## Expert heuristic: provisioned concurrency on alias vs version
+
+Provisioned concurrency eliminates cold starts by pre-initializing
+execution environments. A baseline model puts it on the function;
+the correct approach is to put it on the ALIAS.
+
+| Target | Behavior during traffic shift | Recommendation |
+|---|---|---|
+| Alias | Provisioned capacity follows the alias. As traffic shifts, provisioned environments serve the new version. Stable through rollouts. | **RECOMMENDED** |
+| Version | Provisioned capacity is bound to that version number. When the alias re-points, the provisioned capacity is on the OLD version, not the new one. | Avoid for traffic-shifting scenarios |
+| Function (publish) | Provisioned capacity applies to a specific published version. Same issue as version-level. | Same as version |
+| $LATEST | Not supported. Provisioned concurrency cannot be configured on $LATEST. | Never use |
+
+**Configuration on alias:**
+```bash
+aws lambda put-provisioned-concurrency-config \
+  --function-name my-function \
+  --qualifier prod \
+  --provisioned-concurrent-executions 10
+```
+
+**Key rule:** The `--qualifier` parameter is the ALIAS name (e.g.,
+`prod`), not a version number. This binds provisioned concurrency
+to the alias, and it follows the alias as traffic shifts.
+
+**Cost implication:** Provisioned concurrency is billed regardless
+of invocations. You pay for the pre-initialized environments even
+if no traffic arrives. Right-size based on steady-state traffic,
+not peak. Use Application Auto Scaling to adjust dynamically.

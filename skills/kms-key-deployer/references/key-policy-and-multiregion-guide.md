@@ -563,3 +563,21 @@ Both policies must allow — KMS is a "both-must-allow" service.
   "Resource": "arn:aws:kms:us-east-1:<account-a-id>:key/<key-id>"
 }
 ```
+
+## Edge-case handling — quick list (from SKILL.md)
+
+- **Accidental lockout:** if a key policy excludes root, recovery is
+  impossible. Always validate with IAM policy simulator before applying.
+- **CMK in PendingDeletion:** cannot Encrypt/GenerateDataKey, CAN Decrypt
+  (allows data migration). Cancel with `CancelKeyDeletion`.
+- **Asymmetric key rotation:** manual — create new key, update alias,
+  re-encrypt on next access. Old key must remain for historical decrypt.
+- **Multi-Region replica policy drift:** each replica has independent policy.
+  Automate sync via CloudFormation StackSets or Terraform `for_each`.
+- **Custom key store disconnect:** CloudHSM cluster unhealthy or `kmsuser`
+  password rotated → key store disconnects, all Encrypt/Decrypt fails.
+  Monitor health, set CloudWatch alarm.
+- **Quota limits:** each CMK supports 50,000 RPS for `GenerateDataKey`
+  (Region-wide). For higher throughput, use envelope encryption with data
+  key caching.
+

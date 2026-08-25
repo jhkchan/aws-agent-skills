@@ -205,3 +205,23 @@ endpoint. The caller cannot forge these.
    true if the key is absent." It does NOT make the condition optional.
    Use it when a key may not be present (e.g., `aws:SourceVpce` for
    non-endpoint requests).
+
+## Condition key JSON examples — aws:RequestedRegion, aws:CalledVia (moved from SKILL.md)
+
+**`aws:RequestedRegion` example (multi-region restriction):**
+```json
+"Condition": {
+  "StringEqualsIgnoreCase": {
+    "aws:RequestedRegion": ["us-east-1", "eu-west-1"]
+  }
+}
+```
+
+**`aws:CalledVia` example (CloudFormation-only):**
+```json
+"Condition": {
+  "StringEquals": {
+    "aws:CalledVia": ["cloudformation.amazonaws.com"]
+  }
+}
+```

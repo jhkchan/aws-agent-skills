@@ -148,43 +148,8 @@ Three misconceptions dominate IoT Core misdesign at provisioning time:
 
 ## Configuration dependency graph (novel heuristic)
 
-IoT Core configurations are NOT independent. The certificate must exist
-before it can be attached to a thing. The policy must exist before it
-can be attached to a certificate. Topic rules need an IAM role for
-downstream actions. Device shadow is enabled per-thing.
-
-| Configuration | Hard dependencies | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| Thing | IAM `iot:CreateThing` | name is immutable | cert attachment, shadow, jobs |
-| Thing group | IAM `iot:CreateThingGroup` | supports hierarchical groups | bulk job targeting |
-| Certificate (X.509) | CSR or AWS-generated key pair | cert ARN required for all attachments; must be ACTIVE | thing binding, policy binding |
-| IoT policy | JSON policy document | defines MQTT connect/publish/subscribe/resource ARN patterns | certificate attachment |
-| Attach cert→thing | thing + cert exist; IAM `iot:AttachThingPrincipal` | REQUIRED — without it cert is not bound to thing | device connection |
-| Attach policy→cert | cert + policy exist; IAM `iot:AttachPolicy` | REQUIRED — without it cert has no permissions | MQTT authorization |
-| Topic rule | IAM role for action; SQL statement | SQL evaluates against message PAYLOAD; role needs downstream perms | message-to-Lambda/S3/SQS/etc |
-| Device shadow | Thing exists | created on first update; classic uses standard topics; named uses /name/<name>/ | offline state sync |
-| IoT job | Job document; target things/groups | job doc must be valid JSON; rollout per config | OTA firmware, config updates |
-| Fleet indexing | IAM `iot:CreateIndex` | indexing takes time to build | thing search and discovery |
-| Custom authorizer | Lambda function; IAM role | Lambda must return auth result; authorizer must be ACTIVE | custom device authentication |
-| Greengrass component | Core device registered; recipe | deployed to thing group; async | edge compute |
-
-**The certificate-thing-policy binding row is the one a baseline model
-misses.** Creating a thing, certificate, and policy is necessary but
-NOT sufficient. The certificate must be ATTACHED to the thing
-(`attach-thing-principal`) AND the policy must be ATTACHED to the
-certificate (`attach-policy`). Missing either binding = device cannot
-connect.
-
-**Cross-dependency gotchas:**
-- The IoT policy is attached to the CERTIFICATE (principal), not the
-  thing. A thing can have multiple certificates; each has its own
-  policy set.
-- Topic rule SQL evaluates message payload JSON, NOT a database.
-- Device shadow classic uses topic `$aws/things/<thingName>/shadow/`.
-  Named shadows use
-  `$aws/things/<thingName>/shadow/name/<shadowName>/`.
-- Custom authorizers are invoked BEFORE the IoT policy — the authorizer
-  authenticates, then the policy authorizes.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for the full dependency and gotcha catalog.
 
 ## Expert heuristic: the cert-policy-thing triple binding
 
@@ -213,45 +178,13 @@ Core" is a missing cert-to-thing or policy-to-cert attachment.
 
 ## Expert heuristic: topic rule SQL evaluates against message payload
 
-A baseline model writes topic rule SQL like database SQL. The correct
-heuristic recognizes that the rules engine SQL operates on MQTT message
-payloads (JSON), not tables.
-
-```text
-Incoming MQTT message:
-  Topic: 'device/sensor-001/telemetry'
-  Payload: {"temperature": 35.5, "humidity": 60, "device_id": "sensor-001"}
-
-SQL: SELECT temperature, device_id FROM 'device/+/telemetry'
-       WHERE temperature > 30
-
-Result (when temperature > 30):
-  {"temperature": 35.5, "device_id": "sensor-001"}
-
-Rule action: republish to 'device/alerts'
-OR: invoke Lambda, write to S3/SQS/DynamoDB/Timestream
-
-Key: SQL runs on the PAYLOAD, not any database.
-Wildcards: + = single level, # = multi level in topic filter.
-```
+Moved verbatim to [references/topic-rule-and-shadow.md](references/topic-rule-and-shadow.md).
+Load on demand for rules-engine SQL detail.
 
 ## Expert heuristic: device shadow delta state
 
-```text
-Shadow state machine:
-  Reported (device → cloud):  device reports actual state
-  Desired (cloud → device):   cloud tells device target state
-  Delta:                       desired != reported
-
-  When desired != reported → delta non-empty → device notified
-  When device updates reported to match → delta empty → sync done
-
-  Classic: $aws/things/<thing>/shadow/update
-  Named:   $aws/things/<thing>/shadow/name/<name>/update
-```
-
-**Key implication:** the delta state is the sync mechanism. The device
-must subscribe to the delta topic and update reported to clear it.
+Moved verbatim to [references/topic-rule-and-shadow.md](references/topic-rule-and-shadow.md).
+Load on demand for device-shadow state machine detail.
 
 ## Prerequisites (verify before provisioning)
 
@@ -366,166 +299,23 @@ verified.
 
 ## Step 5 — Topic rule (SQL SELECT, republish)
 
-```bash
-aws iot create-topic-rule \
-  --rule-name "telemetry-to-timestream" \
-  --topic-rule-payload '{
-    "sql": "SELECT temperature, humidity, device_id FROM '\''device/+/telemetry'\'' WHERE temperature > 30",
-    "ruleDisabled": false,
-    "awsIotSqlVersion": "2016-03-23",
-    "actions": [
-      {"timestream": {
-        "roleArn": "arn:aws:iam::123456789012:role/IoTTopicRuleRole",
-        "databaseName": "sensors", "tableName": "telemetry",
-        "dimensions": [{"name":"device_id","value":"${device_id}"}]
-      }},
-      {"republish": {
-        "roleArn": "arn:aws:iam::123456789012:role/IoTTopicRuleRole",
-        "topic": "device/alerts", "qos": 1
-      }}
-    ],
-    "errorAction": {
-      "republish": {
-        "roleArn": "arn:aws:iam::123456789012:role/IoTTopicRuleRole",
-        "topic": "device/errors", "qos": 1
-      }
-    }
-  }' --region us-east-1
-```
-
-**Available actions:** republish, Lambda, S3, SQS, DynamoDB, Timestream,
-SNS, Kinesis Firehose, CloudWatch Alarm/Logs, Elasticsearch, Step
-Functions, IoT Events, IoT Analytics.
-
-**Topic rule IAM role** needs trust policy for `iot.amazonaws.com` and
-permissions for each downstream action (e.g., `timestream:WriteRecords`,
-`iot:Publish`, `lambda:InvokeFunction`).
+CLI and IAM detail moved verbatim to [references/topic-rule-and-shadow.md](references/topic-rule-and-shadow.md).
+Load on demand when authoring the topic rule.
 
 ## Step 6 — Device shadow (classic vs named)
 
-**Classic shadow** — one shadow per thing:
-
-```text
-Topics: $aws/things/<thing>/shadow/update | /get | /delete
-```
-
-**Named shadow** — multiple shadows per thing:
-
-```text
-Topics: $aws/things/<thing>/shadow/name/<name>/update | /get | /delete
-```
-
-**Shadow document:**
-
-```json
-{
-  "state": {
-    "desired": { "led": "on", "threshold": 30 },
-    "reported": { "led": "off", "threshold": 25 }
-  },
-  "version": 3, "timestamp": 1630000000
-}
-```
-
-**Delta:** when desired != reported, the delta is non-empty. Devices
-subscribe to `.../shadow/update/delta` to receive notifications and
-update reported to clear the delta.
+Topic names, shadow document, and delta detail moved verbatim to [references/topic-rule-and-shadow.md](references/topic-rule-and-shadow.md).
+Load on demand when configuring shadows.
 
 ## Step 7 — IoT jobs, fleet indexing, and monitoring
 
-### IoT jobs (OTA firmware update)
-
-```bash
-aws iot create-job \
-  --job-id "firmware-update-v2-1" \
-  --targets "arn:aws:iot:us-east-1:123456789012:thinggroup/factory-floor-sensors" \
-  --document-source "s3://my-job-bucket/firmware-update-v2.1.json" \
-  --target-selection "SNAPSHOT" \
-  --job-execution-rollout-config '{"maximumPerMinute": 10}' \
-  --region us-east-1
-```
-
-`maximumPerMinute` controls deployment rate. For continuous jobs
-(`CONTINUOUS`), things added to the group later also receive the job.
-
-### Fleet indexing
-
-```bash
-aws iot update-indexing-configuration \
-  --thing-indexing-configuration '{
-    "thingIndexingMode": "REGISTRY_AND_SHADOW",
-    "thingConnectivityIndexingMode": "STATUS",
-    "namedShadowIndexingMode": "ON"
-  }' --region us-east-1
-
-aws iot search-index \
-  --index-name "AWS_Things" \
-  --query-string "connectivity.connected:true" \
-  --region us-east-1
-```
-
-### CloudWatch metrics
-
-IoT Core publishes: `Connect.AuthError`, `Connect.Success`,
-`PublishIn.Success`, `PublishOut.Success`, `Subscribe.Success`,
-`Rules.Executed`, `Rules.Failed`.
-
-```bash
-aws cloudwatch put-metric-alarm \
-  --alarm-name "IoT-Connection-Auth-Errors" \
-  --metric-name "Connect.AuthError" --namespace "AWS/IoT" \
-  --statistic "Sum" --period 300 --threshold 10 \
-  --comparison-operator "GreaterThanThreshold" \
-  --evaluation-periods 1 --region us-east-1
-```
+Fleet CLI moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for jobs, fleet indexing, and CloudWatch alarms.
 
 ## Step 8 — Custom authorizer, protocol, Greengrass
 
-### Custom authorizer (Lambda)
-
-Custom authorizers authenticate devices using custom logic beyond
-X.509. The Lambda function returns `isAuthenticated`, `principalId`,
-and `policyDocuments`.
-
-```bash
-aws iot create-authorizer \
-  --authorizer-name "custom-device-auth" \
-  --authorizer-function-arn "arn:aws:lambda:us-east-1:123456789012:function:iot-authorizer" \
-  --token-key-name "token" \
-  --token-signing-public-keys '{"key-1":"-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"}' \
-  --status "ACTIVE" --region us-east-1
-```
-
-The IAM role for IoT to invoke Lambda needs trust policy for
-`iot.amazonaws.com` and `lambda:InvokeFunction` permission. The
-authorizer must be ACTIVE to be invoked.
-
-### MQTT vs HTTPS broker
-
-| Protocol | Use case | Port | Notes |
-|---|---|---|---|
-| MQTT over TLS | Persistent, low latency, pub/sub | 8883 | Recommended for devices |
-| MQTT over WSS | Through firewalls/proxies | 443 | Web-based devices |
-| HTTPS | Request-response only | 443 | Simple ingestion |
-
-**QoS levels:** QoS 0 (at most once), QoS 1 (at least once), QoS 2
-(exactly once). Use QoS 1+ for critical commands.
-
-### Greengrass component deployment
-
-```bash
-aws greengrassv2 create-deployment \
-  --target-arn "arn:aws:iot:us-east-1:123456789012:thinggroup/factory-edge-devices" \
-  --deployment-name "deploy-telemetry-component" \
-  --components '{
-    "com.example.TelemetryAgent": {
-      "componentVersion": "1.0.0",
-      "configurationUpdate": {"MERGE": {"sampleRate": "5s"}}
-    }
-  }' --region us-east-1
-```
-
-Core device must be registered and online to receive the deployment.
+Advanced provisioning CLI moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for authorizers, broker protocol choice, and Greengrass.
 
 ## NEVER do these things
 
@@ -652,27 +442,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Device cannot connect (connection refused)
-- Verify certificate is ACTIVE. Verify policy is attached to the
-  CERTIFICATE (not the thing). Verify certificate is attached to the
-  thing as a principal. Check `iot:Connect` resource matches client ID.
+Moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when a device or pipeline fails.
 
-### Topic rule not triggering
-- Verify SQL topic filter matches the MQTT topic. Check IAM role
-  permissions. Look at the error action topic. Verify rule is enabled.
+## References (load on demand)
 
-### Device shadow delta not clearing
-- Device must update reported state to match desired. If device is
-  offline, delta persists until reconnection and update.
-
-### Job not reaching devices
-- Verify things are in the target group. Check rollout rate. Verify
-  job is IN_PROGRESS. For snapshot jobs, things added later do not
-  receive the job.
-
-### Custom authorizer errors
-- Verify authorizer is ACTIVE. Check Lambda logs. Verify signing keys.
-  Test with `iot test-invoke-authorizer`.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — dependency graph, fleet ops (Step 7), and advanced provisioning (Step 8) moved from this SKILL.md
+- [references/error-handling.md](references/error-handling.md) — connection, rule, shadow, job, and authorizer failure playbooks moved from this SKILL.md
+- [references/certificate-and-policy.md](references/certificate-and-policy.md) — X.509 certificate provisioning, IoT policy syntax, and the thing-cert-policy triple binding
+- [references/topic-rule-and-shadow.md](references/topic-rule-and-shadow.md) — topic rule SQL, action IAM roles, and device shadow mechanics (incl. blocks moved from this SKILL.md)
 
 ## Domain
 
@@ -689,3 +467,4 @@ AWS CloudOps / AWS IoT Core Thing & Device Pipeline Provisioning.
 - **IoT jobs** — https://docs.aws.amazon.com/iot/latest/developerguide/iot-jobs.html
 - **Custom authorizers** — https://docs.aws.amazon.com/iot/latest/developerguide/custom-authentication.html
 - **Greengrass V2** — https://docs.aws.amazon.com/greengrass/v2/developerguide/what-is-iot-greengrass.html
+

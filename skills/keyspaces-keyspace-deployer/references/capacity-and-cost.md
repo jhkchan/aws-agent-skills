@@ -295,3 +295,101 @@ resource "aws_appautoscaling_policy" "write" {
   }
 }
 ```
+
+## Expert heuristic: on-demand vs provisioned RU crossover (moved from SKILL.md)
+
+The capacity mode decision is the primary cost lever. The crossover
+point where provisioned becomes cheaper than on-demand depends on
+workload predictability.
+
+```text
+Workload profile analysis:
+  ├── Unpredictable / spiky / new workload → on-demand (no capacity planning)
+  │     on-demand: $1.25 per million read RUs, $2.50 per million write RUs
+  │
+  ├── Steady, predictable traffic → provisioned with auto-scaling
+  │     provisioned: $0.0001484 per read capacity unit-hour
+  │                 $0.0002968 per write capacity unit-hour
+  │     → crossover at ~10-15% sustained utilization of provisioned capacity
+  │
+  └── Hybrid: start on-demand, switch to provisioned after traffic stabilizes
+        → on-demand for first 1-2 months (understand traffic)
+        → switch to provisioned with auto-scaling once patterns emerge
+```
+
+**Key implication:** the crossover is roughly at 10-15% sustained
+utilization. If provisioned capacity units are utilized more than 15%
+of the time on average, provisioned is cheaper. Below 15%, on-demand is
+cheaper. For new workloads with unknown traffic, start on-demand and
+switch to provisioned after 1-2 months once traffic patterns stabilize.
+Monitor `ConsumedReadCapacityUnits` and `ConsumedWriteCapacityUnits` to
+make the data-driven switch.
+
+## Step 10 — CloudWatch metrics and observability (moved from SKILL.md)
+
+Keyspaces emits CloudWatch metrics automatically (no enable needed).
+Key metrics for monitoring and auto-scaling:
+
+| Metric | Description | Use case |
+|---|---|---|
+| `ConsumedReadCapacityUnits` | RUs consumed by reads | Capacity planning, auto-scaling trigger |
+| `ConsumedWriteCapacityUnits` | RUs consumed by writes | Capacity planning, auto-scaling trigger |
+| `ProvisionedReadCapacityUnits` | Configured read capacity | Provisioned mode monitoring |
+| `ProvisionedWriteCapacityUnits` | Configured write capacity | Provisioned mode monitoring |
+| `Storage` | Total table storage (bytes) | Cost monitoring |
+| `SystemErrors` | Server-side errors | Error monitoring |
+| `UserErrors` | Client-side errors (bad CQL) | Application debugging |
+| `ConnectionAttempts` | CQL connection attempts | Connectivity monitoring |
+| `SuccessfulRequestCount` | Successful CQL requests | Throughput monitoring |
+| `SuccessfulConnectionCount` | Established CQL connections | Pool monitoring |
+
+```bash
+# Monitor consumed write capacity (last hour)
+aws cloudwatch get-metric-statistics \
+  --namespace AWS/Cassandra \
+  --metric-name ConsumedWriteCapacityUnits \
+  --dimensions Name=Keyspace,Value=my_app_keyspace Name=TableName,Value=user_events \
+  --start-time $(date -u -v-1H +%Y-%m-%dT%H:%M:%S) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+  --period 300 \
+  --statistics Sum Average \
+  --region us-east-1
+```
+
+## Step 11 — Auto-scaling for provisioned mode (moved from SKILL.md)
+
+For provisioned capacity tables, auto-scaling adjusts capacity units
+based on utilization. Target tracking scales based on a target
+utilization percentage of consumed vs provisioned RUs.
+
+```bash
+# Enable auto-scaling on write capacity (target 70% utilization)
+aws application-autoscaling register-scalable-target \
+  --service-namespace cassandra \
+  --resource-id keyspace/my_app_keyspace/table/user_events \
+  --scalable-dimension cassandra:table:WriteCapacityUnits \
+  --min-capacity 100 \
+  --max-capacity 5000
+
+aws application-autoscaling put-scaling-policy \
+  --policy-name user-events-write-autoscaling \
+  --service-namespace cassandra \
+  --resource-id keyspace/my_app_keyspace/table/user_events \
+  --scalable-dimension cassandra:table:WriteCapacityUnits \
+  --policy-type TargetTrackingScaling \
+  --target-tracking-scaling-policy-configuration '{
+    "TargetValue": 70.0,
+    "PredefinedMetricSpecification": {
+      "PredefinedMetricType": "CassandraWriteCapacityUtilization"
+    },
+    "ScaleInCooldown": 300,
+    "ScaleOutCooldown": 60
+  }'
+
+# Repeat for read capacity (scalable-dimension: ReadCapacityUnits)
+```
+
+**Scale-in vs scale-out cooldowns:** scale-out (60s) is faster than
+scale-in (300s) to handle bursts quickly while avoiding flapping during
+traffic dips.
+
