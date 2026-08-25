@@ -180,3 +180,28 @@ the table. A table with 3 GSIs needs 8 total scaling configurations.
 - [DynamoDB metrics](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/metrics-dimensions.html)
 - [Capacity mode auto-switching](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/AutoScaling.html)
 - [GSI best practices](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-indexes.html)
+
+---
+
+## Step 6 — throttle alarm and consumed-vs-provisioned gap (moved from SKILL.md)
+
+
+```bash
+aws cloudwatch put-metric-alarm \
+  --alarm-name dynamodb-throttle-my-table \
+  --namespace AWS/DynamoDB \
+  --metric-name ThrottledRequests \
+  --dimensions Name=TableName,Value=my-table \
+  --statistic Sum \
+  --period 300 \
+  --threshold 1 \
+  --comparison-operator GreaterThanThreshold \
+  --evaluation-periods 1 \
+  --alarm-actions arn:aws:sns:us-east-1:111111111111:alerts
+```
+
+**Consumed-vs-provisioned gap:** if
+`ConsumedReadCapacityUnits` consistently exceeds 80% of
+`ProvisionedReadCapacityUnits`, the auto-scaling policy is not
+keeping up. Possible causes: ScaleOutCooldown too high,
+MaxCapacity too low, or the table is on-demand (no provisioning).

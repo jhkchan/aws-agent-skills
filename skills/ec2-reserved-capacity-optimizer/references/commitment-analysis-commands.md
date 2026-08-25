@@ -153,3 +153,50 @@ aws ce get-cost-and-usage \
   --metrics "UnblendedCost" \
   --group-by Type=DIMENSION,Key=INSTANCE_TYPE
 ```
+
+## Step 0 — baseline pull: RI/SP utilization, coverage, inventory (moved from SKILL.md)
+
+```bash
+# Pull RI utilization (last 30 days):
+aws ce get-reservation-utilization \
+  --time-period Start=2026-07-01,End=2026-08-01 \
+  --granularity MONTHLY \
+  --filter '{"Dimensions":{"Key":"Service","Values":["Amazon Elastic Compute Cloud - Compute"]}}'
+
+# Pull RI coverage (last 30 days):
+aws ce get-reservation-coverage \
+  --time-period Start=2026-07-01,End=2026-08-01 \
+  --granularity MONTHLY \
+  --filter '{"Dimensions":{"Key":"Service","Values":["Amazon Elastic Compute Cloud - Compute"]}}'
+
+# List active Reserved Instances:
+aws ec2 describe-reserved-instances \
+  --filters Name=state,Values=active \
+  --query 'ReservedInstances[*].{id:ReservedInstancesId,type:InstanceType,offering:OfferingType,term:Duration,start:Start,az:AvailabilityZone,count:InstanceCount,tenancy:InstanceTenancy}'
+
+# List active Savings Plans:
+aws savingsplans describe-savings-plans \
+  --states ACTIVE \
+  --query 'savingsPlans[*].{id:savingsPlanId,type:savingsPlanType,commitment:commitment,term:termInYears,payment:paymentOption,state:state}'
+```
+
+## Utilization monitoring — CloudWatch alarm and Budget alert setup (moved from SKILL.md)
+
+```bash
+# Create a CloudWatch alarm for RI utilization < 80%:
+aws cloudwatch put-metric-alarm \
+  --alarm-name "RI-Utilization-Below-80" \
+  --namespace AWS/Billing \
+  --metric-name "TotalRIUtilization" \
+  --threshold 80 \
+  --comparison-operator LessThanThreshold \
+  --period 86400 \
+  --evaluation-periods 1 \
+  --alarm-actions <sns-topic-arn>
+
+# Create a Budget alert for RI/SP spend exceeding commitment:
+aws budgets create-budget \
+  --account-id <account-id> \
+  --budget file://ri-spend-budget.json \
+  --notifications-with-subscribers file://ri-spend-notifications.json
+```

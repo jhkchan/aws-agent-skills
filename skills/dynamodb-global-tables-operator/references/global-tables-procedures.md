@@ -167,3 +167,46 @@ aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
 - LWW conflicts: writes during the outage in the new primary win over
   stale writes in the recovered region (later timestamp).
 - Do NOT remove the degraded region's replica.
+
+---
+
+## Remediation guidance (moved from SKILL.md)
+
+### For create-global-table
+1. Create identical empty tables in all target regions with the same key
+   schema and billing mode.
+2. Call `create-global-table` with the replication group.
+3. Verify all replicas reach ACTIVE status.
+4. Enable PITR per region.
+5. Register autoscaling per region (if PROVISIONED).
+
+### For add-replica
+1. Verify all pre-checks pass (no replica in CREATING/DELETING).
+2. Call `update-global-table` with `Create` replica update.
+3. Poll `describe-global-table` until the new replica is ACTIVE.
+4. Enable PITR in the new region.
+5. Register autoscaling in the new region (if PROVISIONED).
+6. Verify data replication with a test item write/read.
+
+### For remove-replica
+1. Verify no active traffic in the target region (CloudWatch metrics).
+2. Call `update-global-table` with `Delete` replica update.
+3. Poll `describe-global-table` until the replica is gone.
+4. Verify `describe-table` returns `ResourceNotFoundException` in the
+   removed region.
+5. Update application configuration to remove the region from its
+   endpoint list.
+
+### For failover
+1. Verify the target region is ACTIVE with acceptable ReplicationLatency.
+2. Trigger the application-level failover mechanism (SDK, Route 53,
+   or manual switch).
+3. Verify writes succeed in the new region.
+4. Monitor for LWW conflicts when the degraded region recovers.
+5. Do NOT remove the degraded region's replica — it will recover.
+
+### For enable-pitr (per region)
+1. Verify the table is ACTIVE in the target region.
+2. Call `update-continuous-backups` with PITR enabled.
+3. Verify `PointInTimeRecoveryStatus: ENABLED`.
+4. Repeat for each replica region independently.

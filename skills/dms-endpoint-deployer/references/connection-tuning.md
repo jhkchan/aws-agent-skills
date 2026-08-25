@@ -221,3 +221,39 @@ resource "aws_dms_endpoint" "pg_source" {
   }
 }
 ```
+## Expert heuristic: extra-connection-attributes for engine tuning (moved from SKILL.md)
+
+
+Extra connection attributes (`--extra-connection-attributes` or
+`ExtraConnectionAttributes` in CloudFormation) are the primary
+mechanism for engine-specific tuning. They use a semicolon-delimited
+key=value syntax.
+
+```text
+Common extra connection attributes by engine:
+  PostgreSQL source (CDC):
+    PluginName=pglogical;slotName=dms_slot;secretsManagerSecretId=prod-db-secret
+
+  Oracle source (CDC):
+    AdditionalArchivedLogDestId=1;EnableHomogenousTablespace=true;ExtraArchivedLogDestIds=2
+
+  MySQL source (CDC):
+    eventsPollInterval=5;initstmt=SET FOREIGN_KEY_CHECKS=0
+
+  MongoDB source:
+    NestingLevel=ONE;ExtractDocId=true;DocsToInvestigate=50
+
+  S3 target:
+    DataFormat=parquet;EncodingType=rle-dictionary;CompressionType=snappy
+
+  Redshift target:
+    AcceptAnyDate=true;AfterConnectScript=SET search_path TO dms;MaxFileSize=100000
+
+  Kinesis target:
+    MessageFormat=json;ServiceAccessRoleArn=arn:aws:iam::...
+```
+
+**Key implication:** skipping extra connection attributes results in
+default behavior that often does NOT match migration requirements.
+Always specify engine-specific attributes explicitly.
+

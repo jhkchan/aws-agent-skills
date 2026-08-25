@@ -312,3 +312,91 @@ resource "aws_docdb_cluster_instance" "replica_2" {
   promotion_tier          = 2
 }
 ```
+## Expert heuristic: the storage autoscaling ceiling (moved from SKILL.md)
+
+
+A baseline model says "storage auto-grows." The correct heuristic
+recognizes that autoscaling has a ceiling, and hitting it stops writes.
+
+```text
+DocumentDB storage autoscaling:
+  Cluster volume starts at 10 GB (minimum), auto-grows in 10 GB increments.
+  Ceiling: configurable up to 64 TB.
+
+  When storage hits the ceiling:
+    → Cluster enters STORAGE_FULL state
+    → ALL writes are rejected (inserts, updates, deletes fail)
+    → Resolution: increase the ceiling (modify-db-cluster) or delete data
+
+  Expert rule:
+    Set ceiling = projected_growth_12_months × 1.5 (50% headroom)
+    Alert when free storage < 20% of ceiling
+```
+
+
+## Expert heuristic: change streams for CDC (moved from SKILL.md)
+
+
+Change streams provide ordered, resumable change events. They are the
+recommended CDC mechanism for real-time data pipelines.
+
+```text
+Change stream flow:
+  1. Enable change_streams_log_retention_duration (1-3 days) in parameter group
+  2. Application opens a change stream via MongoDB driver:
+     const stream = db.collection.watch([], { startAtOperationTime: timestamp })
+  3. DocumentDB emits events: insert, update, delete, replace
+  4. Application processes events and checkpoints resume token
+  5. On restart, application resumes from last checkpoint token
+
+  Expert rule:
+    Enable change streams at CLUSTER CREATION (parameter group).
+    Retention: 2 days (gives 48h of buffer for pipeline recovery).
+    Always checkpoint resume tokens in a durable store.
+```
+
+**Resume-token invalidation gotcha:** the change stream resume token
+encodes the cluster timestamp and log sequence number. If the change
+stream log retention period expires (e.g., the consumer was offline
+longer than `change_streams_log_retention_duration`), the token
+becomes invalid — `resumeAfter` throws a `ChangeStreamHistoryLost`
+error. The consumer must restart with `startAtOperationTime` set to
+a timestamp within the current retention window. Expert rule: set
+retention to 3 days (maximum) for critical CDC pipelines, and
+checkpoint tokens to a durable store (DynamoDB, SQS) after each
+batch, not in memory.
+
+
+## Step 9 — Change streams for CDC (moved from SKILL.md)
+
+
+Change streams must be enabled in the parameter group (see Step 6). Once
+enabled, applications subscribe via the MongoDB driver.
+
+```bash
+# Enable change streams + reboot for parameter to take effect
+aws docdb modify-db-cluster-parameter-group \
+  --db-cluster-parameter-group-name my-param-group \
+  --parameters \
+    ParameterName=change_streams_log_retention_duration,ParameterValue=172800,ApplyMethod=immediate \
+  --region us-east-1
+
+aws docdb reboot-db-instance \
+  --db-instance-identifier my-docdb-primary \
+  --region us-east-1
+```
+
+```javascript
+// Consume change streams (Node.js)
+const { MongoClient } = require('mongodb');
+const client = await MongoClient.connect(
+  'mongodb://admin:password@cluster-endpoint:27017/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false',
+  { tlsCAFile: 'rds-combined-ca-bundle.pem' }
+);
+const stream = client.db('mydb').collection('orders').watch();
+stream.on('change', (next) => {
+  console.log('Change event:', JSON.stringify(next));
+  // Process and checkpoint resume token
+});
+```
+

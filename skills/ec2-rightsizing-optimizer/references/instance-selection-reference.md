@@ -259,3 +259,77 @@ aws ec2 describe-instances --filters Name=instance-state-name,Values=running \
   --output json | jq '.Reservations[].Instances[] | select(.State.Name == "running") | .InstanceId'
 # Then for each, pull CPU and NetworkIn over 14 days; flag if both < 5%
 ```
+
+## Deep reference: EC2 instance selection (moved from SKILL.md)
+
+### Instance family taxonomy (current generation, 2026)
+
+| Family | Class | Target workload | Notable feature |
+|---|---|---|---|
+| m7i, m7a (x86), m7g (Graviton) | General purpose | Web/app servers, dev/test, small databases | Balanced CPU/Memory/Network |
+| m6i, m6a, m6g | General purpose (prior gen) | Same as m7 | Lower cost; m7 preferred for new |
+| c7i, c7a, c7g | Compute optimized | Batch, HPC, web servers, CI runners | Highest vCPU per dollar |
+| r7i, r7a, r7g | Memory optimized | In-memory caches (Redis, Memcached), relational DB | High memory per vCPU |
+| x2idn, x2iedn, x2iezn | Memory optimized (extreme) | SAP HANA, large in-memory analytics | Very high memory (12 TB+) |
+| i4i, i4g, im4gn | Storage optimized | NoSQL (Cassandra, MongoDB), data warehousing | NVMe instance storage |
+| d3, d3en | Dense storage | Hadoop, data lake | HDD-based instance storage |
+| g5, g5g, g6, g6e | GPU (general) | ML inference, rendering, video encoding | NVIDIA A10G / L4 / T4G |
+| p5, p4d, p3 | GPU (compute) | ML training, HPC | NVIDIA H100 / A100 / V100 |
+| inf2, trn1, trn1n | Accelerator (AWS) | ML inference / training | AWS Inferentia / Trainium |
+| c6n, m6n, r6n | Network optimized | HFT, real-time streaming, NFV | 100 Gbps networking |
+| t3, t3a, t4g | Burstable | Dev/test, low-traffic web | CPU credit system |
+
+### Graviton generations
+
+| Generation | Families | Notes |
+|---|---|---|
+| Graviton (v1) | a1 | Deprecated; replaced by Graviton 2. |
+| Graviton 2 (2020) | m6g, c6g, r6g, t4g, im4gn, x2gd | Significant price-performance jump; widely deployed. |
+| Graviton 3 (2022) | c7g, r7g, m7g | DDR5 memory; up to 25% better performance than Graviton 2. |
+| Graviton 4 (2024) | i8g, r8g (rolling out 2024-2026) | Further performance improvements; broader family coverage. |
+
+### Pricing model comparison
+
+| Model | Commitment | Discount | Flexibility | Best for |
+|---|---|---|---|---|
+| On-Demand | None | 0% | Highest | Spiky workloads, experiments |
+| Spot | None (2 min warning) | Up to 90% | Interruptible | Stateless batch, microservices |
+| Standard RI (1-yr) | 1 yr | ~40% | Zonal or Regional; fixed family | Predictable steady-state |
+| Standard RI (3-yr) | 3 yr | ~60% | Zonal or Regional; fixed family | Long-term steady-state |
+| Convertible RI (1-yr) | 1 yr | ~30% | Exchangeable across families | Workloads with growth |
+| Convertible RI (3-yr) | 3 yr | ~55% | Exchangeable across families | Long-term with flexibility |
+| Compute Savings Plan (1-yr) | 1 yr | ~30% | Any family, region, OS | Mixed fleets |
+| Compute Savings Plan (3-yr) | 3 yr | ~50% | Any family, region, OS | Mixed fleets (long-term) |
+| Instance Savings Plan (1-yr) | 1 yr | ~35% | Specific family + region | Family-steady fleets |
+| Instance Savings Plan (3-yr) | 3 yr | ~55% | Specific family + region | Family-steady fleets (long-term) |
+
+### Burstable (t-family) credit math
+
+```
+Earn rate (credits/hour) = instance vCPUs * 6
+Spend rate (credits/hour) = CPU utilization % / 100 * vCPUs * 60
+Net credit change per hour = earn rate - spend rate
+```
+
+Example: t3.large (2 vCPUs) at 50% sustained CPU:
+- Earn: 2 * 6 = 12 credits/hour
+- Spend: 50% / 100 * 2 * 60 = 60 credits/hour
+- Net: -48 credits/hour (credit balance depletes)
+
+Below the credit-balance floor, performance drops to ~20% baseline (12%
+of full CPU on a 2-vCPU t3.large). Enable Unlimited mode or migrate to
+m-family.
+
+### Network performance tiers
+
+| Instance class | Network performance | Notes |
+|---|---|---|
+| nano / micro | "Up to 0.064 Gbps" | Burstable, low ceiling |
+| small / medium | "Up to 0.256 / 0.5 Gbps" | Burstable, modest |
+| large (m5/c5/r5) | "Up to 10 Gbps" | Burstable, sufficient for most |
+| xlarge+ (m5.2xlarge+) | "Up to 12.5 Gbps" | Higher burst ceiling |
+| n-family (c6n/m6n/r6n) | 25-100 Gbps guaranteed | Network-optimized |
+| 7th-gen large+ (m7i/c7i) | "Up to 12.5 Gbps" (better burst) | Improvement over 5th-gen |
+
+"Up to X" means burst, not guaranteed. Sustained high network traffic
+should use n-family or 7th-gen for guaranteed bandwidth.

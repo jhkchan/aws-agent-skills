@@ -206,3 +206,36 @@ Detection via CloudWatch:
 
 - NEVER leave TTL disabled on tables with known data expiry. TTL is
   free and automatic — there is no downside.
+
+---
+
+## Step 1 pricing comparison and crossover math (moved from SKILL.md)
+
+**Pricing comparison (us-east-1, 2026):**
+```
+On-demand:
+  Read: $0.25 per million eventually-consistent reads (4 KB item)
+  Write: $1.25 per million writes (up to 1 KB item)
+
+Provisioned:
+  Read: $0.00013 per RCU-hour
+  Write: $0.00065 per WCU-hour
+
+Monthly (730 hours):
+  1 RCU for a month: $0.00013 × 730 = $0.0949
+  1 WCU for a month: $0.00065 × 730 = $0.4745
+```
+
+**Crossover math (read-heavy, 1000 RCU provisioned table):**
+```
+Provisioned monthly: 1000 × $0.0949 = $94.90
+Capacity: 1000 RCU × 2 reads/sec = 2000 reads/sec → 5.256B reads/month at 100%
+
+At 100% utilization: on-demand would cost 5256M × $0.25 = $1,314 → provisioned 13.8x cheaper
+At 30% utilization: on-demand = $394.20; provisioned = $94.90 → provisioned 4.2x cheaper
+At 10% utilization: on-demand = $131.25; provisioned = $94.90 → barely cheaper
+Below ~7% utilization: on-demand wins.
+
+Rule of thumb: consumed > 30% of provisioned → keep provisioned.
+Consumed < 15% → on-demand likely wins. Between 15-30% → calculate.
+```

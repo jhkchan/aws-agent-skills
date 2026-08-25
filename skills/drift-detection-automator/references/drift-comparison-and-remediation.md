@@ -318,3 +318,46 @@ aws cloudformation continue-update-rollback \
 Always test remediation in a non-production account first. A failed
 remediation that leaves a stack in `UPDATE_ROLLBACK_FAILED` is worse
 than the original drift.
+
+---
+
+## Step 6 — SSM Automation remediation, Option A change-set runbook (moved from SKILL.md)
+
+
+```yaml
+---
+schemaVersion: '0.3'
+assumeRole: '{{ AutomationAssumeRole }}'
+description: 'Remediate CloudFormation drift via change-set'
+parameters:
+  StackName: {type: String}
+  AutomationAssumeRole: {type: String}
+mainSteps:
+  - name: CreateChangeSet
+    action: aws:executeAwsApi
+    inputs:
+      Service: cloudformation
+      Api: CreateChangeSet
+      StackName: '{{ StackName }}'
+      ChangeSetName: 'drift-remediation-{{ global:TIMESTAMP }}'
+      ChangeSetType: UPDATE
+      UsePreviousTemplate: true
+      Capabilities: '["CAPABILITY_IAM","CAPABILITY_NAMED_IAM"]'
+    outputs:
+      - {Name: ChangeSetId, Selector: '$.Id', Type: String}
+  - name: ApproveRemediation
+    action: aws:approve
+    inputs:
+      NotificationArn: 'arn:aws:sns:us-east-1:111111111111:drift-approval'
+      Message: 'Approve drift remediation for {{ StackName }}?'
+      MinRequiredApprovals: 1
+  - name: ExecuteChangeSet
+    action: aws:executeAwsApi
+    inputs:
+      Service: cloudformation
+      Api: ExecuteChangeSet
+      ChangeSetName: '{{ CreateChangeSet.ChangeSetId }}'
+      StackName: '{{ StackName }}'
+    isCritical: true
+    onFailure: abort
+```

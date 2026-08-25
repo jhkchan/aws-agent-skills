@@ -207,3 +207,121 @@ MIGRATION_STEPS:
   3. Re-run throttling optimization analysis.
 CONFIRM: (n/a -- read-only recommendation)
 ```
+
+
+---
+
+## Step 1: Write sharding (random suffix strategy) (moved from SKILL.md)
+
+**Write sharding (random suffix strategy):**
+```python
+import random
+
+SHARD_COUNT = 10  # Number of suffixes
+
+def get_sharded_key(base_key):
+    """Add random suffix to spread writes across partitions."""
+    suffix = str(random.randint(1, SHARD_COUNT)).zfill(2)
+    return f"{base_key}#{suffix}"
+
+# Write: pk = "user123#07"
+# Read: Query all 10 suffixes in parallel, then merge
+```
+
+---
+
+## Step 1: Write sharding trade-offs (moved from SKILL.md)
+
+**Write sharding trade-offs:**
+
+| Factor | Unsharded | Sharded (10 suffixes) |
+|---|---|---|
+| Write throughput on hot key | 1,000 WCU/partition | 10,000 WCU (10 partitions) |
+| Read (single key) | 1 Query | 10 parallel Queries |
+| Read (scan by key prefix) | 1 Query | 10 parallel Queries + merge |
+| Complexity | Low | Medium (parallel reads) |
+
+---
+
+## Step 2: Burst capacity math (moved from SKILL.md)
+
+**Burst capacity math:**
+```
+burst_bucket_max = 300 seconds × provisioned_wcu
+burst_available = min(burst_bucket_max, accumulated_unused_wcu)
+
+Example: 1000 WCU provisioned
+  burst_bucket_max = 300 × 1000 = 300,000 WCUs
+  A spike of 2000 WCU for 60 seconds uses 60 × (2000-1000) = 60,000 WCUs
+  Remaining burst: 300,000 - 60,000 = 240,000 WCUs (sustained for 240 more seconds)
+```
+
+---
+
+## Step 5: Switching capacity mode (moved from SKILL.md)
+
+**Switching capacity mode:**
+```bash
+aws dynamodb update-table --table-name <table> \
+  --billing-mode PAY_PER_REQUEST  # or PROVISIONED
+```
+
+---
+
+## Step 6: BatchWriteItem example (moved from SKILL.md)
+
+**BatchWriteItem example:**
+```python
+import boto3
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('<table>')
+
+# Process 16 items per batch
+with table.batch_writer() as batch:
+    for item in items:
+        batch.put_item(Item=item)
+    # batch_writer handles chunking, retries, and UnprocessedItems
+```
+
+---
+
+## Step 6: Batch vs individual write comparison (moved from SKILL.md)
+
+**Batch vs individual write comparison:**
+
+| Metric | 16x PutItem | 1x BatchWriteItem |
+|---|---|---|
+| Network round trips | 16 | 1 |
+| Consumed WCU | Same | Same (per-item WCU) |
+| Client-side latency | 16x RTT | 1x RTT |
+| Request count | 16 | 1 |
+| Connection pool pressure | High | Low |
+
+---
+
+## Step 8: Conditional writes for idempotency (moved from SKILL.md)
+
+**Conditional writes for idempotency:**
+```python
+# Prevent duplicate writes
+table.put_item(
+    Item=item,
+    ConditionExpression='attribute_not_exists(pk)'
+)
+# If item exists, ConditionalCheckFailedException -- write rejected
+# This prevents duplicates without consuming downstream resources
+```
+
+---
+
+## Step 8: TTL for data lifecycle (moved from SKILL.md)
+
+**TTL for data lifecycle:**
+```bash
+# Enable TTL on an attribute
+aws dynamodb update-time-to-live \
+  --table-name <table> \
+  --time-to-live-specification Enabled=true,AttributeName=ttl
+
+# Set ttl attribute on write: item['ttl'] = int(time.time()) + 86400  # 24h
+```

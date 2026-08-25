@@ -36,12 +36,8 @@ matters, and emits a READY_TO_DEPLOY checklist with copy-pasteable
 verification commands.
 
 ## Activation keywords
-
-create DocumentDB cluster, DocumentDB instance, DocumentDB change
-streams, DocumentDB global cluster, DocumentDB storage autoscaling,
-DocumentDB subnet group, DocumentDB parameter group, DocumentDB KMS
-encryption, DocumentDB backup retention, DocumentDB index, mongo shell
-connect DocumentDB.
+Activation keyword list moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## STRICT output contract
 
@@ -116,201 +112,32 @@ Three misconceptions dominate DocumentDB misdesign at provisioning time:
   cluster creation if any downstream system needs CDC.
 
 ## Configuration dependency graph (novel heuristic)
-
-DocumentDB configurations are NOT independent. The cluster must exist
-before instances. The subnet group must exist before the cluster. Change
-streams require parameter-group configuration. Use this graph to
-sequence provisioning.
-
-| Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| Subnet group | at least 2 subnets across 2 AZs | subnets must be private; no public DocumentDB | cluster creation |
-| Security group | VPC exists | SG must allow port 27017 (or custom) from app tier | cluster network access |
-| Parameter group | none (uses default initially) | change streams parameter requires cluster modification + reboot | change streams, TTL, profiling |
-| KMS key | KMS key exists (if customer-managed) | KMS key cannot be changed after cluster creation without snapshot/restore | encryption at rest |
-| Cluster (create-db-cluster) | subnet group, security group, KMS key, parameter group | cluster endpoint is immutable once created; storage volume auto-grows | instances, endpoints |
-| Instances (create-db-instance) | cluster exists; instance class chosen | instances are created one at a time; failover priority is set per instance | compute capacity |
-| Storage autoscaling | cluster exists | autoscaling ceiling must be set explicitly; hitting the ceiling stops writes | storage growth |
-| Change streams | parameter group with change_streams_log_retention_duration > 0 | change stream retention can be 1-3 days; expired events are lost | CDC pipelines |
-| Global cluster | primary cluster exists and is healthy | secondary clusters are read-only; failover is not automatic (must be scripted) | cross-region DR |
-| Backup retention | cluster exists (set at creation or modify) | retention 1-35 days; point-in-time recovery enabled automatically with backup | PITR, snapshot restore |
-| Indexes | cluster is accessible via mongo shell | creating an index on a large collection blocks; use background index builds | query performance |
-
-**The storage-autoscaling-ceiling and index-before-query rows are the
-ones a baseline model misses.** DocumentDB auto-grows storage but stops
-at the ceiling. And without explicit indexes, every query is a scan. The
-procedure below forces an explicit decision on each.
-
-**Cross-dependency gotchas:**
-- The subnet group must span at least 2 AZs for multi-AZ clusters.
-  Single-AZ subnet groups block multi-AZ deployment.
-- Change streams require the parameter
-  `change_streams_log_retention_duration` to be greater than 0 in the
-  cluster parameter group. The default is 0 (disabled).
-- KMS key is set at cluster creation. Changing it later requires a
-  snapshot-restore cycle (downtime).
-- Global cluster secondary clusters are read-only. Applications must
-  be designed to read from the secondary or wait for promotion during
-  failover.
+Full dependency table and cross-dependency gotchas moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Expert heuristic: the storage autoscaling ceiling
-
-A baseline model says "storage auto-grows." The correct heuristic
-recognizes that autoscaling has a ceiling, and hitting it stops writes.
-
-```text
-DocumentDB storage autoscaling:
-  Cluster volume starts at 10 GB (minimum), auto-grows in 10 GB increments.
-  Ceiling: configurable up to 64 TB.
-
-  When storage hits the ceiling:
-    → Cluster enters STORAGE_FULL state
-    → ALL writes are rejected (inserts, updates, deletes fail)
-    → Resolution: increase the ceiling (modify-db-cluster) or delete data
-
-  Expert rule:
-    Set ceiling = projected_growth_12_months × 1.5 (50% headroom)
-    Alert when free storage < 20% of ceiling
-```
+Autoscaling-ceiling heuristic moved to
+[references/storage-and-changestreams.md](references/storage-and-changestreams.md).
 
 ## Expert heuristic: index before query (no query optimizer)
-
-DocumentDB does NOT have a query optimizer. A query without a matching
-index is a full collection scan.
-
-| Index type | When to use | Example |
-|---|---|---|
-| Single-field | Simple equality or range on one field | `{email: 1}` for user lookup |
-| Compound | Multi-field equality + range (ESR rule: Equality, Sort, Range) | `{status: 1, created_at: -1}` |
-| Text | Full-text search across string fields | `{description: "text"}` |
-| TTL | Auto-expire documents after a duration | `{createdAt: 1}` with expireAfterSeconds |
-| Unique | Enforce uniqueness | `{orderId: 1}` with unique: true |
-
-**Expert rule:** create indexes BEFORE deploying queries that need them.
-A query without a matching index is a full collection scan — on a 10M
-document collection, that is seconds of latency and high CPU.
+Index-type selection heuristic moved to
+[references/global-clusters-and-indexing.md](references/global-clusters-and-indexing.md).
 
 ## Expert heuristic: change streams for CDC
-
-Change streams provide ordered, resumable change events. They are the
-recommended CDC mechanism for real-time data pipelines.
-
-```text
-Change stream flow:
-  1. Enable change_streams_log_retention_duration (1-3 days) in parameter group
-  2. Application opens a change stream via MongoDB driver:
-     const stream = db.collection.watch([], { startAtOperationTime: timestamp })
-  3. DocumentDB emits events: insert, update, delete, replace
-  4. Application processes events and checkpoints resume token
-  5. On restart, application resumes from last checkpoint token
-
-  Expert rule:
-    Enable change streams at CLUSTER CREATION (parameter group).
-    Retention: 2 days (gives 48h of buffer for pipeline recovery).
-    Always checkpoint resume tokens in a durable store.
-```
-
-**Resume-token invalidation gotcha:** the change stream resume token
-encodes the cluster timestamp and log sequence number. If the change
-stream log retention period expires (e.g., the consumer was offline
-longer than `change_streams_log_retention_duration`), the token
-becomes invalid — `resumeAfter` throws a `ChangeStreamHistoryLost`
-error. The consumer must restart with `startAtOperationTime` set to
-a timestamp within the current retention window. Expert rule: set
-retention to 3 days (maximum) for critical CDC pipelines, and
-checkpoint tokens to a durable store (DynamoDB, SQS) after each
-batch, not in memory.
+Change-stream flow and resume-token gotcha moved to
+[references/storage-and-changestreams.md](references/storage-and-changestreams.md).
 
 ## Expert heuristic: index build blocking writes (foreground vs background)
-
-A baseline model says "just create indexes." The expert knows that
-DocumentDB index builds behave differently from MongoDB and can lock
-a production cluster.
-
-```text
-DocumentDB index build behavior:
-  ├── Foreground (default for createIndex):
-  │     └── Blocks ALL writes to the collection for the duration
-  │         of the build. On a 10M-document collection, this can
-  │         be 5-20 minutes of write lockout.
-  ├── Background ("background: true" option):
-  │     └── NON-blocking — allows concurrent reads and writes.
-  │         DocumentDB supports background builds on 4.0+.
-  └── DocumentDB does NOT support the MongoDB "createIndexes"
-        shell helper's automatic background detection.
-
-Expert rule:
-  1. ALWAYS use { background: true } for production index creation
-  2. Schedule large index builds during low-traffic windows
-  3. Monitor DatabaseCpuUtilization during build (> 80% = throttle)
-  4. For compound indexes on > 5M docs, build on a replica first,
-     then failover — the index replicates to the primary
-```
-
-**Key implication:** A foreground index build on a large collection
-silently blocks all writes. Always pass `{ background: true }` and
-monitor the build progress via `db.currentOp()`.
+Foreground-vs-background index build behavior moved to
+[references/global-clusters-and-indexing.md](references/global-clusters-and-indexing.md).
 
 ## Expert heuristic: MongoDB API compatibility gaps
-
-DocumentDB implements the MongoDB wire protocol but does NOT support
-100% of MongoDB's API surface. A baseline model assumes "MongoDB
-compatible = drop-in replacement." The expert knows the gaps.
-
-```text
-Unsupported aggregation pipeline stages (DocumentDB 5.0):
-  ├── $graphLookup — NOT supported (no graph traversal)
-  ├── $merge — NOT supported (use $out for materialization)
-  ├── $facet — limited support (no nested $facet)
-  └── $bucket / $bucketAuto — NOT supported
-
-Unsupported features:
-  ├── Transactions — supported on 4.0+ but with constraints:
-  │     cross-shard transactions NOT supported (single-shard only)
-  ├── Retryable writes — NOT supported (retryWrites=false always)
-  ├── Change stream $lookup stage — NOT supported in pipeline
-  └── Collation in indexes — NOT supported
-
-Expert rule:
-  1. Audit aggregation pipelines BEFORE migrating from MongoDB
-  2. Replace $graphLookup with application-side traversal
-  3. Replace $merge with a two-step $out + application merge
-  4. Test with the actual driver version, not just the shell
-```
-
-**Key implication:** "MongoDB-compatible" means wire-protocol-level
-compatibility, not feature parity. Unmapped aggregation stages cause
-runtime errors, not syntax errors — they fail at execution time, not
-parse time.
+Unsupported aggregation stages and feature gaps moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Expert heuristic: TLS certificate rotation downtime
-
-DocumentDB clusters use a cluster certificate for TLS connections.
-A baseline model assumes certificates rotate transparently. The
-expert knows the rotation can cause connectivity blips.
-
-```text
-DocumentDB TLS certificate lifecycle:
-  ├── Certificate is managed by AWS RDS/DocumentDB infrastructure
-  ├── Rotation is automatic but NOT instant — the cluster endpoint
-  │     gets a new cert, and existing connections using the old
-  │     cert's fingerprint break on next TLS handshake
-  ├── The rds-combined-ca-bundle.pem contains BOTH the old and
-  │     new CA certs — clients using this bundle survive rotation
-  └── Clients pinning a SPECIFIC certificate fingerprint break
-
-Expert rule:
-  1. NEVER pin a specific certificate fingerprint in the client
-  2. ALWAYS use rds-combined-ca-bundle.pem (contains all CAs)
-  3. When AWS announces CA rotation, update the CA bundle in
-     application containers BEFORE the rotation date
-  4. Use connection pooling with health checks — pools that don't
-     validate TLS on reconnect will mask rotation failures
-```
-
-**Key implication:** TLS certificate rotation is transparent ONLY
-if clients use the combined CA bundle. Pinned certificates or stale
-CA bundles cause silent connection failures during rotation.
+TLS certificate rotation lifecycle moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Prerequisites (verify before provisioning)
 
@@ -521,90 +348,16 @@ Point-in-time recovery is automatically enabled when backup retention is
 > 0.
 
 ## Step 9 — Change streams for CDC
-
-Change streams must be enabled in the parameter group (see Step 6). Once
-enabled, applications subscribe via the MongoDB driver.
-
-```bash
-# Enable change streams + reboot for parameter to take effect
-aws docdb modify-db-cluster-parameter-group \
-  --db-cluster-parameter-group-name my-param-group \
-  --parameters \
-    ParameterName=change_streams_log_retention_duration,ParameterValue=172800,ApplyMethod=immediate \
-  --region us-east-1
-
-aws docdb reboot-db-instance \
-  --db-instance-identifier my-docdb-primary \
-  --region us-east-1
-```
-
-```javascript
-// Consume change streams (Node.js)
-const { MongoClient } = require('mongodb');
-const client = await MongoClient.connect(
-  'mongodb://admin:password@cluster-endpoint:27017/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false',
-  { tlsCAFile: 'rds-combined-ca-bundle.pem' }
-);
-const stream = client.db('mydb').collection('orders').watch();
-stream.on('change', (next) => {
-  console.log('Change event:', JSON.stringify(next));
-  // Process and checkpoint resume token
-});
-```
+Enablement commands and driver consumption example moved to
+[references/storage-and-changestreams.md](references/storage-and-changestreams.md).
 
 ## Step 10 — Indexing strategy (no query optimizer)
-
-DocumentDB has NO query optimizer. Indexes MUST be created BEFORE
-queries that need them.
-
-```bash
-# Connect to the cluster
-mongo "mongodb://admin:password@cluster-endpoint:27017/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false" \
-  --tlsCAFile rds-combined-ca-bundle.pem
-```
-
-```javascript
-// Single-field index
-db.users.createIndex({ email: 1 })
-// Compound index (ESR rule: Equality, Sort, Range)
-db.orders.createIndex({ status: 1, created_at: -1 })
-// Text index for search
-db.products.createIndex({ name: "text", description: "text" })
-// Unique index
-db.accounts.createIndex({ accountId: 1 }, { unique: true })
-// TTL index (auto-expire after 3600 seconds)
-db.sessions.createIndex({ createdAt: 1 }, { expireAfterSeconds: 3600 })
-// List indexes
-db.users.getIndexes()
-```
+Connect and create-index commands moved to
+[references/global-clusters-and-indexing.md](references/global-clusters-and-indexing.md).
 
 ## Step 11 — Global clusters
-
-DocumentDB global clusters provide cross-region replication with
-typically under 1 second latency. One primary region (read-write) and
-up to 5 secondary regions (read-only).
-
-```bash
-# Create the global cluster
-aws docdb create-global-cluster \
-  --global-cluster-identifier my-global-cluster \
-  --source-db-cluster-identifier my-docdb-cluster \
-  --region us-east-1
-
-# Add a secondary cluster in another region
-aws docdb create-db-cluster \
-  --db-cluster-identifier my-docdb-cluster-eu \
-  --engine docdb \
-  --global-cluster-identifier my-global-cluster \
-  --master-username admin \
-  --master-user-password 'UseAStrongPassword123!' \
-  --db-subnet-group-name my-subnet-group-eu \
-  --region eu-west-1
-```
-
-**Key limitation:** global cluster failover is NOT automatic. You must
-script it (typically with Lambda + EventBridge). Secondary clusters are
-read-only until promoted.
+Global cluster creation commands moved to
+[references/global-clusters-and-indexing.md](references/global-clusters-and-indexing.md).
 
 ## Step 12 — MongoDB compatibility and connecting
 
@@ -644,14 +397,8 @@ aws docdb describe-db-cluster-parameters \
 traffic in plaintext. Only disable for local development testing.
 
 ## Step 14 — CloudWatch metrics
-
-| Metric | What it measures | Alert threshold |
-|---|---|---|
-| DatabaseCpuUtilization | CPU across instances | > 80% sustained 5 min |
-| DatabaseFreeStorageSpace | Free storage (bytes) | < 20% of ceiling |
-| DatabaseConnections | Active connections | Approaching max |
-| DatabaseMemoryUsagePercentage | RAM utilization | > 90% sustained |
-| DatabaseReplicaLag | Replica lag (seconds) | > 30 seconds |
+Metrics and alert-threshold table moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -743,28 +490,15 @@ VERIFICATION_COMMANDS:
 ```
 
 ## Error handling
+Failure-mode deep dives (STORAGE_FULL, slow queries, change streams,
+TLS handshake, replica lag) moved to [references/error-handling.md](references/error-handling.md).
 
-### Cluster stuck in STORAGE_FULL
-- Storage has hit the autoscaling ceiling. Increase the ceiling with
-  `modify-db-cluster` or delete data. All writes are rejected until free
-  space is available.
+## References (load on demand)
 
-### Queries are slow (seconds of latency)
-- Missing indexes. DocumentDB has no query optimizer. Connect via mongo
-  shell, run `db.collection.getIndexes()` to verify. Create indexes
-  before redeploying the application queries.
-
-### Change stream not emitting events
-- `change_streams_log_retention_duration` is 0 in the parameter group.
-  Set it to 172800 (2 days) and reboot the cluster.
-
-### Connection failures (TLS handshake error)
-- TLS is enabled but the client is not using the CA bundle. Download
-  `rds-combined-ca-bundle.pem` and pass it via `--tlsCAFile`.
-
-### Replica lag is high
-- Check if the primary is overloaded (CPU, memory). Consider scaling up
-  the instance class or adding replicas.
+- [references/storage-and-changestreams.md](references/storage-and-changestreams.md) — storage autoscaling + CDC detail (now also holds the autoscaling-ceiling and change-stream heuristics and the Step 9 commands moved from this file)
+- [references/global-clusters-and-indexing.md](references/global-clusters-and-indexing.md) — global cluster + indexing detail (now also holds the indexing heuristics and Step 10/11 commands moved from this file)
+- [references/error-handling.md](references/error-handling.md) — STORAGE_FULL, slow queries, change-stream, TLS, replica-lag failure modes (moved from this file)
+- [references/advanced-patterns.md](references/advanced-patterns.md) — dependency graph, MongoDB API gaps, TLS rotation, CloudWatch metrics, activation keywords (moved from this file)
 
 ## Domain
 

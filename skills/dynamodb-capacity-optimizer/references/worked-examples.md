@@ -277,3 +277,66 @@ Saving: $1,566.35/month (73.3%), $18,796.20/year
 ```
 
 **Step 6 — Emit the output block** (see SKILL.md perfect example).
+
+---
+
+## Output format — simple per-table block (moved from SKILL.md)
+
+```text
+TARGET: <table-name>
+VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE | ALREADY_OPTIMAL
+REASON: <1-2 sentences naming the recommendation and the supporting data>
+RECOMMENDATION:
+  Current: <billing mode>, <RCU/WCU>, <GSIs>, <table class>, <TTL>, <Streams>
+  Proposed: <billing mode>, <RCU/WCU>, <GSIs>, <table class>, <TTL>, <Streams>
+  Dimensions changed: <capacity-mode | rcu-wcu-sizing | autoscaling | partition-key | gsi | table-class | ttl-streams>
+  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
+ESTIMATED_SAVINGS:
+  Monthly: $<amount>
+  Annual: $<amount>
+  Assumptions: <list (consumed capacity, pricing region, GSI count, etc.)>
+MIGRATION_STEPS:
+  1. <specific action with CLI command>
+  2. <verification step>
+CONFIRM: Before executing any state-changing CLI, emit and await operator
+  approval: "CONFIRM: About to <action> on <table-name> in <region>.
+  Proceed? (yes/no)"
+```
+
+Full worked examples are in `references/worked-examples.md`.
+
+---
+
+## Perfect example output — OPTIMIZED (post-apply verification) (moved from SKILL.md)
+
+This is the shape emitted AFTER the operator approves and the change is
+applied. VERDICT is `OPTIMIZED` (not FURTHER_OPTIMIZATION_AVAILABLE).
+The "before → after" capacity numbers and dollar savings are preserved
+so downstream FinOps can close the loop.
+
+```text
+TARGET: user-events-prod
+VERDICT: OPTIMIZED
+REASON: Capacity reduced from 5000/2000 to 1200/600 RCU/WCU with
+  autoscaling; GSI recreated with INCLUDE projection (120 GB → 30 GB);
+  TTL enabled on expires_at; Streams disabled. CloudWatch confirms zero
+  ThrottledRequests over the 7-day post-apply window.
+RECOMMENDATION:
+  Current: PROVISIONED 1200 RCU / 600 WCU (autoscaled, target 70%), 2 GSIs (INCLUDE, 30 GB), TTL on (expires_at), Streams off
+  Proposed: same as Current — no further action
+  Dimensions changed: capacity-mode ✓  rcu-wcu-sizing ✓ (applied)  autoscaling ✓ (applied)
+    partition-key ✓ (no skew)  gsi ✓ (applied)  table-class ✓ (Standard, high traffic)  ttl-streams ✓ (applied)
+  Confidence: HIGH — 7-day post-apply CloudWatch shows ConsumedReadCapacityUnits avg 820/s, max 1190/s; zero ThrottledRequests.
+ESTIMATED_SAVINGS:
+  Pre-apply monthly: $2,137.80
+  Post-apply monthly: $571.45
+  Monthly saving: $1,566.35 ($2,137.80 − $571.45 ✓)
+  Annual saving: $18,796.20
+MIGRATION_STEPS:
+  1. Completed: autoscaling min reduced (5000→1200 RCU, 2000→600 WCU) on 2026-08-04.
+  2. Completed: GSI recreated with INCLUDE projection (by-type-v2 live, by-type-v1 deleted).
+  3. Completed: TTL enabled on expires_at; first deletes observed within 38 hours.
+  4. Completed: Streams disabled after confirming no Lambda consumers.
+  5. Monitor ThrottledRequests and ConsumedCapacity for 7 more days.
+CONFIRM: Change applied and verified. No further approval needed.
+```

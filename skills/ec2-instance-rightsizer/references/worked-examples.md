@@ -532,3 +532,29 @@ Post-tree overrides (always take precedence):
 - NEVER skip the CONFIRM gate before stop, modify, or terminate.
 - NEVER recommend hibernation without verifying prerequisites
   (EBS-backed, root volume >= RAM size, supported instance family).
+
+## Output format template (moved from SKILL.md)
+
+```text
+TARGET: <instance-id> (<instance-type>)
+VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
+REASON: <1-2 sentences naming the recommendation and the supporting data>
+RECOMMENDATION:
+  Current: <instance-type>, <architecture>, <pricing-model>, <region>
+  Proposed: <instance-type>, <architecture>, <pricing-model>, <region>
+  Dimensions changed: <idle | cpu-mem | family | graviton | burstable | workload | pricing | spot>
+  Dimensions checked: <list ALL, each ✓ (no finding) or → (finding)>
+  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
+ESTIMATED_SAVINGS:
+  Current monthly: $<amount>
+  Projected monthly: $<amount>
+  Monthly saving: $<amount>
+  Annual saving: $<amount>
+  Assumptions: <list (pricing region, SP coverage, 730 hrs/month)>
+MIGRATION_STEPS:
+  1. <specific action with CLI command>
+  2. <verification step>
+CONFIRM: Before executing any state-changing CLI, emit and await operator
+  approval: "CONFIRM: About to <action> on <instance-id> in <region>.
+  Proceed? (yes/no)"
+```

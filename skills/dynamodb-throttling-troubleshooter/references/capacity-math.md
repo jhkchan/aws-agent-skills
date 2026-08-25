@@ -255,3 +255,37 @@ GSI_ProvisionedReadCapacityUnits ≥ GSI_query_rate × rcu_per_query
 
 Underprovisioning the GSI causes GSI throttling, which propagates to the
 base table write path in provisioned mode.
+
+
+---
+
+## Step 2: RCU consumption math (moved from SKILL.md)
+
+**RCU consumption math (memorise this):**
+
+| Read type | RCU per 4 KB read | Notes |
+|---|---|---|
+| Eventually consistent | 0.5 RCU | Default for GetItem / Query / Scan with consistent read off |
+| Strongly consistent | 1.0 RCU | `ConsistentRead: true` on GetItem / Query |
+| Transactional | 2.0 RCU | 2x the strongly-consistent cost |
+
+A single GetItem on a 40 KB item consumes 10 RCUs (eventually consistent) or
+20 RCUs (strongly consistent). A Scan on a 1 GB table consumes ~128,000
+RCUs (eventually consistent) — enough to throttle a 100,000-RCU table.
+
+---
+
+## Step 3: WCU consumption math and GSI cost multiplier (moved from SKILL.md)
+
+**WCU consumption math (memorise this):**
+
+| Write type | WCU per 1 KB written | Notes |
+|---|---|---|
+| Standard PutItem / UpdateItem / DeleteItem | 1.0 WCU per 1 KB | Rounded up to nearest 1 KB |
+| Transactional (`TransactWriteItems`) | 2.0 WCU per 1 KB | 2x the standard cost |
+
+**GSI WCU cost multiplier:** each GSI on the table replicates the write.
+A table with 3 GSIs and a 1 KB item write consumes 4 WCUs (1 for the base
+table + 3 for the GSI replicas). If any GSI's provisioned capacity is
+below its share, the GSI throttles — and in provisioned mode, that
+propagates to the base table write.

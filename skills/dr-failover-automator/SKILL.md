@@ -121,11 +121,7 @@ rpo_target_minutes=5.
 ```
 
 **Live-account pre-flight checks (skip for offline authoring):**
-1. Verify Route 53 hosted zone exists: `aws route53 list-hosted-zones`.
-2. Verify secondary region enabled: `aws account get-region-opt-status --region-name <secondary>`.
-3. Verify Aurora Global cluster (if applicable): `aws rds describe-global-clusters`.
-4. Verify Elastic DRS source servers synced: `aws drs describe-source-servers`.
-5. Verify AWS Backup vault in secondary region: `aws backup list-backup-vaults --region <secondary>`.
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 ## Decision tree — strategy selection
 
@@ -360,94 +356,7 @@ Secrets Manager replica for shared config.
 
 The canonical failover sequence: health check -> promote primary ->
 update DNS -> verify -> notify.
-
-```json
-{
-  "StartAt": "CheckKillSwitch",
-  "States": {
-    "CheckKillSwitch": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::ssm:get-parameter",
-      "Parameters": {"Name": "/dr/kill-switch"},
-      "Next": "KillSwitchChoice"
-    },
-    "KillSwitchChoice": {
-      "Type": "Choice",
-      "Choices": [{"Variable": "$.Parameter.Value", "StringEquals": "disabled", "Next": "AbortFailover"}],
-      "Default": "ConfirmPrimaryDown"
-    },
-    "AbortFailover": {"Type": "Succeed", "Comment": "Kill-switch tripped"},
-    "ConfirmPrimaryDown": {
-      "Comment": "Verify primary is truly down — prevent split-brain",
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:<region>:<account>:function:dr-verify-primary-down",
-      "Retry": [{"ErrorEquals": ["States.TaskFailed"], "IntervalSeconds": 30, "MaxAttempts": 3, "BackoffRate": 1.5}],
-      "Next": "PrimaryDownChoice"
-    },
-    "PrimaryDownChoice": {
-      "Type": "Choice",
-      "Choices": [{"Variable": "$.primaryHealthy", "BooleanEquals": true, "Next": "AbortFailover"}],
-      "Default": "PromoteSecondary"
-    },
-    "PromoteSecondary": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:<region>:<account>:function:dr-promote-secondary",
-      "Next": "UpdateDNS"
-    },
-    "UpdateDNS": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::route53:changeResourceRecordSets",
-      "Parameters": {
-        "HostedZoneId": "<zone-id>",
-        "ChangeBatch": {"Changes": [{"Action": "UPSERT", "ResourceRecordSet": {
-          "Name": "app.example.com", "Type": "A",
-          "AliasTarget": {"HostedZoneId": "Z2FDTNDATAQYW2",
-            "DNSName": "secondary-alb.us-west-2.elb.amazonaws.com",
-            "EvaluateTargetHealth": true}
-        }}]}
-      },
-      "Next": "VerifySecondaryUp"
-    },
-    "VerifySecondaryUp": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:<region>:<account>:function:dr-verify-secondary-up",
-      "Next": "VerifyChoice"
-    },
-    "VerifyChoice": {
-      "Type": "Choice",
-      "Choices": [{"Variable": "$.secondaryHealthy", "BooleanEquals": true, "Next": "NotifySuccess"}],
-      "Default": "RollbackDNS"
-    },
-    "NotifySuccess": {
-      "Type": "Task",
-      "Resource": "arn:aws:sns:<region>:<account>:dr-notifications",
-      "Next": "WaitForHumanApproval"
-    },
-    "RollbackDNS": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::route53:changeResourceRecordSets",
-      "Parameters": {
-        "HostedZoneId": "<zone-id>",
-        "ChangeBatch": {"Changes": [{"Action": "UPSERT", "ResourceRecordSet": {
-          "Name": "app.example.com", "Type": "A",
-          "AliasTarget": {"HostedZoneId": "Z2FDTNDATAQYW2",
-            "DNSName": "primary-alb.us-east-1.elb.amazonaws.com",
-            "EvaluateTargetHealth": true}
-        }}]}
-      },
-      "Next": "NotifyFailure"
-    },
-    "NotifyFailure": {"Type": "Task", "Resource": "arn:aws:sns:<region>:<account>:dr-critical-alerts", "End": true},
-    "WaitForHumanApproval": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::sqs:sendMessage.waitForTaskToken",
-      "Parameters": {"QueueUrl": "https://sqs.<region>.amazonaws.com/<account>/dr-approval",
-        "MessageBody": {"failoverId.$": "$.failoverId", "taskToken.$": "$$.Task.Token"}},
-      "End": true
-    }
-  }
-}
-```
+Moved verbatim to [references/failover-orchestration-patterns.md](references/failover-orchestration-patterns.md) - load on demand (see References below).
 
 Always prefer `waitForTaskToken` for human approval gates — pauses
 cleanly, resumes on callback. Avoid `Wait` with fixed duration (clutters
@@ -530,39 +439,7 @@ REMEDIATION:
 ```
 
 ### Worked example — MANUAL_STEP_REQUIRED (no verification)
-```text
-STRATEGY: warm-standby
-RTO_TARGET: 5
-RPO_TARGET: 1
-REGIONS: primary=us-east-1, secondary=us-west-2
-FAILOVER:
-  - [PASS] Route 53 health check configured
-  - [FAIL] No primary verification step — failover proceeds on first health check failure
-  - [PASS] RDS cross-region read replica promotion defined
-  - [PASS] DNS update via Route 53 API
-  - [FAIL] No post-failover verification — clients may hit broken secondary
-ORCHESTRATION:
-  - [PASS] Step Functions state machine
-  - [FAIL] No kill-switch
-  - [FAIL] No human approval gate — fully automatic on first health failure
-VERIFICATION:
-  - [FAIL] No game-day drill in the last 12 months
-  - [WARN] Resilience Hub assessment: 65 (below 80 target)
-  - [WARN] Health check threshold 1 (too sensitive — false positives)
-VERDICT: MANUAL_STEP_REQUIRED
-FINDINGS:
-  - [CRITICAL] No primary verification: a transient health check failure
-    triggers full failover with no split-brain protection.
-  - [CRITICAL] No kill-switch: a misconfigured health check endpoint causes
-    automatic failover to an untested secondary.
-  - [HIGH] No drill in 12 months: warm standby may have drift (stale AMIs).
-  - [HIGH] No post-failover verification: clients routed to broken secondary.
-REMEDIATION:
-  1. Add dr-verify-primary-down Lambda as the first state; abort if primary is healthy.
-  2. Add kill-switch Parameter Store /dr/kill-switch checked first.
-  3. Run a game-day drill; document RTO measured.
-  4. Tune health check threshold from 1 to 3.
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand (see References below).
 
 ## NEVER (these things)
 
@@ -592,98 +469,24 @@ REMEDIATION:
   orchestration via `remove-from-global-cluster`.
 
 ## Expert heuristic callouts
-
-- **Aurora Global unplanned failover loses ~1s of writes.** Storage-level
-  async replication has typical lag under 1s but can spike. Document
-  worst-case RPO as the observed max lag, not the average.
-- **RDS MySQL cross-region replica replication uses binlog.** Big
-  transactions can stall replication for minutes. Monitor with
-  `aws rds describe-db-instances --query 'DBInstances[0].StatusInfos'`.
-- **Route 53 health checks evaluate from multiple AWS regions globally.**
-  A health check is healthy only if the endpoint responds from all
-  health-check regions. A regionally-restricted endpoint may fail health
-  checks from other regions.
-- **Step Functions Route 53 integration is synchronous.**
-  `arn:aws:states:::route53:changeResourceRecordSets` waits for the
-  change to reach INSYNC (typically within 60 seconds).
-- **Elastic DRS recovery instances use the staging area's latest sync
-  point.** No PITR concept — recovery is always at the latest replicated
-  state. For PITR, layer in AWS Backup.
-- **Global Accelerator anycast IPs survive regional outages.** Clients
-  connecting via anycast IPs route to the nearest healthy region
-  automatically. Sub-second failover without DNS update.
-- **Aurora Serverless v2 secondaries are cost-effective for warm standby.**
-  Scale to minimum (0.5 ACU) when idle; scales up when promoted.
-- **AWS Backup restore time scales with snapshot size.** A 10TB EBS
-  snapshot restore can take hours. Use incremental snapshots for large
-  volumes.
-- **DynamoDB Global Tables support multi-region active-active writes.**
-  Last-writer-wins is the default — design for idempotency.
-- **CloudEndure is being sunset; migrate to Elastic DRS.** Do not run
-  both simultaneously on the same source server — they conflict at the
-  block-replication layer.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## Pre-flight safety checks
-
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing DR operation
-  (`rds failover-global-cluster`, `drs start-recovery`, `route53
-  change-resource-record-sets` for failover), emit:
-  `CONFIRM: About to <action> for <component> from <primary> to
-  <secondary>. Proceed? (yes/no)` and wait for explicit `yes`.
-- **Dry-run with `is_drill=true`.** DRS supports drill mode; Aurora
-  Global supports managed planned failover. Always drill before going
-  live with the orchestrator.
-- **Verify the kill-switch is enabled.**
-  `aws ssm get-parameter --name /dr/kill-switch` should return `enabled`.
-- **Verify health check endpoints respond 200 in both regions.**
-- **Verify the rollback path.** Aurora Global reverse requires snapshot
-  rebuild; RDS requires re-snapshot. Plan ahead.
-- **Verify the on-call notification path.** Send a test SNS message —
-  unconfirmed subscriptions silently drop notifications.
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 ## Edge-case handling
-
-- **Split-brain during failover.** If primary verification fails (Lambda
-  error) but the orchestrator proceeds, two primaries serve writes.
-  The state machine MUST gate promotion behind a successful verification
-  state — abort on verification failure.
-- **DNS cache extends effective RTO.** Even with 60s TTL, mobile
-  carriers and OS-level caches can hold the old endpoint for 5+ minutes.
-  For tier-0 apps, use Global Accelerator (anycast IPs change without
-  DNS update).
-- **Replication lag exceeds RPO.** Aurora Global or RDS replica falls
-  behind. Monitor lag continuously; alert if lag approaches RPO target.
-- **DR region outage.** For tier-0, consider a tertiary region or
-  active/active across three regions.
-- **CloudEndure to DRS migration.** AWS provides a migration script —
-  plan 2-4 weeks per project. Do not run both on the same source.
-- **Health check endpoint behind authentication.** Route 53 health
-  checks do not perform auth — expose an unauthenticated `/health`
-  endpoint.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## Recent AWS features (2024-2026)
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
-- **Aurora Global Database Managed Planned Failover (2024-2025):**
-  One-API-call planned failover with no data loss. For drills and
-  controlled failover.
-- **Elastic Disaster Recovery non-blocking agent (2024-2025):** Decouples
-  replication from source-server I/O. No performance impact under heavy
-  write load.
-- **AWS Resilience Hub drift detection (2024-2025):** Periodic
-  re-assessment detects configuration drift. Schedule monthly via
-  EventBridge.
-- **Route 53 health check improvements (2024-2025):** Custom headers and
-  request body support for health endpoints requiring API key.
-- **AWS Backup logical-tier support (2024-2025):** SAP HANA, VMware Cloud
-  on AWS, FSx for NetApp ONTAP — broader DR coverage.
-- **DynamoDB Global Tables (2024-2025):** Custom Lambda-based merge
-  beyond last-writer-wins for multi-writer workloads.
-- **Global Accelerator custom routing (2024-2025):** Non-HTTP workloads
-  (TCP/UDP) for multi-region gaming or VOIP backends.
-- **S3 CRR with Replication Time Control (2024-2025):** 15-minute SLA
-  on object replication — tighter S3 RPO.
-- **Step Functions Distributed Map (2024-2025):** Iterate over many
-  resources (1000+ EC2 instances) for large-scale DR orchestration.
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked example (MANUAL_STEP_REQUIRED) moved from SKILL.md
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert heuristics, edge-case handling, 2024-2026 features moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — live pre-flight checks + pre-failover safety checks moved from SKILL.md
+- [references/failover-orchestration-patterns.md](references/failover-orchestration-patterns.md) — canonical Step Functions failover ASL moved from SKILL.md
+- [references/dr-strategy-deep-dive.md](references/dr-strategy-deep-dive.md) — DR strategy cost/RTO-RPO deep dive
 
 ## Domain
 

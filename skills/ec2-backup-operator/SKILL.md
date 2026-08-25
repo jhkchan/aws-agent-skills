@@ -84,22 +84,7 @@ READY):**
    pre-check surfaces the mode so the operator cannot accidentally rely on
    immutability that is not enforced.
 
-**Cost/time baselines (2026):**
-
-- EBS snapshot create: ~1 min per 100 GB (storage-bound); first snapshot
-  is full, subsequent snapshots of the same volume are incremental (block-
-  level diff).
-- Cross-region snapshot copy: $0.02/GB transfer + destination-region
-  storage ($0.05/GB-mo standard, $0.0125/GB-mo archive tier).
-- AMI create: same as snapshot create for each attached EBS volume, plus
-  metadata registration (~seconds).
-- AWS Backup restore job: minutes to hours depending on size; PITR for EC2
-  continuous backups supports 1-second-granularity restore for the last 35
-  days.
-- FSR cost: $0.06/hr per AZ per snapshot (~$43.20/AZ-month) — verify the
-  latency benefit justifies the cost.
-- Vault lock: free; the cost is the immutability commitment (you cannot
-  delete backups before the retention expires).
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## Tool-selection matrix — which service to use
 
@@ -123,68 +108,13 @@ READY):**
 AMI does NOT delete its snapshots; vault lock immutability depends on the
 mode. Driven by three EC2 backup realities:
 
-- **Snapshots are incremental but the chain is independent of snapshot-id
-  ordering.** EBS tracks blocks by reference count. Deleting an intermediate
-  snapshot migrates its unique blocks to later snapshots that reference
-  them — storage is freed only when a block is unreferenced by ANY
-  remaining snapshot. The delete is safe but the cost saving may lag by
-  weeks. A `delete-snapshot` of the "oldest" snapshot does NOT cascade
-  forward.
-- **`deregister-image` does NOT delete the AMI's snapshots.** Deregister
-  removes the AMI metadata; the underlying EBS snapshots persist and
-  continue to bill until explicitly deleted. Conversely, `delete-snapshot`
-  of a snapshot referenced by a registered AMI bricks launches from that
-  AMI (the volume can't be created). The full AMI cleanup is deregister +
-  delete-snapshot per EBS-mapping snapshot.
-- **Vault lock has two modes with different immutability.** Compliance mode
-  is immutable for the entire retention period — NO role, including root,
-  can delete or modify backups before expiry. Governance mode locks most
-  users but `Backup:$account:full-access` roles can break retention —
-  governance mode is a guardrail, not a WORM. A compliance auditor who
-  assumes "vault-locked" means compliance-mode will be wrong half the time.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## Pre-flight: resource metadata gate
 
 Run before classification. Misclassifying these produces wrong plans.
 
-**Pagination:** `describe-snapshots` paginates at 500/page — ALWAYS pass
-`--owner-ids self` (without it, the call returns every public snapshot in
-the world and is rate-limited). `describe-images` paginates at 200/page
-when filtering by owner. AWS Backup jobs paginate at 100/page.
-
-**Live-account pre-flight (skip if offline plan audit):**
-1. `aws ec2 describe-instances --instance-ids <id>` — confirm `State` is
-   `running` or `stopped` for AMI create; capture `BlockDeviceMappings`
-   (volume-ids), `IamInstanceProfile`, `RootDeviceName`, VPC/subnet/SG
-   context (needed for launch-from-AMI restore).
-2. `aws ec2 describe-volumes --volume-ids <id>` — confirm `State: in-use`
-   for attached volumes, capture `Encrypted`, `KmsKeyId`, `Size`,
-   `VolumeType`, `Iops`, `Throughput`, `Attachments` (AttachTime, DeleteOnTermination).
-3. `aws ec2 describe-snapshots --snapshot-ids <id> --owner-ids self` —
-   confirm `State: completed`; capture `StartTime` (age), `VolumeId`,
-   `Encrypted`, `KmsKeyId`, `Description`, `Tags`, `StorageTier` (standard
-   vs archive).
-4. `aws ec2 describe-images --image-ids <id> --owners self` — confirm
-   `State: available`; capture `BlockDeviceMappings` (the snapshot-ids
-   backing the AMI), `RootDeviceType`, `DeprecationTime`, `Tags`.
-5. `aws ec2 describe-snapshot-attribute --snapshot-id <id> --attribute
-   createVolumePermission` — for cross-account share, verify whether
-   `Group: all` (public) or specific account IDs are present.
-6. `aws kms describe-key --key-id <kms-key-id>` — for encrypted snapshots,
-   confirm `KeyState: Enabled` and the key policy grants the caller
-   `kms:Decrypt` and `kms:CreateGrant`. For cross-account copy, the source
-   account's KMS key policy MUST grant the recipient.
-7. `aws ec2 describe-fast-snapshot-restores` — for any snapshot targeted
-   for delete, verify it is NOT FSR-enabled (deleting an FSR snapshot
-   fails; FSR must be disabled first via `disable-fast-snapshot-restores`).
-8. `aws backup describe-backup-vault --backup-vault-name <name>` — for
-   vault operations, capture `VaultType`, `LockState` (`Unlocked` /
-   `Locked` / `Compliance`), `MinRetentionDays`, `MaxRetentionDays`.
-9. `aws backup get-backup-plan --backup-plan-id <id>` — for plan
-   operations, capture rules, target vault, schedule, lifecycle.
-10. `aws dlm get-lifecycle-policy --policy-id <id>` — for DLM, capture
-    `PolicyType` (`EBS_SNAPSHOT_MANAGEMENT` / `IMAGE_MANAGEMENT`), schedule,
-    target tags, `PolicyDetails`.
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 **Malformed input:** if the input JSON is invalid or missing required fields,
 emit `VERDICT: ERROR` with `REASON: Resource/operation configuration is not
@@ -220,123 +150,7 @@ backup describe-*` / `aws dlm get-*` command in JSON output and re-plan.`
 
 ### Step 0: Expert knowledge — non-obvious EC2/EBS backup behaviors
 
-These behaviors are easy to misjudge without operational EC2 backup
-experience. Each changes a plan if ignored:
-
-- **Snapshots are incremental but the chain is reference-counted, not
-  ordered.** EBS stores unique blocks; each snapshot references the blocks
-  it captured. Deleting any snapshot is safe — its unique blocks migrate
-  to later snapshots that reference them. The cost saving from a delete
-  may lag by weeks (until the blocks are unreferenced by ANY remaining
-  snapshot). Never tell an operator "the storage cost drops immediately
-  after delete."
-
-- **`create-image` reboots the source by default.** Without `--no-reboot`,
-  the instance is rebooted to quiesce filesystems for an app-consistent
-  snapshot. Pass `--no-reboot` for a crash-consistent AMI (faster, no
-  reboot, but the filesystem is captured mid-write — fsck on first boot
-  is normal). For databases, either stop the DB engine before AMI create
-  OR use `--no-reboot` and accept crash-consistency (most modern DBs
-  recover cleanly).
-
-- **`deregister-image` does NOT delete the AMI's snapshots.** Deregister
-  removes only the metadata registration. The EBS snapshots in the AMI's
-  `BlockDeviceMappings` continue to exist and bill. Full AMI cleanup is
-  deregister, then `delete-snapshot` per EBS-mapping snapshot. Operators
-  who "clean up old AMIs" by deregistering alone are paying for orphaned
-  snapshots for years.
-
-- **`delete-snapshot` of a snapshot referenced by a registered AMI fails
-  OR bricks launches.** Newer API versions reject the delete with
-  `InvalidSnapshot.InUse`; older API versions allow it and the AMI fails
-  to launch. Always check `describe-images --filters
-  BlockDeviceMapping.SnapshotId=<id>` before delete.
-
-- **Cross-account encrypted snapshot share requires BOTH the snapshot
-  attribute AND the source KMS key policy.** `modify-snapshot-attribute
-  --create-volume-permission` shares the snapshot; the recipient can
-  `describe-snapshots` but cannot `create-volume` or `copy-snapshot`
-  without `kms:Decrypt` and `kms:CreateGrant` on the source's KMS key.
-  Cross-region copy additionally requires the recipient to re-encrypt
-  with their own KMS key in the destination region.
-
-- **Cross-region snapshot copy re-encrypts with a destination-region KMS
-  key.** The source-region KMS key cannot decrypt in the destination
-  region (KMS keys are regional). The copy operation must specify
-  `--kms-key-id` in the destination region; passing the source key ARN
-  fails.
-
-- **Snapshot Archive tier restore takes 24-72 hours.** Tiered snapshots
-  cost $0.0125/GB-mo (vs $0.05/GB-mo standard) but the restore latency is
-  much higher. Use archive only for cold retention; for DR, keep a
-  standard-tier copy in the DR region.
-
-- **`describe-snapshots` without `--owner-ids self` returns EVERY public
-  snapshot in the world.** This call is throttled and rate-limited.
-  ALWAYS pass `--owner-ids self` (or an explicit owner ID) for inventory
-  operations.
-
-- **AMI launch permissions are separate from snapshot permissions.**
-  Sharing an AMI with another account (`modify-image-attribute --launch-
-  permission`) does NOT share the underlying snapshots — the recipient
-  can launch but cannot `create-volume` from the AMI's snapshots
-  directly. To enable direct snapshot use, also `modify-snapshot-
-  attribute --create-volume-permission`.
-
-- **`DeleteOnTermination: true` on the root volume of an AMI's launch is
-  a data-loss vector.** If the launched instance is terminated, the root
-  volume is deleted automatically. For stateful launches, set
-  `BlockDeviceMappings[].Ebs.DeleteOnTermination=false` on launch.
-
-- **AWS Backup vault lock in compliance mode is immutable.** Once the
-  vault is locked in compliance mode AND the cool-down period passes,
-  NO role (including root) can delete or modify backups before the
-  retention expires. Set the retention carefully; you cannot shorten it
-  later. Cooling-down period (default 72 hr) lets you back out.
-
-- **AWS Backup governance mode is NOT WORM.** Governance mode locks most
-  users but `Backup:$account:full-access`-equivalent roles can break
-  retention. Compliance auditors must verify the mode, not just that the
-  vault is "locked."
-
-- **AWS Backup continuous backups enable 1-second-granularity PITR for
-  EC2.** Set `BackupRule.BackupOptions.WindowsVSS: enabled` and
-  `BackupRule.Lifecycle` with a continuous-backup vault. The 35-day
-  window is the maximum; shorter windows reduce cost. Restore creates a
-  new EC2 instance with new volume-ids.
-
-- **DLM policy tags target resources; security groups / VPC are NOT in
-  the policy.** DLM snapshots capture the volume only — they do NOT
-  capture the instance metadata, security groups, or launch config. For
-  instance-level restore, use AMI-based DLM (`PolicyType: IMAGE_MANAGEMENT`)
-  or AWS Backup (which captures the entire EC2 resource).
-
-- **`copy-snapshot` with `--source-region` and `--destination-region` is
-  idempotent only by description-tag, not by snapshot-id.** Two copies
-  of the same source snapshot produce two destination snapshots. Track
-  source via the `Description` field or a `copied-from` tag.
-
-- **FSR (Fast Snapshot Restore) bills per-AZ per-snapshot, regardless of
-  use.** $0.06/hr per AZ per snapshot (~$43.20/AZ-month). Enable FSR only
-  on snapshots that gate latency-sensitive launches; for routine DR,
-  prefer standard tier (the first-volume-create is slow but the cost is
-  zero ongoing).
-
-- **`create-volume-from-snapshot` with a different AZ or KMS key is
-  explicit.** Volume inherits snapshot's size and type unless
-  overridden. To resize on restore, pass `--size`. To re-encrypt with a
-  different key, pass `--encrypted --kms-key-id`. Cross-AZ volume
-  creation is allowed but attach must be in the same AZ as the instance.
-
-- **AWS Backup restore job for EC2 creates a NEW instance with NEW
-  volume-ids and a NEW ENI.** The original instance is unchanged. The
-  new instance may have a different private IP (if the original IP was
-  released). Plan application connection-string cutover.
-
-- **Snapshot tiering via DLM Archive rule is separate from the standard
-  tier.** A DLM policy can have a `PolicyActions` with
-  `SnapshotTiering` to archive snapshots after N days. The archive
-  snapshot has the same id but a different `StorageTier`.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
@@ -462,43 +276,9 @@ and the CONFIRM gate. The plan includes:
   instance-id / restore-job-id; reboot vs no-reboot for AMI).
 - The CONFIRM gate prompt.
 
-### Step 3: Execute behind CONFIRM gate
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing CLI, emit:
-  `CONFIRM: About to <operation> on <instance/volume/snapshot/AMI/vault>
-  in account <account> region <region>. This will <consequence>. Proceed?
-  (yes/no)`. Do NOT execute until the operator confirms.
-- Capture pre-state for rollback: `aws ec2 describe-volumes --volume-ids
-  <id> --output json > /tmp/<id>-pre-$(date +%s).json`. EBS state is not
-  versioned.
-- Execute the CLI. Capture the new resource id (snapshot-id, AMI-id,
-  volume-id, instance-id, restore-job-id).
-- For long-running operations, wait via `aws ec2 wait snapshot-completed`
-  / `aws ec2 wait image-available` / `aws ec2 wait volume-available` /
-  `aws ec2 wait instance-running` / `aws backup wait-restore-job-completed`.
-
-### Step 4: Post-verification — COMPLETED
-
-After the operation finishes, run post-verification. ALL checks must pass
-for `COMPLETED`.
-
-1. `describe-snapshots --snapshot-ids <id>` — confirm `State: completed`.
-2. `describe-images --image-ids <id>` — confirm `State: available`.
-3. `describe-volumes --volume-ids <id>` — confirm `State: available` (pre-
-   attach) or `in-use` (post-attach).
-4. `describe-instances --instance-ids <id>` — confirm `State: running`.
-5. For AWS Backup restore: `describe-restore-job --restore-job-id <id>` —
-   confirm `Status: COMPLETED` and the created resource ARN.
-6. For cross-account/cross-region: verify the recipient can `describe` and
-   `create-volume`/`run-instances` from the new resource.
-7. For application-consistent restore: fsck the volume, mount, and run a
-   sentinel query (database checksum, file count).
-8. Clean up temporary resources (verification volumes, restored instances).
-9. Plan follow-up: tag the new resource, schedule lifecycle transition
-   (archive tier, DLM policy attachment, AWS Backup plan attachment).
-
-If ANY verification fails, emit `VERDICT: ERROR` with the failure details
-— do not claim COMPLETED.
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 ## Output format (per operation)
 
@@ -568,144 +348,7 @@ NOTES:
     modify-image-attribute --launch-permission to share.
 ```
 
-### Worked example — cross-account encrypted snapshot share BLOCKED
-
-```text
-OPERATION: copy-snapshot (cross-account, encrypted)
-VERDICT: BLOCKED
-TARGET: snap-0enc1234567890abc -> recipient account 222222222222
-PRE_CHECKS:
-  - [PASS] Snapshot State completed
-  - [PASS] Snapshot Encrypted with KMS key arn:aws:kms:us-east-1:111111111111:key/abc
-  - [PASS] Snapshot attribute createVolumePermission includes
-    222222222222 (shared with recipient)
-  - [FAIL] KMS key policy for arn:aws:kms:us-east-1:111111111111:key/abc
-    does NOT grant 222222222222 kms:Decrypt or kms:CreateGrant.
-    Recipient can describe-snapshots but cannot create-volume or
-    copy-snapshot — the data is unreadable.
-  - [PASS] Destination region us-west-2 opted-in
-STEPS: (none — pre-checks failed)
-POST_VERIFY: (none)
-NEW_RESOURCE: (none)
-REBOOT: n/a
-NOTES:
-  - Update the source account's KMS key policy to grant the recipient:
-      {
-        "Sid": "Allow recipient account to use the snapshot",
-        "Effect": "Allow",
-        "Principal": {"AWS": "arn:aws:iam::222222222222:root"},
-        "Action": ["kms:Decrypt", "kms:CreateGrant", "kms:DescribeKey"],
-        "Resource": "*"
-      }
-    Then re-fetch: aws kms get-key-policy --key-id <key-id>
-    --policy-name default.
-  - OR re-issue the snapshot unencrypted via copy-snapshot --encrypted
-    is NOT possible (encryption is immutable per resource); instead
-    create a new unencrypted snapshot from the volume directly.
-  - For cross-region: the recipient will additionally need to re-encrypt
-    with their own KMS key in the destination region during copy-snapshot.
-```
-
-### Worked example — AWS Backup restore job
-
-```text
-OPERATION: start-restore-job (AWS Backup, EC2)
-VERDICT: READY
-TARGET: arn:aws:backup:us-east-1:111111111111:recovery-point:1a2b3c-4d5e-6f7g
-PRE_CHECKS:
-  - [PASS] Recovery point Status COMPLETED
-  - [PASS] Recovery point ResourceArn is the source EC2 instance
-  - [PASS] Restore IAM role arn:aws:iam::111111111111:role/service-role/AWSBackupRestoreRole
-    trusts backup.amazonaws.com
-  - [PASS] Metadata includes InstanceType, SubnetId, SecurityGroupIds,
-    IamInstanceProfile (recovery-point defaults are valid)
-  - [PASS] Target subnet has capacity for the instance type
-STEPS:
-  1. CONFIRM: About to start-restore-job from recovery-point
-     1a2b3c-4d5e-6f7g in account 111111111111 region us-east-1. This
-     will create a NEW EC2 instance with NEW volume-ids and a NEW ENI
-     (original instance unchanged). Estimated duration: 15-30 minutes.
-     Proceed? (yes/no)
-  2. aws backup start-restore-job \
-       --recovery-point-arn arn:aws:backup:us-east-1:111111111111:recovery-point:1a2b3c-4d5e-6f7g \
-       --iam-role-arn arn:aws:iam::111111111111:role/service-role/AWSBackupRestoreRole \
-       --metadata '{"InstanceType":"t3.large","SubnetId":"subnet-0prod","SecurityGroupIds":["sg-0prod"],"IamInstanceProfile":"arn:aws:iam::111111111111:instance-profile/prod-webapp","DeleteOnTermination":"false"}' \
-       --resource-type EC2
-  3. aws backup wait restore-job-completed --restore-job-id <RestoreJobId from step 2>
-POST_VERIFY:
-  - (pending execution)
-  - aws backup describe-restore-job --restore-job-id <RestoreJobId>
-    → Status: COMPLETED, CreatedResourceArn: arn:aws:ec2:...
-  - aws ec2 describe-instances --instance-ids <instance-id from CreatedResourceArn>
-    → State: running
-  - Verify application on the new instance (HTTP 200, DB connectivity)
-  - Plan connection-string cutover: original instance continues to bill
-NEW_RESOURCE: (pending — will be a new EC2 instance-id and restore-job-id)
-REBOOT: n/a (new instance)
-NOTES:
-  - The new instance has a NEW private IP (unless explicitly assigned).
-    Update DNS, secrets manager, and connection strings atomically.
-  - DeleteOnTermination=false on the root volume preserves data on
-    instance termination.
-  - Tag the restored instance with restored-from=<recovery-point-arn>
-    and delete-after for cleanup.
-  - Original instance unchanged — plan decommission separately.
-```
-
-### Worked example — DLM policy creation
-
-```text
-OPERATION: create-lifecycle-policy (DLM)
-VERDICT: READY
-TARGET: tag:BackupSchedule=daily (10 volumes match)
-PRE_CHECKS:
-  - [PASS] PolicyType EBS_SNAPSHOT_MANAGEMENT
-  - [PASS] Schedule cron rate(1 day) valid; create-interval 24h
-  - [PASS] Target tags Key=BackupSchedule,Values=daily → 10 volumes match
-    (verified via ec2 describe-volumes --filters)
-  - [PASS] IAM role AWS-DLM-LifeCycleRole exists, trusts dlm.amazonaws.com,
-    has ec2:CreateSnapshot/CreateTags/DeleteSnapshot on the volume ARNs
-  - [PASS] Retention count 7 (7 daily snapshots), reasonable
-  - [PASS] Copy-tags-from-source=true (lineage preserved)
-  - [PASS] Cross-region copy NOT configured (single-region policy)
-STEPS:
-  1. CONFIRM: About to create-lifecycle-policy in account 111111111111
-     region us-east-1. This will take a daily snapshot of 10 volumes
-     tagged BackupSchedule=daily, retain 7 snapshots per volume (~70 GB-
-     month added storage initially). Proceed? (yes/no)
-  2. aws dlm create-lifecycle-policy \
-       --description "Daily snapshots of volumes tagged BackupSchedule=daily" \
-       --state ENABLED \
-       --execution-role-arn arn:aws:iam::111111111111:role/service-role/AWS-DLM-LifeCycleRole \
-       --policy-details '{
-         "PolicyType": "EBS_SNAPSHOT_MANAGEMENT",
-         "ResourceTypes": ["VOLUME"],
-         "TargetTags": [{"Key": "BackupSchedule", "Value": "daily"}],
-         "Schedules": [{
-           "Name": "Daily",
-           "CreateRule": {"Interval": 24, "IntervalUnit": "HOURS", "Times": ["03:00"]},
-           "RetainRule": {"Count": 7},
-           "CopyTags": true,
-           "FastRestoreRule": {"Interval": 0, "IntervalUnit": "HOURS"}
-         }]
-       }'
-  3. aws dlm get-lifecycle-policy --policy-id <PolicyId from step 2>
-POST_VERIFY:
-  - (pending first execution at 03:00 UTC)
-  - aws dlm get-lifecycle-policy --policy-id <PolicyId>
-    → State: ENABLED, no recent failures
-  - After 03:00 UTC: aws ec2 describe-snapshots --owner-ids self
-    --filters Name=tag:dlm:policy,Values=<PolicyId> → 10 snapshots State completed
-NEW_RESOURCE: (pending — will be a DLM policy-id)
-REBOOT: n/a
-NOTES:
-  - DLM does NOT capture instance metadata (AMI is the right tool for
-    that). Use PolicyType=IMAGE_MANAGEMENT for instance-level DLM.
-  - Retain count 7 keeps 7 daily snapshots; older snapshots auto-deleted.
-  - Review the policy weekly for `State: ERROR` (often IAM role drift).
-  - For cross-region DR via DLM, add a `CrossRegionCopyRule` (separate
-    region, separate KMS key).
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand (see References below).
 
 ## Anti-Patterns — NEVER do these things
 
@@ -839,53 +482,13 @@ NOTES:
   concurrency limit (one concurrent create per volume). Bulk DLM
   schedules stagger automatically; manual bulk-create must be staggered.
 
-## Recent AWS features (2024-2026)
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
-- **AWS Backup for Amazon FSx (2024-2025):** AWS Backup now natively
-  backs up FSx for Lustre, FSx for OpenZFS, and FSx for NetApp ONTAP.
-  Operators should centralize FSx backups in the same vault as EC2/RDS
-  for unified DR orchestration and vault lock coverage.
+## References (load on demand)
 
-- **Fast Snapshot Restore (FSR) GA and cost transparency (2024):** FSR
-  eliminates initialization latency on restored volumes. Operators must
-  audit FSR usage — the $0.06/hr per-AZ cost routinely exceeds storage
-  cost 10-30x. Use only for snapshots gating latency-sensitive launches.
-
-- **Snapshot Archive tier (2024-2025):** `modify-snapshot-tier` or DLM
-  `SnapshotTiering` rule moves snapshots to the $0.0125/GB-mo archive
-  tier. 24-72 hr restore latency. Apply the 180-day staleness threshold
-  (vs 90-day for standard tier) when auditing.
-
-- **EBS Snapshots Recycling Bin (2024):** The Recycling Bin retains
-  deleted snapshots for a configurable period (1-365 days) for recovery
-  from accidental deletes. Operators should set a Recycling Bin rule
-  alongside any deletion automation.
-
-- **AWS Backup Vault Lock cool-down (2024-2025):** Vault lock has a
-  configurable cool-down period (`ChangeableForDays`, default 72 hr)
-  during which compliance-mode lock can be backed out. After cool-down,
-  compliance mode is irreversible. Operators must surface the cool-down
-  state in every vault-lock plan.
-
-- **AWS Backup continuous backups for EC2 (2024):** Continuous backups
-  enable 1-second-granularity PITR for EC2 (35-day window). Requires a
-  continuous-backup vault and a BackupRule with `BackupOptions`. The
-  restore creates a new EC2 instance at the specified timestamp.
-
-- **DLM IMAGE_MANAGEMENT GA (2024):** DLM now supports AMI lifecycle
-  policies (not just snapshots), enabling automated AMI creation and
-  deregistration. Operators can use a single DLM policy for AMI-based
-  instance-level backups.
-
-- **EC2 Image Builder integration with AMI lifecycle (2024-2025):**
-  Image Builder pipelines now emit `DeprecationTime` on produced AMIs
-  automatically. Operators should verify that launch templates skip
-  deprecated AMIs.
-
-- **Cross-account AWS Backup (2025):** AWS Backup now supports cross-
-  account backup management via AWS Organizations, simplifying the KMS
-  key policy coordination that previously made cross-account EC2
-  restore error-prone.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Cost/time baselines, Mindset deep-dive realities, Step 0 expert backup behaviors, Step 3 CONFIRM-gate execution, and 2024-2026 feature changes moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — Pagination rules, live-account pre-flight command list, and Step 4 post-verification commands moved from SKILL.md
+- [references/worked-examples.md](references/worked-examples.md) — cross-account BLOCKED, AWS Backup restore, and DLM policy worked examples moved from SKILL.md
 
 ## Domain
 

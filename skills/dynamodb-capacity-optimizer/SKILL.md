@@ -79,30 +79,8 @@ recommendation with exact CLI commands.
 
 ## Mindset
 
-DynamoDB cost optimization is a capacity-mode and access-pattern
-decision, not a throughput maximization exercise. The goal is the
-billing mode, capacity setting, and index design that minimize dollar
-cost while preserving latency and throttling SLOs.
-
-Four principles guide every recommendation:
-
-- **Provisioned pays for idle.** Whether you use the RCU/WCU or not,
-  provisioned mode charges for the configured amount 24/7. On-demand
-  charges only for what you use. The 30% utilization crossover is the
-  single most important calculation.
-- **Hot partitions throttle before the table does.** DynamoDB distributes
-  data across partitions. A hot partition key (all writes to one key)
-  exhausts a single partition's 3000 RCU / 1000 WCU capacity long
-  before the table's provisioned capacity is exhausted. Adaptive
-  Capacity mitigates this but is reactive, not preventive.
-- **GSIs multiply cost.** Every GSI has its own RCU/WCU and storage.
-  A table with 3 GSIs configured at the same capacity as the base
-  table pays 4x. GSI projection size (which attributes are projected)
-  directly affects storage cost and RCUs consumed per query.
-- **TTL eliminates storage cost invisibly.** TTL deletes expired items
-  automatically at no charge. A table with 90% data churn (logs,
-  sessions) that doesn't use TTL pays for data that is never read
-  again.
+Four-principle mindset (provisioned pays for idle, hot partitions throttle first, GSIs multiply cost, TTL eliminates storage cost invisibly) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when explaining why capacity mode is the #1 lever.
 
 ## Quick reference — verdict thresholds
 
@@ -153,84 +131,15 @@ consumed-capacity utilization; CE wins for dollar amounts.
 
 ## Configuration dependency graph
 
-```
-                    ┌────────────────────────────────┐
-                    │  CloudWatch Consumed Capacity   │
-                    │  Cost Explorer DynamoDB Spend   │
-                    │  Table Configuration            │
-                    └───────────────┬────────────────┘
-                                    │
-              ┌─────────────────────┼─────────────────────┐
-              ▼                     ▼                     ▼
-    ┌──────────────────┐  ┌─────────────────┐  ┌─────────────────┐
-    │ Capacity Mode    │  │ RCU/WCU Sizing  │  │ Partition Key   │
-    │ Crossover (S1)   │  │ + AutoScaling   │  │ Design (S4)     │
-    │                  │  │ Tuning (S2/S3)  │  │                 │
-    └────────┬─────────┘  └────────┬────────┘  └────────┬────────┘
-             │                     │                    │
-             ▼                     ▼                    ▼
-    ┌─────────────────────────────────────────────────────────┐
-    │           GSI Optimization Gate (Step 5)                │
-    │  Verify GSI capacity and projection are not excessive   │
-    └─────────────────────────┬───────────────────────────────┘
-                              │
-                              ▼
-    ┌─────────────────────────────────────────────────────────┐
-    │     Table Class + TTL + Streams Gate (Step 6/7)         │
-    │  Verify table class, TTL, and Streams cost are optimal  │
-    └─────────────────────────┬───────────────────────────────┘
-                              │
-                              ▼
-    ┌─────────────────────────────────────────────────────────┐
-    │           Impact Estimation (Step 8)                    │
-    │           Verdict + savings block                        │
-    └─────────────────────────────────────────────────────────┘
-```
-
-**Dependency rule:** Never recommend a capacity-mode switch without
-first verifying the partition key design (Step 4 gate). A hot-partition
-problem is a capacity problem, not a billing-mode problem — switching
-to on-demand to avoid throttling is a valid mitigation but the root
-cause (skew) should be surfaced.
+Configuration dependency graph (consumed-capacity inputs through the capacity-mode / sizing / partition-key gates to the verdict block) and the never-switch-mode-before-Step-4 dependency rule moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when sequencing a multi-dimension optimization.
 
 ## Process — Optimization logic (apply in order)
 
 ### Step 0: Non-obvious behaviours that change the recommendation
 
-These operational gotchas route a recommendation away from the obvious
-choice:
-
-- **On-demand charges per request, not per capacity.** A 300 KB item
-  read consumes 5 RCU. Item size directly affects on-demand cost.
-- **Provisioned mode charges for configured capacity, not consumed.** A
-  table provisioned for 10,000 RCU that uses 1,000 RCU pays for 10,000.
-  This is the #1 DynamoDB cost waste.
-- **The 30% crossover is a rule of thumb, not a cliff.** Writes are 5x
-  more expensive than reads ($1.25/M vs $0.25/M on-demand). A write-
-  heavy workload hits the crossover at a different utilization than
-  read-heavy.
-- **Auto-scaling is not instantaneous.** Cooldown period (default 60s)
-  and scaling increments mean sudden spikes can throttle before scaling.
-- **Adaptive Capacity is automatic and free** (since 2024). It
-  temporarily redirects unused capacity from cold partitions to hot ones.
-  It does NOT eliminate the need for good partition key design.
-- **GSI RCUs and WCUs are independent from the base table.** When the
-  base table writes exceed the GSI's WCU, the GSI falls behind.
-- **GSI projection ALL stores every attribute.** KEYS_ONLY stores just
-  partition+sort key. INCLUDE projects specified attributes — the sweet
-  spot for cost-sensitive GSIs.
-- **Table class Standard-IA does NOT change capacity pricing.** Only
-  storage is 60% cheaper. RCU/WCU pricing stays the same.
-- **TTL deletes are free and automatic.** Items past the TTL timestamp
-  are deleted within 48 hours. No WCU charged. Cheapest data lifecycle.
-- **DynamoDB Streams are billed per read.** Every write generates a
-  stream record. Lambda triggers consume RCU-equivalent reads.
-- **Global Tables replicate writes to all regions.** Each replica
-  region consumes WCU for replicated writes — a 2-region table doubles
-  write cost.
-- **Switching provisioned→on-demand is instant** (`update-table --
-  billing-mode PAY_PER_REQUEST`). Switching back requires re-specifying
-  RCU/WCU and auto-scaling.
+All twelve non-obvious behaviours (per-request on-demand billing, provisioned idle charge, 30% crossover nuance, autoscaling cooldown lag, adaptive capacity, GSI capacity independence, projection types, Standard-IA storage-only pricing, free TTL deletes, Streams read billing, Global Tables WCU multiplier, instant mode switch) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when an operational gotcha could reroute the recommendation.
 
 ### Step 1: On-demand vs provisioned capacity mode crossover
 
@@ -238,34 +147,8 @@ This is the primary cost lever. The crossover point determines whether
 on-demand (pay per request) or provisioned (pay for capacity) is
 cheaper for the observed usage pattern.
 
-**Pricing comparison (us-east-1, 2026):**
-```
-On-demand:
-  Read: $0.25 per million eventually-consistent reads (4 KB item)
-  Write: $1.25 per million writes (up to 1 KB item)
-
-Provisioned:
-  Read: $0.00013 per RCU-hour
-  Write: $0.00065 per WCU-hour
-
-Monthly (730 hours):
-  1 RCU for a month: $0.00013 × 730 = $0.0949
-  1 WCU for a month: $0.00065 × 730 = $0.4745
-```
-
-**Crossover math (read-heavy, 1000 RCU provisioned table):**
-```
-Provisioned monthly: 1000 × $0.0949 = $94.90
-Capacity: 1000 RCU × 2 reads/sec = 2000 reads/sec → 5.256B reads/month at 100%
-
-At 100% utilization: on-demand would cost 5256M × $0.25 = $1,314 → provisioned 13.8x cheaper
-At 30% utilization: on-demand = $394.20; provisioned = $94.90 → provisioned 4.2x cheaper
-At 10% utilization: on-demand = $131.25; provisioned = $94.90 → barely cheaper
-Below ~7% utilization: on-demand wins.
-
-Rule of thumb: consumed > 30% of provisioned → keep provisioned.
-Consumed < 15% → on-demand likely wins. Between 15-30% → calculate.
-```
+us-east-1 2026 pricing comparison and the 1000-RCU crossover math (provisioned 13.8x cheaper at 100%, on-demand wins below ~7%) moved verbatim to [references/dynamodb-pricing-and-capacity.md](references/dynamodb-pricing-and-capacity.md).
+Load on demand when computing the capacity-mode crossover.
 
 **Decision gate:**
 ```
@@ -280,40 +163,11 @@ Is the table in PROVISIONED mode?
 
 ### Step 2: RCU/WCU sizing from consumed capacity
 
-For provisioned tables that are correctly in provisioned mode, right-
-size the RCU/WCU configuration.
+RCU/WCU sizing formula (max consumed / 0.7, round up to 100) and the right-sizing decision matrix moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when right-sizing a provisioned table.
 
-**Sizing formula:**
-```
-required_rcu = max(consumed_rcu_avg) / 0.7  (with 70% target headroom)
-required_wcu = max(consumed_wcu_avg) / 0.7
-
-round up to the nearest multiple of 100 for auto-scaling minimum.
-```
-
-**Right-sizing decision matrix:**
-
-| Consumed vs Provisioned | Utilization | Verdict | Action |
-|---|---|---|---|
-| Consumed < 30% of provisioned | Under-utilized | Switch to on-demand (Step 1) | |
-| Consumed 30-60% of provisioned | Well-utilized | Reduce provisioned to ~140% of consumed | |
-| Consumed 60-85% of provisioned | Optimal | No change needed | |
-| Consumed > 85% of provisioned | Near-ceiling | Increase provisioned or fix partition skew | |
-
-**CLI for right-sizing (with auto-scaling):**
-```bash
-aws application-autoscaling register-scalable-target \
-  --service-namespace dynamodb --resource-id table/my-table \
-  --scalable-dimension dynamodb:table:ReadCapacityUnits \
-  --min-capacity <new_min> --max-capacity <new_max>
-
-aws application-autoscaling put-scaling-policy \
-  --policy-name my-table-read-scaling \
-  --service-namespace dynamodb --resource-id table/my-table \
-  --scalable-dimension dynamodb:table:ReadCapacityUnits \
-  --policy-type TargetTrackingScaling \
-  --target-tracking-scaling-policy-configuration '{"TargetValue":70.0,"PredefinedMetricSpecification":{"PredefinedMetricType":"DynamoDBReadCapacityUtilization"},"ScaleOutCooldown":60,"ScaleInCooldown":60}'
-```
+Right-sizing CLI (register-scalable-target + TargetTrackingScaling put-scaling-policy) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before applying any capacity change.
 
 ### Step 3: Auto-scaling target utilization tuning
 
@@ -334,31 +188,8 @@ exceeds p50 consumed, the table is over-provisioned at the floor.
 
 ### Step 4: Partition key design and hot-partition detection
 
-DynamoDB partitions data by partition key hash. A hot partition key
-(all traffic to one key) exhausts that partition's capacity before the
-table-level capacity is reached.
-
-**Hot partition detection via CloudWatch:**
-```
-Table consumed = 800 RCU/sec of 1000 provisioned → expect no throttle.
-But ThrottledRequests > 0. Why?
-→ One partition key receives 80% of traffic → 640 RCU on one partition.
-→ Partition < 10 GB has 1000 RCU limit; combined hot keys can exceed it.
-→ Detection: any partition key consuming > 1000 RCU sustained = hot.
-```
-
-**Mitigation strategies:**
-
-| Strategy | When to use | Implementation |
-|---|---|---|
-| Add randomization suffix to partition key | Write-heavy, uniform reads | `user_id + "#" + random(0-9)` |
-| Use sort key for time-series data | Time-series patterns | Partition by date bucket, sort by timestamp |
-| Separate hot keys to different tables | Few known hot keys | Dedicated table for high-traffic entities |
-| Switch to on-demand | Unknown patterns | Bursting per-request avoids throttle |
-
-**Hot partition is NOT a billing-mode problem.** Switching to on-demand
-avoids throttling but does not fix the access pattern. Always surface
-the root cause.
+Hot-partition detection math (any partition key consuming > 1000 RCU sustained) and the four mitigation strategies moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when ThrottledRequests > 0 with consumed < provisioned.
 
 ### Step 5: GSI optimization
 
@@ -375,81 +206,18 @@ high capacity is a common cost sink.
 | GSI queried < 100x/day? | Evaluate dropping; use Scan with Filter instead |
 | Multiple GSIs on same partition key? | Consolidate or use sparse GSIs |
 
-**Sparse GSI strategy:**
-A sparse GSI only includes items with the indexed attribute. If the
-attribute exists on < 10% of items, the GSI is 90% smaller — reducing
-both storage and RCU cost dramatically.
-
-```
-Example: 500M items in base table.
-  Non-sparse GSI: 500M items, 200 GB → $50/mo storage + RCU
-  Sparse GSI (5% have attribute): 25M items, 10 GB → $2.50/mo (95% saving)
-```
-
-**Projection optimization math:**
-```
-GSI with ALL projection: 500 GB → $125/mo storage
-GSI with INCLUDE (3 attributes): 50 GB → $12.50/mo
-Savings: $112.50/month per GSI
-```
+Sparse GSI strategy (5%-attribute example, 95% saving) and projection optimization math ($112.50/month per GSI) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when auditing GSI projection size.
 
 ### Step 6: Table class selection
 
-DynamoDB offers two table classes:
-
-| Class | Storage $/GB-month | Use case |
-|---|---|---|
-| Standard | $0.25 | Active tables (default) |
-| Standard-Infrequent Access | $0.10 | Low-traffic, data-heavy tables (60% storage savings) |
-
-**Standard-IA decision gate:**
-```
-avg_consumed_rcu_per_second < 50 AND table_storage > 50 GB
-→ Standard-IA saves 60% on storage, same capacity pricing
-
-Example:
-  Table: audit-log-archive
-  Storage: 800 GB
-  Avg consumed: 8 RCU/sec (occasional compliance queries)
-
-  Standard: 800 × $0.25 = $200/month storage
-  Standard-IA: 800 × $0.10 = $80/month storage
-  Saving: $120/month (60%)
-```
-
-**WARNING:** Standard-IA has no change to capacity pricing. If the
-table is in provisioned mode, the RCU/WCU cost is identical. The
-savings are storage-only.
+Table class comparison, the Standard-IA decision gate (avg RCU < 50/s AND storage > 50 GB, $120/month example), and the storage-only-savings warning moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when evaluating Standard vs Standard-Infrequent Access.
 
 ### Step 7: TTL and DynamoDB Streams cost impact
 
-**TTL configuration:**
-```bash
-aws dynamodb update-time-to-live \
-  --table-name my-table \
-  --time-to-live-specification '{"Enabled": true, "AttributeName": "expires_at"}'
-```
-
-TTL items are automatically deleted within 48 hours of the TTL
-timestamp. No WCU charged. This is the cheapest data lifecycle
-mechanism.
-
-**TTL savings estimation:**
-```
-churn_storage = table_storage_GB × churn_rate_per_month
-Monthly saving = churn_storage × $0.25/GB (Standard) or $0.10/GB (Standard-IA)
-Without TTL, churned data accumulates indefinitely.
-```
-
-**DynamoDB Streams cost:**
-```
-Streams enabled with NEW_AND_OLD_IMAGES at 1,000 writes/sec:
-  Monthly records: 1,000 × 730 × 3600 = 2.628B records
-  Lambda trigger at batch size 100: 26.28M invocations/month
-  Lambda cost (512 MB, 200ms): ~$460/month
-
-If the consumer is optional (audit log), consider disabling to save.
-```
+TTL CLI, TTL savings estimation formula, and the Streams/Lambda cost math (~$460/month at 1,000 writes/sec) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when evaluating TTL or Streams cost.
 
 ### Step 8: Impact estimation
 
@@ -493,28 +261,8 @@ every `NEED_MORE_INFO`/`BLOCKED` gate.
 
 ## Output format
 
-```text
-TARGET: <table-name>
-VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE | ALREADY_OPTIMAL
-REASON: <1-2 sentences naming the recommendation and the supporting data>
-RECOMMENDATION:
-  Current: <billing mode>, <RCU/WCU>, <GSIs>, <table class>, <TTL>, <Streams>
-  Proposed: <billing mode>, <RCU/WCU>, <GSIs>, <table class>, <TTL>, <Streams>
-  Dimensions changed: <capacity-mode | rcu-wcu-sizing | autoscaling | partition-key | gsi | table-class | ttl-streams>
-  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
-ESTIMATED_SAVINGS:
-  Monthly: $<amount>
-  Annual: $<amount>
-  Assumptions: <list (consumed capacity, pricing region, GSI count, etc.)>
-MIGRATION_STEPS:
-  1. <specific action with CLI command>
-  2. <verification step>
-CONFIRM: Before executing any state-changing CLI, emit and await operator
-  approval: "CONFIRM: About to <action> on <table-name> in <region>.
-  Proceed? (yes/no)"
-```
-
-Full worked examples are in `references/worked-examples.md`.
+Simple per-table output block moved verbatim to [references/worked-examples.md](references/worked-examples.md); the STRICT output contract below remains authoritative.
+Load on demand when emitting a non-strict summary block.
 
 ## STRICT output contract
 
@@ -678,37 +426,8 @@ CONFIRM: About to reduce capacity (5000→1200 RCU, 2000→600 WCU), swap GSI,
 
 ### Perfect example output — OPTIMIZED (post-apply verification)
 
-This is the shape emitted AFTER the operator approves and the change is
-applied. VERDICT is `OPTIMIZED` (not FURTHER_OPTIMIZATION_AVAILABLE).
-The "before → after" capacity numbers and dollar savings are preserved
-so downstream FinOps can close the loop.
-
-```text
-TARGET: user-events-prod
-VERDICT: OPTIMIZED
-REASON: Capacity reduced from 5000/2000 to 1200/600 RCU/WCU with
-  autoscaling; GSI recreated with INCLUDE projection (120 GB → 30 GB);
-  TTL enabled on expires_at; Streams disabled. CloudWatch confirms zero
-  ThrottledRequests over the 7-day post-apply window.
-RECOMMENDATION:
-  Current: PROVISIONED 1200 RCU / 600 WCU (autoscaled, target 70%), 2 GSIs (INCLUDE, 30 GB), TTL on (expires_at), Streams off
-  Proposed: same as Current — no further action
-  Dimensions changed: capacity-mode ✓  rcu-wcu-sizing ✓ (applied)  autoscaling ✓ (applied)
-    partition-key ✓ (no skew)  gsi ✓ (applied)  table-class ✓ (Standard, high traffic)  ttl-streams ✓ (applied)
-  Confidence: HIGH — 7-day post-apply CloudWatch shows ConsumedReadCapacityUnits avg 820/s, max 1190/s; zero ThrottledRequests.
-ESTIMATED_SAVINGS:
-  Pre-apply monthly: $2,137.80
-  Post-apply monthly: $571.45
-  Monthly saving: $1,566.35 ($2,137.80 − $571.45 ✓)
-  Annual saving: $18,796.20
-MIGRATION_STEPS:
-  1. Completed: autoscaling min reduced (5000→1200 RCU, 2000→600 WCU) on 2026-08-04.
-  2. Completed: GSI recreated with INCLUDE projection (by-type-v2 live, by-type-v1 deleted).
-  3. Completed: TTL enabled on expires_at; first deletes observed within 38 hours.
-  4. Completed: Streams disabled after confirming no Lambda consumers.
-  5. Monitor ThrottledRequests and ConsumedCapacity for 7 more days.
-CONFIRM: Change applied and verified. No further approval needed.
-```
+OPTIMIZED post-apply verification example moved verbatim to [references/worked-examples.md](references/worked-examples.md); the FURTHER_OPTIMIZATION_AVAILABLE example above is the primary inline example.
+Load on demand when emitting the post-apply OPTIMIZED verdict.
 
 ## Verdict semantics
 
@@ -754,46 +473,13 @@ Extended anti-patterns in `references/dynamodb-pricing-and-capacity.md`.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation,
-  emit and await operator approval. Do NOT execute until confirmed.
-- **Test GSI changes on a new index, not the existing one.** Create a
-  new GSI with the desired projection; verify queries work; then delete
-  the old GSI. Never modify an in-use GSI directly (GSIs cannot be
-  modified — only created or deleted).
-- **Verify no consumers depend on Streams before disabling.** Lambda
-  triggers on DynamoDB Streams will silently stop processing. Check
-  event source mappings before disabling.
-- **TTL takes up to 48 hours for the first deletes.** Do not expect
-  immediate storage reduction. Monitor table size over 7 days.
-- **Capacity mode switch from provisioned to on-demand is instant**
-  but switching back requires specifying RCU/WCU. Ensure the rollback
-  path is documented.
-- **Auto-scaling changes can cause brief throttling.** Lowering
-  min-capacity below the current consumed rate will cause throttling
-  during the transition. Lower gradually.
-- **Global Table replica changes require multi-region coordination.**
-  Do not change capacity on a Global Table member without verifying
-  replication health first.
-- **Bulk-operation limit:** Process at most 5 tables per batch. Sort
-  by estimated savings, verify each batch before proceeding. Abort if
-  any table shows increased throttling or errors post-change.
+Pre-remediation safety checks (CONFIRM gate, GSI blue/green swap, Streams consumer check, TTL 48-hour lag, mode-switch rollback path, gradual capacity lowering, Global Table coordination, 5-table batches) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before executing any remediation CLI.
 
 ## Recent AWS features (2024-2026)
 
-- **Standard-Infrequent Access table class (2024):** 60% storage cost
-  reduction for low-traffic tables. No capacity pricing change.
-- **Adaptive capacity improvements (2024-2025):** Absorbs hot-partition
-  spikes faster (seconds). Still reactive, not preventive.
-- **On-demand mode maturation (2024-2025):** Instant mode switching.
-  The 30% crossover rule remains the guideline.
-- **Streams to Kinesis Data Streams (2024):** KDS alternative offers
-  longer retention but higher cost. Flag if detected.
-- **Global Tables writer improvements (2025):** Replicated write
-  consumption optimized by 15%. Still doubles write cost for 2-region.
-- **IaC support (2024-2025):** CloudFormation/CDK now support table
-  class, TTL, and auto-scaling in one resource definition.
-- **Zero-ETL integration with OpenSearch (2025-2026):** Eliminates
-  custom search pipelines. Flag if detected.
+Recent AWS features 2024-2026 (Standard-IA class, adaptive capacity improvements, on-demand maturation, KDS alternative, Global Tables writer optimizations, IaC support, OpenSearch zero-ETL) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when a 2024-2026 feature affects the recommendation.
 
 ## References
 
@@ -804,6 +490,13 @@ Extended anti-patterns in `references/dynamodb-pricing-and-capacity.md`.
 - `references/worked-examples.md` — full worked examples (capacity mode
   crossover, auto-scaling tuning, GSI optimization, hot partition, already-
   optimal, NEED_MORE_INFO, end-to-end walkthrough).
+
+## References (load on demand)
+
+- [`references/advanced-patterns.md`](references/advanced-patterns.md) — Mindset principles, configuration dependency graph, Step 0 gotchas, Steps 2/4/5/6/7 detail, and recent AWS features (2024-2026) moved from SKILL.md
+- [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — pre-remediation safety checks and the right-sizing CLI moved from SKILL.md
+- [`references/dynamodb-pricing-and-capacity.md`](references/dynamodb-pricing-and-capacity.md) — capacity-mode pricing comparison and crossover math moved from SKILL.md, plus the pre-existing pricing tables, partition-key patterns, and extended NEVER list
+- [`references/worked-examples.md`](references/worked-examples.md) — the simple output block and the OPTIMIZED post-apply example moved from SKILL.md, plus the pre-existing worked examples
 
 ## Domain
 

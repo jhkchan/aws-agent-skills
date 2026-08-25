@@ -79,44 +79,8 @@ source engine (MySQL vs PostgreSQL vs Oracle) or the migration mode
 (full load vs CDC vs full load + CDC) produces false root causes.
 
 ### Account-wide pre-flight commands
-
-```bash
-# 1. Task config (status, migration type, table mappings, settings)
-aws dms describe-replication-tasks \
-  --filters Name=replication-task-id,Values=<task-id> --output json
-
-# 2. Replication instance (class, engine version, multi-AZ, storage)
-aws dms describe-replication-instances \
-  --filters Name=replication-instance-id,Values=<inst-id> --output json
-
-# 3. Endpoints (source and target engine type, server, port, SSL)
-aws dms describe-endpoints \
-  --filters Name=endpoint-arn,Values=<source-arn>,Values=<target-arn> --output json
-
-# 4. Table statistics (per-table FullLoadRowCount, Insert/Delete/Update)
-aws dms describe-table-statistics --replication-task-arn <task-arn> --output json
-
-# 5. CloudWatch Logs for the task (the highest-signal source for errors)
-aws logs filter-log-events \
-  --log-group-name dms-task-<task-id> \
-  --start-time $(date -u -d '-1 hour' +%s)000 \
-  --filter-pattern "ERROR" --output json
-
-# 6. CloudWatch metrics — CDC latency + instance capacity
-aws cloudwatch get-metric-statistics --namespace AWS/DMS \
-  --metric-name CDCLatencySource \
-  --dimensions Name=ReplicationTaskIdentifier,Value=<task-id> \
-  --start-time $(date -u -d '-1 hour' +%FT%TZ) --end-time $(date -u +%FT%TZ) \
-  --period 300 --statistics Average,Maximum --output json
-# (repeat for FreeableMemory, SwapUsage with ReplicationInstanceIdentifier)
-
-# 7. IAM roles (dms-vpc-role, dms-cloudwatch-logs-role)
-aws iam get-role --role-name dms-vpc-role --output json
-aws iam get-role --role-name dms-cloudwatch-logs-role --output json
-
-# 8. Source and target security groups (ingress rules)
-aws ec2 describe-security-groups --group-ids <source-sg> <target-sg> --output json
-```
+Full pre-flight command block moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### Source-engine short-circuit
 
@@ -160,54 +124,8 @@ REMEDIATION: Re-prompt the operator for: (1) the DMS task ID or ARN,
 ## Process — Diagnostic decision tree (apply in symptom order)
 
 ### Step 0: Expert knowledge — non-obvious DMS behaviors
-
-These behaviors are easy to misjudge without operational DMS experience.
-Each changes a diagnosis if ignored:
-
-- **`LastFailureMessage` is the starting point, not the root cause.**
-  The task's `LastFailureMessage` is a high-level signal ("Task was
-  suspended"). The actual error is in CloudWatch Logs near the failure
-  timestamp. Always pull task logs (`aws logs filter-log-events`) before
-  diagnosing — the logs contain the engine-specific error that
-  `LastFailureMessage` omits.
-
-- **RDS MySQL binlog retention defaults to 0 hours.** DMS cannot read
-  changes older than the current binlog. If the task restarts or falls
-  behind, the binlog may be purged and unrecoverable. Set
-  `binlog_retention_hours=24` via the RDS parameter group BEFORE
-  starting a CDC task. This is the #1 silent CDC stall on RDS MySQL.
-
-- **PostgreSQL source needs `wal_level=logical` BEFORE the task starts.**
-  Changing `wal_level` requires an RDS reboot. Started with `replica`,
-  logical replication fails immediately with "logical decoding requires
-  wal_level >= logical." Check the parameter group BEFORE starting.
-
-- **The DMS user needs `EXECUTE on DBMS_LOGMNR` for Oracle, not just
-  SELECT.** Oracle LogMiner CDC requires the `LOGMINING` role (12c+) or
-  explicit `EXECUTE on DBMS_LOGMNR` (11g). Missing this produces
-  "ORA-01331: LogMiner session does not exist" — a permissions error,
-  not a binary-logging error.
-
-- **Table-mapping rules can silently exclude tables.** A `selection`
-  rule with `filter` can exclude tables the operator expects to migrate.
-  `describe-table-statistics` shows what DMS actually loaded — compare
-  against the expected list. A "wasn't migrated" table is almost always
-  a table-mapping issue, not a DMS bug.
-
-- **LOB columns default to `LIMITED` mode (32KB).** CLOB/TEXT/BLOB
-  columns larger than `LobMaxSize` (default 32KB) are truncated or fail.
-  For LOB-heavy migrations, set `LobMaxSize=0` (unlimited, slower) or
-  use `InlineLob`. Failure shows as "LOB size exceeds maximum."
-
-- **CDC latency is measured from the source, not the target.**
-  `CDCLatencySource` = lag between source's current time and last change
-  DMS read. `CDCLatencyTarget` = lag between last read and last applied.
-  High source = binlog/pglogical bottleneck; high target = constraint
-  checks/trigger overhead.
-
-- **The replication instance is shared across tasks.** One task's heavy
-  CDC load can starve others. `FreeableMemory` near zero and `SwapUsage`
-  climbing indicates capacity exhaustion, not a per-task issue.
+Expert-knowledge behaviors (LastFailureMessage limits, binlog retention
+defaults, LOB defaults, shared instances) moved to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 1: task-failed-at-start
 
@@ -465,92 +383,16 @@ CONFIRM: "About to set wal_level=logical on <pg-id> and reboot.
 ```
 
 ### Worked example — CDC latency from binlog retention (MySQL RDS)
-
-```text
-TARGET: arn:aws:dms:us-east-1:111:task:TASK002 (source: mysql,
-        target: postgres, instance: dms.r5.xlarge)
-VERDICT: ROOT_CAUSE_FOUND
-REASON: MySQL RDS source has binlog_retention_hours=0 (default),
-  causing binlogs to be purged before DMS reads them. CDCLatencySource
-  climbed to 86400s (24h); task cannot recover the missing changes.
-LAYER: SOURCE_BINARY_LOGGING
-EVIDENCE:
-  - Symptom: CDCLatencySource climbing steadily over 24 hours; task
-    running but not applying changes.
-  - Probe: show variables like 'binlog_retention_hours'; returns 0.
-  - Probe: show binary logs; returns only current binlog — older
-    binlogs purged.
-  - Passing: binlog_format=ROW; binlog_row_image=FULL; DMS user has
-    REPLICATION SLAVE, REPLICATION CLIENT.
-REMEDIATION:
-  1. aws rds modify-db-parameter-group --db-parameter-group-name
-     <pg-name> --parameters ParameterName=binlog_retention_hours,
-     ApplyMethod=immediate,ParameterValue=24
-  2. For already-purged binlogs: reload from snapshot or accept data
-     loss for the gap. Restart in full-load-and-cdc mode if needed.
-  3. Verify binlog_retention_hours=24; monitor CDCLatencySource.
-CONFIRM: "About to set binlog_retention_hours=24 on <pg-name>. No
-  reboot required. Proceed? (yes/no)"
-```
+Full worked example moved to
+[references/worked-examples.md](references/worked-examples.md).
 
 ### Worked example — FK constraint violation on full load
-
-```text
-TARGET: arn:aws:dms:us-east-1:111:task:TASK003 (source: oracle,
-        target: postgres, instance: dms.r5.2xlarge)
-VERDICT: ROOT_CAUSE_FOUND
-REASON: Target PostgreSQL has FK constraint on orders.customer_id
-  referencing customers.id, but customers was not loaded before
-  orders. FK check failed on first orders insert.
-LAYER: TARGET_CONSTRAINTS
-EVIDENCE:
-  - Symptom: task failed at table ORDERS, FullLoadRowCount at 0 while
-    other tables loaded.
-  - Probe: task logs: "insert or update on table 'orders' violates
-    foreign key constraint 'orders_customer_id_fkey'."
-  - Probe: describe-table-statistics shows CUSTOMERS in "loading"
-    while ORDERS attempted inserts — load order did not respect FK.
-  - Passing: source/target connections OK; data types compatible.
-REMEDIATION:
-  1. On target: set session_replication_role=replica; (disables FK
-     checks for the session).
-  2. Or set DMS TargetTablePrepMode=TRUNCATE_BEFORE_LOAD with table-
-     order rules placing parent tables before child tables.
-  3. aws dms start-replication-task --replication-task-arn <task-arn>
-     --start-replication-task-type reload-target
-  4. Verify: ORDERS FullLoadRowCount advancing; no constraint errors.
-CONFIRM: "About to disable FK checks on the target and restart the
-  task. Proceed? (yes/no)"
-```
+Full worked example moved to
+[references/worked-examples.md](references/worked-examples.md).
 
 ### Worked example — memory pressure causing CDC stall
-
-```text
-TARGET: arn:aws:dms:us-east-1:111:task:TASK004 (source: mysql,
-        target: postgres, instance: dms.r5.large)
-VERDICT: ROOT_CAUSE_FOUND
-REASON: dms.r5.large (8GB RAM) running 3 CDC tasks. FreeableMemory
-  dropped to 200MB, SwapUsage climbed to 2GB, causing thrashing and
-  CDC disk spill.
-LAYER: MEMORY_PRESSURE
-EVIDENCE:
-  - Symptom: CDCLatencyTarget climbing on all 3 tasks; task running
-    but applying changes slowly.
-  - Probe: CloudWatch FreeableMemory: avg 200MB, min 50MB (under
-    500MB threshold for dms.r5.large).
-  - Probe: SwapUsage: avg 2GB, climbing. CDCChangesDiskSource non-zero.
-  - Passing: source binlog retention sufficient; SG rules OK; target
-    constraints OK.
-REMEDIATION:
-  1. aws dms modify-replication-instance --replication-instance-arn
-     <inst-arn> --replication-instance-class dms.r5.xlarge
-     --apply-immediately
-  2. Or move 1-2 tasks to a separate instance to reduce contention.
-  3. Verify: FreeableMemory > 2GB; SwapUsage drops to zero;
-     CDCLatencyTarget decreases on all tasks.
-CONFIRM: "About to upgrade <inst-id> dms.r5.large -> dms.r5.xlarge.
-  Brief task interruption. Proceed? (yes/no)"
-```
+Full worked example moved to
+[references/worked-examples.md](references/worked-examples.md).
 
 ## Anti-Patterns — NEVER
 
@@ -612,65 +454,20 @@ CONFIRM: "About to upgrade <inst-id> dms.r5.large -> dms.r5.xlarge.
   the correct fix; increasing `ParallelApplyThreads` is a workaround.
 
 ## Expert heuristic — the top 5 non-obvious signals
-
-A senior DMS engineer checks these five things first when a task is
-failing. Each flips a diagnosis if missed:
-
-1. **Task logs are empty — Logging is ESSENTIAL.** If
-   `filter-log-events` returns nothing, `Logging` is `ESSENTIAL`
-   (default) or the `dms-cloudwatch-logs-role` IAM role is missing.
-   Set `Logging` to `DETAILED` and verify the role before diagnosing.
-
-2. **RDS MySQL `binlog_retention_hours=0`.** The default on RDS MySQL;
-   causes silent CDC stalls. The task runs, then hours later
-   CDCLatencySource climbs to infinity because binlogs were purged.
-   Always check first for MySQL CDC sources, even if previously working.
-
-3. **PostgreSQL `wal_level=replica`.** Changing this requires a reboot.
-   If the source was recently restored from a snapshot or the parameter
-   group was changed, `wal_level` may have reverted. A task that worked
-   yesterday may fail today.
-
-4. **Table load order vs FK dependencies.** DMS loads tables in an
-   unspecified order by default. If a child table loads before its
-   parent, the FK check fails. The fix is `TargetTablePrepMode` or
-   disabling FK checks during load, not removing the constraints.
-
-5. **Shared instance capacity.** A single replication instance running
-   multiple CDC tasks is the most common cause of "all tasks are slow
-   at the same time." The root cause is the instance's `FreeableMemory`
-   and `SwapUsage`, not any individual task. Check instance-level
-   metrics first when multiple tasks degrade simultaneously.
+Top-5 non-obvious signal checklist moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Recent AWS features (2024-2026)
+2024-2026 DMS feature notes moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
-- **DMS Serverless (2024 GA):** Auto-provisions replication capacity,
-  scaling up/down automatically. Eliminates manual instance-class
-  tuning. No fixed replication instance; capacity is Data Migration
-  Units (DMUs). Instance-capacity probes become DMU-utilization probes.
+## References (load on demand)
 
-- **DMS with Babelfish for Aurora PostgreSQL (2024 GA):** Babelfish
-  enables T-SQL on Aurora PostgreSQL. DMS migrates SQL Server to
-  Aurora PostgreSQL with Babelfish; target understands T-SQL
-  constraints. Target-side diagnosis must account for Babelfish's
-  T-SQL-to-PostgreSQL translation.
-
-- **Amazon DMS Fleet Advisor (2024 GA):** Pre-migration assessment tool
-  that inventories databases, analyzes complexity, recommends target
-  engines. Runs BEFORE the DMS task — not a troubleshooting tool.
-
-- **DMS data validation (2024 enhancement):** Validates data between
-  source and target (row count, checksum, full comparison). Enable via
-  `Validation` in task settings. Failures appear in `awsdms_control`
-  schema tables and task logs. Catches silent data loss.
-
-- **DMS Zero-ETL integration (2025):** For Aurora/RDS PostgreSQL to
-  Redshift, native Zero-ETL (no DMS task required). Different pipeline
-  — do not confuse with DMS CDC.
-
-- **DMS support for MySQL 8.0 and PostgreSQL 16 (2024-2026):** Improved
-  binlog performance and logical replication slot management. Older
-  engine versions may have CDC bugs fixed in newer releases.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — account-wide pre-flight command block (moved out of the Pre-flight section)
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples: binlog retention latency, FK constraint violation, memory pressure
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 expert knowledge, top-5 signals, recent DMS features (moved from this file)
+- [references/source-cdc-requirements.md](references/source-cdc-requirements.md) — source engine CDC requirements
+- [references/task-settings-and-logging.md](references/task-settings-and-logging.md) — task settings and logging reference
 
 ## Domain
 

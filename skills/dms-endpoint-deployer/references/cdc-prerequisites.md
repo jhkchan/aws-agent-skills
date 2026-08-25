@@ -255,3 +255,48 @@ Extra connection attributes:
 | MongoDB 6.0 (change streams) | 3.5.x |
 
 Always check the latest DMS documentation for current compatibility.
+## Expert heuristic: source-specific CDC prerequisites (moved from SKILL.md)
+
+
+A baseline model says "create the endpoint and enable CDC." The correct
+heuristic recognizes that CDC prerequisites are OUTSIDE DMS — they are
+on the source database itself.
+
+```text
+CDC prerequisites by engine:
+  PostgreSQL:
+    ├── wal_level=logical (check: SHOW wal_level)
+    ├── max_replication_slots >= 1 (check: SHOW max_replication_slots)
+    ├── Endpoint extra attr: PluginName=pglogical (or test_decoding)
+    └── Replication slot auto-created by DMS
+
+  Oracle:
+    ├── ARCHIVELOG mode enabled (check: ARCHIVE LOG LIST)
+    ├── Supplemental logging: ALTER DATABASE ADD SUPPLEMENTAL LOG DATA
+    ├── Force logging (optional): ALTER DATABASE FORCE LOGGING
+    └── DMS user privileges: SELECT ANY TRANSACTION, EXECUTE on DBMS_LOGMNR
+
+  MySQL:
+    ├── Binary logging enabled (log_bin=ON)
+    ├── binlog_format=ROW
+    ├── binlog_row_image=FULL
+    └── DMS user: REPLICATION SLAVE, REPLICATION CLIENT, SELECT
+
+  SQL Server:
+    ├── SQL Server Agent running
+    ├── CDC enabled on database (sys.sp_cdc_enable_db)
+    ├── CDC enabled on tables (sys.sp_cdc_enable_table)
+    └── DMS user in db_owner role (or sysadmin)
+
+  MongoDB:
+    ├── Replica set (standalone NOT supported for CDC)
+    └── DMS user with clusterMonitor and readWrite roles
+```
+
+**Key implication:** the #1 cause of DMS CDC failures is missing
+source-database prerequisites. The endpoint connection test passes
+(basic connectivity works), but CDC tasks fail with errors like
+"could not create replication slot" (PostgreSQL) or "supplemental
+logging not enabled" (Oracle). Always verify source prerequisites
+BEFORE creating the endpoint.
+

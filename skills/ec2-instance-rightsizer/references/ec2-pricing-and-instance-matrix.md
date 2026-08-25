@@ -424,3 +424,14 @@ Action: aws ec2 stop-instances --instance-ids i-0legacy06
 Note: EBS volume continues to charge (~$0.10/GB-month for gp2).
       Total EBS cost remains until the instance is terminated.
 ```
+
+## Graviton instance families (moved from SKILL.md)
+
+**Graviton instance families:**
+| Family | Graviton version | Equivalent x86 | Workload |
+|---|---|---|---|
+| t4g | Graviton2 | t3 | Burstable, low-cost |
+| m6g / m7g | Graviton2 / Graviton3 | m6i / m7i | General purpose |
+| c6g / c7g | Graviton2 / Graviton3 | c6i / c7i | Compute-optimized |
+| r6g / r7g | Graviton2 / Graviton3 | r6i / r7i | Memory-optimized |
+| x2gd | Graviton2 | x2iezn | Extreme memory |

@@ -109,125 +109,13 @@ Three misconceptions dominate DynamoDB auto-scaling misdesign:
   policies for EACH GSI.
 
 ## Configuration dependency graph (novel heuristic)
-
-DynamoDB auto-scaling configurations are NOT independent. Several
-depend on the table being in PROVISIONED mode; several are
-immutable or destructive if changed; several silently break when
-the table switches modes. Use this graph to sequence provisioning
-and to debug "why is my GSI throttling when my table is fine?"
-
-| Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| Table capacity mode | Table must exist | Switching provisioned→on-demand DETACHES all scaling policies; switching back requires re-registration | determines if auto-scaling is applicable |
-| Scalable target (table) | Table in PROVISIONED mode; `RegisterScalableTarget` for dimension `table:<table-name>` | `MinCapacity` and `MaxCapacity` define the scaling envelope; outside this range, no scaling occurs | target tracking policy attachment |
-| Scalable target (GSI) | GSI exists; table in PROVISIONED mode; `RegisterScalableTarget` for dimension `table:<table-name>` with `resourceId=table/<table-name>/index/<gsi-name>` | GSI capacity CANNOT be set separately from table mode — inherits PROVISIONED from parent table | GSI target tracking policy |
-| Target tracking policy | Scalable target registered; CloudWatch metric available (`DynamoDBReadCapacityUtilization` / `DynamoDBWriteCapacityUtilization`) | target value (utilization %) + scale-in cooldown + scale-out cooldown set at policy creation | automatic capacity adjustment |
-| Application auto-scaling role | IAM role with trust to `application-autoscaling.amazonaws.com` (service-linked role `AWSServiceRoleForApplicationAutoScaling_DynamoDBFeedback` auto-created) | missing role → `AccessDenied` on RegisterScalableTarget | CloudFormation/CLI scaling operations |
-| Min/Max capacity | Min ≤ current provisioned ≤ Max at registration time | MinCapacity > MaxCapacity → ValidationError; MaxCapacity > account-level limit → LimitExceededException | scaling envelope bounds |
-| On-demand mode | Table exists; `BillingMode=PAY_PER_REQUEST` | ALL scaling policies detached; `BillingModeSummary` reflects on-demand | no scaling policy needed |
-| Throttle monitoring | CloudWatch `AWS/DynamoDB` namespace | `ConsumedReadCapacityUnits` vs `ProvisionedReadCapacityUnits` gap signals under-provisioning | alerting and remediation |
-
-**The mode-switch row is the one a baseline model misses.** Switching
-a table from PROVISIONED to on-demand SILENTLY DETACHES all scaling
-policies. Switching back to PROVISIONED does NOT re-attach them —
-you must re-register scalable targets and re-create policies. The
-procedure below forces an explicit capacity mode decision before any
-scaling configuration.
-
-**Cross-dependency gotchas:**
-- A GSI inherits its capacity mode from the parent table. A
-  PROVISIONED table can have auto-scaled GSIs; an on-demand table's
-  GSIs are also on-demand (no scaling policies).
-- `MinCapacity` must be ≤ the table's currently provisioned RCU/WCU
-  at the time of registration. If you lower provisioned throughput
-  below Min, scaling will immediately raise it back.
-- Target tracking uses the DynamoDB-managed CloudWatch metric
-  `DynamoDBReadCapacityUtilization` / `DynamoDBWriteCapacityUtilization`
-  — NOT `ConsumedReadCapacityUnits`. These are pre-computed
-  utilization metrics that account-auto-scaling owns.
-- Scale-in cooldown (default 0s for DynamoDB) determines how fast
-  capacity is reduced. A longer cooldown prevents flapping but
-  delays cost reduction.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## Expert heuristic: target tracking lifecycle
-
-Target tracking is NOT a one-time configuration. Application Auto
-Scaling continuously evaluates the metric and adjusts capacity. A
-baseline model says "create the policy and forget"; this heuristic
-explains the full lifecycle.
-
-```text
-RegisterScalableTarget
-  → MinCapacity=5, MaxCapacity=40000 (for RCU on table)
-  → application-autoscaling tracks DynamoDBReadCapacityUtilization
-
-PutScalingPolicy (target tracking)
-  → TargetValue=70 (70% utilization)
-  → ScaleOutCooldown=60 (wait 60s between scale-out actions)
-  → ScaleInCooldown=60 (wait 60s between scale-in actions)
-
-Continuous evaluation (every ~60 seconds):
-  → CloudWatch reports DynamoDBReadCapacityUtilization
-  → if utilization > 70%: increase RCU (respecting MaxCapacity)
-  → if utilization < 70%: decrease RCU (respecting MinCapacity)
-  → capacity changes are instantaneous for DynamoDB
-
-Mode switch (PROVISIONED → on-demand):
-  → ALL scalable targets and policies are DETACHED
-  → switching back to PROVISIONED does NOT re-attach them
-  → must re-register targets and re-create policies from scratch
-```
-
-**Key implication:** auto-scaling is a PROVISIONED-mode feature.
-If your workload is unpredictable and you switch to on-demand, you
-lose all scaling configuration. Document the scaling parameters so
-you can re-create them if you switch back.
-
-**GSI lifecycle:** each GSI has its OWN scalable target and policy,
-independent of the table and of other GSIs. A table with 3 GSIs
-needs 2 (table RCU/WCU) + 3×2 (GSI RCU/WCU) = 8 scalable targets
-and 8 scaling policies for full coverage.
+Moved verbatim to [references/target-tracking-and-cooldowns.md](references/target-tracking-and-cooldowns.md) - load on demand (see References below).
 
 ## Expert heuristic: target utilization tuning
-
-Target utilization looks like a simple percentage; it is the
-single most important cost-vs-availability dial. A baseline model
-accepts 50%; this heuristic explains how to tune it.
-
-```text
-TargetValue=70  (AWS recommended default)
-  → 70% of provisioned capacity is consumed before scaling OUT
-  → 30% headroom absorbs short bursts
-  → balances cost (minimal over-provisioning) with availability (buffer for spikes)
-  → RECOMMENDED for most steady-state workloads
-
-TargetValue=50  (conservative)
-  → 50% headroom — pays for 2x the needed capacity
-  → RECOMMENDED for spiky/unpredictable workloads where throttling is unacceptable
-  → higher cost, lower throttle risk
-
-TargetValue=90  (aggressive)
-  → 10% headroom — minimal buffer
-  → RECOMMENDED only for cost-optimized workloads with predictable traffic
-  → higher throttle risk during unexpected bursts
-
-ScaleOutCooldown  (default 60s for DynamoDB)
-  → minimum seconds between consecutive scale-OUT actions
-  → too low: overscaling (wastes money); too high: throttling during bursts
-
-ScaleInCooldown  (default 0s for DynamoDB)
-  → minimum seconds between consecutive scale-IN actions
-  → 0s: capacity reduces immediately when utilization drops (cost-optimal)
-  → higher: delays cost reduction but prevents flapping
-```
-
-**Production pattern (steady-state):** TargetValue=70,
-ScaleOutCooldown=60, ScaleInCooldown=60. Balances cost and
-availability for most workloads.
-
-**Spiky workload pattern:** TargetValue=50, ScaleOutCooldown=0,
-ScaleInCooldown=300. Aggressive scale-out, conservative scale-in
-to avoid flapping.
+Moved verbatim to [references/target-tracking-and-cooldowns.md](references/target-tracking-and-cooldowns.md) - load on demand (see References below).
 
 ## Prerequisites (verify before provisioning)
 
@@ -306,20 +194,8 @@ auto-create it. You can also create it explicitly:
 aws iam create-service-linked-role \
   --aws-service-name dynamodb.application-autoscaling.amazonaws.com
 ```
+Moved verbatim to [references/error-handling.md](references/error-handling.md) - load on demand (see References below).
 
-**For custom roles (advanced):** if you need a custom role instead
-of the service-linked role, the trust policy must allow
-`application-autoscaling.amazonaws.com` and the permission policy
-must include `dynamodb:UpdateTable`, `dynamodb:DescribeTable`, and
-`cloudwatch:PutMetricAlarm`, `cloudwatch:DescribeAlarms`,
-`cloudwatch:DeleteAlarms` (target tracking creates CloudWatch
-alarms internally).
-
-**Common mistake:** using the DynamoDB service role instead of the
-Application Auto Scaling role. The roles are different — DynamoDB
-has `AWSServiceRoleForDynamoDBBackup`, `AWSServiceRoleForDynamoDB`,
-etc. Auto-scaling specifically needs
-`AWSServiceRoleForApplicationAutoScaling_DynamoDBFeedback`.
 
 ## Step 3 — Table target tracking (read/write)
 
@@ -505,67 +381,10 @@ provisioning or auto-scaling gaps.
 | `SystemErrors` | DynamoDB internal errors | Alert if > 0 |
 
 **Throttle alarm:**
-
-```bash
-aws cloudwatch put-metric-alarm \
-  --alarm-name dynamodb-throttle-my-table \
-  --namespace AWS/DynamoDB \
-  --metric-name ThrottledRequests \
-  --dimensions Name=TableName,Value=my-table \
-  --statistic Sum \
-  --period 300 \
-  --threshold 1 \
-  --comparison-operator GreaterThanThreshold \
-  --evaluation-periods 1 \
-  --alarm-actions arn:aws:sns:us-east-1:111111111111:alerts
-```
-
-**Consumed-vs-provisioned gap:** if
-`ConsumedReadCapacityUnits` consistently exceeds 80% of
-`ProvisionedReadCapacityUnits`, the auto-scaling policy is not
-keeping up. Possible causes: ScaleOutCooldown too high,
-MaxCapacity too low, or the table is on-demand (no provisioning).
+Moved verbatim to [references/capacity-modes-and-throttling.md](references/capacity-modes-and-throttling.md) - load on demand (see References below).
 
 ## Step 7 — Recent features
-
-**Recent AWS features (2023-2026):**
-
-- **On-demand vs provisioned capacity mode auto-switching
-  (2024-2025):** DynamoDB can now automatically switch between
-  on-demand and provisioned capacity modes based on usage
-  patterns. This feature analyzes 24-hour usage windows and
-  recommends or applies the cost-optimal mode. Requires opt-in
-  via `aws dynamodb update-table --billing-mode
-  PROVISIONED_AND_ON_DEMAND_AUTO_SWITCH` (where available). Useful
-  for workloads with diurnal traffic patterns.
-
-- **GSI auto-scaling MaxCapacity increase (2023-2024):** GSI
-  MaxCapacity limits were raised to match table limits (up to
-  40,000 RCU/WCU for most regions). Previously GSIs had lower
-  limits than tables.
-
-- **Faster scale-out for DynamoDB (2023-2024):** Application Auto
-  Scaling reduced the evaluation interval for DynamoDB from 60s
-  to as low as 15s for certain metrics, enabling faster response
-  to traffic bursts.
-
-- **Predictive scaling for DynamoDB (2024-2025):** Application
-  Auto Scaling now supports predictive scaling policies for
-  DynamoDB, using historical traffic patterns to pre-scale
-  capacity before predicted bursts. Complements (does not
-  replace) target tracking.
-
-- **Capacity advisor (2023-2025):** DynamoDB capacity advisor
-  analyzes usage and recommends optimal capacity mode (on-demand
-  vs provisioned) and scaling parameters. Accessible via the
-  console and `aws dynamodb describe-capacity-reservations`.
-
-- **CloudWatch metric `DynamoDBReadCapacityUtilization` /
-  `DynamoDBWriteCapacityUtilization` (2023-2024):** These pre-
-  computed utilization metrics (consumed/provisioned ratio) are
-  now first-class CloudWatch metrics, not just internal to
-  Application Auto Scaling. Useful for custom dashboards and
-  alarms independent of scaling policies.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## NEVER do these things
 
@@ -668,37 +487,14 @@ VERIFICATION_COMMANDS:
 ```
 
 ## Error handling
+Moved verbatim to [references/error-handling.md](references/error-handling.md) - load on demand (see References below).
 
-### `ValidationException` on register-scalable-target
-- Table is in on-demand mode. Switch to PROVISIONED:
-  `aws dynamodb update-table --table-name <name> --billing-mode PROVISIONED`.
-- MinCapacity > current provisioned capacity. Lower Min or raise current throughput.
+## References (load on demand)
 
-### `AccessDenied` on register-scalable-target
-- The application auto-scaling service-linked role is missing.
-  Create it:
-  `aws iam create-service-linked-role --aws-service-name dynamodb.application-autoscaling.amazonaws.com`.
-
-### `LimitExceededException` on register-scalable-target
-- MaxCapacity exceeds the account-level DynamoDB throughput limit.
-  Request a limit increase via AWS Support, or lower MaxCapacity.
-
-### Scaling policy not adjusting capacity
-- Verify the scalable target is registered:
-  `aws application-autoscaling describe-scalable-targets`.
-- Verify the policy is attached:
-  `aws application-autoscaling describe-scaling-policies`.
-- Check CloudWatch for `DynamoDBReadCapacityUtilization` /
-  `DynamoDBWriteCapacityUtilization` to confirm the metric is
-  reporting.
-- If the table was switched to on-demand and back, all policies
-  were detached — re-register targets and re-create policies.
-
-### GSI throttling despite table auto-scaling
-- GSI scaling was not configured. Register scalable targets for
-  the GSI:
-  `--resource-id table/<table-name>/index/<gsi-name> --scalable-dimension dynamodb:index:ReadCapacityUnits`.
-- Create target tracking policies for each GSI dimension.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — configuration dependency graph + 2023-2026 features moved from SKILL.md
+- [references/error-handling.md](references/error-handling.md) — API error remediation + role mistakes moved from SKILL.md
+- [references/target-tracking-and-cooldowns.md](references/target-tracking-and-cooldowns.md) — lifecycle + utilization tuning heuristics moved from SKILL.md
+- [references/capacity-modes-and-throttling.md](references/capacity-modes-and-throttling.md) — throttle alarm + consumed-vs-provisioned gap moved from SKILL.md
 
 ## Domain
 

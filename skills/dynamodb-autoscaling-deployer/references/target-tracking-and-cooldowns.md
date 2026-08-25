@@ -151,3 +151,89 @@ MinCapacity ≤ desired_capacity ≤ MaxCapacity
 - [Target tracking policies](https://docs.aws.amazon.com/autoscaling/application/userguide/application-auto-scaling-target-tracking.html)
 - [DynamoDB auto-scaling](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/AutoScaling.html)
 - [Application Auto Scaling cooldowns](https://docs.aws.amazon.com/autoscaling/application/userguide/application-auto-scaling-target-tracking.html#application-auto-scaling-cooldowns)
+
+---
+
+## Expert heuristic: target tracking lifecycle (moved from SKILL.md)
+
+
+Target tracking is NOT a one-time configuration. Application Auto
+Scaling continuously evaluates the metric and adjusts capacity. A
+baseline model says "create the policy and forget"; this heuristic
+explains the full lifecycle.
+
+```text
+RegisterScalableTarget
+  → MinCapacity=5, MaxCapacity=40000 (for RCU on table)
+  → application-autoscaling tracks DynamoDBReadCapacityUtilization
+
+PutScalingPolicy (target tracking)
+  → TargetValue=70 (70% utilization)
+  → ScaleOutCooldown=60 (wait 60s between scale-out actions)
+  → ScaleInCooldown=60 (wait 60s between scale-in actions)
+
+Continuous evaluation (every ~60 seconds):
+  → CloudWatch reports DynamoDBReadCapacityUtilization
+  → if utilization > 70%: increase RCU (respecting MaxCapacity)
+  → if utilization < 70%: decrease RCU (respecting MinCapacity)
+  → capacity changes are instantaneous for DynamoDB
+
+Mode switch (PROVISIONED → on-demand):
+  → ALL scalable targets and policies are DETACHED
+  → switching back to PROVISIONED does NOT re-attach them
+  → must re-register targets and re-create policies from scratch
+```
+
+**Key implication:** auto-scaling is a PROVISIONED-mode feature.
+If your workload is unpredictable and you switch to on-demand, you
+lose all scaling configuration. Document the scaling parameters so
+you can re-create them if you switch back.
+
+**GSI lifecycle:** each GSI has its OWN scalable target and policy,
+independent of the table and of other GSIs. A table with 3 GSIs
+needs 2 (table RCU/WCU) + 3×2 (GSI RCU/WCU) = 8 scalable targets
+and 8 scaling policies for full coverage.
+
+---
+
+## Expert heuristic: target utilization tuning (moved from SKILL.md)
+
+
+Target utilization looks like a simple percentage; it is the
+single most important cost-vs-availability dial. A baseline model
+accepts 50%; this heuristic explains how to tune it.
+
+```text
+TargetValue=70  (AWS recommended default)
+  → 70% of provisioned capacity is consumed before scaling OUT
+  → 30% headroom absorbs short bursts
+  → balances cost (minimal over-provisioning) with availability (buffer for spikes)
+  → RECOMMENDED for most steady-state workloads
+
+TargetValue=50  (conservative)
+  → 50% headroom — pays for 2x the needed capacity
+  → RECOMMENDED for spiky/unpredictable workloads where throttling is unacceptable
+  → higher cost, lower throttle risk
+
+TargetValue=90  (aggressive)
+  → 10% headroom — minimal buffer
+  → RECOMMENDED only for cost-optimized workloads with predictable traffic
+  → higher throttle risk during unexpected bursts
+
+ScaleOutCooldown  (default 60s for DynamoDB)
+  → minimum seconds between consecutive scale-OUT actions
+  → too low: overscaling (wastes money); too high: throttling during bursts
+
+ScaleInCooldown  (default 0s for DynamoDB)
+  → minimum seconds between consecutive scale-IN actions
+  → 0s: capacity reduces immediately when utilization drops (cost-optimal)
+  → higher: delays cost reduction but prevents flapping
+```
+
+**Production pattern (steady-state):** TargetValue=70,
+ScaleOutCooldown=60, ScaleInCooldown=60. Balances cost and
+availability for most workloads.
+
+**Spiky workload pattern:** TargetValue=50, ScaleOutCooldown=0,
+ScaleInCooldown=300. Aggressive scale-out, conservative scale-in
+to avoid flapping.

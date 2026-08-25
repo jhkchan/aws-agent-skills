@@ -356,3 +356,97 @@ resource "aws_kms_key" "dynamodb" {
   })
 }
 ```
+
+---
+
+## Step 5 PROVISIONED autoscaling registration CLI (moved from SKILL.md)
+
+**PROVISIONED autoscaling registration (MANDATORY if PROVISIONED)**:
+
+```bash
+aws application-autoscaling register-scalable-target \
+  --service-namespace dynamodb \
+  --resource-id table/<table> \
+  --scalable-dimension dynamodb:table:ReadCapacityUnits \
+  --min-capacity 5 --max-capacity <max>
+aws application-autoscaling register-scalable-target \
+  --service-namespace dynamodb \
+  --resource-id table/<table> \
+  --scalable-dimension dynamodb:table:WriteCapacityUnits \
+  --min-capacity 5 --max-capacity <max>
+
+aws application-autoscaling put-scaling-policy \
+  --policy-name <table>-read-autoscaling \
+  --service-namespace dynamodb \
+  --resource-id table/<table> \
+  --scalable-dimension dynamodb:table:ReadCapacityUnits \
+  --policy-type TargetTrackingScaling \
+  --target-tracking-scaling-policy-configuration \
+    '{"TargetValue":70.0,"PredefinedMetricSpecification":{"PredefinedMetricType":"DynamoDBReadCapacityUtilization"}}'
+# Repeat for WriteCapacityUnits and for EVERY GSI:
+#   --resource-id table/<table>/index/<gsi-name>
+#   --scalable-dimension dynamodb:index:ReadCapacityUnits (and Write)
+```
+
+---
+
+## Step 7 — Point-in-time recovery (PITR) — enable by default (moved from SKILL.md)
+
+Enable PITR on every production table. PITR provides a 35-day continuous
+replay window — restore to any second within the window. AWS Backup
+(scheduled snapshots) is COMPLEMENTARY, not a substitute.
+
+```bash
+aws dynamodb update-continuous-backups --table-name <table> \
+  --point-in-time-recovery-specification PointInTimeRecoveryEnabled=true
+```
+
+**PITR restore creates a NEW table** — it cannot rewind the original. The
+restored table gets DEFAULT capacity settings; reconfigure after restore.
+
+**Cost note**: PITR consumes additional storage proportional to the change
+rate. For most production tables the recovery benefit outweighs the cost.
+
+---
+
+## Step 9 — Streams + table class + deletion protection (moved from SKILL.md)
+
+Three additive, reversible configurations:
+
+**DynamoDB Streams** (for CDC pipelines — Lambda triggers, OpenSearch
+sync, Kinesis replay, Aurora zero-ETL):
+
+```bash
+aws dynamodb update-table --table-name <table> \
+  --stream-specification StreamEnabled=true,StreamViewType=NEW_AND_OLD_IMAGES
+```
+
+Choose `StreamViewType` based on the consumer:
+- `NEW_IMAGE` — consumer needs only the post-update state (e.g., search index sync).
+- `OLD_IMAGE` — consumer needs only the pre-update state (e.g., audit log of deletions).
+- `NEW_AND_OLD_IMAGES` — consumer needs both (e.g., diff-based replication, Aurora zero-ETL, full CDC).
+- `KEYS_ONLY` — consumer needs only the keys (e.g., trigger a Lambda to re-fetch).
+
+Streams have a 24-hour retention window. For longer retention, fan out to
+Kinesis Data Streams.
+
+**Table class** (`STANDARD` vs `STANDARD_INFREQUENT_ACCESS`):
+
+```bash
+aws dynamodb update-table --table-name <table> --table-class STANDARD_INFREQUENT_ACCESS
+```
+
+- `STANDARD` (default): for actively-used tables.
+- `STANDARD_INFREQUENT_ACCESS`: for cold / infrequently accessed tables
+  (audit logs, archives). Lower storage cost; higher per-request cost.
+  Use only when access is rare.
+
+**Deletion protection** (blocks `delete-table` API):
+
+```bash
+aws dynamodb update-table --table-name <table> --deletion-protection-enabled
+```
+
+Mandatory for production tables. Blocks accidental deletion and ransomware.
+Note: any principal with `dynamodb:UpdateTable` can disable it — it is an
+accidental-deletion guardrail, not a security control.

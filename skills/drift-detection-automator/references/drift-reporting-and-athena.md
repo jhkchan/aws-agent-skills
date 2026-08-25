@@ -212,3 +212,29 @@ Recommended dashboard panels for a drift visibility dashboard:
    critical drifts, last detection time. Sortable by critical count.
 5. **Suppression audit table** — resource type, property, suppression
    count, last review date. For quarterly suppression review.
+
+---
+
+## Step 9 — Drift report export to S3 + Athena (moved from SKILL.md)
+
+
+```python
+def export_drift_report(drift_results, bucket, date_str):
+    key = f"drift-reports/dt={date_str}/drift-report.json"
+    s3.put_object(Bucket=bucket, Key=key,
+                 Body=json.dumps(drift_results, indent=2),
+                 ContentType='application/json')
+```
+
+Athena table:
+
+```sql
+CREATE EXTERNAL TABLE IF NOT EXISTS drift_reports (
+  stack_name string, account_id string, region string,
+  resource_id string, resource_type string, drift_severity string,
+  drift_status string, detection_time string, property_path string,
+  expected_value string, actual_value string)
+PARTITIONED BY (dt string)
+STORED AS JSON
+LOCATION 's3://drift-reports-bucket/drift-reports/';
+```

@@ -45,30 +45,7 @@ to distinguish them. The diagnostic walk combines CloudWatch metrics
 (consumed vs provisioned), table/GSI metadata, partition key distribution,
 and the access pattern (scan vs query vs batch) to pinpoint the cause.
 
-Three facts make DynamoDB throttling diagnosis different from generic
-database capacity debugging:
-
-- **A throttle does not always mean "raise capacity."** DynamoDB throttles
-  for six different reasons: hot partition, GSI hot key, sustained
-  provisioned-capacity breach, burst exhaustion, adaptive capacity lag,
-  and scan/batch misuse. Raising capacity fixes only two of these. Hot
-  partition and GSI hot key require a key redesign. Scan misuse requires
-  switching to query. Misdiagnosing any of these wastes spend without
-  resolving the throttle.
-
-- **GSI throttling propagates to the base table.** A GSI shares the
-  table's provisioned capacity pool in provisioned mode. A hot GSI can
-  throttle writes to the base table even when the base table's own
-  capacity is ample. Operators who debug "the table is throttled" without
-  checking per-GSI metrics miss that the cause is the GSI, not the table.
-
-- **Intermittent throttling is almost always burst capacity exhaustion.**
-  DynamoDB retains up to 5 minutes of unused burst capacity (up to 300
-  seconds). When traffic is spiky, the burst absorbs the spikes — until it
-  does not. The symptom is "works fine for 5 minutes, then throttles,"
-  which operators misdiagnose as "the capacity is fine, it must be a
-  DynamoDB outage." The fix is sustained capacity above the average rate,
-  not on-demand.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## Quick reference — symptom to throttle type
 
@@ -117,27 +94,7 @@ If the user reports "DynamoDB is throttling" but does not know which table
 or which operation, ask for the application's DynamoDB client configuration
 and the approximate time window. Then run:
 
-```bash
-# Find recent throttle events across all tables in the account/region.
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/DynamoDB \
-  --metric-name ThrottledRequests \
-  --dimensions Name=TableName,Value=<table> \
-  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 60 --statistics Sum --output json
-
-# Or scan all tables (requires a script):
-for t in $(aws dynamodb list-tables --query 'TableNames[]' --output text); do
-  echo "== $t =="
-  aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
-    --metric-name ThrottledRequests \
-    --dimensions Name=TableName,Value=$t \
-    --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
-    --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-    --period 300 --statistics Sum --query 'Datapoints[*].Sum' --output text
-done
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 ### Step 1: Identify the symptom category
 
@@ -166,38 +123,9 @@ Read throttling: `ConsumedReadCapacityUnits` sustained at or above
 volume is expected (genuine traffic) or unexpected (a scan consuming the
 entire budget).
 
-**RCU consumption math (memorise this):**
+Moved verbatim to [references/capacity-math.md](references/capacity-math.md) - load on demand (see References below).
 
-| Read type | RCU per 4 KB read | Notes |
-|---|---|---|
-| Eventually consistent | 0.5 RCU | Default for GetItem / Query / Scan with consistent read off |
-| Strongly consistent | 1.0 RCU | `ConsistentRead: true` on GetItem / Query |
-| Transactional | 2.0 RCU | 2x the strongly-consistent cost |
-
-A single GetItem on a 40 KB item consumes 10 RCUs (eventually consistent) or
-20 RCUs (strongly consistent). A Scan on a 1 GB table consumes ~128,000
-RCUs (eventually consistent) — enough to throttle a 100,000-RCU table.
-
-**Diagnostic commands:**
-
-```bash
-aws dynamodb describe-table --table-name <table> \
-  --query 'Table.{provisioned:ProvisionedThroughput.{read:ReadCapacityUnits,write:WriteCapacityUnits},gsis:GlobalSecondaryIndexes[*].{name:IndexName,provisioned:ProvisionedThroughput}}'
-
-aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
-  --metric-name ConsumedReadCapacityUnits \
-  --dimensions Name=TableName,Value=<table> \
-  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 60 --statistics Sum Average --output json
-
-aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
-  --metric-name ProvisionedReadCapacityUnits \
-  --dimensions Name=TableName,Value=<table> \
-  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 60 --statistics Sum Average --output json
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 | Sub-symptom | Root cause | Probe |
 |---|---|---|
@@ -206,15 +134,7 @@ aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
 | `ConsumedReadCapacityUnits` doubled vs expected | Strongly consistent reads where eventually consistent would do, OR transactional reads | Check application read consistency flags |
 | `ConsumedReadCapacityUnits` high but `GetItem` count low | Large items (> 4 KB) consuming multiple RCUs per read | `ReturnConsumedCapacity: TOTAL` on GetItem responses |
 
-**Common fix patterns:**
-
-- Sustained read traffic above provisioned: raise `ProvisionedReadCapacityUnits`
-  via `update-table`, OR switch to on-demand (`BillingMode: PAY_PER_REQUEST`).
-- Scan misuse: replace Scan with Query on the partition key; see Step 7.
-- Strongly consistent reads where eventually consistent suffices: switch to
-  eventually consistent to halve RCU consumption.
-- Large items: consider compressing or splitting items; each 4 KB chunk is
-  a separate RCU.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ### Step 3: WRITE_CAPACITY_LOW diagnostic
 
@@ -222,36 +142,9 @@ Write throttling: `ConsumedWriteCapacityUnits` sustained at or above
 `ProvisionedWriteCapacityUnits`. The first question is whether GSI
 replication is inflating the WCU cost.
 
-**WCU consumption math (memorise this):**
+Moved verbatim to [references/capacity-math.md](references/capacity-math.md) - load on demand (see References below).
 
-| Write type | WCU per 1 KB written | Notes |
-|---|---|---|
-| Standard PutItem / UpdateItem / DeleteItem | 1.0 WCU per 1 KB | Rounded up to nearest 1 KB |
-| Transactional (`TransactWriteItems`) | 2.0 WCU per 1 KB | 2x the standard cost |
-
-**GSI WCU cost multiplier:** each GSI on the table replicates the write.
-A table with 3 GSIs and a 1 KB item write consumes 4 WCUs (1 for the base
-table + 3 for the GSI replicas). If any GSI's provisioned capacity is
-below its share, the GSI throttles — and in provisioned mode, that
-propagates to the base table write.
-
-**Diagnostic commands:**
-
-```bash
-aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
-  --metric-name ConsumedWriteCapacityUnits \
-  --dimensions Name=TableName,Value=<table> \
-  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 60 --statistics Sum Average --output json
-
-aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
-  --metric-name ThrottledRequests \
-  --dimensions Name=TableName,Value=<table> Name=Operation,Value=PutItem \
-  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 60 --statistics Sum --output json
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 | Sub-symptom | Root cause | Probe |
 |---|---|---|
@@ -260,14 +153,7 @@ aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
 | `ThrottledRequests` on writes but `ConsumedWriteCapacityUnits` < provisioned | GSI hot key throttling (see Step 4) | Per-GSI metrics |
 | WCU doubled vs expected | Transactional writes (`TransactWriteItems`) | Check application write path |
 
-**Common fix patterns:**
-
-- Sustained write traffic above provisioned: raise
-  `ProvisionedWriteCapacityUnits`, OR switch to on-demand.
-- GSI replication cost: audit each GSI for necessity; delete GSIs that are
-  no longer queried. Each GSI removed reduces WCU cost by 1x per item.
-- Transactional writes where standard writes suffice: switch to standard
-  `PutItem` / `UpdateItem` to halve WCU cost.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ### Step 4: GSI_HOT_KEY diagnostic
 
@@ -281,29 +167,7 @@ the base item).
 `ThrottledRequests` on the base table, raise base table capacity, and the
 throttle persists — because the cause is the GSI, not the base table.
 
-**Diagnostic commands:**
-
-```bash
-# Per-GSI throttle metrics (the key signal).
-aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
-  --metric-name ThrottledRequests \
-  --dimensions Name=TableName,Value=<table> Name=GlobalSecondaryIndexName,Value=<gsi> \
-  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 60 --statistics Sum --output json
-
-# Per-GSI consumed capacity.
-aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
-  --metric-name ConsumedWriteCapacityUnits \
-  --dimensions Name=TableName,Value=<table> Name=GlobalSecondaryIndexName,Value=<gsi> \
-  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 60 --statistics Sum Average --output json
-
-# Inspect the GSI key schema and cardinality.
-aws dynamodb describe-table --table-name <table> \
-  --query 'Table.GlobalSecondaryIndexes[?IndexName==`<gsi>`].{key:KeySchema,projection:Projection,provisioned:ProvisionedThroughput}'
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 | Sub-symptom | Root cause | Probe |
 |---|---|---|
@@ -312,17 +176,7 @@ aws dynamodb describe-table --table-name <table> \
 | GSI partition key has < 100 distinct values | GSI hot key — low cardinality concentrates writes on few partitions | Add a suffix to the GSI key; or use a composite key |
 | GSI partition key has high cardinality but one value dominates (e.g., "status=ACTIVE") | GSI hot key — skewed distribution | Redesign the access pattern; consider a different GSI |
 
-**Common fix patterns:**
-
-- GSI provisioned too low (reads): raise the GSI's
-  `ProvisionedReadCapacityUnits` independently of the base table.
-- GSI hot key (writes): redesign the GSI partition key. Add a random
-  suffix or a composite component to spread writes across partitions. If
-  the access pattern is "find all items with status=ACTIVE," consider a
-  sparse GSI that only includes active items.
-- Switch the table to on-demand: on-demand mode removes GSI provisioned
-  capacity entirely; the GSI auto-scales with query load. This is the
-  fastest fix when the GSI access pattern cannot be redesigned quickly.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ### Step 5: BURST_EXHAUSTED diagnostic
 
@@ -346,38 +200,9 @@ consumed capacity below provisioned.
    hot partition (fix: redesign key) from burst exhaustion on an even
    distribution (fix: raise sustained capacity).
 
-**Diagnostic commands:**
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
-```bash
-# 1-minute period reveals the spiky pattern that 5-min period hides.
-aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
-  --metric-name ConsumedWriteCapacityUnits \
-  --dimensions Name=TableName,Value=<table> \
-  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 60 --statistics Sum Average Maximum --output json
-
-# Throttle timing relative to the spike.
-aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
-  --metric-name ThrottledRequests \
-  --dimensions Name=TableName,Value=<table> \
-  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 60 --statistics Sum --output json
-```
-
-**Common fix patterns:**
-
-- Raise sustained capacity above the average rate so burst is not needed.
-  The rule of thumb: set provisioned capacity to the 99th percentile of
-  the traffic rate, not the average. This keeps burst in reserve for true
-  spikes.
-- Switch to on-demand: on-demand mode absorbs spikes without burst budget
-  (it bills per request). This is the simplest fix for spiky workloads
-  where the average is well below the peak.
-- Smooth the traffic at the application layer: batch writes, use a queue
-  (SQS) to decouple producers from DynamoDB, or add client-side rate
-  limiting.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ### Step 6: ADAPTIVE_LAG / HOT_PARTITION diagnostic
 
@@ -410,24 +235,7 @@ capacity but the hot partition's allocation did not increase fast enough.
    tables). The lag is inherent; the fix is key redesign, not disabling
    adaptive capacity.
 
-**Diagnostic commands:**
-
-```bash
-# Enable contributor insights if not already enabled.
-aws dynamodb update-contributor-insights --table-name <table> \
-  --contributor-insights-action ENABLE
-
-# Read contributor insights for the top partition keys.
-aws dynamodb describe-contributor-insights --table-name <table> \
-  --index-name <gsi-or-blank-for-base-table>
-
-# Sample the partition key distribution (for low-cardinality keys).
-aws dynamodb scan --table-name <table> \
-  --select SPECIFIC_ATTRIBUTES --attributes-to-get <partition-key-attr> \
-  --limit 1000 --return-consumed-capacity TOTAL \
-  --query 'Items[*].<partition-key-attr>.S' --output text | \
-  sort | uniq -c | sort -rn | head -20
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 | Sub-symptom | Root cause | Probe |
 |---|---|---|
@@ -436,21 +244,7 @@ aws dynamodb scan --table-name <table> \
 | Partition key is a date / status / category | HOT_PARTITION — low cardinality by design | Redesign the key |
 | Partition key is high-cardinality but one value dominates | HOT_PARTITION — power-law distribution | Add a suffix to spread the hot key |
 
-**Common fix patterns:**
-
-- **Add a random suffix to the partition key.** Append a 2-digit random
-  number (`userId#04`) to spread writes across 100 partitions. Read
-  queries must then fan out across all suffixes and merge — acceptable for
-  write-heavy, read-light workloads.
-- **Use a composite partition key.** Combine the hot attribute with a
-  higher-cardinality attribute (e.g., `userId#orderId`) so writes
-  distribute across partitions.
-- **Switch to on-demand mode.** On-demand handles hot partitions without
-  throttling (it scales per-partition). This is the fastest fix when the
-  key cannot be redesigned immediately.
-- **For "today" date keys:** use a write-sharding pattern with N shards
-  per day (`2026-08-07#0` through `2026-08-07#99`). Reads query all N
-  shards for today.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ### Step 7: SCAN_MISUSE / BATCH_LIMIT diagnostic
 
@@ -469,27 +263,7 @@ consumption.
 capacity. The error is not about table capacity — it is about the batch
 size.
 
-**Diagnostic commands:**
-
-```bash
-# Find recent Scan calls (CloudTrail).
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventName,AttributeValue=Scan \
-  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --query 'Events[*].{time:EventTime,user:Username,resource:CloudTrailEvent' --output json
-
-# Find BatchGetItem / BatchWriteItem calls.
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventName,AttributeValue=BatchGetItem \
-  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) --output json
-
-# ReturnConsumedCapacity on a Scan reveals the cost.
-aws dynamodb scan --table-name <table> \
-  --limit 100 --return-consumed-capacity TOTAL \
-  --query 'ConsumedCapacity'
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 | Sub-symptom | Root cause | Probe |
 |---|---|---|
@@ -498,19 +272,7 @@ aws dynamodb scan --table-name <table> \
 | `BatchWriteItem` throttle with `UnprocessedItems` | BATCH_LIMIT — same as above | Reduce batch size; backoff on `UnprocessedItems` |
 | Scan with `FilterExpression` consuming all RCUs before filtering | SCAN_MISUSE — filter is applied AFTER read | Move the filter into the key schema (Query with KeyConditionExpression) |
 
-**Common fix patterns:**
-
-- Replace Scan with Query: if the access pattern is "find items for user
-  X," Query on the partition key `userId` instead of Scan with a filter.
-- For analytics scans: use Parallel Scan with N workers (each scans a
-  segment); or export the table to S3 via DynamoDB export and run
-  analytics on S3 (Athena / Spark).
-- For BatchGetItem: keep batches to 50-80 items (below the 100 limit) to
-  leave headroom for retries. Always implement exponential backoff on
-  `UnprocessedKeys`.
-- For FilterExpression misuse: if the filter removes > 90% of scanned
-  items, the access pattern is wrong — redesign the key schema so the
-  filter becomes a KeyConditionExpression.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ### Step 8: Map to root-cause catalog
 
@@ -529,20 +291,7 @@ After the walk identifies the category, cross-reference with this catalog.
 
 ### Step 9: Verify the fix
 
-Before applying, validate the proposed fix:
-
-- **For capacity changes (provisioned mode):** `update-table` applies
-  within minutes. Monitor CloudWatch `ThrottledRequests` for 15 minutes
-  after the change.
-- **For on-demand switch:** `update-table --billing-mode PAY_PER_REQUEST`
-  applies immediately. Verify `ThrottledRequests` drops to 0.
-- **For key redesign:** this requires a data migration. Create a new table
-  with the redesigned key, copy data via DynamoDB export/import or AWS
-  Glue, and cut over the application. Verify the new key distribution with
-  Contributor Insights before declaring the fix complete.
-- **For GSI redesign:** GSIs can be added (`update-table`) but not
-  modified in-place. Create a new GSI with the redesigned key, verify query
-  patterns, then delete the old GSI.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ### Step 10: Decide — ROOT_CAUSE_FOUND vs NEED_MORE_INFO vs ESCALATE
 
@@ -618,97 +367,11 @@ REMEDIATION:
 
 ### Worked example — burst capacity exhaustion
 
-```text
-TABLE: events-ingest in us-east-1
-VERDICT: ROOT_CAUSE_FOUND
-ROOT_CAUSE: BURST_EXHAUSTED — traffic is spiky (batch writes every 2
-  minutes). The 5-minute burst capacity absorbs the first 2-3 batches,
-  then throttling begins. Average WCU is 4,000/min (below the 5,000
-  provisioned), but the peak batch is 12,000 WCU in 10 seconds.
-THROTTLE_TYPE: BURST_EXHAUSTED
-EVIDENCE:
-  - CloudWatch ConsumedWriteCapacityUnits (1-min period): alternating
-    0 and 12,000 datapoints — confirms spiky pattern
-  - CloudWatch ThrottledRequests: starts ~5 minutes after the first
-    batch, continues on every subsequent batch
-  - CloudWatch ConsumedWriteCapacityUnits (5-min avg): 4,000 WCU/min
-    — below the 5,000 provisioned, misleading if viewed at 5-min period
-ROOT_CAUSE_CATALOG: #5 (burst capacity exhaustion)
-REMEDIATION:
-  1. Raise ProvisionedWriteCapacityUnits to the 99th percentile of the
-    per-second rate, not the per-minute average:
-    aws dynamodb update-table --table-name events-ingest \
-      --provisioned-throughput ReadCapacityUnits=1000,WriteCapacityUnits=12000
-  2. Or switch to on-demand for immediate relief:
-    aws dynamodb update-table --table-name events-ingest \
-      --billing-mode PAY_PER_REQUEST
-  3. Or smooth the traffic: buffer batches in SQS, drain at a steady
-    rate via a Lambda consumer writing to DynamoDB.
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand (see References below).
 
 ## Diagnostic command reference
 
-```bash
-# 1. Table capacity mode and per-GSI capacity.
-aws dynamodb describe-table --table-name <table> \
-  --query 'Table.{billing:BillingModeSummary.BillingMode,provisioned:ProvisionedThroughput,gsis:GlobalSecondaryIndexes[*].{name:IndexName,key:KeySchema,provisioned:ProvisionedThroughput,projection:Projection.ProjectionType}}'
-
-# 2. Consumed vs provisioned (reads, 1-min period for burst detection).
-aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
-  --metric-name ConsumedReadCapacityUnits \
-  --dimensions Name=TableName,Value=<table> \
-  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 60 --statistics Sum Average Maximum --output json
-
-aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
-  --metric-name ProvisionedReadCapacityUnits \
-  --dimensions Name=TableName,Value=<table> \
-  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 60 --statistics Sum Average --output json
-
-# 3. Consumed vs provisioned (writes, 1-min period).
-aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
-  --metric-name ConsumedWriteCapacityUnits \
-  --dimensions Name=TableName,Value=<table> \
-  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 60 --statistics Sum Average Maximum --output json
-
-# 4. Throttled requests (all operations).
-aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
-  --metric-name ThrottledRequests \
-  --dimensions Name=TableName,Value=<table> \
-  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 60 --statistics Sum --output json
-
-# 5. Per-GSI throttled requests (the key signal for GSI_HOT_KEY).
-aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
-  --metric-name ThrottledRequests \
-  --dimensions Name=TableName,Value=<table> Name=GlobalSecondaryIndexName,Value=<gsi> \
-  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 60 --statistics Sum --output json
-
-# 6. System errors (distinguish throttling from engine errors).
-aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
-  --metric-name SystemErrors \
-  --dimensions Name=TableName,Value=<table> \
-  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 60 --statistics Sum --output json
-
-# 7. Contributor insights (top partition keys by traffic).
-aws dynamodb describe-contributor-insights --table-name <table>
-
-# 8. CloudTrail for Scan / BatchGetItem / BatchWriteItem events.
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventName,AttributeValue=Scan \
-  --start-time $(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) --output json
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 ## Anti-Patterns — NEVER
 
@@ -767,93 +430,24 @@ aws cloudtrail lookup-events \
 
 ## Remediation guidance
 
-### For HOT_PARTITION
-
-1. Enable Contributor Insights to confirm the top partition key.
-2. Short-term: switch to on-demand (immediate throttle relief).
-3. Long-term: redesign the partition key:
-   - Add a random suffix (write-sharding).
-   - Use a composite key combining the hot attribute with a
-     high-cardinality attribute.
-4. Verify the new key distribution with Contributor Insights after
-   migration.
-
-### For GSI_HOT_KEY
-
-1. Check per-GSI `ThrottledRequests` to confirm the GSI is the cause.
-2. Short-term: raise the GSI's provisioned capacity (provisioned mode) or
-   switch to on-demand.
-3. Long-term: redesign the GSI partition key for higher cardinality.
-4. Create a new GSI with the redesigned key, migrate queries, delete the
-   old GSI.
-
-### For READ_CAPACITY_LOW
-
-1. Confirm sustained `ConsumedReadCapacityUnits` > provisioned at 1-min
-   period.
-2. Check for scan misuse (Step 7) before raising capacity.
-3. Check read consistency: switch strongly-consistent reads to eventually
-   consistent where possible (halves RCU cost).
-4. Raise `ProvisionedReadCapacityUnits` or switch to on-demand.
-
-### For WRITE_CAPACITY_LOW
-
-1. Confirm sustained `ConsumedWriteCapacityUnits` > provisioned.
-2. Audit GSIs: each GSI adds WCU cost. Remove unused GSIs.
-3. Check for transactional writes: switch to standard writes where
-   possible (halves WCU cost).
-4. Raise `ProvisionedWriteCapacityUnits` or switch to on-demand.
-
-### For BURST_EXHAUSTED
-
-1. Confirm the spiky pattern at 1-min period (5-min period hides it).
-2. Raise sustained capacity to the 99th percentile of per-second rate.
-3. Or switch to on-demand (absorbs spikes without burst budget).
-4. Or smooth traffic at the application layer (SQS queue, batch writes).
-
-### For SCAN_MISUSE
-
-1. Confirm Scan in CloudTrail correlates with throttle events.
-2. Replace Scan with Query on the partition key.
-3. For analytics: use Parallel Scan, or export to S3 via DynamoDB export
-   and query with Athena.
-4. For FilterExpression misuse: redesign the key schema so the filter
-   becomes a KeyConditionExpression.
-
-### For BATCH_LIMIT
-
-1. Reduce batch size to 50-80 items (below the 100 limit).
-2. Implement exponential backoff on `UnprocessedKeys` / `UnprocessedItems`.
-3. Split large items across batches to stay under the 16 MB limit.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## Recent AWS features (2024-2026)
 
-- **On-demand mode burst limit refinement (2024-2025):** On-mode mode now
-  ramps per-partition capacity over 30 minutes from the previous peak. A
-  sudden spike > 2x the previous peak on a single partition can still
-  throttle. Troubleshoot via Contributor Insights, not capacity settings.
-- **DynamoDB Contributor Insights enhanced (2024):** More granular
-  per-GSI key visibility. Auditors should enable Contributor Insights on
-  every table with GSIs for hot-key detection.
-- **DynamoDB export to S3 (2024-2025 improvements):** Faster exports and
-  incremental export support. Use exports to offload analytics workloads
-  from the production table, eliminating Scan-induced throttling.
-- **DynamoDB Streams + Kinesis Data Streams fan-out (2024):** Higher
-  shard capacity for change-data-capture consumers. For high-throughput
-  CDC, use Kinesis Data Streams (not just DynamoDB Streams) to decouple
-  consumers and avoid read-throttling the table.
-- **Amazon DynamoDB zero-ETL integration with OpenSearch (2025):**
-  Enables search analytics without scanning DynamoDB. Eliminates a common
-  Scan-induced throttle pattern for search workloads.
-- **Adaptive capacity improvements (2024-2025):** Faster partition
-  rebalancing for moderately skewed keys. Severely skewed keys still
-  require redesign.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## References
 
 See `references/throttle-decision-tree.md` for the full symptom-to-cause
 walk with worked examples per category, and `references/capacity-math.md`
 for the RCU/WCU consumption formulas and cost multipliers.
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Mindset deep-dive facts, per-step common fix patterns, Step 9 fix verification, remediation guidance, and 2024-2026 feature changes moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 0 account-wide throttle scan, Steps 2-7 per-category diagnostic commands, and the consolidated diagnostic command reference moved from SKILL.md
+- [references/worked-examples.md](references/worked-examples.md) — burst capacity exhaustion worked example moved from SKILL.md
+- [references/capacity-math.md](references/capacity-math.md) — RCU and WCU consumption math tables plus the GSI WCU cost multiplier moved from SKILL.md (extends the existing capacity math reference)
 
 ## Domain
 

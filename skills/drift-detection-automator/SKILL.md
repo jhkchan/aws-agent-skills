@@ -118,36 +118,7 @@ GAP: Re-supply list-stacks output and the desired detection schedule.
 ## Process — Workflow design (apply in order)
 
 ### Step 0: Expert knowledge — non-obvious CloudFormation + Config behaviors
-
-- **Drift detection does NOT modify the stack.** `detect-stack-drift` is
-  read-only. Remediation is a SEPARATE step (update-stack or change-set).
-
-- **`detect-stack-drift` has an API rate limit.** Running detection on
-  more than ~50 stacks simultaneously throttles. For fleets, stagger via
-  SQS queue with batch size 10 or Step Functions map state.
-
-- **Config's drift rule reads the LAST result.** It does NOT trigger new
-  detection. If the last detection was 30 days ago, the rule reports
-  30-day-old status. You MUST schedule periodic `detect-stack-drift`.
-
-- **Not all resource types support drift detection.** Unsupported types
-  report `NOT_CHECKED`. Common unsupported: `AWS::CloudFormation::Wait*`,
-  nested stacks (now supported as of 2024-2025 — recurses into children).
-
-- **Stack update reverts drift but may cause interruption.** For resources
-  requiring replacement (immutable property changes), this means downtime.
-  Always review the change-set before executing.
-
-- **StackSet drift detection runs per stack-instance.** Iterate
-  `list-stack-instances` and call `detect-stack-drift` per instance. For
-  large StackSets (100+), use Step Functions Distributed Map.
-
-- **Config Aggregator provides cross-account visibility WITHOUT deploying
-  Lambda to each account.** The aggregator pulls Config data from members
-  into a central account. Recommended pattern for multi-account.
-
-- **Terraform `plan` detects drift against Terraform state, NOT CFN.** If
-  resources are Terraform-managed, CFN drift detection does not apply.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ### Step 1: Classify the stack and detection cadence
 
@@ -256,44 +227,7 @@ def notify_drift(stack_name, drift_results, topic_arn):
 ### Step 6: SSM Automation remediation
 
 **Option A — CloudFormation change-set (re-apply template):**
-
-```yaml
----
-schemaVersion: '0.3'
-assumeRole: '{{ AutomationAssumeRole }}'
-description: 'Remediate CloudFormation drift via change-set'
-parameters:
-  StackName: {type: String}
-  AutomationAssumeRole: {type: String}
-mainSteps:
-  - name: CreateChangeSet
-    action: aws:executeAwsApi
-    inputs:
-      Service: cloudformation
-      Api: CreateChangeSet
-      StackName: '{{ StackName }}'
-      ChangeSetName: 'drift-remediation-{{ global:TIMESTAMP }}'
-      ChangeSetType: UPDATE
-      UsePreviousTemplate: true
-      Capabilities: '["CAPABILITY_IAM","CAPABILITY_NAMED_IAM"]'
-    outputs:
-      - {Name: ChangeSetId, Selector: '$.Id', Type: String}
-  - name: ApproveRemediation
-    action: aws:approve
-    inputs:
-      NotificationArn: 'arn:aws:sns:us-east-1:111111111111:drift-approval'
-      Message: 'Approve drift remediation for {{ StackName }}?'
-      MinRequiredApprovals: 1
-  - name: ExecuteChangeSet
-    action: aws:executeAwsApi
-    inputs:
-      Service: cloudformation
-      Api: ExecuteChangeSet
-      ChangeSetName: '{{ CreateChangeSet.ChangeSetId }}'
-      StackName: '{{ StackName }}'
-    isCritical: true
-    onFailure: abort
-```
+Moved verbatim to [references/drift-comparison-and-remediation.md](references/drift-comparison-and-remediation.md) - load on demand (see References below).
 
 **Production:** always include the `aws:approve` step. **Non-production:**
 remove the approval step for auto-remediation.
@@ -346,27 +280,7 @@ aws ssm put-parameter --name /drift-detection/suppression-rules \
 become critical tomorrow.
 
 ### Step 9: Drift report export to S3 + Athena
-
-```python
-def export_drift_report(drift_results, bucket, date_str):
-    key = f"drift-reports/dt={date_str}/drift-report.json"
-    s3.put_object(Bucket=bucket, Key=key,
-                 Body=json.dumps(drift_results, indent=2),
-                 ContentType='application/json')
-```
-
-Athena table:
-
-```sql
-CREATE EXTERNAL TABLE IF NOT EXISTS drift_reports (
-  stack_name string, account_id string, region string,
-  resource_id string, resource_type string, drift_severity string,
-  drift_status string, detection_time string, property_path string,
-  expected_value string, actual_value string)
-PARTITIONED BY (dt string)
-STORED AS JSON
-LOCATION 's3://drift-reports-bucket/drift-reports/';
-```
+Moved verbatim to [references/drift-reporting-and-athena.md](references/drift-reporting-and-athena.md) - load on demand (see References below).
 
 Common queries — top drifted resource types, most frequent drift by stack,
 critical drift not remediated. See **references/drift-reporting-and-athena.md**.
@@ -384,25 +298,7 @@ fi
 ```
 
 GitHub Actions integration:
-
-```yaml
-name: Drift Detection
-on:
-  schedule: [{cron: '0 2 * * *'}]
-jobs:
-  drift-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      - run: |
-          terraform init -input=false
-          terraform plan -detailed-exitcode -out=plan.tfplan || exit_code=$?
-          if [ $exit_code -eq 2 ]; then
-            echo "::warning::Drift detected"
-            terraform show -json plan.tfplan > drift.json
-          fi
-```
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ### Step 11: Config Aggregator cross-account drift visibility
 
@@ -496,27 +392,7 @@ TEMPLATE:
 ```
 
 ### Worked example — REVIEW_REQUIRED, production stack
-
-```text
-DRIFT_AUTOMATION: prod-drift-pipeline
-STACK: prod-payment-service
-DETECTION:
-  - Method: EventBridge scheduled (cron 0 2 * * ? *)
-  - Cadence: daily at 02:00 UTC
-COMPARISON:
-  - Lambda: drift-detector
-  - Severity: CRITICAL (3 resources: SG modified, IAM policy changed, ALB listener)
-NOTIFICATION:
-  - SNS topic: arn:aws:sns:us-east-1:111111111111:drift-alerts-critical
-  - Routing: CRITICAL -> page on-call
-REMEDIATION:
-  - Method: MANUAL — SSM Change Manager approval required
-  - Auto-remediate: BLOCKED (production stack)
-SAFETY: production protection active, approval required
-VERDICT: REVIEW_REQUIRED
-GAP: Production drift detected but auto-remediation intentionally blocked. Operator must review 3 drifted resources. If intentional hotfixes from incident response, update the CFN template to match. If unintentional, create a change-set to revert. Do NOT auto-remediate without approval — re-applying the template may revert an active hotfix and cause a production outage.
-TEMPLATE: (SSM Automation with aws:approve gate — see Step 6)
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand (see References below).
 
 ## Anti-Patterns — NEVER do these things
 
@@ -567,107 +443,27 @@ TEMPLATE: (SSM Automation with aws:approve gate — see Step 6)
   provides cross-account visibility from a single account.
 
 ## Pre-flight safety checks
-
-- **MANDATORY CONFIRMATION GATE.** Before state-changing operations:
-  `CONFIRM: About to <action> for stack <stack> in account <account>.
-  Proceed? (yes/no)`
-
-- **Verify the stack exists and is stable** before scheduling:
-  `describe-stacks --stack-name <name> --query 'Stacks[0].StackStatus'`
-
-- **For production, verify the approval SNS topic has confirmed
-  subscriptions.** Unconfirmed means `aws:approve` blocks indefinitely.
-
-- **Test the remediation SSM document in non-production.** Create
-  deliberate drift, run the document, verify the stack returns to
-  `IN_SYNC`.
-
-- **For StackSets, verify `auto-deployment`** so new accounts receive
-  the drift detection pipeline automatically.
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 ## Appendix A — Drift detection methods comparison
-
-| Method | Scope | Real-time? | Pros | Cons |
-|---|---|---|---|---|
-| `detect-stack-drift` (scheduled) | Per-stack | No (on-demand) | Comprehensive; all property diffs | Must schedule; rate limited |
-| Config rule `cfn-stack-drift-check` | Per-stack | Near-real-time | Config compliance; Security Hub | Reads last result only |
-| Custom Config rule (Lambda) | Per-resource | Real-time | Catches changes as they happen | No stack-level drift; custom Lambda |
-| Terraform `plan -detailed-exitcode` | Per-state | Pipeline-driven | Native to Terraform; CI/CD | Terraform resources only |
-| Config Aggregator | Cross-account | Near-real-time | Single pane across accounts | Read-only; no remediation |
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## Appendix B — Drift remediation decision tree
-
-```
-Is the stack production?
-├─ Yes → Notify + human approval (aws:approve or Change Manager)
-│        └─ Intentional hotfix? → update template
-│           Unintentional?      → create change-set to revert
-└─ No  → Remediation runbook tested?
-        ├─ Yes → Auto-remediate via SSM (change-set re-apply)
-        └─ No  → REVIEW_REQUIRED — test in sandbox first
-```
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## Recent AWS features (2024-2026)
-
-- **StackSets auto-deployment (2024):** New accounts in an OU
-  automatically receive StackSet deployments, including the drift
-  detection Lambda.
-
-- **Nested stack drift detection (2024-2025):** `detect-stack-drift` now
-  recurses into nested stacks. Previously showed as `NOT_CHECKED`.
-
-- **Config Conformance Pack for drift (2024):** Managed pack
-  `operational-best-practices-for-cloudformation` includes drift rules.
-
-- **Change-set drift preview (2025):** `create-change-set` shows which
-  drifted properties will be reverted, before execution.
-
-- **Step Functions Distributed Map (2024):** Native iteration for > 10,000
-  stack-instances with concurrency control. Replaces Lambda + SQS.
-
-- **Config Aggregator advanced query (2025):** `select-aggregate-resource-
-  config` SQL queries for cross-account drift without Athena.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## Expert heuristic: drift remediation blast radius
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
-Drift remediation on production stacks is the most dangerous governance
-automation. Re-applying a template to "fix" drift can revert an
-intentional hotfix, trigger resource replacement (downtime), or cascade
-failures across dependent stacks.
+## References (load on demand)
 
-> ALWAYS classify the stack (production vs non-production) before
-> enabling auto-remediation. For production, require human approval.
-> For non-production, validate the runbook in sandbox first.
-
-**Stack classification techniques:**
-
-| Technique | Mechanism | Limit |
-|---|---|---|
-| Stack name pattern | `prod-*` → approval | Name-based, fragile |
-| Stack tags | `Environment: production` → manual | More robust; tag-driven |
-| OU-based scoping | Prod OU → manual; Sandbox → auto | Strongest; org-level |
-| Account isolation | Prod accounts excluded from auto | Complete isolation |
-| Change Manager gate | All prod via Change Template | Human approval per execution |
-
-**3-phase validation:**
-
-1. **Sandbox — detect + auto-remediate:** Deploy full pipeline. Create
-   deliberate drift. Verify detection → notification → remediation →
-   `IN_SYNC`.
-2. **Staging — detect + notify only:** Monitor drift patterns 1 week.
-   Tune suppression rules for acceptable changes.
-3. **Production — detect + notify only (permanent):** All remediation
-   requires human-approved change-set. Never flip to auto without
-   architecture review.
-
-**Post-deploy alarms:** SSM Automation Executions Failed > 0 for the
-remediation runbook. CFN drift status = DRIFTED for > 48 hours on
-production stacks (detection fires but remediation never succeeds/approved).
-
-**Surface in output:** `STACK_CLASS: <production | staging | dev |
-sandbox>` and `REMEDIATION_MODE: <auto | approval-required | notify-only>`.
-If `STACK_CLASS` is `production` and `REMEDIATION_MODE` is `auto`, flag
-as UNSAFE.
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked example (REVIEW_REQUIRED) moved from SKILL.md
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step-0 expert knowledge, appendices, GitHub Actions workflow, 2024-2026 features moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight safety checks moved from SKILL.md
+- [references/drift-comparison-and-remediation.md](references/drift-comparison-and-remediation.md) — SSM Automation change-set runbook moved from SKILL.md
+- [references/drift-reporting-and-athena.md](references/drift-reporting-and-athena.md) — drift report export + Athena DDL moved from SKILL.md
 
 ## Domain
 

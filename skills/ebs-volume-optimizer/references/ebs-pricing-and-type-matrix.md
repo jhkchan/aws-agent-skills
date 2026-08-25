@@ -203,3 +203,22 @@ Is the workload random I/O (database, transactional)?
 
 Migrating from legacy (m3/c3/m4/c4) to current-gen (m5+/c5+/r5+) unlocks
 free EBS optimization in addition to compute savings.
+
+
+---
+
+## Step 6: Pricing reference (us-east-1, 2026) (moved from SKILL.md)
+
+**Pricing reference (us-east-1, 2026):**
+
+| Volume type | $/GB-month | $/IOPS-month | $/MBps-month | Max IOPS | Max throughput |
+|---|---|---|---|---|---|
+| gp3 | $0.08 | $0.005 (above 3000 baseline) | $0.04 (above 125 baseline) | 16,000 | 1,000 MB/s |
+| gp2 | $0.10 | included | included | 16,000 (burst) | varies by size |
+| io1 | $0.125 | $0.065 | included | 64,000 | 1,000 MB/s |
+| io2 | $0.125 | $0.065 | included | 64,000 (256,000 Block Express) | 4,000 MB/s |
+| st1 | $0.045 | included | included | 500 per TB | 500 MB/s per TB |
+| sc1 | $0.015 | included | included | 250 per TB | 250 MB/s per TB |
+| Snapshot (standard) | $0.05/GB-month | — | — | — | — |
+| Snapshot Archive | $0.0125/GB-month | — | — | — | — |
+| FSR | $0.06/hour per AZ per snapshot | — | — | — | — |

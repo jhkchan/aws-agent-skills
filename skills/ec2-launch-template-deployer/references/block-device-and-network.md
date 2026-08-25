@@ -200,3 +200,24 @@ multiple network cards:
 | `AssociatePublicIpAddress` on `DeviceIndex>0` | Silently ignored | Only works on index 0 |
 | `ephemeralN` on non-`d` instance type | Silently ignored | Verify instance type has disks |
 | IPv6 on subnet without IPv6 CIDR | Fails at launch | Assign IPv6 CIDR to VPC + subnet first |
+
+## Expert heuristic: block device mapping — gp3 vs gp2 (moved from SKILL.md)
+
+EBS `gp3` (2020+) is cheaper than `gp2` (~20%) and allows independent
+IOPS/throughput tuning. A baseline model accepts the `gp2` default
+from the AMI snapshot. Use `gp3` for all production volumes.
+
+| Volume type | IOPS | Throughput | Price | When |
+|---|---|---|---|---|
+| `gp3` | 3,000 (tunable 16,000) | 125 MB/s (tunable 1,000) | ~20% cheaper | **Default** |
+| `gp2` | Sized (3 IOPS/GB) | Tied to IOPS | Baseline | Legacy |
+| `io2` | Up to 256,000 | Up to 4,000 MB/s | Premium | Databases |
+| `st1`/`sc1` | n/a | Up to 500 MB/s | Cheapest | Data lakes / cold |
+
+**DeleteOnTermination:** default is `true` for root, `false` for
+non-root EBS volumes added via block device mapping — orphaned volumes
+accumulate cost silently. Set explicitly to `true` on stateless.
+
+**Instance store (`ephemeralN`):** only on instance types with
+physical disks (`m5d`, `c5d`, `i3`, `x2ied`). Setting
+`VirtualName=ephemeral0` on a type without disks is silently ignored.

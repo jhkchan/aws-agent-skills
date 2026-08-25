@@ -295,3 +295,96 @@ The Step Functions execution role needs:
 
 Scope to specific resources where possible. Avoid `Resource: "*"` for
 production deployments.
+
+---
+
+## Canonical failover orchestrator — Step Functions ASL (moved from SKILL.md)
+
+
+```json
+{
+  "StartAt": "CheckKillSwitch",
+  "States": {
+    "CheckKillSwitch": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::ssm:get-parameter",
+      "Parameters": {"Name": "/dr/kill-switch"},
+      "Next": "KillSwitchChoice"
+    },
+    "KillSwitchChoice": {
+      "Type": "Choice",
+      "Choices": [{"Variable": "$.Parameter.Value", "StringEquals": "disabled", "Next": "AbortFailover"}],
+      "Default": "ConfirmPrimaryDown"
+    },
+    "AbortFailover": {"Type": "Succeed", "Comment": "Kill-switch tripped"},
+    "ConfirmPrimaryDown": {
+      "Comment": "Verify primary is truly down — prevent split-brain",
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:<region>:<account>:function:dr-verify-primary-down",
+      "Retry": [{"ErrorEquals": ["States.TaskFailed"], "IntervalSeconds": 30, "MaxAttempts": 3, "BackoffRate": 1.5}],
+      "Next": "PrimaryDownChoice"
+    },
+    "PrimaryDownChoice": {
+      "Type": "Choice",
+      "Choices": [{"Variable": "$.primaryHealthy", "BooleanEquals": true, "Next": "AbortFailover"}],
+      "Default": "PromoteSecondary"
+    },
+    "PromoteSecondary": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:<region>:<account>:function:dr-promote-secondary",
+      "Next": "UpdateDNS"
+    },
+    "UpdateDNS": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::route53:changeResourceRecordSets",
+      "Parameters": {
+        "HostedZoneId": "<zone-id>",
+        "ChangeBatch": {"Changes": [{"Action": "UPSERT", "ResourceRecordSet": {
+          "Name": "app.example.com", "Type": "A",
+          "AliasTarget": {"HostedZoneId": "Z2FDTNDATAQYW2",
+            "DNSName": "secondary-alb.us-west-2.elb.amazonaws.com",
+            "EvaluateTargetHealth": true}
+        }}]}
+      },
+      "Next": "VerifySecondaryUp"
+    },
+    "VerifySecondaryUp": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:<region>:<account>:function:dr-verify-secondary-up",
+      "Next": "VerifyChoice"
+    },
+    "VerifyChoice": {
+      "Type": "Choice",
+      "Choices": [{"Variable": "$.secondaryHealthy", "BooleanEquals": true, "Next": "NotifySuccess"}],
+      "Default": "RollbackDNS"
+    },
+    "NotifySuccess": {
+      "Type": "Task",
+      "Resource": "arn:aws:sns:<region>:<account>:dr-notifications",
+      "Next": "WaitForHumanApproval"
+    },
+    "RollbackDNS": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::route53:changeResourceRecordSets",
+      "Parameters": {
+        "HostedZoneId": "<zone-id>",
+        "ChangeBatch": {"Changes": [{"Action": "UPSERT", "ResourceRecordSet": {
+          "Name": "app.example.com", "Type": "A",
+          "AliasTarget": {"HostedZoneId": "Z2FDTNDATAQYW2",
+            "DNSName": "primary-alb.us-east-1.elb.amazonaws.com",
+            "EvaluateTargetHealth": true}
+        }}]}
+      },
+      "Next": "NotifyFailure"
+    },
+    "NotifyFailure": {"Type": "Task", "Resource": "arn:aws:sns:<region>:<account>:dr-critical-alerts", "End": true},
+    "WaitForHumanApproval": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sqs:sendMessage.waitForTaskToken",
+      "Parameters": {"QueueUrl": "https://sqs.<region>.amazonaws.com/<account>/dr-approval",
+        "MessageBody": {"failoverId.$": "$.failoverId", "taskToken.$": "$$.Task.Token"}},
+      "End": true
+    }
+  }
+}
+```

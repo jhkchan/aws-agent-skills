@@ -157,93 +157,15 @@ Driven by four Global Tables realities:
 
 ## Expert heuristic — non-obvious global table behaviours
 
-- **Adding a replica copies data from an existing replica, not from
-  the "primary."** The new replica's data is bootstrapped from a
-  snapshot of the closest existing replica. During the CREATING phase,
-  the new replica is not writable. Monitor `ReplicaStatus` transitioning
-  to `ACTIVE`.
-
-- **Removing a replica is irreversible.** Once `update-global-table`
-  removes a replica, the data in that region is deleted. There is no
-  "pause replication" — the table in the removed region is permanently
-  deleted. Always verify the region is no longer needed before removal.
-
-- **Schema changes propagate but are not instantaneous.** A GSI added
-  to the primary region must be explicitly created on each replica.
-  DynamoDB does not auto-propagate GSI changes across replicas. Use
-  `update-table` in each region for GSI additions.
-
-- **Billing mode changes must be applied to all replicas.** Switching
-  from PROVISIONED to PAY_PER_REQUEST on one replica does not switch
-  the others. Apply billing mode changes region by region.
-
-- **`describe-global-table` returns the global table view; `describe-table`
-  returns the regional view.** Operators must check both. A replica may
-  be `ACTIVE` in the global table view but `UPDATING` in the regional
-  `describe-table` output (e.g., during GSI rebuild).
-
-- **ReplicationLatency is measured per region pair, not per item.**
-  CloudWatch `ReplicationLatency` shows the average time for a write
-  to replicate from one region to another. High latency does not mean
-  data is lost — it means the replication pipeline is slow. Data will
-  eventually arrive unless the replica is deleted.
-
-- **Concurrent writes from multiple regions with the same partition
-  key can cause thrashing under LWW.** If two regions continuously
-  update the same item, the LWW resolution flips the value back and
-  forth. This is not a conflict — it is the expected behavior. Design
-  the access pattern to avoid concurrent cross-region writes to the
-  same key.
-
-- **PITR restore on a global table replica creates a NEW single-region
-  table.** The restored table is NOT a global table — it does not
-  replicate to other regions. To restore a global table, restore in
-  one region, then recreate the global table from the restored table.
-
-- **Autoscaling policies must be registered per replica region.**
-  Global table replication does not copy autoscaling policies. Each
-  replica needs its own `register-scalable-target` and
-  `put-scaling-policy` calls.
-
-- **Global Tables write cost scales linearly with replica count.** A
-  write to a 3-replica global table consumes 3x the WCU of a
-  single-region write. The replicated write cost is the single-region
-  WCU × (number of replicas). Budget accordingly.
+All ten non-obvious behaviours (replica bootstrapping, irreversible removal, per-region GSI/billing changes, dual describe views, per-pair ReplicationLatency, LWW thrashing, PITR restore creating a single-region table, per-replica autoscaling, linear WCU scaling) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when reviewing complex operations.
 
 ## Pre-flight: global table metadata gate
 
 Run before any operation. Misclassifying these produces wrong plans.
 
-**Live-account pre-flight (skip if offline plan audit):**
-
-```bash
-# 1. Global table configuration (replication group members).
-aws dynamodb describe-global-table --global-table-name <table> \
-  --query 'GlobalTableDescription.{table:GlobalTableName,regions:ReplicationGroup[*].{region:RegionName,status:ReplicaStatus}}'
-
-# 2. Regional table configuration (run in each replica region).
-aws dynamodb describe-table --table-name <table> --region <region> \
-  --query 'Table.{status:TableStatus,billing:BillingModeSummary.BillingMode,throughput:ProvisionedThroughput,gsis:GlobalSecondaryIndexes[*].IndexName,stream:StreamSpecification,pitr:SSEDescription}'
-
-# 3. PITR status per region.
-aws dynamodb describe-continuous-backups --table-name <table> --region <region> \
-  --query 'ContinuousBackupsDescription.{continuous:ContinuousBackupsStatus,pitr:PointInTimeRecoveryDescription.PointInTimeRecoveryStatus}'
-
-# 4. ReplicationLatency metric (per region pair).
-aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
-  --metric-name ReplicationLatency \
-  --dimensions Name=TableName,Value=<table> Name=ReceivingRegion,Value=<region> \
-  --start-time $(date -u -v-1H +%Y-%m-%dT%H:%M:%SZ) --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 300 --statistics Average Maximum --output json
-
-# 5. Autoscaling policies per region.
-aws application-autoscaling describe-scaling-policies \
-  --service-namespace dynamodb --resource-ids table/<table> --region <region>
-
-# 6. Check for in-progress updates.
-aws dynamodb describe-table --table-name <table> --region <region> \
-  --query 'Table.TableStatus'
-```
+Live-account pre-flight CLI (describe-global-table, per-region describe-table, describe-continuous-backups, ReplicationLatency and autoscaling metrics, in-progress update check) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before any live-account operation.
 
 | Table attribute | Effect on operation |
 |---|---|
@@ -262,52 +184,8 @@ aws dynamodb describe-table --table-name <table> --region <region> \
 
 ### Step 0: Expert knowledge — non-obvious Global Tables behaviors
 
-These behaviors are easy to misjudge without operational experience.
-Each changes a plan if ignored:
-
-- **`create-global-table` requires identical empty tables in all target
-  regions first.** For a new global table, create the table in each
-  region with the same key schema and billing mode, THEN call
-  `create-global-table`. The tables must be EMPTY (no items). DynamoDB
-  then links them into a global table.
-
-- **Adding a replica to an existing global table does NOT require a
-  pre-created table.** `update-global-table --replica-updates
-  '[{Create:{RegionName:<region>}}]'` creates the new replica table
-  automatically in the target region. Data is copied from an existing
-  replica.
-
-- **The global table name must match the regional table name.** If the
-  table is called `orders-prod` in `us-east-1`, it must be
-  `orders-prod` in every replica region. The global table name is also
-  `orders-prod`. This is not configurable.
-
-- **Conflict resolution is `LAST_WRITER_WINS` with no alternative.**
-  Global Tables v2 does not support custom conflict resolution. The
-  application must be designed for LWW semantics. For counters or
-  append-heavy workloads, use DynamoDB Streams to merge, not direct
-  cross-region writes.
-
-- **Replication is asynchronous.** A write to region A replicates to
-  region B within typically < 1 second, but there is no synchronous
-  guarantee. An application reading from region B immediately after
-  writing to region A may see stale data. Use read-after-write
-  consistency within a single region only.
-
-- **Per-region PITR is independent.** Enabling PITR on the primary
-  does NOT enable it on replicas. For DR, enable PITR on EVERY replica
-  region. The cost is per-region per-GB.
-
-- **Removing the last replica is equivalent to deleting the global
-  table.** If you remove all replicas except one, the global table
-  becomes a single-region table. The replication metadata is removed.
-  Re-adding replicas later requires going through the full add-replica
-  process.
-
-- **`describe-global-table-settings` shows per-region autoscaling and
-  replica-specific configuration.** This is separate from
-  `describe-global-table` which shows only replication group membership.
-  Always check both before operations.
+All eight Step 0 expert behaviors (empty-table prerequisite for create-global-table, update-global-table auto-creating replicas, name matching, LWW-only conflict resolution, async replication, per-region PITR, last-replica removal, describe-global-table-settings) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when planning any operation.
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
@@ -451,116 +329,18 @@ NOTES:
 
 ### Worked example — remove replica blocked by active traffic
 
-```text
-OPERATION: remove-replica
-VERDICT: BLOCKED
-TARGET: orders-prod global table, removing replica in us-west-2
-PRE_CHECKS:
-  - [PASS] Global table orders-prod exists
-  - [PASS] All current replicas ACTIVE
-  - [PASS] No replica in CREATING or DELETING state
-  - [PASS] us-west-2 has an ACTIVE replica
-  - [FAIL] us-west-2 is receiving active application traffic —
-    CloudWatch ConsumedReadCapacityUnits averages 5,000/min and
-    ConsumedWriteCapacityUnits averages 2,000/min. Removing the region
-    will cause application failures if traffic is not redirected first.
-STEPS: (none — pre-checks failed)
-POST_VERIFY: (none)
-REPLICA_STATUS:
-  - us-east-1: ACTIVE
-  - us-west-2: ACTIVE (BLOCKED from removal — active traffic)
-NOTES:
-  - Redirect application traffic from us-west-2 to another region
-    BEFORE removing the replica.
-  - Verify CloudWatch ConsumedReadCapacityUnits and
-    ConsumedWriteCapacityUnits in us-west-2 drop to near-zero.
-  - Then re-run this operation.
-```
+Remove-replica BLOCKED worked example (active-traffic pre-check failure, redirect-first notes) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when planning a remove-replica operation.
 
 ### Worked example — regional failover (COMPLETED)
 
-```text
-OPERATION: failover
-VERDICT: COMPLETED
-TARGET: orders-prod global table, application failover from us-east-1
-  to us-west-2
-PRE_CHECKS:
-  - [PASS] us-west-2 replica is ACTIVE
-  - [PASS] ReplicationLatency us-east-1 -> us-west-2: 0.3s average
-  - [PASS] Application SDK configured with RegionSwitchingRetryPolicy
-  - [PASS] us-west-2 PITR is ENABLED
-STEPS:
-  1. Application SDK failover triggered (Route 53 health check detected
-    us-east-1 degradation at 2026-08-09T10:15Z)
-  2. Application now writing to us-west-2 endpoint:
-     arn:aws:dynamodb:us-west-2:111111111111:table/orders-prod
-  3. Verified write success: test item inserted at 2026-08-09T10:17Z
-  4. Verified replication to us-east-1 will resume when region recovers
-POST_VERIFY:
-  - [PASS] Application writes succeeding in us-west-2
-  - [PASS] Application reads succeeding in us-west-2
-  - [PASS] ReplicationLatency from us-west-2 to eu-west-1: 0.8s
-  - [PASS] No data loss detected (LWW conflicts monitored)
-REPLICA_STATUS:
-  - us-east-1: ACTIVE (degraded — AWS Health Dashboard confirms
-    regional service degradation)
-  - us-west-2: ACTIVE (now the application's primary write region)
-  - eu-west-1: ACTIVE
-NOTES:
-  - Failover is application-level. DynamoDB Global Tables does NOT
-    automatically redirect traffic. The application SDK's
-    RegionSwitchingRetryPolicy detected the failure and switched.
-  - When us-east-1 recovers, replication resumes automatically. Writes
-    that occurred during the outage in us-west-2 will replicate back
-    to us-east-1.
-  - LWW conflict risk: if the application wrote to us-east-1 during
-    the degradation window AND to us-west-2 after failover, the
-    us-west-2 writes win (later timestamp). Audit conflicting items
-    post-recovery.
-  - Do NOT remove the us-east-1 replica during the outage. It will
-    recover and resume replication automatically.
-```
+Regional failover COMPLETED worked example (SDK RegionSwitchingRetryPolicy cutover, LWW conflict notes, do-not-remove-degraded-replica) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when planning a failover or DR drill.
 
 ## Diagnostic command reference
 
-```bash
-# 1. Global table replication group status.
-aws dynamodb describe-global-table --global-table-name <table> \
-  --query 'GlobalTableDescription.{table:GlobalTableName,regions:ReplicationGroup[*].{region:RegionName,status:ReplicaStatus}}'
-
-# 2. Global table settings (per-region autoscaling, replica config).
-aws dynamodb describe-global-table-settings --global-table-name <table> \
-  --query 'GlobalTableSettings.ReplicaGlobalSecondaryIndexSettingsUpdate'
-
-# 3. Regional table status (run per region).
-aws dynamodb describe-table --table-name <table> --region <region> \
-  --query 'Table.{status:TableStatus,billing:BillingModeSummary.BillingMode,gsis:GlobalSecondaryIndexes[*].IndexName}'
-
-# 4. PITR status per region.
-aws dynamodb describe-continuous-backups --table-name <table> --region <region> \
-  --query 'ContinuousBackupsDescription.PointInTimeRecoveryDescription.PointInTimeRecoveryStatus'
-
-# 5. ReplicationLatency metric (per receiving region).
-aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
-  --metric-name ReplicationLatency \
-  --dimensions Name=TableName,Value=<table> Name=ReceivingRegion,Value=<region> \
-  --start-time $(date -u -v-1H +%Y-%m-%dT%H:%M:%SZ) --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 300 --statistics Average Maximum --output json
-
-# 6. Consumed capacity per region (check active traffic before removal).
-aws cloudwatch get-metric-statistics --namespace AWS/DynamoDB \
-  --metric-name ConsumedWriteCapacityUnits \
-  --dimensions Name=TableName,Value=<table> \
-  --start-time $(date -u -v-1H +%Y-%m-%dT%H:%M:%SZ) --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 300 --statistics Sum --region <region> --output json
-
-# 7. List all global tables in the account.
-aws dynamodb list-global-tables --output json
-
-# 8. Autoscaling policies per region.
-aws application-autoscaling describe-scaling-policies \
-  --service-namespace dynamodb --resource-ids table/<table> --region <region>
-```
+All eight diagnostic commands (global table status, settings, regional status, PITR, ReplicationLatency, consumed capacity, list-global-tables, autoscaling) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when diagnosing replication or replica state.
 
 ## Anti-Patterns — NEVER (top 5)
 
@@ -598,76 +378,13 @@ aws application-autoscaling describe-scaling-policies \
 
 ## Remediation guidance
 
-### For create-global-table
-1. Create identical empty tables in all target regions with the same key
-   schema and billing mode.
-2. Call `create-global-table` with the replication group.
-3. Verify all replicas reach ACTIVE status.
-4. Enable PITR per region.
-5. Register autoscaling per region (if PROVISIONED).
-
-### For add-replica
-1. Verify all pre-checks pass (no replica in CREATING/DELETING).
-2. Call `update-global-table` with `Create` replica update.
-3. Poll `describe-global-table` until the new replica is ACTIVE.
-4. Enable PITR in the new region.
-5. Register autoscaling in the new region (if PROVISIONED).
-6. Verify data replication with a test item write/read.
-
-### For remove-replica
-1. Verify no active traffic in the target region (CloudWatch metrics).
-2. Call `update-global-table` with `Delete` replica update.
-3. Poll `describe-global-table` until the replica is gone.
-4. Verify `describe-table` returns `ResourceNotFoundException` in the
-   removed region.
-5. Update application configuration to remove the region from its
-   endpoint list.
-
-### For failover
-1. Verify the target region is ACTIVE with acceptable ReplicationLatency.
-2. Trigger the application-level failover mechanism (SDK, Route 53,
-   or manual switch).
-3. Verify writes succeed in the new region.
-4. Monitor for LWW conflicts when the degraded region recovers.
-5. Do NOT remove the degraded region's replica — it will recover.
-
-### For enable-pitr (per region)
-1. Verify the table is ACTIVE in the target region.
-2. Call `update-continuous-backups` with PITR enabled.
-3. Verify `PointInTimeRecoveryStatus: ENABLED`.
-4. Repeat for each replica region independently.
+Per-operation remediation sequences (create-global-table, add-replica, remove-replica, failover, enable-pitr) moved verbatim to [references/global-tables-procedures.md](references/global-tables-procedures.md).
+Load on demand when executing any operation end-to-end.
 
 ## Recent AWS features (2024-2026)
 
-- **Global Tables v2 is the only supported version (2024+).** The
-  original Global Tables (v1) is deprecated. All new global tables
-  must use the v2 API (`create-global-table`, `update-global-table`).
-  Existing v1 tables should be migrated to v2.
-
-- **Per-region PITR independence confirmed (2024-2025).** PITR can be
-  enabled/disabled independently on each replica region. This is the
-  recommended DR posture: enable PITR on every replica so each region
-  has its own 35-day recovery window.
-
-- **Improved ReplicationLatency metrics (2024):** CloudWatch now
-  provides per-region-pair ReplicationLatency with finer granularity.
-  Use `ReceivingRegion` dimension to track latency for each replica
-  independently.
-
-- **Global Tables cost optimization (2025):** the replicated write
-  cost is now transparently reported in Cost Explorer per replica
-  region. Use the `DB_INSTANCE_IDENTIFIER` dimension (or Cost Tags)
-  to attribute cost per region.
-
-- **Multi-region strong consistency preview (2025-2026):** AWS has
-  previewed an optional strong-consistency mode for Global Tables that
-  uses a quorum-based protocol instead of LWW. This is not yet GA —
-  most workloads still use LWW. Check the latest documentation before
-  assuming strong consistency is available.
-
-- **Global Tables with DeleteProtectionEnabled (2024):** per-region
-  deletion protection prevents accidental table deletion in any
-  replica region. Enable this on all production global table replicas.
+Recent AWS features 2024-2026 (v2-only APIs, per-region PITR, ReplicationLatency metrics, cost attribution, strong-consistency preview, DeleteProtectionEnabled) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when deciding between v2 capabilities.
 
 ## References
 
@@ -675,6 +392,13 @@ See `references/global-tables-procedures.md` for the full operation
 procedures (create, add-replica, remove-replica, failover, PITR), and
 `references/multi-region-dr-guide.md` for the disaster recovery
 planning guide including failover runbooks and RTO/RPO analysis.
+
+## References (load on demand)
+
+- [`references/advanced-patterns.md`](references/advanced-patterns.md) — expert heuristics, Step 0 expert behaviors, and recent AWS features (2024-2026) moved from SKILL.md
+- [`references/diagnostic-commands.md`](references/diagnostic-commands.md) — pre-flight and diagnostic command listings moved from SKILL.md
+- [`references/worked-examples.md`](references/worked-examples.md) — the remove-replica (BLOCKED) and regional failover (COMPLETED) worked examples moved from SKILL.md; the add-replica (READY) example stays inline
+- [`references/global-tables-procedures.md`](references/global-tables-procedures.md) — per-operation remediation sequences moved from SKILL.md, plus the pre-existing full operation procedures
 
 ## Domain
 

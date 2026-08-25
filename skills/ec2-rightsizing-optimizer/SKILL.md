@@ -29,68 +29,15 @@ metadata:
 
 ## Quick start
 
-- **Memory data is the load-bearing signal.** CPU utilization without
-  memory data tells you nothing about memory-bound workloads (the #1
-  cause of false-positive right-sizes). If `MemoryUtilization` is absent
-  from CloudWatch metrics, the verdict is BLOCKED → install the
-  CloudWatch Agent, wait 14-30 days, re-evaluate. Never recommend a
-  downsize based on CPU-only data.
-- **Decision matrix:**
-  - CPU < 30% avg AND Memory < 50% avg → downsize 1-2 sizes.
-  - CPU > 70% sustained OR Memory > 80% → upsize.
-  - Burstable t-family: check CPUCreditBalance; chronic exhaustion →
-    Unlimited mode or migrate to m-family.
-  - Network-bound (NetworkIn or NetworkOut > 50% of instance limit) →
-    Enhanced Networking or larger instance.
-- **Graviton first.** For compatible workloads (JVM, Python, Go,
-  containerized), the AWS Graviton family (m7g/c7g/r7g/i7g) offers up to
-  40% better price-performance than equivalent x86. Check application
-  compatibility before recommending.
-- **Pricing model gates the savings.** Right-sizing an On-Demand instance
-  captures the gross savings. Adding a 3-year Convertible RI captures
-  30-72% on top. A right-size WITHOUT a pricing-model review leaves the
-  largest savings on the table.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## Mindset
 
-EC2 right-sizing is a cost-quality decision, not a pure utilization
-exercise. The goal is the smallest instance class/type that comfortably
-handles peak workload without performance regression — not the absolute
-minimum that satisfies the average. A right-size that triggers a customer-
-visible latency spike costs more than it saves. The decision matrix below
-favours conservatism: downsize in 1-2 size increments, verify with load
-testing for production, and always provide a rollback path.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## Philosophy
 
-Four behaviours separate a senior FinOps engineer from a generalist:
-
-- **Memory data is non-negotiable for downsizing.** Without the
-  CloudWatch Agent reporting `mem_used_percent`, you cannot tell whether
-  an idle CPU instance is genuinely underutilized (downsize candidate)
-  or memory-pressured (right-size would crash the workload). CPU is the
-  visible signal; memory is the load-bearing constraint. A downsize
-  recommendation without memory data is a guess, not an engineering
-  decision.
-- **Burstable t-family has a hidden cost cliff.** t3/t3a instances earn
-  CPU credits at idle and spend them under load. Below the credit-balance
-  floor, performance drops to a 20% baseline — a 5x latency spike. The
-  symptom is intermittent slowdowns during business hours. Operators who
-  right-size INTO a t-family without checking the workload's burst pattern
-  discover the cliff at the worst possible moment.
-- **Graviton compatibility must be verified, not assumed.** Most JVM,
-  Python, Go, and containerized workloads run on Graviton unchanged. C++,
-  Rust, and any code with platform-specific binaries (native libraries,
-  ARM-incompatible .so files) require recompilation or replacement.
-  Recommending Graviton without checking compatibility produces a
-  migration that fails at runtime — sometimes subtly (wrong endianness in
-  serialization) rather than loudly (binary won't load).
-- **The pricing model is half the savings.** A typical On-Demand fleet
-  spends 60-70% more than the same fleet on a 3-year Compute Savings Plan.
-  Right-sizing captures utilization savings; pricing-model optimization
-  captures commitment savings. Doing one without the other leaves money
-  on the table. Always pair a rightsizing recommendation with a pricing-
-  model recommendation.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## Quick reference — verdict thresholds
 
@@ -117,36 +64,7 @@ them produces recommendations that fail at runtime.
 
 ### Required data sources
 
-```bash
-# 1. Confirm CloudWatch Agent is reporting MemoryUtilization
-aws ec2 describe-instances --instance-ids <id> --output json | \
-  jq '.Reservations[].Instances[] | .InstanceId'
-
-aws cloudwatch list-metrics --namespace CWAgent \
-  --metric-name mem_used_percent \
-  --dimensions Name=InstanceId,Value=<id> --output json
-
-# 2. Pull 14-30 day utilization history
-START=$(date -d '-30 days' +%FT%TZ)
-END=$(date +%FT%TZ)
-
-aws cloudwatch get-metric-statistics --namespace AWS/EC2 \
-  --metric-name CPUUtilization \
-  --dimensions Name=InstanceId,Value=<id> \
-  --start-time $START --end-time $END \
-  --period 3600 --statistics Average,Maximum,Minimum \
-  --output json > cpu.json
-
-aws cloudwatch get-metric-statistics --namespace CWAgent \
-  --metric-name mem_used_percent \
-  --dimensions Name=InstanceId,Value=<id> \
-  --start-time $START --end-time $END \
-  --period 3600 --statistics Average,Maximum,Minimum \
-  --output json > mem.json
-
-# 3. Confirm Compute Optimizer enrollment
-aws compute-optimizer get-enrollment-status --output json
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 ### Data-quality short-circuits
 
@@ -170,164 +88,14 @@ out recent workload spikes. The freshest signal wins.
 
 ### Step 0: Non-obvious behaviours that change the recommendation
 
-These are the operational gotchas a senior FinOps engineer knows from
-incident experience — each one routes a recommendation away from the
-obvious choice:
-
-- **`MemoryUtilization` is the load-bearing constraint for downsizing.**
-  CPU utilization is the visible signal; memory is the silent killer. An
-  instance at 5% CPU and 90% memory is NOT a downsize candidate — it's
-  a memory-bound workload that needs MORE memory, not less. The decision
-  matrix checks BOTH dimensions; downsize requires both to be low.
-
-- **Burstable t-family CPUCreditBalance depletion is a hidden performance
-  cliff.** t3/t3a/t4g instances earn CPU credits at idle (proportional to
-  instance size) and spend them under load. Below the floor, performance
-  drops to a 20% baseline. The symptom is intermittent slowdowns during
-  business hours that don't appear in the average utilization. Always
-  check `CPUCreditBalance` over the observation window — if it chronically
-  drops below ~50 credits, the workload is not burst-compatible. Migrate
-  to a non-burstable (m-family) instance or enable Unlimited mode (which
-  charges for overage credits but maintains performance).
-
-- **Graviton (ARM) compatibility must be verified, not assumed.**
-  - JVM (Java 11+): runs unchanged.
-  - Python: pure-Python works; C-extension packages (numpy, pandas,
-    psycopg2) need ARM wheels — most are available in 2024+.
-  - Go: pure-Go works; CGO with x86 assembly needs recompile.
-  - Node.js: works; native addons (.node files) need ARM builds.
-  - C/C++ and Rust: must recompile for aarch64; some dependencies may
-    not have ARM builds.
-  - Docker images: multi-arch images work; single-arch x86 images must
-    be rebuilt for arm64.
-  - Always check `aws ec2 describe-instance-types --instance-types <type>
-    --query 'InstanceTypes[].ProcessorInfo.SupportedArchitectures'`
-    before recommending Graviton.
-
-- **Network performance is instance-class-capped, not burstable (except
-  on t-family).** A `m5.large` has "Up to 10 Gbps" (burst, not guaranteed);
-  a `m5.2xlarge` has "Up to 10 Gbps"; a `c5n.18xlarge` has 25 Gbps
-  guaranteed. Network-bound workloads (real-time streaming, HFT, large
-  data transfers) should migrate to network-optimized families
-  (c5n/c6n/m6n/r6n) or use Enhanced Networking (ENA) where available.
-  The symptom of network saturation: `NetworkIn + NetworkOut` sustained
-  > 50% of the instance's documented limit.
-
-- **EBS-optimized instances are the default for current-generation
-  instances.** m5/c5/r5 and later all have EBS optimization built in.
-  Older generations (m3/c3/m4/c4 — m4.16xlarge is the exception) need
-  `--ebs-optimized` flag or may lack the feature. EBS-bound workloads
-  (heavy database I/O, large sequential reads) on legacy generations
-  should migrate to current-gen for EBS performance alone.
-
-- **Reserved Instances are zone-specific (until Convertible or Regional).**
-  A Zonal RI for `m5.2xlarge` in `us-east-1a` does not apply to an
-  `m5.2xlarge` in `us-east-1b`. Regional RIs (and all Savings Plans)
-  apply across AZs in the region. When right-sizing across AZs, prefer
-  Regional RIs or Compute Savings Plans to maintain flexibility.
-
-- **Spot Instance interruptions make Spot unsuitable for stateful
-  workloads.** Spot can be reclaimed with 2 minutes warning. Use Spot
-  only for stateless, fault-tolerant, or batch workloads (CI runners,
-  batch processing, containerized microservices with auto-scaling).
-  NEVER recommend Spot for databases, queues, or singleton services.
-
-- **Convertible RIs allow instance-family changes; Standard RIs do not.**
-  A 3-year Standard RI for `m5.2xlarge` cannot be exchanged for a `c5.2xlarge`
-  if the workload shape changes. Convertible RIs (slightly lower discount)
-  allow exchanges within the same instance family and across families.
-  For workloads with uncertain growth, Convertible RIs or Compute Savings
-  Plans provide flexibility insurance.
-
-- **Savings Plans apply to spend, not instances.** A Compute Savings Plan
-  commits to $X/hour of compute spend (any instance family, any region,
-  any OS). An Instance Savings Plan commits to a specific instance family
-  in a specific region (more discount, less flexibility). Compute Savings
-  Plans are the most flexible commitment vehicle and the recommended
-  default for mixed fleets.
-
-- **Cross-family migrations (e.g., m5 → t3) require validation.** Same-
-  family right-sizes (m5.2xlarge → m5.large) are low-risk: identical
-  architecture, identical drivers, only size changes. Cross-family
-  migrations may need AMI changes (different virtualization: Nitro vs
-  Xen), driver compatibility checks, and application testing. Always flag
-  cross-family migrations as higher-effort remediation.
-
-- **The 7th-generation (m7i/c7i/r7i) and Graviton (m7g/c7g/r7g) instances
-  offer DDR5 memory and better networking.** Migrating from 5th-gen
-  (m5/c5/r5) to 7th-gen often improves performance 15-25% at the same
-  hourly price — a "free" rightsizing opportunity that doesn't show up
-  in utilization metrics. Consider as part of any rightsizing batch.
-
-- **Aurora Serverless v2, RDS Proxy, and ECS Fargate have different
-  rightsizing models.** This skill is EC2-specific. For Aurora/RDS,
-  refer to the database rightsizing docs. For ECS/Fargate, right-size
-  the task definition CPU/memory, not the underlying EC2 host.
-
-- **`describe-instance-types` is the source of truth for specs.** Don't
-  rely on memorized instance specs — they change with new generations.
-  Always query:
-  ```bash
-  aws ec2 describe-instance-types --instance-types m7i.2xlarge \
-    --query 'InstanceTypes[].{VCpuInfo:VCpuInfo, MemoryInfo:MemoryInfo, NetworkInfo:NetworkInfo}' --output json
-  ```
-
-  **Parsing the response for a rightsizing decision:**
-
-  ```bash
-  aws ec2 describe-instance-types --instance-types <candidate-type> \
-    --output json | jq '.InstanceTypes[] | {
-      vcpus: .VCpuInfo.DefaultVCpus,
-      memory_gib: (.MemoryInfo.SizeInMiB / 1024),
-      architectures: .ProcessorInfo.SupportedArchitectures,
-      network_perf: .NetworkInfo.NetworkPerformance,        # "Up to 12.5 Gbps"
-      ebs_optimized: .EbsInfo.EbsOptimizedSupport,           # "supported" | "unsupported"
-      ebs_throughput: .EbsInfo.EbsOptimizedInfo.BandwidthGbps,
-      burstable: (.BurstablePerformance.Supported // false),  # true for t-family
-      instance_storage: .InstanceStorageInfo.Disks[].SizeInGB,
-      supported_virtualization: .SupportedVirtualizationTypes  # ["hvm"] required for current gen
-    }'
-  ```
-
-  **Decision gates when comparing candidate vs current type:**
-
-  | Field | Gate | Why it matters |
-  |---|---|---|
-  | `SupportedArchitectures` includes `arm64` | Graviton path available (otherwise stay x86). | Determines AMI family and runtime compatibility. |
-  | `EbsInfo.EbsOptimizedSupport == "supported"` | Required for EBS-heavy workloads. | Legacy m4/c4 lack this by default; current-gen includes it. |
-  | `BurstablePerformance.Supported == true` | Candidate is t-family — apply Step 6 credit math before recommending. | A downsize into t-family without credit math triggers the performance cliff. |
-  | `NetworkInfo.NetworkPerformance` starts with "Up to" | Burst bandwidth; derate by 30% for sustained ceiling. | Network-bound workloads need guaranteed bandwidth (n-family). |
-  | `MemoryInfo.SizeInMiB / VCpuInfo.DefaultVCpus` ratio | Match to workload shape (general ~1:4, compute 1:2, memory 1:8). | Wrong ratio = wrong family even if raw size seems correct. |
-  | `InstanceStorageInfo` present | Candidate has NVMe/SSD local storage. | Required for storage-optimized (i4i, im4gn) workloads; costs more if unused. |
-
-  If ANY of these fields is absent from the response, the candidate
-  type is not available in the region or the API version is stale.
-  Fall back to a documented alternative from
-  `references/instance-selection-reference.md` rather than guessing.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ### Step 1: Validate input and data sufficiency
 
 If `MemoryUtilization` is absent from the input metrics (CWAgent not
 installed), emit NEED_MORE_INFO with a specific installation instruction:
 
-```text
-TARGET: <instance-id>
-VERDICT: NEED_MORE_INFO
-REASON: MemoryUtilization metric is absent — CloudWatch Agent is not
-  reporting mem_used_percent for this instance. Without memory data,
-  a downsize recommendation is a guess, not an engineering decision.
-RECOMMENDATION:
-  1. Install the CloudWatch Agent on the instance with mem_used_percent
-     enabled (see AWS docs: CWAgent installation guide).
-  2. Wait 14-30 days for representative observation.
-  3. Re-evaluate with CPU + Memory + Network + Disk data.
-ESTIMATED_SAVINGS: $0 (cannot quantify without memory data)
-MIGRATION_STEPS:
-  - Install CWAgent (Linux): sudo yum install amazon-cloudwatch-agent
-  - Configure mem_used_percent in the CWAgent config JSON
-  - Validate: aws cloudwatch list-metrics --namespace CWAgent
-    --metric-name mem_used_percent --dimensions Name=InstanceId,Value=<id>
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand (see References below).
 
 If the observation window is < 14 days, emit NEED_MORE_INFO: "Observation
 window is N days; minimum 14 days required for representative data."
@@ -339,32 +107,7 @@ If a Compute Optimizer finding is provided, reconcile with CloudWatch
 metrics. Compute Optimizer's 30-day analysis is a sanity check; the
 fresh CloudWatch signal wins on disagreement.
 
-**Concrete parsing of `get-ec2-instance-recommendations` output:**
-
-```bash
-aws compute-optimizer get-ec2-instance-recommendations \
-  --instance-arns arn:aws:ec2:us-east-1:<acct>:instance/<id> \
-  --output json | jq '
-    .instanceRecommendations[] | {
-      instance_arn: .instanceArn,
-      current_type: .currentInstanceType,
-      finding: .finding,                  # Optimized | Underprovisioned | Overprovisioned
-      finding_reasons: .findingReasonCodes,
-      recommendations: [
-        .recommendationOptions[] | {
-          rank: .rank,                    # 1 = highest savings (may carry highest risk)
-          type: .instanceType,
-          performance_risk: .performanceRisk,  # 1 (safe) .. 5 (risky)
-          vcpus: .instanceDigest.vCpu.vCpus,
-          memory_gb: (.instanceDigest.instanceMemory.sizeInMiB / 1024),
-          savings_pct: .savingsOpportunity.savingsPercentage,
-          monthly_savings: .savingsOpportunity.estimatedMonthlySavings.amount
-        }
-      ],
-      last_refresh: .lastRefreshTimestamp,
-      utilization_metrics: .utilizationMetrics
-    }'
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 | Field to verify | What it tells you | Action if missing/stale |
 |---|---|---|
@@ -465,63 +208,11 @@ burst-compatible. Two remediation paths:
 
 ### Step 7: Graviton (ARM) migration evaluation
 
-Evaluate Graviton compatibility for any current-gen x86 instance. The
-Graviton family (m7g/c7g/r7g/i7g) offers up to 40% better price-
-performance than equivalent x86.
-
-**Compatibility check:**
-- Operating system: Amazon Linux 2023, Ubuntu 22.04+, Debian 11+ all
-  support arm64.
-- Application runtime:
-  - JVM (Java 11+): full support.
-  - Python: pure-Python and most C-extension packages support arm64
-    (numpy, pandas, psycopg2-binary in 2024+).
-  - Go: full support, including cross-compile via `GOOS=linux GOARCH=arm64`.
-  - Node.js: full support; native addons may need rebuild.
-  - C/C++ and Rust: recompile required; check dependencies for arm64.
-- Docker images: multi-arch images (manifest list with arm64 entry) work;
-  x86-only images must be rebuilt via `docker buildx`.
-
-**Savings estimate:**
-- Graviton hourly price is typically 10-20% lower than the equivalent
-  x86 (e.g., m7g.large vs m7i.large).
-- Graviton performance per vCPU is often 15-25% better (depending on
-  workload).
-- Combined price-performance improvement: up to 40%.
-
-**Migration risk:**
-- LOW: pure-JVM, Python, Go, containerized workloads with multi-arch
-  images.
-- MEDIUM: workloads with native addons or C-extension dependencies
-  (verify arm64 wheel availability).
-- HIGH: C/C++ applications, workloads with platform-specific binaries
-  (x86 assembly, endianness-sensitive serialization).
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ### Step 8: Pricing model optimization
 
-After utilization-based rightsizing, evaluate the pricing model. This is
-where the largest savings typically live.
-
-**Pricing model decision tree:**
-
-| Workload pattern | Recommended model | Savings vs On-Demand |
-|---|---|---|
-| Steady-state 24/7, predictable (database, app server) | 3-year Convertible RI or 3-year Compute Savings Plan | 50-72% |
-| Steady-state but uncertain growth | 1-year Compute Savings Plan (renewable) | 30-40% |
-| Dev/test, business-hours only | 1-year Convertible RI or Scheduled RI | 30-50% |
-| Batch, fault-tolerant, horizontally scalable | Spot Instances | Up to 90% |
-| Mixed fleet (some steady, some variable) | Compute Savings Plan for the baseline + On-Demand/Spot for the variable portion | Varies |
-
-**Commitment laddering (recommended approach):**
-1. Identify the baseline (steady-state) compute spend. Commit to a
-   1-year Compute Savings Plan for this amount (low risk, flexible).
-2. After 30 days of additional observation, extend the commitment to a
-   3-year Compute Savings Plan or Convertible RI (locks in deeper
-   discount).
-3. Use Spot for batch and fault-tolerant workloads (CI runners, batch
-   jobs, autoscaled microservices).
-4. Use On-Demand only for genuine spiky workloads and short-lived
-   experiments.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ### Step 9: Impact estimation
 
@@ -637,58 +328,11 @@ CONFIRM: Before provisioning the new instance, emit and await:
 
 ### Worked example — already optimal
 
-```text
-TARGET: i-0def456
-VERDICT: ALREADY_OPTIMAL
-REASON: c6i.4xlarge at 55% CPU / 65% Memory / 40% Network over 30 days
-  is correctly sized for its workload. Already on a 3-year Compute
-  Savings Plan covering 100% of the hourly spend. No Graviton
-  opportunity (workload uses x86-specific SIMD intrinsics).
-RECOMMENDATION:
-  Current: c6i.4xlarge at 3-year Compute Savings Plan in us-east-1
-  Proposed: no change
-  Graviton: no (x86 SIMD intrinsics in compiled binary)
-  Family change: no
-  Confidence: HIGH — all utilization dimensions within healthy bands,
-    Compute Optimizer finding Optimized, pricing model already optimized.
-ESTIMATED_SAVINGS:
-  Monthly (rightsize): $0
-  Monthly (pricing model): $0
-  Annual total: $0
-MIGRATION_STEPS:
-  - None required. Continue monitoring CloudWatch metrics monthly.
-  - Re-evaluate at the Savings Plan renewal date (18 months out) for
-    next-generation instance opportunities.
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand (see References below).
 
 ### Worked example — NEED_MORE_INFO (memory data missing)
 
-```text
-TARGET: i-0ghi789
-VERDICT: NEED_MORE_INFO
-REASON: MemoryUtilization metric is absent (CloudWatch Agent not
-  reporting mem_used_percent). CPU at 12% suggests Overprovisioned but
-  cannot be confirmed without memory data — the workload may be memory-
-  bound with an idle CPU (Step 1 data gate).
-RECOMMENDATION:
-  Current: m5.xlarge at On-Demand in us-east-1
-  Proposed: pending data
-  Graviton: unknown (depends on workload type)
-  Family change: pending
-  Confidence: LOW — single-dimension (CPU) data only.
-ESTIMATED_SAVINGS:
-  Monthly (rightsize): $0 (cannot quantify without memory data)
-  Monthly (pricing model): pending
-MIGRATION_STEPS:
-  1. Install CloudWatch Agent:
-     sudo yum install amazon-cloudwatch-agent
-     sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl
-       -a fetch-config -m ec2 -s -c file:config.json
-     (config.json must include mem_used_percent)
-  2. Wait 14-30 days for representative observation.
-  3. Re-evaluate with CPU + Memory + Network + Disk data.
-  Do NOT right-size based on CPU-only data.
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand (see References below).
 
 ## Verdict semantics — reconciling the verdict_shape
 
@@ -714,77 +358,11 @@ risk misclassification the skill can make.
 
 ## Network-limit calculation (concrete formula)
 
-D7 references "Network > 50% of limit" without defining the limit. Use
-this formula to make the threshold deterministic:
-
-```
-instance_limit_Mbps =
-  describe-instance-types.NetworkInfo.NetworkPerformance
-    parsed from the documented "Up to N Gbps" or "N Gbps" string.
-
-utilization_pct =
-  ( max(NetworkIn_bytes_per_sec, NetworkOut_bytes_per_sec)
-    / (instance_limit_Mbps * 125000) ) * 100
-
-# NetworkIn/Out come from CloudWatch get-metric-statistics,
-# statistic=Maximum, period=3600, over the 14-30 day window.
-# Use the MAX, not the average — bursts saturate the interface
-# even when the average is modest.
-```
-
-| `utilization_pct` (peak hour) | Verdict contribution |
-|---|---|
-| > 80% sustained > 1 hour/day | `OPPORTUNITY_FOUND` (upsize or migrate to n-family). Performance risk is active. |
-| 50-80% sustained | `OPPORTUNITY_FOUND` if combined with another dimension; otherwise surface as MEDIUM-severity finding. |
-| < 50% | Network is not the bottleneck; proceed with other dimensions. |
-
-For "Up to N Gbps" instances, treat N as the burst ceiling, not the
-sustained limit — subtract ~30% to derive the realistic sustained
-ceiling (e.g., m5.large "Up to 10 Gbps" → ~7 Gbps sustained).
-Guaranteed-bandwidth families (c6n, m6n, r6n, p5) use the documented
-value directly.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## Error handling — CLI and data-source failures
 
-The workflow depends on three live data sources (CloudWatch, Compute
-Optimizer, EC2 API). Each can fail independently. Handle every branch
-explicitly; silent failures produce misclassifications.
-
-### CloudWatch metric failures
-
-| Failure mode | Detection | Handling |
-|---|---|---|
-| `get-metric-statistics` returns empty `Datapoints` array for CPUUtilization | `len(Datapoints) == 0` | Verdict: `BLOCKED`. Reason: "CloudWatch returned no CPU data for <id> over <window>. The instance may have been stopped for the entire window, or IAM denies cloudwatch:GetMetricStatistics." Recommendation: re-pull with `--start-time` shifted 1 day forward; verify IAM policy includes `cloudwatch:GetMetricStatistics` for `AWS/EC2`. |
-| `mem_used_percent` absent from CWAgent namespace | `list-metrics` returns no match | Verdict: `NEED_MORE_INFO` per Step 1. Never downgrade to `OPPORTUNITY_FOUND` on CPU-only data. |
-| Datapoints present but `SampleCount < 168` (less than 7 days of hourly data) | `len(Datapoints) < window_days * 24 * 0.7` | Verdict: `NEED_MORE_INFO`. Reason: "Insufficient samples (<70% of expected hourly datapoints) — observation window is not representative." |
-| CloudWatch API throttling (`Throttling` error) | Exit code non-zero, stderr contains "Throttling" | Retry with exponential backoff (`--max-attempts 5`). If still failing, fall back to a 7-day window and flag the result as LOW-confidence. |
-
-### Compute Optimizer failures
-
-| Failure mode | Detection | Handling |
-|---|---|---|
-| Enrollment `Inactive` | `get-enrollment-status` returns `"status": "Inactive"` | Compute Optimizer findings are unavailable. Proceed with CloudWatch-only analysis; mark `compute_optimizer_cross_check: unavailable` in the output. Do NOT block the workflow. |
-| `get-ec2-instance-recommendations` returns empty `recommendations` array | `len(recommendations) == 0` | Either the instance is Optimal (no findings) or Compute Optimizer has not yet analyzed it. Cross-check `lastRefreshTimestamp`; if > 30 days old, treat as stale and rely on CloudWatch. If recent, treat as `Optimized` from Compute Optimizer's perspective. |
-| Compute Optimizer finding present but `performanceRisk` missing | Field absent in JSON | Reject the finding as LOW-confidence. Fall back to CloudWatch thresholds; do not blindly apply the recommendation. |
-| `AccessDeniedException` for `compute-optimizer:*` | Exit code non-zero | Compute Optimizer is not enabled in the account or the role lacks permissions. Proceed with CloudWatch-only; surface the gap in the output. |
-
-### EC2 API failures
-
-| Failure mode | Detection | Handling |
-|---|---|---|
-| `describe-instance-types` returns `UnknownInstanceType` | API error | The target type (e.g., next-gen not yet rolled out in this region) is unavailable. Fall back to a documented alternative from the references/instance-selection-reference.md table. |
-| `describe-instances` shows instance `Terminated` | `State.Name == "terminated"` | Skip the instance entirely. Emit no verdict; note in the fleet rollup as "terminated during evaluation." |
-| `modify-instance-attribute` fails with `IncorrectInstanceState` | Instance not stopped | Stop the instance first (`stop-instances`), wait for `State.Name == "stopped"`, retry. Surface the stop/start sequence in MIGRATION_STEPS. |
-| `purchase-reserved-instances-offering` fails with `InvalidParticle` | Offering ID stale or already fulfilled | Re-query `describe-reserved-instances-offerings --offering-class <standard|convertible> --instance-type <type>` to fetch a fresh offering-id. |
-
-### Aggregate behavior
-
-If ANY data source fails with a transient error (throttling, network),
-retry up to 3 times with exponential backoff before emitting `BLOCKED`.
-For persistent failures (IAM denial, terminated instance, enrollment
-Inactive), emit the appropriate gating verdict and proceed with the
-remaining dimensions — do not abort the entire evaluation on a single
-source failure.
+Moved verbatim to [references/error-handling.md](references/error-handling.md) - load on demand (see References below).
 
 ## Anti-Patterns — NEVER
 
@@ -901,211 +479,27 @@ source failure.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`stop-instances`, `modify-instance-attribute`, `run-instances`,
-  `create-savings-plan`), emit and await operator approval. Do NOT
-  execute the CLI until the operator confirms.
-
-- **Snapshot before right-sizing.** Capture the current state:
-  `aws ec2 create-image --instance-id <id> --name "pre-rightsize-$(date +%s)"`
-  This provides a rollback path if the new type cannot handle the workload.
-
-- **Verify the instance is `stopped` before type change.**
-  `aws ec2 modify-instance-attribute --instance-type` requires the
-  instance to be stopped. Attempting it on a running instance returns
-  `IncorrectInstanceState`.
-
-- **Right-size in off-peak hours for production.** Stop, modify, restart
-  causes 2-10 minutes of downtime. Schedule outside peak traffic windows.
-
-- **Prefer replacement to in-place modification for cross-family
-  migrations.** Cross-family changes (m5 → t3, m5 → m7g) may require AMI
-  changes (different architecture, different virtualization). Provision
-  a new instance, validate, cutover, decommission the original — safer
-  than in-place modification.
-
-- **Savings Plan commitments are billing-account-level.** A Savings Plan
-  applies to the entire payer account; committing $X/hour affects all
-  instances in the account, not just the target. Surface this in the
-  CONFIRMATION gate.
-
-- **Bulk-operation safety limit.** Remediation across a fleet MUST
-  follow this algorithm:
-  1. Sort flagged instances by estimated savings (largest first).
-  2. Slice into batches of at most 5 instances.
-  3. For each batch: emit the per-instance MIGRATION_STEPS, then a
-     single CONFIRM for the batch.
-  4. After the operator confirms and the CLI runs, re-query with
-     `aws ec2 describe-instances` and verify the new type landed
-     before emitting the NEXT batch.
-  5. Abort the sweep if any instance fails to restart or shows degraded
-     performance in CloudWatch post-change.
-  The skill MUST NOT emit remediation CLI for more than 5 instances in
-  a single output block. Auto-applying across an entire fleet in one
-  pass is forbidden: a single systematic misclassification cascades
-  into mass disruption.
-
-- **Verify Savings Plan coverage post-commitment.**
-  `aws savingsplans describe-savings-plans --state ACTIVE` — confirm the
-  commitment is active and the target instances are drawing from it.
-  Savings Plans take up to 1 hour to fully propagate.
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 ## Remediation guidance
 
-### For OPPORTUNITY_FOUND — downsize
-
-1. Snapshot the current instance:
-   `aws ec2 create-image --instance-id <id> --name "pre-rightsize-<timestamp>"`.
-2. Stop the instance: `aws ec2 stop-instances --instance-ids <id>`.
-3. Change the type: `aws ec2 modify-instance-attribute --instance-id <id>
-   --instance-type "{\"Value\": \"<new-type>\"}"`.
-4. Start: `aws ec2 start-instances --instance-ids <id>`.
-5. Monitor CPU + Memory for 7 days. Roll back if CPU > 80% or Memory > 85%.
-
-### For OPPORTUNITY_FOUND — upsize
-
-Same as downsize, but with a larger instance type. For memory-bound
-upsizes, prefer the r-family (more memory per vCPU) over m-family if
-the workload is genuinely memory-pressured.
-
-### For OPPORTUNITY_FOUND — Graviton migration
-
-1. Provision a new instance with an arm64 AMI:
-   `aws ec2 run-instances --image-id <ami-arm64> --instance-type <new-type>`.
-2. Migrate application code/data.
-3. Validate for 24-48 hours (memory leaks, JIT behaviour, GC pauses).
-4. Cutover DNS / load balancer.
-5. Decommission the original x86 instance.
-
-### For OPPORTUNITY_FOUND — t-family architecture change
-
-- **Enable Unlimited mode**: `aws ec2 modify-instance-credit-specification
-  --instance-id <id> --cpu-credits unlimited`. Immediate effect, no
-  restart required.
-- **Migrate to m-family**: same as cross-family migration (above).
-
-### For OPPORTUNITY_FOUND — pricing model
-
-- **Reserved Instance (Standard)**: `aws ec2 purchase-reserved-instances-offering
-  --reserved-instances-offering-id <id> --instance-count 1`. Apply for
-  steady-state workloads with predictable usage.
-- **Reserved Instance (Convertible)**: same CLI, different offering class.
-  Apply for workloads with growth uncertainty.
-- **Compute Savings Plan**: `aws savingsplans create-savings-plan
-  --savings-plan-offering-id <id> --commitment "<amount>"`. Apply for
-  mixed fleets with flexible instance mix.
-- **Spot Instances**: launch with `--instance-market-options
-  "MarketType=spot,SpotOptions={SpotInstanceType=persistent,
-  InstanceInterruptionBehavior=stop}"`. Apply only for fault-tolerant
-  workloads.
-
-### For ALREADY_OPTIMAL or OPTIMIZED
-
-1. No remediation required for the current posture.
-2. Recommend quarterly review of CloudWatch metrics and Compute Optimizer
-   findings — workloads drift.
-3. For Savings Plan renewals, re-evaluate at the renewal date for next-
-   generation instance opportunities (e.g., m6i → m7i may offer 15-25%
-  performance improvement at the same price).
+Moved verbatim to [references/error-handling.md](references/error-handling.md) - load on demand (see References below).
 
 ## Deep reference: EC2 instance selection
 
-### Instance family taxonomy (current generation, 2026)
-
-| Family | Class | Target workload | Notable feature |
-|---|---|---|---|
-| m7i, m7a (x86), m7g (Graviton) | General purpose | Web/app servers, dev/test, small databases | Balanced CPU/Memory/Network |
-| m6i, m6a, m6g | General purpose (prior gen) | Same as m7 | Lower cost; m7 preferred for new |
-| c7i, c7a, c7g | Compute optimized | Batch, HPC, web servers, CI runners | Highest vCPU per dollar |
-| r7i, r7a, r7g | Memory optimized | In-memory caches (Redis, Memcached), relational DB | High memory per vCPU |
-| x2idn, x2iedn, x2iezn | Memory optimized (extreme) | SAP HANA, large in-memory analytics | Very high memory (12 TB+) |
-| i4i, i4g, im4gn | Storage optimized | NoSQL (Cassandra, MongoDB), data warehousing | NVMe instance storage |
-| d3, d3en | Dense storage | Hadoop, data lake | HDD-based instance storage |
-| g5, g5g, g6, g6e | GPU (general) | ML inference, rendering, video encoding | NVIDIA A10G / L4 / T4G |
-| p5, p4d, p3 | GPU (compute) | ML training, HPC | NVIDIA H100 / A100 / V100 |
-| inf2, trn1, trn1n | Accelerator (AWS) | ML inference / training | AWS Inferentia / Trainium |
-| c6n, m6n, r6n | Network optimized | HFT, real-time streaming, NFV | 100 Gbps networking |
-| t3, t3a, t4g | Burstable | Dev/test, low-traffic web | CPU credit system |
-
-### Graviton generations
-
-| Generation | Families | Notes |
-|---|---|---|
-| Graviton (v1) | a1 | Deprecated; replaced by Graviton 2. |
-| Graviton 2 (2020) | m6g, c6g, r6g, t4g, im4gn, x2gd | Significant price-performance jump; widely deployed. |
-| Graviton 3 (2022) | c7g, r7g, m7g | DDR5 memory; up to 25% better performance than Graviton 2. |
-| Graviton 4 (2024) | i8g, r8g (rolling out 2024-2026) | Further performance improvements; broader family coverage. |
-
-### Pricing model comparison
-
-| Model | Commitment | Discount | Flexibility | Best for |
-|---|---|---|---|---|
-| On-Demand | None | 0% | Highest | Spiky workloads, experiments |
-| Spot | None (2 min warning) | Up to 90% | Interruptible | Stateless batch, microservices |
-| Standard RI (1-yr) | 1 yr | ~40% | Zonal or Regional; fixed family | Predictable steady-state |
-| Standard RI (3-yr) | 3 yr | ~60% | Zonal or Regional; fixed family | Long-term steady-state |
-| Convertible RI (1-yr) | 1 yr | ~30% | Exchangeable across families | Workloads with growth |
-| Convertible RI (3-yr) | 3 yr | ~55% | Exchangeable across families | Long-term with flexibility |
-| Compute Savings Plan (1-yr) | 1 yr | ~30% | Any family, region, OS | Mixed fleets |
-| Compute Savings Plan (3-yr) | 3 yr | ~50% | Any family, region, OS | Mixed fleets (long-term) |
-| Instance Savings Plan (1-yr) | 1 yr | ~35% | Specific family + region | Family-steady fleets |
-| Instance Savings Plan (3-yr) | 3 yr | ~55% | Specific family + region | Family-steady fleets (long-term) |
-
-### Burstable (t-family) credit math
-
-```
-Earn rate (credits/hour) = instance vCPUs * 6
-Spend rate (credits/hour) = CPU utilization % / 100 * vCPUs * 60
-Net credit change per hour = earn rate - spend rate
-```
-
-Example: t3.large (2 vCPUs) at 50% sustained CPU:
-- Earn: 2 * 6 = 12 credits/hour
-- Spend: 50% / 100 * 2 * 60 = 60 credits/hour
-- Net: -48 credits/hour (credit balance depletes)
-
-Below the credit-balance floor, performance drops to ~20% baseline (12%
-of full CPU on a 2-vCPU t3.large). Enable Unlimited mode or migrate to
-m-family.
-
-### Network performance tiers
-
-| Instance class | Network performance | Notes |
-|---|---|---|
-| nano / micro | "Up to 0.064 Gbps" | Burstable, low ceiling |
-| small / medium | "Up to 0.256 / 0.5 Gbps" | Burstable, modest |
-| large (m5/c5/r5) | "Up to 10 Gbps" | Burstable, sufficient for most |
-| xlarge+ (m5.2xlarge+) | "Up to 12.5 Gbps" | Higher burst ceiling |
-| n-family (c6n/m6n/r6n) | 25-100 Gbps guaranteed | Network-optimized |
-| 7th-gen large+ (m7i/c7i) | "Up to 12.5 Gbps" (better burst) | Improvement over 5th-gen |
-
-"Up to X" means burst, not guaranteed. Sustained high network traffic
-should use n-family or 7th-gen for guaranteed bandwidth.
+Moved verbatim to [references/instance-selection-reference.md](references/instance-selection-reference.md) - load on demand (see References below).
 
 ## Recent AWS features (2024-2026)
 
-- **Graviton 4 (2024-2025):** Broad rollout across i8g, r8g, and other
-  families. Up to 30% better performance than Graviton 3. Auditors
-  should re-evaluate Graviton migration opportunities even on workloads
-  that were not Graviton-3-compatible.
-- **7th-generation Intel and AMD instances (2024-2025):** m7i/c7i/r7i
-  (Intel Sapphire Rapids) and m7a/c7a/r7a (AMD Genoa). DDR5 memory,
-  better network performance, and 15-25% perf improvement over 6th-gen
-  at the same price. Re-evaluate 5th-gen fleets for "free" upgrades.
-- **Compute Savings Plans enhancements (2024):** More flexible commitment
-  terms (8-hour, 24-hour, 36-hour). Easier to ladder commitments. Use
-  for any fleet with uncertain growth.
-- **Spot Placement Score (2024-2025):** Predicts Spot capacity
-  availability before launch. Auditors should check SPS for Spot
-  recommendations to avoid recommending Spot for capacity-constrained
-  instance types.
-- **Instance Type Calculator (2024-2025):** AWS-hosted tool for
-  comparing instance types across regions with pricing. Auditors should
-  reference for accurate pricing in savings estimates.
-- **EBS optimization defaults (2024):** All current-gen instances
-  (m5/c5/r5 and later) include EBS-optimized at no extra charge. Legacy
-  instances (m4.16xlarge, c4.10xlarge) still charge. Auditors should
-  flag legacy instances for migration.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Quick start rules, Mindset, Philosophy, Step 0 expert behaviours, Step 7 Graviton and Step 8 pricing deep-dives, network-limit formula, and 2024-2026 features, moved verbatim from SKILL.md
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples (already optimal, NEED_MORE_INFO memory-missing) and the Step 1 NEED_MORE_INFO emit template, moved verbatim from SKILL.md
+- [references/error-handling.md](references/error-handling.md) — CloudWatch/Compute Optimizer/EC2 API failure tables and per-verdict remediation guidance, moved verbatim from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight data-source CLI, Compute Optimizer parsing, and pre-flight safety checks, moved verbatim from SKILL.md
+- [references/instance-selection-reference.md](references/instance-selection-reference.md) — extended with the instance family taxonomy, Graviton generations, pricing comparison, credit math, and network tiers, moved verbatim from SKILL.md
 
 ## Domain
 

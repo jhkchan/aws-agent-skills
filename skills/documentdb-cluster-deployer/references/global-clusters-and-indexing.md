@@ -284,3 +284,111 @@ resource "null_resource" "create_indexes" {
   }
 }
 ```
+## Expert heuristic: index before query (moved from SKILL.md)
+
+
+DocumentDB does NOT have a query optimizer. A query without a matching
+index is a full collection scan.
+
+| Index type | When to use | Example |
+|---|---|---|
+| Single-field | Simple equality or range on one field | `{email: 1}` for user lookup |
+| Compound | Multi-field equality + range (ESR rule: Equality, Sort, Range) | `{status: 1, created_at: -1}` |
+| Text | Full-text search across string fields | `{description: "text"}` |
+| TTL | Auto-expire documents after a duration | `{createdAt: 1}` with expireAfterSeconds |
+| Unique | Enforce uniqueness | `{orderId: 1}` with unique: true |
+
+**Expert rule:** create indexes BEFORE deploying queries that need them.
+A query without a matching index is a full collection scan — on a 10M
+document collection, that is seconds of latency and high CPU.
+
+
+## Expert heuristic: index build blocking writes (moved from SKILL.md)
+
+
+A baseline model says "just create indexes." The expert knows that
+DocumentDB index builds behave differently from MongoDB and can lock
+a production cluster.
+
+```text
+DocumentDB index build behavior:
+  ├── Foreground (default for createIndex):
+  │     └── Blocks ALL writes to the collection for the duration
+  │         of the build. On a 10M-document collection, this can
+  │         be 5-20 minutes of write lockout.
+  ├── Background ("background: true" option):
+  │     └── NON-blocking — allows concurrent reads and writes.
+  │         DocumentDB supports background builds on 4.0+.
+  └── DocumentDB does NOT support the MongoDB "createIndexes"
+        shell helper's automatic background detection.
+
+Expert rule:
+  1. ALWAYS use { background: true } for production index creation
+  2. Schedule large index builds during low-traffic windows
+  3. Monitor DatabaseCpuUtilization during build (> 80% = throttle)
+  4. For compound indexes on > 5M docs, build on a replica first,
+     then failover — the index replicates to the primary
+```
+
+**Key implication:** A foreground index build on a large collection
+silently blocks all writes. Always pass `{ background: true }` and
+monitor the build progress via `db.currentOp()`.
+
+
+## Step 10 — Indexing strategy (moved from SKILL.md)
+
+
+DocumentDB has NO query optimizer. Indexes MUST be created BEFORE
+queries that need them.
+
+```bash
+# Connect to the cluster
+mongo "mongodb://admin:password@cluster-endpoint:27017/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false" \
+  --tlsCAFile rds-combined-ca-bundle.pem
+```
+
+```javascript
+// Single-field index
+db.users.createIndex({ email: 1 })
+// Compound index (ESR rule: Equality, Sort, Range)
+db.orders.createIndex({ status: 1, created_at: -1 })
+// Text index for search
+db.products.createIndex({ name: "text", description: "text" })
+// Unique index
+db.accounts.createIndex({ accountId: 1 }, { unique: true })
+// TTL index (auto-expire after 3600 seconds)
+db.sessions.createIndex({ createdAt: 1 }, { expireAfterSeconds: 3600 })
+// List indexes
+db.users.getIndexes()
+```
+
+
+## Step 11 — Global clusters (moved from SKILL.md)
+
+
+DocumentDB global clusters provide cross-region replication with
+typically under 1 second latency. One primary region (read-write) and
+up to 5 secondary regions (read-only).
+
+```bash
+# Create the global cluster
+aws docdb create-global-cluster \
+  --global-cluster-identifier my-global-cluster \
+  --source-db-cluster-identifier my-docdb-cluster \
+  --region us-east-1
+
+# Add a secondary cluster in another region
+aws docdb create-db-cluster \
+  --db-cluster-identifier my-docdb-cluster-eu \
+  --engine docdb \
+  --global-cluster-identifier my-global-cluster \
+  --master-username admin \
+  --master-user-password 'UseAStrongPassword123!' \
+  --db-subnet-group-name my-subnet-group-eu \
+  --region eu-west-1
+```
+
+**Key limitation:** global cluster failover is NOT automatic. You must
+script it (typically with Lambda + EventBridge). Secondary clusters are
+read-only until promoted.
+
