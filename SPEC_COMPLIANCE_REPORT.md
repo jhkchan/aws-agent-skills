@@ -1,10 +1,10 @@
 # Agent Skills Specification Compliance Report
 
-*Audit of all 409 skills against the open Agent Skills format specification (agentskills.io), 2026-08-24.*
+*Audit of all 409 skills against the open Agent Skills format specification (agentskills.io), 2026-08-24. Full remediation completed 2026-08-25.*
 
-## Verdict
+## Verdict — RESOLVED
 
-**0 of 409 skills are fully spec-compliant.** Every skill has at least one hard or structural violation. The violations fall into two classes: mechanical frontmatter issues (cheap to fix) and one architectural divergence (the spec's progressive-disclosure model vs. this repo's eval methodology).
+**409 of 409 skills are fully spec-compliant** (final audit, 2026-08-25): 0 violations across all 9 rule classes (description ≤1024, compatibility ≤500, metadata string→string map, no extra top-level fields, body <500 lines — max 499/mean 465, YAML parse, no `---` artifacts, name-matches-directory, name format). Zero content loss throughout (dual multiset+structural verification on every skill). Eval context preserved via the references-inclusive harness; 835 tests green at every wave commit.
 
 ## Findings
 
