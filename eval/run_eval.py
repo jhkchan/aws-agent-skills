@@ -291,6 +291,12 @@ def load_eval_spec(path: Path) -> dict:
 def load_skill_definition(skill_name: str, repo_root: Path | None = None) -> str:
     """Read the SKILL.md content for a given skill (S-003).
 
+    Per the agentskills.io progressive-disclosure model, depth lives in
+    ``references/`` and agents load it on demand. The eval mirrors a
+    reference-loading agent: SKILL.md body first, then every
+    ``references/*.md`` file concatenated after it, so the executor model
+    receives the same total context a spec-compliant skill folder provides.
+
     Raises FileNotFoundError if SKILL.md is absent.
     """
     root = repo_root or REPO_ROOT
@@ -299,7 +305,15 @@ def load_skill_definition(skill_name: str, repo_root: Path | None = None) -> str
         raise FileNotFoundError(
             f"SKILL.md not found for skill '{skill_name}': {skill_md}"
         )
-    return skill_md.read_text()
+    parts = [skill_md.read_text()]
+    ref_dir = root / "skills" / skill_name / "references"
+    if ref_dir.is_dir():
+        for ref in sorted(ref_dir.glob("*.md")):
+            parts.append(
+                f"\n\n--- reference file: references/{ref.name} ---\n\n"
+                + ref.read_text()
+            )
+    return "".join(parts)
 
 
 def build_target_prompt(skill_definition: str, test_case: dict) -> str:
@@ -457,8 +471,20 @@ def run_eval_for_skill(spec_path: Path, assertion_only: bool = False) -> dict | 
     temperature = spec.get("temperature", 0.0)
     test_cases = spec.get("test_cases", [])
 
-    skill_md = spec_path.parent.parent / "SKILL.md"
-    skill_definition = skill_md.read_text() if skill_md.exists() else ""
+    # Spec-compliant skill folder: SKILL.md body + references/ (see
+    # load_skill_definition for why references are included).
+    skill_dir = spec_path.parent.parent
+    skill_definition = ""
+    skill_md = skill_dir / "SKILL.md"
+    if skill_md.exists():
+        skill_definition = skill_md.read_text()
+        ref_dir = skill_dir / "references"
+        if ref_dir.is_dir():
+            for ref in sorted(ref_dir.glob("*.md")):
+                skill_definition += (
+                    f"\n\n--- reference file: references/{ref.name} ---\n\n"
+                    + ref.read_text()
+                )
 
     assertion_results: list[AssertionResult] = []
     model_outputs: list[str] = []
