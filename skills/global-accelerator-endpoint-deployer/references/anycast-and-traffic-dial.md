@@ -211,3 +211,64 @@ resource "aws_globalaccelerator_endpoint_group" "dr" {
   }
 }
 ```
+
+---
+
+## Expert heuristic: anycast IPs pinned at creation + traffic dial for regional canary + endpoint weight for within-region distribution (moved from SKILL.md)
+
+A baseline model says "create an accelerator and add endpoints." The
+correct heuristic recognizes three independent dimensions of traffic
+control:
+
+```text
+Layer 1 — Anycast IPs (pinned at accelerator creation)
+  ├── Two static anycast IPs assigned at creation
+  ├── Cannot be changed without recreating the accelerator
+  ├── BYOIP must be provisioned BEFORE creation
+  └── DNS points to anycast IPs → traffic enters nearest AWS edge
+
+Layer 2 — Traffic dial (per endpoint group = per region)
+  ├── 0.0 = drain this region (no new traffic)
+  ├── 1.0 = send full traffic (normalized across all groups)
+  ├── 0.1 = canary 10% to this region
+  └── Failover: set dial to 0.0 for unhealthy region
+
+Layer 3 — Endpoint weight (per endpoint within a group)
+  ├── 0-255 range; default 128
+  ├── 0 = drain this specific endpoint
+  ├── 255 vs 128 = 2:1 ratio within the group
+  └── Independent of traffic dial
+```
+
+**Key implication:** regional canary uses traffic dial (Layer 2);
+within-region canary uses endpoint weight (Layer 3). Anycast IPs (Layer
+1) are the fixed entry points. All three layers are independent and
+must be configured separately.
+
+## Step 7 — BYOIP integration (moved from SKILL.md)
+
+Bring Your Own IP allows you to use your own IP address ranges as the
+anycast IPs for Global Accelerator.
+
+```bash
+# Step 1: Provision the CIDR (requires ROA already published)
+aws ec2 provision-byoipcidr --cidr 203.0.113.0/24 --description "GA BYOIP"
+
+# Step 2: Wait for provisioned state
+aws ec2 describe-byoipcidrs --query 'ByoipCidrs[?Cidr==`203.0.113.0/24`].State'
+
+# Step 3: Advertise the CIDR
+aws ec2 advertise-byoipcidr --cidr 203.0.113.0/24
+
+# Step 4: Create accelerator referencing BYOIP (MUST be at creation)
+aws globalaccelerator create-accelerator \
+  --name "byoip-accelerator" \
+  --ip-address-type IPV4 \
+  --ip-addresses Cidr=203.0.113.0/24 \
+  --enabled
+```
+
+**Critical:** BYOIP cannot be added to an existing accelerator. The IP
+pool must be provisioned and advertised BEFORE the accelerator is
+created.
+

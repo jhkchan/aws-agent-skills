@@ -150,53 +150,13 @@ provisioned BEFORE the accelerator is created.
 
 ## Expert heuristic: anycast IPs pinned at creation + traffic dial for regional canary + endpoint weight for within-region distribution
 
-A baseline model says "create an accelerator and add endpoints." The
-correct heuristic recognizes three independent dimensions of traffic
-control:
-
-```text
-Layer 1 — Anycast IPs (pinned at accelerator creation)
-  ├── Two static anycast IPs assigned at creation
-  ├── Cannot be changed without recreating the accelerator
-  ├── BYOIP must be provisioned BEFORE creation
-  └── DNS points to anycast IPs → traffic enters nearest AWS edge
-
-Layer 2 — Traffic dial (per endpoint group = per region)
-  ├── 0.0 = drain this region (no new traffic)
-  ├── 1.0 = send full traffic (normalized across all groups)
-  ├── 0.1 = canary 10% to this region
-  └── Failover: set dial to 0.0 for unhealthy region
-
-Layer 3 — Endpoint weight (per endpoint within a group)
-  ├── 0-255 range; default 128
-  ├── 0 = drain this specific endpoint
-  ├── 255 vs 128 = 2:1 ratio within the group
-  └── Independent of traffic dial
-```
-
-**Key implication:** regional canary uses traffic dial (Layer 2);
-within-region canary uses endpoint weight (Layer 3). Anycast IPs (Layer
-1) are the fixed entry points. All three layers are independent and
-must be configured separately.
+Moved verbatim to [references/anycast-and-traffic-dial.md](references/anycast-and-traffic-dial.md) — load on demand.
+Covers: Expert heuristic: anycast IPs pinned at creation + traffic dial for regional canary + endpoint weight for within-region distribution. See the "References (load on demand)" section.
 
 ## Expert heuristic: health check customization drives failover timing
 
-Global Accelerator performs its own health checks on endpoints,
-independent of the target group health checks.
-
-```text
-Health check interval = 10s, threshold = 3
-  → Detection: 3 * 10s = 30 seconds to mark unhealthy
-  → Recovery: 3 * 10s = 30 seconds to mark healthy
-  → Total failover: ~30-60 seconds
-
-Health check interval = 30s, threshold = 3
-  → Detection: 3 * 30s = 90 seconds to mark unhealthy
-  → Total failover: ~90-180 seconds
-```
-
-A 10-second interval detects failures faster but generates more health
-check traffic. For latency-sensitive workloads, use 10-second intervals.
+Moved verbatim to [references/endpoint-types-and-failover.md](references/endpoint-types-and-failover.md) — load on demand.
+Covers: Expert heuristic: health check customization drives failover timing. See the "References (load on demand)" section.
 
 ## Prerequisites (verify before provisioning)
 
@@ -405,106 +365,23 @@ aws route53 change-resource-record-sets \
 
 ## Step 7 — BYOIP integration
 
-Bring Your Own IP allows you to use your own IP address ranges as the
-anycast IPs for Global Accelerator.
-
-```bash
-# Step 1: Provision the CIDR (requires ROA already published)
-aws ec2 provision-byoipcidr --cidr 203.0.113.0/24 --description "GA BYOIP"
-
-# Step 2: Wait for provisioned state
-aws ec2 describe-byoipcidrs --query 'ByoipCidrs[?Cidr==`203.0.113.0/24`].State'
-
-# Step 3: Advertise the CIDR
-aws ec2 advertise-byoipcidr --cidr 203.0.113.0/24
-
-# Step 4: Create accelerator referencing BYOIP (MUST be at creation)
-aws globalaccelerator create-accelerator \
-  --name "byoip-accelerator" \
-  --ip-address-type IPV4 \
-  --ip-addresses Cidr=203.0.113.0/24 \
-  --enabled
-```
-
-**Critical:** BYOIP cannot be added to an existing accelerator. The IP
-pool must be provisioned and advertised BEFORE the accelerator is
-created.
+Moved verbatim to [references/anycast-and-traffic-dial.md](references/anycast-and-traffic-dial.md) — load on demand.
+Covers: Step 7 — BYOIP integration. See the "References (load on demand)" section.
 
 ## Step 8 — Flow logs and CloudWatch metrics
 
-### Flow logs
-
-Global Accelerator supports flow logs for traffic analysis. Flow logs
-can be sent to CloudWatch Logs or Amazon S3.
-
-```bash
-aws globalaccelerator update-accelerator \
-  --accelerator-arn "$ACCEL_ARN" \
-  --flow-log-cloudwatch-log-group-arn arn:aws:logs:us-west-2:123456789012:log-group:/aws/globalaccelerator/my-accelerator
-```
-
-### CloudWatch metrics
-
-Key metrics: NewFlowCount, FlowCountInActive, ProcessedBytesIn,
-ProcessedBytesOut, HealthyEndpointCount, UnhealthyEndpointCount.
-
-```bash
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/GlobalAccelerator \
-  --metric-name HealthyEndpointCount \
-  --dimensions Name=EndpointGroup,Value="$EG_PRIMARY" \
-  --start-time $(date -u -v-1H +%Y-%m-%dT%H:%M:%S) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
-  --period 300 --statistics Average
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
+Covers: Step 8 — Flow logs and CloudWatch metrics. See the "References (load on demand)" section.
 
 ## Step 9 — Endpoint group failover
 
-Failover is automatic when an endpoint becomes unhealthy. The health
-check interval and threshold determine how quickly traffic shifts.
-
-**Active-passive failover:**
-
-```text
-Primary region (us-east-1): traffic dial = 1.0
-DR region (us-west-2):     traffic dial = 0.0
-
-When us-east-1 endpoints become unhealthy:
-  → GA detects unhealthy (threshold * interval)
-  → Traffic shifts to us-west-2
-  → Recovery: traffic returns to us-east-1 when healthy
-```
-
-**Manual failover (drain a region):**
-
-```bash
-aws globalaccelerator update-endpoint-group \
-  --endpoint-group-arn "$EG_PRIMARY" --traffic-dial 0.0
-
-aws globalaccelerator update-endpoint-group \
-  --endpoint-group-arn "$EG_DR" --traffic-dial 1.0
-```
-
-For active-passive, the DR region's endpoints must be healthy for
-failover to work. Global Accelerator only sends traffic to healthy
-endpoints within an endpoint group.
+Moved verbatim to [references/endpoint-types-and-failover.md](references/endpoint-types-and-failover.md) — load on demand.
+Covers: Step 9 — Endpoint group failover. See the "References (load on demand)" section.
 
 ## Step 10 — Recent features
 
-- **Dual-stack anycast IPs (2023-2024):** IPv6 anycast alongside IPv4.
-  Use `--ip-address-type DUAL_STACK` at creation.
-- **Cross-account endpoint support (2023-2024):** Endpoints can reference
-  resources in different AWS accounts within an organization.
-- **Endpoint weight granular control (2023-2024):** Zero-weight draining
-  for individual endpoints without removal.
-- **Custom routing accelerators (2023-2024):** Port-based routing to
-  specific endpoints for non-HTTP protocols.
-- **BYOIP IPv6 support (2024-2025):** BYOIP now supports IPv6 CIDRs for
-  dual-stack accelerators.
-- **Flow logs enhancements (2024-2025):** Endpoint health transitions
-  and traffic dial changes captured in flow logs.
-- **Health check protocol expansion (2024-2025):** Additional protocols
-  including gRPC health probes.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+Covers: Step 10 — Recent features. See the "References (load on demand)" section.
 
 ## NEVER do these things
 
@@ -599,18 +476,16 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Endpoints always unhealthy
-- Verify the endpoint resource exists and is healthy at the target group
-  level. Check health check protocol, path, and port match.
+Moved verbatim to [references/error-handling.md](references/error-handling.md) — load on demand.
+Covers: Error handling. See the "References (load on demand)" section.
 
-### Traffic not reaching failover region
-- The DR region's endpoints must be healthy. If all endpoints in the
-  primary region are unhealthy but DR has no healthy endpoints, traffic
-  is dropped.
+## References (load on demand)
 
-### BYOIP accelerator creation fails
-- Verify the BYOIP pool is in READY state and advertised. The
-  provision-byoipcidr process can take 24-48 hours for ROA propagation.
+- [references/anycast-and-traffic-dial.md](references/anycast-and-traffic-dial.md) — anycast IP and traffic dial detail (existing); now also the three-layer traffic-control heuristic and the BYOIP CLI walkthrough (Step 7)
+- [references/endpoint-types-and-failover.md](references/endpoint-types-and-failover.md) — endpoint types, weights, and failover detail (existing); now also the health-check timing heuristic and the failover playbook (Step 9)
+- [references/advanced-patterns.md](references/advanced-patterns.md) — recent AWS features (Step 10)
+- [references/error-handling.md](references/error-handling.md) — error-handling deep dives: endpoints always unhealthy, traffic not reaching failover region, BYOIP creation failure
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — flow-log configuration and CloudWatch metrics commands (Step 8)
 
 ## Domain
 

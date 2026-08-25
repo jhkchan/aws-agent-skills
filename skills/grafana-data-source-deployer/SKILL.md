@@ -177,24 +177,8 @@ but queries return no data. Always verify per-service permissions.
 
 ## Expert heuristic: SAML SSO requires external IdP
 
-```text
-SAML SSO Setup Flow:
-  1. Configure external IdP (Okta, Azure AD, etc.)
-     → Create SAML application
-     → Set ACS URL: https://<workspace-endpoint>/login/saml/acs
-     → Set audience: https://<workspace-endpoint>/
-     → Configure attribute mappings: email, displayName, groups
-  2. Export IdP metadata (XML or metadata URL)
-  3. Update Grafana workspace SAML configuration:
-     aws grafana update-workspace-saml-configuration
-       --workspace-id <id>
-       --saml-configuration '{"idpMetadata":{"url":"..."},"assertionAttributes":{...}}'
-  4. Test SAML login at https://<workspace-endpoint>/login/saml
-```
-
-**Key implication:** without the IdP metadata, SAML login fails. The
-IdP must be configured first. This is a prerequisite — the workspace
-cannot generate the IdP configuration for you.
+IdP-first SAML setup flow (ACS URL, attribute mappings, update-workspace-saml-configuration) moved verbatim to [references/authentication-and-access.md](references/authentication-and-access.md).
+Load on demand when the authentication mode is SAML.
 
 ## Prerequisites (verify before provisioning)
 
@@ -396,61 +380,18 @@ workspace data source UIDs. Mismatches cause panels to show "No data".
 
 ## Step 6 — User management, notifications, plugins
 
-**With IAM Identity Center, assign users/groups:**
-
-```bash
-aws grafana update-permissions \
-  --workspace-id "$WORKSPACE_ID" \
-  --update-instruction-batch \
-    "action=ADD,role=ADMIN,groups=[{\"id\":\"group-id\",\"ssoId\":\"grafana-admins\"}]"
-```
-
-**With SAML SSO, users are mapped via assertion attributes.** The
-`groups` attribute maps to Grafana roles via `roleValues` in the SAML
-configuration.
-
-**Create notification contact point (Slack example):**
-
-```bash
-curl -s -X POST "$ENDPOINT/api/v1/provisioning/contact-points" \
-  -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" \
-  -d '{"name":"ops-team-slack","type":"slack","settings":{"url":"https://hooks.slack.com/services/xxx","channel":"#ops-alerts"}}'
-```
-
-**List available plugins:**
-
-```bash
-curl -s "$ENDPOINT/api/plugins" -H "Authorization: Bearer $API_KEY" | jq '.[].id'
-```
-
-Managed Grafana restricts plugins to AWS-approved ones. Verify
-availability before designing dashboards that depend on specific plugins.
+User/group assignment commands, Slack contact point, and plugin listing moved verbatim to [references/authentication-and-access.md](references/authentication-and-access.md).
+Load on demand for user, notification, or plugin operations.
 
 ## Step 7 — Version control integration
 
-Grafana Enterprise supports Git-based dashboard provisioning:
-
-```bash
-aws grafana update-workspace-configuration \
-  --workspace-id "$WORKSPACE_ID" \
-  --configuration '{"versionControl":{"provider":"github","repository":"my-org/grafana-dashboards","branch":"main","directory":"/dashboards"}}' \
-  --region us-east-1
-```
+Version control (GitOps) configuration command moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for Git-based dashboard provisioning.
 
 ## Step 8 — Recent features
 
-- **Grafana Enterprise features (2023-2024):** Enhanced RBAC, data
-  source permissions, reporting, audit logs, and SAML team sync.
-- **Native SNS notification channel (2023-2024):** Direct SNS
-  integration for alert notifications.
-- **AMP auto-discovery (2023-2024):** Streamlined Prometheus data
-  source creation that auto-discovers AMP workspaces.
-- **CloudWatch Logs Insights (2024-2025):** Enhanced Logs query syntax
-  support in Grafana panels.
-- **Workspace configuration API (2024-2025):** Network access
-  controls and enterprise settings without recreating the workspace.
-- **Terraform provider (2023-2024):** Full support for workspace, API
-  key, role association, and permission resources.
+2023-2026 feature list (Enterprise RBAC, SNS channel, AMP auto-discovery, Logs Insights, config API, Terraform) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when recent features matter.
 
 ## NEVER do these things
 
@@ -539,25 +480,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Data source returns empty results
-- The workspace IAM role is missing per-service permissions. Verify
-  the role has correct actions (e.g., `cloudwatch:GetMetricData`).
-  Silent failure — no error in the Grafana UI.
+Five failure modes (empty results, SAML login, Prometheus query, UID mismatch, key expiry) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when diagnosing a failed deployment.
 
-### SAML login fails
-- IdP metadata not configured or incorrect. Verify IdP metadata
-  URL/XML. Check ACS URL matches `https://<workspace>/login/saml/acs`.
+## References (load on demand)
 
-### Prometheus data source query fails
-- AMP workspace URL incorrect or workspace role lacks
-  `aps:QueryMetrics`. Verify data source URL and SigV4 config.
-
-### Dashboard panels show "No data"
-- Data source UID in dashboard JSON does not match workspace data
-  source UID. Query the API for correct UIDs and update the JSON.
-
-### API key authentication fails
-- API key has expired. Create a new key with an appropriate TTL.
+- [references/data-sources-and-iam.md](references/data-sources-and-iam.md) — per-data-source IAM permissions, data source JSON, and the complete workspace IAM role policy
+- [references/authentication-and-access.md](references/authentication-and-access.md) — SSO/SAML setup, API keys, user/group management, notifications, plugins
+- [references/advanced-patterns.md](references/advanced-patterns.md) — version control (GitOps) integration and 2023-2026 feature notes
+- [references/error-handling.md](references/error-handling.md) — symptom-to-root-cause for empty results, SAML login, Prometheus, UID mismatch, key expiry
 
 ## Domain
 

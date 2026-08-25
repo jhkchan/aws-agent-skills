@@ -284,3 +284,150 @@ aws health describe-events-for-organization \
   ingestion path to avoid double-processing.
 - **Scheduler max is 1 year.** Long deprecation windows (e.g., API shutdown
   in 18 months) need a recurring schedule or a different mechanism.
+
+## Affected-entity enrichment Lambda (moved from SKILL.md)
+
+```python
+import boto3, json, os
+health = boto3.client('health', region_name='us-east-1')
+sns = boto3.client('sns')
+
+def lambda_handler(event, context):
+    detail = event['detail']
+    event_arn = detail['eventArn']
+    # Health API is global endpoint — always us-east-1
+    entities = health.describe_affected_entities(
+        filter={'eventArns': [event_arn]}
+    )['entities']
+    affected = [e['entityValue'] for e in entities]
+    message = {
+        'category': detail['eventTypeCategory'],
+        'service': detail['service'],
+        'code': detail['eventTypeCode'],
+        'region': event['region'],
+        'start_time': detail['startTime'],
+        'affected_entities': affected,
+        'event_arn': event_arn
+    }
+    sns.publish(
+        TopicArn=os.environ['TOPIC_ARN'],
+        Subject=f"[{detail['eventTypeCategory']}] {detail['service']} - {detail['eventTypeCode']}",
+        Message=json.dumps(message, indent=2, default=str)
+    )
+    return {'statusCode': 200, 'affected_count': len(affected)}
+```
+
+## Slack notification Lambda (moved from SKILL.md)
+
+```python
+import json, urllib.request, os
+
+WEBHOOK = os.environ['SLACK_WEBHOOK']
+
+def lambda_handler(event, context):
+    detail = event['detail']
+    blocks = [
+        {"type": "header", "text": {"type": "plain_text",
+         "text": f"AWS Health: {detail['eventTypeCategory']} - {detail['service']}"}},
+        {"type": "section", "fields": [
+            {"type": "mrkdwn", "text": f"*Code:*\n{detail['eventTypeCode']}"},
+            {"type": "mrkdwn", "text": f"*Region:*\n{event['region']}"},
+            {"type": "mrkdwn", "text": f"*Status:*\n{detail.get('statusCode','unknown')}"},
+            {"type": "mrkdwn", "text": f"*Start:*\n{str(detail.get('startTime'))}"}
+        ]},
+        {"type": "section", "text": {"type": "mrkdwn",
+         "text": f"*Description:*\n{detail.get('eventDescription',[{}])[0].get('latestDescription','N/A')}"}}
+    ]
+    req = urllib.request.Request(
+        WEBHOOK,
+        data=json.dumps({'blocks': blocks}).encode(),
+        headers={'Content-Type': 'application/json'}
+    )
+    urllib.request.urlopen(req)
+    return {'statusCode': 200}
+```
+
+## Organizational-view setup commands (moved from SKILL.md)
+
+```bash
+# In the management account: enable Health org view
+aws health enable-health-service-access-for-organization
+
+# Delegate admin to a member account
+aws organizations register-delegated-administrator \
+  --account-id 222222222222 \
+  --service-principal health.amazonaws.com
+
+# In the delegated admin account: org-wide EventBridge rule
+aws events put-rule --name health-org-all-accounts \
+  --event-pattern '{"source": ["aws.health"]}' \
+  --state ENABLED
+```
+
+Then in the delegated admin account, the Health API returns events across
+all member accounts:
+
+```bash
+aws health describe-events-for-organization \
+  --filter 'eventTypeCategories=[issue,scheduledChange]' \
+  --query 'events[*].[arn,awsAccountId,service,region,statusCode]' \
+  --output table
+```
+
+## Step Functions responder orchestration state machine (moved from SKILL.md)
+
+```json
+{
+  "StartAt": "EnrichEntities",
+  "States": {
+    "EnrichEntities": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:<region>:<account>:function:health-enrich-entities",
+      "Next": "EvaluateImpact"
+    },
+    "EvaluateImpact": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:<region>:<account>:function:health-evaluate-impact",
+      "Next": "ImpactChoice"
+    },
+    "ImpactChoice": {
+      "Type": "Choice",
+      "Choices": [
+        {"Variable": "$.impactLevel", "StringEquals": "region_outage", "Next": "TriggerDRFailover"},
+        {"Variable": "$.impactLevel", "StringEquals": "resource_degradation", "Next": "ScaleOut"},
+        {"Variable": "$.impactLevel", "StringEquals": "low", "Next": "NotifyOnly"}
+      ],
+      "Default": "NotifyOnly"
+    },
+    "TriggerDRFailover": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::states:startExecution",
+      "Parameters": {"StateMachineArn": "arn:aws:states:<region>:<account>:stateMachine:dr-failover-orchestrator",
+        "Input.$": "$"},
+      "Next": "NotifyStakeholders"
+    },
+    "ScaleOut": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:<region>:<account>:function:health-scale-out-asg",
+      "Next": "NotifyStakeholders"
+    },
+    "NotifyOnly": {
+      "Type": "Task",
+      "Resource": "arn:aws:sns:<region>:<account>:health-issue-alerts",
+      "Next": "CreateJiraTicket"
+    },
+    "NotifyStakeholders": {
+      "Type": "Task",
+      "Resource": "arn:aws:sns:<region>:<account>:health-critical-alerts",
+      "Next": "CreateJiraTicket"
+    },
+    "CreateJiraTicket": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:<region>:<account>:function:jira-create-from-health",
+      "Retry": [{"ErrorEquals": ["States.TaskFailed"], "IntervalSeconds": 60, "MaxAttempts": 3}],
+      "End": true
+    }
+  }
+}
+```
+

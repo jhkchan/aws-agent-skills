@@ -447,3 +447,56 @@ resource "aws_grafana_role_association" "admin" {
   group_ids    = ["group-id-from-identity-center"]
 }
 ```
+
+## Expert heuristic: SAML SSO requires external IdP — moved from SKILL.md
+
+```text
+SAML SSO Setup Flow:
+  1. Configure external IdP (Okta, Azure AD, etc.)
+     → Create SAML application
+     → Set ACS URL: https://<workspace-endpoint>/login/saml/acs
+     → Set audience: https://<workspace-endpoint>/
+     → Configure attribute mappings: email, displayName, groups
+  2. Export IdP metadata (XML or metadata URL)
+  3. Update Grafana workspace SAML configuration:
+     aws grafana update-workspace-saml-configuration
+       --workspace-id <id>
+       --saml-configuration '{"idpMetadata":{"url":"..."},"assertionAttributes":{...}}'
+  4. Test SAML login at https://<workspace-endpoint>/login/saml
+```
+
+**Key implication:** without the IdP metadata, SAML login fails. The
+IdP must be configured first. This is a prerequisite — the workspace
+cannot generate the IdP configuration for you.
+
+## Step 6 — User management, notifications, plugins — moved from SKILL.md
+
+**With IAM Identity Center, assign users/groups:**
+
+```bash
+aws grafana update-permissions \
+  --workspace-id "$WORKSPACE_ID" \
+  --update-instruction-batch \
+    "action=ADD,role=ADMIN,groups=[{\"id\":\"group-id\",\"ssoId\":\"grafana-admins\"}]"
+```
+
+**With SAML SSO, users are mapped via assertion attributes.** The
+`groups` attribute maps to Grafana roles via `roleValues` in the SAML
+configuration.
+
+**Create notification contact point (Slack example):**
+
+```bash
+curl -s -X POST "$ENDPOINT/api/v1/provisioning/contact-points" \
+  -H "Authorization: Bearer $API_KEY" -H "Content-Type: application/json" \
+  -d '{"name":"ops-team-slack","type":"slack","settings":{"url":"https://hooks.slack.com/services/xxx","channel":"#ops-alerts"}}'
+```
+
+**List available plugins:**
+
+```bash
+curl -s "$ENDPOINT/api/plugins" -H "Authorization: Bearer $API_KEY" | jq '.[].id'
+```
+
+Managed Grafana restricts plugins to AWS-approved ones. Verify
+availability before designing dashboards that depend on specific plugins.

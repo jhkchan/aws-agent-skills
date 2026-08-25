@@ -93,18 +93,8 @@ production service.
 
 ## Pre-flight: data requirements
 
-| Input | Source | Why |
-|---|---|---|
-| Finding types to automate | `get-findings-statistics --group-by type` | Drives remediation action selection |
-| Severity distribution | `get-findings-statistics --group-by severity` | Drives routing tier |
-| Sample finding JSON | `get-findings --finding-ids <id>` | Concrete parameters for Lambda |
-| EventBridge rule status | `events describe-rule` | Existing routing |
-| Lambda function config | `lambda get-function-configuration` | Existing remediation functions |
-| Security Hub enabled? | `securityhub describe-hub` | Integration target |
-| Organizations delegated admin | `organizations list-delegated-administrators` | Multi-account setup |
-| Existing suppression filters | `guardduty list-filters` | Don't overwrite blindly |
-| WAF web ACL | `wafv2 list-web-acls` | IP blocking target |
-| SNS topic ARN | `sns list-topics` | Notification target |
+Pre-flight data-gathering commands (findings statistics, sample JSON, rule status, filters, WAF ACLs, SNS topics) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand to populate the required inputs before designing automation.
 
 **If the input is malformed** (missing finding type, ambiguous severity),
 emit:
@@ -121,37 +111,8 @@ GAP: Re-supply get-findings output for the finding type and the severity-routing
 
 ### Step 0: Expert knowledge — non-obvious GuardDuty + EventBridge behaviors
 
-- **EventBridge `detail.severity` may serialize as string or number**
-  depending on detector version. Numeric matching rules can fail
-  silently. Test with a sample event; when in doubt, route ALL findings
-  to Lambda and branch internally on `detail.finding.severity`.
-
-- **Finding IDs are stable across updates.** GuardDuty updates the
-  existing finding and increments `service.eventCount`. EventBridge
-  emits on every update. Track processed IDs in DynamoDB (7-day TTL).
-
-- **`archive-findings` does NOT delete.** Archived findings remain
-  queryable for 90 days. Suppression filters archive automatically but
-  do not prevent EventBridge emission if applied after the initial emit.
-
-- **Security Hub auto-enables GuardDuty as a source** when both are
-  enabled in the same Region. Custom enrichment via `BatchImportFindings`
-  creates a SEPARATE finding — deduplicate on finding ID to avoid dups.
-
-- **WAF IP set limits: 10,000 IPs per set, 200 sets per ACL.** Blocking
-  every GuardDuty source IP exhausts the limit within weeks. Use a
-  rotating IP set (TTL eviction) or NACL-based blocking for high volume.
-
-- **Organizations delegated admin is Region-specific.** Each Region
-  requires its own designation. Deploy the pipeline via StackSets.
-
-- **Lambda remediation timeout must be at least 60 seconds.** EC2 SG
-  swap takes 10-30 seconds to propagate. The default 3-second timeout
-  is insufficient.
-
-- **Cross-account event bus routing is required for multi-account.**
-  Member-account findings emit to the member's default bus. Configure
-  forwarding to the delegated admin's bus.
+Eight non-obvious behaviors (severity serialization, finding-ID stability, archive semantics, Security Hub dups, WAF IP-set limits, Region-specific admin, Lambda timeouts, cross-account bus) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before finalizing rule or Lambda design.
 
 ### Step 1: Classify the finding family and severity tier
 
@@ -276,21 +237,8 @@ def revoke_access_key(user_name, access_key_id, finding_type):
 
 ### Step 6: WAF / NACL IP blocking
 
-```python
-wafv2 = boto3.client('wafv2')
-
-def block_ip_in_waf(ip_address, ip_set_arn):
-    ip_entry = f'{ip_address}/32'
-    current = wafv2.get_ip_set(IPSetArn=ip_set_arn)
-    addresses = current['IPSet']['Addresses']
-    if ip_entry not in addresses:
-        addresses.append(ip_entry)
-        wafv2.update_ip_set(IPSetArn=ip_set_arn, Scope='REGIONAL',
-                           Addresses=addresses, LockToken=current['LockToken'])
-```
-
-**Limit management:** WAF IP sets cap at 10,000 entries. Use eviction
-policy (oldest removed when full) or switch to NACL-based blocking.
+boto3 WAF update_ip_set snippet and IP-set limit management moved verbatim to [references/finding-types-and-remediation-actions.md](references/finding-types-and-remediation-actions.md).
+Load on demand when blocking source IPs.
 
 ### Step 7: SNS notification with finding context
 
@@ -339,115 +287,28 @@ def ingest_custom_finding(gd_finding, correlation_note=None):
 
 ### Step 9: Multi-account via Organizations delegated administrator
 
-```bash
-# Designate delegated admin (per Region)
-aws guardduty enable-organization-admin-account \
-  --admin-account-id 111111111111 --region us-east-1
-
-# Auto-enable for all member accounts
-aws guardduty update-organization-configuration \
-  --detector-id <detector-id> --auto-enable --region us-east-1
-```
-
-**Cross-account event forwarding** (in each member account via StackSet):
-
-```bash
-aws events put-rule --name forward-guardduty-to-admin \
-  --event-pattern '{"source":["aws.guardduty"],"detail-type":["GuardDuty Finding"]}'
-
-aws events put-targets --rule forward-guardduty-to-admin \
-  --targets '[{"Id":"admin-bus","Arn":"arn:aws:events:us-east-1:111111111111:event-bus/default",
-  "RoleArn":"arn:aws:iam::222222222222:role/EventBridgeForwardRole"}]'
-```
+Delegated-admin enablement, auto-enable, and cross-account forwarding rules moved verbatim to [references/eventbridge-and-lambda-patterns.md](references/eventbridge-and-lambda-patterns.md).
+Load on demand for multi-account rollout.
 
 ### Step 10: Suppression filters for known false positives
 
-```bash
-aws guardduty create-filter \
-  --detector-id <detector-id> \
-  --name suppress-authorized-scanner \
-  --action ARCHIVE \
-  --finding-criteria '{
-    "Criterion": {
-      "type": {"Eq": ["Recon:EC2/PortProbeUnprotectedPort"]},
-      "service.additionalInfo.remoteIpDetails.ipAddressV4": {"Eq": ["203.0.113.50"]}
-    }
-  }' \
-  --description "Suppress port probe from scanner 203.0.113.50. REVIEW: 2026-11-01"
-```
-
-Common false-positive patterns:
-
-| Finding type | FP source | Filter criteria |
-|---|---|---|
-| `Recon:EC2/PortProbe*` | Authorized scanner | `remoteIpDetails.ipAddressV4` = scanner IP |
-| `UnauthorizedAccess:EC2/SSHBruteForce` | CI/CD pipeline | `remoteIpDetails.ipAddressV4` = CI NAT gateway |
-| `Recon:IAMUser/*` | Break-glass access | `accessKeyDetails.accessKeyId` = break-glass key |
-
-**Never suppress without a review date.** Add it to the description and
-set a calendar reminder.
+create-filter command, false-positive criteria table, and review-date rule moved verbatim to [references/finding-types-and-remediation-actions.md](references/finding-types-and-remediation-actions.md).
+Load on demand when suppressing known false positives.
 
 ### Step 11: CloudTrail correlation for TTPs
 
-A single finding is an event. A sequence of findings is an attack chain.
-
-| Chain pattern | MITRE tactic | Finding sequence |
-|---|---|---|
-| Recon → Initial Access | TA0043 → TA0001 | `Recon:EC2/PortProbe` → `UnauthorizedAccess:EC2/SSHBruteForce` |
-| Initial Access → Persistence | TA0001 → TA0003 | `UnauthorizedAccess:EC2` → `Persistence:IAMUser/NewUserCreation` |
-| Persistence → Exfiltration | TA0003 → TA0010 | `Backdoor:EC2` → `Exfiltration:S3/ObjectExfiltration` |
-| Impact | TA0040 | `CryptoCurrency:EC2/BitcoinTool` (single, high confidence) |
-
-```python
-def correlate_ttps(finding, dynamodb_table):
-    """Check for related findings within 60-min window."""
-    related_types = get_related_ttps(finding['type'])
-    recent = dynamodb_table.query(
-        KeyConditionExpression='resource_id = :rid',
-        FilterExpression='finding_type IN :types AND #ts > :cutoff',
-        ExpressionAttributeValues={':rid': finding['resource']['resourceId'],
-                                   ':types': related_types,
-                                   ':cutoff': (datetime.utcnow() - timedelta(minutes=60)).isoformat()})
-    if recent['Items']:
-        chain = [i['finding_type'] for i in recent['Items']] + [finding['type']]
-        return f"TTP chain detected: {' -> '.join(chain)}"
-    return None
-```
+MITRE chain table and correlate_ttps() DynamoDB query moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when correlating findings into attack chains.
 
 ### Step 12: Auto-enable GuardDuty in new accounts
 
-Lambda on CreateAccount event (via EventBridge):
-
-```bash
-aws events put-rule --name new-org-account-guardduty \
-  --event-pattern '{
-    "source": ["aws.organizations"],
-    "detail-type": ["AWS API Call via CloudTrail"],
-    "detail": {"eventName": ["CreateAccount"]}
-  }'
-```
-
-The Lambda creates detectors in all target Regions and accepts the
-invitation from the delegated admin.
+CreateAccount EventBridge rule pattern and Lambda responsibilities moved verbatim to [references/eventbridge-and-lambda-patterns.md](references/eventbridge-and-lambda-patterns.md).
+Load on demand for new-account auto-enablement.
 
 ### Step 13: Custom threat intel upload
 
-```bash
-# Threat intel set (malicious IPs/domains)
-aws guardduty create-threat-intel-set \
-  --detector-id <detector-id> --name custom-malicious-ips \
-  --format TXT --location s3://threat-intel-bucket/malicious-ips.txt \
-  --activate --tags '{"Source":"internal","ReviewDate":"2026-11-01"}'
-
-# Trusted IP set (allowlist — overrides threat intel)
-aws guardduty create-ip-set \
-  --detector-id <detector-id> --name trusted-ips \
-  --format TXT --location s3://threat-intel-bucket/trusted-ips.txt \
-  --activate
-```
-
-Always verify with `list-threat-intel-sets` / `list-ip-sets` that the
-status is `ACTIVE`. A set created with `--no-activate` is inert.
+create-threat-intel-set / create-ip-set commands and activation check moved verbatim to [references/finding-types-and-remediation-actions.md](references/finding-types-and-remediation-actions.md).
+Load on demand for custom threat intel.
 
 ## Output format
 
@@ -518,19 +379,8 @@ TEMPLATE:
 
 ### Worked example — REVIEW_REQUIRED, low-severity recon
 
-```text
-AUTOMATION_DEPLOYED: prod-guardduty-auto-response
-FINDING_TYPE: Recon:EC2/PortProbeUnprotectedPort
-SEVERITY: 2.0 (LOW)
-ROUTING: none (Low — log only tier)
-REMEDIATION: none (Low — no auto-response)
-NOTIFICATION: N/A (Low severity)
-INTEGRATION: Security Hub native forwarding only
-SAFETY: N/A (no auto-action)
-VERDICT: REVIEW_REQUIRED
-GAP: Low-severity recon does not warrant auto-response. Recommend: (1) create suppression filter for authorized scanner IPs (Step 10); (2) CloudWatch metric for recon trend analysis (spike detection); (3) CloudTrail correlation — a recon finding followed by a High within 60 min indicates a real attack chain.
-TEMPLATE: (suppression filter — see Step 10)
-```
+Secondary worked example (REVIEW_REQUIRED, low-severity recon) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when formatting a REVIEW_REQUIRED response; the primary AUTOMATION_DEPLOYED example stays in this file.
 
 ## Anti-Patterns — NEVER do these things
 
@@ -622,71 +472,21 @@ Severity >= 7.0?
 
 ## Recent AWS features (2024-2026)
 
-- **Runtime Monitoring for ECS/EKS (2024 GA):** Runtime-level detection.
-  Findings of type `Runtime/EKS/*`, `Runtime/ECS/*`. Remediation should
-  isolate the task/pod, not the host.
-
-- **Malware Protection for EBS (2024):** Automated malware scan of
-  flagged volumes. Wire AFTER isolation — scan the snapshot, not the
-  live volume. `THREATS_DETECTED` should page on-call.
-
-- **EKS Protection (2024-2025):** Kubernetes API-level detection.
-  Remediation: revoke K8s RBAC token or isolate pod via Lambda + EKS API.
-
-- **Security Hub custom actions (2024):** Console-button custom actions
-  triggering Lambda — analyst-initiated remediation without EventBridge.
-
-- **EventBridge global endpoints (2024-2025):** Multi-region failover
-  for event-driven remediation pipelines.
-
-- **Organizations auto-enable enhancements (2025):** `--auto-enable`
-  now covers Runtime Monitoring and Malware Protection for new accounts.
+2024-2026 feature notes (Runtime Monitoring, Malware Protection for EBS, EKS Protection, Security Hub custom actions, global endpoints, auto-enable enhancements) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when a request mentions recent detections.
 
 ## Expert heuristic: severity-based auto-response blast radius
 
-A single misconfigured EventBridge rule with a Lambda that auto-isolates
-on all findings can quarantine every EC2 instance in an account within
-minutes — including the one running the Lambda itself.
+Blast-radius scoping table, 3-phase validation, dedup snippet, and post-deploy alarms moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before enabling containment.
 
-> ALWAYS test GuardDuty auto-remediation in a non-production account
-> first, and scope every EventBridge rule with an explicit finding-type
-> AND severity filter. Never deploy a Lambda that auto-isolates on all
-> finding types against an unbounded resource population.
+## References (load on demand)
 
-**Scoping techniques:**
-
-| Technique | Mechanism | Limit |
-|---|---|---|
-| Finding-type filter | `detail.type` in rule | Restricts to specific families |
-| Severity threshold in Lambda | Internal branch on `severity` | Low/Medium never triggers containment |
-| Resource-tag scope | Check instance tags before isolating | Only `auto-remediate: enabled` |
-| Account isolation | Sandbox account only | Zero production exposure |
-| Lambda reserved concurrency | `--reserved-concurrent-invocations 10` | Caps simultaneous actions |
-
-**3-phase validation:**
-
-1. **Phase 1 — DRY (notify only):** Deploy in non-prod with NOTIFY ONLY.
-   Generate test findings. Monitor 1 week.
-2. **Phase 2 — CONTAINMENT in non-prod:** Enable containment. Test on
-   sandbox instances. Verify rollback. Monitor for FPs.
-3. **Phase 3 — DRY in prod:** Deploy to prod in NOTIFY ONLY. Monitor
-   2 weeks. If < 1% FP, enable containment for Critical/High only.
-
-**Finding ID deduplication:**
-
-```python
-# DynamoDB: guardduty-processed-findings, PK: finding_id, TTL: 7 days
-def is_already_processed(finding_id, table):
-    return 'Item' in table.get_item(Key={'finding_id': finding_id})
-```
-
-**Post-deploy alarms:** Lambda Errors > 0, DLQ depth > 0, GuardDuty
-Critical/High count increasing without Security Hub finding (broken
-pipeline). All should page on-call.
-
-**Surface in output:** `BLAST_RADIUS: <scope>` and
-`VALIDATION_STATUS: <phase-1-dry | phase-2-containment | prod-dry |
-prod-containment>`. If not `prod-containment`, do NOT mark as deployable.
+- [references/finding-types-and-remediation-actions.md](references/finding-types-and-remediation-actions.md) — finding-type to action matrix, WAF IP blocking, suppression filters, threat intel sets
+- [references/eventbridge-and-lambda-patterns.md](references/eventbridge-and-lambda-patterns.md) — event structure, rule patterns, Lambda templates, multi-account forwarding
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked example (REVIEW_REQUIRED, low-severity recon)
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight data-gathering commands
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step-0 expert behaviors, TTP correlation, blast-radius validation, 2024-2026 features
 
 ## Domain
 

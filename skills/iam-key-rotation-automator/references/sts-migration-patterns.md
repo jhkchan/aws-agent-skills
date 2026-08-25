@@ -264,3 +264,23 @@ Track migration progress across the fleet:
 | IRSA not working | OIDC provider not configured on EKS cluster | Associate OIDC provider with the cluster |
 | STS assume-role fails from on-prem | Trust policy does not include the IAM user | Add the user ARN to the role's trust policy |
 | Credential refresh gap in long-running process | STS credentials expire mid-process | Implement credential refresh loop or use Session with auto-refresh |
+
+## Step 11 — STS temporary credentials migration (from SKILL.md § Step 11)
+
+```python
+# Before: static key
+s3 = boto3.client('s3', aws_access_key_id='AKIAOLD', aws_secret_access_key='old')
+
+# After: STS assume role (auto-refreshing)
+sts = boto3.client('sts')
+assumed = sts.assume_role(RoleArn='arn:aws:iam::111111111111:role/AppS3Access',
+                          RoleSessionName='app-session')
+s3 = boto3.client('s3',
+    aws_access_key_id=assumed['Credentials']['AccessKeyId'],
+    aws_secret_access_key=assumed['Credentials']['SecretAccessKey'],
+    aws_session_token=assumed['Credentials']['SessionToken'])
+```
+
+For EC2/ECS/EKS: use instance/task/pod roles directly — the SDK
+auto-discovers credentials. No code change needed beyond removing the
+static keys.

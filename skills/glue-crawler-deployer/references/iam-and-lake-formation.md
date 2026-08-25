@@ -268,3 +268,57 @@ aws glue create-connection \
 
 `Path: "public/%"` crawls all tables in the `public` schema. Use
 exclusions to skip temporary or staging tables.
+
+---
+
+## Crawler IAM policies (trust + least-privilege permissions)
+
+**Trust policy:**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": { "Service": "glue.amazonaws.com" },
+    "Action": "sts:AssumeRole"
+  }]
+}
+```
+
+**Permissions policy (least-privilege for S3 crawler):**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow", "Action": ["s3:GetObject", "s3:ListBucket"],
+      "Resource": ["arn:aws:s3:::my-data-lake", "arn:aws:s3:::my-data-lake/*"] },
+    { "Effect": "Allow",
+      "Action": ["glue:GetDatabase", "glue:CreateDatabase", "glue:GetTable",
+        "glue:CreateTable", "glue:UpdateTable", "glue:DeleteTable",
+        "glue:GetTables", "glue:GetPartition", "glue:CreatePartition",
+        "glue:UpdatePartition", "glue:GetPartitions", "glue:BatchCreatePartition"],
+      "Resource": ["arn:aws:glue:us-east-1:123456789012:catalog",
+        "arn:aws:glue:us-east-1:123456789012:database/my_database",
+        "arn:aws:glue:us-east-1:123456789012:table/my_database/*"] }
+  ]
+}
+```
+
+## Grant Lake Formation permissions to the crawler role
+
+**Grant LF permissions to crawler role:**
+
+```bash
+aws lakeformation grant-permissions \
+  --principal DataLakePrincipalIdentifier=arn:aws:iam::123456789012:role/GlueCrawlerRole \
+  --permissions CREATE_TABLE, ALTER, DROP \
+  --resource '{ "Database": { "Name": "my_database" } }'
+
+aws lakeformation grant-permissions \
+  --principal DataLakePrincipalIdentifier=arn:aws:iam::123456789012:role/GlueCrawlerRole \
+  --permissions ALL \
+  --resource '{ "Table": { "DatabaseName": "my_database", "Name": "*" } }'
+```
+

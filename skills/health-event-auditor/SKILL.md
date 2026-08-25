@@ -315,103 +315,8 @@ REMEDIATION:
 These patterns are easy to misjudge without operational Health
 experience. Each changes a verdict if ignored.
 
-- **`eventScopeCode` governs visibility, not severity.** `PUBLIC` events
-  appear in the public AWS Health Dashboard (region-wide outages). They
-  do not require an account-level audit — they affect everyone. An
-  account-scope audit that flags a `PUBLIC` event as UNRESOLVED_EVENT is
-  double-counting: the event is real, but the action is "monitor AWS's
-  regional recovery," not "remediate your resource." Treat `PUBLIC`
-  events as informational FINDINGS; only `ACCOUNT_SPECIFIC` events
-  require per-resource remediation.
-
-- **`describe-entity-aggregates` returns counts, not resources.** The
-  org-view API `aws health describe-entity-aggregates --event-arns <arn>`
-  returns `{eventId, eventArn, entityArn, entityValue, statusCode,
-  awsAccountId}` per entity but does NOT include the underlying resource
-  ARN or tags. For remediation, you must cross-reference the
-  `entityValue` (e.g., an instance ID) against the resource in the
-  member account. Confusing the aggregate entity ARN for a resource ARN
-  breaks downstream automation.
-
-- **The Health API throttles at ~1 request/second per account.** Bulk
-  enumeration across many member accounts needs exponential backoff
-  (`--max-attempts` and a jittered retry loop). Without throttling,
-  `describe-affected-entities` returns `ThrottlingException` on large
-  events. The throttle is per-account, not per-event — a 5000-entity
-  event paginated in serial will throttle.
-
-- **`eventDescription` is a list, not a string.** `describe-events`
-  returns `eventDescription: [{language: "en_US", latestDescription:
-  "..."}, ...]`. Iterating past the first element silently picks a
-  non-English description. Always filter for `language: "en_US"` (or the
-  operator's preferred locale). The description text often contains the
-  prescribed action for scheduled changes — losing it via wrong-language
-  iteration means emitting a SCHEDULED_CHANGE verdict with no action
-  verb.
-
-- **`startTime` for scheduled changes is the deadline, not the issue
-  time.** Confusing `startTime` (deadline for scheduledChange, issue
-  onset for issue events) with `lastUpdatedTime` (when AWS last touched
-  the record) is the most common scheduling error. A scheduled change
-  with `startTime` in the past and `eventStatus: upcoming` is rare but
-  possible (AWS extending a window without updating status) — flag as
-  DEADLINE_OVERDUE and treat as UNRESOLVED_EVENT-equivalent urgency.
-
-- **`eventStatus: upcoming` only applies to scheduled changes.**
-  `accountNotification` and `issue` events transition `open` → `closed`
-  directly. If an input shows `eventStatus: upcoming` with
-  `eventTypeCategory: issue`, the data is malformed — emit ERROR.
-
-- **Health Organizational View is independent of AWS Organizations
-  "all features."** An org in "consolidated billing only" mode can still
-  enable Health org view — the feature does not require the full
-  organization feature set. Treating "org features not enabled" as
-  blocking Health org view is a false-CONFIG_GAP.
-
-- **EventBridge rule patterns must match `source`, not just
-  `detail-type`.** A rule filtering only on
-  `detail-type: ["AWS Health Event"]` works but is brittle — AWS could
-  rename detail-types (the v1 → v2 Health event schema renamed several).
-  Filtering on `"source": ["aws.health"]` is the durable pattern.
-  Composite rules (source + detail-type + detail.eventTypeCategory) are
-  the most selective and the most resilient.
-
-- **`affectedAccountName` is only populated in org-view events.** In a
-  single-account event, the field is absent. Treating absence of
-  `affectedAccountName` as "no affected accounts" is a false-OK — the
-  account is implicit in the event ARN's account segment.
-
-- **Multi-account events have a single org-view event ARN.** The same
-  underlying incident surfaces as ONE event with multiple affected
-  entities across accounts when org view is enabled, but as SEPARATE
-  event ARNs (one per account) when each account is audited individually.
-  De-duplicate cross-account findings by `eventTypeCode` + window, not
-  by eventArn.
-
-- **`describe-event-types` catalog is not exhaustive.** New event types
-  appear before the catalog is updated. An unknown `eventTypeCode` is
-  not an error — classify by `eventTypeCategory` and `eventStatus`,
-  which are always present. Treat catalog absence as informational.
-
-- **Health API is read-only and idempotent.** No Health API call modifies
-  state — remediation commands are always against the affected resource's
-  own service (EC2, RDS, Lambda). The `aws health` namespace has no
-  `close-event` or `acknowledge-event`; closure is AWS-side and
-  automatic when the underlying incident resolves.
-
-- **Default rule name `default-rule-Health-<random>`** is created once
-  per account around the time of first Health event delivery. If an
-  account has never had a Health event, the rule may not exist yet —
-  this is NOT a CONFIG_GAP on its own (it is AWS's lazy initialisation).
-  The CONFIG_GAP is when Health events have occurred and no rule exists
-  to consume them. Distinguish "no rule yet because no events" from
-  "no rule while events exist."
-
-- **Closed events are retained for ~90 days** in the Health API. Beyond
-  that they age out and `describe-events` no longer returns them.
-  Forensic audits older than 90 days must use CloudTrail (management
-  events for `health:Describe*` calls) or the AWS Health Dashboard
-  historical view.
+Expert edge-case catalog moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Expert edge cases — non-obvious AWS Health behaviours
 
 ## Anti-Patterns — NEVER
 
@@ -558,175 +463,25 @@ prescribed actions; deviating from it (e.g., reboot vs stop/start) can
 fail silently. For config gaps, prefer additive changes (add a rule,
 add a bus-policy statement) over destructive ones (replace policy).
 
-### For UNRESOLVED_EVENT — open issue with impaired entities
-
-1. Verify the impaired entities are still impaired:
-   `aws health describe-affected-entities --filter eventArn=<arn>
-   --region us-east-1 --output json`
-   Page via `--next-token` until exhausted.
-2. For each `IMPAIRED` entity, apply the prescribed action from the
-   event description. For EC2 degraded-performance, the typical action
-   is stop/start:
-   `aws ec2 stop-instances --instance-ids <id> --region <resource-region>`
-   wait for `Stopped`, then
-   `aws ec2 start-instances --instance-ids <id> --region <resource-region>`
-3. Re-fetch the entity status after remediation. The status may take
-   5-15 minutes to update from `IMPAIRED` to `RESOLVED`.
-4. If all entities are `RESOLVED` but `eventStatus` is still `open`,
-   open a Support case referencing the eventArn and the entity
-   resolutions. Do NOT leave the event open — it pollutes future audits.
-
-### For SCHEDULED_CHANGE — upcoming scheduled change
-
-1. Identify the deadline (`startTime`) and the prescribed action from
-   the event description.
-2. Schedule the action during the operator's maintenance window,
-   BEFORE the deadline. For EC2 instance retirement:
-   `aws ec2 stop-instances --instance-ids <id>`
-   `aws ec2 start-instances --instance-ids <id>`
-   (Stop/start, not reboot — reboot does not migrate hosts.)
-3. For multi-entity scheduled changes, batch the actions to minimize
-   availability impact (e.g., cycle through an ASG rather than stop all
-   instances at once).
-4. After the deadline, the event transitions to `closed`. Verify the
-   post-action state:
-   `aws health describe-affected-entities --filter eventArn=<arn>`
-
-### For CONFIG_GAP — org view disabled
-
-1. From the Organizations MANAGEMENT account (not a delegated admin):
-   `aws health enable-health-service-access-for-organization
-   --region us-east-1`
-2. Verify activation:
-   `aws health describe-health-service-status-for-organization
-   --region us-east-1`
-   The `healthServiceAccessStatusForOrganization` field should read
-   `enabled`.
-3. Optionally register a delegated administrator for ongoing audits:
-   `aws organizations register-delegated-administrator
-   --account-id <security-tooling-account>
-   --service-principal health.amazonaws.com`
-4. Re-run the org-scope audit to enumerate events across all member
-   accounts. Events that were previously invisible now surface.
-
-### For CONFIG_GAP — missing EventBridge aws.health rule
-
-1. Create the rule on the default event bus in EACH account (or use
-   org-wide stacks via CloudFormation StackSets):
-   `aws events put-rule --name HealthEventRouter --event-bus-name default
-   --event-pattern '{"source":["aws.health"]}' --region us-east-1`
-2. Add a target (SNS topic, Lambda, or Step Functions):
-   `aws events put-targets --rule HealthEventRouter --event-bus-name
-   default --targets file://targets.json --region us-east-1`
-3. Verify the event bus policy allows `health.amazonaws.com` to put
-   events:
-   `aws events describe-event-bus --name default --region us-east-1`
-   If no statement authorises `events:PutEvents` from
-   `health.amazonaws.com`, add it:
-   `aws events put-permission --event-bus-name default
-   --statement-id HealthAllow --action events:PutEvents
-   --principal health.amazonaws.com`
-4. Test by emitting a mock event via `aws events put-events` (for the
-   default bus) or wait for the next real Health event.
-
-### For OK
-
-1. No remediation required for the current posture.
-2. Recommend verifying Health Organizational View status quarterly
-   (the field can be inadvertently disabled by org-management changes).
-3. Recommend reviewing the EventBridge aws.health rule set quarterly to
-   catch target drift (Lambda deprecation, SNS topic deletion).
-4. For closed events with active post-state verification (e.g., a
-   migrated instance), confirm the resource is healthy in its own
-   service console before considering the incident fully closed.
+Per-verdict remediation command sequences moved to references.
+→ [references/diagnostic-commands.md](references/diagnostic-commands.md) § Remediation guidance — per-verdict commands
 
 ## Deep reference: AWS Health internals
 
-### Health API surface
-
-The Health API (`health.amazonaws.com`, service prefix `health`) is
-global — all calls go to `us-east-1` regardless of resource region.
-The core audit surface:
-
-- `describe-events` — list events by filter (eventStatusCodes,
-  eventTypeCategories, services, regions, lastUpdatedTime ranges).
-  Returns event metadata only, not affected entities.
-- `describe-affected-entities` — list entities (resources) impacted by
-  a specific event, with per-entity `statusCode`. Paginated at 100/page.
-- `describe-entity-aggregates` — org-view aggregate counts per event
-  per account. Does NOT return resource ARNs or tags.
-- `describe-event-types` — catalog of all known event type codes. May
-  lag behind newly introduced events.
-- `describe-health-service-status-for-organization` — returns
-  `healthServiceAccessStatusForOrganization` (enabled / disabled /
-  pending). The authoritative org-view check.
-
-### Event lifecycle
-
-An event progresses through a fixed lifecycle by `eventTypeCategory`:
-
-- `issue`: `open` → `closed`. AWS opens on incident detection, closes
-  on resolution. Affected entities may transition
-  `UNIMPAIRED → IMPAIRED → RESOLVED` independently.
-- `scheduledChange`: `upcoming` → `closed`. AWS opens on schedule
-  announcement, closes after the change window passes. Entities
-  typically stay `UNIMPAIRED` until the action window, then transition
-  based on operator action.
-- `accountNotification`: no status transition — purely informational.
-  Always treat as OK unless the notice text prescribes an action.
-
-### Health event schema versions
-
-AWS Health event JSON has two coexisting schema versions (v1 and v2)
-delivered to EventBridge. v2 adds `eventArn` structural metadata and
-renames several detail fields. EventBridge rules that filter on v1
-field paths may silently miss v2 events. Filter on `source` to be
-version-resilient.
-
-### EventBridge delivery
-
-Health events are delivered to the **default event bus** in each
-affected account (and each member account with org view enabled). The
-delivery requires:
-
-1. The default event bus exists (it always does in modern accounts).
-2. The bus policy authorises `health.amazonaws.com` to call
-   `events:PutEvents`. AWS auto-adds this statement when org view is
-   enabled; without org view, the statement may be absent for member
-   accounts — verify per account.
-3. At least one rule on the default bus matches the event (typically
-   `source: ["aws.health"]`). Without a matching rule, the event is
-   delivered to the bus and immediately dropped (no rule consumes it).
-
-### Pagination and throttle limits
-
-- `describe-events`: 10-100 results per page (default 10), `nextToken`
-  pagination.
-- `describe-affected-entities`: 100 per page max.
-- `describe-entity-aggregates`: returns up to 100 aggregates per call.
-- Throttle: ~1 request/second per account. Bulk enumeration across
-  many events or accounts needs exponential backoff with jitter.
-
-### Support tier matrix
-
-| Tier | Health API access | Health Dashboard | EventBridge delivery |
-|---|---|---|---|
-| Basic | No (`SubscriptionRequiredException`) | Read-only (limited) | Yes |
-| Developer | No (`SubscriptionRequiredException`) | Read-only (limited) | Yes |
-| Enterprise On-Ramp | Yes | Full | Yes |
-| Business | Yes | Full | Yes |
-| Enterprise | Yes | Full + org view | Yes |
-
-A Basic/Developer account still receives EventBridge Health events —
-the API gating is for direct programmatic audit, not delivery.
-EventBridge-driven automations work even on Basic-tier accounts.
+AWS Health internals deep reference moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Deep reference: AWS Health internals
 
 ## Recent AWS features (2024-2026)
 
-- **Health Dashboard refresh (2024-2025):** The AWS Health Dashboard was redesigned with a unified view for account and organizational events. The organizational view is now enabled by default for management accounts. Auditors should verify that the org-level Health Dashboard is accessible to security/ops teams.
-- **Health Aware notifications (2024):** Enhanced EventBridge integration for Health events with more detailed event metadata. Auditors should verify that EventBridge rules for `aws.health` events are configured for critical event categories (issue, scheduledChange).
-- **RCA (Root Cause Analysis) events (2024):** AWS Health now publishes RCA summaries for resolved incidents. No new audit-surface fields, but auditors should verify that RCAs are reviewed and tracked.
+2024-2026 feature notes moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Recent AWS features (2024-2026)
 
+## References (load on demand)
+
+Consult these only when the corresponding topic comes up:
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert edge cases (non-obvious Health behaviours), the AWS Health internals deep reference (API surface, event lifecycle, schema versions, EventBridge delivery, pagination/throttling, support-tier matrix), and recent AWS features
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — per-verdict remediation command sequences (moved from § Remediation guidance)
 ## Domain
 
 AWS CloudOps / AWS Health Operational Event Management.

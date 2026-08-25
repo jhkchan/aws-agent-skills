@@ -283,3 +283,110 @@ resource "aws_glue_crawler" "events" {
   }
 }
 ```
+
+---
+
+## Expert heuristic: classifier order evaluation (first match wins)
+
+A baseline model says "just add classifiers." The correct heuristic
+recognizes that classifier ORDER determines the output schema.
+
+```text
+Crawler classifier evaluation order:
+  1. Custom classifiers (in the ORDER listed in the crawler config)
+  2. Built-in classifiers (CSV, JSON, ORC, Parquet, Avro, XML)
+
+  First match wins:
+  ├── File: app-2026-08-05.log (matches both Grok and CSV)
+  │     Custom Grok classifier listed FIRST → Grok schema used ✓
+  │     Custom Grok classifier listed SECOND → CSV schema used (built-in CSV runs first) ✗
+  └── File: events-2026-08-05.json (matches custom JSON + built-in JSON)
+        Custom JSON classifier listed FIRST → custom JSON schema used ✓
+        Custom JSON classifier listed SECOND → built-in JSON used ✗
+
+Rule: custom classifiers should ALWAYS be listed BEFORE relying on
+built-in classifiers. The Classifiers list is ordered — position 0
+is evaluated first.
+```
+
+**Key implication:** if your custom Grok pattern for log parsing is
+not matching, check if a built-in classifier is matching first.
+Reorder the classifiers list to put custom classifiers first.
+
+## Expert heuristic: partition projection for cost reduction
+
+A baseline model says "let the crawler discover partitions." The
+correct heuristic uses partition projection for high-cardinality or
+well-structured partitioning schemes.
+
+```text
+Folder partitioning (default):
+  s3://bucket/year=2026/month=08/day=05/
+  → Crawler enumerates EACH partition value
+  → Creates partition objects in the Data Catalog
+  → Athena queries hit GetPartitions API for each partition
+  → Cost: crawler time + GetPartitions API calls
+  → Problem: 1000 partitions = 1000 catalog entries + slow queries
+
+Partition projection (configured, not enumerated):
+  Table property: projection.enabled=true
+  projection.year.range=2024,2026
+  projection.month.range=01,12
+  projection.day.range=01,31
+  projection.day.type=date
+  projection.day.format=yyyy-MM-dd
+  → NO partition objects created in catalog
+  → Athena COMPUTES partition values from the configured range
+  → Cost: zero partition enumeration, zero GetPartitions calls
+  → Works for: date ranges, enum values, integer ranges
+  → Does NOT work for: arbitrary partition values (e.g., user IDs)
+```
+
+**Key implication:** for date-based or range-based partitioning,
+partition projection eliminates crawler partition enumeration and
+Athena GetPartitions costs. Use folder partitioning only for arbitrary
+or unpredictable partition values.
+
+## Create custom classifiers (Grok and CSV CLI)
+
+**Create custom Grok classifier:**
+
+```bash
+aws glue create-grok-classifier \
+  --name "AppLogClassifier" \
+  --classification "app-logs" \
+  --grok-pattern "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{DATA:service} %{GREEDYDATA:message}" \
+  --custom-patterns "LOGLEVEL [DEBUG|INFO|WARN|ERROR|FATAL]"
+```
+
+**Create custom CSV classifier:**
+
+```bash
+aws glue create-csv-classifier \
+  --name "CustomCsvClassifier" \
+  --delimiter "," \
+  --quote-symbol "\"" \
+  --contains-header "PRESENT" \
+  --header "id,name,value,timestamp"
+```
+
+## Partition projection table properties
+
+**Partition projection (table properties set post-crawl or via template):**
+
+```json
+{
+  "Properties": {
+    "projection.enabled": "true",
+    "projection.year.type": "integer",
+    "projection.year.range": "2024,2026",
+    "projection.month.type": "integer",
+    "projection.month.range": "01,12",
+    "projection.day.type": "date",
+    "projection.day.format": "yyyy-MM-dd",
+    "projection.day.range": "2024-01-01,NOW",
+    "storage.location.template": "s3://my-data-lake/events/year=${year}/month=${month}/day=${day}"
+  }
+}
+```
+

@@ -260,3 +260,169 @@ resource "aws_greengrass_component_definition" "data_processor" {
   }
 }
 ```
+
+## Step 1 — Component recipe (lifecycle hooks) — moved from SKILL.md
+
+The component recipe is a YAML file that defines the component's
+metadata, lifecycle hooks, artifacts, and configuration schema.
+
+**Minimal recipe structure:**
+
+```yaml
+---
+RecipeFormatVersion: "2020-01-25"
+ComponentName: com.example.MyComponent
+ComponentVersion: "1.0.0"
+ComponentDescription: "My first Greengrass component"
+ComponentPublisher: Example
+ComponentConfiguration:
+  DefaultConfiguration:
+    message: "Hello from Greengrass"
+    interval: 5
+Manifests:
+  - Name: "linux-amd64"
+    Platform:
+      architecture: amd64
+      os: linux
+    Artifacts:
+      - URI: s3://my-bucket/artifacts/my-script.py
+        Unarchive: NONE
+    Lifecycle:
+      Install:
+        Script: |
+          mkdir -p {artifacts:decompressedPath}/my-component
+          cp {artifacts:path}/my-script.py {artifacts:decompressedPath}/my-component/
+      Startup:
+        Script: |
+          python3 {artifacts:decompressedPath}/my-component/my-script.py
+      Shutdown:
+        Script: |
+          echo "Shutting down MyComponent"
+```
+
+**Lifecycle hook precedence:**
+
+| Hook | When it runs | Exit code 0 | Exit code non-zero |
+|---|---|---|---|
+| Install | On first deploy or version update | Component proceeds to Startup | Component deployment fails |
+| Startup | After install, on device boot, on restart | Component is RUNNING (stays running) | Component enters ERRORED state; recover hook runs |
+| Shutdown | On undeploy, device shutdown, version update | Clean stop | Force kill after timeout |
+| Recover | If startup fails (optional) | Component retries startup | Component stays ERRORED |
+
+**Artifact path variables:**
+
+| Variable | Expands to |
+|---|---|
+| `{artifacts:path}` | Path to the artifact as downloaded (file or directory) |
+| `{artifacts:decompressedPath}` | Path to the decompressed artifact (for ZIP/TAR archives) |
+| `{work:path}` | Component work directory (persistent, per-component) |
+| `{configuration:/<key>}` | Configuration value for the given key |
+
+## Step 2 — Component versioning — moved from SKILL.md
+
+Greengrass v2 components use semantic versioning (`MAJOR.MINOR.PATCH`).
+Every recipe change requires a version bump. Creating a component
+version with the same version as an existing one is a no-op.
+
+**Version bump rules:**
+
+| Change type | Version bump | Example |
+|---|---|---|
+| Bug fix, no new features | PATCH | 1.0.0 → 1.0.1 |
+| New feature, backward-compatible | MINOR | 1.0.1 → 1.1.0 |
+| Breaking change | MAJOR | 1.1.0 → 2.0.0 |
+| Recipe lifecycle change | MINOR or MAJOR | 1.1.0 → 1.2.0 |
+| Artifact update only | PATCH | 1.1.0 → 1.1.1 |
+
+**Create a component version:**
+
+```bash
+# Upload the recipe to S3 (or use inline)
+aws greengrassv2 create-component-version \
+  --inline-recipe fileb://recipe.yaml \
+  --region us-east-1
+
+# Or from S3
+aws greengrassv2 create-component-version \
+  --lambda-function '{"lambdaArn": "arn:aws:lambda:us-east-1:123456789012:function:my-func:1", "componentName": "com.example.MyLambda", "componentVersion": "1.0.0"}' \
+  --region us-east-1
+```
+
+**Verify component version created:**
+
+```bash
+aws greengrassv2 describe-component \
+  --arn "arn:aws:greengrass:us-east-1:123456789012:components:com.example.MyComponent:versions:1.0.0" \
+  --region us-east-1
+```
+
+## Step 3 — Artifact storage (S3) — moved from SKILL.md
+
+Component artifacts (scripts, binaries, models, archives) are stored
+in S3. The recipe references them by S3 URI. Greengrass uses the
+token exchange role on the core device to download artifacts (NOT
+presigned URLs).
+
+**Upload artifact to S3:**
+
+```bash
+aws s3 cp my-script.py s3://my-greengrass-artifacts/artifacts/com.example.MyComponent/1.0.0/my-script.py \
+  --region us-east-1
+```
+
+**Token exchange role policy (must include s3:GetObject):**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:GetObject"],
+      "Resource": "arn:aws:s3:::my-greengrass-artifacts/*"
+    }
+  ]
+}
+```
+
+**Artifact archive types:**
+
+| Unarchive value | When to use |
+|---|---|
+| NONE | Single file (script, binary) |
+| ZIP | Multiple files compressed as ZIP |
+| TAR | Multiple files compressed as TAR |
+| TAR_GZ | Multiple files compressed as TAR.GZ |
+
+For ZIP/TAR archives, use `{artifacts:decompressedPath}` in lifecycle
+scripts to reference the extracted files.
+
+## Step 4 — Component dependencies (hard vs soft) — moved from SKILL.md
+
+Components can depend on other components. There are two dependency
+types:
+
+| Dependency type | Behavior | Use case |
+|---|---|---|
+| HARD | If dependency fails, THIS component also fails | Required runtime (e.g., aws.lambda for Lambda components) |
+| SOFT | If dependency fails, THIS component still starts | Optional features (e.g., a logging component) |
+
+**Recipe with dependencies:**
+
+```yaml
+ComponentDependencies:
+  - DependencyType: HARD
+    ComponentRequire:
+      ThingName: aws.lambda
+      Version: "2.3.0"
+  - DependencyType: SOFT
+    ComponentRequire:
+      ThingName: com.example.Logging
+      Version: "1.0.0"
+```
+
+**Dependency resolution order:**
+
+Greengrass resolves dependencies in topological order. HARD
+dependencies are installed and started BEFORE the dependent
+component. SOFT dependencies are started before but do not block.

@@ -72,3 +72,62 @@ aws cloudwatch put-metric-alarm \
 3. Never set throughput below 8 MB/s for active workloads
 4. Never forget to validate AD trust before self-managed AD join
 5. Never use SCRATCH for data that needs persistence
+
+---
+
+## Step 8 — Backup and restore (moved from SKILL.md)
+
+```bash
+# Create a manual backup
+aws fsx create-backup \
+  --file-system-id fs-aaa111222 \
+  --tags Key=Name,Value=pre-change-backup \
+  --region us-east-1
+
+# Restore from a backup (creates a NEW file system)
+aws fsx create-file-system-from-backup \
+  --backup-id backup-xxx \
+  --subnet-ids subnet-aaa111 subnet-bbb222 \
+  --region us-east-1
+
+# List backups
+aws fsx describe-backups \
+  --filters Name=file-system-id,Values=fs-aaa111222 \
+  --region us-east-1 --output table
+```
+
+**Constraints:** Restore creates a NEW file system (the original is
+not overwritten). Automated backups are configured at creation.
+
+## Step 9 — ONTAP SVM and volume tiering (moved from SKILL.md)
+
+FSx for ONTAP uses Storage Virtual Machines (SVMs) and volumes with
+tiering (SSD cache + HDD capacity pool).
+
+```bash
+# Create an ONTAP file system
+aws fsx create-file-system \
+  --file-system-type ONTAP \
+  --storage-capacity 1024 \
+  --ontap-configuration DeploymentType=MULTI_AZ_1,\
+PreferredSubnetId=subnet-aaa111 \
+  --subnet-ids subnet-aaa111 subnet-bbb222 \
+  --region us-east-1
+
+# Create an SVM (after file system is ACTIVE)
+aws fsx create-storage-virtual-machine \
+  --file-system-id fs-aaa111222 \
+  --name svm-prod \
+  --region us-east-1
+
+# Create a volume with tiering
+aws fsx create-volume \
+  --volume-type ONTAP \
+  --name vol-prod \
+  --ontap-configuration \
+    JunctionPath=/vol-prod,SizeInMegabytes=1048576,\
+StorageEfficiency=enabled,TieringPolicy=auto,\
+StorageVirtualMachineId=svm-xxx \
+  --region us-east-1
+```
+

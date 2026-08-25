@@ -120,30 +120,7 @@ ErrorMessage, ExecutionTime, configuration), CloudWatch Logs excerpt for
 the failing run, and — for performance/skew diagnoses — the Spark UI
 event log exported to S3.
 
-```bash
-# 1. Job-run metadata
-RUN_ID=jr_abc123def456
-aws glue get-job-run --job-name nightly-sales-aggregation \
-  --run-id $RUN_ID --output json > job-run.json
-
-# 2. Recent runs (was this the first failure?)
-aws glue get-job-runs --job-name nightly-sales-aggregation \
-  --max-results 20 --output json > job-runs.json
-
-# 3. CloudWatch Logs for the failing run (/aws-glue/jobs/output)
-aws logs filter-log-events \
-  --log-group-name /aws-glue/jobs/output \
-  --log-stream-name $RUN_ID --filter-pattern "ERROR" \
-  --output json > job-errors.json
-
-# 4. Bookmark state (for bookmark-stall category)
-aws glue get-job-bookmark --job-name nightly-sales-aggregation \
-  --run-id $RUN_ID --output json > bookmark.json
-
-# 5. Spark UI event log (when enabled via --spark-event-logs-path)
-LOG_PATH=$(jq -r '.JobRun.Arguments["--spark-event-logs-path"] // empty' job-run.json)
-aws s3 cp "$LOG_PATH/$RUN_ID/" ./spark-ui/ --recursive
-```
+Data-gate CLI (get-job-run, get-job-runs, CloudWatch Logs, bookmark state, Spark UI event log) moved to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
 
 ### Data-quality short-circuits
 
@@ -165,41 +142,7 @@ may have failed earlier.
 
 ### Step 0: Non-obvious behaviours that change the diagnosis
 
-- **`ErrorMessage` is frequently `No ErrorReason` even when the script
-  threw.** Glue's control plane surfaces a high-level state (FAILED) but
-  only captures the Python traceback if continuous logging is enabled.
-  Always check `--enable-continuous-cloudwatch-log` before assuming
-  "no error."
-- **Job timeout is the configured `Timeout` minutes, not a Spark kill.**
-  A job with `Timeout: 60` that runs exactly 60 minutes and fails was
-  killed by the Glue control plane. The fix is either raising `Timeout`
-  or fixing the slowness — never both at once.
-- **Bookmark tracks the source's partition column, not the job's
-  output.** A job reading from `s3://bucket/year=2025/month=01/` with
-  `partitionKeys=["year","month"]` bookmarks the highest `(year, month)`
-  seen. If source layout changes to `dt=2025-01-01`, the bookmark is
-  orphaned and the job reprocesses everything.
-- **Glue 4.0 tightened Spark SQL strictness.** A script that ran on 3.0
-  may fail on 4.0 with `SparkUpgradeException` on date parsing (Julian
-  → Proleptic Gregorian calendar). Pass
-  `--conf spark.sql.legacy.timeParserPolicy=LEGACY` to restore.
-- **JDBC reads succeeding in dev fail in prod when the Glue connection's
-  SG lacks a self-referencing rule.** The Glue ENI's own SG must allow
-  egress back to itself for the database port, in addition to the
-  database SG allowing ingress from the Glue SG.
-- **`G.1X` vs `G.2X` changes executor heap, not just DPU count.**
-  `G.1X` ≈ 6 GB executor heap; `G.2X` ≈ 12 GB. OOM on `G.1X` may resolve
-  on `G.2X` — but only if the OOM is genuine heap pressure, not skew.
-- **Spark UI event logs land in S3 only after the run ends.** For a live
-  RUNNING job, the Spark UI is accessible from the Glue Console; for
-  historical runs, the S3 path is the source of truth.
-- **`NumberOfWorkers` minimum is 2 (Spark) or 1 (Ray).** Auto-scaling
-  (Glue 3.0+) can lower the floor, but a static job with
-  `NumberOfWorkers: 1` will fail to start.
-- **Data Catalog "table not found" is usually the database name or IAM
-  permission, not the table.** `EntityNotFoundException` fires when the
-  table doesn't exist AND when the job's IAM role lacks `glue:GetTable`
-  on it. Both look identical.
+Step 0 non-obvious behaviours moved to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
 ### Step 1: Job failure (Python script exceptions)
 
@@ -208,12 +151,7 @@ may have failed earlier.
 
 **Failing probe:** CloudWatch Logs for the run, filtered to `Traceback`.
 
-```bash
-aws logs filter-log-events \
-  --log-group-name /aws-glue/jobs/output \
-  --log-stream-name $RUN_ID --filter-pattern "Traceback" \
-  --output json
-```
+Probe: [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 1 Traceback log filter.
 
 | Exception in trace | Root cause | Fix |
 |---|---|---|
@@ -261,16 +199,7 @@ connect`.
 **Failing probe:** verify Glue connection's SG, subnet route table, and
 the database SG ingress.
 
-```bash
-aws glue get-connection --name nightly-rds-conn --output json > conn.json
-CONN_SG=$(jq -r '.Connection.Properties.SECURITY_GROUP_ID' conn.json)
-CONN_SUBNET=$(jq -r '.Connection.Properties.SUBNET_ID' conn.json)
-
-aws ec2 describe-security-groups --group-ids $CONN_SG --output json
-aws ec2 describe-security-groups --group-ids $DB_SG --output json
-aws ec2 describe-route-tables \
-  --filters Name=association.subnet-id,Values=$CONN_SUBNET --output json
-```
+Probe: [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 3 connection SG / subnet / DB SG / route table.
 
 | Missing config | Symptom | Fix |
 |---|---|---|
@@ -349,11 +278,7 @@ failure with `Lost task` retries.
 **Failing probe:** Spark UI event log — identify the failed stage, task
 attempt counts, and executor memory metrics.
 
-```bash
-LOG_BUCKET=$(jq -r '.JobRun.Arguments["--spark-event-logs-path"]' job-run.json)
-aws s3 ls "$LOG_BUCKET/$RUN_ID/" --recursive
-# Inspect with spark-events-reader or the Glue Console "Spark UI" tab
-```
+Probe: [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 6 Spark UI event log retrieval.
 
 | Spark symptom | Root cause | Fix |
 |---|---|---|
@@ -450,115 +375,19 @@ REMEDIATION:
 
 ### Worked example — JDBC VPC security group
 
-```text
-TARGET: orders-etl-job/jr_def789abc012
-VERDICT: ROOT_CAUSE_FOUND
-REASON: Glue connection nightly-rds-conn uses SG sg-glue123, but the
-  database SG sg-rds456 lacks inbound on port 5432 from sg-glue123.
-  The TCP SYN was dropped at the database SG.
-CATEGORY: JDBC_VPC
-EVIDENCE:
-  - State=FAILED, ExecutionTime=18, ErrorMessage="VPC Connection error"
-  - Failing probe:
-    aws ec2 describe-security-groups --group-ids sg-rds456
-    → IpPermissions lack port 5432 with sg-glue123 source
-  - Passing probes: route table for Glue subnet reaches DB subnet;
-    Glue SG has egress to 0.0.0.0/0 on 5432; last successful 3 days ago
-REMEDIATION:
-  1. Add inbound to database SG:
-     aws ec2 authorize-security-group-ingress --group-id sg-rds456 \
-       --ip-permissions IpProtocol=tcp,FromPort=5432,ToPort=5432,\
-         UserIdGroupPairs=[{GroupId=sg-glue123}]
-  2. Add self-referencing rule to Glue SG (idempotent):
-     aws ec2 authorize-security-group-ingress --group-id sg-glue123 \
-       --ip-permissions IpProtocol=-1,FromPort=-1,ToPort=-1,\
-         UserIdGroupPairs=[{GroupId=sg-glue123}]
-  3. Verify from a Glue dev endpoint in the same subnet:
-     nc -vz orders-db.cluster-abc.us-east-1.rds.amazonaws.com 5432
-  4. Re-run:
-     aws glue start-job-run --job-name orders-etl-job
-```
+Full JDBC VPC security-group example moved to [references/worked-examples.md](references/worked-examples.md) — load on demand.
 
 ### Worked example — bookmark stall
 
-```text
-TARGET: hourly-events-rollup/jr_xyz987abc321
-VERDICT: ROOT_CAUSE_FOUND
-REASON: Source layout changed from year=/month= to dt= but the
-  bookmark tracks (year, month). The bookmark cannot advance on the
-  new layout, so the job reprocesses everything on every run.
-CATEGORY: BOOKMARK_STALL
-EVIDENCE:
-  - Reprocessed_bytes near total source bytes on each run
-  - Failing probe:
-    aws glue get-job-bookmark --job-name hourly-events-rollup
-    → bookmark Args partitionKeys == ["year","month"],
-      but source layout is now dt=
-  - Passing probes: IAM role has glue:UpdateJobBookmark (Allow);
-    --job-bookmark-option=enable
-REMEDIATION:
-  1. Reset the bookmark (one-time; forces full reprocess once):
-     aws glue reset-job-bookmark --job-name hourly-events-rollup
-  2. Update the script to read from dt= and set partition_keys=["dt"].
-  3. Re-crawl to register dt partitions:
-     aws glue start-crawler --name events-crawler
-  4. Verify subsequent runs skip processed dt partitions.
-```
+Full bookmark-stall example moved to [references/worked-examples.md](references/worked-examples.md) — load on demand.
 
 ### Worked example — Spark OOM with data skew
 
-```text
-TARGET: big-join-batch/jr_oom456def789
-VERDICT: ROOT_CAUSE_FOUND
-REASON: Executor OOM in stage 7 (join on customer_id). Spark UI shows
-  one task reading 380 GB vs median 1.2 GB — 316x skew. OOM is from
-  shuffling the hot key, not DPU shortage.
-CATEGORY: SPARK_OOM
-EVIDENCE:
-  - State=FAILED, ExecutionTime=23, ErrorMessage="Container killed by
-    YARN for exceeding memory limits"
-  - Failing probe: Spark UI stage 7 — min=12s, median=45s, max=2h17m;
-    one task processed 380 GB (single customer_id "ACME-001")
-  - Passing probes: NumberOfWorkers=10 (not DPU-starved);
-    ExecutionTime=23 < Timeout=240; no Python traceback
-REMEDIATION:
-  1. Salt the skewed join key:
-     hot="ACME-001"
-     df_small = df_small.withColumn("join_key",
-       when(col("customer_id")==hot,
-         concat(col("customer_id"), lit("_"),
-           (rand()*8).cast("int")))
-       .otherwise(col("customer_id")))
-     # Replicate df_big rows 8x for the hot key (see reference)
-  2. Raise shuffle partitions before the join:
-     spark.conf.set("spark.sql.shuffle.partitions", "2000")
-  3. Re-run at the same DPU count (do NOT raise workers yet):
-     aws glue start-job-run --job-name big-join-batch
-```
+Full Spark OOM data-skew example moved to [references/worked-examples.md](references/worked-examples.md) — load on demand.
 
 ### Worked example — NEED_MORE_INFO
 
-```text
-TARGET: long-running-extract/jr_qrs654tuv321
-VERDICT: NEED_MORE_INFO
-REASON: Job RUNNING for 90 minutes against a 60-min SLA, but Spark UI
-  was not enabled for this run. Cannot determine whether slowness is
-  skew, DPU starvation, or a stuck task.
-CATEGORY: UNKNOWN
-EVIDENCE:
-  - State=RUNNING, ExecutionTime=90, Timeout=180
-  - CloudWatch logs show normal progress, no errors
-  - Spark UI event log path not configured
-REMEDIATION:
-  1. Let the current run finish (do NOT cancel; data may be valid).
-  2. Enable Spark UI on the job:
-     aws glue update-job --job-name long-running-extract \
-       --job-update '{"DefaultArguments":{
-         "--enable-spark-ui":"true",
-         "--spark-event-logs-path":"s3://glue-spark-logs-us-east-1/long-running-extract/"}}'
-  3. Add a bucket lifecycle policy on the Spark UI logs (30-day expiry).
-  4. Re-run and re-invoke this skill with the new RunId.
-```
+Full NEED_MORE_INFO example moved to [references/worked-examples.md](references/worked-examples.md) — load on demand.
 
 ## Anti-Patterns — NEVER do these things
 
@@ -612,26 +441,7 @@ REMEDIATION:
 
 ## Expert heuristic — the 60-second triage
 
-When handed a failing Glue job and asked "what's wrong?", run this
-60-second triage before deep-diving any single category:
-
-1. **Pull `get-job-run`.** ExecutionTime vs Timeout and the ErrorMessage
-   narrow the category:
-   - Traceback → Step 1 (SCRIPT_EXCEPTION).
-   - `ExecutionTime == Timeout` (no traceback) → Step 2 (TIMEOUT_*).
-   - "Connection refused" / "VPC" → Step 3 (JDBC_VPC).
-   - "Table not found" / "Partition not found" → Step 5 (CATALOG_*).
-   - "OutOfMemoryError" / "YARN" → Step 6 (SPARK_OOM).
-2. **Pull CloudWatch Logs.** The run's log stream surfaces the actual
-   Python/Java exception even when ErrorMessage is empty.
-3. **Pull `get-job-bookmark`** if the complaint is reprocessing.
-4. **Pull the Glue connection's SG and subnet** if the symptom is JDBC.
-5. **Pull the Spark UI** if the symptom is slowness, OOM, or stage
-   failure. Without Spark UI, emit NEED_MORE_INFO rather than guessing.
-
-If none of the five steps produces a failing probe, the category is
-UNKNOWN and the next step is to enable Spark UI + continuous logging on
-the next run.
+60-second triage heuristic moved to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
@@ -666,21 +476,14 @@ the next run.
 
 ## Recent AWS features (2024-2026)
 
-- **Glue version 5.0 (2025 preview):** Spark 3.5, Python 3.11, faster
-  Iceberg support. Test in dev before promoting prod jobs.
-- **Glue auto-scaling (Glue 3.0+, broadened 2024):** Cluster scales down
-  to `--min-workers` when idle. Removes over-provisioning for spiky loads.
-- **Glue Iceberg support (Glue 4.0+):** Native Iceberg reads via
-  `from_catalog` with `format="iceberg"`. Bookmark behavior differs —
-  Iceberg snapshots are the bookmark, not partition keys.
-- **Glue Ray jobs (Glue 4.0+, 2024):** Ray workload type (Z.2X workers).
-  Different failure modes from Spark; this skill covers Spark only.
-- **Glue Schema Registry (2023-2024):** Avro/Protobuf/JSON schemas enforced at the DynamicFrame layer.
-- **Glue flexible execution class (2024):** Lower-cost DPUs with
-  potential preemption. A FAILED run on flexible execution may be
-  preemption — check ErrorMessage for `FLEX_EXECUTION_PREEMPTED` before
-  diagnosing.
-- **Glue Data Quality (2023-2024):** Separate service; route rule failures there, not to this skill.
+Recent AWS feature notes moved to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples (JDBC VPC SG, bookmark stall, Spark OOM skew, NEED_MORE_INFO).
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 non-obvious behaviours, the 60-second triage heuristic, recent AWS features.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight data-gate CLI and per-step probe commands (Steps 1, 3, 6).
+- [references/glue-runtime-reference.md](references/glue-runtime-reference.md) — Glue version / worker type / runtime mapping.
 
 ## Domain
 

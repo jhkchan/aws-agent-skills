@@ -22,6 +22,7 @@ metadata:
   keywords: IAM access key, key rotation, credential report, get-access-key-last-used, EventBridge scheduled rule, Lambda rotation, access advisor, break-glass exception, overlap window, STS temporary credentials, assume role, cross-account key sync
   tags: aws-iam, key-rotation, security, access-keys, eventbridge, lambda, automate
 ---
+---
 
 # IAM Key Rotation Automator
 
@@ -90,37 +91,8 @@ while still in use) or a security exposure (old key never deleted).
 
 ### Step 0: Expert knowledge — non-obvious IAM key behaviors
 
-- **IAM allows exactly 2 access keys per user.** The rotation flow uses
-  the second slot. If both are Active, the pipeline must first
-  determine which can be deactivated — this is the most common blocker.
-
-- **`get-access-key-last-used` is eventually consistent.** `LastUsedDate`
-  may lag by up to 4 hours. A key that appears "unused" may have been
-  used minutes ago. Always add a 24-hour buffer before deactivation.
-
-- **Deactivating a key does NOT immediately revoke active sessions.**
-  An application using the key may continue calling for minutes to
-  hours after deactivation. The overlap window accounts for this.
-
-- **Deleting a key is irreversible.** Any app still using it fails
-  immediately with `InvalidClientTokenId`. Always verify the new key
-  works AND the old key has not been used for N hours before deleting.
-
-- **Credential reports are generated on demand and may be 4 hours
-  stale.** For real-time data, use `list-access-keys` +
-  `get-access-key-last-used`.
-
-- **STS temporary credentials do NOT need rotation.** When an app
-  assumes a role via STS, credentials are temporary (15min-12hr). No
-  access key to rotate — this is the target architecture.
-
-- **`create-access-key` returns the secret ONCE.** If lost, the key
-  must be deactivated and recreated. Store immediately in Secrets
-  Manager. NEVER log the secret.
-
-- **Keys aged > 90 days trigger Security Hub findings.** Check IAM.7
-  (key aged > 90 days) and IAM.6 (key never used). Use these as
-  secondary detection signals.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Step 0: Expert knowledge".
+> Load when: designing the pipeline — 2-slot limit, last-used eventual consistency, session survival after deactivation, irreversible delete, 4h-stale reports.
 
 ### Step 1: Classify the access key
 
@@ -145,21 +117,8 @@ aws iam list-access-keys --user-name deployment-user
 aws iam get-access-key-last-used --access-key-id AKIAXYZ123
 ```
 
-```python
-import boto3, datetime
-iam = boto3.client('iam')
-
-def get_key_ages(user_name):
-    keys = iam.list_access_keys(UserName=user_name)['AccessKeyMetadata']
-    now = datetime.datetime.now(datetime.timezone.utc)
-    for key in keys:
-        age_days = (now - key['CreateDate']).days
-        last_used = iam.get_access_key_last_used(AccessKeyId=key['AccessKeyId'])
-        lu = last_used['AccessKeyLastUsed'].get('LastUsedDate')
-        yield {'key_id': key['AccessKeyId'], 'status': key['Status'],
-               'age': age_days, 'last_used': lu,
-               'days_since_used': (now - lu).days if lu else None}
-```
+> **Moved verbatim** → [references/iam-key-rotation-flows.md](references/iam-key-rotation-flows.md) § "Step 2 — key age detection (Python)".
+> Load when: computing per-key age and days-since-used in Python instead of the CLI.
 
 **Risk classification:**
 
@@ -186,60 +145,8 @@ past 90 days for rotation with SNS notification.
 
 ### Step 4: Lambda rotation flow (create → verify → deactivate → delete)
 
-**Phase 1 — Create:**
-
-```python
-def create_new_key(user_name):
-    keys = iam.list_access_keys(UserName=user_name)['AccessKeyMetadata']
-    active = [k for k in keys if k['Status'] == 'Active']
-    if len(active) >= 2:
-        return {'error': 'Both key slots in use'}
-    new_key = iam.create_access_key(UserName=user_name)
-    # Store secret securely immediately
-    sm = boto3.client('secretsmanager')
-    sm.put_secret_value(SecretId=f'iam-access-key/{user_name}',
-        SecretString=json.dumps({
-            'access_key_id': new_key['AccessKey']['AccessKeyId'],
-            'secret_access_key': new_key['AccessKey']['SecretAccessKey']}))
-    return new_key['AccessKey']
-```
-
-**Phase 2 — Verify new key works:**
-
-```python
-def verify_key(akid, secret):
-    sts = boto3.client('sts', aws_access_key_id=akid, aws_secret_access_key=secret)
-    try:
-        sts.get_caller_identity()
-        return True
-    except Exception:
-        return False
-```
-
-**Phase 3 — Deactivate old (after overlap + 24h inactivity):**
-
-```python
-def deactivate_old_key(user_name, old_key_id):
-    last = iam.get_access_key_last_used(AccessKeyId=old_key_id)
-    lu = last['AccessKeyLastUsed'].get('LastUsedDate')
-    if lu:
-        hours = (datetime.datetime.now(datetime.timezone.utc) - lu).total_seconds()/3600
-        if hours < 24:
-            return {'deferred': f'Key used {hours:.1f}h ago'}
-    iam.update_access_key(UserName=user_name, AccessKeyId=old_key_id, Status='Inactive')
-    return {'deactivated': True}
-```
-
-**Phase 4 — Delete (after 72h post-deactivation):**
-
-```python
-def delete_old_key(user_name, old_key_id):
-    for k in iam.list_access_keys(UserName=user_name)['AccessKeyMetadata']:
-        if k['AccessKeyId'] == old_key_id and k['Status'] != 'Inactive':
-            return {'error': 'Cannot delete Active key'}
-    iam.delete_access_key(UserName=user_name, AccessKeyId=old_key_id)
-    return {'deleted': True}
-```
+> **Moved verbatim** → [references/iam-key-rotation-flows.md](references/iam-key-rotation-flows.md) § "Step 4 — Lambda rotation flow code".
+> Load when: implementing the four-phase rotation Lambda (create, verify, deactivate, delete).
 
 ### Step 5: Overlap window design (graceful rotation)
 
@@ -365,23 +272,8 @@ The permanent fix: eliminate permanent keys via role assumption.
 | On-premises | STS assume role with long-lived user scoped to `sts:AssumeRole` only |
 | Third-party SaaS | IAM role with external trust policy (Web Identity) |
 
-```python
-# Before: static key
-s3 = boto3.client('s3', aws_access_key_id='AKIAOLD', aws_secret_access_key='old')
-
-# After: STS assume role (auto-refreshing)
-sts = boto3.client('sts')
-assumed = sts.assume_role(RoleArn='arn:aws:iam::111111111111:role/AppS3Access',
-                          RoleSessionName='app-session')
-s3 = boto3.client('s3',
-    aws_access_key_id=assumed['Credentials']['AccessKeyId'],
-    aws_secret_access_key=assumed['Credentials']['SecretAccessKey'],
-    aws_session_token=assumed['Credentials']['SessionToken'])
-```
-
-For EC2/ECS/EKS: use instance/task/pod roles directly — the SDK
-auto-discovers credentials. No code change needed beyond removing the
-static keys.
+> **Moved verbatim** → [references/sts-migration-patterns.md](references/sts-migration-patterns.md) § "Step 11 — STS migration code".
+> Load when: converting static-key boto3 clients to STS assume-role with auto-refreshing sessions.
 
 ### Step 12: CloudTrail audit
 
@@ -474,33 +366,8 @@ TEMPLATE:
 
 ### Worked example — REVIEW_REQUIRED
 
-```text
-ROTATION: break-glass-key
-USER: break-glass-admin
-KEY: AKIABREAK789
-CLASSIFICATION:
-  - Age: 365 days
-  - Last used: 45 days ago (during incident)
-  - Status: Active
-  - Exception: Yes
-DETECTION:
-  - Credential report: generated today
-  - Access advisor: last used 45 days ago (STS, IAM)
-  - EventBridge scan: flagged but skipped (exception)
-ROTATION_FLOW:
-  - N/A — break-glass exception
-OVERLAP: N/A
-NOTIFICATION:
-  - SNS: exception review notice sent to security-team
-EXCEPTIONS:
-  - Break-glass list: /iam-key-rotation/exceptions
-  - User excepted: Yes (Emergency access, owner: security-team)
-AUDIT:
-  - CloudTrail: iam.amazonaws.com tracking
-VERDICT: REVIEW_REQUIRED
-GAP: Break-glass account on exception list. Key is 365 days old but exempted. Required: (1) Manual review by security-team; (2) evaluate STS assume-role with MFA instead of permanent key; (3) if permanent key still required, manually rotate and update break-glass procedure; (4) set review date.
-TEMPLATE: (manual rotation — break-glass accounts require human approval)
-```
+> **Moved verbatim** → [references/worked-examples.md](references/worked-examples.md) § "Worked example — REVIEW_REQUIRED".
+> Load when: emitting a REVIEW_REQUIRED verdict for a break-glass exception key.
 
 ## Anti-Patterns — NEVER do these
 
@@ -590,88 +457,25 @@ On break-glass exception list?
 
 ## Appendix C — CloudFormation skeleton
 
-```yaml
-AWSTemplateFormatVersion: '2010-09-09'
-Description: 'IAM Access Key Rotation Automation Pipeline'
-Resources:
-  KeyRotationTopic:
-    Type: AWS::SNS::Topic
-    Properties: {TopicName: key-rotation-alerts}
-  RotationRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement: [{Effect: Allow, Principal: {Service: lambda.amazonaws.com}, Action: sts:AssumeRole}]
-      ManagedPolicyArns: [arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole]
-      Policies:
-        - PolicyName: IAMKeyMgmt
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - {Effect: Allow, Action: [iam:ListAccessKeys, iam:CreateAccessKey, iam:UpdateAccessKey, iam:DeleteAccessKey, iam:GetAccessKeyLastUsed, iam:ListUsers, iam:GetUser], Resource: '*'}
-              - {Effect: Allow, Action: [secretsmanager:PutSecretValue, secretsmanager:GetSecretValue], Resource: '*'}
-              - {Effect: Allow, Action: [ssm:GetParameter], Resource: '*'}
-              - {Effect: Allow, Action: [sns:Publish], Resource: !Ref KeyRotationTopic}
-              - {Effect: Allow, Action: sts:GetCallerIdentity, Resource: '*'}
-  RotationFunction:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: iam-key-rotation
-      Runtime: python3.12
-      Handler: index.lambda_handler
-      Role: !GetAtt RotationRole.Arn
-      Timeout: 300
-      Environment: {Variables: {SNS_TOPIC_ARN: !Ref KeyRotationTopic, ROTATION_AGE_DAYS: '90', OVERLAP_DAYS: '7', EXCEPTION_PARAM: '/iam-key-rotation/exceptions'}}
-      Code: {ZipFile: 'import boto3,os,json,datetime\niam=boto3.client("iam")\nsns=boto3.client("sns")\nssm=boto3.client("ssm")\ndef lambda_handler(e,c):\n  try:\n    exc=json.loads(ssm.get_parameter(Name=os.environ["EXCEPTION_PARAM"])["Parameter"]["Value"])\n  except: exc={}\n  for u in iam.list_users()["Users"]:\n    if u["UserName"] in exc: continue\n    for k in iam.list_access_keys(UserName=u["UserName"])["AccessKeyMetadata"]:\n      age=(datetime.datetime.now(datetime.timezone.utc)-k["CreateDate"]).days\n      if age>=int(os.environ["ROTATION_AGE_DAYS"]) and k["Status"]=="Active":\n        sns.publish(TopicArn=os.environ["SNS_TOPIC_ARN"],Subject=f"Key rotation: {u[\"UserName\"]}",Message=f"Key {k[\"AccessKeyId\"]} is {age} days old")'}
-  DailyRule:
-    Type: AWS::Events::Rule
-    Properties:
-      ScheduleExpression: rate(1 day)
-      State: ENABLED
-      Targets: [{Id: key-rotation, Arn: !GetAtt RotationFunction.Arn, DeadLetterConfig: {Arn: !GetAtt RotationDLQ.Arn}}]
-  RotationDLQ:
-    Type: AWS::SQS::Queue
-    Properties: {QueueName: key-rotation-dlq}
-  InvokePermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref RotationFunction
-      Action: lambda:InvokeFunction
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt DailyRule.Arn
-```
+> **Moved verbatim** → [references/worked-examples.md](references/worked-examples.md) § "Appendix C — CloudFormation skeleton".
+> Load when: deploying the rotation pipeline as CloudFormation (SNS, role, Lambda, EventBridge rule, DLQ).
 
 ## Recent AWS features (2024-2026)
 
-- **Access Analyzer key findings (2024):** Flags external access to IAM
-  keys, including third-party service usage. Integrates with rotation
-  pipeline to identify exposed keys.
-- **Security Hub IAM.7 enhanced (2024-2025):** The "key > 90 days" check
-  now includes `LastUsedDate`, distinguishing active-aged from stale.
-- **STS session tagging (2024):** Assumed-role sessions carry session
-  tags for better attribution when migrating from permanent keys.
-- **Credential report format (2025):** Now includes `last_rotated` and
-  `last_used_region` columns for richer lifecycle analysis.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Recent AWS features".
+> Load when: using Access Analyzer key findings, Security Hub IAM.7 enrichment, session tagging, or the new credential-report columns.
 
 ## Expert heuristic: the overlap-window principle
 
-The single most important principle: **NEVER remove the old key until
-you have verified the new key works in production.**
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Expert heuristic: the overlap-window principle".
+> Load when: sizing the overlap window or deciding when deactivation/deletion is safe; includes why apps break without overlap.
 
-**The rule:** the pipeline MUST include an overlap window of at least
-24 hours (7 days for production) where both keys are active. During
-this window: (1) new key deployed, (2) app verified, (3) old key usage
-monitored — if still used, app has NOT transitioned, (4) only after 24h
-of old-key non-use is it deactivated, (5) only after 72h of successful
-operation is it deleted.
+## References (load on demand)
 
-**Why:** applications cache credentials. An app that reads the key at
-startup won't pick up the new key until restarted. Without overlap,
-deletion precedes restart — immediate `InvalidClientTokenId`.
-
-**STS migration is the permanent fix.** The overlap window is correct
-for rotation. But eliminating keys entirely via STS is the real fix.
+- [references/worked-examples.md](references/worked-examples.md) — REVIEW_REQUIRED worked example (break-glass key) and the Appendix C CloudFormation skeleton
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 non-obvious key behaviors, overlap-window principle, recent AWS features
+- [references/iam-key-rotation-flows.md](references/iam-key-rotation-flows.md) — full rotation flow patterns; now also holds the Step 2 age-detection code and Step 4 four-phase Lambda code moved from SKILL.md
+- [references/sts-migration-patterns.md](references/sts-migration-patterns.md) — migration patterns by workload; now also holds the Step 11 before/after STS code moved from SKILL.md
 
 ## Domain
 

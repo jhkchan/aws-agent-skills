@@ -216,3 +216,78 @@ aws scheduler create-schedule \
 | Old key still used after new key deployed | App caches credentials | Extend overlap; implement Secrets Manager auto-refresh |
 | Cross-account sync fails | Target role trust policy missing | Add rotation role ARN to target role trust policy |
 | Rotation Lambda times out | Too many users in one invocation | Paginate or split across multiple invocations |
+
+## Step 2 — key age detection (Python) (from SKILL.md § Step 2)
+
+```python
+import boto3, datetime
+iam = boto3.client('iam')
+
+def get_key_ages(user_name):
+    keys = iam.list_access_keys(UserName=user_name)['AccessKeyMetadata']
+    now = datetime.datetime.now(datetime.timezone.utc)
+    for key in keys:
+        age_days = (now - key['CreateDate']).days
+        last_used = iam.get_access_key_last_used(AccessKeyId=key['AccessKeyId'])
+        lu = last_used['AccessKeyLastUsed'].get('LastUsedDate')
+        yield {'key_id': key['AccessKeyId'], 'status': key['Status'],
+               'age': age_days, 'last_used': lu,
+               'days_since_used': (now - lu).days if lu else None}
+```
+
+## Step 4 — Lambda rotation flow (from SKILL.md § Step 4)
+
+**Phase 1 — Create:**
+
+```python
+def create_new_key(user_name):
+    keys = iam.list_access_keys(UserName=user_name)['AccessKeyMetadata']
+    active = [k for k in keys if k['Status'] == 'Active']
+    if len(active) >= 2:
+        return {'error': 'Both key slots in use'}
+    new_key = iam.create_access_key(UserName=user_name)
+    # Store secret securely immediately
+    sm = boto3.client('secretsmanager')
+    sm.put_secret_value(SecretId=f'iam-access-key/{user_name}',
+        SecretString=json.dumps({
+            'access_key_id': new_key['AccessKey']['AccessKeyId'],
+            'secret_access_key': new_key['AccessKey']['SecretAccessKey']}))
+    return new_key['AccessKey']
+```
+
+**Phase 2 — Verify new key works:**
+
+```python
+def verify_key(akid, secret):
+    sts = boto3.client('sts', aws_access_key_id=akid, aws_secret_access_key=secret)
+    try:
+        sts.get_caller_identity()
+        return True
+    except Exception:
+        return False
+```
+
+**Phase 3 — Deactivate old (after overlap + 24h inactivity):**
+
+```python
+def deactivate_old_key(user_name, old_key_id):
+    last = iam.get_access_key_last_used(AccessKeyId=old_key_id)
+    lu = last['AccessKeyLastUsed'].get('LastUsedDate')
+    if lu:
+        hours = (datetime.datetime.now(datetime.timezone.utc) - lu).total_seconds()/3600
+        if hours < 24:
+            return {'deferred': f'Key used {hours:.1f}h ago'}
+    iam.update_access_key(UserName=user_name, AccessKeyId=old_key_id, Status='Inactive')
+    return {'deactivated': True}
+```
+
+**Phase 4 — Delete (after 72h post-deactivation):**
+
+```python
+def delete_old_key(user_name, old_key_id):
+    for k in iam.list_access_keys(UserName=user_name)['AccessKeyMetadata']:
+        if k['AccessKeyId'] == old_key_id and k['Status'] != 'Inactive':
+            return {'error': 'Cannot delete Active key'}
+    iam.delete_access_key(UserName=user_name, AccessKeyId=old_key_id)
+    return {'deleted': True}
+```

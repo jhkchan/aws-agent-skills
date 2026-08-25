@@ -155,26 +155,8 @@ The `detail.eventTypeCategory` is the primary routing lever. Sub-filter by
 
 ## EventBridge rule for Health events
 
-```bash
-# Single-account rule: all issue events for EC2 and RDS
-aws events put-rule --name health-issue-ec2-rds \
-  --event-pattern '{
-    "source": ["aws.health"],
-    "detail": {
-      "eventTypeCategory": ["issue"],
-      "service": ["EC2", "RDS"]
-    }
-  }' \
-  --state ENABLED
-
-# Add an SNS target
-aws events put-targets --rule health-issue-ec2-rds \
-  --targets '[{"Id":"HealthTopic","Arn":"arn:aws:sns:us-east-1:111111111111:health-issue-alerts","DeadLetterConfig":{"Arn":"arn:aws:sqs:us-east-1:111111111111:health-dlq"}}]'
-
-# Add a Lambda target (responder)
-aws events put-targets --rule health-issue-ec2-rds \
-  --targets '[{"Id":"HealthResponder","Arn":"arn:aws:lambda:us-east-1:111111111111:function:health-responder"}]'
-```
+Rule-creation CLI moved to references.
+→ [references/eventbridge-health-patterns.md](references/eventbridge-health-patterns.md) § Rule creation commands
 
 **Scope options:**
 - By service: `"service": ["EC2", "RDS", "S3"]`
@@ -206,35 +188,8 @@ aws health describe-affected-entities \
 
 **Enrichment pattern (Lambda responder):**
 
-```python
-import boto3, json, os
-health = boto3.client('health', region_name='us-east-1')
-sns = boto3.client('sns')
-
-def lambda_handler(event, context):
-    detail = event['detail']
-    event_arn = detail['eventArn']
-    # Health API is global endpoint — always us-east-1
-    entities = health.describe_affected_entities(
-        filter={'eventArns': [event_arn]}
-    )['entities']
-    affected = [e['entityValue'] for e in entities]
-    message = {
-        'category': detail['eventTypeCategory'],
-        'service': detail['service'],
-        'code': detail['eventTypeCode'],
-        'region': event['region'],
-        'start_time': detail['startTime'],
-        'affected_entities': affected,
-        'event_arn': event_arn
-    }
-    sns.publish(
-        TopicArn=os.environ['TOPIC_ARN'],
-        Subject=f"[{detail['eventTypeCategory']}] {detail['service']} - {detail['eventTypeCode']}",
-        Message=json.dumps(message, indent=2, default=str)
-    )
-    return {'statusCode': 200, 'affected_count': len(affected)}
-```
+Enrichment Lambda code moved to references.
+→ [references/responders-and-org-view.md](references/responders-and-org-view.md) § Affected-entity enrichment Lambda
 
 **Gotchas:** The Health API endpoint is global (`us-east-1`) regardless of
 where the event fires. `describe-affected-entities` requires a Business or
@@ -255,33 +210,8 @@ enrichment payload.
 
 **Slack notification Lambda (excerpt):**
 
-```python
-import json, urllib.request, os
-
-WEBHOOK = os.environ['SLACK_WEBHOOK']
-
-def lambda_handler(event, context):
-    detail = event['detail']
-    blocks = [
-        {"type": "header", "text": {"type": "plain_text",
-         "text": f"AWS Health: {detail['eventTypeCategory']} - {detail['service']}"}},
-        {"type": "section", "fields": [
-            {"type": "mrkdwn", "text": f"*Code:*\n{detail['eventTypeCode']}"},
-            {"type": "mrkdwn", "text": f"*Region:*\n{event['region']}"},
-            {"type": "mrkdwn", "text": f"*Status:*\n{detail.get('statusCode','unknown')}"},
-            {"type": "mrkdwn", "text": f"*Start:*\n{str(detail.get('startTime'))}"}
-        ]},
-        {"type": "section", "text": {"type": "mrkdwn",
-         "text": f"*Description:*\n{detail.get('eventDescription',[{}])[0].get('latestDescription','N/A')}"}}
-    ]
-    req = urllib.request.Request(
-        WEBHOOK,
-        data=json.dumps({'blocks': blocks}).encode(),
-        headers={'Content-Type': 'application/json'}
-    )
-    urllib.request.urlopen(req)
-    return {'statusCode': 200}
-```
+Slack notification Lambda code moved to references.
+→ [references/responders-and-org-view.md](references/responders-and-org-view.md) § Slack notification Lambda
 
 **Dead-letter handling:** Every EventBridge target needs a DLQ. Health
 events are low-volume (a few per day on a quiet account) but high-urgency —
@@ -294,30 +224,8 @@ For AWS Organizations, enable the organizational view feature so a delegated
 administrator account sees aggregated Health events across all member
 accounts.
 
-```bash
-# In the management account: enable Health org view
-aws health enable-health-service-access-for-organization
-
-# Delegate admin to a member account
-aws organizations register-delegated-administrator \
-  --account-id 222222222222 \
-  --service-principal health.amazonaws.com
-
-# In the delegated admin account: org-wide EventBridge rule
-aws events put-rule --name health-org-all-accounts \
-  --event-pattern '{"source": ["aws.health"]}' \
-  --state ENABLED
-```
-
-Then in the delegated admin account, the Health API returns events across
-all member accounts:
-
-```bash
-aws health describe-events-for-organization \
-  --filter 'eventTypeCategories=[issue,scheduledChange]' \
-  --query 'events[*].[arn,awsAccountId,service,region,statusCode]' \
-  --output table
-```
+Org-view enablement, delegation, and org-wide enumeration commands moved to references.
+→ [references/responders-and-org-view.md](references/responders-and-org-view.md) § Organizational-view setup commands
 
 **Gotchas:** Org view rules fire ONLY in the delegated admin account's
 default bus. The delegated admin needs an IAM policy allowing
@@ -404,60 +312,8 @@ metrics for synchronous alerting.
 For multi-step responders (e.g., issue → enrich entities → evaluate impact →
 trigger DR or scale-out → notify), use Step Functions:
 
-```json
-{
-  "StartAt": "EnrichEntities",
-  "States": {
-    "EnrichEntities": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:<region>:<account>:function:health-enrich-entities",
-      "Next": "EvaluateImpact"
-    },
-    "EvaluateImpact": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:<region>:<account>:function:health-evaluate-impact",
-      "Next": "ImpactChoice"
-    },
-    "ImpactChoice": {
-      "Type": "Choice",
-      "Choices": [
-        {"Variable": "$.impactLevel", "StringEquals": "region_outage", "Next": "TriggerDRFailover"},
-        {"Variable": "$.impactLevel", "StringEquals": "resource_degradation", "Next": "ScaleOut"},
-        {"Variable": "$.impactLevel", "StringEquals": "low", "Next": "NotifyOnly"}
-      ],
-      "Default": "NotifyOnly"
-    },
-    "TriggerDRFailover": {
-      "Type": "Task",
-      "Resource": "arn:aws:states:::states:startExecution",
-      "Parameters": {"StateMachineArn": "arn:aws:states:<region>:<account>:stateMachine:dr-failover-orchestrator",
-        "Input.$": "$"},
-      "Next": "NotifyStakeholders"
-    },
-    "ScaleOut": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:<region>:<account>:function:health-scale-out-asg",
-      "Next": "NotifyStakeholders"
-    },
-    "NotifyOnly": {
-      "Type": "Task",
-      "Resource": "arn:aws:sns:<region>:<account>:health-issue-alerts",
-      "Next": "CreateJiraTicket"
-    },
-    "NotifyStakeholders": {
-      "Type": "Task",
-      "Resource": "arn:aws:sns:<region>:<account>:health-critical-alerts",
-      "Next": "CreateJiraTicket"
-    },
-    "CreateJiraTicket": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:<region>:<account>:function:jira-create-from-health",
-      "Retry": [{"ErrorEquals": ["States.TaskFailed"], "IntervalSeconds": 60, "MaxAttempts": 3}],
-      "End": true
-    }
-  }
-}
-```
+Step Functions orchestration state machine moved to references.
+→ [references/responders-and-org-view.md](references/responders-and-org-view.md) § Step Functions responder orchestration
 
 **Gotchas:** Always evaluate impact before triggering DR failover — not
 every Health `issue` is a region outage. The `ImpactChoice` state is the
@@ -532,44 +388,8 @@ REMEDIATION:
 ```
 
 ### Worked example — MANUAL_STEP_REQUIRED (no org view, no DLQ)
-```text
-EVENT_TYPES:
-  - [PASS] issue rule: aws.health / EC2 / us-east-1
-  - [FAIL] accountNotification rule missing
-  - [FAIL] scheduledChange rule missing
-AFFECTED_ENTITIES:
-  - [FAIL] No enrichment step — Slack messages lack specific resources
-RESPONDERS:
-  - [PASS] Slack notify target configured
-  - [FAIL] No Jira correlation ID
-  - [FAIL] DR trigger wired directly to issue events (no impact gate)
-  - [FAIL] No DLQ — failed deliveries silently dropped
-ORG_VIEW:
-  - [FAIL] Organizational view not enabled (org with 25 accounts)
-  - [FAIL] No delegated administrator — per-account rules needed in 25 accounts
-SCHEDULED_CHANGES:
-  - [FAIL] No lead-time action — instance retirement discovered at deadline
-VERIFICATION:
-  - [FAIL] No synthetic event replay test
-  - [FAIL] No poller fallback
-VERDICT: MANUAL_STEP_REQUIRED
-FINDINGS:
-  - [CRITICAL] DR trigger ungated: any issue event (including single-host
-    degradation) triggers full regional failover.
-  - [CRITICAL] No DLQ: a Lambda cold-start failure drops the Health event
-    silently — missed outage.
-  - [HIGH] No org view: 25 member accounts each need their own rule; org-
-    wide visibility is lost.
-  - [HIGH] No scheduledChange automation: instance retirement will cause
-    surprise outages when AWS retires the host.
-  - [HIGH] No enrichment: Slack messages say "EC2 issue" with no instance IDs.
-REMEDIATION:
-  1. Add ImpactChoice state before any DR trigger — only region_outage triggers.
-  2. Attach SQS DLQ to every EventBridge target.
-  3. Enable org view + delegate admin to centralize across 25 accounts.
-  4. Add scheduledChange rule + EventBridge Scheduler lead-time action.
-  5. Add enrichment Lambda: describe-affected-entities before notify.
-```
+Full MANUAL_STEP_REQUIRED worked example moved to references.
+→ [references/worked-examples.md](references/worked-examples.md) § Worked example — MANUAL_STEP_REQUIRED (no org view, no DLQ)
 
 ## NEVER (these things)
 
@@ -601,34 +421,8 @@ REMEDIATION:
 
 ## Expert heuristic callouts
 
-- **The Health API endpoint is global (us-east-1) regardless of event
-  region.** A `describe-events` call always goes to us-east-1; the
-  `region` field in the response tells you where the affected resource is.
-- **EventBridge Health events fire on the default bus, not a custom bus.**
-  Rules must target the default bus (`--event-bus-name default`) or the
-  AWS-default service bus — a custom bus will not see Health events.
-- **`eventTypeCode` is the stable identifier for routing.** Examples:
-  `AWS_EC2_INSTANCE_DEGRADATION`, `AWS_RDS_MAINTENANCE_SCHEDULED`. Build
-  per-code routing tables for high-volume categories.
-- **`scheduledEndTime` shifts.** AWS extends windows; re-fetch the event
-  before firing the lead-time action. Cache the latest `scheduledEndTime`
-  in the Scheduler input.
-- **Account-notification events for exposed credentials are urgent.**
-  `AWS_ACCOUNT_NOTIFICATION_CREDENTIAL_EXPOSED` means a key was found on a
-  public site. Route this to immediate key rotation, not a daily digest.
-- **Org view requires the management account to enable it.** Delegated
-  admin alone is not enough — `enable-health-service-access-for-organization`
-  must run from the management account first.
-- **Health Omics workflow events fire post-failure, not pre-failure.**
-  Omics runs are long; pair Health with CloudWatch metrics for synchronous
-  detection of run failures.
-- **User Notifications delivery lag (~30s) is higher than EventBridge
-  (~5s).** For sub-minute SLA, use EventBridge + Lambda directly.
-- **The `eventDescription` array has `latestDescription` at index 0.** AWS
-  appends updates as the event evolves — always read index 0, not the
-  last element.
-- **Event replay is the only way to verify the responder chain.** AWS
-  publishes synthetic Health events for testing; use them quarterly.
+Expert heuristic callouts moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Expert heuristic callouts
 
 ## Pre-flight safety checks
 
@@ -650,48 +444,22 @@ REMEDIATION:
 
 ## Edge-case handling
 
-- **Public Health events lag the Health API.** A Health event for an
-  ongoing issue may appear in `describe-events` before EventBridge fires.
-  Run a poller as backup for tier-0 workloads.
-- **Region scoping.** A rule in us-east-1 does not catch a Health event for
-  a resource in ap-southeast-1. Deploy rules in every active region, or
-  use the delegated admin's org-view bus (single rule, all regions).
-- **DLQ growth.** A growing `health-dlq` indicates responder failures
-  (Lambda cold-start, IAM misconfiguration, SNS throttle). Alarm on
-  `ApproximateNumberOfMessagesVisible > 0`.
-- **Delegated admin rotation.** When the delegated admin account changes,
-  re-enable org view from the management account and re-deploy rules in
-  the new delegated admin.
-- **Event replay drift.** Synthetic Health events for testing may not
-  match the production event schema exactly — pin the test event to the
-  schema documented in the AWS Health user guide.
-- **Multi-account Health events without org view.** For orgs that cannot
-  enable org view (e.g., regulatory constraints), deploy per-account
-  rules in every member account and forward to a central bus.
+Edge-case handling catalog moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Edge-case handling
 
 ## Recent AWS features (2024-2026)
 
-- **AWS User Notifications (2024-2025):** Managed delivery of Health events
-  to Slack, Chime, Teams, and email without custom Lambda. Pairs with
-  EventBridge for action responders.
-- **AWS Health Omics (2024-2025):** Health events for Omics workflow run
-  failures and quota issues. Long-running workflows — pair with CloudWatch.
-- **EventBridge Scheduler (2024-2025):** Serverless cron for scheduled-
-  change lead-time actions. One-time and recurring schedules with
-  flexible time windows.
-- **Health API organizational view (2024-2025):** Aggregated Health events
-  across all member accounts via a delegated administrator.
-- **Health API programmatic access (2024-2025):** Business / Enterprise
-  support now includes programmatic (API + EventBridge) access; Basic
-  support sees only the Personal Health Dashboard.
-- **EventBridge cross-account event routing (2024-2025):** Forward Health
-  events from member accounts to a central security / operations bus
-  without org view.
-- **Health event replay API (2024-2025):** Synthetic event replay for
-  responder chain testing.
-- **HealthOmics multi-omics workflows (2024-2025):** Expanded Health event
-  coverage for variant calling and workflow run states.
+2024-2026 feature notes moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Recent AWS features (2024-2026)
 
+## References (load on demand)
+
+Consult these only when the corresponding topic comes up:
+
+- [references/eventbridge-health-patterns.md](references/eventbridge-health-patterns.md) — Health event-pattern catalogue, responder chains, and delivery verification (extended with the rule-creation commands moved from § EventBridge rule)
+- [references/responders-and-org-view.md](references/responders-and-org-view.md) — full responder implementations and org-view setup (extended with the enrichment Lambda, Slack Lambda, org-view commands, and Step Functions orchestrator moved from SKILL.md)
+- [references/worked-examples.md](references/worked-examples.md) — the MANUAL_STEP_REQUIRED worked example (moved from § Output format)
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert heuristic callouts, edge-case handling, and recent AWS features (moved verbatim)
 ## Domain
 
 AWS CloudOps / Health Event Response Automation.

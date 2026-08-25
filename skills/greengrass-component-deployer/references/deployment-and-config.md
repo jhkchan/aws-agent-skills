@@ -409,3 +409,132 @@ resource "aws_greengrass_deployment" "prod" {
   }
 }
 ```
+
+## Step 5 — Deployment to thing group — moved from SKILL.md
+
+Deployments target thing GROUPS, not individual devices. A thing
+group can contain one or more IoT things (core devices).
+
+**Create a thing group:**
+
+```bash
+aws iot create-thing-group \
+  --thing-group-name MyDeviceGroup \
+  --region us-east-1
+```
+
+**Add a thing to the group:**
+
+```bash
+aws iot add-thing-to-thing-group \
+  --thing-name MyCoreDevice \
+  --thing-group-name MyDeviceGroup \
+  --region us-east-1
+```
+
+**Create a deployment:**
+
+```bash
+aws greengrassv2 create-deployment \
+  --target-arn "arn:aws:iot:us-east-1:123456789012:thinggroup/MyDeviceGroup" \
+  --deployment-name "Deploy MyComponent 1.0.0" \
+  --components '{
+    "com.example.MyComponent": {
+      "componentVersion": "1.0.0",
+      "configurationUpdate": {
+        "MERGE": "{\"message\": \"Hello from deployment\"}"
+      }
+    }
+  }' \
+  --deployment-policies '{
+    "componentUpdatePolicy": {
+      "timeoutInSeconds": 60,
+      "action": "NOTIFY_COMPONENTS"
+    },
+    "configurationValidationPolicy": {
+      "timeoutInSeconds": 60
+    },
+    "failureDetectionPolicy": {
+      "action": "ROLLBACK"
+    }
+  }' \
+  --region us-east-1
+```
+
+**Verify deployment status:**
+
+```bash
+DEPLOYMENT_ID="<deployment-id from create-deployment output>"
+
+aws greengrassv2 get-deployment \
+  --deployment-id "$DEPLOYMENT_ID" \
+  --region us-east-1
+# Expected: deploymentStatus: ACTIVE, COMPLETED
+```
+
+**Deployment policies:**
+
+| Policy | Options | Default |
+|---|---|---|
+| ComponentUpdatePolicy | NOTIFY_COMPONENTS (graceful), SKIP_NOTIFY_COMPONENTS (immediate) | NOTIFY_COMPONENTS with 60s timeout |
+| ConfigurationValidationPolicy | timeoutInSeconds for validation | 60s |
+| FailureDetectionPolicy | ROLLBACK (revert on failure), DO_NOTHING | ROLLBACK |
+
+## Step 6 — Configuration merge — moved from SKILL.md
+
+Configuration merge allows per-deployment customization of component
+parameters. The recipe defines default configuration; the deployment
+can merge overrides.
+
+**Recipe default configuration:**
+
+```yaml
+ComponentConfiguration:
+  DefaultConfiguration:
+    message: "Hello from Greengrass"
+    interval: 5
+    logging:
+      level: "info"
+      path: "/var/log/my-component"
+```
+
+**Deployment configuration merge:**
+
+```bash
+# Override message and logging.level for this deployment
+aws greengrassv2 create-deployment \
+  --target-arn "arn:aws:iot:us-east-1:123456789012:thinggroup/MyDeviceGroup" \
+  --components '{
+    "com.example.MyComponent": {
+      "componentVersion": "1.0.0",
+      "configurationUpdate": {
+        "MERGE": "{\"message\": \"Custom message for this group\", \"logging\": {\"level\": \"debug\"}}"
+      }
+    }
+  }' \
+  --region us-east-1
+```
+
+**Merge semantics:**
+
+- MERGE: Deep-merges with existing configuration (nested keys are
+  merged, not replaced).
+- RESET: Resets specified keys to recipe defaults (removes deployment
+  overrides).
+
+```bash
+# Reset message to recipe default
+"configurationUpdate": {
+  "RESET": ["message"]
+}
+```
+
+**Accessing configuration in lifecycle scripts:**
+
+```bash
+# In a lifecycle script, reference configuration via {configuration:/key}
+Script: |
+  MESSAGE={configuration:/message}
+  INTERVAL={configuration:/interval}
+  echo "$MESSAGE at interval $INTERVAL"
+```

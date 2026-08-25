@@ -128,26 +128,8 @@ Before producing the deployment plan, validate the input specification.
 Several requirements **block deployment** — proceeding with an invalid
 spec produces a non-functional or insecure accelerator.
 
-**Live-account pre-flight checks (skip if doing offline architecture plan):**
-
-1. Verify IAM permissions: `globalaccelerator:CreateAccelerator`,
-   `CreateListener`, `CreateEndpointGroup`, `AddEndpoints`,
-   `UpdateEndpointGroup`, and (for BYOIP) `ec2:AdvertiseByoipCidr`,
-   `ec2:ProvisionByoipCidr`, `route53:AssociateVpcWithHostedZone`.
-2. Verify endpoint ARNs resolve and region matches its endpoint group
-   region (cross-region endpoints within a group are NOT supported):
-   - ALB/NLB: `aws elbv2 describe-load-balancers --load-balancer-arns <arn>` returns `active`.
-   - EC2: `aws ec2 describe-instances --instance-ids <id>` returns `running`.
-   - EIP: `aws ec2 describe-addresses --allocation-ids <id>` returns `allocated`.
-3. For BYOIP, verify the CIDR is `PROVISIONED` in Route 53:
-   `aws ec2 describe-byoip-cidrs` — only `PROVISIONED` can be advertised.
-4. For cross-account endpoints, verify the RAM resource share is
-   `ACTIVE` and accepted by the consumer account.
-5. For flow logs to CloudWatch, verify the log group exists and the
-   `AWSServiceRoleForGlobalAccelerator` service-linked role has
-   `logs:CreateLogStream` and `logs:PutLogEvents`.
-6. For flow logs to S3, verify the bucket policy grants `s3:PutObject`
-   to `flowlogs.globalaccelerator.amazonaws.com`.
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
+Covers: Live-account pre-flight checks (IAM, endpoint ARN/region, BYOIP state, RAM share, flow-log destinations). See the "References (load on demand)" section.
 
 | Attribute | Value | Effect on plan |
 |---|---|---|
@@ -182,68 +164,8 @@ REQUIRED:
 
 ### Step 0: Expert knowledge — non-obvious Global Accelerator behaviors that change the plan
 
-- **The two static IPs are anycast and pinned for the accelerator's
-  lifetime.** They cannot be re-mapped without deletion + recreation.
-  For migrations, plan DNS TTL tuning and dual-running windows. BYOIP
-  ranges give portability — move a BYOIP range between accelerators by
-  de-advertising and re-advertising.
-
-- **Endpoint groups are region-scoped.** One endpoint group covers one
-  AWS region. Traffic dials are per group (per region), NOT per
-  endpoint. Within a group, endpoints are weighted. To shift traffic
-  between regions, change traffic dials; to shift between endpoints in
-  the same region, change endpoint weights.
-
-- **Traffic dial 0 drops ALL traffic to the region.** It is NOT
-  "drain" — it is a hard cut, and existing flows may be dropped. For
-  graceful drain, reduce to 5, wait for connections to close (verify
-  via flow logs), then 0. Endpoint weight 0 within a group IS graceful
-  drain (no new connections, existing stay until close).
-
-- **Mixing endpoint types in one endpoint group is rejected by the
-  API.** `AddEndpoints` with an ALB ARN into an NLB group returns
-  `ValidationError`. Multi-type designs require separate endpoint
-  groups, each in a different region.
-
-- **Client IP preservation differs by endpoint type.** ALB endpoints
-  always see the client IP via `X-Forwarded-For` (the L4 source IP at
-  the ALB is an AWS GA IP). NLB and EC2 endpoints can set
-  `PreserveClientIpEnabled: true` — the L4 source IP at the origin IS
-  the client IP. Preservation ON = origin SG must allow client IP
-  ranges; OFF = origin SG scopes to the GA prefix pool
-  (`51.224.0.0/14` for IPv4, 2026).
-
-- **BYOIP requires Route 53 provisioning BEFORE advertising.** Flow:
-  (1) publish ROA with your RIR, (2) provision the CIDR in Route 53
-  via `ec2 provision-byoip-cidr` (signed message), (3) wait for
-  `PROVISIONED` state, (4) advertise via GA on accelerator creation.
-  Skipping step 2 makes the CIDR unusable — GA cannot advertise a
-  CIDR not provisioned in your account.
-
-- **Custom routing accelerators expose endpoint-specific ports.** In a
-  standard accelerator, the listener port maps to the same port on all
-  endpoints. In a custom routing accelerator, GA allocates a
-  deterministic range of listener ports per endpoint — a client
-  connecting to listener port 10042 reaches a specific
-  endpoint:destination-port combination. Use for gaming, VoIP, media.
-
-- **Health check protocol must match the endpoint.** ALB: uses the
-  ALB's target group health check. NLB: TCP, HTTP, or HTTPS,
-  independently of the NLB's own target group check. EC2: TCP or
-  HTTP/HTTPS; the EC2 instance must have a listener on the health
-  check port.
-
-- **Flow log destination policy is critical.** CloudWatch: GA uses the
-  `AWSServiceRoleForGlobalAccelerator` service-linked role with
-  `logs:CreateLogStream` and `logs:PutLogEvents`. S3: bucket policy
-  MUST grant `s3:PutObject` to `flowlogs.globalaccelerator.amazonaws.com`.
-  A misconfigured destination silently drops flow logs — there is no
-  error surfaced in accelerator status.
-
-- **Dual-stack requires accelerator recreation.** IPv6 support (Nov
-  2023) is set at accelerator creation. An accelerator created before
-  that date cannot be updated to dual-stack — create a new accelerator
-  and migrate DNS.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+Covers: Step 0: Expert knowledge — non-obvious Global Accelerator behaviors that change the plan. See the "References (load on demand)" section.
 
 ### Step 1: Accelerator creation — IP source and IP version
 
@@ -379,116 +301,23 @@ pool. Add this CIDR to security group inbound rules.
 
 ### Step 6: Flow logs — CloudWatch Logs or S3
 
-**CloudWatch Logs:**
-
-```bash
-aws globalaccelerator update-accelerator-attributes \
-  --accelerator-arn <arn> \
-  --flow-logs-s3-bucket "" \
-  --flow-logs-log-group "/aws/globalaccelerator/prod-ga"
-```
-
-The `AWSServiceRoleForGlobalAccelerator` service-linked role needs
-`logs:CreateLogStream` and `logs:PutLogEvents` on the log group ARN.
-Verify via `iam:get-role` and check the attached policy.
-
-**S3 destination:**
-
-```bash
-aws globalaccelerator update-accelerator-attributes \
-  --accelerator-arn <arn> \
-  --flow-logs-s3-bucket "prod-ga-flowlogs" \
-  --flow-logs-log-group ""
-```
-
-**S3 bucket policy (required):**
-
-```json
-{
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": {"Service": "flowlogs.globalaccelerator.amazonaws.com"},
-    "Action": "s3:PutObject",
-    "Resource": "arn:aws:s3:::prod-ga-flowlogs/*"
-  }]
-}
-```
-
-**Anti-pattern:** NEVER configure flow logs without verifying the
-destination permission. GA silently drops logs on permission errors —
-there is no status field indicating "logging failed." Verify by sending
-test traffic and checking for log entries within 5 minutes.
+Moved verbatim to [references/ip-preservation-and-flowlogs-guide.md](references/ip-preservation-and-flowlogs-guide.md) — load on demand.
+Covers: Step 6: Flow logs — CloudWatch Logs or S3. See the "References (load on demand)" section.
 
 ### Step 7: Cross-account endpoints (2024+) — RAM resource share
 
-Cross-account endpoints centralize the accelerator in one account
-(the "network"/"edge" account) while endpoints live in workload
-accounts. Use cases: shared edge platform, multi-tenant SaaS,
-separation of networking from application ownership.
-
-**Resource owner account:**
-
-```bash
-aws ram create-resource-share --name prod-alb-share \
-  --resource-arns "arn:aws:elasticloadbalancing:us-east-1:222222222222:loadbalancer/app/prod-alb/abc"
-aws ram associate-resource-share --resource-share-arn <rs-arn> --principals "111111111111"
-```
-
-**Consumer account (accept invitation):**
-
-```bash
-aws ram accept-resource-share-invitation --resource-share-invitation-arn <invitation-arn>
-```
-
-**Verify share is ACTIVE before adding endpoint:**
-`aws ram get-resource-shares --resource-arns <endpoint-arn>`. The
-endpoint ARN in `add-endpoints` uses the consumer-account ARN; GA
-resolves it via the RAM share. If the share is `PENDING` or
-`REJECTED`, `add-endpoints` returns `AccessDeniedException`.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+Covers: Step 7: Cross-account endpoints (2024+) — RAM resource share. See the "References (load on demand)" section.
 
 ### Step 8: Custom routing accelerator — deterministic port mapping
 
-```bash
-aws globalaccelerator create-custom-routing-accelerator --name prod-gaming-ga --ip-addresses IPV4
-aws globalaccelerator create-custom-routing-listener --accelerator-arn <arn> \
-  --port-ranges "FromPort=10000,ToPort=10999"
-aws globalaccelerator create-custom-routing-endpoint-group --listener-arn <arn> \
-  --endpoint-group-region us-east-1 \
-  --destination-configurations '[{"EndpointId":"i-0abc","Protocols":["TCP","UDP"],"DestinationPorts":[{"FromPort":27015,"ToPort":27015}]}]'
-```
-
-GA allocates listener ports deterministically: each endpoint gets a
-sub-range of the listener's port range. A client connecting to
-listener port 10042 is routed to a specific endpoint:destination-port
-combination. Use `list-custom-routing-port-mappings` to discover the
-allocation.
-
-**Custom routing constraints:**
-- No health checks (assumes endpoint readiness).
-- No traffic dial (the listener port allocation IS the routing).
-- Destination protocols: `TCP`, `UDP`, or both.
-- No client IP preservation config (always preserved at L4 by definition).
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+Covers: Step 8: Custom routing accelerator — deterministic port mapping. See the "References (load on demand)" section.
 
 ## Common patterns
 
-- **Multi-region ALB active-active.** Two regional ALBs (us-east-1 +
-  eu-west-1), each in its own endpoint group, both traffic dial 100.
-  Anycast routing sends each user to the closest region. Client IP at
-  origin via `X-Forwarded-For`. Use for global SaaS frontends.
-
-- **Single-region NLB with client IP preservation.** NLB endpoint with
-  `PreserveClientIpEnabled: true`. Origin sees real client IP for rate
-  limiting and geo-blocking. Use for gaming backends, financial APIs.
-
-- **Custom routing for gaming.** Custom routing accelerator, listener
-  port range 10000-19999. Each game server EC2 is an endpoint with
-  destination ports matching the per-session range. Matchmaker queries
-  `list-custom-routing-port-mappings` to assign each player a port.
-
-- **Cross-account centralized edge.** Accelerator in the "network"
-  account; endpoints are ALBs in workload accounts. RAM resource share
-  for each ALB. Network team owns accelerator and IP reputation (BYOIP);
-  workload teams own the ALB and target groups.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+Covers: Common patterns. See the "References (load on demand)" section.
 
 ## Output format
 
@@ -661,61 +490,13 @@ or security regression.
 
 ## Expert heuristic: choosing client IP preservation per endpoint type
 
-The "right" client IP preservation setting is a function of endpoint
-type and the origin's security model. The heuristic below resolves it.
-
-| Endpoint | Default | When to enable | Origin SG posture |
-|---|---|---|---|
-| ALB | Always X-Forwarded-For (no toggle) | N/A — header-based | Scope to GA pool (`51.224.0.0/14`); WAF at ALB sees real client IP |
-| NLB | `false` (recommended) | Origin has IP-based controls (WAF, rate limit, geo-block by CIDR) | `true`: allow client CIDRs; `false`: scope to GA pool |
-| EC2 | `false` (recommended) | Application reads L4 source IP for logs or IP-based rules | `true`: allow client CIDRs; `false`: scope to GA pool |
-| Elastic IP | N/A (EIP is the endpoint) | Client IP preserved at L4 by definition | Origin SG scope unchanged |
-
-**Decision rules:**
-- Default `PreserveClientIpEnabled: false` for NLB and EC2 unless the
-  origin has explicit IP-based controls. Simpler SGs; trade-off is
-  origin logs show AWS GA IPs.
-- When `true`, update the origin SG in the SAME deploy. GA enabling
-  preservation without an SG update cuts off all traffic.
-- For custom routing accelerators, client IP is always preserved at L4
-  — no toggle exists.
-- The GA prefix pool is `51.224.0.0/14` (IPv4, 2026). Verify via
-  `aws globalaccelerator list-byoip-cidrs` before scoping SGs; the pool
-  may expand over time.
-
-ALWAYS emit the client IP preservation decision as a PRE_CHECKS row
-naming the endpoint ARN, the setting, and the SG posture
-(client-ranges vs GA-pool).
+Moved verbatim to [references/ip-preservation-and-flowlogs-guide.md](references/ip-preservation-and-flowlogs-guide.md) — load on demand.
+Covers: Expert heuristic: choosing client IP preservation per endpoint type. See the "References (load on demand)" section.
 
 ## Recent AWS features (2024-2026)
 
-- **Cross-account endpoints (2024):** endpoints in peer AWS accounts,
-  shared via RAM resource share. Enables centralized edge platform
-  with distributed workload ownership. Requires `ACTIVE` share before
-  `add-endpoints`.
-
-- **Custom routing accelerators (2023-2024):** deterministic port-to-
-  endpoint mapping for gaming, VoIP, and media workloads. Listener
-  port range allocated to endpoints via `list-custom-routing-port-mappings`.
-  No traffic dial or health checks — caller's responsibility.
-
-- **Dual-stack IPv4+IPv6 (2023):** accelerators created after Nov 2023
-  can be dual-stack (IPv4 + IPv6 anycast IPs). Older accelerators must
-  be recreated and DNS migrated.
-
-- **BYOIP for Global Accelerator (2022-2024):** advertise your own
-  /24+ IPv4 CIDR through GA. Requires ROA + Route 53 provisioning
-  (`PROVISIONED` state). Enables IP portability across accelerators.
-
-- **Flow logs to S3 (2023):** GA flow logs can stream to S3 in addition
-  to CloudWatch Logs. Useful for long-term retention and Athena queries.
-  Bucket policy MUST grant `s3:PutObject` to the GA logging principal.
-
-- **Health check enhancements (2024-2025):** per-endpoint health check
-  override — different intervals per endpoint within a group.
-
-- **Endpoint weight drain (2025):** weight 0 is now documented as
-  graceful drain. Traffic dial 0 remains a hard cut.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+Covers: Recent AWS features (2024-2026). See the "References (load on demand)" section.
 
 ## AWS documentation
 
@@ -728,3 +509,10 @@ naming the endpoint ARN, the setting, and the SG posture
 - **Flow logs** — https://docs.aws.amazon.com/global-accelerator/latest/dg/monitoring-global-accelerator.flow-logs.html
 - **Global Accelerator API Reference** — https://docs.aws.amazon.com/global-accelerator/latest/api/Welcome.html
 - **AWS RAM Developer Guide** — https://docs.aws.amazon.com/ram/latest/userguide/what-is.html
+
+## References (load on demand)
+
+- [references/endpoint-and-listener-guide.md](references/endpoint-and-listener-guide.md) — endpoint types, listener protocols, and endpoint-group topology (existing)
+- [references/ip-preservation-and-flowlogs-guide.md](references/ip-preservation-and-flowlogs-guide.md) — client IP preservation and flow log destinations (existing); now also the Step 6 flow-log CLI and the client-IP-preservation decision heuristic
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 expert-knowledge deep dive, cross-account RAM endpoints (Step 7), custom routing accelerators (Step 8), common patterns, and recent AWS features
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — live-account pre-flight check commands (IAM, endpoint ARN/region, BYOIP state, RAM share, flow-log destinations)

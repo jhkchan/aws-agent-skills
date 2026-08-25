@@ -123,3 +123,67 @@ def evict_oldest_if_full(ip_set_arn, max_entries=9500):
         addresses = addresses[500:]
     return addresses
 ```
+
+## Step 6: WAF / NACL IP blocking — moved from SKILL.md
+
+```python
+wafv2 = boto3.client('wafv2')
+
+def block_ip_in_waf(ip_address, ip_set_arn):
+    ip_entry = f'{ip_address}/32'
+    current = wafv2.get_ip_set(IPSetArn=ip_set_arn)
+    addresses = current['IPSet']['Addresses']
+    if ip_entry not in addresses:
+        addresses.append(ip_entry)
+        wafv2.update_ip_set(IPSetArn=ip_set_arn, Scope='REGIONAL',
+                           Addresses=addresses, LockToken=current['LockToken'])
+```
+
+**Limit management:** WAF IP sets cap at 10,000 entries. Use eviction
+policy (oldest removed when full) or switch to NACL-based blocking.
+
+## Step 10: Suppression filters for known false positives — moved from SKILL.md
+
+```bash
+aws guardduty create-filter \
+  --detector-id <detector-id> \
+  --name suppress-authorized-scanner \
+  --action ARCHIVE \
+  --finding-criteria '{
+    "Criterion": {
+      "type": {"Eq": ["Recon:EC2/PortProbeUnprotectedPort"]},
+      "service.additionalInfo.remoteIpDetails.ipAddressV4": {"Eq": ["203.0.113.50"]}
+    }
+  }' \
+  --description "Suppress port probe from scanner 203.0.113.50. REVIEW: 2026-11-01"
+```
+
+Common false-positive patterns:
+
+| Finding type | FP source | Filter criteria |
+|---|---|---|
+| `Recon:EC2/PortProbe*` | Authorized scanner | `remoteIpDetails.ipAddressV4` = scanner IP |
+| `UnauthorizedAccess:EC2/SSHBruteForce` | CI/CD pipeline | `remoteIpDetails.ipAddressV4` = CI NAT gateway |
+| `Recon:IAMUser/*` | Break-glass access | `accessKeyDetails.accessKeyId` = break-glass key |
+
+**Never suppress without a review date.** Add it to the description and
+set a calendar reminder.
+
+## Step 13: Custom threat intel upload — moved from SKILL.md
+
+```bash
+# Threat intel set (malicious IPs/domains)
+aws guardduty create-threat-intel-set \
+  --detector-id <detector-id> --name custom-malicious-ips \
+  --format TXT --location s3://threat-intel-bucket/malicious-ips.txt \
+  --activate --tags '{"Source":"internal","ReviewDate":"2026-11-01"}'
+
+# Trusted IP set (allowlist — overrides threat intel)
+aws guardduty create-ip-set \
+  --detector-id <detector-id> --name trusted-ips \
+  --format TXT --location s3://threat-intel-bucket/trusted-ips.txt \
+  --activate
+```
+
+Always verify with `list-threat-intel-sets` / `list-ip-sets` that the
+status is `ACTIVE`. A set created with `--no-activate` is inert.

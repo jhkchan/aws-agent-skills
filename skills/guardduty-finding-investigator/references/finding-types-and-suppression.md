@@ -198,3 +198,19 @@ fields srcAddr, dstAddr, bytes
 | stats sum(bytes) as totalBytes by dstAddr
 | sort totalBytes desc | limit 20
 ```
+
+## Suppression patterns by FP class (moved from SKILL.md Step 11)
+
+- **Authorised scanner** — filter on
+  `service.action.portProbeAction.remoteIpDetails.ipAddressV4` in
+  `<scanner-cidr>` AND action = ARCHIVED.
+- **AWS Config aggregator** — filter on
+  `resource.accessKeyDetails.principalId` containing
+  `AWSServiceRoleForConfig` AND `awsApiCallAction.api` = `ListBuckets`.
+- **Deployment pipeline IAM burst** — filter on principalId containing
+  `<deployment-role-name>` AND finding type in
+  `Recon:IAMUser/UserPermissions`, `Persistence:IAMUser/UserCreation`.
+- **Public S3 bucket (documented)** — filter on
+  `resource.s3BucketDetails.name` = `<bucket>` AND finding type =
+  `Policy:IAMUser/S3BucketAnonymousGranted`.
+

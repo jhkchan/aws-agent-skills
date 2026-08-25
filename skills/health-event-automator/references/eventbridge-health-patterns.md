@@ -179,3 +179,27 @@ Zero invocations over a week may indicate the pattern is mis-scoped.
 - **Public events fire across all accounts.** A `PUBLIC` scope event
   (region-wide AWS issue) fires once per account — if you have 25 accounts
   in an org without org view, you get 25 duplicate alerts.
+
+## Rule creation commands (single-account rule + SNS/Lambda targets, moved from SKILL.md)
+
+```bash
+# Single-account rule: all issue events for EC2 and RDS
+aws events put-rule --name health-issue-ec2-rds \
+  --event-pattern '{
+    "source": ["aws.health"],
+    "detail": {
+      "eventTypeCategory": ["issue"],
+      "service": ["EC2", "RDS"]
+    }
+  }' \
+  --state ENABLED
+
+# Add an SNS target
+aws events put-targets --rule health-issue-ec2-rds \
+  --targets '[{"Id":"HealthTopic","Arn":"arn:aws:sns:us-east-1:111111111111:health-issue-alerts","DeadLetterConfig":{"Arn":"arn:aws:sqs:us-east-1:111111111111:health-dlq"}}]'
+
+# Add a Lambda target (responder)
+aws events put-targets --rule health-issue-ec2-rds \
+  --targets '[{"Id":"HealthResponder","Arn":"arn:aws:lambda:us-east-1:111111111111:function:health-responder"}]'
+```
+

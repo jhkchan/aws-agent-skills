@@ -161,126 +161,23 @@ on each.
 
 ## Expert heuristic: Multi-AZ vs Single-AZ failover pairing
 
-A baseline model says "pick Single-AZ to save cost." The correct
-heuristic recognizes that the deployment type depends on the RPO/RTO
-requirements and workload criticality.
-
-```text
-Workload availability requirements:
-  ├── Production, high-availability, RPO ≈ 0
-  │     → Multi-AZ (automatic failover, standby in different AZ)
-  │       Cost: ~2x Single-AZ
-  │       Failover: automatic, sub-minute (Windows), transparent (ONTAP)
-  │
-  ├── Production, can tolerate brief downtime
-  │     → Single-AZ with automated backups (backup window: minutes-hours)
-  │       Cost: 1x
-  │       Recovery: from backup (RPO = last backup, RTO = restore time)
-  │
-  ├── Dev/test, ephemeral, or non-critical
-  │     → Single-AZ (lowest cost)
-  │       Or SCRATCH deployment for Lustre (ephemeral, no replication)
-  │
-  └── HPC / burst, data in S3
-        → FSx for Lustre SCRATCH (ephemeral) or PERSISTENT (durable)
-          SCRATCH: no replication; data lost on deletion
-          PERSISTENT: replicated within AZ; survives server failures
-```
-
-**Key implication:** Multi-AZ CANNOT be changed to Single-AZ after
-creation (or vice versa). Getting this wrong means recreating the
-file system. Always choose Multi-AZ for production workloads with
-strict availability requirements.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+Covers: Expert heuristic: Multi-AZ vs Single-AZ failover pairing. See the "References (load on demand)" section.
 
 ## Expert heuristic: throughput capacity step sizing
 
-Throughput capacity is NOT arbitrary. It comes in discrete steps.
-Picking the right step avoids overpaying for unused capacity or
-underprovisioning performance.
-
-```text
-FSx for Windows throughput capacity steps (MB/s):
-  8, 16, 32, 64, 128, 256, 512, 1024, 2048
-
-FSx for Lustre throughput (per TB of storage):
-  50, 100, 200 MB/s per TB (HDD-based)
-  125, 250, 500, 1000 MB/s per TB (SSD-based)
-
-Selection heuristic:
-  1. Measure or estimate peak workload throughput (MB/s)
-  2. Select the nearest step ABOVE the requirement
-  3. Leave 20-30% headroom for growth
-  4. If between two steps, pick the higher one
-     (upgrading requires a maintenance window; downtime cost > step cost delta)
-
-  Example: workload needs 180 MB/s
-    → Step above: 256 MB/s (Windows) or 200 MB/s/TB (Lustre HDD)
-    → Leave headroom: 256 MB/s gives 30% headroom over 180
-    → DO NOT pick 128 MB/s (below requirement → performance issues)
-```
-
-**Key implication:** throughput CAN be changed after creation for
-most FSx types, but the change requires a brief I/O suspension or
-maintenance window. Over-provisioning slightly is cheaper than
-frequent upgrades.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+Covers: Expert heuristic: throughput capacity step sizing. See the "References (load on demand)" section.
 
 ## Expert heuristic: S3 export for Lustre
 
-S3 export links a Lustre file system to an S3 bucket, enabling HPC
-workloads to process data stored in S3 without manual transfers.
-
-```text
-S3-linked Lustre architecture:
-  S3 Bucket (source of truth)
-    ├── Import: S3 objects → Lustre files (lazy-loaded on first access)
-    │     └── Metadata imported at file system creation
-    └── Export: Lustre files → S3 objects (on write or via export job)
-          └── Background sync or explicit aws fsx create-data-repository-task
-
-  Deployment types for S3-linked:
-    ├── SCRATCH_1: no replication, ephemeral, lowest cost
-    ├── SCRATCH_2: partial replication for durability
-    └── PERSISTENT: full replication, durable
-
-  Import configuration:
-    ├── NEW_FILES (import only files not already in Lustre)
-    ├── CHANGED_FILES (re-import files that changed in S3)
-    └── CHANGED_FILES_ALL (re-import everything)
-```
-
-**Key implication:** S3 export does NOT mean "data lives in S3." The
-Lustre file system stores data on SSD/HDD. S3 is the backing data
-repository for import/export. The file system must be in the SAME
-region as the S3 bucket.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+Covers: Expert heuristic: S3 export for Lustre. See the "References (load on demand)" section.
 
 ## Expert heuristic: dedup savings estimation
 
-Dedup (FSx for Windows only) eliminates duplicate data blocks,
-providing storage savings.
-
-```text
-Dedup savings estimation by workload type:
-  ├── Windows file shares (user documents)
-  │     Savings: 50-80% (lots of duplicate office documents)
-  ├── Software deployment shares
-  │     Savings: 30-70% (duplicate installers, package files)
-  ├── Home directories
-  │     Savings: 40-60% (duplicate user files, templates)
-  └── Unique binary data (media, databases)
-        Savings: 0-10% (no duplicates; dedup overhead may exceed savings)
-
-  Configuration:
-    DedupType:
-      ├── GeneralPurpose — for general file shares (default)
-      └── HyperV — for Hyper-V VM storage
-
-    Schedule:
-      └── Run during off-peak hours (e.g., nightly)
-```
-
-**Key implication:** dedup is NOT free — it uses CPU and I/O during
-the dedup scan. Schedule it during off-peak hours. Estimate savings
-based on data patterns before enabling.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+Covers: Expert heuristic: dedup savings estimation. See the "References (load on demand)" section.
 
 ## Prerequisites (verify before provisioning)
 
@@ -459,59 +356,13 @@ managed for audit/control or AWS-managed (default) for simplicity.
 
 ## Step 8 — Backup and restore
 
-```bash
-# Create a manual backup
-aws fsx create-backup \
-  --file-system-id fs-aaa111222 \
-  --tags Key=Name,Value=pre-change-backup \
-  --region us-east-1
-
-# Restore from a backup (creates a NEW file system)
-aws fsx create-file-system-from-backup \
-  --backup-id backup-xxx \
-  --subnet-ids subnet-aaa111 subnet-bbb222 \
-  --region us-east-1
-
-# List backups
-aws fsx describe-backups \
-  --filters Name=file-system-id,Values=fs-aaa111222 \
-  --region us-east-1 --output table
-```
-
-**Constraints:** Restore creates a NEW file system (the original is
-not overwritten). Automated backups are configured at creation.
+Moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — load on demand.
+Covers: Step 8 — Backup and restore. See the "References (load on demand)" section.
 
 ## Step 9 — ONTAP SVM and volume tiering
 
-FSx for ONTAP uses Storage Virtual Machines (SVMs) and volumes with
-tiering (SSD cache + HDD capacity pool).
-
-```bash
-# Create an ONTAP file system
-aws fsx create-file-system \
-  --file-system-type ONTAP \
-  --storage-capacity 1024 \
-  --ontap-configuration DeploymentType=MULTI_AZ_1,\
-PreferredSubnetId=subnet-aaa111 \
-  --subnet-ids subnet-aaa111 subnet-bbb222 \
-  --region us-east-1
-
-# Create an SVM (after file system is ACTIVE)
-aws fsx create-storage-virtual-machine \
-  --file-system-id fs-aaa111222 \
-  --name svm-prod \
-  --region us-east-1
-
-# Create a volume with tiering
-aws fsx create-volume \
-  --volume-type ONTAP \
-  --name vol-prod \
-  --ontap-configuration \
-    JunctionPath=/vol-prod,SizeInMegabytes=1048576,\
-StorageEfficiency=enabled,TieringPolicy=auto,\
-StorageVirtualMachineId=svm-xxx \
-  --region us-east-1
-```
+Moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — load on demand.
+Covers: Step 9 — ONTAP SVM and volume tiering. See the "References (load on demand)" section.
 
 ## Step 10 — Maintenance windows
 
@@ -534,29 +385,8 @@ off-peak hours.
 
 ## Step 11 — Recent features
 
-- **FSx for OpenZFS (2023-2024):** ZFS-based file system with
-  snapshots, compression, and NFS. Added for workloads needing ZFS
-  features without managing ZFS infrastructure.
-
-- **Lustre PERSISTENT_2 with SSD metadata (2024-2025):** Enhanced
-  PERSISTENT_2 deployment with SSD-backed metadata configuration for
-  workloads with many small files.
-
-- **Data compression for Lustre (2024-2025):** LZ4 compression for
-  Lustre file systems, reducing storage footprint by 30-60% for
-  compressible data.
-
-- **ONTAP volume tiering improvements (2024-2025):** Enhanced
-  auto-tiering policies with configurable cooling period and
-  improved capacity pool performance.
-
-- **Multi-AZ for ONTAP (2024-2025):** Multi-AZ deployment for FSx
-  for ONTAP, providing transparent failover for multi-protocol
-  workloads.
-
-- **FSx backup cross-region copy (2025-2026):** Cross-region backup
-  copy for DR, enabling FSx backups to be copied to a different
-  region for cross-region recovery.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+Covers: Step 11 — Recent features. See the "References (load on demand)" section.
 
 ## NEVER do these things
 
@@ -660,30 +490,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### File system stuck in CREATING state
-- File system creation can take 10-60 minutes depending on type and
-  size. If it stays in CREATING beyond expected time, check subnet
-  configuration, AD integration (for Windows), and IAM permissions.
+Moved verbatim to [references/error-handling.md](references/error-handling.md) — load on demand.
+Covers: Error handling. See the "References (load on demand)" section.
 
-### AD domain join failure (Windows)
-- The directory may not be ACTIVE, or the security group may block
-  required AD ports (53, 88, 389, 445). Verify the directory status
-  and security group rules.
+## References (load on demand)
 
-### S3 export/import not working (Lustre)
-- The S3 bucket may not exist, or the IAM permissions may be
-  incorrect. Verify the bucket is in the same region and the FSx
-  service role has read/write access to the bucket.
-
-### Multi-AZ failover not working
-- The standby may not be in a different AZ, or the security group
-  may block inter-AZ traffic. Verify both subnets are in different
-  AZs and the security group allows traffic on required ports.
-
-### Throughput capacity change failed
-- The new throughput value may not be a valid step, or a maintenance
-  window is required. Verify the throughput step is valid and
-  schedule the change during a maintenance window.
+- [references/deployment-types-and-ad-integration.md](references/deployment-types-and-ad-integration.md) — deployment types and AD integration detail (existing)
+- [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — provisioning CLI reference (existing); now also the backup/restore (Step 8) and ONTAP SVM/volume (Step 9) command sequences
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert-heuristic deep dives (Multi-AZ vs Single-AZ pairing, throughput step sizing, S3 export architecture, dedup savings) and recent features (Step 11)
+- [references/error-handling.md](references/error-handling.md) — error-handling deep dives: stuck in CREATING, AD domain-join failure, S3 export/import, Multi-AZ failover, throughput change failure
 
 ## Domain
 

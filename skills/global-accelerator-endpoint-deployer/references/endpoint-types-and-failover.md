@@ -176,3 +176,56 @@ with a dedicated health endpoint for application-level verification.
 In active-passive, the DR region's endpoints must be healthy for
 failover to work. If DR endpoints are unhealthy, there is no failover
 target. Monitor DR endpoint health continuously.
+
+---
+
+## Expert heuristic: health check customization drives failover timing (moved from SKILL.md)
+
+Global Accelerator performs its own health checks on endpoints,
+independent of the target group health checks.
+
+```text
+Health check interval = 10s, threshold = 3
+  → Detection: 3 * 10s = 30 seconds to mark unhealthy
+  → Recovery: 3 * 10s = 30 seconds to mark healthy
+  → Total failover: ~30-60 seconds
+
+Health check interval = 30s, threshold = 3
+  → Detection: 3 * 30s = 90 seconds to mark unhealthy
+  → Total failover: ~90-180 seconds
+```
+
+A 10-second interval detects failures faster but generates more health
+check traffic. For latency-sensitive workloads, use 10-second intervals.
+
+## Step 9 — Endpoint group failover (moved from SKILL.md)
+
+Failover is automatic when an endpoint becomes unhealthy. The health
+check interval and threshold determine how quickly traffic shifts.
+
+**Active-passive failover:**
+
+```text
+Primary region (us-east-1): traffic dial = 1.0
+DR region (us-west-2):     traffic dial = 0.0
+
+When us-east-1 endpoints become unhealthy:
+  → GA detects unhealthy (threshold * interval)
+  → Traffic shifts to us-west-2
+  → Recovery: traffic returns to us-east-1 when healthy
+```
+
+**Manual failover (drain a region):**
+
+```bash
+aws globalaccelerator update-endpoint-group \
+  --endpoint-group-arn "$EG_PRIMARY" --traffic-dial 0.0
+
+aws globalaccelerator update-endpoint-group \
+  --endpoint-group-arn "$EG_DR" --traffic-dial 1.0
+```
+
+For active-passive, the DR region's endpoints must be healthy for
+failover to work. Global Accelerator only sends traffic to healthy
+endpoints within an endpoint group.
+

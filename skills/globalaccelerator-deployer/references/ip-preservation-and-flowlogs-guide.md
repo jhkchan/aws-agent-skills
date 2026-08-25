@@ -252,3 +252,76 @@ Network account (111111111111)
 Always verify share state via
 `aws ram get-resource-share-invitations --resource-arns <endpoint-arn>`
 before adding cross-account endpoints.
+
+---
+
+### Step 6: Flow logs — CloudWatch Logs or S3 (moved from SKILL.md)
+
+**CloudWatch Logs:**
+
+```bash
+aws globalaccelerator update-accelerator-attributes \
+  --accelerator-arn <arn> \
+  --flow-logs-s3-bucket "" \
+  --flow-logs-log-group "/aws/globalaccelerator/prod-ga"
+```
+
+The `AWSServiceRoleForGlobalAccelerator` service-linked role needs
+`logs:CreateLogStream` and `logs:PutLogEvents` on the log group ARN.
+Verify via `iam:get-role` and check the attached policy.
+
+**S3 destination:**
+
+```bash
+aws globalaccelerator update-accelerator-attributes \
+  --accelerator-arn <arn> \
+  --flow-logs-s3-bucket "prod-ga-flowlogs" \
+  --flow-logs-log-group ""
+```
+
+**S3 bucket policy (required):**
+
+```json
+{
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": {"Service": "flowlogs.globalaccelerator.amazonaws.com"},
+    "Action": "s3:PutObject",
+    "Resource": "arn:aws:s3:::prod-ga-flowlogs/*"
+  }]
+}
+```
+
+**Anti-pattern:** NEVER configure flow logs without verifying the
+destination permission. GA silently drops logs on permission errors —
+there is no status field indicating "logging failed." Verify by sending
+test traffic and checking for log entries within 5 minutes.
+
+## Expert heuristic: choosing client IP preservation per endpoint type (moved from SKILL.md)
+
+The "right" client IP preservation setting is a function of endpoint
+type and the origin's security model. The heuristic below resolves it.
+
+| Endpoint | Default | When to enable | Origin SG posture |
+|---|---|---|---|
+| ALB | Always X-Forwarded-For (no toggle) | N/A — header-based | Scope to GA pool (`51.224.0.0/14`); WAF at ALB sees real client IP |
+| NLB | `false` (recommended) | Origin has IP-based controls (WAF, rate limit, geo-block by CIDR) | `true`: allow client CIDRs; `false`: scope to GA pool |
+| EC2 | `false` (recommended) | Application reads L4 source IP for logs or IP-based rules | `true`: allow client CIDRs; `false`: scope to GA pool |
+| Elastic IP | N/A (EIP is the endpoint) | Client IP preserved at L4 by definition | Origin SG scope unchanged |
+
+**Decision rules:**
+- Default `PreserveClientIpEnabled: false` for NLB and EC2 unless the
+  origin has explicit IP-based controls. Simpler SGs; trade-off is
+  origin logs show AWS GA IPs.
+- When `true`, update the origin SG in the SAME deploy. GA enabling
+  preservation without an SG update cuts off all traffic.
+- For custom routing accelerators, client IP is always preserved at L4
+  — no toggle exists.
+- The GA prefix pool is `51.224.0.0/14` (IPv4, 2026). Verify via
+  `aws globalaccelerator list-byoip-cidrs` before scoping SGs; the pool
+  may expand over time.
+
+ALWAYS emit the client IP preservation decision as a PRE_CHECKS row
+naming the endpoint ARN, the setting, and the SG posture
+(client-ranges vs GA-pool).
+

@@ -269,653 +269,68 @@ If any prerequisite is missing, output
 
 ## Step 1 — Component recipe (lifecycle hooks)
 
-The component recipe is a YAML file that defines the component's
-metadata, lifecycle hooks, artifacts, and configuration schema.
-
-**Minimal recipe structure:**
-
-```yaml
----
-RecipeFormatVersion: "2020-01-25"
-ComponentName: com.example.MyComponent
-ComponentVersion: "1.0.0"
-ComponentDescription: "My first Greengrass component"
-ComponentPublisher: Example
-ComponentConfiguration:
-  DefaultConfiguration:
-    message: "Hello from Greengrass"
-    interval: 5
-Manifests:
-  - Name: "linux-amd64"
-    Platform:
-      architecture: amd64
-      os: linux
-    Artifacts:
-      - URI: s3://my-bucket/artifacts/my-script.py
-        Unarchive: NONE
-    Lifecycle:
-      Install:
-        Script: |
-          mkdir -p {artifacts:decompressedPath}/my-component
-          cp {artifacts:path}/my-script.py {artifacts:decompressedPath}/my-component/
-      Startup:
-        Script: |
-          python3 {artifacts:decompressedPath}/my-component/my-script.py
-      Shutdown:
-        Script: |
-          echo "Shutting down MyComponent"
-```
-
-**Lifecycle hook precedence:**
-
-| Hook | When it runs | Exit code 0 | Exit code non-zero |
-|---|---|---|---|
-| Install | On first deploy or version update | Component proceeds to Startup | Component deployment fails |
-| Startup | After install, on device boot, on restart | Component is RUNNING (stays running) | Component enters ERRORED state; recover hook runs |
-| Shutdown | On undeploy, device shutdown, version update | Clean stop | Force kill after timeout |
-| Recover | If startup fails (optional) | Component retries startup | Component stays ERRORED |
-
-**Artifact path variables:**
-
-| Variable | Expands to |
-|---|---|
-| `{artifacts:path}` | Path to the artifact as downloaded (file or directory) |
-| `{artifacts:decompressedPath}` | Path to the decompressed artifact (for ZIP/TAR archives) |
-| `{work:path}` | Component work directory (persistent, per-component) |
-| `{configuration:/<key>}` | Configuration value for the given key |
+Minimal recipe YAML, lifecycle-hook precedence table, and artifact path variables moved verbatim to [references/recipe-and-lifecycle.md](references/recipe-and-lifecycle.md).
+Load on demand when authoring or validating a component recipe.
 
 ## Step 2 — Component versioning
 
-Greengrass v2 components use semantic versioning (`MAJOR.MINOR.PATCH`).
-Every recipe change requires a version bump. Creating a component
-version with the same version as an existing one is a no-op.
-
-**Version bump rules:**
-
-| Change type | Version bump | Example |
-|---|---|---|
-| Bug fix, no new features | PATCH | 1.0.0 → 1.0.1 |
-| New feature, backward-compatible | MINOR | 1.0.1 → 1.1.0 |
-| Breaking change | MAJOR | 1.1.0 → 2.0.0 |
-| Recipe lifecycle change | MINOR or MAJOR | 1.1.0 → 1.2.0 |
-| Artifact update only | PATCH | 1.1.0 → 1.1.1 |
-
-**Create a component version:**
-
-```bash
-# Upload the recipe to S3 (or use inline)
-aws greengrassv2 create-component-version \
-  --inline-recipe fileb://recipe.yaml \
-  --region us-east-1
-
-# Or from S3
-aws greengrassv2 create-component-version \
-  --lambda-function '{"lambdaArn": "arn:aws:lambda:us-east-1:123456789012:function:my-func:1", "componentName": "com.example.MyLambda", "componentVersion": "1.0.0"}' \
-  --region us-east-1
-```
-
-**Verify component version created:**
-
-```bash
-aws greengrassv2 describe-component \
-  --arn "arn:aws:greengrass:us-east-1:123456789012:components:com.example.MyComponent:versions:1.0.0" \
-  --region us-east-1
-```
+Version-bump rules table and create-component-version commands moved verbatim to [references/recipe-and-lifecycle.md](references/recipe-and-lifecycle.md).
+Load on demand when publishing a component version.
 
 ## Step 3 — Artifact storage (S3)
 
-Component artifacts (scripts, binaries, models, archives) are stored
-in S3. The recipe references them by S3 URI. Greengrass uses the
-token exchange role on the core device to download artifacts (NOT
-presigned URLs).
-
-**Upload artifact to S3:**
-
-```bash
-aws s3 cp my-script.py s3://my-greengrass-artifacts/artifacts/com.example.MyComponent/1.0.0/my-script.py \
-  --region us-east-1
-```
-
-**Token exchange role policy (must include s3:GetObject):**
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": ["s3:GetObject"],
-      "Resource": "arn:aws:s3:::my-greengrass-artifacts/*"
-    }
-  ]
-}
-```
-
-**Artifact archive types:**
-
-| Unarchive value | When to use |
-|---|---|
-| NONE | Single file (script, binary) |
-| ZIP | Multiple files compressed as ZIP |
-| TAR | Multiple files compressed as TAR |
-| TAR_GZ | Multiple files compressed as TAR.GZ |
-
-For ZIP/TAR archives, use `{artifacts:decompressedPath}` in lifecycle
-scripts to reference the extracted files.
+Artifact upload command, token-exchange role policy, and unarchive types moved verbatim to [references/recipe-and-lifecycle.md](references/recipe-and-lifecycle.md).
+Load on demand when packaging artifacts.
 
 ## Step 4 — Component dependencies (hard vs soft)
 
-Components can depend on other components. There are two dependency
-types:
-
-| Dependency type | Behavior | Use case |
-|---|---|---|
-| HARD | If dependency fails, THIS component also fails | Required runtime (e.g., aws.lambda for Lambda components) |
-| SOFT | If dependency fails, THIS component still starts | Optional features (e.g., a logging component) |
-
-**Recipe with dependencies:**
-
-```yaml
-ComponentDependencies:
-  - DependencyType: HARD
-    ComponentRequire:
-      ThingName: aws.lambda
-      Version: "2.3.0"
-  - DependencyType: SOFT
-    ComponentRequire:
-      ThingName: com.example.Logging
-      Version: "1.0.0"
-```
-
-**Dependency resolution order:**
-
-Greengrass resolves dependencies in topological order. HARD
-dependencies are installed and started BEFORE the dependent
-component. SOFT dependencies are started before but do not block.
+HARD vs SOFT dependency table, recipe snippet, and resolution order moved verbatim to [references/recipe-and-lifecycle.md](references/recipe-and-lifecycle.md).
+Load on demand when defining component dependencies.
 
 ## Step 5 — Deployment to thing group
 
-Deployments target thing GROUPS, not individual devices. A thing
-group can contain one or more IoT things (core devices).
-
-**Create a thing group:**
-
-```bash
-aws iot create-thing-group \
-  --thing-group-name MyDeviceGroup \
-  --region us-east-1
-```
-
-**Add a thing to the group:**
-
-```bash
-aws iot add-thing-to-thing-group \
-  --thing-name MyCoreDevice \
-  --thing-group-name MyDeviceGroup \
-  --region us-east-1
-```
-
-**Create a deployment:**
-
-```bash
-aws greengrassv2 create-deployment \
-  --target-arn "arn:aws:iot:us-east-1:123456789012:thinggroup/MyDeviceGroup" \
-  --deployment-name "Deploy MyComponent 1.0.0" \
-  --components '{
-    "com.example.MyComponent": {
-      "componentVersion": "1.0.0",
-      "configurationUpdate": {
-        "MERGE": "{\"message\": \"Hello from deployment\"}"
-      }
-    }
-  }' \
-  --deployment-policies '{
-    "componentUpdatePolicy": {
-      "timeoutInSeconds": 60,
-      "action": "NOTIFY_COMPONENTS"
-    },
-    "configurationValidationPolicy": {
-      "timeoutInSeconds": 60
-    },
-    "failureDetectionPolicy": {
-      "action": "ROLLBACK"
-    }
-  }' \
-  --region us-east-1
-```
-
-**Verify deployment status:**
-
-```bash
-DEPLOYMENT_ID="<deployment-id from create-deployment output>"
-
-aws greengrassv2 get-deployment \
-  --deployment-id "$DEPLOYMENT_ID" \
-  --region us-east-1
-# Expected: deploymentStatus: ACTIVE, COMPLETED
-```
-
-**Deployment policies:**
-
-| Policy | Options | Default |
-|---|---|---|
-| ComponentUpdatePolicy | NOTIFY_COMPONENTS (graceful), SKIP_NOTIFY_COMPONENTS (immediate) | NOTIFY_COMPONENTS with 60s timeout |
-| ConfigurationValidationPolicy | timeoutInSeconds for validation | 60s |
-| FailureDetectionPolicy | ROLLBACK (revert on failure), DO_NOTHING | ROLLBACK |
+Thing-group creation, deployment JSON, verification, and deployment policies table moved verbatim to [references/deployment-and-config.md](references/deployment-and-config.md).
+Load on demand when creating the deployment.
 
 ## Step 6 — Configuration merge
 
-Configuration merge allows per-deployment customization of component
-parameters. The recipe defines default configuration; the deployment
-can merge overrides.
-
-**Recipe default configuration:**
-
-```yaml
-ComponentConfiguration:
-  DefaultConfiguration:
-    message: "Hello from Greengrass"
-    interval: 5
-    logging:
-      level: "info"
-      path: "/var/log/my-component"
-```
-
-**Deployment configuration merge:**
-
-```bash
-# Override message and logging.level for this deployment
-aws greengrassv2 create-deployment \
-  --target-arn "arn:aws:iot:us-east-1:123456789012:thinggroup/MyDeviceGroup" \
-  --components '{
-    "com.example.MyComponent": {
-      "componentVersion": "1.0.0",
-      "configurationUpdate": {
-        "MERGE": "{\"message\": \"Custom message for this group\", \"logging\": {\"level\": \"debug\"}}"
-      }
-    }
-  }' \
-  --region us-east-1
-```
-
-**Merge semantics:**
-
-- MERGE: Deep-merges with existing configuration (nested keys are
-  merged, not replaced).
-- RESET: Resets specified keys to recipe defaults (removes deployment
-  overrides).
-
-```bash
-# Reset message to recipe default
-"configurationUpdate": {
-  "RESET": ["message"]
-}
-```
-
-**Accessing configuration in lifecycle scripts:**
-
-```bash
-# In a lifecycle script, reference configuration via {configuration:/key}
-Script: |
-  MESSAGE={configuration:/message}
-  INTERVAL={configuration:/interval}
-  echo "$MESSAGE at interval $INTERVAL"
-```
+MERGE/RESET semantics and configuration access in lifecycle scripts moved verbatim to [references/deployment-and-config.md](references/deployment-and-config.md).
+Load on demand when overriding configuration per thing group.
 
 ## Step 7 — Secret manager integration (IoT role alias)
 
-Greengrass components can access AWS Secrets Manager secrets via an
-IoT role alias. The role alias maps an IoT credential to an IAM role
-that has `secretsmanager:GetSecretValue` permission.
-
-**Create IAM role for secret access:**
-
-```bash
-aws iam create-role \
-  --role-name GreengrassSecretAccessRole \
-  --assume-role-policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Effect": "Allow",
-        "Principal": {"Service": "credentials.iot.amazonaws.com"},
-        "Action": "sts:AssumeRole"
-      }
-    ]
-  }'
-
-# Attach Secrets Manager policy
-aws iam put-role-policy \
-  --role-name GreengrassSecretAccessRole \
-  --policy-name SecretAccessPolicy \
-  --policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Effect": "Allow",
-        "Action": ["secretsmanager:GetSecretValue"],
-        "Resource": "arn:aws:secretsmanager:us-east-1:123456789012:secret:*"
-      }
-    ]
-  }'
-```
-
-**Create IoT role alias:**
-
-```bash
-aws iot create-role-alias \
-  --role-alias MySecretRoleAlias \
-  --role-arn arn:aws:iam::123456789012:role/GreengrassSecretAccessRole \
-  --credential-duration-seconds 3600 \
-  --region us-east-1
-```
-
-**Recipe referencing the role alias:**
-
-```yaml
-ComponentConfiguration:
-  DefaultConfiguration:
-    secretManagerRoleAlias: "MySecretRoleAlias"
-    secretId: "my-database-credentials"
-
-Manifests:
-  - Lifecycle:
-      Startup:
-        Script: |
-          # Greengrass automatically provides AWS credentials via the
-          # IoT role alias. Access the secret using the AWS CLI or SDK.
-          aws secretsmanager get-secret-value \
-            --secret-id {configuration:/secretId} \
-            --query SecretString --output text
-```
-
-**Critical:** the IoT role alias credential provider runs on the
-core device and automatically rotates credentials. The component
-does NOT need to manage credentials manually. Greengrass sets the
-`AWS_CONTAINER_AUTHORIZATION_TOKEN` and `AWS_CONTAINER_CREDENTIALS_FULL_URI`
-environment variables for the component.
+Secret-access IAM role, IoT role alias creation, and recipe snippet moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when a component reads Secrets Manager secrets.
 
 ## Step 8 — Lambda as component
 
-Lambda functions can run on Greengrass core devices as components.
-The `aws.lambda` component (managed by AWS) provides the Lambda
-runtime on the edge device.
-
-**Create Lambda component from function ARN:**
-
-```bash
-aws greengrassv2 create-component-version \
-  --lambda-function '{
-    "lambdaArn": "arn:aws:lambda:us-east-1:123456789012:function:my-edge-function:3",
-    "componentName": "com.example.MyEdgeLambda",
-    "componentVersion": "1.0.0",
-    "componentPlatforms": [{"name": "Linux amd64", "attributes": {"os": "linux", "architecture": "amd64"}}]
-  }' \
-  --region us-east-1
-```
-
-**Recipe with Lambda dependency:**
-
-```yaml
-ComponentDependencies:
-  - DependencyType: HARD
-    ComponentRequire:
-      ThingName: aws.lambda
-      Version: "2.3.0"
-```
-
-**Lambda component configuration:**
-
-| Parameter | Description | Default |
-|---|---|---|
-| lambdaExecutionParameters | Event sources, environment variables, timeout | N/A |
-| maxInstances | Max concurrent instances on device | 0 (unlimited) |
-| maxQueueSize | Max event queue size | 1000 |
-| pinned | Whether the function is long-lived (true) or event-driven (false) | true |
-
-**Example deployment with Lambda component:**
-
-```bash
-aws greengrassv2 create-deployment \
-  --target-arn "arn:aws:iot:us-east-1:123456789012:thinggroup/MyDeviceGroup" \
-  --components '{
-    "com.example.MyEdgeLambda": {
-      "componentVersion": "1.0.0",
-      "configurationUpdate": {
-        "MERGE": "{\"lambdaExecutionParameters\": {\"environmentVariables\": {\"LOG_LEVEL\": \"debug\"}}}"
-      }
-    },
-    "aws.lambda": {
-      "componentVersion": "2.3.0"
-    }
-  }' \
-  --region us-east-1
-```
+create-component-version --lambda-function, dependency snippet, Lambda config table, and deployment example moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for Lambda-based components.
 
 ## Step 9 — Docker container as component
 
-Docker containers can run on Greengrass core devices as components.
-The `aws.greengrass.DockerApplicationManager` component manages
-Docker images (pull, run, stop).
-
-**Prerequisites:**
-- Docker must be installed and running on the core device.
-- `aws.greengrass.DockerApplicationManager` must be deployed as a
-  dependency.
-- For private registries, use `aws.docker.Login` to authenticate.
-
-**Recipe for Docker component:**
-
-```yaml
----
-RecipeFormatVersion: "2020-01-25"
-ComponentName: com.example.MyDockerComponent
-ComponentVersion: "1.0.0"
-ComponentPublisher: Example
-ComponentDependencies:
-  - DependencyType: HARD
-    ComponentRequire:
-      ThingName: aws.greengrass.DockerApplicationManager
-      Version: "2.0.0"
-Manifests:
-  - Platform:
-      architecture: amd64
-      os: linux
-    Artifacts:
-      - URI: "docker:nginx:latest"
-        ArtifactType: DOCKER
-    Lifecycle:
-      Startup: |
-        docker run -d --name my-nginx -p 8080:80 nginx:latest
-      Shutdown: |
-        docker stop my-nginx && docker rm my-nginx
-```
-
-**Private registry login component:**
-
-```yaml
-ComponentName: aws.docker.Login
-ComponentVersion: "2.0.0"
-# This is a managed AWS component — reference it as a dependency
-# alongside DockerApplicationManager if using private registries
-```
-
-**Deploy Docker component:**
-
-```bash
-aws greengrassv2 create-deployment \
-  --target-arn "arn:aws:iot:us-east-1:123456789012:thinggroup/MyDeviceGroup" \
-  --components '{
-    "com.example.MyDockerComponent": {
-      "componentVersion": "1.0.0"
-    },
-    "aws.greengrass.DockerApplicationManager": {
-      "componentVersion": "2.0.0"
-    }
-  }' \
-  --region us-east-1
-```
+Docker recipe, private-registry login, and deployment example moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for Docker-based components.
 
 ## Step 10 — Local volume mount
 
-Docker components can mount local directories (volumes) on the edge
-device for persistent storage.
-
-**Recipe with volume mount:**
-
-```yaml
-Manifests:
-  - Lifecycle:
-      Startup: |
-        docker run -d \
-          --name my-data-processor \
-          -v /greengrass/v2/work/com.example.MyDockerComponent/data:/data \
-          -v /greengrass/v2/work/com.example.MyDockerComponent/config:/config \
-          my-data-processor:latest
-```
-
-**Volume mount best practices:**
-
-| Mount path | Purpose | Persistence |
-|---|---|---|
-| `{work:path}/data` | Component work directory | Persists across component restarts; cleared on undeploy |
-| `/greengrass/v2/work/<component>/data` | Same as work:path | Same |
-| Host path (e.g., `/mnt/data`) | External storage | Persists across undeploy (device-level) |
-
-**Critical:** use `{work:path}` for component-scoped storage. This
-ensures the path is unique per component and managed by Greengrass.
-Hardcoded host paths (e.g., `/mnt/data`) require the path to exist
-on the device.
+Volume-mount recipe and persistence best-practices table moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for persistent edge storage.
 
 ## Step 11 — Cloud-based deployment vs local deployment
 
-Greengrass v2 supports two deployment modes:
-
-| Mode | How it works | When to use |
-|---|---|---|
-| Cloud-based (default) | Deploy via AWS cloud (create-deployment API). Components pushed from cloud to device. | Production, fleet management, centralized control |
-| Local deployment | Deploy via Greengrass CLI on the device itself. Components run locally without cloud round-trip. | Development, debugging, air-gapped devices |
-
-**Cloud-based deployment (production):**
-
-```bash
-# From the cloud (AWS CLI or console)
-aws greengrassv2 create-deployment \
-  --target-arn "arn:aws:iot:us-east-1:123456789012:thinggroup/MyDeviceGroup" \
-  --components '{"com.example.MyComponent": {"componentVersion": "1.0.0"}}' \
-  --region us-east-1
-```
-
-**Local deployment (development):**
-
-```bash
-# On the core device, using Greengrass CLI
-# Deploy a local component for testing
-sudo /greengrass/v2/bin/greengrass-cli deployment create \
-  --merge "com.example.MyComponent=1.0.0" \
-  --recipeDir /path/to/recipes \
-  --artifactsDir /path/to/artifacts
-
-# Check local deployment status
-sudo /greengrass/v2/bin/greengrass-cli deployment status
-```
-
-**Default deployment (thing group default):**
-
-A default deployment is a deployment that Greengrass automatically
-applies to new devices when they join a thing group. This ensures
-new devices get the correct component set without manual
-intervention.
-
-```bash
-# Create a thing group with a default deployment
-aws greengrassv2 create-deployment \
-  --target-arn "arn:aws:iot:us-east-1:123456789012:thinggroup/MyDeviceGroup" \
-  --components '{"com.example.MyComponent": {"componentVersion": "1.0.0"}}' \
-  --deployment-name "Default deployment for MyDeviceGroup" \
-  --region us-east-1
-```
+Cloud vs local mode table, Greengrass CLI local deployment, and default-deployment pattern moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when choosing a deployment mode.
 
 ## Step 12 — Core device setup
 
-The core device must have Greengrass v2 installed and configured.
-
-**Install Greengrass v2 on a Linux device:**
-
-```bash
-# Download the Greengrass installer
-curl -s https://d2s8p88vqu9w66.cloudfront.net/releases/greengrass-nucleus-latest.zip \
-  -o greengrass-nucleus-latest.zip
-unzip greengrass-nucleus-latest.zip -d GreengrassInstaller
-
-# Install Greengrass core (requires AWS credentials with provisioning permissions)
-sudo java -Droot="/greengrass/v2" \
-  -Dlog.store=FILE \
-  -jar ./GreengrassInstaller/lib/Greengrass.jar \
-  --aws-region us-east-1 \
-  --thing-name MyCoreDevice \
-  --thing-group-name MyDeviceGroup \
-  --thing-policy-name GreengrassV2IoTThingPolicy \
-  --tes-role-name GreengrassV2TokenExchangeRole \
-  --tes-role-alias-name GreengrassV2TokenExchangeRoleAlias \
-  --component-default-user ggc_user:ggc_group \
-  --provision true \
-  --setup-system-service true
-```
-
-**Verify core device is registered:**
-
-```bash
-aws greengrassv2 list-core-devices \
-  --region us-east-1 \
-  --query "coreDevices[?coreDeviceThingName=='MyCoreDevice']"
-# Expected: coreDeviceStatus: HEALTHY
-```
-
-**Token exchange role (auto-created during provisioning):**
-
-The installer creates a token exchange role that allows the core
-device to interact with AWS services (S3, Secrets Manager, IoT).
-This role needs additional policies for:
-- `s3:GetObject` on artifact buckets
-- `secretsmanager:GetSecretValue` for secret access
-- `iot:*` for IoT operations
+Nucleus install commands, device verification, and token-exchange role notes moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when setting up a core device.
 
 ## Step 13 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Greengrass v2 component management APIs (2023-2024):** Enhanced
-  APIs for component version management, including batch operations
-  for large fleets. The create-component-version API now supports
-  inline recipes and Lambda function conversion.
-
-- **Docker container improvements (2023-2024):** The
-  aws.greengrass.DockerApplicationManager component now supports
-  multi-architecture images and private registry authentication
-  via aws.docker.Login with credential rotation.
-
-- **Configuration merge validation (2023-2024):** Configuration
-  validation policies now support custom validation scripts that
-  run on the device before applying configuration changes. This
-  prevents invalid configurations from breaking components.
-
-- **Stream manager enhancements (2023-2024):** The Greengrass stream
-  manager now supports data prioritization and batch flushing,
-  improving real-time data processing on edge devices.
-
-- **Fleet provisioning by claim (2023-2024):** Enhanced fleet
-  provisioning flows allow devices to self-provision using a claim
-  certificate, reducing manual device setup for large fleets.
-
-- **CloudWatch metrics for Greengrass (2024-2025):** Automatic
-  CloudWatch metric emission for component lifecycle events
-  (install, startup, shutdown, error), enabling fleet-wide
-  observability without custom instrumentation.
-
-- **Greengrass CLI local deployment improvements (2024-2025):**
-  The local CLI now supports component recipe validation before
-  deployment, catching recipe errors before they reach the device.
+2023-2026 feature notes (component APIs, Docker improvements, merge validation, stream manager, fleet provisioning, CloudWatch metrics, CLI validation) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when recent features matter.
 
 ## NEVER do these things
 
@@ -1022,41 +437,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Component stuck in ERRORED state
-- The startup script is likely exiting immediately (one-shot script
-  in startup hook). Move one-shot logic to the install hook, or make
-  the startup hook a long-running process. Check device logs at
-  `/greengrass/v2/logs/<component>.log`.
+Six failure modes (ERRORED state, unreachable device, artifact download, merge no-op, Lambda start, Docker start) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when a deployment misbehaves.
 
-### Deployment not reaching the device
-- The core device may be UNHEALTHY or offline. Check
-  `aws greengrassv2 list-core-devices` for device status. Verify the
-  device is in the target thing group. Check network connectivity
-  from the device to AWS IoT.
+## References (load on demand)
 
-### Artifacts not downloading
-- The token exchange role may lack `s3:GetObject` on the artifact
-  bucket. Verify the IAM policy attached to the token exchange role
-  includes the artifact bucket ARN. Check device logs for S3 access
-  errors.
-
-### Configuration merge not taking effect
-- The merge keys may not match the recipe's configuration schema.
-  Configuration merge only works for keys defined in
-  `ComponentConfiguration.DefaultConfiguration`. Verify the merge
-  JSON keys match the recipe schema.
-
-### Lambda component fails to start
-- The `aws.lambda` component may not be deployed. Verify it is listed
-  as a HARD dependency in the recipe and deployed alongside the
-  Lambda component. Check that the Lambda runtime is compatible with
-  the device architecture.
-
-### Docker container fails to start
-- Docker may not be installed or running on the device. Verify
-  `docker ps` works on the device. Ensure
-  `aws.greengrass.DockerApplicationManager` is deployed. For private
-  registries, deploy `aws.docker.Login`.
+- [references/recipe-and-lifecycle.md](references/recipe-and-lifecycle.md) — recipe schema, lifecycle hooks, versioning, artifact storage, dependencies
+- [references/deployment-and-config.md](references/deployment-and-config.md) — thing-group deployment, deployment policies, configuration-merge semantics
+- [references/advanced-patterns.md](references/advanced-patterns.md) — secrets via IoT role alias, Lambda/Docker components, volume mounts, deployment modes, core device setup, 2023-2026 features
+- [references/error-handling.md](references/error-handling.md) — ERRORED components, unreachable devices, artifact download and merge failures
 
 ## Domain
 

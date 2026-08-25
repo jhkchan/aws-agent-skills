@@ -274,3 +274,78 @@ resource "aws_grafana_workspace" "workspace" {
   }
 }
 ```
+
+## Step 2 — IAM role for data source access (code listings) — moved from SKILL.md
+
+**Customer-managed IAM role:** create a role with the `Grafana`
+service principal and scoped read permissions:
+
+```bash
+# Trust policy for Amazon Managed Grafana
+aws iam create-role \
+  --role-name GrafanaDataSourceRole \
+  --assume-role-policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [{"Effect": "Allow","Principal": {"Service": "grafana.amazonaws.com"},"Action": "sts:AssumeRole"}]
+  }'
+
+# Attach inline policy for data source read access
+aws iam put-role-policy \
+  --role-name GrafanaDataSourceRole \
+  --policy-name GrafanaDataSourceRead \
+  --policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [
+      {"Effect": "Allow","Action": ["cloudwatch:GetMetricData","cloudwatch:GetMetricStatistics","cloudwatch:ListMetrics"],"Resource": "*"},
+      {"Effect": "Allow","Action": ["logs:DescribeLogGroups","logs:GetLogEvents","logs:StartQuery","logs:GetQueryResults"],"Resource": "*"},
+      {"Effect": "Allow","Action": ["aps:GetLabels","aps:GetMetricMetadata","aps:GetSeries","aps:QueryMetrics"],"Resource": "arn:aws:aps:<region>:<acct>:workspace/<amp-id>"},
+      {"Effect": "Allow","Action": ["timestream:Select","timestream:DescribeEndpoints"],"Resource": "*"},
+      {"Effect": "Allow","Action": ["xray:GetTraceSummaries","xray:GetTraceGraph","xray:GetSamplingRules"],"Resource": "*"},
+      {"Effect": "Allow","Action": ["es:ESHttpGet","es:ESHttpHead"],"Resource": "arn:aws:es:<region>:<acct>:domain/<domain>/*"}
+    ]
+  }'
+```
+
+**Associate the role with the workspace:**
+```bash
+aws grafana update-workspace-configuration \
+  --workspace-id <workspace-id> \
+  --data-sources CLOUDWATCH PROMETHEUS XRAY
+```
+
+## Common patterns (boilerplate) — moved from SKILL.md
+
+### Create a workspace with CloudWatch + AMP + X-Ray (production)
+
+```bash
+aws grafana create-workspace \
+  --workspace-name prod-observability \
+  --account-access-type CURRENT_ACCOUNT \
+  --authentication-providers AWS_SSO \
+  --permission-type CUSTOMER_MANAGED \
+  --data-sources CLOUDWATCH PROMETHEUS XRAY \
+  --grafana-version 10.4
+```
+
+### Create a customer-managed IAM role for data source access
+
+```bash
+aws iam create-role --role-name GrafanaDataSourceRole \
+  --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"grafana.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
+
+aws iam put-role-policy --role-name GrafanaDataSourceRole \
+  --policy-name DataSourceRead \
+  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["cloudwatch:GetMetricData","cloudwatch:ListMetrics","logs:DescribeLogGroups","aps:QueryMetrics","xray:GetTraceSummaries"],"Resource":"*"}]}'
+```
+
+### AMP workspace + dashboard import
+
+```bash
+aws amps create-workspace --workspace-name prod-metrics --alias prod
+
+GRAFANA_KEY=$(aws grafana create-workspace-api-key --workspace-id <id> \
+  --key-name deploy --key-role ADMIN --seconds-to-live 3600 --query 'key' --output text)
+
+curl -X POST -H "Authorization: Bearer $GRAFANA_KEY" -H "Content-Type: application/json" \
+  -d @dashboard.json https://<endpoint>/api/dashboards/db
+```

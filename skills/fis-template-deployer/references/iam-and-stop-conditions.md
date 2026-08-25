@@ -347,3 +347,56 @@ resource "aws_cloudwatch_metric_alarm" "fis_cpu_high" {
   alarm_actions = [aws_sns_topic.fis_alerts.arn]
 }
 ```
+
+---
+
+## Step 5 — IAM role configuration (moved from SKILL.md)
+
+The FIS service role must have a trust policy allowing `fis.amazonaws.com`
+to assume it, plus permissions scoped to the specific fault action on
+the target resources (via `Condition` on resource tags).
+
+**Trust policy:**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow",
+      "Principal": { "Service": "fis.amazonaws.com" },
+      "Action": "sts:AssumeRole" }
+  ]
+}
+```
+
+**Permissions policy (scoped to EC2 stop on tagged resources):**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow",
+      "Action": ["ec2:StopInstances", "ec2:StartInstances", "ec2:DescribeInstances"],
+      "Resource": "*",
+      "Condition": { "StringEquals": { "aws:ResourceTag/FIS_Target": "enabled" } } },
+    { "Effect": "Allow",
+      "Action": ["cloudwatch:DescribeAlarms"],
+      "Resource": "*" }
+  ]
+}
+```
+
+**Create the role:**
+
+```bash
+aws iam create-role --role-name FISExperimentRole \
+  --assume-role-policy-document file://trust-policy.json --region us-east-1
+
+aws iam put-role-policy --role-name FISExperimentRole \
+  --policy-name FISExperimentPermissions \
+  --policy-document file://permissions-policy.json
+```
+
+**Critical:** scope the permissions to the target tags via a `Condition`
+block. Do NOT grant blanket `ec2:*` on `*`.
+

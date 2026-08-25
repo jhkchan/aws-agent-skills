@@ -114,3 +114,35 @@ a LEAST_PRIVILEGE policy as long as the action is explicitly named:
   effective permissions of a principal. Set on roles to prevent even an
   attached admin policy from granting full access. Often forgotten but
   critical for delegated administration.
+
+## CloudTrail-derived least-privilege workflow (from SKILL.md § Remediation guidance)
+
+The authoritative procedure for generating a scoped policy from observed
+API usage:
+
+1. **Identify the principal** — get the role or user ARN from the policy
+   under review.
+2. **Query CloudTrail** — pull a minimum of 90 days of events where
+   `userIdentity.arn` matches the principal. 90 days captures quarterly
+   batch jobs and monthly rotations that a 30-day window would miss. Use
+   CloudTrail LookupEvents for targeted queries or Athena for high-volume
+   trails.
+3. **Extract unique API calls** — build a set of `EventSource` +
+   `EventName` pairs and map to IAM action format (e.g.,
+   `s3.amazonaws.com` + `GetObject` maps to `s3:GetObject`).
+4. **Extract resource ARNs** — from `requestParameters` and the `resources`
+   field. For S3, map `bucketName` to both `arn:aws:s3:::<bucket>` and
+   `arn:aws:s3:::<bucket>/*`.
+5. **Account for implicit calls** — SDKs often call list/describe before
+   write operations (e.g., `s3:ListBuckets` before `s3:PutObject`). Include
+   these if the workload depends on them.
+6. **Preserve service-list exceptions** — actions that only support
+   `Resource: "*"` (see Step 9) must keep `"*"` or the policy will fail.
+7. **Generate the policy** — use AWS IAM Access Analyzer policy generation
+   or build manually from the action + resource lists.
+8. **Validate** — run `aws iam simulate-principal-policy` with the scoped
+   action list to confirm the principal can still perform required
+   operations without `AccessDenied`.
+9. **Apply and monitor** — attach the scoped policy, then watch CloudTrail
+   for `AccessDenied` events for 1-2 weeks. Add any missing actions and
+   iterate.

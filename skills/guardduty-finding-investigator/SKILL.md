@@ -112,32 +112,8 @@ wrong layer.
 
 ### Account-wide pre-flight commands
 
-```bash
-# Detector IDs and the finding itself (preferred path)
-aws guardduty list-detectors --output json
-aws guardduty get-findings --detector-id <detector-id> \
-  --finding-ids <finding-id> --output json
-
-# Finding statistics, trusted IPs, and enabled features
-aws guardduty get-findings-statistics --detector-id <detector-id> \
-  --finding-statistics-types COUNT_BY_SEVERITY COUNT_BY_TYPE --output json
-aws guardduty list-ip-sets --detector-id <detector-id> --output json
-aws guardduty list-threat-intel-sets --detector-id <detector-id> --output json
-aws guardduty list-features --detector-id <detector-id> --output json
-
-# CloudTrail lookup for the finding's actor and time window
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventName,AttributeValue=ConsoleLogin \
-  --start-time <finding-utc-minus-15m> --end-time <finding-utc-plus-15m>
-
-# VPC Flow Log location (log group or S3) for the resource's VPC
-aws ec2 describe-flow-logs --filter Name=resource-id,Values=<vpc-id> --output json
-
-# AWS Health (regional events for GuardDuty)
-aws health describe-events \
-  --filter services=GUARDDUTY,eventStatusCodes=OPEN,UPCOMING \
-  --region us-east-1 --output json
-```
+Account-wide pre-flight command listing moved to references.
+→ [references/diagnostic-commands.md](references/diagnostic-commands.md) § Account-wide pre-flight commands
 
 ### Finding-shape short-circuit
 
@@ -169,40 +145,8 @@ source.**
 
 ### Step 0: Non-obvious behaviours that change the diagnosis
 
-- **A finding from a "trusted" source IP is still a finding until the
-  IP is in the trusted IP list.** GuardDuty does not deduce trust from
-  on-prem CIDRs, SaaS ranges, or scanner hostnames. Prefer the Trusted
-  IP list over suppression — the trusted IP list lets GuardDuty keep
-  tracking the source's behaviour.
-
-- **ConsoleLogin from a new AWS Region fires on the first successful
-  login from that Region.** Travelling users trigger this once per
-  Region. Either add their CIDRs to the trusted IP list, or accept the
-  Low severity noise — never blanket-suppress.
-
-- **CryptoCurrency:EC2/BitcoinTool.B!DNS fires on DNS, not on the
-  binary.** A misconfigured app calling a domain that resolves to a
-  pool will trigger. Corroborate with CloudWatch CPUUtilization before
-  isolating.
-
-- **Policy:IAMUser/S3BucketAnonymousGranted fires even for intentional
-  public buckets** (website bucket, CloudFront origin). Confirm the
-  change author and ticket, then suppress if intentional.
-
-- **Runtime:EC2/ProcessA findings require the GuardDuty Security
-  Agent installed.** If the agent is disabled or unsupported, Runtime
-  findings will not fire — absence does not mean absence of runtime
-  threats. EKS findings may originate from the host node (privileged
-  DaemonSet), not the workload pod — inspect
-  `resource.eksClusterDetails` and `resource.containerDetails`.
-
-- **VPC Flow Logs capture only L3/L4 traffic.** DNS-over-HTTPS,
-  encrypted C2, and tunneled egress look like benign TLS on port 443.
-  For Backdoor/CryptoCurrency, supplement with Route 53 Resolver logs
-  (DNS) and Malware Protection scans. Suppression filters using
-  `equals` on the resource ARN break when the resource is recreated —
-  use `equals` on the static attribute (instance profile, IAM user
-  name, bucket name).
+Step 0 non-obvious behaviours moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Step 0: Non-obvious behaviours that change the diagnosis
 
 ### Step 1: Symptom entry — pick the diagnostic branch
 
@@ -233,21 +177,8 @@ positives.
 
 #### 2a: Port probe findings (`Recon:EC2/PortProbe` or `Recon:IAMUser/PortProbe`)
 
-```bash
-# Identify the probing source from the finding
-jq '.service.action.portProbeAction.remoteIpDetails' finding.json
-# ipAddressV4, organization {asn, org}, location {country, city}
-
-# Compare against the trusted IP list
-aws guardduty list-ip-sets --detector-id <detector-id> --output json
-aws guardduty get-ip-set --detector-id <detector-id> \
-  --ip-set-id <ip-set-id> --output json
-
-# Check CloudTrail for the actor behind the probe (IAM findings only)
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventName,AttributeValue=ListBuckets \
-  --start-time <finding-utc-minus-30m> --end-time <finding-utc-plus-30m>
-```
+Probe commands moved to references.
+→ [references/diagnostic-commands.md](references/diagnostic-commands.md) § Step 2a: Recon — port probe commands
 
 **Verdict signals:**
 - Source IP matches a known scanner (authorised security scanner, AWS
@@ -264,16 +195,8 @@ aws cloudtrail lookup-events \
 
 #### 2b: IAM permission discovery (`Recon:IAMUser/UserPermissions`)
 
-```bash
-# CloudTrail burst pattern — List* / Get* calls
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=Username,AttributeValue=<iam-user> \
-  --start-time <finding-utc-minus-15m> --end-time <finding-utc-plus-15m>
-# Look for: ListBuckets, GetCallerIdentity, ListRoles, ListUsers bursts
-
-# Access key last used (is the key still active?)
-aws iam get-access-key-last-used --access-key-id <AKIA...>
-```
+Probe commands moved to references.
+→ [references/diagnostic-commands.md](references/diagnostic-commands.md) § Step 2b: Recon — IAM permission discovery commands
 
 **Verdict signals:**
 - API calls match a known automation (Terraform plan, AWS Config,
@@ -288,14 +211,8 @@ aws iam get-access-key-last-used --access-key-id <AKIA...>
 
 #### 3a: ConsoleLogin from a new geography or account (`UnauthorizedAccess:IAMUser/ConsoleLogin`)
 
-```bash
-# CloudTrail ConsoleLogin event
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventName,AttributeValue=ConsoleLogin \
-  --start-time <finding-utc-minus-15m> --end-time <finding-utc-plus-15m>
-# Capture: sourceIPAddress, userIdentity.arn, additionalEventData.MFAUsed
-aws iam get-login-profile --user-name <iam-user>
-```
+Probe commands moved to references.
+→ [references/diagnostic-commands.md](references/diagnostic-commands.md) § Step 3a: UnauthorizedAccess — ConsoleLogin commands
 
 **Verdict signals:**
 - `additionalEventData.MFAUsed == Yes`, source IP in the user's
@@ -309,20 +226,8 @@ aws iam get-login-profile --user-name <iam-user>
 
 #### 3b: SSH/RDP brute force (`UnauthorizedAccess:EC2/SSHBruteForce` or `RDPBruteForce`)
 
-```bash
-# VPC Flow Logs — concentration of dstport=22 from many source IPs
-aws logs start-query --log-group-name <flow-log-group> \
-  --start-time <epc-finding-utc-minus-30m> --end-time <epc-finding-utc-plus-30m> \
-  --query-string 'fields @timestamp, srcAddr, dstAddr, dstPort
-    | filter dstPort=22 and action=ACCEPT
-    | stats count() by srcAddr | sort count desc | limit 20'
-
-# Check the EC2 instance's security group — is port 22 open to 0.0.0.0/0?
-aws ec2 describe-security-groups \
-  --group-ids $(aws ec2 describe-instances --instance-ids <i-id> \
-    --output json | jq -r '.Reservations[0].Instances[0].SecurityGroups[].GroupId') \
-  --output json | jq '.SecurityGroups[].IpPermissions[] | select(.FromPort==22)'
-```
+Probe commands moved to references.
+→ [references/diagnostic-commands.md](references/diagnostic-commands.md) § Step 3b: UnauthorizedAccess — SSH/RDP brute force commands
 
 **Verdict signals:**
 - Many distinct source IPs attempting port 22 over a short window,
@@ -338,22 +243,8 @@ aws ec2 describe-security-groups \
 Symptom: instance is communicating with known C&C infrastructure
 (GuardDuty ThreatintelSet match) or exhibiting spambot behaviour.
 
-```bash
-# Extract the remote IP from the finding
-jq '.service.action.networkConnectionAction.remoteIpDetails' finding.json
-
-# VPC Flow Logs — sustained outbound to the suspicious IP
-aws logs start-query --log-group-name <flow-log-group> \
-  --start-time <epc-finding-utc-minus-1h> --end-time <epc-finding-utc-plus-1h> \
-  --query-string 'fields @timestamp, srcAddr, dstAddr, dstPort, bytes
-    | filter (srcAddr="<instance-private-ip>" and dstAddr="<remote-ip>")
-    | sort @timestamp desc | limit 100'
-
-# Route 53 Resolver logs (DNS-based C&C)
-aws logs start-query --log-group-name <resolver-log-group> \
-  --query-string 'fields @timestamp, srcaddr, query_name
-    | filter srcaddr="<instance-private-ip>" | sort @timestamp desc'
-```
+Probe commands moved to references.
+→ [references/diagnostic-commands.md](references/diagnostic-commands.md) § Step 4: Backdoor:EC2 — C&C / spambot commands
 
 **Verdict signals:**
 - Sustained outbound to a ThreatintelSet-matched IP on non-standard
@@ -366,23 +257,8 @@ aws logs start-query --log-group-name <resolver-log-group> \
 
 ### Step 5: CryptoCurrency:EC2 — crypto mining
 
-```bash
-# DNS variant — mining pool domain lookup
-jq '.service.action.dnsRequestAction.domain' finding.json
-
-# VPC Flow Logs — outbound to mining pool CIDRs (ports 3333, 4444, 8888, 14444)
-aws logs start-query --log-group-name <flow-log-group> \
-  --query-string 'fields @timestamp, srcAddr, dstAddr, dstPort, bytes
-    | filter srcAddr="<instance-private-ip>" and
-      (dstPort=3333 or dstPort=4444 or dstPort=8888 or dstPort=14444)
-    | stats sum(bytes) by dstAddr'
-
-# CloudWatch — CPU spike around the finding time
-aws cloudwatch get-metric-statistics --namespace AWS/EC2 \
-  --metric-name CPUUtilization --dimensions Name=InstanceId,Value=<i-id> \
-  --start-time <finding-utc-minus-1h> --end-time <finding-utc-plus-1h> \
-  --period 300 --statistics Average,Maximum --output json
-```
+Probe commands moved to references.
+→ [references/diagnostic-commands.md](references/diagnostic-commands.md) § Step 5: CryptoCurrency:EC2 — crypto mining commands
 
 **Verdict signals:**
 - DNS mining-pool domain AND sustained high CPU (> 80% across the
@@ -399,14 +275,8 @@ aws cloudwatch get-metric-statistics --namespace AWS/EC2 \
 
 ### Step 6: Persistence:IAMUser — anomalous IAM changes
 
-```bash
-# CloudTrail — CreateUser, CreateAccessKey, AttachRolePolicy around the finding
-for EV in CreateUser CreateAccessKey AttachUserPolicy; do
-  aws cloudtrail lookup-events \
-    --lookup-attributes AttributeKey=EventName,AttributeValue=$EV \
-    --start-time <finding-utc-minus-30m> --end-time <finding-utc-plus-30m>
-done
-```
+Probe commands moved to references.
+→ [references/diagnostic-commands.md](references/diagnostic-commands.md) § Step 6: Persistence:IAMUser — anomalous IAM change commands
 
 **Verdict signals:**
 - CreateUser / CreateAccessKey from an authorised CI/CD pipeline
@@ -422,18 +292,8 @@ done
 
 ### Step 7: Policy:IAMUser — suspicious policy grants
 
-```bash
-# S3BucketAnonymousGranted — confirm the ACL change
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventName,AttributeValue=PutBucketAcl \
-  --start-time <finding-utc-minus-30m> --end-time <finding-utc-plus-30m>
-aws s3api get-bucket-acl --bucket <bucket>
-
-# RootCredentialUsage — root API call source
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=Username,AttributeValue=root \
-  --start-time <finding-utc-minus-15m> --end-time <finding-utc-plus-15m>
-```
+Probe commands moved to references.
+→ [references/diagnostic-commands.md](references/diagnostic-commands.md) § Step 7: Policy:IAMUser — suspicious policy grant commands
 
 **Verdict signals:**
 - PutBucketAcl from a known deployment role, bucket is a documented
@@ -446,21 +306,8 @@ aws cloudtrail lookup-events \
 
 ### Step 8: Exfiltration — data leaving the account
 
-```bash
-# S3 variant — anomalous GetObject volume (needs CloudTrail data events)
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventName,AttributeValue=GetObject \
-  --start-time <finding-utc-minus-1h> --end-time <finding-utc-plus-1h>
-
-# VPC Flow Logs — anomalous outbound volume
-aws logs start-query --log-group-name <flow-log-group> \
-  --query-string 'fields srcAddr, dstAddr, bytes
-    | filter srcAddr="<instance-private-ip>"
-    | stats sum(bytes) as totalBytes by dstAddr | sort totalBytes desc | limit 20'
-
-# S3 access logs (for S3 exfil)
-aws s3api get-bucket-logging --bucket <bucket>
-```
+Probe commands moved to references.
+→ [references/diagnostic-commands.md](references/diagnostic-commands.md) § Step 8: Exfiltration — data-leaving-account commands
 
 **Verdict signals:**
 - Outbound bytes 10x baseline to an unfamiliar ASN, GetObject burst on
@@ -475,18 +322,8 @@ aws s3api get-bucket-logging --bucket <bucket>
 
 ### Step 9: Runtime Monitoring findings (`Runtime:EC2/ECS/EKS/ProcessA`)
 
-```bash
-# Inspect the runtime evidence from the finding itself
-jq '.service.runtimeData' finding.json
-# processDetails: name, path, pid, user, cmdline, parent
-# networkConnection: direction, local, remote
-# moduleInformation: loaded libraries
-
-# CloudWatch Container Insights (ECS/EKS), EKS context, agent status
-aws logs describe-log-groups --log-group-name-prefix /aws/ecs/containerinsights
-jq '.resource.eksClusterDetails, .resource.containerDetails' finding.json
-aws ssm describe-instance-information --filters Key=InstanceIds,Values=<i-id>
-```
+Probe commands moved to references.
+→ [references/diagnostic-commands.md](references/diagnostic-commands.md) § Step 9: Runtime Monitoring findings commands
 
 **Verdict signals:**
 - `processDetails.name` matches a known malicious binary (e.g.,
@@ -503,12 +340,8 @@ aws ssm describe-instance-information --filters Key=InstanceIds,Values=<i-id>
 
 ### Step 10: Malware Protection scan
 
-```bash
-aws malware-scan start-malware-scan \
-  --resource-arn arn:aws:ec2:<region>:<acct>:snapshot/<snap-id>
-aws malware-scan list-scans --filter-criteria '<json>' --output json
-aws malware-scan get-scan --scan-id <scan-id> --output json
-```
+Probe commands moved to references.
+→ [references/diagnostic-commands.md](references/diagnostic-commands.md) § Step 10: Malware Protection scan commands
 
 **Verdict signals:**
 - Scan returns `INFECTED` with a named malware family →
@@ -535,18 +368,8 @@ aws guardduty create-filter --detector-id <detector-id> \
 **Suppression patterns by FP class** (full criteria JSON in
 `references/finding-types-and-suppression.md`):
 
-- **Authorised scanner** — filter on
-  `service.action.portProbeAction.remoteIpDetails.ipAddressV4` in
-  `<scanner-cidr>` AND action = ARCHIVED.
-- **AWS Config aggregator** — filter on
-  `resource.accessKeyDetails.principalId` containing
-  `AWSServiceRoleForConfig` AND `awsApiCallAction.api` = `ListBuckets`.
-- **Deployment pipeline IAM burst** — filter on principalId containing
-  `<deployment-role-name>` AND finding type in
-  `Recon:IAMUser/UserPermissions`, `Persistence:IAMUser/UserCreation`.
-- **Public S3 bucket (documented)** — filter on
-  `resource.s3BucketDetails.name` = `<bucket>` AND finding type =
-  `Policy:IAMUser/S3BucketAnonymousGranted`.
+Suppression-pattern bullets moved to references.
+→ [references/finding-types-and-suppression.md](references/finding-types-and-suppression.md) § Suppression patterns by FP class
 
 ### Step 12: Auto-remediation via EventBridge → Lambda
 
@@ -600,19 +423,8 @@ indicates an AWS-side issue (region event, detector bug), emit:
 
 ## Expert heuristic
 
-When triaging a finding, ask three questions in order. (1) Does the
-finding's `service.action` field match the resource type? A
-`networkConnectionAction` on an `AccessKey` is misattributed — treat
-with suspicion. (2) Does the finding's actor (IAM user, source IP,
-parent process) appear in another finding in the same time window?
-Correlated findings across families (e.g., a ConsoleLogin success
-followed by a Persistence:IAMUser finding) are a kill-chain signature;
-either alone might be noise, together they are almost certainly a
-compromise. (3) What does the operator's environment say? The trusted
-IP list, the IAM role name, and the deployment pipeline pattern are the
-three highest-signal contextual inputs. A finding matching all three is
-almost certainly a false positive; matching none is almost certainly a
-true positive; the middle case is where senior judgment matters most.
+Expert heuristic deep dive moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Expert heuristic
 
 ## Output format
 
@@ -660,17 +472,17 @@ CONFIRM: "CONFIRM: About to modify-instance-attribute on i-app-1
 
 ### Worked example — Recon:IAMUser/PortProbe (authorised scanner FP)
 
-A Low-severity port-probe finding from `198.51.100.10` resolves to
-FALSE_POSITIVE when the IP is the corporate Qualys scanner CIDR (verified
-against `organization.org = "Qualys, Inc."` and the weekly scan window).
-The block sets `LAYER: FALSE_POSITIVE`, recommends adding the CIDR to
-the GuardDuty trusted IP list (`aws guardduty create-ip-set ... --activate`)
-rather than suppressing the finding family, and confirms subsequent
-weekly scans no longer produce `Recon:EC2/PortProbe` findings. The full
-block format follows the STRICT output contract above; the key
-suppression preference is **trusted IP list over archive filter** so
-GuardDuty continues tracking the source.
+Full worked example moved to references.
+→ [references/worked-examples.md](references/worked-examples.md) § Worked example — Recon:IAMUser/PortProbe (authorised scanner FP)
 
+## References (load on demand)
+
+Consult these only when the corresponding topic comes up:
+
+- [references/finding-types-and-suppression.md](references/finding-types-and-suppression.md) — finding-type catalogue, severity bands, suppression criteria, and the FP-class suppression patterns (moved from Step 11)
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — account-wide pre-flight commands and every per-step probe command listing (moved from Pre-flight and Steps 2-10)
+- [references/worked-examples.md](references/worked-examples.md) — the authorised-scanner false-positive worked example (moved from § Output format)
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 non-obvious behaviours, the three-question expert heuristic, and recent AWS features (moved verbatim)
 ## Domain
 
 AWS CloudOps / Amazon GuardDuty Threat Investigation, CloudTrail
@@ -679,40 +491,8 @@ Incident Containment.
 
 ## Recent AWS features (2024-2026)
 
-- **GuardDuty Runtime Monitoring (2024-2025):** GA for EC2, ECS
-  (incl. Fargate), and EKS. The SSM-managed GuardDuty Security Agent
-  reports process/network/module telemetry. Findings of the form
-  `Runtime:EC2/ProcessA`, `Runtime:ECS/ProcessA`, `Runtime:EKS/ProcessA`
-  require the agent installed and feature enabled per detector. Verify
-  `aws guardduty list-features` shows Runtime Monitoring ENABLED.
-
-- **GuardDuty EKS Protection (2024-2025):** Adds EKS audit-log
-  monitoring alongside Runtime Monitoring. Findings attribute to the
-  cluster via `resource.eksClusterDetails` and
-  `resource.containerDetails` — distinguish audit-log findings (K8s API
-  abuse) from Runtime findings (process behaviour). New K8s types
-  include `UnauthorizedAccess:Kubernetes/SuccessfulAnonymousAccess`.
-
-- **GuardDuty Malware Protection (2024-2025):** Scans EBS snapshots
-  and S3 objects on-demand or via EventBridge. `aws malware-scan
-  start-malware-scan` is the primary CLI. Scans are point-in-time — a
-  clean scan does not prove the resource is malware-free in perpetuity.
-  Malware Protection for S3 (GA 2024) auto-scans new objects on
-  enabled buckets.
-
-- **GuardDuty cross-account suppression (2024):** In Organizations
-  with delegated admin, suppression filters created by the admin
-  account propagate to member accounts — use the admin account for
-  global rules.
-
-- **GuardDuty RDS Protection (2024-2025):** GA, monitors RDS login
-  anomalies (`UnauthorizedAccess:RDS/BruteForce`). VPC Flow Logs and
-  RDS PostgreSQL/MySQL logs are the corroborating surfaces.
-
-- **GuardDuty General Bucket Monitoring for S3 (2024):** Extended
-  detection beyond Public Bucket Access — includes data-pattern
-  exfiltration on private buckets. Tune via the S3 feature on the
-  detector.
+2024-2026 GuardDuty feature notes moved to references.
+→ [references/advanced-patterns.md](references/advanced-patterns.md) § Recent AWS features (2024-2026)
 
 ## AWS documentation
 

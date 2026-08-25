@@ -176,3 +176,59 @@ Best practice: use DynamicFrame for the initial read (from_catalog),
 then immediately convert to DataFrame (`dynamicframe.toDF()`) for all
 transformations. This minimises DynamicFrame overhead while keeping
 the convenient catalog integration.
+
+---
+
+## Step 2: DPU allocation / worker type — probes and branches
+
+Symptom: `Container killed by YARN for exceeding memory limits` in
+CloudWatch Logs. The executor's container exceeded its allocated
+memory and YARN killed it.
+
+```bash
+aws glue get-job --job-name <name> --output json | \
+  jq '.Job.{WorkerType, NumberOfWorkers, GlueVersion, Command}'
+```
+
+#### 2a: Worker type assessment
+
+| WorkerType | Executors per worker | Heap per executor | Use case |
+|---|---|---|---|
+| `G.025X` | 0 (no Spark) | 1 GB total | Python shell only |
+| `G.1X` | 1 | 10 GB | Default Spark; small-to-medium datasets |
+| `G.2X` | 2 | 10 GB each (20 GB total) | Spark-optimised; large datasets, wide transformations |
+
+If `WorkerType: G.025X` on a Spark job (`Command.Name: glueetl`),
+**ROOT_CAUSE_IDENTIFIED** with `LAYER: GLUE_WORKER_TYPE_WRONG`. G.025X
+cannot run Spark. Fix: switch to G.1X or G.2X.
+
+If `WorkerType: G.1X` and the dataset has grown significantly since
+the last successful run, the single executor per worker is now
+handling too much data. **ROOT_CAUSE_IDENTIFIED** with
+`LAYER: GLUE_DPU_INSUFFICIENT` (if more workers would help) or
+`LAYER: GLUE_WORKER_TYPE_WRONG` (if switching to G.2X would double
+executor parallelism).
+
+#### 2b: Number of workers
+
+```bash
+aws glue get-job --job-name <name> --output json | jq '.Job.NumberOfWorkers'
+```
+
+The minimum for G.1X and G.2X is 2 workers (Spark driver + executor).
+The minimum for G.025X is 1. If `NumberOfWorkers` is at the minimum
+and the dataset is large, raise the worker count.
+
+#### 2c: Verify with CloudWatch metrics
+
+```bash
+aws cloudwatch get-metric-statistics --namespace Glue \
+  --metric-name glue.executor.memory.maxUsed \
+  --dimensions Name=JobName,Value=<name> \
+  --start-time $(date -d '-2 hours' +%FT%TZ) --end-time $(date +%FT%TZ) \
+  --period 300 --statistics Average,Maximum --output json
+```
+
+If `Maximum` is close to the heap limit (10 GB for G.1X), the
+executors are at the edge. The YARN kill is the expected outcome.
+

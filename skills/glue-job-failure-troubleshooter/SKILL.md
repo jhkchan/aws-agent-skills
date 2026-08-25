@@ -102,42 +102,7 @@ are proven clean.
 
 ## Philosophy
 
-Four behaviours separate a senior Glue engineer from a generalist:
-
-- **`Container killed by YARN` is a memory sizing problem, not a
-  script bug.** YARN kills an executor when its container exceeds the
-  allocated memory. The fix is either more DPUs (more parallelism, so
-  each executor handles less data), a larger worker type (G.2X doubles
-  the heap per executor), or repartitioning the input so no single
-  executor holds too much data. Operators who "debug the script" for
-  hours miss that the same script succeeded last week on a smaller
-  dataset.
-- **G.2X is Spark-optimised; G.1X is the default.** G.2X provides two
-  Spark executors per worker, doubling executor parallelism for the
-  same DPU count. G.1X provides one executor per worker. For
-  memory-bound Spark workloads (large shuffles, wide transformations),
-  G.2X halves the per-executor data volume and frequently resolves OOM
-  without any script change. G.025X is for Python shell jobs only
-  (0.0625 DPU per worker) — it cannot run Spark.
-- **Bookmark state is per-job-run and tied to partition keys.** Glue
-  bookmarking saves the last-processed partition value (typically the
-  date or hour column) in the job-bookmark state. On the next run, the
-  job reads only partitions newer than the bookmark. If the
-  `partition_keys` argument in `glue_context.create_dynamic_frame.
-  from_catalog` changes, or the source table's partition columns
-  change, the bookmark cannot compare and the job reprocesses
-  everything. Operators who "enabled bookmarking" but see the job
-  reprocess all data every run usually changed the partition keys
-  without resetting the bookmark.
-- **JDBC connectivity requires the Glue connection, the security
-  group, AND the route.** The Glue connection object stores the JDBC
-  URL, the VPC, subnet, and security group. The security group
-  attached to the Glue connection must allow outbound to the database.
-  The database's security group must allow inbound from the Glue
-  connection's security group on the database port. The subnet's route
-  table must reach the database's subnet (same VPC, peered VPC, or
-  TGW). A failure at any of these three points produces
-  `Connection timed out` with no further detail.
+The four senior-engineer behaviours moved to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
 ## Quick reference — symptom triage table
 
@@ -162,26 +127,7 @@ and short-circuit on job states that mimic execution failures.
 
 ### Pre-flight commands
 
-```bash
-# 1. Job configuration (WorkerType, NumberOfWorkers, Timeout, GlueVersion,
-#    SecurityConfiguration, Arguments, Command, Role)
-aws glue get-job --job-name <name> --output json
-
-# 2. Job run details (state, execution time, error message, arguments)
-aws glue get-job-run --job-name <name> --run-id <run-id> --output json
-
-# 3. Recent job runs (state transitions, failure patterns)
-aws glue get-job-runs --job-name <name> --output json
-
-# 4. CloudWatch Logs for the failed run
-aws logs filter-log-events \
-  --log-group-name /aws-glue/jobs/default \
-  --filter-pattern '"Container killed by YARN" OR "Table not found" OR "Connection timed out" OR "OutOfMemoryError"' \
-  --start-time $(date -d '-2 hours' +%s)000 --output json
-
-# 5. Security configuration (CloudWatch encryption, S3 encryption, KMS key)
-aws glue get-security-configuration --name <sec-config-name> --output json 2>/dev/null
-```
+Pre-flight CLI (get-job, get-job-run, get-job-runs, CloudWatch Logs filter, security configuration) moved to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
 
 ### Job-run-state short-circuit
 
@@ -211,30 +157,7 @@ that matches the symptom.**
 
 ### Step 0: Operational gotchas that change diagnosis
 
-- **`Container killed by YARN` is the #1 Glue failure mode.** YARN
-  kills an executor when its container exceeds memory. The fix is
-  more DPUs, G.2X, or repartitioning — not script changes.
-- **G.025X cannot run Spark.** It is for Python shell only (0.0625
-  DPU, 1 GB memory). Any Spark job on G.025X produces chronic OOM.
-- **MSCK REPAIR TABLE is required after partition data lands
-  externally.** Crawlers add partitions automatically; external
-  processes (Firehose, S3 copy, EMR) do not. The table exists but
-  returns 0 rows until a crawl or `MSCK REPAIR` runs.
-- **CloudWatch Logs need `logs:CreateLogStream` and
-  `logs:PutLogEvents` on the job's IAM role.** `AWSGlueServiceRole`
-  includes these; custom roles may omit them. The job runs but logs
-  are empty.
-- **DynamicFrame has overhead vs RDD.** Convert to DataFrame early
-  (`dynamicframe.toDF()`) and use native Spark APIs for large
-  workloads.
-- **The default job timeout is 2.5 hours (150 minutes).** Raise for
-  known long-running workloads (large backfills).
-- **Job metrics require `--enable-metrics`.** Spark UI requires
-  `--enable-spark-ui` and `--spark-event-logs-path s3://<bucket>`.
-  Without these, the diagnostics dashboards are empty.
-- **Python shell jobs do NOT use Spark.** `Command.Name: pythonshell`
-  runs a single Python process. If the script expects a Spark session,
-  it fails immediately. Use `Command.Name: glueetl` for Spark jobs.
+Operational gotchas moved to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
 ### Step 1: Symptom entry
 
@@ -254,65 +177,14 @@ that matches the symptom.**
 
 ### Step 2: DPU allocation / worker type
 
-Symptom: `Container killed by YARN for exceeding memory limits` in
-CloudWatch Logs. The executor's container exceeded its allocated
-memory and YARN killed it.
-
-```bash
-aws glue get-job --job-name <name> --output json | \
-  jq '.Job.{WorkerType, NumberOfWorkers, GlueVersion, Command}'
-```
-
-#### 2a: Worker type assessment
-
-| WorkerType | Executors per worker | Heap per executor | Use case |
-|---|---|---|---|
-| `G.025X` | 0 (no Spark) | 1 GB total | Python shell only |
-| `G.1X` | 1 | 10 GB | Default Spark; small-to-medium datasets |
-| `G.2X` | 2 | 10 GB each (20 GB total) | Spark-optimised; large datasets, wide transformations |
-
-If `WorkerType: G.025X` on a Spark job (`Command.Name: glueetl`),
-**ROOT_CAUSE_IDENTIFIED** with `LAYER: GLUE_WORKER_TYPE_WRONG`. G.025X
-cannot run Spark. Fix: switch to G.1X or G.2X.
-
-If `WorkerType: G.1X` and the dataset has grown significantly since
-the last successful run, the single executor per worker is now
-handling too much data. **ROOT_CAUSE_IDENTIFIED** with
-`LAYER: GLUE_DPU_INSUFFICIENT` (if more workers would help) or
-`LAYER: GLUE_WORKER_TYPE_WRONG` (if switching to G.2X would double
-executor parallelism).
-
-#### 2b: Number of workers
-
-```bash
-aws glue get-job --job-name <name> --output json | jq '.Job.NumberOfWorkers'
-```
-
-The minimum for G.1X and G.2X is 2 workers (Spark driver + executor).
-The minimum for G.025X is 1. If `NumberOfWorkers` is at the minimum
-and the dataset is large, raise the worker count.
-
-#### 2c: Verify with CloudWatch metrics
-
-```bash
-aws cloudwatch get-metric-statistics --namespace Glue \
-  --metric-name glue.executor.memory.maxUsed \
-  --dimensions Name=JobName,Value=<name> \
-  --start-time $(date -d '-2 hours' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Average,Maximum --output json
-```
-
-If `Maximum` is close to the heap limit (10 GB for G.1X), the
-executors are at the edge. The YARN kill is the expected outcome.
+Step 2 probes (worker-type table, worker-count check, CloudWatch memory metrics) moved to [references/glue-worker-type-and-dpu-reference.md](references/glue-worker-type-and-dpu-reference.md) — load on demand.
 
 ### Step 3: Data Catalog table not found
 
 Symptom: `AnalysisException: Table or view not found: '<database>.<table>'`
 or `Table <database>.<table> not found`.
 
-```bash
-aws glue get-table --database <database> --name <table> --output json
-```
+Probe: [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 3 get-table.
 
 If `EntityNotFoundException`, the table does not exist in the Data
 Catalog. **ROOT_CAUSE_IDENTIFIED** with
@@ -322,9 +194,7 @@ database and table names in the job script.
 
 If the table exists, check the database:
 
-```bash
-aws glue get-database --name <database> --output json
-```
+Probe: [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 3 get-database.
 
 The Data Catalog database must exist and the job's IAM role must have
 `glue:GetTable` on the table ARN.
@@ -334,14 +204,7 @@ The Data Catalog database must exist and the job's IAM role must have
 Symptom: `Path does not exist: s3://<bucket>/<prefix>` or the source
 returns no data despite the table existing.
 
-```bash
-# Check the table's StorageDescriptor.Location
-aws glue get-table --database <db> --name <table> --output json | \
-  jq '.Table.StorageDescriptor.Location'
-
-# Verify the S3 path exists and has objects
-aws s3 ls s3://<bucket>/<prefix>/ --recursive | head -20
-```
+Probe: [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 4 StorageDescriptor.Location and s3 ls.
 
 If the S3 path is empty or does not exist, **ROOT_CAUSE_IDENTIFIED**
 with `LAYER: GLUE_S3_SOURCE_PATH_WRONG`. Common causes: typo in the
@@ -350,13 +213,7 @@ the data was written to a different prefix than the catalog expects.
 
 Also check if the job script hardcodes the S3 path:
 
-```python
-# In the script — this bypasses the Data Catalog
-datasource = glue_context.create_dynamic_frame.from_options(
-    connection_type="s3",
-    connection_options={"paths": ["s3://wrong-bucket/data/"]},
-    format="parquet")
-```
+Hardcoded-path script example (Step 4) moved to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
 
 If the hardcoded path differs from the Data Catalog location, that is
 the error source.
@@ -366,40 +223,21 @@ the error source.
 Symptom: the table exists, the S3 path has data, but
 `dynamicframe.count()` returns 0.
 
-```bash
-aws glue get-partitions --database <db> --table-name <table> --output json | \
-  jq '.Partitions | length'
-```
+Probe: [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 5 get-partitions count.
 
 If 0 partitions but S3 has partitioned data
 (`s3://bucket/data/year=2026/month=08/`), the partitions are not
 registered in the Data Catalog. **ROOT_CAUSE_IDENTIFIED** with
 `LAYER: GLUE_PARTITION_NOT_LOADED`. Fix:
 
-```bash
-# Option 1: MSCK REPAIR TABLE (via Athena)
-aws athena start-query-execution \
-  --query-string "MSCK REPAIR TABLE <database>.<table>" \
-  --work-group <workgroup> --output json
-
-# Option 2: Run a Glue crawler on the S3 path
-aws glue start-crawler --name <crawler-name>
-```
+Fix commands (MSCK REPAIR via Athena, start-crawler — Step 5) moved to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
 
 ### Step 6: Bookmark corrupted / partition-key mismatch
 
 Symptom: the job succeeds but reprocesses all data on every run
 despite `--job-bookmark-option: job-bookmark-enable`.
 
-```bash
-# Check the job run's bookmark option
-aws glue get-job-run --job-name <name> --run-id <run-id> --output json | \
-  jq '.JobRun.Arguments["--job-bookmark-option"]'
-
-# Check the job's default arguments
-aws glue get-job --job-name <name> --output json | \
-  jq '.Job.DefaultArguments["--job-bookmark-option"]'
-```
+Bookmark option probes (Step 6) moved to [references/glue-bookmark-and-jdbc-reference.md](references/glue-bookmark-and-jdbc-reference.md) — load on demand.
 
 If `--job-bookmark-option` is `job-bookmark-disable`, bookmarking is
 off — the job reprocesses by design. **ROOT_CAUSE_IDENTIFIED** with
@@ -414,9 +252,7 @@ that altered the partition columns.
 
 Fix: reset the bookmark state:
 
-```bash
-aws glue reset-job-bookmark --job-name <name> --output json
-```
+Bookmark reset command (Step 6 fix) moved to [references/glue-bookmark-and-jdbc-reference.md](references/glue-bookmark-and-jdbc-reference.md) — load on demand.
 
 Then run the job again with `--job-bookmark-option: job-bookmark-enable`.
 The first run after reset reprocesses all data (expected); subsequent
@@ -424,65 +260,14 @@ runs should process only new partitions.
 
 ### Step 7: JDBC connection error
 
-Symptom: `Connection timed out`, `Connection refused`, or
-`org.postgresql.util.PSQLException` when connecting to RDS/Redshift.
-
-```bash
-# Get the Glue connection
-aws glue get-connection --name <connection-name> --output json | \
-  jq '.Connection.{ConnectionType, ConnectionProperties, PhysicalConnectionRequirements}'
-
-# Check the security group on the Glue connection
-SG=$(aws glue get-connection --name <connection-name> --output json | \
-  jq -r '.Connection.PhysicalConnectionRequirements.SecurityGroupIdList[]')
-aws ec2 describe-security-groups --group-ids "$SG" --output json | \
-  jq '.SecurityGroups[].IpPermissions'
-```
-
-#### 7a: Glue connection does not exist
-
-If `EntityNotFoundException`, the Glue connection was never created or
-was deleted. **ROOT_CAUSE_IDENTIFIED** with
-`LAYER: GLUE_JDBC_CONNECTION_ERROR`. Fix: create the connection with
-the JDBC URL, VPC, subnet, and security group.
-
-#### 7b: Security group inbound missing on the database
-
-The database's security group must allow inbound from the Glue
-connection's security group on the database port:
-
-```bash
-aws ec2 describe-security-groups \
-  --filters Name=group-id,Values=<db-sg-id> --output json | \
-  jq '.SecurityGroups[].IpPermissions[] | select(.FromPort==<db-port>)'
-```
-
-If no inbound rule matches the Glue connection's SG,
-**ROOT_CAUSE_IDENTIFIED** with `LAYER: GLUE_JDBC_CONNECTION_ERROR`.
-Fix: add an inbound rule to the database's SG allowing the Glue
-connection's SG on the database port.
-
-#### 7c: Route table missing
-
-The Glue connection's subnet must have a route to the database's
-subnet (same VPC, peered VPC, or TGW). Check the route table:
-
-```bash
-aws ec2 describe-route-tables \
-  --filters Name=association.subnet-id,Values=<glue-subnet-id> --output json | \
-  jq '.RouteTables[].Routes'
-```
+Step 7 probes (get-connection, SG checks, route table) and branches 7a/7b/7c moved to [references/glue-bookmark-and-jdbc-reference.md](references/glue-bookmark-and-jdbc-reference.md) — load on demand.
 
 ### Step 8: Job timeout
 
 Symptom: the job run transitions to `TIMEOUT` after the configured
 `Timeout` value (default 150 minutes = 2.5 hours).
 
-```bash
-aws glue get-job --job-name <name> --output json | jq '.Job.Timeout'
-aws glue get-job-run --job-name <name> --run-id <run-id> --output json | \
-  jq '.JobRun.{ExecutionTime, CompletedOn, ErrorMessage}'
-```
+Probe: [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 8 Timeout/ExecutionTime.
 
 If `ExecutionTime` is close to `Timeout` and the CloudWatch Logs show
 the job was still making progress (not stuck), the timeout is too low
@@ -498,15 +283,7 @@ Investigate the last log activity before the timeout.
 
 Symptom: the job ran but CloudWatch Logs for the run are empty.
 
-```bash
-# Check if the job has a security configuration with CloudWatch encryption
-aws glue get-job --job-name <name> --output json | \
-  jq '.Job.SecurityConfiguration'
-
-# Check the IAM role for logs permissions
-ROLE_NAME=$(aws glue get-job --job-name <name> --output json | jq -r '.Job.Role' | cut -d/ -f2)
-aws iam list-attached-role-policies --role-name "$ROLE_NAME" --output json
-```
+Probe: [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 9 SecurityConfiguration and IAM role check.
 
 If the role does not have `AWSGlueServiceRole` (or equivalent inline
 permissions with `logs:CreateLogStream` and `logs:PutLogEvents`),
@@ -522,12 +299,7 @@ verify the KMS key is enabled and the role has `kms:Decrypt` on it.
 Symptom: `py4j.Py4JException`, `PythonException`, or a Python
 traceback in CloudWatch Logs.
 
-```bash
-aws logs filter-log-events \
-  --log-group-name /aws-glue/jobs/default \
-  --filter-pattern '"Traceback" OR "py4j" OR "PythonException"' \
-  --start-time $(date -d '-2 hours' +%s)000 --output json
-```
+Probe: [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 10 Traceback/py4j log filter.
 
 If the job's `Command.Name` is `pythonshell` and the script uses
 `SparkContext.getOrCreate()` or `glue_context`,
@@ -545,11 +317,7 @@ address the Python error in the script.
 Symptom: the job runs but is very slow; execution time is dominated
 by `glue_context` overhead rather than Spark transformations.
 
-```bash
-# Check if metrics are enabled
-aws glue get-job --job-name <name> --output json | \
-  jq '.Job.DefaultArguments["--enable-metrics"]'
-```
+Probe: [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 11 --enable-metrics check.
 
 If `--enable-metrics` is not set, enable it and re-run. Then inspect
 the job metrics dashboard for executor skew, spill, and GC overhead.
@@ -643,33 +411,7 @@ CONFIRM: Before updating the job, emit and await:
 
 ### Worked example — Bookmark partition-key mismatch
 
-```text
-TARGET: etl-hourly-events (JobRunId: jr_def456)
-VERDICT: ROOT_CAUSE_IDENTIFIED
-REASON: The job has --job-bookmark-option=job-bookmark-enable but
-  reprocesses all data on every run. The script was updated 3 days ago
-  to change partition_keys from ["event_date"] to
-  ["event_date","event_hour"]. The bookmark state references the old
-  single-key schema and cannot compare; the job treats every run as a
-  full reload (Step 6).
-LAYER: GLUE_BOOKMARK_CORRUPTED
-EVIDENCE:
-  - Symptom: CloudWatch Logs show "Processing 2,400,000 records" on
-    every run; the source grows by ~100,000/hour, so a bookmarked run
-    should process ~100,000, not 2.4M.
-  - Probe: aws glue get-job-run returns
-    Arguments["--job-bookmark-option"]="job-bookmark-enable".
-  - Probe: the script uses partition_keys=["event_date","event_hour"];
-    get-job-bookmark references only "event_date".
-  - Passing: table exists; partitions loaded; G.2X workers (not memory).
-REMEDIATION:
-  1. Reset the bookmark: aws glue reset-job-bookmark --job-name etl-hourly-events
-  2. Re-run with --job-bookmark-option=job-bookmark-enable (first run
-     after reset reprocesses all — expected).
-  3. Verify the second run processes only ~100,000 new records.
-CONFIRM: Before resetting: "CONFIRM: About to reset the bookmark for
-  etl-hourly-events. The next run will reprocess all data. Proceed?"
-```
+Full bookmark partition-key-mismatch example moved to [references/worked-examples.md](references/worked-examples.md) — load on demand.
 
 ## Anti-Patterns — NEVER
 
@@ -732,6 +474,14 @@ CONFIRM: Before resetting: "CONFIRM: About to reset the bookmark for
 See `references/glue-worker-type-and-dpu-reference.md` for the full
 worker-type / DPU mapping and `references/glue-bookmark-and-jdbc-reference.md`
 for bookmark and JDBC connection detail.
+
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples (bookmark partition-key mismatch).
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight CLI and per-step read-only probe commands (Steps 3-5, 8-11).
+- [references/advanced-patterns.md](references/advanced-patterns.md) — philosophy deep dive and Step 0 operational gotchas.
+- [references/glue-worker-type-and-dpu-reference.md](references/glue-worker-type-and-dpu-reference.md) — Step 2 worker-type/DPU probes and branch logic.
+- [references/glue-bookmark-and-jdbc-reference.md](references/glue-bookmark-and-jdbc-reference.md) — Step 6 bookmark probes and Step 7 JDBC probes/branches.
 
 ## Domain
 

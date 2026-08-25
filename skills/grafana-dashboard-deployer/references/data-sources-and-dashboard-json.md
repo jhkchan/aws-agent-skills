@@ -294,3 +294,117 @@ Grafana uses a 24-column grid. Panels are positioned via `gridPos`:
 | `webhook` | url, httpMethod | Custom integrations |
 | `opsgenie` | apiKey, priority | Enterprise incident management |
 | `telegram` | bottoken, chatid | Mobile notifications |
+
+## Step 4 — Dashboard JSON model (panels, templating, time range) — moved from SKILL.md
+
+**Dashboard JSON structure:**
+
+```json
+{
+  "title": "Production Observability",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "cloudwatch",
+        "current": { "text": "CloudWatch", "value": "cloudwatch" }
+      },
+      {
+        "name": "region",
+        "type": "query",
+        "datasource": "$datasource",
+        "query": "regions()",
+        "current": { "text": "us-east-1", "value": "us-east-1" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "CPU Utilization",
+      "datasource": "$datasource",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "AWS/EC2 CPUUtilization",
+          "namespace": "AWS/EC2",
+          "metricName": "CPUUtilization",
+          "statistics": ["Average"]
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Templating variables** make dashboards reusable across environments,
+regions, and services. Use `datasource`, `query`, and `custom` variable
+types for dynamic filtering.
+
+**Panel types by use case:**
+
+| Panel type | Use when |
+|---|---|
+| `timeseries` | Time-series metrics (CPU, latency, throughput) |
+| `stat` | Single-value KPIs (current value, threshold) |
+| `gauge` | Single-value with range (0-100%, utilization) |
+| `table` | Multi-column data (instance list, log results) |
+| `bargauge` | Comparison across categories (cost by service) |
+| `heatmap` | Distribution over time (latency percentiles) |
+| `nodegraph` | Service maps (X-Ray traces) |
+| `logs` | Log viewer (CloudWatch Logs queries) |
+
+**Provisioning dashboards via API:**
+```bash
+# Get workspace API key
+aws grafana create-workspace-api-key \
+  --workspace-id <workspace-id> \
+  --key-name deploy-key \
+  --key-role ADMIN \
+  --seconds-to-live 3600 \
+  --query 'key' --output text > /tmp/grafana-key
+
+# Import dashboard via Grafana HTTP API
+curl -X POST \
+  -H "Authorization: Bearer $(cat /tmp/grafana-key)" \
+  -H "Content-Type: application/json" \
+  -d @dashboard.json \
+  https://<workspace-endpoint>/api/dashboards/db
+```
+
+## Step 6 — AMP workspace integration — moved from SKILL.md
+
+Amazon Managed Service for Prometheus (AMP) provides serverless Prometheus-
+compatible metric storage. Integration with Grafana is via the Prometheus
+data source.
+
+```bash
+# Create AMP workspace
+aws amps create-workspace \
+  --workspace-name <amp-name> \
+  --alias <amp-alias> \
+  --kms-key-arn arn:aws:kms:<region>:<acct>:key/<key-id>
+
+# Wait for ACTIVE status
+aws amps describe-workspace --workspace-id <amp-id> \
+  --query 'workspace.status.statusCode' --output text
+
+# Configure remote write (from Prometheus / OpenTelemetry / CloudWatch agent)
+# The AMP workspace endpoint is:
+# https://aps-workspaces.<region>.amazonaws.com/workspaces/<amp-id>/
+```
+
+**Remote write sources:**
+- CloudWatch agent with embedded metric format
+- Prometheus server with `remote_write` to AMP
+- OpenTelemetry Collector with Prometheus exporter
+- Distroless OTel collector on EKS/ECS
+
+**Common mistake:** querying AMP before metrics are flowing. Verify remote
+write is active by checking `aws amps describe-workspace` for ingest
+metrics, then querying from Grafana.

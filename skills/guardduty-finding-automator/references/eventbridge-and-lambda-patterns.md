@@ -390,3 +390,42 @@ EventBridge → SQS queue → Lambda (batch size 10, concurrency 10)
 
 This batches findings, prevents API throttling, and provides a natural
 deduplication layer (SQS `ApproximateFirstReceiveTimestamp` for ordering).
+
+## Step 9: Multi-account via Organizations delegated administrator — moved from SKILL.md
+
+```bash
+# Designate delegated admin (per Region)
+aws guardduty enable-organization-admin-account \
+  --admin-account-id 111111111111 --region us-east-1
+
+# Auto-enable for all member accounts
+aws guardduty update-organization-configuration \
+  --detector-id <detector-id> --auto-enable --region us-east-1
+```
+
+**Cross-account event forwarding** (in each member account via StackSet):
+
+```bash
+aws events put-rule --name forward-guardduty-to-admin \
+  --event-pattern '{"source":["aws.guardduty"],"detail-type":["GuardDuty Finding"]}'
+
+aws events put-targets --rule forward-guardduty-to-admin \
+  --targets '[{"Id":"admin-bus","Arn":"arn:aws:events:us-east-1:111111111111:event-bus/default",
+  "RoleArn":"arn:aws:iam::222222222222:role/EventBridgeForwardRole"}]'
+```
+
+## Step 12: Auto-enable GuardDuty in new accounts — moved from SKILL.md
+
+Lambda on CreateAccount event (via EventBridge):
+
+```bash
+aws events put-rule --name new-org-account-guardduty \
+  --event-pattern '{
+    "source": ["aws.organizations"],
+    "detail-type": ["AWS API Call via CloudTrail"],
+    "detail": {"eventName": ["CreateAccount"]}
+  }'
+```
+
+The Lambda creates detectors in all target Regions and accepts the
+invitation from the delegated admin.

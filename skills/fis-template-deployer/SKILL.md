@@ -155,67 +155,18 @@ procedure below forces an explicit decision on each.
 
 ## Expert heuristic: tag-based target scoping is the safest mechanism
 
-A baseline model says "target all EC2 instances in the account." The
-correct heuristic recognizes that FIS targets should be scoped to a
-blast-radius-controlled set via resource tags.
-
-```text
-Target scoping mechanisms (safest to riskiest):
-  ├── Resource tags (RECOMMENDED): match resources with specific tag key=value
-  │     e.g., Filter: tag:FIS_Target = enabled AND tag:Environment = staging
-  │     Pros: stable, auditable, explicit opt-in, version-controlled
-  │     Cons: requires tagging discipline; untagged resources excluded
-  ├── Resource IDs: specify exact resource IDs
-  │     e.g., resourceIds: ["i-aaa111222", "i-bbb222333"]
-  │     Pros: precise
-  │     Cons: brittle — IDs change when instances are replaced (ASG, karpenter)
-  ├── Filter patterns: match by attribute
-  │     e.g., filterPattern: "vpc-id = vpc-xxx"
-  │     Pros: flexible
-  │     Cons: can match unexpected resources if filters are too broad
-  └── All resources (DO NOT USE in production): match everything
-        Pros: simple
-        Cons: UNCONTROLLED BLAST RADIUS — can impact production
-```
-
-**Key implication:** the safest production FIS target is a tag-based
-filter that requires an explicit opt-in tag (e.g., `FIS_Target=enabled`).
-This prevents accidental targeting of resources that were not intended
-to be part of the experiment. Resources without the tag are never
-matched, even if the filter is misconfigured.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+Covers: Expert heuristic: tag-based target scoping is the safest mechanism. See the "References (load on demand)" section.
 
 ## Expert heuristic: stop conditions auto-abort when alarms fire
 
-Stop conditions are CloudWatch alarms that, when they transition to
-ALARM state during the experiment, trigger FIS to auto-abort all running
-actions and initiate rollback. Without a stop condition, FIS runs the
-fault action to its full duration regardless of impact. Always configure
-at least one stop condition that represents "the system is degraded
-beyond acceptable limits" (e.g., CPU > 90%, error rate > 5%, latency
-> 2000ms, HealthyHostCount < 1).
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+Covers: Expert heuristic: stop conditions auto-abort when alarms fire. See the "References (load on demand)" section.
 
 ## Expert heuristic: IAM role must allow the specific fault action on target resources
 
-The FIS service role must have a trust policy that allows
-`fis.amazonaws.com` to assume it, plus permissions scoped to the
-specific fault action on the specific target resources (ideally scoped
-by `Condition` on resource tags). The #1 cause of "experiment failed to
-start" is a missing permission in the IAM role. FIS's error message is
-often opaque ("FIS could not assume the role" or "permission denied").
-Always verify the role has both the trust policy and the action-specific
-permissions before creating the experiment template.
-
-```text
-IAM role permission matrix:
-  aws:ec2:stop-instances        → ec2:StopInstances, ec2:StartInstances, ec2:DescribeInstances
-  aws:ec2:terminate-instances   → ec2:TerminateInstances, ec2:DescribeInstances
-  aws:ecs:drain-container-instances → ecs:ListContainerInstances, ecs:UpdateContainerInstancesState, ecs:DescribeContainerInstances
-  aws:lambda:invoke             → lambda:InvokeFunction
-  aws:network:disrupt-connectivity → ec2:CreateNetworkInterface, ec2:DeleteNetworkInterface, ec2:DescribeNetworkInterfaces + FIS network agent pass-role
-  aws:rds:failover-db-cluster   → rds:FailoverDBCluster, rds:DescribeDBClusters
-  aws:s3:pause-bucket-access    → s3:PutBucketAcl (or equivalent on the bucket)
-  aws:cloudwatch:put-metric-data → cloudwatch:PutMetricData (account-wide)
-```
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+Covers: Expert heuristic: IAM role must allow the specific fault action on target resources. See the "References (load on demand)" section.
 
 ## Prerequisites (verify before provisioning)
 
@@ -357,53 +308,8 @@ completion regardless of impact. Always configure at least one.
 
 ## Step 5 — IAM role configuration
 
-The FIS service role must have a trust policy allowing `fis.amazonaws.com`
-to assume it, plus permissions scoped to the specific fault action on
-the target resources (via `Condition` on resource tags).
-
-**Trust policy:**
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    { "Effect": "Allow",
-      "Principal": { "Service": "fis.amazonaws.com" },
-      "Action": "sts:AssumeRole" }
-  ]
-}
-```
-
-**Permissions policy (scoped to EC2 stop on tagged resources):**
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    { "Effect": "Allow",
-      "Action": ["ec2:StopInstances", "ec2:StartInstances", "ec2:DescribeInstances"],
-      "Resource": "*",
-      "Condition": { "StringEquals": { "aws:ResourceTag/FIS_Target": "enabled" } } },
-    { "Effect": "Allow",
-      "Action": ["cloudwatch:DescribeAlarms"],
-      "Resource": "*" }
-  ]
-}
-```
-
-**Create the role:**
-
-```bash
-aws iam create-role --role-name FISExperimentRole \
-  --assume-role-policy-document file://trust-policy.json --region us-east-1
-
-aws iam put-role-policy --role-name FISExperimentRole \
-  --policy-name FISExperimentPermissions \
-  --policy-document file://permissions-policy.json
-```
-
-**Critical:** scope the permissions to the target tags via a `Condition`
-block. Do NOT grant blanket `ec2:*` on `*`.
+Moved verbatim to [references/iam-and-stop-conditions.md](references/iam-and-stop-conditions.md) — load on demand.
+Covers: Step 5 — IAM role configuration. See the "References (load on demand)" section.
 
 ## Step 6 — Log group and report generation
 
@@ -475,33 +381,8 @@ seconds to propagate. Wait before starting.
 
 ## Step 8 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Account-level targeting (2023-2024):** FIS added support for
-  targeting resources across an account, enabling broader blast-radius
-  experiments.
-- **S3 bucket access pause (2023-2024):** `aws:s3:pause-bucket-access`
-  action added for resilience testing (applications must handle S3
-  unavailability).
-- **CloudWatch metric injection (2023-2024):**
-  `aws:cloudwatch:put-metric-data` action added for testing
-  alarm-triggered auto-remediation without actually faulting a resource.
-- **Network connectivity disruption enhancements (2023-2024):**
-  `aws:network:disrupt-connectivity` now supports port-range filtering,
-  direction filtering (ingress/egress), and packet delay/loss (not just
-  full connectivity drop).
-- **ECS container instance drain (2023-2024):**
-  `aws:ecs:drain-container-instances` action added, allowing FIS to
-  drain ECS container instances and test task rescheduling behavior.
-- **FIS experiment template versioning (2024-2025):** Templates now
-  support versioning, enabling safe updates to in-use templates without
-  breaking running experiments.
-- **Cross-account experiment execution (2024-2025):** Centralized chaos
-  engineering teams can run experiments in workload accounts via IAM
-  role assumption.
-- **AWS Step Functions integration (2024-2025):** FIS experiments can
-  be orchestrated as steps in a Step Functions state machine for
-  complex multi-stage game-day scenarios.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+Covers: Step 8 — Recent features. See the "References (load on demand)" section.
 
 ## NEVER do these things
 
@@ -597,34 +478,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Experiment fails to start: permission denied
-- The IAM role is missing a required permission. Verify the role has
-  the action-specific permission (e.g., `ec2:StopInstances`) AND the
-  trust policy allows `fis.amazonaws.com`. IAM propagation can take
-  up to 30 seconds.
+Moved verbatim to [references/error-handling.md](references/error-handling.md) — load on demand.
+Covers: Error handling. See the "References (load on demand)" section.
 
-### Experiment targets zero resources
-- The target filter (resource tags) does not match any resources.
-  Verify the tags are applied: `aws ec2 describe-instances --filters
-  Name=tag:FIS_Target,Values=enabled`. Check that `selectionMode` is
-  not `COUNT(0)`.
+## References (load on demand)
 
-### Stop condition does not fire
-- The CloudWatch alarm is not in ALARM state. Stop conditions trigger
-  ONLY when the alarm transitions to ALARM. Verify the alarm threshold
-  and that the metric is breaching. Also verify the alarm ARN in the
-  template matches the actual alarm ARN.
-
-### Network disruption action fails
-- `aws:network:disrupt-connectivity` requires the FIS network agent
-  IAM role and additional networking permissions
-  (`ec2:CreateNetworkInterface`, etc.). Verify the role includes these.
-
-### Experiment stuck in pending
-- FIS may be waiting for the IAM role to propagate, or the target
-  resources may be in a state that prevents the action (e.g., already
-  stopped). Check the experiment state and action state via
-  `get-experiment`.
+- [references/actions-and-targets.md](references/actions-and-targets.md) — the eight fault actions and target-selection detail (existing)
+- [references/iam-and-stop-conditions.md](references/iam-and-stop-conditions.md) — IAM role trust/permissions and stop-condition detail (existing); now also the full Step 5 trust/permissions policy documents and role-creation CLI
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert-heuristic deep dives (tag-based target scoping, stop-condition auto-abort, IAM permission matrix) and recent AWS features (Step 8)
+- [references/error-handling.md](references/error-handling.md) — error-handling deep dives: start permission denied, zero matched targets, stop condition not firing, network disruption failure, stuck in pending
 
 ## Domain
 

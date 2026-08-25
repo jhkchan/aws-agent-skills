@@ -197,41 +197,8 @@ configured types. For compliance (least-privilege), use `CUSTOMER_MANAGED`.
 permissions scoped to the configured data source types. No manual IAM
 configuration needed.
 
-**Customer-managed IAM role:** create a role with the `Grafana`
-service principal and scoped read permissions:
-
-```bash
-# Trust policy for Amazon Managed Grafana
-aws iam create-role \
-  --role-name GrafanaDataSourceRole \
-  --assume-role-policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [{"Effect": "Allow","Principal": {"Service": "grafana.amazonaws.com"},"Action": "sts:AssumeRole"}]
-  }'
-
-# Attach inline policy for data source read access
-aws iam put-role-policy \
-  --role-name GrafanaDataSourceRole \
-  --policy-name GrafanaDataSourceRead \
-  --policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [
-      {"Effect": "Allow","Action": ["cloudwatch:GetMetricData","cloudwatch:GetMetricStatistics","cloudwatch:ListMetrics"],"Resource": "*"},
-      {"Effect": "Allow","Action": ["logs:DescribeLogGroups","logs:GetLogEvents","logs:StartQuery","logs:GetQueryResults"],"Resource": "*"},
-      {"Effect": "Allow","Action": ["aps:GetLabels","aps:GetMetricMetadata","aps:GetSeries","aps:QueryMetrics"],"Resource": "arn:aws:aps:<region>:<acct>:workspace/<amp-id>"},
-      {"Effect": "Allow","Action": ["timestream:Select","timestream:DescribeEndpoints"],"Resource": "*"},
-      {"Effect": "Allow","Action": ["xray:GetTraceSummaries","xray:GetTraceGraph","xray:GetSamplingRules"],"Resource": "*"},
-      {"Effect": "Allow","Action": ["es:ESHttpGet","es:ESHttpHead"],"Resource": "arn:aws:es:<region>:<acct>:domain/<domain>/*"}
-    ]
-  }'
-```
-
-**Associate the role with the workspace:**
-```bash
-aws grafana update-workspace-configuration \
-  --workspace-id <workspace-id> \
-  --data-sources CLOUDWATCH PROMETHEUS XRAY
-```
+Customer-managed role trust/inline policy JSON and the workspace role-association commands moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) (Step 2 section).
+Load on demand when emitting the IAM role portion of a CUSTOMER_MANAGED deployment plan.
 
 ### Step 3 — Data source configuration
 
@@ -279,85 +246,8 @@ specific read actions for each data source.
 Grafana dashboards are JSON documents. The dashboard JSON model defines
 panels, templating variables, time range, annotations, and refresh rate.
 
-**Dashboard JSON structure:**
-
-```json
-{
-  "title": "Production Observability",
-  "schemaVersion": 39,
-  "version": 1,
-  "refresh": "30s",
-  "time": { "from": "now-6h", "to": "now" },
-  "templating": {
-    "list": [
-      {
-        "name": "datasource",
-        "type": "datasource",
-        "query": "cloudwatch",
-        "current": { "text": "CloudWatch", "value": "cloudwatch" }
-      },
-      {
-        "name": "region",
-        "type": "query",
-        "datasource": "$datasource",
-        "query": "regions()",
-        "current": { "text": "us-east-1", "value": "us-east-1" }
-      }
-    ]
-  },
-  "panels": [
-    {
-      "type": "timeseries",
-      "title": "CPU Utilization",
-      "datasource": "$datasource",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
-      "targets": [
-        {
-          "expr": "AWS/EC2 CPUUtilization",
-          "namespace": "AWS/EC2",
-          "metricName": "CPUUtilization",
-          "statistics": ["Average"]
-        }
-      ]
-    }
-  ]
-}
-```
-
-**Templating variables** make dashboards reusable across environments,
-regions, and services. Use `datasource`, `query`, and `custom` variable
-types for dynamic filtering.
-
-**Panel types by use case:**
-
-| Panel type | Use when |
-|---|---|
-| `timeseries` | Time-series metrics (CPU, latency, throughput) |
-| `stat` | Single-value KPIs (current value, threshold) |
-| `gauge` | Single-value with range (0-100%, utilization) |
-| `table` | Multi-column data (instance list, log results) |
-| `bargauge` | Comparison across categories (cost by service) |
-| `heatmap` | Distribution over time (latency percentiles) |
-| `nodegraph` | Service maps (X-Ray traces) |
-| `logs` | Log viewer (CloudWatch Logs queries) |
-
-**Provisioning dashboards via API:**
-```bash
-# Get workspace API key
-aws grafana create-workspace-api-key \
-  --workspace-id <workspace-id> \
-  --key-name deploy-key \
-  --key-role ADMIN \
-  --seconds-to-live 3600 \
-  --query 'key' --output text > /tmp/grafana-key
-
-# Import dashboard via Grafana HTTP API
-curl -X POST \
-  -H "Authorization: Bearer $(cat /tmp/grafana-key)" \
-  -H "Content-Type: application/json" \
-  -d @dashboard.json \
-  https://<workspace-endpoint>/api/dashboards/db
-```
+Dashboard JSON structure, templating-variable guidance, panel-type table, and API import commands moved verbatim to [references/data-sources-and-dashboard-json.md](references/data-sources-and-dashboard-json.md) (Step 4 section).
+Load on demand when authoring or importing dashboard JSON.
 
 ### Step 5 — Alerting (rules, notification policies, contact points)
 
@@ -405,105 +295,18 @@ Configure all three layers.
 
 ### Step 6 — AMP workspace integration
 
-Amazon Managed Service for Prometheus (AMP) provides serverless Prometheus-
-compatible metric storage. Integration with Grafana is via the Prometheus
-data source.
-
-```bash
-# Create AMP workspace
-aws amps create-workspace \
-  --workspace-name <amp-name> \
-  --alias <amp-alias> \
-  --kms-key-arn arn:aws:kms:<region>:<acct>:key/<key-id>
-
-# Wait for ACTIVE status
-aws amps describe-workspace --workspace-id <amp-id> \
-  --query 'workspace.status.statusCode' --output text
-
-# Configure remote write (from Prometheus / OpenTelemetry / CloudWatch agent)
-# The AMP workspace endpoint is:
-# https://aps-workspaces.<region>.amazonaws.com/workspaces/<amp-id>/
-```
-
-**Remote write sources:**
-- CloudWatch agent with embedded metric format
-- Prometheus server with `remote_write` to AMP
-- OpenTelemetry Collector with Prometheus exporter
-- Distroless OTel collector on EKS/ECS
-
-**Common mistake:** querying AMP before metrics are flowing. Verify remote
-write is active by checking `aws amps describe-workspace` for ingest
-metrics, then querying from Grafana.
+AMP workspace creation, remote-write source list, and ACTIVE-status verification moved verbatim to [references/data-sources-and-dashboard-json.md](references/data-sources-and-dashboard-json.md) (Step 6 section).
+Load on demand when wiring the Prometheus data source to AMP.
 
 ### Step 7 — Grafana Enterprise features (Incident, OnCall)
 
-**Grafana Incident** (Enterprise):
-- Real-time incident declaration and tracking
-- Integrated with Grafana dashboards and alerting
-- Post-incident timeline and root-cause analysis
-
-**Grafana OnCall** (Enterprise):
-- On-call schedule management
-- Escalation policies (PagerDuty-like)
-- Integration with Slack, Telegram, phone calls
-
-**Enabling Enterprise features:**
-Enterprise features require a Grafana Enterprise workspace. Upgrade from
-Standard via AWS support or create a new Enterprise workspace:
-
-```bash
-aws grafana create-workspace \
-  --workspace-name <workspace-name>-enterprise \
-  --account-access-type CURRENT_ACCOUNT \
-  --authentication-providers AWS_SSO \
-  --permission-type CUSTOMER_MANAGED \
-  --data-sources CLOUDWATCH PROMETHEUS XRAY \
-  --grafana-version 11.0 \
-  --workspace-data-sources CLOUDWATCH PROMETHEUS XRAY \
-  --network-access-control-configuration '{...}' \
-  --description "Enterprise observability with Incident and OnCall"
-```
-
-**Enterprise SAML team sync:** maps IdP groups to Grafana teams
-automatically. Configure in the workspace SAML settings with group
-attribute statements from the IdP.
+Enterprise workspace creation command, Incident/OnCall capability notes, and SAML team sync moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when the workspace tier is Enterprise.
 
 ## Common patterns (boilerplate)
 
-### Create a workspace with CloudWatch + AMP + X-Ray (production)
-
-```bash
-aws grafana create-workspace \
-  --workspace-name prod-observability \
-  --account-access-type CURRENT_ACCOUNT \
-  --authentication-providers AWS_SSO \
-  --permission-type CUSTOMER_MANAGED \
-  --data-sources CLOUDWATCH PROMETHEUS XRAY \
-  --grafana-version 10.4
-```
-
-### Create a customer-managed IAM role for data source access
-
-```bash
-aws iam create-role --role-name GrafanaDataSourceRole \
-  --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"grafana.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
-
-aws iam put-role-policy --role-name GrafanaDataSourceRole \
-  --policy-name DataSourceRead \
-  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["cloudwatch:GetMetricData","cloudwatch:ListMetrics","logs:DescribeLogGroups","aps:QueryMetrics","xray:GetTraceSummaries"],"Resource":"*"}]}'
-```
-
-### AMP workspace + dashboard import
-
-```bash
-aws amps create-workspace --workspace-name prod-metrics --alias prod
-
-GRAFANA_KEY=$(aws grafana create-workspace-api-key --workspace-id <id> \
-  --key-name deploy --key-role ADMIN --seconds-to-live 3600 --query 'key' --output text)
-
-curl -X POST -H "Authorization: Bearer $GRAFANA_KEY" -H "Content-Type: application/json" \
-  -d @dashboard.json https://<endpoint>/api/dashboards/db
-```
+Boilerplate snippets (production workspace, customer-managed IAM role, AMP + dashboard import) moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+Load on demand when emitting copy-paste deployment commands.
 
 ## NEVER do these things (top 5)
 
@@ -663,41 +466,14 @@ VERIFICATION_COMMANDS:
 
 ## Recent AWS features (2024-2026)
 
-- **Grafana version 11.x support (2025):** Managed Grafana supports
-  Grafana 11.x with new panel types, improved alerting UI, and canvas
-  panels. Provisioning tip: specify `--grafana-version 11.0` at workspace
-  creation; version upgrades are managed by AWS.
+2024-2026 feature notes (Grafana 11.x, Enterprise on AWS, AMP cross-account, IoT SiteWise, API-key automation, SNS alerting, VPC config) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when a request references recent features or versions.
 
-- **Grafana Enterprise on AWS (2024-2025):** Enterprise tier with
-  Incident (real-time incident management), OnCall (escalation schedules),
-  reporting (scheduled PDF reports), SAML team sync, and audit logs.
-  Provisioning tip: Enterprise requires a separate license; create as
-  Enterprise workspace or upgrade via AWS support.
+## References (load on demand)
 
-- **AMP cross-account observability (2024):** AMP workspaces can ingest
-  metrics from multiple accounts via cross-account IAM roles. Provisioning
-  tip: configure the remote write source with a cross-account role that
-  has `aps:RemoteWrite` on the central AMP workspace.
-
-- **Grafana data source for AWS IoT SiteWise (2024):** Managed Grafana
-  supports IoT SiteWise as a data source for industrial asset metrics.
-  Provisioning tip: add `IOTSITEWISE` to `--data-sources` at workspace
-  creation.
-
-- **Grafana workspace API key automation (2024-2025):** Programmatic
-  API key creation for CI/CD dashboard deployment. Provisioning tip:
-  use short-lived keys (`--seconds-to-live 3600`) for deployment pipelines;
-  rotate regularly.
-
-- **Grafana alerting with SNS integration (2024):** Native SNS contact
-  point type for Grafana-managed alerting. Provisioning tip: configure
-  the SNS contact point with `authProvider: aws_iam` and the Grafana
-  workspace IAM role must have `sns:Publish` on the topic.
-
-- **Managed Grafana VPC configuration (2024):** Workspaces can be
-  deployed within a VPC for private data source access. Provisioning
-  tip: specify `--network-access-control-configuration` with VPC subnets
-  and security groups at creation.
+- [references/data-sources-and-dashboard-json.md](references/data-sources-and-dashboard-json.md) — per-data-source configuration, dashboard JSON model, AMP integration, panel and alerting detail
+- [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — prerequisite checks, IAM role JSON, workspace/API-key/dashboard CLI walkthroughs, and common boilerplate
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Enterprise tier (Incident/OnCall) and 2024-2026 feature notes
 
 ## Domain
 

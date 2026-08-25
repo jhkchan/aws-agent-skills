@@ -22,6 +22,7 @@ metadata:
   keywords: IAM, AccessDenied, ExplicitDeny, Client.UnauthorizedOperation, NotAuthorized, sts:AssumeRole, trust policy, SCP, permissions boundary, session policy, policy evaluation, cross-account, KMS key policy, PassRole, simulate-principal-policy, CloudTrail, implicit deny
   tags: iam, security, troubleshoot, access-denied, policy-evaluation, scp, permissions-boundary
 ---
+---
 
 # IAM Permission Troubleshooter
 
@@ -156,16 +157,8 @@ in the output `INCIDENT` line.
 | **Resource ARN** | Resource-based policy and condition keys (`aws:ResourceAccount`, `aws:ResourceTag`) depend on the exact ARN including path | The error message includes the resource if the service supports resource-level; otherwise `Resource: "*"` |
 | **Request context** | Region, source IP, source VPCE, source VPC, federation attributes — every condition key depends on this | CloudTrail `requestParameters` and `sourceIPAddress` |
 
-**ARN format gotcha (Step 4 root cause #1).** The single most common IAM
-misdiagnosis is "the policy has `s3:GetObject` on the bucket ARN." For S3:
-
-- Bucket-level actions (`s3:ListBucket`, `s3:DeleteBucket`, `s3:GetBucketLocation`) require `arn:aws:s3:::bucket-name` (no `/*`).
-- Object-level actions (`s3:GetObject`, `s3:PutObject`, `s3:DeleteObject`) require `arn:aws:s3:::bucket-name/*` (with `/*`).
-
-Confusing the two produces AccessDenied on a policy that "looks right." A
-similar pattern exists for SQS (`arn:aws:sqs:...:queue-name` vs queue URL),
-and for Secrets Manager (`arn:aws:secretsmanager:...:secret:name-??????`
-with the random 6-char suffix).
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "ARN format gotcha".
+> Load when: the policy "looks right" but never matches — S3 bucket vs object ARNs, SQS queue ARN vs URL, Secrets Manager 6-char suffix.
 
 If the operator cannot supply the exact action or resource ARN, do not
 guess — emit `NEED_MORE_INFO` listing the missing field.
@@ -223,20 +216,8 @@ whose `Action`, `Resource`, and `Condition` all match the request. The
 first match is the cause. Output its layer, policy name, statement Sid,
 and the matched condition keys.
 
-**Common Deny patterns to look for first:**
-
-- **Region restriction SCP.** `Condition: { "StringNotEquals": { "aws:RequestedRegion": ["us-east-1", "us-west-2"] } }` — denies anything outside the listed regions. Often deployed org-wide and forgotten when a workload moves regions.
-- **IP restriction in identity policy or boundary.** `Condition: { "NotIpAddress": { "aws:SourceIp": ["10.0.0.0/8"] } }` — denies anything outside the corporate CIDR. Breaks when a Lambda runs from a VPC with a NAT gateway whose EIP is not on the allowlist.
-- **VPC endpoint restriction.** `Condition: { "StringNotEqualsIfExists": { "aws:sourceVpce": "vpce-aaaaaaa" } }` — denies anything not coming through the specified VPC endpoint. Breaks cross-region or cross-account traffic.
-- **MFA requirement.** `Condition: { "Bool": { "aws:MultiFactorAuthPresent": "false" } }` — programmatic calls without MFA fail. Note that long-lived access keys never set the MFA key, so `Bool` evaluates false; the correct pattern is `Null` + `Bool` together.
-- **Resource tag requirement.** `Condition: { "StringNotEquals": { "aws:ResourceTag/Environment": "prod" } }` — denies access to resources without the tag. Breaks when a new resource is created without tags.
-- **`aws:SourceArn` / `aws:SourceAccount` on a service-to-service chain.** A KMS key policy that requires `aws:SourceAccount: "111111111111"` denies a cross-account S3 access because the KMS call is made by S3 on behalf of the caller — the `aws:SourceAccount` is the S3 service account, not the caller's.
-
-**NotAction in a Deny is the easiest to miss.** A Deny statement with
-`NotAction: ["iam:*"]` denies every action except `iam:*`. Operators read
-"iam:*" and think the statement is about IAM; it is actually denying
-everything else. Scan all Deny statements for `NotAction` / `NotResource`
-first — they are the broadest denies.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Common Deny patterns".
+> Load when: an explicit deny is confirmed and you are scanning for region/IP/VPCe/MFA/resource-tag/SourceArn deny shapes, incl. the NotAction trap.
 
 ### Step 5: EC2-specific path (Client.UnauthorizedOperation)
 
@@ -300,29 +281,8 @@ Same-account:   identity-based  ∪  resource-based  (either Allows = grant)
 Cross-account:  identity-based  ∩  resource-based  (both must Allow)
 ```
 
-Common cross-account failures:
-
-1. **S3 bucket policy missing the cross-account principal.** A Lambda in
-   account B reading an object in account A's bucket needs the bucket
-   policy in A to list B's role ARN in `Principal`. Adding the IAM
-   permission to B's Lambda role is necessary but not sufficient.
-2. **KMS key policy does not grant decrypt to the cross-account caller.**
-   Even if the S3 bucket policy allows B to read the object, if the
-   object is encrypted with a KMS key in account A, the key policy must
-   also grant `kms:Decrypt` to B's role. This is a three-party chain
-   (Lambda role → S3 → KMS) that fails at KMS even though S3 works.
-3. **SQS queue policy does not grant `sqs:SendMessage` cross-account.**
-   Same pattern as S3.
-4. **Secrets Manager secret policy missing the cross-account principal.**
-   Same pattern; additionally, the KMS key used to encrypt the secret
-   must also grant decrypt to the caller.
-5. **Cross-account Lambda invocation.** `lambda:InvokeFunction`
-   resource-based policy on the function must list the cross-account
-   caller. The caller's identity policy must also Allow `lambda:InvokeFunction`.
-
-For any cross-account failure, output both sides in the EVIDENCE block:
-"Caller identity policy: <Allowed / Denied / Missing action>. Target
-resource-based policy: <Allowed / Denied / Missing principal>."
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Common cross-account failures".
+> Load when: the cross-account intersection rule fires — S3/KMS/SQS/Secrets/Lambda both-sides checks and the EVIDENCE format.
 
 ### Step 8: Map to the common root-cause catalog
 
@@ -351,27 +311,8 @@ After proposing a fix, validate it with `aws iam simulate-principal-policy`
 BEFORE applying. This catches second-order effects (e.g., the new
 statement is shadowed by a Deny the operator forgot).
 
-```bash
-aws iam simulate-principal-policy \
-  --policy-source-arn arn:aws:iam::111111111111:role/app-role \
-  --action-names s3:GetObject \
-  --resource-arns arn:aws:s3:::app-data-prod/file.txt \
-  --eval-decision SHAPE \
-  --output json \
-  --profile <profile>
-```
-
-A return of `allowed` means the simulator confirms the principal can
-perform the action. `explicitDeny` means a Deny statement still matches.
-`implicitDeny` means no Allow matches. Add `--markers` or
-`--detail-evaluation` to surface the matched statement.
-
-**Simulator caveat.** The simulator tests individual actions in isolation.
-It does NOT catch chained API flows (e.g., a Lambda function calling S3
-under the function's role — the simulator tests `lambda:InvokeFunction`
-and `s3:GetObject` separately but cannot detect that the Lambda runtime
-needs the second permission on the function's role, not the caller's).
-Always cross-reference simulator results with CloudTrail for chained flows.
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Step 9 — policy simulator verification".
+> Load when: validating a proposed fix with simulate-principal-policy; includes the chained-API-flow caveat.
 
 ### Step 10: Decide — ROOT_CAUSE_FOUND vs NEED_MORE_INFO vs ESCALATE
 
@@ -442,146 +383,16 @@ REMEDIATION:
 
 ## Diagnostic command reference
 
-Run these in order. Each command's output narrows the decision tree.
-
-```bash
-# 1. Confirm the caller identity. The ARN reveals assumed-role vs user
-#    vs federated. Federation paths carry session policies.
-aws sts get-caller-identity --profile <profile>
-
-# 2. Pull the CloudTrail event. errorMessage disambiguates implicit vs
-#    explicit deny. sourceIPAddress and requestParameters give the
-#    condition-key context.
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventName,AttributeValue=PutObject \
-  --start-time $(date -d '-1 hour' +%s) \
-  --end-time $(date +%s) \
-  --profile <profile>
-
-# 3. List every policy attached to the principal. Include inline.
-aws iam list-attached-role-policies --role-name <role> --profile <profile>
-aws iam list-role-policies --role-name <role> --profile <profile>
-aws iam get-role-policy --role-name <role> --policy-name <inline> --profile <profile>
-aws iam get-policy-version \
-  --policy-arn arn:aws:iam::111111111111:policy/<managed> \
-  --version-id v1 --profile <profile>
-
-# 4. For assumed-role failures, read the target role's trust policy.
-aws iam get-role --role-name <target-role> --query 'Role.AssumeRolePolicyDocument' --profile <profile>
-
-# 5. For SCP-blocked calls, list the policies attached at every level
-#    above the account (root, parent OUs, account itself).
-aws organizations list-policies-for-target \
-  --target-id <account-id> --filter SERVICE_CONTROL_POLICY --profile <profile>
-aws organizations describe-policy --policy-id <policy-id> --profile <profile>
-
-# 6. For permissions boundary, check the boundary ARN on the role.
-aws iam get-role --role-name <role> --query 'Role.PermissionsBoundary' --profile <profile>
-
-# 7. Simulate the principal against the exact action and resource.
-aws iam simulate-principal-policy \
-  --policy-source-arn arn:aws:iam::111111111111:role/<role> \
-  --action-names s3:GetObject \
-  --resource-arns arn:aws:s3:::bucket/key \
-  --eval-decision SHAPE \
-  --output json --profile <profile>
-
-# 8. For KMS-encrypted resources, read the key policy. The key policy
-#    is the authoritative source — IAM grants on the caller do not
-#    help if the key policy does not include them.
-aws kms get-key-policy --key-id <key-id> --policy-name default --profile <profile>
-
-# 9. For S3 access specifically, use the S3 access analyzer to surface
-#    the bucket ACL and policy combined view.
-aws accessanalyzer validate-policy-resource \
-  --policy-arn arn:aws:s3:::bucket --profile <profile>
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Diagnostic command reference".
+> Load when: gathering evidence live — caller identity, CloudTrail event, attached policies, trust policy, SCPs, boundary, simulation, KMS key policy, S3 analyzer.
 
 ## Expert edge cases
 
 These patterns represent genuine, non-obvious IAM AccessDenied causes
 that a senior security engineer would catch but a generalist would miss.
 
-### The `aws:SourceAccount` chain on service-to-service calls
-
-When S3 reads an object encrypted with a KMS key, the KMS `Decrypt` call
-is made BY S3 on behalf of the calling principal — not by the principal
-directly. A KMS key policy that requires `aws:SourceAccount: "111111111111"`
-expects the source account of the S3 service call to be `111111111111`,
-but if the bucket is in `222222222222`, the S3 service call originates
-from `222222222222`, not the caller's account. The key policy denies
-the call even though the principal appears in the policy. Fix: scope on
-`aws:SourceArn` of the bucket instead, OR list the bucket's account in
-`aws:SourceAccount`.
-
-### The VPC endpoint policy shadow
-
-A VPC endpoint has its own policy that is independent of IAM. If a VPC
-endpoint policy denies an action, the request fails even though every
-IAM policy allows it. The CloudTrail event will show AccessDenied with
-no hint that the VPC endpoint policy is the cause. The diagnostic is to
-bypass the endpoint (route over the internet or a different endpoint)
-and see if the call succeeds. VPC endpoint policies are the most
-overlooked layer because they live in the VPC console, not IAM.
-
-### Session policies injected by federation
-
-When a user federates via IAM Identity Center or a SAML provider, the
-federation flow can inject a session policy that narrows the role's
-effective permissions. The session policy is NOT visible in the role's
-policy list — it lives in the `assumeRole` request parameters. A common
-failure: a SAML claim maps to a session policy that includes a
-`Resource: "arn:aws:s3:::personal-${aws:username}/*"` restriction, and
-the username has special characters that cause the substitution to fail
-silently. The CloudTrail `userIdentity.sessionContext.sessionIssuer`
-field reveals the session policy presence.
-
-### The CloudFormation service-linked role pass-through
-
-When CloudFormation creates a stack, it makes calls under its own
-service-linked role (`AWSServiceRoleForCloudFormation`) for some
-operations and under the passed role for others. A caller with
-`cloudformation:CreateStack` but without `iam:PassRole` on the stack's
-execution role gets `AccessDenied` on CreateStack even though the policy
-allows CreateStack — CloudFormation needs PassRole to receive the
-execution role. The error message rarely mentions PassRole. The fix is
-to add `iam:PassRole` on the specific execution role ARN with
-`iam:PassedToService: cloudformation.amazonaws.com`.
-
-### Condition-key mismatch on `aws:ResourceTag`
-
-Tag-based conditions are case-sensitive. A policy conditioned on
-`aws:ResourceTag/Environment: prod` does NOT match a tag `environment:
-prod` (lowercase key). AWS normalises tag VALUES to lowercase for some
-services but not tag KEYS. The diagnostic is to read the actual tag key
-case from `aws <service> describe-tags` output, not from the policy.
-
-### The `StringLike` wildcard anchor trap
-
-A trust policy with
-`"StringLike": { "sts:RoleName": "dev-*" }` matches `dev-app` AND
-`development-app` AND `devops-app`. Operators intend "starts with dev-"
-but the wildcard matches anywhere. The fix is to anchor explicitly:
-`dev-*` is correct only if the role names always start with `dev-`. For
-service-role patterns, prefer `StringEquals` on a full role-name list
-over `StringLike` patterns.
-
-### Resource-based policy principal format
-
-For Lambda function policies, the `Principal` MUST be a service principal
-(`lambda.amazonaws.com`), an account root (`111111111111`), or an IAM
-ARN. SAML/OIDC federation principals are NOT supported in Lambda function
-policies — they must assume an IAM role first. A common failure is to
-try granting a SAML principal direct access to a Lambda function via the
-function policy.
-
-### IAM database authentication quasi-policy
-
-RDS IAM authentication uses a special quasi-policy mechanism. The caller
-needs `connect:DB` on the DB cluster ARN — NOT `rds-db:connect`. The
-action prefix changed in 2018 but old documentation still references
-`rds-db:connect`. The error is AccessDenied on a policy that has the
-wrong action name.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Expert edge cases".
+> Load when: the standard tree finds nothing — SourceAccount chains, VPC endpoint policy shadow, federation session policies, CFN service-linked role PassRole, ResourceTag case, StringLike anchors, Lambda principal formats, RDB IAM auth.
 
 ## Anti-Patterns — NEVER
 
@@ -658,91 +469,13 @@ wrong action name.
 
 ## Remediation guidance
 
-### For implicit deny (most common)
-
-1. Identify the specific missing action and resource ARN from
-   `simulate-principal-policy` output.
-2. Add the minimum-scope Allow statement to the identity-based policy:
-   specific action, specific ARN, no wildcards.
-3. For cross-account, also add the corresponding Allow on the
-   resource-based policy.
-4. Re-run the simulator. If the simulator now returns `allowed`, the
-   fix is complete.
-5. Apply the policy change via a new managed policy version (do not
-   edit inline — preserve audit history).
-
-### For explicit deny
-
-1. Identify the Deny statement from CloudTrail `errorMessage` or
-   simulator matched statements.
-2. Determine whether the Deny SHOULD match this request:
-   - If yes (the workload should be in scope of the deny): the workload
-     must be re-architected (different region, different resource tag,
-     different network path) — do not weaken the deny.
-   - If no (the deny was written too broadly): scope the deny to
-     exclude the workload via a `Condition` (e.g.,
-     `StringNotEqualsIfExists: aws:ResourceTag/Allow: "true"`).
-3. Apply the deny-policy change. Test that the previously-denied call
-   now succeeds AND that the deny still blocks the calls it was
-   designed to block (regression test).
-
-### For SCP denies (escalation path)
-
-1. Identify the SCP from `organizations list-policies-for-target`.
-2. Read the SCP from the management account.
-3. If the workload is genuinely in scope, no SCP change — the workload
-   must comply. Output ESCALATE if the SCP is owned by a central team.
-4. If the SCP was written too broadly (e.g., region restriction
-   excludes a region the workload legitimately uses), request an
-   exception or a scoped exclude condition.
-
-### For KMS key policy denies
-
-1. Identify the calling role ARN.
-2. Add a statement to the KEY policy (resource-based) granting
-   `kms:Decrypt` (and `kms:DescribeKey` if the workload needs it) to
-   the calling role ARN.
-3. ALSO verify the caller's identity-based policy has `kms:Decrypt` on
-   the key ARN (cross-account intersection).
-4. If the key has a grant-based access pattern, prefer
-   `kms:CreateGrant` over editing the key policy.
-
-### For trust-policy AssumeRole denies
-
-1. Read the target role's `assumeRolePolicyDocument`.
-2. Identify the missing principal, condition, or external ID.
-3. Add the caller's ARN to the `Principal.AWS` list. If the caller is
-   a service, use the service principal
-   (`lambda.amazonaws.com`) AND the service-linked role ARN if
-   applicable.
-4. If `sts:ExternalId` is required, ensure the caller passes the
-   correct external ID (configured on both sides).
+> **Moved verbatim** → [references/error-handling.md](references/error-handling.md) § "Remediation guidance".
+> Load when: the root cause is identified — per-cause fix procedures: implicit deny, explicit deny, SCP escalation, KMS key policy, trust policy.
 
 ## Recent AWS features (2024-2026)
 
-- **Access Analyzer policy validation (2024 GA):** Access Analyzer now
-  surfaces logical errors, unused actions, and notable findings directly
-  in the IAM console. For troubleshooting, generate a policy from
-  CloudTrail activity via Access Analyzer to see what the principal
-  actually does — the generated policy is the authoritative scope.
-- **IAM Identity Center (SSO) permission sets and session policies
-  (2024-2025):** Identity Center can inject session policies via
-  permission set associations. Troubleshoot SSO-routed AccessDenied by
-  reading the permission set's inline policy AND the session policy
-  that Identity Center attaches.
-- **`aws:CalledVia` / `aws:CalledViaFirst` / `aws:CalledViaLast` (2024):**
-  These condition keys identify service-chain calls. Use them to scope
-  Deny statements that should apply only when a call is made through a
-  specific service (e.g., deny direct S3 access but allow S3 access via
-  CloudFormation).
-- **`aws:SourceOrgID` / `aws:SourceOrgPaths` (2024-2025):** For
-  organizations-wide trust policies, these keys are more stable than
-  `aws:SourceAccount` because they survive account moves between OUs.
-- **Cross-account S3 access with bucket-owner-enforced ACLs (2024):**
-  The default S3 ACL model now uses bucket-owner-enforced ACLs. Cross-
-  account uploads work differently — the bucket owner automatically owns
-  the object. This changes which KMS key policy entries are required for
-  encrypted cross-account writes.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Recent AWS features".
+> Load when: using Access Analyzer validation, Identity Center session policies, aws:CalledVia, aws:SourceOrgID, or bucket-owner-enforced ACL cross-account flows.
 
 ## References
 
@@ -751,72 +484,27 @@ evaluation order with worked examples per layer, and
 `references/common-gotchas.md` for the catalog of 30+ real-world
 AccessDenied patterns and their fixes.
 
+## References (load on demand)
+
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — ordered diagnostic CLI sequence (identity, CloudTrail, policies, trust, SCP, boundary, simulator, KMS, S3) and the Step 9 simulator verification
+- [references/error-handling.md](references/error-handling.md) — remediation guidance per deny type (implicit, explicit, SCP escalation, KMS key policy, trust policy)
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert edge cases, ARN gotcha, common Deny patterns, cross-account failure catalog, works-for-admin heuristic, STS session-policy scoping, recent AWS features
+- [references/policy-evaluation-logic.md](references/policy-evaluation-logic.md) — full policy evaluation order with worked examples per layer (existing)
+- [references/common-gotchas.md](references/common-gotchas.md) — catalog of 30+ real-world AccessDenied patterns and fixes (existing)
+
 ## Domain
 
 AWS CloudOps / IAM Security & Access Control Diagnostics.
 
 ## Expert heuristic: the "works for admin but not for me" pattern
 
-When the root user or an administrator with `Action: "*", Resource: "*"`
-can perform an operation but a specific IAM identity cannot, the cause
-is almost always in the IAM identity's own policy stack — not the
-resource or the service. Root and admin effective permissions are the
-union of `*`, so any deny must live below them in the evaluation chain
-(identity-based, boundary, session, or an SCP that explicitly Denies).
-
-**Diagnostic shortcut — simulate the identity directly:**
-
-```bash
-aws iam simulate-principal-policy \
-  --policy-source-arn <user-or-role-arn> \
-  --action-names <denied-action> \
-  --resource-arns <target-arn> \
-  --eval-decision SHAPE \
-  --output json
-```
-
-The simulator walks identity-based + boundary + session policies
-together and returns `allowed`, `implicitDeny`, or `explicitDeny`. If
-the admin simulator returns `allowed` but the identity returns
-`implicitDeny`, the missing statement is in the identity-based or
-boundary layer. If `explicitDeny`, hunt for the Deny statement in the
-identity-based or boundary policy — a session policy cannot Deny.
-
-**Common root causes for this pattern:**
-1. Identity-based policy missing the specific action or resource ARN.
-2. Permissions boundary attached but not granting the action.
-3. SCP at the OU or account level (SCPs still apply to admins only if
-   they explicitly Deny — an explicit-Deny SCP blocks admins too).
-4. Session policy injected by federation scoping the role down.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Expert heuristic: works-for-admin-but-not-for-me".
+> Load when: admin can do it but the identity cannot — direct identity simulation shortcut and the four common root causes.
 
 ## Edge case: STS session policy scoping
 
-When a principal assumes a role via `sts:AssumeRole` with a session
-policy (`--policy-arns` or `--policy`), the session's effective
-permissions are the INTERSECTION of the role's identity-based policy
-AND the session policy:
-
-```
-effective = role_policy ∩ session_policy
-```
-
-A session policy can only NARROW permissions — never widen. The most
-common failure pattern: a CI/CD system assumes a deployment role and
-injects a session policy scoping the session to a single S3 prefix; a
-later pipeline step that writes to a different prefix fails with
-AccessDenied even though the role's identity-based policy Allows it.
-
-**Diagnosis:**
-- CloudTrail `userIdentity.sessionContext.sessionIssuer` reveals the
-  session policy presence.
-- The session policy itself is NOT visible in the role's policy list —
-  it lives in the assume-role request parameters.
-- Re-run `sts:AssumeRole` without `--policy-arns` to confirm the role
-  policy alone is sufficient.
-
-**Fix:** widen the session policy (not the role policy) to include the
-additional prefix, OR drop the session policy if the role's identity-
-based policy is already correctly scoped.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Edge case: STS session policy scoping".
+> Load when: a CI/CD session policy narrows the role — intersection semantics, diagnosis via CloudTrail sessionIssuer, fix by widening the session policy.
 
 ## AWS documentation
 

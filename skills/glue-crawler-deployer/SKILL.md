@@ -117,137 +117,19 @@ time:
 
 ## Configuration dependency graph (novel heuristic)
 
-Glue Crawler configurations are NOT independent. The IAM role must
-exist before the crawler. Lake Formation permissions must be granted
-before the crawler can create tables in a Lake Formation-enabled
-database. Classifier ordering determines schema inference results.
-Use this graph to sequence provisioning.
-
-| Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| IAM role | Role exists; `iam:PassRole` permission | role must have glue:CreateTable, glue:UpdateTable, s3:GetObject on the source | crawler can read data + write catalog |
-| Data source (S3) | S3 bucket exists; crawler role can read it | crawling a non-existent path creates an empty table or fails silently | schema inference source |
-| Data source (DynamoDB) | DynamoDB table exists; role has dynamodb:Scan, dynamodb:DescribeTable | DynamoDB export to S3 is required first; crawler reads from the export in S3 | schema inference from DynamoDB export |
-| Data source (JDBC) | Database reachable from Glue; connection exists; role has glue:GetConnection | JDBC connection must be in the same VPC/subnet/security group as the database | schema inference from relational DB |
-| Classifiers | Classifier exists (custom) or built-in | ordering is CRITICAL — first match wins; built-in classifiers are always evaluated after custom ones | custom schema inference |
-| Catalog database | Glue database exists; crawler role has glue:CreateTable on it | if Lake Formation is enabled, crawler role needs LF permissions on the database | tables created in the correct database |
-| Lake Formation | LF permissions granted to crawler role; database is LF-enabled | without LF permissions, crawler FAILS to create or update tables | governed data lake tables |
-| Schedule (cron) | Crawler exists; EventBridge scheduler has permission to start crawler | schedule is in UTC; misconfigured cron runs at wrong times | automatic crawl cadence |
-| Schedule (event-driven) | S3 Event Notification configured; EventBridge/Lambda trigger exists | missing S3 Event Notification = no trigger fires | event-driven crawl on data arrival |
-| Schema merge policy | Crawler exists; ConfigurationOverrides set | "Crawler" behavior is the default; merge affects how multi-table schema conflicts resolve | schema conflict handling |
-| Incremental crawl | Crawler has run at least once (needs state) | first run is always full; subsequent runs use incremental state | faster cheaper crawls |
-
-**The classifier-ordering row is the one a baseline model misses.**
-Classifiers are evaluated in order — the first match wins. If a custom
-Grok classifier is listed AFTER a built-in CSV classifier, and the
-file matches both, the CSV result is used, overriding the Grok output.
-The procedure below forces an explicit classifier ordering decision.
-
-**Cross-dependency gotchas:**
-- The IAM role must be created BEFORE the crawler. The crawler
-  references the role ARN at creation time.
-- Lake Formation permissions must be granted to the crawler role BEFORE
-  the crawler runs. Without LF permissions, table creation fails.
-- DynamoDB crawling requires exporting the table to S3 first. The
-  crawler reads from the S3 export path, not directly from DynamoDB.
-- JDBC crawling requires a Glue Connection (network configuration).
-  The crawler uses the connection's VPC/subnet/SG settings.
-- Incremental crawl requires at least one successful full crawl to
-  establish state. The first run is always full.
+Full dependency table and cross-dependency gotchas moved to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand when sequencing provisioning.
 
 ## Expert heuristic: classifier order evaluation (first match wins)
 
-A baseline model says "just add classifiers." The correct heuristic
-recognizes that classifier ORDER determines the output schema.
-
-```text
-Crawler classifier evaluation order:
-  1. Custom classifiers (in the ORDER listed in the crawler config)
-  2. Built-in classifiers (CSV, JSON, ORC, Parquet, Avro, XML)
-
-  First match wins:
-  ├── File: app-2026-08-05.log (matches both Grok and CSV)
-  │     Custom Grok classifier listed FIRST → Grok schema used ✓
-  │     Custom Grok classifier listed SECOND → CSV schema used (built-in CSV runs first) ✗
-  └── File: events-2026-08-05.json (matches custom JSON + built-in JSON)
-        Custom JSON classifier listed FIRST → custom JSON schema used ✓
-        Custom JSON classifier listed SECOND → built-in JSON used ✗
-
-Rule: custom classifiers should ALWAYS be listed BEFORE relying on
-built-in classifiers. The Classifiers list is ordered — position 0
-is evaluated first.
-```
-
-**Key implication:** if your custom Grok pattern for log parsing is
-not matching, check if a built-in classifier is matching first.
-Reorder the classifiers list to put custom classifiers first.
+Evaluation-order diagram moved to [references/classifiers-and-partitioning.md](references/classifiers-and-partitioning.md) — load on demand when configuring classifiers.
 
 ## Expert heuristic: partition projection for cost reduction
 
-A baseline model says "let the crawler discover partitions." The
-correct heuristic uses partition projection for high-cardinality or
-well-structured partitioning schemes.
-
-```text
-Folder partitioning (default):
-  s3://bucket/year=2026/month=08/day=05/
-  → Crawler enumerates EACH partition value
-  → Creates partition objects in the Data Catalog
-  → Athena queries hit GetPartitions API for each partition
-  → Cost: crawler time + GetPartitions API calls
-  → Problem: 1000 partitions = 1000 catalog entries + slow queries
-
-Partition projection (configured, not enumerated):
-  Table property: projection.enabled=true
-  projection.year.range=2024,2026
-  projection.month.range=01,12
-  projection.day.range=01,31
-  projection.day.type=date
-  projection.day.format=yyyy-MM-dd
-  → NO partition objects created in catalog
-  → Athena COMPUTES partition values from the configured range
-  → Cost: zero partition enumeration, zero GetPartitions calls
-  → Works for: date ranges, enum values, integer ranges
-  → Does NOT work for: arbitrary partition values (e.g., user IDs)
-```
-
-**Key implication:** for date-based or range-based partitioning,
-partition projection eliminates crawler partition enumeration and
-Athena GetPartitions costs. Use folder partitioning only for arbitrary
-or unpredictable partition values.
+Folder-vs-projection comparison moved to [references/classifiers-and-partitioning.md](references/classifiers-and-partitioning.md) — load on demand when choosing a partitioning strategy.
 
 ## Expert heuristic: incremental crawl vs full crawl trade-off
 
-```text
-Full Crawl:
-  ├── Reads ALL files in the data source
-  ├── Re-creates table schema from scratch
-  ├── Slow for large datasets (hours for TB-scale data)
-  ├── Always detects schema changes in existing files
-  ├── Best for: small datasets, evolving schemas, first run
-  └── Cost: high (re-reads everything every time)
-
-Incremental Crawl:
-  ├── Reads only NEW or CHANGED files since last crawl
-  ├── Preserves existing table schema (does NOT detect schema changes in existing files)
-  ├── Fast for append-only workloads
-  ├── Requires: at least one full crawl first
-  ├── Best for: large append-only datasets (logs, events, streaming sinks)
-  └── Cost: low (only reads delta)
-
-Decision matrix:
-  ├── Data is append-only (new files added, old files unchanged) → Incremental
-  ├── Data schema evolves (existing files may change type) → Full
-  ├── Dataset < 10 GB → Full (fast enough, detects schema changes)
-  ├── Dataset > 1 TB → Incremental (full would take hours)
-  ├── First crawl → Full (always, establishes baseline)
-  └── Periodic schema validation needed → Schedule full crawl weekly/monthly
-```
-
-**Key implication:** incremental crawl is 10-100x faster than full for
-large append-only datasets, but it misses schema changes in existing
-files. Schedule periodic full crawls alongside incremental for schema
-validation.
+Full-vs-incremental decision tree moved to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand when choosing crawl scope.
 
 ## Prerequisites (verify before provisioning)
 
@@ -296,38 +178,7 @@ crawler at that path.
 The crawler needs an IAM role with trust policy (Glue service) and
 permissions policy (read data source, write to catalog).
 
-**Trust policy:**
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": { "Service": "glue.amazonaws.com" },
-    "Action": "sts:AssumeRole"
-  }]
-}
-```
-
-**Permissions policy (least-privilege for S3 crawler):**
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    { "Effect": "Allow", "Action": ["s3:GetObject", "s3:ListBucket"],
-      "Resource": ["arn:aws:s3:::my-data-lake", "arn:aws:s3:::my-data-lake/*"] },
-    { "Effect": "Allow",
-      "Action": ["glue:GetDatabase", "glue:CreateDatabase", "glue:GetTable",
-        "glue:CreateTable", "glue:UpdateTable", "glue:DeleteTable",
-        "glue:GetTables", "glue:GetPartition", "glue:CreatePartition",
-        "glue:UpdatePartition", "glue:GetPartitions", "glue:BatchCreatePartition"],
-      "Resource": ["arn:aws:glue:us-east-1:123456789012:catalog",
-        "arn:aws:glue:us-east-1:123456789012:database/my_database",
-        "arn:aws:glue:us-east-1:123456789012:table/my_database/*"] }
-  ]
-}
-```
+Trust and permissions policy JSON moved to [references/iam-and-lake-formation.md](references/iam-and-lake-formation.md) — load on demand when creating the crawler role.
 
 **Critical:** scope S3 permissions to the specific bucket/path. Do NOT
 use `Resource: "*"`. Scope Glue permissions to the specific database.
@@ -344,26 +195,7 @@ are evaluated in ORDER before built-in classifiers. First match wins.
 | CSV | Custom delimiters, headers | Delimiter, quote character, column headers |
 | XML | XML structure | XML path, row tag |
 
-**Create custom Grok classifier:**
-
-```bash
-aws glue create-grok-classifier \
-  --name "AppLogClassifier" \
-  --classification "app-logs" \
-  --grok-pattern "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{DATA:service} %{GREEDYDATA:message}" \
-  --custom-patterns "LOGLEVEL [DEBUG|INFO|WARN|ERROR|FATAL]"
-```
-
-**Create custom CSV classifier:**
-
-```bash
-aws glue create-csv-classifier \
-  --name "CustomCsvClassifier" \
-  --delimiter "," \
-  --quote-symbol "\"" \
-  --contains-header "PRESENT" \
-  --header "id,name,value,timestamp"
-```
+Classifier creation CLI moved to [references/classifiers-and-partitioning.md](references/classifiers-and-partitioning.md) — load on demand when creating custom classifiers.
 
 **Attach classifiers to crawler (ORDER matters):**
 
@@ -412,23 +244,7 @@ Options: `MergeNewColumns` (default), `UpdateNewColumns`, `UpdateAll`.
 | Folder partitioning | Crawler enumerates folder values as partitions | Arbitrary partition values |
 | Partition projection | Athena computes partitions from configured range | Date/range/enum partitions |
 
-**Partition projection (table properties set post-crawl or via template):**
-
-```json
-{
-  "Properties": {
-    "projection.enabled": "true",
-    "projection.year.type": "integer",
-    "projection.year.range": "2024,2026",
-    "projection.month.type": "integer",
-    "projection.month.range": "01,12",
-    "projection.day.type": "date",
-    "projection.day.format": "yyyy-MM-dd",
-    "projection.day.range": "2024-01-01,NOW",
-    "storage.location.template": "s3://my-data-lake/events/year=${year}/month=${month}/day=${day}"
-  }
-}
-```
+Partition projection table properties moved to [references/classifiers-and-partitioning.md](references/classifiers-and-partitioning.md) — load on demand when configuring projection.
 
 Partition projection eliminates the need for crawler-created partition
 entries. Athena computes the partition list from the configured range.
@@ -438,19 +254,7 @@ entries. Athena computes the partition list from the configured range.
 If the Glue Data Catalog database is Lake Formation-enabled, the
 crawler role needs LF permissions.
 
-**Grant LF permissions to crawler role:**
-
-```bash
-aws lakeformation grant-permissions \
-  --principal DataLakePrincipalIdentifier=arn:aws:iam::123456789012:role/GlueCrawlerRole \
-  --permissions CREATE_TABLE, ALTER, DROP \
-  --resource '{ "Database": { "Name": "my_database" } }'
-
-aws lakeformation grant-permissions \
-  --principal DataLakePrincipalIdentifier=arn:aws:iam::123456789012:role/GlueCrawlerRole \
-  --permissions ALL \
-  --resource '{ "Table": { "DatabaseName": "my_database", "Name": "*" } }'
-```
+Lake Formation grant commands moved to [references/iam-and-lake-formation.md](references/iam-and-lake-formation.md) — load on demand for LF-enabled databases.
 
 **Critical:** without LF permissions, the crawler fails with
 `AccessDeniedException` when trying to create or update tables in an
@@ -543,35 +347,7 @@ crawlers write to the same database). `TableThreshold` (default
 
 ## Step 12 — Recent features
 
-**Recent AWS Glue features (2023-2026):**
-
-- **Incremental crawl improvements (2023-2024):** Enhanced incremental
-  crawl with better file change detection using S3 event-time markers.
-  Reduced false negatives for schema changes.
-
-- **Partition projection native support (2023-2024):** Glue crawlers
-  can now automatically configure partition projection table
-  properties when the partition structure is date-range based.
-
-- **Lake Formation tag-based access integration (2023-2024):** Crawlers
-  can assign LF-tags to newly created tables, automating tag-based
-  access control for discovered data.
-
-- **DynamoDB export to S3 pipeline (2023-2024):** Streamlined DynamoDB
-  to S3 export with automatic Glue table creation. The crawler reads
-  the DynamoDB JSON export format directly.
-
-- **JDBC crawler performance (2024-2025):** Parallel JDBC crawling for
-  large databases with connection pooling, reducing crawl time by up
-  to 5x for databases with many tables.
-
-- **Schema change notifications (2024-2025):** EventBridge events fired
-  when a crawler detects schema changes, enabling downstream
-  pipelines to react automatically.
-
-- **Hudi, Iceberg, Delta Lake support (2024-2025):** Crawlers now
-  natively recognize open table formats (Apache Hudi, Apache Iceberg,
-  Delta Lake) and create catalog tables with the correct SerDe.
+Recent feature notes moved to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
 ## NEVER do these things
 
@@ -671,30 +447,14 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Crawler fails with AccessDeniedException
-- IAM role missing S3 permissions on the data source, or Lake
-  Formation permissions on the database. Verify the role has
-  `s3:GetObject`, `s3:ListBucket` on the bucket, and LF grants on the
-  database.
+Error deep dives moved to [references/error-handling.md](references/error-handling.md) — load on demand when a crawl fails or misbehaves.
 
-### Crawler creates wrong schema (all string columns)
-- No custom classifier matched. A built-in classifier guessed all
-  fields as string. Create a custom classifier for your data format
-  and list it BEFORE built-in classifiers.
+## References (load on demand)
 
-### Partitions not discovered
-- Folder structure does not match `key=value` format. The crawler
-  expects `year=2026/month=08/day=05/`. Verify the folder naming. Or
-  use partition projection if the range is predictable.
-
-### JDBC crawler cannot connect
-- Glue Connection has wrong VPC/subnet/SG. The connection must be in
-  the same network as the database. Test the connection:
-  `aws glue test-connection --connection-name <name>`.
-
-### Crawler runs but no tables created
-- TableThreshold too high, or the S3 path is empty. Check if data
-  files exist at the configured path. Lower TableThreshold if needed.
+- [references/classifiers-and-partitioning.md](references/classifiers-and-partitioning.md) — classifier ordering heuristics, partition projection patterns, classifier creation CLI, projection table properties.
+- [references/iam-and-lake-formation.md](references/iam-and-lake-formation.md) — crawler IAM trust and permissions policies, Lake Formation grant commands.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — configuration dependency graph, crawl trade-off deep dives, recent AWS Glue features.
+- [references/error-handling.md](references/error-handling.md) — crawler failure deep dives: AccessDenied, wrong schema, missing partitions, JDBC connect, no tables.
 
 ## Domain
 

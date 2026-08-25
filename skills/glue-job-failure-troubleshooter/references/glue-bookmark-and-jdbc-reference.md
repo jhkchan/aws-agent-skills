@@ -288,3 +288,75 @@ aws glue get-security-configuration --name <sec-config-name> --output json | \
 aws kms describe-key --key-id <key-id> --output json | \
   jq '.KeyMetadata.{KeyState, KeyManager, Enabled}'
 ```
+
+---
+
+## Step 6 probes — bookmark option checks
+
+```bash
+# Check the job run's bookmark option
+aws glue get-job-run --job-name <name> --run-id <run-id> --output json | \
+  jq '.JobRun.Arguments["--job-bookmark-option"]'
+
+# Check the job's default arguments
+aws glue get-job --job-name <name> --output json | \
+  jq '.Job.DefaultArguments["--job-bookmark-option"]'
+```
+
+## Step 6 fix — reset-job-bookmark
+
+```bash
+aws glue reset-job-bookmark --job-name <name> --output json
+```
+
+## Step 7: JDBC connection error — probes and branches
+
+Symptom: `Connection timed out`, `Connection refused`, or
+`org.postgresql.util.PSQLException` when connecting to RDS/Redshift.
+
+```bash
+# Get the Glue connection
+aws glue get-connection --name <connection-name> --output json | \
+  jq '.Connection.{ConnectionType, ConnectionProperties, PhysicalConnectionRequirements}'
+
+# Check the security group on the Glue connection
+SG=$(aws glue get-connection --name <connection-name> --output json | \
+  jq -r '.Connection.PhysicalConnectionRequirements.SecurityGroupIdList[]')
+aws ec2 describe-security-groups --group-ids "$SG" --output json | \
+  jq '.SecurityGroups[].IpPermissions'
+```
+
+#### 7a: Glue connection does not exist
+
+If `EntityNotFoundException`, the Glue connection was never created or
+was deleted. **ROOT_CAUSE_IDENTIFIED** with
+`LAYER: GLUE_JDBC_CONNECTION_ERROR`. Fix: create the connection with
+the JDBC URL, VPC, subnet, and security group.
+
+#### 7b: Security group inbound missing on the database
+
+The database's security group must allow inbound from the Glue
+connection's security group on the database port:
+
+```bash
+aws ec2 describe-security-groups \
+  --filters Name=group-id,Values=<db-sg-id> --output json | \
+  jq '.SecurityGroups[].IpPermissions[] | select(.FromPort==<db-port>)'
+```
+
+If no inbound rule matches the Glue connection's SG,
+**ROOT_CAUSE_IDENTIFIED** with `LAYER: GLUE_JDBC_CONNECTION_ERROR`.
+Fix: add an inbound rule to the database's SG allowing the Glue
+connection's SG on the database port.
+
+#### 7c: Route table missing
+
+The Glue connection's subnet must have a route to the database's
+subnet (same VPC, peered VPC, or TGW). Check the route table:
+
+```bash
+aws ec2 describe-route-tables \
+  --filters Name=association.subnet-id,Values=<glue-subnet-id> --output json | \
+  jq '.RouteTables[].Routes'
+```
+
