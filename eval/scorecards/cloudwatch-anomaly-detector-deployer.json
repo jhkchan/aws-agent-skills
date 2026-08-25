@@ -5,66 +5,66 @@
     {
       "id": "D1",
       "name": "Knowledge Delta",
-      "score": 17,
+      "score": 16,
       "max": 20,
-      "justification": "Provides several expert\u2011level heuristics not usually enumerated by a generic model (2\u2011week baseline rule, 15\u2011point minimum, detailed std\u2011dev multiplier guide, dependency graph, cross\u2011account resource\u2011policy JSON). However, the std\u2011dev multiplier table and basic detector command are common knowledge, so a small delta is missing."
+      "justification": "Provides concrete heuristics (>=15 data points, 2\u2011week baseline, std\u2011dev multiplier table, cross\u2011account policy JSON, dependency graph) that go beyond generic knowledge, but many statements simply restate AWS documentation (e.g., basic put\u2011metric\u2011anomaly\u2011detector syntax) so the delta is not maximal."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes an AWS\u2011specific workflow: verify metric existence, check historical data, create detector, wait for TRAINED, configure band\u2011breach alarm, SNS, cross\u2011account sharing, composite alarm. Missing a concise decision\u2011tree for when to choose cross\u2011account vs single\u2011account deployment."
+      "justification": "Offers an AWS\u2011specific step\u2011by\u2011step workflow (metric compatibility check, dependency ordering, cross\u2011account sharing policy, composite alarm creation). However, some procedures are generic checks like \"verify IAM permissions\" without detailing the exact policy statements required."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
       "score": 13,
       "max": 15,
-      "justification": "Contains a detailed NEVER list with concrete reasons (e.g., never create without 15 data points, never use eval\u2011period\u202f=\u202f1), but omits a common pitfall: the cost impact of leaving many anomaly detectors active and the need to prune unused detectors."
+      "justification": "Contains a solid NEVER list with concrete reasons and an error\u2011handling section, but it omits a few common pitfalls (e.g., forgetting to set ReturnData on metric\u2011math expressions, handling high\u2011resolution custom metrics) that would make the anti\u2011pattern coverage more complete."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 15,
       "max": 15,
-      "justification": "Frontmatter is complete, description clearly states WHAT, WHEN, and KEYWORDS. Activation triggers, strict output contract, and when\u2011to\u2011use section are all present and unambiguous."
+      "justification": "Frontmatter is complete, description, activation keywords, when_to_use, and strict output contract are all present and unambiguous, enabling reliable skill invocation."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Top\u2011level sections (quick navigation, mindset, checklist) are concise, but the long \"Expert heuristic\" blocks and full command listings are presented before the checklist, adding cognitive load. Could have deferred detailed CLI examples to a deeper reference layer."
+      "justification": "Uses quick\u2011navigation table, moves deep reference material to external files, and layers top\u2011level instructions before details. The main body still holds a large amount of information, which could be further off\u2011loaded."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
       "score": 14,
       "max": 15,
-      "justification": "Destructive actions (detector creation, alarm creation) are gated by prerequisite checks, matching fragility. The only shortfall is that std\u2011dev tuning is allowed without an explicit confirmation step, which could lead to accidental re\u2011training."
+      "justification": "Destructive actions (detector creation, alarm creation) are gated by prerequisite checks and NEVER rules, but the cross\u2011account flow assumes the sharing policy already exists and does not explicitly guard against a missing link, leaving a slight over\u2011freedom."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 8,
+      "score": 9,
       "max": 10,
-      "justification": "Follows a recognizable pattern (activation \u2192 mindset \u2192 step\u2011by\u2011step process \u2192 anti\u2011patterns \u2192 output format). However, the ordering of sections (e.g., mixing dependency graph with heuristics) feels slightly ad\u2011hoc, preventing a perfectly clean pattern."
+      "justification": "Follows a recognizable structure (mindset, dependency graph, prerequisites, step\u2011by\u2011step process, NEVER list, output format, references). Section ordering is slightly ad\u2011hoc, preventing a perfect score."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides working CLI examples, a checklist template, and error\u2011handling guidance, enabling an agent to execute the skill. Missing are explicit handling of API throttling, retries, and a pre\u2011flight check that the referenced SNS topic actually exists, which could cause runtime failures."
+      "justification": "Provides working CLI commands, checklist, and verification steps, but lacks guidance for region defaults, updating an existing detector, and handling the case where a detector already exists, which could cause execution errors."
     }
   ],
-  "total_score": 107,
+  "total_score": 108,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 51216,
-  "latency_ms": 9868,
+  "grade": "A",
+  "token_count": 68955,
+  "latency_ms": 14093,
   "assertions_passed": false,
-  "assertions_passed_count": 3,
-  "assertions_failed_count": 2
+  "assertions_passed_count": 4,
+  "assertions_failed_count": 1
 }

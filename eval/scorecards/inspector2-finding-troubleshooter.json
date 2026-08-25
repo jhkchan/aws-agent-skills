@@ -7,64 +7,64 @@
       "name": "Knowledge Delta",
       "score": 17,
       "max": 20,
-      "justification": "Adds expert-level guidance not commonly known: exact probe ordering (batch-get-finding-details as highest\u2011signal), staleness heuristics, recent 2024\u20112026 Inspector features (SBOM export, Lambda layer scanning), and nuanced CVE condition checks. Missing: no guidance for pagination of CLI results, no handling of IAM permission errors, and no explicit fallback when required services (e.g., SSM) are unavailable."
+      "justification": "The skill delivers a detailed, expert-level decision tree, specific AWS CLI probes, nuanced staleness and exploitability checks, and integrates SBOM, layer, and code scanning nuances that go beyond generic knowledge. However, it omits guidance on pagination of list commands, handling of findings with multiple CVEs or multi\u2011resource scopes, and cross\u2011account considerations, leaving a small knowledge gap."
     },
     {
       "id": "D2",
       "name": "Mindset + Appropriate Procedures",
       "score": 14,
       "max": 15,
-      "justification": "Encodes AWS\u2011specific reasoning: always start with batch\u2011get\u2011finding-details, use SSM inventory for EC2 packages, probe ECR image scans, verify Lambda layers, and respect staleness checks. Procedure is detailed and ordered, but it omits a fallback for missing SSM agent on an instance."
+      "justification": "Provides AWS\u2011specific mindset (symptom vs root\u2011cause) and a clear, ordered procedure (pre\u2011flight, type\u2011driven probes, remediation) that reflects senior CloudOps practice. The only shortfall is the lack of an explicit step to verify coverage before any type\u2011specific probe, which is a minor procedural omission."
     },
     {
       "id": "D3",
       "name": "Anti-Pattern Quality",
-      "score": 13,
+      "score": 14,
       "max": 15,
-      "justification": "Provides a concrete NEVER list of five common pitfalls with clear why\u2011statements (e.g., never emit ROOT_CAUSE_FOUND without a failing probe). Could be stronger by adding more domain\u2011specific anti\u2011patterns (e.g., never ignore IAM permission errors, never assume a single finding maps to a single resource)."
+      "justification": "A concrete NEVER list with five specific anti\u2011patterns and clear reasoning is provided (e.g., never emit ROOT_CAUSE_FOUND without a failing probe). The list is experience\u2011driven. It omits a few edge\u2011case warnings such as handling redacted code snippets or rate\u2011limit throttling, hence a small deduction."
     },
     {
       "id": "D4",
       "name": "Specification Compliance",
       "score": 14,
       "max": 15,
-      "justification": "Full frontmatter, detailed description, explicit when_to_use/when_not_to_use, and a strict output contract with required labels. Slight deduction because activation triggers rely on natural\u2011language description rather than a concise keyword list that an orchestrator could reliably match."
+      "justification": "Frontmatter is complete, description, when_to_use/when_not_to_use, keywords, and verdict shape are present. Missing an explicit activation trigger field (e.g., a dedicated \"trigger\" key) makes automated invocation slightly less reliable."
     },
     {
       "id": "D5",
       "name": "Progressive Disclosure",
       "score": 13,
       "max": 15,
-      "justification": "Information is layered (high\u2011level overview, mindset, philosophy, quick navigation, step\u2011by\u2011step tree, anti\u2011patterns, output format). However, the initial sections are dense, which can cause cognitive overload before the agent reaches the actionable steps."
+      "justification": "Uses references for deep content (commands, remediation) and layers information (high\u2011level overview \u2192 detailed steps). Nonetheless, the main skill body contains a large amount of detailed tables and step\u2011by\u2011step instructions that could cause cognitive overload; moving more of this into referenced files would improve progressive disclosure."
     },
     {
       "id": "D6",
       "name": "Freedom Calibration",
-      "score": 14,
+      "score": 15,
       "max": 15,
-      "justification": "Calibrates freedom well: destructive actions require CONFIRM prompts, pre\u2011flight safety checks, and explicit warnings about irreversible commands. Slight gap: batch\u2011delete\u2011image is mentioned without an explicit NEVER warning."
+      "justification": "Destructive actions are gated by explicit CONFIRM prompts and the skill emphasizes read\u2011only probes first. The calibration matches the fragility of the tasks perfectly."
     },
     {
       "id": "D7",
       "name": "Pattern Recognition",
-      "score": 9,
+      "score": 10,
       "max": 10,
-      "justification": "Follows a recognizable pattern (Mindset \u2192 Philosophy \u2192 Quick navigation \u2192 Process steps \u2192 Anti\u2011patterns \u2192 Output format). Structure is coherent, though not labeled as a known template."
+      "justification": "The skill follows a coherent, recognizable structure (What, Mindset, Philosophy, Navigation, Process, Output, Anti\u2011Patterns, Safety, References) that aligns with established CloudOps skill patterns."
     },
     {
       "id": "D8",
       "name": "Practical Usability",
       "score": 13,
       "max": 15,
-      "justification": "Provides a complete decision tree, concrete CLI commands, and worked examples that an agent can execute. Missing: explicit error\u2011handling branches, pagination guidance for list commands, and guidance for missing required permissions or region mismatches."
+      "justification": "Provides a functional decision tree, working examples, and clear remediation commands, enabling an agent to act. Lacks explicit error\u2011handling guidance for CLI failures, pagination handling, and detailed steps for ambiguous or multi\u2011type findings, which could cause execution gaps."
     }
   ],
-  "total_score": 107,
+  "total_score": 110,
   "max_score": 120,
-  "grade": "B",
-  "token_count": 46527,
-  "latency_ms": 25219,
+  "grade": "A",
+  "token_count": 61694,
+  "latency_ms": 19038,
   "assertions_passed": false,
-  "assertions_passed_count": 3,
-  "assertions_failed_count": 2
+  "assertions_passed_count": 2,
+  "assertions_failed_count": 3
 }
