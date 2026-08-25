@@ -139,3 +139,35 @@ the endpoint.
 This prevents the endpoint from being used to exfiltrate data to other
 S3 buckets. Without this policy, any S3 API call (including `s3:PutObject`
 to an attacker's bucket) routes through the endpoint.
+---
+
+## Interface endpoint service table (Step 9)
+
+| Service | Endpoint | Why |
+|---|---|---|
+| Secrets Manager | `com.amazonaws.<region>.secretsmanager` | Avoid NAT for secret retrieval |
+| SSM | `com.amazonaws.<region>.ssm` | Session Manager, Parameter Store |
+| KMS | `com.amazonaws.<region>.kms` | KMS API calls without NAT |
+| CloudWatch Logs | `com.amazonaws.<region>.logs` | Log delivery without NAT |
+| STS | `com.amazonaws.<region>.sts` | AssumeRole without NAT |
+| ECR | `com.amazonaws.<region>.ecr.api` + `ecr.dkr` | Container image pulls without NAT |
+
+## Interface endpoint deployment and private DNS (Step 9)
+
+**Interface Endpoint deployment:**
+```
+aws ec2 create-vpc-endpoint \
+  --vpc-id vpc-xxx \
+  --vpc-endpoint-type Interface \
+  --service-name com.amazonaws.us-east-1.secretsmanager \
+  --subnet-ids subnet-private-a subnet-private-b subnet-private-c \
+  --security-group-ids sg-endpoint-xxx \
+  --private-dns-enabled
+```
+
+**Private DNS:** `--private-dns-enabled` rewrites the service's public DNS
+name (e.g., `secretsmanager.us-east-1.amazonaws.com`) to the endpoint's
+private IP within the VPC. Without it, applications must use the
+endpoint-specific DNS name — most SDKs default to the public name and
+would route through NAT. Always enable private DNS for Interface Endpoints
+unless you have a specific reason not to.

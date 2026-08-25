@@ -210,3 +210,23 @@ aws wafv2 get-logging-configuration \
 A `CLOUDFRONT` scope ACL created in any region other than `us-east-1` is
 invalid. A `REGIONAL` scope ACL cannot protect a CloudFront distribution —
 CloudFront requires a `CLOUDFRONT` scope ACL.
+
+## Managed rule group coverage matrix (moved from SKILL.md Step 4)
+
+**Managed rule group coverage matrix:**
+
+| Category | Group Name | What it blocks | Required? |
+|---|---|---|---|
+| Baseline | `AWSManagedRulesCommonRuleSet` | OWASP Top 10 (SQLi, XSS, RFI, LFI, traversal, protocol anomalies, generic RCE) | **MUST HAVE** |
+| Input validation | `AWSManagedRulesKnownBadInputsRuleSet` | Log4j, SSRF, bad-IP patterns, page-preview exploits | **STRONGLY RECOMMENDED** |
+| Input validation | `AWSManagedRulesSQLiRuleSet` | Dedicated SQLi patterns (complements CommonRuleSet) | Recommended for form/API endpoints |
+| OS hardening | `AWSManagedRulesLinuxRuleSet` | Linux-specific shell injection | If backend is Linux |
+| OS hardening | `AWSManagedRulesUnixRuleSet` | POSIX shell patterns | If backend is Unix |
+| OS hardening | `AWSManagedRulesWindowsRuleSet` | PowerShell, cmd.exe injection | If backend is Windows |
+| Reputation | `AWSManagedRulesAmazonIpReputationList` | Known malicious IPs (botnets, scanners) | Recommended |
+| Reputation | `AWSManagedRulesAnonymousIpList` | Tor, proxies, VPNs, hosting providers | Optional (false-positive prone) |
+| App framework | `AWSManagedRulesWordPressRuleSet` | WordPress exploits | If running WordPress |
+| App framework | `AWSManagedRulesPHPRuleSet` | PHP-specific exploits | If running PHP |
+| Bot / fraud | `AWSBotControlRuleSet` | Bot classification (good/bad/unknown) | Paid add-on; optional |
+| Bot / fraud | `AWSManagedRulesATPRuleSet` | Account takeover (credential stuffing, brute force) | Paid; recommended for login endpoints |
+| Bot / fraud | `AWSManagedRulesACFRuleSet` | Account creation fraud | Paid; for signup flows |

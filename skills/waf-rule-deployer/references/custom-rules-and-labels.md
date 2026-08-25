@@ -527,3 +527,22 @@ resource "aws_wafv2_web_acl" "production" {
 6. **CAPTCHA on general traffic.** CAPTCHA disrupts UX. Use Challenge
    (silent) for general traffic; reserve CAPTCHA for specific
    endpoints (login, registration).
+
+## Step 7 - create IP set and regex pattern set (moved from SKILL.md)
+
+```bash
+# Create an IP set
+IP_SET_ARN=$(aws wafv2 create-ip-set \
+  --scope CLOUDFRONT --region us-east-1 \
+  --name "partner-cidrs" \
+  --addresses "203.0.113.0/24" "198.51.100.10/32" \
+  --ip-address-version IPV4 \
+  --query 'Summary.IPSetARN' --output text)
+
+# Create a regex pattern set
+REGEX_SET_ARN=$(aws wafv2 create-regex-pattern-set \
+  --scope CLOUDFRONT --region us-east-1 \
+  --name "sqli-patterns" \
+  --regular-expression-list "(?i)(union.*select)" "(?i)(drop.*table)" \
+  --query 'Summary.RegexPatternSetARN' --output text)
+```

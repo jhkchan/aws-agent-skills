@@ -47,31 +47,7 @@ peering. One TGW per region (typical), attachments plug VPCs and
 remote networks in, and route tables (with association and
 propagation) express the routing policy.
 
-Three facts make TGW provisioning different from "a big VPC peering
-mesh":
-
-- **Route tables in TGW use BOTH association AND propagation — they
-  are not the same.** Association = which route table an attachment
-  LOOKS UP its routes in (one default + extras). Propagation = which
-  route tables an attachment INJECTS its routes INTO (many). An
-  attachment can be associated with one route table and propagate to
-  many. Misunderstanding this is the #1 cause of "I can't route
-  between VPCs" outages.
-
-- **Cross-account attachments require TWO-SIDED consent.** The TGW
-  owner account shares the TGW via RAM; the consumer account creates
-  the VPC attachment. With `AutoAcceptSharedAttachments=false`
-  (recommended for production), the TGW owner must also `accept` the
-  attachment after the consumer creates it. Skipping the accept step
-  leaves the attachment in `pendingAcceptance` forever.
-
-- **Connect attachments carry the BGP/EIGRP control plane of your
-  SD-WAN.** A TGW Connect attachment rides on top of a VPC or Direct
-  Connect gateway attachment and establishes GRE tunnels to a
-  Connect peer (your SD-WAN controller or branch appliance). Routes
-  the peer advertises via BGP land in the TGW route table as
-  propagated routes. Connect is NOT a VPN replacement — it assumes
-  the underlying transport is already encrypted.
+The three Mindset deep-dive facts moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Quick navigation
 
@@ -118,15 +94,7 @@ mesh":
 | RAM share | Principal accepted in consumer account before attachment creation | Step 8 |
 | Cloud WAN | Core network attached to TGW via `create-attachment` | Step 9 |
 
-**Transit Gateway limits (2026):**
-
-- TGWs per region per account: 5 (soft limit; raise via support).
-- VPC attachments per TGW: 50 (soft; raise to 500). Route tables per TGW: 50 (raise to 100).
-- Routes per route table: 10000. Peering attachments per TGW: 50.
-- Connect attachments per TGW: 20. Connect peers per Connect attachment: 4 (hard).
-- Multicast domains per TGW: 20. Multicast group members per domain: 1000.
-- Supported ASNs: 64512-65535 (private 2-byte), 4200000000-4294967294 (private 4-byte).
-- Throughput: up to 50 Gbps per attachment (burst 100 Gbps); 500 Gbps aggregate; inter-region peering up to 50 Gbps.
+Transit Gateway limits (2026) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Pre-flight: deployment specification gate (run before architecture output)
 
@@ -136,21 +104,7 @@ spec produces a non-functional or insecure TGW topology.
 
 **Live-account pre-flight checks (skip if doing offline architecture plan):**
 
-1. Verify IAM permissions: `ec2:CreateTransitGateway*`, `AssociateTransitGatewayRouteTable`,
-   `EnableTransitGatewayRouteTablePropagation`, `ec2:ModifyTransitGateway`,
-   plus `ram:CreateResourceShare` for cross-account.
-2. Verify each VPC subnet is `available` and AZ scope is consistent:
-   `aws ec2 describe-subnets --subnet-ids <list>` returns `State=available`.
-3. Verify no conflicting TGW ASN: each TGW in a peering pair must have
-   a unique ASN. `aws ec2 describe-transit-gateways` returns ASNs.
-4. For RAM shares: verify `aws ram get-resource-shares` shows the
-   share `ACTIVE` and accepted by the consumer account.
-5. For peering: verify the peer-region TGW exists in the peer account
-   via `describe-transit-gateways --region <peer-region>`.
-6. For Connect: verify the underlying VPC or Direct Connect gateway
-   attachment is `available` in the same TGW.
-7. For multicast: verify TGW `Options.MulticastSupport=enable`
-   (cannot be added after creation).
+The 7 live-account pre-flight checks moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 | Attribute | Value | Effect on plan |
 |---|---|---|
@@ -181,60 +135,11 @@ REQUIRED:
 
 ### Step 0: Expert knowledge — non-obvious TGW behaviors that change the plan
 
-- **Association and propagation are DIFFERENT operations.** An
-  attachment is **associated** with one route table (for its own
-  lookups) and **propagates** to zero or many route tables (injecting
-  its routes). Forgetting to set the propagation leaves the
-  attachment's routes invisible to other attachments' route tables,
-  even though the VPC is attached.
-
-- **Default route table association and propagation are set at TGW
-  creation time.** If both `true`, new attachments auto-associate
-  and auto-propagate to the default route table. If either `false`,
-  manage explicitly. For multi-tier segmentation, set both to
-  `false`.
-
-- **Cross-account attachments require the consumer account to create
-  the VPC attachment, not the TGW owner.** The owner shares the TGW
-  via RAM; the consumer calls `create-transit-gateway-vpc-attachment`
-  with the shared TGW ID. With `AutoAcceptSharedAttachments=false`,
-  the owner then calls `accept-transit-gateway-vpc-attachment`.
-  Missing either side leaves the attachment in `pendingAcceptance`.
-
-- **VPC attachment subnets must be one-per-AZ, and the AZ set should
-  be consistent across attachments.** Each attachment uses one
-  subnet per AZ (TGW places an ENI in each). If attachment A uses
-  us-east-1a/b/c and B uses us-east-1a/b/d, traffic between c and d
-  crosses AZs via the TGW, incurring cross-AZ charges.
-
-- **Peering attachments do NOT auto-accept.** The peer TGW's owner
-  must call `accept-transit-gateway-peering-attachment` in the peer
-  region. The peering stays in `pendingAcceptance` until accepted.
-  Intra-region peering between TGWs in the same account auto-accepts.
-
-- **Connect attachments ride on top of an existing transport
-  attachment.** A Connect attachment requires a backing VPC or
-  Direct Connect gateway attachment. The Connect peer (your SD-WAN
-  appliance) terminates the GRE tunnel and establishes BGP. Connect
-  does NOT encrypt — assumes underlying transport already does.
-
-- **Multicast cannot be enabled after TGW creation.** Set
-  `Options.MulticastSupport=enable` at `create-transit-gateway`
-  time. Disabling later is destructive (requires TGW recreation).
-
-- **Route table propagation is one-way.** If A propagates to B, B
-  sees A's routes. B does NOT automatically propagate back to A —
-  set B's propagation explicitly. Most common cause of asymmetric
-  routing in TGW topologies.
+All 8 non-obvious TGW behaviors moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 1: TGW creation — ASN, DNS, multicast, defaults
 
-```bash
-aws ec2 create-transit-gateway \
-  --description "prod-tgw-us-east-1" \
-  --options AmazonSideAsn=64512,AutoAcceptSharedAttachments=disable,DefaultRouteTableAssociation=enable,DefaultRouteTablePropagation=enable,VpnEcmpSupport=enable,DnsSupport=enable,MulticastSupport=disable \
-  --tag-specifications "ResourceType=transit-gateway,Tags=[{Key=Name,Value=prod-tgw-us-east-1}]"
-```
+create-transit-gateway CLI moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 | Option | Recommended | Effect |
 |---|---|---|
@@ -248,14 +153,7 @@ aws ec2 create-transit-gateway \
 
 ### Step 2: VPC attachments — subnets, AZ scope, appliance mode
 
-```bash
-aws ec2 create-transit-gateway-vpc-attachment \
-  --transit-gateway-id tgw-0abc123 \
-  --vpc-id vpc-0abc123 \
-  --subnet-ids subnet-0a1 subnet-0b1 subnet-0c1 \
-  --options ApplianceModeSupport=disable,DnsSupport=enable,Ipv6Support=disable \
-  --tag-specifications "ResourceType=transit-gateway-attachment,Tags=[{Key=Name,Value=prod-vpc-app1-tgw}]"
-```
+create-transit-gateway-vpc-attachment CLI moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 | Subnet selection rule | Effect |
 |---|---|
@@ -264,30 +162,11 @@ aws ec2 create-transit-gateway-vpc-attachment \
 | Minimum /28 subnet | TGW ENI needs 6+ IPs per subnet. |
 | Appliance mode `enable` for NVAs | Hairpins traffic through a firewall/NVA in a VPC attachment. Required for centralized inspection. |
 
-**Appliance mode deep-dive:** when enabled, the TGW preserves the
-source AZ for return traffic, allowing the NVA to handle asymmetric
-flows. Without appliance mode, return packets may exit a different
-AZ's ENI, breaking stateful firewalls.
+Appliance-mode deep-dive moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 3: Route tables — associations and propagations
 
-```bash
-# Create a non-default route table for "prod" segmentation tier
-aws ec2 create-transit-gateway-route-table --transit-gateway-id tgw-0abc123 \
-  --tag-specifications "ResourceType=transit-gateway-route-table,Tags=[{Key=Name,Value=prod-rtb}]"
-
-# Associate a VPC attachment with a route table (one association per attachment)
-aws ec2 associate-transit-gateway-route-table --transit-gateway-route-table-id tgw-rtb-0prod \
-  --transit-gateway-attachment-id tgw-attach-0app1
-
-# Propagate an attachment's routes INTO a route table (many propagations allowed)
-aws ec2 enable-transit-gateway-route-table-propagation --transit-gateway-route-table-id tgw-rtb-0prod \
-  --transit-gateway-attachment-id tgw-attach-0app1
-
-# Add a static route (e.g., default route to a firewall NVA attachment)
-aws ec2 create-transit-gateway-route --transit-gateway-route-table-id tgw-rtb-0prod \
-  --destination-cidr-block 0.0.0.0/0 --transit-gateway-attachment-id tgw-attach-0firewall --blackhole false
-```
+Route table create/associate/propagate/static-route CLIs moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 | Operation | CLI | Effect |
 |---|---|---|
@@ -303,15 +182,7 @@ both operations explicitly for multi-table topologies.
 
 ### Step 4: Peering connections — inter-region and intra-region
 
-```bash
-# Request peering (in source TGW owner account, source region)
-aws ec2 create-transit-gateway-peering-attachment --transit-gateway-id tgw-0source \
-  --peer-transit-gateway-id tgw-0peer --peer-region eu-west-1 --peer-account-id 111111111111 \
-  --tag-specifications "ResourceType=transit-gateway-peering-attachment,Tags=[{Key=Name,Value=us-east-1-to-eu-west-1}]"
-
-# Accept peering (in peer TGW owner account, peer region)
-aws ec2 accept-transit-gateway-peering-attachment --transit-gateway-peering-attachment-id tgw-attach-0peer --region eu-west-1
-```
+Peering request/accept CLIs moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 | Peering type | Acceptance model | Bandwidth |
 |---|---|---|
@@ -326,16 +197,7 @@ most common cause of asymmetric routing in inter-region topologies.
 
 ### Step 5: Connect attachments — GRE tunnels for SD-WAN
 
-```bash
-# 1. Create the Connect attachment (requires existing transport attachment)
-aws ec2 create-transit-gateway-connect --transport-transit-gateway-attachment-id tgw-attach-0transport \
-  --options Protocol=gre --tag-specifications "ResourceType=transit-gateway-connect,Tags=[{Key=Name,Value=sdwan-connect}]"
-
-# 2. Create the Connect peer (your SD-WAN appliance endpoint)
-aws ec2 create-transit-gateway-connect-peer --transit-gateway-attachment-id tgw-attach-0connect \
-  --peer-address 10.0.1.10 --bgp-options PeerAsn=65000 --inside-cidr-cidrs 169.254.0.0/29 \
-  --tag-specifications "ResourceType=transit-gateway-connect-peer,Tags=[{Key=Name,Value=sdwan-peer-1}]"
-```
+Connect attachment + Connect peer CLIs moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 | Field | Range | Notes |
 |---|---|---|
@@ -357,19 +219,7 @@ attachment as the transport for the Connect attachment.
 
 ### Step 6: Multicast domains — optional multicast routing
 
-```bash
-# TGW must be created with MulticastSupport=enable
-aws ec2 create-transit-gateway-multicast-domain \
-  --transit-gateway-id tgw-0abc123 \
-  --options Igmpv2Support=enable,StaticSourcesSupport=enable \
-  --tag-specifications "ResourceType=transit-gateway-multicast-domain,Tags=[{Key=Name,Value=video-multicast}]"
-
-# Add group members (VPC attachments)
-aws ec2 associate-transit-gateway-multicast-domain \
-  --transit-gateway-multicast-domain-id tgw-mc-0abc \
-  --transit-gateway-attachment-id tgw-attach-0app1 \
-  --subnet-ids subnet-0a1
-```
+Multicast domain CLIs moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 Multicast domains enable one-to-many streaming within a TGW (video
 broadcast, financial market data, gaming backplanes). All members
@@ -378,17 +228,7 @@ optional.
 
 ### Step 7: TGW Network Manager — global topology visualization
 
-```bash
-# 1. Create a global network
-aws networkmanager create-global-network \
-  --description "corp-global-network" \
-  --tags Key=Name,Value=corp-global-network
-
-# 2. Register the TGW with the global network
-aws networkmanager register-transit-gateway \
-  --global-network-id global-network-0abc \
-  --transit-gateway-arn arn:aws:ec2:us-east-1:111111111111:transit-gateway/tgw-0abc123
-```
+Network Manager global-network CLIs moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 Network Manager visualizes the global topology across all registered
 TGWs (and their attachments, peers, and Connect peers) in a single
@@ -398,20 +238,7 @@ Cross-account TGWs require the consumer account to register as well
 
 ### Step 8: Cross-account sharing via AWS RAM
 
-```bash
-# Owner: share the TGW with consumer account 222222222222
-aws ram create-resource-share --name prod-tgw-share \
-  --resource-arns arn:aws:ec2:us-east-1:111111111111:transit-gateway/tgw-0abc123 \
-  --principals 222222222222
-
-# Consumer: accept the share, then create the VPC attachment
-aws ram accept-resource-share-invitation --resource-share-invitation-arn <invitation-arn>
-aws ec2 create-transit-gateway-vpc-attachment --transit-gateway-id tgw-0abc123 \
-  --vpc-id vpc-0consumer-vpc --subnet-ids subnet-0c1 subnet-0c2 subnet-0c3
-
-# Owner: accept the consumer's attachment (when AutoAcceptSharedAttachments=disable)
-aws ec2 accept-transit-gateway-vpc-attachment --transit-gateway-vpc-attachment-id tgw-attach-0consumer
-```
+RAM share + cross-account attachment CLIs moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 | Step | Account | Action |
 |---|---|---|
@@ -422,16 +249,7 @@ aws ec2 accept-transit-gateway-vpc-attachment --transit-gateway-vpc-attachment-i
 
 ### Step 9: AWS Cloud WAN integration (2024+)
 
-```bash
-# 1. Create a global network + core network in one step (Cloud WAN)
-aws networkmanager create-core-network --global-network-id global-network-0abc \
-  --description "corp-core-network" --tags Key=Name,Value=corp-core-network
-
-# 2. Attach an existing TGW to the core network
-aws networkmanager create-attachment --core-network-id core-network-0abc \
-  --attachment-type TRANSIT_GATEWAY --edge-location us-east-1 \
-  --resource-arn arn:aws:ec2:us-east-1:111111111111:transit-gateway/tgw-0abc123
-```
+Cloud WAN core-network + attachment CLIs moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 Cloud WAN provides a policy-driven global network abstraction on top
 of TGWs. The core network policy defines segments (e.g., prod,
@@ -444,35 +262,7 @@ ones.
 
 ## Common patterns
 
-- **Single-region hub-and-spoke.** One TGW; three VPC attachments
-  (shared, app1, app2). Single default route table with
-  auto-association and auto-propagation. All VPCs route to each
-  other. Use for simple topologies (under 5 VPCs, no segmentation).
-
-- **Segmented multi-tier (prod/non-prod/shared).** Three route
-  tables: `prod-rtb`, `nonprod-rtb`, `shared-rtb`. Each attachment
-  associated with its tier's route table. Shared propagates to both
-  prod and non-prod; prod and non-prod do NOT propagate to each
-  other (isolation). Default route table is the "reject-all" sink.
-
-- **Inter-region peering for DR.** TGW in us-east-1 peers with TGW
-  in us-west-2. VPC routes propagate to both TGWs. Single AWS
-  backbone transit path. Use for active-passive DR topologies.
-
-- **Centralized egress via NVA (appliance mode).** All VPCs route
-  0.0.0.0/0 to a firewall VPC attachment with appliance mode
-  enabled. The firewall inspects and forwards to NAT Gateway or
-  Direct Connect.
-
-- **SD-WAN Connect for hybrid.** A Connect attachment rides on a
-  VPC attachment; Connect peer is a Cisco/Fortinet/Velocloud SD-WAN
-  controller. BGP routes for on-prem branches land in the TGW route
-  table as propagated routes.
-
-- **Cloud WAN migration.** Existing multi-region TGW topology
-  attached to a Cloud WAN core network. Policy defines three
-  segments (prod, non-prod, shared). Cloud WAN creates managed route
-  tables; cutover by re-associating attachments.
+All six common topology patterns moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 ## Output format — MANDATORY literal labels
 
@@ -702,35 +492,7 @@ directions.
 
 ## Recent AWS features (2024-2026)
 
-- **AWS Cloud WAN (2022-2024):** global network abstraction on top
-  of TGWs. Policy-driven segmentation, route table management, and
-  cross-region policy application. Existing TGWs attach non-disruptively.
-
-- **TGW multicast domains (2023-2024):** IGMPv2 support, static
-  sources, cross-VPC multicast group membership. Must be enabled at
-  TGW creation. Use for video broadcast, financial market data,
-  gaming backplanes.
-
-- **TGW Connect with BGP (2023-2025):** Connect peers exchange BGP
-  routes with the TGW, injecting on-prem SD-WAN routes as propagated
-  routes. BGP MD5 authentication (2024). GRE-only protocol (no
-  IPsec) — assumes underlying transport encrypts.
-
-- **Inter-region peering enhancements (2024):** up to 50 Gbps per
-  peering connection, lower latency via AWS backbone, Flow Logs
-  support for peering traffic.
-
-- **TGW Flow Logs (2023-2024):** VPC Flow Logs format captures TGW
-  traffic including peering and Connect attachment traffic. Send to
-  CloudWatch Logs, S3, or Kinesis.
-
-- **Network Manager topology (2024-2025):** real-time topology view
-  of all registered TGWs, attachments, peers, and Connect peers.
-  Includes on-prem device registration for hybrid views.
-
-- **Appliance mode IPv6 (2024):** preserved AZ semantics extended to
-  IPv6 traffic; improved handling of stateful firewall asymmetric
-  flows.
+The 2024-2026 feature timeline moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## AWS documentation
 
@@ -742,3 +504,12 @@ directions.
 - **TGW multicast domains** — https://docs.aws.amazon.com/vpc/latest/tgw/tgw-multicast-overview.html
 - **AWS Cloud WAN User Guide** — https://docs.aws.amazon.com/networkmanager/latest/cloudwan/what-is-cloudwan.html
 - **TGW API Reference** — https://docs.aws.amazon.com/AWSEC2/latest/APIReference/Amazon_EC2_Transit_Gateways.html
+
+
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) — per-step CLI sequences (Steps 1-9) and the six common topology patterns
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Mindset deep-dive facts, Step 0 non-obvious TGW behaviors, 2026 TGW limits, appliance-mode deep-dive, 2024-2026 feature timeline
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — 7 live-account pre-flight checks
+- [references/cross-account-and-connect-guide.md](references/cross-account-and-connect-guide.md) — cross-account and Connect detail
+- [references/route-tables-and-routing.md](references/route-tables-and-routing.md) — route table and routing detail

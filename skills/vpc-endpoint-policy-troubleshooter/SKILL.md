@@ -92,204 +92,28 @@ IAM but fail the endpoint policy.
 
 Three misconceptions dominate VPC endpoint troubleshooting failures:
 
-- **"The endpoint policy is the same as IAM."** It is NOT. The endpoint
-  policy is an ADDITIONAL IAM layer attached to the endpoint itself.
-  Evaluation order is: IAM policy (caller identity) THEN endpoint policy
-  (attached to the VPC endpoint). A request can pass the caller's IAM
-  policy but be denied by the endpoint policy. The default endpoint
-  policy allows full access; a custom policy can restrict it. Missing
-  this dual-layer evaluation is the #1 cause of "access denied" mysteries
-  on endpoints.
-
-- **"The security group on the interface endpoint does not matter."** It
-  DOES. An interface endpoint creates ENIs in the specified subnets with
-  attached security groups. The client sends traffic to the ENI's private
-  IP. If the endpoint's security group does not allow inbound on the
-  service port (e.g., 443 for most PrivateLink services) from the client
-  subnet, the connection times out. This is the #1 cause of "endpoint
-  connection timeout" tickets.
-
-- **"Gateway endpoints work automatically once created."** They do NOT.
-  A Gateway endpoint (S3/DynamoDB) must be explicitly added to the route
-  table(s) for the affected subnets. Without the route table entry,
-  traffic to S3/DynamoDB goes via the NAT Gateway (incurring cost) or
-  fails entirely. The route table entry is added automatically only for
-  the VPC's main route table; custom route tables need manual addition.
+The three misconception deep-dives (endpoint policy vs IAM, the endpoint's own SG, Gateway endpoint route-table entries) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when the operator asserts one of them.
 
 ## Configuration dependency graph (novel heuristic)
 
-VPC endpoint configurations are layered. Security group, endpoint
-policy, DNS, route table, and endpoint service health are evaluated in
-sequence. Use this graph to isolate the failing layer.
-
-| Layer | Hard failure (connection drops) | Silent failure / misconfig | Diagnostic signal |
-|---|---|---|---|
-| Security group (interface endpoint ENI) | Connection timeout (SYN dropped) | SG allows wrong port or source | Connection hangs, no response |
-| Endpoint policy (custom) | Access denied (403) | Policy allows principals but not actions, or vice versa | HTTP 403 from endpoint |
-| DNS resolution (interface endpoint) | DNS name does not resolve | Private DNS not enabled, PHZ not associated | NXDOMAIN or wrong IP |
-| Route table (Gateway endpoint) | Traffic goes via NAT (cost) | Gateway endpoint not in route table | S3 traffic not using endpoint prefix |
-| Cross-account (resource policy) | Access denied across accounts | Endpoint service resource policy missing consumer account | 403 from endpoint service |
-| Endpoint service (NLB) health | Connection refused or timeout | NLB target unhealthy, listener misconfigured | Intermittent failures, health check failures |
-| Endpoint policy JSON syntax | Endpoint creation or update fails | Trailing comma, missing bracket, invalid principal | API error on modify |
-
-**The security group row is the one a baseline model misses.** The
-endpoint's own SG must allow inbound traffic from the client subnet.
-This is the #1 cause of interface endpoint connection timeouts. The
-endpoint policy row is the #2 most missed — the policy is a separate
-IAM layer from the caller's IAM permissions.
-
-**Cross-dependency gotchas:**
-- The endpoint policy is evaluated AFTER the IAM policy. Passing IAM is
-  necessary but not sufficient — the endpoint policy must also allow the
-  action.
-- Interface endpoint DNS resolution requires private DNS to be enabled
-  (for AWS services) or a private hosted zone to be associated (for non-
-  AWS services). Without this, the endpoint DNS name resolves to the
-  wrong IP or does not resolve at all.
-- Gateway endpoints do NOT use security groups or DNS. They route via
-  the route table. An S3 Gateway endpoint without a route table entry
-  sends traffic via the NAT Gateway instead.
-- Cross-account PrivateLink requires BOTH the consumer's IAM/endpoint
-  policy AND the service provider's endpoint service resource policy to
-  allow access. Either side can block access.
-- The endpoint service (NLB-backed) health check determines whether the
-  NLB forwards traffic. Unhealthy targets cause connection failures that
-  look like endpoint policy issues.
+The dependency graph table (hard vs silent failure per layer, diagnostic signals) plus cross-dependency gotchas moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand to map a failure signal to its layer.
 
 ## Expert heuristic: the three-layer evaluation model
 
-A baseline model checks "is the endpoint created?" The correct heuristic
-recognizes that an endpoint connection passes through three independent
-evaluation layers, each of which can block traffic independently.
-
-```text
-Client (10.0.1.5) → DNS resolve endpoint name → ENI IP (10.0.1.10)
-
-Layer 1 - Security Group (ENI):
-  Does the endpoint's SG allow inbound from client subnet on service port?
-  ├── YES → traffic reaches endpoint ENI
-  └── NO  → connection TIMEOUT (SYN dropped silently)
-
-Layer 2 - Endpoint Policy:
-  Does the endpoint policy allow this action/principal?
-  ├── YES → request forwarded to service
-  └── NO  → HTTP 403 ACCESS DENIED
-
-Layer 3 - DNS Resolution:
-  Does the endpoint DNS name resolve to the ENI's private IP?
-  ├── YES → client connects to the right IP
-  └── NO  → NXDOMAIN or resolves to public IP (bypasses endpoint)
-
-For Gateway endpoints (S3/DynamoDB), the model differs:
-  Layer 1 - Route Table:
-    Is the Gateway endpoint in the subnet's route table?
-    ├── YES → S3/DynamoDB traffic uses the endpoint
-    └── NO  → traffic goes via NAT Gateway (cost, latency)
-  (No SG, no DNS, no endpoint policy for Gateway endpoints)
-```
-
-**Key implication:** the #1 cause of "endpoint connection timeout" is a
-missing security group rule on the endpoint ENI. The #1 cause of
-"endpoint access denied" is a restrictive endpoint policy. These are
-different layers with different symptoms — the diagnosis must test each
-layer independently.
+The three-layer evaluation tree (SG on the ENI, endpoint policy, DNS — plus the Gateway endpoint route-table variant) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for the per-layer YES/NO walkthrough.
 
 ## Expert heuristic: interface vs Gateway endpoint differences
 
-Interface endpoints (PrivateLink) and Gateway endpoints (S3/DynamoDB)
-have fundamentally different architectures. Confusing them leads to
-wrong diagnoses.
-
-| Feature | Interface endpoint | Gateway endpoint |
-|---|---|---|
-| Service type | PrivateLink (any supported service) | S3, DynamoDB only |
-| Connectivity | ENI in your VPC (private IP) | Route table entry (prefix list) |
-| Security group | Required (on the ENI) | Not applicable |
-| DNS | Private DNS or PHZ required | Not applicable (uses route table) |
-| Endpoint policy | Supported (custom JSON) | Supported (custom JSON) |
-| Cost | Per-endpoint hourly + per-GB data | Free (no hourly, no per-GB) |
-| Cross-VPC | Supported (peering, TGW) | Not supported (single VPC) |
-| Health check | NLB target health (for endpoint services) | N/A |
-
-```text
-Diagnosis decision tree:
-  Is the endpoint for S3 or DynamoDB?
-  ├── YES → Gateway endpoint
-  │     Check: route table entry? prefix list? endpoint policy?
-  │     SKIP: security group, DNS, ENI
-  └── NO  → Interface endpoint (PrivateLink)
-        Check: security group on ENI? private DNS? endpoint policy?
-        SKIP: route table (interface endpoints do not use route tables)
-```
-
-**Key implication:** the most common diagnostic error is checking
-security groups on a Gateway endpoint (which does not use them) or
-checking route tables on an interface endpoint (which does not use them
-for endpoint traffic). Identify the endpoint type first.
+The interface-vs-Gateway comparison table and the endpoint-type diagnosis decision tree moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when the endpoint type is unclear.
 
 ## Expert heuristic: endpoint policy as a separate IAM layer
 
-The endpoint policy is NOT the caller's IAM policy. It is a separate
-policy document attached to the VPC endpoint that controls which AWS
-service actions can be performed through the endpoint.
-
-```text
-Request evaluation order:
-  1. IAM policy (caller identity)
-       Does the caller's IAM policy allow ec2:DescribeInstances?
-       ├── NO → IAM denies (before the endpoint is involved)
-       └── YES → continue to endpoint policy
-
-  2. Endpoint policy (attached to VPC endpoint)
-       Does the endpoint policy allow ec2:DescribeInstances for this principal?
-       ├── NO → endpoint denies (HTTP 403 from endpoint)
-       └── YES → request reaches the AWS service
-
-  BOTH must allow the action. Either can deny.
-```
-
-Default endpoint policy (full access):
-
-```json
-{
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": "*",
-      "Action": "*",
-      "Resource": "*"
-    }
-  ]
-}
-```
-
-A restrictive endpoint policy may limit actions, principals, or
-resources:
-
-```json
-{
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "AWS": "arn:aws:iam::123456789012:role/MyAppRole"
-      },
-      "Action": [
-        "s3:GetObject",
-        "s3:ListBucket"
-      ],
-      "Resource": [
-        "arn:aws:s3:::my-bucket",
-        "arn:aws:s3:::my-bucket/*"
-      ]
-    }
-  ]
-}
-```
-
-**Key implication:** when a request passes IAM but gets a 403 from the
-endpoint, the endpoint policy is the likely cause. Compare the endpoint
-policy with the requested action and principal.
+The IAM-then-endpoint-policy evaluation order, the default full-access policy JSON, and the restrictive policy example moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand on any endpoint 403.
 
 ## Diagnostic prerequisites (gather before diagnosing)
 
@@ -323,55 +147,18 @@ client subnet, the connection times out.
 
 **Verify the endpoint's security group:**
 
-```bash
-# Get the endpoint's network interface IDs
-ENI_IDS=$(aws ec2 describe-vpc-endpoints \
-  --vpc-endpoint-ids vpce-aaa111222 \
-  --query 'VpcEndpoints[0].NetworkInterfaceIds' \
-  --output text --region us-east-1)
-
-# Get the security group attached to the endpoint ENIs
-for ENI in $ENI_IDS; do
-  echo "ENI: $ENI"
-  aws ec2 describe-network-interfaces \
-    --network-interface-ids "$ENI" \
-    --query 'NetworkInterfaces[0].Groups[*].{GroupId:GroupId,GroupName:GroupName}' \
-    --output table --region us-east-1
-done
-
-# Check inbound rules on the endpoint's security group
-SG_ID=$(aws ec2 describe-network-interfaces \
-  --network-interface-ids $(aws ec2 describe-vpc-endpoints \
-    --vpc-endpoint-ids vpce-aaa111222 \
-    --query 'VpcEndpoints[0].NetworkInterfaceIds' --output text) \
-  --query 'NetworkInterfaces[0].Groups[0].GroupId' --output text --region us-east-1)
-
-aws ec2 describe-security-groups \
-  --group-ids "$SG_ID" \
-  --query 'SecurityGroups[0].IpPermissions[*].{Protocol:IpProtocol,From:FromPort,To:ToPort,Source:IpRanges[*].CidrIp}' \
-  --output table --region us-east-1
-```
+Layer 1 ENI and SG probe commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand to run the probe or apply the fix.
 
 **Common SG failure:**
 
-```text
-Endpoint SG inbound rules:
-  Port 443 (TCP)  Source 10.0.0.0/16  ← allows VPC-wide
-  Port 443 (TCP)  Source 10.0.1.0/24  ← allows only subnet-1
-
-Client is in subnet-2 (10.0.2.0/24) → TIMEOUT (no matching inbound rule)
-```
+Common-failure illustration moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when interpreting the probe output.
 
 **Fix: add inbound rule from client subnet:**
 
-```bash
-aws ec2 authorize-security-group-ingress \
-  --group-id sg-vpce123 \
-  --protocol tcp \
-  --port 443 \
-  --cidr 10.0.2.0/24 \
-  --region us-east-1
-```
+Layer 1 fix command (authorize-security-group-ingress) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand to run the probe or apply the fix.
 
 **Critical:** the SG must allow inbound on the SERVICE PORT. For most
 PrivateLink services this is TCP 443. For some services (e.g., a custom
@@ -386,40 +173,13 @@ pass IAM but fail the endpoint policy.
 
 **Retrieve the endpoint policy:**
 
-```bash
-# Get the endpoint policy (URL-encoded JSON)
-aws ec2 describe-vpc-endpoints \
-  --vpc-endpoint-ids vpce-aaa111222 \
-  --query 'VpcEndpoints[0].PolicyDocument' \
-  --output text --region us-east-1 | jq -r 'URL DECODE'
-
-# Or use --query to decode automatically
-aws ec2 describe-vpc-endpoints \
-  --vpc-endpoint-ids vpce-aaa111222 \
-  --query 'VpcEndpoints[0].PolicyDocument' \
-  --output text --region us-east-1
-```
+Layer 2 policy-retrieval commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand to run the probe or apply the fix.
 
 **Verify the endpoint policy allows the requested action:**
 
-```bash
-# Check if the policy allows s3:GetObject (example)
-aws ec2 describe-vpc-endpoints \
-  --vpc-endpoint-ids vpce-aaa111222 \
-  --query 'VpcEndpoints[0].PolicyDocument' \
-  --output text --region us-east-1 | python3 -c "
-import sys, json, urllib.parse
-policy = json.loads(urllib.parse.unquote(sys.stdin.read()))
-for stmt in policy.get('Statement', []):
-    if stmt.get('Effect') == 'Allow':
-        actions = stmt.get('Action', [])
-        if isinstance(actions, str):
-            actions = [actions]
-        print(f'Allowed actions: {actions}')
-        print(f'Principal: {stmt.get(\"Principal\")}')
-        print(f'Resource: {stmt.get(\"Resource\")}')
-"
-```
+Layer 2 policy-decoding verification commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand to run the probe or apply the fix.
 
 **Default policy (full access):** if `PolicyDocument` is empty or null,
 the endpoint uses the default policy (full access). In that case, the
@@ -427,23 +187,13 @@ endpoint policy is NOT the blocker.
 
 **Custom policy failure:**
 
-```text
-Endpoint policy:
-  Allow: s3:GetObject on arn:aws:s3:::bucket-a/*
-
-Request: s3:PutObject on arn:aws:s3:::bucket-a/
-→ ENDPOINT POLICY DENIES (action not in allowed list)
-→ HTTP 403 Access Denied
-```
+Common-failure illustration moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when interpreting the probe output.
 
 **Fix: update the endpoint policy to include the action:**
 
-```bash
-aws ec2 modify-vpc-endpoint \
-  --vpc-endpoint-id vpce-aaa111222 \
-  --policy-document file://updated-policy.json \
-  --region us-east-1
-```
+Layer 2 fix command (modify-vpc-endpoint) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand to run the probe or apply the fix.
 
 **Critical:** the endpoint policy is a SEPARATE IAM layer from the
 caller's IAM policy. Both must allow the action. When diagnosing a 403,
@@ -464,52 +214,23 @@ ENI's private IP. Two DNS modes exist:
 
 **Verify private DNS is enabled:**
 
-```bash
-aws ec2 describe-vpc-endpoints \
-  --vpc-endpoint-ids vpce-aaa111222 \
-  --query 'VpcEndpoints[0].PrivateDnsEnabled' \
-  --output text --region us-east-1
-# Expected: true (for AWS services with private DNS)
-```
+Layer 3 private-DNS verification command moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand to run the probe or apply the fix.
 
 **Verify DNS resolution from a client instance:**
 
-```bash
-# From a client EC2 instance in the VPC
-dig vpce-aaa111222-xxx.service-region.vpce.amazonaws.com
-# Should return the ENI's private IP (e.g., 10.0.1.10)
-
-# For AWS services with private DNS enabled
-dig ec2.us-east-1.amazonaws.com
-# Should return the endpoint ENI's private IP, NOT the public IP
-
-# If it returns a public IP or NXDOMAIN → DNS is not routing through endpoint
-```
+Layer 3 dig-based DNS verification commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand to run the probe or apply the fix.
 
 **Common DNS failures:**
 
-```text
-Failure 1: Private DNS not enabled
-  dig ssm.us-east-1.amazonaws.com → returns public IP
-  Fix: enable private DNS on the endpoint
-
-Failure 2: PHZ not associated with VPC
-  dig my-service.custom.example.com → NXDOMAIN
-  Fix: associate the Route 53 PHZ with the VPC
-
-Failure 3: DNS resolution conflict
-  Client VPC has enableDnsSupport=false
-  Fix: enable DNS support on the VPC
-```
+Common-failure illustration moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when interpreting the probe output.
 
 **Enable private DNS:**
 
-```bash
-aws ec2 modify-vpc-endpoint \
-  --vpc-endpoint-id vpce-aaa111222 \
-  --private-dns-enabled \
-  --region us-east-1
-```
+Layer 3 fix command (modify-vpc-endpoint --private-dns-enabled) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand to run the probe or apply the fix.
 
 ## Layer 4 — Route table (Gateway endpoint)
 
@@ -520,40 +241,18 @@ is routed through the endpoint.
 
 **Verify the Gateway endpoint is in the route table:**
 
-```bash
-# List Gateway endpoints and their route tables
-aws ec2 describe-vpc-endpoints \
-  --filters Name=vpc-endpoint-type,Values=Gateway \
-  --query 'VpcEndpoints[*].{Id:VpcEndpointId,Service:ServiceName,Routes:RouteTableIds}' \
-  --output table --region us-east-1
-
-# Check if the affected subnet's route table has the endpoint
-aws ec2 describe-route-tables \
-  --route-table-ids rtb-abc123 \
-  --query 'RouteTables[0].Routes[?VpcEndpointId!=`null`].{Dest:DestinationCidrBlock,PrefixList:DestinationPrefixListId,Endpoint:VpcEndpointId}' \
-  --output table --region us-east-1
-```
+Layer 4 Gateway endpoint route-table verification commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand to run the probe or apply the fix.
 
 **Common Gateway endpoint routing failure:**
 
-```text
-Subnet route table (rtb-private-1):
-  10.0.0.0/16 → local
-  0.0.0.0/0   → nat-xxx
-  (NO Gateway endpoint entry for S3 prefix list pl-68a54001)
-
-Result: S3 traffic goes via NAT Gateway (costs money, not using endpoint)
-Fix: add the Gateway endpoint to the route table
-```
+Common-failure illustration moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when interpreting the probe output.
 
 **Add a Gateway endpoint to a route table:**
 
-```bash
-aws ec2 modify-vpc-endpoint \
-  --vpc-endpoint-id vpce-s3gateway123 \
-  --add-route-table-ids rtb-private-1 rtb-private-2 \
-  --region us-east-1
-```
+Layer 4 fix command (modify-vpc-endpoint --add-route-table-ids) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand to run the probe or apply the fix.
 
 **Critical:** Gateway endpoints do NOT use security groups or DNS. They
 route via the route table. If S3 or DynamoDB traffic is going via the
@@ -565,51 +264,18 @@ For cross-account PrivateLink access, BOTH the consumer's IAM/endpoint
 policy AND the service provider's endpoint service resource policy must
 allow access. Either side can block.
 
-```text
-Cross-account endpoint flow:
-  Consumer account → Interface endpoint → Endpoint service (provider account)
-                                                        ↓
-                                           NLB → backend instances
-
-  Access control (two independent layers):
-    1. Consumer side: IAM policy + endpoint policy
-       - Does the consumer's IAM policy allow the action?
-       - Does the consumer's endpoint policy allow the action?
-    2. Provider side: endpoint service resource policy
-       - Does the endpoint service allow the consumer's account?
-
-  Either layer can block access (403).
-```
+The cross-account endpoint flow diagram (consumer IAM/endpoint policy vs provider resource policy) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for the two-sided access-control model.
 
 **Verify the endpoint service allows the consumer account:**
 
-```bash
-# Provider account: check who is allowed to connect
-aws ec2 describe-vpc-endpoint-service-permissions \
-  --service-name com.amazonaws.vpce.us-east-1.vpce-svc-xxx \
-  --query 'AllowedPrincipals[*].Principal' \
-  --output table --region us-east-1
-
-# If the consumer account is not listed, add it
-aws ec2 modify-vpc-endpoint-service-permissions \
-  --service-name com.amazonaws.vpce.us-east-1.vpce-svc-xxx \
-  --add-allowed-principals arn:aws:iam::123456789012:root \
-  --region us-east-1
-```
+Layer 5 allowed-principals verification and fix commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand to run the probe or apply the fix.
 
 **Common cross-account failure:**
 
-```text
-Consumer account: 123456789012
-Provider endpoint service: com.amazonaws.vpce.us-east-1.vpce-svc-xxx
-
-Provider service allowed principals:
-  arn:aws:iam::111111111111:root  ← only account A is allowed
-
-Consumer account 123456789012 is NOT in the allowed list → 403
-
-Fix: provider adds consumer account to allowed principals
-```
+Common-failure illustration moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when interpreting the probe output.
 
 ## Layer 6 — Endpoint service (NLB-backed) connection failures
 
@@ -618,47 +284,18 @@ NLB), the NLB and its targets must be healthy for the endpoint to work.
 
 **Verify the endpoint service configuration:**
 
-```bash
-# Check the endpoint service
-aws ec2 describe-vpc-endpoint-services \
-  --service-names com.amazonaws.vpce.us-east-1.vpce-svc-xxx \
-  --query 'ServiceDetails[0].{ServiceName:ServiceName,AvailabilityZones:AvailabilityZones,PrivateDnsName:PrivateDnsName}' \
-  --output table --region us-east-1
-
-# Check NLB target health (from the provider account)
-aws elbv2 describe-target-health \
-  --target-group-arn arn:aws:elasticloadbalancing:us-east-1:999999999999:targetgroup/tg-xxx/xxx \
-  --query 'TargetHealthDescriptions[*].{Target:Target.Id,Port:Target.Port,State:TargetHealth.State,Reason:TargetHealth.Reason}' \
-  --output table --region us-east-1
-```
+Layer 6 endpoint service and NLB target-health probe commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand to run the probe or apply the fix.
 
 **Common endpoint service failures:**
 
-```text
-Failure 1: NLB target unhealthy
-  Target state: unhealthy
-  Reason: Target.Timeout or Target.FailedHealthChecks
-  Result: endpoint connection times out intermittently or always
-
-Failure 2: NLB listener misconfigured
-  Listener port does not match the endpoint service port
-  Result: connection refused
-
-Failure 3: Endpoint service acceptance required
-  Endpoint is in pending-waiting state
-  Provider has not accepted the endpoint connection request
-  Fix: provider accepts the endpoint connection
-```
+Common-failure illustration moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when interpreting the probe output.
 
 **Provider accepts the endpoint connection:**
 
-```bash
-# Provider account: accept pending endpoint connections
-aws ec2 accept-vpc-endpoint-connections \
-  --service-id vpce-svc-xxx \
-  --vpc-endpoint-ids vpce-aaa111222 \
-  --region us-east-1
-```
+Layer 6 accept-vpc-endpoint-connections command moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand to run the probe or apply the fix.
 
 ## Layer 7 — Connection timeout (health check from endpoint service)
 
@@ -666,22 +303,8 @@ When a client connects to an interface endpoint and the connection times
 out (no response, SYN dropped), the failure is at Layer 1 (security
 group) or Layer 6 (endpoint service health). Distinguish between them:
 
-```text
-Timeout diagnosis:
-  Test 1: Can the client reach the endpoint ENI IP?
-    telnet 10.0.1.10 443
-    ├── TIMEOUT → Layer 1 (security group blocking)
-    └── CONNECTED → Layer 1 is OK, proceed to Layer 6
-
-  Test 2: Is the NLB target healthy?
-    aws elbv2 describe-target-health (from provider account)
-    ├── unhealthy → Layer 6 (NLB/backend issue)
-    └── healthy → Layer 6 is OK, check endpoint policy (Layer 2)
-
-  Test 3: Does the endpoint policy allow the action?
-    (HTTP 403 → endpoint policy, NOT timeout)
-    (HTTP 200 → everything works, issue was transient)
-```
+The three-test timeout decision tree (telnet to the ENI IP, NLB target health, endpoint policy) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when the endpoint connection times out.
 
 ## Layer 8 — Endpoint policy JSON syntax errors
 
@@ -691,25 +314,13 @@ and invalid principal values.
 
 **Validate the endpoint policy JSON before applying:**
 
-```bash
-# Validate JSON syntax
-echo '{"Statement":[{"Effect":"Allow","Principal":"*","Action":"*","Resource":"*"}]}' | python3 -m json.tool
-
-# Common errors:
-# - Trailing comma: {"Action":["s3:GetObject",]} ← remove trailing comma
-# - Missing bracket: {"Statement":[{"Effect":"Allow"} ← close all brackets
-# - Invalid principal: {"Principal":{"AWS":"account-id"}} ← must be ARN or "*"
-# - String not quoted: {"Effect": Allow} ← quote the value: {"Effect": "Allow"}
-```
+Layer 8 JSON validation command and common syntax errors moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand to run the probe or apply the fix.
 
 **Policy with syntax error fails on modify:**
 
-```bash
-aws ec2 modify-vpc-endpoint \
-  --vpc-endpoint-id vpce-aaa111222 \
-  --policy-document file://broken-policy.json
-# Error: InvalidPolicyDocument — policy document is malformed
-```
+Layer 8 broken-policy modify example moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand to run the probe or apply the fix.
 
 ## Layer 9 — PrivateLink endpoint service availability
 
@@ -718,20 +329,8 @@ instances terminated), the endpoint will show failures.
 
 **Verify the endpoint service is available:**
 
-```bash
-# Check the endpoint service state
-aws ec2 describe-vpc-endpoint-services \
-  --service-names com.amazonaws.vpce.us-east-1.vpce-svc-xxx \
-  --query 'ServiceDetails[0].{ServiceName:ServiceName,Owner:Owner,BaseEndpointDnsNames:BaseEndpointDnsNames}' \
-  --output table --region us-east-1
-
-# If the service is not found, it may have been deleted by the provider
-# Check the endpoint's service name
-aws ec2 describe-vpc-endpoints \
-  --vpc-endpoint-ids vpce-aaa111222 \
-  --query 'VpcEndpoints[0].{ServiceName:ServiceName,State:State}' \
-  --output table --region us-east-1
-```
+Layer 9 endpoint service availability probe commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand to run the probe or apply the fix.
 
 **Endpoint states indicating service issues:**
 
@@ -841,63 +440,22 @@ REMEDIATION_COMMANDS:
 
 ### Worked example — Gateway endpoint not in route table
 
-```text
-VPC_ENDPOINT: vpce-s3gateway123 (Gateway — com.amazonaws.us-east-1.s3)
-VERDICT: ROOT_CAUSE_IDENTIFIED
-DIAGNOSIS:
-  ROOT CAUSE: Gateway endpoint vpce-s3gateway123 is NOT in route table rtb-private-2; S3 traffic from subnet-private-2 goes via NAT Gateway
-  FAILURE LAYER: Route Table
-  IMPACT: S3 traffic from subnet-private-2 incurs NAT Gateway data processing charges instead of using the free Gateway endpoint
-EVIDENCE:
-  [N/A] Security group (interface): not applicable (gateway endpoint)
-  [✓] Endpoint policy: default (full access)
-  [N/A] DNS resolution: not applicable (gateway endpoint)
-  [✗] Route table (gateway): endpoint vpce-s3gateway123 NOT in route table rtb-private-2; only in rtb-private-1
-  [N/A] Cross-account: not applicable (same account)
-  [N/A] Endpoint service health: not applicable (gateway endpoint)
-  [✓] Endpoint state: available
-  [✓] Policy JSON syntax: valid (default policy)
-REMEDIATION_COMMANDS:
-  aws ec2 modify-vpc-endpoint --vpc-endpoint-id vpce-s3gateway123 --add-route-table-ids rtb-private-2 --region us-east-1
-  # Verify: aws ec2 describe-route-tables --route-table-ids rtb-private-2 --query 'RouteTables[0].Routes[?VpcEndpointId==`vpce-s3gateway123`]' --region us-east-1
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when formatting a Route Table verdict.
 
 ## Error handling
 
-### Connection timeout (no response from endpoint)
-- Layer 1: Check the endpoint's security group for inbound rules from
-  the client subnet on the service port. This is the #1 cause.
-- Layer 6: If SG is correct, check the NLB target health (for custom
-  endpoint services). Unhealthy targets cause timeouts.
-- Layer 9: Verify the endpoint state is `available` (not
-  `pending-waiting` or `failed`).
+The symptom-to-layer error-handling playbook (timeout, 403, DNS, S3/DynamoDB NAT bypass, policy-update failures) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when mapping a symptom to its layer.
 
-### HTTP 403 Access Denied from endpoint
-- Layer 2: Check the endpoint policy. It may deny the requested action
-  or principal. The policy is a SEPARATE layer from IAM.
-- IAM: Verify the caller's IAM policy also allows the action. Both IAM
-  and endpoint policy must allow.
-- Layer 5: For cross-account, check the provider's endpoint service
-  resource policy. The consumer account must be in the allowed
-  principals.
+## References (load on demand)
 
-### DNS does not resolve endpoint name
-- Layer 3: Check if private DNS is enabled for the endpoint (AWS
-  services). If not, enable it.
-- Layer 3: For non-AWS services, check if a Route 53 private hosted zone
-  is associated with the VPC.
-- Verify the VPC has `enableDnsSupport` and `enableDnsHostnames` set to
-  true.
-
-### S3/DynamoDB traffic not using Gateway endpoint
-- Layer 4: Check if the Gateway endpoint is in the route table for the
-  affected subnet(s). Add it if missing.
-- Verify the endpoint state is `available`.
-
-### Endpoint policy update fails
-- Layer 8: Validate the JSON syntax. Common errors are trailing commas,
-  missing brackets, and invalid principal values.
-- Use `python3 -m json.tool` or `jq` to validate before applying.
+- [Advanced patterns](references/advanced-patterns.md) — mindset misconceptions, the configuration dependency graph, the three-layer evaluation model, interface vs Gateway differences, endpoint policy as a separate IAM layer, cross-account flow
+- [Diagnostic commands](references/diagnostic-commands.md) — per-layer probe and fix command listings (Layers 1-4, 5, 6, 8, 9) plus the Layer 7 timeout decision tree
+- [Worked examples](references/worked-examples.md) — secondary worked example (Gateway endpoint not in route table) and per-layer common-failure illustrations
+- [Error handling](references/error-handling.md) — symptom-to-layer error-handling playbook
+- [Endpoint policy and SG](references/endpoint-policy-and-sg.md) — endpoint policy evaluation, SG configuration for endpoint ENIs, policy JSON validation
+- [Gateway endpoint and DNS](references/gateway-endpoint-and-dns.md) — Gateway endpoint routing, DNS resolution for interface endpoints, endpoint service health
 
 ## Domain
 

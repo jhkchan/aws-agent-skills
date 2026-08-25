@@ -542,3 +542,38 @@ resource "aws_cloudfront_distribution" "payments" {
 - `AWS::WAFv2::IPSet` — `Scope`, `Addresses`, `IPAddressVersion`.
 - `AWS::WAFv2::RegexPatternSet` — `Scope`, `RegularExpressionList`.
 - `AWS::WAFv2::LoggingConfiguration` — `ResourceArn`, `LogDestinationConfigs`.
+
+## Step 7 - put-logging-configuration CLI (moved from SKILL.md)
+
+```bash
+aws wafv2 put-logging-configuration \
+  --logging-configuration \
+    WebACLArn=<web-acl-arn>,LogDestinationConfigs=arn:aws:firehose:us-east-1:123456789012:deliverystream/aws-waf-logs-payments \
+  --region us-east-1
+```
+
+
+## Step 8 - ALB / API Gateway / CloudFront association CLI (moved from SKILL.md)
+
+**ALB:**
+```bash
+aws wafv2 associate-web-acl \
+  --web-acl-arn <web-acl-arn> \
+  --resource-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/payments-alb/50dc6c495c0c9188 \
+  --region us-east-1
+```
+
+**API Gateway (REST and HTTP):**
+```bash
+aws wafv2 associate-web-acl \
+  --web-acl-arn <web-acl-arn> \
+  --resource-arn arn:aws:apigateway:us-east-1::/restapis/<api-id>/stages/prod \
+  --region us-east-1
+```
+
+**CloudFront** (set on distribution, not via WAF API):
+```bash
+aws cloudfront get-distribution-config --id <dist-id> > /tmp/cf-config.json
+# Edit config: set WebACLId to the Web ACL ARN
+aws cloudfront update-distribution --id <dist-id> --if-match <etag> --distribution-config file:///tmp/cf-config.json
+```

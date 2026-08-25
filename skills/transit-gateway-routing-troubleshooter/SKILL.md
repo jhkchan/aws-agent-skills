@@ -103,35 +103,7 @@ both the source and destination attachments.
 
 ## Philosophy
 
-Four behaviours separate a senior TGW engineer from a generalist:
-
-- **Routing is bidirectional.** A successful ping from VPC-A to VPC-B
-  requires VPC-A's route table to send traffic to the TGW AND the
-  destination VPC-B's route table (or a default route in VPC-B) to
-  send the reply back to the TGW. Operators who prove only the
-  forward path chase ghosts for hours. Always probe both directions.
-- **The TGW route table is per-attachment, not per-TGW.** A TGW has
-  one or more route tables; each VPC attachment is associated with
-  exactly one (the "association"). Routes are looked up in the
-  associated route table. An attachment whose associated route table
-  lacks the destination CIDR drops the packet, even if a different
-  TGW route table has the route.
-- **Default route 0.0.0.0/0 to TGW is a common footgun.** A VPC route
-  table with `0.0.0.0/0 → tgw-aaa` sends ALL non-local traffic to
-  the TGW, including internet-bound traffic that should go to the
-  IGW. The TGW has no path to the internet (it is not a NAT); the
-  traffic is blackholed. Always check whether the VPC route table's
-  default route points at the IGW (correct for internet) or the TGW
-  (correct only for a centralized egress design with a dedicated
-  egress VPC).
-- **TGW does NOT support cross-VPC security group references.** Unlike
-  VPC peering, where `sg-aaa` in VPC-A can reference `sg-bbb` in
-  VPC-B as a source rule, TGW-attached VPCs CANNOT reference each
-  other's security groups. The SG rule must use a CIDR block, a
-  prefix list, or another SG in the SAME VPC. Operators who "set up
-  the security group peering" for a TGW topology produce a silent
-  allow-list failure.
-
+The four Philosophy behaviours moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 ## Quick reference — symptom triage table
 
 | Symptom phrase / observation | Most likely layer | First probe |
@@ -154,31 +126,7 @@ and short-circuit on attachment states that mimic routing failures.
 
 ### Pre-flight commands
 
-```bash
-# TGW and its route tables
-aws ec2 describe-transit-gateways --transit-gateway-ids <tgw-id> --output json
-aws ec2 describe-transit-gateway-route-tables \
-  --filters Name=transit-gateway-id,Values=<tgw-id> --output json
-
-# All attachments (VPC, VPN, Peering, Connect, Direct Connect gateway)
-aws ec2 describe-transit-gateway-attachments \
-  --filters Name=transit-gateway-id,Values=<tgw-id> --output json
-
-# Association and propagation per route table
-aws ec2 get-transit-gateway-route-table-associations \
-  --transit-gateway-route-table-id <rtb-id> --output json
-aws ec2 get-transit-gateway-route-table-propagations \
-  --transit-gateway-route-table-id <rtb-id> --output json
-
-# Search the actual routes the TGW will use
-aws ec2 search-transit-gateway-routes \
-  --transit-gateway-route-table-id <rtb-id> \
-  --filters Name=state,Values=active --output json
-
-# Flow logs on the TGW
-aws ec2 describe-flow-logs \
-  --filter Name=resource-type,Values=transit-gateway --output json
-```
+The pre-flight gather commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### Attachment-state short-circuit
 
@@ -220,52 +168,7 @@ symptom.**
 
 ### Step 0: Operational gotchas that change diagnosis
 
-- **Association and propagation are independent controls.** Associating
-  VPC-A's attachment with `tgw-rtb-default` makes it the lookup table
-  for VPC-A's outbound traffic. Propagating VPC-B's attachment into
-  `tgw-rtb-default` adds VPC-B's CIDR as a route. A working VPC-A →
-  VPC-B path requires BOTH. Operators who "added both VPCs to the
-  TGW" but only configured association (or only propagation) produce
-  a silent blackhole.
-- **Static routes ALWAYS win over propagated routes for the same
-  CIDR in the same route table.** TGW priority: longest prefix wins;
-  for equal prefix length, static beats propagated. A static
-  `10.20.0.0/16 → tgw-attach-wrong` entry hides the propagated
-  `10.20.0.0/16 → tgw-attach-correct` entry. Invisible without
-  explicitly searching for static routes.
-- **TGW peering attachments are strictly non-transitive.** A peering
-  between `tgw-a` and `tgw-b` carries traffic between attachments on
-  those two TGWs only. If `tgw-a` needs to reach `tgw-c`, establish
-  a direct peering — `tgw-b` does not transit.
-- **Appliance mode is per-attachment, not per-TGW.** Enable it on the
-  INSPECTION VPC's attachment. With it on, TGW routes return traffic
-  for any flow that transited the inspection VPC back through the
-  inspection VPC's AZ, regardless of source AZ. Without it, source-AZ
-  preservation causes cross-AZ stateful firewalls to drop flows.
-- **TGW does not support SG references across VPCs.** Cross-VPC SG
-  references work in VPC peering (same region), NOT through TGW.
-  Frequent confusion when migrating from VPC peering to TGW.
-- **TGW route tables do NOT learn VPC peering routes.** If VPC-A is
-  peered with VPC-B (direct VPC peering) AND VPC-A is attached to a
-  TGW, VPC-B's CIDR is NOT propagated into the TGW.
-- **The default route `0.0.0.0/0` in a VPC route table pointing at
-  the TGW is only valid in a centralized-egress design.** Otherwise
-  internet-bound traffic blackholes at the TGW.
-- **Multicast on TGW requires a dedicated multicast domain, and IGMP
-  is not supported.** Members are statically added by ENI. A sender
-  succeeds; receivers see nothing if their ENI is not in the group.
-- **DNS resolution across TGW-attached VPCs requires Route 53
-  Resolver.** VPC-A's `enableDnsHostnames` only resolves names within
-  VPC-A. Deploy Resolver inbound/outbound endpoints for cross-VPC
-  resolution.
-- **TGW attachments are placed in specific subnets/AZs.** An
-  attachment in `subnet-a-public us-east-1a` only has a data-plane
-  ENI in `us-east-1a`. Cross-AZ traffic from `us-east-1b` to the TGW
-  incurs a cross-AZ hop.
-- **TGW flow logs capture only the TGW's view of the flow.** A flow
-  that enters the TGW and is blackholed appears as `ACCEPT` ingress
-  with no corresponding egress. Correlate VPC flow logs (source +
-  destination sides) for end-to-end debugging.
+All 11 operational gotchas moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 1: Symptom entry
 
@@ -289,11 +192,7 @@ Symptom: traffic leaves VPC-A but never arrives at VPC-B.
 
 #### 2a: Source attachment's associated route table
 
-```bash
-aws ec2 describe-transit-gateway-attachments \
-  --filters Name=transit-gateway-attachment-id,Values=<source-attach-id> \
-  --output json | jq '.TransitGatewayAttachments[].Association.TransitGatewayRouteTableId'
-```
+Probe CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If the source attachment has NO association, **ROOT_CAUSE_IDENTIFIED**
 with `LAYER: TGW_ROUTE_TABLE_ASSOCIATION`. The TGW has no lookup
@@ -301,12 +200,7 @@ table for its outbound traffic.
 
 #### 2b: Destination CIDR in the associated route table
 
-```bash
-aws ec2 search-transit-gateway-routes \
-  --transit-gateway-route-table-id <source-rtb-id> \
-  --filters Name=type,Values=propagated,static --output json | \
-  jq '.Routes[] | select(.DestinationCidrBlock | startswith("<dest-cidr-prefix>"))'
-```
+Probe CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If the destination CIDR is NOT present, the destination attachment
 was not propagated. **ROOT_CAUSE_IDENTIFIED** with
@@ -317,11 +211,7 @@ was not propagated. **ROOT_CAUSE_IDENTIFIED** with
 The #1 missed check. The destination VPC's route table must send the
 reply back to the TGW.
 
-```bash
-aws ec2 describe-route-tables \
-  --filters Name=vpc-id,Values=<dest-vpc-id> --output json | \
-  jq '.RouteTables[].Routes[] | select(.DestinationCidrBlock | startswith("<source-cidr-prefix>"))'
-```
+Probe CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If no route exists for the source CIDR (neither specific nor default
 to the TGW), the reply goes to the IGW or is dropped.
@@ -329,11 +219,7 @@ to the TGW), the reply goes to the IGW or is dropped.
 
 #### 2d: Default route 0.0.0.0/0 pointing at TGW
 
-```bash
-aws ec2 describe-route-tables \
-  --filters Name=vpc-id,Values=<vpc-id> --output json | \
-  jq '.RouteTables[].Routes[] | select(.DestinationCidrBlock=="0.0.0.0/0")'
-```
+Probe CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If the default route points at a TransitGatewayId (not `igw-`),
 internet-bound traffic is blackholed unless the VPC is in a
@@ -345,12 +231,7 @@ Symptom: traffic reaches the WRONG target VPC.
 
 #### 3a: Static routes overriding propagated
 
-```bash
-aws ec2 search-transit-gateway-routes \
-  --transit-gateway-route-table-id <rtb-id> \
-  --filters Name=type,Values=static --output json | \
-  jq '.Routes[] | select(.DestinationCidrBlock | startswith("<dest-cidr-prefix>"))'
-```
+Probe CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If a static route exists for the same CIDR as a propagated route and
 points at a DIFFERENT attachment, the static wins. Traffic goes to
@@ -359,10 +240,7 @@ the wrong attachment. **ROOT_CAUSE_IDENTIFIED** with
 
 #### 3b: Overlapping CIDR
 
-```bash
-aws ec2 describe-vpcs --vpc-ids <vpc-a-id> <vpc-b-id> --output json | \
-  jq '.Vpcs[] | {VpcId, CidrBlock, CidrBlockAssociationSet}'
-```
+Probe CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If two attachments advertise overlapping CIDRs (e.g.,
 `10.0.0.0/16` and `10.0.1.0/24`), the longest-prefix match wins; the
@@ -374,23 +252,14 @@ re-CIDR one of the VPCs (no NAT-on-TGW workaround).
 
 #### 4a: Peering attachment state
 
-```bash
-aws ec2 describe-transit-gateway-peering-attachments \
-  --filters Name=transit-gateway-id,Values=<tgw-a-id> --output json | \
-  jq '.TransitGatewayPeeringAttachments[] | {TransitGatewayPeeringAttachmentId, State, AccepterTgwInfo, RequesterTgwInfo}'
-```
+Probe CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 `pending-acceptance` requires peer acceptance; `rejected` is dead;
 `failed` errored. Only `available` carries traffic.
 
 #### 4b: Route tables on BOTH TGWs
 
-```bash
-aws ec2 search-transit-gateway-routes \
-  --transit-gateway-route-table-id <local-rtb> \
-  --filters Name=type,Values=propagated,static --output json | \
-  jq '.Routes[] | select(.TransitGatewayAttachments[].TransitGatewayAttachmentId=="<peering-attach-id>")'
-```
+Probe CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 Repeat on the remote TGW. If either side lacks the route, traffic is
 one-directional.
@@ -405,11 +274,7 @@ is no workaround.
 
 ### Step 5: Appliance mode
 
-```bash
-aws ec2 describe-transit-gateway-attachments \
-  --transit-gateway-attachment-ids <inspection-vpc-attachment-id> --output json | \
-  jq '.TransitGatewayAttachments[].Options.ApplianceModeSupport'
-```
+Probe CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If `ApplianceModeSupport` is `disable`, cross-AZ stateful flows are
 dropped. **ROOT_CAUSE_IDENTIFIED** with `LAYER: TGW_APPLIANCE_MODE`.
@@ -419,24 +284,14 @@ Fix: enable appliance mode on the inspection VPC's attachment.
 
 #### 6a: On-prem CIDR in the TGW route table
 
-```bash
-aws ec2 search-transit-gateway-routes \
-  --transit-gateway-route-table-id <rtb-id> \
-  --filters Name=type,Values=propagated,static --output json | \
-  jq '.Routes[] | select(.DestinationCidrBlock | startswith("<onprem-cidr-prefix>"))'
-```
+Probe CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If absent, the VPN/DX attachment is not propagating. For VPN: check
 `CustomerGateway` BGP. For DX: check the DX gateway association.
 
 #### 6b: VPN attachment's association
 
-```bash
-aws ec2 describe-transit-gateway-attachments \
-  --filters Name=resource-type,Values=vpn \
-  --filters Name=transit-gateway-id,Values=<tgw-id> --output json | \
-  jq '.TransitGatewayAttachments[] | {TransitGatewayAttachmentId, Association, State}'
-```
+Probe CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If the VPN attachment is associated with a different route table than
 the VPC attachments use for outbound lookups, VPC outbound traffic
@@ -444,10 +299,7 @@ never finds the on-prem route.
 
 #### 6c: DX gateway association
 
-```bash
-aws directconnect describe-direct-connect-gateways --output json
-aws directconnect describe-direct-connect-gateway-associations --output json
-```
+Probe CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If the TGW is not associated with the DX gateway, or the allowed
 prefixes exclude the target CIDR, **ROOT_CAUSE_IDENTIFIED** with
@@ -455,14 +307,7 @@ prefixes exclude the target CIDR, **ROOT_CAUSE_IDENTIFIED** with
 
 ### Step 7: Multicast domain
 
-```bash
-aws ec2 describe-transit-gateway-multicast-domains \
-  --transit-gateway-id <tgw-id> --output json
-
-aws ec2 search-transit-gateway-multicast-groups \
-  --transit-gateway-multicast-domain-id <domain-id> --output json | \
-  jq '.MulticastGroups[] | {GroupIpAddress, NetworkInterfaceId, GroupMember}'
-```
+Probe CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If a receiver's ENI is not in the group, it does not receive. If the
 multicast domain itself does not exist, **ROOT_CAUSE_IDENTIFIED** with
@@ -470,12 +315,7 @@ multicast domain itself does not exist, **ROOT_CAUSE_IDENTIFIED** with
 
 ### Step 8: DNS resolution across TGW attachments
 
-```bash
-aws ec2 describe-vpc-attribute --vpc-id <vpc-id> --attribute enableDnsSupport --output json
-aws ec2 describe-vpc-attribute --vpc-id <vpc-id> --attribute enableDnsHostnames --output json
-aws route53resolver list-resolver-endpoints --output json
-aws route53resolver list-resolver-rules --output json
-```
+Probe CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 Both VPCs need `enableDnsSupport: true` and `enableDnsHostnames:
 true`. For cross-VPC resolution, deploy Route 53 Resolver inbound
@@ -485,11 +325,7 @@ source VPC; create a forwarding rule. If absent,
 
 ### Step 8b: TGW flow logs
 
-```bash
-aws ec2 describe-flow-logs \
-  --filter Name=resource-type,Values=transit-gateway \
-  --filter Name=resource-id,Values=<tgw-id> --output json
-```
+Probe CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If no flow log is configured, or the IAM role lacks
 `logs:CreateLogStream` / `logs:PutLogEvents`, or the destination
@@ -498,11 +334,7 @@ CloudWatch Logs group does not exist, **ROOT_CAUSE_IDENTIFIED** with
 
 ### Step 8c: Cross-VPC security group references
 
-```bash
-aws ec2 describe-security-groups \
-  --filters Name=vpc-id,Values=<vpc-a-id> --output json | \
-  jq '.SecurityGroups[].IpPermissions[] | .UserIdGroupPairs[]?'
-```
+Probe CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If a `UserIdGroupPairs` entry references a GroupId in a different VPC,
 the reference is invalid for a TGW topology. Cross-VPC SG references
@@ -588,33 +420,7 @@ CONFIRM: Before deleting the route, emit and await:
 
 ### Worked example — Appliance mode disabled
 
-```text
-TARGET: tgw-aaa (inspection-vpc-attachment: tgw-attach-inspection)
-VERDICT: ROOT_CAUSE_IDENTIFIED
-REASON: The inspection VPC's attachment has ApplianceModeSupport=disable.
-  Flows from us-east-1a (where the firewall ENI lives) succeed; flows
-  from us-east-1b fail because the return traffic exits the TGW in
-  us-east-1b, bypassing the firewall, which drops the flow as
-  out-of-state (Step 5).
-LAYER: TGW_APPLIANCE_MODE
-EVIDENCE:
-  - Symptom: cross-VPC flows succeed when the source is in
-    us-east-1a; intermittently fail when the source is in
-    us-east-1b. Firewall logs show "out-of-state drop".
-  - Probe: aws ec2 describe-transit-gateway-attachments on
-    tgw-attach-inspection returns Options.ApplianceModeSupport=disable.
-  - Passing: TGW route tables contain correct routes for both VPCs;
-    no static routes override; CIDRs do not overlap.
-REMEDIATION:
-  1. Enable appliance mode:
-     aws ec2 modify-transit-gateway-attachment \
-       --transit-gateway-attachment-id tgw-attach-inspection \
-       --options ApplianceModeSupport=enable
-  2. Verify flows from us-east-1b now succeed.
-CONFIRM: Before modifying the attachment, emit and await:
-  "CONFIRM: About to enable ApplianceModeSupport on
-   tgw-attach-inspection. Proceed? (yes/no)"
-```
+Full appliance-mode-disabled worked example moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 ## Anti-Patterns — NEVER
 
@@ -683,22 +489,19 @@ CONFIRM: Before modifying the attachment, emit and await:
 
 ## Remediation guidance (command index)
 
-- **TGW_ROUTE_TABLE_ASSOCIATION**: `associate-transit-gateway-route-table`
-- **TGW_ROUTE_TABLE_PROPAGATION**: `enable-transit-gateway-route-table-propagation`
-- **TGW_STATIC_ROUTE_PRIORITY**: `delete-transit-gateway-route` (stale static)
-- **TGW_OVERLAPPING_CIDR**: re-CIDR one VPC (no NAT-on-TGW)
-- **TGW_PEERING_NON_TRANSITIVE**: `create-transit-gateway-peering-attachment` (direct peering)
-- **TGW_VPN_DX_ROUTING**: verify BGP / DX gateway association / allowed prefixes
-- **TGW_MULTICAST_DOMAIN**: `register-transit-gateway-multicast-group-members`
-- **VPC_DEFAULT_ROUTE_TGW**: `create-route --transit-gateway-id` (return path)
-- **TGW_APPLIANCE_MODE**: `modify-transit-gateway-attachment --options ApplianceModeSupport=enable`
-- **TGW_DNS_RESOLUTION**: Route 53 Resolver inbound + outbound endpoints + forwarding rule
-- **TGW_FLOW_LOGS**: `create-flow-logs --resource-type transit-gateway`
-- **TGW_SG_CROSS_VPC**: replace cross-VPC SG ref with CIDR / prefix list (`authorize-security-group-ingress --ip-ranges`)
+The 12-entry remediation command index moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 See `references/tgw-routing-reference.md` for the full command index
 and `references/tgw-attachment-and-appliance-mode.md` for attachment-
 type and appliance-mode detail.
+
+## References (load on demand)
+
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight gather commands, every per-step probe CLI (Steps 2-8c), and the remediation command index
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Philosophy four behaviours and Step 0 operational gotchas
+- [references/worked-examples.md](references/worked-examples.md) — Appliance-mode-disabled worked example
+- [references/tgw-routing-reference.md](references/tgw-routing-reference.md) — full TGW routing command index
+- [references/tgw-attachment-and-appliance-mode.md](references/tgw-attachment-and-appliance-mode.md) — attachment types and appliance-mode detail
 
 ## Domain
 

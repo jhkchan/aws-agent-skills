@@ -189,58 +189,13 @@ configure in the console are NEVER applied.
 
 #### EC2 (systemd)
 
-```bash
-# Download the daemon
-curl -o /tmp/xray.zip https://s3.us-east-1.amazonaws.com/aws-xray-assets.us-east-1/xray-daemon/aws-xray-daemon-linux-3.x.zip
-unzip /tmp/xray.zip -d /opt/aws-xray-daemon
-
-# Create systemd unit
-cat > /etc/systemd/system/xray.service << 'EOF'
-[Unit]
-Description=AWS X-Ray Daemon
-After=network.target
-
-[Service]
-Type=simple
-User=xray
-ExecStart=/opt/aws-xray-daemon/xray -o /var/log/xray/xray.log
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable --now xray
-```
+EC2 systemd install (daemon download, unit file, enable): [Daemon and sampling guide](references/daemon-and-sampling-guide.md).
+Load on demand for EC2 deployments.
 
 #### ECS Fargate (sidecar container)
 
-The daemon MUST be a sidecar in the SAME task definition as the app.
-Add this container to the task definition:
-
-```json
-{
-  "name": "xray-daemon",
-  "image": "public.ecr.aws/xray/aws-xray-daemon:4.1",
-  "cpu": 256,
-  "memory": 512,
-  "essential": true,
-  "portMappings": [{"containerPort": 2000, "protocol": "udp"}],
-  "logConfiguration": {
-    "logDriver": "awslogs",
-    "options": {
-      "awslogs-group": "/ecs/xray-daemon",
-      "awslogs-region": "us-east-1",
-      "awslogs-stream-prefix": "xray"
-    }
-  }
-}
-```
-
-The app container sends traces to `127.0.0.1:2000` (UDP). Both containers
-share the task network namespace (awsvpc), so localhost works.
+ECS Fargate sidecar container definition (JSON) and localhost UDP 2000 rationale: [Daemon and sampling guide](references/daemon-and-sampling-guide.md).
+Load on demand for ECS Fargate deployments.
 
 #### ECS EC2 (daemon as a service, NOT sidecar)
 
@@ -252,67 +207,13 @@ memory but requires the app to send traces to the HOST IP on port 2000
 
 #### EKS / Kubernetes (DaemonSet)
 
-```yaml
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: aws-xray-daemon
-  namespace: kube-system
-spec:
-  selector:
-    matchLabels:
-      app: aws-xray-daemon
-  template:
-    metadata:
-      labels:
-        app: aws-xray-daemon
-    spec:
-      containers:
-        - name: xray-daemon
-          image: public.ecr.aws/xray/aws-xray-daemon:4.1
-          ports:
-            - containerPort: 2000
-              protocol: UDP
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
-```
-
-The app pod sends traces to the NODE IP on port 2000. Use the downward
-API to inject the node IP:
-
-```yaml
-env:
-  - name: AWS_XRAY_DAEMON_ADDRESS
-    valueFrom:
-      fieldRef:
-        fieldPath: status.hostIP
-```
+EKS DaemonSet manifest and node-IP downward-API injection: [Daemon and sampling guide](references/daemon-and-sampling-guide.md).
+Load on demand for EKS deployments.
 
 #### Lambda (built-in — no daemon needed)
 
-Lambda injects the X-Ray daemon automatically when tracing is enabled.
-You do NOT deploy the daemon. Enable tracing on the function:
-
-```bash
-aws lambda update-function-configuration \
-  --function-name <name> \
-  --tracing-config Mode=Active
-```
-
-For Powertools (recommended for clean annotation syntax):
-
-```bash
-# Add the Powertools layer
-aws lambda update-function-configuration \
-  --function-name <name> \
-  --layers arn:aws:lambda:us-east-1:017000801446:layer:AWSLambdaPowertoolsPythonV2:75 \
-  --tracing-config Mode=Active
-```
+Lambda enable-tracing and Powertools layer CLI: [Daemon and sampling guide](references/daemon-and-sampling-guide.md).
+Load on demand for Lambda deployments.
 
 ### Step 3: SDK instrumentation (by language)
 
@@ -456,33 +357,8 @@ aws xray get-insight-summaries --start-time <ISO> --end-time <ISO>
 
 ## Latest X-Ray features (2024-2026)
 
-- **Lambda Powertools tracing (2024-2025):** Powertools v2 provides clean
-  `@tracer.capture_lambda_handler` and `@tracer.capture_method` decorators
-  for Python and TypeScript. Eliminates manual segment management. The
-  recommended path for new Lambda instrumentation.
-- **OpenTelemetry / ADOT Collector (2024-2025):** AWS Distro for
-  OpenTelemetry (ADOT) Collector replaces the X-Ray daemon for ECS and
-  EKS. Supports OTel-format traces (W3C trace context) and exports to
-  X-Ray via the `awsxray` exporter. The X-Ray daemon is in maintenance
-  mode — new deployments should use ADOT.
-- **X-Ray sampling rule goop (2024-2025):** centralized sampling rules
-  now support rule-based sampling with attributes, enabling dynamic
-  sampling (e.g., sample 100% of traces with `environment=production`).
-- **X-Ray Insights with anomaly detection (2024-2025):** Insights now
-  detect anomalies in dependency latency (e.g., RDS slow-down) and
-  surface them in the X-Ray console and EventBridge.
-- **CloudWatch ServiceLens cross-account (2024-2025):** ServiceLens
-  service map now aggregates traces across accounts (via CloudWatch
-  cross-account observability). Previously single-account only.
-- **X-Ray encryption with CMK (2024-2025):** set a customer-managed KMS
-  key via `aws xray put-encryption-config`. The key must have a grant
-  for the X-Ray service principal.
-- **X-Ray daemon 4.x (2024-2025):** the 4.x daemon line is the final
-  major version. It receives security patches only. Feature development
-  has moved to ADOT Collector. Plan migration to ADOT for new deployments.
-- **W3C trace context support (2024-2025):** the X-Ray SDK now supports
-  W3C `traceparent` header propagation alongside the X-Ray `X-Amzn-Trace-Id`
-  header. Enables interop with non-AWS tracing systems.
+2024-2026 feature delta (Powertools v2, ADOT Collector, attribute-based sampling, Insights anomaly detection, cross-account ServiceLens, CMK, daemon 4.x maintenance mode, W3C): [Advanced patterns](references/advanced-patterns.md).
+Load on demand when choosing components.
 
 ## Platform matrix
 
@@ -520,28 +396,8 @@ aws xray get-insight-summaries --start-time <ISO> --end-time <ISO>
 
 ## Expert heuristic — choosing X-Ray SDK vs ADOT, sampling, and annotations
 
-- **X-Ray SDK vs ADOT:** X-Ray SDK is AWS-specific and simpler (one
-  package, one middleware). ADOT (OpenTelemetry) is vendor-neutral and
-  supports multiple backends. For AWS-only environments, X-Ray SDK is
-  faster to deploy. For multi-cloud or migration-ready architectures,
-  ADOT is the future-proof choice.
-- **Reservoir + Rate tuning:** reservoir = guaranteed traces/s (before
-  rate applies). rate = fraction of remaining requests to sample. For
-  low-traffic services (< 10 req/s), set reservoir = 1, rate = 0.05
-  (default). For high-traffic critical endpoints (checkout, payment),
-  set reservoir = 10, rate = 1.0 (100% above reservoir).
-- **Annotation discipline:** annotate `customer_id`, `environment`,
-  `region`, `feature_flag`. These are the fields you will filter on in
-  the X-Ray console. NEVER annotate with high-cardinality fields (e.g.,
-  `request_id`) — annotation index bloats and degrades query performance.
-- **Trace context propagation:** ensure the `X-Amzn-Trace-Id` header (or
-  W3C `traceparent`) is propagated across ALL service boundaries (ALB,
-  API Gateway, Lambda, SQS, EventBridge). Without propagation, each
-  service starts a new trace — the service map shows disconnected nodes.
-- **Cost control:** X-Ray charges per trace ingested ($5 per 1M traces
-  in us-east-1 as of 2026). For high-traffic services, keep the Default
-  rule at 5% and use custom rules for critical endpoints. Monitor
-  `GetTraceSummaries` count in CloudWatch.
+SDK-vs-ADOT choice, reservoir/rate tuning, annotation discipline, trace-context propagation, and cost control: [Advanced patterns](references/advanced-patterns.md).
+Load on demand when making design decisions.
 
 ## Pre-flight safety checks (run before any deployment CLI)
 
@@ -599,44 +455,20 @@ VERIFICATION_COMMANDS:
 (IAM permissions, daemon / Collector not running, SDK not instrumented,
 sampling rules not configured), the verdict is `PREREQUISITES_MISSING`.
 
+## References (load on demand)
+
+- [Advanced patterns](references/advanced-patterns.md) — 2024-2026 feature delta, SDK-vs-ADOT heuristics, edge-case catalog
+- [Daemon and sampling guide](references/daemon-and-sampling-guide.md) — per-platform daemon deployment blocks (EC2, ECS Fargate, EKS, Lambda) plus the full daemon/sampling CLI sequence
+- [SDK instrumentation guide](references/sdk-instrumentation-guide.md) — language-by-language instrumentation and AWS SDK patching
+
 ## Domain
 
 AWS CloudOps / X-Ray Distributed Tracing Observability Provisioning.
 
 ## Edge-case handling
 
-- **Cross-account tracing:** traces can span accounts via CloudWatch
-  cross-account observability. The trace context (`X-Amzn-Trace-Id`)
-  propagates across accounts. ServiceLens aggregates the cross-account
-  service map.
-- **SQS / EventBridge trace propagation:** the X-Ray SDK does NOT
-  automatically propagate trace context through SQS / EventBridge. The
-  producer must include the `X-Amzn-Trace-Id` header in the message
-  attribute, and the consumer must read it and start a subsegment with
-  the parent trace ID.
-- **ECS EC2 daemon-as-a-service vs sidecar:** daemon-as-a-service (one
-  daemon per EC2 instance) saves memory but requires the app to send to
-  the HOST IP, not localhost. Use the ECS task metadata endpoint to
-  discover the host IP, or use `AWS_XRAY_DAEMON_ADDRESS` env var.
-- **EKS resource limits:** the daemon consumes CPU and memory. Set
-  requests (100m CPU, 128Mi memory) and limits (500m CPU, 512Mi memory)
-  on the DaemonSet. Without limits, a spike in trace volume can starve
-  the app containers on the same node.
-- **Lambda cold start with X-Ray:** enabling X-Ray on Lambda adds ~50-100ms
-  to cold start (daemon initialization). Use Powertools to minimize
-  overhead — it lazy-loads the SDK.
-- **OTel migration:** the ADOT Collector replaces the X-Ray daemon.
-  Switch the SDK from `aws-xray-sdk` to `opentelemetry-*` and deploy the
-  ADOT Collector sidecar. The X-Ray backend is the same — only the agent
-  and SDK change.
-- **High-cardinality annotations:** NEVER annotate with `request_id`,
-  `timestamp`, or other per-request unique fields. The annotation index
-  grows unbounded and degrades X-Ray query performance. Use metadata for
-  these fields.
-- **X-Ray encryption with CMK:** if a CMK is set via
-  `put-encryption-config`, the X-Ray service needs a grant on the key.
-  If the grant is missing, `PutTraceSegments` fails silently (the daemon
-  retries indefinitely).
+Edge-case catalog (cross-account, SQS/EventBridge propagation, ECS EC2 host-IP, EKS limits, Lambda cold start, OTel migration, high-cardinality annotations, CMK grants): [Advanced patterns](references/advanced-patterns.md).
+Load on demand when deployment hits a corner case.
 
 ## AWS documentation
 

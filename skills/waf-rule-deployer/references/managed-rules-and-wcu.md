@@ -334,3 +334,15 @@ resource "aws_cloudfront_distribution" "production" {
 
 4. **Bot Control and ATP are paid.** These managed rule groups have
    additional charges per request. Confirm budget before enabling.
+
+## Step 4 - offload WCU to a referenced rule group (moved from SKILL.md)
+
+**Offload WCU to a rule group** (up to 1500 WCU separately):
+
+```bash
+aws wafv2 create-rule-group \
+  --scope CLOUDFRONT --region us-east-1 \
+  --name "custom-exceptions" --capacity 1500 \
+  --visibility-config SampledRequestsEnabled=true,CloudWatchMetricsEnabled=true,MetricName='custom-exceptions'
+# Reference it in the Web ACL via RuleGroupReferenceStatement (1 WCU)
+```

@@ -132,3 +132,22 @@ A /56 supports 256 /64 subnets — sufficient for any VPC topology.
 **Key difference:** IPv6 addresses are internet-routable by default.
 Private IPv6 subnets need an Egress-Only Internet Gateway for
 outbound-only connectivity. There is no IPv6 NAT.
+---
+
+## RFC 1918 private ranges (Step 1)
+
+**RFC 1918 private ranges:**
+
+| Range | CIDR | IPs | Typical use |
+|---|---|---|---|
+| 10.0.0.0/8 | /8 to /28 | 16M+ | Large enterprises, multi-VPC, on-prem integration |
+| 172.16.0.0/12 | /12 to /28 | 1M+ | Mid-size, common for VPCs |
+| 192.168.0.0/16 | /16 to /28 | 65K+ | Small deployments, home/office overlap risk |
+
+## Sizing rationale — why /16 and /20 per tier (Step 1)
+
+**Sizing rationale:** A /16 (65,536 IPs) seems excessive for a starter
+VPC, but AWS reserves 5 IPs per subnet (network, broadcast, DNS, future
+use ×2). A /28 subnet has only 11 usable IPs. A /24 has 251 usable.
+Over-provisioning at /20 (4,094 IPs) per tier per AZ eliminates the need
+for subnet migration later.

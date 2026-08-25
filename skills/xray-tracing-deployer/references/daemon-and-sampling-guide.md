@@ -433,3 +433,120 @@ aws lambda get-function-configuration --function-name <function-name> --query 'T
 - `AWS::IAM::Role` — attach `AWSXRayDaemonWriteAccess` managed policy.
 - `AWS::ECS::TaskDefinition` — add the `xray-daemon` sidecar container.
 - `AWS::Lambda::Function` — `TracingConfig: { Mode: Active }`.
+
+## Per-platform daemon deployment blocks (moved from SKILL.md)
+
+### EC2 (systemd)
+```bash
+# Download the daemon
+curl -o /tmp/xray.zip https://s3.us-east-1.amazonaws.com/aws-xray-assets.us-east-1/xray-daemon/aws-xray-daemon-linux-3.x.zip
+unzip /tmp/xray.zip -d /opt/aws-xray-daemon
+
+# Create systemd unit
+cat > /etc/systemd/system/xray.service << 'EOF'
+[Unit]
+Description=AWS X-Ray Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=xray
+ExecStart=/opt/aws-xray-daemon/xray -o /var/log/xray/xray.log
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now xray
+```
+
+### ECS Fargate (sidecar container)
+The daemon MUST be a sidecar in the SAME task definition as the app.
+Add this container to the task definition:
+
+```json
+{
+  "name": "xray-daemon",
+  "image": "public.ecr.aws/xray/aws-xray-daemon:4.1",
+  "cpu": 256,
+  "memory": 512,
+  "essential": true,
+  "portMappings": [{"containerPort": 2000, "protocol": "udp"}],
+  "logConfiguration": {
+    "logDriver": "awslogs",
+    "options": {
+      "awslogs-group": "/ecs/xray-daemon",
+      "awslogs-region": "us-east-1",
+      "awslogs-stream-prefix": "xray"
+    }
+  }
+}
+```
+
+The app container sends traces to `127.0.0.1:2000` (UDP). Both containers
+share the task network namespace (awsvpc), so localhost works.
+
+### EKS / Kubernetes (DaemonSet)
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: aws-xray-daemon
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: aws-xray-daemon
+  template:
+    metadata:
+      labels:
+        app: aws-xray-daemon
+    spec:
+      containers:
+        - name: xray-daemon
+          image: public.ecr.aws/xray/aws-xray-daemon:4.1
+          ports:
+            - containerPort: 2000
+              protocol: UDP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+```
+
+The app pod sends traces to the NODE IP on port 2000. Use the downward
+API to inject the node IP:
+
+```yaml
+env:
+  - name: AWS_XRAY_DAEMON_ADDRESS
+    valueFrom:
+      fieldRef:
+        fieldPath: status.hostIP
+```
+
+### Lambda (built-in — no daemon needed)
+Lambda injects the X-Ray daemon automatically when tracing is enabled.
+You do NOT deploy the daemon. Enable tracing on the function:
+
+```bash
+aws lambda update-function-configuration \
+  --function-name <name> \
+  --tracing-config Mode=Active
+```
+
+For Powertools (recommended for clean annotation syntax):
+
+```bash
+# Add the Powertools layer
+aws lambda update-function-configuration \
+  --function-name <name> \
+  --layers arn:aws:lambda:us-east-1:017000801446:layer:AWSLambdaPowertoolsPythonV2:75 \
+  --tracing-config Mode=Active
+```

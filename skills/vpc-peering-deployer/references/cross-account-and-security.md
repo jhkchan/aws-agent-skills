@@ -305,3 +305,24 @@ resource "aws_security_group_rule" "requester_ingress" {
    its own VPC CIDRs. Two accounts may independently allocate
    overlapping CIDRs. Always verify before creating cross-account
    peering.
+---
+
+## Step 7 — SG cross-reference vs CIDR-based rule commands
+
+**Same-account, same-region SG cross-reference:**
+
+```bash
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-requester111 \
+  --ip-permissions "IpProtocol=tcp,FromPort=443,ToPort=443,UserIdGroupPairs=[{GroupId=sg-accepter222,VpcPeeringConnectionId=$PCX_ID}]" \
+  --region us-east-1
+```
+
+**Cross-account or inter-region (CIDR-based rule):**
+
+```bash
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-requester111 \
+  --ip-permissions "IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges=[{CidrIp=10.1.0.0/16}]" \
+  --region us-east-1
+```

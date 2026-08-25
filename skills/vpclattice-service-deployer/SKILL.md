@@ -82,6 +82,9 @@ with a specific gap citation in the checklist (marked `[✗]`), and
 | Output format | The literal checklist template |
 | references/auth-policy-and-access.md | Auth + policy detail |
 | references/listener-rules-and-health.md | Routing + health detail |
+| references/worked-examples.md | Step CLIs (network, service, association, domain) |
+| references/error-handling.md | Failure triage |
+| references/advanced-patterns.md | Recent features |
 
 ## Mindset
 
@@ -187,53 +190,13 @@ determine which VPCs can reach the services.
 
 ## Expert heuristic: health check determines routing eligibility
 
-A baseline model treats health checks as monitoring. In VPC Lattice,
-health checks are a routing input — not just observability.
-
-```text
-Request → Listener → Rule match → Target Group
-                                    ├── Target 1: HEALTHY   → receives traffic ✓
-                                    ├── Target 2: HEALTHY   → receives traffic ✓
-                                    └── Target 3: UNHEALTHY → receives ZERO   ✗
-
-If ALL targets in TG are unhealthy → Lattice returns 503 to client.
-If SOME targets healthy → traffic distributed among healthy only.
-```
-
-Health check parameters: **path** (e.g., `/health`, must return 200),
-**interval** (default 30s, range 5-300), **timeout** (default 5s),
-**healthy threshold** (default 2, range 2-10), **unhealthy threshold**
-(default 2, range 2-10), **matcher** (HTTP code(s), default 200).
-
-**Key implication:** misconfigured health checks cause 503s that look
-like "service down." Always verify health check status BEFORE expecting
-traffic to flow. This is the #1 cause of "my Lattice service returns
-503" tickets.
+Expert heuristic — health check determines routing eligibility — moved verbatim.
+Full detail: [Listener rules and health](references/listener-rules-and-health.md).
 
 ## Expert heuristic: auth policy scope (service, not rule)
 
-A baseline model assumes auth can be scoped per path. The correct
-heuristic recognizes the auth policy boundary.
-
-```text
-WRONG (impossible in VPC Lattice):
-  Service: payments-svc
-    ├── Rule 1: /public/* → no auth
-    └── Rule 2: /admin/*  → IAM auth required
-
-CORRECT:
-  Service: payments-public-svc (no auth policy)
-    └── Rule 1: /public/* → TG-public
-  Service: payments-admin-svc (IAM auth policy attached)
-    └── Rule 1: /admin/*  → TG-admin
-
-Auth policy attaches to the SERVICE, not to individual rules.
-Need different auth per path? Create separate services.
-```
-
-**Key implication:** if your design requires different auth semantics
-per path, you MUST split into separate services. One auth policy per
-service — no exceptions.
+Expert heuristic — auth policy scope (service, not rule) — moved verbatim.
+Full detail: [Auth policy and access](references/auth-policy-and-access.md).
 
 ## Prerequisites (verify before provisioning)
 
@@ -256,14 +219,8 @@ and cite the specific gap.
 The service network is the top-level routing plane. It is an account-
 level construct — NOT a VPC-level construct. Typically one per account.
 
-```bash
-SN_ID=$(aws vpc-lattice create-service-network \
-  --name my-service-network \
-  --auth-type AWS_IAM \
-  --tags source=skill-deploy \
-  --query 'id' --output text)
-echo "Service Network: $SN_ID"
-```
+Step 1 — create service network CLI — moved verbatim.
+Full detail: [Worked examples](references/worked-examples.md).
 
 **Auth type:** `AWS_IAM` enforces IAM auth by default (the auth policy
 still needs PUT on each service). `NONE` means no IAM auth enforcement
@@ -281,55 +238,21 @@ The target group type must be chosen at creation and CANNOT be changed.
 | LAMBDA | Lambda function ARN | No | Serverless functions |
 | ALB | ALB ARN | Yes | ALB with Lattice upstream |
 
-**Instance target group with health check:**
-
-```bash
-TG_ID=$(aws vpc-lattice create-target-group \
-  --name tg-stable --type INSTANCE \
-  --config '{"port":8080,"protocol":"HTTP","vpcIdentifier":"vpc-aaa11122","healthCheck":{"enabled":true,"path":"/health","protocol":"HTTP","intervalSeconds":30,"timeoutSeconds":5,"healthyThresholdCount":2,"unhealthyThresholdCount":2,"matcher":{"httpCode":"200"}}}' \
-  --query 'id' --output text)
-
-aws vpc-lattice register-targets \
-  --target-group-identifier "$TG_ID" \
-  --targets '[{"id":"i-aaa111222333444","port":8080}]'
-```
-
-**Lambda target group:**
-
-```bash
-TG_LAMBDA_ID=$(aws vpc-lattice create-target-group \
-  --name tg-lambda-processor --type LAMBDA \
-  --config '{"lambdaEventStructureVersion":"2.0"}' \
-  --query 'id' --output text)
-
-aws vpc-lattice register-targets \
-  --target-group-identifier "$TG_LAMBDA_ID" \
-  --targets '[{"id":"arn:aws:lambda:us-east-1:123456789012:function:processor"}]'
-```
+Step 2 — instance target group with health check CLI; Step 2 — Lambda target group CLI — moved verbatim.
+Full detail: [Listener rules and health](references/listener-rules-and-health.md).
 
 **Critical:** health check status determines routing eligibility. Verify:
 
-```bash
-aws vpc-lattice list-targets \
-  --target-group-identifier "$TG_ID" \
-  --query 'items[*].{Target:id,Status:status}' --output table
-```
+Step 2 — verify target health CLI — moved verbatim.
+Full detail: [Listener rules and health](references/listener-rules-and-health.md).
 
 ## Step 3 — Service (HTTP/gRPC)
 
 A service is a runnable unit within a service network. It gets an
 auto-assigned DNS name.
 
-```bash
-SVC_ID=$(aws vpc-lattice create-service \
-  --name payments-svc \
-  --query 'id' --output text)
-
-echo "Service: $SVC_ID"
-echo "Service DNS: $(aws vpc-lattice get-service \
-  --service-identifier "$SVC_ID" \
-  --query 'dnsEntry.domainName' --output text)"
-```
+Step 3 — create service CLI — moved verbatim.
+Full detail: [Worked examples](references/worked-examples.md).
 
 **Protocol:** HTTP and gRPC are supported. Set when creating the
 listener (not the service). A service can have one listener per
@@ -341,37 +264,8 @@ Listeners receive traffic for a service. Rules define routing based on
 path, header, and HTTP method. Rules are evaluated in priority order;
 first match wins.
 
-**Create a listener with default action:**
-
-```bash
-LISTENER_ID=$(aws vpc-lattice create-listener \
-  --service-identifier "$SVC_ID" \
-  --default-action '{"forward":{"targetGroups":[{"targetGroupIdentifier":"'$TG_ID'","weight":100}]}}' \
-  --protocol HTTP --port 80 --name payments-listener \
-  --query 'id' --output text)
-```
-
-**Path-based routing rule (weighted canary split):**
-
-```bash
-aws vpc-lattice create-rule \
-  --service-identifier "$SVC_ID" \
-  --listener-identifier "$LISTENER_ID" \
-  --name canary-rule --priority 10 \
-  --match '{"httpMatch":{"path":{"prefix":"/api"},"method":"GET"}}' \
-  --actions '[{"type":"FORWARD","forward":{"targetGroups":[{"targetGroupIdentifier":"'$TG_CANARY_ID'","weight":20},{"targetGroupIdentifier":"'$TG_ID'","weight":80}]}}]'
-```
-
-**Header-based routing rule:**
-
-```bash
-aws vpc-lattice create-rule \
-  --service-identifier "$SVC_ID" \
-  --listener-identifier "$LISTENER_ID" \
-  --name beta-header-rule --priority 20 \
-  --match '{"httpMatch":{"headerMatches":[{"name":"x-env","match":{"exact":"beta"}}]}}' \
-  --actions '[{"type":"FORWARD","forward":{"targetGroups":[{"targetGroupIdentifier":"'$TG_CANARY_ID'","weight":100}]}}]'
-```
+Step 4 — listener and routing rule CLIs (default, path, header) — moved verbatim.
+Full detail: [Listener rules and health](references/listener-rules-and-health.md).
 
 ## Step 5 — IAM auth policy (service level, NOT rule level)
 
@@ -379,17 +273,8 @@ The IAM auth policy enforces IAM-based authentication on the SERVICE.
 It applies to ALL listener rules and ALL paths — you CANNOT scope auth
 to a specific rule.
 
-```bash
-# Set service auth type
-aws vpc-lattice update-service \
-  --service-identifier "$SVC_ID" \
-  --body '{"authType":"AWS_IAM"}'
-
-# Put the auth policy on the service
-aws vpc-lattice put-auth-policy \
-  --resource-identifier "$SVC_ID" \
-  --policy '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/PaymentsCaller"},"Action":"vpc-lattice-svcs:Invoke","Resource":"*"}]}'
-```
+Step 5 — IAM auth policy CLI (service level) — moved verbatim.
+Full detail: [Auth policy and access](references/auth-policy-and-access.md).
 
 **Critical:** the auth policy is at the SERVICE level. If you need
 different auth per path, split into separate services with separate
@@ -401,11 +286,8 @@ The resource-based service policy controls who can INVOKE the service
 (cross-account access). Separate from the IAM auth policy (which
 controls request-level auth).
 
-```bash
-aws vpc-lattice put-service-policy \
-  --service-identifier "$SVC_ID" \
-  --policy '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::999999999999:root"},"Action":"vpc-lattice-svcs:Invoke","Resource":"*"}]}'
-```
+Step 6 — resource-based service policy CLI — moved verbatim.
+Full detail: [Auth policy and access](references/auth-policy-and-access.md).
 
 Combined with RAM sharing, this enables full cross-account service
 access.
@@ -416,40 +298,15 @@ VPCs must be ASSOCIATED with the service network to use Lattice DNS
 resolution and reach services. Without association, instances in the VPC
 cannot resolve Lattice service DNS names.
 
-```bash
-aws vpc-lattice create-service-network-vpc-association \
-  --service-network-identifier "$SN_ID" \
-  --vpc-identifier vpc-aaa11122
-
-# Verify association status
-aws vpc-lattice list-service-network-vpc-associations \
-  --service-network-identifier "$SN_ID" \
-  --query 'items[*].{VPC:vpcId,Status:status}' --output table
-# Expected: ACTIVE
-```
+Step 7 — service network VPC association CLI — moved verbatim.
+Full detail: [Worked examples](references/worked-examples.md).
 
 ## Step 8 — Cross-account service access
 
 Cross-account access requires RAM share + service policy.
 
-```bash
-# 1. Create RAM resource share (shares service network with other account)
-aws ram create-resource-share \
-  --name lattice-cross-account-share \
-  --resource-arns "arn:aws:vpc-lattice:us-east-1:123456789012:servicenetwork/$SN_ID" \
-  --principals 999999999999
-
-# 2. In the consumer account (999999999999): accept the RAM invitation
-aws ram accept-resource-share-invitation \
-  --resource-share-invitation-arn <invitation-arn>
-
-# 3. In the consumer account: associate their VPC with the shared network
-aws vpc-lattice create-service-network-vpc-association \
-  --service-network-identifier "$SN_ID" \
-  --vpc-identifier vpc-cross-acct-222
-
-# 4. Put the service policy allowing cross-account invocation (Step 6)
-```
+Step 8 — cross-account access CLI (RAM share + association) — moved verbatim.
+Full detail: [Auth policy and access](references/auth-policy-and-access.md).
 
 **Missing any of the four steps results in AccessDenied.**
 
@@ -458,22 +315,8 @@ aws vpc-lattice create-service-network-vpc-association \
 Custom domains map a user-facing DNS name to a Lattice service. The ACM
 certificate MUST be in us-east-1 regardless of the service's region.
 
-```bash
-# Associate custom domain with the service
-aws vpc-lattice associate-custom-domain \
-  --service-identifier "$SVC_ID" \
-  --domain-name payments.internal.example.com \
-  --certificate-arn arn:aws:acm:us-east-1:123456789012:certificate/aaa-bbb-ccc
-
-# Create Route 53 CNAME pointing to the service DNS
-SERVICE_DNS=$(aws vpc-lattice get-service \
-  --service-identifier "$SVC_ID" \
-  --query 'dnsEntry.domainName' --output text)
-
-aws route53 change-resource-record-sets \
-  --hosted-zone-id "$ZONE_ID" \
-  --change-batch '{"Changes":[{"Action":"CREATE","ResourceRecordSet":{"Name":"payments.internal.example.com","Type":"CNAME","TTL":60,"ResourceRecords":[{"Value":"'$SERVICE_DNS'"}]}}]}'
-```
+Step 9 — custom domain mapping CLI — moved verbatim.
+Full detail: [Worked examples](references/worked-examples.md).
 
 **Critical:** ACM cert must be in us-east-1, and the cert's domain name
 must match the custom domain.
@@ -485,25 +328,8 @@ group via weighted forwarding in a listener rule. Weights are relative
 (not percentage); weights 1 and 4 produce the same 20/80 split as 20
 and 80.
 
-```bash
-# Create canary target group (same health check as stable)
-TG_CANARY_ID=$(aws vpc-lattice create-target-group \
-  --name tg-canary --type INSTANCE \
-  --config '{"port":8080,"protocol":"HTTP","vpcIdentifier":"vpc-aaa11122","healthCheck":{"enabled":true,"path":"/health","protocol":"HTTP","intervalSeconds":30,"healthyThresholdCount":2}}' \
-  --query 'id' --output text)
-
-aws vpc-lattice register-targets \
-  --target-group-identifier "$TG_CANARY_ID" \
-  --targets '[{"id":"i-canary111222","port":8080}]'
-
-# Rule: 20% canary, 80% stable
-aws vpc-lattice create-rule \
-  --service-identifier "$SVC_ID" \
-  --listener-identifier "$LISTENER_ID" \
-  --name canary-split --priority 10 \
-  --match '{"httpMatch":{"path":{"prefix":"/api"}}}' \
-  --actions '[{"type":"FORWARD","forward":{"targetGroups":[{"targetGroupIdentifier":"'$TG_CANARY_ID'","weight":20},{"targetGroupIdentifier":"'$TG_ID'","weight":80}]}}]'
-```
+Step 10 — traffic splitting (canary) CLI — moved verbatim.
+Full detail: [Listener rules and health](references/listener-rules-and-health.md).
 
 **Progressive canary (20 -> 50 -> 100%):** update rule weights with
 `update-rule` to shift traffic gradually.
@@ -513,19 +339,8 @@ aws vpc-lattice create-rule \
 Access logs capture Lattice request details for observability and audit.
 Delivery is async; first logs appear within 5-10 minutes.
 
-```bash
-# Deliver to CloudWatch Logs
-aws vpc-lattice put-access-log-subscription \
-  --resource-identifier "$SN_ID" \
-  --service-network-log-type SERVICE \
-  --log-destination '{"provider":"cloudwatch","destinationArn":"arn:aws:logs:us-east-1:123456789012:log-group:/aws/vpc-lattice"}'
-
-# Or deliver to S3
-aws vpc-lattice put-access-log-subscription \
-  --resource-identifier "$SN_ID" \
-  --service-network-log-type SERVICE \
-  --log-destination '{"provider":"s3","destinationArn":"arn:aws:s3:::my-lattice-logs","prefix":"lattice/"}'
-```
+Step 11 — access log delivery CLI — moved verbatim.
+Full detail: [Auth policy and access](references/auth-policy-and-access.md).
 
 ## Step 12 — Pricing (per GB processed)
 
@@ -542,24 +357,8 @@ hourly charge is minor for a small number of services.
 
 ## Step 13 — Recent features
 
-- **VPC Lattice GA (2023):** Service networks, services, target groups,
-  listener rules, and IAM auth policies.
-- **gRPC support (2023-2024):** Full gRPC protocol for services,
-  including gRPC health checks and gRPC-specific listener rules.
-- **Lambda TG event structure 2.0 (2023-2024):** Lambda target groups
-  use an improved event structure with Lattice metadata.
-- **Cross-account via RAM (2023-2024):** RAM resource shares enable
-  cross-account VPC association with a shared service network.
-- **Custom domain with ACM TLS (2023-2024):** ACM-managed TLS certs
-  (us-east-1) for user-facing custom domain names.
-- **Access log subscription (2024-2025):** Structured access log
-  delivery to CloudWatch Logs or S3.
-- **Weighted traffic splitting (2024-2025):** Listener rules support
-  weighted forwarding to multiple target groups for canary/blue-green.
-- **Header-based routing (2024-2025):** Listener rules support header
-  matching in addition to path-based and method-based routing.
-- **Tiered pricing (2025-2026):** Reduced per-GB cost above monthly
-  thresholds for high-volume workloads.
+Step 13 — recent features (2023-2026) — moved verbatim.
+Full detail: [Advanced Patterns](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -663,32 +462,16 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Service returns 503 (no healthy targets)
-- All targets in the target group are failing health checks. Verify
-  health check path, port, and matcher. Check that targets are running
-  and responding on the health check path. Use `list-targets` to see
-  health status and reasons.
+Error handling deep dives — moved verbatim.
+Full detail: [Error handling](references/error-handling.md).
 
-### Cross-account invocation fails with AccessDenied
-- Either the RAM resource share was not accepted, the VPC association
-  was not created in the consumer account, or the resource-based service
-  policy does not include the consumer account principal. Verify all
-  three: RAM, association, service policy.
+## References (load on demand)
 
-### Custom domain does not resolve
-- The Route 53 record may not point to the service DNS name. Or the ACM
-  certificate is not in us-east-1. Verify the cert ARN region and DNS
-  record target.
-
-### VPC instances cannot reach the Lattice service
-- The VPC may not be associated with the service network. Verify the VPC
-  association status is ACTIVE. Without association, Lattice DNS names
-  do not resolve within the VPC.
-
-### Auth policy not enforcing
-- The service auth type may not be set to AWS_IAM. The auth policy only
-  takes effect when the service auth type is AWS_IAM. Use
-  `update-service --body '{"authType":"AWS_IAM"}'` to set it.
+- [Auth policy and access](references/auth-policy-and-access.md) — auth-scope heuristic, Step 5/6/8/11 CLIs (auth policy, service policy, RAM cross-account, access logs)
+- [Listener rules and health](references/listener-rules-and-health.md) — health-check heuristic, Step 2/4/10 CLIs (target groups, listeners/rules, canary)
+- [Worked examples](references/worked-examples.md) — Step 1/3/7/9 CLIs (service network, service, VPC association, custom domain)
+- [Error handling](references/error-handling.md) — 503 no healthy targets, cross-account AccessDenied, DNS, reachability, auth-policy fixes
+- [Advanced patterns](references/advanced-patterns.md) — recent features 2023-2026
 
 ## Domain
 

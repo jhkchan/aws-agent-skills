@@ -215,26 +215,8 @@ Managed rule groups are curated by AWS and AWS Marketplace sellers.
 They are versioned — pin a version for stability, or use
 `AGENTIC` versioning (auto-update) for hands-off maintenance.
 
-**AWS-managed rule groups (free, no subscription):**
-
-| Rule group | What it blocks | Typical priority |
-|---|---|---|
-| `AWSManagedRulesCommonRuleSet` | Core rule set — protocol anomalies, XSS, SQLi, LFI/RFI, session fixation. 10 rules. | 10 |
-| `AWSManagedRulesAdminProtectionRuleSet` | External access to admin panels. | 30 |
-| `AWSManagedRulesKnownBadInputsRuleSet` | Log4j, SSRF, bad-input signatures. | 40 |
-| `AWSManagedRulesSQLiRuleSet` | SQL injection signatures. | 20 |
-| `AWSManagedRulesLinuxRuleSet` | Linux shell injection (`/etc/passwd`, `/bin/sh`). | 50 |
-| `AWSManagedRulesWindowsRuleSet` | PowerShell / cmd injection. | 70 |
-| `AWSManagedRulesAmazonIpReputationList` | AWS threat-intel IPs (bots, malware C2). | 100 |
-| `AWSManagedRulesAnonymousIpList` | Tor exit nodes, proxies, VPNs, hosting providers. | 110 |
-
-**Subscription rule groups (Marketplace, billed per-request):**
-
-| Rule group | What it blocks | Notes |
-|---|---|---|
-| `AWSManagedRulesBotControlRuleSet` | Bots, scrapers, crawlers (categorized: Common, Monitoring, Scraping, Spam, Automated, SearchEngine). | Public-facing sites; subscription required. |
-| `AWSManagedRulesATPRuleSet` | Account Takeover Prevention — credential stuffing, brute force. | Requires login path config. |
-| `AWSManagedRulesACFPRuleSet` | Account Creation Fraud Prevention — abusive signups. | Requires signup path config. |
+Managed/subscription rule group tables moved verbatim to [managed-rules-and-logging-guide.md](references/managed-rules-and-logging-guide.md).
+Load on demand when selecting rule groups in Step 3.
 
 ### Step 4: Custom rules
 
@@ -285,43 +267,11 @@ A rate-based rule counts requests per aggregate key value over a
 rolling 5-minute window. When the count exceeds the limit, the
 action fires for the remainder of the window.
 
-```json
-{
-  "Name": "rate-limit-api",
-  "Priority": 5000,
-  "Action": { "Block": {} },
-  "Statement": {
-    "RateBasedStatement": {
-      "Limit": 2000,
-      "AggregateKeyType": "IP",
-      "ScopeDownStatement": {
-        "ByteMatchStatement": {
-          "SearchString": "/api/",
-          "FieldToMatch": { "UriPath": {} },
-          "PositionalConstraint": "STARTS_WITH"
-        }
-      }
-    }
-  },
-  "VisibilityConfig": { "SampledRequestsEnabled": true, "CloudWatchMetricsEnabled": true, "MetricName": "rate-limit-api" }
-}
-```
+Rate-based rule JSON example moved verbatim to [worked-examples.md](references/worked-examples.md).
+Load on demand when authoring a RateBasedStatement rule.
 
-**Aggregate key types:**
-
-| Key | Behavior | Use when |
-|---|---|---|
-| `IP` | Source IP from TCP connection | Direct client-to-AWS connections |
-| `FORWARDED_IP` | First IP from `X-Forwarded-For` (configurable) | Behind CDN, ALB, or proxy |
-| `URI` | Per-URI-path aggregation | Rate-limit specific endpoints independently |
-| `QUERY_STRING` | Per-query-string aggregation | Rate-limit by API key in query |
-| `HTTP_METHOD` | Per-method aggregation | Limit POST/PUT separately |
-| `HEADER` | Per-header value aggregation | Limit by `Authorization` or `User-Agent` |
-
-**FORWARDED_IP configuration:** set `HeaderName`
-(`X-Forwarded-For`), `FallbackBehavior` (`MATCH|NO_MATCH`),
-`Position` (`FIRST|LAST|ANY`). `FIRST` = original client; `LAST`
-= closest proxy.
+Aggregate key table and FORWARDED_IP config moved verbatim to [managed-rules-and-logging-guide.md](references/managed-rules-and-logging-guide.md).
+Load on demand when choosing a rate aggregate key in Step 6.
 
 **NEVER use `IP` aggregate key behind a CDN or proxy.** All
 traffic shares the CDN egress IP — the rule rate-limits the CDN
@@ -338,115 +288,35 @@ client IP, URI, headers, labels) to one of three destinations.
 | **CloudWatch Logs** | Log group ARN with resource policy permitting `delivery.logs.amazonaws.com:PutLogEvents`. | Easiest for low-volume alerting and Insights queries. |
 | **S3** (via Firehose) | Firehose delivers to S3. S3 bucket policy must allow `delivery.logs.amazonaws.com`. | Firehose is the intermediary — WAF does not write to S3 directly. |
 
-```bash
-aws wafv2 put-logging-configuration \
-  --logging-configuration \
-    WebACLArn=<web-acl-arn>,LogDestinationConfigs=arn:aws:firehose:us-east-1:123456789012:deliverystream/aws-waf-logs-payments \
-  --region us-east-1
-```
+put-logging-configuration CLI moved verbatim to [deployment-cli-commands.md](references/deployment-cli-commands.md).
+Load on demand when enabling logging in Step 7.
 
-**CloudWatch Logs resource policy:**
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": { "Service": "delivery.logs.amazonaws.com" },
-    "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
-    "Resource": "arn:aws:logs:us-east-1:123456789012:log-group:/aws/wafv2/payments:*"
-  }]
-}
-```
+CloudWatch Logs resource policy JSON moved verbatim to [managed-rules-and-logging-guide.md](references/managed-rules-and-logging-guide.md).
+Load on demand when logging to CloudWatch Logs.
 
 ### Step 8: Association with ALB / API Gateway / CloudFront
 
-**ALB:**
-```bash
-aws wafv2 associate-web-acl \
-  --web-acl-arn <web-acl-arn> \
-  --resource-arn arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/payments-alb/50dc6c495c0c9188 \
-  --region us-east-1
-```
-
-**API Gateway (REST and HTTP):**
-```bash
-aws wafv2 associate-web-acl \
-  --web-acl-arn <web-acl-arn> \
-  --resource-arn arn:aws:apigateway:us-east-1::/restapis/<api-id>/stages/prod \
-  --region us-east-1
-```
-
-**CloudFront** (set on distribution, not via WAF API):
-```bash
-aws cloudfront get-distribution-config --id <dist-id> > /tmp/cf-config.json
-# Edit config: set WebACLId to the Web ACL ARN
-aws cloudfront update-distribution --id <dist-id> --if-match <etag> --distribution-config file:///tmp/cf-config.json
-```
+ALB / API Gateway / CloudFront association CLI moved verbatim to [deployment-cli-commands.md](references/deployment-cli-commands.md).
+Load on demand when associating in Step 8.
 
 A Web ACL can associate with multiple resources (one ACL per
 resource). CloudFront allows only one Web ACL per distribution.
 
 ### Step 9: CAPTCHA and Challenge actions
 
-`CAPTCHA` and `Challenge` are non-terminating actions for bot
-defense. When a rule with CAPTCHA action matches, WAF checks for
-a valid token (cookie or header). If valid, the request is
-allowed. If invalid or absent, WAF returns a CAPTCHA interstitial
-(HTTP 405 with a JavaScript challenge). Browsers solve silently
-in ~5 seconds and retry with the token.
+CAPTCHA/Challenge semantics moved verbatim to [managed-rules-and-logging-guide.md](references/managed-rules-and-logging-guide.md).
+Load on demand when deciding CAPTCHA vs Challenge.
 
-`Challenge` is the silent variant — a background JavaScript
-challenge, no user-visible puzzle. Use Challenge for low-friction
-bot filtering; use CAPTCHA when Challenge fails repeatedly.
-
-**CAPTCHA rule:**
-
-```json
-{
-  "Name": "captcha-signup",
-  "Priority": 1000,
-  "Action": { "Captcha": {} },
-  "Statement": {
-    "ByteMatchStatement": {
-      "SearchString": "/signup",
-      "FieldToMatch": { "UriPath": {} },
-      "PositionalConstraint": "STARTS_WITH"
-    }
-  },
-  "VisibilityConfig": { "SampledRequestsEnabled": true, "CloudWatchMetricsEnabled": true, "MetricName": "captcha-signup" }
-}
-```
+CAPTCHA rule JSON moved verbatim to [worked-examples.md](references/worked-examples.md).
+Load on demand when adding CAPTCHA in Step 9.
 
 **Integration SDK:** the client-side `aws-waf` JavaScript SDK
 captures the token and attaches it to subsequent requests. The
 SDK is specific to each Web ACL — copy the integration snippet
 from the console or API.
 
-**ATP (Account Takeover Prevention):** requires a managed rule
-group ARN and exact login path configuration. Start in `Count`
-mode for 1-2 weeks to baseline, then switch to Block.
-
-```json
-{
-  "Name": "atp-login",
-  "Priority": 200,
-  "Statement": {
-    "ManagedRuleGroupStatement": {
-      "VendorName": "AWS",
-      "Name": "AWSManagedRulesATPRuleSet",
-      "ManagedRuleGroupConfigs": [{
-        "LoginPath": "/api/v1/login",
-        "PayloadType": "JSON",
-        "UsernameField": { "Identifier": "username" },
-        "PasswordField": { "Identifier": "password" }
-      }]
-    }
-  },
-  "OverrideAction": { "Count": {} },
-  "VisibilityConfig": { "SampledRequestsEnabled": true, "CloudWatchMetricsEnabled": true, "MetricName": "atp-login" }
-}
-```
+ATP rule group config moved verbatim to [managed-rules-and-logging-guide.md](references/managed-rules-and-logging-guide.md).
+Load on demand when configuring ATP login protection.
 
 ## Visibility config
 
@@ -483,36 +353,8 @@ essential for debugging rule matches.
 
 ## Recent AWS features (2024-2026)
 
-- **Challenge action (2021, expanded 2024-2025):** silent browser
-  challenge for low-friction bot filtering. Returns HTTP 202 with
-  JavaScript; browsers solve in ~5 seconds. Custom request handling
-  and AWS WAF JavaScript SDK integration expanded.
-
-- **CAPTCHA action (2021, expanded 2024-2025):** interactive
-  CAPTCHA for high-confidence abuse. Token lifetime configurable;
-  mobile SDK support expanded.
-
-- **ATP GA (2021-2024):** managed rule group for credential
-  stuffing and brute force. Configurable login path, field
-  identifiers, payload type. Integrates with threat-intel feeds.
-
-- **ACFP GA (2022-2024):** managed rule group for abusive signup
-  detection. Configurable signup path and registration fields.
-
-- **Aggregate key types expanded (2024):** rate-based rules now
-  support `URI`, `QUERY_STRING`, `HTTP_METHOD`, `HEADER` as
-  aggregate keys in addition to `IP` and `FORWARDED_IP`.
-
-- **Bot Control category overrides (2024):** finer-grained
-  per-category overrides (allow Googlebot, block scrapers).
-
-- **JSON body parsing (2024):** `JsonBody` field-to-match with
-  `MatchPattern` and `MatchScope` for inspecting JSON request
-  bodies without regex.
-
-- **Token domains (2024-2025):** CAPTCHA / Challenge tokens can
-  be shared across multiple Web ACLs in the same account/Region,
-  reducing user friction across properties.
+Recent AWS features moved verbatim to [advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for 2024-2026 capability checks.
 
 ## NEVER (anti-patterns)
 
@@ -560,80 +402,13 @@ essential for debugging rule matches.
 
 ## Expert heuristic — choosing scope, rules, and actions
 
-**Scope — CloudFront vs Regional:** determined by the target
-resource. CloudFront distribution = CLOUDFRONT scope (always in
-us-east-1). Everything else = REGIONAL scope in the resource's
-Region. There is no "global" REGIONAL ACL — replicate per Region.
-
-**Managed rules — start with the Core Rule Set:**
-`AWSManagedRulesCommonRuleSet` is the right default for any
-public-facing workload. Add `SQLiRuleSet` for database endpoints,
-`LinuxRuleSet`/`WindowsRuleSet` based on target OS, and
-`AmazonIpReputationList` for threat-intel blocking. Add Bot
-Control and ATP only when you have a clear bot /
-credential-stuffing problem — they are billed per request.
-
-**Custom rules — allow-lists first, blocks last:** put partner IP
-allows and known-good path allows at the lowest priorities
-(0-9). Put workload-specific blocks (geo, URI, size) at high
-priorities (1000+). This ensures legitimate partners are not
-caught by managed rule groups.
-
-**Actions — Count before Block:** always run a new rule in Count
-mode for 1-2 weeks. Inspect the CloudWatch metric and sampled
-requests. If the false-positive rate is acceptable, switch to
-Block. For bot defense, use Challenge first (low friction), then
-CAPTCHA if Challenge is insufficient.
-
-**Rate limiting — choose the aggregate key carefully:** for
-direct-to-AWS connections, use `IP`. For traffic behind a CDN, ALB,
-or proxy, use `FORWARDED_IP` with `X-Forwarded-For` and
-`Position: FIRST`. For per-endpoint rate limits, use `URI` or
-scope-down with `ByteMatchStatement`.
-
-**Logging — Kinesis Firehose is the default:** Firehose buffers and
-batches to S3 with the least operational overhead. CloudWatch Logs
-is fine for low-volume (<1000 req/s) alerting. Direct S3 is not
-supported — Firehose is the intermediary.
-
-**ATP / ACFP — pin login and signup paths:** ATP requires
-`LoginPath`, `UsernameField.Identifier`, `PasswordField.Identifier`,
-and `PayloadType` (JSON or FORM_ENCODED). ACFP requires
-`RegistrationPath` and the same field identifiers. Wrong paths
-silently disable the rule group.
+Full heuristic detail moved verbatim to [advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when choosing scope, rules, actions, rate keys, or logging.
 
 ## Pre-flight safety checks (run before any provisioning CLI)
 
-- **Confirm the scope decision:**
-  ```bash
-  aws cloudfront get-distribution --id <dist-id> 2>/dev/null && echo "CLOUDFRONT scope needed"
-  aws elbv2 describe-load-balancers --load-balancer-arns <alb-arn> 2>/dev/null && echo "REGIONAL scope needed"
-  ```
-
-- **Confirm the target resource exists:**
-  ```bash
-  aws elbv2 describe-load-balancers --names <alb-name> --region <region>
-  aws apigateway get-rest-apis --region <region>
-  aws cloudfront get-distribution --id <dist-id>
-  ```
-
-- **Confirm the logging destination exists and has the right policy:**
-  ```bash
-  aws firehose describe-delivery-stream --delivery-stream-name aws-waf-logs-<name>
-  aws logs describe-resource-policies
-  aws s3api get-bucket-policy --bucket <log-bucket>
-  ```
-
-- **Confirm IP sets and regex pattern sets exist (if referenced):**
-  ```bash
-  aws wafv2 list-ip-sets --scope <scope> --region <region>
-  aws wafv2 list-regex-pattern-sets --scope <scope> --region <region>
-  ```
-
-- **Confirm managed rule group availability (ATP, Bot Control):**
-  ```bash
-  aws wafv2 list-available-managed-rule-groups --scope <scope> --region <region>
-  ```
+Pre-flight CLI checks moved verbatim to [diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before running any provisioning CLI.
 
 ## Output format — MANDATORY literal labels
 
@@ -683,36 +458,16 @@ or `[✗]` for unmet prerequisites.
 
 ## Edge-case handling
 
-- **Wrong scope discovered after creation.** The scope is immutable.
-  Delete the Web ACL and recreate with the correct scope.
-  Associations are removed on deletion. CloudFront association
-  requires a distribution update.
+Edge-case catalog moved verbatim to [advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when a deployed ACL misbehaves.
 
-- **Rule matches but no Block fires.** Check the rule's action — it
-  may be `Count` (non-terminating). Check priority — a higher-
-  priority `Allow` rule may be winning. Check `ExcludedRules` in
-  the managed rule group.
+## References (load on demand)
 
-- **Rate-based rule never triggers.** Verify the aggregate key. If
-  using `IP` behind a CDN, switch to `FORWARDED_IP`. Verify the
-  `Limit` is requests per 5 minutes. Verify `ScopeDownStatement`
-  is not over-narrowing.
-
-- **Logging silently drops logs.** Verify the Firehose name starts
-  with `aws-waf-logs-`. Verify the destination resource policy
-  allows `delivery.logs.amazonaws.com`. Check Firehose CloudWatch
-  metrics for `DeliveryToS3.Success`.
-
-- **CAPTCHA interstitial does not render.** The client-side AWS WAF
-  JavaScript SDK must be integrated. The token cookie domain must
-  match the site domain. Verify the action is `CAPTCHA` not
-  `Challenge` (Challenge is silent).
-
-- **Web ACL exceeds WCU budget.** Each Web ACL has a WCU limit
-  (1500 default, 3000 on request). Bot Control (~50 WCUs), ATP
-  (~50 WCUs), and large regex rules consume the most. Reduce by
-  excluding rules within managed groups, or request a limit
-  increase.
+- [worked-examples.md](references/worked-examples.md) - secondary examples: rate-based rule JSON, CAPTCHA rule JSON
+- [diagnostic-commands.md](references/diagnostic-commands.md) - pre-flight safety check CLI
+- [advanced-patterns.md](references/advanced-patterns.md) - expert heuristic detail, edge cases, recent AWS features
+- [deployment-cli-commands.md](references/deployment-cli-commands.md) - full 9-step CLI sequences, logging and association CLI
+- [managed-rules-and-logging-guide.md](references/managed-rules-and-logging-guide.md) - rule group tables, ATP config, aggregate keys, logging policies
 
 ## Domain
 

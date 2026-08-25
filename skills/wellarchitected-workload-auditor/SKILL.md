@@ -98,26 +98,8 @@ explicit error.
 
 ### Step 0: Critical behaviors that change classification (read before Step 1)
 
-- **`effectiveReviewDate` uses milestones, not just `LastUpdated`.** A
-  workload's `LastUpdated` reflects metadata edits (name, description, lenses).
-  Milestone `RecordedAt` reflects review-answer progression. Always use
-  `max(LastUpdated, most-recent milestone.RecordedAt)` for staleness.
-
-- **`RiskCounts` at the workload level is an aggregate across ALL pillars.**
-  The `describe-workload` API returns a single `RiskCounts` map — it does NOT
-  break down by pillar. You must call `list-answers --pillar-id <pillar>` per
-  pillar and aggregate client-side to know whether HIGH_RISK issues are in
-  `security` (urgent) or `costOptimization` (less urgent).
-
-- **Security pillar is zero-tolerance.** One HIGH_RISK in `security` is more
-  dangerous than five in `costOptimization` — security risks are exploitable
-  attack vectors. Rule 2a triggers on `security.HIGH_RISK > 0`; other pillars
-  need total > 5.
-
-- **`UNANSWERED > 50%` means the review was abandoned.** The operator may
-  have answered easy questions and skipped hard ones, producing a falsely
-  optimistic risk picture. Classify as STALE_REVIEW — the data is not
-  trustworthy enough to evaluate HIGH_RISK or CONFIG_GAP.
+Step-0 classification behaviors (effectiveReviewDate vs LastUpdated, aggregate RiskCounts, security zero-tolerance, UNANSWERED>50% abandonment): [Advanced patterns](references/advanced-patterns.md).
+Load on demand before classifying a workload.
 
 > Additional non-obvious WA Tool internals (milestone immutability, lens
 > versioning, improvement-plan composition, Trusted Advisor check-summaries,
@@ -466,104 +448,38 @@ REMEDIATION:
 
 ### Non-obvious WA Tool behaviors (extended)
 
-- **Milestones are immutable once created.** You cannot delete or edit a
-  milestone — `RecordedAt` and `WorkloadSummary` are frozen. This makes
-  milestones the authoritative audit trail and the only rollback reference.
-
-- **`list-answers` requires `--pillar-id` as a mandatory parameter.** There
-  is no "list all answers" API call. The six pillar IDs are fixed:
-  `security`, `reliability`, `performance`, `costOptimization`,
-  `operationalExcellence`, `sustainability`.
-
-- **`list-workloads` and `list-milestones` both cap at 50 per page.** For
-  account-wide sweeps, drain `NextToken` to completion.
-
-- **Workload ID is a 32-character hex string**, not an ARN. All WA Tool API
-  calls take `--workload-id <hex>`.
-
-- **Lens aliases are lowercase identifiers, not display names.** The default
-  Framework lens is `wellarchitected`. Additional lenses appear as aliases
-  or custom lens ARNs.
-
-- **`ImprovementPlan` from `describe-workload` mixes manual and
-  tool-generated items.** The API does not distinguish human-committed
-  actions from auto-generated gap-report suggestions. A non-zero
-  `ImprovementPlanItems` count does NOT mean a human reviewed each item —
-  check whether items carry a `GapReport` origin before citing the count as
-  evidence of an active remediation plan.
-
-- **Lens versioning silently remaps answer risk.** If a lens is upgraded
-  after the review, `list-answers` returns answers against the new version.
-  `QuestionId` is stable across versions, but `SelectedChoices` may map to
-  different risk levels. A review that was OK under lens v1 may show new
-  HIGH_RISK under v2 without any architectural change.
-
-- **`list-check-summaries` returns empty (not error) when no AppRegistry
-  association exists.** Automated Trusted Advisor checks require a linked
-  CloudFormation stack or AppRegistry application. An empty result does NOT
-  validate the review answers — it means the cross-check infrastructure is
-  not connected. Do not treat "no failing checks" as evidence of correctness
-  when the association is absent.
+WA Tool API internals (milestone immutability, list-answers pillar-id requirement, pagination caps, workload-ID shape, lens versioning, improvement-plan composition, check-summaries): [Advanced patterns](references/advanced-patterns.md).
+Per-pillar enumeration, milestone trend, account-wide sweep, and share-audit CLI: [Diagnostic commands](references/diagnostic-commands.md).
 
 ### Per-pillar risk enumeration
 
-The `describe-workload` API returns aggregate `RiskCounts`. To produce the
-`PILLAR_RISK` block in the output, iterate all six pillars:
-
-```bash
-for pillar in security reliability performance costOptimization operationalExcellence sustainability; do
-  aws wellarchitected list-answers \
-    --workload-id <id> --pillar-id $pillar \
-    --query 'AnswerSummaries[*].Risk' --output text | sort | uniq -c
-done
-```
-
-Each answer summary includes a `Risk` field (`HIGH_RISK`, `MEDIUM_RISK`,
-`NO_RISK`, `NOT_APPLICABLE`, `UNANSWERED`). Aggregate these client-side to
-produce per-pillar counts.
+Per-pillar risk enumeration CLI loop: [Diagnostic commands](references/diagnostic-commands.md).
+Load on demand when building the PILLAR_RISK block.
 
 ### Milestone trend analysis
 
-Compare the `WorkloadSummary.RiskCounts` from the two most recent milestones:
-
-```bash
-aws wellarchitected get-milestone \
-  --workload-id <id> --milestone-number <latest> \
-  --query 'Milestone.WorkloadSummary.RiskCounts'
-```
-
-If HIGH_RISK decreased between milestones, remediation is progressing. If it
-increased, the architecture is regressing — flag in REMEDIATION.
+Milestone trend analysis CLI: [Diagnostic commands](references/diagnostic-commands.md).
+Load on demand when checking remediation progress.
 
 ### Account-wide sweep (pagination)
 
-```bash
-aws wellarchitected list-workloads --max-results 50
-# Drain NextToken:
-aws wellarchitected list-workloads --max-results 50 --next-token <token>
-```
-
-For each workload, run `describe-workload` + `list-milestones`. The sweep
-should flag STALE_REVIEW workloads first — these are the highest-priority
-candidates for re-review. Process in batches of 10 workloads to avoid API
-rate limits and keep output manageable.
+Account-wide sweep pagination CLI: [Diagnostic commands](references/diagnostic-commands.md).
+Load on demand for multi-workload audits.
 
 ### Share audit
 
-```bash
-aws wellarchitected list-workload-shares --workload-id <id>
-```
-
-Check `PermissionType` for each share. `CONTRIBUTOR` grants write access —
-the shared principal can modify answers. Restrict to `READ` unless active
-collaboration is intended.
+Share audit CLI: [Diagnostic commands](references/diagnostic-commands.md).
+Load on demand when auditing cross-account shares.
 
 ## Recent AWS features (2024-2026)
 
-- **Well-Architected Framework updates (2024-2025):** AWS published updates to the Well-Architected Framework including sustainability pillar refinements and machine learning lens updates. Auditors should verify that reviews use the latest framework version and that new best-practice questions are addressed.
-- **Custom lenses GA (2024):** Custom lenses allow organizations to define their own Well-Architected review questions. Auditors should verify that custom lenses are versioned, documented, and reviewed for alignment with organizational policies.
-- **Well-Architected Tool API enhancements (2024-2025):** Expanded API support for programmatic workload creation, milestone management, and report generation. Auditors should verify that API-driven workload updates are tracked and that milestone API calls are logged in CloudTrail.
-- **Integration with AWS Resilience Hub (2024):** Well-Architected Tool now integrates with Resilience Hub for reliability pillar deep-dives. Auditors should verify that reliability findings from Resilience Hub are incorporated into WA reviews.
+2024-2026 feature delta (framework updates, custom lenses GA, API enhancements, Resilience Hub integration): [Advanced patterns](references/advanced-patterns.md).
+Load on demand when validating review currency.
+
+## References (load on demand)
+
+- [Advanced patterns](references/advanced-patterns.md) — Step-0 classification behaviors, WA Tool API internals, 2024-2026 features
+- [Diagnostic commands](references/diagnostic-commands.md) — per-pillar risk enumeration, milestone trend analysis, account-wide sweep, share audit
 
 ## Domain
 

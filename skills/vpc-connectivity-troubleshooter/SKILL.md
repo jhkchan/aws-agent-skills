@@ -65,54 +65,13 @@ metadata:
 
 ## Mindset
 
-A "the network is broken" page is usually a routing or security-group
-incident wearing a service-down costume. The destination service is
-often healthy; the broken thing is the packet path between source and
-destination. Treat the destination service as innocent until every OSI
-layer between source and destination is proven clean. Senior network
-engineers do not start with the destination's application logs; they
-start with the route table and the security group, and only open the
-application once L3-L4 reachability is confirmed.
+Mindset detail moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for the incident-framing model.
 
 ## Philosophy
 
-Four behaviours separate a senior VPC network engineer from a generalist:
-
-- **OSI ordering is non-negotiable.** A "connection timed out" tells
-  you the SYN packet did not round-trip; that constrains the cause to
-  L3-L4 (routing, SG, NACL, cross-VPC plumbing). A "connection refused"
-  tells you the SYN reached a port with no listener — that is a
-  destination-side issue (instance down, app not running, wrong port),
-  not a VPC issue. A "DNS resolution failed" tells you L7 DNS is broken
-  before any packet leaves the host. Routing the symptom to the wrong
-  layer is the #1 source of wasted cycles in connectivity incidents.
-
-- **Security groups are stateful; NACLs are stateless.** A SG inbound
-  allow on 443 implicitly allows the return SYN-ACK. A NACL inbound
-  allow on 443 ALSO requires an outbound allow on the ephemeral range
-  (1024-65535) because the return SYN-ACK is a separate NACL
-  evaluation. The default NACL allows all traffic both ways; a custom
-  NACL with a restrictive inbound list and a default outbound deny
-  silently breaks the return path. Always evaluate the NACL in both
-  directions for the connection's source port (ephemeral) and
-  destination port.
-
-- **Overlapping CIDRs between peered VPCs are a silent failure.** AWS
-  refuses to route traffic for a CIDR that exists on both sides of a
-  peering connection — the route appears in the table but packets do
-  not deliver. There is no error event; the symptom is "the peering is
-  Active but the destination is unreachable." The diagnostic is to
-  compare the VPC CIDRs of both sides; overlapping CIDRs require a
-  renumbering or a Transit Gateway with a translation / overlay
-  (Privatelink).
-
-- **SG references (`sg-xxx`) only resolve within the same VPC or a
-  peered VPC.** A SG rule that references `sg-xxx` from an unrelated
-  VPC (no peering in the route table) is silently ignored — the rule
-  appears valid in the console but never matches traffic. Cross-VPC
-  callers (TGW-attached VPC, unrelated peered VPC) referenced by SG-id
-  silently fail; they must be expressed as CIDR blocks or as a
-  referenced SG in a peered VPC with peering in the route table.
+The four senior-engineer behaviours (OSI ordering, SG stateful vs NACL stateless, overlapping-CIDR silent failure, SG-reference scope) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for the reasoning behind each probe-order rule.
 
 ## Quick reference — symptom triage table
 
@@ -138,23 +97,8 @@ debugging for a problem that is not a network problem.
 
 ### Pre-flight commands
 
-```bash
-# 1. Source context — instance, subnet, VPC, SG, AZ
-aws ec2 describe-instances --instance-ids <source-instance-id> --output json | \
-  jq '.Reservations[].Instances[] | {VpcId, SubnetId, SecurityGroups, PrivateIpAddress, PublicIpAddress}'
-
-aws ec2 describe-subnets --subnet-ids <source-subnet-id> --output json | \
-  jq '.Subnets[] | {VpcId, CidrBlock, AvailabilityZone, AvailableIpAddressCount}'
-
-# 2. Destination context
-aws ec2 describe-instances --instance-ids <dest-instance-id> --output json 2>/dev/null || \
-  aws ec2 describe-network-interfaces \
-    --filters Name=private-ip-address,Values=<dest-ip> --output json
-
-# 3. AWS Health (regional events, AZ-wide degradation)
-aws health describe-events --filter eventStatusCodes=OPEN,UPCOMING \
-  --region us-east-1 --output json
-```
+Source/destination context + AWS Health pre-flight command listing moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before the first probe.
 
 ### Pre-flight short-circuits
 
@@ -169,21 +113,8 @@ aws health describe-events --filter eventStatusCodes=OPEN,UPCOMING \
 If the input is malformed (missing source or destination identifier,
 absent symptom, no port/protocol for reachability diagnosis), emit:
 
-```text
-TARGET: <source → destination pair, or unknown>
-VERDICT: NEED_MORE_INFO
-REASON: Input is missing required context — at minimum a symptom
-  description (timeout, refused, DNS failure), a source identifier
-  (instance / subnet / IP), a destination identifier (instance / IP /
-  hostname), and the port and protocol under test.
-LAYER: UNKNOWN
-EVIDENCE:
-  - Missing: <list specific missing fields>
-REMEDIATION: Re-prompt the operator for: (1) the exact error string or
-  observed symptom, (2) the source identifier (EC2 instance / Lambda
-  function name / ECS task / on-prem CIDR), (3) the destination
-  identifier, and (4) the port/protocol under test.
-```
+The NEED_MORE_INFO malformed-input output template moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Emit it whenever required context is missing.
 
 ## Process — Diagnostic decision tree (apply in symptom order)
 
@@ -195,110 +126,8 @@ emit ROOT_CAUSE_FOUND without a failing probe that matches the symptom.**
 
 ### Step 0: Non-obvious behaviours that change diagnosis
 
-These are the operational gotchas a senior VPC engineer knows from
-incident experience. Each one routes a diagnosis away from the obvious
-layer to a less obvious one:
-
-- **Security group references across VPCs do not resolve.** A SG rule
-  referencing `sg-xxx` works only when the source SG is in the SAME VPC
-  OR in a peered VPC with peering in the route table. A cross-VPC caller
-  (TGW-attached VPC, unrelated peered VPC) referenced by SG-id silently
-  fails — the rule appears correct in the console but never matches
-  inbound traffic. Cross-VPC callers must use CIDR blocks or a referenced
-  SG in the peered VPC (with peering enabled for the route). Operators
-  who "see the SG allows sg-app" miss that sg-app is in a different VPC
-  and the rule is dead.
-
-- **NACLs are stateless; SGs are stateful.** A SG inbound allow on 443
-  implicitly allows the SYN-ACK back. A NACL inbound allow on 443 also
-  requires an outbound allow on the ephemeral range (1024-65535) because
-  the return SYN-ACK is a separate NACL evaluation. The default NACL
-  allows all traffic both ways; a custom NACL with a restrictive inbound
-  list and a default outbound deny silently breaks the return path.
-  Always evaluate the NACL in both directions for the connection's
-  source port (ephemeral) and destination port.
-
-- **Overlapping CIDRs between peered VPCs are a silent failure.** AWS
-  refuses to route traffic for a CIDR that exists on both sides of a
-  peering connection — the route appears in the table but packets do
-  not deliver. There is no error event; the symptom is "the peering is
-  Active but the destination is unreachable." Overlapping CIDRs cannot
-  be fixed by a route table change; they require VPC renumbering or a
-  Transit Gateway with PrivateLink overlay.
-
-- **VPC peering is NOT transitive.** A peering connection between VPC-A
-  and VPC-B, and another between VPC-B and VPC-C, does NOT allow VPC-A
-  to reach VPC-C via VPC-B. The transit pattern requires Transit
-  Gateway. Operators who "set up peering on both legs" expect transitivity
-  and are surprised.
-
-- **VPC DNS resolution and support are independent flags.** A VPC has
-  two DNS settings: `enableDnsResolution` (use the VPC's .2 address as
-  a resolver) and `enableDnsHostnames` (the VPC can have private
-  hostnames). Both must be true for Route 53 private hosted zones to
-  resolve. Operators who set only one see intermittent DNS failures.
-
-- **Route 53 private hosted zones must be explicitly associated with
-  the VPC.** A PHZ created in account A is NOT automatically visible
-  to a VPC in account B, even if the VPCs are peered. The PHZ must be
-  associated with the consumer VPC (cross-account, via Shared VPC or
-  Resolver Rules). Operators who "created the PHZ and it works in the
-  source VPC but not the peered VPC" miss the association step.
-
-- **VPC endpoint policies are independent of IAM.** A VPC endpoint
-  policy can deny an action even when IAM allows it. The CloudTrail
-  event will show AccessDenied with no hint that the VPC endpoint
-  policy is the cause. The diagnostic is to bypass the endpoint (route
-  over the internet or a different endpoint) and see if the call
-  succeeds. VPC endpoint policies are the most overlooked layer because
-  they live in the VPC console, not IAM.
-
-- **Transit Gateway route propagation is per-attachment.** A TGW has
-  its own route table; attachments must propagate their routes into
-  the TGW route table. An attachment that is associated with the TGW
-  route table but does not propagate its VPC CIDR is invisible to other
-  attachments. Operators who "added both VPCs to the TGW" miss that
-  propagation is a separate flag.
-
-- **PrivateLink endpoint services require an NLB and an accepting
-  hand-shake.** The service provider creates an endpoint service backed
-  by an NLB; the consumer creates an interface endpoint and the
-  provider accepts (if manual acceptance is enabled). The endpoint's
-  SG must allow the consumer's source. The NLB's listener must be
-  configured for the right port and protocol. Operators who "created
-  the endpoint but traffic times out" often miss the SG on either
-  side.
-
-- **`telnet` / `nc -vz` from the source host is the ground truth.**
-  Every other probe (route table reading, SG rule enumeration, NACL
-  evaluation) is a model of the network. The actual packet round-trip
-  is the only definitive test. Always run `nc -vz <dest> <port>` from
-  the source host before declaring a verdict.
-
-- **Reachability Analyzer is the next best thing to packet
-  round-trip.** It builds a model of the path and reports the
-  blocking layer (SG, NACL, route table, peering, TGW). It does NOT
-  test the live packet; it tests the configured state. For
-  intermittent issues, pair Reachability Analyzer with VPC Flow Logs.
-
-- **VPC Flow Logs tell you whether the packet reached the destination
-  ENI.** Flow Logs with `reject` action confirm the packet was dropped
-  by a SG or NACL. Flow Logs with `accept` action confirm the packet
-  reached the ENI but do NOT confirm the application received it (the
-  app could still be down). Pair Flow Logs with the application logs
-  to localise the issue.
-
-- **Internet Gateway (IGW) is one-way for Lambda.** A Lambda function
-  in a public subnet has NO internet access — the function gets no
-  public IP, so traffic to the IGW has no return path. EC2 instances
-  with public IPs do get a return path via the IGW. Operators who
-  "placed the Lambda in the default VPC" (which is public) and cannot
-  reach the internet miss this asymmetry.
-
-- **Cross-AZ traffic in the same VPC incurs cost.** Cross-AZ data
-  transfer is billable in both directions. This is not a connectivity
-  issue but is worth surfacing when diagnosing why a workload is in
-  a different AZ than its dependency.
+The full Step-0 gotcha catalog (cross-VPC SG references, NACL statelessness, overlapping CIDRs, peering non-transitivity, DNS flags, PHZ association, endpoint policy vs IAM, TGW propagation, PrivateLink handshake, nc ground truth, Reachability Analyzer, Flow Logs, Lambda/IGW asymmetry, cross-AZ cost) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before diagnosing any non-trivial symptom.
 
 ### Step 1: Symptom entry — pick the diagnostic branch
 
@@ -319,544 +148,43 @@ NEED_MORE_INFO).
 
 ### Step 2: Connection timeout — OSI-aligned diagnostic tree
 
-Symptom: SYN never receives a SYN-ACK. Tools report `Connection timed
-out` or `Operation timed out`. `nc -vz <dest> <port>` or `telnet` hangs
-and eventually times out. No application error (the app never saw the
-connection).
-
-Probe order (OSI-aligned; each layer must pass before the next):
-
-#### 2a: Source reachability — confirm source IP and subnet
-
-```bash
-aws ec2 describe-instances --instance-ids <source-instance-id> --output json | \
-  jq '.Reservations[].Instances[] | {VpcId, SubnetId, PrivateIpAddress, PublicIpAddress}'
-
-aws ec2 describe-subnets --subnet-ids <source-subnet-id> --output json | \
-  jq '.Subnets[] | {VpcId, CidrBlock, AvailabilityZone}'
-```
-
-Capture the source VPC, subnet CIDR, AZ, and source IP. Every
-subsequent probe references these.
-
-#### 2b: Route table — source subnet
-
-```bash
-aws ec2 describe-route-tables \
-  --filters Name=association.subnet-id,Values=<source-subnet-id> --output json | \
-  jq '.RouteTables[].Routes'
-```
-
-If the subnet has no explicit route table, it uses the VPC's main route
-table:
-
-```bash
-aws ec2 describe-route-tables \
-  --filters Name=vpc-id,Values=<source-vpc-id> Name=association.main,Values=true \
-  --output json | jq '.RouteTables[].Routes'
-```
-
-- For same-VPC destination: confirm a local route to the destination
-  CIDR exists.
-- For cross-VPC via peering: confirm a `pcx-xxx` peering route to the
-  destination VPC CIDR.
-- For cross-VPC via Transit Gateway: confirm a `tgw-xxx` route.
-- For internet destination: confirm route to IGW (`igw-xxx`) for
-  instances with public IP, OR route to NAT (`nat-xxx`) for private
-  instances / Lambda.
-
-If no route exists for the destination CIDR, **ROOT_CAUSE_FOUND** with
-`LAYER: ROUTE_TABLE_MISSING`.
-
-If a route exists but the target is wrong (e.g., IGW for a Lambda
-function that needs NAT, or NAT for an internal destination that
-needs a peering route), **ROOT_CAUSE_FOUND** with
-`LAYER: ROUTE_TABLE_WRONG_TARGET`.
-
-#### 2c: Route table — destination subnet (return path)
-
-Mirror of 2b for the destination subnet. The SYN-ACK must route back.
-For cross-VPC, the destination subnet's route table must have the
-peering/TGW route back to the source VPC CIDR.
-
-#### 2d: Overlapping CIDRs — silent peering failure
-
-```bash
-aws ec2 describe-vpcs --vpc-ids <source-vpc-id> <dest-vpc-id> --output json | \
-  jq '.Vpcs[] | {VpcId, CidrBlock, CidrBlockAssociationSet}'
-```
-
-If the source VPC CIDR and destination VPC CIDR overlap (e.g., both
-`10.0.0.0/16`), AWS silently refuses to route traffic between them via
-peering. The route table may show the `pcx-xxx` route but packets do
-not deliver. **ROOT_CAUSE_FOUND** with
-`LAYER: ROUTE_OVERLAPPING_CIDR`. The fix is VPC renumbering or a TGW
-with PrivateLink overlay (translation).
-
-#### 2e: Security group — destination inbound
-
-```bash
-aws ec2 describe-security-groups --group-ids <dest-sg-1> <dest-sg-2> --output json | \
-  jq '.SecurityGroups[].IpPermissions'
-```
-
-**Match the source against the inbound rules:**
-- If the rule allows `0.0.0.0/0` on the destination port → SG allows.
-- If the rule allows a CIDR — does the source IP fall within it?
-  - Source in same VPC: use the source's private IP.
-  - Source in peered VPC: use the source's private IP in the peer
-    VPC's CIDR.
-  - Source on-prem/over internet: use the source's public IP or NAT
-    EIP.
-- If the rule references `sg-xxx` — is the source SG in the SAME VPC
-  as the destination SG? Cross-VPC SG references are silently ignored.
-- If the rule references a prefix list — does the prefix list contain
-  the source CIDR?
-
-If no inbound rule matches the source on the destination port,
-**ROOT_CAUSE_FOUND** with `LAYER: SG_INBOUND`.
-
-If a rule references `sg-xxx` from a different VPC (and the VPCs are
-not peered with peering in the route table), **ROOT_CAUSE_FOUND** with
-`LAYER: SG_REFERENCE_CROSS_VPC`. Use a CIDR block or a referenced SG
-in the peered VPC instead.
-
-#### 2f: Security group — source outbound
-
-SGs are stateful, but the source still needs an outbound allow. The
-default outbound (allow all) usually covers this, but a locked-down
-source SG can block the SYN.
-
-```bash
-aws ec2 describe-security-groups --group-ids <source-sg> --output json | \
-  jq '.SecurityGroups[].IpPermissionsEgress'
-```
-
-If the source's egress does not allow traffic to the destination
-private IP (or the destination SG, if egress is SG-referenced),
-**ROOT_CAUSE_FOUND** with `LAYER: SG_OUTBOUND` (source-side).
-
-#### 2g: NACL — source subnet (stateless — both directions)
-
-```bash
-aws ec2 describe-network-acls \
-  --filters Name=association.subnet-id,Values=<source-subnet-id> --output json | \
-  jq '.NetworkAcls[].Entries'
-```
-
-**Inbound** (return SYN-ACK from destination to source's ephemeral
-port):
-- Rule allow on the destination port from the destination CIDR to the
-  source's ephemeral port range (1024-65535).
-- Default NACL allows all; custom NACLs often miss this.
-
-**Outbound** (initial SYN from source to destination port):
-- Rule allow on the destination port to the destination CIDR.
-
-If either direction denies, **ROOT_CAUSE_FOUND** with
-`LAYER: NACL_STATELESS` (source-side).
-
-#### 2h: NACL — destination subnet (mirror of 2g)
-
-Same logic, mirrored. Fetch the NACL for the destination subnet and
-verify inbound on destination port + outbound on ephemeral range. A
-common pattern is a custom NACL on the destination subnet that allows
-inbound on the listener port but has no explicit outbound allow on
-the ephemeral range, silently dropping the SYN-ACK.
-
-#### 2i: After all SG/NACL/route layers pass — final reachability probe
-
-From the source host:
-
-```bash
-# TCP reachability (should succeed if all above passed)
-nc -vz <dest-ip-or-hostname> <port>
-
-# Or:
-telnet <dest-ip-or-hostname> <port>
-```
-
-If `nc -vz` succeeds but the application still times out, the issue is
-likely client-side (connection pool, driver config, JVM DNS cache) —
-emit ROOT_CAUSE_FOUND with `LAYER: UNKNOWN` and a client-side note, or
-NEED_MORE_INFO if the caller context is incomplete.
-
-If `nc -vz` fails intermittently, use VPC Flow Logs to localise:
-
-```bash
-aws ec2 describe-flow-logs \
-  --filter Name=resource-id,Values=<source-eni> --output json
-
-# Query the Flow Logs log group (e.g., via CloudWatch Logs Insights)
-aws logs start-query \
-  --log-group-name <flow-logs-group> \
-  --start-time $(date -d '-1 hour' +%s) --end-time $(date +%s) \
-  --query-string 'fields @timestamp, srcAddr, dstAddr, srcPort, dstPort,
-    action | filter (srcAddr = "<source-ip>" and dstAddr = "<dest-ip>")
-    or (srcAddr = "<dest-ip>" and dstAddr = "<source-ip>") | limit 50'
-```
-
-`action: REJECT` confirms the packet was dropped by a SG or NACL.
-`action: ACCEPT` confirms the packet reached the ENI but does not
-confirm the application received it.
-
-#### 2j: Reachability Analyzer (cross-layer automated path analysis)
-
-```bash
-# Create a path between source and destination
-PATH_ID=$(aws ec2 create-network-insights-path \
-  --source <source-eni-id> \
-  --destination <dest-eni-id> \
-  --destination-port <port> \
-  --protocol tcp \
-  --output json | jq -r '.NetworkInsightsPath.NetworkInsightsPathId')
-
-# Run the analysis
-ANALYSIS_ID=$(aws ec2 start-network-insights-analysis \
-  --network-insights-path-id $PATH_ID \
-  --output json | jq -r '.NetworkInsightsAnalysis.NetworkInsightsAnalysisId')
-
-# Wait for completion, then read the result
-aws ec2 describe-network-insights-analyses \
-  --network-insights-analysis-ids $ANALYSIS_ID --output json | \
-  jq '.NetworkInsightsAnalyses[0] | {Status, ForwardPathComponents,
-    Explanations}'
-```
-
-Reachability Analyzer returns the path component that blocks traffic
-(e.g., "Outbound rule of sg-xxx denies traffic on port 443"). Use it
-to confirm a SG/NACL/route diagnosis when manual probes are
-inconclusive.
+Sub-steps 2a-2j — the full OSI walk (source/dest context, route tables both sides, overlapping CIDRs, SG inbound/outbound + cross-VPC SG references, NACLs in both directions on both subnets, nc/telnet probe, VPC Flow Logs, Reachability Analyzer) with every probe command and verdict condition moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when diagnosing a timeout symptom.
 
 ### Step 3: DNS resolution failure
 
-Symptom: hostname does not resolve. Tools report `NXDOMAIN`, `server
-can't find`, `Name or service not known`.
-
-```bash
-# From the source host
-nslookup <hostname>
-dig <hostname>
-
-# What resolver is the source using?
-aws ec2 describe-vpcs --vpc-ids <source-vpc-id> --output json | \
-  jq '.Vpcs[] | {VpcId, CidrBlock,
-    DhcpOptionsId: .DhcpOptionsId}'
-
-aws ec2 describe-dhcp-options \
-  --dhcp-options-ids <dhcp-options-id> --output json | \
-  jq '.DhcpOptions.Configurations'
-```
-
-The DHCP options set `domain-name-servers` should be
-`AmazonProvidedDNS` (169.254.169.53 / VPC `.2` address) for AWS DNS
-resolution. Custom resolvers require a Route 53 Resolver inbound
-endpoint in the VPC.
-
-#### 3a: VPC DNS settings
-
-```bash
-aws ec2 describe-vpc-attribute --vpc-id <source-vpc-id> \
-  --attribute enableDnsSupport --output json
-aws ec2 describe-vpc-attribute --vpc-id <source-vpc-id> \
-  --attribute enableDnsHostnames --output json
-```
-
-Both `enableDnsSupport` and `enableDnsHostnames` must be `true` for:
-- Route 53 private hosted zones to resolve.
-- VPC private hostnames (e.g., `ec2-10-0-1-10.us-east-1.compute.internal`)
-  to resolve.
-
-If either is false, **ROOT_CAUSE_FOUND** with `LAYER: DNS_RESOLUTION`.
-
-#### 3b: Route 53 private hosted zone association
-
-```bash
-aws route53 list-hosted-zones-by-vpc \
-  --vpc-id <source-vpc-id> --vpc-region us-east-1 --output json
-
-aws route53 list-hosted-zones --output json | \
-  jq '.HostedZones[] | {Id, Name, Config: .Config}'
-```
-
-For cross-account PHZs:
-- The PHZ must be associated with the consumer VPC (cross-account
-  association via Shared VPC, Resource Access Manager, or the
-  `list-hosted-zones-by-vpc` API).
-- Alternatively, a Route 53 Resolver Rule can forward queries from
-  the consumer VPC to the PHZ owner's Resolver inbound endpoint.
-
-If the PHZ is not associated with the source VPC, **ROOT_CAUSE_FOUND**
-with `LAYER: DNS_PHZ_ASSOCIATION`.
-
-#### 3c: Resolver endpoints and rules
-
-```bash
-aws route53resolver list-resolver-endpoints \
-  --filters Name=VpcId,Values=<source-vpc-id> --output json
-
-aws route53resolver list-resolver-rules --output json | \
-  jq '.ResolverRules[] | {Id, Name, DomainName, RuleType}'
-```
-
-A `SYSTEM` rule for `.` (root) forwards everything to AmazonProvidedDNS.
-A `FORWARD` rule forwards specific domains to a target IP (e.g., on-prem
-DNS). Conflicting rules can shadow each other; the more specific domain
-wins.
-
-If a forward rule is misconfigured (target IP unreachable, port
-mismatch), DNS for the rule's domain fails. **ROOT_CAUSE_FOUND** with
-`LAYER: DNS_RESOLUTION`.
+DNS probes (resolver/DHCP options, enableDnsSupport + enableDnsHostnames, Route 53 PHZ association, Resolver endpoints and rules) with DNS_RESOLUTION / DNS_PHZ_ASSOCIATION verdict conditions moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when a hostname does not resolve.
 
 ### Step 4: VPC endpoint policy
 
-Symptom: an AWS service API call returns AccessDenied when made from
-within a VPC, but the same call succeeds from outside the VPC (or from
-a different VPC). The IAM role and identity-based policy are correct.
-
-```bash
-aws ec2 describe-vpc-endpoints \
-  --filters Name=vpc-id,Values=<source-vpc-id> --output json | \
-  jq '.VpcEndpoints[] | {ServiceName, State, Policy, PrivateDnsEnabled}'
-```
-
-A VPC endpoint policy is independent of IAM. It can allow or deny
-specific actions, principals, and resources. Common restrictive patterns:
-
-- Policy allows `s3:GetObject` only — `s3:PutObject` is denied even
-  though IAM allows it.
-- Policy restricts to a specific bucket ARN — other buckets are denied.
-- Policy requires a specific VPC or VPC endpoint condition.
-
-To verify the endpoint is the cause, bypass it:
-- For an S3 Gateway endpoint: remove the endpoint temporarily, or test
-  from a subnet without the prefix list in its route table.
-- For an Interface endpoint: route via NAT Gateway or a different VPC.
-
-If bypassing the endpoint makes the API call succeed,
-**ROOT_CAUSE_FOUND** with `LAYER: ENDPOINT_POLICY`. Fix: scope the
-endpoint policy to allow the required action, OR add the action to the
-existing Allow statement.
+Endpoint-policy probes (describe-vpc-endpoints policy read, endpoint bypass test) with ENDPOINT_POLICY verdict conditions moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand on AccessDenied that clears outside the VPC.
 
 ### Step 5: VPC peering — Active but traffic times out
 
-```bash
-aws ec2 describe-vpc-peering-connections \
-  --filters Name=requester-vpc-info.vpc-id,Values=<source-vpc-id> \
-            Name=status-code,Values=active --output json | \
-  jq '.VpcPeeringConnections[] | {Id, Status: .Status.Code,
-    RequesterVpcInfo, AccepterVpcInfo}'
-```
-
-For each peering connection:
-
-#### 5a: Status check
-
-| Status | Effect |
-|---|---|
-| `active` | Peering is up; continue with route and SG checks. |
-| `pending-acceptance` | Accepter has not accepted. Traffic does not flow. **ROOT_CAUSE_FOUND**, `LAYER: PEERING_INACTIVE`. Accepter accepts. |
-| `rejected`, `failed`, `expired`, `deleted` | Peering is non-functional. **ROOT_CAUSE_FOUND**, `LAYER: PEERING_INACTIVE`. Recreate the peering request. |
-| `provisioning` | Peering is being established; wait. |
-
-#### 5b: Route table — both sides
-
-Both the requester and accepter VPCs' route tables must have a route
-to the other VPC's CIDR via the `pcx-xxx` peering connection. A common
-failure: only the requester side has the route; the accepter side
-forgets to add it.
-
-```bash
-aws ec2 describe-route-tables \
-  --filters Name=vpc-id,Values=<requester-vpc-id> --output json | \
-  jq '.RouteTables[].Routes[] | select(.VpcPeeringConnectionId != null)'
-
-aws ec2 describe-route-tables \
-  --filters Name=vpc-id,Values=<accepter-vpc-id> --output json | \
-  jq '.RouteTables[].Routes[] | select(.VpcPeeringConnectionId != null)'
-```
-
-If either side is missing the `pcx-xxx` route, traffic fails. The fix
-is `create-route --route-table-id <rtb> --destination-cidr-block
-<peer-cidr> --vpc-peering-connection-id <pcx>`.
-
-#### 5c: Overlapping CIDRs
-
-See Step 2d. Overlapping CIDRs are a silent failure on peering.
-
-#### 5d: Security group references
-
-A SG rule in the requester VPC can reference a SG in the accepter VPC
-BY ID, IF the peering connection is in the route table. Without the
-route, the reference is silently ignored. Confirm the peering route
-exists (5b) before trusting a cross-VPC SG reference.
-
-If a cross-VPC SG reference is used and the peering route is missing,
-the rule is dead. **ROOT_CAUSE_FOUND** with `LAYER: PEERING_SG_REFERENCE`.
-
-#### 5e: DNS resolution from remote VPC
-
-```bash
-aws ec2 describe-vpc-peering-connections \
-  --vpc-peering-connection-ids <pcx-id> --output json | \
-  jq '.VpcPeeringConnections[] | {
-    RequesterDns: .RequesterVpcInfo.AllowDnsResolutionFromRemoteVpcDomainName,
-    AccepterDns: .AccepterVpcInfo.AllowDnsResolutionFromRemoteVpcDomainName}'
-```
-
-If the symptom is "IP works but hostname does not" across peered VPCs,
-the `AllowDnsResolutionFromRemoteVpcDomainName` flag is false on one
-side. **ROOT_CAUSE_FOUND** with `LAYER: PEERING_DNS_RESOLUTION`. Both
-VPCs must have `enableDnsSupport` AND `enableDnsHostnames` true, and
-the requester side must enable the remote DNS resolution flag at
-peering creation time.
+Peering probes (status table, both-side pcx routes, overlapping CIDRs, cross-VPC SG references, remote DNS resolution flag) with PEERING_* verdict conditions moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when peering is Active but traffic times out.
 
 ### Step 6: Transit Gateway — attachments Active but traffic times out
 
-```bash
-aws ec2 describe-transit-gateway-attachments \
-  --filters Name=resource-id,Values=<source-vpc-id> --output json | \
-  jq '.TransitGatewayAttachments[]'
-
-aws ec2 describe-transit-gateways \
-  --transit-gateway-ids <tgw-id> --output json | \
-  jq '.TransitGateways[] | {TransitGatewayId,
-    Options: .Options.AssociationDefaultRouteTableId,
-    PropagationDefaultRouteTableId}'
-```
-
-#### 6a: Attachment state
-
-| State | Effect |
-|---|---|
-| `available` | Attachment is up; continue with route checks. |
-| `pending`, `modifying`, `pending-acceptance` | Attachment is being established or modified; wait or accept. |
-| `rejected`, `failed`, `deleted` | Attachment is non-functional. Recreate. |
-
-#### 6b: TGW route table — association vs propagation
-
-Each attachment is associated with exactly one TGW route table (the
-"association"). Routes from the attachment's VPC can be:
-- **Statically added** to a TGW route table.
-- **Dynamically propagated** to one or more TGW route tables (the
-  "propagation").
-
-```bash
-aws ec2 describe-transit-gateway-route-tables \
-  --transit-gateway-route-table-ids <tgw-rtb-id> --output json | \
-  jq '.TransitGatewayRouteTables[]'
-
-aws ec2 get-transit-gateway-route-table-associations \
-  --transit-gateway-route-table-id <tgw-rtb-id> --output json
-
-aws ec2 get-transit-gateway-route-table-propagations \
-  --transit-gateway-route-table-id <tgw-rtb-id> --output json
-```
-
-If the source VPC's attachment is associated with TGW route table A
-but the destination VPC's attachment propagates only into TGW route
-table B, the source cannot reach the destination.
-
-If either attachment is missing from the TGW route table,
-**ROOT_CAUSE_FOUND** with `LAYER: TGW_ASSOCIATION_MISSING` (if not
-associated) or `LAYER: TGW_ROUTE_PROPAGATION` (if associated but not
-propagated).
-
-#### 6c: VPC route tables — both sides
-
-Both VPCs' subnet route tables must have a `tgw-xxx` route to the
-other VPC's CIDR. A common failure: one side has the route, the other
-does not.
+TGW probes (attachment state, TGW route-table association vs propagation, both-side tgw routes) with TGW_ASSOCIATION_MISSING / TGW_ROUTE_PROPAGATION verdict conditions moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when attachments are Active but traffic times out.
 
 ### Step 7: PrivateLink — endpoint accepted but service unreachable
 
-```bash
-aws ec2 describe-vpc-endpoints \
-  --filters Name=vpc-id,Values=<consumer-vpc-id> \
-            Name=service.service-type,Values=Interface --output json | \
-  jq '.VpcEndpoints[] | {ServiceName, State, SubnetIds, Groups,
-    PrivateDnsEnabled}'
-```
-
-#### 7a: Endpoint state
-
-| State | Effect |
-|---|---|
-| `available` | Endpoint is up; continue with SG and NLB checks. |
-| `pending`, `pending-waiting`, `pending-acceptance` | Provider must accept (if manual acceptance). Wait. |
-| `rejected`, `failed`, `deleted` | Endpoint is non-functional. Provider rejected or the NLB was deleted. |
-
-#### 7b: Endpoint SG
-
-The endpoint's SG (consumer side) must allow inbound from the source
-on the listener port. The endpoint creates an ENI in the consumer
-subnet; the ENI's SG governs inbound traffic to the endpoint.
-
-```bash
-aws ec2 describe-network-interfaces \
-  --filters Name=vpc-id,Values=<consumer-vpc-id> \
-            Name=description,Values="VPC Endpoint Interface" --output json | \
-  jq '.NetworkInterfaces[] | {NetworkInterfaceId, Groups, PrivateIpAddress}'
-```
-
-If the endpoint's SG does not allow the source, **ROOT_CAUSE_FOUND**
-with `LAYER: PRIVATELINK_SG`. Fix: add an inbound rule to the
-endpoint's SG.
-
-#### 7c: Endpoint service (provider side)
-
-```bash
-aws ec2 describe-vpc-endpoint-service-configurations \
-  --service-ids <service-id> --output json | \
-  jq '.ServiceConfigurations[] | {ServiceName, State,
-    AcceptanceRequired, NetworkLoadBalancerArns}'
-```
-
-The provider's endpoint service must be `available`. The NLB must be
-healthy in the consumer's AZs. If the NLB has no healthy targets in
-the consumer's AZ, traffic fails.
-
-If the endpoint service is misconfigured (NLB deleted, listener on
-wrong port), **ROOT_CAUSE_FOUND** with
-`LAYER: PRIVATELINK_ENDPOINT_SERVICE`. Fix: provider restores the NLB
-and listener.
-
-#### 7d: Private DNS
-
-If `PrivateDnsEnabled: true`, the service's DNS name resolves to the
-endpoint's private IP from within the consumer VPC. If `false`, the
-consumer must use the endpoint's DNS name (or IP). Operators who "use
-the public DNS name" with PrivateDnsEnabled=false see traffic route
-over the internet instead of the endpoint.
+PrivateLink probes (endpoint state, endpoint-SG ENI, provider endpoint service + NLB health, private DNS) with PRIVATELINK_* verdict conditions moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when an endpoint is accepted but the service is unreachable.
 
 ### Step 8: Application layer — TLS / auth
 
-Symptom: TCP succeeds, TLS or application-layer auth fails. Common
-strings: `SSL handshake failed`, `certificate verify failed`,
-`unauthorised`, `403 Forbidden` (from the application, not the AWS
-service).
-
-This layer is outside the VPC's packet path; the VPC is fine. Surface
-the diagnosis and route to the application-specific troubleshooter
-(e.g., `rds-connectivity-troubleshooter` for database TLS, `iam-
-permission-troubleshooter` for AccessDenied from the application's
-IAM calls).
-
-If the symptom is purely application-layer, **ROOT_CAUSE_FOUND** with
-`LAYER: APP_AUTH`. Note that the VPC layers all passed.
+APP_AUTH routing guidance (TLS/auth symptoms route to the application-specific troubleshooters) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when TCP succeeds but TLS or auth fails.
 
 ### Step 9: Escalate or NEED_MORE_INFO
 
-If none of the above produced a positive root-cause match, OR the
-symptom clearly indicates an AWS-side incident (AZ-wide degradation,
-region event, Direct Connect carrier issue), emit one of:
-
-- **ESCALATE** — AWS-side incident. Surface the AWS Health event ARN
-  and recommend opening a Support case. Do NOT continue diagnosing.
-- **NEED_MORE_INFO** — A specific probe requires operator input. List
-  the missing pieces (source instance ID, destination identifier,
-  port, protocol, region) and the next probe to run once the info is
-  available.
+ESCALATE / NEED_MORE_INFO exit rules (AWS-side incidents, missing operator input) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when no layer produced a positive match.
 
 ## Output format
 
@@ -918,105 +246,18 @@ CONFIRM: Before authorizing the SG ingress, emit and await:
 
 ### Worked example — NACL missing ephemeral outbound
 
-```text
-TARGET: i-app (10.0.1.10, subnet-aaa) → i-db (172.16.1.10,
-  subnet-bbb) on tcp/5432
-VERDICT: ROOT_CAUSE_FOUND
-REASON: The destination subnet's custom NACL (acl-bbb) has an inbound
-  allow on tcp/5432 but no outbound allow on the ephemeral range
-  (1024-65535) for the return SYN-ACK — the SYN reaches the
-  destination but the SYN-ACK is dropped on the outbound evaluation
-  (Step 2h).
-LAYER: NACL_STATELESS
-EVIDENCE:
-  - Symptom: nc -vz 172.16.1.10 5432 from 10.0.1.10 hangs and times
-    out. nc -vz in the reverse direction also fails.
-  - Probe: aws ec2 describe-network-acls for subnet-bbb returns
-    acl-bbb with inbound rule 100: tcp/5432 from 10.0.0.0/8 (allow)
-    and outbound rule 100: tcp/5432 to 10.0.0.0/8 (allow) — but NO
-    outbound rule for the ephemeral range (1024-65535). The default
-    rule * denies all other outbound.
-  - Passing: SG on both sides allows the rule; route table on both
-    sides has the peering route; peering is Active; CIDRs do not
-    overlap.
-REMEDIATION:
-  1. Add an outbound rule on acl-bbb for the ephemeral range back to
-     the source CIDR:
-     aws ec2 create-network-acl-entry --network-acl-id acl-bbb
-       --rule-number 110 --protocol tcp --port-range From=1024,To=65535
-       --cidr-block 10.0.0.0/8 --rule-action allow --egress --profile <p>
-  2. Verify from the source: nc -vz 172.16.1.10 5432.
-CONFIRM: Before modifying the NACL, emit and await operator approval.
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when formatting a NACL_STATELESS verdict.
 
 ### Worked example — overlapping CIDR (silent peering failure)
 
-```text
-TARGET: i-app (10.0.1.10, vpc-source 10.0.0.0/16) → i-db
-  (10.0.2.10, vpc-target 10.0.0.0/16) on tcp/5432
-VERDICT: ROOT_CAUSE_FOUND
-REASON: The source and destination VPCs both use 10.0.0.0/16. AWS
-  silently refuses to route traffic between overlapping CIDRs via
-  peering. The peering connection pcx-aaa is Active but packets do
-  not deliver (Step 2d).
-LAYER: ROUTE_OVERLAPPING_CIDR
-EVIDENCE:
-  - Symptom: nc -vz 10.0.2.10 5432 from 10.0.1.10 times out despite
-    peering being Active, route tables both having the pcx route,
-    SGs allowing the rule, and NACLs being default.
-  - Probe: aws ec2 describe-vpcs for both VPCs returns
-    CidrBlock 10.0.0.0/16 for each.
-  - Passing: peering Active; route tables correct; SGs correct;
-    NACLs default.
-REMEDIATION:
-  1. Renumber one VPC to a non-overlapping CIDR (e.g., change vpc-
-     target to 10.99.0.0/16). This requires recreating subnets,
-     updating route tables, and migrating workloads — plan a
-     maintenance window.
-  2. Or migrate the connectivity to a Transit Gateway with
-     PrivateLink overlay for network translation. This avoids
-     renumbering but adds complexity.
-  3. Verify after renumbering: nc -vz 10.0.2.10 5432 from 10.0.1.10
-     (with the new subnet's IP) succeeds.
-CONFIRM: VPC renumbering is a major change. Emit and await operator
-  approval before any state-changing CLI.
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when formatting a ROUTE_OVERLAPPING_CIDR verdict.
 
 ### Worked example — VPC endpoint policy blocking S3 PutObject
 
-```text
-TARGET: i-app (10.0.1.10, vpc-source) → s3:PutObject on
-  arn:aws:s3:::logs-bucket-prod/*
-VERDICT: ROOT_CAUSE_FOUND
-REASON: The S3 VPC Gateway endpoint (vpce-aaa) policy allows only
-  s3:GetObject; s3:PutObject is denied by the endpoint policy even
-  though the IAM role allows it. Bypassing the endpoint (over NAT)
-  succeeds — confirming the endpoint policy is the cause.
-LAYER: ENDPOINT_POLICY
-EVIDENCE:
-  - Symptom: application on i-app fails to upload to
-     s3://logs-bucket-prod/ with AccessDenied. The IAM role policy
-     includes s3:PutObject on the bucket ARN (verified via
-     simulate-principal-policy).
-  - Probe: aws ec2 describe-vpc-endpoints for vpce-aaa returns a
-     policy with a single statement: Allow s3:GetObject on
-     arn:aws:s3:::logs-bucket-prod/*. No statement allows
-     s3:PutObject.
-  - Probe: bypass the endpoint (route via a NAT Gateway in a test
-     subnet) — s3:PutObject succeeds. This confirms the endpoint
-     policy is the cause.
-  - Passing: IAM policy allows; bucket policy allows; network
-    path is fine.
-REMEDIATION:
-  1. Update the endpoint policy to allow s3:PutObject:
-     aws ec2 modify-vpc-endpoint --vpc-endpoint-id vpce-aaa
-       --policy-document '<JSON with Allow statement for
-       s3:PutObject on the bucket ARN>' --profile <p>
-  2. Verify from the source: re-run the upload; it should succeed.
-  3. Re-enable the endpoint for production traffic once verified.
-CONFIRM: Before modifying the endpoint policy, emit and await
-  operator approval.
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when formatting an ENDPOINT_POLICY verdict.
 
 ## STRICT output contract
 
@@ -1030,22 +271,8 @@ misdiagnosis.
 Every diagnosis MUST emit this exact block, with all fields populated
 (no empty fields, no omitted sections, no reordering):
 
-```text
-TARGET: <source → destination pair, including IPs / subnets / VPCs>
-VERDICT: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
-REASON: <1-2 sentences naming the failed layer and the failing probe>
-LAYER: <one of the 18 LAYER enum values — never blank, never prose>
-EVIDENCE:
-  - <observed symptom — error string or behaviour>
-  - <failing probe — command and its output that confirms the cause>
-  - <passing probes — layers ruled out, with the probe that ruled them out>
-REMEDIATION:
-  1. <specific action with CLI command>
-  2. <verification command after the fix>
-CONFIRM: Before executing any state-changing CLI, emit and await operator
-  approval: "CONFIRM: About to <action> on <id> in <region>. Proceed?
-  (yes/no)"
-```
+The literal block template is the one in ## Output format above; this annotated duplicate moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when the contract wording is unclear.
 
 Verdict-specific rules:
 - `ROOT_CAUSE_FOUND` → LAYER is one of the 18 enum values; EVIDENCE
@@ -1092,35 +319,8 @@ Verdict-specific rules:
 
 ### Perfect example output
 
-```text
-TARGET: i-app (10.0.1.10, subnet-aaa, vpc-source) → i-db
-  (172.16.1.10, subnet-bbb, vpc-target) on tcp/5432
-VERDICT: ROOT_CAUSE_FOUND
-REASON: The destination SG sg-db has no inbound rule matching the
-  source CIDR 10.0.1.0/24 on port 5432 — the SYN is dropped at the
-  instance's security group (Step 2e).
-LAYER: SG_INBOUND
-EVIDENCE:
-  - Symptom: application on i-app (10.0.1.10) reports "Operation
-    timed out" connecting to i-db (172.16.1.10:5432). nc -vz hangs.
-  - Probe: aws ec2 describe-security-groups --group-ids sg-db returns
-    inbound rules allowing 172.16.0.0/16 on 5432 only — no rule
-    matches 10.0.1.0/24 (source VPC CIDR).
-  - Passing: route table for subnet-aaa has pcx-aaa route to
-    172.16.0.0/16; route table for subnet-bbb has pcx-aaa route back
-    to 10.0.0.0/16; peering pcx-aaa is Active; VPC CIDRs do not
-    overlap; NACL on both subnets allows inbound 5432 AND outbound
-    ephemeral 1024-65535 (verified in both directions).
-REMEDIATION:
-  1. Add an inbound rule to sg-db for the source CIDR on tcp/5432:
-     aws ec2 authorize-security-group-ingress --group-id sg-db \
-       --protocol tcp --port 5432 --cidr 10.0.1.0/24
-  2. Verify from the source: nc -vz 172.16.1.10 5432 (should succeed
-     within 1s).
-CONFIRM: Before authorizing the SG ingress, emit and await:
-  "CONFIRM: About to authorize-security-group-ingress on sg-db in
-   us-east-1 for 10.0.1.0/24 on tcp/5432. Proceed? (yes/no)"
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when formatting a complete ROOT_CAUSE_FOUND verdict.
 
 ## Anti-Patterns — NEVER
 
@@ -1196,268 +396,31 @@ CONFIRM: Before authorizing the SG ingress, emit and await:
 
 ## Pre-flight safety checks (run before any state-changing CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`authorize-security-group-ingress`, `create-network-acl-entry`,
-  `create-route`, `modify-vpc-endpoint`, `accept-vpc-peering-
-  connection`), emit and await operator approval.
-
-- **Read-only first.** Every probe in the diagnostic tree is
-  read-only (`describe-*`, `dig`, `nc -vz`, Reachability Analyzer).
-  Do not perform state-changing operations as diagnostic probes.
-
-- **SG changes should prefer CIDR over specific IP** for tolerance to
-  instance moves within the subnet, but never expand the scope to
-  `0.0.0.0/0` to "fix" a connectivity issue.
-
-- **NACL changes are not stateful.** Adding an inbound rule requires
-  a matching outbound rule on the ephemeral range for the return
-  traffic. Always update both directions.
-
-- **Route table changes affect every subnet using the table.** A
-  VPC-wide main route table change affects every subnet that does not
-  have an explicit subnet-level table. Verify scope before applying.
-
-- **VPC peering accept changes the accepter's network exposure.**
-  Accepting a peering connection allows the requester's VPC to reach
-  the accepter's VPC per the route table. Confirm the route table
-  scope before accepting.
-
-- **Transit Gateway route changes affect every attachment using the
-  table.** Verify the TGW route table's association and propagation
-  scope before modifying.
-
-- **VPC endpoint policy changes affect every VPC using the endpoint.**
-  Tighten gradually; never deny-by-default without confirming no
-  workload depends on the denied action.
-
-- **Bulk remediation batch limit.** If the diagnosis identifies the
-  same root cause across multiple subnets/instances (e.g., a missing
-  NACL outbound rule), batch remediation into groups of at most 5
-  resources, emit a single CONFIRM per batch, and verify between
-  batches.
+Pre-flight safety checks (confirmation gate, read-only-first, SG/NACL/route/peering/TGW/endpoint blast-radius rules, bulk batch limit) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand before any state-changing CLI.
 
 ## Remediation guidance
 
-### For ROUTE_TABLE_MISSING — no route for destination
-
-```bash
-aws ec2 create-route --route-table-id <rtb> \
-  --destination-cidr-block <dest-cidr> \
-  --vpc-peering-connection-id <pcx>   # for peered VPC
-  # --transit-gateway-id <tgw>         # for TGW
-  # --gateway-id <igw-xxx>             # for internet (with public IP)
-  # --nat-gateway-id <nat-xxx>         # for internet (private)
-```
-
-Verify both source and destination route tables have the corresponding
-route.
-
-### For ROUTE_TABLE_WRONG_TARGET — wrong route target
-
-Replace the route with the correct target:
-
-```bash
-aws ec2 replace-route --route-table-id <rtb> \
-  --destination-cidr-block <dest-cidr> \
-  --nat-gateway-id <nat-xxx>   # or other correct target
-```
-
-### For ROUTE_OVERLAPPING_CIDR — silent peering failure
-
-- Renumber one VPC to a non-overlapping CIDR (major change; plan a
-  maintenance window).
-- Or migrate connectivity to Transit Gateway with PrivateLink overlay
-  (translation).
-
-### For SG_INBOUND — missing or mis-scoped inbound rule
-
-```bash
-aws ec2 authorize-security-group-ingress --group-id <sg> \
-  --protocol tcp --port <port> --cidr <source-cidr>
-```
-Prefer a referenced SG (same-VPC) or prefix list over a raw CIDR.
-Verify with `nc -vz`.
-
-### For SG_OUTBOUND — missing source-side egress
-
-Same pattern, on the source SG. The default egress is allow-all; if
-the egress was tightened, restore the necessary scope.
-
-### For SG_REFERENCE_CROSS_VPC — dead SG reference
-
-Replace the cross-VPC SG reference with:
-- A CIDR block matching the source's peered-VPC subnet, OR
-- A referenced SG in the peered VPC (with peering in the route table).
-
-### For NACL_STATELESS — missing ephemeral rule
-
-Add the inbound rule on the listener port from the source CIDR. Add
-the outbound rule on the ephemeral port range (1024-65535) to the
-source CIDR. Verify with `nc -vz`.
-
-### For DNS_RESOLUTION — VPC DNS settings
-
-```bash
-aws ec2 modify-vpc-attribute --vpc-id <vpc-id> \
-  --enable-dns-support
-aws ec2 modify-vpc-attribute --vpc-id <vpc-id> \
-  --enable-dns-hostnames
-```
-
-### For DNS_PHZ_ASSOCIATION — PHZ not associated
-
-Associate the PHZ with the consumer VPC:
-
-```bash
-aws route53 associate-vpc-with-hosted-zone \
-  --hosted-zone-id <hz-id> \
-  --vpc VPCRegion=<region>,VPCId=<vpc-id>
-```
-
-For cross-account, use Shared VPC or a Route 53 Resolver Rule.
-
-### For ENDPOINT_POLICY — endpoint policy blocking
-
-```bash
-aws ec2 modify-vpc-endpoint --vpc-endpoint-id <vpce> \
-  --policy-document '<JSON with the necessary Allow>'
-```
-
-### For PEERING_INACTIVE — peering not active
-
-Accept the peering on the accepter side:
-
-```bash
-aws ec2 accept-vpc-peering-connection \
-  --vpc-peering-connection-id <pcx>
-```
-
-### For PEERING_DNS_RESOLUTION — remote DNS flag false
-
-The flag is set at peering creation; to enable on an existing
-peering:
-
-```bash
-aws ec2 modify-vpc-peering-connection-options \
-  --vpc-peering-connection-id <pcx> \
-  --requester-peering-connection-options \
-    AllowDnsResolutionFromRemoteVpcDomainName=true
-```
-
-Both VPCs must have `enableDnsSupport` and `enableDnsHostnames` true.
-
-### For PEERING_SG_REFERENCE — dead cross-VPC SG reference
-
-Replace with a CIDR or a referenced SG in the peered VPC.
-
-### For TGW_ROUTE_PROPAGATION — routes not propagating
-
-```bash
-aws ec2 enable-transit-gateway-route-table-propagation \
-  --transit-gateway-route-table-id <tgw-rtb> \
-  --transit-gateway-attachment-id <attachment-id>
-```
-
-### For TGW_ASSOCIATION_MISSING — attachment not associated
-
-```bash
-aws ec2 associate-transit-gateway-route-table \
-  --transit-gateway-route-table-id <tgw-rtb> \
-  --transit-gateway-attachment-id <attachment-id>
-```
-
-### For PRIVATELINK_ENDPOINT_SERVICE — provider-side issue
-
-Restore the NLB and listener; verify target health in the consumer's
-AZ.
-
-### For PRIVATELINK_SG — endpoint SG missing
-
-Add an inbound rule to the endpoint's SG:
-
-```bash
-aws ec2 authorize-security-group-ingress --group-id <endpoint-sg> \
-  --protocol tcp --port <listener-port> --cidr <source-cidr>
-```
+Per-LAYER remediation commands for all 17 layer values (create-route, replace-route, SG ingress/egress, NACL ephemeral entries, DNS attributes, PHZ association, endpoint policy, peering accept/DNS options, TGW propagation/association, PrivateLink NLB/SG) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when writing the REMEDIATION block.
 
 ## Deep reference: VPC connectivity layer model
 
-### Layer ordering for timeout symptoms (strict OSI)
-
-```
-DNS resolution      (L7)   →  does the hostname resolve?
-Routing             (L3)   →  does the route table have a route?
-SG (source egress)  (L4)   →  does the source SG allow the SYN out?
-SG (dest ingress)   (L4)   →  does the dest SG allow the SYN in?
-NACL (source)       (L4)   →  both directions: SYN out, SYN-ACK back
-NACL (dest)         (L4)   →  both directions: SYN in, SYN-ACK out
-Cross-VPC plumbing  (L3)   →  peering/TGW/PrivateLink state and routes
-Port reachability   (L4)   →  does nc -vz succeed?
-Application         (L7)   →  TLS handshake, auth, application logic
-```
-
-Skipping a layer produces false root causes. Always probe in order.
-
-### SG vs NACL comparison
-
-| Property | Security Group | Network ACL |
-|---|---|---|
-| Stateful | Yes (return traffic automatic) | No (each direction evaluated) |
-| Rule evaluation | All rules evaluated; any allow matches | Lowest rule number wins; first match |
-| Default | Deny all inbound, allow all outbound | Default NACL: allow all; custom NACL: deny all |
-| Applies to | ENI (instance / Lambda / NLB / endpoint) | Subnet |
-| Source | CIDR, SG reference (same-VPC or peered), prefix list | CIDR only |
-| Return traffic | Implicit allow | Requires explicit rule on ephemeral range |
-
-### VPC peering vs Transit Gateway
-
-| Property | VPC Peering | Transit Gateway |
-|---|---|---|
-| Topology | Point-to-point | Hub-and-spoke |
-| Transitivity | No | Yes (via TGW route table) |
-| Cross-region | Yes (cross-region peering) | Yes (inter-region peering via TGW) |
-| Cost | Free (data transfer fees apply) | Hourly per attachment + per-GB |
-| Route table | Per-VPC | Centralised on TGW |
-| Overlapping CIDRs | Silent failure | Silent failure (same limit) |
-| Use case | Small mesh, single-pair | Many-VPC mesh, centralised routing |
-
-### VPC endpoint types
-
-| Type | Services supported | Cost | Configuration |
-|---|---|---|---|
-| Gateway | S3, DynamoDB | Free | Route table entry; automatic prefix list |
-| Interface | Most AWS services | Hourly + per-GB | ENI in subnet; SG governs |
-| Gateway Load Balancer | GatewayLB (third-party firewalls) | Hourly + per-GB | Appliance-backed |
+Layer model, SG-vs-NACL comparison, VPC peering vs Transit Gateway, and VPC endpoint type tables moved verbatim to [references/connectivity-layer-reference.md](references/connectivity-layer-reference.md).
+Load on demand for the comparison tables.
 
 ## Recent AWS features (2024-2026)
 
-- **Reachability Analyzer V2 path components (2024-2025):** Richer
-  path component data including SG rule references, NACL rule
-  numbers, and route table entry context. Use it to localise the
-  exact rule that blocks traffic.
-- **Transit Gateway multicast (2024):** Multicast routing on TGW for
-  broadcast-style workloads; rarely used but worth noting for
-  media-streaming patterns.
-- **VPC Flow Logs with `vpc-flow-log` multi-format (2024-2025):**
-  Support for parquet and JSON output formats; pairs well with
-  Athena for historical packet-level analysis.
-- **Network Access Analyzer (2024 GA):** Declarative network
-  reachability checks (e.g., "no subnet can reach 0.0.0.0/0 on
-  22"). Use for posture audits; complement Flow Logs for incident
-  diagnosis.
-- **Route 53 Resolver DNS Firewall (2024-2025):** Domain-list-based
-  DNS filtering inside the VPC. Misconfigured lists can cause
-  `DNS_RESOLUTION` failures; check the Resolver firewall rule
-  associations.
-- **Interface VPC endpoint private DNS overrides (2024):** Custom
-  private DNS names for interface endpoints beyond the service's
-  default. Operators should verify PrivateDnsEnabled plus any custom
-  DNS name config when diagnosing endpoint DNS issues.
-- **Transit Gateway inter-region peering default quotas raised
-  (2024):** Higher attachment limits per TGW. Diagnostically, attach
-  exhaustion is rarer but still possible — check the
-  `VerifiedAccess*` and TGW attachment quotas for very large
-  topologies.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand to check what changed in the last 24 months.
+
+## References (load on demand)
+
+- [Diagnostic commands](references/diagnostic-commands.md) — pre-flight context commands and the full Step 2-9 diagnostic walk with every probe command and verdict condition
+- [Worked examples](references/worked-examples.md) — secondary worked examples (NACL ephemeral outbound, overlapping CIDR, endpoint policy), the NEED_MORE_INFO re-prompt template, and annotated output-contract templates
+- [Error handling](references/error-handling.md) — pre-flight safety checks before state-changing CLIs and per-LAYER remediation guidance with fix and verify commands
+- [Advanced patterns](references/advanced-patterns.md) — mindset, philosophy, Step-0 non-obvious behaviours, and recent AWS features (2024-2026)
+- [Connectivity layer reference](references/connectivity-layer-reference.md) — ports and protocol semantics, SG/NACL evaluation, peering/TGW/PrivateLink specifics, plus the moved layer-model comparison tables
 
 ## Domain
 

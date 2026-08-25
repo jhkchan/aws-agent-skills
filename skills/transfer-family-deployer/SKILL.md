@@ -107,16 +107,7 @@ for READY_TO_DEPLOY):**
 13. **IAM permissions** — the operator principal holds
     `transfer:CreateServer` and `iam:PassRole`.
 
-**Transfer Family limits (2026):**
-
-- Servers per account (default): 100 (soft limit, raisable).
-- Users per server: 5000 (Service Managed); Directory Service: governed
-  by the directory size.
-- Concurrent files per server: governed by instance capacity (default
-  sizing auto-scales).
-- Tags per server: 50.
-- AS2 messages per server: unlimited (subject to throughput limits).
-- VPC endpoint servers per VPC: soft limit, raisable via Support.
+Transfer Family service limits (2026) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Mindset
 
@@ -156,32 +147,7 @@ Run before classification. Misclassifying these produces wrong plans.
 Use `--next-token` to drain.
 
 **Live-account pre-flight (skip if offline plan audit):**
-1. `aws transfer list-servers` — confirm the server name does not
-   collide (note: Transfer Family uses server-id, not names; tags hold
-   the human-readable name).
-2. `aws transfer describe-server --server-id <id>` — capture the full
-   server config for snapshot/diff.
-3. `aws s3api head-bucket --bucket <bucket>` — verify S3 backend exists
-   in the same region.
-4. `aws s3api get-bucket-policy --bucket <bucket>` — verify the bucket
-   policy grants the IAM role.
-5. `aws iam get-role --role-name <TransferUserRole>` — verify the
-   execution role exists and trusts `transfer.amazonaws.com`.
-6. `aws iam get-role-policy --role-name <role> --policy-name <policy>`
-   or `aws iam list-attached-role-policies` — verify the role has S3
-   permissions.
-7. `aws acm describe-certificate --certificate-arn <arn>` — for FTPS,
-   verify cert is ISSUED in the same region.
-8. `aws ec2 describe-security-groups --group-ids <sg-ids>` — for VPC
-   endpoints, verify the SGs exist and inbound rules match protocols.
-9. `aws ds describe-directories --directory-ids <id>` — for
-   AWS_DIRECTORY_SERVICE, verify the directory exists and is ACTIVE.
-10. `aws apigateway get-rest-api --rest-api-id <id>` — for
-    `API_GATEWAY` IdP, verify the API exists and the stage is deployed.
-11. `aws lambda get-policy --function-name <idp-lambda>` — for custom
-    IdP, verify the API Gateway principal can invoke the Lambda.
-12. `aws transfer list-workflows` — for managed workflow reference,
-    verify the workflow exists and is ACTIVE.
+The 12-command live-account pre-flight listing moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Malformed input:** if the server spec is missing required fields
 (`Protocols`, endpoint type, identity provider type, or storage
@@ -207,84 +173,7 @@ https://docs.aws.amazon.com/transfer/latest/userguide/create-server-cli.html.`
 
 ### Step 0: Expert knowledge — non-obvious Transfer Family behaviors
 
-These behaviors are easy to misjudge without operational Transfer
-Family experience. Each changes a plan if ignored:
-
-- **Protocols gate the endpoint type.** Plain FTP REQUIRES a VPC or
-  VPC_ENDPOINT (never PUBLIC). FTPS supports any endpoint type but
-  PUBLIC FTPS still leaks metadata. SFTP over PUBLIC is acceptable but
-  VPC is preferred for partner B2B. AS2 only supports VPC/VPC_ENDPOINT.
-
-- **IAM role = max scope; session policy = effective scope.** The
-  Transfer Family service assumes the IAM role on behalf of the user
-  for every S3 operation. The session policy (passed via `--policy` on
-  `create-user` or returned by the custom IdP) is intersected with the
-  role's identity-based policies to produce the effective permission
-  set. Always pass a session policy that scopes the user to their home
-  directory.
-
-- **HomeDirectoryType: LOGICAL vs PATH.** `PATH` is the literal S3
-  prefix. `LOGICAL` lets you map virtual directories to different S3
-  prefixes via `HomeDirectoryMappings` — useful for chroot-like
-  isolation. Default is `PATH`; use `LOGICAL` only when you need
-  multi-folder mappings.
-
-- **Service Managed users use SSH keys, not passwords.** Each user
-  is created with `--ssh-public-key-body` (an SSH public key in
-  OpenSSH format). Passwords are not supported for Service Managed
-  SFTP users — rotate keys, not passwords.
-
-- **Custom IdP response shape is non-negotiable.** The Lambda behind
-  the API Gateway must return JSON with at minimum: `Role` (IAM ARN),
-  `HomeDirectory` (S3 prefix), and optionally `Policy` (session policy
-  JSON string), `HomeDirectoryType`, `PublicKeys`. Missing fields cause
-  silent auth failures.
-
-- **Directory Service SFTP uses AD credentials.** Users sign in with
-  their `DOMAIN\username` and AD password — no SSH keys. The Directory
-  Service must be a Managed Microsoft AD in the same VPC. Simple AD is
-  not supported.
-
-- **FTPS requires an ACM cert in the server's region.** The cert's
-  subject MUST match the FTPS hostname clients connect to. Wildcard
-  certs work for subdomains. Self-signed certs are technically
-  supported but rejected by most client SFTP libraries.
-
-- **VPC endpoint servers create an ENI in your VPC.** Clients connect
-  to the ENI's private IP. You control networking (security groups,
-  route tables, DNS). VPC_ENDPOINT (newer) lets you attach the server
-  to your VPC without provisioning an ENI per subnet — preferred for
-  multi-AZ resilience.
-
-- **Logging role writes structured logs to CloudWatch.** Each
-  user-level operation (upload, download, list, mkdir) is logged with
-  a structured JSON payload. Without a `LoggingRole`, no audit trail.
-
-- **AS2 uses local and partner profiles.** AS2 (RFC 4130) is B2B
-  app-level file exchange over HTTP. Each partner needs a local profile
-  (private key in Secrets Manager) and a partner profile (partner's
-  cert). MDN (Message Disposition Notification) is asynchronous by
-  default.
-
-- **Managed workflows fire on partial or complete upload.**
-  `OnPartialUpload` fires when bytes are received (chunked transfers).
-  `OnUpload` fires when the file is fully written. Each workflow step
-  is a Lambda, EKS task, or service step (copy, delete, tag). Workflows
-  run in order; a failure can retry, abort, or continue.
-
-- **Tags propagate for cost allocation.** Tag the server, not users.
-  Tags like `Environment=prod` and `Partner=acme` flow through to
-  Cost Explorer for chargeback.
-
-- **Server endpoint DNS resolves after creation.** For PUBLIC servers,
-  the endpoint is `s-<id>.server.transfer.<region>.amazonaws.com`.
-  For VPC servers, you control DNS — typically a Route 53 private
-  hosted zone record pointing at the server's VPC endpoint.
-
-- **Pre-signed URLs for file operations.** Transfer Family uses
-  pre-signed S3 URLs internally for uploads/downloads — the IAM role
-  must have `s3:GetObject` and `s3:PutObject` for the URL generation
-  to succeed, even when the session policy scopes the path.
+All 15 non-obvious Transfer Family behaviors moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 1: Pre-check gate — PREREQUISITES_MISSING if any check fails
 
@@ -414,126 +303,7 @@ After the operation finishes, run post-verification:
 
 ## Common server patterns (boilerplate)
 
-### Service Managed SFTP — S3 backend (public endpoint)
-
-```bash
-# Trust policy for the Transfer user execution role
-cat > transfer-user-trust.json <<'EOF'
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": {"Service": "transfer.amazonaws.com"},
-    "Action": "sts:AssumeRole",
-    "Condition": {"StringEquals": {"aws:SourceAccount": "111111111111"}}
-  }]
-}
-EOF
-
-aws iam create-role \
-  --role-name TransferUserS3Role \
-  --assume-role-policy-document file://transfer-user-trust.json
-
-# Inline policy: maximum scope (session policy narrows per-user)
-aws iam put-role-policy \
-  --role-name TransferUserS3Role \
-  --policy-name S3Access \
-  --policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [
-      {"Effect": "Allow", "Action": ["s3:ListBucket"], "Resource": "arn:aws:s3:::prod-sftp-inbox"},
-      {"Effect": "Allow", "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"], "Resource": "arn:aws:s3:::prod-sftp-inbox/*"}
-    ]
-  }'
-
-# Logging role
-aws iam create-role --role-name TransferLoggingRole \
-  --assume-role-policy-document file://transfer-user-trust.json
-aws iam attach-role-policy --role-name TransferLoggingRole \
-  --policy-arn arn:aws:iam::aws:policy/service-role/AWSTransferLoggingAccess
-
-# Create the server (Service Managed SFTP, public endpoint)
-aws transfer create-server \
-  --description "prod-sftp-inbox" \
-  --protocols SFTP \
-  --endpoint-type PUBLIC \
-  --identity-provider-type SERVICE_MANAGED \
-  --logging-role arn:aws:iam::111111111111:role/TransferLoggingRole \
-  --tags Key=Environment,Value=prod Key=Name,Value=prod-sftp-inbox
-
-# Returns: { "ServerId": "s-abc123def456" }
-
-# Add a user with a session policy scoping them to home/alice/
-aws transfer create-user \
-  --server-id s-abc123def456 \
-  --user-name alice \
-  --role arn:aws:iam::111111111111:role/TransferUserS3Role \
-  --home-directory "/prod-sftp-inbox/alice" \
-  --home-directory-type PATH \
-  --ssh-public-key-body "ssh-rsa AAAAB3...alice@laptop" \
-  --policy '{
-    "Version": "2012-10-17",
-    "Statement": [
-      {"Effect": "Allow", "Action": ["s3:ListBucket"], "Resource": "arn:aws:s3:::prod-sftp-inbox", "Condition": {"StringLike": {"s3:prefix": ["alice/*","alice"]}}},
-      {"Effect": "Allow", "Action": ["s3:GetObject","s3:PutObject","s3:DeleteObject"], "Resource": "arn:aws:s3:::prod-sftp-inbox/alice/*"}
-    ]
-  }'
-```
-
-### Custom IdP via API Gateway + Lambda (VPC endpoint)
-
-```bash
-# Invocation role for Transfer Family to call the API Gateway
-aws iam create-role \
-  --role-name TransferIdPInvocationRole \
-  --assume-role-policy-document file://transfer-user-trust.json
-aws iam put-role-policy \
-  --role-name TransferIdPInvocationRole \
-  --policy-name InvokeIdP \
-  --policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [{
-      "Effect": "Allow",
-      "Action": "apigateway:Invoke",
-      "Resource": "arn:aws:apigateway:us-east-1::/restapis/abc123/stages/prod/POST/"
-    }]
-  }'
-
-aws transfer create-server \
-  --description "prod-sftp-vpc-custom-idp" \
-  --protocols SFTP FTPS \
-  --endpoint-type VPC \
-  --identity-provider-type API_GATEWAY \
-  --identity-provider-details '{
-    "Url": "https://abc123.execute-api.us-east-1.amazonaws.com/prod/",
-    "InvocationRole": "arn:aws:iam::111111111111:role/TransferIdPInvocationRole"
-  }' \
-  --certificate arn:aws:acm:us-east-1:111111111111:certificate/abc-123 \
-  --address-allocation-id allocation-id-elastic-ip \
-  --vpc-id vpc-abc123 \
-  --subnet-ids subnet-aaa subnet-bbb \
-  --security-group-ids sg-ssh sg-ftps \
-  --logging-role arn:aws:iam::111111111111:role/TransferLoggingRole \
-  --tags Key=Environment,Value=prod
-```
-
-### Directory Service (Managed AD), FTPS, AS2 — short forms
-
-Directory Service SFTP uses `--identity-provider-type AWS_DIRECTORY_SERVICE --identity-provider-details '{"DirectoryId":"d-abc123"}'` with `--endpoint-type VPC_ENDPOINT`. FTPS requires `--certificate <acm-arn>` in the same region. AS2 uses `--protocols AS2 --endpoint-type VPC_ENDPOINT` followed by `create-profile` for local and partner profiles. Full CLI sequences in `references/identity-providers-and-storage.md`.
-
-### Managed workflow (OnUpload — process inbound file)
-
-```bash
-# Execution role trusts transfer.amazonaws.com with lambda:InvokeFunction on the step Lambda
-aws transfer create-workflow \
-  --description "Process inbound SFTP file" \
-  --steps '[{"Type":"COPY","CopyStepDetails":{"DestinationFileLocation":{"S3FileLocation":{"Bucket":"prod-processed","Key":"inbound"}},"SourceFileLocation":"${originalFile}"}},{"Type":"CUSTOM","CustomStepDetails":{"Target":"arn:aws:lambda:us-east-1:111111111111:function:process-inbound-file"}}]' \
-  --on-exception-steps '[{"Type":"DELETE","DeleteStepDetails":{"SourceFileLocation":"${originalFile}"}}]'
-
-# Reference the workflow on the server via update-server --workflow-details '{"OnUpload":{"WorkflowId":"w-abc123","ExecutionRole":"arn:aws:iam::111111111111:role/TransferWorkflowExecutionRole"}}'
-```
-
-Full managed-workflow CLI sequence with execution role setup is in `references/identity-providers-and-storage.md`.
+All four boilerplate CLI sequences (Service Managed SFTP/S3, custom IdP via API Gateway, Directory Service/FTPS/AS2 short forms, managed workflow OnUpload) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 ## STRICT output contract
 
@@ -721,34 +491,7 @@ ALWAYS tag the server with `Environment` and (for partner servers)
 
 ## Recent AWS features (2024-2026)
 
-- **Transfer Family AS2 (2023-2024 GA):** app-level B2B file exchange
-  over HTTP/HTTPS, RFC 4130 compliant. Local and partner profiles with
-  cert-based mutual auth. Asynchronous MDN by default. Replaces the
-  need for a third-party AS2 gateway for many B2B integrations.
-- **Managed workflows (2024-2025):** native step-based workflow engine
-  triggered `OnUpload` or `OnPartialUpload`. Step types: COPY, DELETE,
-  TAG, CUSTOM (Lambda). Exception steps run on failure. Replaces the
-  common pattern of EventBridge + Lambda for inbound file processing.
-- **VPC_ENDPOINT endpoint type (2024-2025):** attaches the server to
-  your VPC without provisioning a per-subnet ENI. Single endpoint
-  serves all AZs. Preferred over the older VPC type for multi-AZ
-  resilience.
-- **Structured CloudWatch logging (2024):** JSON-formatted logs with
-  user, file, operation, and timestamp fields. Replaces the older
-  text-format logs. Queryable via CloudWatch Logs Insights.
-- **EFS storage backend (2024-2025):** EFS-backed home directories for
-  users requiring POSIX file system semantics. Optional EFS access
-  points for chroot-like isolation. S3 remains the most common
-  backend.
-- **Directory Service Simple AD deprecation (2025):** Simple AD no
-  longer supported for new Transfer Family servers. Use Managed
-  Microsoft AD only.
-- **Tag-based access control (2024-2025):** ABAC via resource tags
-  on the server and user — useful for multi-tenant Transfer Family
-  deployments.
-- **Per-server throttling and queueing (2024-2025):** server-side
-  queueing of concurrent connections beyond the per-server limit,
-  removing silent connection drops under load.
+The 2024-2026 feature timeline moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## AWS documentation
 
@@ -762,6 +505,14 @@ ALWAYS tag the server with `Environment` and (for partner servers)
 - **AS2 profiles** — https://docs.aws.amazon.com/transfer/latest/userguide/as2-profiles.html
 - **Managed workflows** — https://docs.aws.amazon.com/transfer/latest/userguide/working-with-workflows.html
 - **Structured logging** — https://docs.aws.amazon.com/transfer/latest/userguide/monitoring.html
+
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) — full CLI boilerplate for the four common server patterns
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 non-obvious behaviors, 2026 service limits, 2024-2026 feature timeline
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — 12-command live-account pre-flight listing
+- [references/identity-providers-and-storage.md](references/identity-providers-and-storage.md) — identity provider and storage backend detail
+- [references/server-and-iam-session-policies.md](references/server-and-iam-session-policies.md) — server IAM and session policy detail
 
 ## Domain
 

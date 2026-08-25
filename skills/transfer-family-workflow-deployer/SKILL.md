@@ -171,67 +171,11 @@ no internet exposure.
 
 ## Expert heuristic: session policy for per-user S3 scoping
 
-A baseline model says "attach an IAM role with S3 permissions." The
-correct heuristic recognizes that the session policy is the per-user
-scoping mechanism.
-
-```text
-Per-user S3 scoping model:
-  IAM role (assumed by Transfer Family on behalf of the user):
-    ├── Defines MAXIMUM permissions (e.g., s3:GetObject, s3:PutObject)
-    └── Attached to each user via create-user --role
-
-  Session policy (applied at connection time):
-    ├── Scopes the IAM role to specific S3 paths
-    ├── Effective permissions = IAM role INTERSECT session policy
-    └── Without session policy → user gets FULL IAM role permissions (RISK)
-
-  Example:
-    IAM role: s3:GetObject, s3:PutObject on all buckets
-    Session policy: s3:GetObject, s3:PutObject on my-bucket/home/alice/*
-    Effective: s3:GetObject, s3:PutObject on my-bucket/home/alice/*
-
-  Without session policy:
-    Effective: s3:GetObject, s3:PutObject on ALL buckets (SECURITY RISK)
-```
-
-**Key implication:** ALWAYS attach a session policy to every Transfer
-Family user. The session policy is the only mechanism that scopes
-each user to their own home directory. Without it, a user can access
-any S3 path the IAM role permits.
+Session-policy scoping model and full walkthrough moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 ## Expert heuristic: managed workflow for file landing zone automation
 
-A managed workflow turns SFTP from a passive file store into an active
-data pipeline. Every file upload triggers a Step Functions execution.
-
-```text
-Managed workflow pipeline (per file upload):
-  1. File arrives via SFTP → lands in S3 (home directory)
-  2. Transfer Family triggers the managed workflow
-  3. Step Functions executes the workflow steps:
-     ├── Pre-processing (optional): virus scan, format validation
-     │   → if fails: quarantine file, notify user
-     │   → if passes: continue
-     4. File is available in S3
-     5. Post-processing: transform, route, trigger downstream
-        ├── Copy to data lake bucket
-        ├── Trigger Lambda for ETL
-        ├── Send SNS notification
-        └── Move to archive bucket
-
-  Workflow definition (JSON):
-    Steps:
-      - Type: COPY | DELETE | TAG | CUSTOM
-      - Destination: s3://data-lake/processed/${originalName}
-      - OnException: send SNS, retry 3x
-```
-
-**Key implication:** managed workflows are the mechanism for building
-a file landing zone on Transfer Family. Without a workflow, files land
-in S3 and require manual intervention or a separate event-driven
-pipeline. With a workflow, the entire processing chain is automated
-and visible in Step Functions execution history.
+Managed-workflow landing-zone pipeline walkthrough moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 ## Expert heuristic: VPC endpoint for private SFTP
 
@@ -333,15 +277,7 @@ Connect.
 
 For VPC and VPC_ENDPOINT types, specify subnets and security groups:
 
-```bash
-aws transfer create-server \
-  --protocols SFTP \
-  --endpoint-type VPC_ENDPOINT \
-  --endpoint-details \
-    VpcId=vpc-aaa11122,\
-    SubnetIds=subnet-aaa,subnet-bbb,\
-    SecurityGroupIds=sg-sftp
-```
+The create-server VPC_ENDPOINT CLI example moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 **Security group rules:** allow inbound TCP 22 (SFTP) from the
 expected client CIDR ranges. For VPC_ENDPOINT, the security group
@@ -352,26 +288,7 @@ is attached to the VPC endpoint network interface.
 To use a custom hostname (e.g., `sftp.example.com`), create a Route 53
 record pointing to the server endpoint:
 
-```bash
-# Get the server endpoint
-SERVER_ENDPOINT=$(aws transfer describe-server --server-id s-xxx \
-  --query 'Server.EndpointDetails.Address' --output text)
-
-# Create a CNAME record in Route 53
-aws route53 change-resource-record-sets \
-  --hosted-zone-id Z111111XXXX \
-  --change-batch '{
-    "Changes": [{
-      "Action": "CREATE",
-      "ResourceRecordSet": {
-        "Name": "sftp.example.com",
-        "Type": "CNAME",
-        "TTL": 60,
-        "ResourceRecords": [{"Value": "'"$SERVER_ENDPOINT"'"}]
-      }
-    }]
-  }'
-```
+The Route 53 CNAME CLI sequence moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 ## Step 6 — User home directory mapping
 
@@ -383,16 +300,7 @@ aws route53 change-resource-record-sets \
 **Logical mapping** uses `HomeDirectoryDetails` to map virtual paths
 to real S3 paths:
 
-```bash
-aws transfer create-user \
-  --server-id s-xxx \
-  --user-name alice \
-  --role arn:aws:iam::123456789012:role/TransferFamilyS3 \
-  --home-directory-type LOGICAL \
-  --home-directory-mappings \
-    Entry=/uploads,Target=/my-bucket/home/alice/uploads \
-    Entry=/downloads,Target=/shared-bucket/distributions
-```
+The logical home-directory-mapping CLI example moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 Alice sees `/uploads` and `/downloads` as top-level directories, but
 they map to different S3 buckets.
@@ -402,44 +310,7 @@ they map to different S3 buckets.
 The IAM role is assumed BY Transfer Family on behalf of the user. The
 session policy scopes the role to the user's home directory.
 
-**IAM role trust policy:**
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": {"Service": "transfer.amazonaws.com"},
-    "Action": "sts:AssumeRole"
-  }]
-}
-```
-
-**Session policy (per-user S3 scoping):**
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Action": ["s3:ListBucket"],
-    "Resource": "arn:aws:s3:::my-bucket",
-    "Condition": {
-      "StringLike": {"s3:prefix": ["home/alice/*"]}
-    }
-  }, {
-    "Effect": "Allow",
-    "Action": ["s3:GetObject", "s3:PutObject"],
-    "Resource": "arn:aws:s3:::my-bucket/home/alice/*"
-  }]
-}
-```
-
-```bash
-aws transfer create-user \
-  --server-id s-xxx \
-  --user-name alice \
-  --role arn:aws:iam::123456789012:role/TransferFamilyS3 \
-  --session-policy file://session-policy-alice.json
-```
+Trust policy JSON, session policy JSON, and create-user CLI moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 **Critical:** the session policy INTERSECTS with the IAM role. The
 effective permissions are the intersection of both. If the IAM role
@@ -451,12 +322,7 @@ The server host key identifies the Transfer Family server to SSH
 clients. Transfer Family generates one automatically, but you can
 upload a custom host key for brand consistency or compliance.
 
-```bash
-# Create server with a custom host key
-aws transfer create-server \
-  --protocols SFTP \
-  --host-key file://server_host_key_rsa
-```
+The custom host-key CLI example moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 **Trusted host keys** are used by clients to verify the server. When a
 client connects, SSH compares the server's host key against its
@@ -467,14 +333,7 @@ known_hosts entry. Distribute the host key to clients via a secure channel.
 AS2 (Applicability Statement 2) is a B2B file transfer protocol for
 EDI (Electronic Data Interchange) trading partner exchange.
 
-```bash
-aws transfer create-connector \
-  --url "https://partner.example.com/as2" \
-  --as2-config \
-    Compression=ZLIB,EncryptionAlgorithm=AES256_CBC,\
-    SigningAlgorithm=SHA256,MdnResponse=SYNC,\
-    LocalProfileId=local-profile-xxx,PartnerProfileId=partner-profile-yyy
-```
+The AS2 create-connector CLI example moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 AS2 requires certificate exchange: you need the partner's public
 certificate (for encryption) and your own private key (for signing).
@@ -485,27 +344,7 @@ Certificates are managed via Transfer Family profiles.
 Managed workflows automate file processing via Step Functions. Each
 file upload triggers the workflow.
 
-```bash
-# Create a managed workflow
-aws transfer create-workflow \
-  --description "File landing zone pipeline" \
-  --steps \
-    Type=COPY,\
-    CopyStepDetails={DestinationFileLocation={Bucket=processed-data,Key=landing/},Name=CopyToDataLake},\
-    Type=TAG,\
-    TagStepDetails={Tags=[{Key=Status,Value=Processed}]} \
-  --on-exception-steps \
-    Type=TAG,\
-    TagStepDetails={Tags=[{Key=Status,Value=Failed}]}
-```
-
-Attach the workflow to the Transfer server:
-
-```bash
-aws transfer update-server \
-  --server-id s-xxx \
-  --workflow-id w-xxx
-```
+The create-workflow and update-server CLI sequences moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 Every file upload now triggers the workflow: copy to the data lake,
 tag as processed, and on exception tag as failed.
@@ -515,13 +354,7 @@ tag as processed, and on exception tag as failed.
 Transfer Family supports structured JSON logging to CloudWatch Logs.
 Each connection, authentication, and file transfer is logged.
 
-```bash
-# Enable structured logging
-aws transfer create-server \
-  --protocols SFTP \
-  --logging-role arn:aws:iam::123456789012:role/TransferFamilyLogging \
-  --structured-log-destinations arn:aws:logs:us-east-1:123456789012:log-group:/aws/transfer/sftp
-```
+The structured-logging CLI example moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 Structured logs include connection timestamp, client IP, username,
 authentication result, file transfer details, and session duration.
@@ -541,37 +374,7 @@ provide throughput visibility.
 
 ## Step 13 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Managed Workflows GA (2023-2024):** Step Functions-based managed
-  workflows for automated pre/post file processing. Configurable steps:
-  COPY, DELETE, TAG, CUSTOM (Lambda). On-exception steps for error
-  handling.
-
-- **AS2 Connectors GA (2023-2024):** B2B AS2 protocol support for
-  EDI trading partner exchange. Certificate-based encryption and
-  signing. Message Disposition Notifications (MDN) for delivery
-  confirmation.
-
-- **Structured JSON Logging (2023-2024):** Structured JSON logs to
-  CloudWatch Logs with per-connection, per-file, and per-session
-  details. Enables CloudWatch Logs Insights queries for audit and
-  troubleshooting.
-
-- **VPC_ENDPOINT Support (2023-2024):** PrivateLink-based VPC endpoint
-  for private SFTP without NLB cost. Connect via VPC peering, TGW, VPN,
-  or Direct Connect.
-
-- **EFS Backing Storage (2023-2024):** Transfer Family now supports
-  EFS as backing storage in addition to S3. Users can be mapped to EFS
-  access points for file-system-based workflows.
-
-- **Directory Service Integration (2024-2025):** Enhanced AWS Directory
-  Service integration with automatic user provisioning and group-based
-  home directory mapping.
-
-- **Web App (2024-2025):** Managed web-based file browser for Transfer
-  Family users, providing a GUI alternative to SFTP clients.
+The 2023-2026 feature timeline moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -679,16 +482,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-- **User authenticates but cannot read/write files:** check IAM role
-  S3 permissions AND session policy (effective = intersection).
-- **Connection timeout on VPC_ENDPOINT:** verify security group allows
-  TCP 22 from client subnet. Check VPC DNS resolution.
-- **Managed workflow not triggering:** verify workflow attached via
-  `describe-server`. Check Step Functions execution history.
-- **AS2 delivery failure:** verify partner certificate validity and
-  connector URL. Check MDN status.
-- **Custom Lambda auth failure:** check Lambda CloudWatch Logs. Verify
-  response format (home directory, IAM role, session policy).
+All five failure-mode playbooks moved verbatim to [references/error-handling.md](references/error-handling.md).
+
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) — per-step CLI sequences (Steps 4-11) plus session-policy and managed-workflow heuristic walkthroughs
+- [references/advanced-patterns.md](references/advanced-patterns.md) — 2023-2026 recent-feature timeline
+- [references/error-handling.md](references/error-handling.md) — five failure-mode playbooks (auth/no-file-access, VPC_ENDPOINT timeout, workflow not triggering, AS2 delivery, Lambda auth)
+- [references/identity-providers-and-endpoints.md](references/identity-providers-and-endpoints.md) — identity provider and endpoint detail
+- [references/managed-workflows-and-as2.md](references/managed-workflows-and-as2.md) — managed workflow and AS2 detail
 
 ## Domain
 

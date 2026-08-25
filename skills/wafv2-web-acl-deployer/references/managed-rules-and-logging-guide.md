@@ -291,3 +291,104 @@ the proxy (ALB, CloudFront) overwrites it. Configure the proxy to
 set `X-Forwarded-For` from the real source IP, not append the
 client-provided value. Without this, attackers can spoof unique IPs
 to evade rate limiting.
+
+## Step 7 - CloudWatch Logs resource policy (moved from SKILL.md)
+
+**CloudWatch Logs resource policy:**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": { "Service": "delivery.logs.amazonaws.com" },
+    "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+    "Resource": "arn:aws:logs:us-east-1:123456789012:log-group:/aws/wafv2/payments:*"
+  }]
+}
+```
+
+
+## Step 9 - ATP rule group configuration (moved from SKILL.md)
+
+**ATP (Account Takeover Prevention):** requires a managed rule
+group ARN and exact login path configuration. Start in `Count`
+mode for 1-2 weeks to baseline, then switch to Block.
+
+```json
+{
+  "Name": "atp-login",
+  "Priority": 200,
+  "Statement": {
+    "ManagedRuleGroupStatement": {
+      "VendorName": "AWS",
+      "Name": "AWSManagedRulesATPRuleSet",
+      "ManagedRuleGroupConfigs": [{
+        "LoginPath": "/api/v1/login",
+        "PayloadType": "JSON",
+        "UsernameField": { "Identifier": "username" },
+        "PasswordField": { "Identifier": "password" }
+      }]
+    }
+  },
+  "OverrideAction": { "Count": {} },
+  "VisibilityConfig": { "SampledRequestsEnabled": true, "CloudWatchMetricsEnabled": true, "MetricName": "atp-login" }
+}
+```
+
+
+## Step 6 - rate-based aggregate key selection (moved from SKILL.md)
+
+**Aggregate key types:**
+
+| Key | Behavior | Use when |
+|---|---|---|
+| `IP` | Source IP from TCP connection | Direct client-to-AWS connections |
+| `FORWARDED_IP` | First IP from `X-Forwarded-For` (configurable) | Behind CDN, ALB, or proxy |
+| `URI` | Per-URI-path aggregation | Rate-limit specific endpoints independently |
+| `QUERY_STRING` | Per-query-string aggregation | Rate-limit by API key in query |
+| `HTTP_METHOD` | Per-method aggregation | Limit POST/PUT separately |
+| `HEADER` | Per-header value aggregation | Limit by `Authorization` or `User-Agent` |
+
+**FORWARDED_IP configuration:** set `HeaderName`
+(`X-Forwarded-For`), `FallbackBehavior` (`MATCH|NO_MATCH`),
+`Position` (`FIRST|LAST|ANY`). `FIRST` = original client; `LAST`
+= closest proxy.
+
+
+## Step 9 - CAPTCHA and Challenge semantics (moved from SKILL.md)
+
+`CAPTCHA` and `Challenge` are non-terminating actions for bot
+defense. When a rule with CAPTCHA action matches, WAF checks for
+a valid token (cookie or header). If valid, the request is
+allowed. If invalid or absent, WAF returns a CAPTCHA interstitial
+(HTTP 405 with a JavaScript challenge). Browsers solve silently
+in ~5 seconds and retry with the token.
+
+`Challenge` is the silent variant — a background JavaScript
+challenge, no user-visible puzzle. Use Challenge for low-friction
+bot filtering; use CAPTCHA when Challenge fails repeatedly.
+
+
+## Step 3 - managed and subscription rule group tables (moved from SKILL.md)
+
+**AWS-managed rule groups (free, no subscription):**
+
+| Rule group | What it blocks | Typical priority |
+|---|---|---|
+| `AWSManagedRulesCommonRuleSet` | Core rule set — protocol anomalies, XSS, SQLi, LFI/RFI, session fixation. 10 rules. | 10 |
+| `AWSManagedRulesAdminProtectionRuleSet` | External access to admin panels. | 30 |
+| `AWSManagedRulesKnownBadInputsRuleSet` | Log4j, SSRF, bad-input signatures. | 40 |
+| `AWSManagedRulesSQLiRuleSet` | SQL injection signatures. | 20 |
+| `AWSManagedRulesLinuxRuleSet` | Linux shell injection (`/etc/passwd`, `/bin/sh`). | 50 |
+| `AWSManagedRulesWindowsRuleSet` | PowerShell / cmd injection. | 70 |
+| `AWSManagedRulesAmazonIpReputationList` | AWS threat-intel IPs (bots, malware C2). | 100 |
+| `AWSManagedRulesAnonymousIpList` | Tor exit nodes, proxies, VPNs, hosting providers. | 110 |
+
+**Subscription rule groups (Marketplace, billed per-request):**
+
+| Rule group | What it blocks | Notes |
+|---|---|---|
+| `AWSManagedRulesBotControlRuleSet` | Bots, scrapers, crawlers (categorized: Common, Monitoring, Scraping, Spam, Automated, SearchEngine). | Public-facing sites; subscription required. |
+| `AWSManagedRulesATPRuleSet` | Account Takeover Prevention — credential stuffing, brute force. | Requires login path config. |
+| `AWSManagedRulesACFPRuleSet` | Account Creation Fraud Prevention — abusive signups. | Requires signup path config. |

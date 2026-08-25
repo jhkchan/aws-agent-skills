@@ -77,6 +77,9 @@ with a specific gap citation in the checklist (marked `[✗]`), and
 | Output format | The literal checklist template |
 | references/routing-and-dns.md | Route table + DNS detail |
 | references/cross-account-and-security.md | Cross-account + SG detail |
+| references/worked-examples.md | Create/accept CLI walkthroughs |
+| references/error-handling.md | Failure triage |
+| references/advanced-patterns.md | Recent features |
 
 ## Mindset
 
@@ -282,69 +285,8 @@ region data transfer rates.
 
 ## Step 4 — Create and accept the peering connection
 
-**Same-account, same-region:**
-
-```bash
-# Requester creates the peering connection
-PCX_ID=$(aws ec2 create-vpc-peering-connection \
-  --vpc-id vpc-aaa11122 \
-  --peer-vpc-id vpc-bbb22233 \
-  --region us-east-1 \
-  --query 'VpcPeeringConnection.VpcPeeringConnectionId' --output text)
-
-echo "Peering connection: $PCX_ID"
-
-# Accepter accepts (same account — can be immediate)
-aws ec2 accept-vpc-peering-connection \
-  --vpc-peering-connection-id "$PCX_ID" \
-  --region us-east-1
-```
-
-**Cross-account, same-region:**
-
-```bash
-# Requester creates the peering connection (specify peer owner ID)
-PCX_ID=$(aws ec2 create-vpc-peering-connection \
-  --vpc-id vpc-aaa11122 \
-  --peer-vpc-id vpc-bbb22233 \
-  --peer-owner-id 999999999999 \
-  --region us-east-1 \
-  --query 'VpcPeeringConnection.VpcPeeringConnectionId' --output text)
-
-# Accepter accepts (in the accepter account — different credentials)
-# Either: assume a role in the accepter account, or have the accepter
-# operator run this in their account:
-aws ec2 accept-vpc-peering-connection \
-  --vpc-peering-connection-id "$PCX_ID" \
-  --region us-east-1
-```
-
-**Inter-region (cross-region):**
-
-```bash
-# Requester creates the peering connection (specify peer region)
-PCX_ID=$(aws ec2 create-vpc-peering-connection \
-  --vpc-id vpc-aaa11122 \
-  --peer-vpc-id vpc-bbb22233 \
-  --peer-owner-id 999999999999 \
-  --peer-region us-west-2 \
-  --region us-east-1 \
-  --query 'VpcPeeringConnection.VpcPeeringConnectionId' --output text)
-
-# Accepter accepts (in the accepter's region)
-aws ec2 accept-vpc-peering-connection \
-  --vpc-peering-connection-id "$PCX_ID" \
-  --region us-west-2
-```
-
-**Verify the connection is ACTIVE:**
-
-```bash
-aws ec2 describe-vpc-peering-connections \
-  --vpc-peering-connection-ids "$PCX_ID" \
-  --query 'VpcPeeringConnections[0].Status' --region us-east-1
-# Expected: { Code: "active", Message: "Active" }
-```
+Step 4 — create/accept CLI walkthroughs (same-account, cross-account, inter-region) — moved verbatim.
+Full detail: [Worked examples](references/worked-examples.md).
 
 **Common mistake:** trying to update route tables before the connection
 is ACTIVE. Route creation fails if the peering is still
@@ -356,25 +298,8 @@ Route tables on BOTH the requester and accepter sides must be updated
 to route traffic to the peered VPC's CIDR via the peering connection.
 This is the most commonly forgotten step.
 
-**Requester side route (VPC-A 10.0.0.0/16 → VPC-B 10.1.0.0/16):**
-
-```bash
-aws ec2 create-route \
-  --route-table-id rtb-requester111 \
-  --destination-cidr-block 10.1.0.0/16 \
-  --vpc-peering-connection-id "$PCX_ID" \
-  --region us-east-1
-```
-
-**Accepter side route (VPC-B 10.1.0.0/16 → VPC-A 10.0.0.0/16):**
-
-```bash
-aws ec2 create-route \
-  --route-table-id rtb-accepter222 \
-  --destination-cidr-block 10.0.0.0/16 \
-  --vpc-peering-connection-id "$PCX_ID" \
-  --region us-east-1
-```
+Step 5 — route table update commands (both sides required) — moved verbatim.
+Full detail: [Routing and DNS](references/routing-and-dns.md).
 
 **Critical:** BOTH routes are needed for bidirectional traffic. Missing
 the accepter-side route is the #1 cause of "peering doesn't work."
@@ -388,23 +313,8 @@ By default, DNS hostnames from one VPC are NOT resolvable from the
 peered VPC. To enable cross-VPC DNS resolution, set
 `AllowDnsResolutionFromPeeredVpc` to true on the peering connection.
 
-**Enable DNS resolution (requester side):**
-
-```bash
-aws ec2 modify-vpc-peering-connection-options \
-  --vpc-peering-connection-id "$PCX_ID" \
-  --requester-peering-connection-options AllowDnsResolutionFromPeeredVpc=true \
-  --region us-east-1
-```
-
-**Enable DNS resolution (accepter side):**
-
-```bash
-aws ec2 modify-vpc-peering-connection-options \
-  --vpc-peering-connection-id "$PCX_ID" \
-  --accepter-peering-connection-options AllowDnsResolutionFromPeeredVpc=true \
-  --region us-east-1
-```
+Step 6 — DNS resolution enablement commands (both sides) — moved verbatim.
+Full detail: [Routing and DNS](references/routing-and-dns.md).
 
 **Critical:** BOTH sides must enable the flag for bidirectional DNS
 resolution. Enabling it on one side only does NOT work.
@@ -424,23 +334,8 @@ peer VPC). This is more precise than CIDR-based rules.
 Cross-account or inter-region peering CANNOT use SG cross-references.
 Use CIDR-based rules instead.
 
-**Same-account, same-region SG cross-reference:**
-
-```bash
-aws ec2 authorize-security-group-ingress \
-  --group-id sg-requester111 \
-  --ip-permissions "IpProtocol=tcp,FromPort=443,ToPort=443,UserIdGroupPairs=[{GroupId=sg-accepter222,VpcPeeringConnectionId=$PCX_ID}]" \
-  --region us-east-1
-```
-
-**Cross-account or inter-region (CIDR-based rule):**
-
-```bash
-aws ec2 authorize-security-group-ingress \
-  --group-id sg-requester111 \
-  --ip-permissions "IpProtocol=tcp,FromPort=443,ToPort=443,IpRanges=[{CidrIp=10.1.0.0/16}]" \
-  --region us-east-1
-```
+Step 7 — SG cross-reference vs CIDR-based rule commands — moved verbatim.
+Full detail: [Cross-account and security](references/cross-account-and-security.md).
 
 ## Step 8 — Limitations (no transitive routing)
 
@@ -466,56 +361,16 @@ VPC peering supports IPv6 traffic if both VPCs have IPv6 CIDR blocks
 assigned. IPv6 routes must be added separately (in addition to IPv4
 routes).
 
-**Add IPv6 routes (both sides):**
-
-```bash
-# Requester side
-aws ec2 create-route \
-  --route-table-id rtb-requester111 \
-  --destination-ipv6-cidr-block 2600:1f18:4113:b200::/56 \
-  --vpc-peering-connection-id "$PCX_ID" \
-  --region us-east-1
-
-# Accepter side
-aws ec2 create-route \
-  --route-table-id rtb-accepter222 \
-  --destination-ipv6-cidr-block 2600:1f18:4113:a100::/56 \
-  --vpc-peering-connection-id "$PCX_ID" \
-  --region us-east-1
-```
+Step 9 — IPv6 route commands (both sides) — moved verbatim.
+Full detail: [Routing and DNS](references/routing-and-dns.md).
 
 IPv4 and IPv6 routing are independent. Both must be configured if both
 protocols are needed.
 
 ## Step 10 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **IPv6 VPC peering maturity (2023-2024):** Full IPv6 support for VPC
-  peering connections, including inter-region IPv6 peering. Both VPCs
-  must have IPv6 CIDR blocks assigned.
-
-- **Inter-region VPC peering performance (2023-2024):** AWS backbone
-  optimization for inter-region peering traffic, reducing latency and
-  improving throughput for cross-region workloads. Inter-region peering
-  uses the AWS global backbone (not the public internet).
-
-- **CloudWatch VPC peering metrics (2023-2024):** Enhanced metrics for
-  peering connection traffic monitoring, including bytes/data transfer
-  per peering connection.
-
-- **Peering connection tags (2023-2024):** VPC peering connections now
-  support tagging for cost allocation and governance.
-
-- **Terraform provider improvements (2023-2024):** The Terraform
-  `aws_vpc_peering_connection` and `aws_vpc_peering_connection_accepter`
-  resources now support inter-region peering with proper provider
-  aliasing and auto-accept options for same-account.
-
-- **Inter-region data transfer cost optimization (2024-2025):** AWS
-  reduced inter-region data transfer pricing for peering connections in
-  select region pairs, making inter-region peering more cost-effective
-  for cross-region replication and DR.
+Step 10 — recent AWS features (2023-2026) — moved verbatim.
+Full detail: [Advanced Patterns](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -614,29 +469,16 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Peering stuck in pending-acceptance
-- The accepter has not accepted. For same-account, accept manually. For
-  cross-account, ensure the accepter account has IAM permission and
-  runs `accept-vpc-peering-connection` (or automate via role assumption).
+Error handling deep dives — moved verbatim.
+Full detail: [Error handling](references/error-handling.md).
 
-### Traffic not flowing despite ACTIVE peering
-- Missing route table entry. Verify BOTH sides have routes to the
-  peered VPC's CIDR via the peering connection ID. This is the #1
-  cause. Check with `describe-route-tables`.
+## References (load on demand)
 
-### DNS resolution not working across peered VPCs
-- `AllowDnsResolutionFromPeeredVpc` not enabled on BOTH sides. Verify
-  both VPCs have `enableDnsHostnames` and `enableDnsSupport` true. Then
-  enable the peering DNS flag on both requester and accepter.
-
-### Security group cross-reference fails
-- Cross-account or inter-region peering does NOT support SG cross-
-  references. Switch to CIDR-based SG rules for these topologies.
-
-### CIDR overlap detected
-- The VPCs have overlapping CIDR blocks. The peering may have been
-  created but routing is ambiguous. Re-design CIDR allocation with
-  non-overlapping ranges, or use NAT/TGW if overlap is unavoidable.
+- [Routing and DNS](references/routing-and-dns.md) — route table update commands (both sides), DNS resolution commands, IPv6 routes
+- [Cross-account and security](references/cross-account-and-security.md) — acceptance automation, SG cross-reference vs CIDR-based rule commands
+- [Worked examples](references/worked-examples.md) — create/accept CLI walkthroughs (same-account, cross-account, inter-region)
+- [Error handling](references/error-handling.md) — pending-acceptance, no-traffic, DNS, SG-reference, CIDR-overlap fixes
+- [Advanced patterns](references/advanced-patterns.md) — recent features 2023-2026
 
 ## Domain
 

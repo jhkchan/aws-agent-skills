@@ -219,3 +219,88 @@ destination IP, and Lattice trace ID.
 5. **Access logs not appearing.** Log delivery is async (5-10 minutes
    delay). Verify the CloudWatch log group or S3 bucket exists and has
    the correct permissions.
+---
+
+## Expert heuristic — auth policy scope (service, not rule)
+
+A baseline model assumes auth can be scoped per path. The correct
+heuristic recognizes the auth policy boundary.
+
+```text
+WRONG (impossible in VPC Lattice):
+  Service: payments-svc
+    ├── Rule 1: /public/* → no auth
+    └── Rule 2: /admin/*  → IAM auth required
+
+CORRECT:
+  Service: payments-public-svc (no auth policy)
+    └── Rule 1: /public/* → TG-public
+  Service: payments-admin-svc (IAM auth policy attached)
+    └── Rule 1: /admin/*  → TG-admin
+
+Auth policy attaches to the SERVICE, not to individual rules.
+Need different auth per path? Create separate services.
+```
+
+**Key implication:** if your design requires different auth semantics
+per path, you MUST split into separate services. One auth policy per
+service — no exceptions.
+
+## Step 5 — IAM auth policy CLI (service level)
+
+```bash
+# Set service auth type
+aws vpc-lattice update-service \
+  --service-identifier "$SVC_ID" \
+  --body '{"authType":"AWS_IAM"}'
+
+# Put the auth policy on the service
+aws vpc-lattice put-auth-policy \
+  --resource-identifier "$SVC_ID" \
+  --policy '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::123456789012:role/PaymentsCaller"},"Action":"vpc-lattice-svcs:Invoke","Resource":"*"}]}'
+```
+
+## Step 6 — resource-based service policy CLI
+
+```bash
+aws vpc-lattice put-service-policy \
+  --service-identifier "$SVC_ID" \
+  --policy '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::999999999999:root"},"Action":"vpc-lattice-svcs:Invoke","Resource":"*"}]}'
+```
+
+## Step 8 — cross-account access CLI (RAM share + association)
+
+```bash
+# 1. Create RAM resource share (shares service network with other account)
+aws ram create-resource-share \
+  --name lattice-cross-account-share \
+  --resource-arns "arn:aws:vpc-lattice:us-east-1:123456789012:servicenetwork/$SN_ID" \
+  --principals 999999999999
+
+# 2. In the consumer account (999999999999): accept the RAM invitation
+aws ram accept-resource-share-invitation \
+  --resource-share-invitation-arn <invitation-arn>
+
+# 3. In the consumer account: associate their VPC with the shared network
+aws vpc-lattice create-service-network-vpc-association \
+  --service-network-identifier "$SN_ID" \
+  --vpc-identifier vpc-cross-acct-222
+
+# 4. Put the service policy allowing cross-account invocation (Step 6)
+```
+
+## Step 11 — access log delivery CLI
+
+```bash
+# Deliver to CloudWatch Logs
+aws vpc-lattice put-access-log-subscription \
+  --resource-identifier "$SN_ID" \
+  --service-network-log-type SERVICE \
+  --log-destination '{"provider":"cloudwatch","destinationArn":"arn:aws:logs:us-east-1:123456789012:log-group:/aws/vpc-lattice"}'
+
+# Or deliver to S3
+aws vpc-lattice put-access-log-subscription \
+  --resource-identifier "$SN_ID" \
+  --service-network-log-type SERVICE \
+  --log-destination '{"provider":"s3","destinationArn":"arn:aws:s3:::my-lattice-logs","prefix":"lattice/"}'
+```

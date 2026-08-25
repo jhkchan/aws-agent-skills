@@ -271,3 +271,66 @@ resource "aws_vpc_peering_connection_options" "accepter_dns" {
 #   auto_accept               = true
 # }
 ```
+---
+
+## Step 5 — route table update commands (both sides required)
+
+**Requester side route (VPC-A 10.0.0.0/16 → VPC-B 10.1.0.0/16):**
+
+```bash
+aws ec2 create-route \
+  --route-table-id rtb-requester111 \
+  --destination-cidr-block 10.1.0.0/16 \
+  --vpc-peering-connection-id "$PCX_ID" \
+  --region us-east-1
+```
+
+**Accepter side route (VPC-B 10.1.0.0/16 → VPC-A 10.0.0.0/16):**
+
+```bash
+aws ec2 create-route \
+  --route-table-id rtb-accepter222 \
+  --destination-cidr-block 10.0.0.0/16 \
+  --vpc-peering-connection-id "$PCX_ID" \
+  --region us-east-1
+```
+
+## Step 6 — DNS resolution enablement commands (both sides)
+
+**Enable DNS resolution (requester side):**
+
+```bash
+aws ec2 modify-vpc-peering-connection-options \
+  --vpc-peering-connection-id "$PCX_ID" \
+  --requester-peering-connection-options AllowDnsResolutionFromPeeredVpc=true \
+  --region us-east-1
+```
+
+**Enable DNS resolution (accepter side):**
+
+```bash
+aws ec2 modify-vpc-peering-connection-options \
+  --vpc-peering-connection-id "$PCX_ID" \
+  --accepter-peering-connection-options AllowDnsResolutionFromPeeredVpc=true \
+  --region us-east-1
+```
+
+## Step 9 — IPv6 route commands (both sides)
+
+**Add IPv6 routes (both sides):**
+
+```bash
+# Requester side
+aws ec2 create-route \
+  --route-table-id rtb-requester111 \
+  --destination-ipv6-cidr-block 2600:1f18:4113:b200::/56 \
+  --vpc-peering-connection-id "$PCX_ID" \
+  --region us-east-1
+
+# Accepter side
+aws ec2 create-route \
+  --route-table-id rtb-accepter222 \
+  --destination-ipv6-cidr-block 2600:1f18:4113:a100::/56 \
+  --vpc-peering-connection-id "$PCX_ID" \
+  --region us-east-1
+```

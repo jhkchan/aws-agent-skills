@@ -110,76 +110,13 @@ response.
 
 ## Reasoning framework (why the review order matters)
 
-Operating a Well-Architected review has **dependency and
-ordering constraints** that make the procedure non-trivial.
-Skipping or misordering causes silent gaps — answers don't
-persist, the report is empty, or milestones capture the wrong
-snapshot:
-
-1. **Workload FIRST with lens selection** — `create-workload`
-   provisions the review container and binds the lenses
-   (Well-Architected Framework + optional specialty lenses like
-   SaaS, FTR, Healthcare). Adding a lens later via
-   `import-lens` requires the lens to be enabled in the account.
-2. **Environment + description drive downstream** — the
-   workload `Environment` (`PRODUCTION` | `PREPRODUCTION` |
-   `OTHER`) shapes risk tolerance interpretation. A `PREPROD`
-   workload may accept MEDIUM risks a `PRODUCTION` workload
-   would not.
-3. **Lens availability is account-scoped** — specialty lenses
-   (SaaS, FTR, Healthcare, etc.) must be enabled in the account
-   via `import-lens`. Referencing an un-imported lens produces
-   `ResourceNotFoundException` at update-answer time.
-4. **Answer risk-tier is opinion, not metric** — the
-   Well-Architected Tool stores `ChoiceUpdates` with a risk
-   tier (`HIGH_ISSUE` / `MEDIUM_ISSUE` / `NO_ISSUE`). The
-   skill answers with rationale tied to actual workload state;
-   a generic answer with no workload evidence is rejected by
-   the operator as invalid.
-5. **Improvement plan items are derived from HIGH and MEDIUM
-   answers** — the consolidated report aggregates every
-   `HIGH_ISSUE` and `MEDIUM_ISSUE` answer into the improvement
-   plan. Answering with `NO_ISSUE` removes the item from the
-   plan silently.
-6. **Milestones snapshot at write time** — a milestone captures
-   the current state of answers and improvement plan at the
-   moment of `create-milestone`. Subsequent answer updates do
-   NOT back-propagate. Create the milestone AFTER the review
-   is complete.
-7. **Trusted Advisor checks supplement, not replace** — TA
-   findings map to specific Well-Architected questions
-   (cost optimization, security, performance). Importing TA
-   findings pre-populates evidence but does not auto-answer.
-8. **The Prosperity pillar (2025) is opt-in via lens import**
-   — the Prosperity pillar is delivered as a specialty lens,
-   not part of the default Well-Architected Framework. Import
-   the lens before answering Prosperity questions.
+Why the review order matters (lens binding, environment risk tolerance, milestone snapshots, TA as evidence): [Advanced patterns](references/advanced-patterns.md).
+Load on demand when sequencing an unfamiliar review.
 
 ## Pre-flight: workload / lens metadata gate
 
-Run before classification. `list-workloads` returns max 50/page
-(`--max-results 50`, paginate with `--next-token`).
-
-**Live-account pre-flight (skip if offline plan):**
-1. `aws wellarchitected list-workloads` — confirm workload
-   exists; capture `WorkloadId`, `WorkloadArn`, `Environment`.
-2. `aws wellarchitected list-lenses --workload-id <id>` —
-   confirm lens is associated with the workload.
-3. `aws wellarchitected get-workload --workload-id <id>` —
-   read `Lenses[]`, `PillarIds[]`, `ReviewOwner`,
-   `IsReviewOwnerUpdateAllowed`.
-4. `aws wellarchitected list-answers --workload-id <id>
-   --lens-alias wellarchitected` — check current answer state
-   for the target pillar.
-5. `aws wellarchitected list-share-invitations` — confirm
-   cross-account sharing state if applicable.
-6. `aws trustedadvisor describe-checks --region <r>` — confirm
-   TA checks available for the pillar integration.
-7. `aws sts get-caller-identity` — confirm caller identity and
-   IAM permissions.
-
-**Malformed input:** emit `VERDICT: ERROR` with reason and
-remediation.
+Pre-flight metadata gate commands (list-workloads / list-lenses / get-workload / list-answers / list-share-invitations / describe-checks / sts get-caller-identity): [Diagnostic commands](references/diagnostic-commands.md).
+Load on demand before classification in live-account runs.
 
 ## Review procedure (apply in order)
 
@@ -301,14 +238,8 @@ The consolidated report enumerates:
 - Lens-specific findings (specialty lenses appear here).
 - Workload metadata and review owner.
 
-For a PDF report, use `--format PDF`:
-
-```bash
-aws wellarchitected get-consolidated-report \
-  --workload-id <id> \
-  --format PDF \
-  --region us-east-1 > /tmp/war-report.pdf
-```
+PDF report variant CLI: [Diagnostic commands](references/diagnostic-commands.md).
+Load on demand when an executive-ready PDF is requested.
 
 ### Step 5: Draft the improvement plan
 
@@ -325,17 +256,8 @@ aws wellarchitected list-improvement-plans \
   --region us-east-1
 ```
 
-Each improvement plan item references the question, the
-choice that introduced the risk, and the guidance text from
-AWS. The skill augments each item with a concrete remediation
-link:
-- For operational excellence gaps, link to the
-  operational excellence lab.
-- For security gaps, link to the security lab and the
-  Security Hub control that maps to the question.
-- For cost optimization gaps, link to the cost optimization
-  lab and the Compute Optimizer / Cost Optimization Hub
-  recommendation.
+Per-pillar remediation link mapping (operational excellence / security / cost labs): [Advanced patterns](references/advanced-patterns.md).
+Load on demand when augmenting improvement plan items.
 
 ### Step 6: Create a milestone
 
@@ -351,90 +273,28 @@ at the moment of creation. Subsequent answer updates do NOT
 back-propagate. Create the milestone AFTER the review is
 complete and the improvement plan is drafted.
 
-```bash
-aws wellarchitected list-milestones \
-  --workload-id <id> \
-  --region us-east-1
-```
+list-milestones CLI: [Diagnostic commands](references/diagnostic-commands.md).
+Load on demand when verifying milestones.
 
 ### Step 7: Integrate Trusted Advisor findings
 
-Trusted Advisor findings map to specific Well-Architected
-questions. The integration pre-populates evidence but does
-NOT auto-answer — the operator must confirm the answer.
-
-```bash
-aws trustedadvisor describe-checks --region us-east-1
-aws trustedadvisor describe-check-refresh-statuses --region us-east-1
-aws trustedadvisor get-check-result \
-  --check-id <check-id> \
-  --region us-east-1
-```
-
-Map TA findings to Well-Architected questions:
-- **Cost Optimization checks** (e.g., `LowUtilizationEC2Resources`)
-  → Cost Optimization pillar questions on right-sizing.
-- **Security checks** (e.g., `IAMPasswordPolicy`) → Security
-  pillar questions on IAM hygiene.
-- **Performance checks** (e.g., `HighUtilizationEC2Instance`)
-  → Performance pillar questions on capacity planning.
-- **Fault Tolerance checks** (e.g., `MultiAZEC2`) →
-  Reliability pillar questions on multi-AZ deployment.
-
-The skill surfaces the TA evidence in the answer rationale,
-then prompts the operator to confirm the risk-tier selection.
+TA pulling CLI and the TA-check → pillar-question mapping: [Diagnostic commands](references/diagnostic-commands.md).
+Load on demand when integrating Trusted Advisor evidence.
 
 ### Step 8: Wire Well-Architected Labs runbooks
 
-Well-Architected Labs (https://www.wellarchitectedlabs.com)
-provides hands-on remediation runbooks. The skill references
-the relevant lab for each improvement plan item:
-- Operational Excellence: Reliability by Workload category.
-- Security: Security pillar labs.
-- Reliability: Resiliency labs (e.g., Resiliency of
-  Workloads).
-- Performance: Performance Efficiency pillar labs.
-- Cost Optimization: Cost Optimization labs.
-- Sustainability: Sustainability labs.
-- Prosperity: Value-stream labs (2025).
+Per-pillar labs wiring list (including Prosperity value-stream labs): [Advanced patterns](references/advanced-patterns.md).
+Load on demand when attaching runbooks to plan items.
 
 ### Step 9: Verify review completeness
 
-After answering all pillar questions, verify the review is
-complete:
-
-```bash
-aws wellarchitected list-answers \
-  --workload-id <id> \
-  --lens-alias wellarchitected \
-  --pillar-id operationalExcellence \
-  --region us-east-1 | jq '.AnswerSummaries | length'
-
-# Repeat for each pillar: security, reliability, performance,
-# costOptimization, sustainability
-```
-
-A pillar is complete when every question has at least one
-selected choice. Unanswered questions appear as `UNANSWERED`
-in the consolidated report.
+Per-pillar completeness verification CLI and the UNANSWERED rule: [Diagnostic commands](references/diagnostic-commands.md).
+Load on demand before declaring a review complete.
 
 ### Step 10: Tag, share, and close
 
-Tag the workload for governance tracking; optionally share
-cross-account:
-
-```bash
-aws wellarchitected tag-resource \
-  --workload-arn arn:aws:wellarchitected:us-east-1:111122223333:workload/<id> \
-  --tags team=payments,env=prod,review-cycle=2026-Q3
-
-# Cross-account share (recipient account must accept)
-aws wellarchitected create-workload-share \
-  --workload-id <id> \
-  --shared-with 111122223334 \
-  --permission-mode REVIEWER \
-  --region us-east-1
-```
+tag-resource and cross-account create-workload-share CLI: [Diagnostic commands](references/diagnostic-commands.md).
+Load on demand at review close-out.
 
 ## Pillar matrix
 
@@ -450,112 +310,18 @@ aws wellarchitected create-workload-share \
 
 ## Trusted Advisor integration
 
-Trusted Advisor (TA) is the operational signal source for
-Well-Architected reviews. The integration is read-only — TA
-findings inform the answer rationale but the operator must
-confirm the risk-tier selection.
-
-### TA check categories
-
-| Category | Maps to pillar | Example check |
-|---|---|---|
-| Cost Optimization | `costOptimization` | LowUtilizationEC2Resources |
-| Security | `security` | IAMPasswordPolicy, RootAccountMFA |
-| Performance | `performance` | HighUtilizationEC2Instance |
-| Fault Tolerance | `reliability` | MultiAZEC2, ELBConnectionDraining |
-| Service Limits | `operationalExcellence` | ServiceLimits
-
-### Pulling TA findings
-
-```bash
-# List all checks
-aws trustedadvisor describe-checks --region us-east-1
-
-# Get a check result
-aws trustedadvisor get-check-result \
-  --check-id <check-id> \
-  --region us-east-1
-```
-
-The skill maps each TA finding to the corresponding
-Well-Architected question, surfaces the evidence in the answer
-rationale, and prompts the operator to confirm the risk-tier.
+TA check category table and findings-pulling CLI: [Diagnostic commands](references/diagnostic-commands.md).
+Load on demand when mapping TA evidence to answers.
 
 ## Edge-case handling
 
-- **Lens not in account:** `update-answer` with an un-imported
-  lens alias returns `ResourceNotFoundException`. Run
-  `import-lens` first, then `associate-lenses` to attach to
-  the workload.
-- **Workload `Environment` mismatch:** a `PREPRODUCTION`
-  workload accepts MEDIUM risks that a `PRODUCTION` workload
-  would not. Re-assess risk tolerance when promoting.
-- **Answer did not persist:** the most common cause is
-  `ChoiceUpdates` referencing a wrong `ChoiceId`. Verify the
-  choice ID via the lens question before `update-answer`.
-- **Milestone captured wrong state:** a milestone is a
-  point-in-time snapshot. If answers changed after the
-  milestone, create a new milestone. Milestones cannot be
-  updated.
-- **Consolidated report empty:** no answers recorded for the
-  target pillar. Verify `list-answers` returns entries for
-  the pillar before generating the report.
-- **Cross-account share rejected:** the recipient account must
-  accept the share via `accept-workload-share`. The workload
-  does NOT appear in the recipient account until accepted.
-- **Prosperity pillar not appearing:** the Prosperity lens
-  must be imported AND associated with the workload. Verify
-  via `list-lenses --workload-id <id>`.
-- **Trusted Advisor check returning no result:** some TA
-  checks require opt-in or have been migrated to AWS
-  Resilience Hub / Security Hub. Check `describe-checks` for
-  availability.
+Full edge-case catalog (lens import, environment mismatch, silent answer loss, milestone snapshots, empty reports, share rejection, Prosperity lens, TA migration): [Advanced patterns](references/advanced-patterns.md).
+Load on demand when a review operation fails or silently no-ops.
 
 ## Recent AWS features (2024-2026)
 
-- **Prosperity pillar (2025):** a new pillar delivered as a
-  specialty lens (`wellarchitected-prosperity`) covering
-  sustainability of growth, customer-centric measures, and
-  value-stream health. Opt-in via `import-lens`. Not part of
-  the default Well-Architected Framework.
-
-- **Well-Architected Tool API expansion (2024-2025):** the
-  API now supports `list-improvement-plans`,
-  `get-consolidated-report` with `--format PDF`,
-  `--include-shared-resources`, and per-pillar filtering on
-  `list-answers`. Programmable review lifecycle is now
-  first-class.
-
-- **Trusted Advisor integration via AWS Health Aware (2024-2025):**
-  the Well-Architected Tool consumes Trusted Advisor findings
-  via the AWS Health API, automatically suggesting risk-tier
-  selections for cost, security, performance, and reliability
-  questions.
-
-- **Well-Architected Labs automation (2024-2026):** the labs
-  site (wellarchitectedlabs.com) ships Infrastructure-as-Code
-  runbooks (CDK + Terraform) for each pillar's common gaps.
-  The skill references the relevant lab per improvement plan
-  item.
-
-- **Custom lenses (2024-2025):** customers can author custom
-  lenses and publish to the AWS Well-Architected Tool. Custom
-  lenses appear alongside AWS-authored lenses in `list-lenses`.
-
-- **Cross-account review sharing (2024-2025):**
-  `create-workload-share` enables reviewer or contributor
-  access across accounts. The recipient must accept via
-  `accept-workload-share`.
-
-- **Consolidated Reports PDF (2024-2025):** the
-  `get-consolidated-report` API now supports `--format PDF`
-  for executive-ready reports with per-pillar risk distribution
-  charts.
-
-- **Integration with AWS Resilience Hub (2024-2025):** for
-  reliability pillar reviews, Resilience Hub policy assessments
-  can be imported as evidence via the
-  `ImportResiliencePolicy` integration.
+2024-2026 feature delta (Prosperity lens, API expansion, AWS Health Aware TA feed, Labs IaC, custom lenses, cross-account sharing, PDF reports, Resilience Hub import): [Advanced patterns](references/advanced-patterns.md).
+Load on demand when a question references a recent capability.
 
 ## NEVER (top 5 — full list in references)
 
@@ -579,29 +345,8 @@ rationale, and prompts the operator to confirm the risk-tier.
 
 ## Expert heuristic — risk-tier strategy
 
-- **Default to evidence-driven answers.** Every answer must
-  cite workload evidence (deployment topology, observability
-  coverage, on-call runbooks). A generic answer is invalid.
-- **HIGH risks need a remediation owner.** Every `HIGH_ISSUE`
-  should be paired with an owner and a target date in the
-  improvement plan. The skill surfaces this as a follow-up.
-- **MEDIUM risks are acceptable with rationale.** A
-  `MEDIUM_ISSUE` is acceptable for a `PREPRODUCTION`
-  workload. Promote to `HIGH_ISSUE` when the workload moves
-  to `PRODUCTION`.
-- **Use TA findings as supporting evidence, not as the
-  answer.** TA findings inform the rationale; the operator
-  confirms the risk-tier based on the workload's tolerance.
-- **The Prosperity pillar (2025) is a specialty lens.** Import
-  the lens and associate with the workload before answering
-  Prosperity questions.
-- **Milestones mark review cycles.** Use a date-based naming
-  convention (`2026-Q3-baseline`). Create one milestone per
-  review cycle, not per answer.
-- **Specialty lenses cross-reference.** The Security lens and
-  the FTR lens overlap on IAM questions. Answer the question
-  once per lens — the consolidated report shows both lens
-  findings.
+Full risk-tier strategy (evidence-driven answers, HIGH-risk owners, PREPROD tolerance, TA as evidence, milestone cadence, lens cross-reference): [Advanced patterns](references/advanced-patterns.md).
+Load on demand when deciding risk tiers.
 
 ## Pre-flight safety checks (run before any state-changing CLI)
 
@@ -731,6 +476,11 @@ POST_VERIFY:
 STATE: Review complete. Milestone 2026-Q3-baseline captured. Next review cycle: 2026-Q4.
 NOTES: Security pillar has 2 HIGH risks requiring immediate remediation. All improvement plan items have assigned owners and target dates. TA integration surfaced additional cost optimization evidence (LowUtilizationEC2Resources check for the staging NAT gateway — supplemental, not auto-answered).
 ```
+
+## References (load on demand)
+
+- [Diagnostic commands](references/diagnostic-commands.md) — pre-flight metadata gate CLI, PDF report, milestone listing, TA integration, completeness verification, tag/share
+- [Advanced patterns](references/advanced-patterns.md) — reasoning framework, remediation mapping, labs wiring, edge-case catalog, 2024-2026 features, risk-tier heuristics
 
 ## Domain
 

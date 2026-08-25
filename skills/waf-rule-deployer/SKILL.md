@@ -92,29 +92,8 @@ evaluated first. CloudFront-scoped Web ACLs MUST be created in
 us-east-1. The WCU budget per Web ACL defaults to 1500; exceeding
 it causes create/update to fail.
 
-Three misconceptions dominate WAF rule design at provisioning time:
-
-- **"Custom rules first, managed rules as backstop."** Backwards.
-  Managed rule groups (CommonRuleSet, SQLiRuleSet,
-  AmazonIpReputationList) are maintained by AWS and cover the OWASP
-  Top 10 and emerging threats — they are the foundation (high
-  coverage, low effort). Custom rules are for application-specific
-  exceptions (allow a known scanner, block a specific geo, rate-limit
-  a login endpoint). Managed rules first, custom rules for exceptions.
-
-- **"Rule priority does not matter because WAF evaluates all rules."**
-  Priority matters absolutely. WAF evaluates rules in priority order
-  (lowest number first). The FIRST rule that matches determines the
-  action — subsequent rules are NOT evaluated. If a broad block rule
-  (block country X) has priority 0 and a specific allow (allow known
-  partner IP in Country X) has priority 1, the partner IP is blocked.
-  The specific allow MUST have the lower priority number.
-
-- **"Any Web ACL can protect CloudFront."** Only a CLOUDFRONT-scoped
-  Web ACL created in us-east-1 can be associated with a CloudFront
-  distribution. A REGIONAL Web ACL (or a CloudFront ACL in any other
-  region) CANNOT be associated. This is a hard constraint at
-  association time.
+Misconception deep dives moved verbatim to [advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when explaining managed-vs-custom rule ordering.
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -144,90 +123,18 @@ assignment for every rule.
 
 ## Expert heuristic: managed rules first, custom rules for exceptions
 
-A baseline model says "write a custom rule to block SQL injection."
-The correct heuristic uses the managed rule group
-(AWSManagedRulesSQLiRuleSet) that is continuously updated with new
-signatures by AWS, then layers custom rules for exceptions.
-
-```text
-Rule priority chain (lowest number = evaluated first):
-
-  Priority 0:  custom allow — known partner IP (specific exception)
-  Priority 1:  custom allow — internal health-checker CIDR
-  Priority 10: AWSManagedRulesCommonRuleSet (broad coverage)
-  Priority 20: AWSManagedRulesSQLiRuleSet (SQLi signatures)
-  Priority 30: AWSManagedRulesAmazonIpReputationList (known bad IPs)
-  Priority 40: custom block — geo-match country X
-  Priority 50: custom rate-based — 100 req / 5 min on /login
-  Default action: ALLOW (or BLOCK, depending on posture)
-
-Why this order:
-  1. Specific allows (0, 1) evaluated FIRST so known-good traffic
-     is never accidentally blocked by a downstream rule.
-  2. Managed rule groups (10-30) provide broad threat coverage.
-  3. Custom blocks (40) are application-specific.
-  4. Rate-based (50) catches volume attacks.
-  5. Default action applies if no rule matches.
-```
-
-**Key implication:** the specific-allow-before-broad-block pattern is
-the #1 design principle. If a partner IP is in a blocked country, the
-allow rule MUST be evaluated before the geo-block rule.
+Priority-chain rationale moved verbatim to [advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when assigning rule priorities.
 
 ## Expert heuristic: WCU budget planning (1500 default)
 
-Every rule and rule group consumes WCU. Default limit is 1500 per
-ACL. Exceeding causes create/update to fail with
-`WAFInvalidParameterException`.
-
-```text
-Typical WCU costs (approximate, verify in AWS docs):
-  AWSManagedRulesCommonRuleSet          ~700
-  AWSManagedRulesSQLiRuleSet            ~200
-  AWSManagedRulesAmazonIpReputationList ~20
-  AWSManagedRulesLinuxRuleSet           ~200
-  AWSManagedRulesWindowsRuleSet         ~200
-  AWSManagedRulesBotControlRuleSet      ~50
-  AWSManagedRulesATPRuleSet             ~50
-  Custom byte-match (single condition)  1
-  Custom geo-match                      3
-  Custom IP set match                   1
-  Custom regex pattern set match        25
-  Custom rate-based                     1 + base rule cost
-
-Example budget:
-  CommonRuleSet(700) + SQLi(200) + IPReputation(20) + BotControl(50)
-  + ATP(50) = 1020 WCU (managed)
-  + 5 custom rules (~5 each) = 25 WCU (custom)
-  = ~1045 WCU total (under 1500 limit, 455 headroom)
-  Adding LinuxRuleSet(200) + WindowsRuleSet(200):
-    1045 + 400 = 1445 WCU → only 55 WCU headroom.
-    → Offload to a referenced rule group (1500 WCU separate budget).
-```
-
-**Key implication:** the 1500 WCU limit is hit faster than expected
-when stacking managed rule groups. Use a referenced rule group to
-offload capacity. Request a limit increase via Support for >1500.
+WCU cost tables and budget example moved verbatim to [advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when planning the 1500-WCU budget.
 
 ## Expert heuristic: CloudFront ACL must be in us-east-1
 
-A CloudFront-scoped Web ACL MUST be created in us-east-1. A Regional
-ACL cannot protect a CloudFront distribution, regardless of region.
-
-```text
-CloudFront protection flow:
-  1. Create Web ACL --scope CLOUDFRONT --region us-east-1
-  2. Add managed + custom rules (all resources in us-east-1)
-  3. Create IP sets and regex sets in us-east-1
-  4. Associate with distribution:
-     aws wafv2 associate-web-acl \
-       --web-acl-arn arn:aws:wafv2:us-east-1:...:global-webacl/... \
-       --resource-arn arn:aws:cloudfront::...:distribution/...
-
-Regional protection flow (ALB, API Gateway, AppSync):
-  1. Create Web ACL --scope REGIONAL --region <any>
-  2. Add rules; associate with the regional resource ARN
-```
+CloudFront vs regional protection flows moved verbatim to [advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when protecting a CloudFront distribution.
 
 ## Prerequisites (verify before provisioning)
 
@@ -290,39 +197,16 @@ Custom rules handle application-specific logic using statement types:
 | NotStatement | Negate another statement | Allow everything NOT from country X |
 | OrStatement / AndStatement | Combine statements | Block if geo=X AND header=`BadBot` |
 
-**Specific allow before broad block:**
-
-```text
-Custom rule: allow-known-partner
-  Priority: 0, Action: ALLOW
-  Statement: IPSetMatch(ip-set-partner-cidrs)
-  → Evaluates first; known partner IPs bypass all other rules.
-
-Custom rule: block-high-risk-geo
-  Priority: 40, Action: BLOCK
-  Statement: GeoMatch(RU, KP)
-  → A partner IP in a blocked geo is ALLOWED (priority 0 wins).
-```
+Specific-allow-before-broad-block example moved verbatim to [worked-examples.md](references/worked-examples.md).
+Load on demand when authoring exception rules.
 
 ## Step 4 — WCU budget planning (1500 default)
 
-```bash
-# Check current WCU usage
-aws wafv2 describe-web-acl \
-  --scope CLOUDFRONT --region us-east-1 \
-  --id <acl-id> \
-  --query 'WebACL.Capacity' --output text
-```
+WCU usage check CLI moved verbatim to [diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when auditing current capacity.
 
-**Offload WCU to a rule group** (up to 1500 WCU separately):
-
-```bash
-aws wafv2 create-rule-group \
-  --scope CLOUDFRONT --region us-east-1 \
-  --name "custom-exceptions" --capacity 1500 \
-  --visibility-config SampledRequestsEnabled=true,CloudWatchMetricsEnabled=true,MetricName='custom-exceptions'
-# Reference it in the Web ACL via RuleGroupReferenceStatement (1 WCU)
-```
+Rule-group offload CLI moved verbatim to [managed-rules-and-wcu.md](references/managed-rules-and-wcu.md).
+Load on demand when the WCU budget is tight.
 
 ## Step 5 — Rule priority ordering
 
@@ -362,22 +246,8 @@ false positives.
 Reusable resources referenced by custom rules. Must be in the SAME
 scope and region as the Web ACL.
 
-```bash
-# Create an IP set
-IP_SET_ARN=$(aws wafv2 create-ip-set \
-  --scope CLOUDFRONT --region us-east-1 \
-  --name "partner-cidrs" \
-  --addresses "203.0.113.0/24" "198.51.100.10/32" \
-  --ip-address-version IPV4 \
-  --query 'Summary.IPSetARN' --output text)
-
-# Create a regex pattern set
-REGEX_SET_ARN=$(aws wafv2 create-regex-pattern-set \
-  --scope CLOUDFRONT --region us-east-1 \
-  --name "sqli-patterns" \
-  --regular-expression-list "(?i)(union.*select)" "(?i)(drop.*table)" \
-  --query 'Summary.RegexPatternSetARN' --output text)
-```
+IP set / regex pattern set creation CLI moved verbatim to [custom-rules-and-labels.md](references/custom-rules-and-labels.md).
+Load on demand when creating reusable match sets.
 
 **Constraint:** an IP set in us-east-1 CANNOT be referenced by a
 Regional ACL in us-west-2. Scope and region must match.
@@ -451,40 +321,16 @@ Firehose writes to S3.
 **Prerequisites:** Firehose stream in the SAME region as the Web ACL;
 stream name MUST start with `aws-waf-logs-`; S3 bucket exists.
 
-```bash
-# Create the Firehose stream (if needed)
-aws firehose create-delivery-stream \
-  --delivery-stream-name aws-waf-logs-production \
-  --s3-destination-configuration \
-    RoleARN=arn:aws:iam::<acct>:role/firehose-waf-role,\
-    BucketARN=arn:aws:s3:::waf-logs-bucket \
-  --region us-east-1
-
-# Enable logging
-aws wafv2 put-logging-configuration \
-  --web-acl-arn <web-acl-arn> \
-  --logging-configuration \
-    LogDestinationConfigs=arn:aws:firehose:us-east-1:<acct>:deliverystream/aws-waf-logs-production \
-  --region us-east-1
-```
+Firehose logging CLI moved verbatim to [diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when enabling WAF logging.
 
 **RedactedFields:** omit sensitive fields (e.g., `Authorization`
 header, `password` parameter) via the `RedactedFields` config.
 
 ## Step 12 — CloudFront distribution association
 
-```bash
-aws wafv2 associate-web-acl \
-  --web-acl-arn <web-acl-arn> \
-  --resource-arn arn:aws:cloudfront::<acct>:distribution/E1234567890 \
-  --region us-east-1
-
-# Verify
-aws wafv2 get-web-acl-for-resource \
-  --resource-arn arn:aws:cloudfront::<acct>:distribution/E1234567890 \
-  --region us-east-1 \
-  --query 'WebACL.WebACLArn' --output text
-```
+Association + verify CLI moved verbatim to [diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when attaching the ACL to CloudFront.
 
 Association takes ~1 minute to propagate to all edge locations.
 
@@ -582,33 +428,17 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### WAFInvalidParameterException: WCU limit exceeded
-- Total WCU exceeds 1500. Offload to a referenced rule group, remove
-  low-value managed groups, or request a limit increase via Support.
+Error deep dives moved verbatim to [error-handling.md](references/error-handling.md).
+Load on demand when create/associate/logging calls fail.
 
-### Association fails for CloudFront distribution
-- ACL scope is not CLOUDFRONT, or ACL is not in us-east-1. Scope and
-  region are immutable; recreate with `--scope CLOUDFRONT --region
-  us-east-1`.
+## References (load on demand)
 
-### put-logging-configuration fails
-- Firehose stream name does not start with `aws-waf-logs-`. Rename
-  or recreate with the required prefix. Verify the stream is in the
-  same region as the ACL.
-
-### Custom rule referencing IP set fails
-- IP set is in a different scope or region. Recreate in the same
-  scope and region.
-
-### Rate-based rule not triggering
-- Rate window is fixed at 5 minutes. Verify the limit is not too
-  high for the traffic volume. Behind a proxy, switch to
-  `FORWARDED_IP` with `X-Forwarded-For`.
-
-### Managed rule group pinned, no new signatures
-- Pinned versions do not receive updates. Use
-  `describe-managed-rule-group` to see available versions and
-  upgrade quarterly.
+- [worked-examples.md](references/worked-examples.md) - secondary worked example: specific allow before broad block
+- [error-handling.md](references/error-handling.md) - WCU/association/logging/rate-limit failure deep dives
+- [diagnostic-commands.md](references/diagnostic-commands.md) - WCU audit, logging, association and verification CLI
+- [advanced-patterns.md](references/advanced-patterns.md) - misconceptions, priority chain, WCU tables, CloudFront scope flows
+- [managed-rules-and-wcu.md](references/managed-rules-and-wcu.md) - managed rule groups + WCU offload detail
+- [custom-rules-and-labels.md](references/custom-rules-and-labels.md) - custom rules, labels, IP/regex set detail
 
 ## Domain
 

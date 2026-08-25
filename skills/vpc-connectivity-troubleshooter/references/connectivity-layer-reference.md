@@ -358,3 +358,52 @@ Both must be true for Route 53 private hosted zones to resolve.
 
 Always probe `aws health describe-events` for regional issues before
 declaring a customer-side root cause during a wide-impact incident.
+
+## VPC connectivity layer model (moved from SKILL.md)
+
+### Layer ordering for timeout symptoms (strict OSI)
+
+```
+DNS resolution      (L7)   →  does the hostname resolve?
+Routing             (L3)   →  does the route table have a route?
+SG (source egress)  (L4)   →  does the source SG allow the SYN out?
+SG (dest ingress)   (L4)   →  does the dest SG allow the SYN in?
+NACL (source)       (L4)   →  both directions: SYN out, SYN-ACK back
+NACL (dest)         (L4)   →  both directions: SYN in, SYN-ACK out
+Cross-VPC plumbing  (L3)   →  peering/TGW/PrivateLink state and routes
+Port reachability   (L4)   →  does nc -vz succeed?
+Application         (L7)   →  TLS handshake, auth, application logic
+```
+
+Skipping a layer produces false root causes. Always probe in order.
+
+### SG vs NACL comparison
+
+| Property | Security Group | Network ACL |
+|---|---|---|
+| Stateful | Yes (return traffic automatic) | No (each direction evaluated) |
+| Rule evaluation | All rules evaluated; any allow matches | Lowest rule number wins; first match |
+| Default | Deny all inbound, allow all outbound | Default NACL: allow all; custom NACL: deny all |
+| Applies to | ENI (instance / Lambda / NLB / endpoint) | Subnet |
+| Source | CIDR, SG reference (same-VPC or peered), prefix list | CIDR only |
+| Return traffic | Implicit allow | Requires explicit rule on ephemeral range |
+
+### VPC peering vs Transit Gateway
+
+| Property | VPC Peering | Transit Gateway |
+|---|---|---|
+| Topology | Point-to-point | Hub-and-spoke |
+| Transitivity | No | Yes (via TGW route table) |
+| Cross-region | Yes (cross-region peering) | Yes (inter-region peering via TGW) |
+| Cost | Free (data transfer fees apply) | Hourly per attachment + per-GB |
+| Route table | Per-VPC | Centralised on TGW |
+| Overlapping CIDRs | Silent failure | Silent failure (same limit) |
+| Use case | Small mesh, single-pair | Many-VPC mesh, centralised routing |
+
+### VPC endpoint types
+
+| Type | Services supported | Cost | Configuration |
+|---|---|---|---|
+| Gateway | S3, DynamoDB | Free | Route table entry; automatic prefix list |
+| Interface | Most AWS services | Hourly + per-GB | ENI in subnet; SG governs |
+| Gateway Load Balancer | GatewayLB (third-party firewalls) | Hourly + per-GB | Appliance-backed |

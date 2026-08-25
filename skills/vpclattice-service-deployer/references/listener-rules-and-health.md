@@ -293,3 +293,123 @@ resource "aws_vpclattice_service_network_vpc_association" "main" {
   service_network_identifier = aws_vpclattice_service_network.main.id
 }
 ```
+---
+
+## Expert heuristic — health check determines routing eligibility
+
+A baseline model treats health checks as monitoring. In VPC Lattice,
+health checks are a routing input — not just observability.
+
+```text
+Request → Listener → Rule match → Target Group
+                                    ├── Target 1: HEALTHY   → receives traffic ✓
+                                    ├── Target 2: HEALTHY   → receives traffic ✓
+                                    └── Target 3: UNHEALTHY → receives ZERO   ✗
+
+If ALL targets in TG are unhealthy → Lattice returns 503 to client.
+If SOME targets healthy → traffic distributed among healthy only.
+```
+
+Health check parameters: **path** (e.g., `/health`, must return 200),
+**interval** (default 30s, range 5-300), **timeout** (default 5s),
+**healthy threshold** (default 2, range 2-10), **unhealthy threshold**
+(default 2, range 2-10), **matcher** (HTTP code(s), default 200).
+
+**Key implication:** misconfigured health checks cause 503s that look
+like "service down." Always verify health check status BEFORE expecting
+traffic to flow. This is the #1 cause of "my Lattice service returns
+503" tickets.
+
+## Step 2 — instance target group with health check CLI
+
+**Instance target group with health check:**
+
+```bash
+TG_ID=$(aws vpc-lattice create-target-group \
+  --name tg-stable --type INSTANCE \
+  --config '{"port":8080,"protocol":"HTTP","vpcIdentifier":"vpc-aaa11122","healthCheck":{"enabled":true,"path":"/health","protocol":"HTTP","intervalSeconds":30,"timeoutSeconds":5,"healthyThresholdCount":2,"unhealthyThresholdCount":2,"matcher":{"httpCode":"200"}}}' \
+  --query 'id' --output text)
+
+aws vpc-lattice register-targets \
+  --target-group-identifier "$TG_ID" \
+  --targets '[{"id":"i-aaa111222333444","port":8080}]'
+```
+
+## Step 2 — Lambda target group CLI
+
+**Lambda target group:**
+
+```bash
+TG_LAMBDA_ID=$(aws vpc-lattice create-target-group \
+  --name tg-lambda-processor --type LAMBDA \
+  --config '{"lambdaEventStructureVersion":"2.0"}' \
+  --query 'id' --output text)
+
+aws vpc-lattice register-targets \
+  --target-group-identifier "$TG_LAMBDA_ID" \
+  --targets '[{"id":"arn:aws:lambda:us-east-1:123456789012:function:processor"}]'
+```
+
+## Step 2 — verify target health CLI
+
+```bash
+aws vpc-lattice list-targets \
+  --target-group-identifier "$TG_ID" \
+  --query 'items[*].{Target:id,Status:status}' --output table
+```
+
+## Step 4 — listener and routing rule CLIs (default, path, header)
+
+**Create a listener with default action:**
+
+```bash
+LISTENER_ID=$(aws vpc-lattice create-listener \
+  --service-identifier "$SVC_ID" \
+  --default-action '{"forward":{"targetGroups":[{"targetGroupIdentifier":"'$TG_ID'","weight":100}]}}' \
+  --protocol HTTP --port 80 --name payments-listener \
+  --query 'id' --output text)
+```
+
+**Path-based routing rule (weighted canary split):**
+
+```bash
+aws vpc-lattice create-rule \
+  --service-identifier "$SVC_ID" \
+  --listener-identifier "$LISTENER_ID" \
+  --name canary-rule --priority 10 \
+  --match '{"httpMatch":{"path":{"prefix":"/api"},"method":"GET"}}' \
+  --actions '[{"type":"FORWARD","forward":{"targetGroups":[{"targetGroupIdentifier":"'$TG_CANARY_ID'","weight":20},{"targetGroupIdentifier":"'$TG_ID'","weight":80}]}}]'
+```
+
+**Header-based routing rule:**
+
+```bash
+aws vpc-lattice create-rule \
+  --service-identifier "$SVC_ID" \
+  --listener-identifier "$LISTENER_ID" \
+  --name beta-header-rule --priority 20 \
+  --match '{"httpMatch":{"headerMatches":[{"name":"x-env","match":{"exact":"beta"}}]}}' \
+  --actions '[{"type":"FORWARD","forward":{"targetGroups":[{"targetGroupIdentifier":"'$TG_CANARY_ID'","weight":100}]}}]'
+```
+
+## Step 10 — traffic splitting (canary) CLI
+
+```bash
+# Create canary target group (same health check as stable)
+TG_CANARY_ID=$(aws vpc-lattice create-target-group \
+  --name tg-canary --type INSTANCE \
+  --config '{"port":8080,"protocol":"HTTP","vpcIdentifier":"vpc-aaa11122","healthCheck":{"enabled":true,"path":"/health","protocol":"HTTP","intervalSeconds":30,"healthyThresholdCount":2}}' \
+  --query 'id' --output text)
+
+aws vpc-lattice register-targets \
+  --target-group-identifier "$TG_CANARY_ID" \
+  --targets '[{"id":"i-canary111222","port":8080}]'
+
+# Rule: 20% canary, 80% stable
+aws vpc-lattice create-rule \
+  --service-identifier "$SVC_ID" \
+  --listener-identifier "$LISTENER_ID" \
+  --name canary-split --priority 10 \
+  --match '{"httpMatch":{"path":{"prefix":"/api"}}}' \
+  --actions '[{"type":"FORWARD","forward":{"targetGroups":[{"targetGroupIdentifier":"'$TG_CANARY_ID'","weight":20},{"targetGroupIdentifier":"'$TG_ID'","weight":80}]}}]'
+```
