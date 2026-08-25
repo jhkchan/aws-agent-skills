@@ -142,120 +142,8 @@ REQUIRED:
 
 ### Step 0: Expert knowledge — non-obvious Step Functions behaviors that change the plan
 
-These behaviors are easy to misjudge without operational Step Functions
-experience. Each changes the architecture if ignored:
-
-- **Standard bills per state transition; Express bills per invocation +
-  duration.** Standard: $0.025 per 1,000 transitions. A 10-state workflow
-  running 1M times/day = 10M transitions = $250/day. The same workload on
-  Express at 100ms average duration = $1.00 per 1M invocations + ~$0.5/M
-  GB-sec = ~$1.50/day. For high-volume idiomatic workloads, Express is
-  ~100x cheaper. For long-running sagas, Standard is the only option.
-
-- **Express at-least-once means Tasks MUST be idempotent.** Express
-  workflows can retry a Task on internal failure — the integration is
-  invoked MORE THAN ONCE. A non-idempotent Task (e.g., `dynamodb:PutItem`
-  without idempotency key, or SQS SendMessage without dedup) produces
-  duplicates. Standard does not have this issue (exactly-once).
-
-- **Express execution history expires in 5 minutes (sync) or 1 hour
-  (async).** Without `LoggingConfiguration.level: ALL` +
-  `includeExecutionData: true`, an Express execution is forensic-black-hole
-  after 5-60 minutes. Standard retains 90 days via API/console. This is
-  why logging is a CRITICAL severity finding on Express.
-
-- **`TracingConfiguration.enabled: true` is a NO-OP on Express.** The API
-  accepts the field silently; no X-Ray traces are produced. Express
-  distributed visibility uses CloudWatch Logs ServiceLens (weaker). Standard
-  honors the field and emits full X-Ray segments per state transition.
-
-- **A Task without explicit `TimeoutSeconds` defaults to 60 seconds.**
-  Lambda functions configured with timeout > 60s are silently killed by
-  Step Functions at 60s — the Lambda invocation continues (and bills) but
-  the state advances to `States.Timeout`. Always set `TimeoutSeconds`
-  based on the integration's expected runtime.
-
-- **`HeartbeatSeconds` is REQUIRED for Activity-based Tasks.** A Task with
-  `Resource: arn:aws:states:<region>:<account>:activity:<name>` relies on
-  an external worker calling `GetActivityTask` + `SendTaskHeartbeat`.
-  Without `HeartbeatSeconds`, a dead worker is not detected until
-  `TimeoutSeconds` (potentially hours).
-
-- **`Retry` and `Catch` are NOT interchangeable.** `Retry` re-executes the
-  SAME state (for transient errors). `Catch` routes to a DIFFERENT state
-  (the error handler). `Retry` without `Catch` still fails the execution
-  if retries exhaust. `Catch` without `Retry` does not retry transient
-  errors. Production Tasks require BOTH.
-
-- **Default `Retry` parameters (IntervalSeconds=1, MaxAttempts=3,
-  BackoffRate=2.0) are reasonable but should be explicit.** A `Retry`
-  block with only `ErrorEquals` and no other fields uses these defaults.
-  Make them explicit so reviewers can audit the backoff curve.
-
-- **`MaxConcurrency: 0` on a Map means UNBOUNDED.** The default is 0, which
-  means Step Functions invokes iterations as fast as possible. For >100
-  items, this overwhelms downstream services (Lambda concurrency,
-  DynamoDB throttling). Always set an explicit `MaxConcurrency`.
-
-- **Inline Map caps at 40 concurrent iterations and 256KB total payload.**
-  Beyond that, use Distributed Map. Distributed Map supports up to 10,000+
-  concurrent iterations and reads directly from S3 or DynamoDB via
-  `ItemReader` without loading items into the workflow payload.
-
-- **Distributed Map runs under a SEPARATE child execution.** Each
-  Distributed Map iteration is its own Step Functions execution with its
-  own execution history. The parent workflow's `MaxConcurrency` controls
-  child-execution fan-out. The child executions bill separately.
-
-- **`.sync` waits for the integration to complete; the workflow is billed
-  for the wait.** `arn:aws:states:::ecs:runTask.sync` blocks the Task until
-  the ECS task finishes — the state transition is "in progress" for the
-  task duration. On Standard, this is one transition (cheap); on Express,
-  this counts against the 5-minute cap. Long ECS/Glue jobs on Express
-  are impossible.
-
-- **`.waitForTaskToken` pauses indefinitely (up to 1 year on Standard).**
-  The Task returns a Task Token; the workflow pauses until an external
-  worker calls `SendTaskSuccess` or `SendTaskFailure`. The Token is valid
-  for 1 year on Standard, 5 minutes on Express (essentially unusable on
-  Express for human-approval patterns).
-
-- **`definition` is a STRING in the API, not a JSON object.**
-  `CreateStateMachine` expects `"definition": "{\"StartAt\": ...}"`
-  (stringified ASL). Terraform's `jsonencode()` handles this; raw
-  CloudFormation requires `!Sub` with JSON-string escape. Passing a parsed
-  object fails with `InvalidDefinition`.
-
-- **`States.ALL` does NOT match `States.Timeout` in older runtime
-  versions.** State machines created before November 2022 with
-  `Catch: [{"ErrorEquals": ["States.ALL"]}]` miss the timeout path. For
-  long-running production workflows, list `States.Timeout` explicitly
-  alongside `States.ALL`.
-
-- **The execution role's trust policy MUST include
-  `states.amazonaws.com`.** `CreateStateMachine` does NOT validate the
-  trust policy — it accepts any role ARN. At runtime, the first service
-  integration fails with `AccessDenied`. Always verify the trust policy
-  separately.
-
-- **AWS SDK integrations allow direct API calls without Lambda.**
-  `arn:aws:states:::aws-sdk:dynamodb:query` invokes the DynamoDB Query
-  API directly — no Lambda glue code needed. This is the modern pattern
-  for single-API-call Tasks. Resource ARN format:
-  `arn:aws:states:::aws-sdk:<service>:<action>`.
-
-- **Bedrock model invocation is a first-class integration.**
-  `arn:aws:states:::bedrock:invokeModel` synchronously invokes a Bedrock
-  model from a Task. The role needs `bedrock:InvokeModel` on the model
-  ARN. Async invocation uses
-  `arn:aws:states:::bedrock:invokeModel.sync` (Standard only).
-
-- **RedriveExecution (November 2024) changes the recovery calculus for
-  failed Standard executions.** A failed Standard execution can be
-  redriven from the point of failure after fixing the definition — without
-  re-running already-succeeded states. Express does NOT support redrive.
-  Build Catch blocks that route to a state which can be safely re-run on
-  redrive.
+> Full detail moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand.
+> Summary: the complete Step 0 catalog of behaviors that change the deployment plan (billing, idempotency, history expiry, tracing no-op, timeouts, heartbeats, Retry/Catch, Map concurrency, .sync/.waitForTaskToken billing, definition-as-string, States.ALL gap, trust policy, SDK integrations, Bedrock, Redrive).
 
 ### Step 1: Workflow type selection (STANDARD vs EXPRESS)
 
@@ -311,228 +199,23 @@ with `StartAt`, `States`, and terminal transitions. Each state has a
 
 ### Step 3: Service integrations — Resource ARN patterns
 
-The `Resource` field of a `Task` state selects both the service AND the
-integration semantics via the ARN suffix:
-
-| Resource pattern | Semantics | Typical use |
-|---|---|---|
-| `arn:aws:states:::lambda:invoke` | Fire-and-forget (Lambda is already sync) | Function invocation |
-| `arn:aws:states:::dynamodb:getItem` / `putItem` / `updateItem` / `deleteItem` | Direct DynamoDB API (no Lambda) | CRUD on a single item |
-| `arn:aws:states:::dynamodb:query` / `scan` | Direct DynamoDB read API | Query by partition key |
-| `arn:aws:states:::sqs:sendMessage` | Fire-and-forget | Decouple to a queue |
-| `arn:aws:states:::sqs:sendMessage.sync` | (Not meaningful — SendMessage is already sync) | — |
-| `arn:aws:states:::sns:publish` | Fire-and-forget | Fan-out notification |
-| `arn:aws:states:::ecs:runTask` | Fire-and-forget | Launch a task and move on |
-| `arn:aws:states:::ecs:runTask.sync` | Wait for task completion | Long-running batch, returns final result |
-| `arn:aws:states:::glue:startJobRun.sync` | Wait for Glue job | ETL pipeline |
-| `arn:aws:states:::athena:startQueryExecution.sync` | Wait for Athena query | Interactive analytics |
-| `arn:aws:states:::sagemaker:createTrainingJob.sync` | Wait for training job | ML training |
-| `arn:aws:states:::sagemaker:createTransformJob.sync` | Wait for batch transform | Batch inference |
-| `arn:aws:states:::states:startExecution.sync` | Wait for nested execution (Standard only) | Compose workflows |
-| `arn:aws:states:::states:startExecution.waitForTaskToken` | Nested execution with callback | Compose with external signal |
-| `arn:aws:states:::sns:publish.waitForTaskToken` | Pause for human/external approval via SNS | Approval workflow |
-| `arn:aws:states:::sqs:sendMessage.waitForTaskToken` | Pause for worker via SQS | Async worker pattern |
-| `arn:aws:states:::lambda:invoke.waitForTaskToken` | Pause for Lambda-driven callback | External system integration |
-| `arn:aws:states:::aws-sdk:<service>:<action>` | Direct AWS SDK call (no Lambda) | Single-API operations (e.g., `aws-sdk:secretsmanager:GetSecretValue`) |
-| `arn:aws:states:::bedrock:invokeModel` | Synchronous Bedrock model call | GenAI inference |
-| `arn:aws:states:::bedrock:invokeModel.sync` | Async Bedrock invocation (Standard only) | Long-running model |
-
-**Decision tree for suffix:**
-- Service call returns immediately (Lambda, SQS SendMessage, SNS Publish) → bare ARN.
-- Service call runs to completion you need to wait for (ECS task, Glue job, Athena query, SageMaker training) → `.sync`.
-- Workflow pauses pending external signal (human approval, async worker) → `.waitForTaskToken` (the Task receives a `TaskToken` field to pass along; Standard only for > 5min waits).
-- Single AWS API call without Lambda glue → `arn:aws:states:::aws-sdk:<service>:<action>`.
+> Full detail moved verbatim to [references/service-integration-patterns.md](references/service-integration-patterns.md) - load on demand.
+> Summary: the full Resource ARN pattern catalog and suffix decision tree.
 
 ### Step 4: Sync vs callback pattern selection
 
-**`.sync` (run-to-completion):**
-- The Task blocks until the integration returns a terminal state.
-- Use for ECS tasks, Glue jobs, Athena queries, SageMaker training, Bedrock async.
-- The Task's `TimeoutSeconds` must exceed the integration's max runtime.
-- On Express, the `.sync` wait counts against the 5-min execution cap.
-
-**`.waitForTaskToken` (callback):**
-- The Task produces a `TaskToken` (string, ~256 chars). The workflow pauses.
-- An external worker calls `SendTaskSuccess(taskToken, output)` or
-  `SendTaskFailure(taskToken, error, cause)` to resume or fail the Task.
-- Use for human approval, async external systems, long-poll patterns.
-- On Standard, the Task can wait up to 1 year. On Express, capped at 5 min
-  (effectively unusable for human-approval patterns — use Standard).
-- The Token MUST be sent over a secure channel — it is a bearer credential
-  for the workflow's state.
-
-**Anti-pattern:** NEVER use `.waitForTaskToken` on Express for human
-approval. The 5-min cap will fail the Task before any human responds.
+> Full detail moved verbatim to [references/service-integration-patterns.md](references/service-integration-patterns.md) - load on demand.
+> Summary: the .sync vs .waitForTaskToken selection detail with anti-pattern.
 
 ### Step 5: Map state design (Inline vs Distributed)
 
-| Dimension | Inline Map | Distributed Map |
-|---|---|---|
-| Max concurrent iterations | 40 | 10,000+ |
-| Total payload size | 256KB | Run under a child execution (no parent-payload cap) |
-| Item source | Items in workflow payload (`ItemsPath`) | S3 CSV/JSON, DynamoDB Scan/Query, or payload (`ItemReader`) |
-| Batching | Manual (one Task per item) | `ItemBatcher` (batch N items per Task — reduces integration count) |
-| Failure tolerance | Whole Map fails on first uncaught iteration error | `ToleratedFailurePercentage` / `ToleratedFailureCount` — continue past failures |
-| Per-iteration billing | Standard: one transition per iteration; Express: one invocation per iteration | Distributed Map runs as a child execution — separate billing |
-| Ideal use | <1000 items, small payload, simple transform | >1000 items, large datasets, fault-tolerant batch processing |
-
-**Inline Map example:**
-```json
-"ProcessOrders": {
-  "Type": "Map",
-  "ItemsPath": "$.orders",
-  "MaxConcurrency": 10,
-  "Iterator": {
-    "StartAt": "ChargeOrder",
-    "States": {
-      "ChargeOrder": {
-        "Type": "Task",
-        "Resource": "arn:aws:states:::lambda:invoke",
-        "Parameters": {
-          "FunctionName": "ChargeOrderFn",
-          "Payload.$": "$"
-        },
-        "TimeoutSeconds": 30,
-        "Retry": [{
-          "ErrorEquals": ["Lambda.ServiceException", "Lambda.TooManyRequestsException"],
-          "IntervalSeconds": 2,
-          "MaxAttempts": 3,
-          "BackoffRate": 2.0
-        }],
-        "Catch": [{
-          "ErrorEquals": ["States.ALL"],
-          "Next": "ChargeFailed",
-          "ResultPath": "$.error"
-        }],
-        "End": true
-      },
-      "ChargeFailed": {
-        "Type": "Fail",
-        "Error": "ChargeFailed",
-        "Cause": "Order charge failed after retries"
-      }
-    }
-  },
-  "Next": "NotifyComplete"
-}
-```
-
-**Distributed Map example with S3 ItemReader and ItemBatcher:**
-```json
-"ProcessLargeDataset": {
-  "Type": "Map",
-  "MaxConcurrency": 1000,
-  "ItemReader": {
-    "Resource": "arn:aws:states:::s3:getObject",
-    "ReaderConfig": {
-      "InputType": "CSV",
-      "CSVHeaderLocation": "FIRST_ROW"
-    },
-    "Parameters": {
-      "Bucket": "my-dataset-bucket",
-      "Key": "input/2026-08.csv"
-    }
-  },
-  "ItemBatcher": {
-    "BatchInput": { "batchMetadata": "created-by-state-machine" },
-    "MaxItemsPerBatch": 100,
-    "MaxItemsPerBatchPath": "$.batchSize"
-  },
-  "ToleratedFailurePercentage": 0,
-  "Iterator": {
-    "StartAt": "ProcessBatch",
-    "States": {
-      "ProcessBatch": {
-        "Type": "Task",
-        "Resource": "arn:aws:states:::lambda:invoke",
-        "Parameters": {
-          "FunctionName": "ProcessBatchFn",
-          "Payload.$": "$"
-        },
-        "TimeoutSeconds": 300,
-        "Retry": [{
-          "ErrorEquals": ["Lambda.ServiceException"],
-          "IntervalSeconds": 5,
-          "MaxAttempts": 5,
-          "BackoffRate": 2.0
-        }],
-        "Catch": [{
-          "ErrorEquals": ["States.ALL"],
-          "Next": "BatchFail"
-        }],
-        "End": true
-      },
-      "BatchFail": {
-        "Type": "Fail",
-        "Error": "BatchProcessingFailed",
-        "Cause": "Batch failed after retries"
-      }
-    }
-  },
-  "Next": "Summarize"
-}
-```
+> Full detail moved verbatim to [references/asl-states-reference.md](references/asl-states-reference.md) - load on demand.
+> Summary: the Inline-vs-Distributed comparison and both full ASL templates.
 
 ### Step 6: Error handling — Retry and Catch
 
-ASL does NOT auto-retry. Production Tasks require explicit `Retry` (transient
-errors) AND `Catch` (terminal fallback).
-
-**Retry block fields:**
-- `ErrorEquals` (array of strings): which errors trigger retry. Common
-  patterns: `["Lambda.ServiceException", "Lambda.TooManyRequestsException"]`,
-  `["States.TaskFailed"]`, `["States.ALL"]`.
-- `IntervalSeconds` (number, default 1): wait before first retry.
-- `MaxAttempts` (number, default 3): max retry count. After this, the
-  `Retry` is exhausted and the error propagates to `Catch` (or fails the
-  execution if no `Catch`).
-- `BackoffRate` (number, default 2.0): multiplier applied to
-  `IntervalSeconds` after each retry. e.g., IntervalSeconds=2,
-  BackoffRate=2.0 → waits 2s, 4s, 8s.
-
-**Catch block fields:**
-- `ErrorEquals` (array of strings): which errors route to this handler.
-- `Next` (string): state to route to on match.
-- `ResultPath` (string, optional): where to insert the error data in the
-  input. Common: `"$.error"` — preserves original input alongside the
-  error context.
-
-**Standard Retry/Catch shape for a Lambda Task:**
-```json
-"Task": {
-  "Type": "Task",
-  "Resource": "arn:aws:states:::lambda:invoke",
-  "Parameters": { "FunctionName": "MyFn", "Payload.$": "$" },
-  "TimeoutSeconds": 60,
-  "HeartbeatSeconds": 30,
-  "Retry": [
-    {
-      "ErrorEquals": ["Lambda.ServiceException", "Lambda.TooManyRequestsException", "Lambda.AWSLambdaException"],
-      "IntervalSeconds": 2,
-      "MaxAttempts": 3,
-      "BackoffRate": 2.0
-    },
-    {
-      "ErrorEquals": ["States.Timeout", "States.TaskFailed"],
-      "IntervalSeconds": 5,
-      "MaxAttempts": 2,
-      "BackoffRate": 3.0
-    }
-  ],
-  "Catch": [
-    {
-      "ErrorEquals": ["States.ALL"],
-      "Next": "ErrorHandler",
-      "ResultPath": "$.error"
-    }
-  ],
-  "Next": "Success"
-}
-```
-
-**`States.ALL` does NOT match `States.Timeout` on state machines created
-before November 2022.** Always add `"States.Timeout"` explicitly in the
-`Catch` for long-running workflows.
+> Full detail moved verbatim to [references/error-handling.md](references/error-handling.md) - load on demand.
+> Summary: the complete Retry/Catch field reference and standard JSON shape.
 
 ### Step 7: Input/output processing
 
@@ -569,96 +252,13 @@ URI in the payload, fetch in the next Task) or use Distributed Map.
 
 ### Step 8: IAM execution role (least privilege)
 
-The execution role is the identity under which EVERY service integration
-runs. Its scope is the workflow's total blast radius.
-
-**Trust policy (mandatory):**
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": { "Service": "states.amazonaws.com" },
-    "Action": "sts:AssumeRole"
-  }]
-}
-```
-
-**Identity policy derivation (per-Task audit):**
-Walk each `Task` state's `Resource` ARN and grant the corresponding named
-action on the specific resource ARN. Example for a workflow invoking two
-Lambdas and one DynamoDB table:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "InvokeLambdas",
-      "Effect": "Allow",
-      "Action": "lambda:InvokeFunction",
-      "Resource": [
-        "arn:aws:lambda:us-east-1:111111111111:function:ChargeOrderFn",
-        "arn:aws:lambda:us-east-1:111111111111:function:NotifyCompleteFn"
-      ]
-    },
-    {
-      "Sid": "DynamoDBAccess",
-      "Effect": "Allow",
-      "Action": ["dynamodb:PutItem", "dynamodb:GetItem", "dynamodb:UpdateItem"],
-      "Resource": "arn:aws:dynamodb:us-east-1:111111111111:table/OrdersTable"
-    }
-  ]
-}
-```
-
-**Special permissions by integration pattern:**
-- `.sync` on ECS: needs `ecs:RunTask`, `ecs:DescribeTasks`, `ecs:StopTask`,
-  and `iam:PassRole` (for the ECS task role).
-- `.waitForTaskToken`: needs `states:SendTaskSuccess`,
-  `states:SendTaskFailure`, `states:SendTaskHeartbeat` — usually granted
-  to the external worker, not the execution role.
-- Distributed Map reading from S3: needs `s3:GetObject` on the source
-  bucket/key.
-- Bedrock: needs `bedrock:InvokeModel` on the model ARN.
-- Standard with X-Ray: needs `xray:PutTraceSegments` +
-  `xray:PutTelemetryRecords`.
-- Logging to CloudWatch: needs `logs:CreateLogDelivery`,
-  `logs:PutLogEvents`, `logs:DescribeLogGroups`, `logs:GetLogDelivery`,
-  `logs:UpdateLogDelivery`.
-
-**NEVER use `Action: "*"` on the execution role.** This is
-admin-equivalent — one compromised state machine = full account
-compromise.
+> Full detail moved verbatim to [references/iam-and-logging-templates.md](references/iam-and-logging-templates.md) - load on demand.
+> Summary: the trust policy, identity-policy derivation, and per-integration permission templates.
 
 ### Step 9: Logging and tracing
 
-**Express workflows (logging is MANDATORY):**
-```json
-"LoggingConfiguration": {
-  "Level": "ALL",
-  "IncludeExecutionData": true,
-  "Destinations": [{
-    "CloudWatchLogsLogGroup": { "LogGroupArn": "arn:aws:logs:us-east-1:111111111111:log-group:/aws/states/myworkflow:*" }
-  }]
-}
-```
-- `Level: ALL` + `IncludeExecutionData: true` is the only meaningful config.
-- `Level: OFF`/`ERROR`/absent → no durable record (Express history expires
-  in 5-60 min).
-- The log group's ARN MUST end with `:*` (the trailing wildcard is
-  required by Step Functions).
-- The role MUST grant `logs:CreateLogDelivery`, `logs:PutLogEvents`,
-  `logs:DescribeLogGroups`, `logs:GetLogDelivery`, `logs:UpdateLogDelivery`.
-
-**Standard workflows (tracing is recommended):**
-```json
-"TracingConfiguration": { "Enabled": true }
-```
-- Honored only on Standard — silently no-op on Express.
-- Role MUST grant `xray:PutTraceSegments` + `xray:PutTelemetryRecords`.
-- Standard logging is optional (90-day history via API is a fallback) but
-  recommended for CloudWatch alarms and metric filters.
+> Full detail moved verbatim to [references/iam-and-logging-templates.md](references/iam-and-logging-templates.md) - load on demand.
+> Summary: the Express logging and Standard tracing configuration templates.
 
 ### Step 10: Express invocation mode
 
@@ -784,55 +384,8 @@ DEPLOY_COMMANDS:
 
 ## Verification commands (run after deployment)
 
-```bash
-# Verify the state machine was created with correct type
-aws stepfunctions describe-state-machine \
-  --state-machine-arn arn:aws:states:us-east-1:111111111111:stateMachine:order-checkout-express \
-  --query '[name,type,roleArn,loggingConfiguration,tracingConfiguration]' \
-  --output json
-
-# Validate the definition (catches structural errors only, NOT missing
-# Retry/Catch or missing TimeoutSeconds — those are caught by this skill)
-aws stepfunctions validate-state-machine-definition \
-  --definition file://definition.json --type EXPRESS
-
-# Start a test execution (Express Sync)
-aws stepfunctions start-sync-execution \
-  --state-machine-arn arn:aws:states:us-east-1:111111111111:stateMachine:order-checkout-express \
-  --input file://test-input.json
-
-# Start a test execution (Standard or Express Async)
-aws stepfunctions start-execution \
-  --state-machine-arn arn:aws:states:us-east-1:111111111111:stateMachine:order-pipeline \
-  --input file://test-input.json
-
-# Check execution status (Standard — 90 day history)
-aws stepfunctions describe-execution --execution-arn <arn>
-
-# For Express Async, find executions in CloudWatch Logs
-aws logs filter-log-events \
-  --log-group-name /aws/states/order-checkout-express \
-  --filter-pattern '"status":"FAILED"'
-
-# List activity workers (if using Activities)
-aws stepfunctions get-activity-task --activity-arn <arn>
-
-# Verify the execution role's identity policy scope
-aws iam list-attached-role-policies --role-name <role-name>
-aws iam list-role-policies --role-name <role-name>
-aws iam get-role-policy --role-name <role-name> --policy-name <inline>
-
-# Verify the trust policy includes states.amazonaws.com
-aws iam get-role --role-name <role-name> \
-  --query 'Role.AssumeRolePolicyDocument.Statement[?Principal.Service==`states.amazonaws.com`]'
-
-# Verify X-Ray tracing is producing traces (Standard only)
-aws xray get-trace-summaries --start-time $(date -d '-1 hour' +%s) \
-  --end-time $(date +%s) --filter-expression 'service("states")'
-
-# Redrive a failed Standard execution (November 2024+) instead of re-running
-aws stepfunctions redrive-execution --execution-arn <arn>
-```
+> Full detail moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand.
+> Summary: the full post-deployment verification CLI listing.
 
 ## Anti-Patterns — NEVER
 
@@ -918,90 +471,13 @@ aws stepfunctions redrive-execution --execution-arn <arn>
 
 ## Pre-flight safety checks (run before any deployment CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`create-state-machine`, `update-state-machine`,
-  `delete-state-machine`), the deployer MUST emit:
-  `CONFIRM: About to <action> on state machine <name> in account <account>
-  region <region>. Estimated monthly cost: <$X>. This is a non-reversible
-  deployment. Proceed? (yes/no)`
-
-- **Validate the definition BEFORE `create-state-machine`:**
-  `aws stepfunctions validate-state-machine-definition --definition file://def.json --type STANDARD`
-  This catches structural errors before they reach production. It does NOT
-  catch missing-Catch or missing-TimeoutSeconds — the deployer skill does.
-
-- **Verify the execution role trust policy:**
-  `aws iam get-role --role-name <role> --query 'Role.AssumeRolePolicyDocument'`
-  Confirm `Principal.Service: states.amazonaws.com` and
-  `Action: sts:AssumeRole`.
-
-- **Verify the identity policy scope:**
-  `aws iam list-attached-role-policies` + `list-role-policies` +
-  `get-role-policy`. Confirm no `Action: "*"` and no
-  `Resource: "*"` (except for the few list/describe actions that require
-  account-level scope).
-
-- **Definition changes are unversioned.** `UpdateStateMachine` replaces
-  the entire definition atomically — there is no rollback. Capture the
-  current definition first:
-  `aws stepfunctions describe-state-machine --state-machine-arn <arn> --output json > /tmp/<name>-backup-$(date +%s).json`
-
-- **Cost estimate is MANDATORY for Express.** The deployer MUST emit a
-  monthly cost estimate before deployment:
-  - Express: $1.00 per 1M invocations + $0.00001667 per GB-sec duration
-  - Standard: $0.025 per 1,000 state transitions
-  - Distributed Map child executions bill separately per above
-
-- **Tag everything at creation.** Use `--tags` on
-  `create-state-machine`. Tags are the primary cost-allocation mechanism.
-  Required tags: `Name`, `Environment`, `Team`, `CostCenter`.
-
-- **Prefer additive changes** (add a Catch block, add a Retry block) over
-  destructive changes (rewriting the definition) — additive changes are
-  reversible and lower-risk.
+> Full detail moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand.
+> Summary: the pre-deployment safety checklist and CLI listings.
 
 ## Recent AWS features (2024-2026)
 
-- **RedriveExecution (November 2024):** A failed Standard execution can
-  be redriven from the point of failure after fixing the definition
-  — without re-running already-succeeded states. Express does NOT support
-  redrive. Build Catch blocks that route to states safe to re-run on
-  redrive. `aws stepfunctions redrive-execution --execution-arn <arn>`.
-
-- **Distributed Map enhancements (2024-2025):** Distributed Map now
-  supports cross-account S3 sources, DynamoDB Scan/Query with filters,
-  and `MaxItemsPerBatchPath` for dynamic batch sizing. Higher
-  `MaxConcurrency` (10,000+) is now supported.
-
-- **Step Functions Playground (2024-2025):** In-console ASL experimentation
-  environment with live validation. Useful for prototyping, but production
-  definitions should be deployed via IaC.
-
-- **AWS SDK service integrations (2024-2025 expansion):** Direct API
-  calls to ~140+ AWS services without Lambda glue code. Resource ARN:
-  `arn:aws:states:::aws-sdk:<service>:<action>`. Modern preferred
-  pattern for single-API Tasks (e.g.,
-  `arn:aws:states:::aws-sdk:secretsmanager:GetSecretValue`).
-
-- **Bedrock model invocation (2024-2025):** First-class integration via
-  `arn:aws:states:::bedrock:invokeModel` (sync) and
-  `arn:aws:states:::bedrock:invokeModel.sync` (Standard only, async).
-  The role needs `bedrock:InvokeModel` on the model ARN. Enables GenAI
-  orchestration (RAG pipelines, multi-step LLM flows) without Lambda.
-
-- **Resource-based policies for state machines (2024-2025):** Cross-account
-  state machine execution via resource-based policies. The deploying
-  account can grant `states:StartExecution` to a cross-account principal.
-  Verify such policies include `aws:SourceAccount` conditions.
-
-- **Payload validation with JSON Schema (2024):** Step Functions accepts
-  a JSON Schema for state-input validation. Add schemas on states
-  receiving external input to prevent malformed data from propagating.
-
-- **Variable policies and JSONata (Parsed 2024 features):** New ASL
-  extensions for richer variable manipulation. Available on newly-created
-  state machines; opt-in via the `StateMachineVersionName` field. Verify
-  the runtime supports these features before depending on them.
+> Full detail moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand.
+> Summary: the 2024-2026 feature list (Redrive, Distributed Map enhancements, SDK integrations, Bedrock, resource policies, payload validation, JSONata).
 
 ## References
 
@@ -1012,6 +488,15 @@ aws stepfunctions redrive-execution --execution-arn <arn>
   catalog (Lambda, DynamoDB, SQS, SNS, ECS, SageMaker, Glue, Athena,
   Bedrock, AWS SDK) with sync/callback variants, required IAM actions,
   and integration-specific gotchas.
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) - Step 0 expert knowledge and recent AWS features
+- [references/error-handling.md](references/error-handling.md) - Retry/Catch design deep dive
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) - post-deploy verification and pre-deploy safety CLI listings
+- [references/iam-and-logging-templates.md](references/iam-and-logging-templates.md) - IAM trust/identity policy and logging/tracing templates
+- [references/asl-states-reference.md](references/asl-states-reference.md) - (existing) ASL state catalog; now also holds Map design and I/O processing detail
+- [references/service-integration-patterns.md](references/service-integration-patterns.md) - (existing) Resource ARN catalog; now also holds Steps 3-4 selection detail
 
 ## Domain
 

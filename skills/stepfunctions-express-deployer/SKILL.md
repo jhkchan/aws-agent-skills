@@ -111,29 +111,8 @@ breaks automation silently.
 
 ## Reasoning framework (why the Express decision matters)
 
-Step Functions offers two workflow types. The choice is a cost,
-durability, and semantics decision — not a syntax decision (the
-ASL is identical for both).
-
-1. **Standard bills per state transition; Express bills per
-   invocation + duration + memory.** Standard is $0.025 per 1,000
-   state transitions; Express is $1.00 per million invocations plus
-   $0.025 / GB-hour. A 10-state workflow at 10M runs/day costs
-   ~$2,500/day on Standard vs ~$10/day on Express (short duration).
-
-2. **Standard is exactly-once; Express is at-least-once.** Express
-   async executions may retry steps on infrastructure events; the
-   same input can produce two invocations of a side-effecting
-   integration. Write paths MUST be idempotent.
-
-3. **Standard supports runs up to 1 year; Express caps at 5
-   minutes.** The 5-minute cap is enforced per execution, not per
-   state — a 4-min Lambda plus a 2-min downstream fails at minute 5.
-
-4. **`.waitForTaskToken` is NOT supported on Express.** Only `.sync`
-   is Express-compatible among the callback-style integrations.
-   Operators migrating from Standard discover this only at
-   create-time.
+> Full detail moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand.
+> Summary: full Express-vs-Standard reasoning prose; every branch is preserved in the Decision tree below.
 
 ## Dependency graph (silent-failure table)
 
@@ -158,83 +137,18 @@ the gap.
 
 ## Expert heuristic: the waitForTaskToken Express block
 
-The most dangerous migration trap: a Standard workflow using
-`.waitForTaskToken` (the callback pattern, e.g., for human
-approval, external system callbacks, long-running ECS tasks) is
-silently converted to Express. The `create-state-machine` API call
-rejects the ASL with a definition-validation error — but the error
-references the line number of the Resource ARN, not the
-incompatibility, and operators re-apply believing the issue is IAM
-or formatting.
-
-```text
-Operator sees:                What it actually means:
-"Invalid State Machine         .waitForTaskToken is NOT supported
- Definition: ...Resource       on EXPRESS workflows. The Resource
- ...".                         ARN suffix :waitForTaskToken is the
-                               cause; convert to .sync or use
-                               STANDARD workflow type.
-```
-
-The `.waitForTaskToken` pattern is fundamentally incompatible with
-the 5-minute Express cap because the task token can be returned
-days later. Two remedies: (1) use `.sync` for supported run-job
-integrations, or (2) use a Standard workflow for the callback
-portion and an Express workflow for the high-volume portion, with
-`StartExecution` between them.
+> Full detail moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand.
+> Summary: the complete waitForTaskToken migration-trap analysis and remedies.
 
 ## Expert heuristic: at-least-once idempotency
 
-Express executions are at-least-once. The infrastructure can
-restart an execution on rare events (deployment, failover); the
-same input can produce two invocations of a side-effecting
-integration. For read-only integrations this is invisible; for
-side-effecting integrations it is a data-corruption hazard.
-
-```text
-Operator assumes:              What actually happens:
-Lambda writes a charge          Lambda invoked twice with same input
- to the card → one charge       → two charges, no error signal
-```
-
-The remedy is an idempotency key at the workflow input, persisted
-BEFORE the side-effecting state:
-
-```json
-{
-  "ChargeCard": {
-    "Type": "Task",
-    "Resource": "arn:aws:lambda:<REGION>:<ACCOUNT>:function:charge-card",
-    "Parameters": {
-      "IdempotencyKey.$": "$$.Execution.Id",
-      "Amount.$": "$.amount"
-    },
-    "Retry": [{ "ErrorEquals": ["States.TaskFailed"], "MaxAttempts": 3 }]
-  }
-}
-```
-
-The Lambda handler checks `IdempotencyKey` against a DynamoDB table
-before charging; duplicate retries are no-ops. Every side-effecting
-Express integration MUST have this pattern.
+> Full detail moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand.
+> Summary: the complete at-least-once idempotency pattern with ASL example.
 
 ## Expert heuristic: sync API Gateway timeout misalignment
 
-A sync Express workflow (`start-sync-execution`) invoked from API
-Gateway returns the workflow result synchronously. API Gateway caps
-the integration at 29 seconds; Express sync can run up to 5 minutes.
-Misalignment produces a pattern that works in dev (2-second runs)
-and fails in production (a cold Lambda pushes it past 30 seconds):
-- API Gateway returns 504 to the client at second 29.
-- Express keeps running to completion (up to 5 min) and writes the
-  result to logs.
-- The client retries; if the integration is non-idempotent, this is
-  a double-charge.
-
-Remedy: set the API Gateway integration timeout to 29000 ms,
-monitor p99 execution duration, and alarm on `ExecutionsTimedOut`.
-If p99 exceeds 25s, move to async (return a 202 with the execution
-ARN).
+> Full detail moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand.
+> Summary: the complete sync API Gateway timeout misalignment analysis.
 
 ## Prerequisites (verify before provisioning)
 
@@ -267,10 +181,8 @@ Verify Express is the correct type. Use this decision table:
 | Fronted by API Gateway returning the workflow result synchronously | EXPRESS (sync) |
 | Async messaging with very high throughput | EXPRESS (async) |
 
-Cost estimate (rough): Standard = $0.025 / 1,000 state transitions.
-Express = $1.00 / 1M invocations + $0.025 / GB-hour. A 5-state
-workflow at 1M runs/day = ~$125/day on Standard vs ~$1/day on
-Express. Always compute the break-even for your state count.
+> Full detail moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand.
+> Summary: the worked cost math (Standard vs Express break-even).
 
 ### Step 2 — Verify workflow duration fits in the 5-minute cap
 
@@ -279,11 +191,8 @@ Retry `MaxAttempts`. If the workflow includes a Distributed Map,
 sum the longest batch. If the result can exceed 5 minutes, the
 workflow is incompatible with Express — go back to Step 1.
 
-```bash
-# Validate the ASL definition (does NOT check duration)
-aws stepfunctions validate-state-machine-definition \
-  --definition file://definition.json --type EXPRESS
-```
+> Full detail moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand.
+> Summary: the validate-state-machine-definition CLI (syntax-only check).
 
 **Common mistake:** assuming `validate-state-machine-definition`
 checks the 5-min cap. It does NOT — only syntax. The cap is
@@ -291,10 +200,8 @@ enforced at runtime; executions fail with `States.Timeout`.
 
 ### Step 3 — Verify all service integrations are Express-compatible
 
-```bash
-# Reject if any match
-grep -E ':waitForTaskToken' definition.json && echo "INCOMPATIBLE"
-```
+> Full detail moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand.
+> Summary: the grep command that rejects .waitForTaskToken definitions.
 
 Express-compatible integration patterns:
 - RequestResponse (default): invoke and return immediately
@@ -311,116 +218,18 @@ status) or split into two workflows.
 
 ### Step 4 — Define the ASL with Express-compatible patterns
 
-Write the ASL definition. For fan-out, use Inline Map (≤40
-concurrent) or Distributed Map (≤10,000 concurrent with S3 /
-DynamoDB ItemReader). For job-style integrations, use `.sync`.
-
-```json
-{
-  "StartAt": "FanOut",
-  "States": {
-    "FanOut": {
-      "Type": "Map",
-      "ItemProcessor": {
-        "ProcessorConfig": { "Mode": "DISTRIBUTED" },
-        "StartAt": "ProcessItem",
-        "States": {
-          "ProcessItem": {
-            "Type": "Task",
-            "Resource": "arn:aws:lambda:<REGION>:<ACCOUNT>:function:process-item",
-            "End": true
-          }
-        }
-      },
-      "ItemReader": {
-        "Resource": "arn:aws:states:::s3:getObject",
-        "Parameters": { "Bucket": "my-bucket", "Key": "input.json" }
-      },
-      "MaxConcurrency": 1000,
-      "End": true
-    }
-  }
-}
-```
-
-**Common mistake:** Inline Map on Express with > 40 concurrent
-iterations. Inline Map caps at 40 concurrent; the rest queue. For
-large fan-out on Express, use Distributed Map — but verify the
-total iteration time still fits in the 5-minute cap.
+> Full detail moved verbatim to [references/express-asl-patterns.md](references/express-asl-patterns.md) - load on demand.
+> Summary: the complete Step 4 walkthrough with Distributed Map ASL template.
 
 ### Step 5 — Create the IAM execution role with least-privilege
 
-```bash
-cat > trust-policy.json <<'EOF'
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": { "Service": "states.<REGION>.amazonaws.com" },
-    "Action": "sts:AssumeRole"
-  }]
-}
-EOF
-
-aws iam create-role --role-name <ROLE_NAME> \
-  --assume-role-policy-document file://trust-policy.json
-```
-
-The inline policy MUST scope each integration to specific ARNs:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    { "Effect": "Allow", "Action": "lambda:InvokeFunction",
-      "Resource": "arn:aws:lambda:<REGION>:<ACCOUNT>:function:process-item" },
-    { "Effect": "Allow", "Action": "s3:GetObject",
-      "Resource": "arn:aws:s3:::my-bucket/input.json" }
-  ]
-}
-```
-
-**Common mistake:** granting `lambda:InvokeFunction` on `*` and
-forgetting an AWS SDK integration calls a different action
-(e.g., `lambda:UpdateFunctionCode`). Scope to the exact ARNs.
+> Full detail moved verbatim to [references/iam-and-logging-templates.md](references/iam-and-logging-templates.md) - load on demand.
+> Summary: the complete Step 5 CLI + trust/identity policy templates.
 
 ### Step 6 — Configure logging (CloudWatch Logs)
 
-Logging is NOT enabled by default. Without it, async Express
-executions are invisible after the 5-minute execution-history
-rollover.
-
-```bash
-# Create the log group with retention
-aws logs create-log-group --log-group-name /aws/states/<NAME>
-aws logs put-retention-policy --log-group-name /aws/states/<NAME> \
-  --retention-in-days 30
-```
-
-Attach the log group at create-time:
-
-```bash
-aws stepfunctions create-state-machine \
-  --name <NAME> --definition file://definition.json \
-  --role-arn arn:aws:iam::<ACCOUNT>:role/<ROLE_NAME> \
-  --type EXPRESS \
-  --logging-configuration \
-    level=ALL,includeExecutionData=true,\
-    destinations='[{CloudWatchLogsLogGroup={LogGroupArn=arn:aws:logs:<REGION>:<ACCOUNT>:log-group:/aws/states/<NAME>:*}}]'
-```
-
-The level choices:
-- `ALL`: log Start, StateEntered, StateExited, End. Highest volume; full RCA.
-- `ERROR`: log only failures and state errors. Lower cost; cannot debug successful-path issues.
-- `FATAL`: log only workflow-level fatal errors. Near-useless for debugging.
-- `OFF`: no logging. NEVER for async Express — failures are invisible.
-
-`includeExecutionData=true` records input/output at each transition. Without it, logs show only metadata.
-
-**Common mistake:** setting `includeExecutionData=false` to save
-cost on a PII workflow, then being unable to RCA a production
-failure. Redact PII at workflow input; do NOT disable execution
-data wholesale.
+> Full detail moved verbatim to [references/iam-and-logging-templates.md](references/iam-and-logging-templates.md) - load on demand.
+> Summary: the complete Step 6 logging CLI, level guidance, and pitfalls.
 
 ### Step 7 — Choose sync (RequestResponse) vs async invocation
 
@@ -429,80 +238,21 @@ data wholesale.
 | Sync | API Gateway, direct start-sync-execution | Caller needs result synchronously, workflow < 29s p99 |
 | Async | EventBridge, S3, SQS, start-execution | High throughput, fire-and-forget, up to 5 min |
 
-```bash
-aws stepfunctions start-sync-execution \
-  --state-machine-arn arn:aws:states:<REGION>:<ACCOUNT>:stateMachine:<NAME> \
-  --input '{"amount": 100}'
-aws stepfunctions start-execution \
-  --state-machine-arn arn:aws:states:<REGION>:<ACCOUNT>:stateMachine:<NAME> \
-  --input '{"amount": 100}'
-```
-
-**Common mistake:** fronting an Express workflow with API Gateway
-sync and not aligning timeouts. API Gateway times out at 29s;
-Express sync can run to 5 min. Set the API Gateway integration
-timeout to 29000 ms and alarm on p99 execution duration > 25s.
+> Full detail moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand.
+> Summary: the start-sync/start-execution CLI and timeout-alignment warning.
 
 ### Step 8 — Configure EventBridge scheduling + observability
 
-#### 8a. EventBridge rule for scheduled Express
-
-```bash
-# Schedule: every 5 minutes
-aws events put-rule --name <RULE_NAME> \
-  --schedule-expression "rate(5 minutes)"
-
-# Target: the Express state machine
-aws events put-targets --rule <RULE_NAME> \
-  --targets 'Id=1,Arn=arn:aws:states:<REGION>:<ACCOUNT>:stateMachine:<NAME>,RoleArn=arn:aws:iam::<ACCOUNT>:role/<EVENTBRIDGE_ROLE>'
-```
-
-The EventBridge target role MUST trust `events.amazonaws.com` and
-allow `states:StartExecution` on the state machine ARN. Without
-the target role, the rule fires but no execution starts —
-EventBridge shows `Invocations: 1`, Step Functions shows
-`Executions: 0`, with no error.
-
-#### 8b. CloudWatch alarms
-
-```bash
-aws cloudwatch put-metric-alarm \
-  --alarm-name "<NAME>-failed" \
-  --metric-name "ExecutionsFailed" \
-  --namespace "AWS/States" \
-  --dimensions Name=StateMachineArn,Value=arn:aws:states:<REGION>:<ACCOUNT>:stateMachine:<NAME> \
-  --threshold 1 --comparison-operator GreaterThanOrEqualToThreshold \
-  --period 60 --evaluation-periods 1 --treat-missing-data notBreaching
-```
-
-Always alarm on `ExecutionsFailed` for async Express — there is no
-caller to surface the error.
-
-#### 8c. X-Ray tracing
-
-```bash
-aws stepfunctions update-state-machine \
-  --state-machine-arn arn:aws:states:<REGION>:<ACCOUNT>:stateMachine:<NAME> \
-  --tracing-configuration enabled=true
-```
-
-X-Ray tracing requires the execution role to have
-`xray:PutTraceSegments` and `xray:PutTelemetryRecords`.
+> Full detail moved verbatim to [references/scheduling-and-observability.md](references/scheduling-and-observability.md) - load on demand.
+> Summary: the complete Step 8 EventBridge rule, alarm, and X-Ray templates.
 
 ### Step 9 — Verification
 
 Run every verification command and confirm each output matches the
 expected state.
 
-```bash
-aws stepfunctions describe-state-machine \
-  --state-machine-arn arn:aws:states:<REGION>:<ACCOUNT>:stateMachine:<NAME>
-# Expected: type EXPRESS, loggingConfiguration.level=ALL, includeExecutionData=true
-aws logs describe-log-groups --log-group-name-prefix /aws/states/<NAME>
-# Expected: retentionInDays > 0
-aws events describe-rule --name <RULE_NAME>  # if scheduled; State ENABLED
-aws cloudwatch describe-alarms --alarm-names <NAME>-failed  # StateValue OK
-```
+> Full detail moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand.
+> Summary: the Step 9 verification CLI listing.
 
 ## NEVER do these things
 
@@ -550,22 +300,8 @@ compliance violations. Each is observed in real production incidents
 
 ## Output format
 
-```
-EXPRESS_WORKFLOW: <name>
-VERDICT: READY_TO_DEPLOY | PREREQUISITES_MISSING
-CHECKLIST:
-  [✓|✗] Express-vs-Standard decision: EXPRESS (duration < 5 min, at-least-once acceptable)
-  [✓|✗] Duration budget: p99 < 5 min (sync: p99 < 29s)
-  [✓|✗] No .waitForTaskToken in ASL: verified
-  [✓|✗] ASL definition validated: Distributed Map / .sync / AWS SDK as applicable
-  [✓|✗] IAM execution role: least-privilege, service principal states.<region>.amazonaws.com
-  [✓|✗] Logging: log-group /aws/states/<NAME>, level ALL|ERROR, includeExecutionData=true
-  [✓|✗] Invocation mode: sync | async (sync caller timeout aligned)
-  [✓|✗] EventBridge schedule + CloudWatch alarm: configured
-  [✓|✗] Idempotency: side-effecting integrations have idempotency key
-VERIFICATION_COMMANDS:
-  <copy-pasteable verification commands>
-```
+> Full detail moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand.
+> Summary: the literal output template block.
 
 ## STRICT output contract
 
@@ -764,53 +500,18 @@ aws stepfunctions create-state-machine \
 
 ### Perfect example output — PREREQUISITES_MISSING
 
-```text
-EXPRESS_WORKFLOW: approval-flow
-VERDICT: PREREQUISITES_MISSING
-CHECKLIST:
-  [✓] Express-vs-Standard decision: EXPRESS requested
-  [✗] Duration budget: workflow includes a 4-min Glue job plus a 2-min downstream ECS task; cannot fit in 5-min cap — migrate to STANDARD or split
-  [✗] No .waitForTaskToken in ASL: FAILED — arn:aws:states:::sqs:sendMessage.waitForTaskToken at line 18; replace with .sync or STANDARD
-  [✗] ASL definition validated: blocked pending integration fixes
-  [✓] IAM execution role: scoped
-  [✗] Logging: not yet attached — create /aws/states/approval-flow first
-  [OPTIONAL] Invocation mode: not applicable pending ASL fix
-  [OPTIONAL] EventBridge schedule: not requested
-  [✗] Idempotency: cannot verify pending ASL fix
-VERIFICATION_COMMANDS:
-  grep -E ':waitForTaskToken' approval-flow.json
-  aws logs create-log-group --log-group-name /aws/states/approval-flow
-```
-
-**Self-check before emit:**
-- [ ] All 9 checklist rows present (no omitted items)?
-- [ ] Every `[✓]` has a matching verification command?
-- [ ] ASL contains NO `.waitForTaskToken` (verified by grep)?
-- [ ] Logging row cites log group name + level (ALL or ERROR) + includeExecutionData?
-- [ ] Sync caller timeout ≤ 29s verified (if sync mode)?
-- [ ] Idempotency row cites the key source for each side-effecting integration?
-- [ ] Express-vs-Standard row cites the cost-model comparison ($1/M vs $25/M)?
-- [ ] Every `[✗]` cites the specific gap and what the operator must provide?
+> Full detail moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand.
+> Summary: the full PREREQUISITES_MISSING example with self-check list.
 
 ## Recent AWS features
 
-- **Express + Distributed Map (GA)**: Distributed Map is supported
-  on Express, but the 5-min cap limits total iteration time. Use
-  `MaxConcurrency` 1000 with short per-item Lambdas; monitor
-  `MapRunItemCount` / `MapRunFailedCount`.
-- **Express + AWS SDK integrations**: direct API calls (e.g.,
-  DynamoDB `UpdateItem`, SNS `Publish`) without a Lambda wrapper.
-  The IAM role must allow the underlying SDK action.
-- **Express + Typed integrations**: Resource ARNs follow
-  `arn:aws:states:::service:action` (RequestResponse) or
-  `arn:aws:states:::service:action.sync` (run-job-and-wait).
-- **CloudWatch Logs granularity**: levels ALL / ERROR / FATAL / OFF
-  control which execution events are logged;
-  `includeExecutionData` controls input/output capture. Both set
-  in `loggingConfiguration`.
-- **X-Ray tracing on Express**: enable via
-  `tracingConfiguration.enabled=true`; the execution role needs
-  `xray:PutTraceSegments` / `PutTelemetryRecords`.
-- **Step Functions IAM condition keys**: `states:StateMachineArn`
-  scopes who can start executions on which state machines; useful
-  for cross-account Express.
+> Full detail moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand.
+> Summary: the full feature list (Distributed Map on Express, SDK integrations, typed ARNs, log granularity, X-Ray, IAM condition keys).
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) - secondary example output (PREREQUISITES_MISSING) and the output-format template
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) - pre-flight validation, compatibility grep, invocation, and verification CLI listings
+- [references/advanced-patterns.md](references/advanced-patterns.md) - Express reasoning prose, expert heuristics, cost math, recent AWS features
+- [references/scheduling-and-observability.md](references/scheduling-and-observability.md) - EventBridge scheduling, CloudWatch alarms, X-Ray tracing templates
+- [references/express-asl-patterns.md](references/express-asl-patterns.md) - (existing) ASL patterns; now also holds the Step 4 Express ASL template
+- [references/iam-and-logging-templates.md](references/iam-and-logging-templates.md) - (existing) IAM/logging templates; now also holds Step 5-6 CLI templates

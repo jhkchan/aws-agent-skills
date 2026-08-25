@@ -198,67 +198,8 @@ https://docs.aws.amazon.com/systems-manager/latest/userguide/patch-manager-creat
 
 ### Step 0: Expert knowledge — non-obvious Patch Manager behaviors
 
-These behaviors are easy to misjudge without operational Patch Manager
-experience. Each changes a plan if ignored:
-
-- **The default AWS patch baseline auto-approves all patches
-  immediately.** Every supported OS has an AWS-managed baseline with
-  `ApproveAfterDays: 0`. Custom baselines override this for specific
-  patch groups. Registering a custom baseline as the default for an OS
-  replaces the AWS baseline for ALL instances, not just tagged ones.
-
-- **`ApproveAfterDays: 0` means immediate approval.** Patches are
-  approved the day they are released by the OS vendor. This is the
-  most aggressive posture — suitable for dev/staging, risky for
-  production where a patch reboot can cause an outage.
-
-- **`ComplianceLevel` controls the dashboard severity, not the patch
-  severity.** A `ComplianceLevel: CRITICAL` on an approval rule means
-  missing patches show as CRITICAL in the compliance dashboard, even
-  if the patch itself is a `Low` severity update. Set the compliance
-  level based on your operational urgency, not the vendor severity.
-
-- **Patch filters are AND-combined within a rule.** A rule with
-  classification `Security` and severity `Critical` matches patches that
-  are BOTH security AND critical. Multiple `PatchFilters` entries with
-  different products are OR-combined (patches from either product).
-
-- **`AWS-RunPatchBaseline` is the only document that updates
-  compliance.** Using `AWS-RunShellScript` to run `yum update` does
-  not report to the compliance dashboard. The `Operation` parameter
-  (`Scan` vs `Install`) controls whether patches are only scanned or
-  also installed.
-
-- **Patch groups are tag-key-based, not resource-based.** The
-  `Patch Group` tag on an EC2 instance or managed instance is the only
-  way Patch Manager discovers targets. There is no ARN-based targeting.
-
-- **macOS patching (2024-2026) requires the SSM agent on macOS.**
-  macOS instances managed by Jamf or MDM do not automatically report
-  to SSM. The instance must have the SSM agent installed and the
-  instance profile with `AmazonSSMManagedInstanceCore`.
-
-- **Amazon Linux 2023 uses a different package manager (dnf).** The
-  patch baseline product is `Amazon Linux 2023` (not `Amazon Linux 2`).
-  Using the AL2 product filter on an AL2023 baseline matches zero
-  patches — the most common AL2023 patching mistake.
-
-- **Custom repositories (2024-2026).** Patch Manager can patch from
-  custom repositories defined in the baseline via `Sources`. This is
-  used for air-gapped environments or when pulling from a local mirror.
-  The `Name` in `Sources` must match a configured repository on the
-  instance.
-
-- **Rejected patches block installation.** `RejectedPatches` with
-  `BLOCK_AS_PENDING` (default) prevents a patch from installing even if
-  it matches an approval rule. `ALLOW_AS_DEPENDENCY` permits it only if
-  another approved patch requires it as a dependency.
-
-- **Maintenance window task `MaxConcurrency` and `MaxErrors`.** These
-  control how many instances patch simultaneously. A `MaxConcurrency`
-  of `10%` means 10% of targets patch at once; the rest wait.
-  `MaxErrors` of `3` stops the task after 3 failures. Set these
-  conservatively for production to avoid mass reboots.
+Step-0 expert behaviors moved to [references/advanced-patterns.md](references/advanced-patterns.md) —
+load when a plan hinges on default-baseline, approval-rule, or product-filter semantics.
 
 ### Step 1: Pre-check gate — PREREQUISITES_MISSING if any check fails
 
@@ -351,146 +292,8 @@ After the operation finishes, run post-verification:
 
 ## Common baseline patterns (boilerplate)
 
-### Amazon Linux 2023 — auto-approve security patches in 7 days
-
-```bash
-aws ssm create-patch-baseline \
-  --name "al2023-prod-security" \
-  --operating-system AMAZON_LINUX_2023 \
-  --approval-rules '{
-    "PatchRules": [{
-      "PatchFilterGroup": {
-        "OperatingSystem": "AMAZON_LINUX_2023",
-        "PatchFilters": [
-          {"Key":"PRODUCT","Values":["Amazon Linux 2023"]},
-          {"Key":"CLASSIFICATION","Values":["Security","Bugfix"]},
-          {"Key":"SEVERITY","Values":["Critical","Important"]}
-        ]
-      },
-      "ApproveAfterDays": 7,
-      "ComplianceLevel": "CRITICAL",
-      "EnableNonSecurity": true
-    }]
-  }' \
-  --tags '[{"Key":"Environment","Value":"prod"},{"Key":"Purpose","Value":"al2023-security"}]'
-
-aws ssm register-patch-baseline-for-patch-group \
-  --baseline-id <baseline-id> \
-  --patch-group "al2023-prod-web"
-```
-
-### Windows Server — auto-approve critical patches immediately
-
-```bash
-aws ssm create-patch-baseline \
-  --name "win-prod-critical" \
-  --operating-system WINDOWS_SERVER \
-  --approval-rules '{
-    "PatchRules": [{
-      "PatchFilterGroup": {
-        "OperatingSystem": "WINDOWS_SERVER",
-        "PatchFilters": [
-          {"Key":"PRODUCT","Values":["WindowsServer2019","WindowsServer2022"]},
-          {"Key":"CLASSIFICATION","Values":["Critical Updates","Security Updates"]},
-          {"Key":"MSRC_SEVERITY","Values":["Critical"]}
-        ]
-      },
-      "ApproveAfterDays": 0,
-      "ComplianceLevel": "CRITICAL",
-      "EnableNonSecurity": false
-    }]
-  }' \
-  --rejected-patches '["KB5012345"]' \
-  --rejected-patches-action BLOCK_AS_PENDING \
-  --tags '[{"Key":"Environment","Value":"prod"}]'
-
-aws ssm register-patch-baseline-for-patch-group \
-  --baseline-id <baseline-id> \
-  --patch-group "win-prod-servers"
-```
-
-### macOS — patch baseline with Scan-only operation
-
-```bash
-aws ssm create-patch-baseline \
-  --name "macos-prod-baseline" \
-  --operating-system MACOS \
-  --approval-rules '{
-    "PatchRules": [{
-      "PatchFilterGroup": {
-        "OperatingSystem": "MACOS",
-        "PatchFilters": [
-          {"Key":"PRODUCT","Values":["macOS"]},
-          {"Key":"CLASSIFICATION","Values":["Security"]}
-        ]
-      },
-      "ApproveAfterDays": 3,
-      "ComplianceLevel": "HIGH",
-      "EnableNonSecurity": false
-    }]
-  }' \
-  --tags '[{"Key":"Environment","Value":"prod"}]'
-
-aws ssm register-patch-baseline-for-patch-group \
-  --baseline-id <baseline-id> \
-  --patch-group "macos-prod-fleet"
-```
-
-### Maintenance window integration — Install task
-
-```bash
-# Register targets (instances with the Patch Group tag)
-aws ssm register-target-with-maintenance-window \
-  --window-id mw-0abc123 \
-  --resource-type INSTANCE \
-  --targets '[
-    {"Key":"tag:Patch Group","Values":["al2023-prod-web"]}
-  ]' \
-  --owner-information "AL2023 prod web fleet" \
-  --name "al2023-web-targets"
-
-# Register the patch task
-aws ssm register-task-with-maintenance-window \
-  --window-id mw-0abc123 \
-  --targets '[
-    {"Key":"WindowTargetIds","Values":["<target-id>"]}
-  ]' \
-  --task-arn AWS-RunPatchBaseline \
-  --service-role-arn arn:aws:iam::111111111111:role/MaintenanceWindowRole \
-  --task-type RUN_COMMAND \
-  --task-parameters '{"Operation":["Install"],"SnapshotId":[""]}' \
-  --max-concurrency "10%" \
-  --max-errors "3" \
-  --priority 1 \
-  --name "al2023-install-patches" \
-  --cloudwatch-output-config '{"CloudWatchOutputEnabled":true}'
-```
-
-### Custom repository (air-gapped AL2023)
-
-```bash
-aws ssm create-patch-baseline \
-  --name "al2023-airgapped" \
-  --operating-system AMAZON_LINUX_2023 \
-  --approval-rules '{
-    "PatchRules": [{
-      "PatchFilterGroup": {
-        "OperatingSystem": "AMAZON_LINUX_2023",
-        "PatchFilters": [
-          {"Key":"PRODUCT","Values":["Amazon Linux 2023"]},
-          {"Key":"CLASSIFICATION","Values":["Security","Bugfix"]}
-        ]
-      },
-      "ApproveAfterDays": 0,
-      "ComplianceLevel": "CRITICAL"
-    }]
-  }' \
-  --sources '[{
-    "Name":"my-local-mirror",
-    "Products":["Amazon Linux 2023"],
-    "Configuration":"[amzn2023]\nname=Amazon Linux 2023 local mirror\nbaseurl=https://mirror.internal.corp/al2023\nenabled=1\ngpgcheck=1\ngpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-amazon-linux-2023"
-  }]'
-```
+Boilerplate patterns moved to [references/worked-examples.md](references/worked-examples.md):
+AL2023, Windows, macOS baselines; maintenance-window Install task; air-gapped custom repository.
 
 ## STRICT output contract
 
@@ -658,32 +461,8 @@ patches.
 
 ## Recent AWS features (2024-2026)
 
-- **SSM Patch Manager for macOS (2024-2025):** macOS is now a supported
-  operating system for Patch Manager. Requires the SSM agent on macOS
-  instances (not managed by Jamf/MDM-only). Supports `Scan` and
-  `Install` operations via `AWS-RunPatchBaseline`.
-- **Amazon Linux 2023 patch baseline (2024-2025):** AL2023 uses `dnf`
-  as its package manager. The product filter is `Amazon Linux 2023`
-  (not `Amazon Linux 2`). The most common AL2023 patching mistake is
-  reusing AL2 baselines, which match zero patches.
-- **Patch Baseline with custom repositories (2024-2025):** the `Sources`
-  parameter on `create-patch-baseline` allows defining custom package
-  repositories (yum/dnf/apt) for air-gapped or mirrored environments.
-  The `Configuration` field accepts the full repo file content.
-- **Patch Manager compliance dashboard enhancements (2024-2026):**
-  the compliance dashboard now aggregates patch state across accounts
-  via Organizations, with per-OU and per-baseline filtering. Compliance
-  severity is now configurable per approval rule (not just per baseline).
-- **Maintenance window task `CloudWatchOutputConfig` (2024-2025):**
-  task output can now be streamed to CloudWatch Logs directly from the
-  maintenance window task registration, simplifying audit without
-  S3 bucket setup.
-- **`AWS-ApplyPatchBaseline` for Windows offline patching (2024-2025):**
-  a new document for Windows that applies patches from a pre-staged
-  offline catalog — useful for air-gapped Windows Server fleets.
-- **Rocky Linux 9 and AlmaLinux 9 support (2025-2026):** both are now
-  first-class supported operating systems with product-specific patch
-  filters, reducing reliance on the RHEL-compatible baseline workaround.
+2024-2026 feature notes (macOS Patch Manager, AL2023 dnf, Sources,
+dashboard enhancements) moved to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## AWS documentation
 
@@ -693,6 +472,13 @@ patches.
 - **Maintenance windows** — https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-maintenance.html
 - **AWS-RunPatchBaseline document** — https://docs.aws.amazon.com/systems-manager/latest/userguide/patch-manager-ssm-documents.html
 - **SSM CLI reference** — https://docs.aws.amazon.com/cli/latest/reference/ssm/
+
+## References (load on demand)
+
+- [references/baseline-config-and-approval-rules.md](references/baseline-config-and-approval-rules.md) — Canonical per-OS baseline configurations and approval-rule patterns.
+- [references/patch-groups-and-maintenance-windows.md](references/patch-groups-and-maintenance-windows.md) — Patch group registration and maintenance-window integration detail.
+- [references/worked-examples.md](references/worked-examples.md) — Full CLI boilerplate for each OS archetype (moved from Common baseline patterns).
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step-0 expert Patch Manager behaviors and 2024-2026 feature notes (moved from SKILL.md).
 
 ## Domain
 

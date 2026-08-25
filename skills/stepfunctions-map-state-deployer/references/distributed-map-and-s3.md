@@ -351,3 +351,37 @@ Compare: same 10000 items with ItemBatchSize 1:
 5. **Use S3 input** instead of embedding large arrays in the execution
    input. S3 input avoids the 256KB execution input limit and is
    cheaper for large datasets.
+
+## Step 5 - Distributed Map with S3 input (ItemReader template) (moved from SKILL.md)
+
+```json
+{
+  "ProcessCSV": {
+    "Type": "Map",
+    "ItemProcessor": {
+      "ProcessorConfig": { "Mode": "DISTRIBUTED" },
+      "StartAt": "ProcessRow",
+      "States": {
+        "ProcessRow": {
+          "Type": "Task",
+          "Resource": "arn:aws:lambda:us-east-1:123456789012:function:process-row",
+          "End": true
+        }
+      }
+    },
+    "ItemReader": {
+      "Resource": "arn:aws:states:::s3:getObject",
+      "ReaderConfig": {
+        "InputType": "CSV",
+        "CSVHeaderLocation": "FIRST_ROW"
+      },
+      "Parameters": {
+        "Bucket": "my-data-bucket",
+        "Key": "datasets/records.csv"
+      }
+    },
+    "ItemBatchSize": 100,
+    "MaxConcurrency": 50
+  }
+}
+```

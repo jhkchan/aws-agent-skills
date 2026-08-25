@@ -196,59 +196,7 @@ deployment pattern. Real-time streaming is a separate API and
 runtime model. Most production use cases (call center recording
 analysis, meeting transcription, content indexing) use batch.
 
-## Expert heuristic: custom vocabulary vs custom language model
 
-Both improve accuracy but work differently and have different
-costs.
-
-```text
-Accuracy improvement options:
-  ├── Few specific terms (company names, acronyms, product names)?
-  │     → Custom Vocabulary (free to apply, just upload a vocabulary file)
-  │        Boosts recognition of specific words
-  │        No training data needed — just a word list with optional pronunciations
-  │
-  ├── Broader domain vocabulary (medical, legal, technical)?
-  │     → Custom Language Model (requires training text, adds cost per minute)
-  │        Improves OVERALL accuracy by training on domain-specific text
-  │        Requires: 1,000 - 100,000 training sentences in a text file on S3
-  │        Choose BaseModelName: NarrowBand (phone audio, 8kHz) or WideBand (high-quality, 16kHz+)
-  │
-  └── Both can be used simultaneously
-        → Custom vocabulary for specific terms + CLM for overall accuracy
-```
-
-**Key implication:** start with a custom vocabulary (free, simple).
-If accuracy is still insufficient, add a custom language model
-(requires training data, adds ~$0.00075/second additional cost).
-
-## Expert heuristic: diarization vs channel identification
-
-```text
-Speaker separation:
-  ├── Mono audio (single channel, multiple speakers talking together)?
-  │     → Speaker Diarization (ShowSpeakerLabels=true)
-  │        ML-based speaker identification
-  │        Labels: spk_0, spk_1, spk_2, ...
-  │        Accuracy depends on audio quality and speaker overlap
-  │        CANNOT be combined with channel identification
-  │
-  ├── Stereo audio (2 channels, each channel is one speaker)?
-  │     → Channel Identification (ChannelIdentification=true)
-  │        Hardware-based: each channel is labeled exactly
-  │        Labels: ch_0, ch_1
-  │        Exact separation — no ML ambiguity
-  │        CANNOT be combined with diarization
-  │
-  └── Don't know the audio format?
-        → Check: ffprobe -i audio.mp3 -show_channels
-        → Mono (1 channel) → diarization
-        → Stereo (2 channels) → channel identification
-```
-
-**Key implication:** channel identification is always preferred
-when stereo audio is available because it is exact. Diarization is
-the fallback for mono audio where channels are not pre-separated.
 
 ## Prerequisites (verify before deployment)
 
@@ -276,25 +224,8 @@ and cite the specific gap.
 The primary Transcribe API for batch processing. Reads audio from
 S3, processes asynchronously, and writes the transcript to S3.
 
-```bash
-# Basic batch transcription job
-aws transcribe start-transcription-job \
-  --transcription-job-name my-transcription-001 \
-  --media MediaFileUri=s3://my-input-bucket/audio/meeting.wav \
-  --language-code en-US \
-  --output-bucket-name my-output-bucket \
-  --region us-east-1
-
-# Check job status
-aws transcribe get-transcription-job \
-  --transcription-job-name my-transcription-001 \
-  --query 'TranscriptionJob.TranscriptionJobStatus' --output text
-
-# List all jobs
-aws transcribe list-transcription-jobs \
-  --query 'TranscriptionJobSummaries[*].{Name:TranscriptionJobName,Status:TranscriptionJobStatus}' \
-  --output table
-```
+start-transcription-job, get-transcription-job, list-transcription-jobs — moved verbatim.
+Full detail: [Worked examples](references/worked-examples.md).
 
 **Job lifecycle:**
 - `QUEUED` → `IN_PROGRESS` → `COMPLETED` | `FAILED`
@@ -302,18 +233,6 @@ aws transcribe list-transcription-jobs \
   `s3://<output-bucket>/<job-name>.json`
 - Additional formats (if requested) at the same prefix.
 
-**Supported audio formats:**
-
-| Format | Extension | Notes |
-|---|---|---|
-| FLAC | .flac | Lossless, preferred for accuracy |
-| MP3 | .mp3 | Compressed, widely used |
-| MP4 | .mp4 | Video container (audio extracted) |
-| WAV | .wav | Uncompressed |
-| WebM | .webm | Web container |
-| AMR | .amr | Telephony |
-| OGG | .ogg | Compressed |
-| M4A | .m4a | Apple audio |
 
 ## Step 2 — Language: identification vs specified
 
@@ -325,29 +244,9 @@ language from the audio.
 | Specified language | `--language-code en-US` | Language is known |
 | Auto-identify | `--identify-language` | Language is unknown or mixed |
 
-```bash
-# Specified language (faster, more accurate for known language)
-aws transcribe start-transcription-job \
-  --transcription-job-name my-job \
-  --media MediaFileUri=s3://bucket/audio.wav \
-  --language-code en-US \
-  --output-bucket-name my-output-bucket
+--language-code vs --identify-language — moved verbatim.
+Full detail: [Worked examples](references/worked-examples.md).
 
-# Auto-identify language (adds latency, may pick wrong for mixed audio)
-aws transcribe start-transcription-job \
-  --transcription-job-name my-job \
-  --media MediaFileUri=s3://bucket/audio.wav \
-  --identify-language \
-  --output-bucket-name my-output-bucket
-```
-
-**Auto-identify caveats:**
-- Adds processing time.
-- May pick the wrong language for short clips or mixed-language
-  audio.
-- Supports a defined set of languages (not all languages support
-  auto-identify).
-- Medical transcription does NOT support auto-identify.
 
 ## Step 3 — Custom vocabulary
 
@@ -355,49 +254,8 @@ A custom vocabulary tells Transcribe how to handle specific words
 (acronyms, domain terms, product names). It improves recognition
 of those terms.
 
-**Create a custom vocabulary from a list:**
-
-```bash
-# Create vocabulary from a simple phrase list
-aws transcribe create-vocabulary \
-  --vocabulary-name company-terms \
-  --language-code en-US \
-  --phrases "AWS" "EC2" "S3" "DynamoDB" "Lambda"
-
-# Create vocabulary from a file (for complex entries with pronunciations)
-aws transcribe create-vocabulary \
-  --vocabulary-name medical-terms \
-  --language-code en-US \
-  --vocabulary-file-uri s3://my-vocab-bucket/medical-terms.txt
-```
-
-**Vocabulary file format (table-style, tab-delimited):**
-
-```
-Phrase\tSoundsLike\tIPA\tDisplayAs
-Aortic stenosis\taortic stenosis\t\tAS
-Myocardial infarction\tmyocardial infarction\t\tMI
-```
-
-**Apply a custom vocabulary to a job:**
-
-```bash
-aws transcribe start-transcription-job \
-  --transcription-job-name my-job \
-  --media MediaFileUri=s3://bucket/audio.wav \
-  --language-code en-US \
-  --settings VocabularyName=company-terms \
-  --output-bucket-name my-output-bucket
-```
-
-**Check vocabulary status:**
-
-```bash
-aws transcribe get-vocabulary \
-  --vocabulary-name company-terms \
-  --query 'VocabularyState' --output text
-# Must be READY before referencing in a job
-```
+create-vocabulary (phrases / file), table format, apply to job, READY check — moved verbatim.
+Full detail: [Vocabulary and filtering](references/vocabulary-and-filtering.md).
 
 ## Step 4 — Vocabulary filter
 
@@ -410,21 +268,8 @@ names of competitors, confidential terms) using three modes.
 | `remove` | Removes filtered words entirely |
 | `tag` | Tags filtered words with metadata (for post-processing) |
 
-```bash
-# Create a vocabulary filter
-aws transcribe create-vocabulary-filter \
-  --vocabulary-filter-name profanity-filter \
-  --language-code en-US \
-  --words "word1" "word2" "word3"
-
-# Apply filter to a job with mask mode
-aws transcribe start-transcription-job \
-  --transcription-job-name my-job \
-  --media MediaFileUri=s3://bucket/audio.wav \
-  --language-code en-US \
-  --settings VocabularyFilterName=profanity-filter,VocabularyFilterMethod=mask \
-  --output-bucket-name my-output-bucket
-```
+create-vocabulary-filter, mask/remove/tag modes — moved verbatim.
+Full detail: [Vocabulary and filtering](references/vocabulary-and-filtering.md).
 
 ## Step 5 — Speaker identification (diarization)
 
@@ -432,45 +277,8 @@ Speaker diarization identifies and labels different speakers in
 the audio. The output transcript includes speaker labels (spk_0,
 spk_1, etc.).
 
-```bash
-# Enable speaker diarization
-aws transcribe start-transcription-job \
-  --transcription-job-name my-job \
-  --media MediaFileUri=s3://bucket/audio.wav \
-  --language-code en-US \
-  --show-speaker-labels \
-  --output-bucket-name my-output-bucket
-```
-
-**Diarization output (in JSON transcript):**
-
-```json
-{
-  "speaker_labels": {
-    "speakers": 2,
-    "segments": [
-      {
-        "start_time": "0.00",
-        "speaker_label": "spk_0",
-        "end_time": "2.50",
-        "items": [...]
-      },
-      {
-        "start_time": "2.60",
-        "speaker_label": "spk_1",
-        "end_time": "5.00",
-        "items": [...]
-      }
-    ]
-  }
-}
-```
-
-**Constraints:**
-- Diarization CANNOT be combined with channel identification.
-- Best for mono audio where speakers are not pre-separated.
-- ML-based: accuracy depends on audio quality and speaker overlap.
-- You can set the max number of speakers (up to 10) via the API.
+--show-speaker-labels, speaker_labels JSON, constraints — moved verbatim.
+Full detail: [Diarization and redaction](references/diarization-and-redaction.md).
 
 ## Step 6 — Channel identification (stereo)
 
@@ -479,53 +287,16 @@ for stereo audio where each channel is a distinct speaker (e.g.,
 call center recordings with agent on one channel, caller on the
 other).
 
-```bash
-# Enable channel identification
-aws transcribe start-transcription-job \
-  --transcription-job-name my-job \
-  --media MediaFileUri=s3://bucket/stereo-audio.wav \
-  --language-code en-US \
-  --channel-identification \
-  --output-bucket-name my-output-bucket
-```
-
-**Constraints:**
-- Audio MUST be stereo (2 channels).
-- CANNOT be combined with speaker diarization.
-- Exact separation (hardware-based, not ML).
-- Labels: `ch_0`, `ch_1`.
+--channel-identification, stereo-only constraint — moved verbatim.
+Full detail: [Diarization and redaction](references/diarization-and-redaction.md).
 
 ## Step 7 — Medical transcription
 
 Medical transcription uses a separate API (`start-medical-
 transcription-job`) with specialized models for clinical content.
 
-| Feature | Standard Transcription | Medical Transcription |
-|---|---|---|
-| API | `start-transcription-job` | `start-medical-transcription-job` |
-| Model | General-purpose | Medical-specialty (PrimaryCare, etc.) |
-| Auto-language-identify | Supported | NOT supported |
-| Custom language model | Supported | NOT supported |
-| PII redaction | Supported | Supported (PHI-specific) |
-| Output formats | JSON, TXT, SRT, VTT | JSON only |
-
-```bash
-# Start a medical transcription job
-aws transcribe start-medical-transcription-job \
-  --medical-transcription-job-name my-medical-job \
-  --media MediaFileUri=s3://bucket/medical-dictation.wav \
-  --language-code en-US \
-  --specialty PRIMARYCARE \
-  --type DICTATION \
-  --output-bucket-name my-output-bucket \
-  --region us-east-1
-```
-
-**Specialty options:** `PRIMARYCARE`, `CARDIOLOGY`, `NEUROLOGY`,
-`ONCOLOGY`, `RADIOLOGY`, `UROLOGY`.
-
-**Type options:** `DICTATION` (physician dictation) or
-`CONVERSATION` (physician-patient conversation).
+standard-vs-medical comparison, start-medical-transcription-job, specialty/type options — moved verbatim.
+Full detail: [Advanced patterns](references/advanced-patterns.md).
 
 ## Step 8 — Custom language model
 
@@ -536,14 +307,8 @@ alone cannot capture.
 
 **Create a custom language model:**
 
-```bash
-# Training data must be a text file on S3 (1,000-100,000 sentences)
-aws transcribe create-language-model \
-  --model-name my-domain-model \
-  --language-code en-US \
-  --base-model-name WideBand \
-  --input-data-uri s3://my-training-bucket/training-corpus.txt
-```
+create-language-model, apply to job, TRAINED check, CLM constraints — moved verbatim.
+Full detail: [Vocabulary and filtering](references/vocabulary-and-filtering.md).
 
 **Base model selection:**
 
@@ -554,31 +319,7 @@ aws transcribe create-language-model \
 
 **Apply a custom language model to a job:**
 
-```bash
-aws transcribe start-transcription-job \
-  --transcription-job-name my-job \
-  --media MediaFileUri=s3://bucket/audio.wav \
-  --language-code en-US \
-  --model-settings LanguageModelName=my-domain-model \
-  --output-bucket-name my-output-bucket
-```
 
-**Check model training status:**
-
-```bash
-aws transcribe describe-language-model \
-  --model-name my-domain-model \
-  --query 'ModelStatus' --output text
-# Must be TRAINED before referencing in a job
-```
-
-**CLM constraints:**
-- Training data must be 1,000 to 100,000 sentences of domain text.
-- Training takes 30 minutes to several hours depending on data size.
-- Adds ~$0.00075 per second of audio to the standard transcription cost.
-- Language-specific: a model trained for en-US cannot be used for
-  other languages.
-- NOT supported for medical transcription jobs.
 
 ## Step 9 — Content identification and redaction (PII)
 
@@ -586,47 +327,8 @@ PII redaction masks sensitive information DURING transcription.
 The PII is replaced with `[PII]` before the transcript is written
 to S3. The unredacted transcript is never created.
 
-**Content identification (tag PII without removing):**
-
-```bash
-aws transcribe start-transcription-job \
-  --transcription-job-name my-job \
-  --media MediaFileUri=s3://bucket/audio.wav \
-  --language-code en-US \
-  --content-identification-types PII \
-  --output-bucket-name my-output-bucket
-```
-
-**Content redaction (mask PII):**
-
-```bash
-aws transcribe start-transcription-job \
-  --transcription-job-name my-job \
-  --media MediaFileUri=s3://bucket/audio.wav \
-  --language-code en-US \
-  --content-redaction-type PII \
-  --redaction-output redacted \
-  --pii-entity-types "NAME,SSN,EMAIL,PHONE,ADDRESS,BANK_ACCOUNT_NUMBER,BANK_ROUTING,DEBIT_CARD_NUMBER,CREDIT_CARD_NUMBER,PIN,DATE_TIME" \
-  --output-bucket-name my-output-bucket
-```
-
-**Redaction output options:**
-- `redacted`: only the redacted transcript is written to S3.
-- `redacted_and_unredacted`: both versions are written (for
-  compliance review). Requires elevated IAM permissions.
-
-**PII entity types:**
-
-| Category | Entity types |
-|---|---|
-| Personal | NAME, EMAIL, PHONE, ADDRESS, DATE_TIME |
-| Financial | BANK_ACCOUNT_NUMBER, BANK_ROUTING, CREDIT_CARD_NUMBER, DEBIT_CARD_NUMBER, PIN |
-| Government | SSN, PASSPORT_NUMBER |
-
-**Critical:** PII redaction must be configured at job creation time.
-It CANNOT be applied retroactively. The redaction happens during
-the transcription process — the PII is identified and masked before
-the transcript is written.
+content-identification, content-redaction, redaction-output options, PII entity types — moved verbatim.
+Full detail: [Diarization and redaction](references/diarization-and-redaction.md).
 
 ## Step 10 — Output formats (JSON, TXT, SRT, VTT)
 
@@ -641,56 +343,13 @@ Additional formats can be requested.
 | SRT | SubRip subtitles (timestamped) | `--subtitles Formats=srt` |
 | VTT | Web Video Text Tracks (web subtitles) | `--subtitles Formats=vtt` |
 
-```bash
-# Request subtitles (SRT + VTT)
-aws transcribe start-transcription-job \
-  --transcription-job-name my-job \
-  --media MediaFileUri=s3://bucket/audio.wav \
-  --language-code en-US \
-  --subtitles Formats=srt,vtt \
-  --output-bucket-name my-output-bucket
-```
-
-**Output location:**
-- JSON: `s3://<output-bucket>/<job-name>.json`
-- TXT: `s3://<output-bucket>/<job-name>.txt`
-- SRT: `s3://<output-bucket>/<job-name>.srt`
-- VTT: `s3://<output-bucket>/<job-name>.vtt`
+--subtitles Formats=srt,vtt, output locations — moved verbatim.
+Full detail: [Worked examples](references/worked-examples.md).
 
 ## Step 11 — CloudWatch metrics
 
-Transcribe publishes metrics to CloudWatch for monitoring job
-volume, duration, and errors.
-
-| Metric | Description |
-|---|---|
-| `AudioDuration` | Total audio seconds processed (for billing) |
-| `JobDuration` | Total processing time |
-| `ThrottledCount` | Throttled requests |
-| `JobFailureCount` | Failed jobs |
-
-```bash
-# Monitor audio duration processed (for cost tracking)
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/Transcribe \
-  --metric-name AudioDuration \
-  --start-time 2026-08-01T00:00:00Z \
-  --end-time 2026-08-11T00:00:00Z \
-  --period 86400 \
-  --statistics Sum \
-  --dimensions Name=TranscriptionJob,Value=Batch
-
-# Set a billing alarm for audio duration
-aws cloudwatch put-metric-alarm \
-  --alarm-name transcribe-duration-budget \
-  --namespace AWS/Transcribe \
-  --metric-name AudioDuration \
-  --statistic Sum \
-  --period 86400 \
-  --threshold 288000 \
-  --comparison-operator GreaterThanThreshold \
-  --evaluation-periods 1
-```
+AudioDuration / JobDuration / ThrottledCount / JobFailureCount, put-metric-alarm — moved verbatim.
+Full detail: [Diagnostic commands](references/diagnostic-commands.md).
 
 ## Step 12 — Pricing per second of audio
 
@@ -705,19 +364,8 @@ depends on the transcription type and features.
 | Real-time streaming | $0.024/sec ($1.44/min) | Live transcription |
 | Medical real-time | $0.0276/sec ($1.66/min) | Live clinical |
 
-```bash
-# Estimate cost for 1 hour of standard audio
-python3 -c "print(f'1hr standard: \${3600 * 0.024:.2f}')"
-# Output: 1hr standard: $86.40
-
-# Estimate cost for 1 hour of medical audio
-python3 -c "print(f'1hr medical: \${3600 * 0.0276:.2f}')"
-# Output: 1hr medical: $99.36
-
-# Estimate cost for 1 hour with custom language model
-python3 -c "print(f'1hr standard+CLM: \${3600 * (0.024 + 0.00075):.2f}')"
-# Output: 1hr standard+CLM: $89.10
-```
+1-hour standard / medical / +CLM estimates — moved verbatim.
+Full detail: [Worked examples](references/worked-examples.md).
 
 **Free tier:** 60 minutes per month for standard batch
 transcription (first 12 months).
@@ -728,34 +376,8 @@ vocabularies first before resorting to CLM.
 
 ## Step 13 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Custom language model v2 (2024-2025):** Improved training
-  pipeline with better convergence and support for larger training
-  corpora. Faster training times and higher accuracy gains for
-  domain-specific terminology.
-
-- **PII redaction entity expansion (2023-2024):** Additional PII
-  entity types supported for content redaction, including
-  PASSPORT_NUMBER and expanded ADDRESS variants for international
-  compliance.
-
-- **Subtitle generation for all job types (2023-2024):** SRT and
-  VTT subtitle output now available for all batch transcription
-  jobs, not just standard transcription.
-
-- **Medical transcription specialty expansion (2023-2024):**
-  Additional medical specialties supported, including enhanced
-  accuracy for clinical conversation (physician-patient dialogue)
-  beyond traditional dictation.
-
-- **CloudWatch per-feature dimensions (2024-2025):** Granular
-  metrics by transcription type (standard, medical, streaming) and
-  by feature (diarization, CLM) for precise cost attribution.
-
-- **Auto-language-identify accuracy improvements (2024-2025):**
-  Expanded language coverage and improved accuracy for mixed-
-  language audio in auto-identify mode.
+CLM v2, PII entity expansion, subtitles, medical specialties, metric dimensions — moved verbatim.
+Full detail: [Advanced patterns](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -863,39 +485,17 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Job fails with S3 access denied
-- Transcribe does not have permission to read the input audio or
-  write to the output bucket. Verify the IAM role or bucket policy
-  grants `s3:GetObject` on input and `s3:PutObject` on output.
+S3 access denied, unsupported format, vocabulary not READY, diarization+channel conflict, PII not applied, medical auto-identify, CLM accuracy — moved verbatim.
+Full detail: [Error handling](references/error-handling.md).
 
-### Job fails with unsupported audio format
-- The audio file is not in a supported format. Convert to FLAC,
-  MP3, WAV, or another supported format before uploading.
+## References (load on demand)
 
-### Custom vocabulary not found
-- The vocabulary was not created or is not in READY state. Create
-  the vocabulary and wait for it to reach READY before referencing
-  it in a job.
-
-### Diarization and channel identification both enabled
-- These are mutually exclusive. Choose diarization for mono audio
-  or channel identification for stereo audio. Remove one from the
-  configuration.
-
-### PII redaction not working
-- PII redaction must be set at job creation time. If the job was
-  already started without redaction, the transcript contains PII.
-  Re-run the job with `--content-redaction-type PII` enabled.
-
-### Medical transcription fails with auto-identify
-- Medical transcription does NOT support auto-language-identify.
-  Specify the language explicitly with `--language-code`.
-
-### Custom language model not improving accuracy
-- The base model (NarrowBand vs WideBand) may not match the audio
-  quality. Ensure NarrowBand is used for telephone audio and
-  WideBand for high-quality audio. Also verify the training data
-  is representative of the domain.
+- [Vocabulary and filtering](references/vocabulary-and-filtering.md) — custom vocabularies, vocabulary filters, vocabulary-vs-CLM heuristic, CLM training and constraints
+- [Diarization and redaction](references/diarization-and-redaction.md) — diarization-vs-channel heuristic, diarization/channel CLI and output, PII redaction, entity types
+- [Worked examples](references/worked-examples.md) — batch / language / subtitle CLI walkthroughs, cost estimation
+- [Diagnostic commands](references/diagnostic-commands.md) — CloudWatch metrics and billing alarms
+- [Advanced patterns](references/advanced-patterns.md) — audio format catalog, auto-identify caveats, medical transcription, recent features
+- [Error handling](references/error-handling.md) — S3 access, formats, vocabulary states, mutual exclusion, CLM issues
 
 ## Domain
 

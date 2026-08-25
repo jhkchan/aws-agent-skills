@@ -320,3 +320,48 @@ If at any phase file transfers or authentication regresses, roll back:
 - Phase 1 rollback: repoint DNS to the VPC server (kept for 7 days).
 - Phase 2 rollback: reattach the original workflow.
 - Phase 3 rollback: revert log level to INFO.
+
+## Extended from SKILL.md
+
+## Step 1 — VPC-to-PUBLIC savings math
+
+**VPC-to-PUBLIC savings math:**
+```
+vpc_monthly_cost = server_hourly × 730 + NAT_GB × $0.045 + VPC_endpoint_hourly
+public_monthly_cost = server_hourly × 730
+saving = vpc_monthly_cost − public_monthly_cost
+```
+
+Example: VPC server with 500 GB/month outbound via NAT Gateway:
+- VPC: $219 (server) + $22.50 (NAT data processing) + $7.30 (VPC endpoint) = $248.80/month
+- PUBLIC: $219 (server only) = $219/month
+- Saving: $29.80/month per server (13% reduction)
+
+## Step 4 — Consolidation math
+
+**Consolidation math:**
+```
+current_cost = N_servers × server_hourly × 730
+consolidated_cost = M_servers × server_hourly × 730    (where M < N)
+saving = (N − M) × server_hourly × 730
+```
+
+Example: 3 servers at $0.30/hour, each averaging 2 concurrent sessions
+(configured limit 10 each = 30 total). Combined peak is 6 sessions.
+Consolidate to 1 server with concurrency limit 10:
+- Before: 3 × $0.30 × 730 = $657/month
+- After: 1 × $0.30 × 730 = $219/month
+- Saving: $438/month (67% reduction)
+
+## Step 6 — Workflow cost example
+
+Example: 2,000,000 files/month, 5-step workflow:
+- 2,000,000 × 5 × $0.000025 = $250/month in Step Functions charges
+
+**Workflow optimization:**
+| Signal | Recommendation |
+|---|---|
+| Multi-step workflow (5+ steps) on every file | Simplify the workflow; combine steps where possible |
+| File count > 100,000/month AND workflow is validation-only | Move validation to S3 Event Notifications + Lambda (per-invocation, no state machine) |
+| Workflow triggers on every small file | Batch files before triggering the workflow (reduce execution count) |
+| Workflow has retry logic that re-executes on failure | Ensure idempotency; reduce retry count |

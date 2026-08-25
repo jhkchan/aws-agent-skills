@@ -187,3 +187,74 @@ aws stepfunctions redrive-execution --execution-arn <arn> \
 
 Confirm `redriveStatus` transitions to `REDRIVING` then re-poll
 `describe-execution` until status is `SUCCEEDED` or `FAILED`.
+
+
+
+## Step 2 — RUNTIME_ERROR diagnostic commands
+
+**Diagnostic commands:**
+
+```bash
+aws stepfunctions describe-execution --execution-arn <arn> \
+  --query '{status:status,error:error,cause:cause,stateMachineArn:stateMachineArn}'
+
+# Get the failing state name from execution history:
+aws stepfunctions get-execution-history --execution-arn <arn> \
+  --query 'events[?type==`TaskFailed` || type==`ExecutionFailed`].{type:type,stateName:stateEnteredEventDetails.name,error:taskFailedEventDetails.error,cause:taskFailedEventDetails.cause}'
+
+# Read the failing state's definition:
+aws stepfunctions describe-state-machine --state-machine-arn <sm-arn> \
+  --query 'definitionString' --output text | jq '.States["<state-name>"]'
+```
+
+
+## Step 3 — TASK_TIMEOUT diagnostic commands
+
+**Diagnostic commands:**
+
+```bash
+# Read the Task state's TimeoutSeconds / HeartbeatSeconds:
+aws stepfunctions describe-state-machine --state-machine-arn <sm-arn> \
+  --query 'definitionString' --output text \
+  | jq '.States["<state-name>"] | {TimeoutSeconds, HeartbeatSeconds, Resource, Next}'
+
+# For Lambda, compare against the function's configured timeout:
+aws lambda get-function-configuration --function-name <name> \
+  --query '{Timeout:Timeout,MemorySize:MemorySize,Runtime:Runtime}'
+
+# For activity tasks, check for SendTaskHeartbeat calls around the failure:
+aws cloudtrail lookup-events --lookup-attributes AttributeKey=EventName,AttributeValue=SendTaskHeartbeat \
+  --start-time <iso> --end-time <iso> --max-results 20
+```
+
+
+## Step 10 — EXECUTION_LIMIT_HIT diagnostic commands
+
+**Diagnostic commands:**
+
+```bash
+aws cloudwatch get-metric-statistics --namespace AWS/States \
+  --metric-name ExecutionThrottled --dimensions Name=StateMachineArn,Value=<sm-arn> \
+  --start-time <iso> --end-time <iso> --period 300 --statistics Sum
+
+aws cloudwatch get-metric-statistics --namespace AWS/States \
+  --metric-name ThrottledStateTransition --dimensions Name=StateMachineArn,Value=<sm-arn> \
+  --start-time <iso> --end-time <iso> --period 300 --statistics Sum
+
+aws service-quotas get-service-quota --service-code states \
+  --quota-code L-3B4D9EC3  # State transitions per second
+```
+
+
+## Step 11 — REDRIVE_CANDIDATE diagnostic command
+
+**Diagnostic command:**
+
+```bash
+aws stepfunctions describe-execution --execution-arn <arn> \
+  --query '{status:status,stateMachineArn:stateMachineArn,redriveStatus:redriveStatus,redriveDate:redriveDate}'
+
+# Verify workflow type is STANDARD before suggesting redrive:
+aws stepfunctions describe-state-machine --state-machine-arn <sm-arn> \
+  --query 'stateMachineArn' --output text | grep -oE ':stateMachine:[^:]+:express:' && echo "EXPRESS — redrive NOT supported" || echo "STANDARD — redrive supported"
+```

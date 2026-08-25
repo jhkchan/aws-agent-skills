@@ -204,3 +204,12 @@ When removing a patch automation:
 **Order matters.** Deleting a baseline before deregistering patch
 groups produces an orphaned association. Instances show a stale
 baseline ID in their patch state until the association is cleaned up.
+
+## Appendix C — Maintenance-window cron reference (moved from SKILL.md)
+
+| Schedule | Cron | Notes |
+|---|---|---|
+| Daily 06:00 UTC | `cron(0 6 * * ? *)` | Standard daily Scan |
+| Weekly Sat 02:00 UTC | `cron(0 2 ? * SAT *)` | Standard weekly Install |
+| Monthly 1st Sun | `cron(0 2 ? * SUN#1 *)` | Conservative monthly |
+| Every 4 hours | `rate(4 hours)` | High-frequency Scan |

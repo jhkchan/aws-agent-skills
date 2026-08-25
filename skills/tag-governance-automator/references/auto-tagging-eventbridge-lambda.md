@@ -293,3 +293,98 @@ aws sqs get-queue-attributes \
   --queue-url https://sqs.us-east-1.amazonaws.com/111111111111/auto-tagger-dlq \
   --attribute-names ApproximateNumberOfMessages
 ```
+
+## Step 3: Build EventBridge + Lambda auto-tagging (moved from SKILL.md)
+
+Auto-tagging stamps tags on resource creation so the fleet starts
+compliant rather than waiting for remediation. The pattern: CloudTrail
+logs the creation API call → EventBridge rule matches → Lambda derives
+tags from the event context → Lambda calls the resource-type-specific
+tagging API.
+
+EventBridge rule for EC2 RunInstances:
+
+```bash
+aws events put-rule \
+  --name auto-tag-ec2-on-create \
+  --event-pattern '{
+    "source": ["aws.ec2"],
+    "detail-type": ["AWS API Call via CloudTrail"],
+    "detail": {
+      "eventSource": ["ec2.amazonaws.com"],
+      "eventName": ["RunInstances"]
+    }
+  }'
+```
+
+EventBridge rule for S3 CreateBucket and Lambda CreateFunction:
+
+```bash
+aws events put-rule \
+  --name auto-tag-on-create-multi \
+  --event-pattern '{
+    "source": ["aws.s3", "aws.lambda"],
+    "detail-type": ["AWS API Call via CloudTrail"],
+    "detail": {
+      "eventSource": ["s3.amazonaws.com", "lambda.amazonaws.com"],
+      "eventName": ["CreateBucket", "CreateFunction20150331"]
+    }
+  }'
+```
+
+Lambda handler (Python, handles EC2 + S3 + Lambda):
+
+```python
+import boto3, os, json
+
+EC2 = boto3.client("ec2")
+S3 = boto3.client("s3")
+LAMBDA = boto3.client("lambda")
+
+# Account ID -> Environment mapping (inject via env or Secrets Manager)
+ACCOUNT_ENV = json.loads(os.environ["ACCOUNT_ENV_MAP"])
+
+def lambda_handler(event, context):
+    detail = event["detail"]
+    source = detail["eventSource"]
+    event_name = detail["eventName"]
+    identity = detail["userIdentity"]
+    user_arn = identity.get("arn", "unknown")
+    user_name = user_arn.split("/")[-1] if "/" in user_arn else user_arn
+    account_id = detail.get("recipientAccountId", event["account"])
+    env = ACCOUNT_ENV.get(account_id, "unknown")
+    base_tags = [
+        {"Key": "Owner", "Value": user_name},
+        {"Key": "CreatorARN", "Value": user_arn},
+        {"Key": "Environment", "Value": env},
+        {"Key": "CreatedVia", "Value": "auto-tagger"},
+        {"Key": "CreatedAt", "Value": detail["eventTime"]},
+    ]
+    if source == "ec2.amazonaws.com" and event_name == "RunInstances":
+        instances = detail["responseElements"]["instancesSet"]["items"]
+        ids = [i["instanceId"] for i in instances]
+        EC2.create_tags(Resources=ids, Tags=base_tags)
+    elif source == "s3.amazonaws.com" and event_name == "CreateBucket":
+        bucket = detail["requestParameters"]["bucketName"]
+        S3.put_bucket_tagging(Bucket=bucket, Tagging={"TagSet": base_tags})
+    elif source == "lambda.amazonaws.com":
+        fn = detail["requestParameters"]["functionName"]
+        LAMBDA.tag_resource(Resource=fn, Tags={t["Key"]: t["Value"] for t in base_tags})
+    return {"statusCode": 200, "tagged": True}
+```
+
+**Lambda execution role requirements:**
+- `ec2:CreateTags` on `arn:aws:ec2:*:*:instance/*`
+- `s3:PutBucketTagging` on `arn:aws:s3:::*`
+- `lambda:TagResource` on `arn:aws:lambda:*:*:function:*`
+- `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents`
+
+**Trade-off table:**
+
+| Dimension | EventBridge + Lambda | SSM Automation |
+|---|---|---|
+| Latency | ~seconds | ~minutes |
+| Multi-resource type support | Custom branching logic | One document per type |
+| Idempotency | Consumer must handle | SSM handles retries |
+| Backfill (existing resources) | No — only creation events | Yes — Config-driven remediation |
+| Audit trail | CloudTrail + Lambda logs | SSM execution history |

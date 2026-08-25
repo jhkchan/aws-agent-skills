@@ -28,31 +28,8 @@ metadata:
 
 ## Mindset
 
-**One-line takeaway:** tag compliance is a four-layer pipeline —
-**define** (Organizations TagPolicy with `enforced_for` and case-sensitive
-key/value rules) → **detect** (Config `required-tags` and
-`allowed-tag-values` rules flag non-compliant resources; Config CI changes
-catch tag drift) → **propagate** (EventBridge + Lambda auto-tags new
-resources and propagates inherited tags from EC2 to EBS volumes and ENIs)
-→ **remediate** (SSM Automation adds or corrects missing tags; Config
-re-evaluates and flips COMPLIANT). A gap in ANY layer produces a silent
-failure: the policy is published but advisory, auto-tagging stamps tags
-that humans later overwrite, drift goes undetected, or cost allocation
-reports stay empty because no one activated the tag keys in Billing.
-
-- **Organizations TagPolicy** without `enforced_for` is advisory only.
-  AWS does not block non-compliant tag operations. The policy is
-  documentation, not enforcement.
-- **Case sensitivity** is a silent gap. A TagPolicy with
-  `case_sensitive: true` treats `Environment` and `environment` as
-  different keys. Config `required-tags` checks the exact key name in
-  InputParameters. Auto-taggers must normalize casing before stamping.
-- **EC2 tags do NOT propagate to EBS volumes or ENIs.** The `RunInstances`
-  API tags only the instance. An EventBridge Lambda must call
-  `ec2:create-tags` on child resources.
-- **Cost allocation tags are NOT active by default.** A perfectly tagged
-  fleet produces zero cost-dimension data until an administrator activates
-  the tag keys via the Billing API or console.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#mindset).
+> One-line: four layers — define (TagPolicy enforced_for + case rules) → detect (Config rules + drift) → propagate (EventBridge auto-tagger + EC2→EBS/ENI) → remediate (SSM); a gap in ANY layer is a silent failure; cost allocation tags are inactive until activated in Billing.
 
 ## Quick navigation
 
@@ -115,40 +92,8 @@ GAP: Re-supply the required tag keys, allowed values, and the resource types in 
 
 ### Step 0: Expert knowledge — non-obvious TagPolicy and Config behaviors
 
-- **A TagPolicy attached to the org root cascades to all OUs and
-  accounts, but a policy attached to a specific OU OVERRIDES (not
-  merges) the root policy.** The effective tag policy is the policy
-  attached to the closest ancestor. To add a key at the OU level
-  without losing root keys, re-declare every parent key in the child.
-
-- **`enforced_for` accepts resource types in `AWS::service::resource`
-  format.** A typo like `AWS::EC2::instance` (lowercase) is silently
-  ignored. Cross-reference the canonical resource-type list.
-
-- **Config `required-tags` uses `InputParameters` as a JSON-encoded
-  string.** Passing a map where the API expects
-  `"{\"tag1Key\":\"Environment\"}"` silently drops the input.
-
-- **The Resource Groups Tagging API is eventually consistent.** Tagging
-  returns `SUCCESS` immediately but a follow-up `get-resources` within
-  seconds may not reflect new tags. Sleep 10-15 seconds before re-querying.
-
-- **EventBridge auto-taggers that derive Owner from the IAM principal
-  must handle assumed-role sessions.** The `userIdentity.sessionContext`
-  has `sessionIssuer.arn` (the role). Deriving a human owner from a role
-  ARN requires a mapping table.
-
-- **`allowed-tag-values` is a Config managed rule that accepts ONE tag
-  key per invocation.** For 4 tag keys' value validation, deploy 4
-  separate rules.
-
-- **The `ce update-cost-allocation-tags-status` API has a propagation
-  delay of up to 24 hours.** Do not re-activate or assume failure within
-  that window. Poll the `ProcessingStatus` field.
-
-- **Config configuration-item change events fire only for recorded
-  resource types.** Tag drift on an unrecorded type is invisible.
-  Extend the recorder scope before wiring drift detection.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-0-expert-knowledge--non-obvious-tagpolicy-and-config-behaviors).
+> Eight expert behaviors: child-OU policy OVERRIDES root (no merge), enforced_for resource-type typos silently ignored, required-tags InputParameters must be a JSON string, Tagging API eventual consistency, assumed-role owner derivation, allowed-tag-values is one key per rule, 24h cost-tag propagation delay, CI events only for recorded types.
 
 ### Step 1: Design the Organizations TagPolicy
 
@@ -473,25 +418,8 @@ TEMPLATE:
 
 ### Worked example — REVIEW_REQUIRED, manual Billing step
 
-```text
-COMPLIANCE: org-tag-compliance-partial
-SCOPE: org root r-xxxx, all member accounts, us-east-1
-POLICY:
-  - Type: Organizations TagPolicy (baseline-compliance-tag-policy)
-  - enforced_for: AWS::EC2::Instance, AWS::S3::Bucket
-AUTOMATION:
-  - Auto-tagging: EventBridge + Lambda on RunInstances
-  - Tag propagation: EC2 -> EBS only (ENI propagation missing)
-PROPAGATION:
-  - EC2 -> EBS: covered
-  - EC2 -> ENI: NOT covered
-COST:
-  - Cost allocation tags: inactive
-  - Activation method: BLOCKED — API returns AccessDeniedException (Billing console IAM access not enabled)
-VERDICT: REVIEW_REQUIRED
-GAP: Three blockers: (1) ENI tag propagation missing in auto-tagger Lambda; (2) cost allocation tag activation blocked — payer account administrator must enable "IAM User and Role Access to Billing Information" in the Billing console; (3) Config recorder scope excludes S3, so drift detection on S3 is blind.
-TEMPLATE: (partial — see Steps 3, 5, 8 for the missing pieces)
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#worked-example--review_required-manual-billing-step).
+> Full REVIEW_REQUIRED report: ENI propagation missing, cost allocation activation blocked (AccessDeniedException), Config recorder blind on S3.
 
 ## Anti-Patterns — NEVER do these things
 
@@ -535,62 +463,18 @@ TEMPLATE: (partial — see Steps 3, 5, 8 for the missing pieces)
 
 ## Configuration dependency graph
 
-```
-[Organizations: enable TAG_POLICY]
-        |
-        v
-[Organizations: create + attach TagPolicy to root]
-        |
-        +-----------------------------+
-        |                             |
-        v                             v
-[Config: recorder scope covers target types]   [IAM: auto-tagger Lambda role]
-        |                             |
-        v                             v
-[Config: put required-tags + allowed-tag-values rules]   [EventBridge: put-rule + Lambda + DLQ]
-        |                             |
-        v                             v
-[Config: put-remediation-configurations (manual)]   [SSM: create-document Custom-AddRequiredTag]
-        |
-        v
-[Cost Explorer: update-cost-allocation-tags-status (payer)]
-        |
-        v
-[CloudFormation: create-stack-set (OU-wide)]
-```
-
-**Hard ordering constraints:**
-
-1. TAG_POLICY type MUST be enabled before `create-policy`.
-2. Config recorder scope MUST include target types before rules deploy.
-3. Auto-tagger Lambda role MUST exist before EventBridge target attaches.
-4. SSM document MUST exist before `put-remediation-configurations`.
-5. Cost allocation activation runs independently on the payer account.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#configuration-dependency-graph).
+> Ordering: enable TAG_POLICY → attach policy → recorder scope → rules / auto-tagger role → remediation wiring → cost allocation → StackSet; five hard ordering constraints.
 
 ## Pre-flight safety checks
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation,
-  emit: `CONFIRM: About to <action> for tag compliance in <target>.
-  This affects <consequence>. Proceed? (yes/no)`
-- **Back up the current TagPolicy** before modifying:
-  `aws organizations describe-policy --policy-id p-xxxxxxx > /tmp/tag-policy-backup.json`
-- **Before flipping from advisory to enforced**, dry-run by listing
-  NON_COMPLIANT resources via Config first.
-- **For StackSet deployment**, verify admin and execution roles exist in
-  every target account.
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#pre-flight-safety-checks).
+> Gates: CONFIRM prompt before any state change, back up the TagPolicy, dry-run advisory→enforced via Config, verify StackSet roles.
 
 ## Appendix A — TagPolicy JSON reference
 
-| Field | Purpose | Required |
-|---|---|---|
-| `tags.<Key>.TagKey` | The tag key name (must match `<Key>`) | Yes |
-| `tags.<Key>.ExpectedStringValues` | Allowed values list | No |
-| `tags.<Key>.EnforcedFor` | Resource types that MUST comply | Yes for enforcement |
-| `tags.<Key>.CaseSensitive` | Key/value case sensitivity (default: true) | No |
-
-For the full resource-type list and auto-tagger Lambda patterns, see
-**references/organizations-tag-policies.md** and
-**references/auto-tagging-and-propagation.md**.
+> Moved to [references/organizations-tag-policies.md](references/organizations-tag-policies.md#appendix-a--tagpolicy-json-reference-moved-from-skillmd).
+> Field table: TagKey (must match), ExpectedStringValues (optional), EnforcedFor (required for enforcement), CaseSensitive (default true).
 
 ## Appendix B — Decision tree (which enforcement layer)
 
@@ -605,53 +489,21 @@ Is the tag key required on all resources of a type?
 
 ## Recent AWS features (2024-2026)
 
-- **TagPolicy `enforced_for` resource-type expansion:** Additional
-  types including Lambda layers, Step Functions state machines. Re-check
-  the supported-types list quarterly.
-- **Cost Explorer API `ProcessingStatus`:** The 24-hour propagation
-  delay is now visible in the API response. Poll instead of guessing.
-- **CloudFormation StackSets drift detection:** Per-account drift on
-  deployed Config rules via `detect-stack-set-drift`.
-- **Resource Groups Tagging API pagination:** Longer TTL on
-  `PaginationToken`, reducing bulk-enumeration restarts.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#recent-aws-features-2024-2026).
+> enforced_for type expansion, CE ProcessingStatus visibility, StackSet drift detection, Tagging API pagination TTL.
 
 ## Expert heuristic: tag-policy case sensitivity + EventBridge auto-tagger + Config detection
 
-The most common tag-compliance failure is NOT a missing policy — it is a
-policy that looks correct but silently does not enforce, because of
-case-sensitivity mismatches and missing propagation to child resources.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-tag-policy-case-sensitivity--eventbridge-auto-tagger--config-detection).
+> Non-negotiable: declare case_sensitive explicitly, normalize casing in the auto-tagger, propagate EC2→EBS+ENI in the same handler; includes the case-sensitivity matrix and the propagation diagnostic.
 
-**The rule (non-negotiable):**
 
-> ALWAYS declare `case_sensitive` explicitly in the TagPolicy, ALWAYS
-> normalize tag-key casing in the EventBridge auto-tagger Lambda before
-> calling `create-tags`, and ALWAYS propagate tags from EC2 instances to
-> their child EBS volumes and ENIs in the same Lambda handler. A policy
-> that declares `Environment` but an auto-tagger that stamps
-> `environment` produces a fleet that is TagPolicy-compliant but
-> Config-NON_COMPLIANT.
+## References (load on demand)
 
-**Case-sensitivity matrix:**
-
-| System | Default case sensitivity | Override |
-|---|---|---|
-| Organizations TagPolicy | `case_sensitive: true` | `CaseSensitive: false` per key |
-| Config `required-tags` | Exact match on InputParameters key | No override |
-| Config `allowed-tag-values` | Exact match on key and value | No override |
-| Cost Explorer (user-defined) | Case-insensitive on key, case-sensitive on value | No override |
-| Resource Groups Tagging API | Case-sensitive on key | No override |
-
-**EC2-to-child propagation diagnostic:** if Cost Explorer shows instance
-costs tagged but EBS volume costs untagged, the auto-tagger is not
-propagating. Verify the Lambda reads `BlockDeviceMappings[].Ebs.VolumeId`
-and `NetworkInterfaces[].NetworkInterfaceId`, calls `ec2:create-tags`
-in batch, and has `ec2:CreateTags` on `volume/*` and
-`network-interface/*`.
-
-**Surface in the output:** include `CASE_SENSITIVITY`, `CASE_NORMALIZATION`,
-`PROPAGATION_COVERAGE`, and `VALIDATION_STATUS`. If
-`VALIDATION_STATUS` is advisory or `PROPAGATION_COVERAGE` is incomplete,
-do NOT mark the recommendation as AUTOMATION_DEPLOYED.
+- [advanced-patterns](references/advanced-patterns.md) — Mindset, Step 0 expert knowledge, the configuration dependency graph, Recent AWS features, and the case-sensitivity/propagation expert heuristic moved from SKILL.md
+- [worked-examples](references/worked-examples.md) — the REVIEW_REQUIRED worked example moved from SKILL.md
+- [diagnostic-commands](references/diagnostic-commands.md) — pre-flight safety checks (confirmation gate, policy backup, advisory→enforced dry-run) moved from SKILL.md
+- [organizations-tag-policies](references/organizations-tag-policies.md) — now also holds the Appendix A TagPolicy JSON field reference moved from SKILL.md
 
 ## Domain
 

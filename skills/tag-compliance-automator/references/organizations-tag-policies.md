@@ -100,3 +100,16 @@ Tagging API interpret case independently:
 
 A mismatch between the TagPolicy setting and the Config InputParameters
 key name produces conflicting compliance reports.
+
+## Appendix A — TagPolicy JSON reference (moved from SKILL.md)
+
+| Field | Purpose | Required |
+|---|---|---|
+| `tags.<Key>.TagKey` | The tag key name (must match `<Key>`) | Yes |
+| `tags.<Key>.ExpectedStringValues` | Allowed values list | No |
+| `tags.<Key>.EnforcedFor` | Resource types that MUST comply | Yes for enforcement |
+| `tags.<Key>.CaseSensitive` | Key/value case sensitivity (default: true) | No |
+
+For the full resource-type list and auto-tagger Lambda patterns, see
+**references/organizations-tag-policies.md** and
+**references/auto-tagging-and-propagation.md**.

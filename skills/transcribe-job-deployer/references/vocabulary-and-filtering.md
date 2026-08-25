@@ -266,3 +266,138 @@ resource "null_resource" "transcribe_vocab_filter" {
   }
 }
 ```
+
+## Extended from SKILL.md
+
+## Expert heuristic: custom vocabulary vs custom language model
+
+## Expert heuristic: custom vocabulary vs custom language model
+
+Both improve accuracy but work differently and have different
+costs.
+
+```text
+Accuracy improvement options:
+  ├── Few specific terms (company names, acronyms, product names)?
+  │     → Custom Vocabulary (free to apply, just upload a vocabulary file)
+  │        Boosts recognition of specific words
+  │        No training data needed — just a word list with optional pronunciations
+  │
+  ├── Broader domain vocabulary (medical, legal, technical)?
+  │     → Custom Language Model (requires training text, adds cost per minute)
+  │        Improves OVERALL accuracy by training on domain-specific text
+  │        Requires: 1,000 - 100,000 training sentences in a text file on S3
+  │        Choose BaseModelName: NarrowBand (phone audio, 8kHz) or WideBand (high-quality, 16kHz+)
+  │
+  └── Both can be used simultaneously
+        → Custom vocabulary for specific terms + CLM for overall accuracy
+```
+
+**Key implication:** start with a custom vocabulary (free, simple).
+If accuracy is still insufficient, add a custom language model
+(requires training data, adds ~$0.00075/second additional cost).
+
+## Step 3 — Custom vocabulary creation and application
+
+**Create a custom vocabulary from a list:**
+
+```bash
+# Create vocabulary from a simple phrase list
+aws transcribe create-vocabulary \
+  --vocabulary-name company-terms \
+  --language-code en-US \
+  --phrases "AWS" "EC2" "S3" "DynamoDB" "Lambda"
+
+# Create vocabulary from a file (for complex entries with pronunciations)
+aws transcribe create-vocabulary \
+  --vocabulary-name medical-terms \
+  --language-code en-US \
+  --vocabulary-file-uri s3://my-vocab-bucket/medical-terms.txt
+```
+
+**Vocabulary file format (table-style, tab-delimited):**
+
+```
+Phrase\tSoundsLike\tIPA\tDisplayAs
+Aortic stenosis\taortic stenosis\t\tAS
+Myocardial infarction\tmyocardial infarction\t\tMI
+```
+
+**Apply a custom vocabulary to a job:**
+
+```bash
+aws transcribe start-transcription-job \
+  --transcription-job-name my-job \
+  --media MediaFileUri=s3://bucket/audio.wav \
+  --language-code en-US \
+  --settings VocabularyName=company-terms \
+  --output-bucket-name my-output-bucket
+```
+
+**Check vocabulary status:**
+
+```bash
+aws transcribe get-vocabulary \
+  --vocabulary-name company-terms \
+  --query 'VocabularyState' --output text
+# Must be READY before referencing in a job
+```
+
+## Step 4 — Vocabulary filter CLI
+
+```bash
+# Create a vocabulary filter
+aws transcribe create-vocabulary-filter \
+  --vocabulary-filter-name profanity-filter \
+  --language-code en-US \
+  --words "word1" "word2" "word3"
+
+# Apply filter to a job with mask mode
+aws transcribe start-transcription-job \
+  --transcription-job-name my-job \
+  --media MediaFileUri=s3://bucket/audio.wav \
+  --language-code en-US \
+  --settings VocabularyFilterName=profanity-filter,VocabularyFilterMethod=mask \
+  --output-bucket-name my-output-bucket
+```
+
+## Step 8 — Custom language model creation and application
+
+```bash
+# Training data must be a text file on S3 (1,000-100,000 sentences)
+aws transcribe create-language-model \
+  --model-name my-domain-model \
+  --language-code en-US \
+  --base-model-name WideBand \
+  --input-data-uri s3://my-training-bucket/training-corpus.txt
+```
+
+## Step 8 — Apply CLM to a job / training status
+
+```bash
+aws transcribe start-transcription-job \
+  --transcription-job-name my-job \
+  --media MediaFileUri=s3://bucket/audio.wav \
+  --language-code en-US \
+  --model-settings LanguageModelName=my-domain-model \
+  --output-bucket-name my-output-bucket
+```
+
+**Check model training status:**
+
+```bash
+aws transcribe describe-language-model \
+  --model-name my-domain-model \
+  --query 'ModelStatus' --output text
+# Must be TRAINED before referencing in a job
+```
+
+## Step 8 — CLM constraints
+
+**CLM constraints:**
+- Training data must be 1,000 to 100,000 sentences of domain text.
+- Training takes 30 minutes to several hours depending on data size.
+- Adds ~$0.00075 per second of audio to the standard transcription cost.
+- Language-specific: a model trained for en-US cannot be used for
+  other languages.
+- NOT supported for medical transcription jobs.

@@ -271,3 +271,163 @@ from the data source S3 bucket and write to the Timestream table.
   ]
 }
 ```
+
+## Extended from SKILL.md
+
+## Expert heuristic: magnetic store S3 transition for late-arrival data
+
+## Expert heuristic: magnetic store S3 transition for late-arrival data
+
+A baseline model does not configure magnetic store write properties.
+The correct heuristic recognizes that late-arrival data (records with
+timestamps older than the memory store TTL) is silently rejected
+unless magnetic store write properties are explicitly enabled with an
+S3 destination.
+
+```text
+Late-arrival data flow:
+  Writer sends record with timestamp T_old (older than memory store TTL)
+    ├── MagneticStoreWriteProperties disabled (default)
+    │     → record REJECTED (WriteRecords API returns error or silently drops)
+    │     → data is lost
+    └── MagneticStoreWriteProperties enabled (S3 bucket configured)
+          → record accepted, routed to S3 object store
+          → Timestream ingests from S3 into magnetic store
+          → data is queryable from magnetic store (not memory store)
+
+S3 bucket requirements:
+  1. Bucket must exist in the same region as the Timestream table
+  2. Bucket policy must grant s3:PutObject to Timestream service principal
+  3. Timestream writes objects with a managed prefix structure
+  4. Objects are managed by Timestream — do NOT delete or modify them
+```
+
+**Key implication:** for IoT or event-driven workloads where data may
+arrive late (network delays, device offline, batch uploads), magnetic
+store write properties are essential. Without them, late-arrival data
+is silently lost. The S3 bucket must be configured with the correct
+bucket policy before enabling the property.
+
+## Step 3 — Magnetic store write properties (S3) setup
+
+```bash
+# Create the S3 bucket (same region as the Timestream table)
+aws s3api create-bucket \
+  --bucket timestream-magnetic-late-arrival-us-east-1 \
+  --region us-east-1
+
+# Add bucket policy granting Timestream write access
+cat > /tmp/bucket-policy.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "timestream.amazonaws.com"
+      },
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::timestream-magnetic-late-arrival-us-east-1/*"
+    }
+  ]
+}
+EOF
+
+aws s3api put-bucket-policy \
+  --bucket timestream-magnetic-late-arrival-us-east-1 \
+  --policy file:///tmp/bucket-policy.json
+
+# Enable magnetic store write properties on the table
+aws timestream-write update-table \
+  --database-name "IoTSensorData" \
+  --table-name "TemperatureReadings" \
+  --magnetic-store-write-properties \
+    "EnableMagneticStoreWrites=true,MagneticStoreRejectedDataLocation=s3://timestream-magnetic-late-arrival-us-east-1/" \
+  --region us-east-1
+```
+
+**Critical:** the S3 bucket must be in the same region as the
+Timestream table. The bucket policy must grant `s3:PutObject` to the
+Timestream service principal. Objects written by Timestream are
+managed automatically — do NOT delete or modify them.
+
+## Step 10 — IAM policies (table access + scheduled query execution role)
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "timestream:WriteRecords"
+      ],
+      "Resource": [
+        "arn:aws:timestream:us-east-1:123456789012:database/IoTSensorData/table/TemperatureReadings"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "timestream:Describe*",
+        "timestream:List*",
+        "timestream:Select"
+      ],
+      "Resource": [
+        "arn:aws:timestream:us-east-1:123456789012:database/IoTSensorData",
+        "arn:aws:timestream:us-east-1:123456789012:database/IoTSensorData/table/*"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "timestream:ExecuteScheduledQuery"
+      ],
+      "Resource": [
+        "arn:aws:timestream:us-east-1:123456789012:scheduled-query/HourlyTemperatureAggregation"
+      ]
+    }
+  ]
+}
+```
+
+**Scheduled query execution role:** the `ScheduledQueryExecutionRoleArn`
+requires permissions to query the source table, write to the target
+table, and publish to the SNS topic for error reporting.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "timestream:Select",
+        "timestream:DescribeTable",
+        "timestream:DescribeEndpoints"
+      ],
+      "Resource": [
+        "arn:aws:timestream:us-east-1:123456789012:database/IoTSensorData/table/TemperatureReadings"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "timestream:WriteRecords"
+      ],
+      "Resource": [
+        "arn:aws:timestream:us-east-1:123456789012:database/IoTSensorData/table/HourlyTempAggregates"
+      ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "sns:Publish"
+      ],
+      "Resource": [
+        "arn:aws:sns:us-east-1:123456789012:timestream-scheduled-query-errors"
+      ]
+    }
+  ]
+}
+```

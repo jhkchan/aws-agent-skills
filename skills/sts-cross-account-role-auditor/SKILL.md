@@ -24,34 +24,13 @@ metadata:
 
 ## Mindset
 
-Classify IAM role **trust policies** (the `AssumeRolePolicyDocument` attached to
-every IAM role) against cross-account and external-trust principles. The trust
-policy is the single gate that controls WHO can assume a role and obtain its
-permissions — it is the highest-leverage security surface in IAM because a
-misconfigured trust policy grants an external entity the **entire permission
-set** of the role.
-
-The goal is not just "is the Principal `"*"`?" — it is to identify the **trust
-boundary** of every statement: could an entity outside the owning account
-assume this role, and if so, is there a guard (ExternalId, SourceArn,
-SourceAccount) that constrains the assumption to a verified caller?
-
-A trust policy with `Principal: "*"` is an open door — anyone on the internet
-with AWS credentials can assume the role. A trust policy with a cross-account
-root ARN but no ExternalId is a door that the third party's account admin can
-open to any principal in their account. A trust policy with a confused-deputy
-service principal and no SourceArn is a door that any AWS customer can walk
-through via that service. The classification must catch all three patterns,
-plus the subtler condition-bypass paths.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#mindset).
+> One-line: classify WHO can assume the role (trust policy, not permissions policy); catch wildcard `"*"`, unguarded cross-account root, and unguarded confused-deputy service principals; grade condition strength.
 
 ## What this skill is NOT
 
-This skill audits the **trust policy** (who can assume the role). It does NOT
-audit the role's **permissions policy** (what the role can do after assuming
-it) — that is the domain of `iam-least-privilege-advisor`. A role with a clean
-trust policy but an over-permissive permissions policy is still dangerous; the
-two surfaces must be audited independently. When the permissions policy is
-available, recommend running both skills.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#what-this-skill-is-not).
+> Scope: trust policy only — permissions-policy audits belong to iam-least-privilege-advisor; run both when the permissions policy is available.
 
 ## Quick reference
 
@@ -76,50 +55,8 @@ weak conditions, session tags).
 
 ## The confused-deputy problem (core concept)
 
-This is the single most important STS trust concept and the most commonly
-misunderstood. When you write:
-
-```json
-{
-  "Principal": {"Service": "lambda.amazonaws.com"},
-  "Action": "sts:AssumeRole"
-}
-```
-
-you are NOT granting access to YOUR Lambda functions. You are granting access
-to the **Lambda service** — an AWS-owned service endpoint that ANY AWS
-customer can invoke. If another AWS account creates a Lambda function that
-triggers an AssumeRole call to your role, the Lambda service (which your
-trust policy trusts) will make that call on behalf of the other account.
-Your role is now assumed by an attacker.
-
-This is the **confused-deputy problem**: a trusted service (the deputy) is
-confused about which customer it is acting for, and an attacker exploits that
-confusion to access resources they should not reach.
-
-**The fix** is to add a condition that identifies the calling customer:
-
-```json
-"Condition": {
-  "StringEquals": {
-    "aws:SourceAccount": "123456789012"
-  }
-}
-```
-
-or, more precisely:
-
-```json
-"Condition": {
-  "ArnLike": {
-    "aws:SourceArn": "arn:aws:lambda:us-east-1:123456789012:function:*"
-  }
-}
-```
-
-`aws:SourceArn` is stronger than `aws:SourceAccount` because it scopes to a
-specific resource, not just an account. `aws:SourceAccount` is the minimum
-acceptable guard.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#the-confused-deputy-problem-core-concept).
+> Core: Principal.Service trusts the SERVICE, not your resources — any AWS customer can trigger it; fix with aws:SourceAccount (StringEquals, minimum) or aws:SourceArn (ArnLike, strongest).
 
 ## Process — Classification logic (apply in order)
 
@@ -209,16 +146,9 @@ the role's owning account, evaluate the ExternalId guard:
 Cite "Step 3: cross-account without ExternalId" or "Step 3: cross-account
 with ExternalId (CONDITIONAL)".
 
-**Critical expert note — the root ARN expansion rule:**
-`arn:aws:iam::123456789012:root` does NOT mean "only the root user of
-account 123456789012". It means **every authenticated principal** in that
-account — root, every IAM user, every IAM role, and every assumed-role
-session. This is because the trust policy is evaluated at the IAM layer,
-which matches the account-level root principal pattern. A common mistake is
-to assume that granting to `:root` limits exposure to the root user only;
-it does not. If the intent is to allow only a specific role, the Principal
-must name that role ARN explicitly:
-`arn:aws:iam::123456789012:role/specific-role`.
+
+> Expert note moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-note--the-root-arn-expansion-rule).
+> Root ARN expansion: `arn:aws:iam::ACCOUNT:root` = EVERY authenticated principal in that account, not just root — name the specific role ARN.
 
 ### Step 4: Confused-deputy service Principal without source guard
 
@@ -227,50 +157,9 @@ If ANY Allow statement has `Principal.Service` set to a
 does NOT contain `aws:SourceAccount` or `aws:SourceArn`, classify as
 **EXTERNAL_TRUST**, **HIGH**.
 
-**Confused-deputy-risk services** (services that can be invoked by any AWS
-customer and therefore can be triggered cross-account):
 
-- `lambda.amazonaws.com` — any AWS customer can create a Lambda function
-  that calls `sts:AssumeRole`.
-- `ec2.amazonaws.com` — any customer can launch an EC2 instance with an
-  instance profile.
-- `cloudformation.amazonaws.com` — any customer can create a stack that
-  passes a role.
-- `eks.amazonaws.com` / `eks-nodegroup.amazonaws.com` / `eks-fargate.amazonaws.com`
-  — EKS service roles; confused-deputy via EKS cluster creation.
-- `ecs-tasks.amazonaws.com` / `ecs.amazonaws.com` — ECS task execution.
-- `states.amazonaws.com` — Step Functions can be invoked cross-account.
-- `events.amazonaws.com` / `pipes.amazonaws.com` — EventBridge rules and
-  Pipes can be targeted cross-account.
-- `sns.amazonaws.com` / `sqs.amazonaws.com` — messaging services that
-  accept cross-account subscriptions.
-- `codebuild.amazonaws.com` / `codepipeline.amazonaws.com` — CI/CD services.
-- `apigateway.amazonaws.com` / `apigateway.amazonaws.com` — API Gateway
-  can forward AssumeRole calls.
-- `backup.amazonaws.com` — AWS Backup service roles.
-- `cloudtrail.amazonaws.com` — CloudTrail can be configured cross-account.
-- `config.amazonaws.com` / `config-multiaccountsetup.amazonaws.com` —
-  Config aggregator roles.
-- `controltower.amazonaws.com` / `member.org.stacksets.cloudformation.amazonaws.com`
-  — Control Tower / Organizations member roles.
-- `auditmanager.amazonaws.com` — Audit Manager service-linked roles.
-- `macie.amazonaws.com` / `securityhub.amazonaws.com` / `guardduty.amazonaws.com`
-  — security services with cross-account aggregation.
-- `wafv2.amazonaws.com` / `waf-regional.amazonaws.com` — WAF service roles.
-- `firehose.amazonaws.com` / `es.amazonaws.com` / `aoss.amazonaws.com` —
-  data services with cross-account delivery.
-- `bedrock.amazonaws.com` — Bedrock service roles.
-
-**Lower-risk service principals** (services that operate within a single
-account boundary by design and are less commonly exploited as confused-deputy
-vectors, but should still be reviewed):
-
-- `awslambda.amazonaws.com` (legacy Lambda spelling — same risk as the modern spelling)
-- `dynamodb.amazonaws.com` — DynamoDB Streams service role (single-account by design, but verify if cross-account streams are configured)
-- `ds.amazonaws.com` — Directory Service (single-account by design)
-- `ssm.amazonaws.com` — Systems Manager (can operate cross-account via Session Manager delegations; verify deployment scope)
-- `transfer.amazonaws.com` — AWS Transfer Family (single-account by design)
-- `quicksight.amazonaws.com` — QuickSight (single-account by design)
+> Service catalogs moved to [references/trust-policy-hardening-guide.md](references/trust-policy-hardening-guide.md#confused-deputy-risk-service-principal-catalogs-moved-from-skillmd).
+> High-risk: lambda, ec2, cloudformation, eks/ecs, states, events/pipes, sns/sqs, codebuild/codepipeline, apigateway, backup, cloudtrail, config, controltower, security services, waf, firehose/es/aoss, bedrock. Lower-risk: awslambda (legacy), dynamodb, ds, ssm, transfer, quicksight.
 
 For any service principal NOT on either list above, classify as CONDITIONAL
 with a note to manually verify the service's confused-deputy posture via the
@@ -370,13 +259,9 @@ If ALL Allow statements have:
 
 then classify as **OK**, **LOW**.
 
-**Expert note — same-account root ARN:** `arn:aws:iam::123456789012:root`
-where 123456789012 IS the owning account is technically safe in the
-trust-policy sense (no external entity can assume the role), but it grants
-access to EVERY principal in the account, not just root. This is
-acceptable for internal tooling roles but should be flagged for tightening
-if the role has privileged permissions — prefer naming the specific role
-ARN rather than the account root.
+
+> Expert note moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-note--same-account-root-arn).
+> Same-account `:root` is safe externally but grants EVERY principal in the account — prefer naming the specific role ARN for privileged roles.
 
 ### Step 9: Aggregation
 
@@ -458,206 +343,13 @@ also has `iam:PassRole` permissions is a full account-takeover vector.
 
 ## Multi-statement and malformed input handling
 
-- **Iterate every statement** in the trust policy. A role is WILDCARD_TRUST
-  if ANY statement matches Steps 1-2. A role is EXTERNAL_TRUST if ANY
-  statement matches Steps 3-4 (and no statement is worse).
-
-- **`Effect: Deny` statements** in a trust policy are unusual but valid —
-  they prevent the listed principal from assuming the role even if another
-  statement allows it. Deny statements narrow the trust surface; they do
-  not widen it. Exclude Deny statements from the verdict. If a Deny
-  targets `"Principal": "*"`, it blocks ALL assumption — flag as
-  potentially over-restrictive but not a security exposure.
-
-- **Multiple `Principal` entries.** A statement can have:
-  ```json
-  "Principal": {"AWS": ["arn:aws:iam::111:root", "arn:aws:iam::222:root"]}
-  ```
-  Evaluate EACH entry independently. If any entry is cross-account without
-  ExternalId, the statement is EXTERNAL_TRUST.
-
-- **Missing `Action` field.** If an Allow statement has a Principal but no
-  Action, the statement is inert (grants nothing). Flag as a
-  misconfiguration but do not classify based on it.
-
-- **Action is not `sts:AssumeRole*`.** If the Action is a non-STS action
-  (e.g., `s3:GetObject`), the statement is misplaced — trust policies only
-  evaluate STS actions. Flag as a misconfiguration and ignore for verdict
-  purposes.
-
-- **Malformed JSON.** If the trust policy fails to parse, output
-  `VERDICT: ERROR` with a reason citing the parse failure. Do NOT silently
-  classify as OK.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#multi-statement-and-malformed-input-handling).
+> Rules: worst statement wins; Deny statements narrow (exclude from verdict); evaluate EACH Principal entry; missing Action = inert; non-STS Action = misplaced; unparseable → VERDICT: ERROR.
 
 ## Edge case walkthroughs
 
-Concrete worked examples for the most commonly mis-classified patterns. An
-agent should apply these patterns when the classification steps produce an
-ambiguous result.
-
-### Edge 1: ForAllValues trap on aws:SourceArn
-
-```json
-{
-  "Principal": {"Service": "lambda.amazonaws.com"},
-  "Action": "sts:AssumeRole",
-  "Condition": {
-    "ForAllValues:StringEquals": {
-      "aws:SourceArn": "arn:aws:lambda:us-east-1:123456789012:function:my-fn"
-    }
-  }
-}
-```
-
-**Analysis:** `ForAllValues:StringEquals` evaluates TRUE when the request
-contains zero matching values. If Lambda does not populate `aws:SourceArn`
-on certain internal code paths (e.g., service-invoked functions, edge
-optimizations), the key is absent and the condition passes — granting
-access to any caller, including confused-deputy exploitation.
-
-**Verdict:** EXTERNAL_TRUST (Step 4) — the condition is a bypass, not a
-guard.
-
-**Remediation:** Replace with `ArnLike` (which requires the key to be
-present and match):
-```json
-"Condition": {"ArnLike": {"aws:SourceArn": "arn:aws:lambda:us-east-1:123456789012:function:*"}}
-```
-
-### Edge 2: Mixed strong + weak condition keys
-
-```json
-{
-  "Principal": "*",
-  "Action": "sts:AssumeRole",
-  "Condition": {
-    "IpAddress": {"aws:SourceIp": "10.0.0.0/8"},
-    "StringEquals": {"aws:SourceAccount": "123456789012"}
-  }
-}
-```
-
-**Analysis:** Two condition operators at the same level are ANDed — both
-must be true. `aws:SourceAccount` (STRONG) requires the request to
-originate from account 123456789012. `aws:SourceIp` (WEAK for RFC1918)
-restricts to a private CIDR. The strong key dominates — classify as
-CONDITIONAL. The `aws:SourceIp` is redundant but does not weaken the
-strong key.
-
-**Verdict:** CONDITIONAL (Step 2 — wildcard principal with strong condition).
-
-### Edge 3: Multi-statement aggregation — mixed verdicts
-
-```json
-{
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {"AWS": "arn:aws:iam::123456789012:role/app-role"},
-      "Action": "sts:AssumeRole"
-    },
-    {
-      "Effect": "Allow",
-      "Principal": {"AWS": "arn:aws:iam::999999999999:root"},
-      "Action": "sts:AssumeRole",
-      "Condition": {"StringEquals": {"sts:ExternalId": "opaque-id-12345"}}
-    },
-    {
-      "Effect": "Allow",
-      "Principal": "*",
-      "Action": "sts:AssumeRole"
-    }
-  ]
-}
-```
-
-**Analysis:** Statement 1 is OK (same-account scoped). Statement 2 is
-CONDITIONAL (cross-account with ExternalId). Statement 3 is WILDCARD_TRUST
-(Principal `"*"` with no condition). Per Step 9 aggregation, the role-level
-verdict is the worst: WILDCARD_TRUST.
-
-**Verdict:** WILDCARD_TRUST / CRITICAL.
-
-**Remediation:** Remove Statement 3 immediately (containment). Statement 2
-is acceptable if the ExternalId is opaque and rotated on relationship
-change. Statement 1 requires no change.
-
-### Edge 4: Role chaining and aws:PrincipalTag ABAC bypass
-
-```json
-{
-  "Principal": {"AWS": "*"},
-  "Action": "sts:AssumeRole",
-  "Condition": {
-    "StringEquals": {"aws:PrincipalTag/Team": "data-engineering"}
-  }
-}
-```
-
-**Analysis:** `aws:PrincipalTag/Team` reads the assuming principal's session
-tags. If an attacker can assume an intermediate role that allows
-`sts:TagSession` with `Team=data-engineering` (role chaining), they inject
-the tag and satisfy this condition. The trust policy trusts attacker-
-controlled data.
-
-**Verdict:** WILDCARD_TRUST / CRITICAL — the condition is bypassable via
-role chaining. `Principal: "*"` gated by `aws:PrincipalTag` is not a
-security boundary.
-
-**Remediation:** Replace `Principal: "*"` with a specific account or role
-ARN. Do not rely on `aws:PrincipalTag` as the sole guard for wildcard
-principals — the tag source must be admin-set (not session-injected) and
-the tag-setting roles must themselves be audited for `sts:TagSession`
-exposure.
-
-### Edge 5: SAML federated trust with valid vs missing condition
-
-Valid (constrained):
-```json
-{
-  "Principal": {"Federated": "arn:aws:iam::123456789012:saml-provider/CorpIdP"},
-  "Action": "sts:AssumeRoleWithSAML",
-  "Condition": {
-    "StringEquals": {
-      "SAML:sub": "corp-ad:data-engineering-group",
-      "SAML:aud": "https://signin.aws.amazon.com/saml"
-    }
-  }
-}
-```
-**Verdict:** CONDITIONAL — the IdP controls who can assert, and the
-condition narrows the accepted assertions to a specific subject and
-audience.
-
-Missing condition (dangerous):
-```json
-{
-  "Principal": {"Federated": "arn:aws:iam::123456789012:saml-provider/CorpIdP"},
-  "Action": "sts:AssumeRoleWithSAML"
-}
-```
-**Verdict:** EXTERNAL_TRUST — any assertion from the IdP that matches the
-provider ARN is accepted. The IdP admin (or anyone who compromises the
-IdP) controls access to your AWS role.
-
-### Edge 6: Action-principal mismatch (silent failure)
-
-```json
-{
-  "Principal": {"Federated": "arn:aws:iam::123456789012:saml-provider/CorpIdP"},
-  "Action": "sts:AssumeRole"
-}
-```
-
-**Analysis:** This statement is invalid. SAML federated principals require
-`sts:AssumeRoleWithSAML`, not `sts:AssumeRole`. The combination silently
-fails at runtime — no principal can assume the role via this statement. Flag
-as a misconfiguration.
-
-**Verdict:** ERROR with reason "Action-principal mismatch:
-`sts:AssumeRole` cannot be used with a Federated principal — use
-`sts:AssumeRoleWithSAML` for SAML or `sts:AssumeRoleWithWebIdentity` for
-OIDC."
+> Moved to [references/worked-examples.md](references/worked-examples.md#edge-case-walkthroughs).
+> Six worked edges: ForAllValues trap on aws:SourceArn, mixed strong+weak keys, multi-statement aggregation, aws:PrincipalTag role-chaining bypass, SAML valid vs missing condition, Action-principal mismatch.
 
 ## Output format (per role)
 
@@ -671,13 +363,8 @@ REMEDIATION: <specific action, or "None required" if OK>
 
 ### Multi-statement aggregation example
 
-```text
-ROLE: multi-trust-role
-VERDICT: WILDCARD_TRUST
-REASON: Statement 1 (Principal: {"AWS": "arn:aws:iam::123456789012:role/internal-app"} on same account) is OK. Statement 2 (Principal: "*" with no condition) is WILDCARD_TRUST — anyone with AWS credentials can assume this role. Role verdict is the worst statement (Step 9 aggregation).
-RISK: CRITICAL
-REMEDIATION: Remove Statement 2 entirely. If public access was never intended, this is a critical misconfiguration — rotate all credentials exposed via this role immediately and audit CloudTrail for unauthorized AssumeRole events.
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#multi-statement-aggregation-example).
+> Full WILDCARD_TRUST / CRITICAL report for a mixed three-statement trust policy (Step 9 aggregation).
 
 ## Anti-Patterns — NEVER
 
@@ -778,207 +465,23 @@ REMEDIATION: Remove Statement 2 entirely. If public access was never intended, t
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **Confirm the role exists** and capture its current state:
-  ```bash
-  aws iam get-role --role-name <name> --query Role.AssumeRolePolicyDocument \
-    --output json > /tmp/<name>-trust-backup-$(date +%s).json
-  ```
-  Fail closed (skip remediation) if `get-role` returns an error.
-
-- **Check if the role is a service-linked role** (role name starts with
-  `AWSServiceRoleFor...`). Service-linked roles have trust policies managed
-  by AWS and CANNOT be modified via `update-assume-role-policy`. Flagging
-  them as remediable wastes the operator's time.
-
-- **Check CloudTrail for recent AssumeRole events** on the role before
-  restricting trust — an active cross-account trust may be load-bearing
-  for a CI/CD pipeline or monitoring integration:
-  ```bash
-  aws cloudtrail lookup-events \
-    --lookup-attributes AttributeKey=EventName,AttributeValue=AssumeRole \
-    --max-results 50
-  ```
-
-- **Prefer additive remediation** (adding a condition) over destructive
-  remediation (removing a statement). Adding `aws:SourceAccount` to a
-  service-principal statement narrows the trust without breaking it;
-  removing the statement may break a production workload immediately.
-
-- **For WILDCARD_TRUST findings** (Principal `"*"`), treat as
-  incident-response. The role may have been assumed by unauthorized parties.
-  Contain first (restrict the Principal), then investigate (CloudTrail
-  AssumeRole events, session activity), then rotate credentials.
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#pre-flight-safety-checks-run-before-any-remediation-cli).
+> Gates: back up the trust policy (get-role), service-linked-role check, CloudTrail AssumeRole lookup before restricting trust, prefer additive remediation, treat WILDCARD_TRUST as incident response.
 
 ## Remediation guidance
 
-### For WILDCARD_TRUST (Principal `"*"` — CRITICAL)
-
-1. **Contain immediately.** Replace `Principal: "*"` with the specific
-   principal ARN that needs the role. If the principal is unknown, remove
-   the statement entirely — a role that nobody should assume should not
-   have a trust policy granting everyone.
-
-2. **Audit CloudTrail.** Search for `AssumeRole` events where the role ARN
-   is the target, for the entire window of exposure. Look for `userIdentity`
-   entries from unexpected accounts or services.
-
-3. **Rotate credentials.** If the role had access to secrets, KMS keys, or
-   data stores, rotate all credentials accessible via the role's permissions
-   policy.
-
-### For WILDCARD_TRUST (NotPrincipal / NotAction)
-
-1. Rewrite the statement with an explicit `Principal` allow-list. The
-   inverse-wildcard pattern is never correct in a trust policy.
-
-### For EXTERNAL_TRUST (cross-account without ExternalId)
-
-1. **Add an ExternalId condition.** If the cross-account access is
-   intentional (e.g., a third-party SaaS integration), add:
-   ```json
-   "Condition": {
-     "StringEquals": {
-       "sts:ExternalId": "<opaque-random-string>"
-     }
-   }
-   ```
-   The ExternalId should be a cryptographically random string (at least 16
-   characters), NOT a human-readable name or a derivable pattern.
-
-2. **If the cross-account access is NOT intentional**, remove the statement.
-   The role should not be assumable by external accounts without explicit
-   design and a guard.
-
-3. **Tighten the Principal.** If the current Principal is an account-root
-   ARN (`arn:aws:iam::ACCOUNT:root`), replace it with the specific role ARN
-   the third party uses:
-   `arn:aws:iam::ACCOUNT:role/third-party-integration-role`.
-
-### For EXTERNAL_TRUST (confused-deputy without source guard)
-
-1. **Add a source guard condition.** Use `aws:SourceArn` for maximum
-   precision, or `aws:SourceAccount` as the minimum:
-   ```json
-   "Condition": {
-     "ArnLike": {
-       "aws:SourceArn": "arn:aws:lambda:us-east-1:123456789012:function:*"
-     },
-     "StringEquals": {
-       "aws:SourceAccount": "123456789012"
-     }
-   }
-   ```
-
-2. **Use BOTH `aws:SourceArn` and `aws:SourceAccount`** for
-   defense-in-depth. `SourceArn` scopes to a specific resource;
-   `SourceAccount` is a fallback if the service does not populate
-   `SourceArn` on all code paths.
-
-### For CONDITIONAL (cross-account with ExternalId)
-
-1. **Verify the ExternalId rotation policy.** The ExternalId should be
-   rotated when the third-party relationship changes (vendor switch,
-   contract renewal). It should NOT be rotated frequently (it is a
-   shared secret, not a credential) — but it MUST be changed if compromised.
-
-2. **Verify the ExternalId is opaque.** It must be a random string, not
-   a guessable pattern. If it reads like a company name, project code, or
-   sequential ID, rotate it.
-
-### For CONDITIONAL (confused-deputy with source guard)
-
-1. **Verify the source account/resource ARN is still correct.** If the
-   source resource was deleted and recreated (e.g., a Lambda function
-   recreated after an IaC teardown), the ARN may have changed.
-
-2. **Consider adding a permissions boundary** on the role to cap the
-   maximum effective permissions, as a defense-in-depth measure.
-
-### For OK
-
-1. No remediation required for trust-policy exposure.
-
-2. **Recommend running `iam-least-privilege-advisor`** on the role's
-   permissions policy — a clean trust policy with an over-permissive
-   permissions policy is still a security risk.
-
-3. For same-account root ARN principals, recommend tightening to the
-   specific role ARN if the role has privileged permissions.
+> Moved to [references/trust-policy-hardening-guide.md](references/trust-policy-hardening-guide.md#remediation-guidance-moved-from-skillmd).
+> Per-verdict playbooks: WILDCARD_TRUST (contain → audit CloudTrail → rotate), EXTERNAL_TRUST (add opaque ExternalId / SourceArn+SourceAccount, tighten Principal), CONDITIONAL (verify ExternalId opacity + rotation, verify ARN still correct), OK (recommend iam-least-privilege-advisor).
 
 ## Effective trust boundary (expert note)
 
-The trust policy is necessary but not sufficient for role assumption. AWS
-evaluates role assumption in this order:
-
-1. **Trust policy** (AssumeRolePolicyDocument) — must explicitly Allow the
-   principal + action + (optional) condition. This is the first gate.
-
-2. **Identity-based policy of the assuming principal** — the principal's
-   own policy must also Allow `sts:AssumeRole` on the role's ARN. For
-   same-account access, EITHER the trust policy OR the identity policy can
-   allow (union). For cross-account, BOTH must allow (intersection).
-
-3. **SCP (Service Control Policy)** — if the assuming principal's account
-   is in an Organization, an SCP Deny blocks the assumption regardless of
-   the trust policy.
-
-4. **Session policy** — if the role was assumed via a chained AssumeRole
-   with a session policy, the effective permissions are the INTERSECTION of
-   the role's policy and the session policy. The trust boundary, however,
-   is determined by the trust policy alone.
-
-**Classification implication:** the trust policy is the widest boundary.
-Even if the assuming principal's identity-based policy is scoped down, a
-broad trust policy means any future principal in the trusted account (or
-any future service invocation) can attempt assumption. The trust policy
-must be scoped independently of the assuming principal's permissions.
-
-### Role chaining and tag propagation
-
-Role chaining — assuming Role A, then from Role A's session assuming Role B
-— creates a trust chain where each hop's trust policy is evaluated
-independently. Key expert insights:
-
-- **`aws:PrincipalType`**: distinguishes the principal type of the assuming
-  entity. `AssumedRole` means the caller is already an assumed-role session
-  (role chaining). `User` means an IAM user. `Service` means an AWS service.
-  Use this in conditions to block role-chaining attacks: e.g., require
-  `"aws:PrincipalType": "Service"` for a service-role trust to prevent
-  user/session assumption.
-
-- **Session tag propagation**: if Role A's trust policy allows
-  `sts:TagSession`, the assuming principal can set tags that propagate to
-  the Role A session. If Role B's trust policy gates on `aws:PrincipalTag`,
-  the attacker who controls the tags on Role A satisfies Role B's condition.
-  This is the **session-tag ABAC bypass** — the most subtle trust-policy
-  vulnerability. To detect it: audit whether any role in the chain allows
-  `sts:TagSession` without `sts:TransitiveTagKeys`, and whether any
-  downstream role trusts `aws:PrincipalTag` conditions.
-
-- **`maxSessionDuration` interaction**: the role's `maxSessionDuration`
-  property (NOT in the trust policy — it is a separate role attribute) caps
-  the session length. A long duration (up to 43200 seconds / 12 hours) means
-  a compromised session persists longer. This is not a trust-policy finding,
-  but it affects the blast radius of any trust-policy misconfiguration: a
-  WILDCARD_TRUST role with a 12-hour session duration gives an attacker a
-  12-hour persistent credential.
-
-### Permissions boundary on the trusted role
-
-A permissions boundary on the role being assumed caps the role's effective
-permissions (the intersection of the identity-based policy and the boundary).
-This is a defense-in-depth measure: even if the trust policy is broad and the
-permissions policy is over-permissive, a tight boundary limits what an
-attacker who assumes the role can actually do. Recommend adding a permissions
-boundary to any role classified as EXTERNAL_TRUST or WILDCARD_TRUST as an
-interim containment measure while the trust policy is being remediated.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#effective-trust-boundary-expert-note).
+> Full evaluation order (trust policy → identity policy → SCP → session policy), role chaining + session-tag ABAC bypass, maxSessionDuration blast radius, and permissions-boundary containment.
 
 ## Recent AWS features (2024-2026)
 
-- **STS session tagging (2024-2025):** STS now supports passing session tags during AssumeRole, enabling attribute-based access control. Auditors should verify that cross-account trust policies that accept session tags use `aws:RequestTag` conditions to constrain which tags can be assumed — an unconstrained session tag policy can be abused to bypass ABAC controls.
-- **External ID enforcement improvements (2024):** Enhanced confused-deputy protection guidance and API validation. Auditors should verify that all cross-account trust policies for third-party (SaaS vendor) roles include a strong `sts:ExternalId` condition — this remains the primary defense against confused-deputy attacks.
-- **IAM Access Analyzer integration with STS (2024):** Access Analyzer now flags cross-account trust policies that allow assumption without conditions. Auditors should cross-reference STS trust policy analysis with Access Analyzer external-access findings.
-- **Role chaining detection (2024-2025):** Enhanced CloudTrail logging for role chaining (AssumeRole followed by AssumeRole). Auditors should verify that role-chaining patterns (A assumes B which assumes C) are documented and that the effective trust boundary includes all intermediary roles.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#recent-aws-features-2024-2026).
+> STS session tagging, ExternalId enforcement guidance, Access Analyzer cross-referencing, role-chaining CloudTrail detection.
 
 ## References
 
@@ -989,22 +492,16 @@ copy-pasteable remediation commands for each verdict.
 
 ## Section taxonomy (CloudOps auditor pattern)
 
-This skill follows the CloudOps auditor skill pattern, with sections in
-this canonical order:
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#section-taxonomy-cloudops-auditor-pattern).
+> The 13-section canonical CloudOps auditor layout this skill follows.
 
-1. **Frontmatter** — name, description, version, metadata.
-2. **Mindset** — the auditor's frame: trust boundary, not permissions.
-3. **Quick reference** — one-paragraph decision summary.
-4. **Confused-deputy problem** — the core expert concept.
-5. **Classification logic** — the ordered decision tree (Steps 0-9).
-6. **Condition strength matrix** — strong vs weak keys.
-7. **Risk / severity matrix** — verdict + pattern → risk level.
-8. **Edge-case handling** — multi-statement, Deny, malformed input.
-9. **Output format** — the fixed per-role report shape.
-10. **NEVER** — anti-patterns with explicit reasoning.
-11. **Pre-flight safety checks** — non-destructive operation guards.
-12. **Remediation guidance** — per-verdict action plan.
-13. **References** — pointer to deeper references.
+
+## References (load on demand)
+
+- [advanced-patterns](references/advanced-patterns.md) — Mindset, scope note, the confused-deputy concept, root-ARN expansion, multi-statement/malformed handling, effective trust boundary + role chaining, Recent AWS features, and section taxonomy moved from SKILL.md
+- [worked-examples](references/worked-examples.md) — the six edge-case walkthroughs and the multi-statement aggregation example moved from SKILL.md
+- [diagnostic-commands](references/diagnostic-commands.md) — pre-flight safety checks (trust-policy backup, service-linked-role check, CloudTrail lookup) moved from SKILL.md
+- [trust-policy-hardening-guide](references/trust-policy-hardening-guide.md) — now also holds the confused-deputy service-principal catalogs and the per-verdict remediation guidance moved from SKILL.md
 
 ## Domain
 

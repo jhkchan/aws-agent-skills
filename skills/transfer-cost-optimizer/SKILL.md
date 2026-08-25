@@ -87,26 +87,8 @@ CLI commands.
 
 ## Mindset
 
-Transfer Family cost optimization is a usage-pattern decision, not a
-pure capacity-sizing exercise. The goal is the endpoint type,
-concurrency, and workflow configuration that minimizes dollar cost
-while preserving the file-transfer SLO — not the maximum concurrency
-that the server can handle.
-
-Four principles guide every recommendation:
-
-- **Per-hour charges dominate for low-usage servers.** A server running
-  24/7 at $0.30/hour costs $219/month even with zero transfers. Idle
-  detection is the highest-leverage action for sporadic workloads.
-- **Endpoint type compounds with NAT Gateway cost.** A VPC endpoint
-  server that routes outbound through a NAT Gateway adds per-GB data
-  processing on top of the per-hour surcharge. PUBLIC eliminates both.
-- **Managed workflow cost is invisible until you count executions.**
-  Step Functions charges per state transition. A multi-step workflow
-  on every uploaded file multiplies cost linearly with file count.
-- **Logging cost is a silent multiplier.** CloudWatch Logs ingest at
-  ~$0.50/GB; a high-volume SFTP server can generate hundreds of GB of
-  logs per month, exceeding the server cost itself.
+per-hour dominance, endpoint+NAT compounding, invisible workflow cost, silent log multiplier — moved verbatim.
+Full detail: [Advanced patterns](references/advanced-patterns.md).
 
 ## Quick reference — verdict thresholds
 
@@ -129,92 +111,28 @@ Optimization decisions are only as good as the underlying data. Pull
 these metrics before any recommendation. Full CLI sequences are in
 `references/transfer-pricing-and-endpoint-types.md`.
 
-**Required data sources** (summarized — see reference for full CLI):
-1. Server configuration: `aws transfer describe-server --server-id <id>`
-2. ConcurrentSessions, FilesIn, FilesOut (14-30 day window): `aws cloudwatch get-metric-statistics --namespace AWS/Transfer`
-3. User list and activity: `aws transfer list-users --server-id <id>` + `describe-user`
-4. Managed workflows: `aws transfer list-workflows` + `describe-workflow`
-5. CloudWatch Logs volume: `aws logs describe-metric-filters` + `get-metric-statistics` on `IncomingLogEvents`
-6. Cost Explorer Transfer spend: `aws ce get-cost-and-usage --filter '{"Dimensions":{"Key":"SERVICE","Values":["Transfer"]}}'`
-7. Custom IdP Lambda (if API_GATEWAY): `aws lambda get-function-configuration` + CloudWatch invocations
-8. Step Functions executions (if managed workflow): `aws stepfunctions get-execution-history`
+server config, CloudWatch metrics, user activity, workflows, logs volume, Cost Explorer, IdP Lambda, Step Functions — moved verbatim.
+Full detail: [Diagnostic commands](references/diagnostic-commands.md).
 
 ### Data-quality short-circuits
 
-| Condition | Effect on optimization |
-|---|---|
-| `describe-server` returns `ResourceNotFoundException` | Server does not exist in this region. Skip. |
-| `ConcurrentSessions` metric absent (server never used) | **NEED_MORE_INFO**. Verify server wiring; may be idle since creation. |
-| Cost Explorer Transfer line items absent | **NEED_MORE_INFO**. Transfer Family may not be in use, or filter is wrong. |
-| Observation window < 14 days | **NEED_MORE_INFO**. Minimum 14 days; 30 days preferred. |
-| `State = OFFLINE` | Server is stopped. Surface as already-idle; no per-hour charge while offline. |
-| CloudWatch `IncomingBytes` for Transfer log group absent | Logging may be disabled or log group deleted. Surface gap. |
-| IAM denies `transfer:DescribeServer` | Surface as BLOCKED; cannot evaluate without server config. |
-
-When Cost Explorer and CloudWatch metrics disagree, CloudWatch
-(`ConcurrentSessions`, `FilesIn`, `FilesOut`) is the ground truth for
-usage patterns — Cost Explorer reflects invoiced spend which may lag.
+ResourceNotFound, absent metrics/line items, short window, OFFLINE, IAM deny — moved verbatim.
+Full detail: [Diagnostic commands](references/diagnostic-commands.md).
 
 ## Process — Optimization logic (apply in order)
 
 ### Step 0: Non-obvious behaviours that change the recommendation
 
-These operational gotchas route a recommendation away from the obvious
-choice:
-
-- **PUBLIC is cheapest; VPC adds NAT cost.** A VPC endpoint server
-  routing S3 access through a NAT Gateway incurs per-GB data processing
-  ($0.045/GB) on top of the per-hour VPC surcharge. PUBLIC endpoints
-  access S3 directly over the AWS network with no NAT overhead.
-- **Idle servers charge per hour.** A server with zero sessions still
-  incurs the full per-hour rate. The only way to stop the charge is to
-  delete the server (configuration is lost) or accept the cost. For
-  sporadic workloads, consider whether a serverless alternative (e.g.,
-  S3 pre-signed URLs for occasional transfers) is viable.
-- **Per-GB Transfer fee is on top of S3 data transfer.** Transfer
-  Family charges a per-GB fee ($0.04/GB) for data transferred through
-  the server. This is separate from S3 upload/download costs.
-- **Managed workflow cost scales with file count.** A Step Functions
-  managed workflow charges per execution. A 5-step workflow on 1M files
-  = 5M state transitions. The cost is the same whether each file is 1
-  KB or 1 GB.
-- **CloudWatch Logs ingest is the silent cost multiplier.** SFTP
-  logging generates one log event per file transfer operation. At
-  $0.50/GB ingest, a server transferring 1M small files can generate
-  200+ GB of logs per month — $100+ in logging cost alone.
-- **FTP protocol is rarely available.** FTP (unencrypted) is supported
-  only on VPC-type servers and is disabled by default. SFTP is the
-  standard; FTPS adds TLS overhead. Protocol choice rarely affects
-  cost directly but affects session duration and retry patterns.
-- **Custom IdP Lambda charges per authentication.** Each SFTP login
-  triggers a Lambda invocation via API Gateway. At high session-start
-  rates, the Lambda + API Gateway cost compounds.
-- **Concurrency limit is per-server, not per-user.** A server with
-  `Protocols.Sftp.SessionPolicy` concurrency of 10 can handle 10
-  concurrent sessions across ALL users. Spawning a second server to
-  handle more is a cost decision vs increasing the concurrency limit.
-- **Sticky sessions affect retry patterns.** If sticky sessions are
-  configured, session reconnects target the same server. This can
-  cause uneven load distribution, leading to over-provisioning.
-- **Trusted host key rotation causes transient reconnects.** Rotating
-  the host key invalidates cached client `known_hosts` entries. While
-  rotation has no direct cost, the resulting retry storm can spike
-  ConcurrentSessions and Lambda IdP invocations.
+PUBLIC vs NAT, idle charging, per-GB fee, workflow file-count scaling, log multiplier, FTP availability, IdP per-auth, per-server concurrency, sticky sessions, host-key rotation — moved verbatim.
+Full detail: [Advanced patterns](references/advanced-patterns.md).
 
 ### Step 1: Endpoint type — PUBLIC vs VPC vs VPC_ENDPOINT
 
 The endpoint type is the primary cost lever because it determines both
 the per-hour rate and whether NAT Gateway data-processing fees apply.
 
-**Pricing comparison:**
-```
-PUBLIC:        $0.30/hour per server (baseline rate)
-               No NAT Gateway overhead; S3 access direct over AWS network
-VPC:           $0.30/hour + VPC infrastructure (NAT Gateway $0.045/GB if outbound)
-               Required for private connectivity or FTP protocol
-VPC_ENDPOINT:  $0.30/hour + VPC endpoint hourly + per-GB fees
-               Required for internal-only access without internet gateway
-```
+per-hour rates, NAT Gateway per-GB, VPC endpoint fees — moved verbatim.
+Full detail: [Pricing and endpoint types](references/transfer-pricing-and-endpoint-types.md).
 
 **Decision tree:**
 ```
@@ -227,17 +145,8 @@ Does the use case require private/VPC-internal access?
     └── Use VPC. Accept the NAT Gateway cost as a network requirement.
 ```
 
-**VPC-to-PUBLIC savings math:**
-```
-vpc_monthly_cost = server_hourly × 730 + NAT_GB × $0.045 + VPC_endpoint_hourly
-public_monthly_cost = server_hourly × 730
-saving = vpc_monthly_cost − public_monthly_cost
-```
-
-Example: VPC server with 500 GB/month outbound via NAT Gateway:
-- VPC: $219 (server) + $22.50 (NAT data processing) + $7.30 (VPC endpoint) = $248.80/month
-- PUBLIC: $219 (server only) = $219/month
-- Saving: $29.80/month per server (13% reduction)
+vpc_monthly vs public_monthly formula, 500 GB worked example — moved verbatim.
+Full detail: [Worked examples](references/worked-examples.md).
 
 ### Step 2: Idle server detection
 
@@ -252,29 +161,16 @@ stopping them is the second lever.
 | 0.1 – 1 | Low-usage. Evaluate whether the per-hour cost justifies the usage. |
 | > 1 | Active. Proceed to other dimensions. |
 
-**Idle server options:**
-- **Delete the server** if the use case is decommissioned. This is
-  the only way to fully eliminate the per-hour charge.
-- **Migrate to serverless alternatives** (S3 pre-signed URLs, S3
-  Access Points for occasional partner transfers) if the usage is
-  sporadic and does not require the SFTP protocol.
-- **Keep but document** if the server is required for compliance or
-  partner connectivity even at low usage. Accept the cost as
-  operational overhead.
+delete, migrate to serverless, keep-but-document — moved verbatim.
+Full detail: [Advanced patterns](references/advanced-patterns.md).
 
 ### Step 3: Protocol selection (SFTP vs FTPS vs FTP)
 
 Protocol selection rarely affects per-hour cost directly, but affects
 session duration and retry patterns.
 
-| Protocol | Cost impact | Notes |
-|---|---|---|
-| SFTP | Baseline | Default; most cost-efficient (single TCP connection, no TLS handshake) |
-| FTPS | TLS overhead per session | Slightly longer session setup; negligible per-session cost impact |
-| FTP | Only on VPC servers | Unencrypted; rare in practice. Requires VPC endpoint (higher cost). |
-
-**Recommendation:** Use SFTP wherever the client supports it. FTPS is
-acceptable if the partner requires it. FTP is almost never justified.
+SFTP baseline, FTPS TLS overhead, FTP VPC-only — moved verbatim.
+Full detail: [Advanced patterns](references/advanced-patterns.md).
 
 ### Step 4: Concurrency right-sizing vs server count
 
@@ -289,32 +185,13 @@ on a single server.
 | avg > 90% of configured | Low | Increase concurrency limit OR add a server |
 | Multiple servers, each < 30% utilized | Over-provisioned | Consolidate onto fewer servers |
 
-**Consolidation math:**
-```
-current_cost = N_servers × server_hourly × 730
-consolidated_cost = M_servers × server_hourly × 730    (where M < N)
-saving = (N − M) × server_hourly × 730
-```
-
-Example: 3 servers at $0.30/hour, each averaging 2 concurrent sessions
-(configured limit 10 each = 30 total). Combined peak is 6 sessions.
-Consolidate to 1 server with concurrency limit 10:
-- Before: 3 × $0.30 × 730 = $657/month
-- After: 1 × $0.30 × 730 = $219/month
-- Saving: $438/month (67% reduction)
+N vs M servers formula, 3-to-1 worked example — moved verbatim.
+Full detail: [Worked examples](references/worked-examples.md).
 
 ### Step 5: User session duration analysis
 
-Long sessions tie up concurrency slots without transferring files. A
-user who connects and holds the session open for hours without
-transferring data wastes concurrency capacity.
-
-**Session duration checklist:**
-| Symptom | Fix |
-|---|---|
-| Average session > 30 min AND few files per session | Investigate idle session hold; set session timeout |
-| Sessions correlate with business hours only | Consider stopping the server outside business hours (VPC_ENDPOINT only) |
-| Session count >> file transfer count | Users are connecting and disconnecting without transferring; audit user scripts |
+idle hold timeout, business-hours stop, connect-without-transfer audit — moved verbatim.
+Full detail: [Advanced patterns](references/advanced-patterns.md).
 
 ### Step 6: Managed workflow cost (Step Functions)
 
@@ -326,16 +203,8 @@ download events. Cost scales with file count, not file size.
 workflow_monthly_cost = files_per_month × steps_per_workflow × $0.025/1000
 ```
 
-Example: 2,000,000 files/month, 5-step workflow:
-- 2,000,000 × 5 × $0.000025 = $250/month in Step Functions charges
-
-**Workflow optimization:**
-| Signal | Recommendation |
-|---|---|
-| Multi-step workflow (5+ steps) on every file | Simplify the workflow; combine steps where possible |
-| File count > 100,000/month AND workflow is validation-only | Move validation to S3 Event Notifications + Lambda (per-invocation, no state machine) |
-| Workflow triggers on every small file | Batch files before triggering the workflow (reduce execution count) |
-| Workflow has retry logic that re-executes on failure | Ensure idempotency; reduce retry count |
+2M-file $250/month example, workflow optimization signals — moved verbatim.
+Full detail: [Worked examples](references/worked-examples.md).
 
 ### Step 7: CloudWatch Logs volume
 
@@ -348,13 +217,8 @@ logs_monthly_cost = log_GB_per_month × $0.50/GB (ingest)
                     + log_GB_per_month × $0.03/GB (storage, first 5 GB free)
 ```
 
-**Logging optimization:**
-| Signal | Recommendation |
-|---|---|
-| Log volume > 100 GB/month | Reduce log verbosity; log only errors and authentication events |
-| Log group retention = Never expire | Set retention to 7-30 days; archive older logs to S3 |
-| Every file operation logged at INFO | Change to WARNING or ERROR level; filter at the source |
-| Logs used for audit compliance | Export to S3 (cheaper storage) and query via Athena |
+verbosity reduction, retention, log level, S3+Athena export — moved verbatim.
+Full detail: [Advanced patterns](references/advanced-patterns.md).
 
 ### Step 8: Custom identity provider Lambda cost
 
@@ -367,40 +231,13 @@ on every SFTP authentication. At high session-start rates, the Lambda
 idp_monthly_cost = sessions_started_per_month × (lambda_per_invocation + apigw_per_request)
 ```
 
-**IdP optimization:**
-| Signal | Recommendation |
-|---|---|
-| Sessions started > 50,000/month | Enable authentication caching in the Lambda (short-lived cache for repeated logins) |
-| API Gateway cost dominates | Evaluate Lambda Function URL instead of API Gateway (cheaper per-request) |
-| Lambda is cold-start heavy | Provisioned concurrency on the IdP Lambda (trade-off: provisioned cost vs latency) |
-| Every file transfer triggers re-authentication | Investigate session reuse; SFTP should authenticate once per session, not per file |
+auth caching, Lambda URL vs API Gateway, provisioned concurrency, session reuse — moved verbatim.
+Full detail: [Advanced patterns](references/advanced-patterns.md).
 
 ### Step 9: Impact estimation
 
-Compute the monthly savings for each recommendation:
-
-```
-current_monthly_cost =
-  (N_servers × server_hourly × 730)
-  + (GB_transferred × per_GB_rate)
-  + (workflow_executions × step_rate)
-  + (CloudWatch_Logs_GB × $0.50)
-  + (Lambda_IdP_invocations × lambda_rate)
-  + (NAT_GB × $0.045)            [if VPC]
-
-projected_monthly_cost =
-  (M_servers × server_hourly × 730)
-  + (GB_transferred × per_GB_rate)
-  + (projected_workflow_executions × step_rate)
-  + (projected_Logs_GB × $0.50)
-  + (projected_Lambda_invocations × lambda_rate)
-  + 0                            [if migrated to PUBLIC]
-
-monthly_saving = current_monthly_cost − projected_monthly_cost
-```
-
-Always state assumptions: server count, per-hour rate, GB transferred,
-files per month, workflow steps, log volume, pricing region.
+current vs projected monthly cost formulas, savings, assumptions — moved verbatim.
+Full detail: [Pricing and endpoint types](references/transfer-pricing-and-endpoint-types.md).
 
 ### Step 10: Final verdict
 
@@ -634,53 +471,9 @@ Extended anti-patterns in `references/transfer-pricing-and-endpoint-types.md`.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation,
-  emit and await operator approval. Do NOT execute until confirmed.
-- **Verify client connectivity before PUBLIC migration.** Confirm all
-  clients can reach the server over the public internet before
-  migrating from VPC/VPC_ENDPOINT.
-- **Preserve user configurations during server migration.** When
-  creating a new server and migrating users, copy all SSH public keys,
-  home directory mappings, and session policies before deleting the old
-  server.
-- **Test the simplified workflow before cutover.** Run the new workflow
-  on a test file to verify all required transformations still execute
-  correctly.
-- **Server deletion is irreversible.** `delete-server` removes the
-  server and all its configuration. Ensure user data (home directories
-  in S3) is preserved before deletion.
-- **Log level changes apply to new transfers only.** In-flight log
-  events are not re-filtered.
-- **Concurrency limit changes are immediate.** Reducing the limit may
-  reject in-flight sessions if the current count exceeds the new limit.
-- **Bulk-operation limit:** Process at most 5 servers per batch. Sort
-  by estimated savings, verify each batch before proceeding. Abort if
-  any server shows increased errors or session rejection post-change.
+CONFIRM gate, connectivity check, user-config preservation, workflow test, irreversible delete, log-level timing, concurrency immediacy, 5-server batch limit — moved verbatim.
+Full detail: [Diagnostic commands](references/diagnostic-commands.md).
 
-## Recent AWS features (2024-2026)
-
-- **Transfer Family managed workflows GA (2024-2025):** Step Functions-
-  backed workflows triggered on file upload/download. Cost scales with
-  file count × steps per workflow.
-- **Transfer Family async (2025-2026):** Delegated authentication with
-  caching, reducing per-authentication Lambda invocations for repeated
-  logins.
-- **Transfer Family web apps (2025):** AWS-managed web app for SFTP
-  file transfer without a custom client. May reduce session duration
-  for interactive users.
-- **Improved CloudWatch metrics (2024):** `BytesIn`, `BytesOut`,
-  `FilesIn`, `FilesOut`, `ConcurrentSessions`, `UserSessionsStarted`
-  per server. Enables precise usage-pattern analysis.
-- **Transfer Family directory listing optimization (2024-2025):**
-  Reduced per-listing S3 ListObjects calls for large directories.
-  Lowers indirect S3 request cost for browsing-heavy workloads.
-- **VPC endpoint for Transfer Family (2024):** `VPC_ENDPOINT` type
-  enables internal-only access without an internet gateway. Adds
-  per-hour VPC endpoint fee but eliminates NAT Gateway requirement for
-  internal-only servers.
-- **S3 Access Points integration (2025):** Transfer Family home
-  directory mappings can target S3 Access Points, simplifying multi-
-  tenant server configurations.
 
 ## References
 
@@ -694,6 +487,13 @@ Extended anti-patterns in `references/transfer-pricing-and-endpoint-types.md`.
   migration, idle server deletion, workflow simplification, log
   reduction, concurrency consolidation, already-optimized,
   NEED_MORE_INFO, end-to-end walkthrough).
+
+## References (load on demand)
+
+- [Pricing and endpoint types](references/transfer-pricing-and-endpoint-types.md) — endpoint pricing comparison, impact-estimation formulas
+- [Worked examples](references/worked-examples.md) — endpoint-migration and consolidation savings math, workflow cost example
+- [Diagnostic commands](references/diagnostic-commands.md) — required data sources, data-quality short-circuits, pre-flight safety checks
+- [Advanced patterns](references/advanced-patterns.md) — mindset principles, Step 0 gotchas, per-step optimization signals, recent features
 
 ## Domain
 

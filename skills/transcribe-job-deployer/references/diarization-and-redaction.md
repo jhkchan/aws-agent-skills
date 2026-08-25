@@ -293,3 +293,139 @@ resource "null_resource" "transcription_job" {
   }
 }
 ```
+
+## Extended from SKILL.md
+
+## Expert heuristic: diarization vs channel identification
+
+## Expert heuristic: diarization vs channel identification
+
+```text
+Speaker separation:
+  ├── Mono audio (single channel, multiple speakers talking together)?
+  │     → Speaker Diarization (ShowSpeakerLabels=true)
+  │        ML-based speaker identification
+  │        Labels: spk_0, spk_1, spk_2, ...
+  │        Accuracy depends on audio quality and speaker overlap
+  │        CANNOT be combined with channel identification
+  │
+  ├── Stereo audio (2 channels, each channel is one speaker)?
+  │     → Channel Identification (ChannelIdentification=true)
+  │        Hardware-based: each channel is labeled exactly
+  │        Labels: ch_0, ch_1
+  │        Exact separation — no ML ambiguity
+  │        CANNOT be combined with diarization
+  │
+  └── Don't know the audio format?
+        → Check: ffprobe -i audio.mp3 -show_channels
+        → Mono (1 channel) → diarization
+        → Stereo (2 channels) → channel identification
+```
+
+**Key implication:** channel identification is always preferred
+when stereo audio is available because it is exact. Diarization is
+the fallback for mono audio where channels are not pre-separated.
+
+## Step 5 — Speaker diarization CLI and output
+
+```bash
+# Enable speaker diarization
+aws transcribe start-transcription-job \
+  --transcription-job-name my-job \
+  --media MediaFileUri=s3://bucket/audio.wav \
+  --language-code en-US \
+  --show-speaker-labels \
+  --output-bucket-name my-output-bucket
+```
+
+**Diarization output (in JSON transcript):**
+
+```json
+{
+  "speaker_labels": {
+    "speakers": 2,
+    "segments": [
+      {
+        "start_time": "0.00",
+        "speaker_label": "spk_0",
+        "end_time": "2.50",
+        "items": [...]
+      },
+      {
+        "start_time": "2.60",
+        "speaker_label": "spk_1",
+        "end_time": "5.00",
+        "items": [...]
+      }
+    ]
+  }
+}
+```
+
+**Constraints:**
+- Diarization CANNOT be combined with channel identification.
+- Best for mono audio where speakers are not pre-separated.
+- ML-based: accuracy depends on audio quality and speaker overlap.
+- You can set the max number of speakers (up to 10) via the API.
+
+## Step 6 — Channel identification CLI
+
+```bash
+# Enable channel identification
+aws transcribe start-transcription-job \
+  --transcription-job-name my-job \
+  --media MediaFileUri=s3://bucket/stereo-audio.wav \
+  --language-code en-US \
+  --channel-identification \
+  --output-bucket-name my-output-bucket
+```
+
+**Constraints:**
+- Audio MUST be stereo (2 channels).
+- CANNOT be combined with speaker diarization.
+- Exact separation (hardware-based, not ML).
+- Labels: `ch_0`, `ch_1`.
+
+## Step 9 — Content identification and redaction (PII)
+
+**Content identification (tag PII without removing):**
+
+```bash
+aws transcribe start-transcription-job \
+  --transcription-job-name my-job \
+  --media MediaFileUri=s3://bucket/audio.wav \
+  --language-code en-US \
+  --content-identification-types PII \
+  --output-bucket-name my-output-bucket
+```
+
+**Content redaction (mask PII):**
+
+```bash
+aws transcribe start-transcription-job \
+  --transcription-job-name my-job \
+  --media MediaFileUri=s3://bucket/audio.wav \
+  --language-code en-US \
+  --content-redaction-type PII \
+  --redaction-output redacted \
+  --pii-entity-types "NAME,SSN,EMAIL,PHONE,ADDRESS,BANK_ACCOUNT_NUMBER,BANK_ROUTING,DEBIT_CARD_NUMBER,CREDIT_CARD_NUMBER,PIN,DATE_TIME" \
+  --output-bucket-name my-output-bucket
+```
+
+**Redaction output options:**
+- `redacted`: only the redacted transcript is written to S3.
+- `redacted_and_unredacted`: both versions are written (for
+  compliance review). Requires elevated IAM permissions.
+
+**PII entity types:**
+
+| Category | Entity types |
+|---|---|
+| Personal | NAME, EMAIL, PHONE, ADDRESS, DATE_TIME |
+| Financial | BANK_ACCOUNT_NUMBER, BANK_ROUTING, CREDIT_CARD_NUMBER, DEBIT_CARD_NUMBER, PIN |
+| Government | SSN, PASSPORT_NUMBER |
+
+**Critical:** PII redaction must be configured at job creation time.
+It CANNOT be applied retroactively. The redaction happens during
+the transcription process — the PII is identified and masked before
+the transcript is written.

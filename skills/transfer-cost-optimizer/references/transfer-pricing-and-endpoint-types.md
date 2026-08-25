@@ -361,3 +361,44 @@ Combined peak ConcurrentSessions across all servers:
     │   └── NO → Keep N servers but right-size each (p99 + 20% headroom)
     └── Evaluate sticky session necessity (uneven load → over-provisioning)
 ```
+
+## Extended from SKILL.md
+
+## Step 1 — Pricing comparison (PUBLIC vs VPC vs VPC_ENDPOINT)
+
+**Pricing comparison:**
+```
+PUBLIC:        $0.30/hour per server (baseline rate)
+               No NAT Gateway overhead; S3 access direct over AWS network
+VPC:           $0.30/hour + VPC infrastructure (NAT Gateway $0.045/GB if outbound)
+               Required for private connectivity or FTP protocol
+VPC_ENDPOINT:  $0.30/hour + VPC endpoint hourly + per-GB fees
+               Required for internal-only access without internet gateway
+```
+
+## Step 9 — Impact estimation formulas
+
+Compute the monthly savings for each recommendation:
+
+```
+current_monthly_cost =
+  (N_servers × server_hourly × 730)
+  + (GB_transferred × per_GB_rate)
+  + (workflow_executions × step_rate)
+  + (CloudWatch_Logs_GB × $0.50)
+  + (Lambda_IdP_invocations × lambda_rate)
+  + (NAT_GB × $0.045)            [if VPC]
+
+projected_monthly_cost =
+  (M_servers × server_hourly × 730)
+  + (GB_transferred × per_GB_rate)
+  + (projected_workflow_executions × step_rate)
+  + (projected_Logs_GB × $0.50)
+  + (projected_Lambda_invocations × lambda_rate)
+  + 0                            [if migrated to PUBLIC]
+
+monthly_saving = current_monthly_cost − projected_monthly_cost
+```
+
+Always state assumptions: server count, per-hour rate, GB transferred,
+files per month, workflow steps, log volume, pricing region.

@@ -251,3 +251,35 @@ resource "aws_storagegateway_gateway" "main" {
   active_directory_status = "JOINED"
 }
 ```
+
+## File share configuration notes (moved from SKILL.md)
+
+- `--default-storage-class`: S3_STANDARD (default), S3_STANDARD_IA,
+  S3_INTELLIGENT_TIERING, S3_GLACIER_IR. Choose based on access patterns.
+- `--client-list` (NFS): restrict to known CIDR blocks for security.
+- `--object-acl`: public-read-write, private (default). Use private
+  unless explicitly needed.
+- File shares support automatic refresh to detect objects added to S3
+  directly (outside the gateway).
+
+## Prerequisites for AD join (moved from SKILL.md)
+
+- DNS resolution: the gateway must resolve the domain controller.
+- Network connectivity: ports 53 (DNS), 88 (Kerberos), 389 (LDAP),
+  445 (SMB), 464 (Kerberos password), 3268 (LDAP GC) must be open.
+- Service account with domain join permissions.
+
+## Enable audit logging (SMB file shares) (moved from SKILL.md)
+
+```bash
+# Create a CloudWatch Logs log group for audit logs
+aws logs create-log-group \
+  --log-group-name /aws/storagegateway/sgw-XXXXX-audit \
+  --region us-east-1
+
+# Enable SMB audit logging on file shares (requires AD)
+aws storagegateway update-smb-file-share \
+  --file-share-arn arn:aws:storagegateway:us-east-1:123456789012:share/share-XXXXX \
+  --audit-destination-arn arn:aws:logs:us-east-1:123456789012:log-group:/aws/storagegateway/sgw-XXXXX-audit \
+  --region us-east-1
+```

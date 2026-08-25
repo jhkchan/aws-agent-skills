@@ -218,3 +218,125 @@ resource "aws_timestreamquery_scheduled_query" "hourly_agg" {
   scheduled_query_execution_role_arn = aws_iam_role.timestream_sq.arn
 }
 ```
+
+## Extended from SKILL.md
+
+## Expert heuristic: scheduled query materialized view freshness
+
+## Expert heuristic: scheduled query materialized view freshness
+
+Scheduled queries continuously materialize results into a target
+table. The freshness of the materialized view depends on the query
+schedule and the target table's own retention properties.
+
+```text
+Scheduled query materialization:
+  Source table (raw events)
+    → Scheduled query runs every 1 hour (schedule expression)
+    → Query: SELECT region, measure_name, AVG(measure_value) ...
+             GROUP BY region, measure_name, bin(time, 1h)
+    → Results written to target table (pre-computed aggregates)
+
+  Target table considerations:
+    ├── Memory store TTL on target: controls how fresh aggregates are queryable fast
+    │     e.g., 30 days of aggregates in memory store → fast recent aggregates
+    ├── Magnetic store TTL on target: controls long-term aggregate retention
+    │     e.g., 5 years → historical aggregate analysis
+    └── Schedule frequency vs data freshness:
+          schedule = 1 min → aggregates are at most 1 min stale
+          schedule = 1 hour → aggregates are at most 1 hour stale
+          schedule = 1 day → aggregates are at most 1 day stale
+
+Notification configuration:
+  ├── SNS topic → alerts on scheduled query errors (DDL errors, permission issues)
+  └── SQS queue → programmatic error handling for retry pipelines
+```
+
+**Key implication:** scheduled queries are the primary tool for
+balancing query freshness, latency, and cost. Choose the schedule
+frequency to match the acceptable staleness of the materialized view.
+Configure error notifications via SNS/SQS to catch failures early.
+
+## Step 2 — Table creation and retention update CLI
+
+```bash
+# Create a table with retention properties
+aws timestream-write create-table \
+  --database-name "IoTSensorData" \
+  --table-name "TemperatureReadings" \
+  --retention-properties \
+    "MemoryStoreRetentionPeriodInHours=12,MagneticStoreRetentionPeriodInDays=365" \
+  --region us-east-1
+
+# Verify
+aws timestream-write describe-table \
+  --database-name "IoTSensorData" \
+  --table-name "TemperatureReadings" \
+  --region us-east-1
+```
+
+**Retention property rules:**
+
+| Property | Minimum | Maximum | Effect |
+|---|---|---|---|
+| MemoryStoreRetentionPeriodInHours | 1 hour | practically unlimited (but costly) | Data queryable from fast in-memory storage |
+| MagneticStoreRetentionPeriodInDays | 1 day | 73000 days (~200 years) | Data retained in cost-effective magnetic storage |
+
+**Updating retention properties:**
+
+```bash
+aws timestream-write update-table \
+  --database-name "IoTSensorData" \
+  --table-name "TemperatureReadings" \
+  --retention-properties \
+    "MemoryStoreRetentionPeriodInHours=24,MagneticStoreRetentionPeriodInDays=730" \
+  --region us-east-1
+```
+
+## Step 5 — Scheduled query creation CLI
+
+```bash
+# Create the target table for materialized results
+aws timestream-write create-table \
+  --database-name "IoTSensorData" \
+  --table-name "HourlyTempAggregates" \
+  --retention-properties \
+    "MemoryStoreRetentionPeriodInHours=720,MagneticStoreRetentionPeriodInDays=1825" \
+  --region us-east-1
+
+# Create an SNS topic for error notifications
+SNS_ARN=$(aws sns create-topic \
+  --name timestream-scheduled-query-errors \
+  --region us-east-1 \
+  --query 'TopicArn' --output text)
+
+# Create the scheduled query
+aws timestream-query create-scheduled-query \
+  --name "HourlyTemperatureAggregation" \
+  --query-string \
+    "SELECT region, device_id, BIN(time, 1h) as hour, AVG(measure_value::double) as avg_temp \
+     FROM \"IoTSensorData\".\"TemperatureReadings\" \
+     WHERE measure_name = 'temperature' \
+     GROUP BY region, device_id, BIN(time, 1h)" \
+  --schedule-configuration "ScheduleExpression='rate(1 hour)'" \
+  --notification-configuration "SnsConfiguration={TopicArn='${SNS_ARN}'}" \
+  --target-configuration \
+    "TimestreamConfiguration={DatabaseName='IoTSensorData',TableName='HourlyTempAggregates',TimeColumn='hour',DimensionMappings=[{Name='region',DimensionValueType='VARCHAR'},{Name='device_id',DimensionValueType='VARCHAR'}],MeasureNameColumn='avg_temp_measure',MeasureValueType='DOUBLE'}" \
+  --scheduled-query-execution-role-arn arn:aws:iam::123456789012:role/TimestreamScheduledQueryRole \
+  --region us-east-1
+```
+
+**Scheduled query components:**
+
+| Component | Purpose | Required |
+|---|---|---|
+| QueryString | The SQL query to materialize | Yes |
+| ScheduleExpression | How often to run (rate or cron) | Yes |
+| NotificationConfiguration | SNS topic for error reporting | Yes |
+| TargetConfiguration | Destination table for results | Yes |
+| ScheduledQueryExecutionRoleArn | IAM role for query execution | Yes |
+| ErrorReportConfiguration | S3 path for detailed error reports | No (recommended) |
+
+**Common mistake:** forgetting to create the target table before
+creating the scheduled query. The scheduled query fails at execution
+time if the target table does not exist.

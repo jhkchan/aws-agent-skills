@@ -189,3 +189,146 @@ still assumable via a service outside direct account control.
 ```
 
 Verdict: OK / LOW. Same account, specific role ARN.
+
+## Confused-deputy-risk service principal catalogs (moved from SKILL.md)
+
+**Confused-deputy-risk services** (services that can be invoked by any AWS
+customer and therefore can be triggered cross-account):
+
+- `lambda.amazonaws.com` — any AWS customer can create a Lambda function
+  that calls `sts:AssumeRole`.
+- `ec2.amazonaws.com` — any customer can launch an EC2 instance with an
+  instance profile.
+- `cloudformation.amazonaws.com` — any customer can create a stack that
+  passes a role.
+- `eks.amazonaws.com` / `eks-nodegroup.amazonaws.com` / `eks-fargate.amazonaws.com`
+  — EKS service roles; confused-deputy via EKS cluster creation.
+- `ecs-tasks.amazonaws.com` / `ecs.amazonaws.com` — ECS task execution.
+- `states.amazonaws.com` — Step Functions can be invoked cross-account.
+- `events.amazonaws.com` / `pipes.amazonaws.com` — EventBridge rules and
+  Pipes can be targeted cross-account.
+- `sns.amazonaws.com` / `sqs.amazonaws.com` — messaging services that
+  accept cross-account subscriptions.
+- `codebuild.amazonaws.com` / `codepipeline.amazonaws.com` — CI/CD services.
+- `apigateway.amazonaws.com` / `apigateway.amazonaws.com` — API Gateway
+  can forward AssumeRole calls.
+- `backup.amazonaws.com` — AWS Backup service roles.
+- `cloudtrail.amazonaws.com` — CloudTrail can be configured cross-account.
+- `config.amazonaws.com` / `config-multiaccountsetup.amazonaws.com` —
+  Config aggregator roles.
+- `controltower.amazonaws.com` / `member.org.stacksets.cloudformation.amazonaws.com`
+  — Control Tower / Organizations member roles.
+- `auditmanager.amazonaws.com` — Audit Manager service-linked roles.
+- `macie.amazonaws.com` / `securityhub.amazonaws.com` / `guardduty.amazonaws.com`
+  — security services with cross-account aggregation.
+- `wafv2.amazonaws.com` / `waf-regional.amazonaws.com` — WAF service roles.
+- `firehose.amazonaws.com` / `es.amazonaws.com` / `aoss.amazonaws.com` —
+  data services with cross-account delivery.
+- `bedrock.amazonaws.com` — Bedrock service roles.
+
+**Lower-risk service principals** (services that operate within a single
+account boundary by design and are less commonly exploited as confused-deputy
+vectors, but should still be reviewed):
+
+- `awslambda.amazonaws.com` (legacy Lambda spelling — same risk as the modern spelling)
+- `dynamodb.amazonaws.com` — DynamoDB Streams service role (single-account by design, but verify if cross-account streams are configured)
+- `ds.amazonaws.com` — Directory Service (single-account by design)
+- `ssm.amazonaws.com` — Systems Manager (can operate cross-account via Session Manager delegations; verify deployment scope)
+- `transfer.amazonaws.com` — AWS Transfer Family (single-account by design)
+- `quicksight.amazonaws.com` — QuickSight (single-account by design)
+
+## Remediation guidance (moved from SKILL.md)
+
+### For WILDCARD_TRUST (Principal `"*"` — CRITICAL)
+
+1. **Contain immediately.** Replace `Principal: "*"` with the specific
+   principal ARN that needs the role. If the principal is unknown, remove
+   the statement entirely — a role that nobody should assume should not
+   have a trust policy granting everyone.
+
+2. **Audit CloudTrail.** Search for `AssumeRole` events where the role ARN
+   is the target, for the entire window of exposure. Look for `userIdentity`
+   entries from unexpected accounts or services.
+
+3. **Rotate credentials.** If the role had access to secrets, KMS keys, or
+   data stores, rotate all credentials accessible via the role's permissions
+   policy.
+
+### For WILDCARD_TRUST (NotPrincipal / NotAction)
+
+1. Rewrite the statement with an explicit `Principal` allow-list. The
+   inverse-wildcard pattern is never correct in a trust policy.
+
+### For EXTERNAL_TRUST (cross-account without ExternalId)
+
+1. **Add an ExternalId condition.** If the cross-account access is
+   intentional (e.g., a third-party SaaS integration), add:
+   ```json
+   "Condition": {
+     "StringEquals": {
+       "sts:ExternalId": "<opaque-random-string>"
+     }
+   }
+   ```
+   The ExternalId should be a cryptographically random string (at least 16
+   characters), NOT a human-readable name or a derivable pattern.
+
+2. **If the cross-account access is NOT intentional**, remove the statement.
+   The role should not be assumable by external accounts without explicit
+   design and a guard.
+
+3. **Tighten the Principal.** If the current Principal is an account-root
+   ARN (`arn:aws:iam::ACCOUNT:root`), replace it with the specific role ARN
+   the third party uses:
+   `arn:aws:iam::ACCOUNT:role/third-party-integration-role`.
+
+### For EXTERNAL_TRUST (confused-deputy without source guard)
+
+1. **Add a source guard condition.** Use `aws:SourceArn` for maximum
+   precision, or `aws:SourceAccount` as the minimum:
+   ```json
+   "Condition": {
+     "ArnLike": {
+       "aws:SourceArn": "arn:aws:lambda:us-east-1:123456789012:function:*"
+     },
+     "StringEquals": {
+       "aws:SourceAccount": "123456789012"
+     }
+   }
+   ```
+
+2. **Use BOTH `aws:SourceArn` and `aws:SourceAccount`** for
+   defense-in-depth. `SourceArn` scopes to a specific resource;
+   `SourceAccount` is a fallback if the service does not populate
+   `SourceArn` on all code paths.
+
+### For CONDITIONAL (cross-account with ExternalId)
+
+1. **Verify the ExternalId rotation policy.** The ExternalId should be
+   rotated when the third-party relationship changes (vendor switch,
+   contract renewal). It should NOT be rotated frequently (it is a
+   shared secret, not a credential) — but it MUST be changed if compromised.
+
+2. **Verify the ExternalId is opaque.** It must be a random string, not
+   a guessable pattern. If it reads like a company name, project code, or
+   sequential ID, rotate it.
+
+### For CONDITIONAL (confused-deputy with source guard)
+
+1. **Verify the source account/resource ARN is still correct.** If the
+   source resource was deleted and recreated (e.g., a Lambda function
+   recreated after an IaC teardown), the ARN may have changed.
+
+2. **Consider adding a permissions boundary** on the role to cap the
+   maximum effective permissions, as a defense-in-depth measure.
+
+### For OK
+
+1. No remediation required for trust-policy exposure.
+
+2. **Recommend running `iam-least-privilege-advisor`** on the role's
+   permissions policy — a clean trust policy with an over-permissive
+   permissions policy is still a security risk.
+
+3. For same-account root ARN principals, recommend tightening to the
+   specific role ARN if the role has privileged permissions.

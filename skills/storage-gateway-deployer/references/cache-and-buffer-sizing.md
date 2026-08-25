@@ -161,3 +161,46 @@ resource "aws_storagegateway_upload_buffer" "buffer" {
   disk_id     = data.aws_storagegateway_local_disk.buffer.disk_id
 }
 ```
+
+## Expert heuristic: cache vs upload buffer sizing (moved from SKILL.md)
+
+A baseline model says "allocate local disks." The correct heuristic
+recognizes that cache and upload buffer serve fundamentally different
+purposes and must be sized independently.
+
+```text
+Cache (S3 File Gateway, Volume Gateway cached mode):
+  Purpose: store recently accessed data for low-latency reads
+  Sizing rule: cache should hold the "working set" of hot data
+    ├── Typical: 10-20% of total dataset for active workloads
+    ├── Minimum: 150 GB (hard floor)
+    └── More cache = fewer S3 fetches = lower latency + lower S3 GET costs
+
+Upload Buffer (ALL gateway types):
+  Purpose: queue data written locally that is waiting to upload to AWS
+  Sizing rule: buffer should hold data generated between upload cycles
+    ├── Typical: 1.5x the estimated daily data change rate
+    ├── Minimum: 150 GB (hard floor)
+    └── Too small = writes block when buffer is full (application stalls)
+
+Volume Gateway stored mode:
+  ├── NO cache (the local disk IS the primary copy)
+  ├── Upload buffer still needed (async replication to AWS)
+  └── Local disk sizing = full primary dataset + upload buffer
+```
+
+**Key implication:** the #1 cause of "my Storage Gateway is slow" is
+an undersized cache (read-heavy workloads) or an undersized upload
+buffer (write-heavy workloads). Always size them independently based
+on the workload's read/write characteristics.
+
+## Critical sizing rules (moved from SKILL.md)
+
+**Critical sizing rules:**
+- Cache: 150 GB minimum; size for the working set of hot data (10-20%
+  of total dataset for active workloads).
+- Upload buffer: 150 GB minimum; size for 1.5x the estimated daily data
+  change rate.
+- Volume Gateway stored mode: NO cache needed (local disk is primary).
+- Use separate physical disks for cache and upload buffer for
+  performance isolation.

@@ -353,3 +353,103 @@ resource "aws_sfn_state_machine" "data_pipeline" {
   })
 }
 ```
+
+## Step 3 - ItemProcessor vs Iterator (table + template) (moved from SKILL.md)
+
+As of 2022, `ItemProcessor` replaces `Iterator`. Key differences:
+
+| Feature | `Iterator` (legacy) | `ItemProcessor` (current) |
+|---|---|---|
+| Inline Map | Supported | Supported (`Mode: INLINE`) |
+| Distributed Map | NOT supported | Supported (`Mode: DISTRIBUTED`) |
+| ProcessorConfig | Not available | Available |
+| Validation with Mode field | N/A | Required |
+
+**Always use `ItemProcessor`** for new state machines. Only use
+`Iterator` when maintaining legacy definitions that cannot be migrated.
+
+```json
+{
+  "ProcessItems": {
+    "Type": "Map",
+    "ItemProcessor": {
+      "ProcessorConfig": {
+        "Mode": "DISTRIBUTED",
+        "ExecutionType": "STANDARD"
+      },
+      "StartAt": "HandleItem",
+      "States": {
+        "HandleItem": {
+          "Type": "Task",
+          "Resource": "arn:aws:lambda:us-east-1:123456789012:function:process-item",
+          "End": true
+        }
+      }
+    },
+    "ItemsPath": "$.items",
+    "MaxConcurrency": 10,
+    "ItemBatchSize": 50,
+    "ToleratedFailurePercentage": 5
+  }
+}
+```
+
+## Step 4 - batch processing templates (ItemBatchSize / ItemBatcher) (moved from SKILL.md)
+
+**ItemBatchSize (simple):**
+
+```json
+{
+  "Type": "Map",
+  "ItemProcessor": {
+    "ProcessorConfig": { "Mode": "DISTRIBUTED" },
+    "StartAt": "ProcessBatch",
+    "States": {
+      "ProcessBatch": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:us-east-1:123456789012:function:process-batch",
+        "End": true
+      }
+    }
+  },
+  "ItemBatchSize": 100
+}
+```
+
+**ItemBatcher (advanced):**
+
+```json
+{
+  "Type": "Map",
+  "ItemProcessor": {
+    "ProcessorConfig": { "Mode": "DISTRIBUTED" },
+    "StartAt": "ProcessBatch",
+    "States": { ... }
+  },
+  "ItemBatcher": {
+    "MaxItemsPerBatch": 100,
+    "MaxInputBytesPerBatch": 1048576,
+    "BatchInput": {
+      "timestamp": "2026-08-11T00:00:00Z"
+    }
+  }
+}
+```
+
+## Step 7 - ResultSelector/ResultPath template (moved from SKILL.md)
+
+```json
+{
+  "ProcessItems": {
+    "Type": "Map",
+    "ItemsPath": "$.items",
+    "ItemProcessor": { ... },
+    "ResultSelector": {
+      "processed_count.$": "$.length(@)",
+      "items.$": "$"
+    },
+    "ResultPath": "$.processing_result",
+    "Next": "NotifyComplete"
+  }
+}
+```

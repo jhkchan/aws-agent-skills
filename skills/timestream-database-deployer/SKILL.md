@@ -214,71 +214,7 @@ workloads needing long-range aggregations, use scheduled queries to
 pre-compute materialized views rather than extending the memory store
 TTL.
 
-## Expert heuristic: magnetic store S3 transition for late-arrival data
 
-A baseline model does not configure magnetic store write properties.
-The correct heuristic recognizes that late-arrival data (records with
-timestamps older than the memory store TTL) is silently rejected
-unless magnetic store write properties are explicitly enabled with an
-S3 destination.
-
-```text
-Late-arrival data flow:
-  Writer sends record with timestamp T_old (older than memory store TTL)
-    ├── MagneticStoreWriteProperties disabled (default)
-    │     → record REJECTED (WriteRecords API returns error or silently drops)
-    │     → data is lost
-    └── MagneticStoreWriteProperties enabled (S3 bucket configured)
-          → record accepted, routed to S3 object store
-          → Timestream ingests from S3 into magnetic store
-          → data is queryable from magnetic store (not memory store)
-
-S3 bucket requirements:
-  1. Bucket must exist in the same region as the Timestream table
-  2. Bucket policy must grant s3:PutObject to Timestream service principal
-  3. Timestream writes objects with a managed prefix structure
-  4. Objects are managed by Timestream — do NOT delete or modify them
-```
-
-**Key implication:** for IoT or event-driven workloads where data may
-arrive late (network delays, device offline, batch uploads), magnetic
-store write properties are essential. Without them, late-arrival data
-is silently lost. The S3 bucket must be configured with the correct
-bucket policy before enabling the property.
-
-## Expert heuristic: scheduled query materialized view freshness
-
-Scheduled queries continuously materialize results into a target
-table. The freshness of the materialized view depends on the query
-schedule and the target table's own retention properties.
-
-```text
-Scheduled query materialization:
-  Source table (raw events)
-    → Scheduled query runs every 1 hour (schedule expression)
-    → Query: SELECT region, measure_name, AVG(measure_value) ...
-             GROUP BY region, measure_name, bin(time, 1h)
-    → Results written to target table (pre-computed aggregates)
-
-  Target table considerations:
-    ├── Memory store TTL on target: controls how fresh aggregates are queryable fast
-    │     e.g., 30 days of aggregates in memory store → fast recent aggregates
-    ├── Magnetic store TTL on target: controls long-term aggregate retention
-    │     e.g., 5 years → historical aggregate analysis
-    └── Schedule frequency vs data freshness:
-          schedule = 1 min → aggregates are at most 1 min stale
-          schedule = 1 hour → aggregates are at most 1 hour stale
-          schedule = 1 day → aggregates are at most 1 day stale
-
-Notification configuration:
-  ├── SNS topic → alerts on scheduled query errors (DDL errors, permission issues)
-  └── SQS queue → programmatic error handling for retry pipelines
-```
-
-**Key implication:** scheduled queries are the primary tool for
-balancing query freshness, latency, and cost. Choose the schedule
-frequency to match the acceptable staleness of the materialized view.
-Configure error notifications via SNS/SQS to catch failures early.
 
 ## Prerequisites (verify before provisioning)
 
@@ -305,38 +241,8 @@ and cite the specific gap.
 A Timestream database is the container for one or more tables. The
 database name is immutable after creation.
 
-```bash
-# Create a Timestream database
-aws timestream-write create-database \
-  --database-name "IoTSensorData" \
-  --region us-east-1
-
-# With KMS encryption (customer-managed key)
-aws timestream-write create-database \
-  --database-name "IoTSensorData" \
-  --kms-key-id arn:aws:kms:us-east-1:123456789012:key/abc123 \
-  --region us-east-1
-
-# With tags
-aws timestream-write create-database \
-  --database-name "IoTSensorData" \
-  --tags Key=Environment,Value=production Key=Team,Value=iot \
-  --region us-east-1
-```
-
-**Verify the database:**
-
-```bash
-aws timestream-write describe-database \
-  --database-name "IoTSensorData" \
-  --region us-east-1
-```
-
-**Database naming rules:** 3-256 characters, alphanumeric characters
-and underscores. Must be unique within the account and region.
-
-**Database ARN pattern:**
-`arn:aws:timestream:<region>:<account>:database/<database-name>`
+create-database (+KMS, +tags), describe-database verify, naming rules, ARN pattern — moved verbatim.
+Full detail: [Worked examples](references/worked-examples.md).
 
 ## Step 2 — Table creation with retention properties
 
@@ -344,39 +250,8 @@ A Timestream table belongs to a database and stores time-series
 records. Each table has its own retention properties: memory store
 TTL and magnetic store TTL.
 
-```bash
-# Create a table with retention properties
-aws timestream-write create-table \
-  --database-name "IoTSensorData" \
-  --table-name "TemperatureReadings" \
-  --retention-properties \
-    "MemoryStoreRetentionPeriodInHours=12,MagneticStoreRetentionPeriodInDays=365" \
-  --region us-east-1
-
-# Verify
-aws timestream-write describe-table \
-  --database-name "IoTSensorData" \
-  --table-name "TemperatureReadings" \
-  --region us-east-1
-```
-
-**Retention property rules:**
-
-| Property | Minimum | Maximum | Effect |
-|---|---|---|---|
-| MemoryStoreRetentionPeriodInHours | 1 hour | practically unlimited (but costly) | Data queryable from fast in-memory storage |
-| MagneticStoreRetentionPeriodInDays | 1 day | 73000 days (~200 years) | Data retained in cost-effective magnetic storage |
-
-**Updating retention properties:**
-
-```bash
-aws timestream-write update-table \
-  --database-name "IoTSensorData" \
-  --table-name "TemperatureReadings" \
-  --retention-properties \
-    "MemoryStoreRetentionPeriodInHours=24,MagneticStoreRetentionPeriodInDays=730" \
-  --region us-east-1
-```
+create-table with retention, retention min/max rules, update-table TTL change — moved verbatim.
+Full detail: [Retention and scheduled queries](references/retention-and-scheduled-queries.md).
 
 **Common mistake:** setting memory store TTL too high for a high-volume
 ingestion table. Memory store charges are per GB-hour. A table
@@ -390,46 +265,8 @@ By default, magnetic store writes are disabled. Late-arrival data
 Enabling magnetic store write properties routes late-arrival data to
 an S3 bucket, which Timestream then ingests into the magnetic store.
 
-```bash
-# Create the S3 bucket (same region as the Timestream table)
-aws s3api create-bucket \
-  --bucket timestream-magnetic-late-arrival-us-east-1 \
-  --region us-east-1
-
-# Add bucket policy granting Timestream write access
-cat > /tmp/bucket-policy.json << 'EOF'
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {
-        "Service": "timestream.amazonaws.com"
-      },
-      "Action": "s3:PutObject",
-      "Resource": "arn:aws:s3:::timestream-magnetic-late-arrival-us-east-1/*"
-    }
-  ]
-}
-EOF
-
-aws s3api put-bucket-policy \
-  --bucket timestream-magnetic-late-arrival-us-east-1 \
-  --policy file:///tmp/bucket-policy.json
-
-# Enable magnetic store write properties on the table
-aws timestream-write update-table \
-  --database-name "IoTSensorData" \
-  --table-name "TemperatureReadings" \
-  --magnetic-store-write-properties \
-    "EnableMagneticStoreWrites=true,MagneticStoreRejectedDataLocation=s3://timestream-magnetic-late-arrival-us-east-1/" \
-  --region us-east-1
-```
-
-**Critical:** the S3 bucket must be in the same region as the
-Timestream table. The bucket policy must grant `s3:PutObject` to the
-Timestream service principal. Objects written by Timestream are
-managed automatically — do NOT delete or modify them.
+bucket creation, bucket-policy JSON, update-table MagneticStoreWriteProperties — moved verbatim.
+Full detail: [IAM and magnetic store](references/iam-and-magnetic-store.md).
 
 ## Step 4 — Partition key enforcement
 
@@ -438,17 +275,8 @@ scanned for specific access patterns. When a schema includes partition
 key enforcement, records with mismatched partition key types are
 rejected at write time.
 
-```bash
-# Create a table with partition key enforcement
-aws timestream-write create-table \
-  --database-name "IoTSensorData" \
-  --table-name "PartitionedReadings" \
-  --retention-properties \
-    "MemoryStoreRetentionPeriodInHours=12,MagneticStoreRetentionPeriodInDays=365" \
-  --schema \
-    "CompositePartitionKey={EnforcementInRecord=REQUIRED,DimInsightsOptimization=DISABLED}" \
-  --region us-east-1
-```
+create-table with CompositePartitionKey schema — moved verbatim.
+Full detail: [Worked examples](references/worked-examples.md).
 
 **Partition key configuration options:**
 
@@ -457,14 +285,6 @@ aws timestream-write create-table \
 | EnforcementInRecord | REQUIRED, OPTIONAL | REQUIRED rejects records without the partition key dimension; OPTIONAL allows records without it |
 | DimInsightsOptimization | ENABLED, DISABLED | ENABLED optimizes partition key access for common dimension patterns |
 
-**Verify partition key configuration:**
-
-```bash
-aws timestream-write describe-table \
-  --database-name "IoTSensorData" \
-  --table-name "PartitionedReadings" \
-  --query 'Table.Schema' --region us-east-1
-```
 
 **When to use partition key enforcement:**
 - Queries frequently filter by specific dimensions (e.g., device_id,
@@ -478,51 +298,8 @@ Scheduled queries continuously pre-compute materialized results into a
 target table. They reduce latency and cost for predictable, recurring
 query patterns.
 
-```bash
-# Create the target table for materialized results
-aws timestream-write create-table \
-  --database-name "IoTSensorData" \
-  --table-name "HourlyTempAggregates" \
-  --retention-properties \
-    "MemoryStoreRetentionPeriodInHours=720,MagneticStoreRetentionPeriodInDays=1825" \
-  --region us-east-1
-
-# Create an SNS topic for error notifications
-SNS_ARN=$(aws sns create-topic \
-  --name timestream-scheduled-query-errors \
-  --region us-east-1 \
-  --query 'TopicArn' --output text)
-
-# Create the scheduled query
-aws timestream-query create-scheduled-query \
-  --name "HourlyTemperatureAggregation" \
-  --query-string \
-    "SELECT region, device_id, BIN(time, 1h) as hour, AVG(measure_value::double) as avg_temp \
-     FROM \"IoTSensorData\".\"TemperatureReadings\" \
-     WHERE measure_name = 'temperature' \
-     GROUP BY region, device_id, BIN(time, 1h)" \
-  --schedule-configuration "ScheduleExpression='rate(1 hour)'" \
-  --notification-configuration "SnsConfiguration={TopicArn='${SNS_ARN}'}" \
-  --target-configuration \
-    "TimestreamConfiguration={DatabaseName='IoTSensorData',TableName='HourlyTempAggregates',TimeColumn='hour',DimensionMappings=[{Name='region',DimensionValueType='VARCHAR'},{Name='device_id',DimensionValueType='VARCHAR'}],MeasureNameColumn='avg_temp_measure',MeasureValueType='DOUBLE'}" \
-  --scheduled-query-execution-role-arn arn:aws:iam::123456789012:role/TimestreamScheduledQueryRole \
-  --region us-east-1
-```
-
-**Scheduled query components:**
-
-| Component | Purpose | Required |
-|---|---|---|
-| QueryString | The SQL query to materialize | Yes |
-| ScheduleExpression | How often to run (rate or cron) | Yes |
-| NotificationConfiguration | SNS topic for error reporting | Yes |
-| TargetConfiguration | Destination table for results | Yes |
-| ScheduledQueryExecutionRoleArn | IAM role for query execution | Yes |
-| ErrorReportConfiguration | S3 path for detailed error reports | No (recommended) |
-
-**Common mistake:** forgetting to create the target table before
-creating the scheduled query. The scheduled query fails at execution
-time if the target table does not exist.
+target table, SNS topic, create-scheduled-query, component table — moved verbatim.
+Full detail: [Retention and scheduled queries](references/retention-and-scheduled-queries.md).
 
 ## Step 6 — Query API (raw vs scheduled)
 
@@ -530,28 +307,8 @@ Timestream supports two query patterns: raw queries (direct SQL
 against source tables) and scheduled query results (queries against
 materialized views in target tables).
 
-**Raw query (direct SQL):**
-
-```bash
-aws timestream-query query \
-  --query-string \
-    "SELECT region, AVG(measure_value::double) as avg_temp \
-     FROM \"IoTSensorData\".\"TemperatureReadings\" \
-     WHERE time > ago(1h) AND measure_name = 'temperature' \
-     GROUP BY region" \
-  --region us-east-1
-```
-
-**Scheduled query result (materialized view):**
-
-```bash
-aws timestream-query query \
-  --query-string \
-    "SELECT region, hour, avg_temp \
-     FROM \"IoTSensorData\".\"HourlyTempAggregates\" \
-     WHERE hour > ago(24h)" \
-  --region us-east-1
-```
+raw SQL query, materialized-view query — moved verbatim.
+Full detail: [Worked examples](references/worked-examples.md).
 
 **When to use each:**
 
@@ -577,29 +334,8 @@ delta). Understanding the difference is critical for cost monitoring.
 | QueryBytesRead | Interval | Bytes scanned by queries per period |
 | QueryRequestCount | Interval | Number of query requests per period |
 
-```bash
-# Get cumulative memory store metered bytes (total cost driver)
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/Timestream \
-  --metric-name MemoryStoreMeteredBytes \
-  --dimensions Name=DatabaseName,Value=IoTSensorData Name=TableName,Value=TemperatureReadings \
-  --start-time 2026-08-01T00:00:00Z \
-  --end-time 2026-08-11T00:00:00Z \
-  --period 86400 \
-  --statistics Sum \
-  --region us-east-1
-
-# Get interval query bytes read (per-period scan volume)
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/Timestream \
-  --metric-name QueryBytesRead \
-  --dimensions Name=DatabaseName,Value=IoTSensorData Name=TableName,Value=TemperatureReadings \
-  --start-time 2026-08-10T00:00:00Z \
-  --end-time 2026-08-11T00:00:00Z \
-  --period 3600 \
-  --statistics Sum \
-  --region us-east-1
-```
+MemoryStoreMeteredBytes (CUMULATIVE), QueryBytesRead (interval) — moved verbatim.
+Full detail: [Diagnostic commands](references/diagnostic-commands.md).
 
 **Critical:** CUMULATIVE metrics show the running total. To compute
 per-period cost, subtract the previous period's value. Interval
@@ -611,24 +347,8 @@ The magnetic store write properties S3 bucket serves two purposes:
 late-arrival data ingestion and rejected data location. The bucket
 must have a policy granting Timestream write access.
 
-```bash
-# Verify the bucket policy grants Timestream access
-aws s3api get-bucket-policy \
-  --bucket timestream-magnetic-late-arrival-us-east-1 \
-  --region us-east-1
-
-# Verify the table's magnetic store write properties
-aws timestream-write describe-table \
-  --database-name "IoTSensorData" \
-  --table-name "TemperatureReadings" \
-  --query 'Table.MagneticStoreWriteProperties' \
-  --region us-east-1
-```
-
-**S3 object lifecycle:** objects written by Timestream to the magnetic
-store write bucket are managed by the service. Do NOT configure S3
-lifecycle rules to delete them — Timestream manages the lifecycle
-internally. The bucket is a staging area, not a permanent archive.
+get-bucket-policy, describe-table MagneticStoreWriteProperties — moved verbatim.
+Full detail: [Diagnostic commands](references/diagnostic-commands.md).
 
 ## Step 9 — Batch load task
 
@@ -636,179 +356,28 @@ Batch load tasks perform bulk ingestion of historical data from S3
 (CSV or Parquet) into a Timestream table. Batch load is asynchronous
 and progresses through stages.
 
-```bash
-# Create a batch load task
-aws timestream-write create-batch-load-task \
-  --database-name "IoTSensorData" \
-  --table-name "TemperatureReadings" \
-  --data-source-configuration \
-    "DataSourceS3Configuration={BucketName='historical-sensor-data',ObjectKeyPrefix='2025/'}" \
-  --report-configuration \
-    "ReportS3Configuration={BucketName='batch-load-reports',ObjectKeyPrefix='reports/2025/'}" \
-  --region us-east-1
-
-# Check batch load task status
-aws timestream-write describe-batch-load-task \
-  --task-id "task-abc123" \
-  --region us-east-1
-```
-
-**Batch load task stages:**
-
-| Stage | Description |
-|---|---|
-| PENDING | Task created, waiting to start |
-| LOADING | Data is being ingested |
-| SUCCEEDED | All records loaded successfully |
-| FAILED | Task failed (check report for details |
-| CANCELLED | Task was cancelled by the operator |
-
-**CSV format requirements:** the data source CSV must have a header
-row with columns matching the Timestream table schema. Dimensions,
-measures, and time columns must be present.
+create-batch-load-task, stage table, CSV format requirements — moved verbatim.
+Full detail: [Advanced patterns](references/advanced-patterns.md).
 
 ## Step 10 — IAM policies for Timestream
 
 Timestream uses several resource types for IAM policies: database,
 table, scheduled query, and batch load task.
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "timestream:WriteRecords"
-      ],
-      "Resource": [
-        "arn:aws:timestream:us-east-1:123456789012:database/IoTSensorData/table/TemperatureReadings"
-      ]
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "timestream:Describe*",
-        "timestream:List*",
-        "timestream:Select"
-      ],
-      "Resource": [
-        "arn:aws:timestream:us-east-1:123456789012:database/IoTSensorData",
-        "arn:aws:timestream:us-east-1:123456789012:database/IoTSensorData/table/*"
-      ]
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "timestream:ExecuteScheduledQuery"
-      ],
-      "Resource": [
-        "arn:aws:timestream:us-east-1:123456789012:scheduled-query/HourlyTemperatureAggregation"
-      ]
-    }
-  ]
-}
-```
-
-**Scheduled query execution role:** the `ScheduledQueryExecutionRoleArn`
-requires permissions to query the source table, write to the target
-table, and publish to the SNS topic for error reporting.
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "timestream:Select",
-        "timestream:DescribeTable",
-        "timestream:DescribeEndpoints"
-      ],
-      "Resource": [
-        "arn:aws:timestream:us-east-1:123456789012:database/IoTSensorData/table/TemperatureReadings"
-      ]
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "timestream:WriteRecords"
-      ],
-      "Resource": [
-        "arn:aws:timestream:us-east-1:123456789012:database/IoTSensorData/table/HourlyTempAggregates"
-      ]
-    },
-    {
-      "Effect": "Allow",
-      "Action": [
-        "sns:Publish"
-      ],
-      "Resource": [
-        "arn:aws:sns:us-east-1:123456789012:timestream-scheduled-query-errors"
-      ]
-    }
-  ]
-}
-```
+WriteRecords/Describe/Select policy JSON, ScheduledQueryExecutionRole trust policy JSON — moved verbatim.
+Full detail: [IAM and magnetic store](references/iam-and-magnetic-store.md).
 
 ## Step 11 — Tagging
 
 Tags enable cost allocation and governance for Timestream resources.
 
-```bash
-# Tag a database
-aws timestream-write tag-resource \
-  --resource-arn arn:aws:timestream:us-east-1:123456789012:database/IoTSensorData \
-  --tags Key=Environment,Value=production Key=Team,Value=iot \
-  --region us-east-1
-
-# Tag a table
-aws timestream-write tag-resource \
-  --resource-arn arn:aws:timestream:us-east-1:123456789012:database/IoTSensorData/table/TemperatureReadings \
-  --tags Key=Environment,Value=production Key=CostCenter,Value=CC-1001 \
-  --region us-east-1
-
-# List tags
-aws timestream-write list-tags-for-resource \
-  --resource-arn arn:aws:timestream:us-east-1:123456789012:database/IoTSensorData \
-  --region us-east-1
-```
+tag-resource, list-tags-for-resource — moved verbatim.
+Full detail: [Worked examples](references/worked-examples.md).
 
 ## Step 12 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Partition key enforcement (2023-2024):** Enforce partition key
-  dimensions at write time for improved query performance on
-  high-cardinality tables. Records missing the partition key dimension
-  are rejected (REQUIRED mode) or accepted without enforcement
-  (OPTIONAL mode).
-
-- **Magnetic store write properties (2023-2024):** Enable late-arrival
-  data ingestion via S3. Records with timestamps older than the memory
-  store TTL are routed to an S3 bucket and ingested into the magnetic
-  store, preventing data loss.
-
-- **Batch load task (2023-2024):** Bulk ingestion of historical data
-  from S3 (CSV or Parquet) into Timestream tables. Asynchronous task
-  with progress tracking and detailed error reporting.
-
-- **Scheduled query improvements (2023-2025):** Enhanced scheduled
-  query error reporting with S3 error report configuration. SNS
-  notification improvements for real-time alerting on query failures.
-
-- **CloudWatch metrics enhancements (2024-2025):** Additional
-  CloudWatch metrics for magnetic store write monitoring and batch
-  load task progress tracking.
-
-- **Dimension insights optimization (2024-2025):** Optimize partition
-  key access patterns for common dimension queries, reducing scan
-  volume and cost for analytical workloads.
-
-- **Terraform provider maturity (2023-2025):** Full Terraform support
-  for `aws_timestreamwrite_database`, `aws_timestreamwrite_table`
-  (with magnetic store write properties and partition key enforcement),
-  and `aws_timestreamquery_scheduled_query` resources.
+partition keys, magnetic store writes, batch load, dim insights, Terraform — moved verbatim.
+Full detail: [Advanced patterns](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -915,37 +484,17 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Table creation fails — database not found
-- The database must exist before creating a table. Verify with
-  `describe-database`. Create the database first.
+table creation, magnetic store update, scheduled query failure, batch load stuck, late-arrival rejection, memory store cost — moved verbatim.
+Full detail: [Error handling](references/error-handling.md).
 
-### Magnetic store write property update fails
-- The S3 bucket must exist and have a bucket policy granting
-  `s3:PutObject` to the Timestream service principal. Verify the
-  bucket policy with `get-bucket-policy`. Ensure the bucket is in the
-  same region as the table.
+## References (load on demand)
 
-### Scheduled query execution fails
-- Check the SNS notification for error details. Common causes: target
-  table does not exist, IAM role lacks permissions, query syntax error,
-  schema mismatch in dimension mappings. Verify the execution role has
-  query, write, and SNS publish permissions.
-
-### Batch load task stuck in PENDING
-- Check IAM permissions for the batch load role. Verify the S3 data
-  source bucket exists and contains data in the expected format (CSV
-  with headers or Parquet).
-
-### Late-arrival data silently rejected
-- Magnetic store writes are disabled by default. Enable
-  MagneticStoreWriteProperties with an S3 bucket destination. Verify
-  the bucket policy grants Timestream write access.
-
-### Memory store costs unexpectedly high
-- Check the memory store TTL. A high TTL on a high-ingestion table
-  retains a large volume of data in memory. Reduce the TTL or use
-  scheduled queries to pre-compute aggregates with a shorter source
-  TTL.
+- [Retention and scheduled queries](references/retention-and-scheduled-queries.md) — TTL rules and updates, scheduled query creation, materialized-view freshness heuristic
+- [IAM and magnetic store](references/iam-and-magnetic-store.md) — magnetic store bucket policy + setup, late-arrival heuristic, IAM and execution-role policy JSON
+- [Worked examples](references/worked-examples.md) — database / table / partition-key / query / tagging CLI walkthroughs
+- [Diagnostic commands](references/diagnostic-commands.md) — CloudWatch metering queries, magnetic store integration verification
+- [Advanced patterns](references/advanced-patterns.md) — batch load task detail, recent features
+- [Error handling](references/error-handling.md) — table creation, magnetic store updates, scheduled query failures, cost spikes
 
 ## Domain
 

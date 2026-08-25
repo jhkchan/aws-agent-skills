@@ -344,3 +344,112 @@ execution and state, NOT the workflow input. Useful values:
 - [ ] Every `Map` has explicit `MaxConcurrency` (not the default 0).
 - [ ] Total payload (input + each state I/O) is < 256KB.
 - [ ] Choice `Default` is set on every `Choice` state.
+
+## Step 5 - Map state design (Inline vs Distributed) (moved from SKILL.md)
+
+| Dimension | Inline Map | Distributed Map |
+|---|---|---|
+| Max concurrent iterations | 40 | 10,000+ |
+| Total payload size | 256KB | Run under a child execution (no parent-payload cap) |
+| Item source | Items in workflow payload (`ItemsPath`) | S3 CSV/JSON, DynamoDB Scan/Query, or payload (`ItemReader`) |
+| Batching | Manual (one Task per item) | `ItemBatcher` (batch N items per Task — reduces integration count) |
+| Failure tolerance | Whole Map fails on first uncaught iteration error | `ToleratedFailurePercentage` / `ToleratedFailureCount` — continue past failures |
+| Per-iteration billing | Standard: one transition per iteration; Express: one invocation per iteration | Distributed Map runs as a child execution — separate billing |
+| Ideal use | <1000 items, small payload, simple transform | >1000 items, large datasets, fault-tolerant batch processing |
+
+**Inline Map example:**
+```json
+"ProcessOrders": {
+  "Type": "Map",
+  "ItemsPath": "$.orders",
+  "MaxConcurrency": 10,
+  "Iterator": {
+    "StartAt": "ChargeOrder",
+    "States": {
+      "ChargeOrder": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::lambda:invoke",
+        "Parameters": {
+          "FunctionName": "ChargeOrderFn",
+          "Payload.$": "$"
+        },
+        "TimeoutSeconds": 30,
+        "Retry": [{
+          "ErrorEquals": ["Lambda.ServiceException", "Lambda.TooManyRequestsException"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }],
+        "Catch": [{
+          "ErrorEquals": ["States.ALL"],
+          "Next": "ChargeFailed",
+          "ResultPath": "$.error"
+        }],
+        "End": true
+      },
+      "ChargeFailed": {
+        "Type": "Fail",
+        "Error": "ChargeFailed",
+        "Cause": "Order charge failed after retries"
+      }
+    }
+  },
+  "Next": "NotifyComplete"
+}
+```
+
+**Distributed Map example with S3 ItemReader and ItemBatcher:**
+```json
+"ProcessLargeDataset": {
+  "Type": "Map",
+  "MaxConcurrency": 1000,
+  "ItemReader": {
+    "Resource": "arn:aws:states:::s3:getObject",
+    "ReaderConfig": {
+      "InputType": "CSV",
+      "CSVHeaderLocation": "FIRST_ROW"
+    },
+    "Parameters": {
+      "Bucket": "my-dataset-bucket",
+      "Key": "input/2026-08.csv"
+    }
+  },
+  "ItemBatcher": {
+    "BatchInput": { "batchMetadata": "created-by-state-machine" },
+    "MaxItemsPerBatch": 100,
+    "MaxItemsPerBatchPath": "$.batchSize"
+  },
+  "ToleratedFailurePercentage": 0,
+  "Iterator": {
+    "StartAt": "ProcessBatch",
+    "States": {
+      "ProcessBatch": {
+        "Type": "Task",
+        "Resource": "arn:aws:states:::lambda:invoke",
+        "Parameters": {
+          "FunctionName": "ProcessBatchFn",
+          "Payload.$": "$"
+        },
+        "TimeoutSeconds": 300,
+        "Retry": [{
+          "ErrorEquals": ["Lambda.ServiceException"],
+          "IntervalSeconds": 5,
+          "MaxAttempts": 5,
+          "BackoffRate": 2.0
+        }],
+        "Catch": [{
+          "ErrorEquals": ["States.ALL"],
+          "Next": "BatchFail"
+        }],
+        "End": true
+      },
+      "BatchFail": {
+        "Type": "Fail",
+        "Error": "BatchProcessingFailed",
+        "Cause": "Batch failed after retries"
+      }
+    }
+  },
+  "Next": "Summarize"
+}
+```

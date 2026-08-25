@@ -174,3 +174,99 @@ require tag presence, use Config `required-tags` (Step 5 of SKILL.md).
    ```bash
    aws organizations attach-policy --policy-id p-xxxxxxx --target-id r-xxxx
    ```
+
+## Step 2: Author the Organizations TagPolicy JSON (moved from SKILL.md)
+
+Enable tag policies at the org root (one-time):
+
+```bash
+aws organizations enable-policy-type \
+  --root-id r-xxxx \
+  --policy-type TAG_POLICY
+```
+
+Tag policy JSON template (the canonical baseline):
+
+```json
+{
+  "tags": {
+    "Environment": {
+      "tag_key": {
+        "case_sensitive": false
+      },
+      "allowed_values": ["dev", "staging", "prod"],
+      "enforced_for": [
+        "ec2:instance",
+        "ec2:volume",
+        "s3:bucket",
+        "lambda:function",
+        "rds:db-instance",
+        "dynamodb:table",
+        "elasticloadbalancing:loadbalancer",
+        "kms:key"
+      ]
+    },
+    "CostCenter": {
+      "tag_key": { "case_sensitive": false },
+      "allowed_values": ["cc-1001", "cc-1002", "cc-1003", "cc-9999"],
+      "enforced_for": [
+        "ec2:instance",
+        "s3:bucket",
+        "lambda:function",
+        "rds:db-instance"
+      ]
+    },
+    "Owner": {
+      "tag_key": {},
+      "enforced_for": [
+        "ec2:instance",
+        "s3:bucket",
+        "lambda:function"
+      ]
+    },
+    "Project": {
+      "tag_key": {},
+      "enforced_for": ["ec2:instance", "s3:bucket"]
+    }
+  }
+}
+```
+
+Create the policy:
+
+```bash
+aws organizations create-policy \
+  --type TAG_POLICY \
+  --name "baseline-tag-policy" \
+  --description "Required tags with allowed_values enforcement" \
+  --content file://tag-policy.json \
+  --tags '[{"Key":"Governance","Value":"tag-baseline"}]'
+```
+
+Attach to root or OU:
+
+```bash
+aws organizations attach-policy \
+  --policy-id p-xxxxxxx \
+  --target-id r-xxxx      # root
+  # --target-id ou-xxxx-xxxx   # OU
+```
+
+Verify enforcement:
+
+```bash
+# This call should FAIL if the tag value is not in allowed_values
+aws ec2 create-tags \
+  --resources i-0abc123 \
+  --tags Key=Environment,Value=production
+# AccessDenied / TagPolicyViolation — "production" not in allowed_values
+```
+
+**Common errors and fixes:**
+
+| Error | Cause | Fix |
+|---|---|---|
+| `TagPolicyViolationException` on CreateTags | Tag value not in `allowed_values` | Use an allowed value, or extend `allowed_values` in the policy |
+| Policy attached but no enforcement | `enforced_for` missing or typo'd resource type | Verify notation `service:resource-type` (lowercase) |
+| Cannot add `staging` at OU level | Child policy is additive, cannot extend parent's `allowed_values` | Edit the root policy to include `staging` |
+| `PolicyTypeNotEnabledException` | Tag policies not enabled at root | Run `enable-policy-type --policy-type TAG_POLICY` first |

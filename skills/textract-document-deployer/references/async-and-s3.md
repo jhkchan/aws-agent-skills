@@ -247,3 +247,90 @@ together using the per-page offset.
 | Synchronous AnalyzeDocument max pages | 1 (single-page) or up to 30 (Tiff/PDF) | No |
 | Queries per AnalyzeDocument call | 30 | No |
 | Queries per StartDocumentAnalysis job | 500 | No |
+
+## Extended from SKILL.md
+
+## Step 3 — S3 document source and output config
+
+The async APIs require an S3 location for input. The OutputConfig
+parameter writes structured JSON results to a customer-owned S3 bucket.
+
+```bash
+aws textract start-document-analysis \
+  --document-location '{"S3Object":{"Bucket":"my-input-bucket","Name":"invoices/2026/q3/batch-001.pdf"}}' \
+  --feature-types '["FORMS","TABLES"]' \
+  --output-config '{"S3Bucket":"my-output-bucket","S3Prefix":"textract-output/"}' \
+  --notification-channel '{"SNSTopicArn":"arn:aws:sns:us-east-1:123456789012:TextractComplete","RoleArn":"arn:aws:iam::123456789012:role/TextractNotificationRole"}' \
+  --region us-east-1
+```
+
+OutputConfig writes per-page JSON plus structured CSV summaries
+(`key-values/`, `queries-results/`, `tables/`) to your bucket. Full
+OutputConfig directory layout is in `references/async-and-s3.md`. The
+OutputConfig bucket MUST be in the same region as the Textract job —
+cross-region S3 causes `InvalidS3Object` or similar errors.
+
+## Step 4 — KMS encryption
+
+Textract supports KMS encryption for both input documents (if stored
+encrypted in S3) and output JSON. Specify the KMS key ID via
+`--kms-key-id`.
+
+```bash
+aws textract start-document-analysis \
+  --document-location '{"S3Object":{"Bucket":"my-input-bucket","Name":"encrypted/batch-001.pdf"}}' \
+  --feature-types '["FORMS","TABLES","QUERIES"]' \
+  --queries-config '{"Queries":[{"Text":"What is the invoice total?"}]}' \
+  --output-config '{"S3Bucket":"my-output-bucket","S3Prefix":"textract-encrypted/"}' \
+  --kms-key-id arn:aws:kms:us-east-1:123456789012:key/abcd1234-... \
+  --region us-east-1
+```
+
+**KMS key policy requirements:** the Textract service principal
+(`textract.amazonaws.com`) must have `kms:GenerateDataKey` and
+`kms:Decrypt` on the key. The calling role must have `kms:Decrypt` for
+reading encrypted input. Full key policy JSON with the
+`aws:SourceAccount` confused-deputy condition is in
+`references/async-and-s3.md`.
+
+## Step 5 — SNS notification for async completion
+
+The NotificationChannel parameter configures an SNS topic that
+Textract publishes to when the async job completes (success or
+failure).
+
+```bash
+aws textract start-document-analysis \
+  --document-location '{"S3Object":{"Bucket":"my-input","Name":"batch.pdf"}}' \
+  --feature-types '["FORMS","TABLES"]' \
+  --notification-channel '{"SNSTopicArn":"arn:aws:sns:us-east-1:123456789012:TextractComplete","RoleArn":"arn:aws:iam::123456789012:role/TextractNotificationRole"}' \
+  --region us-east-1
+```
+
+**Notification role:** the RoleArn must trust `textract.amazonaws.com`
+and have `sns:Publish` on the topic. Full trust + permission policy
+JSON is in `references/async-and-s3.md`.
+
+The SNS message body includes `JobId`, `Status` (SUCCEEDED / FAILED),
+and `API` (e.g., StartDocumentAnalysis). Wire this to a Lambda or SQS
+queue for downstream processing.
+
+## Step 8 — Document splitting for large PDFs
+
+Textract does NOT split oversized documents. For PDFs over 3000 pages,
+split the document customer-side (e.g., with `PyPDF2` or `qpdf`) before
+invoking Textract. Submit each chunk as a separate
+StartDocumentAnalysis job and aggregate downstream using chunk index
+and page offsets. Full splitting code is in
+`references/async-and-s3.md`.
+
+```python
+# Pattern: split into ≤3000-page chunks, submit one job per chunk
+chunks = split_pdf("s3://doc-input/large.pdf", pages_per_chunk=2500)
+for i, chunk in enumerate(chunks):
+    submit_textract_job(chunk, tag=f"large-part-{i:04d}")
+```
+
+**Key implication:** the 3000-page limit is a hard quota. Plan for
+document splitting in any document-management pipeline that handles
+large reports, contracts, or regulatory filings.

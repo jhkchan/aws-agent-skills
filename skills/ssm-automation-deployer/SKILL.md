@@ -209,29 +209,8 @@ For example, if Step 1 calls `ec2:DescribeInstances` and Step 2 calls
 
 ## Expert heuristic: target collection via resource groups
 
-```text
-Target collection modes:
-
-  1. Explicit resource IDs:
-       Targets: [{Key: "InstanceIds", Values: ["i-aaa", "i-bbb"]}]
-       → Fixed set.
-
-  2. Resource group query:
-       Targets: [{Key: "ResourceGroup", Values: ["rg-prod-ec2"]}]
-       → Dynamic. Evaluated at execution time.
-
-  3. Tag-based query:
-       Targets: [{Key: "tag:Environment", Values: ["production"]}]
-       → Dynamic. All resources matching the tag.
-
-Rate control on dynamic targets:
-  MaxConcurrency: "10" or "10%"  → max parallel executions
-  MaxErrors: "3" or "1%"         → stop when exceeded
-```
-
-**Key implication:** dynamic targets enable fleet-wide operations
-(patch all production instances, remediate all non-compliant
-resources). Rate control prevents runaway execution.
+Target-collection modes and rate-control implications moved to
+[references/execution-role-and-targets.md](references/execution-role-and-targets.md) (load on demand).
 
 ## Prerequisites (verify before provisioning)
 
@@ -407,16 +386,8 @@ aws events put-targets --rule "NightlyPatchAutomation" \
 
 ## Step 12 — Recent features
 
-- **aws:branch multi-condition (2023-2024):** `LogicalOperator` (And/Or)
-  for multi-condition evaluation in a single branch step.
-- **Dynamic document parameters (2024-2025):** parameters can reference
-  Parameter Store values at execution time.
-- **Cross-account automation (2023-2024):** documents can target
-  resources in delegate accounts via AWS Organizations.
-- **Enhanced CloudWatch metrics (2024-2025):** per-step execution
-  metrics for Automation runbooks.
-- **Runbook dry-run (2024-2025):** validates step references and
-  parameter bindings without executing API calls.
+Recent SSM Automation features (multi-condition aws:branch, dynamic
+parameters, cross-account, per-step metrics, dry-run) moved to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -511,25 +482,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Automation execution fails with "AccessDenied"
-- The execution role lacks permissions. Review role policy against
-  every step's API call. Common missing: `iam:PassRole`.
+Error-handling deep dives (AccessDenied, InvalidAssumeRole, branch
+mis-evaluation, zero targets, throttling) moved to [references/error-handling.md](references/error-handling.md).
 
-### Automation fails with "InvalidAssumeRole"
-- Trust policy does not allow `ssm.amazonaws.com`. Verify trust
-  policy includes the SSM service principal.
+## References (load on demand)
 
-### aws:branch evaluates wrong condition
-- Condition syntax: `{{ StepName.OutputName == 'value' }}`. Verify
-  output variable names match outputs defined in prior steps.
-
-### No targets matched
-- Resource group or tag query returned zero resources. Verify group
-  has members. Use `aws resource-groups get-group-query-results`.
-
-### Rate control throttling
-- MaxConcurrency exceeds quota (default 10). Request increase or
-  reduce concurrency.
+- [references/step-actions-and-branching.md](references/step-actions-and-branching.md) — Step action syntax, inputs, and aws:branch conditional detail.
+- [references/execution-role-and-targets.md](references/execution-role-and-targets.md) — Execution role trust policy and permissions; resource-group/tag target collection and rate control.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Recent SSM Automation features (moved from Step 12).
+- [references/error-handling.md](references/error-handling.md) — Execution failure deep dives (moved from Error handling).
 
 ## Domain
 

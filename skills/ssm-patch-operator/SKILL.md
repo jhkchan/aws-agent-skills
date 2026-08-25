@@ -83,32 +83,13 @@ READY):**
    if the instance is in an ASG without ELB grace, in a Multi-AZ RDS primary
    pair, or outside the maintenance window, BLOCK until the operator confirms.
 
-**Cost/time baselines (2026):**
-
-- Scan: ~30 seconds to 5 minutes per host (package-manager-bound).
-- Install: minutes to ~1 hour per host (depends on patch count; Windows
-  cumulative updates dominate).
-- Cross-region Patch Baseline export/import: the baseline itself is small
-  JSON; replication is metadata-only (seconds).
-- SSM data transfer for command output: free in-region; cross-region command
-  output to S3 incurs normal S3 + replication costs.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#costtime-baselines-2026).
+> Scan ~30 s-5 min/host, Install minutes to ~1 h/host (Windows cumulative updates dominate), baseline export/import metadata-only, in-region command output free.
 
 ## OS-by-OS baseline matrix
 
-| OS | Default baseline | Default document | Reboot-on-Install |
-|---|---|---|---|
-| Amazon Linux 2 | `AWS-AmazonLinux2DefaultPatchBaseline` | `AWS-RunPatchBaseline` | Kernel update reboots; userspace usually does not |
-| Amazon Linux 2023 | `AWS-AmazonLinux2023DefaultPatchBaseline` | `AWS-RunPatchBaseline` | Kernel update reboots |
-| Ubuntu 20.04 / 22.04 / 24.04 | `AWS-UbuntuDefaultPatchBaseline` | `AWS-RunPatchBaseline` | Kernel update reboots (snapd holds kernel) |
-| RHEL 7/8/9 | `AWS-RedHatDefaultPatchBaseline` | `AWS-RunPatchBaseline` | Kernel update reboots |
-| SUSE SLES | `AWSSUSEDefaultPatchBaseline` | `AWS-RunPatchBaseline` | Kernel update reboots |
-| Windows Server 2012R2–2022 | `AWS-WindowsDefaultPatchBaseline` | `AWS-RunPatchBaseline` (uses `AWS-WindowsPatchBaseline` family on the baseline side) | Cumulative update reboots; `NoReboot=true` leaves `InstalledPending` |
-| macOS (EC2 Mac hosts) | `AWS-macOSDefaultPatchBaseline` | `AWS-RunPatchBaseline` | OS or firmware update reboots; macOS host may need `aws ssm start-automation-execution AWS-UpdateMacOS` flow |
-
-The default baseline only applies if no custom baseline is set as the
-regional default AND no `Patch Group` tag matches a custom baseline. Always
-verify which baseline is in effect for the specific instance before judging
-compliance.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#os-by-os-baseline-matrix).
+> Default baseline, default document, and reboot-on-Install semantics for AL2/AL2023, Ubuntu, RHEL, SLES, Windows, macOS; default only applies when no custom default and no Patch Group tag matches.
 
 ## Mindset
 
@@ -138,38 +119,8 @@ Driven by three Patch Manager realities:
 
 Run before classification. Misclassifying these produces wrong plans.
 
-**Pagination:** `describe-instance-information` returns 50/page by default
-— drain `--next-token` for fleet-wide operations. `describe-patch-states`
-paginates at 100/page. `list-compliance-items` paginates similarly.
-
-**Live-account pre-flight (skip if offline plan audit):**
-1. `aws ssm describe-instance-information --instance-information-filter-list
-   Key=InstanceIds,ValueSet=<id>` — confirm `PingStatus: Active` and
-   `LastPingDateTime` < 30 min ago. Capture `PlatformType`, `PlatformName`,
-   `PlatformVersion`, `ResourceType`, `IamRoleARN`.
-2. `aws ec2 describe-instances --instance-ids <id>` — confirm `State: running`
-   and capture the IAM instance profile, VPC, subnet, and tags. Diff against
-   SSM's view to find instances that have never appeared in SSM (silent
-   coverage gap).
-3. `aws ssm describe-patch-baselines --filters Key=OWNER,Values=Self,Key=OPERATING_SYSTEM,Values=<OS>`
-   — list custom baselines. Separately fetch AWS-owned:
-   `--filters Key=OWNER,Values=AWS`.
-4. `aws ssm get-patch-baseline-for-instance --instance-id <id>` — returns the
-   *effective* baseline for this instance (resolves default + `Patch Group`
-   tag + explicit association). This is the source of truth, not
-   `describe-patch-baselines`.
-5. `aws ssm describe-patch-states --instance-ids <id>` — last scan timestamp,
-   installed/missing counts by severity.
-6. `aws ssm list-compliance-items --resource-ids <id> --resource-types ManagedInstance`
-   — per-patch compliance rows.
-7. `aws ssm describe-instance-associations-status --instance-id <id>` — is
-   there a `AWS-ApplyPatchBaseline`/`AWS-RunPatchBaseline` association?
-   Which Operation?
-8. `aws ssm describe-maintenance-window-executions --window-id <id>` (if a
-   maintenance window is the target) — last execution status.
-9. (Optional, requires SSM document execution) `aws ssm send-command
-   --document-name AWS-RunShellScript --parameters commands=["df -m /",
-   "df -m /var"]` — confirm free disk space pre-Install.
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#pagination-and-live-account-pre-flight).
+> Pagination limits (50/page describe-instance-information, 100/page describe-patch-states) and the 9 live-account pre-flight probes: managed status, EC2 state, custom/AWS baselines, effective baseline, patch states, compliance rows, associations, MW executions, free-disk check.
 
 **Malformed input:** if the input JSON is invalid or missing required fields,
 emit `VERDICT: ERROR` with `REASON: Instance/operation configuration is not
@@ -196,94 +147,8 @@ json and aws ssm get-patch-baseline-for-instance --instance-id <id>
 
 ### Step 0: Expert knowledge — non-obvious Patch Manager behaviors
 
-These behaviors are easy to misjudge without operational SSM experience.
-Each changes a plan if ignored:
-
-- **`AWS-RunPatchBaseline` and `AWS-ApplyPatchBaseline` are two documents,
-  one family.** `AWS-RunPatchBaseline` is the modern document (Linux,
-  Windows, macOS). `AWS-ApplyPatchBaseline` is the legacy Windows-only
-  document kept for back-compat. Both accept `Operation: Scan | Install`.
-  New associations should use `AWS-RunPatchBaseline`.
-
-- **Default Operation is `Scan`.** A bare `send-command --document-name
-  "AWS-RunPatchBaseline"` with no `--parameters` runs Scan. An association
-  created without `Operation=Install` is also Scan. The single most common
-  "why are we still NON_COMPLIANT?" root cause is a Scan-only association
-  reporting green.
-
-- **`NoReboot=true` does not eliminate reboots; it defers them.** On
-  Windows, patches that require a reboot install but stay
-  `InstalledPending` until the next reboot. On Linux, a kernel update is
-  installed to disk and only activates on reboot. The host is technically
-  running stale code; compliance will show COMPLIANT only after reboot.
-  Never claim "patched without reboot" without surfacing the
-  `InstalledPending` state.
-
-- **Patch Group tag key is case-sensitive.** `Patch Group` (space, capital
-  G) is the recognized key. `patch group`, `PatchGroup`, `patch-group` are
-  NOT recognized — the instance falls back to the default baseline silently.
-  Always quote-tag in shell: `Key="Patch Group",Value=prod-linux-critical`.
-
-- **Custom baseline requires being "set as default" OR a matching Patch
-  Group.** Creating `pb-0123` with custom rules does nothing until either
-  `set-default-patch-baseline --baseline-id pb-0123 --operating-system
-  AMAZON_LINUX_2` is run (replaces the AWS default for that OS in that
-  region) OR a `Patch Group` tag value matches the baseline's name. A
-  custom baseline that is neither is dead configuration.
-
-- **Baseline rules are AND-ed across filters.** A rule with
-  `Classification=Security, Severity=Critical` installs only patches that
-  match BOTH. Multiple `PatchRules[]` entries are OR-ed (any rule match
-  qualifies the patch). Misreading this produces "we approved Critical but
-  nothing installed" when the patch was classified `Security/Important`.
-
-- **ApproveAfterDays counts from patch RELEASE, not from baseline creation.**
-  `ApproveAfterDays: 7` approves a patch 7 days after the upstream vendor
-  publishes it. A baseline created today with `ApproveAfterDays: 7` will
-  immediately approve any patch older than 7 days — a backdoor to "install
-  everything" on first run. Always test on a single instance first.
-
-- **Scan results report against the EFFECTIVE baseline, not the default.**
-  If the instance's effective baseline is custom and narrow, a Scan may
-  report `COMPLIANT` while a broad Security advisory is missing — it was
-  out-of-scope for the baseline. The compliance report is "compliant with
-  the configured baseline", not "all known CVEs are addressed".
-
-- **`Install` on a fleet without `--max-errors 0 --max-concurrency "10%"`
-  reboots the fleet simultaneously.** A bare `send-command --instance-ids
-  i-a,i-b,i-c,...,i-z` runs in parallel across all targets and reboots them
-  concurrently. Always use rate-control for fleet Installs.
-
-- **Maintenance Window target membership is computed at execution time.**
-  An instance added to the `Patch Group` tag mid-window is NOT picked up
-  that cycle. Always patch-target via `--targets Key=tag:Patch
-  Group,Values=<group>` on the maintenance window and verify membership
-  before the window opens.
-
-- **`AWS-RunPatchBaseline` reboots via the OS-native mechanism.** On Linux
-  this is `shutdown -r`. On Windows it is the Windows Update API reboot.
-  `NoReboot=true` suppresses BOTH — but a kernel patch on Linux still
-  requires eventual reboot to activate.
-
-- **Patch Manager does NOT auto-update the SSM Agent.** A separate
-  `AWS-UpdateSSMAgent` association is required. Old agents misreport
-  compliance on newer OSes (Amazon Linux 2023 in particular needs a
-  recent agent).
-
-- **`describe-patch-states` and `list-compliance-items` are eventually
-  consistent after a Scan.** Allow ~30 seconds to 2 minutes for the
-  compliance items to converge before re-checking. A "scan returned no
-  findings" immediately after `Operation=Scan` is usually eventual
-  consistency, not an empty result.
-
-- **Cross-account / cross-region patch baseline replication is manual.**
-  There is no native "replicate baseline" API. Export the baseline JSON
-  via `describe-patch-baseline`, then `create-patch-baseline` in the
-  destination account/region. The baseline ID will differ.
-
-- **Install with `Snapshot Ids` is for Debian/Ubuntu patch holds.** Ubuntu
-  snap-based packages can pin via `Snapshot Ids` in the baseline. Misuse
-  causes "Install no-op" because the snapshot version is held.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-0-expert-knowledge--non-obvious-patch-manager-behaviors).
+> Run-vs-Apply documents, Scan-only default, NoReboot deferral, Patch Group case sensitivity, dead custom baselines, AND/OR rule logic, ApproveAfterDays counted from patch release, effective-baseline reporting, fleet rate-control, MW target membership timing, OS-native reboot, agent not auto-updated, eventual consistency after Scan, manual cross-account/region replication, Ubuntu Snapshot Ids holds.
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
@@ -487,81 +352,13 @@ NOTES:
 
 ### Worked example — Scan-only association missing patches
 
-```text
-OPERATION: install
-VERDICT: BLOCKED
-TARGET: i-0fedcba9876543210
-PRE_CHECKS:
-  - [PASS] PingStatus Active
-  - [PASS] IAM role includes AmazonSSMManagedInstanceCore
-  - [PASS] EC2 State running
-  - [PASS] Free disk 22 GB on /
-  - [FAIL] Effective baseline is AWS-AmazonLinux2DefaultPatchBaseline
-    (no Patch Group tag, no custom baseline association). Operator intent
-    was "apply the prod-linux-critical baseline" — the instance is
-    silently on the AWS default. Install would apply the default-baseline
-    approved set, NOT the operator's prod-linux-critical rules.
-  - [PASS] Maintenance window mw-0bbb has the instance as a target
-STEPS: (none — pre-checks failed)
-POST_VERIFY: (none)
-COMPLIANCE_DELTA: (none)
-REBOOT: (none)
-NOTES:
-  - Either tag the instance for the prod-linux-critical baseline:
-      aws ec2 create-tags --resources i-0fedcba9876543210 \
-        --tags Key="Patch Group",Value=prod-linux-critical
-    then re-fetch get-patch-baseline-for-instance to confirm.
-  - OR set pb-0aaa1234 as the regional default for AMAZON_LINUX_2:
-      aws ssm set-default-patch-baseline \
-        --baseline-id pb-0aaa1234 --operating-system AMAZON_LINUX_2
-    (replaces AWS-AmazonLinux2DefaultPatchBaseline region-wide — review
-    blast radius before applying.)
-  - Re-run this skill after remediation; pre-checks will re-evaluate.
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#worked-example--scan-only-association-missing-patches).
+> Full BLOCKED block: no Patch Group tag so the effective baseline is the AWS default; remediation via create-tags Key="Patch Group" or set-default-patch-baseline.
 
 ### Worked example — Maintenance window register-task
 
-```text
-OPERATION: register-mw-task
-VERDICT: READY
-TARGET: mw-0bbb (prod-patch-window, cron 0 02 ? * SAT *)
-PRE_CHECKS:
-  - [PASS] mw-0bbb exists, enabled, schedule valid (Saturdays 02:00 UTC,
-    4 h duration, 1 h cutoff)
-  - [PASS] Targets: Key=tag:"Patch Group",Values=prod-linux-critical →
-    14 instances match
-  - [PASS] Service role arn:aws:iam::111111111111:role/service-role/AmazonSSMAutomationRole
-    trusts ssm.amazonaws.com
-  - [PASS] Task parameters: Operation=Install, RebootOption=NoReboot
-  - [PASS] Task invocation lambda/automation role attached
-STEPS:
-  1. CONFIRM: About to register-task-with-maintenance-window on mw-0bbb
-     in account 111111111111 region us-east-1. This will run
-     AWS-RunPatchBaseline Operation=Install on up to 14 instances tagged
-     Patch Group=prod-linux-critical every Saturday 02:00 UTC. Rate
-     control: max-concurrency 10%, max-errors 0. Proceed? (yes/no)
-  2. aws ssm register-task-with-maintenance-window \
-       --window-id mw-0bbb \
-       --targets "Key=tag:Patch Group,Values=prod-linux-critical" \
-       --task-arn "AWS-RunPatchBaseline" \
-       --task-type RUN_COMMAND \
-       --service-role-arn arn:aws:iam::111111111111:role/service-role/AmazonSSMAutomationRole \
-       --task-invocation-parameters '{"RunCommand":{"DocumentVersion":"$DEFAULT","Parameters":{"Operation":["Install"],"RebootOption":["NoReboot"],"SnapshotIds":[""]}}}' \
-       --max-concurrency "10%" --max-errors 0 \
-       --priority 1 \
-       --name "Install-Security-Patches"
-  3. aws ssm describe-maintenance-window-tasks --window-id mw-0bbb
-POST_VERIFY:
-  - (pending next execution)
-COMPLIANCE_DELTA: (will be reported after the next Saturday 02:00 UTC run)
-REBOOT: deferred (NoReboot; kernel patches activate on next reboot)
-NOTES:
-  - Verify target membership weekly: instances drift in/out of the Patch
-    Group tag.
-  - First execution is the next Saturday 02:00 UTC. To run immediately for
-    verification: aws ssm start-automation-execution or send a one-off
-    send-command to a single instance.
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#worked-example--maintenance-window-register-task).
+> Full READY block: register-task-with-maintenance-window with tag targets, NoReboot, max-concurrency 10% / max-errors 0, weekly target-membership verification.
 
 ## Anti-Patterns — NEVER do these things
 
@@ -689,44 +486,15 @@ NOTES:
 
 ## Recent AWS features (2024-2026)
 
-- **SSM Quick Setup patching (2024-2025):** Quick Setup now provides
-  pre-configured patching configurations deployable via CloudFormation
-  across an OU or entire organization. Operators should verify that Quick
-  Setup-managed baselines and associations are not locally overridden, and
-  that Quick Setup's "Patch Manager" configuration is the source of truth.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#recent-aws-features-2024-2026).
+> Quick Setup org-wide patching, Patch Manager for macOS, AL2023 baseline, Ubuntu 24.04 snap holds, SSM document versioning, PatchBaseline CloudFormation resources, Config PatchCompliance reporting.
 
-- **Patch Manager for macOS (2024-2025):** EC2 Mac hosts now support
-  Patch Manager via `AWS-macOSDefaultPatchBaseline`. macOS patching uses
-  `softwareupdate` under the hood and may require the
-  `AWS-UpdateMacOS` automation document for major-version upgrades. The
-  SSM Agent on macOS requires host-level registration via Mac dedicated
-  host setup.
+## References (load on demand)
 
-- **Amazon Linux 2023 patch baseline enhancements (2024):** Dedicated
-  baseline `AWS-AmazonLinux2023DefaultPatchBaseline` with dnf-based
-  package manager integration. Operators migrating from Amazon Linux 2
-  must update their custom baselines to OS = `AMAZON_LINUX_2023` — the
-  AmazonLinux2 baseline does NOT apply to AL2023.
-
-- **Ubuntu 24.04 LTS baseline (2024-2025):** Baseline
-  `AWS-UbuntuDefaultPatchBaseline` extended for Ubuntu 24.04 with snap
-  patch hold support via `Snapshot Ids` in baseline rules.
-
-- **SSM Document versioning (2024):** SSM Documents support explicit
-  versioning. Production associations should reference a specific
-  `$DEFAULT` or version, not `$LATEST`, to prevent implicit patch-rule
-  drift.
-
-- **Patch baseline as a CloudFormation resource (2024-2025):**
-  `AWS::SSM::PatchBaseline` and `AWS::SSM::PatchBaselineAttachment` are
-  GA, enabling baseline-as-code. Operators should verify that Cloud-
-  Formation-managed baselines are not locally edited (drift detection).
-
-- **Compliance reporting via AWS Config (2024):** SSM patch compliance
-  now publishes richer items to AWS Config (`AWS::SSM::PatchCompliance`),
-  enabling cross-account aggregation via Config aggregation. Operators
-  should verify that the Config aggregator includes the
-  `AWS::SSM::PatchCompliance` resource type.
+- [advanced-patterns](references/advanced-patterns.md) — OS-by-OS baseline matrix, cost/time baselines, Step 0 expert knowledge (non-obvious Patch Manager behaviors), Recent AWS features (2024-2026)
+- [diagnostic-commands](references/diagnostic-commands.md) — pagination limits and the nine live-account pre-flight probes moved from SKILL.md
+- [patch-baseline-design](references/patch-baseline-design.md) — baseline archetypes, approval-rule shapes, OS product taxonomy, Patch Group targeting, maintenance-window task contract
+- [worked-examples](references/worked-examples.md) — BLOCKED scan-only-association and READY maintenance-window register-task examples moved from SKILL.md
 
 ## Domain
 

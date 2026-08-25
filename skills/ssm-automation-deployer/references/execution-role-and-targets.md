@@ -250,3 +250,29 @@ Trust policy for the EventBridge role:
   ]
 }
 ```
+
+## Expert heuristic: target collection via resource groups (moved from SKILL.md)
+
+```text
+Target collection modes:
+
+  1. Explicit resource IDs:
+       Targets: [{Key: "InstanceIds", Values: ["i-aaa", "i-bbb"]}]
+       → Fixed set.
+
+  2. Resource group query:
+       Targets: [{Key: "ResourceGroup", Values: ["rg-prod-ec2"]}]
+       → Dynamic. Evaluated at execution time.
+
+  3. Tag-based query:
+       Targets: [{Key: "tag:Environment", Values: ["production"]}]
+       → Dynamic. All resources matching the tag.
+
+Rate control on dynamic targets:
+  MaxConcurrency: "10" or "10%"  → max parallel executions
+  MaxErrors: "3" or "1%"         → stop when exceeded
+```
+
+**Key implication:** dynamic targets enable fleet-wide operations
+(patch all production instances, remediate all non-compliant
+resources). Rate control prevents runaway execution.

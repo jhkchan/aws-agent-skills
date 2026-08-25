@@ -260,3 +260,42 @@ with `RequestResponse`. Set the API Gateway integration timeout to
 
 The API Gateway role needs `states:StartSyncExecution` on the
 state machine ARN.
+
+## Step 4 - Define the ASL with Express-compatible patterns (moved from SKILL.md)
+
+Write the ASL definition. For fan-out, use Inline Map (≤40
+concurrent) or Distributed Map (≤10,000 concurrent with S3 /
+DynamoDB ItemReader). For job-style integrations, use `.sync`.
+
+```json
+{
+  "StartAt": "FanOut",
+  "States": {
+    "FanOut": {
+      "Type": "Map",
+      "ItemProcessor": {
+        "ProcessorConfig": { "Mode": "DISTRIBUTED" },
+        "StartAt": "ProcessItem",
+        "States": {
+          "ProcessItem": {
+            "Type": "Task",
+            "Resource": "arn:aws:lambda:<REGION>:<ACCOUNT>:function:process-item",
+            "End": true
+          }
+        }
+      },
+      "ItemReader": {
+        "Resource": "arn:aws:states:::s3:getObject",
+        "Parameters": { "Bucket": "my-bucket", "Key": "input.json" }
+      },
+      "MaxConcurrency": 1000,
+      "End": true
+    }
+  }
+}
+```
+
+**Common mistake:** Inline Map on Express with > 40 concurrent
+iterations. Inline Map caps at 40 concurrent; the rest queue. For
+large fan-out on Express, use Distributed Map — but verify the
+total iteration time still fits in the 5-minute cap.

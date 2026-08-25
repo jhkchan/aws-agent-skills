@@ -176,3 +176,14 @@ aws ssm create-patch-baseline \
 Use this when the fleet is in a private VPC and uses a local mirror
 instead of the public Amazon Linux repos. Verify the mirror is
 reachable from the instances before deploying the baseline.
+
+## Appendix A — OS-specific baseline quick reference (moved from SKILL.md)
+
+| OS | Filter keys | Typical approval |
+|---|---|---|
+| AL2/AL2023 | `CLASSIFICATION`, `SEVERITY` | Critical: 0d; Medium: 7d |
+| Ubuntu | `CLASSIFICATION`, `PRIORITY` | Critical: 0d; Standard: 7d |
+| Windows | `MSRC_SEVERITY`, `CLASSIFICATION` | Critical: 3d (after Patch Tuesday) |
+| RHEL | `CLASSIFICATION`, `SEVERITY` | Critical: 0d; Medium: 7d |
+
+For detailed templates per OS, see **references/patch-baseline-templates.md**.

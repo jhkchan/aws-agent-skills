@@ -243,3 +243,28 @@ aws ssm describe-instance-associations-status --instance-id <i-id> --output json
 An association in `Running` state during the session failure window
 is the signature. Wait for the patch to complete, or reschedule the
 maintenance window outside session hours.
+
+
+
+### Session document schema (SSM-SessionManagerRunShell)
+
+```json
+{
+  "schemaVersion": "1.0",
+  "sessionType": "Standard_Stream",
+  "inputs": {
+    "s3BucketName": "",
+    "s3KeyPrefix": "",
+    "s3EncryptionEnabled": false,
+    "cloudWatchLogGroupName": "",
+    "cloudWatchStreamingEnabled": false,
+    "kmsKeyId": "",
+    "runAsEnabled": false,
+    "runAsDefaultUser": "",
+    "shellProfile": {"linux": "bash", "windows": "PowerShell"}
+  }
+}
+```
+
+Empty `s3BucketName` / `cloudWatchLogGroupName` disable those
+output paths. Sessions work but produce no audit trail.

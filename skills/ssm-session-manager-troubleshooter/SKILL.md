@@ -38,19 +38,8 @@ enabled). Most "session fails" tickets are one of these layers
 masquerading as a Session Manager bug. Diagnose the layer first,
 then the session-specific config.
 
-- **The 4-layer health check is the upstream gate.** If any of
-  client, IAM, connectivity, or agent is broken, no session can
-  start. Diagnose in that order — most failures resolve before
-  you reach the session-specific branches.
-- **`describe-sessions` + `describe-instance-information` are the
-  source of truth.** The console greys out buttons and shows a
-  generic "Connection refused"; the API returns the precise
-  `PingStatus`, `LastPingDateTime`, and session-state transitions.
-- **`ssmmessages.` is the Session Manager-specific endpoint.**
-  Many SSM health checks only verify `ssm.` and `ec2messages.` —
-  Session Manager also requires `ssmmessages.<region>`. A "managed"
-  instance with the other two endpoints can still fail to start a
-  session.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#mindset--operating-rules).
+> The 4-layer gate (client/IAM/connectivity/agent), describe-sessions + describe-instance-information as source of truth, ssmmessages. as the Session-Manager-specific endpoint.
 
 ## Quick navigation
 
@@ -105,11 +94,8 @@ ESCALATION_PATH: <if ESCALATE, the recommended path>
 
 ## Critical rules at a glance
 
-1. **Run the 4-layer health check FIRST.** Before any session-specific diagnosis, confirm: (1) session-manager-plugin installed and current on the client, (2) caller identity has `ssm:StartSession` + the target role has `ssmmessages:*` via `AmazonSSMManagedInstanceCore`, (3) target can reach `ssmmessages.<region>`, (4) SSM Agent >= 2.3.12.0 running and pinging.
-2. **Use `describe-instance-information`, not the console.** The console's "Start session" button greys out for many reasons. The API returns `PingStatus`, `LastPingDateTime`, and `AgentVersion` — the actual health signals.
-3. **`ssmmessages.` endpoint is Session Manager-specific.** The standard SSM health check verifies `ssm.` and `ec2messages.`; Session Manager requires all three. A "managed" instance with two endpoints still fails sessions.
-4. **`ssm-sessionmanager-console-perm` is separate from `ssm:StartSession`.** Console users need both. CLI-only users need only `ssm:StartSession` + the document/instance resources in the identity policy.
-5. **`IdleDisconnectTimeout` defaults to 20 minutes.** Sessions dropping at predictable intervals almost always trace to this setting or a NAT gateway idle timeout (default 350 seconds).
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#critical-rules-at-a-glance).
+> 4-layer health check first, describe-instance-information over console, ssmmessages endpoint is Session-Manager-specific, ssm-sessionmanager-console-perm separate from ssm:StartSession, IdleDisconnectTimeout default 20 min / NAT idle 350 s.
 
 ## NEVER (top 5)
 
@@ -121,12 +107,8 @@ ESCALATION_PATH: <if ESCALATE, the recommended path>
 
 ## Expert heuristic
 
-- If `aws ssm start-session` returns `TargetNotConnected` within 1-2 seconds, the failure is **IAM or agent registration** (the service rejected the request before attempting a data channel). Route to Steps 2-3.
-- If the session starts but drops after a predictable interval (e.g., always ~20 min or ~5 min 50 sec), the failure is **idle timeout** (Step 7) — check `IdleDisconnectTimeout` on the document and any NAT gateway idle timeout (350 sec).
-- If `start-session` returns `OperationalError` or `daemon error` from the session-manager-plugin, the failure is **client-side** — the plugin is missing, out of date, or the local `~/.ssm` directory has stale state.
-- If sessions work from one bastion but not another, the failure is **client environment** (plugin version, AWS CLI v1 vs v2, IAM identity of the caller) — not the target.
-- If port forwarding binds but immediately closes with `session terminated`, the failure is usually a **local-port conflict** or an `~/.ssh/config` `ProxyCommand` double-routing the tunnel. Test with a fresh port above 30000.
-- If only cross-account sessions fail, the failure is **the target-account trust policy or the KMS key policy** — same-account sessions do not exercise those policies.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic).
+> Fast routing: TargetNotConnected in 1-2 s = IAM/agent registration; predictable drops = idle timeout; plugin OperationalError = client side; bastion-dependent = client environment; port-forward instant close = local port conflict or ProxyCommand; cross-account-only = trust/KMS key policy.
 
 ## Pre-flight: data requirements
 
@@ -172,19 +154,8 @@ ESCALATION_PATH: None
 
 ### Step 0: Expert knowledge - non-obvious Session Manager behaviors
 
-- **The `ssmmessages.` endpoint is Session Manager-specific.** Many health checks only verify `ssm.` and `ec2messages.`. An instance can be "managed" (associations run, Run Command works) but still fail Session Manager if `ssmmessages.<region>` is unreachable. Always check all three.
-- **Agent version >= 2.3.12.0 is the Session Manager floor.** Earlier agents do not load the `mgs` (message gateway service) worker. `IsLatestVersion: true` on a 2.0.x agent still fails sessions.
-- **`ssm-sessionmanager-console-perm` is a managed policy for console users only.** CLI users with `ssm:StartSession` + `ssm:GetConnectionStatus` + `ssm:DescribeInstance*` + `ssm:TerminateSession` work fine without it. Mixing the two paths produces "works in CLI, fails in console" symptoms.
-- **`ssm:StartSession` resource scope matters.** A policy allowing `ssm:StartSession` on `*` works, but scoping to `arn:aws:ssm:<region>:<account>:instance/<instance-id>` fails if the caller passes a different instance-id. Verify the resource ARN matches the target.
-- **The `session-manager-plugin` is a separate binary from the AWS CLI.** Installing or upgrading the AWS CLI does NOT install or upgrade the plugin. The plugin has its own release cadence.
-- **SSH-over-Session-Manager requires `ssm:StartSession` with `SSM-SessionManagerRunShell` document.** If the user's policy scopes `ssm:StartSession` to a specific document that is NOT `SSM-SessionManagerRunShell`, SSH proxy fails.
-- **`IdleDisconnectTimeout` in the session-preferences document overrides the account default.** Verify the document referenced by the session, not the account-level setting, when diagnosing idle disconnects.
-- **NAT gateway idle timeout is 350 seconds.** Sessions that idle through the NAT gateway for > 350 sec get silently dropped by the NAT, not by SSM. This masquerades as "SSM drops my session."
-- **Port forwarding requires the local port to be free.** `--parameters portNumber=2222` fails instantly with `bind: address already in use` if another process holds the port. Always probe with `lsof -i :<port>` before retrying.
-- **Cross-account sessions require the KMS key policy to grant the caller account `kms:GenerateDataKey` and `kms:Decrypt`.** Same-account sessions rely on the caller identity policy; cross-account sessions also exercise the key policy. Many cross-account failures are KMS key policy, not IAM.
-- **The `mgs` (message gateway service) region must match the instance region.** A VPN or Client VPN that hairpins through another region can break Session Manager even though EC2 reachability tests pass.
-- **`session-manager-plugin` writes logs to `~/.ssm/logs/`.** Stale logs or a corrupted `~/.ssm/` directory can cause "OperationalError" on session start. Clearing the directory resolves it.
-- **Session Manager does NOT require inbound SSH (port 22) or RDP (port 3389) on the instance security group.** If a session works only after opening 22, the operator is using traditional SSH, not Session Manager — verify the session-manager-plugin is actually the transport.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#step-0-expert-knowledge---non-obvious-session-manager-behaviors).
+> ssmmessages endpoint specifics, agent >= 2.3.12.0 mgs floor, console-perm vs CLI, StartSession resource scoping, plugin separate from CLI, SSH-over-SSM document scoping, IdleDisconnectTimeout document override, NAT 350 s drops, local port conflicts, cross-account KMS key policy, mgs region match, stale ~/.ssm state, no inbound 22/3389 needed.
 
 ### Step 1: The 4-layer Session Manager health check (run FIRST)
 
@@ -314,17 +285,8 @@ plugin logs from `~/.ssm/logs/`).
 
 **Symptom:** `aws ssm start-session --document-name AWS-StartPortForwardingSession --parameters '{"portNumber":["22"]}'` fails or the tunnel closes immediately.
 
-```bash
-# Verify the document exists and the caller can use it
-aws ssm describe-document --name AWS-StartPortForwardingSession \
-  --query 'Document.[DefaultVersion,PlatformTypes]' --output table
-aws iam simulate-principal-policy --policy-source-arn <caller-arn> \
-  --action-names ssm:StartSession \
-  --resource-arns "arn:aws:ssm:<region>:<account>:document/AWS-StartPortForwardingSession" \
-  --query 'EvaluationResults[*].EvalDecision' --output text
-# Probe the local port before binding
-lsof -i :<local-port-number>
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-4--port-forwarding-diagnostic-commands).
+> describe-document AWS-StartPortForwardingSession, simulate-principal-policy on the port-forwarding document, and the lsof local-port probe.
 
 | Cause | Diagnostic signal | Fix |
 |---|---|---|
@@ -438,19 +400,8 @@ network path or run a long-running test session).
 cross-account session returns `AccessDeniedException` despite the
 caller having `ssm:StartSession`.
 
-```bash
-# Key pair: verify the EC2 key pair exists and the instance was launched with it
-aws ec2 describe-key-pairs --key-names <key-name> \
-  --query 'KeyPairs[*].[KeyName,KeyType]' --output table
-aws ec2 describe-instances --instance-ids <instance-id> \
-  --query 'Reservations[*].Instances[*].KeyName' --output text
-# Cross-account: verify the target-account role trust + KMS key policy
-aws iam simulate-principal-policy --policy-source-arn <caller-arn-in-source-account> \
-  --action-names ssm:StartSession ssm:GetConnectionStatus \
-  --query 'EvaluationResults[*].[EvalActionName,EvalDecision]' --output table
-aws kms describe-key --key-id <key-id> --query 'KeyMetadata.[KeyState,MultiRegion]' --output table
-aws kms get-key-policy --key-id <key-id> --policy-name default --output text
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-8--latest-feature-diagnostic-commands-key-pair-cross-account).
+> describe-key-pairs, describe-instances KeyName, cross-account simulate-principal-policy, kms describe-key and get-key-policy probes.
 
 | Cause | Diagnostic signal | Fix |
 |---|---|---|
@@ -507,81 +458,13 @@ ESCALATION_PATH: None
 
 ### Worked example - NEED_MORE_INFO, SessionDisconnects (intermittent)
 
-```text
-DIAGNOSIS: intermittent-drop-prod
-INSTANCE: i-0fedcba9876543210
-SESSION: jacky-0a1b2c3d4example
-SYMPTOM: SessionDisconnects
-ROOT_CAUSE: Pending diagnosis - session drops at irregular
-            intervals (not aligned to IdleDisconnectTimeout or
-            NAT 350s). Agent and connectivity layers pass. Need
-            session-manager-plugin client log and a long-running
-            test session to correlate.
-EVIDENCE:
-  - describe-sessions: SessionId=jacky-0a1b2c3d4example, Duration=4m12s, TerminateReason=ConnectionLost
-  - describe-instance-information: PingStatus=Active, LastPingDateTime within last 2 min
-  - IdleDisconnectTimeout=20m (not the cause - drop at 4m12s)
-LAYER_CHECK:
-  - Client: PASS - session-manager-plugin 1.2.612.0
-  - IAM: PASS - ssm:StartSession allowed
-  - Connectivity: PASS - ssmmesages endpoint present, SG 443 open
-  - Agent: PASS - AgentVersion 3.3.131.0, IsLatestVersion true
-FIX: (pending root cause)
-VERIFICATION: (pending fix)
-VERDICT: NEED_MORE_INFO
-NEXT_STEP: Capture the session-manager-plugin log from the client
-  during the next drop event:
-    tail -f ~/.ssm/logs/sessionmanagerplugin.log
-  Concurrently, on the instance (via another working session):
-    tail -f /var/log/amazon/ssm/amazon-ssm-agent.log | grep -i mgs
-  Correlate timestamps to identify whether the drop is client,
-  network, or agent side. If the drop aligns with a CloudWatch
-  NetworkOut dip, route to VPC connectivity.
-ESCALATION_PATH: If correlation points to an SSM-side issue, escalate
-  to AWS Support with the session-id and the correlated logs.
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#worked-example---need_more_info-sessiondisconnects-intermittent).
+> Full NEED_MORE_INFO block: drops at 4m12s not aligned to any timeout; NEXT_STEP correlates sessionmanagerplugin.log with amazon-ssm-agent.log mgs entries.
 
 ### Worked example - ESCALATE, cross-account KMS key policy
 
-```text
-DIAGNOSIS: cross-acct-session-kms
-INSTANCE: i-0bbb222ddd333eee4 (in account 222222222222)
-SESSION: none - not started
-SYMPTOM: LatestFeature (cross-account)
-ROOT_CAUSE: KMS key arn:aws:kms:us-east-1:222222222222:key/abc123
-            in the target account does not grant the source-account
-            caller kms:GenerateDataKey. The key policy allows only
-            the target account root. Cross-account Session Manager
-            requires the key policy to grant the source-account
-            principal.
-EVIDENCE:
-  - aws ssm start-session from source account 111111111111 returned: AccessDeniedException ... kms:GenerateDataKey
-  - aws kms get-key-policy shows Statement Principal = {"AWS":"arn:aws:iam::222222222222:root"} only
-LAYER_CHECK:
-  - Client: PASS - session-manager-plugin 1.2.612.0
-  - IAM: PASS - source-account caller has ssm:StartSession via the cross-account role
-  - Connectivity: PASS - ssmmesages endpoint present in target VPC
-  - Agent: PASS - AgentVersion 3.3.131.0
-FIX: Cannot remediate from the source account alone - the KMS key
-  policy must be modified in the target account. Requires
-  target-account key admin access.
-VERIFICATION: After key policy update:
-  aws kms describe-key --key-id arn:aws:kms:us-east-1:222222222222:key/abc123 --query 'KeyMetadata.KeyState' --output text --profile target-account-admin
-  Expect: Enabled. Then re-run start-session from the source account.
-VERDICT: ESCALATE
-NEXT_STEP: Provide the target-account key admin with this statement
-  to add to the key policy:
-  {
-    "Sid": "AllowSourceAccountSessionManager",
-    "Effect": "Allow",
-    "Principal": {"AWS": "arn:aws:iam::111111111111:root"},
-    "Action": ["kms:GenerateDataKey", "kms:Decrypt"],
-    "Resource": "*"
-  }
-ESCALATION_PATH: Target-account KMS key administrator must update the
-  key policy on arn:aws:kms:us-east-1:222222222222:key/abc123. This
-  cannot be done from the source account.
-```
+> Moved to [references/worked-examples.md](references/worked-examples.md#worked-example---escalate-cross-account-kms-key-policy).
+> Full ESCALATE block: target-account KMS key policy lacks the source-account principal; includes the exact key-policy statement to hand to the target-account key admin.
 
 ## Anti-Patterns - NEVER do these things
 
@@ -601,40 +484,20 @@ ESCALATION_PATH: Target-account KMS key administrator must update the
 
 ## Appendix A - Symptom-to-cause map (quick reference)
 
-| Symptom | Most common root cause | Verify via |
-|---|---|---|
-| TargetNotReachable - EC2 | No instance profile / wrong policy / agent down | `describe-instance-information` + `describe-instances` |
-| TargetNotReachable - private subnet | `ssmmessages.` endpoint missing | `describe-vpc-endpoints` |
-| TargetNotReachable - hybrid `mi-*` | Activation expired | `describe-activations` |
-| TargetNotReachable - fresh launch | Agent still bootstrapping (< 5 min) | `LaunchTime` vs current time |
-| SessionFailsToStart - AccessDenied | Caller lacks `ssm:StartSession` | `simulate-principal-policy` |
-| SessionFailsToStart - console greyed out | Console user lacks `ssm-sessionmanager-console-perm` | Identity policy check |
-| SessionFailsToStart - plugin not found | Client missing `session-manager-plugin` | `session-manager-plugin --version` |
-| SessionFailsToStart - KMS | Key policy blocks `kms:GenerateDataKey` | `get-key-policy` |
-| PortForwardingFails - bind error | Local port in use | `lsof -i :<port>` |
-| PortForwardingFails - double route | `~/.ssh/config` ProxyCommand conflict | Inspect SSH config |
-| PortForwardingFails - AccessDenied | `ssm:StartSession` not scoped to `AWS-StartPortForwardingSession` | `simulate-principal-policy` |
-| ShellAccessFails - agent too old | `AgentVersion` < 2.3.12.0 | `describe-instance-information` |
-| ShellAccessFails - shell missing | `/bin/bash` not present; `/etc/passwd` shell is `/sbin/nologin` | `send-command` with `ls /bin/bash` |
-| VpcConnectivity - endpoint missing | `ssmmessages.` or `ec2messages.` not in VPC | `describe-vpc-endpoints` |
-| VpcConnectivity - SG blocks 443 | Endpoint SG ingress lacks instance subnet CIDR | `describe-security-groups` |
-| VpcConnectivity - private DNS off | `PrivateDnsEnabled: false` on endpoint | `describe-vpc-endpoints` |
-| SessionDisconnects - idle | `Duration` matches `IdleDisconnectTimeout` | `describe-sessions` |
-| SessionDisconnects - NAT 350s | Drop at ~5m50s of idle; NAT idle timeout | Network path audit |
-| SessionDisconnects - SSO token | Caller session expired | `aws sts get-caller-identity` failure |
-| LatestFeature - SSH key | Instance launched without key pair; or ProxyCommand missing | `describe-instances KeyName` + SSH config |
-| LatestFeature - cross-account | Target-account KMS key policy or role trust gap | `get-key-policy` + trust policy |
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#appendix-a---symptom-to-cause-map-quick-reference).
+> 21-row symptom-to-cause-to-verify table covering TargetNotReachable, SessionFailsToStart, PortForwardingFails, ShellAccessFails, VpcConnectivity, SessionDisconnects, and LatestFeature branches.
 
 ## Recent AWS features (2024-2026)
 
-- **Session Manager key pair support (2024-2025):** Instances launched with an EC2 key pair can use SSH-over-Session-Manager without inbound port 22. Verify the instance `KeyName` is set and the client SSH config has the `ProxyCommand aws ssm start-session` for `Host i-* mi-*`.
-- **Cross-account Session Manager (2024-2025):** Sessions can target instances in another account via STS assumed roles. Requires both the IAM trust AND the KMS key policy to grant the source-account principal. Most cross-account failures are KMS key policy, not IAM.
-- **Session Manager streaming to CloudWatch Logs (2024):** Session output can stream to CloudWatch Logs. Verify the `SSM-SessionManagerRunShell` `cloudWatchStreamingEnabled` and the instance role has `logs:CreateLogStream`, `logs:PutLogEvents`.
-- **Session Manager streaming to S3 (2024-2025):** Session output can be archived to S3. Verify the `s3EncryptionEnabled` and `outputS3BucketName` and the instance role has `s3:PutObject` on the bucket.
-- **Enhanced port forwarding and SSH proxy (2024-2025):** Native SSH proxy supports `Host i-* mi-*` in `~/.ssh/config`. Verify the client uses the latest `session-manager-plugin` (>= 1.2.x) and the ProxyCommand syntax matches the plugin version.
-- **Session Manager for ECS Exec (2024-2025):** ECS Exec uses Session Manager under the hood. Verify the task role has `ssmmessages:CreateControlChannel`, `CreateDataChannel`, `OpenControlChannel`, `OpenDataChannel`.
-- **MGS (Message Gateway Service) region expansion (2025-2026):** New regions require `ssmmessages.<region>` endpoint deployment. Verify endpoints in all regions where sessions run.
-- **Session encryption with customer-managed KMS keys (2024-2026):** Session prefs can reference a customer-managed KMS key. Verify the key is enabled and the key policy grants both the caller and the instance role.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#recent-aws-features-2024-2026).
+> Key-pair SSH-over-SSM, cross-account sessions, CloudWatch Logs / S3 streaming, enhanced port forwarding and SSH proxy, ECS Exec via ssmmessages, MGS region expansion, customer-managed KMS session encryption.
+
+## References (load on demand)
+
+- [advanced-patterns](references/advanced-patterns.md) — Critical rules at a glance, Mindset operating rules, expert-heuristic routing, Step 0 non-obvious Session Manager behaviors, Recent AWS features (2024-2026)
+- [diagnostic-commands](references/diagnostic-commands.md) — Appendix A symptom-to-cause map plus Step 4 / Step 8 probe commands moved from SKILL.md
+- [ssm-session-manager-diagnostics](references/ssm-session-manager-diagnostics.md) — diagnostic command quick lookup, agent-log interpretation, symptom mapping
+- [worked-examples](references/worked-examples.md) — NEED_MORE_INFO intermittent-disconnect and ESCALATE cross-account KMS examples moved from SKILL.md
 
 ## Domain
 

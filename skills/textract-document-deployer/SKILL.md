@@ -324,166 +324,38 @@ extraction takes more than a few seconds, use async.
 
 ## Step 3 — S3 document source and output config
 
-The async APIs require an S3 location for input. The OutputConfig
-parameter writes structured JSON results to a customer-owned S3 bucket.
-
-```bash
-aws textract start-document-analysis \
-  --document-location '{"S3Object":{"Bucket":"my-input-bucket","Name":"invoices/2026/q3/batch-001.pdf"}}' \
-  --feature-types '["FORMS","TABLES"]' \
-  --output-config '{"S3Bucket":"my-output-bucket","S3Prefix":"textract-output/"}' \
-  --notification-channel '{"SNSTopicArn":"arn:aws:sns:us-east-1:123456789012:TextractComplete","RoleArn":"arn:aws:iam::123456789012:role/TextractNotificationRole"}' \
-  --region us-east-1
-```
-
-OutputConfig writes per-page JSON plus structured CSV summaries
-(`key-values/`, `queries-results/`, `tables/`) to your bucket. Full
-OutputConfig directory layout is in `references/async-and-s3.md`. The
-OutputConfig bucket MUST be in the same region as the Textract job —
-cross-region S3 causes `InvalidS3Object` or similar errors.
+OutputConfig + S3Prefix layout, same-region bucket requirement — moved verbatim.
+Full detail: [Async APIs and S3 output](references/async-and-s3.md).
 
 ## Step 4 — KMS encryption
 
-Textract supports KMS encryption for both input documents (if stored
-encrypted in S3) and output JSON. Specify the KMS key ID via
-`--kms-key-id`.
-
-```bash
-aws textract start-document-analysis \
-  --document-location '{"S3Object":{"Bucket":"my-input-bucket","Name":"encrypted/batch-001.pdf"}}' \
-  --feature-types '["FORMS","TABLES","QUERIES"]' \
-  --queries-config '{"Queries":[{"Text":"What is the invoice total?"}]}' \
-  --output-config '{"S3Bucket":"my-output-bucket","S3Prefix":"textract-encrypted/"}' \
-  --kms-key-id arn:aws:kms:us-east-1:123456789012:key/abcd1234-... \
-  --region us-east-1
-```
-
-**KMS key policy requirements:** the Textract service principal
-(`textract.amazonaws.com`) must have `kms:GenerateDataKey` and
-`kms:Decrypt` on the key. The calling role must have `kms:Decrypt` for
-reading encrypted input. Full key policy JSON with the
-`aws:SourceAccount` confused-deputy condition is in
-`references/async-and-s3.md`.
+KMS key id, key-policy grants (kms:GenerateDataKey / kms:Decrypt) — moved verbatim.
+Full detail: [Async APIs and S3 output](references/async-and-s3.md).
 
 ## Step 5 — SNS notification for async completion
 
-The NotificationChannel parameter configures an SNS topic that
-Textract publishes to when the async job completes (success or
-failure).
-
-```bash
-aws textract start-document-analysis \
-  --document-location '{"S3Object":{"Bucket":"my-input","Name":"batch.pdf"}}' \
-  --feature-types '["FORMS","TABLES"]' \
-  --notification-channel '{"SNSTopicArn":"arn:aws:sns:us-east-1:123456789012:TextractComplete","RoleArn":"arn:aws:iam::123456789012:role/TextractNotificationRole"}' \
-  --region us-east-1
-```
-
-**Notification role:** the RoleArn must trust `textract.amazonaws.com`
-and have `sns:Publish` on the topic. Full trust + permission policy
-JSON is in `references/async-and-s3.md`.
-
-The SNS message body includes `JobId`, `Status` (SUCCEEDED / FAILED),
-and `API` (e.g., StartDocumentAnalysis). Wire this to a Lambda or SQS
-queue for downstream processing.
+NotificationChannel RoleArn + SNSTopicArn, SNS message body fields — moved verbatim.
+Full detail: [Async APIs and S3 output](references/async-and-s3.md).
 
 ## Step 6 — Lambda integration for real-time extraction
 
-For single-page or low-page documents with real-time SLAs, deploy
-Textract behind a Lambda function using the synchronous
-`AnalyzeDocument` API. Full Python handler and IAM policy are in
-`references/sync-and-lambda.md`; the core call is:
-
-```python
-import boto3
-textract = boto3.client("textract")
-
-def lambda_handler(event, context):
-    bucket = event["Records"][0]["s3"]["bucket"]["name"]
-    key = event["Records"][0]["s3"]["object"]["key"]
-    response = textract.analyze_document(
-        Document={"S3Object": {"Bucket": bucket, "Name": key}},
-        FeatureTypes=["FORMS", "TABLES"]
-    )
-    return {"statusCode": 200, "body": response["Blocks"]}
-```
-
-**Lambda IAM policy (minimum):** `textract:AnalyzeDocument` on `*`
-and `s3:GetObject` on the input bucket. See the reference for the
-full JSON.
-
-**Critical:** Lambda's synchronous AnalyzeDocument has the same
-per-call page limits as the direct API. For multipage, route through
-Step Functions with the async StartDocumentAnalysis API instead.
+Python handler, minimum Lambda IAM policy, sync page-limit caveat — moved verbatim.
+Full detail: [Sync APIs and Lambda](references/sync-and-lambda.md).
 
 ## Step 7 — Bounding boxes and confidence scores
 
-Every Textract Block (WORD, LINE, KEY_VALUE_SET, TABLE, CELL, SIGNATURE,
-QUERY) includes:
-
-- **Geometry:** `BoundingBox` (Top, Left, Width, Height as fractions of
-  page dimensions) and `Polygon` (list of points). Use these to draw
-  overlays or extract regions.
-- **Confidence:** float 0-100. Use a threshold (typically 50-90%) to
-  filter low-confidence extractions in downstream validation.
-
-```python
-# Filter low-confidence form values
-CONFIDENCE_THRESHOLD = 75.0
-for block in response["Blocks"]:
-    if block["BlockType"] == "KEY_VALUE_SET":
-        confidence = block["Confidence"]
-        if confidence < CONFIDENCE_THRESHOLD:
-            print(f"Low confidence: {confidence:.1f}% — review manually")
-```
-
-**Key implication:** confidence scores are the primary signal for
-human-in-the-loop review workflows. Set a threshold that matches your
-accuracy SLA; route low-confidence extractions to a manual review
-queue.
+BoundingBox/Polygon geometry, confidence-threshold filtering pattern — moved verbatim.
+Full detail: [Sync APIs and Lambda](references/sync-and-lambda.md).
 
 ## Step 8 — Document splitting for large PDFs
 
-Textract does NOT split oversized documents. For PDFs over 3000 pages,
-split the document customer-side (e.g., with `PyPDF2` or `qpdf`) before
-invoking Textract. Submit each chunk as a separate
-StartDocumentAnalysis job and aggregate downstream using chunk index
-and page offsets. Full splitting code is in
-`references/async-and-s3.md`.
-
-```python
-# Pattern: split into ≤3000-page chunks, submit one job per chunk
-chunks = split_pdf("s3://doc-input/large.pdf", pages_per_chunk=2500)
-for i, chunk in enumerate(chunks):
-    submit_textract_job(chunk, tag=f"large-part-{i:04d}")
-```
-
-**Key implication:** the 3000-page limit is a hard quota. Plan for
-document splitting in any document-management pipeline that handles
-large reports, contracts, or regulatory filings.
+3000-page hard limit, chunk-and-submit pattern — moved verbatim.
+Full detail: [Async APIs and S3 output](references/async-and-s3.md).
 
 ## Step 9 — Comprehend integration for downstream NLP
 
-Textract output (raw text or form values) can be passed to Amazon
-Comprehend for entity detection, key phrase extraction, sentiment
-analysis, PII detection, or custom classification. Full pipeline code
-is in `references/sync-and-lambda.md`; the pattern is:
-
-```python
-textract = boto3.client("textract")
-comprehend = boto3.client("comprehend")
-
-# Extract text, then run NLP on the result
-doc = textract.detect_document_text(Document={"S3Object": {...}})
-text = " ".join(b["Text"] for b in doc["Blocks"] if b["BlockType"] in ("LINE", "WORD"))
-entities = comprehend.detect_entities(Text=text[:100_000], LanguageCode="en")
-pii = comprehend.detect_pii_entities(Text=text[:5_000], LanguageCode="en")
-```
-
-**Critical:** Comprehend has its own quotas — 100 KB per synchronous
-`DetectEntities` call, 5 KB per `DetectPiiEntities` call. For larger
-documents, use async `StartEntitiesDetectionJob` or chunk the Textract
-output.
+entities / PII chaining, Comprehend size quotas — moved verbatim.
+Full detail: [Sync APIs and Lambda](references/sync-and-lambda.md).
 
 ## Step 10 — Identity documents and signatures
 
@@ -503,39 +375,8 @@ SIGNATURE Block with a bounding box.
 
 ## Step 11 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Queries feature GA (2023-2024):** Natural-language question
-  answering on forms. More flexible than FORMS key-value extraction
-  for variable-layout documents. Available in both sync
-  (AnalyzeDocument) and async (StartDocumentAnalysis) APIs.
-
-- **Signatures feature GA (2023-2024):** Bounding-box detection of
-  signatures on documents. Available via AnalyzeDocument with
-  FeatureTypes=["SIGNATURES"].
-
-- **Expense Analysis improvements (2023-2024):** Enhanced vendor name
-  and line-item extraction accuracy. OutputConfig now supports
-  structured CSV outputs for queries and tables.
-
-- **Lending Analysis (2023-2024):** Specialized async API
-  (StartLendingAnalysis) for mortgage and lending documents
-  (pay stubs, W-2s, 1099s, bank statements).
-
-- **Layout feature (2023-2024):** AnalyzeDocument with
-  FeatureTypes=["LAYOUT"] returns reading-order structural elements
-  (titles, headers, footers, sections).
-
-- **OutputConfig enhancements (2024-2025):** Per-page JSON output and
-  structured CSV files (key-values, queries-results, tables) written
-  directly to S3, reducing Get* pagination overhead.
-
-- **European region expansion (2024-2025):** Textract available in
-  additional EU regions (eu-west-3, eu-south-1, eu-north-1).
-
-- **General Availability in APAC (2024-2025):** Textract GA in
-  ap-southeast-3 (Jakarta) and ap-east-1 (Hong Kong), expanding
-  options for APAC data-residency requirements.
+Queries GA, Signatures GA, Expense CSV output, Lending, Layout, EU/APAC expansion — moved verbatim.
+Full detail: [Advanced patterns](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -642,37 +483,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### InvalidS3Object exception
-- The S3 object is missing, in the wrong region, or the IAM role lacks
-  s3:GetObject. Verify the bucket and object key, confirm the region
-  matches the Textract API region, and review the IAM policy.
+InvalidS3Object, KMS AccessDenied, IN_PROGRESS/FAILED, ProvisionedThroughputExceeded, Lambda timeout, empty Queries — moved verbatim.
+Full detail: [Error handling](references/error-handling.md).
 
-### AccessDeniedException on KMS
-- The Textract service principal (or caller role) lacks kms:Decrypt
-  (for encrypted input) or kms:GenerateDataKey (for encrypted output).
-  Update the KMS key policy to grant the required actions.
+## References (load on demand)
 
-### Job status IN_PROGRESS or FAILED
-- For IN_PROGRESS, poll GetDocumentAnalysis with nextToken until Status
-  is SUCCEEDED or FAILED. For FAILED, check the SNS message for the
-  error reason (common: oversized PDF, unsupported format, KMS
-  access).
-
-### ProvisionedThroughputExceeded
-- The Textract transaction rate exceeds the account quota. Request a
-  quota increase via the AWS Support Center, or throttle the client.
-
-### Lambda timeout on synchronous AnalyzeDocument
-- The document is too large for the Lambda timeout, or too many pages
-  for the sync API. Reduce the document size, increase the Lambda
-  timeout and memory (proportionally), or switch to the async API
-  with Step Functions for polling.
-
-### Queries results empty
-- The QUERIES FeatureType was specified without a QueriesConfig block,
-  or the queries are not answerable from the document. Verify
-  QueriesConfig is present and the queries reference fields visible on
-  the page.
+- [Async APIs and S3 output](references/async-and-s3.md) — async API mechanics, OutputConfig layout, KMS key policy, SNS notification role, document splitting
+- [Sync APIs and Lambda](references/sync-and-lambda.md) — sync API limits, Lambda handler + IAM, bounding boxes and confidence filtering, Comprehend NLP chaining
+- [Advanced patterns](references/advanced-patterns.md) — recent features (Queries, Signatures, Layout, Lending, OutputConfig CSV, region expansion)
+- [Error handling](references/error-handling.md) — InvalidS3Object, KMS AccessDenied, job status, throughput, Lambda timeout, empty Queries
 
 ## Domain
 

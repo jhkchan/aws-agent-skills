@@ -333,3 +333,96 @@ No Catcher, or Catcher ErrorEquals does not match
   inline Map re-runs the whole Map.
 - Input payload at the failed state may differ from what the operator
   expects — read the `StateEntered` event from the original history.
+
+
+
+## Step 4 — TASK_FAILED diagnostic walk
+
+**Diagnostic walk:**
+
+1. **Read the `cause` field verbatim.** It is often JSON-encoded; parse
+   it to extract `errorMessage`, `errorType`, `requestId`.
+2. **Cross-reference with the integration's own logs:**
+   - Lambda: `aws logs get-log-events` on `/aws/lambda/<function>`.
+   - DynamoDB: CloudTrail `LookupEvents` for the failing API.
+   - Glue/Athena/Batch: the integration's own CloudWatch Logs.
+3. **Identify whether the error is retryable.** `ThrottlingException`,
+   `ServiceUnavailable`, `ProvisionedThroughputExceededException` are
+   retryable; `ResourceNotFoundException`, `ValidationException` are
+   not. Match the `Retry[].ErrorEquals` array to the error type.
+
+
+## Step 5 — PERMISSION_DENIED diagnostic walk
+
+**Diagnostic walk:**
+
+1. **Identify the role the state machine assumes.** Read
+   `describe-state-machine` → `roleArn`.
+2. **Identify the action and resource the failing state needs.** Read
+   the state's `Resource` (for direct integrations) or `Parameters`
+   (for `.sync` integrations).
+3. **Simulate the role:**
+
+   ```bash
+   aws iam simulate-principal-policy \
+     --policy-source-arn <state-machine-role-arn> \
+     --action-names <service>:<Action> \
+     --resource-arns <resource-arn>
+   ```
+
+4. **For cross-account, also read the resource policy in the target
+   account.** The role in A AND the resource policy in B must both
+   allow the action.
+
+
+## Step 6 — PARAMETER_PATH_FAILURE diagnostic walk
+
+**Diagnostic walk:**
+
+1. **Read the failing state's `Parameters` block.** Each key ending in
+   `.$` must reference a path that exists in the input.
+2. **Read the input payload to the failing state** from
+   `get-execution-history` (look for the `StateEntered` event with
+   `input`).
+3. **Cross-reference each `.$` path** against the actual input.
+
+
+## Step 7 — BRANCH_FAILED diagnostic walk
+
+**Diagnostic walk:**
+
+1. **Read the `Map` or `Parallel` state definition** to enumerate the
+   branches or iteration configuration.
+2. **For Distributed Map**, the child execution ARNs are surfaced in
+   the parent execution history. Read each child's history to find the
+   actual failing state.
+3. **For inline Map / Parallel**, the branch errors are surfaced in the
+   parent execution history under `mapIterationFailed` or similar
+   events.
+
+
+## Step 8 — RETRY_EXHAUSTED diagnostic walk
+
+**Diagnostic walk:**
+
+1. **Read the `Retry` array** in the failing state's definition.
+2. **Count `TaskFailed` events** in the execution history for this
+   state — should equal `MaxAttempts + 1` if retries fired correctly.
+3. **Check the Catcher** — if absent or if `ErrorEquals` does not
+   match, the execution fails terminally.
+
+
+## Root-cause catalog (top 10)
+
+| # | Root cause | Category | Fix pattern |
+|---|---|---|---|
+| 1 | Invalid JSONPath in `InputPath` / `ResultPath` / `Parameters` | RUNTIME_ERROR | Align path with actual payload shape |
+| 2 | Task `TimeoutSeconds` < integration p99 latency | TASK_TIMEOUT | Raise `TimeoutSeconds` or switch to asynchronous `.sync` pattern |
+| 3 | State machine role lacks action on resource | PERMISSION_DENIED | Attach scoped IAM policy to the role |
+| 4 | Cross-account resource policy does not trust the state machine role | PERMISSION_DENIED | Update target resource policy in target account |
+| 5 | `Retry[].ErrorEquals` does not include the actual error | RETRY_EXHAUSTED | Add the error name to `ErrorEquals` |
+| 6 | Catcher `ErrorEquals: ["States.TaskFailed"]` misses `States.Timeout` | CATCH_MISCONFIGURED | List all expected errors OR use `States.ALL` |
+| 7 | Express workflow exceeds 5-minute cap | EXECUTION_LIMIT_HIT | Refactor or migrate to Standard |
+| 8 | Downstream `ProvisionedThroughputExceededException` exhausted retries | TASK_FAILED / RETRY_EXHAUSTED | Raise downstream capacity; extend retry budget |
+| 9 | Activity worker not calling `SendTaskHeartbeat` | TASK_TIMEOUT | Fix worker heartbeat cadence |
+| 10 | Map state `ItemsPath` points to a non-array | PARAMETER_PATH_FAILURE / BRANCH_FAILED | Fix `ItemsPath` or upstream payload |

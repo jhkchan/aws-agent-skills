@@ -233,3 +233,77 @@ account A, the caller's identity policy needs:
 The `states:StateMachineArn` condition key can scope which state
 machines the caller can target — useful for tenant-isolation
 patterns in multi-tenant SaaS.
+
+## Step 5 - Create the IAM execution role with least-privilege (moved from SKILL.md)
+
+```bash
+cat > trust-policy.json <<'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": { "Service": "states.<REGION>.amazonaws.com" },
+    "Action": "sts:AssumeRole"
+  }]
+}
+EOF
+
+aws iam create-role --role-name <ROLE_NAME> \
+  --assume-role-policy-document file://trust-policy.json
+```
+
+The inline policy MUST scope each integration to specific ARNs:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    { "Effect": "Allow", "Action": "lambda:InvokeFunction",
+      "Resource": "arn:aws:lambda:<REGION>:<ACCOUNT>:function:process-item" },
+    { "Effect": "Allow", "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::my-bucket/input.json" }
+  ]
+}
+```
+
+**Common mistake:** granting `lambda:InvokeFunction` on `*` and
+forgetting an AWS SDK integration calls a different action
+(e.g., `lambda:UpdateFunctionCode`). Scope to the exact ARNs.
+
+## Step 6 - Configure logging (CloudWatch Logs) (moved from SKILL.md)
+
+Logging is NOT enabled by default. Without it, async Express
+executions are invisible after the 5-minute execution-history
+rollover.
+
+```bash
+# Create the log group with retention
+aws logs create-log-group --log-group-name /aws/states/<NAME>
+aws logs put-retention-policy --log-group-name /aws/states/<NAME> \
+  --retention-in-days 30
+```
+
+Attach the log group at create-time:
+
+```bash
+aws stepfunctions create-state-machine \
+  --name <NAME> --definition file://definition.json \
+  --role-arn arn:aws:iam::<ACCOUNT>:role/<ROLE_NAME> \
+  --type EXPRESS \
+  --logging-configuration \
+    level=ALL,includeExecutionData=true,\
+    destinations='[{CloudWatchLogsLogGroup={LogGroupArn=arn:aws:logs:<REGION>:<ACCOUNT>:log-group:/aws/states/<NAME>:*}}]'
+```
+
+The level choices:
+- `ALL`: log Start, StateEntered, StateExited, End. Highest volume; full RCA.
+- `ERROR`: log only failures and state errors. Lower cost; cannot debug successful-path issues.
+- `FATAL`: log only workflow-level fatal errors. Near-useless for debugging.
+- `OFF`: no logging. NEVER for async Express — failures are invisible.
+
+`includeExecutionData=true` records input/output at each transition. Without it, logs show only metadata.
+
+**Common mistake:** setting `includeExecutionData=false` to save
+cost on a PII workflow, then being unable to RCA a production
+failure. Redact PII at workflow input; do NOT disable execution
+data wholesale.

@@ -255,3 +255,58 @@ for > 5min waits; Express caps at 5min)
   `LoggingConfiguration` require `logs:CreateLogDelivery`,
   `logs:PutLogEvents`, `logs:DescribeLogGroups`, `logs:GetLogDelivery`,
   `logs:UpdateLogDelivery` on the role, or logging silently fails.
+
+## Step 3 - Service integrations: Resource ARN patterns (moved from SKILL.md)
+
+The `Resource` field of a `Task` state selects both the service AND the
+integration semantics via the ARN suffix:
+
+| Resource pattern | Semantics | Typical use |
+|---|---|---|
+| `arn:aws:states:::lambda:invoke` | Fire-and-forget (Lambda is already sync) | Function invocation |
+| `arn:aws:states:::dynamodb:getItem` / `putItem` / `updateItem` / `deleteItem` | Direct DynamoDB API (no Lambda) | CRUD on a single item |
+| `arn:aws:states:::dynamodb:query` / `scan` | Direct DynamoDB read API | Query by partition key |
+| `arn:aws:states:::sqs:sendMessage` | Fire-and-forget | Decouple to a queue |
+| `arn:aws:states:::sqs:sendMessage.sync` | (Not meaningful — SendMessage is already sync) | — |
+| `arn:aws:states:::sns:publish` | Fire-and-forget | Fan-out notification |
+| `arn:aws:states:::ecs:runTask` | Fire-and-forget | Launch a task and move on |
+| `arn:aws:states:::ecs:runTask.sync` | Wait for task completion | Long-running batch, returns final result |
+| `arn:aws:states:::glue:startJobRun.sync` | Wait for Glue job | ETL pipeline |
+| `arn:aws:states:::athena:startQueryExecution.sync` | Wait for Athena query | Interactive analytics |
+| `arn:aws:states:::sagemaker:createTrainingJob.sync` | Wait for training job | ML training |
+| `arn:aws:states:::sagemaker:createTransformJob.sync` | Wait for batch transform | Batch inference |
+| `arn:aws:states:::states:startExecution.sync` | Wait for nested execution (Standard only) | Compose workflows |
+| `arn:aws:states:::states:startExecution.waitForTaskToken` | Nested execution with callback | Compose with external signal |
+| `arn:aws:states:::sns:publish.waitForTaskToken` | Pause for human/external approval via SNS | Approval workflow |
+| `arn:aws:states:::sqs:sendMessage.waitForTaskToken` | Pause for worker via SQS | Async worker pattern |
+| `arn:aws:states:::lambda:invoke.waitForTaskToken` | Pause for Lambda-driven callback | External system integration |
+| `arn:aws:states:::aws-sdk:<service>:<action>` | Direct AWS SDK call (no Lambda) | Single-API operations (e.g., `aws-sdk:secretsmanager:GetSecretValue`) |
+| `arn:aws:states:::bedrock:invokeModel` | Synchronous Bedrock model call | GenAI inference |
+| `arn:aws:states:::bedrock:invokeModel.sync` | Async Bedrock invocation (Standard only) | Long-running model |
+
+**Decision tree for suffix:**
+- Service call returns immediately (Lambda, SQS SendMessage, SNS Publish) → bare ARN.
+- Service call runs to completion you need to wait for (ECS task, Glue job, Athena query, SageMaker training) → `.sync`.
+- Workflow pauses pending external signal (human approval, async worker) → `.waitForTaskToken` (the Task receives a `TaskToken` field to pass along; Standard only for > 5min waits).
+- Single AWS API call without Lambda glue → `arn:aws:states:::aws-sdk:<service>:<action>`.
+
+## Step 4 - Sync vs callback pattern selection (moved from SKILL.md)
+
+**`.sync` (run-to-completion):**
+- The Task blocks until the integration returns a terminal state.
+- Use for ECS tasks, Glue jobs, Athena queries, SageMaker training, Bedrock async.
+- The Task's `TimeoutSeconds` must exceed the integration's max runtime.
+- On Express, the `.sync` wait counts against the 5-min execution cap.
+
+**`.waitForTaskToken` (callback):**
+- The Task produces a `TaskToken` (string, ~256 chars). The workflow pauses.
+- An external worker calls `SendTaskSuccess(taskToken, output)` or
+  `SendTaskFailure(taskToken, error, cause)` to resume or fail the Task.
+- Use for human approval, async external systems, long-poll patterns.
+- On Standard, the Task can wait up to 1 year. On Express, capped at 5 min
+  (effectively unusable for human-approval patterns — use Standard).
+- The Token MUST be sent over a secure channel — it is a bearer credential
+  for the workflow's state.
+
+**Anti-pattern:** NEVER use `.waitForTaskToken` on Express for human
+approval. The 5-min cap will fail the Task before any human responds.

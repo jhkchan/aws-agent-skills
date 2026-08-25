@@ -324,3 +324,83 @@ For clinical documents, use Comprehend Medical (`detect_entities_v2`
 or `detect_phi`) instead of generic Comprehend. It returns medical-
 specific entity types (DX_NAME, RX_GENERIC, TEST_NAME) and is HIPAA-
 eligible.
+
+## Extended from SKILL.md
+
+## Step 6 — Lambda integration for real-time extraction
+
+For single-page or low-page documents with real-time SLAs, deploy
+Textract behind a Lambda function using the synchronous
+`AnalyzeDocument` API. Full Python handler and IAM policy are in
+`references/sync-and-lambda.md`; the core call is:
+
+```python
+import boto3
+textract = boto3.client("textract")
+
+def lambda_handler(event, context):
+    bucket = event["Records"][0]["s3"]["bucket"]["name"]
+    key = event["Records"][0]["s3"]["object"]["key"]
+    response = textract.analyze_document(
+        Document={"S3Object": {"Bucket": bucket, "Name": key}},
+        FeatureTypes=["FORMS", "TABLES"]
+    )
+    return {"statusCode": 200, "body": response["Blocks"]}
+```
+
+**Lambda IAM policy (minimum):** `textract:AnalyzeDocument` on `*`
+and `s3:GetObject` on the input bucket. See the reference for the
+full JSON.
+
+**Critical:** Lambda's synchronous AnalyzeDocument has the same
+per-call page limits as the direct API. For multipage, route through
+Step Functions with the async StartDocumentAnalysis API instead.
+
+## Step 7 — Bounding boxes and confidence scores
+
+Every Textract Block (WORD, LINE, KEY_VALUE_SET, TABLE, CELL, SIGNATURE,
+QUERY) includes:
+
+- **Geometry:** `BoundingBox` (Top, Left, Width, Height as fractions of
+  page dimensions) and `Polygon` (list of points). Use these to draw
+  overlays or extract regions.
+- **Confidence:** float 0-100. Use a threshold (typically 50-90%) to
+  filter low-confidence extractions in downstream validation.
+
+```python
+# Filter low-confidence form values
+CONFIDENCE_THRESHOLD = 75.0
+for block in response["Blocks"]:
+    if block["BlockType"] == "KEY_VALUE_SET":
+        confidence = block["Confidence"]
+        if confidence < CONFIDENCE_THRESHOLD:
+            print(f"Low confidence: {confidence:.1f}% — review manually")
+```
+
+**Key implication:** confidence scores are the primary signal for
+human-in-the-loop review workflows. Set a threshold that matches your
+accuracy SLA; route low-confidence extractions to a manual review
+queue.
+
+## Step 9 — Comprehend integration for downstream NLP
+
+Textract output (raw text or form values) can be passed to Amazon
+Comprehend for entity detection, key phrase extraction, sentiment
+analysis, PII detection, or custom classification. Full pipeline code
+is in `references/sync-and-lambda.md`; the pattern is:
+
+```python
+textract = boto3.client("textract")
+comprehend = boto3.client("comprehend")
+
+# Extract text, then run NLP on the result
+doc = textract.detect_document_text(Document={"S3Object": {...}})
+text = " ".join(b["Text"] for b in doc["Blocks"] if b["BlockType"] in ("LINE", "WORD"))
+entities = comprehend.detect_entities(Text=text[:100_000], LanguageCode="en")
+pii = comprehend.detect_pii_entities(Text=text[:5_000], LanguageCode="en")
+```
+
+**Critical:** Comprehend has its own quotas — 100 KB per synchronous
+`DetectEntities` call, 5 KB per `DetectPiiEntities` call. For larger
+documents, use async `StartEntitiesDetectionJob` or chunk the Textract
+output.

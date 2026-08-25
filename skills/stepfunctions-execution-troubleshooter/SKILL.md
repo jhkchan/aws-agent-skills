@@ -28,54 +28,13 @@ metadata:
 
 ## Activation
 
-Activate this skill when the user reports a Step Functions execution
-failure. Trigger phrases: "Step Functions execution failed",
-"States.Runtime", "States.Timeout", "States.TaskFailed",
-"States.Permission", "States.Permissions", "States.ParameterPathFailure",
-"States.BranchFailed", "States.ALL not catching", "Step Functions retry
-exhausted", "Step Functions MaxAttempts", "Step Functions execution
-throttled", "Express workflow 5 minute limit", "Step Functions redrive".
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#activation).
+> Trigger phrases for the skill (execution failed, States.* error names, retry exhausted, throttling, Express 5-minute limit, redrive).
 
 ## Mindset
 
-**One-line takeaway:** every Step Functions execution failure has a
-structured `error` and `cause` field in `get-execution-history`, and the
-exact failing state is named in the execution event stream — these two
-signals are the primary diagnostic surface. The job of this skill is to
-walk from the error name to the specific root cause by combining the
-execution history with the state machine definition, the integration's
-IAM role, and CloudWatch Metrics.
-
-Three facts make Step Functions troubleshooting different from generic
-service debugging:
-
-- **The `error` string is a States.* name, not an AWS SDK error.**
-  `States.Timeout`, `States.TaskFailed`, `States.Permission`,
-  `States.Runtime`, `States.ParameterPathFailure`, `States.BranchFailed`
-  are the Step Functions runtime's own error names. They identify which
-  part of the state machine contract was violated, not which downstream
-  service failed. A `States.TaskFailed` for a Lambda invocation may have
-  a `cause` containing the Lambda `TaskTimedOut` exception — but the
-  Step Functions `error` is still `States.TaskFailed`. Always read both
-  fields and never confuse them.
-
-- **Retry and Catch are part of the state machine definition, not the
-  runtime.** When retries silently exhaust, the state machine proceeds
-  to the Catcher (if any) or fails the execution. Operators often
-  report "the execution failed" without realising that the retried
-  error fell through `Retry[0].MaxAttempts` over many minutes. The
-  retry configuration in the ASL definition is the cause; the execution
-  failure is the consequence.
-
-- **Express and Standard workflows have different limits and
-  diagnostics.** Express workflows cannot exceed 5 minutes and cannot
-  be redriven. Standard workflows can run up to 1 year and support
-  redrive from a failed state. Express execution history is delivered
-  via CloudWatch Logs under `/aws/vendedlogs/states/express-<...>`,
-  not via `get-execution-history` at full fidelity (Express history is
-  best-effort and may be truncated). Misdiagnosing the workflow type
-  leads to advice that has no effect (e.g., recommending redrive on an
-  Express workflow).
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#mindset).
+> error/cause in get-execution-history is the primary surface; error is a States.* category not an SDK error; Retry/Catch live in the ASL definition; Express vs Standard limits, diagnostics, and redrive eligibility differ.
 
 ## Quick reference — symptom to failure category
 
@@ -172,18 +131,8 @@ Gather these four pieces. Each step below branches on which is present.
 
 If the user has not provided the execution ARN, output:
 
-```text
-INCIDENT: <state machine> — <symptom>
-VERDICT: NEED_MORE_INFO
-REASON: Cannot diagnose without an execution ARN. Identify the failing
-execution with:
-  aws stepfunctions list-executions --state-machine-arn <sm-arn> \
-    --status FAILED --max-results 5
-MISSING:
-  - Execution ARN (or execution name + state machine ARN)
-  - error and cause strings from describe-execution
-  - Workflow type (STANDARD or EXPRESS)
-```
+> Moved to [references/error-handling.md](references/error-handling.md#need_more_info-block-when-no-execution-arn).
+> Exact output block: list-executions --status FAILED probe plus the MISSING fields (execution ARN, error/cause strings, workflow type).
 
 ### Step 1: Identify the symptom category
 
@@ -201,14 +150,8 @@ Map the observed `error` field to one of nine categories.
 | Execution FAILED, operator expected Catcher to recover | **H. CATCH_MISCONFIGURED** | Step 9 |
 | `ExecutionTimedOut` (Express); CloudWatch `ExecutionThrottled` spike | **I. EXECUTION_LIMIT_HIT** | Step 10 |
 
-**Precedence rule.** When more than one category applies, pick the
-innermost cause. `RUNTIME_ERROR` (the ASL itself is malformed at
-runtime) precedes `PARAMETER_PATH_FAILURE` (input shape mismatch)
-precedes `PERMISSION_DENIED` precedes `TASK_TIMEOUT` precedes
-`TASK_FAILED`. A `States.TaskFailed` whose `cause` is
-`AccessDeniedException` is a downstream IAM issue; the Step Functions
-`error` is `States.TaskFailed` but the actionable cause is in the
-`cause` field.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#category-precedence-rule).
+> Innermost cause wins: RUNTIME_ERROR > PARAMETER_PATH_FAILURE > PERMISSION_DENIED > TASK_TIMEOUT > TASK_FAILED; TaskFailed with AccessDeniedException cause is a downstream IAM issue.
 
 ### Step 2: RUNTIME_ERROR diagnostic (States.Runtime)
 
@@ -224,30 +167,11 @@ the state that owns the bad expression.
 | `ResultPath` conflicts with input field | `ResultPath` references a field that already exists in the input and the runtime cannot merge | Use `ResultPath: null` to discard input, or a non-conflicting path |
 | Reference syntax `$.input.someField` when actual payload uses `$.someField` | Mismatched payload shape between upstream state and this state's expectations | Read the previous state's output and this state's expected input |
 
-**Diagnostic commands:**
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-2--runtime_error-diagnostic-commands).
+> describe-execution error/cause query, get-execution-history TaskFailed/ExecutionFailed event query, describe-state-machine definitionString jq extraction of the failing state.
 
-```bash
-aws stepfunctions describe-execution --execution-arn <arn> \
-  --query '{status:status,error:error,cause:cause,stateMachineArn:stateMachineArn}'
-
-# Get the failing state name from execution history:
-aws stepfunctions get-execution-history --execution-arn <arn> \
-  --query 'events[?type==`TaskFailed` || type==`ExecutionFailed`].{type:type,stateName:stateEnteredEventDetails.name,error:taskFailedEventDetails.error,cause:taskFailedEventDetails.cause}'
-
-# Read the failing state's definition:
-aws stepfunctions describe-state-machine --state-machine-arn <sm-arn> \
-  --query 'definitionString' --output text | jq '.States["<state-name>"]'
-```
-
-**Common fix patterns:**
-
-- Invalid JSONPath `$.body.items[*]` when payload has `$.items`: align
-  the path to the actual payload shape.
-- `ResultPath: "$.result"` collides with existing input field: use
-  `ResultPath: "$.taskResult"` or `ResultPath: null`.
-- Used a JSONPath filter `?(@.active)` on an integration that does not
-  support filters (e.g., Direct Lambda Invoke): remove the filter and
-  post-process in a Pass state.
+> Moved to [references/error-handling.md](references/error-handling.md#step-2--runtime_error-fix-patterns).
+> Align JSONPath to actual payload shape, rename or null the colliding ResultPath, remove unsupported filters and post-process in a Pass state.
 
 ### Step 3: TASK_TIMEOUT diagnostic (States.Timeout)
 
@@ -263,35 +187,11 @@ not send a heartbeat within the window).
 | Cross-region Lambda in a peering-throttled VPC | Network latency plus Lambda cold start exceeds `TimeoutSeconds` | Check VPC config; consider same-region invocations or raise the limit |
 | Express workflow `ExecutionTimedOut` at 5 minutes | Total execution time exceeded the Express 5-minute hard cap | See Step 10 (EXECUTION_LIMIT_HIT) — this is not a per-task timeout |
 
-**Diagnostic commands:**
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-3--task_timeout-diagnostic-commands).
+> jq extraction of TimeoutSeconds/HeartbeatSeconds from the state, lambda get-function-configuration timeout, CloudTrail SendTaskHeartbeat lookup.
 
-```bash
-# Read the Task state's TimeoutSeconds / HeartbeatSeconds:
-aws stepfunctions describe-state-machine --state-machine-arn <sm-arn> \
-  --query 'definitionString' --output text \
-  | jq '.States["<state-name>"] | {TimeoutSeconds, HeartbeatSeconds, Resource, Next}'
-
-# For Lambda, compare against the function's configured timeout:
-aws lambda get-function-configuration --function-name <name> \
-  --query '{Timeout:Timeout,MemorySize:MemorySize,Runtime:Runtime}'
-
-# For activity tasks, check for SendTaskHeartbeat calls around the failure:
-aws cloudtrail lookup-events --lookup-attributes AttributeKey=EventName,AttributeValue=SendTaskHeartbeat \
-  --start-time <iso> --end-time <iso> --max-results 20
-```
-
-**Common fix patterns:**
-
-- Set `TimeoutSeconds` on the Task state to at least 2x the integration's
-  p99 latency. If the integration can exceed 15 minutes, use the
-  asynchronous `.sync` pattern (e.g., `arn:aws:states:::glue:startJobRun.sync`)
-  instead of a high `TimeoutSeconds`.
-- For activity tasks, ensure the worker calls `SendTaskHeartbeat` at
-  intervals shorter than `HeartbeatSeconds` (typically every
-  `HeartbeatSeconds / 2`).
-- For Lambda, raise the function's `Timeout` to match its actual
-  workload; the Step Functions `TimeoutSeconds` should be the function
-  `Timeout` plus a margin.
+> Moved to [references/error-handling.md](references/error-handling.md#step-3--task_timeout-fix-patterns).
+> TimeoutSeconds >= 2x p99 or .sync pattern, heartbeat at HeartbeatSeconds/2, Lambda Timeout plus margin.
 
 ### Step 4: TASK_FAILED diagnostic (States.TaskFailed)
 
@@ -308,28 +208,11 @@ contains the downstream SDK's error message (often JSON-encoded).
 | `cause` contains `StateMachineDoesNotExist` (nested Step Functions `StartExecution`) | Target state machine ARN is wrong or in another account without permission | Verify ARN; check cross-account role |
 | SQS `QueueDoesNotExist` | Queue was deleted or ARN changed | Update the `Parameters.QueueUrl` |
 
-**Diagnostic walk:**
+> Moved to [references/error-catalog-and-decision-tree.md](references/error-catalog-and-decision-tree.md#step-4--task_failed-diagnostic-walk).
+> Read cause verbatim (JSON-encoded), cross-reference integration logs (Lambda/DynamoDB/Glue), classify retryable vs non-retryable.
 
-1. **Read the `cause` field verbatim.** It is often JSON-encoded; parse
-   it to extract `errorMessage`, `errorType`, `requestId`.
-2. **Cross-reference with the integration's own logs:**
-   - Lambda: `aws logs get-log-events` on `/aws/lambda/<function>`.
-   - DynamoDB: CloudTrail `LookupEvents` for the failing API.
-   - Glue/Athena/Batch: the integration's own CloudWatch Logs.
-3. **Identify whether the error is retryable.** `ThrottlingException`,
-   `ServiceUnavailable`, `ProvisionedThroughputExceededException` are
-   retryable; `ResourceNotFoundException`, `ValidationException` are
-   not. Match the `Retry[].ErrorEquals` array to the error type.
-
-**Common fix patterns:**
-
-- For retryable errors, add a `Retry` entry with
-  `ErrorEquals: ["ThrottlingException", "States.TaskFailed"]`,
-  `IntervalSeconds: 2`, `MaxAttempts: 5`, `BackoffRate: 2.0`.
-- For non-retryable errors, add a `Catch` entry that routes to a
-  fallback state.
-- For Lambda `Unhandled`, fix the function — do not retry without a
-  fix (the same input will produce the same exception).
+> Moved to [references/error-handling.md](references/error-handling.md#step-4--task_failed-fix-patterns).
+> Retry entries with jittered backoff for throttling-class errors, Catch to fallback for non-retryable, fix Lambda Unhandled before retrying.
 
 ### Step 5: PERMISSION_DENIED diagnostic (States.Permission / States.Permissions)
 
@@ -343,36 +226,11 @@ integration. Two sub-cases:
 | Cross-account: target resource in account B, state machine in account A | The role in A is allowed, but the resource policy in B does not trust A's role | Read the target resource's policy (e.g., KMS key policy, SQS queue policy, cross-account Lambda) |
 | Service-linked role confusion | Operator assumed the state machine role was the service-linked role; it is a customer role with a typo | Read `roleArn` in `describe-state-machine`; verify the actual role assumed |
 
-**Diagnostic walk:**
+> Moved to [references/error-catalog-and-decision-tree.md](references/error-catalog-and-decision-tree.md#step-5--permission_denied-diagnostic-walk).
+> Read roleArn from describe-state-machine, derive action+resource from the state, simulate-principal-policy, read cross-account resource policy in the target account.
 
-1. **Identify the role the state machine assumes.** Read
-   `describe-state-machine` → `roleArn`.
-2. **Identify the action and resource the failing state needs.** Read
-   the state's `Resource` (for direct integrations) or `Parameters`
-   (for `.sync` integrations).
-3. **Simulate the role:**
-
-   ```bash
-   aws iam simulate-principal-policy \
-     --policy-source-arn <state-machine-role-arn> \
-     --action-names <service>:<Action> \
-     --resource-arns <resource-arn>
-   ```
-
-4. **For cross-account, also read the resource policy in the target
-   account.** The role in A AND the resource policy in B must both
-   allow the action.
-
-**Common fix patterns:**
-
-- Attach a policy to the state machine role with the action scoped to
-  the resource ARN. For Lambda: `lambda:InvokeFunction`. For DynamoDB:
-  `dynamodb:GetItem`, `dynamodb:PutItem`, etc. For SQS: `sqs:SendMessage`.
-- For cross-account, update the target resource's policy to trust the
-  state machine role ARN with `sts:AssumeRole` or the action directly.
-- For `.sync` integrations, also grant `states:StartExecution` on the
-  target state machine and the polling IAM actions
-  (`states:DescribeExecution`, `states:StopExecution`).
+> Moved to [references/error-handling.md](references/error-handling.md#step-5--permission_denied-fix-patterns).
+> Scoped IAM policy per integration (lambda:InvokeFunction, dynamodb:*, sqs:SendMessage), cross-account resource-policy trust, .sync polling actions states:StartExecution/DescribeExecution/StopExecution.
 
 ### Step 6: PARAMETER_PATH_FAILURE diagnostic
 
@@ -386,14 +244,8 @@ here the JSONPath is syntactically valid but resolves to nothing.
 | In a Map state, the iteration input does not include the parent context field | Map state `ItemsPath` or `Parameters` is misconfigured | Read the Map state definition; verify `ItemsPath` points to an array |
 | `Parameters` uses `.$` suffix on a literal | Mixing static and dynamic params incorrectly — `.$` requires a JSONPath | Drop the `.$` for literals, or use a JSONPath for dynamic values |
 
-**Diagnostic walk:**
-
-1. **Read the failing state's `Parameters` block.** Each key ending in
-   `.$` must reference a path that exists in the input.
-2. **Read the input payload to the failing state** from
-   `get-execution-history` (look for the `StateEntered` event with
-   `input`).
-3. **Cross-reference each `.$` path** against the actual input.
+> Moved to [references/error-catalog-and-decision-tree.md](references/error-catalog-and-decision-tree.md#step-6--parameter_path_failure-diagnostic-walk).
+> Read the Parameters block, read the StateEntered input payload, cross-reference each .$ path against the actual input.
 
 ### Step 7: BRANCH_FAILED diagnostic (States.BranchFailed)
 
@@ -407,16 +259,8 @@ A Parallel or Map state reports that a branch failed. The
 | Distributed Map with S3 or CSV items | One row in the CSV triggered an error in the iteration | Read the Map state's `ItemReader`; identify the failing item |
 | `States.BranchFailed` but no obvious branch failure | The branch's own Catcher swallowed the error and the branch then failed for a different reason | Read the inner branch's execution history (Distributed Map exposes child execution ARNs) |
 
-**Diagnostic walk:**
-
-1. **Read the `Map` or `Parallel` state definition** to enumerate the
-   branches or iteration configuration.
-2. **For Distributed Map**, the child execution ARNs are surfaced in
-   the parent execution history. Read each child's history to find the
-   actual failing state.
-3. **For inline Map / Parallel**, the branch errors are surfaced in the
-   parent execution history under `mapIterationFailed` or similar
-   events.
+> Moved to [references/error-catalog-and-decision-tree.md](references/error-catalog-and-decision-tree.md#step-7--branch_failed-diagnostic-walk).
+> Enumerate branches/iteration config, read Distributed Map child execution histories, or inline mapIterationFailed events in the parent history.
 
 ### Step 8: RETRY_EXHAUSTED diagnostic
 
@@ -431,22 +275,11 @@ terminal `ExecutionFailed`, not the retried `TaskFailed`.
 | `Retry[0].ErrorEquals` does not include the actual error name | The retry never fired; the state failed on the first attempt | Match `ErrorEquals` against the actual `error` string |
 | Retry fired but downstream never recovered | The downstream outage outlasted the retry budget | Extend `MaxAttempts` or route to a dead-letter state via Catch |
 
-**Diagnostic walk:**
+> Moved to [references/error-catalog-and-decision-tree.md](references/error-catalog-and-decision-tree.md#step-8--retry_exhausted-diagnostic-walk).
+> Read the Retry array, count TaskFailed events (should equal MaxAttempts + 1), check the Catcher's ErrorEquals.
 
-1. **Read the `Retry` array** in the failing state's definition.
-2. **Count `TaskFailed` events** in the execution history for this
-   state — should equal `MaxAttempts + 1` if retries fired correctly.
-3. **Check the Catcher** — if absent or if `ErrorEquals` does not
-   match, the execution fails terminally.
-
-**Common fix patterns:**
-
-- Extend `Retry` with `MaxAttempts: 6`, `BackoffRate: 2.0` for
-  throttling-class errors.
-- Add a `Catch` entry routing the exhausted error to a fallback or
-  dead-letter state.
-- For Lambda `Unhandled` / `States.TaskFailed`, do NOT blindly raise
-  `MaxAttempts` — fix the function first.
+> Moved to [references/error-handling.md](references/error-handling.md#step-8--retry_exhausted-fix-patterns).
+> Extend MaxAttempts/BackoffRate for throttling, Catch to a dead-letter state, do not raise MaxAttempts for Lambda Unhandled without a fix.
 
 ### Step 9: CATCH_MISCONFIGURED diagnostic
 
@@ -460,17 +293,8 @@ execution still FAILED.
 | Catcher fires but its `Next` state itself fails | The fallback state has its own bug | Read the post-catch state's history |
 | Catcher fired but its `ResultPath` collided | Same as RUNTIME_ERROR ResultPath collision | Use a non-conflicting `ResultPath` |
 
-**Catch semantics cheat sheet:**
-
-- `States.ALL` catches every error EXCEPT `States.DataDoesNotExist`
-  (when used in Choices with `IsPresent`) in some runtime versions.
-- `States.TaskFailed` catches only integration failures, NOT
-  `States.Timeout`, `States.Permission`, `States.Runtime`.
-- To catch all Task-related errors, list:
-  `["States.TaskFailed", "States.Timeout", "States.Permission",
-  "States.Permissions", "States.ParameterPathFailure"]`.
-- Order matters: catchers are evaluated top-down; the first matching
-  `ErrorEquals` wins.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#catch-semantics-cheat-sheet).
+> States.ALL exclusions, States.TaskFailed scope, the explicit Task-related error list, top-down catcher evaluation order.
 
 ### Step 10: EXECUTION_LIMIT_HIT diagnostic
 
@@ -485,20 +309,8 @@ workflows run up to 1 year. Throttling manifests via CloudWatch Metrics
 | CloudWatch `ThrottledStateTransition` > 0 | State transition throttled — exceeds the account's transition rate | Reduce transitions (consolidate Pass states); request quota increase |
 | Standard execution FAILED at exactly 1 year | Standard 1-year cap hit | Redesign — no Standard execution should approach 1 year |
 
-**Diagnostic commands:**
-
-```bash
-aws cloudwatch get-metric-statistics --namespace AWS/States \
-  --metric-name ExecutionThrottled --dimensions Name=StateMachineArn,Value=<sm-arn> \
-  --start-time <iso> --end-time <iso> --period 300 --statistics Sum
-
-aws cloudwatch get-metric-statistics --namespace AWS/States \
-  --metric-name ThrottledStateTransition --dimensions Name=StateMachineArn,Value=<sm-arn> \
-  --start-time <iso> --end-time <iso> --period 300 --statistics Sum
-
-aws service-quotas get-service-quota --service-code states \
-  --quota-code L-3B4D9EC3  # State transitions per second
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-10--execution_limit_hit-diagnostic-commands).
+> CloudWatch AWS/States ExecutionThrottled and ThrottledStateTransition get-metric-statistics, service-quotas L-3B4D9EC3 lookup.
 
 ### Step 11: REDRIVE_CANDIDATE triage
 
@@ -513,45 +325,18 @@ NOT available for Express workflows.
 | Execution FAILED because of an upstream input shape change | Redrive may re-fail if the state definition expects the old shape | Fix the state definition first, then redrive |
 | Execution FAILED in a Map state | Redrive re-runs only the failed iterations (Distributed Map) or the whole Map (inline Map) | Check Map state type before redriving |
 
-**Diagnostic command:**
-
-```bash
-aws stepfunctions describe-execution --execution-arn <arn> \
-  --query '{status:status,stateMachineArn:stateMachineArn,redriveStatus:redriveStatus,redriveDate:redriveDate}'
-
-# Verify workflow type is STANDARD before suggesting redrive:
-aws stepfunctions describe-state-machine --state-machine-arn <sm-arn> \
-  --query 'stateMachineArn' --output text | grep -oE ':stateMachine:[^:]+:express:' && echo "EXPRESS — redrive NOT supported" || echo "STANDARD — redrive supported"
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-11--redrive_candidate-diagnostic-command).
+> describe-execution redriveStatus query and the ARN grep that distinguishes EXPRESS (no redrive) from STANDARD.
 
 ### Step 12: Map to root-cause catalog
 
-| # | Root cause | Category | Fix pattern |
-|---|---|---|---|
-| 1 | Invalid JSONPath in `InputPath` / `ResultPath` / `Parameters` | RUNTIME_ERROR | Align path with actual payload shape |
-| 2 | Task `TimeoutSeconds` < integration p99 latency | TASK_TIMEOUT | Raise `TimeoutSeconds` or switch to asynchronous `.sync` pattern |
-| 3 | State machine role lacks action on resource | PERMISSION_DENIED | Attach scoped IAM policy to the role |
-| 4 | Cross-account resource policy does not trust the state machine role | PERMISSION_DENIED | Update target resource policy in target account |
-| 5 | `Retry[].ErrorEquals` does not include the actual error | RETRY_EXHAUSTED | Add the error name to `ErrorEquals` |
-| 6 | Catcher `ErrorEquals: ["States.TaskFailed"]` misses `States.Timeout` | CATCH_MISCONFIGURED | List all expected errors OR use `States.ALL` |
-| 7 | Express workflow exceeds 5-minute cap | EXECUTION_LIMIT_HIT | Refactor or migrate to Standard |
-| 8 | Downstream `ProvisionedThroughputExceededException` exhausted retries | TASK_FAILED / RETRY_EXHAUSTED | Raise downstream capacity; extend retry budget |
-| 9 | Activity worker not calling `SendTaskHeartbeat` | TASK_TIMEOUT | Fix worker heartbeat cadence |
-| 10 | Map state `ItemsPath` points to a non-array | PARAMETER_PATH_FAILURE / BRANCH_FAILED | Fix `ItemsPath` or upstream payload |
+> Moved to [references/error-catalog-and-decision-tree.md](references/error-catalog-and-decision-tree.md#root-cause-catalog-top-10).
+> The ten canonical patterns (#1-#10) mapping root cause to category (RUNTIME_ERROR ... BRANCH_FAILED) and fix pattern, referenced by the ROOT_CAUSE_CATALOG field.
 
 ### Step 13: Verify the fix
 
-Before applying, validate the proposed fix with one of:
-
-- **For ASL changes:** run a test execution with a known input that
-  reproduces the failure. Use `aws stepfunctions start-execution` with
-  a traceable `name`.
-- **For IAM changes:** re-run `aws iam simulate-principal-policy` with
-  the updated policy source; expect `allowed`.
-- **For Catcher changes:** construct an input that triggers the exact
-  error and verify the Catcher's `Next` state is reached.
-- **For redrive:** verify the execution `redriveStatus: REDRIVABLE`
-  before calling `redrive-execution`.
+> Moved to [references/error-handling.md](references/error-handling.md#fix-verification-step-13).
+> Test execution with traceable name for ASL changes, re-simulate IAM, trigger the exact error for Catcher changes, verify redriveStatus REDRIVABLE before redrive-execution.
 
 ### Step 14: Decide — ROOT_CAUSE_FOUND vs NEED_MORE_INFO vs ESCALATE
 
@@ -626,116 +411,13 @@ REMEDIATION:
 
 ## Expert edge cases
 
-These patterns represent genuine, non-obvious Step Functions failure
-modes that a senior operator would catch but a generalist would miss.
-
-### States.Permission vs States.TaskFailed for IAM errors
-
-Step Functions emits `States.Permission` when the state machine role
-cannot assume the integration's required permissions at the Step
-Functions layer (e.g., the role lacks `sts:AssumeRole` on a cross-
-account role). It emits `States.TaskFailed` with a `cause` of
-`AccessDeniedException` when the integration itself denies the action.
-Operators often conflate these — the fix for the former is on the Step
-Functions role; the fix for the latter is on either the Step Functions
-role OR the target resource's policy.
-
-### Express execution history is best-effort
-
-For Express workflows, `get-execution-history` returns a best-effort
-view delivered via CloudWatch Logs. Under high throughput, history
-events may be truncated or delayed. For definitive diagnosis, query
-the CloudWatch Log Group directly:
-
-```bash
-aws logs filter-log-events \
-  --log-group-name /aws/vendedlogs/states/express-<sm-name>-Logs-<hash> \
-  --filter-pattern "ExecutionFailed" \
-  --start-time <epoch-ms>
-```
-
-A missing event in `get-execution-history` for an Express workflow is
-NOT evidence the event did not occur.
-
-### States.ALL does not catch everything
-
-Despite the name, `States.ALL` does not catch:
-
-- `States.DataDoesNotExist` (older runtimes, when used with
-  Choice `IsPresent`).
-- Some internal runtime errors that pre-empt the Catch evaluation.
-
-If the operator needs a true catch-all, list the explicit errors
-they care about. `States.ALL` is a convenience, not a guarantee.
-
-### Distributed Map child execution ARNs are in the parent history
-
-When a Distributed Map state fails, the parent execution's history
-contains `MapRunStarted` and `MapRunFailed` events with the Map Run
-ARN. The per-iteration failures are surfaced via
-`aws stepfunctions describe-map-run` and the child execution ARNs.
-Operators often stop at the parent's `States.BranchFailed` and miss
-the actual iteration error.
-
-### Activity worker HeartbeatSeconds must be < TimeoutSeconds
-
-If `HeartbeatSeconds >= TimeoutSeconds`, the runtime rejects the state
-definition at creation time. Less obvious: if the worker's actual
-heartbeat interval is greater than `HeartbeatSeconds`, the task will
-time out even though the worker is making progress. The worker should
-call `SendTaskHeartbeat` at `HeartbeatSeconds / 2` intervals.
-
-### Retry does not apply to Catch-less errors that the runtime will not retry
-
-Step Functions retries only the errors listed in `Retry[].ErrorEquals`.
-A common mistake is adding `Retry` for `States.TaskFailed` expecting
-it to retry Lambda `Unhandled` exceptions — it will, but only if
-`ErrorEquals` includes `States.TaskFailed` (or `States.ALL`). Adding
-the Lambda-specific error name `Unhandled` to `ErrorEquals` will NOT
-match, because Step Functions only sees the wrapped `States.TaskFailed`.
-
-### Redrive does not re-run succeeded states
-
-When redriving a Standard execution, only the failed state and any
-states downstream of it re-run. If the root cause was an IAM permission
-fix, the previously-failed state will now succeed. If the root cause
-was an ASL change to an upstream state, the upstream change will NOT
-be picked up by redrive — you must start a new execution. Operators
-often redrive expecting the ASL changes to apply, then are surprised
-when the same state fails the same way.
-
-### Service integration .sync polling uses the state machine role
-
-For `.sync` integrations (e.g., Glue StartJobRun.sync), Step Functions
-polls the integration on the state machine's behalf using the state
-machine's role. The role needs both the start action AND the describe
-action (e.g., `glue:StartJobRun` AND `glue:GetJobRun`). A role with
-only the start action will succeed at start but fail at the polling
-step with `States.Permission` after several minutes.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-edge-cases).
+> States.Permission vs States.TaskFailed for IAM, best-effort Express history, States.ALL exclusions, Distributed Map child ARNs, HeartbeatSeconds < TimeoutSeconds, retry ErrorEquals wrapping, redrive scope, .sync polling role requirements.
 
 ## Expert heuristic — "Read the cause, not the error"
 
-The single most common diagnostic mistake is treating the Step
-Functions `error` name as the root cause. It is not. It is the runtime
-category. The `cause` field carries the downstream service's actual
-error message — and that is the actionable signal.
-
-Quick lookup table for common `error` → real cause mappings:
-
-| `error` | What it means | Where the real cause lives |
-|---|---|---|
-| `States.Runtime` | ASL runtime error (invalid JSONPath, unsupported operation) | The `cause` string names the offending path — read the ASL state |
-| `States.Timeout` | Task exceeded `TimeoutSeconds` or missed `HeartbeatSeconds` | Read the state's timeout config vs integration latency |
-| `States.TaskFailed` | Integration returned a non-success response | The `cause` is the integration's SDK error — parse it as JSON |
-| `States.Permission` | State machine role cannot perform the action | `iam simulate-principal-policy` on the role |
-| `States.ParameterPathFailure` | `Parameters` JSONPath did not resolve | The `cause` names the missing path — read the input payload |
-| `States.BranchFailed` | A Parallel / Map branch failed | Read the branch's own execution history |
-| `States.ALL` (in a Catcher) | Not an error — a catch specifier | N/A |
-
-When in doubt, run:
-`aws stepfunctions describe-execution --execution-arn <arn>` and read
-the `error` and `cause` fields. The `cause` is the actionable signal;
-the `error` is the category.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic--read-the-cause-not-the-error).
+> error -> meaning -> where the real cause lives lookup table; the cause field is the actionable signal, the error is the category.
 
 ## Anti-Patterns — NEVER
 
@@ -801,27 +483,8 @@ the `error` is the category.
 
 ## Recent AWS features (2024-2026)
 
-- **Redrive (Standard workflows, GA 2024):** re-execute a failed
-  Standard execution from the failed state. Verify `redriveStatus:
-  REDRIVABLE` via `describe-execution`. Express workflows are NOT
-  eligible.
-- **Distributed Map (2024 enhancements):** larger item counts, S3 and
-  CSV item sources, child execution ARNs surfaced in parent history.
-  Troubleshoot Distributed Map failures via `describe-map-run`.
-- **Step Functions JSONata support (2024-2025):** newer workflows can
-  use JSONata instead of JSONPath. `States.Runtime` errors in JSONata
-  workflows have different cause strings — read the `cause` carefully.
-- **Express workflow history via CloudWatch Logs insights:** enhanced
-  query support for the vended logs group. Use CloudWatch Logs
-  Insights instead of `get-execution-history` for high-volume Express
-  workflows.
-- **Variable and state persistence (2025):** workflows can persist
-  variables across state transitions. Misuse produces
-  `States.ParameterPathFailure` on the variable reference — read the
-  variable definition.
-- **Service Quotas for state transitions:** account-level quota for
-  state transitions per second. `ThrottledStateTransition` indicates
-  the quota was exceeded — request an increase via Service Quotas.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#recent-aws-features-2024-2026).
+> Redrive GA, Distributed Map enhancements, JSONata support, Express history via Logs Insights, variable persistence, state-transition quotas.
 
 ## References
 
@@ -829,6 +492,13 @@ See `references/error-catalog-and-decision-tree.md` for the full
 States.* error → category → cause → fix walk with worked examples per
 category, and `references/diagnostic-commands.md` for the canonical
 command script for each failure category.
+
+## References (load on demand)
+
+- [advanced-patterns](references/advanced-patterns.md) — Activation triggers, Mindset (error vs cause, Express vs Standard), category precedence rule, Catch semantics cheat sheet, Expert edge cases, Expert heuristic lookup table, Recent AWS features (2024-2026)
+- [diagnostic-commands](references/diagnostic-commands.md) — canonical command script per failure category, plus the Step 2/3/10/11 probe commands moved from SKILL.md
+- [error-catalog-and-decision-tree](references/error-catalog-and-decision-tree.md) — full per-category walk with worked examples, plus the Step 4-8 diagnostic walks and the Step 12 root-cause catalog moved from SKILL.md
+- [error-handling](references/error-handling.md) — per-category common fix patterns, the no-execution-ARN NEED_MORE_INFO block, and the Step 13 fix-verification steps moved from SKILL.md
 
 ## Domain
 

@@ -90,35 +90,8 @@ cost). Distributed Map runs each batch as a separate child execution
 (max 10000 items, incurs child execution cost). Choose Inline for small
 arrays; Distributed for large arrays or S3-sourced datasets.
 
-Three misconceptions dominate Map state misdesign at provisioning time:
-
-- **"Inline Map and Distributed Map are interchangeable."** They are
-  NOT. Inline Map runs within the parent execution context — it shares
-  the parent's execution history, has a hard 5000-item limit, and adds
-  NO extra cost. Distributed Map spawns child executions — each batch is
-  a separate execution with its own history, has a 10000-item limit, and
-  incurs per-child-execution cost. Choosing Inline for a 7000-item array
-  FAILS at runtime. Choosing Distributed for a 50-item array wastes
-  money on unnecessary child executions.
-
-- **"Iterator and ItemProcessor are the same thing."** They are related
-  but NOT interchangeable. `Iterator` is the legacy field name (pre-2022)
-  that defines the sub-workflow to run for each item. `ItemProcessor` is
-  the current field that replaces `Iterator` and adds
-  `ProcessorConfig` (which controls Inline vs Distributed mode). A
-  state machine using `Iterator` cannot use Distributed Map — only
-  `ItemProcessor` with `Mode: DISTRIBUTED` enables it. Mixing
-  `Iterator` with Distributed configuration is a silent failure.
-
-- **"Distributed Map just runs faster."** It runs differently. Each
-  batch in Distributed Map is a SEPARATE child execution, meaning: (1)
-  each batch has its own execution ARN and history, (2) the parent
-  execution's history does NOT grow with item count, (3) the
-  ToleratedFailureCount/Percentage settings control how many batches can
-  fail before the Map state fails, and (4) each child execution counts
-  against your account's concurrent execution quota. The speedup is
-  from parallelism (MaxConcurrency), not from a fundamentally different
-  processing model within a single execution.
+> Full detail moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand.
+> Summary: the three dominant Map-state misconceptions (interchangeable types, Iterator=ItemProcessor, Distributed=faster).
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -193,66 +166,13 @@ grouping). The runtime error or silent failure is costly to debug.
 
 ## Expert heuristic: ItemProcessor vs Iterator
 
-The `Iterator` field was the original way to define the sub-workflow for
-a Map state. In 2022, AWS introduced `ItemProcessor` as a replacement,
-adding `ProcessorConfig` to control Inline vs Distributed mode.
-
-```text
-Legacy (pre-2022) — Inline only:
-  "Map": {
-    "Type": "Map",
-    "Iterator": {
-      "StartAt": "ProcessItem",
-      "States": { ... }
-    },
-    "ItemsPath": "$.items"
-  }
-
-Current (2022+) — supports Inline AND Distributed:
-  "Map": {
-    "Type": "Map",
-    "ItemProcessor": {
-      "ProcessorConfig": {
-        "Mode": "INLINE"  // or "DISTRIBUTED"
-      },
-      "StartAt": "ProcessItem",
-      "States": { ... }
-    },
-    "ItemsPath": "$.items"
-  }
-```
-
-**Key implication:** if you see `Iterator` in a state machine, it is
-implicitly Inline. You CANNOT use Distributed Map with `Iterator` —
-switch to `ItemProcessor` with `ProcessorConfig.Mode: DISTRIBUTED`. Do
-NOT mix both fields; validation will fail.
+> Full detail moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand.
+> Summary: the complete Iterator-vs-ItemProcessor field comparison with ASL examples.
 
 ## Expert heuristic: batch processing with ItemBatchSize
 
-ItemBatchSize groups multiple items into a single batch, reducing the
-number of child executions in Distributed Map. This is critical for
-throughput and cost efficiency.
-
-```text
-Without ItemBatchSize (1 item per child execution):
-  10000 items → 10000 child executions
-  Each child processes 1 item
-  High overhead, high cost, high concurrency pressure
-
-With ItemBatchSize: 100 (100 items per child execution):
-  10000 items → 100 child executions
-  Each child processes 100 items (received as an array)
-  Lower overhead, lower cost, lower concurrency pressure
-```
-
-**Critical:** the ItemProcessor sub-workflow receives a BATCH (array of
-items), not a single item. The sub-workflow must iterate within the
-batch using `States.Intrinsic` functions or a nested Map state. For
-single-item processing, keep ItemBatchSize at 1 (default).
-
-**Key implication:** ItemBatchSize is a throughput and cost lever, not a
-functional one. It does not change WHAT is processed — it changes HOW
-MANY items each child execution handles.
+> Full detail moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand.
+> Summary: the complete ItemBatchSize throughput/cost analysis.
 
 ## Prerequisites (verify before provisioning)
 
@@ -317,88 +237,16 @@ processing. Zero means UNLIMITED. For sequential, use
 
 ## Step 3 — ItemProcessor vs Iterator
 
-As of 2022, `ItemProcessor` replaces `Iterator`. Key differences:
-
-| Feature | `Iterator` (legacy) | `ItemProcessor` (current) |
-|---|---|---|
-| Inline Map | Supported | Supported (`Mode: INLINE`) |
-| Distributed Map | NOT supported | Supported (`Mode: DISTRIBUTED`) |
-| ProcessorConfig | Not available | Available |
-| Validation with Mode field | N/A | Required |
-
-**Always use `ItemProcessor`** for new state machines. Only use
-`Iterator` when maintaining legacy definitions that cannot be migrated.
-
-```json
-{
-  "ProcessItems": {
-    "Type": "Map",
-    "ItemProcessor": {
-      "ProcessorConfig": {
-        "Mode": "DISTRIBUTED",
-        "ExecutionType": "STANDARD"
-      },
-      "StartAt": "HandleItem",
-      "States": {
-        "HandleItem": {
-          "Type": "Task",
-          "Resource": "arn:aws:lambda:us-east-1:123456789012:function:process-item",
-          "End": true
-        }
-      }
-    },
-    "ItemsPath": "$.items",
-    "MaxConcurrency": 10,
-    "ItemBatchSize": 50,
-    "ToleratedFailurePercentage": 5
-  }
-}
-```
+> Full detail moved verbatim to [references/map-configuration-and-batching.md](references/map-configuration-and-batching.md) - load on demand.
+> Summary: the ItemProcessor-vs-Iterator comparison table and full ASL template.
 
 ## Step 4 — Batch processing (ItemBatchSize/ItemBatcher)
 
 Batch processing groups multiple items into a single child execution,
 reducing overhead and cost in Distributed Map.
 
-**ItemBatchSize (simple):**
-
-```json
-{
-  "Type": "Map",
-  "ItemProcessor": {
-    "ProcessorConfig": { "Mode": "DISTRIBUTED" },
-    "StartAt": "ProcessBatch",
-    "States": {
-      "ProcessBatch": {
-        "Type": "Task",
-        "Resource": "arn:aws:lambda:us-east-1:123456789012:function:process-batch",
-        "End": true
-      }
-    }
-  },
-  "ItemBatchSize": 100
-}
-```
-
-**ItemBatcher (advanced):**
-
-```json
-{
-  "Type": "Map",
-  "ItemProcessor": {
-    "ProcessorConfig": { "Mode": "DISTRIBUTED" },
-    "StartAt": "ProcessBatch",
-    "States": { ... }
-  },
-  "ItemBatcher": {
-    "MaxItemsPerBatch": 100,
-    "MaxInputBytesPerBatch": 1048576,
-    "BatchInput": {
-      "timestamp": "2026-08-11T00:00:00Z"
-    }
-  }
-}
-```
+> Full detail moved verbatim to [references/map-configuration-and-batching.md](references/map-configuration-and-batching.md) - load on demand.
+> Summary: the ItemBatchSize and ItemBatcher JSON templates with comparison table.
 
 **ItemBatchSize vs ItemBatcher:**
 
@@ -418,37 +266,8 @@ array input, not a single object.
 Distributed Map can read large datasets directly from S3 (CSV, JSON, or
 JSONL files) using `ReaderConfig`.
 
-```json
-{
-  "ProcessCSV": {
-    "Type": "Map",
-    "ItemProcessor": {
-      "ProcessorConfig": { "Mode": "DISTRIBUTED" },
-      "StartAt": "ProcessRow",
-      "States": {
-        "ProcessRow": {
-          "Type": "Task",
-          "Resource": "arn:aws:lambda:us-east-1:123456789012:function:process-row",
-          "End": true
-        }
-      }
-    },
-    "ItemReader": {
-      "Resource": "arn:aws:states:::s3:getObject",
-      "ReaderConfig": {
-        "InputType": "CSV",
-        "CSVHeaderLocation": "FIRST_ROW"
-      },
-      "Parameters": {
-        "Bucket": "my-data-bucket",
-        "Key": "datasets/records.csv"
-      }
-    },
-    "ItemBatchSize": 100,
-    "MaxConcurrency": 50
-  }
-}
-```
+> Full detail moved verbatim to [references/distributed-map-and-s3.md](references/distributed-map-and-s3.md) - load on demand.
+> Summary: the full S3 ItemReader (CSV) Distributed Map template.
 
 **Supported S3 input formats:**
 
@@ -500,21 +319,8 @@ are placed in the overall state output.
 | `ResultPath: null` | Discards the result (original input passes through) | Drop result |
 | `ResultPath: "$.result"` | Places result at `$.result` | Merge with input |
 
-```json
-{
-  "ProcessItems": {
-    "Type": "Map",
-    "ItemsPath": "$.items",
-    "ItemProcessor": { ... },
-    "ResultSelector": {
-      "processed_count.$": "$.length(@)",
-      "items.$": "$"
-    },
-    "ResultPath": "$.processing_result",
-    "Next": "NotifyComplete"
-  }
-}
-```
+> Full detail moved verbatim to [references/map-configuration-and-batching.md](references/map-configuration-and-batching.md) - load on demand.
+> Summary: the ResultSelector/ResultPath JSON template.
 
 **Common mistake:** using `ResultPath: null` when you need the results
 for downstream states. This silently discards all iteration outputs.
@@ -525,41 +331,8 @@ Retry and Catch are defined INSIDE the ItemProcessor sub-workflow, not
 on the Map state itself. Each iteration (or batch) handles errors
 independently.
 
-```json
-{
-  "ProcessItems": {
-    "Type": "Map",
-    "ItemProcessor": {
-      "StartAt": "CallAPI",
-      "States": {
-        "CallAPI": {
-          "Type": "Task",
-          "Resource": "arn:aws:lambda:us-east-1:123456789012:function:api-call",
-          "Retry": [
-            {
-              "ErrorEquals": ["States.TaskFailed"],
-              "IntervalSeconds": 2,
-              "MaxAttempts": 3,
-              "BackoffRate": 2.0
-            }
-          ],
-          "Catch": [
-            {
-              "ErrorEquals": ["States.ALL"],
-              "Next": "HandleError",
-              "ResultPath": "$.error"
-            }
-          ],
-          "Next": "ProcessResult"
-        },
-        "ProcessResult": { "Type": "Succeed" },
-        "HandleError": { "Type": "Fail" }
-      }
-    },
-    "ToleratedFailurePercentage": 5
-  }
-}
-```
+> Full detail moved verbatim to [references/error-handling.md](references/error-handling.md) - load on demand.
+> Summary: the full per-iteration Retry/Catch JSON template.
 
 **Distributed Map partial failure:**
 
@@ -600,30 +373,8 @@ Map when the same thing is done for EACH item in an array.
 | State transition cost | Billed within parent | Child execution state transitions billed separately |
 | S3 GET (for S3 input) | N/A | Standard S3 pricing |
 
-**Inline Map cost:** ZERO additional cost beyond the parent execution.
-The Map iterations run within the parent execution context. The parent
-execution's state transition count includes all iterations.
-
-**Distributed Map cost:** each child execution is a SEPARATE billable
-execution. For 1000 items with `ItemBatchSize: 1`, that is 1000 child
-executions. With `ItemBatchSize: 100`, it is 10 child executions — a
-100x cost reduction.
-
-```text
-Cost example — 10000 items, Standard workflow:
-  Inline Map: 0 child executions → $0 extra
-    (but may exceed 5000-item limit)
-
-  Distributed Map, ItemBatchSize=1:
-    10000 child executions
-    Each child: ~15 state transitions × $0.025/1000 = $0.000375
-    Total: 10000 × $0.000375 = $3.75
-
-  Distributed Map, ItemBatchSize=100:
-    100 child executions
-    Each child: ~15 state transitions × $0.025/1000 = $0.000375
-    Total: 100 × $0.000375 = $0.0375 (100x cheaper)
-```
+> Full detail moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand.
+> Summary: the cost prose and worked 10000-item cost example.
 
 **Key implication:** batch processing (ItemBatchSize) is the single most
 impactful cost optimization for Distributed Map. Always batch when
@@ -631,36 +382,8 @@ possible.
 
 ## Step 11 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **ItemBatcher (2023):** Replaced ItemBatchSize with a richer
-  configuration object supporting MaxItemsPerBatch,
-  MaxInputBytesPerBatch, and BatchInput. ItemBatchSize remains supported
-  as a simpler alternative.
-
-- **Timestream as Distributed Map input (2024-2025):** Distributed Map
-  can now use Amazon Timestream query results as an input source, in
-  addition to S3. This enables time-series data processing workflows
-  without pre-materializing data into S3.
-
-- **Firehose as Distributed Map input (2024-2025):** Amazon Kinesis
-  Data Firehose delivery streams can serve as input sources for
-  Distributed Map, enabling near-real-time batch processing of streaming
-  data.
-
-- **ToleratedFailureCount (2023-2024):** Added as a complement to
-  ToleratedFailurePercentage for fine-grained partial failure control.
-  Both can be set simultaneously; the Map fails if EITHER threshold is
-  exceeded.
-
-- **Express Workflow Distributed Map (2023-2024):** Distributed Map now
-  supports Express Workflows (previously Standard only). Child
-  executions of Express type are billed at Express pricing (per-invocation
-  + per-execution-duration).
-
-- **Child execution Label (2023-2024):** The `Label` field on
-  Distributed Map allows custom naming of child executions, making it
-  easier to identify which parent execution spawned which children.
+> Full detail moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand.
+> Summary: the 2023-2026 feature list (ItemBatcher, Timestream/Firehose input, ToleratedFailureCount, Express Distributed Map, Label).
 
 ## NEVER do these things
 
@@ -759,33 +482,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Map state fails with "Items exceed maximum allowed"
-- For Inline Map: the input array exceeds 5000 items. Switch to
-  Distributed Map.
-- For Distributed Map: the input exceeds 10000 items. Reduce the input
-  size or split the workflow into multiple runs.
+> Full detail moved verbatim to [references/error-handling.md](references/error-handling.md) - load on demand.
+> Summary: the six runtime failure-mode triage subsections.
 
-### Distributed Map child execution throttling
-- The account's concurrent execution quota is exhausted. Reduce
-  MaxConcurrency or increase ItemBatchSize to reduce the number of
-  child executions. Request a quota increase via Service Quotas.
+## References (load on demand)
 
-### S3 input fails with "Access Denied"
-- The state machine IAM role lacks `s3:GetObject` on the target bucket.
-  Add the S3 read permission to the role's policy.
-
-### ItemBatchSize silently ignored
-- The Map type is Inline, not Distributed. ItemBatchSize only works on
-  Distributed Map. Switch to Distributed Map or remove ItemBatchSize.
-
-### Single batch failure fails entire Map state
-- ToleratedFailureCount and ToleratedFailurePercentage are both at
-  their default (0). Set at least one to allow partial failures.
-
-### Iterator field conflicts with Distributed configuration
-- The state machine uses the legacy `Iterator` field, which only
-  supports Inline Map. Switch to `ItemProcessor` with
-  `ProcessorConfig.Mode: DISTRIBUTED`.
+- [references/advanced-patterns.md](references/advanced-patterns.md) - Map misconceptions, ItemProcessor/batching expert heuristics, cost deep dive, recent features
+- [references/error-handling.md](references/error-handling.md) - per-iteration Retry/Catch template and runtime error triage
+- [references/map-configuration-and-batching.md](references/map-configuration-and-batching.md) - (existing) config + batching detail; now also holds Step 3/4/7 templates
+- [references/distributed-map-and-s3.md](references/distributed-map-and-s3.md) - (existing) Distributed Map + S3 detail; now also holds the Step 5 ItemReader template
 
 ## Domain
 
