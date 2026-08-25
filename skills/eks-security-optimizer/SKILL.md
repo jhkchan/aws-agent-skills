@@ -111,26 +111,8 @@ Always pairs the recommendation with exact kubectl and AWS CLI commands.
 
 ## Mindset
 
-EKS security optimization is a defense-in-depth exercise, not a single
-fix. The goal is to close the highest-severity gaps across all eight
-dimensions — not to achieve perfect security on one dimension while
-leaving others open.
-
-Four principles guide every recommendation:
-
-- **IAM is the root of trust.** If every pod uses the node IAM role,
-  pod-level security controls (PSA, network policies) are bypassable.
-  IRSA or Pod Identity is the foundation; everything else builds on it.
-- **Default deny is the network baseline.** The Kubernetes default of
-  allow-all east-west traffic is unacceptable in production. Every
-  namespace should have a default-deny network policy with explicit
-  allow rules for required flows.
-- **Admission control is policy-as-code.** OPA Gatekeeper or Kyverno
-  enforces security policies at admission time — before a pod is
-  created. This prevents misconfigured workloads from ever running.
-- **Runtime detection is the last line of defense.** GuardDuty EKS
-  runtime monitoring detects lateral movement, credential theft, and
-  anomalous process execution that network and admission controls miss.
+Moved verbatim to `references/advanced-patterns.md` — see "**Mindset — four principles**" (load on demand).
+Applies when: you need the reasoning behind the highest-leverage-first approach.
 
 ## Quick reference — verdict thresholds
 
@@ -156,15 +138,8 @@ inputs before any recommendation. Full CLI sequences are in
 `references/eks-security-config-reference.md`.
 
 **Required data sources** (summarized — see reference for full CLI):
-1. Cluster configuration: `aws eks describe-cluster`
-2. Addon status: `aws eks list-addons`, `aws eks describe-addon`
-3. KMS key for secrets: check `encryptionConfig` in describe-cluster
-4. ECR scan findings: `aws ecr describe-image-scan-findings`
-5. GuardDuty findings: `aws guardduty list-findings --filter criterion.service=EKS`
-6. PSA labels: `kubectl get namespaces --show-labels`
-7. IRSA annotations: `kubectl get serviceaccounts -A -o jsonpath`
-8. Network policies: `kubectl get networkpolicies -A`
-9. Audit log config: check `logging.clusterLogging` in describe-cluster
+Moved verbatim to `references/eks-security-config-reference.md` — see "**Pre-flight data gate — required data sources**" (load on demand).
+Applies when: gathering the nine pre-flight data sources on a live account.
 
 ### Data-quality short-circuits
 
@@ -182,88 +157,8 @@ inputs before any recommendation. Full CLI sequences are in
 
 These operational gotchas route a recommendation away from the obvious:
 
-- **PSA replaced PSP, not extended it.** PodSecurityPolicy was removed
-  in Kubernetes 1.25. PSA is label-based (namespace labels) and enforced
-  by the admission controller. It does NOT support custom policies —
-  use Gatekeeper/Kyverno for custom rules.
-- **EKS Pod Identity is the IRSA successor (2024).** Pod Identity uses
-  a simpler agent-based approach instead of OIDC federation. For new
-  clusters, prefer Pod Identity. For existing clusters, IRSA and Pod
-  Identity can coexist during migration.
-- **IMDSv2 hop-limit=1 blocks pod access.** The Instance Metadata
-  Service is on the node network. Setting `HttpPutResponseHopLimit=1`
-  prevents pods (which are one network hop away) from reaching IMDS.
-  This is the most effective defense against SSRF-based credential theft.
-- **KMS secrets encryption requires a new key for existing secrets.**
-  Enabling KMS encryption on an existing cluster encrypts NEW secrets
-  only. Existing secrets must be re-encrypted by rotating them.
-- **Network policies require a CNI plugin.** The AWS VPC CNI does not
-  implement Kubernetes NetworkPolicy. You must install Calico or Cilium
-  for network policy enforcement.
-- **ECR enhanced scanning requires Inspector enablement.** Basic scan
-  uses open-source CVE databases. Enhanced scan uses Amazon Inspector
-  for broader coverage including package and code vulnerabilities.
-- **GuardDuty EKS runtime monitoring requires the EKS addon.** It is
-  not sufficient to enable the GuardDuty detector — the
-  `aws-guardduty-agent` addon must be installed on the cluster.
-- **Audit log types are individually toggled.** The `logging` config
-  has five types: api, audit, authenticator, controllerManager, scheduler.
-  Each must be explicitly enabled. Missing `audit` logs means no
-  record of API server requests.
-- **API server private endpoint changes cluster networking.** Switching
-  to private-only endpoint means kubectl must run from within the VPC
-  (bastion, VPN, or Connected Tunnel). Plan the migration carefully.
-- **kubelet anonymous auth must be explicitly disabled.** The default
-  kubelet configuration on some AMIs allows anonymous access to the
-  kubelet API. This must be disabled via `--anonymous-auth=false`.
-- **PSA and OPA Gatekeeper overlap is NOT redundant — they serve
-  different layers.** PSA enforces a fixed taxonomy (privileged,
-  baseline, restricted) at the admission controller level with NO
-  customization. Gatekeeper/Kyverno enforce custom policies (e.g.,
-  "every pod must have a cost-center label," "images must come from
-  approved registries"). Use BOTH: PSA for the standard pod-hardening
-  floor, Gatekeeper for organization-specific rules. A common mistake
-  is deploying Gatekeeper to enforce baseline security controls that
-  PSA already covers — this doubles the admission latency with zero
-  additional security. Rule: let PSA handle pod spec validation, let
-  Gatekeeper handle cross-cutting governance (labels, registries,
-  resource quotas).
-- **IRSA token audience must match the IAM trust policy `sts:Audience`
-  condition.** The OIDC token issued to a pod contains an audience
-  (`aud`) field that defaults to `sts.amazonaws.com`. If the IAM role's
-  trust policy specifies a custom audience condition
-  (`"StringEquals": {"oidc.eks.region.amazonaws.com/id/XXX:aud":
-  "my-custom-audience"}`), the pod's service account annotation MUST
-  set `eks.amazonaws.com/audience` to the same value. A mismatch causes
-  `AccessDenied` from STS with no obvious error trail — the pod appears
-  healthy but every AWS SDK call fails silently. Expert rule: use the
-  default audience (`sts.amazonaws.com`) unless you have a specific
-  multi-cluster isolation requirement that demands custom audiences.
-- **KMS key rotation does NOT re-encrypt existing Kubernetes secrets
-  in-place.** When you rotate a KMS key (automatic annual rotation or
-  manual), the KMS key material changes but existing ciphertext
-  (already-encrypted secrets in etcd) is decrypted using the old key
-  material and then re-encrypted with the new key material — BUT only
-  on the NEXT write to that secret. Envelope decryption works because
-  KMS retains the ability to decrypt with old key versions. The
-  security improvement is forward-looking (new encrypt operations use
-  the new key material), not retrospective. To force full re-encryption
-  of all secrets after a key rotation, run:
-  `kubectl get secrets -A -o json | kubectl replace -f -` which reads
-  and re-writes every secret, triggering re-encryption with the current
-  key material. Pods holding decrypted secrets in memory are unaffected;
-  the re-encryption only matters for secrets at rest in etcd.
-- **EKS API server audit log volume is a hidden CloudWatch cost.**
-  Audit logging at the `api` and `audit` log types generates one log
-  event per API server request. A busy production cluster (100+ nodes,
-  frequent deployments, controllers polling) can generate 50-200 GB of
-  audit logs per month in CloudWatch Logs. At $0.50/GB ingestion, this
-  is $25-$100/month just for audit logs. The cost is NOT surfaced in
-  the EKS console. Expert rules: (1) set a CloudWatch Logs retention
-  period (30-90 days) to prevent unbounded growth; (2) if cost is
-  prohibitive, enable only `audit` and `authenticator` log types
-  (skip `api` if you have application-level audit logging); (3) export
-  logs to S3 for long-term archival at 10x lower cost.
+Moved verbatim to `references/advanced-patterns.md` — see "**Step 0 — non-obvious behaviours that change the recommendation**" (load on demand).
+Applies when: a recommendation hinges on PSA/PSP, Pod Identity, IMDSv2 hop-limit, KMS re-encryption, audit-log cost, or IRSA audience behaviour.
 
 ### Step 1: Pod Security Standards (PSA)
 
@@ -284,16 +179,8 @@ PSA enforces three profiles at the namespace level via labels:
 `restricted` as `audit` on production namespaces, and `restricted` as
 `enforce` on new namespaces.
 
-```bash
-# Apply baseline-enforce + restricted-warn to a namespace
-kubectl label namespace production \
-  pod-security.kubernetes.io/enforce=baseline \
-  pod-security.kubernetes.io/enforce-version=latest \
-  pod-security.kubernetes.io/audit=restricted \
-  pod-security.kubernetes.io/audit-version=latest \
-  pod-security.kubernetes.io/warn=restricted \
-  pod-security.kubernetes.io/warn-version=latest
-```
+Moved verbatim to `references/eks-security-config-reference.md` — see "**Step 1 — PSA namespace labels (bash)**" (load on demand).
+Applies when: applying PSA labels to a namespace.
 
 ### Step 2: IAM identity (IRSA / Pod Identity)
 
@@ -307,67 +194,23 @@ only the IAM role's scoped permissions.
 **EKS Pod Identity (2024):** Simpler alternative to IRSA using an
 agent-based approach. No OIDC provider required.
 
-**Detection:**
-```bash
-# Check OIDC provider (IRSA prerequisite)
-aws eks describe-cluster --name <cluster> --query 'cluster.identity.oidc.issuer'
-
-# Check which service accounts use IRSA
-kubectl get serviceaccounts -A -o jsonpath='{range .items[*]}{.metadata.namespace}{"/"}{.metadata.name}{"\t"}{.metadata.annotations.eks\.amazonaws\.com/role-arn}{"\n"}{end}' | grep -v "arn:aws" || echo "No IRSA annotations found"
-
-# Check EKS Pod Identity agent addon
-aws eks list-addons --cluster-name <cluster> --query 'addons[?@==`eks-pod-identity-agent`]'
-```
+Moved verbatim to `references/eks-security-config-reference.md` — see "**Step 2 — IRSA / Pod Identity detection (bash)**" (load on demand).
+Applies when: detecting which service accounts use IRSA or Pod Identity.
 
 **Recommendation:** Migrate all non-system workloads from node IAM role
 to IRSA or Pod Identity. For new clusters, use Pod Identity. For existing
 clusters, migrate incrementally.
 
-**IRSA setup:**
-```bash
-# Create IAM role with trust policy for the OIDC provider
-aws iam create-role --role-name <app-role> \
-  --assume-role-policy-document file://trust-policy.json
-
-# Annotate the Kubernetes service account
-kubectl annotate serviceaccount <sa-name> \
-  eks.amazonaws.com/role-arn=arn:aws:iam::<acct>:role/<app-role> \
-  -n <namespace>
-```
+Moved verbatim to `references/eks-security-config-reference.md` — see "**Step 2 — IRSA setup (bash)**" (load on demand).
+Applies when: creating an IRSA role and annotating a service account.
 
 ### Step 3: Network policies (east-west segmentation)
 
 Without network policies, any pod can reach any other pod in the cluster.
 This enables lateral movement after a single pod compromise.
 
-**CNI plugin required:** AWS VPC CNI does not implement NetworkPolicy.
-Install Calico or Cilium:
-
-```bash
-# Install Calico (via Helm)
-helm repo add projectcalico https://docs.projectcalico.org/charts
-helm install calico projectcalico/tigera-operator -n tigera-operator --create-namespace
-
-# OR install Cilium (via Helm)
-helm repo add cilium https://helm.cilium.io/
-helm install cilium cilium/cilium --namespace kube-system \
-  --set kubeProxyReplacement=disabled \
-  --set enableL7Proxy=false
-```
-
-**Default-deny baseline:**
-```yaml
-# Default deny all ingress in a namespace
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: default-deny-ingress
-  namespace: production
-spec:
-  podSelector: {}
-  policyTypes:
-  - Ingress
-```
+Moved verbatim to `references/eks-security-config-reference.md` — see "**Step 3 — Calico/Cilium install + default-deny NetworkPolicy**" (load on demand).
+Applies when: installing a network-policy CNI or applying a default-deny baseline.
 
 Then add explicit allow rules for required flows (e.g., frontend → backend
 on port 8080).
@@ -378,25 +221,8 @@ Without KMS encryption, Kubernetes secrets are encrypted with a
 cluster-wide key derivable by any etcd access. KMS envelope encryption
 uses a customer-managed KMS key.
 
-**Detection:**
-```bash
-aws eks describe-cluster --name <cluster> \
-  --query 'cluster.encryptionConfig'
-# Empty array = not configured
-```
-
-**Enable KMS encryption:**
-```bash
-# Create a KMS key
-aws kms create-key --description "EKS secrets encryption for <cluster>"
-
-# Enable encryption on the cluster
-aws eks update-cluster-config --name <cluster> \
-  --encryption-config '{
-    "resources": ["secrets"],
-    "provider": {"keyArn": "arn:aws:kms:us-east-1:<acct>:key/<key-id>"}
-  }'
-```
+Moved verbatim to `references/eks-security-config-reference.md` — see "**Step 4 — KMS detection + enable (bash)**" (load on demand).
+Applies when: detecting or enabling KMS secrets encryption.
 
 **Important:** Existing secrets are NOT automatically re-encrypted. After
 enabling, rotate secrets:
@@ -409,24 +235,8 @@ kubectl get secrets -A -o json | kubectl replace -f -
 Without image scanning, vulnerable container images are deployed without
 detection.
 
-**Detection:**
-```bash
-aws ecr describe-repositories --query 'repositories[].imageScanningConfiguration'
-```
-
-**Enable scan-on-push:**
-```bash
-aws ecr put-image-scanning-configuration \
-  --repository-name <repo> \
-  --image-scanning-configuration scanOnPush=true
-```
-
-**Enable enhanced scanning (Inspector):**
-```bash
-aws ecr put-enhanced-image-scan-policy \
-  --repository-name <repo> \
-  --policy '{"enhancedScanType": "INSPECTOR"}'
-```
+Moved verbatim to `references/eks-security-config-reference.md` — see "**Step 5 — ECR scanning detection + enable (bash)**" (load on demand).
+Applies when: detecting or enabling ECR scan-on-push / enhanced scanning.
 
 **Block CRITICAL findings at admission:** Use Gatekeeper or Kyverno to
 verify image scan status before allowing deployment.
@@ -439,13 +249,8 @@ GuardDuty EKS runtime monitoring detects:
 - Anomalous process execution (reverse shells, cryptominers)
 - Container escape attempts
 
-**Enable GuardDuty EKS runtime:**
-```bash
-# Enable the EKS addon
-aws eks create-addon --cluster-name <cluster> \
-  --addon-name aws-guardduty-agent \
-  --addon-version v1.0.0
-```
+Moved verbatim to `references/eks-security-config-reference.md` — see "**Step 6 — enable GuardDuty EKS runtime (bash)**" (load on demand).
+Applies when: enabling the GuardDuty EKS runtime addon.
 
 Ensure the GuardDuty detector is enabled and EKS runtime coverage is
 active in the GuardDuty console.
@@ -455,17 +260,8 @@ active in the GuardDuty console.
 Admission webhooks enforce policy-as-code at pod creation time. This is
 the Kubernetes-native way to prevent misconfigured workloads.
 
-**Gatekeeper (OPA):**
-```bash
-helm install gatekeeper gatekeeper/gatekeeper \
-  -n gatekeeper-system --create-namespace
-```
-
-**Kyverno:**
-```bash
-helm install kyverno kyverno/kyverno \
-  -n kyverno-system --create-namespace
-```
+Moved verbatim to `references/eks-security-config-reference.md` — see "**Step 7 — install Gatekeeper / Kyverno (bash)**" (load on demand).
+Applies when: installing Gatekeeper or Kyverno.
 
 **Baseline policies to enforce:**
 - Disallow privileged containers
@@ -480,18 +276,8 @@ Service mesh mTLS encrypts pod-to-pod communication and authenticates
 workload identity. Without mTLS, any pod on the network can impersonate
 any other pod.
 
-**App Mesh:**
-```bash
-# Install App Mesh controller
-helm appmesh install appmesh appmesh/appmesh \
-  -n appmesh-system --create-namespace
-```
-
-**Istio (alternative):**
-```bash
-istioctl install --set values.global.meshID=mesh1 \
-  --set values.global.network=network1
-```
+Moved verbatim to `references/eks-security-config-reference.md` — see "**Step 8 — install App Mesh / Istio (bash)**" (load on demand).
+Applies when: installing a service mesh for mTLS.
 
 **ACM PCA for certificate authority:** Use AWS Private Certificate
 Authority for managed certificate issuance in the mesh.
@@ -710,25 +496,8 @@ Extended anti-patterns and error-handling tables in
 
 ## Recent AWS features (2024-2026)
 
-- **EKS Pod Identity (2024-2025):** Simpler alternative to IRSA using
-  an agent-based approach. No OIDC provider required. Coexists with
-  IRSA during migration.
-- **Pod Security Admission (Kubernetes 1.25+, EKS):** Replaces
-  PodSecurityPolicy. Label-based enforcement of privileged/baseline/
-  restricted profiles.
-- **GuardDuty EKS Runtime Monitoring (2024-2025):** Runtime threat
-  detection for EKS via the `aws-guardduty-agent` addon. Detects
-  credential theft, lateral movement, anomalous processes.
-- **ECR Enhanced Scanning with Inspector (2024-2025):** Broader
-  vulnerability coverage than basic scanning. Includes package and
-  code-level vulnerabilities.
-- **EKS Auto Mode (2024-2025):** Managed node pools with built-in
-  security defaults (IMDSv2 enforced, latest AMI).
-- **KMS secrets encryption on cluster creation (2024-2025):** Can now
-  be specified at cluster creation time, not just via update-cluster-config.
-- **VPC CNI network policy support (2024-2025):** VPC CNI now supports
-  a subset of Kubernetes NetworkPolicy, reducing the need for Calico/
-  Cilium for basic policies.
+Moved verbatim to `references/advanced-patterns.md` — see "**Recent AWS features (2024-2026)**" (load on demand).
+Applies when: the cluster uses Pod Identity, GuardDuty runtime monitoring, ECR enhanced scanning, Auto Mode, or VPC CNI network policies.
 
 ## References
 
@@ -740,6 +509,12 @@ Extended anti-patterns and error-handling tables in
 - `references/worked-examples.md` — full worked examples (PSA enable,
   IRSA migration, network policy default deny, KMS encryption, already-
   secured, NEED_MORE_INFO, end-to-end walkthrough).
+
+## References (load on demand)
+
+- [references/eks-security-config-reference.md](references/eks-security-config-reference.md) — CLI commands for each security dimension (including the per-step bash blocks moved verbatim from this file), IAM policy templates, error-handling tables, extended NEVER list.
+- [references/worked-examples.md](references/worked-examples.md) — full worked examples (PSA enable, IRSA migration, network policy default deny, KMS encryption, already-secured, NEED_MORE_INFO, end-to-end walkthrough).
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 non-obvious behaviours, mindset principles, and recent AWS features (moved verbatim from this file).
 
 ## Domain
 

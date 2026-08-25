@@ -173,3 +173,24 @@ aws eks update-addon \
    version.
 5. **Multiple IRSA roles for the same add-on.** Each add-on should have
    exactly one IAM role. Multiple roles cause credential conflicts.
+
+## Expert heuristic: add-on version compatibility matrix (moved from SKILL.md)
+
+Each EKS add-on version is validated against specific EKS platform
+versions and Kubernetes minor versions. A baseline model may pick the
+latest version; this can break cluster networking if it's incompatible.
+
+```text
+describe-addon-versions --addon-name vpc-cni --kubernetes-version 1.30
+  → Returns only versions validated for K8s 1.30
+  → Includes "DEFAULT" flag for the recommended version
+  → Includes compatibility info (addonVersion, platformVersions)
+
+Rule: ALWAYS use describe-addon-versions to validate before create-addon.
+      NEVER assume the latest version is compatible.
+```
+
+**Key implication:** the EKS API enforces version compatibility at
+creation time, but a version that passes the API check may still have
+runtime issues if the cluster uses an unusual configuration (custom
+CNI, Fargate-only, etc.). Test add-on updates in a staging cluster first.

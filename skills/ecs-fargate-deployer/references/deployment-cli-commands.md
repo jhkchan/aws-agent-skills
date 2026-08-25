@@ -305,3 +305,41 @@ aws application-autoscaling describe-scaling-policies \
 - `AWS::ElasticLoadBalancingV2::TargetGroup` — `TargetType: ip`.
 - `AWS::ApplicationAutoScaling::ScalableTarget` and
   `AWS::ApplicationAutoScaling::ScalingPolicy`.
+
+---
+
+## Step 4 — capacity provider strategy variant (FARGATE + FARGATE_SPOT) (moved from SKILL.md)
+
+**Capacity provider strategy (preferred over launch-type for Spot):**
+
+```bash
+aws ecs create-service \
+  --cluster payments-prod \
+  --service-name payments-api-prod \
+  --task-definition payments-api:5 \
+  --desired-count 6 \
+  --capacity-provider-strategy \
+    capacityProvider=FARGATE,weight=4,base=2 \
+    capacityProvider=FARGATE_SPOT,weight=1 \
+  ...
+```
+
+---
+
+## Step 9 — auto-scaling (target tracking) CLI (moved from SKILL.md)
+
+```bash
+aws application-autoscaling register-scalable-target \
+  --service-namespace ecs --scalable-dimension ecs:service:DesiredCount \
+  --resource-id service/payments-prod/payments-api-prod \
+  --min-capacity 3 --max-capacity 12
+
+aws application-autoscaling put-scaling-policy \
+  --service-namespace ecs --scalable-dimension ecs:service:DesiredCount \
+  --resource-id service/payments-prod/payments-api-prod \
+  --policy-name payments-api-cpu-60 --policy-type TargetTrackingScaling \
+  --target-tracking-scaling-policy-configuration '{
+    "TargetValue": 60.0,
+    "PredefinedMetricSpecification": {"PredefinedMetricType": "ECSServiceAverageCPUUtilization"},
+    "ScaleOutCooldown": 60, "ScaleInCooldown": 300}'
+```

@@ -215,3 +215,25 @@ Key Prometheus metrics exposed by Karpenter:
   annotations:
     summary: "Pods have been Pending for > 5 minutes — possible capacity issue"
 ```
+
+## EC2NodeClass manifest (Step 2) (moved from SKILL.md)
+
+EC2NodeClass:
+
+```yaml
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: default
+spec:
+  amiSelectorTerms:
+    - alias: al2023@latest
+  subnetSelectorTerms:
+    - tags: {Name: my-prod-cluster-private-*}
+  securityGroupSelectorTerms:
+    - tags: {kubernetes.io/cluster/my-prod-cluster: owned}
+  role: KarpenterNodeRole-my-prod-cluster
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs: {volumeSize: 100Gi, volumeType: gp3, encrypted: true}
+```

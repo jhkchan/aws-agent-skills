@@ -301,3 +301,30 @@ The block prevents accidental deletion of a replica that would cause
 it to be re-replicated from the source on the next push. By requiring
 source deletion first, ECR ensures the deletion is intentional and
 propagates correctly.
+
+## Expert heuristic: pull-through cache reduces external dependency (moved from SKILL.md)
+
+A baseline model may not distinguish pull-through cache from
+replication. The correct heuristic recognizes that pull-through cache
+fetches external images into your ECR for local caching.
+
+```text
+Pull-through cache vs replication:
+  ├── Replication (internal → internal)
+  │     Source: your ECR in region A
+  │     Destination: your ECR in region B (or another account)
+  │     Trigger: push to source → replicates automatically
+  │     Images: your own images
+  │
+  └── Pull-through cache (external → internal)
+        Source: docker.io, quay.io, k8s.io, ecr-public
+        Destination: your ECR
+        Trigger: Lambda/ECS pulls → fetches and caches on first pull
+        Images: third-party images (nginx, redis, etc.)
+```
+
+**Key implication:** pull-through cache solves two problems:
+1. **External rate limits** — docker.io has pull rate limits. Cached
+   pulls bypass the external registry.
+2. **Latency** — pulling from a local ECR is faster than pulling from
+   docker.io across the internet.

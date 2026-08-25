@@ -216,3 +216,23 @@ kubectl get pvc -n <NAMESPACE>
 aws lambda get-function-configuration --function-name <FN_NAME> \
   --query 'fileSystemConfigs'
 ```
+
+---
+
+## Step 9 — Verification command listing (moved from SKILL.md)
+
+```bash
+aws efs describe-access-points --access-point-id <AP_ID>
+aws efs describe-file-system-policy --file-system-id <FS_ID>
+aws efs describe-mount-targets --file-system-id <FS_ID>
+aws efs describe-lifecycle-configuration --file-system-id <FS_ID>
+# (ECS) confirm the task mounts:
+aws ecs describe-tasks --cluster <CLUSTER> --tasks <TASK_ARN> \
+  --query 'tasks[0].volumes'
+# (EKS) confirm the PVC bound:
+kubectl get pvc -n <NAMESPACE>
+# (Lambda) confirm the file-system config:
+aws lambda get-function-configuration --function-name <FN_NAME> \
+  --query 'fileSystemConfigs'
+```
+

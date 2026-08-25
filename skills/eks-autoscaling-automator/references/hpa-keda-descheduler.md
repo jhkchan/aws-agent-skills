@@ -260,3 +260,66 @@ Pending indefinitely. Always enable `nodeFit` in production.
 | Descheduler evicts too many | No maxNoOfPodsToEvict caps | Set `maxNoOfPodsToEvictPerNode: 3` and `maxNoOfPodsToEvictTotal: 50` |
 | Scale-up is slow (2-5 min) | No overprovisioning headroom | Deploy pause-pods with low priority class |
 | Pods Pending after spot eviction | Karpenter cannot provision (capacity issue) | Diversify instance families; increase NodePool limits |
+
+## HPA with CPU + custom metric + behavior tuning manifest (Step 5) (moved from SKILL.md)
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-server-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-server
+  minReplicas: 3
+  maxReplicas: 50
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: {type: Utilization, averageUtilization: 70}
+    - type: Pods
+      pods:
+        metric: {name: http_requests_per_second}
+        target: {type: AverageValue, averageValue: "1000"}
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent, value: 100, periodSeconds: 15
+        - type: Pods, value: 4, periodSeconds: 15
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent, value: 10, periodSeconds: 60
+      selectPolicy: Min
+```
+
+
+## SQS-triggered KEDA ScaledObject manifest (Step 7) (moved from SKILL.md)
+
+```yaml
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: sqs-consumer-scaler
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: sqs-consumer
+  minReplicaCount: 0          # Scale to zero when idle
+  maxReplicaCount: 30
+  pollingInterval: 30
+  cooldownPeriod: 300
+  triggers:
+    - type: aws-sqs-queue
+      metadata:
+        queueURL: https://sqs.us-east-1.amazonaws.com/111111111111/my-queue
+        queueLength: "10"
+        awsRegion: us-east-1
+        identityOwner: operator
+```

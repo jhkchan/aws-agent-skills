@@ -81,157 +81,20 @@ appear.
 | references/provisioning-cli-commands.md | Copy-pasteable CLI sequence |
 
 ## Mindset
-
-**One-line takeaway:** A Spot Fleet is a collection of Spot
-Instances (and optionally On-Demand) launched from a diversified
-set of instance types and Availability Zones, managed as a group
-to maintain a target capacity. The allocation strategy determines
-how the fleet selects pools; the fleet type determines whether AWS
-maintains the capacity or fills it once.
-
-Three misconceptions dominate Spot Fleet misdesign at provisioning
-time:
-
-- **"Just pick lowestPrice and the cheapest instances will
-  appear."** They will — until capacity is reclaimed and the fleet
-  collapses to a single pool. `lowestPrice` selects the lowest-
-  priced pool per AZ with no diversification. If that pool is
-  interrupted, the entire fleet is interrupted simultaneously.
-  `priceCapacityOptimized` (the 2022 default recommendation) is
-  almost always the better choice: it balances price with capacity
-  availability.
-
-- **"Spot Fleet and Auto Scaling Group are the same thing."** They
-  are not. A Spot Fleet is a capacity procurement mechanism — it
-  requests and replaces Spot Instances but has no scaling policies.
-  An Auto Scaling Group can request Spot Instances AND scale based
-  on load. Use Spot Fleet for fixed-capacity cost optimization; use
-  ASG with mixed instances for elastic workloads.
-
-- **"I only need one instance type in my fleet."** The entire point
-  of a Spot Fleet is diversification. A single instance type has no
-  fallback pools. If that type is reclaimed, the fleet cannot
-  replace it from another pool. Always specify at least 2-3 instance
-  types across multiple AZs.
+Full mindset and the three provisioning misconceptions moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Configuration dependency graph (novel heuristic)
-
-Spot Fleet configurations are NOT independent. Many settings are
-immutable after the request is created; others silently degrade
-interruption resilience. Use this graph to sequence provisioning
-and debug "why is my fleet not filling?" later.
-
-| Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| Fleet type | IAM service role (AWSServiceRoleForEC2SpotFleet) | `maintain` continuously replaces; `request` is one-time (cannot be modified) | fleet lifecycle behavior |
-| Launch template | AMI exists in the region + valid instance type | launch template is versioned; changing AMI requires a new version | standardized instance config |
-| Allocation strategy | none — SpotFleetRequestConfig parameter | **CANNOT be changed after request creation** — must cancel and re-create | pool selection logic |
-| Instance types (Overrides) | valid instance type + AZ combination | adding/removing types requires modifying the Spot Fleet request | diversification |
-| Target capacity | positive integer (units or vCPUs or instances) | mutable for `maintain` fleets; `request` fleets fill once and stop | fleet size |
-| Excess capacity termination | `TargetCapacitySpecification` set | defaults to `noTermination` (safe) or `termination` (aggressive) | capacity drift handling |
-| InstanceInterruptionBehavior | valid value: stop/terminate/hibernate | **CANNOT be changed per-instance after launch** — set at request level | interruption response |
-| Capacity rebalance | `maintain` fleet type + Rebalance enabled | only works with `maintain` fleets; `request` fleets ignore it | proactive rebalancing |
-| Spot placement score | must be queried before fleet creation | advisory only — does not guarantee capacity | capacity-aware pool selection |
-| Capacity reservations | existing ODCR in the account | must match instance type + AZ; consumed before Spot | guaranteed capacity |
-
-**The immutable rows are the ones a baseline model misses.**
-Allocation strategy and fleet type are set at request creation and
-CANNOT be changed without canceling and re-creating the fleet. The
-procedure below forces an explicit decision on each before the
-`request-spot-fleet` call.
-
-**Cross-dependency gotchas:**
-- A `request` (one-time) fleet type CANNOT be modified after
-  creation. Target capacity changes, instance type additions, and
-  capacity rebalance all require a `maintain` fleet.
-- Capacity rebalance requires `maintain` fleet type. Enabling it on
-  a `request` fleet is silently ignored.
-- Spot placement score is advisory — it scores pools but does not
-  reserve capacity. The fleet may still be interrupted in a
-  high-scoring pool.
-- Capacity reservations (ODCR) are consumed first, but only if
-  they match instance type + AZ + platform exactly.
+Full dependency table and cross-dependency gotchas moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Expert heuristic: allocation strategy selection
-
-The allocation strategy determines how the Spot Fleet selects which
-Spot Instance pools to draw from. A baseline model lists the four
-options without explaining when each fails; this heuristic provides
-a decision framework.
-
-```text
-Workload profile → allocation strategy
-
-Stateless, fault-tolerant, cost-optimized
-  → priceCapacityOptimized (RECOMMENDED DEFAULT)
-    Balances price with capacity availability. AWS's recommended
-    default since Nov 2022. Avoids concentrating the fleet in a
-    single cheap pool that gets reclaimed all at once.
-
-Stateless, MUST be cheapest, can tolerate interruptions
-  → lowestPrice
-    Picks the lowest-priced pool per AZ. No diversification. High
-    risk of simultaneous fleet-wide interruption. Only use with
-    many instance types (10+) across all AZs.
-
-Stateless, capacity availability > price sensitivity
-  → capacityOptimized
-    Picks pools with the most available capacity, reducing
-    interruption risk. Good for long-running workloads where
-    interruption cost > Spot savings.
-
-Stateful or requires specific instance families
-  → diversified
-    Distributes across all pools equally. Lowest interruption risk
-    but no cost optimization.
-```
-
-**Key implication:** `lowestPrice` was the pre-2022 default and is
-rarely the best choice. `priceCapacityOptimized` avoids the trap of
-concentrating the fleet in a single cheap pool. `capacityOptimized`
-suits workloads where interruption cost is high (batch jobs, CI/CD,
-ML training). `diversified` is the fallback for maximum spread.
+Workload-profile decision framework and key implications moved to
+[references/allocation-strategies.md](references/allocation-strategies.md).
 
 ## Expert heuristic: capacity rebalance and replacement
-
-Capacity rebalance is NOT the same as the default interruption
-replacement. A baseline model conflates the two; this heuristic
-separates them.
-
-| Mechanism | When it triggers | What it does | Fleet type |
-|---|---|---|---|
-| Default replacement (no rebalance) | 2-minute interruption warning | Fleet requests a NEW instance from another pool, then the interrupted instance terminates | `maintain` only |
-| Capacity rebalance (Rebalance) | AWS signals at-risk pool (before warning) | Fleet proactively launches a replacement BEFORE the interruption, giving more migration time | `maintain` only |
-| `request` fleet | n/a | No replacement at all — fleet fills once and stops | `request` only |
-
-**Capacity rebalance lifecycle:**
-```text
-AWS detects rising interruption risk in a pool
-  → Rebalance Recommendation signal emitted (via EventBridge + metadata)
-  → If rebalance is ENABLED:
-    → Fleet launches a NEW replacement instance from a safer pool
-    → Replacement becomes healthy → old instance terminates
-    → Workload drains from old to new
-  → If rebalance is DISABLED:
-    → Wait for 2-minute interruption warning → then launch replacement
-```
-
-**Key implication:** Capacity rebalance buys time. Without it, you
-get 2 minutes from the warning. With it, the rebalance signal can
-come before the interruption notice — critical for stateful
-workloads, ML training checkpoints, and long-running batch jobs.
-
-**Enabling capacity rebalance (set at SpotFleetRequestConfig level):**
-```json
-{
-  "Type": "maintain",
-  "AllocationStrategy": "priceCapacityOptimized",
-  "InstanceInterruptionBehavior": "terminate",
-  "SpotMaintenanceStrategies": {
-    "CapacityRebalance": { "ReplacementStrategy": "launch" }
-  }
-}
-```
+Rebalance-vs-default-replacement comparison, lifecycle, and enabling JSON moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Prerequisites (verify before provisioning)
 
@@ -494,26 +357,7 @@ Spot placement score is a pre-flight capacity check. Before creating
 a fleet, query the score to see which instance type + AZ
 combinations have the best capacity availability.
 
-**Query Spot placement scores:**
-```bash
-aws ec2 get-spot-placement-scores \
-  --instance-types m5.large m5a.large c5.large \
-  --target-capacity 10 \
-  --target-capacity-type vcpu \
-  --region us-east-1 \
-  --single-availability-zone true
-```
-
-**Output:**
-```json
-{
-  "SpotPlacementScores": [
-    { "Region": "us-east-1", "AvailabilityZoneId": "use1-az1", "Score": 10 },
-    { "Region": "us-east-1", "AvailabilityZoneId": "use1-az2", "Score": 7 },
-    { "Region": "us-east-1", "AvailabilityZoneId": "use1-az3", "Score": 3 }
-  ]
-}
-```
+Query command and sample output moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Score interpretation:**
 - Score 1-3: Low availability. High interruption risk. Avoid.
@@ -566,34 +410,8 @@ capacity, On-Demand billing), then Spot fills the rest.
   cost savings for the rest.
 
 ## Step 10 — Recent features
-
-**Recent AWS features (2023-2026):**
-
-- **`priceCapacityOptimized` as default (Nov 2022, refined 2023-
-  2024):** AWS's recommended allocation strategy. Balances price
-  with capacity availability. Replaces `lowestPrice` as the default
-  recommendation for most workloads.
-
-- **Spot placement score API (2023-2024):** Pre-flight capacity
-  check before fleet creation. Scores pools 1-10. Single-AZ or
-  multi-AZ modes. Enables data-driven pool selection.
-
-- **Attribute-based instance selection (2023-2024):** Use
-  `InstanceRequirements` (vCPU, memory, accelerator count) instead
-  of specific instance types. AWS picks any matching type,
-  maximizing pool count and reducing interruption risk.
-
-- **Capacity rebalance with `launch` strategy (2023-2024):**
-  Fleet launches a replacement BEFORE terminating the old instance.
-  Reduces capacity gaps during rebalancing.
-
-- **Spot Fleet with On-Demand Capacity Reservations (2023-2024):**
-  ODCR consumed first when matching instance type + AZ. Enables
-  hybrid guaranteed-capacity + cost-optimization fleets.
-
-- **Spot Fleet support for `hibernate` interruption behavior (2023-
-  2024):** Instances can hibernate on interruption, preserving RAM
-  state. Useful for long-running stateful workloads.
+Recent AWS feature notes (2023-2026) moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -666,29 +484,16 @@ VERIFICATION_COMMANDS:
 ```
 
 ## Error handling
+Fleet failure modes and their fixes moved to
+[references/error-handling.md](references/error-handling.md).
 
-### Fleet stuck in `submitted`/`active` with 0 instances
-- No capacity in the specified pools. Check Spot placement score;
-  diversify by adding instance types/AZs. Switch to
-  `capacityOptimized` if using `lowestPrice`. Verify the IAM service
-  role (`AWSServiceRoleForEC2SpotFleet`) exists.
+## References (load on demand)
 
-### Fleet partially filled (e.g., 10 of 20 target)
-- Add more instance types (m5a, c5, r5 families) and AZs. Consider
-  switching to `priceCapacityOptimized` if using `lowestPrice`.
-
-### Capacity rebalance not working
-- Verify fleet type is `maintain` (not `request`). Verify
-  `ReplacementStrategy` is `launch`. Check EventBridge for rebalance
-  recommendation events.
-
-### `MaxSpotInstanceCountExceeded`
-- Account hit the Spot vCPU limit. Request a quota increase via
-  Service Quotas. Use vCPU-based quotas (now default).
-
-### Allocation strategy cannot be changed
-- Immutable after creation. Cancel the fleet
-  (`cancel-spot-fleet-requests`) and create a new one.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — mindset misconceptions, configuration dependency graph, capacity rebalance deep dive, recent AWS features (moved from this file)
+- [references/allocation-strategies.md](references/allocation-strategies.md) — allocation-strategy workload-profile heuristic (moved from this file) plus the strategy comparison matrix and decision framework
+- [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — full copy-pasteable provisioning CLI sequence
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — Spot placement score query and sample output (moved from this file)
+- [references/error-handling.md](references/error-handling.md) — fleet stuck/partially filled, rebalance not working, MaxSpotInstanceCountExceeded, immutable allocation strategy (moved from this file)
 
 ## Domain
 

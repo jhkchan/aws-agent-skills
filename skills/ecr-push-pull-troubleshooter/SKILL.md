@@ -68,45 +68,12 @@ metadata:
   configured as IMMUTABLE.
 
 ## Mindset
-
-A failing ECR push or pull is almost always an identity, policy, or
-lifecycle incident, not a docker problem. Docker is the messenger —
-the error string it surfaces is almost always the AWS-side denial
-translated into docker terms. Senior container engineers do not start
-by rebuilding the image; they start with `aws ecr get-authorization-token`,
-the repository policy, and the lifecycle policy, and only rebuild once
-auth, policy, and lifecycle are proven correct.
+Mindset reasoning moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Philosophy
-
-Four behaviours separate a senior ECR engineer from a generalist:
-
-- **The auth token is base64(username:password) and valid for 12 hours.**
-  The decoded token's username is the literal string `AWS` and the
-  password is a signed STS-style URL query string. After 12 hours the
-  signature expires and every push/pull fails with `Your authorization
-  token has expired`. CI pipelines that cache the token in
-  `~/.docker/config.json` longer than 12 hours hit this deterministically
-  once a day. The fix is to refresh the token before every build, not
-  to extend the token.
-- **Cross-account access requires BOTH sides.** The caller's
-  identity-based policy must allow `ecr:BatchGetImage` and friends on
-  the target repository ARN, AND the target repository's resource-based
-  policy must list the caller's account (`aws:PrincipalAccount`) or ARN.
-  Operators who "added the IAM permission to the CI role" but still see
-  `denied` from a cross-account pull always missed the repository
-  policy side.
-- **Lifecycle policy is first-match-wins, evaluated top to bottom.** A
-  broad `expire` rule placed above a narrower `keep` rule deletes what
-  the `keep` rule would have protected. Operators who "set a 10-image
-  retention rule" and lost images they needed almost always had an
-  earlier rule match first.
-- **The registry alias, the account ID, and the region are three
-  different things.** `public.ecr.aws/<alias>/repo` is ECR Public;
-  `<account>.dkr.ecr.<region>.amazonaws.com/repo` is ECR Private.
-  `docker push public.ecr.aws/...` when the target was a private URI
-  silently pushes to a different registry and the next pull fails with
-  `manifest unknown`.
+Philosophy behaviours moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Quick reference — symptom triage table
 
@@ -130,59 +97,19 @@ Four behaviours separate a senior ECR engineer from a generalist:
 ## Pre-flight: registry and gather-info gate
 
 ### Account-wide pre-flight commands
+Account-wide pre-flight command block moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
-```bash
-# 1. Registry settings (encryption, public alias, replication source)
-aws ecr describe-registry --output json
-
-# 2. Auth token (decode base64 to read username:password; valid for 12h)
-aws ecr get-authorization-token --output json | \
-  jq '.authorizationData[0] | {proxyEndpoint, expiresAt, token: (.authorizationToken | @base64d)}'
-
-# 3. Repository configuration (imageTagMutability, scan-on-push, encryption)
-aws ecr describe-repositories --repository-names <repo> --output json
-
-# 4. Repository resource-based policy (cross-account grants live here)
-aws ecr get-repository-policy --repository-name <repo> --output json 2>/dev/null || \
-  echo "No repository policy (default deny for cross-account)"
-
-# 5. Lifecycle policy (rule order matters — first match wins)
-aws ecr get-lifecycle-policy --repository-name <repo> --output json 2>/dev/null || \
-  echo "No lifecycle policy"
-
-# 6. AWS Health (regional ECR events)
-aws health describe-events --filter eventStatusCodes=OPEN,UPCOMING \
-  --region us-east-1 --output json
-```
 
 ### Repository-state short-circuit
-
-| `describe-repositories` field | Effect on diagnosis |
-|---|---|
-| `imageTagMutability: IMMUTABLE` | A push with an existing tag fails with `image tag already exists` — route to TAG_IMMUTABILITY before any policy work. |
-| `imageScanningConfiguration.scanOnPush: true` | Every push triggers a scan; downstream gates may block deploy on `HIGH`/`CRITICAL`. Route to SCAN_BLOCKING when the error is from the deploy pipeline. |
-| `encryptionConfiguration.encryptionType: KMS` | Pushes need `kms:GenerateDataAccess`; pulls need `kms:Decrypt`. Route to KMS on any KMS.AccessDeniedException. |
-| `encryptionConfiguration.encryptionType: AES256` | No caller-side KMS permission needed — do NOT chase KMS for AES256 repos. |
-| Empty repository policy | Cross-account pulls fail with `denied`; same-account pulls succeed via IAM. Route to POLICY_REPOSITORY for cross-account. |
+Repository-state short-circuit table moved to
+[references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If the input is malformed (missing registry URI or repository name, no
 symptom description, no caller context for cross-account diagnosis),
 emit:
 
-```text
-TARGET: <registry-uri/repo:tag or unknown>
-VERDICT: INSUFFICIENT_DATA
-REASON: Input is missing required context — at minimum a symptom
-  description (the docker / aws ecr error string) and the full
-  registry URI (account, region, repository name).
-LAYER: UNKNOWN
-EVIDENCE:
-  - Missing: <list specific missing fields>
-REMEDIATION: Re-prompt the operator for: (1) the exact docker or aws
-  ecr error string, (2) the full registry URI being pushed to or
-  pulled from, and (3) for cross-account cases, the IAM principal
-  doing the operation and its account ID.
-```
+INSUFFICIENT_DATA re-prompt template for malformed/missing input: [references/worked-examples.md](references/worked-examples.md).
 
 ## Process — Diagnostic decision tree (apply in symptom order)
 
@@ -191,55 +118,8 @@ symptom, then walk the layer-specific probes in order. **Never emit
 ROOT_CAUSE_IDENTIFIED without a failing probe that matches the symptom.**
 
 ### Step 0: Non-obvious behaviours that change diagnosis
-
-- **The auth token is the same password for all repositories in the
-  registry.** `aws ecr get-login-password` returns one password scoped
-  to the registry (`<account>.dkr.ecr.<region>.amazonaws.com`). Logging
-  in once authorises push/pull to every repository in that registry —
-  there is no per-repository login. A different region OR a different
-  account is a different registry and needs a separate login.
-- **The token in `~/.docker/config.json` is cached indefinitely by
-  default.** Docker does not refresh the token; the cached entry stays
-  until the next `docker login` overwrites it. A CI runner that caches
-  `~/.docker/config.json` between jobs hits `Your authorization token
-  has expired` deterministically once the 12-hour window elapses.
-- **Repository policy and IAM policy combine with explicit-deny-wins.**
-  An explicit `Deny` in either the IAM policy, the repository policy,
-  or an SCP overrides any `Allow`. Implicit deny (no matching
-  statement) in either policy also fails. For same-account access, IAM
-  alone is sufficient; for cross-account, the repository policy must
-  ALSO allow.
-- **Lifecycle policy evaluation is first-match-wins, top to bottom.**
-  Once a rule matches, its action (`expire`) is taken and no further
-  rule is evaluated for that image. A broad `expire` rule placed above
-  a narrower `keep` rule deletes images the `keep` rule would have
-  protected. Always read rule order.
-- **Tag immutability blocks overwrites, not first-push.** A new tag
-  always succeeds; an existing tag always fails when `IMMUTABLE`.
-  Switching mutability is per-repository and takes effect immediately.
-- **Cross-region replication is asynchronous and eventually consistent.**
-  After a push to the source region, the replica may take seconds to
-  minutes to appear. A pull in the destination region before
-  replication completes fails with `manifest unknown`. Replication
-  rules do NOT replicate across accounts unless the destination is in
-  the rule.
-- **Scan-on-push findings do not block the push; they block the
-  deploy.** ECR accepts the image, then runs the scan asynchronously.
-  The push succeeds; a downstream CD gate reads
-  `describe-image-scan-findings` and refuses to promote. Operators who
-  say "the push was blocked by a CVE" almost always had a downstream
-  gate do the blocking.
-- **`describe-images` may briefly show a deleted image.** After a
-  lifecycle `expire`, the image is marked for deletion and may still
-  appear for up to 24 hours, then vanishes. CloudTrail `BatchDeleteImage`
-  events from the ECR service principal are the actual delete record.
-- **Image architecture is a property of the manifest, not the tag.**
-  A tag like `app:v1` can point to a single-arch image (`linux/amd64`)
-  or a multi-arch manifest list. A Fargate task on `x86_64` pulling a
-  tag that resolves to a single-arch `arm64` image fails with `no
-  matching manifest for platform linux/amd64 in the manifest list` (if
-  multi-arch) or `failed to register layer: ...` (if single-arch arm64
-  forced onto x86).
+Step 0 non-obvious behaviours moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 1: Symptom entry
 
@@ -264,14 +144,7 @@ ROOT_CAUSE_IDENTIFIED without a failing probe that matches the symptom.**
 Symptom: `Your authorization token has expired. Reauthenticate at ...`,
 `no basic auth credentials`, `error retrieving credentials`.
 
-```bash
-# Verify the token's expiry (the token is base64(AWS:<signed-url>))
-aws ecr get-authorization-token --output json | \
-  jq '.authorizationData[0] | {proxyEndpoint, expiresAt, decoded: (.authorizationToken | @base64d)}'
-
-# Check what docker has cached
-cat ~/.docker/config.json | jq '.auths'
-```
+Probe (token expiry via get-authorization-token, cached docker auth): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 The decoded token's password contains an `X-amz-expires=43200` (12-hour)
 query parameter. If `expiresAt` is in the past, the cached credentials
@@ -285,12 +158,7 @@ Symptom: `denied: ... is not authorized to perform:
 ecr:GetAuthorizationToken`. Without this permission, the caller cannot
 retrieve an auth token at all.
 
-```bash
-aws iam simulate-principal-policy \
-  --policy-source-arn <caller-arn> \
-  --action-names ecr:GetAuthorizationToken \
-  --output json --profile <p>
-```
+Probe (simulate ecr:GetAuthorizationToken on `*`): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 `ecr:GetAuthorizationToken` must be allowed on `*` (it is a
 service-wide API, not per-resource). If the simulation returns
@@ -305,16 +173,7 @@ ecr:BatchCheckLayerAvailability` (or `BatchGetImage`, `PutImage`,
 `CompleteLayerUpload`, `InitiateLayerUpload`, `UploadLayerPart`,
 `GetDownloadUrlForLayer`).
 
-```bash
-aws iam simulate-principal-policy \
-  --policy-source-arn <caller-arn> \
-  --action-names ecr:BatchCheckLayerAvailability ecr:BatchGetImage \
-                ecr:GetDownloadUrlForLayer ecr:PutImage \
-                ecr:InitiateLayerUpload ecr:UploadLayerPart \
-                ecr:CompleteLayerUpload \
-  --resource-arns arn:aws:ecr:<region>:<account>:repository/<repo> \
-  --output json --profile <p>
-```
+Probe (simulate push/pull ecr actions on the repository ARN): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 A **push** needs at minimum: `BatchCheckLayerAvailability`,
 `CompleteLayerUpload`, `InitiateLayerUpload`, `PutImage`,
@@ -329,10 +188,7 @@ action on the specific repository ARN.
 Symptom: same-account access works; cross-account pull/push is denied
 even though the caller's IAM policy allows it.
 
-```bash
-aws ecr get-repository-policy --repository-name <repo> \
-  --region <region> --output json --profile <p>
-```
+Probe (get-repository-policy): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 Same-account callers do NOT need a repository policy — IAM alone is
 sufficient. Cross-account callers need BOTH the caller's IAM policy
@@ -341,19 +197,7 @@ If the policy is empty or does not list the caller's
 `aws:PrincipalAccount`, **ROOT_CAUSE_IDENTIFIED** with
 `LAYER: POLICY_REPOSITORY`. Fix:
 
-```bash
-aws ecr set-repository-policy --repository-name <repo> --region <region> \
-  --policy-text '{
-    "Version": "2012-10-17",
-    "Statement": [{
-      "Sid": "CrossAccountPull",
-      "Effect": "Allow",
-      "Principal": {"AWS": "arn:aws:iam::<caller-account>:root"},
-      "Action": ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer",
-                 "ecr:BatchCheckLayerAvailability"]
-    }]
-  }' --profile <p>
-```
+Fix command (set-repository-policy cross-account allow): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 Always confirm before changing a resource-based policy — a too-broad
 principal can leak the repository.
@@ -363,17 +207,7 @@ principal can leak the repository.
 Symptom: image tag was present yesterday; today `manifest unknown` and
 gone from `describe-images`. The operator did not delete it manually.
 
-```bash
-aws ecr get-lifecycle-policy --repository-name <repo> --output json --profile <p>
-aws ecr describe-images --repository-name <repo> --output json --profile <p> | \
-  jq '.imageDetails[] | {imageTags, imagePushedAt, imageSizeInBytes}'
-
-# CloudTrail shows the ECR service principal deleting images
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventName,AttributeValue=BatchDeleteImage \
-  --start-time $(date -d '-24 hours' +%s) --end-time $(date +%s) \
-  --output json | jq '.Events[] | select(.CloudTrailEvent | contains("<repo>"))'
-```
+Probes (lifecycle policy, image list, CloudTrail BatchDeleteImage): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 Lifecycle rules evaluate in order, first-match-wins. Look for a rule
 with `type: expire` whose `selection` matches the missing image (e.g.,
@@ -404,11 +238,7 @@ image, exclude dev dependencies, or split the image.
 Symptom: image pushed to source region; replica missing in destination
 region. Pull in destination region fails with `manifest unknown`.
 
-```bash
-aws ecr describe-registry --output json --profile <p>
-aws ecr get-replication-configuration --region <source-region> --output json --profile <p>
-aws ecr describe-images --repository-name <repo> --region <dest-region> --output json --profile <p>
-```
+Probes (describe-registry, replication configuration, destination-region images): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 Replication rules are per-source-registry. If no rule covers the
 repository's region and destination, no replication occurs. If a rule
@@ -422,17 +252,7 @@ minutes after push, check AWS Health for replication service degradation.
 Symptom: `KMS.AccessDeniedException` on push or pull when the
 repository uses `encryptionType: KMS`.
 
-```bash
-aws ecr describe-repositories --repository-names <repo> --output json | \
-  jq '.repositories[0].encryptionConfiguration'
-aws kms describe-key --key-id <kms-key-id> --output json | \
-  jq '.KeyMetadata.{KeyState, KeyManager, Origin}'
-aws iam simulate-principal-policy \
-  --policy-source-arn <caller-arn> \
-  --action-names kms:GenerateDataAccess kms:Decrypt \
-  --resource-arns arn:aws:kms:<region>:<account>:key/<key-id> \
-  --output json --profile <p>
-```
+Probes (encryption config, kms describe-key, simulate kms actions): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 The pusher needs `kms:GenerateDataAccess`; the puller needs
 `kms:Decrypt`. The key policy must also grant the ECR service principal
@@ -446,13 +266,7 @@ caller's IAM policy AND verify the key policy grants ECR access.
 Symptom: `manifest unknown` from some callers but not others; push
 appears to succeed but the image is in a different registry.
 
-```bash
-# Identify which registry the URI points at:
-# - public.ecr.aws/<alias>/<repo>             -> ECR Public
-# - <account>.dkr.ecr.<region>.amazonaws.com  -> ECR Private
-aws ecr-public describe-registries --output json --profile <p> | \
-  jq '.registries[] | {registryId, aliases: [.aliases[] | .name]}'
-```
+Probe (ecr-public describe-registries alias ownership): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If the URI host is `public.ecr.aws` but the operator intended a
 private registry (or vice-versa), or the public alias is owned by a
@@ -466,12 +280,7 @@ Symptom: docker push succeeds; the deploy pipeline refuses to promote
 the image. The gate reads `describe-image-scan-findings` and blocks on
 `HIGH` / `CRITICAL`.
 
-```bash
-aws ecr describe-image-scan-findings \
-  --repository-name <repo> --image-id imageTag=<tag> \
-  --output json --profile <p> | \
-  jq '.imageScanFindings.findings[] | select(.severity == "HIGH" or .severity == "CRITICAL")'
-```
+Probe (describe-image-scan-findings HIGH/CRITICAL): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ECR does NOT block pushes based on scan findings — a downstream gate
 (CodeDeploy, a Lambda promotion step, a custom security gate) does the
@@ -483,19 +292,13 @@ bypassing without a security owner.
 
 Symptom: push fails with `image tag already exists and is immutable`.
 
-```bash
-aws ecr describe-repositories --repository-names <repo> --output json | \
-  jq '.repositories[0].imageTagMutability'
-```
+Probe (imageTagMutability check): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 `IMMUTABLE` blocks overwrites on the named repository only —
 immutability is per-repository, not per-registry. Fix: use a new tag
 (recommended for traceability) or switch to MUTABLE:
 
-```bash
-aws ecr put-image-tag-mutability --repository-name <repo> \
-  --image-tag-mutability MUTABLE --profile <p>
-```
+Fix command (put-image-tag-mutability MUTABLE): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If the repository is `IMMUTABLE` and the push is an overwrite,
 **ROOT_CAUSE_IDENTIFIED** with `LAYER: TAG_IMMUTABILITY`.
@@ -506,25 +309,9 @@ Symptom: `manifest unknown`, `no matching manifest for platform
 linux/arm64 in the manifest list`, Fargate task stops with
 `CannotPullContainerError`.
 
-```bash
-# Inspect the manifest (multi-arch manifests return a list)
-docker manifest inspect <registry-uri>/<repo>:<tag> 2>/dev/null || \
-  aws ecr batch-get-image --repository-name <repo> \
-    --image-ids imageTag=<tag> --output json --profile <p> | \
-  jq '.images[0].imageManifest' | head -50
+Probes (docker manifest inspect, batch-get-image manifest, Fargate/Lambda platform): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
-# Fargate platform / Lambda architecture determine host platform
-aws ecs describe-tasks --cluster <cluster> --tasks <task-id> --output json | \
-  jq '.tasks[0] | {platformVersion}'
-aws lambda get-function-configuration --function-name <name> --output json | \
-  jq '.Architectures'
-```
-
-| Pattern | Cause |
-|---|---|
-| `no matching manifest for platform linux/amd64 in the manifest list` | The tag points to a single-arch arm64 image; the host is x86_64 (or vice-versa). Build a multi-arch manifest with `docker buildx`. |
-| Fargate task fails after pull with `Exec format error` | Image is single-arch and was force-pulled onto an incompatible host (rare — Fargate matches on manifest). |
-| Lambda `ImagePullException: Image architecture arm64 incompatible` | Lambda with `Architectures: [x86_64]` cannot run an arm64-only image. Set `Architectures: [arm64]` OR rebuild for x86_64. |
+Manifest/architecture pattern table: [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If the manifest list does not include the requested platform or the
 image is single-arch on the wrong host, **ROOT_CAUSE_IDENTIFIED** with
@@ -537,16 +324,9 @@ Symptom: pull from a pull-through cache repository loops indefinitely;
 upstream registry unreachable; pull fails with `upstream repository
 does not exist`.
 
-```bash
-aws ecr describe-pull-through-cache-rules --region <region> --output json --profile <p>
-```
+Probe (describe-pull-through-cache-rules): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
-| Pattern | Cause |
-|---|---|
-| `upstream registry does not exist` | Upstream URI is wrong, or upstream is unreachable from the region (network/egress). |
-| Pull loops / never caches | Local cached repository name does not match the rule's prefix; `ecrRepositoryPrefix` misconfigured. |
-| `KMS.AccessDeniedException` on pull-through | Cache writes to a KMS-encrypted repo; caller lacks `kms:Decrypt` on the local key. |
-| Pull from a credentialled upstream fails | Upstream secret (Secrets Manager) is missing or stale; rule cannot authenticate to the upstream. |
+Pull-through-cache pattern table: [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If the rule is misconfigured or the upstream is unreachable,
 **ROOT_CAUSE_IDENTIFIED** with `LAYER: PULL_THROUGH_CACHE`.
@@ -557,12 +337,7 @@ Symptom: `failed to register layer: layer does not exist`,
 `download failed after attempt=5`, retryable errors during `docker
 pull` for specific layers.
 
-```bash
-aws ecr batch-check-layer-availability \
-  --repository-name <repo> \
-  --layer-digests sha256:<digest-1> sha256:<digest-2> \
-  --output json --profile <p>
-```
+Probe (batch-check-layer-availability): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 A layer returning `INVALID_LAYER_DIGEST` or missing from the registry
 is the smoking gun. Common causes: partial upload (pusher crashed
@@ -635,28 +410,8 @@ REMEDIATION:
 ```
 
 ### Worked example — LIFECYCLE_DELETED
-
-```text
-TARGET: 111111111111.dkr.ecr.us-east-1.amazonaws.com/payments:v3
-VERDICT: ROOT_CAUSE_IDENTIFIED
-REASON: A lifecycle policy rule "expire when count=3, tagStatus=any"
-  evaluated in first-match order and deleted the 4th-newest image,
-  which happened to be the production release from 2 days ago.
-LAYER: LIFECYCLE_DELETED
-EVIDENCE:
-  - Symptom: docker pull returns "manifest unknown" for payments:v3
-    since 03:17 UTC; describe-images no longer lists v3.
-  - Probe: get-lifecycle-policy top rule is {type: expire, selection:
-    {count: 3, tagStatus: any}}.
-  - Probe: cloudtrail lookup-events for BatchDeleteImage at 03:17 UTC
-    shows the ECR service principal deleted digest sha256:abc123.
-  - Passing: repository policy empty; no manual-delete CloudTrail event.
-REMEDIATION:
-  1. Re-push the image OR restore from a backup region's replica.
-  2. Reorder the lifecycle policy so "keep last 10 tagged" rules sit
-     ABOVE "expire count=3" rules; first matching rule wins.
-  3. Add tag-rule protection for the prod-* tag prefix.
-```
+Full worked example moved to
+[references/worked-examples.md](references/worked-examples.md).
 
 ## Anti-Patterns — NEVER
 
@@ -723,31 +478,22 @@ REMEDIATION:
 Each layer's fix is summarised below; the step sections above carry the
 full probe commands and worked examples.
 
-| Layer | Fix |
-|---|---|
-| AUTH_TOKEN_EXPIRED | `aws ecr get-login-password --region <region> --profile <p> \| docker login --username AWS --password-stdin <account>.dkr.ecr.<region>.amazonaws.com`. In CI, run before every push; never cache `~/.docker/config.json` across jobs. |
-| AUTH_IAM_DENIED | Add `ecr:GetAuthorizationToken` on `*` to the caller's IAM policy. Service-wide API; cannot be scoped to a repository. |
-| POLICY_IAM | Add the minimum-scope action on the specific repository ARN. Push: `BatchCheckLayerAvailability`, `CompleteLayerUpload`, `InitiateLayerUpload`, `PutImage`, `UploadLayerPart`. Pull: `BatchGetImage`, `GetDownloadUrlForLayer`. |
-| POLICY_REPOSITORY | Add a statement to the repository's resource-based policy listing the caller's account/ARN. Always merge with the existing policy; never overwrite without reading current state. |
-| LIFECYCLE_DELETED | Re-push the image OR restore from a backup region's replica. Reorder the lifecycle policy so `keep` rules sit above `expire` rules (first-match-wins). Add tag-prefix `keep` rules for production tags. |
-| IMAGE_SIZE_EXCEEDED | Multi-stage build, slimmer base image, exclude dev dependencies, or split the image. The 10 GB cap is on compressed size. |
-| REPLICATION_LAG | Verify the replication rule covers source region and destination. Wait for asynchronous replication (seconds to minutes) before pulling. If the rule exists and replication stalls, check AWS Health. |
-| KMS_ACCESS_DENIED | Add `kms:GenerateDataAccess` (pusher) / `kms:Decrypt` (puller) on the KMS key ARN. Verify the key policy grants the ECR service principal `kms:CreateGrant`, `kms:DescribeKey`, `kms:Decrypt`, `kms:GenerateDataAccess` for `ecr.<region>.amazonaws.com`. |
-| REGISTRY_ALIAS_MISMATCH | Use the correct full URI. ECR Private: `<account>.dkr.ecr.<region>.amazonaws.com/<repo>`. ECR Public: `public.ecr.aws/<alias>/<repo>`. Authenticate to the correct registry. |
-| SCAN_BLOCKING | Patch the vulnerability in the base image or dependency. If the gate must be bypassed, get security-owner sign-off (not recommended as routine). |
-| TAG_IMMUTABILITY | Use a new tag (recommended for traceability) OR `aws ecr put-image-tag-mutability --repository-name <repo> --image-tag-mutability MUTABLE`. |
-| MANIFEST_INVALID / ARCHITECTURE_MISMATCH | Build a multi-arch manifest (`docker buildx build --platform linux/amd64,linux/arm64 --tag <uri> --push`). For Lambda, set `Architectures: [arm64]` if the image is arm64-only. For Fargate, align the task `runtimePlatform` with the image architecture. |
-| PULL_THROUGH_CACHE | Verify the rule's `ecrRepositoryPrefix` and upstream URI; verify the upstream secret in Secrets Manager is valid; re-pull to trigger the cache. |
-| LAYER_DOWNLOAD_FAILED | Re-push the image (the pusher uploads only missing layers); verify with `batch-check-layer-availability`; if a service event, check AWS Health. |
-| THROTTLED | Client-side retry with exponential backoff; request a Service Quotas increase for the specific API; cache `batch-get-image` results locally to reduce fan-out. |
+Per-layer fix table moved to
+[references/error-handling.md](references/error-handling.md).
 
 ## Recent AWS features (2024-2026)
+Recent AWS feature notes moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
-- **Pull-through cache for ECR Private (2024-2025):** Rules cache images from upstream registries (Docker Hub, Quay, ECR Public) on first pull. Common misconfigurations: prefix mismatches and upstream secret expiry.
-- **ECR scan engine integration with Inspector (2024-2025):** Enhanced scan delegates to Amazon Inspector for deeper CVE coverage. Downstream gates may consume either source.
-- **Lifecycle policy preview (2024-2025):** `start-lifecycle-policy-preview` dry-runs a policy and returns the would-be deletions. Always preview before applying a new policy.
-- **Registry alias for ECR Public (2024):** Custom aliases; collisions produce REGISTRY_ALIAS_MISMATCH-class errors. Verify alias ownership via `ecr-public describe-registries`.
-- **Fargate arm64 (Graviton) GA (2024):** Fargate supports `runtimePlatform: ARM64` on platform version 1.4.0+. A mismatch between task platform and image architecture fails the pull.
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — mindset, philosophy, Step 0 non-obvious behaviours, recent AWS features (moved from this file)
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — account-wide pre-flight commands, repository-state short-circuit, and every step's probe, fix, and pattern-table commands (moved from this file)
+- [references/worked-examples.md](references/worked-examples.md) — LIFECYCLE_DELETED worked example and the INSUFFICIENT_DATA re-prompt template (moved from this file)
+- [references/error-handling.md](references/error-handling.md) — per-layer remediation fix table (moved from this file)
+- [references/ecr-auth-and-policy-reference.md](references/ecr-auth-and-policy-reference.md) — auth token mechanics, repository vs IAM policy evaluation
+- [references/ecr-lifecycle-replication-reference.md](references/ecr-lifecycle-replication-reference.md) — lifecycle policy evaluation and replication behaviour
 
 ## Domain
 

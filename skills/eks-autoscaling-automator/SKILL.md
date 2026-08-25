@@ -113,42 +113,8 @@ GAP: Run kubectl get nodes -o wide and kubectl get pods -A -o json.
 
 ### Step 0: Expert knowledge — non-obvious autoscaling behaviors
 
-- **Karpenter v1 replaced `AWSNodeTemplate` with `EC2NodeClass` and
-  `Provisioner` with `NodePool`.** A v0.32 manifest will NOT work on v1+
-  without migration.
-
-- **Karpenter consolidation has two modes.** `WhenEmpty` (only delete
-  nodes with zero pods) is conservative. `WhenEmptyOrUnderutilized`
-  (delete underutilized nodes, reschedule pods) is aggressive but
-  disruptive. Start with `WhenEmpty`, graduate to
-  `WhenEmptyOrUnderutilized` with disruption budgets.
-
-- **Cluster Autoscaler does NOT scale down nodes with pods that have
-  PDBs blocking eviction, anti-affinity constraints, or local storage.**
-  These nodes stay forever, inflating costs.
-
-- **KEDA scalers are triggered, not polled.** KEDA activates HPA when
-  the trigger threshold is met (Kafka lag, SQS depth). When the trigger
-  drops to zero, KEDA scales the deployment to zero (HPA alone cannot).
-
-- **Spot interruption notices arrive via IMDS.** Karpenter handles this
-  natively via `interruptionQueue`. NTH (Node Termination Handler) also
-  polls IMDS. Do NOT run both — they conflict.
-
-- **Overprovisioning pause-pods must use a priority class BELOW real
-  workloads.** If pause-pods have equal or higher priority, real pods
-  cannot preempt them, and the headroom is wasted.
-
-- **VPA `Auto` mode recreates pods to apply new requests.** This causes
-  brief outages. Never use `Auto` on single-replica Deployments. Use
-  `Initial` (sets on creation) or `Off` (recommendations only).
-
-- **descheduler `PodLifeTime` evicts old pods.** Set
-  `maxNoOfPodsToEvictPerNode` and run in `DryRun` first.
-
-- **Managed node group `desiredSize` is overridden by CA.** If CA is
-  running, it adjusts `desiredSize` within min/max range. Do NOT set it
-  manually.
+Step 0 expert-knowledge deep dive (Karpenter v1 API migration, consolidation modes, CA scale-down blockers, KEDA trigger semantics, IMDS spot notices, pause-pod priority, VPA Auto restarts, descheduler PodLifeTime, MNG desiredSize override) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before choosing or tuning any autoscaling component.
 
 ### Step 1: Choose Karpenter vs Cluster Autoscaler
 
@@ -213,25 +179,8 @@ spec:
         nodes: "0"
 ```
 
-EC2NodeClass:
-
-```yaml
-apiVersion: karpenter.k8s.aws/v1
-kind: EC2NodeClass
-metadata:
-  name: default
-spec:
-  amiSelectorTerms:
-    - alias: al2023@latest
-  subnetSelectorTerms:
-    - tags: {Name: my-prod-cluster-private-*}
-  securityGroupSelectorTerms:
-    - tags: {kubernetes.io/cluster/my-prod-cluster: owned}
-  role: KarpenterNodeRole-my-prod-cluster
-  blockDeviceMappings:
-    - deviceName: /dev/xvda
-      ebs: {volumeSize: 100Gi, volumeType: gp3, encrypted: true}
-```
+Full EC2NodeClass manifest (AMI alias, subnet/SG selectors, role, block devices) moved verbatim to [references/karpenter-configuration.md](references/karpenter-configuration.md).
+Load on demand when authoring the EC2NodeClass that pairs with the NodePool above.
 
 **Key configuration:**
 - `disruption.budgets`: First budget allows 20% disruption normally.
@@ -284,40 +233,8 @@ aws eks update-cluster-config --name my-prod-cluster \
 
 HPA with CPU + custom metric + behavior tuning:
 
-```yaml
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: api-server-hpa
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: api-server
-  minReplicas: 3
-  maxReplicas: 50
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target: {type: Utilization, averageUtilization: 70}
-    - type: Pods
-      pods:
-        metric: {name: http_requests_per_second}
-        target: {type: AverageValue, averageValue: "1000"}
-  behavior:
-    scaleUp:
-      stabilizationWindowSeconds: 0
-      policies:
-        - type: Percent, value: 100, periodSeconds: 15
-        - type: Pods, value: 4, periodSeconds: 15
-      selectPolicy: Max
-    scaleDown:
-      stabilizationWindowSeconds: 300
-      policies:
-        - type: Percent, value: 10, periodSeconds: 60
-      selectPolicy: Min
-```
+Full HPA manifest (CPU + custom metric + scaleUp/scaleDown behavior policies) moved verbatim to [references/hpa-keda-descheduler.md](references/hpa-keda-descheduler.md).
+Load on demand when authoring the HPA object for a deployment.
 
 **Behavior tuning guide:** scale UP fast (users waiting), scale DOWN
 slow (avoid thrashing). `scaleDown.stabilizationWindowSeconds: 300`
@@ -346,28 +263,8 @@ helm install keda kedacore/keda --namespace keda-system --create-namespace --ver
 
 SQS-triggered ScaledObject (scale-to-zero):
 
-```yaml
-apiVersion: keda.sh/v1alpha1
-kind: ScaledObject
-metadata:
-  name: sqs-consumer-scaler
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: sqs-consumer
-  minReplicaCount: 0          # Scale to zero when idle
-  maxReplicaCount: 30
-  pollingInterval: 30
-  cooldownPeriod: 300
-  triggers:
-    - type: aws-sqs-queue
-      metadata:
-        queueURL: https://sqs.us-east-1.amazonaws.com/111111111111/my-queue
-        queueLength: "10"
-        awsRegion: us-east-1
-        identityOwner: operator
-```
+SQS-triggered ScaledObject manifest (scale-to-zero, queueLength trigger, polling/cooldown) moved verbatim to [references/hpa-keda-descheduler.md](references/hpa-keda-descheduler.md).
+Load on demand when authoring a KEDA ScaledObject.
 
 **KEDA vs HPA:** use KEDA when you need scale-to-zero, external-system
 triggers, or multiple trigger sources. Use HPA when CPU/Memory suffices.
@@ -524,14 +421,8 @@ GAP: None
 
 ### Worked example — REVIEW_REQUIRED
 
-```text
-AUTOSCALING: staging-cluster-autoscaling
-CLUSTER: EKS 1.28, 8 nodes
-TOOLING: NONE | NONE | NOT INSTALLED
-VERDICT: REVIEW_REQUIRED
-GAP: (1) metrics-server not installed — HPA cannot function. (2) No HPA configured. (3) No PDBs. (4) On-demand only — cost savings available. (5) No overprovisioning — 2-5 min scale-up latency.
-TEMPLATE: (blocked until metrics-server installed)
-```
+REVIEW_REQUIRED worked example (staging cluster with metrics-server missing, no HPA/PDBs, on-demand only) moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when the verdict is REVIEW_REQUIRED; the primary AUTOMATION_DEPLOYED example stays inline.
 
 ## Anti-Patterns — NEVER do these things
 
@@ -580,90 +471,41 @@ TEMPLATE: (blocked until metrics-server installed)
 
 ## Pre-flight safety checks
 
-- **MANDATORY CONFIRMATION GATE** before any state-changing operation.
-- **Before CA→Karpenter migration:** scale workloads with 20% headroom,
-  uninstall CA, wait 10 min, install Karpenter, verify NodeClaims.
-- **Before `WhenEmptyOrUnderutilized`:** run `WhenEmpty` for 1 week.
-- **Before descheduler in prod:** run in DryRun for 24h.
-- **For spot clusters:** verify SQS interruption queue receives events.
+Pre-flight safety checks (CONFIRM gate, CA-to-Karpenter migration, WhenEmptyOrUnderutilized graduation, descheduler DryRun, spot SQS verification) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before executing any state-changing autoscaling operation.
 
 ## Appendix A — Karpenter vs CA decision tree
 
-```
-New cluster? → Karpenter (AWS-recommended) unless org needs CA stability
-Existing CA? → Consolidation needed? → Yes: migrate to Karpenter
-                                  → No: keep CA
-EKS Auto Mode available (1.29+)? → Use Auto Mode (simplest)
-```
+Karpenter-vs-CA decision tree appendix moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md); the Step 1 comparison table stays inline.
+Load on demand when deciding the cluster-autoscaler tool.
 
 ## Appendix B — HPA behavior quick reference
 
-| Scenario | scaleUp | scaleDown | Stabilization |
-|---|---|---|---|
-| API (bursty) | Max(100%/15s, 4 pods/15s) | Min(10%/60s) | Down: 300s |
-| Worker (queue) | Max(100%/15s) | Min(5%/60s) | Down: 600s |
-| Batch | Max(2 pods/60s) | Min(1/120s) | Down: 600s |
-
-**Rule:** scale UP fast (users waiting), scale DOWN slow (avoid thrash).
+HPA behavior quick-reference appendix (API/worker/batch scale policies) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when tuning HPA behavior policies.
 
 ## Appendix C — Spot instance diversification
 
-| Workload | Families | Min size |
-|---|---|---|
-| General web | c5, m5, c6i, m6i | large (2 vCPU) |
-| Memory-heavy | r5, r6i, x2iedn | large |
-| Compute-heavy | c5, c6i, c7i | xlarge (4 vCPU) |
-| GPU (ML) | g4dn, g5, g6 | xlarge |
-
-Karpenter flexible selector (AMD64, cost-optimized):
-```yaml
-requirements:
-  - {key: karpenter.k8s.aws/instance-category, operator: In, values: ["c", "m"]}
-  - {key: karpenter.k8s.aws/instance-generation, operator: Gt, values: ["5"]}
-  - {key: karpenter.k8s.aws/instance-cpu, operator: In, values: ["2", "4", "8", "16"]}
-  - {key: karpenter.sh/capacity-type, operator: In, values: ["spot", "on-demand"]}
-```
+Spot diversification appendix (per-workload family tables + Karpenter flexible selector) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when planning spot instance diversification.
 
 ## Recent AWS features (2024-2026)
 
-- **Karpenter v1 GA (2024):** Breaking API changes — `Provisioner` →
-  `NodePool`, `AWSNodeTemplate` → `EC2NodeClass`.
-- **Disruption budgets (2024):** `disruption.budgets` on NodePool caps
-  simultaneous node disruption. Use `nodes: "20%"` + business-hours
-  freeze.
-- **EKS Auto Mode (2025):** AWS-managed Karpenter + node lifecycle.
-  Simplest path for new clusters. Enable via `update-cluster-config`.
-- **KEDA v2.15 (2024-2025):** CloudWatch trigger, improved SQS scaler,
-  scale-to-zero stabilization.
-- **HPA v2 behavior (stable):** Fine-grained scale-up/down control with
-  stabilization windows and policy selection.
-- **VPA in-place resize (2025, K8s 1.33+):** Alpha feature allowing VPA
-  to adjust requests WITHOUT recreating pods. EKS support expected 1.33+.
+Recent AWS features (Karpenter v1 GA, disruption budgets, EKS Auto Mode, KEDA v2.15, HPA v2 behavior, VPA in-place resize) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when picking component versions.
 
 ## Expert heuristic: autoscaling blast radius
 
-> ALWAYS start with conservative settings (Karpenter `WhenEmpty`, HPA
-> 300s stabilization, descheduler DryRun). Enable aggressive settings
-> only after observing conservative behavior for 1 week in production.
+Autoscaling blast-radius heuristic (conservative-first rule, component interaction cascade, 4-phase wave-enabling pattern, failure-detection alarms) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when planning phased rollout or setting failure alarms.
 
-**Why:** autoscaling components interact: Karpenter consolidation feeds
-pods to the scheduler, which respects priority + topology spread, which
-affects HPA decisions, which affect KEDA triggers. A change in ANY
-component can cascade.
+## References (load on demand)
 
-**Wave-enabling pattern:**
-
-| Phase | Karpenter | HPA | KEDA | Descheduler |
-|---|---|---|---|---|
-| 1 | `WhenEmpty` | CPU, 300s stab | Not installed | DryRun |
-| 2 | `WhenEmpty` | + custom metrics | Installed (min 1) | DryRun |
-| 3 | `WhenEmptyOrUnderutilized` + 20% budget | As 2 | As 2 | Enabled (3/node) |
-| 4 | + spot + pause-pods | As 3 | Scale-to-zero | As 3 |
-
-**Failure detection:** alarm on `karpenter_pods_state` Pending > 5 min
-(capacity issue). Alarm on HPA `CurrentReplicas` oscillating > 50%
-in 10 min (thrashing). Alarm on node count dropping > 20% in 5 min
-(aggressive consolidation or mass spot eviction).
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 expert behaviours, Appendices A-C, Recent AWS features (2024-2026), and the blast-radius heuristic, moved from SKILL.md
+- [references/worked-examples.md](references/worked-examples.md) — secondary REVIEW_REQUIRED worked example, moved from SKILL.md (primary AUTOMATION_DEPLOYED example stays inline)
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight safety checks, moved from SKILL.md
+- [references/karpenter-configuration.md](references/karpenter-configuration.md) — Karpenter API reference — extended with the EC2NodeClass manifest moved from SKILL.md
+- [references/hpa-keda-descheduler.md](references/hpa-keda-descheduler.md) — HPA/KEDA/descheduler detail — extended with the HPA and KEDA ScaledObject manifests moved from SKILL.md
 
 ## Domain
 

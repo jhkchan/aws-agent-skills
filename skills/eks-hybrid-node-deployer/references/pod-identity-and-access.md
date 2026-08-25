@@ -308,3 +308,63 @@ resource "aws_eks_pod_identity_association" "app" {
   role_arn        = aws_iam_role.app_pod.arn
 }
 ```
+
+## Expert heuristic: pod identity on hybrid nodes (moved from SKILL.md)
+
+A baseline model assumes pod identity works the same as managed node
+groups. The correct heuristic recognizes the differences.
+
+```text
+Managed Node Group (EC2):
+  ├── EKS Pod Identity association maps SA → IAM role
+  ├── Pod identity agent uses IMDS from EC2
+  └── EC2 instance profile provides baseline node permissions
+
+Hybrid Node (on-prem):
+  ├── EKS Pod Identity association maps SA → IAM role (SAME API)
+  ├── Pod identity agent must run on-prem (NO IMDS available)
+  │     └── Agent obtains credentials via activation-based auth
+  ├── NO EC2 instance profile (on-prem is not EC2)
+  └── Node IAM role is referenced by activation code registration
+```
+
+**Key implication:** the pod identity agent must be explicitly installed
+and configured on hybrid nodes. The node's IAM role (created in Step 1)
+is what the agent uses to obtain credentials.
+
+
+## Pod identity agent and association CLI (Step 4) (moved from SKILL.md)
+
+**Step 1: Install the pod identity agent on the on-prem node:**
+
+```bash
+./nodeadm enable-pod-identity \
+  --role arn:aws:iam::123456789012:role/EKSHybridNodeRole
+```
+
+**Step 2: Create a pod identity association in the EKS cluster:**
+
+```bash
+aws eks create-pod-identity-association \
+  --cluster-name my-cluster \
+  --namespace production \
+  --service-account my-app-sa \
+  --role-arn arn:aws:iam::123456789012:role/MyAppPodRole
+```
+
+
+## SSM Session Manager activation CLI (Step 10) (moved from SKILL.md)
+
+```bash
+# Create a managed-instance activation (registers on-prem as SSM managed)
+aws ssm create-activation \
+  --iam-role EKSHybridSSMRole \
+  --registration-limit 10 \
+  --expiration-date $(date -u -v+30d +"%Y-%m-%dT%H:%M:%SZ")
+
+# On the on-prem node: register with SSM using returned code+id
+# sudo amazon-ssm-agent -register -code <code> -id <id> -region us-east-1
+
+# Start a session
+aws ssm start-session --target mi-xxxxxxxxxxxxxxxxx
+```

@@ -128,53 +128,13 @@ CONFIRM: Before executing any state-changing CLI, emit and await operator
 
 ## Expert heuristic
 
-> **VPC CNI warm IP pool determines pod IP allocation cadence.** Key
-> `aws-node` env vars:
-> - `WARM_ENI_TARGET` (default 1): pre-allocate IPs for one full ENI.
-> - `WARM_IP_TARGET`: pre-allocate exactly N free IPs.
-> - `WARM_PREFIX_TARGET`: pre-allocate a /28 prefix (16 IPs per
->   delegation; requires prefix delegation mode).
->
-> **Node group AMI K8s version MUST align with the control plane.** EKS
-> supports skew of at most one minor version (kubelet ≤ API server + 1).
-> A node group AMI behind the control plane produces NotReady nodes.
->
-> **ASG capacity is the scaling safety net.** For cluster autoscaler /
-> Karpenter, the ASG must have headroom (`minSize < maxSize`). If
-> `maxSize == desiredCapacity`, scaling fails silently — the autoscaler
-> logs "no nodes can be added" but the node group appears healthy.
+Moved verbatim to `references/advanced-patterns.md` — see "**Expert heuristic — warm IP pool, version skew, ASG headroom**" (load on demand).
+Applies when: diagnosing VPC CNI warm-pool cadence, AMI version skew, or autoscaler headroom.
 
 ## Configuration dependency graph
 
-```
-                    EKS Cluster
-                   (kubernetesVersion,
-                    endpoint, CA cert,
-                    vpcConfig)
-                        │
-         ┌──────────────┼──────────────────┐
-         ▼              ▼                  ▼
-    managed node    VPC CNI            cluster autoscaler /
-    group           (aws-node          Karpenter
-    (amiType,       DaemonSet,            (scales ASG or
-     instanceTypes, manages ENIs          provisions nodes)
-     subnets,       and pod IPs;              │
-     nodeRole,      needs IRSA role           ▼
-     scalingConfig, with CNI policy)      ASG
-     SGs)                │               (launch template,
-         │                ▼                minSize, maxSize,
-         ▼          node subnets           desiredCapacity)
-    launch template  (AvailableIpAddr         │
-    (user-data,      Count → IP pool;         ▼
-     bootstrap.sh)   ENI limits per       EC2 instances
-         │            instance type)       (kubelet, containerd,
-         ▼                                node IAM role)
-    node IAM role                            │
-    (ECR pull, SSM,                          ▼
-     CloudWatch)                        ECR repository
-                                        (node role needs
-                                         ecr:BatchGetImage)
-```
+Moved verbatim to `references/advanced-patterns.md` — see "**Configuration dependency graph**" (load on demand).
+Applies when: mapping configuration dependencies before blaming the Kubernetes manifests.
 
 ## Mindset
 
@@ -187,29 +147,8 @@ and networking layers are proven correct.
 
 ## Pre-flight: gather-info gate
 
-```bash
-# 1. Node group details (status, amiType, version, scalingConfig, health)
-aws eks describe-nodegroup \
-  --cluster-name <cluster> --nodegroup-name <ng> --output json
-
-# 2. Cluster details (kubernetesVersion, vpcConfig)
-aws eks describe-cluster --name <cluster> --output json
-
-# 3. Node states and conditions
-kubectl get nodes -o wide
-kubectl describe node <node> | grep -A30 Conditions
-kubectl describe node <node> | grep -A10 Allocatable
-
-# 4. Pod states on affected nodes
-kubectl get pods --all-namespaces --field-selector spec.nodeName=<node>
-
-# 5. ASG activity (launch failures, capacity)
-aws autoscaling describe-scaling-activities \
-  --auto-scaling-group-name <asg-name> --max-records 5 --output json
-
-# 6. Recent cluster events
-kubectl get events --sort-by='.lastTimestamp' | tail -20
-```
+Moved verbatim to `references/diagnostic-commands.md` — see "**Pre-flight gather-info command set**" (load on demand).
+Applies when: starting a live-cluster diagnosis (the gather-info gate).
 
 ### Node-state short-circuit
 
@@ -488,47 +427,13 @@ CONFIRM: Before updating, emit and await:
 
 ### Worked example — Node IAM role missing ECR
 
-```text
-TARGET: prod-cluster / prod-ng-1
-VERDICT: ROOT_CAUSE_IDENTIFIED
-REASON: All pods on the new node group show ImagePullBackOff. The node
-  IAM role (arn:aws:iam::111111111111:role/eks-prod-ng-1) lacks
-  AmazonEC2ContainerRegistryReadOnly — only AmazonEKSWorkerNodePolicy is
-  attached (Step 9).
-ROOT_CAUSE: NODE_IAM_ROLE_ECR
-EVIDENCE:
-  - Symptom: every pod is ImagePullBackOff.
-  - Probe: kubectl describe pod shows "pull access denied" for ECR.
-  - Probe: aws iam list-attached-role-policies returns
-    AmazonEKSWorkerNodePolicy but NOT
-    AmazonEC2ContainerRegistryReadOnly.
-  - Passing: ECR repo allows same-account access; image exists.
-REMEDIATION:
-  1. Attach the managed policy:
-     aws iam attach-role-policy --role-name eks-prod-ng-1 \
-       --policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
-  2. Delete ImagePullBackOff pods to force re-pull.
-  3. Verify pods transition to Running.
-CONFIRM: Before attaching, emit and await:
-  "CONFIRM: About to attach AmazonEC2ContainerRegistryReadOnly to
-   eks-prod-ng-1. Proceed? (yes/no)"
-```
+Moved verbatim to `references/worked-examples.md` — see "**Worked example — Node IAM role missing ECR**" (load on demand).
+Applies when: classifying cluster-wide ImagePullBackOff caused by node IAM role gaps.
 
 ### Worked example — INSUFFICIENT_DATA
 
-```text
-TARGET: unknown / unknown
-VERDICT: INSUFFICIENT_DATA
-REASON: Input is "EKS nodes not ready in prod" with no cluster name,
-  node group name, or kubectl output.
-ROOT_CAUSE: UNKNOWN
-EVIDENCE:
-  - Missing: cluster name, node group name, kubectl output, region
-REMEDIATION:
-  1. Run aws eks list-clusters and share the cluster name.
-  2. Run aws eks list-nodegroups --cluster-name <cluster>.
-  3. Run kubectl get nodes -o wide.
-```
+Moved verbatim to `references/worked-examples.md` — see "**Worked example — INSUFFICIENT_DATA**" (load on demand).
+Applies when: the input lacks cluster/nodegroup names or kubectl output.
 
 ## Pre-flight safety checks
 
@@ -564,6 +469,13 @@ REMEDIATION:
 | `ECR_ENDPOINT` | Create ECR interface VPC endpoints + S3 gateway endpoint. |
 | `CUSTOM_AMI_BOOTSTRAP` | Fix user-data `bootstrap.sh` args; ensure AMI includes EKS bootstrap. |
 | `SCALING_CONFIG` | Raise ASG `maxSize`; verify autoscaler/Karpenter config. |
+
+## References (load on demand)
+
+- [references/nodegroup-lifecycle-reference.md](references/nodegroup-lifecycle-reference.md) — VPC CNI IP allocation model, AMI version matrix, node IAM role policies, kubelet conditions, ASG behavior.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight gather-info command set (moved verbatim from this file).
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples: node IAM role missing ECR, INSUFFICIENT_DATA (moved verbatim from this file).
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert heuristic (warm pool, version skew, ASG headroom) and the configuration dependency graph (moved verbatim from this file).
 
 ## Domain
 

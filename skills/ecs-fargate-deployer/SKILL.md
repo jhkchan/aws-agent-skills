@@ -257,19 +257,8 @@ Key fields:
 - **maximumPercent=200** — allows rolling double during deployment.
 - **assignPublicIp=DISABLED** for private subnets (production).
 
-**Capacity provider strategy (preferred over launch-type for Spot):**
-
-```bash
-aws ecs create-service \
-  --cluster payments-prod \
-  --service-name payments-api-prod \
-  --task-definition payments-api:5 \
-  --desired-count 6 \
-  --capacity-provider-strategy \
-    capacityProvider=FARGATE,weight=4,base=2 \
-    capacityProvider=FARGATE_SPOT,weight=1 \
-  ...
-```
+Capacity-provider-strategy create-service variant moved verbatim to [references/deployment-cli-commands.md](references/deployment-cli-commands.md).
+Load on demand when deploying with FARGATE + FARGATE_SPOT burst capacity.
 
 `base=2` guarantees 2 On-Demand tasks; remaining split 4:1 between
 FARGATE and FARGATE_SPOT. Spot interruption drains tasks gracefully via
@@ -341,21 +330,8 @@ aws logs put-retention-policy --log-group-name /ecs/payments-api --retention-in-
 
 ### Step 9: Auto-scaling (target tracking)
 
-```bash
-aws application-autoscaling register-scalable-target \
-  --service-namespace ecs --scalable-dimension ecs:service:DesiredCount \
-  --resource-id service/payments-prod/payments-api-prod \
-  --min-capacity 3 --max-capacity 12
-
-aws application-autoscaling put-scaling-policy \
-  --service-namespace ecs --scalable-dimension ecs:service:DesiredCount \
-  --resource-id service/payments-prod/payments-api-prod \
-  --policy-name payments-api-cpu-60 --policy-type TargetTrackingScaling \
-  --target-tracking-scaling-policy-configuration '{
-    "TargetValue": 60.0,
-    "PredefinedMetricSpecification": {"PredefinedMetricType": "ECSServiceAverageCPUUtilization"},
-    "ScaleOutCooldown": 60, "ScaleInCooldown": 300}'
-```
+Step 9 auto-scaling CLI (register-scalable-target + put-scaling-policy) moved verbatim to [references/deployment-cli-commands.md](references/deployment-cli-commands.md).
+Load on demand when applying target-tracking auto-scaling after the service is stable.
 
 Metrics: `ECSServiceAverageCPUUtilization`, `ECSServiceAverageMemoryUtilization`,
 `ALBRequestCountPerTarget`. Cooldown: scale-out 60s, scale-in 300s (never
@@ -363,35 +339,13 @@ Metrics: `ECSServiceAverageCPUUtilization`, `ECSServiceAverageMemoryUtilization`
 
 ### Step 10: Verification
 
-```bash
-aws ecs describe-services --cluster <cluster> --services <service>
-aws ecs describe-task-definition --task-definition <family>:<rev>
-aws ecs describe-tasks --cluster <cluster> --tasks <task-id>
-aws elbv2 describe-target-health --target-group-arn <arn>
-aws logs describe-log-groups --log-group-name-prefix /ecs/<service>
-aws application-autoscaling describe-scaling-policies --service-namespace ecs
-```
+Step 10 verification commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand for post-deployment verification.
 
 ## Latest ECS Fargate features (2024-2026)
 
-- **Fargate Spot capacity provider (GA):** Spot drains tasks on 2-minute
-  warning. Use capacity-provider strategy with `base=N` on FARGATE plus
-  FARGATE_SPOT for burst capacity.
-- **EFA support on Fargate (2024-2025):** Elastic Fabric Adapter for ML/HPC
-  workloads. Available on selected CPU configs.
-- **Container health check improvements (2024-2025):** `START_PERIOD`
-  (1-300s) configurable per container. Eliminates false-negative rollbacks
-  for slow-start JVM/Spring workloads.
-- **Availability Zone rebalancing (2024-2025):** ECS auto-rebalances tasks
-  across AZs after failure. Set `availabilityZoneRebalancing=ENABLED`.
-- **Deployment circuit breaker rollback (GA):** auto-rolls back failed
-  deployments. Requires `enableExecution=true` + container health check.
-- **Graviton (ARM64) on Fargate (2024-2025):** `runtimePlatform.cpuArchitecture=ARM64`
-  for up to 20% price-performance. Image must be ARM64.
-- **Fargate platform version 1.4 (current default):** `LATEST` no longer
-  auto-upgrades — pin `platformVersion` for reproducibility.
-- **ECS Exec (session manager):** `enableExecuteCommand` for shell access.
-  Never enable in production without audit review.
+Latest ECS Fargate features (2024-2026) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for Spot capacity providers, EFA, health-check START_PERIOD, AZ rebalancing, circuit-breaker rollback, Graviton, platform versions, ECS Exec.
 
 ## Workload matrix
 
@@ -425,16 +379,8 @@ aws application-autoscaling describe-scaling-policies --service-namespace ecs
 
 ## Expert heuristic — choosing CPU, memory, and AZ spread
 
-- **60/70 rule:** CPU target tracking at 60% for latency-sensitive, 70%
-  for batch. Scale-out takes ~60-90s on Fargate.
-- **Memory: 2x the working set.** JVM app with 2 GB heap needs >= 4 GB.
-  Set `-XX:MaxRAMPercentage=75`.
-- **AZ spread:** minimum 2 AZs for HA, 3 for user-facing. Pair with
-  `desiredCount >= AZ count`.
-- **Fargate Spot blend:** `base=2` on FARGATE + FARGATE_SPOT weight 1-3
-  for burst. NEVER put stateful workloads on Spot.
-- **ALB vs. NLB:** ALB for HTTP/HTTPS, NLB for TCP/TLS. Target type must
-  be `ip` either way.
+Expert heuristic (60/70 rule, memory sizing, AZ spread, Spot blend, ALB vs NLB) moved verbatim to [references/networking-and-scaling-guide.md](references/networking-and-scaling-guide.md).
+Load on demand when choosing CPU, memory, and AZ spread.
 
 ## Pre-flight safety checks (run before any deployment CLI)
 
@@ -491,28 +437,21 @@ VERIFICATION_COMMANDS:
 (cluster, task definition, subnets, execution role, target group ARN for
 ALB-fronted service), the verdict is `PREREQUISITES_MISSING`.
 
+## References (load on demand)
+
+- [references/deployment-cli-commands.md](references/deployment-cli-commands.md) — full copy-pasteable CLI for all 10 deployment steps, plus the capacity-provider-strategy variant and auto-scaling CLI moved from SKILL.md.
+- [references/networking-and-scaling-guide.md](references/networking-and-scaling-guide.md) — awsvpc networking, ALB integration, auto-scaling, Spot strategy, full NEVER list, plus the expert heuristic and edge-case quick list moved from SKILL.md.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 10 verification commands moved from SKILL.md.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — latest ECS Fargate features (2024-2026) moved from SKILL.md.
+
 ## Domain
 
 AWS CloudOps / ECS Fargate Container Compute Provisioning.
 
 ## Edge-case handling
 
-- **Cross-account ECR pull:** execution role needs `ecr:BatchGetImage` on
-  the cross-account repo AND the repo policy in the other account must
-  grant your root.
-- **ECS Exec in production:** `enableExecuteCommand=true` allows shell
-  access. Bypasses bastion auditing. Enable only for break-glass.
-- **ALB vs. container health check divergence:** if ALB passes but
-  container check fails, ECS marks task unhealthy while ALB keeps sending
-  traffic. Align both checks.
-- **Slow-start JVM tasks:** set `healthCheck.startPeriod=60` and
-  `unhealthyThresholdCount=3` to avoid spurious rollback.
-- **Spot interruption drain:** Fargate Spot sends 2-min warning + SIGTERM.
-  Set `stopTimeout=30` for graceful shutdown.
-- **Capacity provider vs. launch type:** once a service uses a
-  capacity-provider strategy, you cannot switch back without recreating.
-- **Service Connect / Cloud Map:** namespace must exist before service
-  creation for service-to-service discovery.
+Edge-case quick list moved verbatim to [references/networking-and-scaling-guide.md](references/networking-and-scaling-guide.md).
+Load on demand for cross-account ECR, ECS Exec, health-check divergence, slow-start JVM, Spot drain, capacity-provider lock-in, Service Connect/Cloud Map.
 
 ## AWS documentation
 

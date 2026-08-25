@@ -142,59 +142,13 @@ silently destroys them.
 
 ## Expert heuristic: EKS-managed vs self-managed conflict lifecycle
 
-The most common EKS add-on failure is a conflict between the EKS-managed
-add-on and a pre-existing self-managed installation. A baseline model
-may say "just create the add-on"; the conflict resolution strategy
-determines whether your customizations survive.
-
-```text
-Scenario: cluster already has self-managed vpc-cni (aws-node DaemonSet)
-
-create-addon --addon-name vpc-cni
-  --resolve-conflicts OVERWRITE  → EKS replaces self-managed config (YOUR CUSTOMIZATIONS LOST)
-  --resolve-conflicts RETAIN     → EKS keeps self-managed config (your customizations survive, but EKS may not fully manage)
-  --resolve-conflicts NONE       → CONFLICT reported, add-on status = DEGRADED
-
-update-addon --addon-name vpc-cni
-  --resolve-conflicts OVERWRITE  → EKS overwrites on every update (not recommended for customized add-ons)
-  --resolve-conflicts PRESERVE   → preserves existing fields, applies new defaults for unset fields
-```
-
-**Key implication:** if you have customized a self-managed add-on (e.g.,
-custom env vars on `aws-node`), use `RETAIN` on first create and
-`PRESERVE` on updates. `OVERWRITE` silently destroys your customizations.
-The safe pattern is: export current config, create the EKS add-on with
-`RETAIN`, then migrate customizations to `--configuration-values`.
-
-**Operational pattern for migration from self-managed to EKS-managed:**
-1. Export the current self-managed add-on config (e.g., `kubectl get
-   ds aws-node -n kube-system -o yaml`).
-2. Create the EKS add-on with `--resolve-conflicts OVERWRITE` to take
-   control.
-3. Re-apply customizations via `--configuration-values` using the EKS
-   add-on API (not kubectl).
-4. Verify the add-on status is `ACTIVE`.
+Conflict-lifecycle deep dive (OVERWRITE/RETAIN/NONE/PRESERVE semantics per create vs update, customization-loss scenario, self-managed-to-EKS-managed migration pattern) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when a self-managed add-on already exists or status is DEGRADED.
 
 ## Expert heuristic: add-on version compatibility matrix
 
-Each EKS add-on version is validated against specific EKS platform
-versions and Kubernetes minor versions. A baseline model may pick the
-latest version; this can break cluster networking if it's incompatible.
-
-```text
-describe-addon-versions --addon-name vpc-cni --kubernetes-version 1.30
-  → Returns only versions validated for K8s 1.30
-  → Includes "DEFAULT" flag for the recommended version
-  → Includes compatibility info (addonVersion, platformVersions)
-
-Rule: ALWAYS use describe-addon-versions to validate before create-addon.
-      NEVER assume the latest version is compatible.
-```
-
-**Key implication:** the EKS API enforces version compatibility at
-creation time, but a version that passes the API check may still have
-runtime issues if the cluster uses an unusual configuration (custom
-CNI, Fargate-only, etc.). Test add-on updates in a staging cluster first.
+Version-compatibility-matrix heuristic (describe-addon-versions DEFAULT flag, platformVersions compatibility info, never-assume-latest rule) moved verbatim to [references/addon-version-management.md](references/addon-version-management.md).
+Load on demand when picking an add-on version.
 
 ## Prerequisites (verify before provisioning)
 
@@ -249,19 +203,8 @@ prerequisites and configuration patterns.
 |---|---|
 | `eks-pod-identity-agent` | EKS Pod Identity credential agent |
 
-**List available add-ons for a cluster:**
-
-```bash
-aws eks describe-addon-versions \
-  --kubernetes-version 1.30 \
-  --query 'addons[*].addonName' --output table
-```
-
-**Check which add-ons are already installed:**
-
-```bash
-aws eks list-addons --name my-cluster --output table
-```
+Add-on enumeration commands (`describe-addon-versions --kubernetes-version` table listing, `list-addons` installed check) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when listing available or already-installed add-ons.
 
 **Common mistake:** installing the `metrics-server` EKS add-on when
 Metrics Server is already deployed via Helm. This creates a conflict
@@ -283,15 +226,8 @@ tooling. Operator handles all updates. Config via Helm values or
 kubectl patches. Can coexist with EKS-managed add-ons IF conflicts
 are resolved.
 
-**Check add-on version compatibility:**
-
-```bash
-aws eks describe-addon-versions \
-  --addon-name vpc-cni \
-  --kubernetes-version 1.30 \
-  --query 'addons[0].addonVersions[*].{Version:addonVersion,Default:compatibilities[0].defaultVersion}' \
-  --output table
-```
+Version-compatibility check command (describe-addon-versions with Version/Default query) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when validating an add-on version against the cluster K8s version.
 
 **Create an EKS-managed add-on with conflict resolution:**
 
@@ -323,26 +259,8 @@ EKS add-ons support JSON-based configuration overrides via
 `--configuration-values`. These replace or supplement the add-on's
 default configuration.
 
-**Set configuration values on creation:**
-
-```bash
-aws eks create-addon \
-  --cluster-name my-cluster \
-  --addon-name vpc-cni \
-  --addon-version v1.18.1-eksbuild.3 \
-  --configuration-values '{"env":{"AWS_VPC_K8S_CNI_LOGLEVEL":"DEBUG","ENABLE_PREFIX_DELEGATION":"true"}}' \
-  --resolve-conflicts OVERWRITE
-```
-
-**Update configuration values:**
-
-```bash
-aws eks update-addon \
-  --cluster-name my-cluster \
-  --addon-name vpc-cni \
-  --configuration-values '{"env":{"ENABLE_PREFIX_DELEGATION":"true","WARM_PREFIX_TARGET":"1"}}' \
-  --resolve-conflicts PRESERVE
-```
+Configuration-values create/update CLI (create-addon and update-addon with `--configuration-values` JSON) moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+Load on demand when overriding add-on configuration; the values-per-add-on table stays inline.
 
 **Configuration values by add-on type:**
 
@@ -382,63 +300,11 @@ IRSA (IAM Roles for Service Accounts) is the traditional method.
 2. IAM role with a trust policy for the OIDC provider and the add-on's
    service account.
 
-**Create an IAM role for vpc-cni (IRSA):**
+Full vpc-cni IRSA provisioning CLI (OIDC URL derivation, trust-policy heredoc, create-role, attach AmazonEKS_CNI_Policy, create-addon with role ARN) moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+Load on demand when creating the IRSA role for an add-on.
 
-```bash
-CLUSTER_NAME=my-cluster
-ACCOUNT_ID=123456789012
-OIDC_URL=$(aws eks describe-cluster --name $CLUSTER_NAME \
-  --query 'cluster.identity.oidc.issuer' --output text | sed 's|https://||')
-
-# Create trust policy
-cat > trust-policy.json << EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": {
-      "Federated": "arn:aws:iam::${ACCOUNT_ID}:oidc-provider/${OIDC_URL}"
-    },
-    "Action": "sts:AssumeRoleWithWebIdentity",
-    "Condition": {
-      "StringEquals": {
-        "${OIDC_URL}:aud": "sts.amazonaws.com",
-        "${OIDC_URL}:sub": "system:serviceaccount:kube-system:aws-node"
-      }
-    }
-  }]
-}
-EOF
-
-aws iam create-role \
-  --role-name AmazonEKSVPCCNIRole \
-  --assume-role-policy-document file://trust-policy.json
-
-# Attach the managed policy
-aws iam attach-role-policy \
-  --role-name AmazonEKSVPCCNIRole \
-  --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
-```
-
-**Create add-on with IRSA role:**
-
-```bash
-aws eks create-addon \
-  --cluster-name my-cluster \
-  --addon-name vpc-cni \
-  --service-account-role-arn arn:aws:iam::${ACCOUNT_ID}:role/AmazonEKSVPCCNIRole \
-  --resolve-conflicts OVERWRITE
-```
-
-**IRSA vs Pod Identity comparison:**
-
-| Feature | IRSA | EKS Pod Identity |
-|---|---|---|
-| Credential delivery | OIDC federation + projected token | Pod Identity Agent + ephemeral credentials |
-| Setup complexity | OIDC provider + trust policy per SA | Agent add-on + IAM association |
-| OIDC provider required | Yes | No |
-| Multi-account support | Complex trust policies | Simpler cross-account |
-| Migration status | Mature, widely supported | Newer (2024+), growing support |
+IRSA-vs-Pod-Identity comparison table (credential delivery, setup complexity, OIDC requirement, multi-account, migration status) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when choosing between IRSA and EKS Pod Identity.
 
 **Common mistake:** using the wrong service account name in the trust
 policy. vpc-cni uses `aws-node` in `kube-system`. EBS CSI uses
@@ -456,43 +322,11 @@ simplifies IAM mapping compared to IRSA.
 2. An IAM role with a Pod Identity trust policy.
 3. A Pod Identity association linking the role to a service account.
 
-**Install the Pod Identity Agent:**
+Pod Identity Agent install CLI (create-addon eks-pod-identity-agent) moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+Load on demand when enabling EKS Pod Identity.
 
-```bash
-aws eks create-addon \
-  --cluster-name my-cluster \
-  --addon-name eks-pod-identity-agent \
-  --resolve-conflicts OVERWRITE
-```
-
-**Create a Pod Identity IAM role:**
-
-```bash
-cat > pod-identity-trust.json << EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": { "Service": "pods.eks.amazonaws.com" },
-    "Action": ["sts:AssumeRole", "sts:TagSession"]
-  }]
-}
-EOF
-
-aws iam create-role \
-  --role-name MyAddonRole \
-  --assume-role-policy-document file://pod-identity-trust.json
-```
-
-**Create a Pod Identity association:**
-
-```bash
-aws eks create-pod-identity-association \
-  --cluster-name my-cluster \
-  --namespace kube-system \
-  --service-account aws-node \
-  --role-arn arn:aws:iam::123456789012:role/MyAddonRole
-```
+Pod Identity provisioning CLI (pods.eks.amazonaws.com trust-policy role creation, create-pod-identity-association) moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+Load on demand when mapping an IAM role to a service account.
 
 **Key advantages of Pod Identity over IRSA:**
 - No OIDC provider configuration needed.
@@ -502,12 +336,8 @@ aws eks create-pod-identity-association \
 - Tag-based access control via session tags.
 - The agent handles credential rotation automatically.
 
-**Migration from IRSA to Pod Identity:**
-1. Install `eks-pod-identity-agent`.
-2. Create a new IAM role with Pod Identity trust policy.
-3. Create Pod Identity association for the service account.
-4. Remove the old IRSA role annotation from the service account.
-5. Verify pods pick up the new credentials (pod restart required).
+IRSA-to-Pod-Identity migration steps moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when migrating an add-on off IRSA.
 
 **Common mistake:** installing the Pod Identity Agent but forgetting
 to create the Pod Identity association. The agent runs but pods still
@@ -527,11 +357,8 @@ including core add-ons. When Auto Mode is enabled, `vpc-cni`,
 - The `--resolve-conflicts` flag is irrelevant for Auto Mode-managed
   add-ons since EKS always wins.
 
-**Check if a cluster uses Auto Mode:**
-
-```bash
-aws eks describe-cluster --name my-cluster --query 'cluster.computeConfig'
-```
+Auto Mode check command (describe-cluster computeConfig query) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when determining whether add-ons are Auto Mode-managed.
 
 **Common mistake:** manually updating vpc-cni on an Auto Mode cluster.
 Auto Mode reconciles it back to its managed state, silently reverting
@@ -550,34 +377,13 @@ EKS cluster. Add-ons on Hybrid Nodes require specific configurations.
 - Not all EKS add-ons support Hybrid Nodes — check
   `describe-addon-versions` for compatibility annotations.
 
-```bash
-# vpc-cni with custom networking for hybrid nodes
-aws eks update-addon \
-  --cluster-name my-hybrid-cluster \
-  --addon-name vpc-cni \
-  --configuration-values '{"env":{"AWS_VPC_K8S_CNI_EXTERNALSNAT":"true","CUSTOM_NETWORK_CFG":"true"}}' \
-  --resolve-conflicts PRESERVE
-```
+Hybrid Nodes vpc-cni custom-networking CLI (AWS_VPC_K8S_CNI_EXTERNALSNAT, CUSTOM_NETWORK_CFG) moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+Load on demand when configuring add-ons for EKS Hybrid Nodes.
 
 ## Step 8 — Recent features
 
-- **EKS Pod Identity (2024):** New credential delivery method using
-  the `eks-pod-identity-agent` add-on. Simpler than IRSA — no OIDC
-  provider required. Uses `pods.eks.amazonaws.com` trust principal.
-- **EKS Auto Mode (2024-2025):** Automatically manages vpc-cni,
-  kube-proxy, coredns, and node lifecycle. Manual add-on management is
-  not needed for these on Auto Mode clusters.
-- **EKS Hybrid Nodes (2024-2025):** On-premises nodes join EKS clusters.
-  Add-ons require hybrid-specific configurations for non-VPC networking.
-- **Add-on configuration values schema validation (2024-2025):** EKS
-  now validates `--configuration-values` JSON against the add-on's
-  schema. Invalid keys are reported at creation/update time.
-- **GuardDuty Agent EKS add-on (2024-2025):** Runtime threat detection
-  as a managed EKS add-on. Requires Pod Identity or IRSA for the
-  GuardDuty security account.
-- **ADOT Operator add-on (2024-2025):** AWS Distro for OpenTelemetry
-  as a managed EKS add-on with Operator pattern for automated
-  collector deployment.
+Recent features (Pod Identity, Auto Mode, Hybrid Nodes, configuration-values schema validation, GuardDuty Agent add-on, ADOT Operator add-on) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when targeting the newest add-on capabilities.
 
 ## NEVER do these things
 
@@ -673,27 +479,16 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-- **`InvalidParameterException` on create-addon:** Add-on version
-  incompatible with cluster K8s version. Run `describe-addon-versions`
-  to find a valid version. Also check the add-on name spelling.
-- **Add-on status `DEGRADED` after creation:** Conflict with self-
-  managed add-on. Check `describe-addon --query 'addon.healthIssues'`.
-  Resolve by updating with `--resolve-conflicts OVERWRITE` or fixing
-  the conflicting resource.
-- **Pods get `AccessDenied` / `Unauthorized` on AWS API:** IRSA trust
-  policy has wrong service account name or OIDC URL. Verify the trust
-  policy matches the add-on's service account. For Pod Identity, verify
-  the association exists and the agent is running.
-- **`ConfigurationConflict` on update:** `--configuration-values`
-  conflicts with existing self-managed config. Use `--resolve-conflicts
-  PRESERVE` to merge, or `OVERWRITE` to replace.
-- **Add-on reverts to default after manual config:** Cluster uses Auto
-  Mode which reconciles managed add-ons. Do not manually configure Auto
-  Mode-managed add-ons. Use cluster-level settings instead.
-- **PVC provisioning fails after EBS CSI add-on:** Missing IAM role.
-  Create an IRSA role for `ebs-csi-controller-sa` with the
-  `AmazonEBSCSIDriverPolicy` (or appropriate custom policy) and
-  re-create the add-on with `--service-account-role-arn`.
+Error-handling table (InvalidParameterException, DEGRADED status, AccessDenied/Unauthorized, ConfigurationConflict, Auto Mode reverts, PVC provisioning failure) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when an add-on create/update fails or behaves unexpectedly.
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — conflict-lifecycle and IRSA-vs-Pod-Identity deep dives, IRSA migration steps, and Recent features, moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — add-on enumeration, version-compatibility, and Auto Mode check commands, moved from SKILL.md
+- [references/error-handling.md](references/error-handling.md) — EKS add-on error-handling table, moved from SKILL.md
+- [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — copy-pasteable CLI sequence — extended with IRSA, Pod Identity, configuration-values, and Hybrid Nodes CLI moved from SKILL.md
+- [references/addon-version-management.md](references/addon-version-management.md) — version conflict detail — extended with the add-on version compatibility matrix heuristic moved from SKILL.md
 
 ## Domain
 

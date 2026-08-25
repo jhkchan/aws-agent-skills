@@ -592,3 +592,284 @@ NEED_MORE_INFO — gather more context
 - If the pod was healthy yesterday and fails today with no change,
   suspect an ECR lifecycle policy purge, a rotated secret, or a
   dependency outage.
+
+<!-- Moved verbatim from SKILL.md (eks-pod-troubleshooter) — progressive-disclosure restructure, lines 200-214 -->
+
+## Step 2 — PENDING common fix patterns
+
+**Common fix patterns:**
+
+- **Insufficient CPU/memory:** raise the cluster's `desired` size, add a
+  Karpenter `NodePool` Provisioner with the right instance categories,
+  or lower the pod `resources.requests`. On EKS with Karpenter, check
+  `kubectl logs -n karpenter deployment/karpenter` for `cannot schedule`
+  events.
+- **Taint without toleration:** add a `tolerations` entry to the pod
+  spec, or remove the taint (`kubectl taint node <node> <key>-`).
+- **Affinity no match:** add the matching label to nodes (`kubectl label
+  nodes <node> <key>=<value>`) or relax the affinity.
+- **Cordoned nodes:** `kubectl uncordon <node>` once the node is healthy.
+- **PVC Pending:** for `gp2`/`gp3` StorageClass on EBS, the PVC AZ must
+  match a node AZ. Use `volumeBindingMode: WaitForFirstConsumer` (default
+  for gp3) or pin the pod's `nodeSelector` to the AZ with capacity.
+
+<!-- Moved verbatim from SKILL.md (eks-pod-troubleshooter) — progressive-disclosure restructure, lines 232-258 -->
+
+## Step 3 — IMAGE_PULL diagnostic walk
+
+**Diagnostic walk:**
+
+1. **Read the full event message** in `kubectl describe pod` Events.
+   The sub-string after `rpc error: code = Unknown desc =` is the
+   containerd error, which distinguishes auth vs manifest vs network.
+2. **Verify the image exists in ECR:**
+   `aws ecr describe-images --repository-name <repo> --image-ids imageTag=<tag>`.
+   If this returns `ImageNotFoundException`, the tag is wrong or purged.
+3. **Identify the node's instance role** and verify ECR read perms. The
+   four required actions are `ecr:GetAuthorizationToken`,
+   `ecr:BatchCheckLayerAvailability`, `ecr:GetDownloadUrlForLayer`,
+   `ecr:BatchGetImage`. The managed policy
+   `AmazonEC2ContainerRegistryReadOnly` covers all four. The managed
+   add-on `AmazonEKS_CNI_Policy` does NOT — do not confuse the two.
+4. **For cross-account ECR (image in account B, pod runs in A):** both
+   the node role in A AND the ECR repo policy in B must allow the pull.
+   This is the cross-account intersection rule. The EKS doc on cross-
+   account ECR is at https://repost.aws/knowledge-center/eks-ecs-cross-account-container-pull.
+5. **Verify the ECR VPC endpoints exist** if the pod's node is in a
+   private subnet: `com.amazonaws.<region>.ecr.api` AND
+   `com.amazonaws.<region>.ecr.dkr`. The `dkr` endpoint is what
+   containerd actually calls; the `api` endpoint is for registry API
+   calls. Both are needed.
+6. **Check the ECR lifecycle policy** if the tag worked yesterday but
+   fails today: `aws ecr get-lifecycle-policy --repository-name <repo>`.
+   A rule that purges `untagged` or `older than N images` can delete the
+   image. `describe-images` will then return `ImageNotFoundException`.
+
+<!-- Moved verbatim from SKILL.md (eks-pod-troubleshooter) — progressive-disclosure restructure, lines 292-307 -->
+
+## Step 3 — IMAGE_PULL common fix patterns
+
+**Common fix patterns:**
+
+- Wrong tag: pin the image to the actual tag in ECR or use a digest
+  reference (`<repo>@sha256:...`).
+- Node role missing ECR perms: attach
+  `AmazonEC2ContainerRegistryReadOnly` to the node instance role, OR if
+  you run IRSA / Pod Identity, attach the policy to the *service
+  account* role and reference it via `serviceAccountName` with
+  `pod-security.kubernetes.io/enforce: restricted` annotations.
+- Network: add VPC endpoints for ECR (interface endpoints, both `.api`
+  and `.dkr`), or fix the NAT gateway route.
+- Cross-account: update the ECR repo policy in the image-owning account
+  to include `arn:aws:iam::<caller-acct>:root` in `Principal`.
+- Disk full: drain the node (`kubectl drain <node> --ignore-daemonsets
+  --delete-emptydir-data`) and let the autoscaler replace it, or upgrade
+  the node AMI to a larger root volume.
+
+<!-- Moved verbatim from SKILL.md (eks-pod-troubleshooter) — progressive-disclosure restructure, lines 346-369 -->
+
+## Step 4 — CRASH_LOOP common root causes
+
+**Common CRASH_LOOP root causes:**
+
+- **Missing required environment variable.** The application reads an
+  env var that is not in the pod spec (`KeyError`, `NameError`,
+  `ReferenceError`). Fix: add it via `env.value` or `env.valueFrom`.
+- **Missing Secret/ConfigMap reference.** `envFrom.configMapKeyRef.name`
+  points at a ConfigMap that does not exist in the namespace. The pod
+  fails before the container starts; Events shows
+  `CreateContainerConfigError` or `container has no logs`.
+- **Database / downstream dependency unreachable.** Logs show
+  `Connection refused` / `i/o timeout`. Fix: verify Service name, DNS
+  resolution, NetworkPolicy, security group.
+- **Wrong command / args.** `command: ["./app"]` but the binary is at
+  `/app/server`. Logs: `no such file or directory`. Fix: pin the command
+  to an absolute path inside the image.
+- **Image architecture mismatch.** Built for `linux/amd64`, deployed to
+  a Graviton (`arm64`) node group — or vice versa. Logs show
+  `exec format error` (exit 126 / 127 / 139). Fix: build a multi-arch
+  image (`docker buildx build --platform linux/amd64,linux/arm64`).
+- **Liveness probe killing the container too aggressively.** See Step 6
+  — if the liveness probe is misconfigured, the kubelet kills the
+  container, restart count climbs, and the pod looks like it is
+  crash-looping. The give-away: Events shows `Liveness probe failed` +
+  `Container containerX killed`.
+
+<!-- Moved verbatim from SKILL.md (eks-pod-troubleshooter) — progressive-disclosure restructure, lines 446-472 -->
+
+## Step 6 — PROBE_FAILURE diagnostic walk
+
+**Diagnostic walk:**
+
+1. **Identify which probe is failing** — liveness (causes restarts) vs
+   readiness (causes not-ready). Read Events:
+   `kubectl get events -n <ns> --field-selector involvedObject.name=<pod>`
+   and grep for `Liveness probe failed` vs `Readiness probe failed`.
+2. **Read the probe config:**
+   `kubectl get pod <pod> -n <ns> -o jsonpath='{.spec.containers[*].livenessProbe}'`
+   (and `.readinessProbe`). Note the path, port, scheme, initial delay,
+   period, timeout, thresholds.
+3. **Reproduce the probe from inside the pod:**
+   `kubectl exec -n <ns> <pod> -c <container> -- curl -i http://localhost:<port><path>`.
+   If this returns 200, the probe config is wrong (wrong port, wrong
+   path, wrong scheme, TLS cert mismatch). If non-200, the application
+   has a bug or its dependency is down.
+4. **For liveness specifically:** if the probe passes when curled
+   manually but fails when the kubelet runs it, check whether the probe
+   path requires CPU that the app does not have under load. Raise
+   `timeoutSeconds` or lower `periodSeconds`.
+5. **Check `initialDelaySeconds`.** If the application needs 60 seconds
+   to start and the probe begins at 5 seconds, the kubelet will kill
+   the container before the app is ready — restart count climbs,
+   presenting as CrashLoopBackOff.
+6. **Verify the Service endpoints:**
+   `kubectl describe endpoints <svc> -n <ns>` (or
+   `kubectl get endpointslices -n <ns>`). A readiness failure shows the
+   pod IP missing from the endpoints list.
+
+<!-- Moved verbatim from SKILL.md (eks-pod-troubleshooter) — progressive-disclosure restructure, lines 494-509 -->
+
+## Step 6 — PROBE_FAILURE common fix patterns
+
+**Common fix patterns:**
+
+- **Path/port mismatch:** align `livenessProbe.httpGet.path` and `.port`
+  with the application's actual endpoint. Common: `/health` vs `/healthz`
+  vs `/api/health`; `containerPort: 8080` but probe port `80`.
+- **`initialDelaySeconds` too short:** raise it above the application's
+  known startup time. For Spring Boot / Java, use 90+ seconds. Better,
+  use a `startupProbe` (introduced in 1.16, GA in 1.20) so the liveness
+  probe only runs after startup completes.
+- **TLS scheme:** if the app serves HTTPS only, set
+  `livenessProbe.httpGet.scheme: HTTPS`. The kubelet does not follow
+  redirects from HTTP to HTTPS.
+- **Readiness depends on a dependency:** the readiness probe path should
+  fail (return non-200) when a *required* dependency is down. If the
+  readiness probe path always returns 200, it is not actually testing
+  readiness.
+
+<!-- Moved verbatim from SKILL.md (eks-pod-troubleshooter) — progressive-disclosure restructure, lines 525-541 -->
+
+## Step 7 — INIT_FAILURE diagnostic walk
+
+**Diagnostic walk:**
+
+1. **List init container statuses:**
+   `kubectl get pod <pod> -n <ns> -o jsonpath='{.status.initContainerStatuses}'`.
+   Identify which init container is failing (the one whose `state` is
+   not `terminated` with `reason: Completed`).
+2. **Read its logs with `--previous`:**
+   `kubectl logs <pod> -n <ns> -c <init-container-name> --previous`.
+   The init container may be in a tight crash loop; the current logs
+   may be empty.
+3. **If the init container waits on a dependency (waiting for DB migration):**
+   verify the dependency is reachable from the pod network. Init
+   containers share the pod network, so Service DNS should resolve.
+4. **Verify init container ordering:** init containers run sequentially
+   in spec order. If init container 2 depends on something init container
+   1 sets up (e.g., a shared volume), verify the volume mount is
+   bidirectional.
+
+<!-- Moved verbatim from SKILL.md (eks-pod-troubleshooter) — progressive-disclosure restructure, lines 557-567 -->
+
+## Step 7 — INIT_FAILURE common root causes
+
+**Common INIT_FAILURE root causes:**
+
+- **Database migration that fails on schema mismatch.** Fix the
+  migration script or pre-flight check it.
+- **Waiting for a Service that does not exist yet.** Use a
+  `Job`-orchestrated init or remove the dependency.
+- **Permissions on a mounted Secret / ConfigMap** — the init container
+  tries to write to a `readOnly: true` mount. Fix the volume mount or
+  use an `emptyDir`.
+- **Init container image is wrong / not built** — same IMAGE_PULL tree
+  (Step 3) but for the init container's image field.
+
+<!-- Moved verbatim from SKILL.md (eks-pod-troubleshooter) — progressive-disclosure restructure, lines 592-602 -->
+
+## Step 9 — verify the fix
+
+Before applying, validate the proposed fix with one of:
+
+- **For pod spec changes:** apply to a single pod via `kubectl apply` or
+  `kubectl edit`, watch the pod come up with
+  `kubectl get pod <pod> -w` before rolling the Deployment.
+- **For probe changes:** use `kubectl exec` to curl the probe path
+  manually before trusting the kubelet verdict.
+- **For node scaling:** wait for the new nodes to be `Ready` and the
+  pending pods to bind before declaring the fix complete.
+- **For image changes:** verify the new tag exists in ECR and pull it
+  locally first (`docker pull <image>`).
+
+<!-- Moved verbatim from SKILL.md (eks-pod-troubleshooter) — progressive-disclosure restructure, lines 803-868 -->
+
+## Remediation guidance by category
+
+### For PENDING
+
+1. Read the Events `FailedScheduling` message verbatim. The sub-string
+   after the colon is the discriminator (`Insufficient cpu`, `had
+   taints`, `didn't match node affinity`, `unschedulable`).
+2. For resource pressure: `kubectl top nodes` and
+   `kubectl describe node <node>` to see Allocatable vs Requests. Scale
+   the EKS managed node group (`aws eks update-nodegroup-config` to bump
+   desiredSize) or check Karpenter NodePool.
+3. For taints: list taints
+   (`kubectl get nodes -o custom-columns=NAME:.metadata.name,TAINTS:.spec.taints`)
+   and either add a toleration or remove the taint.
+4. For PVC: `kubectl describe pvc <pvc> -n <ns>` — check StorageClass
+   exists, has capacity, and AZ matches pod's affinity.
+
+### For IMAGE_PULL
+
+1. Verify the image exists in ECR with `aws ecr describe-images`.
+2. Identify the puller's IAM identity (node role, or IRSA/Pod Identity
+   role via `serviceAccountName`) and verify ECR read permissions using
+   `aws iam simulate-principal-policy`.
+3. Verify network reachability (VPC endpoints for ECR or NAT gateway).
+4. For cross-account ECR, update the repo policy in the image-owning
+   account to include the caller's account root.
+
+### For CRASH_LOOP
+
+1. Read `kubectl logs <pod> -c <container> --previous`.
+2. Cross-reference the exit code and log pattern with common causes
+   (missing env var, dependency outage, version mismatch, arch
+   mismatch).
+3. If the deployment controller is rolling back (Deployment with
+   `progressDeadlineSeconds` exceeded), look at the underlying pod
+   failure, not the rollout state.
+4. Roll back to the last known-good image tag if the fix is not
+   immediately available.
+
+### For OOM
+
+1. Identify container-level vs node-level OOM from
+   `status.containerStatuses[].lastState.reason`.
+2. For container OOM: raise `resources.limits.memory`. For Java: use
+   `-XX:MaxRAMPercentage=75` so the JVM tracks the cgroup limit.
+3. For node OOM: set `resources.requests.memory` on every pod; consider
+   ` Guaranteed` QoS for critical pods; add nodes.
+4. Enable metrics-server and a long-term metrics sink (Prometheus) to
+   catch memory leaks before they OOM.
+
+### For PROBE_FAILURE
+
+1. Identify liveness vs readiness failure from Events.
+2. Reproduce the probe manually:
+   `kubectl exec -n <ns> <pod> -c <container> -- curl -i http://localhost:<port><path>`.
+3. Align probe path/port/scheme with the application's actual endpoint.
+4. Add a `startupProbe` so liveness does not fire during application
+   startup; raise `initialDelaySeconds` if startupProbe is unavailable.
+5. For readiness failures, verify the readiness path actually depends
+   on a real dependency (DB, downstream service).
+
+### For INIT_FAILURE
+
+1. List init container statuses with
+   `kubectl get pod -o jsonpath='{.status.initContainerStatuses}'`.
+2. Read the failing init container's logs with `--previous`.
+3. Fix the init container's script / image / permissions; make it
+   idempotent.
+

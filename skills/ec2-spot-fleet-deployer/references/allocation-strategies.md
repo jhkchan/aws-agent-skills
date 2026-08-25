@@ -141,3 +141,43 @@ many of the cheapest pools the fleet draws from:
   prediction models.
 - Current (2026): `priceCapacityOptimized` remains the recommended
   default; `lowestPrice` is considered legacy.
+
+## Expert heuristic: allocation strategy selection (moved from SKILL.md)
+
+The allocation strategy determines how the Spot Fleet selects which
+Spot Instance pools to draw from. A baseline model lists the four
+options without explaining when each fails; this heuristic provides
+a decision framework.
+
+```text
+Workload profile → allocation strategy
+
+Stateless, fault-tolerant, cost-optimized
+  → priceCapacityOptimized (RECOMMENDED DEFAULT)
+    Balances price with capacity availability. AWS's recommended
+    default since Nov 2022. Avoids concentrating the fleet in a
+    single cheap pool that gets reclaimed all at once.
+
+Stateless, MUST be cheapest, can tolerate interruptions
+  → lowestPrice
+    Picks the lowest-priced pool per AZ. No diversification. High
+    risk of simultaneous fleet-wide interruption. Only use with
+    many instance types (10+) across all AZs.
+
+Stateless, capacity availability > price sensitivity
+  → capacityOptimized
+    Picks pools with the most available capacity, reducing
+    interruption risk. Good for long-running workloads where
+    interruption cost > Spot savings.
+
+Stateful or requires specific instance families
+  → diversified
+    Distributes across all pools equally. Lowest interruption risk
+    but no cost optimization.
+```
+
+**Key implication:** `lowestPrice` was the pre-2022 default and is
+rarely the best choice. `priceCapacityOptimized` avoids the trap of
+concentrating the fleet in a single cheap pool. `capacityOptimized`
+suits workloads where interruption cost is high (batch jobs, CI/CD,
+ML training). `diversified` is the fallback for maximum spread.

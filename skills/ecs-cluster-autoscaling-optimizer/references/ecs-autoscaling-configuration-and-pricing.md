@@ -227,3 +227,23 @@ aws cloudwatch get-metric-statistics \
   --end-time $(date -u +%FT%TZ) \
   --period 3600 --statistics Average,Maximum --output json
 ```
+
+---
+
+## Step 12 — impact estimation formula (moved from SKILL.md)
+
+Compute the utilization improvement for each recommendation:
+
+```
+current_host_count = describe-container-instances count
+current_avg_utilization = avg(CPUUtilization or MemoryUtilization)
+projected_host_count = current_host_count × (current_avg_utilization / target_utilization)
+host_savings = current_host_count - projected_host_count
+monthly_savings = host_savings × 730 hours × $/hour
+
+# For spot migration:
+spot_savings = on_demand_hours_converted × 730 × (on_demand_rate - spot_rate)
+```
+
+Always state assumptions: target utilization, spot discount rate (70%
+typical), node type, and region.

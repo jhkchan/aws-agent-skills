@@ -121,79 +121,11 @@ Rules:
 
 ## Expert heuristic
 
-> **`stoppedReason` is the primary diagnostic surface.** Every stopped
-> ECS task carries a `stoppedReason` string and, in nearly every case,
-> a per-container `containers[].reason` with the exit code. Read these
-> BEFORE opening CloudWatch Logs. The string maps deterministically to
-> a root-cause category:
->
-> - `ResourceInitializationError` → ENI / subnet / ECR endpoint layer
-> - `CannotPullContainerError` → ECR auth / endpoint / size layer
-> - `EC2InstanceStateError` → deregistered container instance
-> - `Essential container in task exited` → application / OOM / task role
->   (fold via `exitCode`)
-> - `GoOffline` / `TaskFailed` from circuit breaker → fold to underlying
->
-> **For `awsvpc` mode, ENI attachment requires a free IP in every
-> subnet the task is placed in.** A `/28` subnet has 11 usable IPs; a
-> burst of 12 tasks exhausts the pool. ENI trunking on EC2 launch type
-> raises the per-instance ENI cap but is NOT automatic — the trunk must
-> be requested and the instance must support it (`ecs.awsvpc-trunking`
-> instance attribute).
->
-> **For private subnets, ECR pull requires the ECR interface endpoint
-> (`ecr.api`, `ecr.dkr`) AND the S3 gateway endpoint.** The execution
-> role must grant `ecr:BatchGetImage`, `ecr:GetDownloadUrlForLayer`,
-> `ecr:GetAuthorizationToken`. Without the endpoints, Fargate cannot
-> authenticate to ECR; without the role, the pull returns 401/403.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## Configuration dependency graph
 
-```
-                       task definition
-                             │
-            ┌────────────────┼───────────────────┐
-            ▼                ▼                   ▼
-       taskRole        executionRole        containerDefinitions
-       (runtime        (ECS agent /         (image, cpu, memory,
-        AWS creds)     Fargate pulls          healthCheck, ports,
-                       image + writes         secrets, entryPoint)
-                       logs)
-                             │
-                             ▼
-              ┌──────────────┴───────────────┐
-              ▼                              ▼
-        ECR repo policy              CloudWatch Logs
-        (cross-account grants        (execution role needs
-        for the function account)    logs:CreateLogStream +
-                                     logs:PutLogEvents on the
-                                     log group)
-                             │
-                             ▼
-                       service
-                             │
-              ┌──────────────┼───────────────┐
-              ▼              ▼               ▼
-        launch type    capacity        network config
-        (Fargate /     provider        (awsvpc → ENI in
-         EC2)          strategy        subnet → needs free IP
-                        placement       + SG; bridge/none →
-                        constraints     host ENI)
-                             │
-                             ▼
-                       subnet / VPC
-                             │
-              ┌──────────────┼───────────────┐
-              ▼              ▼               ▼
-        free IP count   route table      VPC endpoints
-        (per /28 etc)   (NAT / IGW /    (ecr.api, ecr.dkr
-                         TGW)             interface + s3
-                                          gateway required for
-                                          private subnets)
-```
-
-Read top-down: a task failure is a broken edge or broken node in this
-graph. The diagnostic tree walks the graph from the symptom down.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) - load on demand (see References below).
 
 ## Mindset
 
@@ -210,38 +142,7 @@ container ever started.
 
 ### Step 0: Pre-flight — gather task and service state
 
-```bash
-# 1. Most recent stopped task for the service (highest-quality signal)
-aws ecs list-tasks --cluster <cluster> --service-name <service> \
-  --desired-status STOPPED --output json | \
-  jq -r '.taskArns[0]'
-
-# 2. Full describe-tasks for that task
-aws ecs describe-tasks --cluster <cluster> \
-  --tasks <task-arn> --output json | \
-  jq '.tasks[] | {stopCode, stoppedReason, stoppedAt, lastStatus,
-    launchType, platformVersion, platformFamily,
-    attachments: [.attachments[] | {type, status, details}],
-    containers: [.containers[] | {name, exitCode, reason, healthStatus,
-      lastStatus}]}'
-
-# 3. Service event log (last 30 events — placement, circuit breaker)
-aws ecs describe-services --cluster <cluster> \
-  --services <service> --output json | \
-  jq '.services[0].events[:30] | [.[] | {createdAt, message}]'
-
-# 4. Task definition (CPU, memory, roles, container defs, health checks)
-aws ecs describe-task-definition --task-definition <family:rev> \
-  --output json | jq '.taskDefinition'
-
-# 5. (EC2 launch type only) container instance state
-aws ecs describe-container-instances --cluster <cluster> \
-  --container-instances <ci-arn> --output json | \
-  jq '.containerInstances[] | {status, runningTasksCount,
-    remainingResources, registeredResources, attributes:
-    [.attributes[] | select(.name | startswith("ecs."))]}' \
-    2>/dev/null || echo "Fargate launch type — skip"
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 Short-circuit cases that mimic task failure:
 
@@ -267,14 +168,7 @@ driver`. On EC2 launch type with `awsvpc`, the instance has a per-
 instance ENI cap. Without trunking, a `c5.large` (2 ENIs) can run at
 most 1 `awsvpc` task — the second ENI is the host's primary interface.
 
-```bash
-aws ecs describe-container-instances --cluster <cluster> \
-  --container-instances <ci-arn> --output json | \
-  jq '.containerInstances[] | {
-    remaining: [.registeredResources[] | select(.name=="ENI")],
-    trunking: .attributes[]? | select(.name=="ecs.awsvpc-trunking")
-  }'
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 If `ecs.awsvpc-trunking` is absent or `"value": "disabled"`, and the
 instance has hit its ENI cap, **ROOT_CAUSE_IDENTIFIED** with
@@ -290,11 +184,7 @@ For `awsvpc` mode, each task consumes one primary private IP from its
 subnet. A `/28` subnet has 11 usable IPs; a burst of tasks can exhaust
 the pool. Fargate additionally reserves 1 IP per task for the ENI.
 
-```bash
-aws ec2 describe-subnets --subnet-ids <subnet-1> <subnet-2> \
-  --output json | jq '.Subnets[] | {SubnetId, CidrBlock,
-    AvailableIpAddressCount}'
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 `AvailableIpAddressCount < desiredCount + 2` (headroom for the ENI
 itself) is the failure. **ROOT_CAUSE_IDENTIFIED** with
@@ -313,14 +203,7 @@ The image exists but the execution role or ECR repo policy denies the
 pull. Symptom string contains `401`, `403`, `no basic auth credentials`,
 or `RequestError ... send request`.
 
-```bash
-# Execution role must include these actions
-aws iam simulate-principal-policy \
-  --policy-source-arn <execution-role-arn> \
-  --action-names ecr:BatchGetImage ecr:GetDownloadUrlForLayer \
-                 ecr:GetAuthorizationToken \
-  --output json --profile <p>
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 If `implicitDeny`, **ROOT_CAUSE_IDENTIFIED** with
 `ROOT_CAUSE: IMAGE_PULL_AUTH` and the offending side is the execution
@@ -329,10 +212,7 @@ actions inline.
 
 For cross-account images, also check the ECR repo policy:
 
-```bash
-aws ecr get-repository-policy --repository-name <repo> \
-  --registry-id <source-account> --output json --profile <p>
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 The policy must allow `ecr:BatchGetImage` + `ecr:GetDownloadUrlForLayer`
 for the task's execution role ARN (or its account). Same-account pulls
@@ -346,11 +226,7 @@ eventually times out. Symptom string contains `Client.Timeout`,
 `RequestError: ... dial tcp ... i/o timeout`, or
 `net/http: request canceled`.
 
-```bash
-aws ec2 describe-vpc-endpoints --filters Name=vpc-id,Values=<vpc-id> \
-  --output json | \
-  jq '.VpcEndpoints[] | {ServiceName, VpcEndpointType, State}'
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 Required endpoints for ECR from a private subnet:
 
@@ -369,11 +245,7 @@ A NAT Gateway is NOT sufficient for Fargate ECR auth.
 Symptom string contains `layer size exceeds` or the image is above the
 10 GB uncompressed cap. Confirm:
 
-```bash
-aws ecr describe-images --repository-name <repo> \
-  --image-ids imageTag=<tag> --output json | \
-  jq '.imageDetails[].imageSizeInBytes'
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 ECS / Fargate caps at 10 GB uncompressed. Above the cap, the pull
 fails deterministically. **ROOT_CAUSE_IDENTIFIED** with
@@ -387,13 +259,7 @@ Service event contains `was unable to place a task`,
 
 #### 3a: No matching container instance (EC2 launch type)
 
-```bash
-aws ecs describe-container-instances --cluster <cluster> \
-  --container-instances <ci-arns> --output json | \
-  jq '.containerInstances[] | {status, agentConnected,
-    remaining: [.remainingResources[] | {name, integerValue}],
-    registered: [.registeredResources[] | {name, integerValue}]}'
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 Common causes:
 
@@ -406,12 +272,7 @@ Common causes:
 
 #### 3b: Capacity provider failure (Fargate or EC2)
 
-```bash
-aws ecs describe-capacity-providers --capacity-providers <name> \
-  --output json | jq('.capacityProviders[] | {status,
-    autoScalingGroupProvider: .autoScalingGroupProvider?,
-    updateStatus}')
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 If `status: INACTIVE` or the ASG has zero instances, the provider
 cannot service the task. **ROOT_CAUSE_IDENTIFIED** with
@@ -435,19 +296,7 @@ the ASG, or update the service's `capacityProviderStrategy`.
 
 #### 4a: CPU / memory oversubscription (exit 137)
 
-```bash
-# Container-level memory limit vs actual usage
-aws ecs describe-tasks --cluster <cluster> --tasks <task-arn> \
-  --output json | jq('.tasks[].containers[] | {name, exitCode,
-    reason, memory, memoryReservation}')
-
-# Service-wide MemoryUtilization
-aws cloudwatch get-metric-statistics --namespace AWS/ECS \
-  --metric-name MemoryUtilization \
-  --dimensions Name=ClusterName,Value=<cluster> Name=ServiceName,Value=<service> \
-  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Maximum --output json
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 If the task's `memory` (hard limit) is below the container's resident
 set at peak, the OOM killer fires with exit 137. **ROOT_CAUSE_IDENTIFIED**
@@ -487,11 +336,7 @@ the ECS container health check fails. Service event:
 
 #### 6a: ECS container health check (in task definition)
 
-```bash
-aws ecs describe-task-definition --task-definition <family:rev> \
-  --output json | jq('.taskDefinition.containerDefinitions[] |
-    {name, healthCheck}')
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 The `healthCheck.command` runs inside the container; the exit code
 must be 0 for HEALTHY. Common failure: `CMD-SHELL` curl against a
@@ -500,12 +345,7 @@ for cold-start workloads.
 
 #### 6b: ALB target group health check
 
-```bash
-aws elbv2 describe-target-health --target-group-arn <tg-arn> \
-  --targets <target-list> --output json | \
-  jq('.TargetHealthDescriptions[] | {Target: .Target.Id,
-    Health: .TargetHealth)')
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 Common patterns:
 
@@ -541,13 +381,7 @@ Service recently changed `platformVersion` from a pinned version to
 `LATEST`, or AWS patched `LATEST`. Symptom: tasks that ran fine for
 weeks start failing with no config change.
 
-```bash
-aws ecs describe-services --cluster <cluster> \
-  --services <service> --output json | \
-  jq('.services[0] | {platformVersion, platformFamily,
-    deployments: [.deployments[] | {status, rolloutState,
-      platformVersion, runningCount})]')
-```
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) - load on demand (see References below).
 
 Confirm by pinning to the previous platform version and re-deploying.
 If the failure disappears, **ROOT_CAUSE_IDENTIFIED** with
@@ -557,18 +391,7 @@ for production.
 
 ### Step 9: Task definition validation errors
 
-`register-task-definition` or `run-task` returns
-`ClientException` / `InvalidParameterException`. Common patterns:
-
-| Error string | ROOT_CAUSE |
-|---|---|
-| `Container.instanceType is not compatible with cpu/memory` | Invalid Fargate CPU/memory combo |
-| `Invalid parameter at 'containerDefinitions[0].portMappings'` | Port conflict between containers |
-| `requiresCompatibilities lists FARGATE but networkMode is not awsvpc` | Network mode mismatch |
-| `Task role or execution role ARN is malformed or does not exist` | Role ARN invalid |
-
-**ROOT_CAUSE_IDENTIFIED** with `ROOT_CAUSE: CONFIG_DEFINITION_INVALID`.
-Fix: correct the offending field in the task definition.
+Moved verbatim to [references/error-handling.md](references/error-handling.md) - load on demand (see References below).
 
 ### Step 10: INSUFFICIENT_DATA — when to bail
 
@@ -628,23 +451,7 @@ CONFIRM: Before creating the endpoints, emit and await:
 
 ### Worked example — INSUFFICIENT_DATA
 
-```text
-TARGET: unknown
-VERDICT: INSUFFICIENT_DATA
-ROOT_CAUSE: UNKNOWN
-REASON: Input is "ECS task failing in prod" with no cluster, service,
-  task ARN, or symptom string; the category cannot be determined.
-EVIDENCE:
-  - Missing: cluster name or ARN
-  - Missing: service name or task ARN
-  - Missing: observed stoppedReason or service event string
-REMEDIATION:
-  1. Run aws ecs list-clusters and share the cluster ARN.
-  2. Run aws ecs list-tasks --cluster <c> --desired-status STOPPED and
-     share the most recent task ARN.
-  3. Run aws ecs describe-tasks --cluster <c> --tasks <arn> and share
-     the stoppedReason field.
-```
+Moved verbatim to [references/worked-examples.md](references/worked-examples.md) - load on demand (see References below).
 
 ## Pre-flight safety checks
 
@@ -666,21 +473,15 @@ REMEDIATION:
 
 ## Remediation guidance
 
-| ROOT_CAUSE | Specific fix |
-|---|---|
-| `RESOURCE_INIT_ENI` | Enable ENI trunking on supported EC2 instance types, OR migrate to Fargate. |
-| `RESOURCE_INIT_SUBNET_IP` | Create new wider subnets and update the service `networkConfiguration.awsvpcConfiguration.subnets`. Do NOT resize in-use subnets. |
-| `IMAGE_PULL_AUTH` | Attach `AmazonECSTaskExecutionRolePolicy` to the execution role; for cross-account, add a statement to the ECR repo policy granting the task's execution role ARN. |
-| `IMAGE_PULL_ENDPOINT` | Create the three required VPC endpoints (ecr.api, ecr.dkr interface + s3 gateway). Interface endpoints need a SG that allows inbound 443 from the task's SG. |
-| `IMAGE_PULL_SIZE` | Rebuild the image below 10 GB uncompressed (target < 1 GB for fast cold starts). |
-| `CAPACITY_PLACEMENT` | Add container instances or scale the capacity provider's ASG; confirm instance attributes match the task's `requiresCompatibilities`. |
-| `CAPACITY_DEREGISTERED` | Reconnect the ECS agent (`systemctl restart ecs`) or replace the instance via the ASG; check `/var/log/ecs/ecs-agent.log`. |
-| `CONFIG_TASK_ROLE` / `CONFIG_EXECUTION_ROLE` | Add the missing IAM permission via `iam put-role-policy` or attach a managed policy; verify with `simulate-principal-policy`. |
-| `HEALTH_CHECK` | Align `healthCheckPath` in the target group to the application's route; ensure the task's SG allows the ALB's SG on the container port. |
-| `OOM` | Raise `memory` (hard limit) in the container definition, or fix the memory leak in the application code. |
-| `PLATFORM_VERSION` | Pin `platformVersion` to the previous working version; avoid `LATEST` in production. |
-| `CIRCUIT_BREAKER` | Fold to the underlying category via Steps 1–6; the circuit breaker is never the actual root cause. |
-| `CONFIG_DEFINITION_INVALID` | Correct the offending field in the task definition; re-register via `aws ecs register-task-definition`. |
+Moved verbatim to [references/error-handling.md](references/error-handling.md) - load on demand (see References below).
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert heuristic and configuration dependency graph, moved verbatim from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — canonical per-category command scripts (pre-existing), extended with the Step 0 pre-flight listing and all per-step probe commands moved verbatim from SKILL.md
+- [references/error-handling.md](references/error-handling.md) — Step 9 task-definition validation error table and the ROOT_CAUSE remediation table, moved verbatim from SKILL.md
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked example (INSUFFICIENT_DATA block), moved verbatim from SKILL.md
+- [references/failure-decision-tree.md](references/failure-decision-tree.md) — pre-existing category deep-dives (A-G) with per-category worked examples
 
 ## Domain
 

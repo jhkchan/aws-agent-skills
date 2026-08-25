@@ -342,3 +342,176 @@ aws ecr describe-images --repository-name <repo> --image-ids imageTag=<new-tag>
 # For PVC fixes: watch PVC bind.
 kubectl get pvc <pvc> -n <ns> -w
 ```
+
+<!-- Moved verbatim from SKILL.md (eks-pod-troubleshooter) — progressive-disclosure restructure, lines 125-136 -->
+
+## Step 0 — locate the failing pod(s) when name/namespace is unknown
+
+```bash
+kubectl get pods -n <namespace> -o wide \
+  -o custom-columns=NAME:.metadata.name,NS:.metadata.namespace,\
+NODE:.spec.nodeName,STATUS:.status.phase,RESTARTS:.status.containerStatuses[0].restartCount,\
+REASON:.status.containerStatuses[0].state.waiting.reason
+
+# Find pods in a known-bad state across all namespaces:
+kubectl get pods -A --field-selector status.phase!=Running,status.phase!=Succeeded
+
+# Drill into a specific controller's pods (ReplicaSet backing a Deployment):
+kubectl get pods -n <namespace> -l app=<label> -o wide
+```
+
+<!-- Moved verbatim from SKILL.md (eks-pod-troubleshooter) — progressive-disclosure restructure, lines 174-198 -->
+
+## Step 2 — PENDING (FailedScheduling) commands
+
+**Diagnostic commands:**
+
+```bash
+# Capture the exact scheduler message:
+kubectl describe pod <pod> -n <ns> | grep -A 5 -i "Events\|FailedScheduling"
+
+# Or filter events directly:
+kubectl get events -n <ns> \
+  --field-selector involvedObject.name=<pod>,reason=FailedScheduling \
+  -o custom-columns=TIME:.lastTimestamp,MESSAGE:.message
+
+# Node capacity vs requests:
+kubectl describe nodes | grep -E "Name:|Allocated|cpu|memory|Conditions|Taints"
+
+# Compute pressure quickly:
+kubectl top nodes
+kubectl top pods -n <ns> --sort-by=cpu
+
+# Taint inventory:
+kubectl get nodes -o custom-columns=NAME:.metadata.name,TAINTS:.spec.taints,READY:.status.conditions[-1].type
+
+# PVC status (for volume-bound failures):
+kubectl get pvc -n <ns>
+kubectl describe pvc <pvc> -n <ns>
+```
+
+<!-- Moved verbatim from SKILL.md (eks-pod-troubleshooter) — progressive-disclosure restructure, lines 260-290 -->
+
+## Step 3 — IMAGE_PULL commands
+
+**Diagnostic commands:**
+
+```bash
+# Events with full message (the sub-string is the discriminator):
+kubectl describe pod <pod> -n <ns> | grep -A 2 "Failed to pull\|Failed.*image"
+
+# Find the node's instance identity (then map to an IAM role via the
+# EC2 console or describe-instances):
+kubectl get pod <pod> -n <ns> -o jsonpath='{.spec.nodeName}'
+NODE=$(kubectl get pod <pod> -n <ns> -o jsonpath='{.spec.nodeName}')
+INSTANCE_ID=$(kubectl get node "$NODE" -o jsonpath='{.spec.providerID}' | sed 's|.*/||')
+
+# Verify the image exists:
+aws ecr describe-images --repository-name <repo> --image-ids imageTag=<tag>
+
+# Verify the node instance role has ECR read perms (use the instance profile role):
+aws iam simulate-principal-policy \
+  --policy-source-arn arn:aws:iam::<account>:role/<node-instance-role> \
+  --action-names ecr:GetAuthorizationToken ecr:BatchCheckLayerAvailability \
+                  ecr:GetDownloadUrlForLayer ecr:BatchGetImage \
+  --resource-arns arn:aws:ecr:<region>:<account>:repository/<repo>
+
+# Verify VPC endpoints for ECR:
+aws ec2 describe-vpc-endpoints \
+  --filters Name=service-name,Values=com.amazonaws.<region>.ecr.api \
+                     com.amazonaws.<region>.ecr.dkr \
+  --query 'VpcEndpoints[*].{id:VpcEndpointId,service:ServiceName,state:State,subnets:SubnetIds}'
+
+# Verify the repo policy (cross-account):
+aws ecr get-repository-policy --repository-name <repo>
+```
+
+<!-- Moved verbatim from SKILL.md (eks-pod-troubleshooter) — progressive-disclosure restructure, lines 325-344 -->
+
+## Step 4 — CRASH_LOOP commands
+
+**Diagnostic command:**
+
+```bash
+# The current container just started; the logs that explain the crash
+# are in the PREVIOUS instance:
+kubectl logs <pod> -n <ns> --previous
+# For a specific container (when the pod has multiple):
+kubectl logs <pod> -n <ns> -c <container> --previous
+
+# Describe the pod to read lastState (exit code, reason, finishedAt):
+kubectl describe pod <pod> -n <ns> | grep -A 8 "Last State\|State:"
+# Or get lastState as JSON for precise parsing:
+kubectl get pod <pod> -n <ns> -o jsonpath='{.status.containerStatuses[*].lastState}'
+
+# Events timeline (filter by this pod):
+kubectl get events -n <ns> \
+  --field-selector involvedObject.name=<pod> \
+  --sort-by='.lastTimestamp' \
+  -o custom-columns=TIME:.lastTimestamp,REASON:.reason,MESSAGE:.message
+```
+
+<!-- Moved verbatim from SKILL.md (eks-pod-troubleshooter) — progressive-disclosure restructure, lines 401-417 -->
+
+## Step 5 — OOM commands
+
+**Diagnostic commands:**
+
+```bash
+# Read the OOM signal from lastState:
+kubectl get pod <pod> -n <ns> -o jsonpath='{.status.containerStatuses[*].lastState}'
+# Expect: {"terminated":{"reason":"OOMKilled","exitCode":137,...}}
+
+# Pod memory usage right before death (if metrics-server is installed):
+kubectl top pod <pod> -n <ns>
+kubectl top pod <pod> -n <ns> --containers
+
+# Node-level pressure:
+kubectl describe node <node> | grep -A 5 "Allocated\|MemoryPressure"
+
+# Read the pod's memory spec:
+kubectl get pod <pod> -n <ns> -o jsonpath='{.spec.containers[*].name}{"\n"}{.spec.containers[*].resources}'
+```
+
+<!-- Moved verbatim from SKILL.md (eks-pod-troubleshooter) — progressive-disclosure restructure, lines 474-492 -->
+
+## Step 6 — PROBE_FAILURE commands
+
+**Diagnostic commands:**
+
+```bash
+# Read both probes + container ports in one shot:
+kubectl get pod <pod> -n <ns> -o yaml | grep -A 15 "livenessProbe\|readinessProbe\|startupProbe"
+kubectl get pod <pod> -n <ns> -o jsonpath='{.spec.containers[*].{name:name,ports:ports,liveness:livenessProbe,readiness:readinessProbe,startup:startupProbe}}'
+
+# Filter probe events:
+kubectl get events -n <ns> --field-selector involvedObject.name=<pod> \
+  | grep -E "probe failed|Killing|Unhealthy"
+
+# Reproduce the probe from inside the pod:
+kubectl exec -n <ns> <pod> -c <container> -- curl -i \
+  http://localhost:<port><path>
+
+# Service endpoint membership (readiness gate):
+kubectl describe endpoints <svc> -n <ns>
+kubectl get endpointslices -n <ns> -o wide
+```
+
+<!-- Moved verbatim from SKILL.md (eks-pod-troubleshooter) — progressive-disclosure restructure, lines 543-555 -->
+
+## Step 7 — INIT_FAILURE commands
+
+**Diagnostic commands:**
+
+```bash
+# List init containers and their status:
+kubectl get pod <pod> -n <ns> \
+  -o jsonpath='{range .status.initContainerStatuses[*]}{.name}{"  "}{.state}{"\n"}{end}'
+
+# Read the failing init container's previous logs:
+kubectl logs <pod> -n <ns> -c <init-container-name> --previous
+
+# Watch live progress if the init container is slow but not failing:
+kubectl logs <pod> -n <ns> -c <init-container-name> -f
+```
+

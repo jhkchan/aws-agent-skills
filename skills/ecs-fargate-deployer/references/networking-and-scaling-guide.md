@@ -394,3 +394,39 @@ aws logs put-retention-policy --log-group-name /ecs/<service> --retention-in-day
 aws ecs describe-services --cluster <cluster> --services <service> \
   --output json > /tmp/<service>-backup.json
 ```
+
+---
+
+## Expert heuristic — choosing CPU, memory, and AZ spread (moved from SKILL.md)
+
+- **60/70 rule:** CPU target tracking at 60% for latency-sensitive, 70%
+  for batch. Scale-out takes ~60-90s on Fargate.
+- **Memory: 2x the working set.** JVM app with 2 GB heap needs >= 4 GB.
+  Set `-XX:MaxRAMPercentage=75`.
+- **AZ spread:** minimum 2 AZs for HA, 3 for user-facing. Pair with
+  `desiredCount >= AZ count`.
+- **Fargate Spot blend:** `base=2` on FARGATE + FARGATE_SPOT weight 1-3
+  for burst. NEVER put stateful workloads on Spot.
+- **ALB vs. NLB:** ALB for HTTP/HTTPS, NLB for TCP/TLS. Target type must
+  be `ip` either way.
+
+---
+
+## Edge-case handling — quick list (moved from SKILL.md)
+
+- **Cross-account ECR pull:** execution role needs `ecr:BatchGetImage` on
+  the cross-account repo AND the repo policy in the other account must
+  grant your root.
+- **ECS Exec in production:** `enableExecuteCommand=true` allows shell
+  access. Bypasses bastion auditing. Enable only for break-glass.
+- **ALB vs. container health check divergence:** if ALB passes but
+  container check fails, ECS marks task unhealthy while ALB keeps sending
+  traffic. Align both checks.
+- **Slow-start JVM tasks:** set `healthCheck.startPeriod=60` and
+  `unhealthyThresholdCount=3` to avoid spurious rollback.
+- **Spot interruption drain:** Fargate Spot sends 2-min warning + SIGTERM.
+  Set `stopTimeout=30` for graceful shutdown.
+- **Capacity provider vs. launch type:** once a service uses a
+  capacity-provider strategy, you cannot switch back without recreating.
+- **Service Connect / Cloud Map:** namespace must exist before service
+  creation for service-to-service discovery.

@@ -62,126 +62,8 @@ inverse of firewall "default deny" reasoning: a restrictive rule does NOT
 narrow an already-open rule on the same SG.
 
 ## AWS dataplane expert details (Mindset — non-obvious AWS behavior)
-
-These AWS-specific behaviors are NOT in the port registry but routinely
-trip up audits. Internalize them before emitting any verdict.
-
-### Rule evaluation is UNION, not first-match
-
-AWS security groups do NOT use first-match priority. Every inbound allow
-rule is independently evaluated against the packet; the **union** of all
-allow rules is the effective permission. There is no "deny" rule in SGs
-— denies live in Network ACLs, which ARE stateless and ordered. Practical
-consequence: adding a tighter rule on the same port+source does NOT
-override an existing `0.0.0.0/0` rule — you must REMOVE the broader
-rule. This is precisely why the procedure aggregates to the WORST
-per-rule verdict, not the "best" or "most specific."
-
-### Stateful conntrack has a per-ENI ceiling
-
-Return traffic for an allowed outbound flow is auto-permitted via
-connection tracking. Each ENI's conntrack table is sized by instance
-type (see EC2 network performance specs — r5n.16xlarge ~600k entries,
-t3.micro far less). Under sustained high packets-per-second the table
-can exhaust, at which point AWS falls back to strict-flow pinning and
-some established flows may drop. This is NOT a reason to add inbound
-ephemeral rules — the SG is still stateful. It IS a reason to monitor
-`conntrack_allowance_exceeded` in CloudWatch `etwpm`.
-
-### Source field has four distinct shapes in the API
-
-`DescribeSecurityGroups` returns sources in four separate arrays:
-`IpRanges` (IPv4), `Ipv6Ranges` (IPv6), `UserIdGroupPairs` (SG refs),
-`PrefixListIds` (managed prefix lists). A naive auditor that only
-checks `IpRanges` will miss IPv6 exposure, SG-ref cycles, and
-prefix-list drift. Iterate ALL FOUR arrays every time. The
-classification table treats them uniformly; the API does not.
-
-### Quotas that change the audit posture
-
-- `sg-rules-per-sg` quota: default 60 inbound + 60 outbound rules per
-  SG (raisable). An SG near the limit is itself a smell — rule sprawl
-  obscures the real posture and slows dataplane propagation.
-- `SGs-per-ENI` quota: default 5. Effective permission across 5 SGs
-  is the union of up to 300 inbound rules per interface.
-- The VPC default SG **cannot be deleted** — only its rules can. CIS
-  5.4 specifically targets leaving it open. Always include the default
-  SG in scope even when "unused"; AWS re-attaches it to new ENIs in
-  some launch paths.
-
-### VPC peering, RAM sharing, and cross-VPC SG references
-
-- SG IDs are **region-scoped** and CANNOT be referenced from another
-  VPC, even over a peering connection. Cross-VPC rules must use CIDRs
-  — which means there is no SG-ref guardrail on the peer side.
-- Over peering, the peer VPC's effective posture depends on rules YOU
-  cannot see. Flag any peered-CIDR source as "external-trust" and
-  require periodic re-validation.
-- In AWS RAM shared subnets, participant accounts can create SGs in
-  the shared VPC. The owner account's audit MUST enumerate SGs across
-  all participants (`--owner self` filter excludes them — drop it).
-
-### Prefix-list versioning and drift
-
-Every modification to a managed prefix list bumps `Version`. Use
-`--version <current>` for optimistic locking. For periodic re-audit,
-store the version observed at last review and compare; if `Version`
-advanced without a corresponding change ticket, the list has drifted.
-AWS-managed lists (e.g., CloudFront `pl-xxxxxxxx` for global edge IPs)
-rotate entries as POPs are added — treat their classification as
-"valid as of timestamp T", not timeless.
-
-### AWS Config + Security Hub control IDs
-
-Map findings to the downstream tooling auditors actually run — they
-will find the finding in Security Hub before they read your report:
-
-| Finding | AWS Config managed rule | Security Hub control |
-| --- | --- | --- |
-| SSH (22) from `0.0.0.0/0` | `restricted-common-ports` | **EC2.2** |
-| RDP (3389) from `0.0.0.0/0` | `restricted-common-ports` | **EC2.18** |
-| SG not attached to any ENI | `ec2-security-group-attached-to-eni` | EC2.4 |
-| Default SG allows any traffic | — | **EC2.19** (CIS 5.4) |
-| Any other port from `0.0.0.0/0` | `vpc-sg-open-only-to-authorized-ports` | — |
-| Public launch + open SG combined | — | **EC2.15** |
-
-Cite BOTH the CIS control AND the Security Hub control ID in the
-REMEDIATION field — the remediation owner usually triages via
-Security Hub.
-
-### Reachability Analyzer confirms the actual path
-
-For borderline cases ("is the SG reachable through a TGW or peering
-route?"), use VPC Reachability Analyzer — it evaluates SG + route
-table + peering together, while the SG rule alone does not guarantee
-a reachable path:
-
-```
-aws ec2 create-network-insights-path \
-  --source <source-eni> --destination <ip> \
-  --protocol tcp --destination-port <port>
-aws ec2 start-network-insights-analysis \
-  --network-insights-path-id <path-id>
-```
-
-Use it to CONFIRM OPEN verdicts that depend on a specific ingress
-path, and to REFUTE RESTRICTED claims when a transit gateway makes
-the SG effectively reachable from an unexpected CIDR.
-
-### Effective enumeration queries
-
-The single most useful query for scoping an audit — find every SG in
-the region that allows a given CIDR (the `ip-permission.cidr` filter
-matches on substring, so use the exact value):
-
-```
-aws ec2 describe-security-groups \
-  --filters Name=ip-permission.cidr,Values=0.0.0.0/0 \
-            Name=ip-permission.from-port,Values=22 \
-  --query 'SecurityGroups[*].[GroupId,GroupName,VpcId]' --output table
-```
-
-For IPv6 exposure, repeat with `Name=ip-permission.ipv6-ranges.cidr,Values=::/0`.
+Full AWS dataplane expert details moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Classification logic (Process — per-rule evaluation, worst-case aggregation)
 
@@ -260,43 +142,8 @@ high-risk registry (§"High-risk port registry"). Examples:
 - **All-ports range:** SG has `0-65535 TCP 0.0.0.0/0`. Range intersects
   the entire high-risk registry → **OPEN**. Do NOT treat `0-65535` as a
   single non-critical port.
-
-- **Database on private CIDR:** SG has `3306 TCP 10.0.0.0/8`. Source is
-  RESTRICTED → **RESTRICTED**. Port 3306 is critical ONLY when combined
-  with a PUBLIC source.
-
-- **Prefix-list source:** SG has `443 TCP pl-58a543d6` (CloudFront).
-  Entries are public AWS edge IPs, but CloudFront is a trusted CDN →
-  **PUBLIC_NONCRITICAL** (not OPEN).
-
-- **IPv6 dual-stack (the most-missed exposure):** SG has `22 TCP ::/0`
-  with NO IPv4 rule. The model output may look "closed" if the auditor
-  only inspects `IpRanges`. `::/0` is PUBLIC, AWS IPv6 addresses are
-  globally routable by default, and 22 is CRITICAL → **OPEN**. Always
-  iterate BOTH `IpRanges` and `Ipv6Ranges` arrays. A "locked-down on
-  IPv4" SG that is wide-open on IPv6 is a common Shadowserver finding.
-
-- **Overlapping CIDR sources (union semantics):** SG has `22 TCP
-  0.0.0.0/0` AND `22 TCP 10.0.0.0/8` on the same port. AWS evaluates
-  each rule independently — there is no first-match and no deny in
-  SGs. The broader `0.0.0.0/0` rule is the effective exposure.
-  Per-rule verdicts: OPEN + RESTRICTED → aggregate **OPEN**. Add a
-  cleanup note: the `10.0.0.0/8` rule is redundant and obscures
-  posture — REMOVE it, do not "narrow" it.
-
-- **Split-horizon evasion:** SG has `443 TCP 0.0.0.0/1` AND
-  `443 TCP 128.0.0.0/1`. Neither rule literally equals `0.0.0.0/0`,
-  but their union covers the entire IPv4 space. Both are PUBLIC, port
-  443 is NON_CRITICAL → **PUBLIC_NONCRITICAL**. This pattern evades
-  naive `grep "0.0.0.0/0"` audits; always union complementary halves
-  (`/1` pairs, `/2` quads) before classifying.
-
-- **Prefix-list drift between audits:** At review T0, `pl-abcd1234`
-  contained only RFC 1918 CIDRs → RESTRICTED. At review T1, the list
-  owner added `0.0.0.0/0` to debug a vendor issue. The SG rule itself
-  did not change, but the effective verdict flipped to OPEN. Re-fetch
-  prefix-list entries on EVERY review cycle; compare `Version` to the
-  last-audited value. Drift without a change ticket is itself a finding.
+Secondary worked examples moved to
+[references/worked-examples.md](references/worked-examples.md).
 
 ## Risk scoring and compliance mapping
 
@@ -600,10 +447,8 @@ For **RESTRICTED** security groups:
 - Recommend enabling VPC Flow Logs for ongoing auditing.
 
 ## Recent AWS features (2024-2026)
-
-- **Security group VPC associations (2024):** Security groups can now be associated with specific VPCs, and VPC-scoped security groups can be shared across accounts via RAM. Auditors should verify that cross-account shared security groups do not inadvertently grant inbound exposure to unexpected principals.
-- **VPC Lattice security policy integration (2024-2025):** VPC Lattice uses its own authorization model but interacts with security groups. Auditors should note that Lattice-managed traffic may not appear in standard security group rule evaluation — verify that Lattice target groups have appropriate authorization policies.
-- **Prefix list improvements (2024):** Managed prefix lists now support more entries and customer-managed prefix lists can be shared across accounts. Auditors should verify that shared prefix lists are governed — a compromised prefix list can silently widen security group ingress.
+Recent AWS features notes moved to
+[references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Section taxonomy (CloudOps auditor pattern)
 
@@ -629,6 +474,13 @@ structure is machine-recognizable and aids comprehension:
 12. **Output format** `[Tool]` — per-SG report shape.
 13. **Pre-flight safety checks** `[Process]` — non-destructive guards.
 14. **Remediation guidance** `[Tool]` — per-verdict action plan.
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — AWS dataplane expert details (union evaluation, conntrack ceiling, four source arrays, quotas, peering/RAM, prefix-list drift, Config/Security Hub controls, Reachability Analyzer) and recent AWS features (moved from this file)
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — effective enumeration queries for scoping an audit (moved from this file)
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples: private-CIDR database, prefix-list source, IPv6 dual-stack, overlapping CIDRs, split-horizon evasion, prefix-list drift (moved from this file)
+- [references/security-group-exposure-guide.md](references/security-group-exposure-guide.md) — high-risk port registry, CIDR/source classification, remediation patterns
 
 ## Domain
 

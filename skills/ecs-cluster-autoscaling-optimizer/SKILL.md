@@ -65,52 +65,13 @@ recommendation with exact CLI commands.
 
 ## Quick start
 
-- **Managed EC2 capacity provider auto-scaling replaces Cluster Autoscaler.**
-  The legacy `cluster-autoscaler` project (or its K8s equivalent for
-  ECS) is obsolete for native ECS. The managed capacity provider has
-  built-in target tracking on `CapacityProviderReservation` and handles
-  scale-out AND scale-in natively. Migrate if still on the legacy path.
-- **Spot base + on-demand burst is the cost-optimal pattern.** Set
-  `base = 2` on the on-demand provider (steady-state floor), `weight =
-  1` on spot (fills burst capacity at 70% discount). This avoids
-  spot-only risk while capturing the majority of the savings.
-- **Binpack placement maximizes utilization.** The default `spread`
-  strategy places one task per host, wasting 60-80% of host capacity.
-  Switch to `binpack` (by `memory` or `cpu`) to pack tasks densely and
-  reduce the host count.
-- **Scale-in cooldown 300 s is too long for spiky workloads.** Default
-  is 300 s; for microservices with bursty traffic, 60-120 s prevents
-  stranded hosts from lingering after the burst ends.
-- **Empty hosts are pure waste.** A container instance with 0 running
-  tasks costs the full EC2 rate. Detect with
-  `describe-container-instances` and eliminate via scale-in or binpack
-  placement.
+Quick-start headline rules moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for the five headline rules (managed scaling, spot base + burst, binpack, cooldown, empty hosts).
 
 ## Mindset
 
-ECS cluster autoscaling optimization is a utilization-and-cost decision.
-The goal is the capacity provider configuration and placement strategy
-that maximizes host utilization (binpack) while preserving availability
-(on-demand base for steady state + spot for burst) — not the absolute
-minimum instances that run tasks.
-
-Four principles guide every recommendation:
-
-- **Managed scaling adapts; Cluster Autoscaler does not.** The managed
-  capacity provider observes `CapacityProviderReservation` and scales
-  natively. The legacy Cluster Autoscaler is a separate controller with
-  known lag, race conditions, and extra operational overhead.
-- **Spot base + on-demand burst is the cost-optimal hybrid.** Pure
-  on-demand pays full price; pure spot risks availability. The `base`
-  parameter on on-demand ensures a steady-state floor; spot `weight`
-  captures burst capacity at a discount.
-- **Binpack placement maximizes utilization.** The default `spread`
-  strategy wastes host capacity by distributing tasks one-per-host.
-  `binpack` packs tasks densely, reducing the total host count.
-- **Scale-in cooldown controls cost during traffic dips.** A long
-  cooldown (300 s default) keeps stranded hosts alive after a burst
-  ends. A shorter cooldown (60-120 s) for microservices eliminates
-  waste faster.
+Mindset prose and the four guiding principles moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when framing a recommendation (managed vs legacy scaling, hybrid spot pattern, binpack, cooldown control).
 
 ## Quick reference — verdict thresholds
 
@@ -135,16 +96,8 @@ these metrics before any recommendation. Full CLI sequences are in
 `references/ecs-autoscaling-configuration-and-pricing.md`.
 
 **Required data sources** (summarized — see reference for full CLI):
-1. Cluster configuration: `aws ecs describe-clusters` (include
-   `ATTACHMENTS` for capacity provider info)
-2. Services: `aws ecs describe-services` (desired/running/pending counts)
-3. Capacity providers: `aws ecs describe-capacity-providers`
-4. Container instances: `aws ecs describe-container-instances` (CPU and
-   memory remaining per instance)
-5. Scaling policies: `aws application-autoscaling describe-scaling-policies`
-6. CloudWatch: CPUUtilization, MemoryUtilization, RunningTaskCount,
-   DesiredTaskCount, CapacityProviderReservation
-7. EC2 instances: `aws ec2 describe-instances` (for host type and age)
+Required data-source listing moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when pulling cluster, service, capacity-provider, container-instance, scaling-policy, CloudWatch, and EC2 data.
 
 ### Data-quality short-circuits
 
@@ -167,57 +120,13 @@ state; CloudWatch wins for trend analysis.
 These operational gotchas route a recommendation away from the obvious
 choice:
 
-- **`base` on a capacity provider is the steady-state floor.** Set `base`
-  on the on-demand provider to guarantee a minimum number of tasks on
-  on-demand regardless of spot availability.
-- **`weight` controls the distribution ratio.** For every N tasks, the
-  ratio is `weight`-proportional across providers. For cost-optimization:
-  on-demand weight = 1, spot weight = 4 (with on-demand base = 2).
-- **Managed scaling uses CapacityProviderReservation.** The managed
-  capacity provider reports its own CloudWatch metric for target
-  tracking, distinct from service-level ECSServiceAverageCPUUtilization.
-- **Scale-in has two cooldowns: policy-level and capacity-provider-level.**
-  The policy `CooldownSeconds` defaults to 300. The
-  `instanceWarmupPeriod` controls how fast new instances register.
-- **Spread strategy is the default but wastes hosts.** `spread` by
-  `host` leaves 60-80% of host capacity unused. Switch to `binpack`.
-- **Binpack by memory vs CPU depends on the bottleneck resource.**
-  Memory-heavy (JVM, ML) → binpack by `memory`. CPU-heavy → by `cpu`.
-- **Drain lifecycle: DRAINING to DEPROVISIONING.** When scale-in targets
-  an instance, ECS moves it to `DRAINING`, reschedules tasks, then
-  `DEPROVISIONING` terminates it. Takes 60-300 s depending on shutdown.
-- **EC2 instance warm-up adds 60-120 seconds.** Boot, ECS agent
-  registration, and health checks before tasks can be placed.
-- **Fargate has no capacity provider to tune.** Tasks are serverless.
-  Only optimization is CPU/memory right-sizing at the task level.
-- **Spot instance interruption gives 2-minute warning.** Tasks must
-  drain within that window or they are force-terminated.
-- **Desired count != running count means tasks are failing to place.**
-  Sustained gap = cluster lacks capacity. This is a scale-out signal.
+Step 0 non-obvious behaviours moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when a recommendation depends on a non-obvious behaviour (base/weight semantics, CapacityProviderReservation, dual cooldowns, drain lifecycle, warm-up, 2-minute spot notice).
 
 ### Step 1: Capacity provider strategy — spot vs on-demand
 
-The capacity provider strategy controls how tasks distribute across
-on-demand and spot capacity. The cost-optimal pattern is on-demand base
-for steady state + spot weight for burst.
-
-**Capacity provider strategy parameters:**
-```json
-{
-  "capacityProviderStrategy": [
-    {
-      "capacityProvider": "on-demand-cp",
-      "weight": 1,
-      "base": 2
-    },
-    {
-      "capacityProvider": "spot-cp",
-      "weight": 4,
-      "base": 0
-    }
-  ]
-}
-```
+Step 1 prose and the capacity provider strategy JSON moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when authoring a spot + on-demand capacity provider strategy.
 
 **Decision gate:**
 
@@ -228,42 +137,19 @@ for steady state + spot weight for burst.
 | Pure spot, no on-demand base | Any workload with availability SLO | **FURTHER_OPTIMIZATION_AVAILABLE** | Add on-demand base=2 for steady-state floor |
 | On-demand base + spot weight already | Optimal hybrid | No CP finding | Proceed to other dimensions |
 
-**Create a spot capacity provider:**
-```bash
-aws ecs create-capacity-provider \
-  --name spot-cp \
-  --auto-scaling-group-provider autoScalingGroupArn=<asg-arn>,managed-scaling.status=ENABLED,managed-scaling.target-capacity=100
-```
+Create-spot-capacity-provider CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when applying the Step 1 recommendation.
 
 ### Step 2: Managed scaling vs Cluster Autoscaler
 
-The legacy Cluster Autoscaler (a standalone controller) is obsolete for
-native ECS. The managed EC2 capacity provider has built-in target
-tracking on `CapacityProviderReservation` and handles scale-out and
-scale-in natively.
-
-**Detection:**
-```bash
-aws ecs describe-capacity-providers --capacity-providers <cp-name> \
-  --query 'capacityProviders[0].autoScalingGroupProvider.managedScaling' \
-  --output json
-```
+Step 2 prose and the describe-capacity-providers detection CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand for the Cluster Autoscaler to managed scaling migration.
 
 If `managedScaling.status = DISABLED` or the cluster uses a standalone
 `cluster-autoscaler` deployment, migrate to managed scaling.
 
-**Enable managed scaling:**
-```bash
-aws ecs put-cluster-capacity-providers \
-  --cluster <cluster-name> \
-  --capacity-providers <cp-name> \
-  --default-capacity-provider-strategy capacityProvider=<cp-name>,weight=1,base=1
-
-# Update the capacity provider with managed scaling
-aws ecs update-capacity-provider \
-  --name <cp-name> \
-  --auto-scaling-group-provider managedScaling.status=ENABLED,managedScaling.targetCapacity=100,managedScaling.minimumScalingStepSize=1,managedScaling.maximumScalingStepSize=100
-```
+Enable-managed-scaling CLI (put-cluster-capacity-providers + update-capacity-provider) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when applying the managed scaling migration.
 
 ### Step 3: Target tracking metric selection
 
@@ -300,45 +186,15 @@ workloads, 300 s leaves stranded hosts alive too long.
 | Spiky (CV > 0.5) | 60-120 s | Fast scale-in eliminates waste quickly |
 | Predictable (business hours) | 300 s + scheduled scaling | Scheduled handles the pattern |
 
-**Tune the cooldown:**
-```bash
-aws application-autoscaling put-scaling-policy \
-  --policy-name ecs-service-cpu-scaling \
-  --policy-type TargetTrackingScaling \
-  --resource-id service/<cluster>/<service> \
-  --scalable-dimension ecs:service:DesiredCount \
-  --service-namespace ecs \
-  --target-tracking-scaling-policy-configuration \
-    TargetValue=60.0,PredefinedMetricSpecification={PredefinedMetricType=ECSServiceAverageCPUUtilization},ScaleOutCooldown=60,ScaleInCooldown=120
-```
+Cooldown tuning CLI (application-autoscaling put-scaling-policy) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when applying a scale-in cooldown change.
 
 ### Step 5: Bin-packing efficiency (empty host detection)
 
 Empty or under-utilized hosts are the primary source of ECS waste.
 
-**Detection:**
-```bash
-aws ecs describe-container-instances \
-  --cluster <cluster> \
-  --container-instances <instance-arns> \
-  --query 'containerInstances[].{id:ec2InstanceId,cpu:remainingResources[?name==`CPU`].integerValue|[0],memory:remainingResources[?name==`MEMORY`].integerValue|[0],running:runningTasksCount}' \
-  --output table
-```
-
-**Empty host ratio:**
-```
-empty_hosts = count(instances where runningTasksCount == 0)
-empty_ratio = empty_hosts / total_instances
-```
-
-If `empty_ratio > 10%`, the cluster has stranded capacity.
-
-**Resolution:**
-1. Switch placement strategy from `spread` to `binpack` (Step 10).
-2. Verify the managed capacity provider scale-in is firing (check
-   CloudWatch `CapacityProviderReservation`).
-3. If scale-in is not firing, check the ASG `MinSize` — it may be set
-   above the actual need.
+Step 5 empty-host detection CLI, ratio math, and resolution steps moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when quantifying and eliminating stranded capacity.
 
 ### Step 6: Fargate capacity provider (no capacity planning)
 
@@ -369,12 +225,8 @@ ECS waits before considering a new instance available for task placement.
 | Custom AMI with userData scripts | 60-120 s |
 | Bottlerocket | 15-30 s |
 
-**Tune warm-up:**
-```bash
-aws ecs update-capacity-provider \
-  --name <cp-name> \
-  --auto-scaling-group-provider managedScaling.status=ENABLED,instanceWarmupPeriod=60
-```
+Warm-up tuning CLI (update-capacity-provider instanceWarmupPeriod) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when adjusting EC2 instance warm-up.
 
 ### Step 8: Drain instance lifecycle (DRAINING to DEPROVISIONING)
 
@@ -382,35 +234,16 @@ When the managed capacity provider scales in, instances go through
 `DRAINING` before `DEPROVISIONING`. During `DRAINING`, ECS reschedules
 tasks to other instances.
 
-**Monitoring drain time:**
-```bash
-aws ecs describe-container-instances \
-  --cluster <cluster> \
-  --container-instances <arns> \
-  --query 'containerInstances[].{id:ec2InstanceId,status:status,running:runningTasksCount}' \
-  --output table
-```
-
-If drain time exceeds 300 s:
-1. Check task `StopTimeout` (default 30 s — increase if graceful
-   shutdown needs more time).
-2. Check for tasks with long-running connections (DB sessions, file
-   transfers) that resist rescheduling.
-3. Consider connection draining at the ALB level (`deregistration_delay`).
+Step 8 drain monitoring CLI and drain-time resolution steps moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when drain time exceeds 300 s.
 
 ### Step 9: Desired count vs running count gap analysis
 
 If `runningTasksCount < desiredCount` sustained, tasks cannot be placed.
 This is a capacity signal, not a configuration tuning issue.
 
-**Detection:**
-```bash
-aws ecs describe-services \
-  --cluster <cluster> \
-  --services <service-name> \
-  --query 'services[0].{desired:desiredCount,running:runningCount,pending:pendingCount}' \
-  --output json
-```
+Step 9 desired-vs-running gap detection CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when diagnosing stuck or pending tasks.
 
 | Observation | Diagnosis |
 |---|---|
@@ -430,16 +263,8 @@ The placement strategy controls how ECS distributes tasks across hosts.
 | `binpack` (by cpu) | Pack tasks densely by CPU | Cost optimization |
 | `random` | No strategy | Not recommended for production |
 
-**Switch to binpack:**
-```bash
-aws ecs update-service \
-  --cluster <cluster> \
-  --service <service> \
-  --placement-strategy type=binpack,field=memory type=spread,field=attribute:ecs.availability-zone
-```
-
-This strategy: binpack by memory first, then spread across AZs for
-availability.
+Switch-to-binpack CLI (update-service placement-strategy) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when applying the Step 10 recommendation.
 
 ### Step 11: Service auto-scaling vs scheduled scaling
 
@@ -454,34 +279,13 @@ scaling eliminates the reaction-time lag of target tracking.
 | Predictable (business hours, nightly batch) | Scheduled scaling + target tracking |
 | Seasonal (holiday peaks) | Scheduled scaling for known peaks |
 
-**Scheduled scaling:**
-```bash
-aws application-autoscaling put-scheduled-action \
-  --service-namespace ecs \
-  --resource-id service/<cluster>/<service> \
-  --scalable-dimension ecs:service:DesiredCount \
-  --scheduled-action-name business-hours-scale-up \
-  --schedule "cron(0 9 ? * MON-FRI *)" \
-  --scalable-target-action MinCapacity=10,MaxCapacity=50
-```
+Scheduled scaling CLI (put-scheduled-action) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand for predictable business-hours or nightly batch workloads.
 
 ### Step 12: Impact estimation
 
-Compute the utilization improvement for each recommendation:
-
-```
-current_host_count = describe-container-instances count
-current_avg_utilization = avg(CPUUtilization or MemoryUtilization)
-projected_host_count = current_host_count × (current_avg_utilization / target_utilization)
-host_savings = current_host_count - projected_host_count
-monthly_savings = host_savings × 730 hours × $/hour
-
-# For spot migration:
-spot_savings = on_demand_hours_converted × 730 × (on_demand_rate - spot_rate)
-```
-
-Always state assumptions: target utilization, spot discount rate (70%
-typical), node type, and region.
+Impact estimation formula and assumptions moved verbatim to [references/ecs-autoscaling-configuration-and-pricing.md](references/ecs-autoscaling-configuration-and-pricing.md).
+Load on demand when computing host reduction and monthly savings.
 
 ### Step 13: Final verdict
 
@@ -661,47 +465,13 @@ Extended anti-patterns in `references/worked-examples-and-edge-cases.md`.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation,
-  emit and await operator approval. Do NOT execute until confirmed.
-- **Drain instances before terminating.** Never force-terminate a
-  container instance with running tasks. Set to `DRAINING` and wait.
-- **Capacity provider changes apply to new tasks.** Existing tasks
-  continue on their current placement until rescheduled.
-- **Placement strategy changes are immediate.** New tasks use the new
-  strategy; existing tasks are NOT automatically rescheduled.
-- **Spot capacity provider requires a matching ASG.** The spot ASG must
-  use a spot-percentage-based launch template.
-- **Managed scaling conflicts with external auto-scalers.** Disable the
-  legacy Cluster Autoscaler before enabling managed scaling on the same
-  ASG. Running both causes race conditions.
-- **Scale-in cooldown changes apply immediately.** A shorter cooldown
-  may cause rapid scale-in during a traffic dip — verify tolerance.
-- **Fargate tasks cannot use host networking or privileged mode.**
-  Verify task definition compatibility before recommending Fargate.
-- **Binpack placement concentrates risk.** Always pair with AZ spread.
-- **Bulk-operation limit:** Process at most 3 clusters per batch. Sort
-  by estimated savings, verify each batch first.
+Pre-flight safety checks (CONFIRMATION GATE, drain rules, capacity-provider caveats, batch limits) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before executing any state-changing optimization CLI.
 
 ## Recent AWS features (2024-2026)
 
-- **Managed EC2 capacity provider auto-scaling (GA 2024):** Native ECS
-  managed scaling on `CapacityProviderReservation`. Replaces the legacy
-  Cluster Autoscaler for ECS.
-- **Capacity provider weight and base refinement (2024-2025):** `base`
-  on on-demand guarantees a minimum task floor; `weight` controls the
-  distribution ratio across providers.
-- **Fargate capacity up to 16 vCPU / 120 GB (2024):** Expanded task
-  size limits for larger workloads.
-- **ECS Service Connect (2024-2025):** Built-in service mesh for
-  inter-task communication. Does not affect capacity provider tuning.
-- **Bottlerocket AMI for ECS (2024):** Minimal boot time (15-30 s).
-  Reduces `instanceWarmupPeriod` from 60 s to 30 s.
-- **Spot instance interruption handler (2024-2025):** ECS drains tasks
-  on spot instances receiving a 2-minute reclaim notice automatically.
-- **CapacityProviderReservation CloudWatch metric (2024):** Direct
-  visibility into managed scaling target capacity percentage.
-- **Application Auto Scaling dual-policy (2025):** A service can now
-  have both CPU and memory target-tracking policies simultaneously.
+Recent AWS features (2024-2026) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when evaluating managed scaling GA, Fargate 16 vCPU/120 GB, Service Connect, Bottlerocket, or dual-policy scaling.
 
 ## References
 
@@ -713,6 +483,13 @@ Extended anti-patterns in `references/worked-examples-and-edge-cases.md`.
   (managed scaling migration, spot strategy, binpack, target tracking,
   already-optimal, NEED_MORE_INFO, end-to-end walkthrough), CLI failure
   handling, operational edge cases, extended NEVER list.
+
+## References (load on demand)
+
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — required data sources, per-step detection/tuning CLI, and pre-flight safety checks moved from SKILL.md.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — quick-start rules, mindset, Step 0 non-obvious behaviours, and recent AWS features moved from SKILL.md.
+- [references/ecs-autoscaling-configuration-and-pricing.md](references/ecs-autoscaling-configuration-and-pricing.md) — pricing tables, capacity provider JSON schema, warm-up guidance, and the Step 12 impact estimation formula moved from SKILL.md.
+- [references/worked-examples-and-edge-cases.md](references/worked-examples-and-edge-cases.md) — full worked examples, CLI failure handling, operational edge cases, extended NEVER list.
 
 ## Domain
 

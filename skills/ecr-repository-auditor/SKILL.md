@@ -68,28 +68,12 @@ Before evaluating the repository policy, classify the repository itself.
 Several attributes **short-circuit** the audit — misclassifying them produces
 false positives.
 
-**Multi-repo / account-wide sweep note (pagination):** when auditing every
-repo in an account, `aws ecr describe-repositories` returns at most 100 per
-page via `--max-results`. Use `--next-token` to page through all repositories;
-iterating only the first page silently skips repos in other lifecycle stages.
-For each repo, also page `aws ecr describe-images --repository-name <name>`
-(caps at 100/page) and `aws ecr get-lifecycle-policy-preview` — both silently
-truncate. Always drain `nextToken` to completion.
+Multi-repo / account-wide sweep pagination guidance moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when auditing every repository in an account (describe-repositories / describe-images / lifecycle-preview nextToken draining).
 
 **Live-account pre-flight checks (skip if doing offline config audit):**
-1. Verify the caller's identity can run `ecr:PutImageScanningConfiguration` and
-   `ecr:PutLifecyclePolicy` if remediation is intended — most read-only auditor
-   roles CANNOT, and remediation commands will fail with `AccessDenied`.
-   Surface this BEFORE the operator approves the change.
-2. Verify CloudTrail is logging ECR data events (`DeleteImage`, `PutImage`) —
-   ECR management events (`CreateRepository`, `DeleteRepository`) are on by
-   default, but `PutImage`/`BatchDeleteImage` are data events that must be
-   explicitly enabled on the trail. Without them, image-tampering forensics
-   have no signal.
-3. Snapshot `aws ecr describe-images --repository-name <name>` BEFORE any policy
-   edit — image digests and tags are not versioned. A PutImage overwrites a tag
-   with no history. Compare pre/post to detect tag mutations during the
-   remediation window.
+Live-account pre-flight checks (remediation IAM permissions, CloudTrail data events, pre-edit image snapshot) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before a live-account audit that may propose remediation.
 
 | Attribute | Value | Effect on audit |
 |---|---|---|
@@ -122,100 +106,8 @@ REMEDIATION: Retrieve the canonical policy with `aws ecr get-repository-policy -
 These behaviors are easy to misjudge without operational ECR experience.
 Each changes a verdict if ignored:
 
-- **ECR Private vs ECR Public are different services.** ECR Private
-  (`api.ecr.<region>.amazonaws.com`) uses the `ecr` namespace and IAM
-  policies. ECR Public (`public.ecr.aws`, `api.ecr-public.amazonaws.com`) uses
-  the `ecr-public` namespace and is designed for public image distribution.
-  This skill audits **private** repositories. If the input references
-  `ecr-public` actions or a public registry alias, note that ECR Public has
-  no repositoryPolicy-based access control — public visibility is governed by
-  registry-level catalog data.
-
-- **`ecr:GetAuthorizationToken` is account-scoped, not repo-scoped.** It
-  returns a temporary auth token for the ENTIRE registry (all repos in the
-  account). It cannot be restricted via `repositoryPolicy` `Resource` to a
-  single repo — any IAM grant of `ecr:GetAuthorizationToken` exposes the
-  registry auth token. A repositoryPolicy that includes
-  `ecr:GetAuthorizationToken` in its Action list is misleading; this action
-  is evaluated at the IAM level, not the repo-policy level. Do NOT use its
-  presence in a repo policy to escalate the verdict.
-
-- **`repositoryPolicy` and IAM identity-based policy follow the SAME-account
-  union / cross-account intersection rule** as S3 and KMS resource-based
-  policies. For same-account access, EITHER the repo policy OR the IAM policy
-  can grant access (union). For cross-account access, BOTH must allow
-  (intersection). This means an empty repositoryPolicy is SECURE for
-  same-account (IAM governs) but BLOCKS all cross-account access.
-
-- **`aws:SourceVpce` is the strongest condition for ECR.** A VPC endpoint ID
-  (`vpce-abc123`) is assigned by AWS infrastructure and cannot be forged by
-  the caller. It restricts access to traffic arriving through a specific
-  PrivateLink endpoint. `aws:SourceVpce` is STRONGER than `aws:SourceIp`
-  because it is tied to network infrastructure, not a routeable IP. When
-  present with `StringEquals`, downgrade from PUBLIC to CONFIG_GAP per Step 1e — the
-  access is fragile but currently scoped to known infrastructure.
-
-- **`scanOnPush` only triggers on push, not on CVE database updates.** An
-  image scanned on push is scanned against the vulnerability database AS OF
-  the push timestamp. If a new CVE is disclosed tomorrow, the image is NOT
-  automatically re-scanned. Enhanced scanning (Amazon Inspector integration)
-  provides continuous re-scanning. A repo with `scanOnPush: true` but basic
-  (non-enhanced) scanning has STALE vulnerability data for any image older
-  than the last manual scan.
-
-- **Lifecycle policy `rulePriority` is evaluated lowest-number-first, first
-  match wins.** Once an image matches a rule, no lower-priority rule applies.
-  A common misconfiguration: a rule that deletes ALL images after N days at
-  priority 1, followed by a rule that retains the last 5 tagged images at
-  priority 2 — the priority-1 rule deletes everything (including the last 5)
-  before priority-2 is ever evaluated. The rule that should be most selective
-  must have the LOWEST priority number.
-
-- **`tagStatus: untagged` is the ONLY lifecycle rule that cleans up untagged
-  images.** Without it, untagged images (images pushed without a tag, or
-  images whose tags were all deleted) persist indefinitely. Untagged images
-  are invisible to `describe-images --filter tagStatus=TAGGED` but still
-  consume storage billing and count against the per-repo image quota.
-
-- **`imageScanStatus: null` means NEVER scanned.** An image with no
-  `imageScanStatus` field (or `imageScanStatus.status: "PENDING"`) has never
-  been scanned by ECR. This is the signal for NO_SCAN, not `scanStatus` on the
-  repository (which reflects the scanning configuration, not per-image state).
-  Always enumerate images and check per-image scan status, not just the repo
-  config.
-
-- **Repository policy size limit follows IAM policy limits (10,240 chars for
-  resource-based).** A policy with many statements can hit this cap. When
-  proposing additive Deny statements as remediation, estimate cumulative
-  size — prefer fewer, broader statements if near the cap.
-
-- **`ecr:BatchDeleteImage` deletes by tag OR digest.** A principal with
-  `ecr:BatchDeleteImage` can delete any image in the repo, including
-  production images, by referencing the digest directly. Treat it as a
-  destructive action equivalent to `ecr:PutImage` for overwriting risk.
-
-- **`ecr:PutImage` is the tag-overwrite primitive.** With mutable tags, a
-  principal with `ecr:PutImage` can push a new manifest under an existing tag
-  (`:latest`, `:prod`), silently changing what `docker pull` returns. This is
-  the core supply-chain attack vector for mutable-tag repos.
-
-- **`ecr:StartImageScan` / `ecr:StartLifecyclePolicyPreview` are separate
-  actions.** A repo policy that grants `ecr:Describe*` but not
-  `ecr:StartImageScan` means images cannot be manually scanned by callers who
-  rely only on the repo policy. Check whether the scanning workflow needs
-  `StartImageScan` when designing least-privilege repo policies.
-
-- **Cross-region replication is registry-level, not repo-level.** `aws ecr
-  put-replication-configuration` replicates ALL repos to target regions. A
-  public repository policy on a source repo propagates to replicas — the
-  replica inherits the source's repositoryPolicy. Auditing only the source
-  misses that the public exposure is now multi-region.
-
-- **Pull-through cache rules** (`aws ecr put-pull-through-cache-rule`) create
-  upstream-registry-backed repos. These repos are created on first pull and
-  inherit the caller's permissions, not a pre-configured repositoryPolicy.
-  Do not audit a pull-through-cache-created repo with the same logic as a
-  manually created repo — its lifecycle is managed by the cache rule.
+Step 0 expert-knowledge behaviors moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when a verdict depends on non-obvious behavior (private vs public, GetAuthorizationToken scope, union/intersection, SourceVpce strength, scan staleness, rulePriority order, untagged cleanup).
 
 ### Step 1: PUBLIC — repositoryPolicy exposure (highest priority)
 
@@ -568,217 +460,23 @@ REMEDIATION:
 
 ## Remediation guidance
 
-### For PUBLIC — wildcard/cross-account pull or push (Step 1a-1d)
-
-1. **Immediately** remove the wildcard or cross-account principal from the
-   repositoryPolicy, or add a strong condition (`aws:SourceVpce`,
-   `aws:SourceAccount`, `aws:SourceArn`) to scope the grant.
-   ```bash
-   # Back up the current policy
-   aws ecr get-repository-policy --repository-name <name> --registry-id <id> \
-     --output json > /tmp/<name>-policy-backup.json
-
-   # Apply the tightened policy (provide the new policy document)
-   aws ecr set-repository-policy --repository-name <name> --registry-id <id> \
-     --policy-text file://new-policy.json
-   ```
-2. **Assume breach.** Audit CloudTrail for `ecr:BatchGetImage` and
-   `ecr:GetDownloadUrlForLayer` events from external principals during the
-   exposure window. Any image they pulled should be considered inspected —
-   rotate secrets found in image layers and rebuild images with a clean base.
-3. If cross-account pull is **intentional** (e.g., a shared services account),
-   replace `Principal: "*"` with the specific external role ARN and add
-   `aws:SourceAccount` / `aws:SourceArn` conditions.
-
-### For NO_SCAN — scanOnPush disabled or unscanned images (Step 2)
-
-1. Enable scan-on-push:
-   ```bash
-   aws ecr put-image-scanning-configuration --repository-name <name> \
-     --registry-id <id> --image-scanning-configuration scanOnPush=true
-   ```
-2. Manually scan existing unscanned images:
-   ```bash
-   for digest in $(aws ecr describe-images --repository-name <name> \
-     --registry-id <id> --query 'imageDetails[?imageScanStatus==null].imageDigest' \
-     --output text); do
-     aws ecr start-image-scan --repository-name <name> --registry-id <id> \
-       --image-id imageDigest=$digest
-   done
-   ```
-3. For production repos, enable enhanced scanning (Amazon Inspector
-   integration) for continuous re-scanning against the latest CVE database:
-   ```bash
-   aws ecr put-registry-scanning-configuration \
-     --scanning-configuration scanType=ENHANCED,repositoryFilters=[{repositoryName=<name>}] \
-     --profile <profile>
-   ```
-   Note: enhanced scanning is configured at the registry level, not per-repo.
-
-### For NO_LIFECYCLE — no lifecycle policy (Step 3)
-
-1. Create a lifecycle policy that retains the last N tagged images and deletes
-   untagged images after 1 day:
-   ```bash
-   cat > /tmp/lifecycle.json << 'EOF'
-   {
-     "rules": [
-       {
-         "rulePriority": 1,
-         "description": "Delete untagged images after 1 day",
-         "selection": { "tagStatus": "untagged", "countType": "sinceImagePushed", "countUnit": "days", "countNumber": 1 },
-         "action": { "type": "expire" }
-       },
-       {
-         "rulePriority": 2,
-         "description": "Keep last 10 tagged images",
-         "selection": { "tagStatus": "any", "countType": "imageCountMoreThan", "countNumber": 10 },
-         "action": { "type": "expire" }
-       }
-     ]
-   }
-   EOF
-   ```
-2. **Dry-run first** — verify which images would be deleted:
-   ```bash
-   aws ecr get-lifecycle-policy-preview --repository-name <name> --registry-id <id> \
-     --policy-text file:///tmp/lifecycle.json --output json
-   ```
-3. Apply the policy:
-   ```bash
-   aws ecr put-lifecycle-policy --repository-name <name> --registry-id <id> \
-     --lifecycle-policy-text file:///tmp/lifecycle.json
-   ```
-
-### For CONFIG_GAP — tag mutability (Step 4)
-
-1. Set tag immutability:
-   ```bash
-   aws ecr put-image-tag-mutability --repository-name <name> \
-     --registry-id <id> --image-tag-mutability IMMUTABLE
-   ```
-2. Verify:
-   ```bash
-   aws ecr describe-repositories --repository-names <name> --registry-id <id> \
-     --query 'repositories[0].imageTagMutability' --output text
-   ```
-
-### For CONFIG_GAP — condition-restricted cross-account (Step 1e)
-
-1. Validate the condition is still correct and the named VPC endpoint or
-   account still exists.
-2. Convert the Allow-based restriction to an explicit Deny (deny all except
-   the trusted account/endpoint) — Deny statements cannot be accidentally
-   widened by adding a new Allow.
-3. For `aws:SourceVpce`, verify the VPC endpoint is still in use and has not
-   been deleted (a deleted endpoint ID makes the condition unmatchable,
-   silently blocking all access).
-
-### For OK
-
-1. No remediation required for the current posture.
-2. Recommend enabling enhanced scanning if not already on (defense-in-depth
-   for production repos).
-3. Recommend adding a Deny statement for `aws:SecureTransport: false` to
-   enforce TLS for all ECR API calls (defense-in-depth).
-4. For repos with cross-region replication, verify replicas are also audited
-   — they inherit the source repositoryPolicy.
+Per-verdict remediation guidance (PUBLIC, NO_SCAN, NO_LIFECYCLE, CONFIG_GAP, OK) with full CLI sequences moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when emitting REMEDIATION or before executing any state-changing CLI.
 
 ## Deep reference: ECR authorization and scanning internals
 
-### Repository policy vs IAM evaluation pipeline
-
-ECR evaluates an access request in this order:
-
-1. **Organizations SCP** — sets the maximum permissions. An SCP Deny blocks
-   the request.
-2. **Repository policy** (resource-based) — for same-account access, EITHER
-   the repo policy OR the caller's IAM policy can allow (union). For
-   cross-account access, BOTH must allow (intersection). This is identical to
-   the S3 bucket policy evaluation model.
-3. **IAM identity-based policy** — evaluated only if the repo policy does not
-   independently grant or deny. For same-account, the union applies. For
-   cross-account, the intersection applies.
-
-Key consequence: an **empty** repositoryPolicy is SECURE for same-account
-access because IAM governs everything. It also BLOCKS all cross-account
-access because there is no resource-based Allow for the intersection. This
-is why the default (no repo policy) is the most secure posture.
-
-### Lifecycle policy rule evaluation
-
-Rules are evaluated in `rulePriority` order (ascending — lowest number
-first). For each image, the FIRST matching rule applies; no lower-priority
-rule is evaluated for that image. This means:
-
-- Rule priority 1 should be the most SELECTIVE rule (e.g., delete untagged
-  images after 1 day).
-- Rule priority 2+ should be progressively broader (e.g., keep last 10
-  tagged images).
-- A broad rule at priority 1 shadows ALL subsequent rules — images that
-  match it are expired before any retention rule can protect them.
-
-Lifecycle evaluation runs approximately once every 24 hours. Changes to the
-policy are not applied immediately to existing images — they take effect at
-the next evaluation cycle. Use `get-lifecycle-policy-preview` to test before
-applying.
-
-### Scanning internals — basic vs enhanced
-
-- **Basic scanning:** ECR's native scanner. `scanOnPush: true` triggers a
-  scan at push time against the vulnerability database AS OF the push. No
-  re-scanning on CVE database updates. Findings are available via
-  `describe-image-scan-findings`.
-- **Enhanced scanning:** Amazon Inspector integration. Provides continuous
-  re-scanning — images are re-evaluated when the Inspector CVE database is
-  updated, not just at push time. Configured at the **registry** level via
-  `put-registry-scanning-configuration`, not per-repo. Enhanced scanning
-  incurs per-image-scanned costs.
-
-A repo with `scanOnPush: true` and basic scanning has STALE vulnerability
-data for any image older than the last CVE database update. This is not
-flagged by the verdict (the repo IS scanning on push), but the auditor should
-note the recommendation to enable enhanced scanning for production repos.
-
-### KMS encryption internals
-
-ECR supports three encryption types:
-- **AES256** — AWS-managed key, no customer control over rotation or policy.
-  Default if no encryptionConfiguration is specified.
-- **KMS** — Customer-managed KMS key. The KMS key policy governs who can
-  encrypt/decrypt image layers. Changing the KMS key after images are pushed
-  does NOT re-encrypt existing images — they remain encrypted under the
-  original key.
-- **KMS_DSSE** — Double-layer encryption (KMS + AES256). Provides the highest
-  encryption posture for compliance-sensitive workloads. Available in select
-  regions.
-
-The encryption type is set at **repository creation** and CANNOT be changed
-after creation. To migrate encryption types, create a new repo with the
-desired encryption, re-push images, and update pull references.
-
-### Cross-region replication policy propagation
-
-`put-replication-configuration` replicates ALL repositories in the source
-region to target regions. The replication copies:
-- Image content (layers, manifests)
-- Repository policy (the full `repositoryPolicyText`)
-- Scan configuration (`scanOnPush`)
-
-The replication does NOT copy:
-- Lifecycle policy (each replica manages its own lifecycle)
-- Tag immutability setting (each replica manages its own)
-
-This means a PUBLIC repository policy on the source propagates to all
-replicas automatically. If you tighten the source policy, the replicas are
-updated on the next replication cycle. Audit replicas independently.
+Deep ECR authorization and scanning internals moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for the policy-vs-IAM evaluation pipeline, lifecycle rule evaluation, basic vs enhanced scanning, KMS encryption internals, and replication propagation.
 
 ## Recent AWS features (2024-2026)
 
-- **ECR Enhanced Scanning (2024-2025):** ECR Enhanced Scanning now uses Amazon Inspector to scan for both OS package vulnerabilities and language package vulnerabilities (Python, Java, Node.js, etc.). Auditors should verify that `scanType` is set to `ENHANCED` (not `BASIC`) on production repositories — basic scanning only covers OS packages.
-- **Pull-through cache rules (2024):** ECR pull-through cache allows pulling images from upstream registries (Docker Hub, Quay, public ECR) and caching them locally. Auditors should verify that pull-through cache repositories have appropriate lifecycle policies — cached images can accumulate without cleanup.
-- **Replication across regions/accounts (2024):** ECR cross-region and cross-account replication is now GA. Auditors should verify that replicated repositories in other regions/accounts have equivalent security policies (scan-on-push, tag immutability, lifecycle).
-- **Lifecycle policy enhancements (2024):** Improved lifecycle policy rules with more filtering options. Auditors should verify that lifecycle policies cover untagged images and that the policy does not accidentally delete production images.
+Recent AWS features (2024-2026) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when auditing enhanced scanning, pull-through caches, replication, or lifecycle enhancements.
+
+## References (load on demand)
+
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — live-account pre-flight checks, multi-repo sweep pagination, and per-verdict remediation CLI sequences moved from SKILL.md.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 expert-knowledge deep dives, ECR authorization and scanning internals, and recent AWS features moved from SKILL.md.
 
 ## Domain
 

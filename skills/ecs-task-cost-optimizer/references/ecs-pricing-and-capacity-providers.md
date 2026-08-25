@@ -283,3 +283,111 @@ Always re-check via the AWS Pricing API for production estimates.
   killed, not degraded).
 
 - NEVER batch-update more than 5 services in a single output block.
+
+---
+
+## Step 1 — Fargate vs EC2 crossover math (moved from SKILL.md)
+
+**The crossover math (~30% utilization rule):**
+```
+Fargate cost (per task, per hour):
+  vCPU: 1.0 × $0.04048 = $0.04048/hr
+  Memory: 2 GB × $0.004445 = $0.00889/hr
+  Total: $0.04937/hr → $36.04/month per task
+
+EC2 cost (per instance, per hour, amortized across tasks):
+  m5.large (2 vCPU, 8 GB): $0.096/hr → $70.08/month
+  If 4 tasks pack onto 1 instance: $17.52/task/month
+  Saving vs Fargate: 51% for the same task footprint
+
+Crossover: if average tasks per instance > 2-3 (steady), EC2 wins.
+If tasks are bursty or < 30% utilization, Fargate's per-second wins.
+```
+
+---
+
+## Step 2 — Fargate arm64 pricing comparison (moved from SKILL.md)
+
+**Fargate pricing comparison (us-east-1, 2026):**
+```
+x86_64:  $0.04048/vCPU-hr + $0.004445/GB-hr
+arm64:   $0.03238/vCPU-hr + $0.003561/GB-hr  (20% cheaper)
+```
+
+---
+
+## Step 2 — ARM64 compatibility check table (moved from SKILL.md)
+
+**Compatibility check before migration:**
+
+| Application type | ARM64 risk | Verification step |
+|---|---|---|
+| Interpreted (Python, Node, Ruby) | LOW | Verify native deps have arm64 wheels/gems |
+| JVM (Java, Kotlin, Scala) | LOW | Verify JNI libs; JDK 11+ supports arm64 |
+| .NET | LOW-MEDIUM | Verify native interop libs |
+| Go | LOW | Recompile with `GOARCH=arm64` |
+| Rust | LOW | Recompile with `--target aarch64-unknown-linux-gnu` |
+| C/C++ | MEDIUM | Recompile for arm64; verify inline assembly |
+| Container with x86 binary | HIGH | Requires multi-arch build (`docker buildx`) |
+
+---
+
+## Step 3 — right-sizing math and valid CPU/memory combinations (moved from SKILL.md)
+
+**Right-sizing math (Fargate, 8 tasks):**
+```
+Current: 1 vCPU, 2 GB per task → $0.04937/hr × 8 tasks × 730 hr = $288.36/month
+Proposed: 0.5 vCPU, 1 GB per task → $0.02473/hr × 8 tasks × 730 hr = $144.45/month
+Saving: $143.91/month (50%) — if utilization was < 20% at the original size
+```
+
+**Fargate valid CPU/memory combinations:**
+
+| CPU (vCPU) | Memory range (GB) |
+|---|---|
+| 0.25 | 0.5, 1, 2 |
+| 0.5 | 1, 2, 3, 4 |
+| 1 | 2, 3, 4, 5, 6, 7, 8 |
+| 2 | 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 |
+| 4 | 8, 9, 10, ..., 30 |
+| 8 | 16, 17, ..., 60 |
+
+---
+
+## Step 5 — Savings Plan vs Reserved Instance (moved from SKILL.md)
+
+**Savings Plan vs Reserved Instance:**
+
+| Feature | Compute SP | Reserved Instance |
+|---|---|---|
+| Applies to Fargate | YES | NO |
+| Applies to EC2 ECS | YES | YES |
+| Flexibility (any instance family) | YES (any family, any size, any AZ) | NO (specific family only) |
+| Applies to Lambda | YES | NO |
+| Discount depth | Up to 54% (1yr), 72% (3yr) | Up to 72% (3yr Standard) |
+
+---
+
+## Step 8 — impact estimation formula (moved from SKILL.md)
+
+Compute the monthly savings for each recommendation:
+
+```
+current_monthly_cost =
+  (Fargate) vCPU_hours × $0.04048 + GB_hours × $0.004445
+  OR
+  (EC2) instance_count × instance_hourly × 730
+
+projected_monthly_cost =
+  (Fargate arm64) vCPU_hours × $0.03238 + GB_hours × $0.003561
+  OR
+  (EC2 Graviton) instance_count × graviton_hourly × 730
+  OR
+  (right-sized) reduced_vCPU_hours × rate + reduced_GB_hours × rate
+  × (1 - SP_discount) if Savings Plan applied
+
+monthly_saving = current_monthly_cost - projected_monthly_cost
+```
+
+Always state assumptions: launch type, architecture, task count,
+utilization baseline, pricing region, capacity provider mix.

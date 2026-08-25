@@ -288,3 +288,156 @@ aws ecs describe-container-instances --cluster <cluster> \
   --container-instances <new-ci> \
   --query 'containerInstances[*].{status:status,agent:agentConnected,remaining:remainingResources}'
 ```
+
+---
+
+## Step 0: Pre-flight — gather task and service state (commands) (moved from SKILL.md)
+
+```bash
+# 1. Most recent stopped task for the service (highest-quality signal)
+aws ecs list-tasks --cluster <cluster> --service-name <service> \
+  --desired-status STOPPED --output json | \
+  jq -r '.taskArns[0]'
+
+# 2. Full describe-tasks for that task
+aws ecs describe-tasks --cluster <cluster> \
+  --tasks <task-arn> --output json | \
+  jq '.tasks[] | {stopCode, stoppedReason, stoppedAt, lastStatus,
+    launchType, platformVersion, platformFamily,
+    attachments: [.attachments[] | {type, status, details}],
+    containers: [.containers[] | {name, exitCode, reason, healthStatus,
+      lastStatus}]}'
+
+# 3. Service event log (last 30 events — placement, circuit breaker)
+aws ecs describe-services --cluster <cluster> \
+  --services <service> --output json | \
+  jq '.services[0].events[:30] | [.[] | {createdAt, message}]'
+
+# 4. Task definition (CPU, memory, roles, container defs, health checks)
+aws ecs describe-task-definition --task-definition <family:rev> \
+  --output json | jq '.taskDefinition'
+
+# 5. (EC2 launch type only) container instance state
+aws ecs describe-container-instances --cluster <cluster> \
+  --container-instances <ci-arn> --output json | \
+  jq '.containerInstances[] | {status, runningTasksCount,
+    remainingResources, registeredResources, attributes:
+    [.attributes[] | select(.name | startswith("ecs."))]}' \
+    2>/dev/null || echo "Fargate launch type — skip"
+```
+
+## Step 1a: ENI attachment failure (trunking / interface limit) — probe (moved from SKILL.md)
+
+```bash
+aws ecs describe-container-instances --cluster <cluster> \
+  --container-instances <ci-arn> --output json | \
+  jq '.containerInstances[] | {
+    remaining: [.registeredResources[] | select(.name=="ENI")],
+    trunking: .attributes[]? | select(.name=="ecs.awsvpc-trunking")
+  }'
+```
+
+## Step 1b: Subnet IP exhaustion (awsvpc private subnet) — probe (moved from SKILL.md)
+
+```bash
+aws ec2 describe-subnets --subnet-ids <subnet-1> <subnet-2> \
+  --output json | jq '.Subnets[] | {SubnetId, CidrBlock,
+    AvailableIpAddressCount}'
+```
+
+## Step 2a: Authentication failure (401 / 403) — execution-role probe (moved from SKILL.md)
+
+```bash
+# Execution role must include these actions
+aws iam simulate-principal-policy \
+  --policy-source-arn <execution-role-arn> \
+  --action-names ecr:BatchGetImage ecr:GetDownloadUrlForLayer \
+                 ecr:GetAuthorizationToken \
+  --output json --profile <p>
+```
+
+## Step 2a: Authentication failure (401 / 403) — ECR repo-policy probe (moved from SKILL.md)
+
+```bash
+aws ecr get-repository-policy --repository-name <repo> \
+  --registry-id <source-account> --output json --profile <p>
+```
+
+## Step 2b: Network endpoint failure (private subnet, Fargate) — probe (moved from SKILL.md)
+
+```bash
+aws ec2 describe-vpc-endpoints --filters Name=vpc-id,Values=<vpc-id> \
+  --output json | \
+  jq '.VpcEndpoints[] | {ServiceName, VpcEndpointType, State}'
+```
+
+## Step 2c: Image size exceeds limit — probe (moved from SKILL.md)
+
+```bash
+aws ecr describe-images --repository-name <repo> \
+  --image-ids imageTag=<tag> --output json | \
+  jq '.imageDetails[].imageSizeInBytes'
+```
+
+## Step 3a: No matching container instance (EC2 launch type) — probe (moved from SKILL.md)
+
+```bash
+aws ecs describe-container-instances --cluster <cluster> \
+  --container-instances <ci-arns> --output json | \
+  jq '.containerInstances[] | {status, agentConnected,
+    remaining: [.remainingResources[] | {name, integerValue}],
+    registered: [.registeredResources[] | {name, integerValue}]}'
+```
+
+## Step 3b: Capacity provider failure (Fargate or EC2) — probe (moved from SKILL.md)
+
+```bash
+aws ecs describe-capacity-providers --capacity-providers <name> \
+  --output json | jq('.capacityProviders[] | {status,
+    autoScalingGroupProvider: .autoScalingGroupProvider?,
+    updateStatus}')
+```
+
+## Step 4a: CPU / memory oversubscription (exit 137) — probes (moved from SKILL.md)
+
+```bash
+# Container-level memory limit vs actual usage
+aws ecs describe-tasks --cluster <cluster> --tasks <task-arn> \
+  --output json | jq('.tasks[].containers[] | {name, exitCode,
+    reason, memory, memoryReservation}')
+
+# Service-wide MemoryUtilization
+aws cloudwatch get-metric-statistics --namespace AWS/ECS \
+  --metric-name MemoryUtilization \
+  --dimensions Name=ClusterName,Value=<cluster> Name=ServiceName,Value=<service> \
+  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
+  --period 300 --statistics Maximum --output json
+```
+
+## Step 6a: ECS container health check (in task definition) — probe (moved from SKILL.md)
+
+```bash
+aws ecs describe-task-definition --task-definition <family:rev> \
+  --output json | jq('.taskDefinition.containerDefinitions[] |
+    {name, healthCheck}')
+```
+
+## Step 6b: ALB target group health check — probe (moved from SKILL.md)
+
+```bash
+aws elbv2 describe-target-health --target-group-arn <tg-arn> \
+  --targets <target-list> --output json | \
+  jq('.TargetHealthDescriptions[] | {Target: .Target.Id,
+    Health: .TargetHealth)')
+```
+
+## Step 8: Fargate platform version regressions — probe (moved from SKILL.md)
+
+```bash
+aws ecs describe-services --cluster <cluster> \
+  --services <service> --output json | \
+  jq('.services[0] | {platformVersion, platformFamily,
+    deployments: [.deployments[] | {status, rolloutState,
+      platformVersion, runningCount})]')
+```
+

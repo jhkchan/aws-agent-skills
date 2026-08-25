@@ -290,3 +290,58 @@ Delete the source image first, then the orphaned replica.
 Lifecycle policies do NOT replicate. Each region's repos need their
 own lifecycle policy. Without them, old replicas accumulate storage
 cost.
+
+## Expert heuristic: replication is registry-level (moved from SKILL.md)
+
+A baseline model may try to configure replication per-repo (like
+Lifecycle Policies). The correct heuristic recognizes that ECR
+replication is at the REGISTRY level.
+
+```text
+ECR replication scope:
+  ├── Registry-level replication (ALL repos replicate)
+  │     API: put-registry-replication-configuration
+  │     Scope: every repository in the source registry
+  │     Cannot select individual repos
+  │
+  ├── Cross-region (same account)
+  │     Destination: same account, different region
+  │     Use case: DR, low-latency multi-region pulls
+  │
+  ├── Cross-account (different account)
+  │     Destination: different account (by registry ID)
+  │     Use case: sharing images across accounts without per-repo policy
+  │     Requirement: destination must allow replication
+  │
+  └── NOT replication (per-repo):
+        ├── Cross-account repository policy → selective sharing
+        └── Lifecycle policy → image cleanup/retention
+```
+
+**Key implication:** if you only need to share specific repositories
+across accounts, use cross-account repository policies instead of
+full registry replication. Replication is all-or-nothing per
+registry.
+
+## Combined cross-region and cross-account configuration (moved from SKILL.md)
+**Combined cross-region and cross-account:**
+
+```bash
+aws ecr put-registry-replication-configuration \
+  --replication-configuration '{
+    "rules": [
+      {
+        "destinations": [
+          {"region": "us-east-1", "registryId": "999999999999"},
+          {"region": "us-west-2", "registryId": "999999999999"}
+        ]
+      },
+      {
+        "destinations": [
+          {"region": "eu-west-1", "registryId": "111122223333"}
+        ]
+      }
+    ]
+  }' \
+  --region us-east-1
+```

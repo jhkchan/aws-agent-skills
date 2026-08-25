@@ -403,3 +403,190 @@ These supplement the top 5 anti-patterns in SKILL.md.
 | HIGH | Significant attack surface expansion | No network policies, no PSA, no KMS encryption, no image scanning |
 | MEDIUM | Defense-in-depth gap | No GuardDuty runtime, no admission webhook, no mTLS, incomplete audit logging |
 | LOW | Hardening recommendation | PSA warn instead of enforce, basic scan instead of enhanced, no key rotation |
+
+<!-- Moved verbatim from SKILL.md (eks-security-optimizer) — progressive-disclosure restructure, lines 159-167 -->
+
+## Pre-flight data gate — required data sources
+
+1. Cluster configuration: `aws eks describe-cluster`
+2. Addon status: `aws eks list-addons`, `aws eks describe-addon`
+3. KMS key for secrets: check `encryptionConfig` in describe-cluster
+4. ECR scan findings: `aws ecr describe-image-scan-findings`
+5. GuardDuty findings: `aws guardduty list-findings --filter criterion.service=EKS`
+6. PSA labels: `kubectl get namespaces --show-labels`
+7. IRSA annotations: `kubectl get serviceaccounts -A -o jsonpath`
+8. Network policies: `kubectl get networkpolicies -A`
+9. Audit log config: check `logging.clusterLogging` in describe-cluster
+
+<!-- Moved verbatim from SKILL.md (eks-security-optimizer) — progressive-disclosure restructure, lines 287-296 -->
+
+## Step 1 — PSA namespace labels (bash)
+
+```bash
+# Apply baseline-enforce + restricted-warn to a namespace
+kubectl label namespace production \
+  pod-security.kubernetes.io/enforce=baseline \
+  pod-security.kubernetes.io/enforce-version=latest \
+  pod-security.kubernetes.io/audit=restricted \
+  pod-security.kubernetes.io/audit-version=latest \
+  pod-security.kubernetes.io/warn=restricted \
+  pod-security.kubernetes.io/warn-version=latest
+```
+
+<!-- Moved verbatim from SKILL.md (eks-security-optimizer) — progressive-disclosure restructure, lines 310-320 -->
+
+## Step 2 — IRSA / Pod Identity detection (bash)
+
+**Detection:**
+```bash
+# Check OIDC provider (IRSA prerequisite)
+aws eks describe-cluster --name <cluster> --query 'cluster.identity.oidc.issuer'
+
+# Check which service accounts use IRSA
+kubectl get serviceaccounts -A -o jsonpath='{range .items[*]}{.metadata.namespace}{"/"}{.metadata.name}{"\t"}{.metadata.annotations.eks\.amazonaws\.com/role-arn}{"\n"}{end}' | grep -v "arn:aws" || echo "No IRSA annotations found"
+
+# Check EKS Pod Identity agent addon
+aws eks list-addons --cluster-name <cluster> --query 'addons[?@==`eks-pod-identity-agent`]'
+```
+
+<!-- Moved verbatim from SKILL.md (eks-security-optimizer) — progressive-disclosure restructure, lines 326-336 -->
+
+## Step 2 — IRSA setup (bash)
+
+**IRSA setup:**
+```bash
+# Create IAM role with trust policy for the OIDC provider
+aws iam create-role --role-name <app-role> \
+  --assume-role-policy-document file://trust-policy.json
+
+# Annotate the Kubernetes service account
+kubectl annotate serviceaccount <sa-name> \
+  eks.amazonaws.com/role-arn=arn:aws:iam::<acct>:role/<app-role> \
+  -n <namespace>
+```
+
+<!-- Moved verbatim from SKILL.md (eks-security-optimizer) — progressive-disclosure restructure, lines 343-370 -->
+
+## Step 3 — Calico/Cilium install + default-deny NetworkPolicy
+
+**CNI plugin required:** AWS VPC CNI does not implement NetworkPolicy.
+Install Calico or Cilium:
+
+```bash
+# Install Calico (via Helm)
+helm repo add projectcalico https://docs.projectcalico.org/charts
+helm install calico projectcalico/tigera-operator -n tigera-operator --create-namespace
+
+# OR install Cilium (via Helm)
+helm repo add cilium https://helm.cilium.io/
+helm install cilium cilium/cilium --namespace kube-system \
+  --set kubeProxyReplacement=disabled \
+  --set enableL7Proxy=false
+```
+
+**Default-deny baseline:**
+```yaml
+# Default deny all ingress in a namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: production
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+```
+
+<!-- Moved verbatim from SKILL.md (eks-security-optimizer) — progressive-disclosure restructure, lines 381-399 -->
+
+## Step 4 — KMS detection + enable (bash)
+
+**Detection:**
+```bash
+aws eks describe-cluster --name <cluster> \
+  --query 'cluster.encryptionConfig'
+# Empty array = not configured
+```
+
+**Enable KMS encryption:**
+```bash
+# Create a KMS key
+aws kms create-key --description "EKS secrets encryption for <cluster>"
+
+# Enable encryption on the cluster
+aws eks update-cluster-config --name <cluster> \
+  --encryption-config '{
+    "resources": ["secrets"],
+    "provider": {"keyArn": "arn:aws:kms:us-east-1:<acct>:key/<key-id>"}
+  }'
+```
+
+<!-- Moved verbatim from SKILL.md (eks-security-optimizer) — progressive-disclosure restructure, lines 412-429 -->
+
+## Step 5 — ECR scanning detection + enable (bash)
+
+**Detection:**
+```bash
+aws ecr describe-repositories --query 'repositories[].imageScanningConfiguration'
+```
+
+**Enable scan-on-push:**
+```bash
+aws ecr put-image-scanning-configuration \
+  --repository-name <repo> \
+  --image-scanning-configuration scanOnPush=true
+```
+
+**Enable enhanced scanning (Inspector):**
+```bash
+aws ecr put-enhanced-image-scan-policy \
+  --repository-name <repo> \
+  --policy '{"enhancedScanType": "INSPECTOR"}'
+```
+
+<!-- Moved verbatim from SKILL.md (eks-security-optimizer) — progressive-disclosure restructure, lines 442-448 -->
+
+## Step 6 — enable GuardDuty EKS runtime (bash)
+
+**Enable GuardDuty EKS runtime:**
+```bash
+# Enable the EKS addon
+aws eks create-addon --cluster-name <cluster> \
+  --addon-name aws-guardduty-agent \
+  --addon-version v1.0.0
+```
+
+<!-- Moved verbatim from SKILL.md (eks-security-optimizer) — progressive-disclosure restructure, lines 458-468 -->
+
+## Step 7 — install Gatekeeper / Kyverno (bash)
+
+**Gatekeeper (OPA):**
+```bash
+helm install gatekeeper gatekeeper/gatekeeper \
+  -n gatekeeper-system --create-namespace
+```
+
+**Kyverno:**
+```bash
+helm install kyverno kyverno/kyverno \
+  -n kyverno-system --create-namespace
+```
+
+<!-- Moved verbatim from SKILL.md (eks-security-optimizer) — progressive-disclosure restructure, lines 483-494 -->
+
+## Step 8 — install App Mesh / Istio (bash)
+
+**App Mesh:**
+```bash
+# Install App Mesh controller
+helm appmesh install appmesh appmesh/appmesh \
+  -n appmesh-system --create-namespace
+```
+
+**Istio (alternative):**
+```bash
+istioctl install --set values.global.meshID=mesh1 \
+  --set values.global.network=network1
+```
+

@@ -335,3 +335,133 @@ resource "aws_eks_pod_identity_association" "vpc_cni" {
 | List Pod Identity associations | `aws eks list-pod-identity-associations` |
 | Create Pod Identity association | `aws eks create-pod-identity-association` |
 | Delete Pod Identity association | `aws eks delete-pod-identity-association` |
+
+## Configuration values create/update CLI (Step 3) (moved from SKILL.md)
+
+**Set configuration values on creation:**
+
+```bash
+aws eks create-addon \
+  --cluster-name my-cluster \
+  --addon-name vpc-cni \
+  --addon-version v1.18.1-eksbuild.3 \
+  --configuration-values '{"env":{"AWS_VPC_K8S_CNI_LOGLEVEL":"DEBUG","ENABLE_PREFIX_DELEGATION":"true"}}' \
+  --resolve-conflicts OVERWRITE
+```
+
+**Update configuration values:**
+
+```bash
+aws eks update-addon \
+  --cluster-name my-cluster \
+  --addon-name vpc-cni \
+  --configuration-values '{"env":{"ENABLE_PREFIX_DELEGATION":"true","WARM_PREFIX_TARGET":"1"}}' \
+  --resolve-conflicts PRESERVE
+```
+
+
+## vpc-cni IRSA role creation CLI (Step 4) (moved from SKILL.md)
+
+**Create an IAM role for vpc-cni (IRSA):**
+
+```bash
+CLUSTER_NAME=my-cluster
+ACCOUNT_ID=123456789012
+OIDC_URL=$(aws eks describe-cluster --name $CLUSTER_NAME \
+  --query 'cluster.identity.oidc.issuer' --output text | sed 's|https://||')
+
+# Create trust policy
+cat > trust-policy.json << EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": {
+      "Federated": "arn:aws:iam::${ACCOUNT_ID}:oidc-provider/${OIDC_URL}"
+    },
+    "Action": "sts:AssumeRoleWithWebIdentity",
+    "Condition": {
+      "StringEquals": {
+        "${OIDC_URL}:aud": "sts.amazonaws.com",
+        "${OIDC_URL}:sub": "system:serviceaccount:kube-system:aws-node"
+      }
+    }
+  }]
+}
+EOF
+
+aws iam create-role \
+  --role-name AmazonEKSVPCCNIRole \
+  --assume-role-policy-document file://trust-policy.json
+
+# Attach the managed policy
+aws iam attach-role-policy \
+  --role-name AmazonEKSVPCCNIRole \
+  --policy-arn arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+```
+
+**Create add-on with IRSA role:**
+
+```bash
+aws eks create-addon \
+  --cluster-name my-cluster \
+  --addon-name vpc-cni \
+  --service-account-role-arn arn:aws:iam::${ACCOUNT_ID}:role/AmazonEKSVPCCNIRole \
+  --resolve-conflicts OVERWRITE
+```
+
+
+## Pod Identity Agent install CLI (Step 5) (moved from SKILL.md)
+
+**Install the Pod Identity Agent:**
+
+```bash
+aws eks create-addon \
+  --cluster-name my-cluster \
+  --addon-name eks-pod-identity-agent \
+  --resolve-conflicts OVERWRITE
+```
+
+
+## Pod Identity role and association CLI (Step 5) (moved from SKILL.md)
+
+**Create a Pod Identity IAM role:**
+
+```bash
+cat > pod-identity-trust.json << EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": { "Service": "pods.eks.amazonaws.com" },
+    "Action": ["sts:AssumeRole", "sts:TagSession"]
+  }]
+}
+EOF
+
+aws iam create-role \
+  --role-name MyAddonRole \
+  --assume-role-policy-document file://pod-identity-trust.json
+```
+
+**Create a Pod Identity association:**
+
+```bash
+aws eks create-pod-identity-association \
+  --cluster-name my-cluster \
+  --namespace kube-system \
+  --service-account aws-node \
+  --role-arn arn:aws:iam::123456789012:role/MyAddonRole
+```
+
+
+## Hybrid Nodes vpc-cni configuration CLI (Step 7) (moved from SKILL.md)
+
+```bash
+# vpc-cni with custom networking for hybrid nodes
+aws eks update-addon \
+  --cluster-name my-hybrid-cluster \
+  --addon-name vpc-cni \
+  --configuration-values '{"env":{"AWS_VPC_K8S_CNI_EXTERNALSNAT":"true","CUSTOM_NETWORK_CFG":"true"}}' \
+  --resolve-conflicts PRESERVE
+```

@@ -243,3 +243,70 @@ kubectl get node on-prem-node-01   # Wait for Ready
 Always upgrade the control plane first. Node kubelet versions can lag
 by one minor version (k8s skew policy), but do not upgrade nodes before
 the control plane.
+
+## Expert heuristic: network path is non-negotiable (moved from SKILL.md)
+
+A baseline model says "nodes just need internet." The correct heuristic
+recognizes that nodes MUST reach the EKS control plane API.
+
+```text
+On-prem Node (10.0.1.5)
+  │
+  ├── Must reach: EKS API endpoint (TCP 443)
+  │
+  ├── Network path options:
+  │     ├── Direct Connect (private VIF → VPC)     ← RECOMMENDED
+  │     ├── Site-to-Site VPN (IPsec → VPC)          ← Acceptable
+  │     └── Public internet (EKS public endpoint)   ← NOT recommended
+  │
+  └── Latency requirement:
+        ├── kubelet heartbeat: every 10s (default)
+        └── If latency > grace period (40s) → node → NotReady
+```
+
+**Key implication:** verify the network path BEFORE registering nodes.
+A node that registers then loses connectivity will be marked NotReady
+within 40 seconds (default kubelet grace period).
+
+
+## nodeadm registration CLI (Step 3) (moved from SKILL.md)
+
+```bash
+# On the on-prem node (NOT an AWS CLI command):
+# Download and install nodeadm
+curl -O https://s3.us-east-1.amazonaws.com/amazon-eks/hybrid-node-tools/nodeadm
+chmod +x nodeadm
+
+# Configure and start
+./nodeadm init \
+  --cluster-name my-cluster \
+  --cluster-endpoint https://XXXX.gr7.us-east-1.eks.amazonaws.com \
+  --cluster-ca <base64-ca> \
+  --activation-id <activation-id> \
+  --activation-code <activation-code> \
+  --node-role arn:aws:iam::123456789012:role/EKSHybridNodeRole
+
+./nodeadm up
+
+# Verify registration (from a machine with kubectl)
+kubectl get nodes --show-labels | grep hybrid
+# Expected: node appears with Ready status
+```
+
+
+## Direct Connect / VPN verification CLI (Step 5) (moved from SKILL.md)
+
+```bash
+# Verify Direct Connect
+aws directconnect describe-connections \
+  --query 'connections[*].{Name:connectionName,State:connectionState}' \
+  --output table
+
+# Or verify Site-to-Site VPN
+aws ec2 describe-vpn-connections \
+  --query 'VpnConnections[*].{ID:VpnConnectionId,State:State}' \
+  --output table
+
+# Test connectivity from the on-prem node:
+curl -k https://<eks-endpoint>/healthz   # Expected: ok (HTTP 200)
+```

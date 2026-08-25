@@ -43,27 +43,8 @@ logs --previous` (application error), and `kubectl get events` (timeline
 of what the kubelet and scheduler did). Read all three before declaring
 a root cause.
 
-Three facts make EKS pod troubleshooting different from generic container
-debugging:
-
-- **The pod phase is the entry point to the decision tree.** `Pending`
-  means the scheduler has not placed the pod — the failure is in
-  resources, taints, affinity, or PersistentVolume binding. `Running`
-  with restarts means a container is exiting — the failure is in the
-  application or its probe. `ContainerCreating` means the kubelet cannot
-  finish setup — usually image pull, secret volume, or CSI driver.
-  Diagnosing without the phase is guessing.
-- **`kubectl describe pod` Events are the kubelet/scheduler voice, but
-  they age out after ~1 hour.** Events are the authoritative narrative
-  for what the control plane tried and what went wrong, but the kubelet
-  deletes events older than the retention window (default 1h). Capture
-  them early with `kubectl get events --sort-by='.lastTimestamp'` and
-  filter by `involvedObject.name=<pod>`.
-- **`kubectl logs` without `--previous` shows nothing for a
-  CrashLoopBackOff.** The current container has just started; the logs
-  that explain the crash are in the *previous* container instance. Always
-  use `kubectl logs <pod> --previous` (or `-c <container> --previous` for
-  a specific container) when the pod is in CrashLoopBackOff.
+Moved verbatim to `references/advanced-patterns.md` — see "**Mindset — three EKS-specific facts**" (load on demand).
+Applies when: you need the deeper reasoning behind the three-evidence-sources rule.
 
 ## Quick reference — symptom to failure category
 
@@ -122,18 +103,8 @@ MISSING:
 If the user reports "pods keep failing" but does not know which pod,
 ask for the namespace and deployment/pod label. Then run:
 
-```bash
-kubectl get pods -n <namespace> -o wide \
-  -o custom-columns=NAME:.metadata.name,NS:.metadata.namespace,\
-NODE:.spec.nodeName,STATUS:.status.phase,RESTARTS:.status.containerStatuses[0].restartCount,\
-REASON:.status.containerStatuses[0].state.waiting.reason
-
-# Find pods in a known-bad state across all namespaces:
-kubectl get pods -A --field-selector status.phase!=Running,status.phase!=Succeeded
-
-# Drill into a specific controller's pods (ReplicaSet backing a Deployment):
-kubectl get pods -n <namespace> -l app=<label> -o wide
-```
+Moved verbatim to `references/diagnostic-commands.md` — see "**Step 0 — locate the failing pod(s) when name/namespace is unknown**" (load on demand).
+Applies when: the user cannot name the failing pod.
 
 ### Step 1: Identify the symptom category
 
@@ -171,47 +142,11 @@ affinity/selector with no match, or a pending PersistentVolumeClaim.
 | `Insufficient <device>` (e.g. gpu) | Limited resource (NVIDIA GPU) — pod requests a resource no node advertutes via device plugin | `kubectl describe nodes` Capacity; verify device-plugin DaemonSet |
 | `maximum graceful delete duration` etc. (rare) | Pod stuck in termination — different walk; not Pending | Check `deletionTimestamp` |
 
-**Diagnostic commands:**
+Moved verbatim to `references/diagnostic-commands.md` — see "**Step 2 — PENDING (FailedScheduling) commands**" (load on demand).
+Applies when: diagnosing a Pending pod on a live cluster.
 
-```bash
-# Capture the exact scheduler message:
-kubectl describe pod <pod> -n <ns> | grep -A 5 -i "Events\|FailedScheduling"
-
-# Or filter events directly:
-kubectl get events -n <ns> \
-  --field-selector involvedObject.name=<pod>,reason=FailedScheduling \
-  -o custom-columns=TIME:.lastTimestamp,MESSAGE:.message
-
-# Node capacity vs requests:
-kubectl describe nodes | grep -E "Name:|Allocated|cpu|memory|Conditions|Taints"
-
-# Compute pressure quickly:
-kubectl top nodes
-kubectl top pods -n <ns> --sort-by=cpu
-
-# Taint inventory:
-kubectl get nodes -o custom-columns=NAME:.metadata.name,TAINTS:.spec.taints,READY:.status.conditions[-1].type
-
-# PVC status (for volume-bound failures):
-kubectl get pvc -n <ns>
-kubectl describe pvc <pvc> -n <ns>
-```
-
-**Common fix patterns:**
-
-- **Insufficient CPU/memory:** raise the cluster's `desired` size, add a
-  Karpenter `NodePool` Provisioner with the right instance categories,
-  or lower the pod `resources.requests`. On EKS with Karpenter, check
-  `kubectl logs -n karpenter deployment/karpenter` for `cannot schedule`
-  events.
-- **Taint without toleration:** add a `tolerations` entry to the pod
-  spec, or remove the taint (`kubectl taint node <node> <key>-`).
-- **Affinity no match:** add the matching label to nodes (`kubectl label
-  nodes <node> <key>=<value>`) or relax the affinity.
-- **Cordoned nodes:** `kubectl uncordon <node>` once the node is healthy.
-- **PVC Pending:** for `gp2`/`gp3` StorageClass on EBS, the PVC AZ must
-  match a node AZ. Use `volumeBindingMode: WaitForFirstConsumer` (default
-  for gp3) or pin the pod's `nodeSelector` to the AZ with capacity.
+Moved verbatim to `references/failure-decision-tree.md` — see "**Step 2 — PENDING common fix patterns**" (load on demand).
+Applies when: remediating a FailedScheduling finding.
 
 ### Step 3: IMAGE_PULL diagnostic (ImagePullBackOff / ErrImagePull)
 
@@ -229,82 +164,14 @@ without a `Private` namespace identity policy.
 | Pull works for other pods on same node but not this pod | Cross-account ECR — image ARN includes a different account ID | Compare `image: <acct>.dkr.ecr.<region>.amazonaws.com/...`; verify node role trust + repo policy BOTH allow caller |
 | Pull works on newer nodes but fails on older | ECR token rotation + stale `aws-ecr-credential-provider` config on old AMI | Check node AMI version; upgrade the node group |
 
-**Diagnostic walk:**
+Moved verbatim to `references/failure-decision-tree.md` — see "**Step 3 — IMAGE_PULL diagnostic walk**" (load on demand).
+Applies when: walking an ImagePullBackOff / ErrImagePull to its cause.
 
-1. **Read the full event message** in `kubectl describe pod` Events.
-   The sub-string after `rpc error: code = Unknown desc =` is the
-   containerd error, which distinguishes auth vs manifest vs network.
-2. **Verify the image exists in ECR:**
-   `aws ecr describe-images --repository-name <repo> --image-ids imageTag=<tag>`.
-   If this returns `ImageNotFoundException`, the tag is wrong or purged.
-3. **Identify the node's instance role** and verify ECR read perms. The
-   four required actions are `ecr:GetAuthorizationToken`,
-   `ecr:BatchCheckLayerAvailability`, `ecr:GetDownloadUrlForLayer`,
-   `ecr:BatchGetImage`. The managed policy
-   `AmazonEC2ContainerRegistryReadOnly` covers all four. The managed
-   add-on `AmazonEKS_CNI_Policy` does NOT — do not confuse the two.
-4. **For cross-account ECR (image in account B, pod runs in A):** both
-   the node role in A AND the ECR repo policy in B must allow the pull.
-   This is the cross-account intersection rule. The EKS doc on cross-
-   account ECR is at https://repost.aws/knowledge-center/eks-ecs-cross-account-container-pull.
-5. **Verify the ECR VPC endpoints exist** if the pod's node is in a
-   private subnet: `com.amazonaws.<region>.ecr.api` AND
-   `com.amazonaws.<region>.ecr.dkr`. The `dkr` endpoint is what
-   containerd actually calls; the `api` endpoint is for registry API
-   calls. Both are needed.
-6. **Check the ECR lifecycle policy** if the tag worked yesterday but
-   fails today: `aws ecr get-lifecycle-policy --repository-name <repo>`.
-   A rule that purges `untagged` or `older than N images` can delete the
-   image. `describe-images` will then return `ImageNotFoundException`.
+Moved verbatim to `references/diagnostic-commands.md` — see "**Step 3 — IMAGE_PULL commands**" (load on demand).
+Applies when: diagnosing image-pull failures on a live cluster.
 
-**Diagnostic commands:**
-
-```bash
-# Events with full message (the sub-string is the discriminator):
-kubectl describe pod <pod> -n <ns> | grep -A 2 "Failed to pull\|Failed.*image"
-
-# Find the node's instance identity (then map to an IAM role via the
-# EC2 console or describe-instances):
-kubectl get pod <pod> -n <ns> -o jsonpath='{.spec.nodeName}'
-NODE=$(kubectl get pod <pod> -n <ns> -o jsonpath='{.spec.nodeName}')
-INSTANCE_ID=$(kubectl get node "$NODE" -o jsonpath='{.spec.providerID}' | sed 's|.*/||')
-
-# Verify the image exists:
-aws ecr describe-images --repository-name <repo> --image-ids imageTag=<tag>
-
-# Verify the node instance role has ECR read perms (use the instance profile role):
-aws iam simulate-principal-policy \
-  --policy-source-arn arn:aws:iam::<account>:role/<node-instance-role> \
-  --action-names ecr:GetAuthorizationToken ecr:BatchCheckLayerAvailability \
-                  ecr:GetDownloadUrlForLayer ecr:BatchGetImage \
-  --resource-arns arn:aws:ecr:<region>:<account>:repository/<repo>
-
-# Verify VPC endpoints for ECR:
-aws ec2 describe-vpc-endpoints \
-  --filters Name=service-name,Values=com.amazonaws.<region>.ecr.api \
-                     com.amazonaws.<region>.ecr.dkr \
-  --query 'VpcEndpoints[*].{id:VpcEndpointId,service:ServiceName,state:State,subnets:SubnetIds}'
-
-# Verify the repo policy (cross-account):
-aws ecr get-repository-policy --repository-name <repo>
-```
-
-**Common fix patterns:**
-
-- Wrong tag: pin the image to the actual tag in ECR or use a digest
-  reference (`<repo>@sha256:...`).
-- Node role missing ECR perms: attach
-  `AmazonEC2ContainerRegistryReadOnly` to the node instance role, OR if
-  you run IRSA / Pod Identity, attach the policy to the *service
-  account* role and reference it via `serviceAccountName` with
-  `pod-security.kubernetes.io/enforce: restricted` annotations.
-- Network: add VPC endpoints for ECR (interface endpoints, both `.api`
-  and `.dkr`), or fix the NAT gateway route.
-- Cross-account: update the ECR repo policy in the image-owning account
-  to include `arn:aws:iam::<caller-acct>:root` in `Principal`.
-- Disk full: drain the node (`kubectl drain <node> --ignore-daemonsets
-  --delete-emptydir-data`) and let the autoscaler replace it, or upgrade
-  the node AMI to a larger root volume.
+Moved verbatim to `references/failure-decision-tree.md` — see "**Step 3 — IMAGE_PULL common fix patterns**" (load on demand).
+Applies when: remediating an image-pull finding.
 
 ### Step 4: CRASH_LOOP diagnostic (CrashLoopBackOff)
 
@@ -322,51 +189,11 @@ cause; `kubectl describe pod` Events alone are too generic.
 | 255 | Application-defined error | `kubectl logs --previous` |
 | Empty + Events mention `CreateContainerConfigError` | kubelet could not construct the container spec — missing ConfigMap/Secret referenced in `envFrom` or `env.valueFrom` | `kubectl describe pod` Events; verify referenced Secret/ConfigMap exists in the namespace |
 
-**Diagnostic command:**
+Moved verbatim to `references/diagnostic-commands.md` — see "**Step 4 — CRASH_LOOP commands**" (load on demand).
+Applies when: diagnosing a CrashLoopBackOff on a live cluster.
 
-```bash
-# The current container just started; the logs that explain the crash
-# are in the PREVIOUS instance:
-kubectl logs <pod> -n <ns> --previous
-# For a specific container (when the pod has multiple):
-kubectl logs <pod> -n <ns> -c <container> --previous
-
-# Describe the pod to read lastState (exit code, reason, finishedAt):
-kubectl describe pod <pod> -n <ns> | grep -A 8 "Last State\|State:"
-# Or get lastState as JSON for precise parsing:
-kubectl get pod <pod> -n <ns> -o jsonpath='{.status.containerStatuses[*].lastState}'
-
-# Events timeline (filter by this pod):
-kubectl get events -n <ns> \
-  --field-selector involvedObject.name=<pod> \
-  --sort-by='.lastTimestamp' \
-  -o custom-columns=TIME:.lastTimestamp,REASON:.reason,MESSAGE:.message
-```
-
-**Common CRASH_LOOP root causes:**
-
-- **Missing required environment variable.** The application reads an
-  env var that is not in the pod spec (`KeyError`, `NameError`,
-  `ReferenceError`). Fix: add it via `env.value` or `env.valueFrom`.
-- **Missing Secret/ConfigMap reference.** `envFrom.configMapKeyRef.name`
-  points at a ConfigMap that does not exist in the namespace. The pod
-  fails before the container starts; Events shows
-  `CreateContainerConfigError` or `container has no logs`.
-- **Database / downstream dependency unreachable.** Logs show
-  `Connection refused` / `i/o timeout`. Fix: verify Service name, DNS
-  resolution, NetworkPolicy, security group.
-- **Wrong command / args.** `command: ["./app"]` but the binary is at
-  `/app/server`. Logs: `no such file or directory`. Fix: pin the command
-  to an absolute path inside the image.
-- **Image architecture mismatch.** Built for `linux/amd64`, deployed to
-  a Graviton (`arm64`) node group — or vice versa. Logs show
-  `exec format error` (exit 126 / 127 / 139). Fix: build a multi-arch
-  image (`docker buildx build --platform linux/amd64,linux/arm64`).
-- **Liveness probe killing the container too aggressively.** See Step 6
-  — if the liveness probe is misconfigured, the kubelet kills the
-  container, restart count climbs, and the pod looks like it is
-  crash-looping. The give-away: Events shows `Liveness probe failed` +
-  `Container containerX killed`.
+Moved verbatim to `references/failure-decision-tree.md` — see "**Step 4 — CRASH_LOOP common root causes**" (load on demand).
+Applies when: the exit code or log pattern does not match an obvious cause.
 
 ### Step 5: OOM diagnostic (OOMKilled)
 
@@ -398,35 +225,11 @@ container, sometimes the kubelet itself).
 | Node oversubscribed (lots of `BestEffort` or `Burstable` pods) | `kubectl describe node <node>` Allocated resources > 90% | Add `requests.memory` everywhere; lower pod density via `topologySpreadConstraints` or node taints |
 | DaemonSet (logging agent, CNI) consuming memory | `kubectl top pods -A --sort-by=memory` for DaemonSet pods | Resize the DaemonSet, or upgrade the node instance type |
 
-**Diagnostic commands:**
+Moved verbatim to `references/diagnostic-commands.md` — see "**Step 5 — OOM commands**" (load on demand).
+Applies when: diagnosing OOMKilled / node memory pressure on a live cluster.
 
-```bash
-# Read the OOM signal from lastState:
-kubectl get pod <pod> -n <ns> -o jsonpath='{.status.containerStatuses[*].lastState}'
-# Expect: {"terminated":{"reason":"OOMKilled","exitCode":137,...}}
-
-# Pod memory usage right before death (if metrics-server is installed):
-kubectl top pod <pod> -n <ns>
-kubectl top pod <pod> -n <ns> --containers
-
-# Node-level pressure:
-kubectl describe node <node> | grep -A 5 "Allocated\|MemoryPressure"
-
-# Read the pod's memory spec:
-kubectl get pod <pod> -n <ns> -o jsonpath='{.spec.containers[*].name}{"\n"}{.spec.containers[*].resources}'
-```
-
-**EKS-specific note.** EKS nodes by default run cgroup v2 on AL2023
-AMIs (Kubernetes 1.29+). cgroup v2 enforces memory at the pod cgroup,
-not per container — so a pod with two containers and a single pod-level
-limit will be killed as a unit if either container drives the total
-over. Set per-container `limits.memory` AND a pod total implied by the
-sum.
-
-**Java workloads.** Use `-XX:MaxRAMPercentage=75` (or `-XX:InitialRAMPercentage`)
-so the JVM heap tracks the cgroup limit. Never set `-Xmx` higher than
-`resources.limits.memory`; the JVM will be OOMKilled before it ever
-reaches the heap ceiling.
+Moved verbatim to `references/advanced-patterns.md` — see "**Step 5 — EKS-specific OOM notes (cgroup v2, Java)**" (load on demand).
+Applies when: an OOM involves AL2023 cgroup v2 pod-cgroup enforcement or JVM heap sizing.
 
 ### Step 6: PROBE_FAILURE diagnostic (Liveness / Readiness)
 
@@ -443,70 +246,14 @@ from Service endpoints (no traffic).
 | Liveness killing the container repeatedly | Misconfigured liveness path being confused for a real crash (loop into Step 4) | Look at Events ordering — Liveness failures precede the kill |
 | gRPC probe failing | `grpcProbe` configured but app doesn't enable gRPC health checks | Use `grpc.health.v1.Health/Check` per the gRPC health protocol |
 
-**Diagnostic walk:**
+Moved verbatim to `references/failure-decision-tree.md` — see "**Step 6 — PROBE_FAILURE diagnostic walk**" (load on demand).
+Applies when: walking a liveness/readiness failure to its cause.
 
-1. **Identify which probe is failing** — liveness (causes restarts) vs
-   readiness (causes not-ready). Read Events:
-   `kubectl get events -n <ns> --field-selector involvedObject.name=<pod>`
-   and grep for `Liveness probe failed` vs `Readiness probe failed`.
-2. **Read the probe config:**
-   `kubectl get pod <pod> -n <ns> -o jsonpath='{.spec.containers[*].livenessProbe}'`
-   (and `.readinessProbe`). Note the path, port, scheme, initial delay,
-   period, timeout, thresholds.
-3. **Reproduce the probe from inside the pod:**
-   `kubectl exec -n <ns> <pod> -c <container> -- curl -i http://localhost:<port><path>`.
-   If this returns 200, the probe config is wrong (wrong port, wrong
-   path, wrong scheme, TLS cert mismatch). If non-200, the application
-   has a bug or its dependency is down.
-4. **For liveness specifically:** if the probe passes when curled
-   manually but fails when the kubelet runs it, check whether the probe
-   path requires CPU that the app does not have under load. Raise
-   `timeoutSeconds` or lower `periodSeconds`.
-5. **Check `initialDelaySeconds`.** If the application needs 60 seconds
-   to start and the probe begins at 5 seconds, the kubelet will kill
-   the container before the app is ready — restart count climbs,
-   presenting as CrashLoopBackOff.
-6. **Verify the Service endpoints:**
-   `kubectl describe endpoints <svc> -n <ns>` (or
-   `kubectl get endpointslices -n <ns>`). A readiness failure shows the
-   pod IP missing from the endpoints list.
+Moved verbatim to `references/diagnostic-commands.md` — see "**Step 6 — PROBE_FAILURE commands**" (load on demand).
+Applies when: diagnosing probe failures on a live cluster.
 
-**Diagnostic commands:**
-
-```bash
-# Read both probes + container ports in one shot:
-kubectl get pod <pod> -n <ns> -o yaml | grep -A 15 "livenessProbe\|readinessProbe\|startupProbe"
-kubectl get pod <pod> -n <ns> -o jsonpath='{.spec.containers[*].{name:name,ports:ports,liveness:livenessProbe,readiness:readinessProbe,startup:startupProbe}}'
-
-# Filter probe events:
-kubectl get events -n <ns> --field-selector involvedObject.name=<pod> \
-  | grep -E "probe failed|Killing|Unhealthy"
-
-# Reproduce the probe from inside the pod:
-kubectl exec -n <ns> <pod> -c <container> -- curl -i \
-  http://localhost:<port><path>
-
-# Service endpoint membership (readiness gate):
-kubectl describe endpoints <svc> -n <ns>
-kubectl get endpointslices -n <ns> -o wide
-```
-
-**Common fix patterns:**
-
-- **Path/port mismatch:** align `livenessProbe.httpGet.path` and `.port`
-  with the application's actual endpoint. Common: `/health` vs `/healthz`
-  vs `/api/health`; `containerPort: 8080` but probe port `80`.
-- **`initialDelaySeconds` too short:** raise it above the application's
-  known startup time. For Spring Boot / Java, use 90+ seconds. Better,
-  use a `startupProbe` (introduced in 1.16, GA in 1.20) so the liveness
-  probe only runs after startup completes.
-- **TLS scheme:** if the app serves HTTPS only, set
-  `livenessProbe.httpGet.scheme: HTTPS`. The kubelet does not follow
-  redirects from HTTP to HTTPS.
-- **Readiness depends on a dependency:** the readiness probe path should
-  fail (return non-200) when a *required* dependency is down. If the
-  readiness probe path always returns 200, it is not actually testing
-  readiness.
+Moved verbatim to `references/failure-decision-tree.md` — see "**Step 6 — PROBE_FAILURE common fix patterns**" (load on demand).
+Applies when: remediating a probe-failure finding.
 
 ### Step 7: INIT_FAILURE diagnostic (Init:CrashLoopBackOff / Init:Error)
 
@@ -522,49 +269,14 @@ indefinitely.
 | Init container takes too long, pod stuck in `Init:i/N` | Init container doing too much (loading huge dataset) — not a failure but appears stuck | `kubectl logs <pod> -c <init-container-name> -f` to watch progress |
 | Init container runs once but pod recreated by controller | Init containers re-run on every pod start — if it expects state from previous run, it fails | Make init containers idempotent; never depend on prior-run state |
 
-**Diagnostic walk:**
+Moved verbatim to `references/failure-decision-tree.md` — see "**Step 7 — INIT_FAILURE diagnostic walk**" (load on demand).
+Applies when: walking an Init:CrashLoopBackOff to its cause.
 
-1. **List init container statuses:**
-   `kubectl get pod <pod> -n <ns> -o jsonpath='{.status.initContainerStatuses}'`.
-   Identify which init container is failing (the one whose `state` is
-   not `terminated` with `reason: Completed`).
-2. **Read its logs with `--previous`:**
-   `kubectl logs <pod> -n <ns> -c <init-container-name> --previous`.
-   The init container may be in a tight crash loop; the current logs
-   may be empty.
-3. **If the init container waits on a dependency (waiting for DB migration):**
-   verify the dependency is reachable from the pod network. Init
-   containers share the pod network, so Service DNS should resolve.
-4. **Verify init container ordering:** init containers run sequentially
-   in spec order. If init container 2 depends on something init container
-   1 sets up (e.g., a shared volume), verify the volume mount is
-   bidirectional.
+Moved verbatim to `references/diagnostic-commands.md` — see "**Step 7 — INIT_FAILURE commands**" (load on demand).
+Applies when: diagnosing init-container failures on a live cluster.
 
-**Diagnostic commands:**
-
-```bash
-# List init containers and their status:
-kubectl get pod <pod> -n <ns> \
-  -o jsonpath='{range .status.initContainerStatuses[*]}{.name}{"  "}{.state}{"\n"}{end}'
-
-# Read the failing init container's previous logs:
-kubectl logs <pod> -n <ns> -c <init-container-name> --previous
-
-# Watch live progress if the init container is slow but not failing:
-kubectl logs <pod> -n <ns> -c <init-container-name> -f
-```
-
-**Common INIT_FAILURE root causes:**
-
-- **Database migration that fails on schema mismatch.** Fix the
-  migration script or pre-flight check it.
-- **Waiting for a Service that does not exist yet.** Use a
-  `Job`-orchestrated init or remove the dependency.
-- **Permissions on a mounted Secret / ConfigMap** — the init container
-  tries to write to a `readOnly: true` mount. Fix the volume mount or
-  use an `emptyDir`.
-- **Init container image is wrong / not built** — same IMAGE_PULL tree
-  (Step 3) but for the init container's image field.
+Moved verbatim to `references/failure-decision-tree.md` — see "**Step 7 — INIT_FAILURE common root causes**" (load on demand).
+Applies when: the init container fails without an obvious error.
 
 ### Step 8: Map to root-cause catalog
 
@@ -589,17 +301,8 @@ canonical fixes.
 
 ### Step 9: Verify the fix
 
-Before applying, validate the proposed fix with one of:
-
-- **For pod spec changes:** apply to a single pod via `kubectl apply` or
-  `kubectl edit`, watch the pod come up with
-  `kubectl get pod <pod> -w` before rolling the Deployment.
-- **For probe changes:** use `kubectl exec` to curl the probe path
-  manually before trusting the kubelet verdict.
-- **For node scaling:** wait for the new nodes to be `Ready` and the
-  pending pods to bind before declaring the fix complete.
-- **For image changes:** verify the new tag exists in ECR and pull it
-  locally first (`docker pull <image>`).
+Moved verbatim to `references/failure-decision-tree.md` — see "**Step 9 — verify the fix**" (load on demand).
+Applies when: validating a proposed fix before rolling it out.
 
 ### Step 10: Decide — ROOT_CAUSE_FOUND vs NEED_MORE_INFO vs ESCALATE
 
@@ -672,32 +375,8 @@ REMEDIATION:
 
 ## Expert heuristic — "The pod troubleshooting trinity"
 
-Three commands, in order, give you 90% of all pod diagnoses. Run them
-before reaching for anything else.
-
-1. **Events first:** `kubectl describe pod <pod> -n <ns> | grep -A 10 Events`
-   — the Events section is the kubelet/scheduler narrative. It tells
-   you WHAT the control plane tried and HOW it failed:
-   `FailedScheduling: 0/6 nodes are available`, `Failed to pull image
-   "X"`, `Liveness probe failed: HTTP probe failed with status 500`,
-   `CreateContainerConfigError: configmap "Y" not found`.
-2. **Logs second:** `kubectl logs <pod> -n <ns> -c <container> --previous`
-   — the `--previous` flag is critical for CrashLoopBackOff; it shows
-   the logs of the container instance that crashed, not the brand-new
-   one that just started. The application error is here: `KeyError`,
-   `ConnectionRefusedError`, `exec format error`, `OOMKilled` (no logs —
-   killed by kernel).
-3. **Events again (timeline):**
-   `kubectl get events -n <ns> --field-selector
-   involvedObject.name=<pod> --sort-by='.lastTimestamp'` — this shows
-   the ORDER things happened, which is critical for distinguishing cause
-   from consequence. Liveness-failed-then-killed vs killed-then-restart
-   vs ImagePullBackOff-from-the-start are three different diagnoses and
-   the timeline disambiguates them.
-
-Everything else (top, metrics-server, Prometheus, AWS API calls) is
-confirmatory. The trinity alone identifies the root cause in the
-majority of cases.
+Moved verbatim to `references/advanced-patterns.md` — see "**Expert heuristic — the pod troubleshooting trinity**" (load on demand).
+Applies when: you want the 90%-coverage three-command diagnostic order.
 
 ## Anti-Patterns — NEVER
 
@@ -800,112 +479,25 @@ majority of cases.
 
 ## Remediation guidance
 
-### For PENDING
-
-1. Read the Events `FailedScheduling` message verbatim. The sub-string
-   after the colon is the discriminator (`Insufficient cpu`, `had
-   taints`, `didn't match node affinity`, `unschedulable`).
-2. For resource pressure: `kubectl top nodes` and
-   `kubectl describe node <node>` to see Allocatable vs Requests. Scale
-   the EKS managed node group (`aws eks update-nodegroup-config` to bump
-   desiredSize) or check Karpenter NodePool.
-3. For taints: list taints
-   (`kubectl get nodes -o custom-columns=NAME:.metadata.name,TAINTS:.spec.taints`)
-   and either add a toleration or remove the taint.
-4. For PVC: `kubectl describe pvc <pvc> -n <ns>` — check StorageClass
-   exists, has capacity, and AZ matches pod's affinity.
-
-### For IMAGE_PULL
-
-1. Verify the image exists in ECR with `aws ecr describe-images`.
-2. Identify the puller's IAM identity (node role, or IRSA/Pod Identity
-   role via `serviceAccountName`) and verify ECR read permissions using
-   `aws iam simulate-principal-policy`.
-3. Verify network reachability (VPC endpoints for ECR or NAT gateway).
-4. For cross-account ECR, update the repo policy in the image-owning
-   account to include the caller's account root.
-
-### For CRASH_LOOP
-
-1. Read `kubectl logs <pod> -c <container> --previous`.
-2. Cross-reference the exit code and log pattern with common causes
-   (missing env var, dependency outage, version mismatch, arch
-   mismatch).
-3. If the deployment controller is rolling back (Deployment with
-   `progressDeadlineSeconds` exceeded), look at the underlying pod
-   failure, not the rollout state.
-4. Roll back to the last known-good image tag if the fix is not
-   immediately available.
-
-### For OOM
-
-1. Identify container-level vs node-level OOM from
-   `status.containerStatuses[].lastState.reason`.
-2. For container OOM: raise `resources.limits.memory`. For Java: use
-   `-XX:MaxRAMPercentage=75` so the JVM tracks the cgroup limit.
-3. For node OOM: set `resources.requests.memory` on every pod; consider
-   ` Guaranteed` QoS for critical pods; add nodes.
-4. Enable metrics-server and a long-term metrics sink (Prometheus) to
-   catch memory leaks before they OOM.
-
-### For PROBE_FAILURE
-
-1. Identify liveness vs readiness failure from Events.
-2. Reproduce the probe manually:
-   `kubectl exec -n <ns> <pod> -c <container> -- curl -i http://localhost:<port><path>`.
-3. Align probe path/port/scheme with the application's actual endpoint.
-4. Add a `startupProbe` so liveness does not fire during application
-   startup; raise `initialDelaySeconds` if startupProbe is unavailable.
-5. For readiness failures, verify the readiness path actually depends
-   on a real dependency (DB, downstream service).
-
-### For INIT_FAILURE
-
-1. List init container statuses with
-   `kubectl get pod -o jsonpath='{.status.initContainerStatuses}'`.
-2. Read the failing init container's logs with `--previous`.
-3. Fix the init container's script / image / permissions; make it
-   idempotent.
+Moved verbatim to `references/failure-decision-tree.md` — see "**Remediation guidance by category**" (load on demand).
+Applies when: emitting the REMEDIATION block for a confirmed root cause.
 
 ## Recent AWS features (2024-2026)
 
-- **EKS Pod Identity (2023 GA, widely adopted 2024-2026):** EKS Pod
-  Identity is the recommended replacement for IRSA. The agent
-  (`eks-pod-identity-agent`) running as a DaemonSet vends AWS credentials
-  via a Unix socket. Troubleshoot Pod Identity failures by checking
-  `kubectl get pods -n kube-system -l app.kubernetes.io/name=eks-pod-identity-agent`
-  and the pod's `serviceAccountName` + the `EksPodIdentityAgent` add-on
-  version.
-- **Karpenter (default in many EKS blueprints 2024-2026):** Karpenter
-  replaces Cluster Autoscaler. Pending pods trigger Karpenter
-  provisioning; check `kubectl logs -n karpenter
-  deployment/karpenter` for `bucketing`, `cannot schedule`, or
-  `inflight` messages. Karpenter v1 removed `Provisioner` in favor of
-  `NodePool` + `NodeClaim`.
-- **Amazon Linux 2023 node AMI (default for EKS 1.29+):** AL2023 runs
-  cgroup v2 and containerd natively (no `dockershim`). cgroup v2
-  changes OOM behavior: memory is enforced at the pod cgroup by default.
-  Troubleshoot by reading `/sys/fs/cgroup/` from inside the container.
-- **gp3 EBS volumes default for new StorageClasses (2024+):** gp3
-  decouples IOPS from volume size. If PVC is Pending on a gp3
-  StorageClass, the AZ may lack gp3 capacity — try `volumeBindingMode:
-  WaitForFirstConsumer` or a different AZ.
-- **EKS Auto Mode (late 2024 GA):** EKS Auto Mode manages node
-  provisioning for you via an embedded Karpenter. Pending pods that
-  should auto-provision may fail if the `EKS_AUTO_NODEGROUP` role or
-  the `nodeclass` / `nodepool` config is wrong. Check
-  `kubectl get nodepool,nodeclaim -A`.
-- **Network Policies via Amazon VPC CNI Network Policy Engine (2024):**
-  NetworkPolicy enforcement is built into the VPC CNI; an unintended
-  default deny can block ECR pulls and Service-to-Service traffic,
-  presenting as image pull timeouts or readiness failures. Check
-  `kubectl get networkpolicy -A` and the VPC CNI ConfigMap.
+Moved verbatim to `references/advanced-patterns.md` — see "**Recent AWS features (2024-2026)**" (load on demand).
+Applies when: the cluster uses Pod Identity, Karpenter v1, AL2023, gp3, Auto Mode, or VPC CNI network policies.
 
 ## References
 
 See `references/failure-decision-tree.md` for the full symptom-to-cause
 walk with worked examples per category, and `references/diagnostic-
 commands.md` for the canonical command script for each failure category.
+
+## References (load on demand)
+
+- [references/failure-decision-tree.md](references/failure-decision-tree.md) — full symptom-to-cause walk with worked examples per category, plus the per-step diagnostic walks, fix-pattern catalogs, verify-the-fix guidance, and remediation guidance moved verbatim from this file.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — universal first commands plus the per-step/per-category command scripts moved verbatim from this file.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — mindset deep dive, EKS-specific OOM notes (cgroup v2, Java), the troubleshooting trinity, and recent AWS features (moved verbatim from this file).
 
 ## Domain
 
