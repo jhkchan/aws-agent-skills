@@ -169,74 +169,18 @@ non-negotiable for any non-simple policy.
 
 ## Expert heuristic: the weighted-without-health-check myth
 
-The most common misconception: "weighted routing distributes traffic
-across healthy targets." It does not, by itself.
-
-```text
-Operator thinks:                  What actually happens:
-Two weighted records 90/10,       Weighted returns record A 90% of the
-target A up, target B down.       time and B 10% of the time regardless
-Traffic: 90/10 healthy.           of health. 10% of clients get a dead
-                                  IP. No alarm. No failover.
-```
-
-Weighted routing is a deterministic distribution by weight, evaluated
-per DNS query, with NO awareness of target health unless you (a)
-attach a health check to EACH weighted record and (b) the records'
-`HealthCheckId` is set. When the HC is unhealthy, Route 53 omits that
-record from the weighted distribution and re-normalizes the remaining
-weights. Without the HC, the dead target keeps receiving its share.
-
-This applies equally to latency, multivalue answer, and geoproximity:
-the policy itself does not check target health. The remedy is one HC
-per record, with `get-health-check-status` verification in Step 8.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Expert heuristic: the weighted-without-health-check myth".
+> Load when: reasoning about weighted/latency/multivalue/geoproximity without health checks
 
 ## Expert heuristic: TTL and routing-policy interaction
 
-TTL is the resolver cache duration. The interaction with routing
-policy is not obvious:
-
-- **Simple routing**: TTL = stability. 300s is the production default.
-  A 60s TTL on simple is wasted (the target doesn't change).
-- **Weighted routing**: TTL = canary granularity. A 300s TTL means a
-  resolver caches one branch of the split for 5 minutes, so a 10%
-  canary is "10% of resolvers for 5 minutes," not "10% of queries."
-  Use 60s for canaries, 300s for stable weighted.
-- **Failover routing**: TTL = failover speed. The PRIMARY record's TTL
-  is how long a resolver caches the primary IP after the PRIMARY HC
-  flips unhealthy. 60s is the production default for fast failover.
-  300s means up to 5 minutes of continued traffic to a dead primary.
-- **Latency / geolocation**: TTL = stability of the regional decision.
-  300s is standard; clients rarely change region within 5 minutes.
-- **Multivalue answer**: TTL = how long a dead IP stays in client
-  rotation. 30-60s is typical; longer TTLs defeat multivalue's
-  built-in retry.
-
-The wrong TTL produces "feels broken" routing without any error. The
-procedure below applies the policy-appropriate TTL by default.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Expert heuristic: TTL and routing-policy interaction".
+> Load when: choosing the TTL for a policy (Step 7)
 
 ## Expert heuristic: Application Recovery Controller safety rules
 
-ARC routing controls are boolean on/off switches for a region's traffic
-— a sub-second DR cutover primitive. The danger is symmetric: flipping
-the wrong control off is a full region outage, and there is no DNS TTL
-to slow it down.
-
-**Three safety invariants before any production ARC deployment:**
-
-1. **Safety rule (mandatory):** a logical AND/OR rule that blocks
-   "all controls off" — e.g., "us-east-1-routing-control OR
-   us-west-2-routing-control must be ON." Without this, an operator
-   flipping both off takes the entire workload down with no DNS
-   recourse. The safety rule is the single most important ARC
-   configuration.
-2. **Readiness check on the standby:** before flipping routing to the
-   secondary, a readiness check confirms the secondary has capacity,
-   scaled instances, and a healthy dependency tree. Cutover without
-   readiness = overload the secondary, secondary fails, total outage.
-3. **Acknowledged alarm on every control:** every flip should emit a
-   CloudWatch alarm and an SNS notification. ARC flips are rare and
-   high-impact; an alarm is cheap insurance against silent flips.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Expert heuristic: Application Recovery Controller safety rules".
+> Load when: planning any ARC routing-control deployment (safety rule, readiness check, alarms)
 
 ## Prerequisites (verify before provisioning)
 
@@ -336,33 +280,8 @@ aws route53 change-resource-record-sets \
   --change-batch file://change-batch.json
 ```
 
-```json
-{
-  "Changes": [{
-    "Action": "CREATE",
-    "ResourceRecordSet": {
-      "Name": "api.example.com.",
-      "Type": "A",
-      "SetIdentifier": "primary",
-      "Weight": 90,
-      "HealthCheckId": "<hc-id>",
-      "TTL": 60,
-      "ResourceRecords": [{"Value": "10.0.0.10"}]
-    }
-  },{
-    "Action": "CREATE",
-    "ResourceRecordSet": {
-      "Name": "api.example.com.",
-      "Type": "A",
-      "SetIdentifier": "canary",
-      "Weight": 10,
-      "HealthCheckId": "<hc-id-2>",
-      "TTL": 60,
-      "ResourceRecords": [{"Value": "10.0.0.20"}]
-    }
-  }]
-}
-```
+> **Moved verbatim** → [references/routing-policy-change-batches.md](references/routing-policy-change-batches.md) § "Weighted 90/10 canary change-batch (Step 5 worked JSON)".
+> Load when: writing the atomic change-batch for a weighted canary set
 
 **Common mistake:** posting weighted records one-at-a-time. Until both
 exist, the weighted set is incomplete and Route 53 sends 100% to the
@@ -370,57 +289,8 @@ single existing record, defeating the canary intent. Batch them.
 
 ### Step 6 — Optional: Traffic policy / ARC routing control
 
-#### 6a. Traffic policy (visual-editor, versioned routing-as-code)
-
-```bash
-aws route53 create-traffic-policy \
-  --name <POLICY_NAME> \
-  --document file://policy.json
-```
-
-The policy document encodes the routing graph (start record, endpoints,
-rules). To deploy, create an instance:
-
-```bash
-aws route53 create-traffic-policy-instance \
-  --hosted-zone-id <ZONE_ID> \
-  --name api.example.com. \
-  --ttl 60 \
-  --traffic-policy-id <POLICY_ID> \
-  --traffic-policy-version 1
-```
-
-**Common mistake:** updating the policy document creates a new version,
-but the existing instance continues pointing at version 1 until you
-explicitly `update-traffic-policy-instance`. The change looks like it
-did nothing.
-
-#### 6b. Application Recovery Controller
-
-```bash
-# Cluster + control panel (one-time)
-aws route53-recovery-control-config create-cluster --cluster-name <NAME>
-aws route53-recovery-control-config create-control-panel \
-  --cluster-arn <CLUSTER_ARN> --control-panel-name <NAME>
-
-# Routing control
-aws route53-recovery-control-config create-routing-control \
-  --cluster-arn <CLUSTER_ARN> \
-  --control-panel-arn <PANEL_ARN> \
-  --routing-control-name us-east-1-routing
-
-# Safety rule (MANDATORY)
-aws route53-recovery-control-config create-safety-rule \
-  --control-panel-arn <PANEL_ARN> \
-  --safety-rule-type ASSERTION \
-  --asserted-controls <CONTROL_ARN_1>,<CONTROL_ARN_2> \
-  --name prevent-all-off
-
-# Readiness check
-aws route53-recovery-readiness create-readiness-check \
-  --readiness-check-name <NAME> \
-  --resource-set-arn <RESOURCE_SET_ARN>
-```
+> **Moved verbatim** → [references/health-check-and-arc-procedures.md](references/health-check-and-arc-procedures.md) § "Step 6 — Traffic policy / ARC routing control CLIs".
+> Load when: provisioning a traffic policy + instance or ARC cluster / control panel / routing control / safety rule / readiness check
 
 ### Step 7 — Apply TTL appropriate to the policy
 
@@ -593,20 +463,8 @@ VERIFICATION_COMMANDS:
 
 ### Perfect example output — PREREQUISITES_MISSING
 
-```text
-RECORD_SET: api.example.com A (routing policy: weighted)
-VERDICT: PREREQUISITES_MISSING
-CHECKLIST:
-  [✓] Hosted zone confirmed: Z1DABCDEFGHIJ (example.com)
-  [✓] Routing policy: weighted
-  [✓] Target(s) resolved: primary 10.0.0.10 (w=90), canary 10.0.0.20 (w=10)
-  [✗] Health check(s): no HC ID provided for canary target 10.0.0.20 — weighted without HC sends 10% of traffic to a possibly-dead target for the whole TTL window. Create HC before applying.
-  [—] Change-batch: deferred until HC exists
-  [OPTIONAL] Optional feature: none
-  [✗] TTL applied: cannot set without HC confirmation (60s recommended for canary)
-VERIFICATION_COMMANDS:
-  aws route53 list-health-checks --query 'HealthChecks[?HealthCheckConfig.FullyQualifiedDomainName==`api.example.com`]'
-```
+> **Moved verbatim** → [references/worked-examples.md](references/worked-examples.md) § "Perfect example output — PREREQUISITES_MISSING".
+> Load when: emitting the checklist block for a PREREQUISITES_MISSING verdict (missing HC on a weighted canary)
 
 **Self-check before emit:**
 - [ ] All 7 checklist rows present (no omitted items)?
@@ -619,23 +477,13 @@ VERIFICATION_COMMANDS:
 
 ## Recent AWS features
 
-- **IP-based routing (CIDR routing):** route based on the client's
-  EDNS-client-subnet CIDR block. Overlapping CIDRs evaluate in
-  document order — first match wins. Use for fine-grained traffic
-  engineering (e.g., direct known office ranges to a specific origin).
-- **CidrRoutingConfig in alias records:** IP-based routing is now
-  compatible with alias targets, expanding the routing matrix.
-- **Route 53 Application Recovery Controller improvements:** safety
-  rules support AND/OR; readiness checks now support Lambda and
-  DynamoDB resource types; routing-control state changes are now
-  auditable via CloudTrail with the `route53-recovery-cluster`
-  service prefix.
-- **Traffic policy versioning:** max versions per policy raised to
-  1000; `update-traffic-policy-instance` is the only way to move an
-  instance to a new version (the instance does not auto-track).
-- **Health check Lambda-based:** Route 53 can now use a CloudWatch
-  alarm backed by a Lambda as a health check, enabling checks of
-  private-VPC endpoints that Route 53's public checkers cannot reach.
-- **Geolocation subdivision granularity:** added support for more
-  ISO 3166-2 subdivisions; verify coverage in the AWS Region Table
-  before relying on a specific subdivision code.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Recent AWS features".
+> Load when: deciding whether a newer feature (CIDR routing, ARC improvements, TP versioning, Lambda HCs, subdivisions) applies
+
+
+## References (load on demand)
+
+- [references/routing-policy-change-batches.md](references/routing-policy-change-batches.md) — per-policy change-batch JSON, including the weighted 90/10 canary batch moved from SKILL.md
+- [references/health-check-and-arc-procedures.md](references/health-check-and-arc-procedures.md) — health-check / traffic-policy / ARC procedures, including the Step 6 CLIs moved from SKILL.md
+- [references/worked-examples.md](references/worked-examples.md) — PREREQUISITES_MISSING example output moved from SKILL.md
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert heuristics (weighted-no-HC myth, TTL interaction, ARC safety) and recent AWS features

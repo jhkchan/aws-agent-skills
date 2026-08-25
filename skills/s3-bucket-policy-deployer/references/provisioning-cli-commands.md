@@ -284,3 +284,19 @@ resource "aws_s3_bucket_public_access_block" "main" {
 | Create OAC | `aws cloudfront create-origin-access-control` |
 | Get OAC | `aws cloudfront get-origin-access-control` |
 | Validate JSON | `python3 -m json.tool policy.json` |
+
+## Step 7 (SKILL) — disable ACLs with BucketOwnerEnforced
+
+```bash
+aws s3api put-bucket-ownership-controls \
+  --bucket my-bucket \
+  --ownership-controls Rules=[{ObjectOwnership=BucketOwnerEnforced}]
+```
+
+## Step 8 (SKILL) — verify policy size before applying
+
+**Verify policy size before applying:**
+```bash
+wc -c policy.json
+# Must be < 20480 bytes (20 KB)
+```

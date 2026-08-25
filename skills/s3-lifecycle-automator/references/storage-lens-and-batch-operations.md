@@ -218,3 +218,38 @@ Storage Lens verification (StorageClass distribution shifts over time)
 
 Choose StackSets for standard baselines, Lambda for tag-based
 customization, and Config for compliance enforcement.
+
+---
+
+### Step 7: Identify lifecycle gaps via Storage Lens
+
+
+```bash
+aws s3control get-storage-lens-configuration \
+  --config-id org-storage-lens \
+  --account-id 111111111111
+```
+
+| Metric | What it reveals | Action |
+|---|---|---|
+| `LifecycleEnabled` | Buckets with lifecycle policy | Deploy to the gap |
+| `StorageClass` distribution | Objects by storage class | If 90%+ Standard, lifecycle missing |
+| `ObjectAge` distribution | Objects by age bucket | Drives transition day selection |
+| `NoncurrentVersionStorage` | Non-current version storage | Drives NoncurrentVersionExpiration |
+
+---
+
+### Step 8: Retroactive tiering via S3 Batch Operations
+
+
+```bash
+aws s3control create-job \
+  --account-id 111111111111 \
+  --operation '{"S3SetStorageClass": {"TargetStorageClass": "GLACIER_IR"}}' \
+  --report '{"Bucket": "arn:aws:s3:::batch-ops-reports", "Format": "Report_CSV_20180820", "Enabled": true}' \
+  --manifest '{"Spec": {"Format": "S3BatchOperations_CSV_20180820", "Fields": ["Bucket", "Key"]}, "Location": {"ObjectArn": "arn:aws:s3:::batch-ops-manifests/manifest.csv"}}' \
+  --priority 10 \
+  --role-arn arn:aws:iam::111111111111:role/S3BatchOperationsRole
+```
+
+Monitor: `aws s3control describe-job --account-id 111111111111 --job-id <id>`

@@ -54,24 +54,8 @@ all that apply into a single recommendation):**
 5. **Object Lock / retention posture** — compliance-only, not a saving lever
    but surfaces alongside lifecycle for archive workflows.
 
-**Cost baseline summary (us-east-1, 2026, USD per GB-month):**
 
-| Tier | $/GB-mo | Min size / duration | Best for |
-|---|---|---|---|
-| Standard | 0.023 | — | Daily/weekly access |
-| Standard-IA | 0.0125 | 128 KB / 30-day | Monthly access |
-| Intelligent-Tiering | 0.023 entry + $0.0025/1K monitor | >128 KB avg | Unknown / mixed patterns |
-| Glacier Instant Retrieval | 0.004 | 90-day min | Quarterly access, ms retrieve |
-| Glacier Flexible Retrieval | 0.0036 | 90-day min | Archive, hours retrieve |
-| Glacier Deep Archive | 0.00099 | 180-day min | Long-term archive, 12h retrieve |
-
-One-Zone-IA ($0.01/GB, single-AZ risk), S3 Express One Zone ($0.16/GB,
-directory bucket, no lifecycle), and Reduced Redundancy (legacy, do not use)
-are documented in the reference. **Load `references/storage-class-pricing-matrix.md`
-before producing dollar estimates** — it contains full request/monitoring fees,
-retrieval-tier breakdowns, regional multipliers, and minimum-duration charge
-math that materially change the savings projection. The inline table above is
-a quick-selection aid, not a quoting source.
+→ Cost baseline table moved to [references/storage-class-pricing-matrix.md](references/storage-class-pricing-matrix.md) — load it before producing dollar estimates.
 
 ## Decision tree for storage class selection
 
@@ -131,49 +115,13 @@ START: Is the object accessed daily or weekly?
 
 ## Mindset
 
-**One-line takeaway:** the verdict is the **largest net-positive saving** after
-accounting for minimum-duration charges and retrieval fees — driven by four
-S3 realities:
-
-- **Lifecycle transitions are free to set but cost-prohibitive to undo.** A
-  premature Glacier transition on objects that turn out to be accessed weekly
-  incurs retrieval fees that wipe out months of savings. Always ground the
-  recommendation in observed access patterns (Storage Lens, CloudTrail
-  `GetObject`, or tags) before tiering.
-- **Minimum-duration charges dominate for short-lived objects.** Moving a
-  5-day-old object to Standard-IA bills the full 30-day IA charge even if it
-  is deleted on day 6. For logs that roll over weekly, IA is the wrong tier.
-- **Noncurrent versions are the silent S3 bill.** A versioned bucket with no
-  `NoncurrentVersionExpiration` rule accumulates every prior version of every
-  object indefinitely — 100 TB of "current" data routinely hides 400 TB of
-  noncurrent bytes that nobody looks at.
-- **Multipart uploads that never complete bill forever.** `AbortMultipartUpload`
-  is a one-line lifecycle rule that stops indefinite accumulation of orphaned
-  parts; almost every bucket operated >1 year has leaked parts.
-
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — the four S3 realities behind the verdict rule.
 ## Pre-flight: bucket metadata gate
 
 Run before classification. Misclassifying these produces false positives.
 
-**Pagination:** `list-objects-v2` paginates at 1,000 keys/page. For a full
-inventory use S3 Inventory (daily export) or `list-objects-v2 --page-size 1000
---starting-token` drained to completion. For large buckets, **do not** iterate
-all keys live — pull Storage Lens metrics instead (`get-storage-lens-configuration`
-plus the daily CSV/Parquet export).
 
-**Live-account pre-flight (skip if offline audit):**
-1. `aws s3api get-bucket-versioning` — if `Status != Enabled`, noncurrent-version
-   rules are no-ops; skip that dimension.
-2. `aws s3api get-bucket-lifecycle-configuration` — capture current rules to
-   compare against the recommendation.
-3. `aws s3api list-multipart-uploads --bucket <name>` — pending uploads older
-   than 7 days are a leak.
-4. `aws s3control get-storage-lens-configuration --config-id default` —
-   noncurrent-byte %, storage-class distribution, object-age histogram.
-5. `aws s3api get-object-lock-configuration` — if Object Lock is enabled, any
-   lifecycle rule MUST respect the retention period; violating it is a no-op.
-6. `aws s3api list-buckets --query "Buckets[*].Name"` — sweep every bucket in
-   every region; cross-region cost variance is material.
+→ Pagination guidance and the 6-command live-account pre-flight listing moved to [references/diagnostic-commands.md](references/diagnostic-commands.md); the attribute table below is the gate itself.
 
 **Malformed input:** if the input JSON is invalid or missing required fields,
 emit `VERDICT: ERROR` with `REASON: Bucket configuration is not valid JSON or
@@ -197,109 +145,12 @@ re-audit.`
 
 ### Step 0: Expert knowledge — non-obvious S3 lifecycle behaviors
 
-These behaviors are easy to misjudge without operational S3 experience.
-Each changes a recommendation if ignored:
-
-- **Transition `Days` counts from object creation, not from policy creation.**
-  A rule that says "transition to Standard-IA after 30 days" applies to objects
-  that are already 60 days old the moment the rule is added — they transition
-  immediately. This is usually what you want, but surprises operators.
-
-- **Minimum-duration charges bill regardless of when the object is deleted.**
-  Standard-IA bills 30 days minimum, Glacier tiers bill 90/180 days minimum.
-  If the workload deletes objects sooner, the storage class is more expensive
-  than Standard. Always model minimum-duration cost vs Standard before
-  recommending a transition.
-
-- **Small-object surcharge on IA tiers.** Standard-IA and One-Zone-IA have a
-  minimum billable size of 128 KB. Objects smaller than 128 KB are billed as
-  if they were 128 KB — for buckets of small JSON/config files, IA is often
-  MORE expensive than Standard.
-
-- **Intelligent-Tiering has a monitoring fee of $0.0025 per 1,000 objects.**
-  For buckets of millions of small objects, the monitoring fee can exceed the
-  transition savings. Threshold: Intelligent-Tiering wins when average object
-  size > 128 KB and access pattern is genuinely mixed.
-
-- **Glacier retrieval is not free.** Standard retrieval from Glacier Flexible
-  is $2.50-10 per TB (5-12 hours), Expedited is $10-30 per TB (1-5 min). Glacier
-  Deep Archive Standard is $2-10 per TB (12 hours), Bulk is $2.50/TB (48h).
-  Always warn that the saving is a storage saving; retrieval is à la carte.
-
-- **Lifecycle rules are eventually applied.** S3 processes lifecycle transitions
-  asynchronously, typically once per day. A rule added at 09:00 may not execute
-  until the next lifecycle run. Do not alarm on a 24-hour lag.
-
-- **A lifecycle rule with a filter that matches no objects is silently a no-op.**
-  `Filter: { Prefix: "logs/2024/" }` on a bucket where logs are under
-  `2025/logs/` matches nothing. Always cross-check the prefix against the actual
-  key layout before declaring ALREADY_OPTIMAL.
-
-- **`ExpirationInDays` deletes the current version. `NoncurrentVersionExpiration`
-  deletes prior versions.** Conflating them produces data loss: setting
-  `ExpirationInDays: 30` on a versioned bucket with no noncurrent rule deletes
-  the current version (creating a new noncurrent version) but leaves all prior
-  noncurrent versions intact — increasing storage instead of reducing it.
-
-- **S3 Batch Operations complements lifecycle for one-time migrations.**
-  Lifecycle applies to future objects going forward, but existing objects only
-  transition when their `Days` threshold is reached. To immediately move
-  existing Standard objects to Glacier, use `create-job` with
-  `S3CopyObject` and the target storage class — lifecycle handles the
-  forward path, Batch handles the backfill.
-
-- **Intelligent-Tiering Archive configurations are tunable.** The default
-  Archive tier moves objects after 90 consecutive days of no access; Deep
-  Archive moves after 180. Both are configurable via
-  `Tierings[{AccessTier: ARCHIVE_ACCESS, Days: N}]` — for known-cold data,
-  shorter windows capture savings faster.
-
-- **S3 Object Lock retention is enforced before lifecycle expiration.** If
-  an object has a `COMPLIANCE` mode retention period ending in 2030, a
-  lifecycle rule with `ExpirationInDays: 365` will NOT delete it until 2030.
-  The rule is a no-op for the locked object; surface this so the operator
-  understands the lifecycle does not bypass compliance.
-
-- **Cross-Region Replication (CRR) preserves storage class by default.**
-  Replicating a Standard object to a destination bucket copies it as Standard
-  unless the replication rule specifies a different storage class. Destination
-  lifecycle rules apply independently — design them in tandem.
-
-- **S3 Tables (managed Apache Iceberg) have their own lifecycle.** Do not
-  propose `Expiration` rules on table data prefixes; Iceberg compaction and
-  snapshot expiration are managed via table APIs. Surface as a finding only.
-
-- **Directory buckets (S3 Express One Zone) do not support lifecycle, Object
-  Lock, or Glacier tiers.** They are designed for single-AZ, ms-latency ML/AI
-  workloads at $0.16/GB. Verdict for a directory bucket is ALREADY_OPTIMAL
-  for its intended use case; surface the cost-per-GB as a finding.
-
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — non-obvious lifecycle behaviors deep dive.
 ### Step 1: Noncurrent version cleanup (versioned buckets)
 
 If the bucket has versioning `Enabled` or `Suspended`:
 
-- **Pull noncurrent byte % from Storage Lens.** A bucket with >20% noncurrent
-  bytes is a high-confidence opportunity. >50% is severe.
-- **Recommended default rule:**
-  - Transition noncurrent versions to Standard-IA after 30 days.
-  - Transition to Glacier Instant Retrieval after 90 days.
-  - Expire noncurrent versions after 90-180 days (tune by workload).
-- **Pattern — versioning cleanup:**
-  ```json
-  {
-    "ID": "noncurrent-version-cleanup",
-    "Status": "Enabled",
-    "Filter": {},
-    "NoncurrentVersionTransitions": [
-      { "NoncurrentDays": 30, "NewNoncurrentStorageClass": "STANDARD_IA" },
-      { "NoncurrentDays": 90, "NewNoncurrentStorageClass": "GLACIER_IR" }
-    ],
-    "NoncurrentVersionExpiration": { "NoncurrentDays": 180 }
-  }
-  ```
-- **Savings estimate:** `noncurrent_bytes_GB × (Standard_rate - IA_rate)` for
-  the first 30 days, then taper. Most versioned buckets save 40-70% on the
-  noncurrent dimension alone.
+→ Rule templates and savings detail moved to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 If versioning is `Enabled` and no `NoncurrentVersionExpiration` rule exists:
 **OPPORTUNITY_FOUND** on this dimension.
@@ -308,18 +159,8 @@ If versioning is `Enabled` and no `NoncurrentVersionExpiration` rule exists:
 
 - **Pull pending multipart uploads:** `aws s3api list-multipart-uploads --bucket <name>`.
   Any upload with `Initiated` > 7 days ago is a leak.
-- **Recommended rule (always include, even on buckets without known leaks):**
-  ```json
-  {
-    "ID": "abort-incomplete-multipart-uploads",
-    "Status": "Enabled",
-    "Filter": {},
-    "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
-  }
-  ```
-- **Savings estimate:** pending parts bill at Standard rate. A 100 GB
-  half-uploaded file costs $2.30/month indefinitely. The rule pays for itself
-  in zero cost.
+
+→ Abort-rule JSON moved to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 If any multipart upload is >7 days old OR no abort rule exists:
 **OPPORTUNITY_FOUND** on this dimension.
@@ -329,63 +170,21 @@ If any multipart upload is >7 days old OR no abort rule exists:
 Apply per workload archetype. Pick the pattern by access pattern, not by
 data type.
 
+
+→ The four archetype JSON templates moved to [references/advanced-patterns.md](references/advanced-patterns.md); the pattern lines below carry every branch decision.
 **Archetype A — Logs and temporary data (high write, low read after 30 days):**
-```json
-{
-  "ID": "logs-lifecycle",
-  "Status": "Enabled",
-  "Filter": { "Prefix": "logs/" },
-  "Transitions": [
-    { "Days": 30, "StorageClass": "STANDARD_IA" },
-    { "Days": 90, "StorageClass": "GLACIER_IR" },
-    { "Days": 180, "StorageClass": "GLACIER" }
-  ],
-  "Expiration": { "Days": 365 }
-}
-```
 Pattern: Standard -> 30d IA -> 90d Glacier IR -> 180d Glacier -> 365d Expire.
 
 **Archetype B — Compliance archives (write-once, read-rarely, 7-year retention):**
-```json
-{
-  "ID": "compliance-archive",
-  "Status": "Enabled",
-  "Filter": { "Prefix": "archive/" },
-  "Transitions": [
-    { "Days": 90, "StorageClass": "GLACIER_DEEP_ARCHIVE" }
-  ]
-}
-```
 Pattern: Standard -> 90d Deep Archive -> Expire at retention horizon (e.g., 2555 days for 7 years).
 
 **Archetype C — Application data with unknown / mixed access patterns:**
-```json
-{
-  "ID": "app-data-intelligent-tiering",
-  "Status": "Enabled",
-  "Filter": { "Prefix": "app/" },
-  "Transitions": [
-    { "Days": 0, "StorageClass": "INTELLIGENT_TIERING" }
-  ]
-}
-```
 Pattern: Standard -> Intelligent-Tiering (let AWS manage transitions).
 **Threshold check:** only recommend Intelligent-Tiering when average object
 size > 128 KB AND access pattern is genuinely mixed. For small objects, the
 $0.0025/1,000 monitoring fee exceeds the saving.
 
 **Archetype D — Backup / DR target (write-nightly, read-never unless disaster):**
-```json
-{
-  "ID": "backup-tier",
-  "Status": "Enabled",
-  "Filter": { "Prefix": "backup/" },
-  "Transitions": [
-    { "Days": 30, "StorageClass": "GLACIER_IR" },
-    { "Days": 90, "StorageClass": "GLACIER" }
-  ]
-}
-```
 Pattern: Standard -> 30d Glacier IR (quarterly DR test) -> 90d Glacier.
 
 **Archetype E — ML/AI training corpus (frequent random access during training,
@@ -537,328 +336,13 @@ IMPLEMENTATION:
 
 ### Worked example — already optimal compliance bucket
 
-```text
-BUCKET: compliance-archive-7yr
-VERDICT: ALREADY_OPTIMAL
-REASON: Bucket already transitions objects to Glacier Deep Archive at 90 days,
-has Object Lock in COMPLIANCE mode with 2555-day retention, and no incomplete
-multipart uploads.
-RECOMMENDATION: No changes required.
-SAVINGS:
-  CURRENT_MONTHLY: $19.80  (20,000 GB × $0.00099 Deep Archive)
-  PROJECTED_MONTHLY: $19.80
-  MONTHLY_SAVING: $0.00
-  ANNUAL_SAVING: $0.00
-  CAVEATS: Glacier Deep Archive retrieval is $2-10/TB Standard, 12h latency.
-IMPLEMENTATION: None required. Posture is correct for the workload archetype.
-```
-
+→ Secondary example moved to [references/worked-examples.md](references/worked-examples.md).
 ### Worked example — Intelligent-Tiering trap (small objects, proposed plan rejected)
 
-This example demonstrates the **zero-savings rule**: when the proposed
-transition would cost MORE than the current tier, the verdict is
-`ALREADY_OPTIMAL` for the transition dimension — never
-`OPPORTUNITY_FOUND` with $0 or negative savings.
-
-```text
-BUCKET: app-config-state
-VERDICT: ALREADY_OPTIMAL
-REASON: Proposed Intelligent-Tiering transition on 8.2M objects averaging
-  4.2 KB each is MORE expensive than Standard. The monitoring fee alone
-  ($20.50/month) exceeds total current cost. The 128 KB minimum billable
-  size on the Infrequent tier makes tiering even more costly if objects
-  drop. The proposed plan is rejected (Step 3 Archetype C threshold check
-  fails: average object size < 128 KB).
-RECOMMENDATION: No storage-class transition. Standard is already the cheapest
-  tier for this object-size profile. Optionally add AbortIncompleteMultipartUpload
-  hygiene rule (zero-cost, preventive).
-SAVINGS:
-  CURRENT_MONTHLY: $10.09
-    - Storage: 32.0 GiB × $0.023 = $0.74
-    - GETs: 8.2M × 3/month × $0.00038/1K = $9.35
-    - PUTs: negligible (write-once workload)
-  PROJECTED_MONTHLY (Intelligent-Tiering, best case — all in Frequent tier):
-    - Monitoring fee: 8,200,000 / 1,000 × $0.0025 = $20.50
-    - Storage: 32.0 GiB × $0.023 = $0.74
-    - GETs: 8.2M × 3/month × $0.00038/1K = $9.35 (unchanged)
-    - Total projected: $30.59
-  MONTHLY_SAVING: -$20.50  (NEGATIVE — monitoring fee alone exceeds saving)
-  ANNUAL_SAVING: -$246.00
-  CAVEATS: The proposed plan INCREASES cost by $20.50/month (the monitoring
-    fee). If objects auto-tier to Infrequent Access, cost rises further
-    due to the 128 KB minimum billable size (8.2M × 128 KB = 1,025 GiB
-    billable vs 32 GiB actual — a 32x storage inflation). The verdict is
-    ALREADY_OPTIMAL because Standard is already the cheapest applicable
-    tier. The operator should NOT proceed with Intelligent-Tiering.
-IMPLEMENTATION:
-  1. Do NOT apply the proposed Intelligent-Tiering transition.
-  2. Optional hygiene rule (zero-cost):
-     {
-       "Rules": [{
-         "ID": "abort-incomplete-multipart-uploads",
-         "Status": "Enabled",
-         "Filter": {},
-         "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
-       }]
-     }
-  3. Re-evaluate if average object size grows > 128 KB in the future.
-```
-
-**Why this verdict is ALREADY_OPTIMAL, not OPPORTUNITY_FOUND:** the
-proposed plan was a transition to Intelligent-Tiering, but the math
-shows it costs MORE than Standard for this object profile. There is
-no saving to capture — the cheapest applicable tier is already in
-place. Emitting `OPPORTUNITY_FOUND` with `$0.00` or negative savings
-is a hard error per the Verdict consistency rules above.
-
+→ Secondary example moved to [references/worked-examples.md](references/worked-examples.md).
 ## Worked example: end-to-end audit of a 5 TB mixed-workload bucket
 
-This example walks a realistic audit from pre-flight through applied policy
-with actual CLI commands and observed output. It exercises **all four
-opportunity dimensions** in a single bucket: a versioned workload with
-current objects in Standard, 1,420 GiB of noncurrent versions, three stale
-multipart uploads, and mixed access patterns across two prefixes.
-
-### Pre-flight (capture baseline state)
-
-```bash
-# 1. Confirm versioning status (gates the noncurrent dimension)
-aws s3api get-bucket-versioning --bucket app-data-prod
-# {"Status": "Enabled"}   → run noncurrent dimension
-
-# 2. Snapshot current lifecycle for rollback (lifecycle is not versioned)
-aws s3api get-bucket-lifecycle-configuration --bucket app-data-prod \
-  --output json > /tmp/app-data-prod-lifecycle-backup-$(date +%s).json
-# An error occurred (NoSuchLifecycleConfiguration) — bucket has no policy.
-# This is NORMAL; proceed with the full recommendation (do NOT treat as error).
-
-# 3. Detect stale multipart uploads (Step 2 dimension)
-aws s3api list-multipart-uploads --bucket app-data-prod \
-  --query 'Uploads[?Initiated<=`2026-07-22`]' --output table
-# |     Initiated     |      Key                  | UploadId ...
-# | 2026-07-15 03:14  | logs/audit-2026-07-15.log | a1b2c3...   (leak — 26 days old)
-# | 2026-07-18 11:02  | backup/db-snapshot.parquet| d4e5f6...   (leak — 23 days old)
-# | 2026-07-22 09:47  | tmp/export.csv            | g7h8i9...   (leak — 19 days old)
-# → 3 uploads > 7 days → OPPORTUNITY_FOUND on multipart dimension
-
-# 4. Pull Storage Lens (access-pattern evidence for transition math)
-aws s3control get-storage-lens-configuration --config-id default \
-  --account-id 111111111111 --output json | jq '.StorageLensConfiguration'
-# Key fields used in the recommendation:
-#   StorageClassDistribution: { Standard: "92%", Intelligent-Tiering: "8%" }
-#   ObjectSizeDistribution:   { "128KB-1MB": "61%", "1MB-128MB": "34%", "<128KB": "5%" }
-#   NoncurrentStorageBytes:   "1.42 TB" (28% of total 5.07 TB)
-#   AverageObjectAge:         "147 days"
-# → 92% in Standard at 147 days avg → OPPORTUNITY_FOUND on storage-class dimension
-# → 1.42 TB noncurrent (28%)        → OPPORTUNITY_FOUND on noncurrent dimension
-
-# 5. Check Object Lock (gates Expiration rule safety)
-aws s3api get-object-lock-configuration --bucket app-data-prod
-# An error occurred (ObjectLockConfigurationNotFoundError) — no Object Lock.
-# Safe to expire logs at 365 days without retention conflict.
-```
-
-### Classify the dimensions
-
-| Step | Dimension | Finding |
-|---|---|---|
-| Step 1 | Noncurrent cleanup | 1.42 TB noncurrent, no `NoncurrentVersionExpiration` → OPPORTUNITY_FOUND |
-| Step 2 | Multipart cleanup | 3 uploads > 7 days → OPPORTUNITY_FOUND |
-| Step 3 | Storage-class transition | 92% of 3.65 TB current in Standard at 147 days avg age → OPPORTUNITY_FOUND on `logs/` and `archive/` prefixes; `app/hot/` (small, frequently accessed) stays on Standard |
-| Step 4 | Expiration | `logs/` prefix has no expiration → OPPORTUNITY_FOUND |
-| Step 5 | Object Lock | Not enabled — finding only (compliance recommendation, not a verdict change) |
-
-### Compute savings (arithmetic shown for verification)
-
-```
-Current monthly (5,070 GiB all Standard):
-  5,070 GiB × $0.023 = $116.61
-
-Projected monthly (post-lifecycle, by tier):
-  CURRENT versions (3,650 GiB):
-    app/hot/   800 GiB × Standard         × $0.023   = $18.40
-    logs/    1,400 GiB @ Standard-IA 30-90d × $0.0125 = $17.50
-    logs/      900 GiB @ Glacier IR 90-180d × $0.004  = $ 3.60
-    logs/      300 GiB @ Glacier 180-365d  × $0.0036 = $ 1.08
-    logs/      250 GiB expired at 365d              = $ 0.00
-  NONCURRENT versions (1,420 GiB):
-    600 GiB @ Standard-IA 30-90d × $0.0125          = $ 7.50
-    500 GiB @ Glacier IR 90-180d × $0.004           = $ 2.00
-    320 GiB expired (>180d)                          = $ 0.00
-  Multipart abort (prevents future leak)             = $ 0.00
-  ─────────────────────────────────────────────────────────────
-  Projected total:                                   = $50.08
-  Arithmetic check: 18.40 + 17.50 + 3.60 + 1.08 + 0 + 7.50 + 2.00 + 0 + 0
-                   = $50.08 ✓
-
-MONTHLY_SAVING: $116.61 − $50.08 = $66.53
-ANNUAL_SAVING:  $66.53 × 12      = $798.36
-```
-
-### Emit the recommendation block
-
-```text
-BUCKET: app-data-prod
-VERDICT: OPPORTUNITY_FOUND
-REASON: Versioned bucket (5.07 TB) with 1.42 TB noncurrent (28%), 3 stale
-  multipart uploads (19-26 days old), and 92% of current data in Standard
-  at avg age 147 days. All four dimensions active (Steps 1, 2, 3, 4).
-RECOMMENDATION:
-  {
-    "Rules": [
-      {
-        "ID": "logs-tiered-lifecycle",
-        "Status": "Enabled",
-        "Filter": { "Prefix": "logs/" },
-        "Transitions": [
-          { "Days": 30,  "StorageClass": "STANDARD_IA" },
-          { "Days": 90,  "StorageClass": "GLACIER_IR" },
-          { "Days": 180, "StorageClass": "GLACIER" }
-        ],
-        "Expiration": { "Days": 365 }
-      },
-      {
-        "ID": "noncurrent-version-cleanup",
-        "Status": "Enabled",
-        "Filter": {},
-        "NoncurrentVersionTransitions": [
-          { "NoncurrentDays": 30, "NewNoncurrentStorageClass": "STANDARD_IA" },
-          { "NoncurrentDays": 90, "NewNoncurrentStorageClass": "GLACIER_IR" }
-        ],
-        "NoncurrentVersionExpiration": { "NoncurrentDays": 180 }
-      },
-      {
-        "ID": "abort-incomplete-multipart-uploads",
-        "Status": "Enabled",
-        "Filter": {},
-        "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
-      }
-    ]
-  }
-SAVINGS:
-  CURRENT_MONTHLY: $116.61
-  PROJECTED_MONTHLY: $50.08
-  MONTHLY_SAVING: $66.53
-  ANNUAL_SAVING: $798.36
-  CAVEATS:
-    - Standard-IA 30-day minimum-duration charge on early delete (logs/).
-    - Glacier IR 90-day minimum + $0.03/GB retrieval if queried.
-    - app/hot/ prefix intentionally left on Standard (frequent access).
-    - Backfill required for existing objects (lifecycle applies forward-only).
-IMPLEMENTATION:
-  1. CONFIRM: About to put-bucket-lifecycle-configuration on bucket
-     app-data-prod in account 111111111111 region us-east-1. This enables 3
-     rules (logs-tiered-lifecycle, noncurrent-version-cleanup, multipart-abort).
-     Estimated first-cycle effect: ~1.5 TB transitions over 24-48h. Proceed? (yes/no)
-  2. aws s3api put-bucket-lifecycle-configuration --bucket app-data-prod \
-       --lifecycle-configuration file://lifecycle.json
-  3. Verify (within 24h):
-     aws s3api get-bucket-lifecycle-configuration --bucket app-data-prod
-  4. Backfill the 3 stale multipart uploads immediately (lifecycle won't
-     abort uploads that initiated before the rule was added):
-     for uid in a1b2c3 d4e5f6 g7h8i9; do
-       aws s3api abort-multipart-upload --bucket app-data-prod \
-         --key <matched-key> --upload-id $uid
-     done
-  5. Backfill existing objects > 30 days old via S3 Batch Operations
-     (lifecycle only transitions objects reaching the Days threshold AFTER
-     the rule is created):
-     aws s3control create-job --account-id 111111111111 \
-       --operation '{"S3CopyObject": {"TargetStorageClass": "STANDARD_IA"}}' \
-       --manifest-location s3://audit-manifests/app-data-prod-older-than-30d.csv \
-       --report-spec '{"ReportFormat":"Report_20170828","Bucket":"arn:aws:s3:::audit-reports","Enabled":true,"ReportScope":"AllTasks"}' \
-       --role-arn arn:aws:iam::111111111111:role/S3BatchOperationsRole \
-       --client-request-token $(uuidgen)
-```
-
-### Apply and verify
-
-```bash
-# Apply (after operator confirms yes)
-aws s3api put-bucket-lifecycle-configuration --bucket app-data-prod \
-  --lifecycle-configuration file://lifecycle.json
-
-# Verify the policy is set (immediate — no eventual consistency here)
-aws s3api get-bucket-lifecycle-configuration --bucket app-data-prod \
-  --output json | jq '.Rules[].ID'
-# ["logs-tiered-lifecycle", "noncurrent-version-cleanup", "abort-incomplete-multipart-uploads"]
-
-# Verify transitions ran (24-48h later — lifecycle is asynchronously processed)
-aws s3control get-storage-lens-configuration --config-id default \
-  --account-id 111111111111 --output json \
-  | jq '.StorageLensConfiguration.StorageClassDistribution'
-# Expected post-run: {"Standard": "28%", "Standard-IA": "51%", "Glacier IR": "21%"}
-# If the distribution is unchanged after 48h, see Error handling →
-# put-bucket-lifecycle-configuration failure modes.
-```
-
-### Worked example — compliance archive with no lifecycle (OPPORTUNITY_FOUND with correct math)
-
-This example demonstrates the **positive-savings rule**: when a
-compliance archive has no lifecycle and objects sit in Standard at
-120+ days old, transitioning to Deep Archive captures real savings.
-The verdict is `OPPORTUNITY_FOUND` because the math shows positive
-monthly savings.
-
-```text
-BUCKET: compliance-archive-7yr
-VERDICT: OPPORTUNITY_FOUND
-REASON: Compliance archive with 5,000 GiB in Standard at 120 days average
-  age, no lifecycle, accessed < 1x/year. Transitioning to Glacier Deep
-  Archive at 90 days captures 95.7% storage saving. Versioning is Enabled
-  with 0 noncurrent bytes (write-once workload). Object Lock not configured
-  — surface as a parallel compliance finding (Step 5).
-RECOMMENDATION:
-  {
-    "Rules": [
-      {
-        "ID": "compliance-archive-deep-archive",
-        "Status": "Enabled",
-        "Filter": { "Prefix": "" },
-        "Transitions": [
-          { "Days": 90, "StorageClass": "GLACIER_DEEP_ARCHIVE" }
-        ]
-      },
-      {
-        "ID": "abort-incomplete-multipart-uploads",
-        "Status": "Enabled",
-        "Filter": {},
-        "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
-      }
-    ]
-  }
-SAVINGS:
-  CURRENT_MONTHLY: $115.00  (5,000 GiB × $0.023 Standard)
-  PROJECTED_MONTHLY: $4.95  (5,000 GiB × $0.00099 Deep Archive)
-  MONTHLY_SAVING: $110.05
-  ANNUAL_SAVING: $1,320.60
-  CAVEATS:
-    - Deep Archive 180-day minimum duration: objects deleted before day 180
-      still bill. Workload is write-once with 7-year retention — no conflict.
-    - Retrieval is $2-10/TB Standard (12h), $2.50/TB Bulk (48h). Budget
-      separately if regulatory retrieval is likely.
-    - Object Lock is NOT configured. For a compliance archive, recommend
-      enabling Object Lock in COMPLIANCE mode with 2555-day retention
-      (Step 5 finding — not a verdict change).
-IMPLEMENTATION:
-  1. CONFIRM: About to put-bucket-lifecycle-configuration on bucket
-     compliance-archive-7yr. This enables Deep Archive transition at 90d
-     and multipart abort. Proceed? (yes/no)
-  2. aws s3api put-bucket-lifecycle-configuration \
-       --bucket compliance-archive-7yr \
-       --lifecycle-configuration file://lifecycle.json
-  3. Verify: aws s3api get-bucket-lifecycle-configuration \
-       --bucket compliance-archive-7yr
-  4. Backfill existing objects > 90 days old via S3 Batch Operations
-     (lifecycle only applies to objects reaching 90 days AFTER the rule
-     is created):
-     aws s3control create-job --account-id <acct> \
-       --operation '{"S3CopyObject": {"TargetStorageClass": "GLACIER_DEEP_ARCHIVE"}}' \
-       --manifest-location s3://<manifest-bucket>/manifest.csv \
-       --report-spec '<report-config>' \
-       --role-arn arn:aws:iam::<acct>:role/<batch-role>
-```
-
+→ End-to-end audit walkthrough moved to [references/worked-examples.md](references/worked-examples.md).
 ## Verdict consistency rules (prevent misclassification)
 
 The skill MUST emit verdicts that are mathematically and logically
@@ -916,174 +400,13 @@ the output block. If any rule fails, re-run the relevant step.
 
 ## Error handling — CLI and data-source failures
 
-The workflow depends on S3 API, S3 Control API (Storage Lens), and
-optional CloudTrail data. Each can fail independently; silent failures
-produce misclassifications (especially false `ALREADY_OPTIMAL` on
-buckets where Storage Lens is not enabled).
-
-### Storage Lens failures
-
-| Failure mode | Detection | Handling |
-|---|---|---|
-| `get-storage-lens-configuration` returns `NoSuchConfiguration` | API error | Storage Lens is not enabled. Fall back to `list-objects-v2` with `--page-size 1000` for a sample; flag the recommendation as MEDIUM confidence due to absent access-pattern data. Surface "Enable Storage Lens" as a parallel finding. |
-| Storage Lens enabled but `ExportVersion` > 7 days stale | `ExportDataFreshness` check | Noncurrent-byte % and storage-class distribution may not reflect recent changes. Re-pull if possible; otherwise flag as MEDIUM confidence. |
-| Storage Lens shows 0 noncurrent bytes on a versioned bucket | Cross-check with `list-object-versions --noncurrent-versions` | Iflist shows noncurrent versions but Storage Lens shows 0, the dashboard is misconfigured. Trust the direct API call. |
-
-### S3 API failures
-
-| Failure mode | Detection | Handling |
-|---|---|---|
-| `get-bucket-lifecycle-configuration` returns `NoSuchLifecycleConfiguration` (404) | HTTP 404 | This is NORMAL — the bucket has no lifecycle. Proceed with full recommendation; do NOT treat as an error. |
-| `get-bucket-versioning` returns `{}` (empty) | Response body empty | Versioning was never enabled. Skip the noncurrent-version dimension entirely. |
-| `list-multipart-uploads` returns empty `Uploads` array | `len(Uploads) == 0` | No stale multipart uploads. Still emit the `AbortIncompleteMultipartUpload` rule as preventive; do not mark multipart dimension as OPPORTUNITY_FOUND. |
-| `put-bucket-lifecycle-configuration` fails with `MalformedXML` | API error | The JSON payload has a schema error. Common causes: `NoncurrentDays` < 1, `Filter` and `Prefix` at the same rule level, or unsupported `StorageClass` value. Validate against the S3 Lifecycle schema and retry. |
-| `list-objects-v2` returns `AccessDenied` | API error | The role lacks `s3:ListBucket` on the bucket. Surface as a BLOCKED finding; recommend the operator grant `s3:ListBucket` and `s3:GetLifecycleConfiguration` to the audit role. |
-| `list-objects-v2` is paginating > 100 pages on a large bucket | Pagination count | STOP iterating live. Use S3 Inventory (daily export) or Storage Lens aggregate metrics instead. Live iteration of a billion-object bucket can take hours and incur request charges. |
-
-### Object Lock interaction failures
-
-| Failure mode | Detection | Handling |
-|---|---|---|
-| Lifecycle `ExpirationInDays` shorter than Object Lock retention | Cross-check `get-object-lock-configuration` retention period vs `ExpirationInDays` | The rule is silently a no-op on locked objects. Surface as a CONFIG finding; do not change the verdict based on the (silently ineffective) expiration rule. |
-| Object Lock `GOVERNANCE` mode on compliance data | `Mode == GOVERNANCE` for a compliance workload | Surface that any principal with `s3:BypassGovernanceRetention` can shorten retention. Recommend `COMPLIANCE` mode. This is a finding, not a verdict change. |
-
-### Batch Operations failures
-
-| Failure mode | Detection | Handling |
-|---|---|---|
-| `create-job` fails with `AccessDenied` | API error | The role lacks `s3control:CreateJob`. Batch Operations requires a dedicated role with `s3:ObjectLambda`/`s3:ReplicateObject` permissions. Surface the IAM requirement in the IMPLEMENTATION block. |
-| Batch job manifest generation fails | Manifest S3 location not writable | The manifest bucket must be in the same region as the Batch Operations job. Verify region alignment before emitting the IMPLEMENTATION step. |
-
-### Rate-limit and large-batch guidance
-
-For fleet-wide lifecycle audits covering > 100 buckets:
-
-1. **Serialize, do not parallelize** the `put-bucket-lifecycle-configuration`
-   calls across buckets in the same region. S3 Control API has a
-   sustained rate limit of ~5 lifecycle-configuration puts per second
-   per account; parallel puts will throttle.
-2. **Page list-buckets by region** using `--region <region>` on each
-   call. A global `list-buckets` returns buckets across all regions,
-   but lifecycle configuration is region-specific.
-3. **For > 1,000 buckets**, split into batches of 50 buckets per
-   operator CONFIRM gate. Each batch emits a single consolidated
-   CONFIRM; the operator reviews the savings rollup before applying.
-4. **Verify propagation** after each batch: lifecycle rules are
-   eventually consistent (~24 hours for first execution). Surface this
-   in the post-apply verification step.
-
-### put-bucket-lifecycle-configuration failure modes
-
-The single state-changing API call in this skill is
-`put-bucket-lifecycle-configuration`. Each failure below has a specific
-remediation — never blindly retry without identifying the root cause,
-because S3 lifecycle is a single-writer resource and a retry on the same
-bucket can collide with another in-flight put.
-
-| Error | Root cause | Specific fix |
-|---|---|---|
-| `MalformedXML` (most common) | JSON schema error | Validate against the S3 Lifecycle schema. Common causes and fixes: (a) top-level `Prefix` mixed with `Filter` in the same rule — remove `Prefix`, use `Filter: { Prefix: "..." }`; (b) `NoncurrentDays < 1` — set to `>= 1`; (c) unsupported `StorageClass` value — must be one of `STANDARD_IA`, `ONEZONE_IA`, `INTELLIGENT_TIERING`, `GLACIER`, `GLACIER_IR`, `GLACIER_DEEP_ARCHIVE`, `DEEP_ARCHIVE` (the legacy `DEEP_ARCHIVE` alias still works but prefer `GLACIER_DEEP_ARCHIVE`); (d) trailing comma in JSON; (e) `Expiration` block inside a `NoncurrentVersionTransitions` rule — separate current-version and noncurrent rules. |
-| `InvalidArgument: Unexpected Parameter 'StorageClass'` | Wrong key name for the transition type | Use `Transitions[].StorageClass` for CURRENT versions, `NoncurrentVersionTransitions[].NewNoncurrentStorageClass` for NONCURRENT versions. The two keys are not interchangeable. |
-| `InvalidArgument: Conflicting conditional operation` | Another lifecycle put is in flight on the same bucket | S3 lifecycle is a single-writer resource. Serialize per-bucket puts; retry after a 5-second backoff. Do NOT parallelize puts on the same bucket even across regions — the lock is per-bucket. |
-| `AccessDenied (PutLifecycleConfiguration)` | Caller role lacks `s3:PutLifecycleConfiguration` on the bucket | Add the permission to the bucket policy OR the caller's identity-based IAM. The bucket-owner default does NOT include lifecycle permissions — they must be explicit. Also verify there is no `Deny` statement with `s3:PutLifecycleConfiguration`. |
-| `InvalidRequest: Lifecycle configuration filtering is limited to N rules` | Bucket exceeds the rule count cap (1,000 legacy, 1,500 with new filtering model post Aug 2023) | Consolidate rules using broader `Filter` patterns. Replace one-rule-per-prefix with tag-based filters: `Filter: { Tag: { Key: "archive_eligible", Value: "true" } }`. Split very large buckets by prefix into separate buckets if the cap cannot be avoided. |
-| `InvalidStorageClass` | Rule references a storage class not supported in the bucket's region (e.g., Glacier Deep Archive unavailable in a new region at GA time) | Check supported storage classes via `aws pricing get-products --service-code AmazonS3 --filters ...`. Use `GLACIER` (Flexible Retrieval) as the fallback — it has the widest regional availability. |
-| `OperationAborted: A conflicting conditional operation is currently in progress` | Same as above — another writer holds the lock | Same fix: serialize, backoff 5s, retry. Surface as TRANSIENT in the output block. |
-| Throttling: `SlowDown` on a fleet audit (>100 buckets) | S3 Control API sustained rate limit (~5 lifecycle puts/sec/account) | Switch to serial execution with 200ms inter-call delay. For >1,000 buckets, batch 50 per CONFIRM gate (see Rate-limit guidance above). |
-| `NoSuchBucket` mid-batch | Fleet audit iterated while a bucket was being deleted in parallel | Skip the bucket and re-queue. Do NOT fail the batch. Surface as TRANSIENT in the per-bucket output. |
-
-**Recovery after a bad put:** if a `MalformedXML` or wrong-rule put
-partially applies (rare — usually the put is atomic), use the JSON
-backup from the pre-flight to restore the prior configuration via a
-follow-up `put-bucket-lifecycle-configuration` call, then run the
-Rollback procedure below.
-
+→ Error-handling deep dive and failure-mode tables moved to [references/error-handling.md](references/error-handling.md).
 ## Rollback procedure (beyond JSON backup)
 
-The pre-flight captures a JSON backup of the current lifecycle config.
-Rollback is a three-step procedure — the JSON backup alone is
-insufficient because lifecycle rules are eventually consistent and
-objects may have already transitioned.
-
-1. **Restore the prior configuration:**
-   ```bash
-   aws s3api put-bucket-lifecycle-configuration \
-     --bucket <name> \
-     --lifecycle-configuration file://<name>-lifecycle-backup-<timestamp>.json
-   ```
-   This stops FUTURE transitions but does not revert objects that have
-   already moved to a cheaper tier.
-
-2. **Identify objects that transitioned during the bad window:**
-   ```bash
-   # Find objects that transitioned to the target storage class
-   # between the bad-put timestamp and the rollback timestamp.
-   aws s3api list-objects-v2 --bucket <name> \
-     --query "Contents[?StorageClass=='STANDARD_IA']" \
-     --output json > transitioned-objects.json
-   ```
-   For large buckets, use S3 Inventory (daily export) filtered by
-   storage-class column instead of `list-objects-v2`.
-
-3. **Restore the storage class of affected objects via S3 Batch
-   Operations:**
-   ```bash
-   aws s3control create-job --account-id <acct> \
-     --operation '{"S3CopyObject": {"TargetStorageClass": "STANDARD",
-       "ReplaceMetadata": {"ContentType": "application/octet-stream"}}}' \
-     --manifest-location s3://<manifest-bucket>/manifest.csv \
-     --report-spec '{"ReportFormat":"Report_20170828","Bucket":"s3://<report-bucket>","Enabled":true,"ReportScope":"AllTasks"}' \
-     --role-arn arn:aws:iam::<acct>:role/<batch-role> \
-     --client-request-token $(uuidgen)
-   ```
-   This copies each object back to Standard. The copy operation incurs
-   request and data-transfer charges — include them in the rollback
-   cost estimate.
-
-4. **Verify Storage Lens metrics stabilize** within 24-48 hours post-
-   rollback. The noncurrent-byte % and storage-class distribution
-   should return to pre-bad-put levels.
-
-**Cost of rollback:** a bad lifecycle put on a 100 TB bucket that
-triggers a mass Standard → Standard-IA transition costs ~$50-150 in
-request fees (1 PUT per object on transition) plus ~$1,000-2,000 in
-Batch Operations copy-back fees. Surface this in the CONFIRM gate
-before applying any lifecycle change on a large bucket.
-
+→ Moved to [references/error-handling.md](references/error-handling.md).
 ## Cross-region cost variance detail
 
-The Quick reference pricing table is us-east-1 baseline. S3 pricing
-varies materially by region; a recommendation that saves money in
-us-east-1 may save MORE or LESS in another region:
-
-| Region | Standard $/GB-mo | Standard-IA $/GB-mo | Deep Archive $/GB-mo | Notes |
-|---|---|---|---|---|
-| us-east-1, us-west-2 | 0.023 | 0.0125 | 0.00099 | Baseline |
-| eu-west-1 (Ireland) | 0.024 | 0.013 | 0.001 | ~4% premium |
-| eu-central-1 (Frankfurt) | 0.0245 | 0.013 | 0.001 | ~7% premium; high egress |
-| ap-southeast-1 (Singapore) | 0.025 | 0.0141 | 0.001 | ~9% premium |
-| ap-southeast-2 (Sydney) | 0.025 | 0.014 | 0.0011 | ~9% premium |
-| ap-northeast-1 (Tokyo) | 0.025 | 0.0138 | 0.0011 | ~9% premium |
-| ap-south-1 (Mumbai) | 0.0259 | 0.0144 | 0.00114 | ~13% premium |
-| sa-east-1 (São Paulo) | 0.0309 | 0.01688 | 0.00153 | ~35% premium; egress highest |
-| af-south-1 (Cape Town) | 0.0304 | 0.0166 | 0.00153 | ~32% premium |
-
-**Decision impact:**
-
-- **High-premium regions (sa-east-1, af-south-1):** lifecycle
-  transitions capture MORE savings because the gap between Standard
-  and Glacier is wider. Recommend AGGRESSIVE transitions (earlier
-  `Days` thresholds) — the math favours moving to Glacier IR or
-  Flexible sooner.
-- **Low-premium regions (us-east-1, us-east-2):** the savings delta
-  is smaller; the Intelligent-Tiering monitoring fee and minimum-
-  duration charges eat a larger share of the saving. Be more
-  conservative on small-object buckets.
-- **Always re-state the regional rate** in the SAVINGS block when the
-  bucket is not in us-east-1. Pull the rate from the AWS Pricing API
-  (`aws pricing get-products --service-code AmazonS3 --filters ...`)
-  rather than estimating from the multiplier.
-
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md).
 ## Anti-Patterns — NEVER
 
 - NEVER recommend a transition to Standard-IA or One-Zone-IA for objects
@@ -1173,189 +496,20 @@ us-east-1 may save MORE or LESS in another region:
 
 ## Edge-case handling
 
-These are buckets where the standard archetype patterns (Step 3) produce
-wrong recommendations without explicit handling.
-
-### Objects < 128 KB (IA small-object surcharge)
-
-Standard-IA, One-Zone-IA, and the Intelligent-Tiering Infrequent tier carry
-a **128 KB minimum billable size**. A 4 KB object is billed as 128 KB — a
-**32x storage-cost inflation**. For buckets of small JSON/config files, IA
-tiers are often MORE expensive than Standard despite the lower $/GB rate.
-
-**Detection:** pull `ObjectSizeDistribution` from Storage Lens. If the
-`<128KB` bucket is more than 20% of objects by count, the IA tiers are
-likely net-negative on savings.
-
-**Fix:** keep small-object buckets on Standard. If a bucket has a mix of
-small and large objects, scope the IA transition rule with a tag so small
-objects stay on Standard while large objects tier down:
-
-```json
-{
-  "ID": "large-object-ia-only",
-  "Status": "Enabled",
-  "Filter": { "Tag": { "Key": "archive_eligible", "Value": "true" } },
-  "Transitions": [
-    { "Days": 30, "StorageClass": "STANDARD_IA" }
-  ]
-}
-```
-
-Apply the `archive_eligible=true` tag via a tag-based lifecycle rule or a
-Bucket Policy condition at PUT time so publishers self-classify.
-
-### Versioned bucket with 1,000+ noncurrent versions per object
-
-A heavily-overwritten versioned bucket (e.g., a state file written every
-minute, or a config map re-written on every deploy) can accumulate tens of
-thousands of noncurrent versions per object. A bare
-`NoncurrentVersionExpiration: { NoncurrentDays: 180 }` does NOT cap the
-count — it only expires versions older than 180 days. The bucket can still
-hold ~260,000 versions per object (one per minute × 180 days).
-
-**Detection:**
-```bash
-aws s3api list-object-versions --bucket <name> --prefix <key> \
-  --query 'Versions | length(@)'
-# Returns > 1,000 for a single key → high-churn pattern
-```
-
-**Fix:** add `NewerNoncurrentVersions` to cap the count regardless of age
-(requires the S3 Lifecycle filtering model introduced Aug 2023):
-
-```json
-{
-  "ID": "cap-noncurrent-count",
-  "Status": "Enabled",
-  "Filter": {},
-  "NoncurrentVersionExpiration": {
-    "NoncurrentDays": 30,
-    "NewerNoncurrentVersions": 10
-  }
-}
-```
-
-This keeps the 10 most recent noncurrent versions and expires the rest after
-30 days. The two limits interact as a logical OR — whichever triggers first
-expires the version.
-
-**Savings impact:** a state bucket with 50,000 versions per object across
-100 objects routinely holds 20+ TB of noncurrent bytes. Capping at 10
-versions plus 30-day expiry typically reduces noncurrent storage by 90%+.
-Always surface this in the savings projection when the high-churn pattern
-is detected — `NoncurrentDays` alone undercounts the saving.
-
-### Bucket with Object Lock in COMPLIANCE mode
-
-A COMPLIANCE-mode Object Lock retention period is **immutable** — even
-root cannot shorten or bypass it. A lifecycle `ExpirationInDays` shorter
-than the retention period is silently a no-op on locked objects: the rule
-is stored, the operator sees it applied, but locked objects survive past
-the expiry date because lifecycle honors the retention lock.
-
-**Detection:**
-```bash
-aws s3api get-object-lock-configuration --bucket <name>
-# {"ObjectLockConfiguration": {"Rule": {"DefaultRetention":
-#   {"Mode": "COMPLIANCE", "Days": 2555}}}}
-```
-
-**Fix:** set `ExpirationInDays` to AT LEAST the retention period, and
-surface the interaction in the output block:
-
-```text
-CAVEATS:
-  - Object Lock COMPLIANCE mode with 2555-day retention. ExpirationInDays
-    set to 2555 to match — objects are NOT deletable before retention ends,
-    even by root. Lifecycle will not accelerate deletion; it only takes
-    effect on objects whose retention has expired.
-  - Per-object legal holds override lifecycle ENTIRELY. An object under
-    legal hold is never expired, regardless of ExpirationInDays or the
-    retention period. Detect with `aws s3api get-object-legal-hold` and
-    surface as a finding — there is no lifecycle fix for legal hold.
-  - GOVERNANCE mode (if applicable) can be bypassed by principals with
-    s3:BypassGovernanceRetention — surface as a parallel compliance finding
-    and recommend COMPLIANCE mode for true regulatory workloads.
-```
-
-If `ExpirationInDays < retention period`, downgrade the dimension to a
-CONFIG finding — do not emit OPPORTUNITY_FOUND on the Expiration dimension,
-because the saving cannot be captured until retention expires.
-
+→ Edge-case catalog moved to [references/advanced-patterns.md](references/advanced-patterns.md).
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`put-bucket-lifecycle-configuration`, `delete-bucket-lifecycle`,
-  `create-job` for Batch Operations), emit: `CONFIRM: About to <action> on
-  bucket <name> in account <account> region <region>. This affects
-  <consequence>. Proceed? (yes/no)`. Do NOT execute until the operator
-  confirms.
-
-- **Capture current state for rollback.** Before applying:
-  `aws s3api get-bucket-lifecycle-configuration --bucket <name> --output json >
-  /tmp/<name>-lifecycle-backup-$(date +%s).json`. S3 lifecycle is not versioned
-  — a put replaces the entire configuration atomically.
-
-- **Verify Object Lock retention before expiration.** If the bucket has Object
-  Lock, every proposed `ExpirationInDays` MUST be >= the longest retention
-  period. Otherwise the rule is silently a no-op on locked objects — surface
-  as a finding, not an error.
-
-- **Verify versioning status before noncurrent rules.** If versioning is
-  `Suspended`, `NoncurrentVersionTransitions` still applies to existing
-  noncurrent versions. If versioning was never enabled, skip the dimension.
-
-- **Filter scope check.** Before applying, verify the filter prefix matches the
-  intended key layout. `Prefix: "logs/"` on a bucket with keys under
-  `application/logs/` matches nothing.
-
-- **Intelligent-Tiering Archive configuration check.** When recommending
-  Intelligent-Tiering with custom Archive tiers, verify the
-  `Tierings[].Days` values are valid (>= 90 for ARCHIVE_ACCESS, >= 180 for
-  DEEP_ARCHIVE_ACCESS).
-
-- **Batch Operations IAM check.** `s3control create-job` requires a role with
-  `s3:ObjectLambda`/`s3:ReplicateObject` permissions depending on the
-  operation. Verify the role exists before recommending Batch.
-
+→ Command listing moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 ## Recent AWS features (2024-2026)
 
-- **S3 Intelligent-Tiering Archive configurations (2024-2025):** Intelligent-
-  Tiering now supports configurable Archive Access and Deep Archive Access
-  tiers (`Tierings[{AccessTier: ARCHIVE_ACCESS, Days: N}]`). Default is 90/180
-  days; tunable for known-cold data to capture savings faster. No retrieval fee
-  on the tier transition itself; standard Glacier retrieval fees apply on read.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md).
+## References (load on demand)
 
-- **S3 Storage Lens (general availability, expanded 2024-2026):** Organization-
-  wide dashboards with 29+ metrics including noncurrent-byte %, storage-class
-  distribution, object-age histogram, and prefix-level drill-down. Always pull
-  Storage Lens before recommending a transition — it provides the access-pattern
-  evidence the recommendation needs.
-
-- **S3 Tables (managed Apache Iceberg, 2025):** Tabular data stored in S3 with
-  Iceberg table format, supporting ACID transactions, schema evolution, and
-  time travel. Tables have their own lifecycle (snapshot expiration,
-  compaction) — do NOT propose S3 lifecycle rules on table data prefixes.
-
-- **S3 Express One Zone (directory buckets, 2023-2025):** Single-AZ directory
-  buckets with ms-latency HEAD/GET, designed for ML/AI training and high-
-  performance analytics. $0.16/GB, no lifecycle support, no Object Lock.
-  Use for the active training set; tier to general-access buckets after.
-
-- **Glacier Instant Retrieval (GA):** Millisecond-latency retrieval at $0.004/GB
-  with 90-day minimum. The right tier for quarterly-accessed data that still
-  needs ms reads (analytics, compliance lookups).
-
-- **S3 Batch Operations (expanded):** Supports `S3CopyObject` with
-  `TargetStorageClass` for one-time backfill migrations of existing objects
-  (lifecycle only transitions new objects going forward). Pair with lifecycle
-  for the complete migration path.
-
-- **S3 Object Lock expanded retention options:** `COMPLIANCE` mode now supports
-  per-object legal hold alongside retention period. Use legal hold for
-  indefinite holds (litigation, investigation); use retention period for
-  regulatory horizons.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 expert knowledge, step rule templates (Steps 1-3 JSON), cross-region variance, edge cases, recent AWS features, AWS documentation links.
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples (already-optimal, IT trap, 5 TB end-to-end audit).
+- [references/error-handling.md](references/error-handling.md) — error handling for CLI/data-source failures + rollback procedure.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight gate commands + pre-remediation safety checks.
+- [references/storage-class-pricing-matrix.md](references/storage-class-pricing-matrix.md) — pre-existing; extended with the cost baseline table — load before dollar estimates.
 
 ## Domain
 
@@ -1363,13 +517,4 @@ AWS CloudOps / S3 Storage Cost Optimisation & Lifecycle Design.
 
 ## AWS documentation
 
-- **Amazon S3 User Guide** — https://docs.aws.amazon.com/AmazonS3/latest/userguide/Welcome.html
-- **Managing your storage lifecycle** — https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lifecycle-mgmt.html
-- **Amazon S3 Storage Classes** — https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html
-- **S3 Intelligent-Tiering** — https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-class-intro.html#sc-d behavior-data-retrieval
-- **S3 Storage Lens** — https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage_lens_basics_metrics.html
-- **S3 Object Lock** — https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html
-- **S3 Batch Operations** — https://docs.aws.amazon.com/AmazonS3/latest/userguide/batch-ops.html
-- **AWS CLI Command Reference: s3api** — https://docs.aws.amazon.com/cli/latest/reference/s3api/
-- **S3 Express One Zone** — https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-express-one-zone.html
-- **S3 Tables** — https://docs.aws.amazon.com/AmazonS3/latest/userguide/tables.html
+→ Link list moved to [references/advanced-patterns.md](references/advanced-patterns.md).

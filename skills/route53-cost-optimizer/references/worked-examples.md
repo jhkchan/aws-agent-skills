@@ -197,3 +197,29 @@ REMEDIATION_STEPS:
 CONFIRM: About to replace traffic policy with weighted records on
   marketing-site.example.com. Annual saving $594.24. Proceed? (yes/no)
 ```
+
+## Canonical output block template
+
+```text
+TARGET: <zone-name or health-check-id>
+VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
+REASON: <1-2 sentences naming the recommendation and the supporting data>
+RECOMMENDATION:
+  Current: <zone/config description>
+  Proposed: <zone/config description>
+  Dimensions changed: <zones | health_checks | routing | traffic_policy | dnssec | logging>
+  Dimensions checked: <list ALL seven, each ✓ (no finding) or → (finding)>
+  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
+ESTIMATED_SAVINGS:
+  Current monthly: $<amount>
+  Projected monthly: $<amount>
+  Monthly saving: $<amount>
+  Annual saving: $<amount>
+  Assumptions: <list (zone count, query volume, pricing region, etc.)>
+REMEDIATION_STEPS:
+  1. <specific action with CLI command>
+  2. <verification step>
+CONFIRM: Before executing any state-changing CLI, emit and await operator
+  approval: "CONFIRM: About to <action> on <target> in <region>. Proceed?
+  (yes/no)"
+```

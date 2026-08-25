@@ -163,3 +163,25 @@ Maximum expiry by credential type:
   default).
 - EC2 instance profile: limited by the instance role credentials
   rotation (typically 6 hours).
+
+## KMS condition keys for S3
+
+| Condition key | Meaning |
+|---|---|
+| `kms:ViaService` | The AWS service making the KMS call (e.g., `s3.us-east-1.amazonaws.com`) |
+| `kms:EncryptionContext:aws:s3:arn` | The bucket ARN in the encryption context |
+| `kms:CallerAccount` | The account of the caller |
+
+Use these in the KMS key policy to scope which S3 buckets can use the
+key:
+
+```json
+{
+  "Condition": {
+    "StringEquals": {
+      "kms:ViaService": "s3.us-east-1.amazonaws.com",
+      "kms:EncryptionContext:aws:s3:arn": "arn:aws:s3:::prod-data-bucket"
+    }
+  }
+}
+```

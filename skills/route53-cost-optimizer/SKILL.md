@@ -105,28 +105,8 @@ recommendation with exact CLI commands.
 
 ## Mindset
 
-Route 53 cost optimization is an inventory and configuration exercise,
-not a capacity-planning problem. The goal is to eliminate zones, health
-checks, and logging volume that no longer serve traffic — not to tune
-DNS performance.
-
-Four principles guide every recommendation:
-
-- **Zones are the fixed cost.** Every hosted zone bills monthly
-  regardless of query volume. The highest-leverage action is inventory
-  reduction: delete unused zones and consolidate low-traffic domains
-  into a shared zone with subdomain records.
-- **Health checks are the variable cost.** Each endpoint health check
-  costs $0.50/month. Accounts with 100+ checks spend $600+/year on
-  monitoring alone. Calculated health checks (free) can replace
-  endpoint checks for composite monitoring.
-- **Routing policy surcharges are the hidden cost.** A zone using
-  latency-based routing at 500M queries/month pays $100 extra vs simple
-  routing for the same volume. Weighted routing has no surcharge.
-- **Query logging is the wildcard.** CloudWatch Logs charges $0.50/GB
-  ingested. A high-traffic zone logging every query can generate
-  terabytes per month. Sample, filter, or disable logging for
-  non-compliance zones.
+Four principles guide every recommendation (zones are the fixed cost; health checks are the variable cost; routing surcharges are the hidden cost; query logging is the wildcard): [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for the full reasoning behind each principle.
 
 ## Quick reference — verdict thresholds
 
@@ -145,22 +125,8 @@ Four principles guide every recommendation:
 
 ## Configuration dependency graph
 
-```
-HostedZone ─┬─ DNSSEC ──── KMS Key ($1/month)
-            ├─ QueryLogging ── CloudWatch Logs ($0.50/GB ingested)
-            ├─ Records ──── RoutingPolicy ──┬─ Simple (base rate)
-            │                               ├─ Weighted (base rate)
-            │                               ├─ Latency (+$0.20/B)
-            │                               ├─ Geolocation (+$0.30/B)
-            │                               └─ TrafficPolicy ($50/month)
-            ├─ HealthChecks ─┬─ Endpoint ($0.50/month)
-            │                ├─ Calculated (FREE)
-            │                └─ Alarm-based ($0.50/month)
-            └─ VPC Associations (Private Hosted Zones, no surcharge)
-```
-
-Each edge in this graph is a potential cost lever. Walk every node
-before emitting a verdict.
+Configuration dependency graph (HostedZone -> DNSSEC/KMS, QueryLogging, RoutingPolicy surcharges, HealthChecks, VPC associations): [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand to walk every cost-lever node.
 
 ## Pre-flight: data gate (run before any optimization decision)
 
@@ -168,14 +134,8 @@ Optimization decisions are only as good as the underlying data. Pull
 these metrics before any recommendation. Full CLI sequences are in
 `references/route53-pricing-and-configuration.md`.
 
-**Required data sources** (summarized — see reference for full CLI):
-1. Hosted zone inventory: `aws route53 list-hosted-zones`
-2. Per-zone record sets: `aws route53 list-resource-record-sets`
-3. Health check inventory: `aws route53 list-health-checks`
-4. Traffic policy inventory: `aws route53 list-traffic-policies`
-5. Query logging configs: `aws route53 list-query-logging-configs`
-6. DNS queries (14-30 day window): `aws cloudwatch get-metric-statistics --namespace AWS/Route53`
-7. Cost Explorer breakdown: `aws ce get-cost-and-usage --filter "Service=Route53"`
+Required data-source command listing (zone inventory, record sets, health checks, traffic policies, query-logging configs, DNSQueries metrics, Cost Explorer): [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Full CLI sequences also live in [references/route53-pricing-and-configuration.md](references/route53-pricing-and-configuration.md).
 
 ### Data-quality short-circuits
 
@@ -193,67 +153,16 @@ these metrics before any recommendation. Full CLI sequences are in
 
 ### Step 0: Non-obvious behaviours that change the recommendation
 
-These operational gotchas route a recommendation away from the obvious
-choice:
-
-- **Calculated health checks are free but have a nesting limit.** A
-  calculated health check can monitor up to 25 other health checks. You
-  cannot nest calculated health checks inside other calculated health
-  checks — one level only.
-- **DNSSEC signing uses a KMS key that costs $1/month.** The key bills
-  independently of DNS query volume. A zone with DNSSEC enabled pays
-  $0.50 (zone) + $1.00 (KMS key) = $1.50/month minimum.
-- **Hosted zone deletion requires NS record delegation removal first.**
-  If the domain registrar still points NS records at the zone, deleting
-  the zone causes DNS resolution failure. Update the registrar to point
-  elsewhere before deleting.
-- **Traffic policies charge per policy, not per zone.** A single traffic
-  policy applied to multiple records costs $50/month once. The cost
-  trigger is policy CREATION and attachment, not the number of records.
-- **Latency-based routing surcharge applies to ALL queries to the zone.**
-  If any record in a zone uses latency-based routing, the surcharge
-  applies to queries for that specific record set, not the entire zone.
-- **Private hosted zones have no query surcharge.** Private DNS queries
-  (VPC-resolved) are included in the hosted zone cost. No per-query
-  billing for private zones.
-- **Query logging charges for ingestion, not storage.** CloudWatch Logs
-  bills $0.50/GB ingested plus retention storage. Disabling logging
-  eliminates ingestion cost immediately.
-- **Domain transfer does not reduce Route 53 cost.** Domain registration
-  is billed separately from hosted zones. Transferring a domain between
-  registrars does not affect hosted zone billing.
-- **Health check interval does not affect cost.** Whether a check runs
-  every 10 seconds or every 30 seconds, the price is $0.50/month flat.
-  Reducing interval is a reliability decision, not a cost decision.
-- **The first 25 hosted zones cost $0.50/month each; zones 26+ cost
-  $0.10/month each.** Consolidation savings diminish after 25 zones
-  unless the zone is entirely unused.
+The 10 non-obvious behaviours (calculated-check nesting limit, DNSSEC KMS billing, NS-delegation-before-deletion, per-policy traffic-policy billing, latency surcharge scope, private-zone surcharges, ingestion-vs-storage logging, domain-transfer invariance, interval-invariant pricing, 25-zone price break): [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand — each behaviour reroutes the recommendation.
 
 ### Step 1: Hosted zone inventory (the #1 lever)
 
 Every hosted zone bills monthly regardless of query volume. Zone
 reduction is the highest-leverage cost action.
 
-**Unused zone detection:**
-```
-For each zone:
-  1. Check DNSQueries metric over 30 days (Sum)
-  2. If Sum == 0 → candidate for deletion
-  3. Cross-check record sets for ACM validation CNAMEs
-  4. Cross-check dependent services (SES, MX, API Gateway custom domain)
-  5. If no dependents → FURTHER_OPTIMIZATION_AVAILABLE (delete zone)
-```
-
-**Zone consolidation:**
-```
-For domains owned by the same organization:
-  1. Identify zones with < 10,000 queries/month
-  2. Check if the domain is a subdomain of another active zone
-  3. If zone2.example.com has its own zone AND example.com zone exists:
-     → Move records to example.com zone as subdomain records
-     → Delete zone2.example.com zone
-     → Saving: $0.50/month per consolidated zone
-```
+Unused-zone detection loop and zone-consolidation loop (DNSQueries check, ACM/SES dependent-service cross-checks, subdomain consolidation math): [references/advanced-patterns.md](references/advanced-patterns.md).
+The decision gate below is authoritative; procedures are on demand.
 
 **Decision gate:**
 
@@ -278,64 +187,21 @@ calculated checks.
 | Calculated (FREE) | Composite of up to 25 other checks | Combining multiple endpoint checks into one DNS failover decision |
 | Alarm-based ($0.50/mo) | Monitoring a CloudWatch alarm | Route 53 should fail over based on a non-HTTP metric |
 
-**Calculated health check conversion:**
-```
-If 3+ endpoint checks feed into a single DNS failover record:
-  → Create a calculated health check (FQDN = the failover target)
-  → Set the calculated check to monitor the endpoint checks
-  → Point the failover record at the calculated check
-  → The calculated check is FREE (saves $0.50/month per replaced check)
-```
+Calculated health check conversion procedure (3+ endpoint checks -> one free calculated parent): [references/advanced-patterns.md](references/advanced-patterns.md).
+The type decision table above is authoritative.
 
-**Redundancy elimination:**
-- If an ALB has its own health check AND Route 53 also checks the ALB
-  endpoint, the Route 53 check is redundant when the target is an ALB
-  with target group health checks. Evaluate whether the Route 53 check
-  adds value (DNS-level failover) or merely duplicates ALB monitoring.
-- Health check interval reduction does NOT save money. Whether 10s or
-  30s, the cost is $0.50/month. Do not recommend interval changes for
-  cost reasons.
+Redundancy elimination guidance (ALB-vs-Route 53 duplicate checks; interval changes never save money): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 3: Query volume and routing policy analysis
 
 DNS query billing is tiered and routing-policy-dependent. The surcharge
 for latency-based and geolocation routing can dominate cost at scale.
 
-**Query pricing tiers (us-east-1, 2026):**
-```
-Standard queries:
-  First 1B/month:   $0.40 per billion
-  Over 1B/month:    $0.20 per billion
+Query pricing tiers (standard tiering, latency +$0.20/B, geolocation +$0.30/B, weighted no-surcharge): [references/route53-pricing-and-configuration.md](references/route53-pricing-and-configuration.md).
 
-Latency-based routing queries:
-  Base + $0.20 per billion (on top of standard rate)
+Routing policy evaluation procedure (single-region latency cutoffs, multi-region justification): [references/advanced-patterns.md](references/advanced-patterns.md).
 
-Geolocation routing queries:
-  Base + $0.30 per billion (on top of standard rate)
-
-Weighted routing queries:
-  Base rate only (no surcharge)
-```
-
-**Routing policy evaluation:**
-```
-For each zone using latency-based or geolocation routing:
-  1. Check query volume for the policy-bearing records
-  2. If queries < 1M/month from a single region:
-     → Latency-based routing adds no value (single-region traffic)
-     → Recommend switching to weighted or simple routing
-     → Saving: removes the +$0.20/B or +$0.30/B surcharge
-  3. If queries > 100M/month across multiple regions:
-     → Latency-based routing is justified (multi-region latency)
-     → Keep; evaluate other dimensions
-```
-
-**Per-zone query ranking:**
-```
-Rank zones by monthly query volume (descending).
-Focus optimization on the top 5 zones by volume × surcharge rate.
-A zone at 500M latency-based queries costs $100/month in surcharges alone.
-```
+Per-zone query ranking procedure (top-5 zones by volume x surcharge): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 4: Traffic policy evaluation
 
@@ -358,20 +224,11 @@ Private hosted zones bill the same $0.50/month as public zones. VPC
 associations themselves carry no additional charge. The optimization
 is purely inventory-based.
 
-**Private zone audit:**
-```
-For each private hosted zone:
-  1. List VPC associations (aws route53 get-hosted-zone --id <zone>)
-  2. If 0 VPC associations → orphaned zone → delete
-  3. If associated VPC is deleted → remove association, then delete zone
-  4. If 2+ private zones overlap the same VPC and domain → consolidate
-```
+Private zone audit procedure (VPC association check, orphaned-zone and overlap rules): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 6: DNSSEC cost impact analysis
 
-DNSSEC signing requires a KMS key ($1/month for customer-managed key)
-plus KMS API calls for signing ($0.03 per 10,000 signatures). The
-fixed cost is the KMS key.
+DNSSEC cost detail (KMS key $1/month + $0.03 per 10,000 signatures): [references/route53-pricing-and-configuration.md](references/route53-pricing-and-configuration.md).
 
 **DNSSEC decision gate:**
 
@@ -387,26 +244,9 @@ fixed cost is the KMS key.
 CloudWatch Logs charges $0.50/GB ingested. Route 53 query logging can
 generate significant volume on high-traffic zones.
 
-**Logging audit:**
-```
-For each zone with query logging enabled:
-  1. Estimate log volume (queries/month × ~200 bytes/query)
-  2. If volume > 50 GB/month AND no compliance requirement:
-     → Recommend disabling logging or sampling
-     → Saving: $0.50/GB × monthly_GB
-  3. If retention > 90 days AND logs are never queried:
-     → Reduce retention to 7-30 days
-     → Saving: storage cost reduction (incremental)
-```
+Query logging audit procedure (volume estimate, 50 GB/month cutoff, retention reduction): [references/advanced-patterns.md](references/advanced-patterns.md).
 
-**Query logging formula:**
-```
-monthly_log_GB = (monthly_queries × 200) / (1024 × 1024 × 1024)
-monthly_ingestion_cost = monthly_log_GB × $0.50
-
-Example: 100M queries/month × 200 bytes = ~18.6 GB
-         18.6 GB × $0.50 = $9.28/month ingestion
-```
+Query logging volume formula and worked math (100M queries x 200 bytes = ~18.6 GB = $9.28/month): [references/route53-pricing-and-configuration.md](references/route53-pricing-and-configuration.md).
 
 ### Step 8: Impact estimation
 
@@ -443,29 +283,8 @@ every data-gate check.
 
 ## Output format
 
-```text
-TARGET: <zone-name or health-check-id>
-VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-REASON: <1-2 sentences naming the recommendation and the supporting data>
-RECOMMENDATION:
-  Current: <zone/config description>
-  Proposed: <zone/config description>
-  Dimensions changed: <zones | health_checks | routing | traffic_policy | dnssec | logging>
-  Dimensions checked: <list ALL seven, each ✓ (no finding) or → (finding)>
-  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
-ESTIMATED_SAVINGS:
-  Current monthly: $<amount>
-  Projected monthly: $<amount>
-  Monthly saving: $<amount>
-  Annual saving: $<amount>
-  Assumptions: <list (zone count, query volume, pricing region, etc.)>
-REMEDIATION_STEPS:
-  1. <specific action with CLI command>
-  2. <verification step>
-CONFIRM: Before executing any state-changing CLI, emit and await operator
-  approval: "CONFIRM: About to <action> on <target> in <region>. Proceed?
-  (yes/no)"
-```
+Canonical TARGET/VERDICT/RECOMMENDATION/ESTIMATED_SAVINGS/REMEDIATION_STEPS/CONFIRM template: [references/worked-examples.md](references/worked-examples.md).
+The STRICT output contract below is authoritative.
 
 Full worked examples are in `references/worked-examples.md`.
 
@@ -640,28 +459,7 @@ Extended anti-patterns in `references/route53-pricing-and-configuration.md`.
 
 ## Expert heuristic (domain expert rules of thumb)
 
-Three rules that a Route 53 cost expert applies instinctively:
-
-1. **Hosted zone consolidation for low-traffic domains.** If the
-   organization owns multiple domains with < 10K queries/month each,
-   consolidate them into a single parent zone using subdomain records.
-   Each eliminated zone saves $6/year minimum. The break-even point
-   for consolidation effort is ~3 zones.
-
-2. **Health check interval does not scale cost — check count does.** The
-   cost lever is the NUMBER of endpoint checks, not the interval. A
-   single check at 10s costs the same as at 30s. To reduce health check
-   spend, reduce check COUNT by converting endpoint checks to calculated
-   checks (free, nesting limit 25 per calculated check).
-
-3. **Calculated health check nesting limit is one level.** A calculated
-   health check can monitor up to 25 other health checks, but those 25
-   cannot themselves be calculated checks. This means the maximum
-   "fan-in" is 25 endpoint checks per calculated check. For > 25
-   endpoints, you need multiple calculated checks plus a parent record
-   that references both — but the parent record itself cannot use a
-   calculated check of calculated checks. Plan the check topology
-   accordingly.
+Three expert heuristics (consolidation break-even ~3 zones; check COUNT is the cost lever not interval; calculated-check nesting fan-in 25/one-level): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
@@ -693,21 +491,7 @@ Three rules that a Route 53 cost expert applies instinctively:
 
 ## Recent AWS features (2024-2026)
 
-- **DNSSEC signing GA (2024):** All public hosted zones support DNSSEC
-  signing via KMS key. Enabled per-zone with key-signing-key.
-- **Route 53 traffic policies visual editor (2024-2025):** Enhanced
-  policy editor supporting geoproximity with bias tuning. Still $50/month
-  per policy.
-- **Calculated health checks enhancement (2024):** Increased monitoring
-  capacity to 25 child checks per calculated check (up from 10).
-- **CloudWatch Logs insights for Route 53 (2024-2025):** Query DNS log
-  data directly in CloudWatch Logs Insights for top queried domains,
-  NXDOMAIN rates, and source IP analysis.
-- **Route 53 Resolver DNS Firewall (2024):** Domain filtering on
-  Resolver queries. Separate billing from hosted zone cost optimization.
-- **Cost Optimization Hub Route 53 recommendations (2025-2026):**
-  Automated detection of unused hosted zones and idle health checks.
-  Use as input to this skill.
+Recent AWS features (DNSSEC GA, traffic-policy editor, calculated-check capacity 25, Logs Insights, Resolver DNS Firewall, Cost Optimization Hub): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## References
 
@@ -718,6 +502,13 @@ Three rules that a Route 53 cost expert applies instinctively:
 - `references/worked-examples.md` — full worked examples (unused zone
   deletion, health check calculated conversion, routing policy switch,
   already-optimal, end-to-end walkthrough).
+
+## References (load on demand)
+
+- [Advanced patterns](references/advanced-patterns.md) — mindset principles, configuration dependency graph, Step 0 non-obvious behaviours, per-step optimization procedures, expert heuristics, recent AWS features
+- [Diagnostic commands](references/diagnostic-commands.md) — pre-flight data-gate command listing
+- [Worked examples](references/worked-examples.md) — full worked examples plus the canonical output block template
+- [Pricing and configuration](references/route53-pricing-and-configuration.md) — pricing tables, query tiers, DNSSEC cost detail, query-logging formula, CLI reference, anti-pattern catalog
 
 ## Domain
 

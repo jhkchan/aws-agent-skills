@@ -133,3 +133,18 @@ object's original creation date.
 | Orphaned multipart upload costs | No AbortIncompleteMultipartUpload rule | Add `DaysAfterInitiation: 7` |
 | Transition to wrong Glacier tier | Confused IR (90-day min) with Flexible (1-day min) | Verify the storage class name |
 | Objects in Standard after 30+ days | Rule filter excludes the objects (wrong prefix) | Verify the `Filter` prefix matches |
+
+---
+
+## Appendix A — Storage class reference
+
+
+| Storage class | Use case | Retrieval | Min lifecycle days | Cost (vs Standard) |
+|---|---|---|---|---|
+| `STANDARD` | Frequently accessed | Milliseconds | N/A | 1x baseline |
+| `STANDARD_IA` | Infrequent, long-lived | Milliseconds | 30 days | ~40% cheaper |
+| `ONEZONE_IA` | Infrequent, non-critical | Milliseconds | 30 days | ~52% cheaper |
+| `GLACIER_IR` | Archives, millisecond access | Milliseconds | 90 days | ~68% cheaper |
+| `GLACIER` (Flexible) | Long-term archives | 1-5 min to hours | 1 day after IA | ~80% cheaper |
+| `DEEP_ARCHIVE` | Compliance archives | 12 hours | 180 days | ~95% cheaper |
+| `INTELLIGENT_TIERING` | Unknown access patterns | Milliseconds (FA/IA) | 0 days | Varies |

@@ -288,3 +288,22 @@ def lambda_handler(event, context):
 
 Trigger this Lambda on a schedule (e.g., every hour) via EventBridge
 to keep the CRL up to date automatically.
+
+## Signing helper download and AWS CLI integration (from SKILL.md)
+
+**Download the signing helper** for your platform from the AWS Roles
+Anywhere helper tool S3 bucket (e.g.,
+`https://rolesanywhere-helper-tool.s3.us-west-2.amazonaws.com/latest/aws_signing_helper_darwin_arm64`),
+then `chmod +x aws_signing_helper`.
+
+```ini
+[profile rolesanywhere]
+credential_process = ./aws_signing_helper credential-process \
+  --certificate client-cert.pem \
+  --private-key client-key.pem \
+  --trust-anchor-id <trust-anchor-id> \
+  --profile-id <profile-id> \
+  --role-arn arn:aws:iam::123456789012:role/RolesAnywhereCIRunner \
+  --region us-east-1
+region = us-east-1
+```

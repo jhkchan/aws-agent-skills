@@ -231,3 +231,29 @@ resource "aws_route53recoveryreadiness_recovery_group" "app" {
   cells               = ["Cell-A", "Cell-B"]
 }
 ```
+
+## Cell and resource set layout (from Step 2)
+
+```text
+Cell-A (us-east-1):
+  NLB: arn:aws:elasticloadbalancing:us-east-1:...:loadbalancer/net/app-nlb-a/...
+  ASG: arn:aws:autoscaling:us-east-1:...:autoScalingGroup:...
+  DynamoDB: arn:aws:dynamodb:us-east-1:...:table/app-table
+
+Cell-B (us-west-2):
+  NLB: arn:aws:elasticloadbalancing:us-west-2:...:loadbalancer/net/app-nlb-b/...
+  ASG: arn:aws:autoscaling:us-west-2:...:autoScalingGroup:...
+  DynamoDB: arn:aws:dynamodb:us-west-2:...:table/app-table
+
+Resource Set 1 (NLB):
+  Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+  Resources: [Cell-A NLB, Cell-B NLB]
+
+Resource Set 2 (ASG):
+  Type: AWS::AutoScaling::AutoScalingGroup
+  Resources: [Cell-A ASG, Cell-B ASG]
+
+Resource Set 3 (DynamoDB):
+  Type: AWS::DynamoDB::Table
+  Resources: [Cell-A table, Cell-B table]
+```

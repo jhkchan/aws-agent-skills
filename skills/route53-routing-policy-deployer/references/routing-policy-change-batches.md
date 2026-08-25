@@ -354,3 +354,33 @@ hosting enabled.
 
 `EvaluateTargetHealth` is `false` — VPC interface endpoints do not
 expose health to Route 53.
+
+## Weighted 90/10 canary change-batch (Step 5 worked JSON)
+
+```json
+{
+  "Changes": [{
+    "Action": "CREATE",
+    "ResourceRecordSet": {
+      "Name": "api.example.com.",
+      "Type": "A",
+      "SetIdentifier": "primary",
+      "Weight": 90,
+      "HealthCheckId": "<hc-id>",
+      "TTL": 60,
+      "ResourceRecords": [{"Value": "10.0.0.10"}]
+    }
+  },{
+    "Action": "CREATE",
+    "ResourceRecordSet": {
+      "Name": "api.example.com.",
+      "Type": "A",
+      "SetIdentifier": "canary",
+      "Weight": 10,
+      "HealthCheckId": "<hc-id-2>",
+      "TTL": 60,
+      "ResourceRecords": [{"Value": "10.0.0.20"}]
+    }
+  }]
+}
+```

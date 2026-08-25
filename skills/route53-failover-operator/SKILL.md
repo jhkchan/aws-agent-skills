@@ -83,18 +83,7 @@ READY):**
    the old IP for up to TTL; the post-failover verification window must
    account for this.
 
-**Cost/time baselines (2026):**
-
-- Endpoint health check: $0.50/endpoint/month for the first 100, then
-  $0.25 each above 100. CloudWatch-alarm-based and calculated health
-  checks are free (the underlying alarm costs apply).
-- HTTP/HTTPS health check interval: 10s (Fast) or 30s (Standard). 10s
-  roughly doubles cost.
-- DNS propagation after a record change: bounded by the record TTL.
-  Lower TTL = faster failover but more DNS query traffic to Route 53
-  authoritative servers.
-- Calculated health checks (AND/OR of up to 256 child checks): free, but
-  each child check is billed at its own type's rate.
+Cost/time baselines (endpoint check $0.50 then $0.25 above 100, 10s fast vs 30s standard, TTL propagation, calculated checks free up to 256 children): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Mindset
 
@@ -104,70 +93,18 @@ IP from all configured resolver regions AND application metrics confirm
 the secondary is serving real traffic. Driven by three Route 53
 realities:
 
-- **Failover speed is TTL-bound, not health-check-bound.** The health
-  check may flip to unhealthy in 10-30 seconds, but every client that
-  cached the old IP at TTL=N will keep sending traffic to the primary
-  until that cache entry expires. The single highest-leverage failover
-  lever is the record TTL — set it to 60s for failover records. A
-  300s TTL means up to 5 minutes of stale traffic even after a perfect
-  health-check transition.
-
-- **"Healthy" does not mean "working."** A health check that probes
-  `/health` returning 200 will report healthy even when the application
-  is broken on every other route. The failover trigger is only as good
-  as the probe. Pair the endpoint health check with a CloudWatch alarm
-  on a real business metric (request success rate, error rate) so a
-  false-healthy health check does not mask a real outage.
-
-- **Cross-account Route 53 requires the zone-owning account to grant
-  the operator account.** The operator account's IAM role identity-based
-  policy is NOT sufficient by itself. The zone-owning account must
-  attach a resource-based policy (or delegate via RAM / Organizations
-  `AWS::Route53Resolver::*`, or use a cross-account role assumption) that
-  allows the operator's role ARN to call
-  `route53:ChangeResourceRecordSets` on the hosted zone ARN.
+The three realities in full (failover speed is TTL-bound; healthy does not mean working; cross-account zones need a zone-owning-account grant): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Pre-flight: hosted zone + record set gate
 
 Run before classification. Misclassifying these produces wrong plans.
 
-**Pagination:** `list-resource-record-sets` paginates at 300 record sets
-per page — drain `--start-record-name` / `--start-record-type` to
-completion for large zones. `list-health-checks` paginates at 100/page.
+Pagination limits (list-resource-record-sets 300/page, list-health-checks 100/page): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
-**Live-account pre-flight (skip if offline plan audit):**
-1. `aws route53 list-hosted-zones-by-name --dns-name <domain>` — find
-   the zone; capture `Id`, `Name`, `Config.Comment`, `ResourceRecordSetCount`.
-2. `aws route53 list-resource-record-sets --hosted-zone-id <id>` — find
-   the failover records; capture `Type`, `SetIdentifier`, `Failover`
-   (PRIMARY/SECONDARY), `TTL`, `ResourceRecords`, `HealthCheckId`,
-   `RoutingPolicy`.
-3. `aws route53 get-health-check --health-check-id <id>` — capture
-   `HealthCheckConfig` (Type, FullyQualifiedDomainName, IPAddress, Port,
-   ResourcePath, SearchString, Type, RequestInterval, FailureThreshold),
-   `HealthCheckVersion`, and the linked CloudWatch alarm region.
-4. `aws route53 get-health-check-status --health-check-id <id>` —
-   capture `HealthCheckObservations` (one per Route 53 checker region),
-   `Status` (Healthy/Unhealthy/LastKnownGoodStatus).
-5. `aws route53 get-health-check-last-failure-reason --health-check-id
-   <id>` — capture the most recent failure reason string.
-6. `aws route53 test-dns-answer --hosted-zone-id <id> --record-name
-   <fqdn> --record-type A --resolver-ip 1.1.1.1` — verify what Route 53
-   is currently authoritatively answering. Repeat from multiple
-   `--resolver-ip` values (1.1.1.1, 8.8.8.8, 9.9.9.9) to catch
-   regional divergence.
-7. `aws cloudwatch describe-alarms --alarm-name-prefix <name>` — verify
-   an alarm exists on the `AWS/Route53` `HealthCheckStatus` metric for
-   this health check ID.
-8. For cross-account zones: `aws route53 list-resource-record-sets
-   --hosted-zone-id <id> --profile <zone-account-profile>` — verify the
-   operator has the cross-account grant.
+Live-account pre-flight commands 1-8 (list-hosted-zones-by-name, list-resource-record-sets, get-health-check, get-health-check-status, get-health-check-last-failure-reason, test-dns-answer from multiple resolvers, describe-alarms, cross-account profile check) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before a live-account operation; offline plan audits skip it.
 
-**Malformed input:** if the input JSON is invalid or missing required
-fields, emit `VERDICT: ERROR` with `REASON: Hosted zone / record set
-configuration is not valid JSON or is missing required fields — cannot
-plan.` and `REMEDIATION: Re-fetch with aws route53 list-resource-record-
-sets --hosted-zone-id <id> --output json and re-plan.`
+Malformed-input handling (ERROR verdict text and re-fetch remediation): [references/error-handling.md](references/error-handling.md).
 
 | Attribute | Effect on operation |
 |---|---|
@@ -185,107 +122,8 @@ sets --hosted-zone-id <id> --output json and re-plan.`
 
 ### Step 0: Expert knowledge — non-obvious Route 53 behaviors
 
-These behaviors are easy to misjudge without operational failover
-experience. Each changes a plan if ignored:
-
-- **Route 53 health checks run from 3+ global regions, not one.** Each
-  checker region issues the probe independently; a health check is
-  unhealthy only when the failure threshold (default 3) is hit
-  consecutively across the merged observation. This means a single-
-  region network blip rarely triggers failover, but a true outage does
-  in ~10-30 seconds (interval x threshold).
-
-- **The record TTL is the failover contract, not the health check
-  interval.** Even after Route 53 marks the primary unhealthy and stops
-  returning its IP, every recursive resolver and every client OS that
-  cached the old IP at the previous TTL will keep using it. Lowering TTL
-  to 60s ahead of a planned failover is the single highest-leverage
-  action; for an emergency failover with a 300s TTL, the operator must
-  either accept up to 5 minutes of stale traffic or proactively purge
-  caches.
-
-- **Failover routing policy requires paired records.** One record has
-  `Failover: PRIMARY` with a `HealthCheckId`; the other has `Failover:
-  SECONDARY` (no health check, or its own health check). Route 53
-  returns the PRIMARY IP when its health check is healthy, otherwise
-  the SECONDARY. There is no weighted gradient.
-
-- **Weighted routing is the right tool for canary/blue-green, not
-  failover routing.** A weighted policy with weights 100/0 is a valid
-  "failover" shape, and shifting 100->0/0->100 is a planned failover
-  that can be paused (50/50) or rolled back. Failover routing is
-  automatic but binary; weighted is manual but graduated. Choose
-  weighted for planned failovers that may need to pause.
-
-- **Multivalue answer is NOT load balancing.** It returns up to 8
-  healthy IPs per query (shuffled), but clients pick one. It is a
-  "round-robin with health checks" — useful for spreading load across
-  many endpoints, not for primary/secondary failover. Combine with
-  per-endpoint health checks for opportunistic redundancy.
-
-- **Latency routing does not fail over; it falls back.** If the lowest-
-  latency region's endpoint is unhealthy, Route 53 serves the next-
-  lowest-latency healthy region. This is automatic and works without a
-  failover record. Use latency routing for multi-region active-active.
-
-- **Geolocation routing can pair with failover for regional DR.** A
-  geolocation record (e.g., "users in Europe") can be paired with a
-  geolocation + failover SECONDARY record so that if the primary EU
-  endpoint is unhealthy, EU users fall back to a secondary EU endpoint.
-  This requires both records to share the same geolocation continent
-  code.
-
-- **Calculated health checks (AND/OR) compose other health checks.** A
-  calculated check lets you say "failover only when BOTH the endpoint
-  check AND the database-alarm-based check are unhealthy." This is the
-  antidote to the false-healthy trap. Up to 256 child checks; the
-  calculated check itself is free.
-
-- **Insulated health checks prevent child-check influence on other
-  calculated checks.** Insulating a child health check prevents it from
-  affecting the status of OTHER calculated health checks that reference
-  it. Use when a child check is shared between multiple calculated
-  checks with different semantics.
-
-- **`test-dns-answer` shows what Route 53 authoritatively answers from
-  a specific resolver IP.** It does NOT show what a real client at that
-  IP sees — recursive resolvers cache. To verify end-to-end, run
-  `dig @1.1.1.1 <fqdn>` and `dig @8.8.8.8 <fqdn>` from multiple
-  networks. `test-dns-answer` is authoritative truth; `dig` is observed
-  truth.
-
-- **CloudWatch-alarm-based health checks are free but slower.** A
-  CloudWatch alarm in ALARM state flips the health check unhealthy.
-  This avoids the per-endpoint fee but adds alarm-evaluation latency
-  (typically 1 minute for a 1-minute period). Use for composite health
-  signals; use endpoint checks for fast failover.
-
-- **Cross-account hosted zone IAM requires a resource-based grant.**
-  Route 53 does NOT support resource-based policies on hosted zones the
-  way S3/KMS do — the zone-owning account must either (a) attach an
-  inline policy to a role the operator assumes via STS, or (b) use AWS
-  RAM to share the hosted zone with the operator account via
-  Organizations or a direct invitation. Identity-based policies in the
-  operator account alone cannot grant cross-account Route 53 access.
-
-- **`UPSERT` is the safer change action than `CREATE` or `DELETE`.**
-  `UPSERT` creates the record if it does not exist, or updates it if it
-  does. `CREATE` fails if the record exists; `DELETE` fails if it does
-  not. For failover operations, prefer `UPSERT` so the same change
-  batch works whether the record is in its pre-state or post-state.
-
-- **`ChangeResourceRecordSets` is eventually consistent.** The API
-  returns a `ChangeInfo` with `Status: PENDING` immediately; the actual
-  DNS change propagates within 60 seconds typically. Poll
-  `get-change --id <change-id>` until `Status: INSYNC` before declaring
-  the failover applied.
-
-- **Both records unhealthy means Route 53 returns all records.** If
-  PRIMARY and SECONDARY are both unhealthy (both have failing health
-  checks), Route 53 returns BOTH IPs — it prefers serving a possibly-
-  bad answer over no answer. This is why a BLOCKED pre-check on "both
-  unhealthy" matters: failing over when the secondary is also down does
-  not help.
+The 17 non-obvious behaviors (3+ checker regions, TTL is the failover contract, paired failover records, weighted vs failover routing, multivalue is not load balancing, latency fallback, geo+failover pairing, calculated checks, insulated child checks, test-dns-answer vs dig, alarm-based checks, cross-account IAM, UPSERT safety, eventual consistency, both-unhealthy last resort) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand — each behavior changes a plan if ignored.
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
@@ -361,35 +199,14 @@ secondary, OLD secondary the primary):**
 
 **Failover failure-mode table (use during diagnose-failover):**
 
-| Symptom | Root cause | Fix |
-|---|---|---|
-| `test-dns-answer` still returns PRIMARY IP after health check unhealthy | TTL caching by recursive resolvers; or `ChangeResourceRecordSets` not yet INSYNC | Wait TTL seconds; poll `get-change`; verify `test-dns-answer` from multiple resolvers |
-| PRIMARY health check `Healthy` but app is broken | Health check probe path too shallow (e.g., `/health` returns 200 while app is broken) | Deepen the probe (check a real endpoint), or add a calculated health check with a CloudWatch alarm on error rate |
-| PRIMARY health check `Unhealthy` but failover did not happen | PRIMARY record missing `HealthCheckId`, or the record's routing policy is not `Failover`, or there is no SECONDARY record | Wire the health check to the PRIMARY record; add a SECONDARY record |
-| Both records returned (both unhealthy) | PRIMARY and SECONDARY health checks both failing | Fix the secondary before failing over; Route 53 returns both as a last resort |
-| Health check `Unhealthy` with reason "Connection timed out" | Endpoint firewall blocks Route 53 checker IPs (route53-checker-ips AWS-managed prefix list) | Allow the AWS Route 53 checker prefix list on the endpoint SG/firewall |
-| Health check `Unhealthy` with reason "No response from server" | Endpoint crashed or port closed | Restart the endpoint service |
-| Health check `Unhealthy` with reason "String not found" | Search string not in response body (app deployed a new build that changed the response) | Update `SearchString` or the application's health endpoint |
-| Cross-account `AccessDenied` on `ChangeResourceRecordSets` | Operator role not granted by zone-owning account | Zone account attaches inline policy or shares via RAM |
-| DNS still serves old IP from `dig` but `test-dns-answer` is correct | Recursive resolver / OS DNS cache | Wait TTL seconds; flush DNS (`sudo dscacheutil -flushcache` macOS, `sudo systemctl restart systemd-resolved` Linux) |
-| Latency routing serves a "wrong" region | Latency DB has stale measurements; or endpoint moved | Use `test-dns-answer --resolver-ip <client-resolver>` to inspect per-resolver answers |
-| Weighted routing returns a 0-weight record | Both records have weight 0; or weights mis-typed | Verify `Weight` values; sum of all weights for the same name+type = traffic distribution |
-| `ChangeInfo` stuck `PENDING` > 5 minutes | Rare Route 53 backend delay | Open AWS support; do NOT submit a second change-batch for the same record |
+Failover failure-mode table (stale test-dns-answer, false-healthy probe, missing HealthCheckId, both records returned, checker IP blocks, string-not-found, cross-account AccessDenied, resolver cache, latency DB staleness, 0-weight, PENDING stuck): [references/error-handling.md](references/error-handling.md).
 
 ### Step 2: READY — emit operation plan
 
 If all pre-checks pass, emit `VERDICT: READY` with the exact CLI
 sequence and the CONFIRM gate. The plan includes:
 
-- The exact `change-resource-record-sets` JSON batch with all fields
-  populated from the current record set + the operation parameters.
-- The expected DNS propagation time (TTL seconds for cached resolvers;
-  near-instant for uncached).
-- The expected side-effects (which IPs Route 53 will answer with after
-  INSYNC; which health check transitions to expect).
-- The CONFIRM gate prompt.
-- The verification step (`test-dns-answer` + `dig` from multiple
-  resolvers + application metric check).
+What a READY plan includes (change-batch JSON, propagation estimate, side-effects, CONFIRM gate, verification): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 3: Execute behind CONFIRM gate
 
@@ -399,35 +216,14 @@ sequence and the CONFIRM gate. The plan includes:
   `CONFIRM: About to <operation> on <fqdn> in hosted zone <id> (account
   <account> region global). This will <consequence>. Proceed? (yes/no)`.
   Do NOT execute until the operator confirms.
-- Capture pre-state for rollback: `aws route53 list-resource-record-sets
-  --hosted-zone-id <id> --output json > /tmp/<id>-rrsets-pre-$(date
-  +%s).json` AND `aws route53 test-dns-answer --hosted-zone-id <id>
-  --record-name <fqdn> --record-type A --resolver-ip 1.1.1.1 --output
-  json > /tmp/<fqdn>-dnsanswer-pre-$(date +%s).json`.
-- Execute the change-batch. The API returns `ChangeInfo.Id`; capture
-  it for status polling.
-- Poll `aws route53 get-change --id <change-id>` until
-  `Status: INSYNC` (typically 5-60 seconds).
+Pre-state capture commands (record-set + test-dns-answer JSON snapshots) and get-change polling until INSYNC: [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### Step 4: Post-verification — COMPLETED
 
 After the change reaches INSYNC, run post-verification. ALL checks must
 pass for `COMPLETED`.
 
-1. `test-dns-answer --hosted-zone-id <id> --record-name <fqdn>
-   --record-type A --resolver-ip 1.1.1.1` returns the NEW primary IP.
-   Repeat from `8.8.8.8` and `9.9.9.9`.
-2. `dig @1.1.1.1 <fqdn> +short` returns the NEW primary IP from at
-   least one major public resolver (tolerate cache lag on others).
-3. The PRIMARY health check (if applicable) reports `Healthy` for the
-   new primary, OR (for failover FROM a down primary) the SECONDARY
-   health check reports `Healthy`.
-4. Application metric dashboards show traffic shifting to the new
-   primary (sample 2x TTL post-change).
-5. For weighted failover: confirm the new weight distribution by
-   observing traffic share in the metrics.
-6. For failover routing: confirm `test-dns-answer` no longer returns
-   the old primary IP from any resolver.
+Post-verification probes 1-6 (test-dns-answer from three resolvers, dig +short, health check status, traffic shift metrics, weight distribution, old-IP absence): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 If ANY verification fails, emit `VERDICT: ERROR` with the failure
 details — do not claim COMPLETED. A failed verification typically means
@@ -436,181 +232,17 @@ batch did not apply as expected (inspect the INSYNC record set).
 
 ## Output format (per operation)
 
-```text
-OPERATION: <planned-failover | emergency-failover | failback | create-health-check | update-health-check | diagnose-failover | update-routing>
-VERDICT: READY | BLOCKED | COMPLETED
-TARGET: <fqdn> (hosted zone: <id>, routing policy: <policy>)
-PRE_CHECKS:
-  - [PASS] <check description>
-  - [FAIL] <check description> — <reason>
-STEPS:
-  1. <CLI command or change-batch JSON with all fields populated>
-  2. <wait / monitoring command>
-  3. <next step>
-POST_VERIFY:
-  - [PASS] <verification description>
-  - [FAIL] <verification description> — <reason>
-NOTES: <TTL, propagation estimate, monitoring, caveats>
-```
+Canonical OPERATION/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY/NOTES template: [references/worked-examples.md](references/worked-examples.md).
+The STRICT output contract below is authoritative.
 
 ### Worked example — planned-failover (weighted 100/0 -> 0/100)
 
-```text
-OPERATION: planned-failover
-VERDICT: READY
-TARGET: api.example.com (hosted zone: Z2ABCDEFGHIJK, routing policy:
-        weighted)
-PRE_CHECKS:
-  - [PASS] Hosted zone Z2ABCDEFGHIJK exists, not deleted
-  - [PASS] Weighted records found:
-    api.example.com A SetIdentifier=blue  Weight=100  Value=10.0.0.10
-    api.example.com A SetIdentifier=green Weight=0    Value=10.0.1.10
-  - [PASS] Green endpoint 10.0.1.10 reachable on port 443 (TCP probe OK)
-  - [PASS] Green health check h-abcdef1234 Status: Healthy
-  - [PASS] Current TTL: 60s (acceptable for fast failover)
-  - [PASS] Cross-account IAM: operator role authorized in zone account
-  - [PASS] CloudWatch alarm api-example-failover exists on
-    AWS/Route53 HealthCheckStatus
-STEPS:
-  1. CONFIRM: About to flip weighted routing on api.example.com in
-     hosted zone Z2ABCDEFGHIJK (account 111111111111, global Route 53).
-     Blue weight 100->0; Green weight 0->100. Traffic will shift from
-     10.0.0.10 (blue) to 10.0.1.10 (green). DNS propagation bounded by
-     60s TTL. Proceed? (yes/no)
-  2. aws route53 change-resource-record-sets \
-       --hosted-zone-id Z2ABCDEFGHIJK \
-       --change-batch '{
-         "Changes": [
-           {"Action":"UPSERT","ResourceRecordSet":{
-             "Name":"api.example.com.",","Type":"A",
-             "SetIdentifier":"blue","Weight":0,
-             "TTL":60,"ResourceRecords":[{"Value":"10.0.0.10"}],
-             "HealthCheckId":"h-blue123"}},
-           {"Action":"UPSERT","ResourceRecordSet":{
-             "Name":"api.example.com.","Type":"A",
-             "SetIdentifier":"green","Weight":100,
-             "TTL":60,"ResourceRecords":[{"Value":"10.0.1.10"}],
-             "HealthCheckId":"h-abcdef1234"}}
-         ]
-       }'
-  3. Capture ChangeInfo.Id; poll:
-     aws route53 get-change --id <change-id>
-     until Status: INSYNC (typically 5-30 seconds).
-POST_VERIFY:
-  - (pending execution)
-NOTES:
-  - DNS propagation: up to 60s for cached recursive resolvers (TTL).
-    Uncached resolvers see the new answer within seconds of INSYNC.
-  - Rollback: re-run the same change-batch with weights inverted
-    (blue=100, green=0). Keep the rollback command ready.
-  - Watch the application error-rate dashboard for 2x TTL post-change
-    (120s) to catch a bad green deployment before declaring COMPLETED.
-```
+Full worked example (planned weighted 100/0 -> 0/100 flip, READY): [references/worked-examples.md](references/worked-examples.md).
+The Perfect example output in the STRICT contract below shows the same shape.
 
-### Worked example — emergency-failover (TTL lowering required)
+Full worked example (emergency failover with Phase 1 TTL lowering and Phase 2 topology swap): moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
-```text
-OPERATION: emergency-failover
-VERDICT: READY
-TARGET: api.example.com (hosted zone: Z2ABCDEFGHIJK, routing policy:
-        failover)
-PRE_CHECKS:
-  - [PASS] Failover records found:
-    api.example.com A SetIdentifier=primary   Failover=PRIMARY
-      Value=10.0.0.10 HealthCheckId=h-primary
-    api.example.com A SetIdentifier=secondary Failover=SECONDARY
-      Value=10.0.1.10
-  - [PASS] PRIMARY health check h-primary Status: Unhealthy
-    (reason: Connection timed out, 3 consecutive failures)
-  - [PASS] Secondary endpoint 10.0.1.10 reachable on port 443
-  - [PASS] CloudWatch alarm api-example-failover in ALARM state
-  - [WARN] Current TTL: 300s — lowering to 60s FIRST to shrink the
-    stale-traffic window. The full failover will take up to old-TTL
-    (300s) for clients that cached at 300s; new clients see 60s.
-STEPS:
-  1. CONFIRM: About to lower TTL on api.example.com failover records
-     from 300s to 60s in hosted zone Z2ABCDEFGHIJK. Then, after old TTL
-     expires, swap PRIMARY and SECONDARY values (10.0.0.10 becomes
-     SECONDARY, 10.0.1.10 becomes PRIMARY). This redirects traffic from
-     the down primary to the secondary. Proceed? (yes/no)
-  2. Phase 1 — lower TTL (apply immediately, then wait old-TTL seconds):
-     aws route53 change-resource-record-sets \
-       --hosted-zone-id Z2ABCDEFGHIJK \
-       --change-batch '{
-         "Changes": [
-           {"Action":"UPSERT","ResourceRecordSet":{
-             "Name":"api.example.com.","Type":"A",
-             "SetIdentifier":"primary","Failover":"PRIMARY",
-             "TTL":60,"ResourceRecords":[{"Value":"10.0.0.10"}],
-             "HealthCheckId":"h-primary"}},
-           {"Action":"UPSERT","ResourceRecordSet":{
-             "Name":"api.example.com.","Type":"A",
-             "SetIdentifier":"secondary","Failover":"SECONDARY",
-             "TTL":60,"ResourceRecords":[{"Value":"10.0.1.10"}]}}
-         ]
-       }'
-     # Wait 300 seconds (old TTL) for resolver caches to expire.
-  3. Phase 2 — swap topology after old TTL expires:
-     aws route53 change-resource-record-sets \
-       --hosted-zone-id Z2ABCDEFGHIJK \
-       --change-batch '{
-         "Changes": [
-           {"Action":"UPSERT","ResourceRecordSet":{
-             "Name":"api.example.com.","Type":"A",
-             "SetIdentifier":"primary","Failover":"PRIMARY",
-             "TTL":60,"ResourceRecords":[{"Value":"10.0.1.10"}],
-             "HealthCheckId":"h-secondary"}},
-           {"Action":"UPSERT","ResourceRecordSet":{
-             "Name":"api.example.com.","Type":"A",
-             "SetIdentifier":"secondary","Failover":"SECONDARY",
-             "TTL":60,"ResourceRecords":[{"Value":"10.0.0.10"}]}}
-         ]
-       }'
-  4. Poll: aws route53 get-change --id <change-id> until INSYNC.
-POST_VERIFY:
-  - (pending execution)
-NOTES:
-  - Emergency mode: the primary is already unhealthy. Route 53 SHOULD
-    already be serving the secondary (10.0.1.10) for clients whose
-    caches expired. Verify with test-dns-answer and dig BEFORE running
-    Phase 2 — if Route 53 is already serving 10.0.1.10, you only need
-    Phase 1 (TTL lowering) and can defer Phase 2 (topology swap) until
-    the primary is restored.
-  - Bring a new health check online for the new primary (10.0.1.10)
-    before the swap, OR confirm the existing h-secondary health check
-    is wired to 10.0.1.10 and reports Healthy.
-```
-
-### Worked example — diagnose-failover (BLOCKED with remediation)
-
-```text
-OPERATION: diagnose-failover
-VERDICT: BLOCKED
-TARGET: api.example.com (hosted zone: Z2ABCDEFGHIJK, routing policy:
-        failover)
-PRE_CHECKS:
-  - [PASS] Hosted zone exists, failover records present
-  - [PASS] PRIMARY health check h-primary Status: Unhealthy
-  - [FAIL] SECONDARY health check h-secondary Status: Unhealthy
-    (reason: "Connection timed out" from all 3 checker regions)
-  - [INFO] test-dns-answer returns BOTH IPs (10.0.0.10 and 10.0.1.10) —
-    Route 53 is in last-resort mode because both records are unhealthy
-STEPS: (none — secondary is also down)
-POST_VERIFY: (none)
-NOTES:
-  - Root cause: the failover target (secondary) is also unreachable.
-    Route 53 returns both records because it prefers a possibly-bad
-    answer over no answer.
-  - Fix order:
-    1. Restore the secondary endpoint 10.0.1.10 (restart service /
-       fix network / fail over the underlying compute).
-    2. Verify h-secondary flips to Healthy:
-       aws route53 get-health-check-status --health-check-id h-secondary
-    3. Once secondary is Healthy, test-dns-answer should return only
-       10.0.1.10. Confirm before any further routing changes.
-    4. Then diagnose and restore the primary separately; failback only
-       when h-primary has been Healthy for >= 2 consecutive intervals.
-```
+Full worked example (diagnose-failover BLOCKED because the secondary is also down, with fix order): moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 ## STRICT output contract
 
@@ -855,48 +487,16 @@ NOTES:
 
 ## Recent AWS features (2024-2026)
 
-- **Health check `EnableSNI` GA (2024):** Server Name Indication
-  support on HTTPS health checks. Required when the endpoint uses
-  virtual-hosted TLS (multiple certs on one IP). Without SNI, Route 53
-  receives the default certificate which may not match the probe
-  hostname.
+Recent AWS features (EnableSNI GA, alarm-based checks, InsufficientDataHealthStatus, insulated child checks, RAM cross-account sharing, test-dns-answer multiple resolver IPs, Resolver DNS Firewall, CidrRoutingConfig): [references/advanced-patterns.md](references/advanced-patterns.md).
 
-- **CloudWatch-alarm-based health check refinements (2024-2025):**
-  Health checks can now be driven directly by a CloudWatch alarm in
-  ALARM state, with no per-endpoint probe. Useful when the health
-  signal is a composite metric (e.g., error rate > threshold) rather
-  than an HTTP response.
+## References (load on demand)
 
-- **Calculated health check `InsufficientDataHealthStatus` (2024):**
-  Explicit control over the parent's status when child checks have
-  insufficient data. Default is `LastKnownGoodStatus`; set to
-  `Unhealthy` for fail-fast workloads.
-
-- **Insulated child health checks (2024-2025):** A child health check
-  can be marked insulated so that its status does not affect OTHER
-  calculated checks that reference it. Use when sharing a child check
-  between calculated checks with different semantics.
-
-- **Cross-account hosted zone sharing via RAM (2024):** AWS RAM
-  supports sharing Route 53 hosted zones with member accounts in an
-  Organization. The zone-owning account creates a RAM resource share;
-  member accounts can then manage records via their own IAM roles.
-  Replaces the older inline-policy-only pattern.
-
-- **`test-dns-answer` mulcdtiple resolver IPs (2024):** The
-  `test-dns-answer` API now accepts any public resolver IP, allowing
-  operators to verify Route 53's answer from the perspective of
-  specific resolver networks. Previously limited to a small set.
-
-- **Route 53 Resolver DNS Firewall integration (2024-2025):** For
-  VPC-resolver-based failover verification, the Resolver DNS Firewall
-  can block or allow specific domains. Verify the firewall is not
-  blocking the failover target domain during VPC-internal tests.
-
-- **CidrRoutingConfig (2025):** A new routing policy that returns
-  different answers based on the client's CIDR block. Useful for
-  deterministic failover by client geography (e.g., send corporate
-  ranges to a known-good endpoint during DR).
+- [Advanced patterns](references/advanced-patterns.md) — cost/time baselines, mindset realities, Step 0 non-obvious behaviors, READY plan contents, recent AWS features
+- [Diagnostic commands](references/diagnostic-commands.md) — pagination limits, live-account pre-flight, pre-state capture, post-verification probes
+- [Error handling](references/error-handling.md) — malformed input handling, failover failure-mode table
+- [Worked examples](references/worked-examples.md) — canonical output template, planned-failover, emergency-failover, diagnose-failover examples
+- [Failover routing policies](references/failover-routing-policies.md) — routing policy semantics reference
+- [Health check procedures](references/health-check-procedures.md) — health check create/update procedures
 
 ## Domain
 

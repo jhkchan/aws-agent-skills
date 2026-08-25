@@ -137,3 +137,38 @@ s3.get_object(
     ExpectedBucketOwner='111111111111'  # bucket owner account
 )
 ```
+
+## Deep reference: S3 authorisation evaluation model
+
+### Policy evaluation hierarchy (strict order)
+
+```
+1. SCPs (org root → OU → account)     — a Deny at any level blocks
+2. IAM identity policy                  — the caller's effective permissions
+3. Permission boundary (if set)         — narrows effective permissions
+4. Session policy (if STS assumed)      — further narrows for this session
+5. Bucket policy                        — resource-based policy
+6. ACLs (if BucketOwnerEnforced=false)  — legacy per-object access
+7. KMS key policy (if SSE-KMS)         — separate gate for decrypt
+8. VPC endpoint policy (if applicable)  — additional gate for VPC traffic
+9. Block Public Access                  — pre-evaluation gate for public access
+10. Object Lock                         — post-evaluation gate for write/delete
+```
+
+### Explicit deny vs implicit deny
+
+| Type | Meaning | CloudTrail signal |
+|---|---|---|
+| Explicit deny | A `Deny` statement exists somewhere | `errorMessage` contains "explicit deny" |
+| Implicit deny | No `Allow` statement matches | `errorMessage` is bare "Access Denied" |
+
+### Cross-account evaluation matrix
+
+| Bucket in | Caller in | IAM policy allows | Bucket policy allows | Result |
+|---|---|---|---|---|
+| Account A | Account A | Yes | No | Allow (same-account: either allows) |
+| Account A | Account A | Yes | Yes | Allow |
+| Account A | Account A | No | Yes | Allow (same-account: either allows) |
+| Account A | Account B | Yes | No | Deny (cross-account: both must allow) |
+| Account A | Account B | Yes | Yes | Allow |
+| Account A | Account B | No | Yes | Deny (cross-account: both must allow) |

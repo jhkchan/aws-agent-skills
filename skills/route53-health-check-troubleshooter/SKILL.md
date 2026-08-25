@@ -125,39 +125,7 @@ visibility are proven clean.
 
 ## Philosophy
 
-Four behaviours separate a senior Route 53 engineer from a generalist:
-
-- **The health check status drives the diagnostic order.** An
-  `Unhealthy` status with the endpoint reachable from the VPC means
-  the health checker cannot reach the endpoint — that is a network
-  visibility or protocol mismatch problem, not an application problem.
-  A `Healthy` status with traffic still failing over means the routing
-  policy or DNS TTL is the problem.
-
-- **Health checker IPs are external and must be allowed inbound.**
-  Route 53 health checkers probe from 15+ AWS regions using publicly
-  routed IPs. An endpoint behind a security group or firewall that
-  does not allow the Route 53 health checker IP ranges
-  (`aws route53 get-health-check` provides the caller IPs) will fail
-  every probe. This is the #1 cause of "endpoint works from VPC but
-  health check is unhealthy."
-
-- **Calculated health checks apply boolean logic but operators
-  frequently invert AND/OR.** A calculated health check with
-  `Type: CALCULATED` and `Inverted: false` using `AND` logic reports
-  healthy only when ALL child checks are healthy. `OR` logic reports
-  healthy when ANY child is healthy. `NOT` inverts a single child.
-  Operators who expect "healthy if any child is healthy" but configure
-  `AND` see failover trigger when only one region is down — the
-  opposite of what they intended.
-
-- **DNS TTL is the dominant factor in failover speed, not the health
-  check interval.** The health check interval determines how quickly
-  Route 53 detects a failure. The DNS TTL determines how quickly
-  clients stop using the old record. A health check with
-  `RequestInterval: 10` and `FailureThreshold: 3` detects failure in
-  30 seconds, but a record with TTL 300 means clients may continue
-  hitting the dead endpoint for 5 more minutes.
+The four senior-engineer behaviours (status drives diagnostic order; checker IPs are external and must be allowed inbound; calculated AND/OR inversion; TTL dominates failover speed) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Quick reference — symptom triage table
 
@@ -176,40 +144,8 @@ Four behaviours separate a senior Route 53 engineer from a generalist:
 
 ## Pre-flight: health check state and gather-info gate
 
-```bash
-# 1. Health check configuration (type, endpoint, interval, threshold)
-aws route53 get-health-check \
-  --health-check-id <id> --output json
-
-# 2. Health check status (per-region, last checked, status)
-aws route53 get-health-check-status \
-  --health-check-id <id> --output json
-
-# 3. List all health checks (find the relevant one)
-aws route53 list-health-checks --output json
-
-# 4. Record sets for the hosted zone (routing policy, health check assoc.)
-aws route53 list-resource-record-sets \
-  --hosted-zone-id <zone-id> --output json
-
-# 5. CloudWatch health check metrics (HealthCheckPercentageHealthy,
-#    HealthCheckStatus, ConnectionTime, TimeToFirstByte)
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/Route53 \
-  --metric-name HealthCheckPercentageHealthy \
-  --dimensions Name=HealthCheckId,Value=<id> \
-  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Average,Minimum --output json
-
-# 6. For alarm-based health checks: CloudWatch alarm state
-aws cloudwatch describe-alarms \
-  --alarm-names <alarm-name> --output json
-
-# 7. DNS resolution verification (from outside the VPC)
-dig +short NS <domain-name>
-dig +short <domain-name>
-dig +short @<authoritative-NS> <domain-name>
-```
+Gather-info gate commands 1-7 (get-health-check, get-health-check-status, list-health-checks, list-resource-record-sets, CloudWatch HealthCheckPercentageHealthy metrics, describe-alarms, dig NS/A/authoritative) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before a live-account diagnosis; offline classification uses pasted probe output.
 
 ### Health-check-type identification short-circuit
 
@@ -221,79 +157,14 @@ dig +short @<authoritative-NS> <domain-name>
 | `CALCULATED` | Boolean logic over child health checks. ChildHealthChecks lists the IDs. Inverted flag flips the result. |
 | `CLOUDWATCH_METRIC` | Alarm-based. Monitors a CloudWatch alarm state. HealthStatus = ALARM → unhealthy. |
 
-If input is malformed (missing HealthCheckId, absent symptom
-description), emit:
-
-```text
-TARGET: <health-check-id or unknown>
-VERDICT: INSUFFICIENT_DATA
-REASON: Input is missing required context — at minimum a symptom
-  description (health check status, failover behaviour) and the
-  HealthCheckId or domain name.
-LAYER: UNKNOWN
-EVIDENCE:
-  - Missing: <list specific missing fields>
-REMEDIATION: Re-prompt the operator for: (1) the HealthCheckId or
-  domain name, (2) the observed health check status (healthy /
-  unhealthy / flapping), (3) the routing policy and record TTL,
-  and (4) the failover behaviour (not triggering, slow, wrong
-  endpoint served).
-```
+INSUFFICIENT_DATA re-prompt block for malformed input (missing HealthCheckId or symptom description): [references/error-handling.md](references/error-handling.md).
 
 ## Diagnostic decision tree
 
 ### Step 0: Non-obvious behaviours that change diagnosis
 
-- **Route 53 health checkers are external to your VPC.** They probe
-  from 15+ AWS regions using publicly routed IPs. An endpoint on a
-  private subnet (10.x.x.x) without a public IP or a Route 53
-  resolver inbound endpoint is unreachable by health checkers. Use
-  the health check's `IPAddress` with a public ENI, or use a domain
-  name that resolves to a public IP.
-
-- **HTTPS health checks validate the TLS certificate against the
-  FQDN.** If the endpoint serves a certificate for `api.example.com`
-  but the health check FQDN is `health.example.com`, the health check
-  fails with a certificate name mismatch. EnableSNI must be true when
-  the endpoint uses SNI-based virtual hosting.
-
-- **`FailureThreshold` is the number of consecutive failures, not
-  total failures.** With `FailureThreshold: 3` and
-  `RequestInterval: 30`, the health check flips to unhealthy after 3
-  CONSECUTIVE failures (90 seconds). A single success between failures
-  resets the counter. Operators who "see 5 failures in the logs but
-  the health check is still healthy" may be seeing non-consecutive
-  failures with intermittent successes resetting the count.
-
-- **Calculated health check `Inverted` flag flips the logic.** A
-  calculated check with `Inverted: true` reports healthy when the
-  underlying expression is FALSE. Accidental inversion causes the
-  opposite of the expected behaviour.
-
-- **DNS TTL caches stale records on resolvers worldwide.** Even after
-  Route 53 flips the record, recursive DNS resolvers cache the old
-  answer for up to the TTL. A TTL of 300 means some clients may use
-  the old record for 5 minutes. The only way to force faster failover
-  is to lower the TTL before a failover event.
-
-- **`RequestInterval` has two tiers: 30s (standard) and 10s (fast).** Fast detects in ~30s (3×10s); standard in ~90s (3×30s). Fast costs more.
-
-- **Weighted routing failover requires explicit health check
-  association per record.** Without a `HealthCheckId`, Route 53 serves
-  the record regardless of endpoint health.
-
-- **Latency-based and geolocation routing policies evaluate the DNS
-  resolver's location, not the client's location.** A client in London
-  using a DNS resolver in New York gets the latency/geolocation record
-  for New York. This causes apparent "wrong routing" when clients use
-  public resolvers like 8.8.8.8.
-
-- **CloudWatch alarm-based health checks flip on ALARM state only.**
-  The alarm must be in `ALARM` state (not `INSUFFICIENT_DATA` or `OK`)
-  for the health check to report unhealthy. Low traffic alarms may
-  stay in `INSUFFICIENT_DATA`, never triggering failover.
-
-- **NS delegation propagation can take up to 48 hours.** If the hosted zone NS records were recently changed, recursive resolvers worldwide may still cache the old NS records. Use `dig NS <domain>` against multiple public resolvers to check propagation status.
+The 10 non-obvious behaviours (checkers external to the VPC, HTTPS cert vs FQDN validation, consecutive-failure threshold semantics, Inverted flag, TTL caching, 30s/10s interval tiers, per-record health check association, resolver-location routing, ALARM-only alarm-based checks, 48h NS propagation) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand — each behaviour reroutes a diagnosis.
 
 ### Step 1: Symptom entry
 
@@ -311,15 +182,7 @@ REMEDIATION: Re-prompt the operator for: (1) the HealthCheckId or
 
 ### Step 2: Endpoint health — unhealthy but endpoint works from VPC
 
-```bash
-aws route53 get-health-check \
-  --health-check-id <id> --output json | \
-  jq '.HealthCheckConfig | {Type, IPAddress, Port, FullyQualifiedDomainName, ResourcePath, RequestInterval, FailureThreshold}'
-
-aws route53 get-health-check-status \
-  --health-check-id <id> --output json | \
-  jq '.HealthCheckObservations[] | {Region, IPAddress, Status, StatusReport}'
-```
+Probes (get-health-check config fields, get-health-check-status per-region observations): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 Diagnostic checks:
 
@@ -337,15 +200,7 @@ Diagnostic checks:
 
 ### Step 3: Certificate mismatch — HTTPS health check unhealthy
 
-```bash
-aws route53 get-health-check \
-  --health-check-id <id> --output json | \
-  jq '.HealthCheckConfig | {Type, FullyQualifiedDomainName, EnableSNI, Port}'
-
-# Verify the certificate served by the endpoint
-openssl s_client -connect <endpoint-ip>:443 -servername <fqdn> </dev/null 2>/dev/null | \
-  openssl x509 -noout -subject -ext subjectAltName
-```
+Probes (get-health-check FQDN/EnableSNI/Port, openssl s_client SAN inspection): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 | Pattern | Cause |
 |---|---|
@@ -358,11 +213,7 @@ openssl s_client -connect <endpoint-ip>:443 -servername <fqdn> </dev/null 2>/dev
 
 ### Step 4: Calculated health check — unexpected status
 
-```bash
-aws route53 get-health-check \
-  --health-check-id <id> --output json | \
-  jq '.HealthCheckConfig | {Type, ChildHealthChecks, Inverted}'
-```
+Probe (get-health-check Type/ChildHealthChecks/Inverted): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 | Pattern | Cause |
 |---|---|
@@ -376,11 +227,7 @@ update child health checks or invert logic.
 
 ### Step 5: DNS failover routing — failover not triggering
 
-```bash
-aws route53 list-resource-record-sets \
-  --hosted-zone-id <zone-id> --output json | \
-  jq '.ResourceRecordSets[] | select(.Name == "<domain>.") | {Name, Type, RoutingPolicy, SetIdentifier, HealthCheckId, TTL}'
-```
+Probe (list-resource-record-sets routing policy / SetIdentifier / HealthCheckId / TTL for the name): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 | Pattern | Cause |
 |---|---|
@@ -394,11 +241,7 @@ aws route53 list-resource-record-sets \
 
 ### Step 6: DNS resolution — old record after failover
 
-```bash
-dig <domain-name> +noall +answer
-dig @<authoritative-ns> <domain-name> +short
-dig @8.8.8.8 <domain-name> +short
-```
+Probes (dig +noall +answer, dig @authoritative-ns, dig @8.8.8.8): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 | Pattern | Cause |
 |---|---|
@@ -411,11 +254,7 @@ for TTL expiry, or lower TTL for future failovers.
 
 ### Step 7: Health check regions — per-region variation
 
-```bash
-aws route53 get-health-check-status \
-  --health-check-id <id> --output json | \
-  jq '.HealthCheckObservations[] | {Region, Status}'
-```
+Probe (get-health-check-status per-region Status): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 | Pattern | Cause |
 |---|---|
@@ -427,12 +266,7 @@ aws route53 get-health-check-status \
 
 ### Step 8: CloudWatch alarm-based health check
 
-```bash
-aws route53 get-health-check --health-check-id <id> --output json | \
-  jq '.HealthCheckConfig | {Type, AlarmIdentifier}'
-aws cloudwatch describe-alarms --alarm-names <alarm-name> --output json | \
-  jq '.MetricAlarms[] | {StateValue, MetricName, Period, EvaluationPeriods, DatapointsToAlarm, Threshold, ComparisonOperator}'
-```
+Probes (get-health-check AlarmIdentifier, describe-alarms alarm config): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 | Pattern | Cause |
 |---|---|
@@ -446,13 +280,7 @@ aws cloudwatch describe-alarms --alarm-names <alarm-name> --output json | \
 
 ### Step 9: NS delegation — domain not resolving
 
-```bash
-dig NS <domain-name> +short @8.8.8.8
-aws route53 list-resource-record-sets \
-  --hosted-zone-id <zone-id> --output json | \
-  jq '.ResourceRecordSets[] | select(.Type == "NS")'
-dig NS <domain-name> +trace +short
-```
+Probes (dig NS @8.8.8.8, NS record-set scan, dig +trace): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 | Pattern | Cause |
 |---|---|
@@ -533,68 +361,11 @@ CONFIRM: Before requesting the certificate, emit: "CONFIRM: About to
 
 ### Worked example — Failure threshold math (failover delay)
 
-```text
-TARGET: health-check hc-xyz789 / weighted routing
-VERDICT: ROOT_CAUSE_IDENTIFIED
-REASON: Health check RequestInterval is 30s and FailureThreshold is 3.
-  Failover takes 90 seconds (3 x 30s) after the endpoint stops
-  responding. Combined with the record TTL of 300s, total failover
-  time can be up to 390 seconds (6.5 minutes). The operator expected
-  sub-minute failover (Step 5 / Step 0).
-LAYER: HC_INTERVAL_THRESHOLD
-EVIDENCE:
-  - Symptom: after the primary endpoint went down at T+0, DNS did not
-    switch to the secondary until T+7 minutes.
-  - Probe: aws route53 get-health-check returns RequestInterval: 30,
-    FailureThreshold: 3. Total detection time = 90 seconds.
-  - Probe: dig +short api.example.com returns TTL 300 on the weighted
-    record. Total failover = 90s + 300s = 390s max.
-  - Passing: health check is correctly associated with the primary
-    record (not a routing policy issue); SG allows health checker IPs
-    (not a network issue).
-REMEDIATION:
-  1. Lower FailureThreshold to 1 for faster detection:
-     aws route53 update-health-check --health-check-id hc-xyz789 \
-       --failure-threshold 1
-  2. Switch to fast health checks (10s interval) for faster detection:
-     aws route53 update-health-check --health-check-id hc-xyz789 \
-       --request-interval 10  (note: fast health checks incur higher
-       cost)
-  3. Lower the record TTL to 60 seconds for faster client failover:
-     aws route53 change-resource-record-sets --hosted-zone-id Z123 \
-       --change-batch '{"Changes":[{"Action":"UPSERT",...,"TTL":60}]}'
-  4. Verify: stop the endpoint and time how long until dig returns the
-     secondary IP (target: < 70 seconds with threshold 1, interval 10,
-     TTL 60).
-CONFIRM: Before changing the health check and TTL, emit: "CONFIRM:
-  About to lower FailureThreshold to 1, switch to 10s interval, and
-  set TTL to 60 on api.example.com. Proceed? (yes/no)"
-```
+Full worked example (90s detection + 300s TTL = 390s failover; lowering FailureThreshold/interval/TTL): [references/worked-examples.md](references/worked-examples.md).
 
 ### Worked example — INSUFFICIENT_DATA
 
-```text
-TARGET: health-check unknown / example.com
-VERDICT: INSUFFICIENT_DATA
-REASON: Symptom is "DNS failover is not working for example.com" but
-  the health check ID, routing policy type, record TTL, and NS
-  delegation status are not provided. Without these, it is impossible
-  to distinguish a health check config issue, a routing policy
-  association issue, a DNS TTL caching issue, or an NS delegation
-  problem.
-LAYER: UNKNOWN
-EVIDENCE:
-  - Symptom: failover is not triggering for example.com.
-  - Missing: HealthCheckId, routing policy (FAILOVER / WEIGHTED /
-    LATENCY / GEOLOCATION), record TTL, hosted zone ID, NS delegation
-    status.
-  - Missing: get-health-check-status output showing healthy/unhealthy.
-REMEDIATION: Provide: (1) the HealthCheckId and get-health-check-status
-  output, (2) the hosted zone ID and list-resource-record-sets for the
-  domain, (3) the routing policy and TTL on the primary and secondary
-  records, (4) dig NS example.com output, and (5) whether the health
-  check reports unhealthy after the endpoint is confirmed down.
-```
+Full worked example (failover complaint without HealthCheckId/routing policy/TTL/NS context): [references/worked-examples.md](references/worked-examples.md).
 
 ## Anti-Patterns — NEVER
 
@@ -661,69 +432,20 @@ REMEDIATION: Provide: (1) the HealthCheckId and get-health-check-status
 
 Three heuristics separate a senior Route 53 engineer from a generalist:
 
-### Heuristic 1: Health check caller IP visibility
-
-Route 53 health checkers run from 15+ AWS regions using publicly routed
-IPs — they are NOT inside your VPC. An endpoint on a private subnet
-(10.x.x.x) is unreachable unless: (a) it has a public IP, (b) a NAT
-Gateway or public ALB fronts it, or (c) a Route 53 Resolver inbound
-endpoint is configured. Always verify the SG/firewall allows the Route
-53 health checker IP ranges. If ALL regions report unhealthy in
-`get-health-check-status`, the endpoint is genuinely unreachable from
-health checkers. If only SOME regions report unhealthy, it's a
-geographic network issue.
-
-### Heuristic 2: Failure threshold math (consecutive failures)
-
-`FailureThreshold: N` means N CONSECUTIVE failures are required to flip
-to unhealthy — a single success resets the counter. Total detection
-time = `RequestInterval` × `FailureThreshold`. Standard (30s × 3 = 90s),
-fast (10s × 3 = 30s), aggressive (10s × 1 = 10s, high flapping risk).
-The total client-perceived failover time = detection time + DNS TTL:
-standard HC (90s) + TTL 300s = up to 390s (6.5 min); fast HC (30s) +
-TTL 60s = up to 90s (1.5 min). Always calculate and communicate the
-expected failover time to the operator.
-
-### Heuristic 3: DNS TTL vs failover speed trade-off
-
-TTL determines how long recursive resolvers cache the old record —
-Route 53 cannot force resolvers to flush their cache. Low TTL (60s) =
-faster failover but higher Route 53 query cost. High TTL (3600s) =
-lower cost but up to 1 hour of stale records. For failover-critical
-records, 60 seconds is the practical minimum; below 60 seconds some
-resolvers use their own minimum. Pre-warming: lower the TTL several
-hours BEFORE a planned failover so resolvers pick up the new TTL.
+The three heuristics in full (caller IP visibility and all-vs-some-regions reading; failure-threshold math with detection + TTL totals; TTL-vs-cost trade-off and pre-warming) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Configuration dependency graph
 
-```
-DNS Client Query
-    │
-    ▼
-┌────────────────────────────────────────┐
-│ Recursive DNS Resolver (TTL-cached)    │── Step 6: DNS_RESOLUTION
-│   │                                    │
-│   ▼                                    │
-│ Authoritative NS (zone delegation)     │── Step 9: NS_DELEGATION
-│   │                                    │
-│   ▼                                    │
-│ Routing Policy Evaluation              │── Step 5: DNS_FAILOVER_ROUTING
-│  ┌─ FAILOVER / WEIGHTED ─┐             │
-│  ├─ LATENCY / GEOLOCATION┤             │
-│  └───────────────────────┘             │
-│   │                                    │
-│   ▼                                    │
-│ Health Check Evaluation                │── Step 2: ENDPOINT_HEALTH
-│  ┌─ Endpoint HTTP/HTTPS/TCP ─────────┐ │   Step 3: CERTIFICATE_MISMATCH
-│  │   (cert, port, path, SG)           │ │── Step 7: HC_REGION_SELECTION
-│  ├─ Calculated (AND/OR/NOT) ─────────┤ │── Step 4: CALCULATED_HC_LOGIC
-│  ├─ CloudWatch Alarm ────────────────┤ │── Step 8: ALARM_BASED_HC
-│  └─ Interval/Threshold ──────────────┘ │── Step 0: HC_INTERVAL_THRESHOLD
-│   │                                    │
-│   ▼                                    │
-│ Record Served (healthy/unhealthy+TTL)  │
-└────────────────────────────────────────┘
-```
+Configuration dependency graph (resolver -> NS delegation -> routing policy -> health check evaluation -> record served, mapped to Steps 2-9) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+
+## References (load on demand)
+
+- [Advanced patterns](references/advanced-patterns.md) — philosophy, Step 0 non-obvious behaviours, expert heuristics, configuration dependency graph
+- [Diagnostic commands](references/diagnostic-commands.md) — gather-info gate commands, per-step probes (Steps 2-9)
+- [Error handling](references/error-handling.md) — malformed-input INSUFFICIENT_DATA re-prompt
+- [Worked examples](references/worked-examples.md) — failure threshold math, INSUFFICIENT_DATA
+- [Health check and failover reference](references/health-check-and-failover-reference.md) — health check types, failover concepts
+- [Health checker IP and regions reference](references/health-checker-ip-and-regions-reference.md) — checker IP ranges and regions
 
 ## Domain
 

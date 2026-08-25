@@ -260,3 +260,29 @@ When a policy approaches the 20 KB limit:
    access to specific roles, the same access can be an IAM policy
    attached to the role (no bucket policy needed for same-account
    access).
+
+## Canonical bucket-policy structure example (Step 1)
+
+Every bucket policy is a JSON document with a `Version` and a
+`Statement` array. Each statement has four core elements.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": " descriptive-label",
+      "Effect": "Allow",
+      "Principal": { "AWS": "arn:aws:iam::123456789012:role/MyRole" },
+      "Action": ["s3:GetObject", "s3:PutObject"],
+      "Resource": [
+        "arn:aws:s3:::my-bucket",
+        "arn:aws:s3:::my-bucket/*"
+      ],
+      "Condition": {
+        "Bool": { "aws:SecureTransport": "true" }
+      }
+    }
+  ]
+}
+```

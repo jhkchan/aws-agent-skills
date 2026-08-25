@@ -88,152 +88,28 @@ recovery control data plane that maintains quorum across AWS regions.
 Readiness checks validate that a target cell has all required
 resources BEFORE you fail over to it.
 
-Three misconceptions dominate ARC misdesign at provisioning time:
-
-- **"ARC is just another health check."** It is NOT. Route 53 health
-  checks monitor endpoint health and shift DNS routing. ARC provides
-  APPLICATION-LEVEL routing controls — explicit on/off toggles
-  operated by humans or automation to fail over entire application
-  stacks. Health checks react automatically; routing controls are
-  deliberate traffic shifts with safety guardrails. The two
-  complement each other but serve different purposes.
-
-- **"You can toggle routing controls freely."** Not safely. Without
-  safety rules, toggling all routing controls OFF simultaneously
-  takes the entire application down. Safety rules enforce invariants
-  like "at least one routing control must be ON" or "routing control
-  A and B must not both be ON" (preventing split-brain). Every
-  control panel with failover semantics MUST have at least one safety
-  rule.
-
-- **"Readiness checks are optional."** They are NOT optional for safe
-  failover. Without readiness checks, you may fail over to a cell
-  that is missing required resources (e.g., missing DynamoDB table,
-  empty Aurora cluster, no ASG). Readiness checks validate resource
-  parity across cells BEFORE failover. They are the difference
-  between planned failover and blind failover.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#common-misconceptions-from-mindset).
+> Three ARC misconceptions: just a health check, free toggling, optional readiness checks.
 
 ## Configuration dependency graph (novel heuristic)
 
-ARC configurations are NOT independent. The recovery cluster must
-exist before routing controls. Routing controls must exist before
-safety rules. Resource sets must exist before readiness checks. Use
-this graph to sequence provisioning.
-
-| Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| Recovery cluster | Five regional clusters auto-provisioned by AWS on cluster creation | cluster creation takes ~10-15 minutes; cannot be rushed | routing controls, control panels |
-| Control panel | Recovery cluster exists | control panel is a logical grouping; no traffic impact until routing controls are toggled | routing controls |
-| Routing control | Control panel exists; recovery cluster ACTIVE | routing control state is ON or OFF (boolean); toggling is atomic (takes ~10 seconds) | traffic shifting per cell |
-| Safety rule | At least one routing control in the same cluster | safety rule type: AND (enforce) or OR (allow); MUST be configured before production failover | prevents unsafe toggling |
-| Resource set | Resources (by ARN and type) exist in target regions | resource type must match expected template; mismatched types cause readiness check failure | readiness checks |
-| Readiness check | Resource set exists; at least one resource mapped per cell | readiness check evaluates ALL cells; a single missing resource marks the cell NOT READY | pre-failover validation |
-| Cell (readiness scope) | Resources grouped logically per cell | a cell is a logical grouping; readiness checks compare across cells | cross-cell comparison |
-
-**The safety-rule-before-production row is the one a baseline model
-misses.** Creating routing controls without safety rules means an
-operator (or automation) can toggle all controls OFF, causing a
-complete outage. Safety rules are the guardrails. The procedure below
-forces an explicit safety rule for every control panel.
-
-**Cross-dependency gotchas:**
-- Routing controls are toggled via a SEPARATE API endpoint
-  (`route53-recovery-cluster`) from the configuration API
-  (`route53-recovery-control-config`). This is because the data plane
-  (cluster) is decoupled from the control plane (config).
-- Safety rules are evaluated at toggle time. If a toggle would
-  violate a safety rule, the API rejects it. This is synchronous
-  enforcement, not advisory.
-- Readiness checks run on a schedule (every ~5 minutes) and on
-  demand. A cell can become NOT READY between checks.
-- Resource sets map by resource type. Each resource type has a
-  different readiness template (e.g., NLB checks target health, ASG
-  checks desired capacity, DynamoDB checks table exists).
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#configuration-dependency-graph-sequencing-notes).
+> Sequencing table plus the safety-rule-before-production trap and API-split gotchas.
 
 ## Expert heuristic: routing control as a boolean toggle
 
-A baseline model treats routing controls as complex network routing
-rules. The correct heuristic recognizes that a routing control is a
-single boolean: ON (traffic flows to this cell) or OFF (traffic does
-not flow to this cell).
-
-```text
-Active-Active (two cells, both serving):
-  Cell-A routing control: ON  → traffic flows to Cell-A
-  Cell-B routing control: ON  → traffic flows to Cell-B
-  Safety rule: (A OR B must be ON) → prevents total outage
-
-Failover (Cell-A → Cell-B):
-  1. Verify Cell-B readiness check: READY
-  2. Toggle Cell-B routing control: ON  (traffic now flows to BOTH)
-  3. Toggle Cell-A routing control: OFF (traffic flows ONLY to Cell-B)
-  Result: traffic shifted from Cell-A to Cell-B
-
-Recovery (Cell-A → Cell-B):
-  1. Toggle Cell-A routing control: OFF (immediate traffic loss)
-  2. Toggle Cell-B routing control: ON  (traffic restored)
-  Result: failover complete
-```
-
-**Key implication:** the routing control toggle is atomic and takes
-~10 seconds. During the toggle, traffic may be in both cells or
-neither cell, depending on the sequence. Safety rules prevent the
-"neither cell" scenario.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-routing-control-as-a-boolean-toggle).
+> ON/OFF semantics, active-active and failover sequences, atomic ~10s toggle.
 
 ## Expert heuristic: safety rule types
 
-Safety rules come in two types: AND rules (enforce that ALL listed
-routing controls are OFF — used to prevent a specific combination
-from being ON) and OR rules (enforce that at least one listed
-routing control is ON — used to prevent total outage).
-
-```text
-Safety rule types:
-
-  AND rule (assertive):
-    "Routing controls A, B, and C must all be OFF"
-    Use case: prevent A and B from both being ON (no split-brain)
-    When you try to turn A ON while B is ON → REJECTED
-
-  OR rule (permissive):
-    "At least one of routing controls A, B, C must be ON"
-    Use case: prevent total outage (at least one cell serving)
-    When you try to turn the last ON control OFF → REJECTED
-```
-
-**Key implication:** OR rules are the most common safety rule type.
-They prevent the "all controls OFF" scenario. AND rules are used for
-mutual exclusion (e.g., two cells should never serve simultaneously
-for data consistency reasons).
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-safety-rule-types).
+> AND (mutual exclusion) vs OR (minimum ON) rules with rejection semantics.
 
 ## Expert heuristic: readiness check resource templates
 
-Readiness checks use predefined resource-type templates. Each
-template knows what "ready" means for that resource type. A baseline
-model may not know which attributes are checked.
-
-```text
-Resource type → Readiness template:
-  AWS::ElasticLoadBalancingV2::LoadBalancer
-    → NLB/ALB: checks listener count, target health, subnet mapping
-  AWS::AutoScaling::AutoScalingGroup
-    → ASG: checks desired capacity, min size, instance health
-  AWS::DynamoDB::Table
-    → DynamoDB: checks table status (ACTIVE), provisioned throughput
-  AWS::RDS::DBCluster
-    → Aurora: checks cluster status (available), writer instance
-  AWS::EC2::NatGateway
-    → NAT GW: checks state (available), ENI attachment
-  AWS::S3::Bucket
-    → S3: checks bucket exists, versioning config
-  AWS::Lambda::Function
-    → Lambda: checks function exists, runtime configured
-```
-
-**Key implication:** resource sets must map resources by their
-correct CloudFormation resource type. Mapping an ALB as
-`AWS::ElasticLoadBalancingV2::LoadBalancer` is correct; mapping it
-as `AWS::EC2::Instance` causes readiness check failure.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-readiness-check-resource-templates).
+> Per-resource-type readiness template attributes (NLB, ASG, DynamoDB, Aurora, NAT, S3, Lambda).
 
 ## Prerequisites (verify before provisioning)
 
@@ -299,29 +175,8 @@ A **resource set** groups resources by type across cells. For
 example, a resource set of type `AWS::NetworkLoadBalancer::LoadBalancer`
 contains the NLB ARNs from Cell-A and Cell-B.
 
-```text
-Cell-A (us-east-1):
-  NLB: arn:aws:elasticloadbalancing:us-east-1:...:loadbalancer/net/app-nlb-a/...
-  ASG: arn:aws:autoscaling:us-east-1:...:autoScalingGroup:...
-  DynamoDB: arn:aws:dynamodb:us-east-1:...:table/app-table
-
-Cell-B (us-west-2):
-  NLB: arn:aws:elasticloadbalancing:us-west-2:...:loadbalancer/net/app-nlb-b/...
-  ASG: arn:aws:autoscaling:us-west-2:...:autoScalingGroup:...
-  DynamoDB: arn:aws:dynamodb:us-west-2:...:table/app-table
-
-Resource Set 1 (NLB):
-  Type: AWS::ElasticLoadBalancingV2::LoadBalancer
-  Resources: [Cell-A NLB, Cell-B NLB]
-
-Resource Set 2 (ASG):
-  Type: AWS::AutoScaling::AutoScalingGroup
-  Resources: [Cell-A ASG, Cell-B ASG]
-
-Resource Set 3 (DynamoDB):
-  Type: AWS::DynamoDB::Table
-  Resources: [Cell-A table, Cell-B table]
-```
+> Moved to [references/readiness-and-resource-sets.md](references/readiness-and-resource-sets.md#cell-and-resource-set-layout-from-step-2).
+> Concrete Cell-A/Cell-B to resource-set mapping example.
 
 **Create a resource set:**
 
@@ -384,11 +239,8 @@ aws route53-recovery-cluster update-routing-control-state \
 
 **Verify routing control state:**
 
-```bash
-aws route53-recovery-cluster get-routing-control-state \
-  --routing-control-arn "$RC_A_ARN"
-# Expected: RoutingControlState: "On"
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#verify-routing-control-state-step-3).
+> get-routing-control-state check expecting "On".
 
 ## Step 4 — Safety rules (prevent unsafe failover)
 
@@ -451,14 +303,8 @@ aws route53-recovery-readiness create-readiness-check \
 
 **Get readiness status:**
 
-```bash
-aws route53-recovery-readiness get-readiness-check \
-  --readiness-check-name "app-readiness-check"
-
-# Get readiness for a specific cell
-aws route53-recovery-readiness get-cell-readiness \
-  --cell-name "Cell-B"
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#get-readiness-status-step-5).
+> get-readiness-check and get-cell-readiness commands.
 
 **Readiness states:**
 
@@ -471,13 +317,8 @@ aws route53-recovery-readiness get-cell-readiness \
 
 **Create multiple readiness checks (one per resource set):**
 
-```bash
-for RS_NAME in app-nlb-resource-set app-asg-resource-set app-ddb-resource-set; do
-  aws route53-recovery-readiness create-readiness-check \
-    --readiness-check-name "${RS_NAME}-check" \
-    --resource-set-name "$RS_NAME"
-done
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#create-multiple-readiness-checks-one-per-resource-set-step-5).
+> Bash loop creating one readiness check per resource set.
 
 ## Step 6 — Cross-region readiness assessment
 
@@ -526,57 +367,13 @@ alerting on failover events and monitoring control state.
 
 **Create a CloudWatch alarm for routing control state change:**
 
-```bash
-aws cloudwatch put-metric-alarm \
-  --alarm-name "arc-routing-control-changed" \
-  --namespace AWS/Route53RecoveryControl \
-  --metric-name RoutingControlState \
-  --dimensions Name=RoutingControlName,Value=cell-a-traffic \
-  --statistic Maximum \
-  --period 60 \
-  --evaluation-periods 1 \
-  --threshold 0 \
-  --comparison-operator LessThanThreshold \
-  --alarm-actions "arn:aws:sns:us-east-1:123456789012:arc-alerts"
-```
-
-This alarm fires when Cell-A's routing control transitions from ON
-(1) to OFF (0), alerting the team of a failover event.
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#create-a-cloudwatch-alarm-for-routing-control-state-change-step-7).
+> put-metric-alarm firing when a routing control flips ON to OFF.
 
 ## Step 8 — Failover execution patterns
 
-**Active-Standby failover (Cell-A primary, Cell-B standby):**
-
-```text
-1. Check Cell-B readiness: aws route53-recovery-readiness get-cell-readiness
-   → Must be READY
-2. Toggle Cell-B routing control ON:
-   aws route53-recovery-cluster update-routing-control-state --state On
-3. Wait for DNS propagation (~30-60 seconds for Route 53)
-4. Toggle Cell-A routing control OFF:
-   aws route53-recovery-cluster update-routing-control-state --state Off
-   → Safety rule (OR, threshold 1) permits this because Cell-B is ON
-```
-
-**Active-Active load shifting (gradual):**
-
-```text
-1. Both cells ON (normal active-active)
-2. To drain Cell-A: toggle Cell-A routing control OFF
-   → All traffic shifts to Cell-B immediately
-   → Safety rule (OR) ensures Cell-B remains ON
-3. To restore: toggle Cell-A routing control ON
-   → Traffic resumes to both cells
-```
-
-**Failback (return to Cell-A):**
-
-```text
-1. Verify Cell-A readiness: READY
-2. Toggle Cell-A routing control ON (traffic to both cells)
-3. Verify Cell-A is serving traffic
-4. Toggle Cell-B routing control OFF (traffic only to Cell-A)
-```
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#failover-execution-patterns-from-step-8).
+> Active-standby failover, active-active drain, and failback toggle sequences.
 
 ## Step 9 — Integration with Route 53 health checks
 
@@ -586,48 +383,15 @@ so DNS failover follows the routing control toggle.
 
 **Create a Route 53 health check backed by a routing control:**
 
-```bash
-aws route53 create-health-check \
-  --caller-reference "arc-health-check-cell-a" \
-  --health-check-config '
-{
-  "Type": "RECOVERY_CONTROL",
-  "RoutingControlArn": "'"$RC_A_ARN"'"
-}'
-```
-
-When the routing control is ON, the health check returns HEALTHY.
-When OFF, it returns UNHEALTHY. Associate this health check with a
-Route 53 record set for automatic DNS-level failover.
+> Moved to [references/routing-controls-and-safety.md](references/routing-controls-and-safety.md#route-53-health-check-creation-from-step-9).
+> create-health-check with Type RECOVERY_CONTROL backed by a routing control.
 
 ## Step 10 — Recent features
 
 **Recent AWS features (2023-2026):**
 
-- **Routing control APIs in route53-recovery-cluster (2023-2024):**
-  Enhanced data plane API stability and reduced toggle latency from
-  ~15 seconds to ~10 seconds.
-
-- **Safety rule types expansion (2023-2024):** Additional support for
-  complex multi-cell safety rule compositions, including nested AND/OR
-  logic for multi-region active-active topologies.
-
-- **Readiness check new resource types (2023-2024):** Added readiness
-  templates for AWS::SQS::Queue, AWS::SNS::Topic, and
-  AWS::StepFunctions::StateMachine.
-
-- **CloudWatch enhanced metrics (2023-2024):** New dimensions for
-  per-control-panel and per-safety-rule metrics, enabling more
-  granular alerting on ARC state.
-
-- **Terraform provider maturity (2023-2024):** The Terraform
-  aws_route53recoverycontrolconfig_* resources now support full
-  control panel, routing control, and safety rule lifecycle
-  management.
-
-- **Multi-account ARC support (2024-2025):** Enhanced support for
-  multi-account readiness checks, allowing resource sets to span
-  AWS Organizations member accounts.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#recent-aws-features-2023-2026).
+> Cluster API latency, safety-rule compositions, new readiness types, metrics, Terraform, multi-account.
 
 ## NEVER do these things
 
@@ -730,32 +494,16 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Cluster stuck in CREATING
-- Recovery cluster creation takes 10-15 minutes. If it exceeds 20
-  minutes, check IAM permissions and service-linked role creation.
-  Do not create resources until the cluster is ACTIVE.
+> Moved to [references/error-handling.md](references/error-handling.md#error-handling).
+> Cluster stuck CREATING, toggle rejected, NOT_AUTHORIZED, type mismatch, stuck state.
 
-### Routing control toggle rejected
-- A safety rule is preventing the toggle. Check which safety rule is
-  blocking by reviewing the rule config. For OR rules, at least one
-  other control must remain ON. For AND rules, the other control
-  must be OFF first.
+## References (load on demand)
 
-### Readiness check returns NOT_AUTHORIZED
-- ARC lacks IAM permission to access the resource. Add the
-  `route53-recovery-readiness` service-linked role or grant
-  cross-account read permissions for resources in other accounts.
-
-### Resource set type mismatch
-- The resource was mapped with the wrong CloudFormation type. Delete
-  the resource set entry and recreate with the correct type. Verify
-  the resource type matches the actual AWS resource type.
-
-### Routing control state stuck
-- The cluster may have lost quorum. Check
-  `describe-cluster` for quorum status. If fewer than 3 of 5 clusters
-  are available, toggles will fail. This is extremely rare and
-  typically resolves automatically.
+- [advanced-patterns](references/advanced-patterns.md) — misconceptions, dependency graph, expert heuristics, failover patterns, recent features
+- [diagnostic-commands](references/diagnostic-commands.md) — routing-control state, readiness status, CloudWatch alarm commands
+- [error-handling](references/error-handling.md) — symptom-by-symptom troubleshooting
+- [routing-controls-and-safety](references/routing-controls-and-safety.md) — control, safety-rule, and health-check detail (existing)
+- [readiness-and-resource-sets](references/readiness-and-resource-sets.md) — readiness + resource-set detail (existing)
 
 ## Domain
 

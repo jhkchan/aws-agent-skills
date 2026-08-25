@@ -234,3 +234,80 @@ aws logs filter-log-events \
   --start-time $(($(date +%s) * 1000 - 300000)) \
   --limit 10
 ```
+
+## Common patterns — DNS Firewall / query logging boilerplate
+
+### DNS Firewall — managed domain list block
+
+```bash
+# Use an AWS-managed domain list for malware/botnet domains
+aws route53resolver create-firewall-rule \
+  --firewall-rule-group-id <group-id> \
+  --firewall-domain-list-id "rslvr-fdl-aws-managed-domains-malware" \
+  --priority 1 \
+  --action BLOCK \
+  --block-response NXDOMAIN
+
+# Associate the rule group to a VPC (MutationProtection prevents accidental deletion)
+aws route53resolver create-firewall-rule-group-association \
+  --firewall-rule-group-id <group-id> \
+  --vpc-id vpc-0abc123 \
+  --priority 1 \
+  --name "prod-vpc-block-malware" \
+  --mutation-protection ENABLED
+```
+
+### DNS Firewall — custom domain list with ALERT
+
+```bash
+aws route53resolver create-firewall-domain-list \
+  --creator-request-id fdl-$(date +%s) \
+  --name "custom-alert-list" \
+  --tags '[{"Key":"Environment","Value":"prod"}]'
+
+aws route53resolver import-firewall-domains \
+  --firewall-domain-list-id <fdl-id> \
+  --domain-file file://domains.txt
+  # one domain per line: *.gambling.example. badsite.example.
+
+aws route53resolver create-firewall-rule \
+  --firewall-rule-group-id <group-id> \
+  --firewall-domain-list-id <fdl-id> \
+  --priority 2 \
+  --action ALERT
+```
+
+### Query logging — CloudWatch Logs
+
+```bash
+# Resource policy on the log group (run once)
+aws logs put-resource-policy \
+  --policy-name Route53ResolverQueryLogs \
+  --policy-document '{
+    "Version":"2012-10-17",
+    "Statement":[{"Effect":"Allow","Principal":{"Service":"route53resolver.amazonaws.com"},"Action":["logs:PutLogEvents","logs:CreateLogStream"],"Resource":"arn:aws:logs:us-east-1:111111111111:log-group:/aws/route53resolver/*:*"}]
+  }'
+
+aws logs create-log-group --log-group-name /aws/route53resolver/prod
+
+aws route53resolver put-resolver-query-log-config \
+  --name "prod-query-logs-cw" \
+  --destination-arn arn:aws:logs:us-east-1:111111111111:log-group:/aws/route53resolver/prod \
+  --creator-request-id qlc-$(date +%s)
+
+aws route53resolver associate-resolver-query-log-config \
+  --resolver-query-log-config-id <qlc-id> \
+  --resource-id vpc-0abc123
+```
+
+### Query logging — S3 bucket
+
+```bash
+aws s3api put-bucket-policy --bucket my-resolver-logs --policy file://bucket-policy.json
+# bucket-policy.json grants route53resolver.amazonaws.com s3:PutObject
+
+aws route53resolver put-resolver-query-log-config \
+  --name "prod-query-logs-s3" \
+  --destination-arn arn:aws:s3:::my-resolver-logs \
+  --creator-request-id qlc-$(date +%s)
+```

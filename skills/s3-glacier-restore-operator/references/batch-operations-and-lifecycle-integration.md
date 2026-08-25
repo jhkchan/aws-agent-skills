@@ -223,3 +223,111 @@ which may not be archived.
 | Restore on GIR object | No-op or error | Skip restore; use GetObject directly |
 | Restore on versioned object targets wrong version | Restored version not the archived one | Specify --version-id |
 | Restore expires mid-use | GetObject fails on day N+1 | Use longer Days or copy-to-tier |
+
+---
+
+## Bulk restore via S3 Batch Operations
+
+
+For manifests of >1000 objects, use S3 Batch Operations instead of
+inline loops. The manifest, IAM role, and report bucket must exist
+before job creation.
+
+### Step B1: Author the manifest
+
+```csv
+bucket,key
+prod-archive-bucket,reports/2025/Q1.parquet
+prod-archive-bucket,reports/2025/Q2.parquet
+...
+```
+
+Upload to a manifest bucket:
+```bash
+aws s3 cp manifest.csv s3://batch-ops-manifests/restore-2025-Q1.csv
+```
+
+### Step B2: Author the IAM role
+
+The role needs `s3:RestoreObject` on the target bucket(s),
+`s3:GetObject` on the manifest bucket, and `iam:PassRole` on the
+caller:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {"Effect": "Allow", "Action": ["s3:RestoreObject", "s3:GetObject"],
+     "Resource": ["arn:aws:s3:::prod-archive-bucket/*"]},
+    {"Effect": "Allow", "Action": ["s3:GetObject", "s3:GetBucketLocation"],
+     "Resource": ["arn:aws:s3:::batch-ops-manifests/*"]},
+    {"Effect": "Allow", "Action": ["s3:PutObject"],
+     "Resource": ["arn:aws:s3:::batch-ops-reports/*"]}
+  ]
+}
+```
+
+### Step B3: Create the Batch Operations job
+
+```bash
+aws s3control create-job \
+  --account-id 111111111111 --priority 1 \
+  --role-arn arn:aws:iam::111111111111:role/S3BatchRestoreRole \
+  --operation '{"S3RestoreObject": {"Days": 7, "GlacierJobParameters": {"Tier": "Bulk"}}}' \
+  --manifest '{"Spec": {"Format": "S3BatchOperations_CSV_20180820"}, "Location": {"ObjectArn": "arn:aws:s3:::batch-ops-manifests/restore-2025-Q1.csv", "ETag": "<etag>"}}' \
+  --report "{\"Bucket\":\"arn:aws:s3:::batch-ops-reports\",\"Prefix\":\"restore-2025-Q1/\",\"Format\":\"Report_CSV_20180820\",\"ReportScope\":\"AllTasks\",\"Enabled\":true}" \
+  --description "Bulk restore Q1 reports from Glacier Flexible Retrieval (Bulk tier)"
+```
+
+The returned `JobId` is the only restore workflow handle that
+returns a Job ID.
+
+### Step B4: Monitor and review
+
+```bash
+aws s3control describe-job --account-id 111111111111 --job-id <JobId> \
+  --query 'Job.{Status:Status,Progress:ProgressSummary}'
+# Expected terminal: Complete | Cancelled | Failed | Paused
+```
+
+The completion report (CSV in the report bucket) lists each task
+with `TaskStatus` (Succeeded | Failed | NoSuchKey) and failure
+codes — use it to drive re-run decisions.
+
+---
+
+## Lifecycle integration
+
+
+If the bucket has a lifecycle rule that transitions objects to
+Glacier, restored objects are still subject to that rule — they may
+re-archive after the lifecycle trigger fires. To prevent re-archival
+of permanently-promoted objects:
+
+1. Update the lifecycle rule with a filter (prefix/tag) that
+   excludes the promoted objects.
+2. Or copy the promoted objects to a different bucket without the
+   archive rule.
+
+```bash
+# Lifecycle rule to disable archiving for promoted prefix
+aws s3api put-bucket-lifecycle-configuration \
+  --bucket prod-archive-bucket \
+  --lifecycle-configuration file://lifecycle-with-filter.json
+```
+
+```json
+{
+  "Rules": [
+    {
+      "ID": "archive-after-90d",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "logs/"},
+      "Transitions": [{"Days": 90, "StorageClass": "GLACIER"}]
+    }
+  ]
+}
+```
+
+Objects under `promoted/` are NOT subject to this rule and stay in
+Standard.

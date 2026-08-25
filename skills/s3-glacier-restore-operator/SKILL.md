@@ -188,37 +188,7 @@ failure.
 
 ### Step 0: Expert heuristic — field craft for ambiguous cases
 
-- **If the user does not know the source storage class → call
-  `head-object` first.** Never request a restore without confirming
-  StorageClass and ArchiveStatus. Restoring a GIR object is a no-op;
-  restoring a Standard object returns an error; restoring an
-  already-restored object resets the wait clock.
-
-- **If the restore seems "stuck" → check `head-object` Restore
-  field, not the Job ID.** Restore-object does NOT return a Job ID
-  (unlike Batch Operations). The only status source is the Restore
-  field on the object's metadata:
-  `ongoing-request="true"` (in progress) or `ongoing-request="false"`
-  with `expiry-date` (complete).
-
-- **If Batch Operations job is `Active` for hours → check the
-  manifest, not the job.** The job reports Active while the manifest
-  is being processed. Failures are in the job report (CompletionReport
-  bucket), not the job status. A common foot-gun: the manifest
-  contains keys that no longer exist; the job marks them Failed but
-  stays Active until full manifest iteration.
-
-- **If Expedited requests are being rejected → provision capacity.**
-  On-demand Expedited is best-effort and can be rejected during
-  demand peaks. Provisioned capacity guarantees 3 retrieval
-  requests/min or 150 MB/min per unit. Pre-provision for DR drills.
-
-- **If the user wants a "permanent restore" → recommend copy-to-tier,
-  not Days=N.** Days=N is a lease; the object reverts to archive
-  when the window expires. For permanent promotion out of archive,
-  copy the restored object to a hot storage class (Standard or
-  Intelligent-Tiering) or update the lifecycle policy.
-
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — field craft for ambiguous cases.
 ### Step 1: Confirm source storage class and restore state
 
 ```bash
@@ -310,71 +280,7 @@ on day N+1.
 
 ## Bulk restore via S3 Batch Operations
 
-For manifests of >1000 objects, use S3 Batch Operations instead of
-inline loops. The manifest, IAM role, and report bucket must exist
-before job creation.
-
-### Step B1: Author the manifest
-
-```csv
-bucket,key
-prod-archive-bucket,reports/2025/Q1.parquet
-prod-archive-bucket,reports/2025/Q2.parquet
-...
-```
-
-Upload to a manifest bucket:
-```bash
-aws s3 cp manifest.csv s3://batch-ops-manifests/restore-2025-Q1.csv
-```
-
-### Step B2: Author the IAM role
-
-The role needs `s3:RestoreObject` on the target bucket(s),
-`s3:GetObject` on the manifest bucket, and `iam:PassRole` on the
-caller:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {"Effect": "Allow", "Action": ["s3:RestoreObject", "s3:GetObject"],
-     "Resource": ["arn:aws:s3:::prod-archive-bucket/*"]},
-    {"Effect": "Allow", "Action": ["s3:GetObject", "s3:GetBucketLocation"],
-     "Resource": ["arn:aws:s3:::batch-ops-manifests/*"]},
-    {"Effect": "Allow", "Action": ["s3:PutObject"],
-     "Resource": ["arn:aws:s3:::batch-ops-reports/*"]}
-  ]
-}
-```
-
-### Step B3: Create the Batch Operations job
-
-```bash
-aws s3control create-job \
-  --account-id 111111111111 --priority 1 \
-  --role-arn arn:aws:iam::111111111111:role/S3BatchRestoreRole \
-  --operation '{"S3RestoreObject": {"Days": 7, "GlacierJobParameters": {"Tier": "Bulk"}}}' \
-  --manifest '{"Spec": {"Format": "S3BatchOperations_CSV_20180820"}, "Location": {"ObjectArn": "arn:aws:s3:::batch-ops-manifests/restore-2025-Q1.csv", "ETag": "<etag>"}}' \
-  --report "{\"Bucket\":\"arn:aws:s3:::batch-ops-reports\",\"Prefix\":\"restore-2025-Q1/\",\"Format\":\"Report_CSV_20180820\",\"ReportScope\":\"AllTasks\",\"Enabled\":true}" \
-  --description "Bulk restore Q1 reports from Glacier Flexible Retrieval (Bulk tier)"
-```
-
-The returned `JobId` is the only restore workflow handle that
-returns a Job ID.
-
-### Step B4: Monitor and review
-
-```bash
-aws s3control describe-job --account-id 111111111111 --job-id <JobId> \
-  --query 'Job.{Status:Status,Progress:ProgressSummary}'
-# Expected terminal: Complete | Cancelled | Failed | Paused
-```
-
-The completion report (CSV in the report bucket) lists each task
-with `TaskStatus` (Succeeded | Failed | NoSuchKey) and failure
-codes — use it to drive re-run decisions.
-
+→ Full B1-B4 procedure moved to [references/batch-operations-and-lifecycle-integration.md](references/batch-operations-and-lifecycle-integration.md).
 ## Restore in place vs copy to different tier
 
 | Decision | Use case |
@@ -390,39 +296,7 @@ class permanently.
 
 ## Lifecycle integration
 
-If the bucket has a lifecycle rule that transitions objects to
-Glacier, restored objects are still subject to that rule — they may
-re-archive after the lifecycle trigger fires. To prevent re-archival
-of permanently-promoted objects:
-
-1. Update the lifecycle rule with a filter (prefix/tag) that
-   excludes the promoted objects.
-2. Or copy the promoted objects to a different bucket without the
-   archive rule.
-
-```bash
-# Lifecycle rule to disable archiving for promoted prefix
-aws s3api put-bucket-lifecycle-configuration \
-  --bucket prod-archive-bucket \
-  --lifecycle-configuration file://lifecycle-with-filter.json
-```
-
-```json
-{
-  "Rules": [
-    {
-      "ID": "archive-after-90d",
-      "Status": "Enabled",
-      "Filter": {"Prefix": "logs/"},
-      "Transitions": [{"Days": 90, "StorageClass": "GLACIER"}]
-    }
-  ]
-}
-```
-
-Objects under `promoted/` are NOT subject to this rule and stay in
-Standard.
-
+→ Moved to [references/batch-operations-and-lifecycle-integration.md](references/batch-operations-and-lifecycle-integration.md).
 ## Output format — STRICT output contract
 
 The output MUST follow this exact schema. Every field is required;
@@ -480,55 +354,10 @@ NOTES:
 
 ### Worked example — Batch Operations bulk restore
 
-```text
-OPERATION: bulk-restore
-VERDICT: COMPLETED
-TARGET: batch-ops job 1234abcd-...
-PRE_CHECKS:
-  - [PASS] Manifest uploaded to batch-ops-manifests (10000 keys)
-  - [PASS] IAM role S3BatchRestoreRole has s3:RestoreObject on
-    prod-archive-bucket
-  - [PASS] Report bucket batch-ops-reports exists
-  - [PASS] All manifest keys verified in head-object sampling
-STEPS:
-  1. aws s3control create-job (Bulk tier, Days=30)
-  2. aws s3control describe-job --job-id 1234abcd-...
-POST_VERIFY:
-  - [PASS] Job Status: Complete
-  - [PASS] ProgressSummary.TotalTasks: 10000
-  - [PASS] ProgressSummary.NumberSucceeded: 9998
-  - [WARN] ProgressSummary.NumberFailed: 2 (NoSuchKey — see report)
-STATE: complete — 9998 objects restored, 2 NoSuchKey failures in
-       s3://batch-ops-reports/restore-2025-Q1/
-NOTES:
-  - Bulk tier SLA: 5-12 hr. Actual elapsed: 8.2 hr.
-  - Re-run failed tasks with a filtered manifest if needed.
-  - All restored objects revert to archive after 30 days.
-```
-
+→ Secondary example moved to [references/worked-examples.md](references/worked-examples.md); the single-object Expedited example above is primary.
 ## Verification commands
 
-```bash
-# Single object restore status
-aws s3api head-object --bucket <bucket> --key <key> --query 'Restore'
-
-# Wait for restore completion (single object)
-aws s3api wait object-restored --bucket <bucket> --key <key>
-
-# Batch Operations job status
-aws s3control describe-job --account-id <account> --job-id <job-id> \
-  --query 'Job.{Status:Status,Progress:ProgressSummary}'
-
-# List Batch Operations jobs in an account
-aws s3control list-jobs --account-id <account> --operation S3RestoreObject
-
-# Verify object is readable after restore
-aws s3api get-object --bucket <bucket> --key <key> /tmp/test.out && echo OK
-
-# Verify lifecycle rule will not re-archive promoted objects
-aws s3api get-bucket-lifecycle-configuration --bucket <bucket>
-```
-
+→ Command listing moved to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 ## Anti-Patterns — NEVER (top 5)
 
 - **NEVER call `restore-object` on a Glacier Instant Retrieval (GIR)
@@ -616,94 +445,13 @@ aws s3api get-bucket-lifecycle-configuration --bucket <bucket>
 
 ## Edge-case handling
 
-- **Restore seems stuck.** Check `head-object Restore.ongoing-request`.
-  If `true`, the restore is still in progress (Deep Archive Bulk can
-  take 48 hours). If `false` but access fails, the restore failed
-  silently — open an AWS support case.
-- **Restore expires before user accesses the object.** Re-issue
-  `restore-object` with a longer `Days` value, or copy to Standard
-  before expiration. Update the procedure to use a longer lease.
-- **Batch Operations job `Active` for hours with no progress.**
-  Check the manifest ETag, the IAM role permissions, and rate
-  limiting on the source bucket. The report CSV shows per-task
-  failures.
-- **Restoring a versioned object.** Specify `--version-id` on
-  `restore-object` and `head-object`. Without it, the operation
-  targets the current version, which may not be the archived one.
-- **Restoring a Delete Marker.** Delete markers cannot be restored.
-  Remove the delete marker first, then restore the underlying object.
-- **Promotion via lifecycle.** If a lifecycle rule is the source of
-  archiving, update or filter the rule to prevent re-archival of
-  promoted objects. Otherwise the promotion is temporary.
-- **GIR treated as Flexible Retrieval.** GIR is directly readable;
-  restore-object is unnecessary. Re-classify and proceed with
-  GetObject.
-- **Cross-region restore.** Restores happen in the source bucket's
-  region. For cross-region DR, copy the restored object to the
-  destination region after restore completes.
-
+→ Edge-case catalog moved to [references/advanced-patterns.md](references/advanced-patterns.md).
 ## Remediation guidance
 
-**Ordering principle:** verify source class first, then tier-vs-source
-compatibility, then provision capacity for Expedited, then issue the
-restore, then wait, then verify.
-
-### For BLOCKED — GIR object passed for restore
-
-1. Re-classify: GIR is directly readable.
-2. Issue `aws s3api get-object` — no restore needed.
-3. Update the procedure doc to call out GIR as a non-archive tier.
-
-### For BLOCKED — Deep Archive with Expedited tier
-
-1. Re-tier to Standard (12 hr) or Bulk (48 hr).
-2. Reconcile RTO: Deep Archive cannot restore faster than 12 hr.
-3. If faster restore is required, change the source storage class at
-   the lifecycle-policy level.
-
-### For stalled Batch Operations job
-
-1. Check `describe-job` for `FailureReason`.
-2. Check the report bucket CSV for `NoSuchKey` entries.
-3. Re-run failed tasks with a filtered manifest.
-
-### For unexpected re-archival after promotion
-
-1. Check `get-bucket-lifecycle-configuration` for rules that match
-   the promoted prefix or tags.
-2. Update the rule filter to exclude promoted objects.
-3. Re-copy the affected objects to Standard.
-
+→ Remediation deep dive moved to [references/error-handling.md](references/error-handling.md).
 ## Recent AWS features (2024-2026)
 
-- **S3 Glacier Instant Retrieval (GIR) — broadly adopted 2023-2024:**
-  the lowest-cost storage class with single-digit-ms latency for
-  infrequent access. Directly readable via GetObject — no restore
-  required. Replaces Standard-IA for cold-but-queryable data.
-- **Deep Archive Bulk restore cost-tier (2024):** the Bulk tier for
-  Deep Archive is the lowest-cost retrieval option (48 hr SLA,
-  ~$0.0025 per GB). Use for compliance exports with no RTO pressure.
-- **S3 Batch Operations enhanced reporting (2024-2025):** the
-  completion report now includes per-task CloudWatch metrics
-  (BytesRestored, Duration) for tighter observability of bulk
-  restores.
-- **S3 Storage Lens restore dashboards (2024-2025):** Storage Lens
-  now surfaces restore-operation counts and elapsed-time percentiles
-  per bucket — useful for tuning lifecycle policies and predicting
-  restore cost.
-
-- **Lifecycle rule validation (2024-2025):** `put-bucket-lifecycle-configuration`
-  now performs stricter validation, including non-overlapping rule
-  detection — catches re-archival conflicts that previously caused
-  silent object churn.
-- **S3 Batch Operations tag-based manifests (2025):** Batch Operations
-  supports S3 Resource Tags as a manifest source in addition to CSV
-  — useful for tag-driven restore workflows.
-- **Intelligent-Tiering Archive configurations (2025):**
-  Intelligent-Tiering exposes configurable archive-access tiers
-  (Flexible vs Deep Archive) per object — restores follow the same
-  tier SLAs as native Glacier classes.
-
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md).
 ## AWS documentation
 
 - **S3 Glacier Developer Guide** — https://docs.aws.amazon.com/AmazonS3/latest/dev/glacier-restore.html
@@ -716,3 +464,12 @@ restore, then wait, then verify.
 - **Provisioned capacity** — https://docs.aws.amazon.com/AmazonS3/latest/userguide/restoring-objects-retrieval-options.html
 - **S3 Storage Lens** — https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage_lens.html
 - **Pricing — S3** — https://aws.amazon.com/s3/pricing/
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 field craft, edge-case catalog, recent AWS features.
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked example (Batch Operations bulk restore).
+- [references/error-handling.md](references/error-handling.md) — remediation guidance for BLOCKED/stalled/unexpected cases.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — verification command listing.
+- [references/restore-tiers-and-provisioned-capacity.md](references/restore-tiers-and-provisioned-capacity.md) — pre-existing: tier SLA matrix.
+- [references/batch-operations-and-lifecycle-integration.md](references/batch-operations-and-lifecycle-integration.md) — pre-existing; extended with the B1-B4 bulk-restore procedure and lifecycle integration.
+

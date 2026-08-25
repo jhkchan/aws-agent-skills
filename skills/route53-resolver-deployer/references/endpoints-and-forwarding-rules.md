@@ -184,3 +184,47 @@ aws route53resolver get-resolver-endpoint \
 5. **On-prem DNS server port.** Port 53 is default. Non-standard ports
    (e.g., 5353) are supported via `TargetIps[].Port` but the on-prem DNS
    server must be listening on that port.
+
+## Common patterns — inbound / outbound / forwarding boilerplate
+
+### Inbound endpoint — on-prem DNS forwarding to Route 53
+
+```bash
+aws route53resolver create-resolver-endpoint \
+  --creator-request-id inbound-$(date +%s) \
+  --name "prod-inbound" \
+  --security-group-ids sg-0abc123 \
+  --direction INBOUND \
+  --ip-addresses '[
+    {"SubnetId":"subnet-aaa","Ip":"10.0.1.10"},
+    {"SubnetId":"subnet-bbb","Ip":"10.0.2.10"}
+  ]' \
+  --tags '[{"Key":"Environment","Value":"prod"},{"Key":"Purpose","Value":"on-prem-to-route53"}]'
+```
+
+### Outbound endpoint + forwarding rule — VPC to on-prem DNS
+
+```bash
+aws route53resolver create-resolver-endpoint \
+  --creator-request-id outbound-$(date +%s) \
+  --name "prod-outbound" \
+  --security-group-ids sg-0def456 \
+  --direction OUTBOUND \
+  --ip-addresses '[
+    {"SubnetId":"subnet-aaa"},
+    {"SubnetId":"subnet-bbb"}
+  ]' \
+  --tags '[{"Key":"Environment","Value":"prod"},{"Key":"Purpose","Value":"vpc-to-onprem"}]
+
+aws route53resolver create-resolver-rule \
+  --creator-request-id rule-$(date +%s) \
+  --name "forward-corp-local" \
+  --rule-type FORWARD \
+  --domain-name "corp.example.local." \
+  --resolver-endpoint-id <outbound-endpoint-id> \
+  --target-ips '[{"Ip":"10.99.1.5","Port":53},{"Ip":"10.99.2.5","Port":53}]'
+
+aws route53resolver associate-resolver-rule \
+  --resolver-rule-id <rule-id> \
+  --vpc-id vpc-0abc123
+```

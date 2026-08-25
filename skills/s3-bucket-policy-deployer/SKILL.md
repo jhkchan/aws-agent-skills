@@ -91,27 +91,7 @@ the intersection. Bucket policies are the primary mechanism for
 cross-account access, network-source restrictions, and enforcing
 TLS; ACLs are legacy and should not be used.
 
-Three misconceptions dominate bucket-policy misdesign at
-provisioning time:
-
-- **"The bucket policy overrides the IAM policy."** It does not.
-  S3 evaluates both. If the IAM policy denies access, no bucket
-  policy Allow can override it. Conversely, a bucket policy Deny
-  overrides an IAM Allow. The effective permission is the
-  intersection of all applicable policies (IAM + bucket + access
-  point).
-
-- **"Principal: * with a Condition is safe."** It depends. A
-  bucket policy with `Principal: *` + `Condition: aws:SourceVpce`
-  restricts the network source but still allows ANY identity in
-  the account (and potentially other accounts via VPC endpoints)
-  to access the bucket. For identity-based restrictions, pair the
-  condition with a specific principal.
-
-- **"S3 ACLs and bucket policies are interchangeable."** They are
-  not. ACLs are legacy, limited to 100 grants, cannot express
-  conditions, and are ignored when Block Public Access is enabled.
-  Always use bucket policies. ACLs should be disabled.
+The three misconceptions in full (bucket policy vs IAM policy override, `Principal: *` + Condition scoping, ACLs vs policies): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -154,125 +134,15 @@ condition operator for each pattern.
 
 ## Expert heuristic: the aws:SecureTransport condition operator
 
-The #1 HTTPS-only policy bug is using the wrong condition operator.
-A baseline model writes `StringNotEquals` instead of `Bool`.
-
-```text
-CORRECT (Bool operator):
-  "Condition": {
-    "Bool": { "aws:SecureTransport": "false" }
-  }
-  → Deny if the request was NOT over HTTPS (the key is a boolean)
-
-WRONG (StringNotEquals):
-  "Condition": {
-    "StringNotEquals": { "aws:SecureTransport": "true" }
-  }
-  → Silently matches wrong values; aws:SecureTransport is "true"/"false"
-    string but Bool is the canonical operator
-```
-
-**Why Bool is correct:** `aws:SecureTransport` is a boolean
-condition key. The `Bool` operator evaluates it as a boolean
-(`true`/`false`), which is the canonical and reliable form. Using
-`StringNotEquals` works in some cases but is fragile — the key
-value is case-sensitive and the string comparison can silently fail
-on edge-case clients. **Always use `Bool` for `aws:SecureTransport`.**
-
-**Complete HTTPS-only Deny statement:**
-```json
-{
-  "Sid": "DenyInsecureTransport",
-  "Effect": "Deny",
-  "Principal": "*",
-  "Action": "s3:*",
-  "Resource": [
-    "arn:aws:s3:::my-bucket",
-    "arn:aws:s3:::my-bucket/*"
-  ],
-  "Condition": {
-    "Bool": { "aws:SecureTransport": "false" }
-  }
-}
-```
-
-**Key implication:** this single statement enforces HTTPS for ALL
-S3 operations on the bucket. It is the production default and
-should be in every bucket policy unless there is a specific reason
-not to (e.g., a legacy HTTP-only client).
+The aws:SecureTransport operator deep dive (correct `Bool` vs wrong `StringNotEquals`, why, complete HTTPS-only Deny, key implication): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Expert heuristic: aws:SourceVpce vs aws:SourceVpc vs aws:SourceIp
 
-These three condition keys are routinely confused. Each controls a
-different layer of network-source restriction.
-
-| Key | What it checks | When it's populated | Common use |
-|---|---|---|---|
-| `aws:SourceVpce` | The VPC endpoint ID the request came through | Only when the request traverses a VPC endpoint | Restrict to a specific endpoint |
-| `aws:SourceVpc` | The VPC ID the request came from | Only when the request traverses a VPC endpoint with private DNS | Restrict to a VPC |
-| `aws:SourceIp` | The source IP address of the request | Always populated for direct requests; NOT populated for requests through some VPC endpoints | IP allow-listing |
-
-**Critical gotcha:** `aws:SourceVpc` and `aws:SourceVpce` are ONLY
-populated when the request goes through a VPC endpoint. Direct
-internet requests do NOT have these keys set. If you use
-`StringEquals` (positive match), internet requests are implicitly
-denied. If you use `StringNotEquals` (negative match), internet
-requests are implicitly ALLOWED — which is usually NOT what you
-want.
-
-**VPC-endpoint-only pattern (correct):**
-```json
-{
-  "Sid": "DenyNotFromVpcEndpoint",
-  "Effect": "Deny",
-  "Principal": "*",
-  "Action": "s3:*",
-  "Resource": [
-    "arn:aws:s3:::my-bucket",
-    "arn:aws:s3:::my-bucket/*"
-  ],
-  "Condition": {
-    "StringNotEquals": { "aws:SourceVpce": "vpce-0abc123def456" }
-  }
-}
-```
-
-This Deny blocks any request that does NOT come from the specified
-VPC endpoint. Requests from the internet, other VPCs, or other
-endpoints are denied.
-
-**Key implication:** `aws:SourceIp` does NOT work for traffic
-through a VPC endpoint (the source IP becomes the endpoint's
-internal IP, not the client's). For VPC-based restrictions, use
-`aws:SourceVpce` or `aws:SourceVpc`.
+The aws:SourceVpce vs aws:SourceVpc vs aws:SourceIp comparison table, the endpoint-only-population gotcha, the correct VPC-endpoint-only pattern, and the SourceIp-through-endpoint caveat: [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Expert heuristic: policy vs ACL — policy always preferred
 
-S3 has two access-control mechanisms: bucket/object policies and
-ACLs. ACLs are legacy (pre-2015) and should not be used.
-
-| Feature | Bucket Policy | ACL |
-|---|---|---|
-| Condition keys | Full support (aws:SecureTransport, aws:SourceVpce, etc.) | None |
-| Cross-account | Native | Limited to canned grants |
-| Size limit | 20 KB | 100 grants |
-| Block Public Access interaction | Respected | **ACLs are ignored when BPA is enabled** |
-| Recommendation | **Always use** | Legacy — disable |
-
-**Production default:** disable ACLs entirely. Set the bucket
-ownership control to `BucketOwnerEnforced` (S3 Object Ownership),
-which disables ACLs and makes the bucket owner the owner of all
-objects:
-
-```bash
-aws s3api put-bucket-ownership-controls \
-  --bucket my-bucket \
-  --ownership-controls Rules=[{ObjectOwnership=BucketOwnerEnforced}]
-```
-
-With `BucketOwnerEnforced`, ACLs are disabled and all access control
-flows through bucket policies and IAM. This is the AWS-recommended
-default since 2022.
+The policy-vs-ACL comparison table and the `BucketOwnerEnforced` production default: [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Prerequisites (verify before provisioning)
 
@@ -299,26 +169,7 @@ and cite the specific gap.
 Every bucket policy is a JSON document with a `Version` and a
 `Statement` array. Each statement has four core elements.
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": " descriptive-label",
-      "Effect": "Allow",
-      "Principal": { "AWS": "arn:aws:iam::123456789012:role/MyRole" },
-      "Action": ["s3:GetObject", "s3:PutObject"],
-      "Resource": [
-        "arn:aws:s3:::my-bucket",
-        "arn:aws:s3:::my-bucket/*"
-      ],
-      "Condition": {
-        "Bool": { "aws:SecureTransport": "true" }
-      }
-    }
-  ]
-}
-```
+Canonical four-element policy JSON example: [references/policy-patterns.md](references/policy-patterns.md).
 
 **Element rules:**
 - **Version:** always `"2012-10-17"` (NOT `2008-10-17` — the older
@@ -467,11 +318,7 @@ the objects and the bucket account cannot read them.
 See the "Expert heuristic: policy vs ACL" section. Production
 default: disable ACLs with `BucketOwnerEnforced` ownership:
 
-```bash
-aws s3api put-bucket-ownership-controls \
-  --bucket my-bucket \
-  --ownership-controls Rules=[{ObjectOwnership=BucketOwnerEnforced}]
-```
+Disable-ACLs CLI (`put-bucket-ownership-controls` with `BucketOwnerEnforced`): [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
 This disables ACLs entirely — all access control flows through
 bucket policies and IAM.
@@ -491,11 +338,7 @@ this limit are rejected by `put-bucket-policy` with
 | Use IAM policies instead | When the policy grants access to specific roles (not cross-account) |
 | Reduce statement count | Merge similar statements with multi-action / multi-resource arrays |
 
-**Verify policy size before applying:**
-```bash
-wc -c policy.json
-# Must be < 20480 bytes (20 KB)
-```
+Policy-size verification commands (`wc -c`, 20 KB limit): [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
 **Common mistake:** adding a statement per team/department until
 the policy exceeds 20 KB. Use Access Points (Step 9) to delegate
@@ -564,34 +407,7 @@ routes to nearest region; pre-existing objects NOT backfilled.
 
 ## Step 11 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **CloudFront OAC (2022-2023, refined 2024-2025):** Replaces the
-  legacy OAI. Supports SSE-KMS, all HTTP methods, and CloudFront
-  Functions. Use `Principal: { "Service": "cloudfront.amazonaws.com" }`
-  with `AWS:SourceArn` condition.
-
-- **S3 Object Ownership `BucketOwnerEnforced` (2022-2023):**
-  Disables ACLs entirely. Makes the bucket owner the owner of all
-  objects. The AWS-recommended default. ACLs are legacy.
-
-- **S3 Access Points policy delegation (2023-2024 refinements):**
-  Per-access-point policies evaluated alongside the bucket policy.
-  Enables per-team policy management without bloating the bucket
-  policy past the 20 KB limit.
-
-- **S3 Multi-Region Access Point policies (2023-2024):** Separate
-  policy document for MRAP. Failover controls added. MRAP policy
-  does not replace bucket policies.
-
-- **`aws:SourceVpc` / `aws:SourceVpce` for S3 (2023-2024):**
-  Condition keys for VPC-source restriction. Only populated when
-  the request traverses a VPC endpoint. Direct internet requests do
-  NOT have these keys set.
-
-- **S3 Batch Operations for policy enforcement (2024-2025):**
-  Batch-replace ACLs with bucket-owner-full-control across millions
-  of objects when migrating to `BucketOwnerEnforced`.
+Recent AWS features detail (CloudFront OAC, BucketOwnerEnforced, Access Points delegation, MRAP policies, SourceVpc/SourceVpce, Batch Operations for ACL migration): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -671,28 +487,14 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-**`MalformedPolicy` at put-bucket-policy:** policy JSON is invalid
-or exceeds 20 KB. Validate with `python3 -m json.tool` and
-`wc -c`. If over 20 KB, use Access Points to delegate per-team
-policies.
+All five failure scenarios (`MalformedPolicy`, applied-but-denied, SourceVpce not matching, CloudFront OAC 403, cross-account denied despite policy): [references/error-handling.md](references/error-handling.md).
 
-**Policy applied but access still denied:** check Block Public
-Access (`RestrictPublicBuckets` silently blocks public policies).
-Check the IAM policy of the caller — a Deny there overrides any
-bucket policy Allow. Verify the `Resource` includes both bucket and
-object ARNs.
+## References (load on demand)
 
-**`aws:SourceVpce` condition not matching:** the request is not
-going through the specified VPC endpoint. Verify the endpoint ID.
-Direct internet requests do NOT have `aws:SourceVpce` set.
-
-**CloudFront OAC returning 403:** the `AWS:SourceArn` condition
-does not match the distribution ARN. Verify the distribution ID.
-Ensure the OAC config exists in CloudFront.
-
-**Cross-account access denied despite policy:** the foreign
-account's IAM role must ALSO have an Allow policy. Both sides must
-allow. Verify the role's trust policy and permissions.
+- [Advanced patterns](references/advanced-patterns.md) — the three Mindset misconceptions, the aws:SecureTransport / SourceVpce-vs-SourceVpc-vs-SourceIp / policy-vs-ACL expert heuristics, recent AWS features
+- [Error handling](references/error-handling.md) — put-bucket-policy failure scenarios and their diagnosis
+- [Policy patterns](references/policy-patterns.md) — pattern comparison, per-pattern JSON, canonical policy-structure example
+- [Provisioning CLI commands](references/provisioning-cli-commands.md) — full copy-pasteable CLI sequence, Terraform equivalent
 
 ## Domain
 

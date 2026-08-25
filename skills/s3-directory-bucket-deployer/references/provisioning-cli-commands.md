@@ -202,3 +202,28 @@ aws ec2 cancel-capacity-reservation \
 
 **Always resolve with `ec2 describe-availability-zones`.** The mapping
 is consistent within an account but varies across accounts.
+
+---
+
+## Quick reference — provisioning summary (8 steps)
+
+
+| Step | Action | Reversible? | Key risk if skipped |
+|---|---|---|---|
+| 1 | Resolve AZ ID from AZ name (or accept explicit AZ ID) | — | Wrong AZ → cross-AZ latency + transfer fees |
+| 2 | Construct directory bucket name in `base--az-id--x-s3` format | — | **Wrong format → creation fails or creates wrong bucket type** |
+| 3 | Create the directory bucket with `create-directory-bucket` | Yes | Using `create-bucket` instead → creates a standard bucket silently |
+| 4 | Configure encryption (SSE-S3 or SSE-KMS) and bucket policy | Yes | directory bucket policy format differs from standard bucket policy |
+| 5 | Deploy or confirm zone-affinity compute in the SAME AZ | Yes | **Compute in different AZ → no latency benefit + cross-AZ transfer fees** |
+| 6 | For table buckets: create via `s3tables create-table-bucket` | Yes | Using `create-directory-bucket` for a table bucket → wrong API surface |
+| 7 | Configure application to use the Zonal endpoint | — | Standard regional endpoint → routing overhead, loses latency benefit |
+| 8 | Verify every configuration item against actual state + emit checklist | — | silent no-ops |
+
+**Critical ordering constraints:** AZ ID resolution BEFORE bucket name
+construction (the name encodes the AZ); bucket name format validation
+BEFORE `create-directory-bucket` (the API rejects malformed names but
+operators who use `create-bucket` get a standard bucket with no error);
+directory bucket creation BEFORE compute deployment (compute should
+target the bucket's AZ); table bucket creation uses a separate API
+(`s3tables`, not `s3api`). Rationale and the silent-failure table are
+below.

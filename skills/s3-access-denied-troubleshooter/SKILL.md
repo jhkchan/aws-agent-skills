@@ -85,52 +85,13 @@ metadata:
 
 ## Mindset
 
-An S3 Access Denied error is almost never about the application code.
-The application is making a valid S3 API call; the authorisation layer
-is rejecting it. The root cause is somewhere in the policy evaluation
-chain: SCP, IAM identity policy, bucket policy, KMS key policy,
-permission boundary, session policy, VPC endpoint policy, or one of
-the non-policy gates (object ownership, Block Public Access, Object
-Lock, presigned URL validity, Object Lambda routing). Senior storage
-engineers start with the policy evaluation hierarchy and work outward
-to the non-policy gates; they do not start by re-reading the
-application SDK call.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Mindset".
+> Load when: framing where AccessDenied root causes live (policy chain vs non-policy gates)
 
 ## Philosophy
 
-Four behaviours separate a senior S3 engineer from a generalist:
-
-- **The policy evaluation hierarchy is strict and non-negotiable.** The
-  evaluation order is: (1) SCPs at every org/OU level (a deny at any
-  level blocks the request before it reaches IAM), (2) IAM identity
-  policy (the caller's attached and inline policies), (3) bucket policy
-  (the resource-based policy on the bucket), (4) KMS key policy (if
-  the object is SSE-KMS encrypted). An explicit Deny at any level
-  overrides all Allow statements at all levels. Operators who "added
-  the IAM permission" but still see AccessDenied often miss an explicit
-  Deny in an SCP, bucket policy, or permission boundary.
-- **Explicit deny and implicit deny produce the same error but require
-  different fixes.** An explicit deny means a `Deny` statement exists
-  somewhere in the hierarchy and must be removed or scoped narrower.
-  An implicit deny means no `Allow` statement exists at all — the
-  permission was never granted. CloudTrail's `errorMessage` field
-  distinguishes the two: "explicit deny" vs a bare "Access Denied."
-  Operators who treat both the same waste time searching for a Deny
-  statement that does not exist.
-- **KMS is a separate gate from S3.** When an object is encrypted with
-  a customer-managed KMS key, the caller must have `kms:Decrypt` (IAM)
-  AND the key policy must allow the caller's account to use the key.
-  The S3 service makes the `kms:Decrypt` call on behalf of the user;
-  the IAM permission is checked against the caller's identity. A
-  missing KMS grant produces the same `Access Denied` error as a
-  missing S3 permission — the error message does not name KMS.
-- **Object ownership is invisible until it bites.** Before the
-  `BucketOwnerEnforced` setting (default for new buckets since April
-  2023), the uploader owned the object and ACLs controlled access. A
-  bucket owner's policy could not override ACLs on objects they did
-  not own. Operators migrating from cross-account upload patterns
-  discover that their bucket policy "works" for some objects but not
-  others — the difference is who uploaded each object.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Philosophy".
+> Load when: explaining the four behaviours that separate senior S3 diagnosis from generalist guessing
 
 ## Quick reference — symptom triage table
 
@@ -159,37 +120,8 @@ mimic AccessDenied.
 
 ### Account-wide pre-flight commands
 
-```bash
-# 1. Identify the caller (who is making the denied request?)
-aws sts get-caller-identity --profile <p> --output json
-
-# 2. CloudTrail lookup for the exact denied event
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventName,AttributeValue=GetObject \
-  --start-time $(date -d '-1 hour' +%s) --end-time $(date +%s) \
-  --output json | \
-  jq '.Events[] | select(.CloudTrailEvent | contains("AccessDenied"))'
-
-# 3. Bucket policy
-aws s3api get-bucket-policy --bucket <bucket> --output json 2>/dev/null || \
-  echo "No bucket policy"
-
-# 4. Bucket ownership controls
-aws s3api get-bucket-ownership-controls --bucket <bucket> --output json 2>/dev/null || \
-  echo "No ownership controls (defaults apply)"
-
-# 5. Block Public Access settings
-aws s3api get-public-access-block --bucket <bucket> --output json 2>/dev/null
-
-# 6. KMS key (if the bucket has a default encryption config)
-aws s3api get-bucket-encryption --bucket <bucket> --output json 2>/dev/null | \
-  jq '.ServerSideEncryptionConfiguration'
-
-# 7. VPC endpoints for S3 (if the caller is VPC-attached)
-aws ec2 describe-vpc-endpoints \
-  --filters Name=service-name,Values=com.amazonaws.<region>.s3 \
-  --output json | jq '.VpcEndpoints[] | {VpcEndpointId, Policy, State}'
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Pre-flight — account-wide commands".
+> Load when: gathering caller identity, CloudTrail event, bucket policy, ownership, BPA, encryption, VPC endpoints before probing
 
 ### Caller-context short-circuit
 
@@ -231,79 +163,8 @@ matches the symptom.**
 
 ### Step 0: Non-obvious behaviours that change diagnosis
 
-These are the operational gotchas a senior S3 engineer knows from
-incident experience:
-
-- **S3 AccessDenied does not distinguish between S3-layer and KMS-layer
-  denial.** When an object is SSE-KMS encrypted, the S3 service calls
-  `kms:Decrypt` on behalf of the caller. If the caller lacks
-  `kms:Decrypt`, S3 returns `Access Denied` — the same error string as
-  a missing `s3:GetObject` permission. Operators who "fixed the S3
-  policy" but still see AccessDenied on SSE-KMS objects are chasing
-  the wrong layer.
-
-- **An explicit Deny anywhere in the hierarchy overrides ALL Allow
-  statements everywhere.** An SCP `Deny` at the org root blocks the
-  request before IAM or bucket policies are evaluated. A bucket policy
-  `Deny` blocks even if the IAM identity policy allows. A permission
-  boundary `Deny` blocks even if the IAM policy allows. Always search
-  for `Deny` statements at every level before concluding an implicit
-  deny.
-
-- **Cross-account S3 access requires mutual consent: the bucket policy
-  must allow the caller's account, AND the caller's IAM policy must
-  allow the S3 action.** Same-account access works with either side
-  alone. Operators who "added the IAM permission" for a cross-account
-  caller forget the bucket policy side; operators who "added the bucket
-  policy" forget the IAM side.
-
-- **Object Lock retention and legal holds produce AccessDenied on
-  overwrite or delete, not on read.** An object in `COMPLIANCE` mode
-  with an active retention period cannot be overwritten or deleted by
-  ANY principal, including the root account. An object with a legal
-  hold cannot be overwritten or deleted until the hold is removed. The
-  error is `AccessDenied`, not "object locked."
-
-- **Block Public Access at the bucket level blocks public reads even
-  if the bucket policy explicitly allows `s3:GetObject` to `*`.** The
-  Block Public Access settings are evaluated before the bucket policy.
-  If `RestrictPublicBuckets` is enabled and the bucket policy has a
-  public principal (`*`), the public access is blocked silently. The
-  bucket owner's own access is unaffected.
-
-- **S3 Object Lambda access points use a different ARN namespace.** An
-  ARN like `arn:aws:s3-object-lambda:us-east-1:111111111111:accesspoint/`
-  `my-olap` requires the caller to use the Object Lambda ARN, not the
-  standard S3 ARN. Operators who paste the standard S3 bucket ARN get
-  AccessDenied because the policy on the Object Lambda access point
-  was never evaluated.
-
-- **A VPC endpoint policy for S3 can restrict actions independently of
-  IAM and bucket policy.** When traffic flows through an S3 Gateway
-  endpoint, the endpoint policy is evaluated as an additional gate. An
-  endpoint policy that allows only `s3:GetObject` blocks `s3:PutObject`
-  even if IAM and bucket policy both allow it. The error is the same
-  `Access Denied`.
-
-- **Presigned URL expiry is checked at the S3 service edge.** A URL
-  with `X-Amz-Expires=300` (5 minutes) that is used at minute 6 returns
-  `AccessDenied` with the message "Request has expired." The
-  `SignatureDoesNotMatch` error, by contrast, indicates the signature
-  region or credentials used to sign differ from the region or
-  credentials used at request time.
-
-- **The `aws:SourceIp` condition in a bucket policy can block traffic
-  from a NAT Gateway or VPC endpoint.** A policy that allows a
-  corporate CIDR but not the VPC's NAT Gateway IP blocks VPC-attached
-  workloads. When a VPC Gateway endpoint is used, the `aws:SourceIp`
-  condition is NOT populated — `aws:SourceVpce` must be used instead.
-
-- **STS assumed-role sessions carry the permission boundary and session
-  policy as additional filters.** The effective permission for an
-  assumed role is: IAM policy AND permission boundary AND session
-  policy. Operators who assume a role with `--policy-arn` (a session
-  policy) narrow the role's permissions for that session only; the
-  role's own permissions are unchanged for other sessions.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Step 0: Non-obvious behaviours that change diagnosis".
+> Load when: interpreting an AccessDenied that does not match the obvious layer (KMS-vs-S3, deny hierarchy, cross-account consent, Object Lock, BPA, OLAP ARNs, SourceIp/VPCe, session filters)
 
 ### Step 1: Policy evaluation hierarchy — check SCPs first
 
@@ -311,18 +172,8 @@ Symptom: caller gets `Access Denied` on any S3 action. The first gate
 in the evaluation hierarchy is the SCP layer at the Organizations
 level.
 
-```bash
-# List all SCPs attached to the caller's account
-aws organizations list-policies-for-target \
-  --target-id <account-id> \
-  --filter SERVICE_CONTROL_POLICY \
-  --output json
-
-# Get the content of each SCP
-aws organizations describe-policy \
-  --policy-id <policy-id> --output json | \
-  jq '.Policy.Content | fromjson'
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Step 1 — SCP layer probe commands".
+> Load when: checking Step 1 (list/describe SCPs for the caller account)
 
 Check each SCP for:
 - A `Deny` statement with `Action: s3:*` or a specific `s3:GetObject`.
@@ -340,14 +191,8 @@ If no SCP denies, check the caller's IAM identity policies (managed +
 inline). The IAM policy must `Allow` the specific S3 action on the
 specific bucket ARN (or `*`).
 
-```bash
-# Simulate the caller's effective permissions
-aws iam simulate-principal-policy \
-  --policy-source-arn <caller-arn> \
-  --action-names s3:GetObject \
-  --resource-arns arn:aws:s3:::<bucket>/<key> \
-  --output json --profile <p>
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Step 2 — IAM simulation probe".
+> Load when: checking Step 2 (simulate-principal-policy for the denied action)
 
 `simulate-principal-policy` returns one of:
 - `allowed` — the IAM policy allows the action. Move to Step 3.
@@ -362,21 +207,8 @@ aws iam simulate-principal-policy \
 If the IAM policy allows but the caller still gets AccessDenied, check
 for a permissions boundary on the role:
 
-```bash
-aws iam get-role --role-name <role-name> --output json | \
-  jq '.Role.PermissionsBoundary'
-```
-
-If a permissions boundary exists, simulate with it:
-
-```bash
-aws iam simulate-principal-policy \
-  --policy-source-arn <caller-arn> \
-  --action-names s3:GetObject \
-  --resource-arns arn:aws:s3:::<bucket>/<key> \
-  --permissions-boundary-policy-list <boundary-policy-json> \
-  --output json --profile <p>
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Step 3 — permission boundary probes".
+> Load when: checking Step 3 (get-role boundary + simulate with boundary)
 
 If the simulation returns `explicitDeny` with the boundary,
 **ROOT_CAUSE_IDENTIFIED** with `ROOT_CAUSE: PERMISSION_BOUNDARY`.
@@ -386,10 +218,8 @@ If the simulation returns `explicitDeny` with the boundary,
 If IAM allows and no permission boundary blocks, check the bucket
 policy.
 
-```bash
-aws s3api get-bucket-policy --bucket <bucket> --output json | \
-  jq '.Policy | fromjson'
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Step 4 — bucket policy probe".
+> Load when: checking Step 4 (get-bucket-policy for Deny / cross-account Allow)
 
 Check for:
 - A `Deny` statement matching the caller's principal, action, or
@@ -404,28 +234,8 @@ Check for:
 If the S3 policy chain allows, check whether the object is SSE-KMS
 encrypted with a customer-managed key.
 
-```bash
-# Check the bucket's default encryption
-aws s3api get-bucket-encryption --bucket <bucket> --output json | \
-  jq '.ServerSideEncryptionConfiguration'
-
-# If SSE-KMS with a customer-managed key:
-aws kms describe-key --key-id <key-arn> --output json | \
-  jq '.KeyMetadata.{KeyManager, KeyState, Enabled}'
-
-aws kms get-key-policy --key-id <key-arn> --policy-name default --output json | \
-  jq '.Policy | fromjson'
-```
-
-Simulate the caller's KMS permissions:
-
-```bash
-aws iam simulate-principal-policy \
-  --policy-source-arn <caller-arn> \
-  --action-names kms:Decrypt \
-  --resource-arns <key-arn> \
-  --output json --profile <p>
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Step 5 — KMS gate probes".
+> Load when: checking Step 5 (bucket encryption, describe-key, get-key-policy, kms:Decrypt simulation)
 
 If the caller lacks `kms:Decrypt` on the customer-managed key, or the
 key policy does not grant the caller's account,
@@ -442,11 +252,8 @@ applies when the bucket does NOT have `BucketOwnerEnforced` (i.e., the
 bucket was created before April 2023 or explicitly set to
 `ObjectWriter`).
 
-```bash
-aws s3api get-bucket-ownership-controls --bucket <bucket> --output json 2>/dev/null
-
-aws s3api get-object-acl --bucket <bucket> --key <key> --output json
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Step 6 — object ownership probes".
+> Load when: checking Step 6 (ownership controls + object ACL)
 
 If the ACL shows an owner that is NOT the bucket owner's account, and
 the bucket policy does not account for the uploader's account, the
@@ -462,12 +269,8 @@ objects in-place (which changes ownership).
 If the caller is VPC-attached (Lambda in VPC, ECS, EC2 in a VPC with
 an S3 Gateway endpoint), check the endpoint policy.
 
-```bash
-aws ec2 describe-vpc-endpoints \
-  --filters Name=service-name,Values=com.amazonaws.<region>.s3 \
-  --output json | \
-  jq '.VpcEndpoints[] | {VpcEndpointId, Policy, State}'
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Step 7 — VPC endpoint policy probe".
+> Load when: checking Step 7 (describe-vpc-endpoints for the S3 gateway policy)
 
 A VPC endpoint policy can `Deny` specific S3 actions even when IAM
 and bucket policy both allow. Test by bypassing the endpoint (route
@@ -497,9 +300,8 @@ If the URL is expired, **ROOT_CAUSE_IDENTIFIED** with
 If the symptom is "public access blocked" despite a bucket policy
 allowing `s3:GetObject` to `*`:
 
-```bash
-aws s3api get-public-access-block --bucket <bucket> --output json
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Step 9 — Block Public Access probe".
+> Load when: checking Step 9 (get-public-access-block)
 
 Check all four settings:
 - `BlockPublicAcls` — blocks new public ACLs.
@@ -517,13 +319,8 @@ public principal, **ROOT_CAUSE_IDENTIFIED** with
 If the symptom is `AccessDenied` on `PutObject` or `DeleteObject` for
 a specific object (not the whole bucket):
 
-```bash
-aws s3api get-object-lock-configuration --bucket <bucket> --output json 2>/dev/null
-
-aws s3api get-object-retention --bucket <bucket> --key <key> --output json 2>/dev/null
-
-aws s3api get-object-legal-hold --bucket <bucket> --key <key> --output json 2>/dev/null
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Step 10 — Object Lock probes".
+> Load when: checking Step 10 (lock configuration, retention, legal hold)
 
 - `COMPLIANCE` mode: no principal (including root) can shorten the
   retention period or delete the object.
@@ -543,11 +340,8 @@ Check the ARN format in the caller's SDK call:
 - Standard S3: `arn:aws:s3:::bucket/key`
 - Object Lambda: `arn:aws:s3-object-lambda:<region>:<account>:accesspoint/<name>/key`
 
-```bash
-aws s3control get-access-point-configuration-for-object-lambda \
-  --account-id <account-id> \
-  --name <access-point-name> --output json
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Step 11 — Object Lambda probe".
+> Load when: checking Step 11 (get-access-point-configuration-for-object-lambda)
 
 If the caller used a standard S3 ARN but the policy is on the Object
 Lambda access point, **ROOT_CAUSE_IDENTIFIED** with
@@ -558,9 +352,8 @@ Lambda access point, **ROOT_CAUSE_IDENTIFIED** with
 If the bucket has `BucketOwnerEnforced` and a cross-account caller
 sends a request with `x-amz-expected-bucket-owner` that does not match:
 
-```bash
-aws s3api get-bucket-ownership-controls --bucket <bucket> --output json
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Step 12 — ownership controls probe".
+> Load when: checking Step 12 (get-bucket-ownership-controls for RequestAccount mismatch)
 
 If `BucketOwnerEnforced` is set and the caller does not include the
 correct `x-amz-expected-bucket-owner` header (or includes the wrong
@@ -631,54 +424,13 @@ CONFIRM: Before updating the role policy, emit and await:
 
 ### Worked example — Cross-account missing bucket policy
 
-```text
-TARGET: s3://shared-data-bucket/reports/daily.csv
-  caller: arn:aws:iam::222222222222:role/cross-account-reader
-  action: s3:GetObject
-VERDICT: ROOT_CAUSE_IDENTIFIED
-REASON: The caller in account 222222222222 has an IAM policy allowing
-  s3:GetObject on the bucket. However, the bucket is in account
-  111111111111 and the bucket policy does not include a statement
-  allowing account 222222222222. Cross-account S3 access requires
-  BOTH the caller's IAM policy AND the bucket policy to explicitly
-  allow (Step 4).
-ROOT_CAUSE: CROSS_ACCOUNT_MISSING_BUCKET_POLICY
-EVIDENCE:
-  - Symptom: cross-account-reader role in 222222222222 gets
-    AccessDenied on s3:GetObject.
-  - Probe: aws iam simulate-principal-policy on cross-account-reader
-    for s3:GetObject returns "allowed".
-  - Probe: aws s3api get-bucket-policy on shared-data-bucket shows
-    no statement for principal 222222222222.
-  - Passing: no SCP Deny; no KMS encryption (SSE-S3); object
-    ownership is BucketOwnerEnforced (not an ownership issue).
-REMEDIATION:
-  1. Add a bucket policy statement allowing account 222222222222:
-     aws s3api put-bucket-policy --bucket shared-data-bucket \
-       --policy '{"Version":"2012-10-17","Statement":[{"Sid":"CrossAccountRead","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::222222222222:root"},"Action":"s3:GetObject","Resource":"arn:aws:s3:::shared-data-bucket/reports/*"}]}'
-  2. Verify from account 222222222222:
-     aws s3api get-object --bucket shared-data-bucket \
-       --key reports/daily.csv /tmp/test-download --profile caller
-CONFIRM: Before updating the bucket policy, emit and await:
-  "CONFIRM: About to add a cross-account bucket policy statement on
-   shared-data-bucket for account 222222222222. Proceed? (yes/no)"
-```
+> **Moved verbatim** → [references/worked-examples.md](references/worked-examples.md) § "Worked example — Cross-account missing bucket policy".
+> Load when: emitting output for a cross-account caller blocked by the bucket policy
 
 ### Worked example — INSUFFICIENT_DATA
 
-```text
-TARGET: unknown (bucket name not provided)
-VERDICT: INSUFFICIENT_DATA
-REASON: The operator reported "S3 AccessDenied" but did not provide
-  the bucket name, the specific S3 action, or the caller IAM principal.
-  Without these, the diagnostic tree cannot be entered.
-ROOT_CAUSE: UNKNOWN
-EVIDENCE:
-  - Missing: bucket name, S3 action, caller principal ARN
-REMEDIATION: Re-prompt for: (1) the bucket name and key prefix, (2)
-  the exact S3 action and error message, and (3) the caller's IAM
-  role ARN. For live diagnosis, also request the CloudTrail event.
-```
+> **Moved verbatim** → [references/worked-examples.md](references/worked-examples.md) § "Worked example — INSUFFICIENT_DATA".
+> Load when: emitting output when bucket/action/caller context is missing
 
 ## Anti-Patterns — NEVER
 
@@ -744,254 +496,36 @@ REMEDIATION: Re-prompt for: (1) the bucket name and key prefix, (2)
 
 ## Pre-flight safety checks (run before any state-changing CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (`put-bucket-policy`, `put-role-policy`, `put-public-access-block`,
-  `put-bucket-ownership-controls`, `delete-object-retention`), emit
-  and await operator approval. Do NOT execute the CLI until the
-  operator confirms.
-
-- **Read-only first.** Every probe in the diagnostic tree is
-  read-only (`get-bucket-policy`, `get-object-acl`, `simulate-principal-policy`,
-  `lookup-events`, `describe-key`, `describe-vpc-endpoints`). Do not
-  perform state-changing operations as diagnostic probes.
-
-- **Bucket policy changes** affect every consumer of the bucket.
-  Tighten policy gradually; test with `simulate-principal-policy`
-  before applying.
-
-- **KMS key policy changes** affect every service that uses the key.
-  Never remove a key policy statement without confirming no S3 bucket,
-  Lambda function, or other service depends on it.
-
-- **Object Lock changes** are irreversible for COMPLIANCE-mode objects.
-  Never attempt to bypass retention on a COMPLIANCE-mode object.
-
-- **Block Public Access changes** at the account level affect all
-  buckets in the account. Always scope to the bucket level unless
-  the account-level setting is intentionally global.
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Pre-flight safety checks (run before any state-changing CLI)".
+> Load when: about to emit or execute any state-changing remediation CLI (policy, boundary, BPA, ownership, retention)
 
 ## Remediation guidance
 
-### For SCP_DENY
-
-```bash
-# Detach or update the SCP at the org/OU level
-aws organizations detach-policy \
-  --policy-id <policy-id> --target-id <org-unit-id>
-# Or update the SCP to scope the Deny narrower
-aws organizations update-policy \
-  --policy-id <policy-id> \
-  --content '<narrower JSON>'
-```
-
-### For IMPLICIT_DENY_IAM
-
-Add the minimum-scope permission to the caller's identity-based policy:
-
-```bash
-aws iam put-role-policy --role-name <role-name> \
-  --policy-name <name> \
-  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::<bucket>/<prefix>/*"}]}'
-```
-
-### For EXPLICIT_DENY_BUCKET_POLICY
-
-Identify the Deny statement in the bucket policy and remove or scope
-it narrower. Re-test with `simulate-principal-policy`.
-
-### For KMS_KEY_POLICY
-
-Add `kms:Decrypt` on the key ARN to the caller's IAM policy:
-
-```bash
-aws iam put-role-policy --role-name <role-name> \
-  --policy-name kms-decrypt \
-  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"kms:Decrypt","Resource":"<key-arn>"}]}'
-```
-
-If the key policy itself does not grant the caller's account, update
-the key policy:
-
-```bash
-aws kms put-key-policy --key-id <key-arn> \
-  --policy-name default \
-  --policy '<JSON with the caller account in the Principal>'
-```
-
-### For CROSS_ACCOUNT_MISSING_BUCKET_POLICY
-
-Add a bucket policy statement allowing the caller's account:
-
-```bash
-aws s3api put-bucket-policy --bucket <bucket> \
-  --policy '{"Version":"2012-10-17","Statement":[{"Sid":"CrossAccount","Effect":"Allow","Principal":{"AWS":"arn:aws:iam::<caller-account>:root"},"Action":"s3:GetObject","Resource":"arn:aws:s3:::<bucket>/<prefix>/*"}]}'
-```
-
-### For OBJECT_OWNERSHIP
-
-Enable bucket owner enforced:
-
-```bash
-aws s3api put-bucket-ownership-controls --bucket <bucket> \
-  --ownership-controls Rules=[{ObjectOwnership=BucketOwnerEnforced}]
-```
-
-For existing objects owned by the uploader, use S3 Batch Operations to
-copy in-place:
-
-```bash
-aws s3control create-job \
-  --account-id <account-id> \
-  --operation '{"S3PutObjectCopy":{"BucketReference":{"Bucket":"<bucket>"}}}' \
-  --manifest '{"Spec":{"Format":"S3BatchOperations_CSV_20180820","Fields":["Bucket","Key"]},"Location":{"Bucket":"<manifest-bucket>","Key":"manifest.csv"}}' \
-  --report '{"Bucket":"<report-bucket>","Format":"Report_CSV_20180820","Enabled":true}' \
-  --role-arn <batch-role-arn>
-```
-
-### For VPC_ENDPOINT_POLICY
-
-Update the endpoint policy to allow the denied action:
-
-```bash
-aws ec2 modify-vpc-endpoint --vpc-endpoint-id <vpce-id> \
-  --policy-document '<JSON allowing the S3 action>'
-```
-
-### For PRESIGNED_URL_EXPIRED
-
-Generate a new presigned URL with sufficient expiry. If the caller
-needs long-lived access, use IAM credentials directly instead of
-presigned URLs.
-
-### For BLOCK_PUBLIC_ACCESS
-
-If public access is intentionally required (e.g., static website
-hosting), disable the relevant Block Public Access setting:
-
-```bash
-aws s3api put-public-access-block --bucket <bucket> \
-  --public-access-block-configuration BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false
-```
-
-### For OBJECT_LOCK_RETENTION
-
-For GOVERNANCE-mode objects with the `s3:BypassGovernanceRetention`
-permission:
-
-```bash
-aws s3api delete-object --bucket <bucket> --key <key> \
-  --bypass-governance-retention
-```
-
-For COMPLIANCE-mode objects: no bypass is possible. Wait for the
-retention period to expire.
-
-### For PERMISSION_BOUNDARY
-
-Update the permission boundary to allow the S3 action:
-
-```bash
-aws iam put-role-permissions-boundary \
-  --role-name <role-name> \
-  --permissions-boundary <policy-arn>
-```
-
-Or attach a new boundary policy that includes the S3 action.
-
-### For OBJECT_LAMBDA_ROUTING
-
-Update the caller's SDK to use the Object Lambda ARN:
-
-```text
-arn:aws:s3-object-lambda:<region>:<account>:accesspoint/<name>/key
-```
-
-### For REQUEST_ACCOUNT_MISMATCH
-
-Include the `x-amz-expected-bucket-owner` header in the request with
-the bucket owner's account ID. Most SDKs support this via a request
-parameter.
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Remediation guidance (per root cause)".
+> Load when: emitting REMEDIATION for any identified ROOT_CAUSE
 
 ## Deep reference: S3 authorisation evaluation model
 
-### Policy evaluation hierarchy (strict order)
-
-```
-1. SCPs (org root → OU → account)     — a Deny at any level blocks
-2. IAM identity policy                  — the caller's effective permissions
-3. Permission boundary (if set)         — narrows effective permissions
-4. Session policy (if STS assumed)      — further narrows for this session
-5. Bucket policy                        — resource-based policy
-6. ACLs (if BucketOwnerEnforced=false)  — legacy per-object access
-7. KMS key policy (if SSE-KMS)         — separate gate for decrypt
-8. VPC endpoint policy (if applicable)  — additional gate for VPC traffic
-9. Block Public Access                  — pre-evaluation gate for public access
-10. Object Lock                         — post-evaluation gate for write/delete
-```
-
-### Explicit deny vs implicit deny
-
-| Type | Meaning | CloudTrail signal |
-|---|---|---|
-| Explicit deny | A `Deny` statement exists somewhere | `errorMessage` contains "explicit deny" |
-| Implicit deny | No `Allow` statement matches | `errorMessage` is bare "Access Denied" |
-
-### Cross-account evaluation matrix
-
-| Bucket in | Caller in | IAM policy allows | Bucket policy allows | Result |
-|---|---|---|---|---|
-| Account A | Account A | Yes | No | Allow (same-account: either allows) |
-| Account A | Account A | Yes | Yes | Allow |
-| Account A | Account A | No | Yes | Allow (same-account: either allows) |
-| Account A | Account B | Yes | No | Deny (cross-account: both must allow) |
-| Account A | Account B | Yes | Yes | Allow |
-| Account A | Account B | No | Yes | Deny (cross-account: both must allow) |
+> **Moved verbatim** → [references/policy-evaluation-reference.md](references/policy-evaluation-reference.md) § "Deep reference: S3 authorisation evaluation model".
+> Load when: explaining the full 10-layer hierarchy, explicit-vs-implicit deny signals, or the cross-account matrix
 
 ### KMS condition keys for S3
 
-| Condition key | Meaning |
-|---|---|
-| `kms:ViaService` | The AWS service making the KMS call (e.g., `s3.us-east-1.amazonaws.com`) |
-| `kms:EncryptionContext:aws:s3:arn` | The bucket ARN in the encryption context |
-| `kms:CallerAccount` | The account of the caller |
-
-Use these in the KMS key policy to scope which S3 buckets can use the
-key:
-
-```json
-{
-  "Condition": {
-    "StringEquals": {
-      "kms:ViaService": "s3.us-east-1.amazonaws.com",
-      "kms:EncryptionContext:aws:s3:arn": "arn:aws:s3:::prod-data-bucket"
-    }
-  }
-}
-```
+> **Moved verbatim** → [references/kms-and-ownership-reference.md](references/kms-and-ownership-reference.md) § "KMS condition keys for S3".
+> Load when: scoping a KMS key policy to specific buckets (kms:ViaService, encryption context)
 
 ## Recent AWS features (2024-2026)
 
-- **S3 Object Ownership BucketOwnerEnforced default (2023-2024):** All
-  new buckets default to `BucketOwnerEnforced`, disabling ACLs. This
-  eliminates the object-ownership class of AccessDenied for new
-  buckets. Existing buckets may still use `ObjectWriter` or
-  `BucketOwnerPreferred`.
-- **S3 Access Points cross-account (2024):** Access points support
-  cross-account access via access point policies and IAM policies. The
-  evaluation is: IAM policy AND access point policy must both allow.
-- **S3 Batch Operations copy-in-place for ownership (2024-2025):**
-  Batch Operations can copy objects in-place to change ownership when
-  migrating to `BucketOwnerEnforced`. The copy operation reads the
-  object with the uploader's permissions and writes it as the bucket
-  owner.
-- **S3 Object Lambda access point ARN (2024):** Object Lambda access
-  points use the `s3-object-lambda` ARN namespace. Standard S3 SDK
-  calls to an Object Lambda ARN fail; the caller must use the Object
-  Lambda endpoint.
-- **KMS key policy `kms:Decrypt` for S3 (2024-2026):** The KMS key
-  policy must explicitly grant `kms:Decrypt` for the S3 service
-  principal (`s3.<region>.amazonaws.com`) with the bucket ARN in the
-  encryption context. Without this, SSE-KMS objects cannot be read.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Recent AWS features (2024-2026)".
+> Load when: deciding whether a newer S3 feature changes the diagnosis
+
+## References (load on demand)
+
+- [references/policy-evaluation-reference.md](references/policy-evaluation-reference.md) — policy evaluation hierarchy and cross-account matrix, now also holding the deep-reference model moved from SKILL.md
+- [references/kms-and-ownership-reference.md](references/kms-and-ownership-reference.md) — KMS key policy and ownership detail, now also holding the KMS condition keys for S3 moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — account-wide pre-flight commands, per-step probe CLIs, remediation guidance, pre-flight safety checks
+- [references/worked-examples.md](references/worked-examples.md) — cross-account and INSUFFICIENT_DATA worked examples moved from SKILL.md
+- [references/advanced-patterns.md](references/advanced-patterns.md) — mindset, philosophy, Step 0 non-obvious behaviours, recent AWS features
 
 ## Domain
 
@@ -1011,3 +545,4 @@ Hierarchy, and Object Lock Retention.
 - **IAM simulate-principal-policy** — https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_test-policies.html
 - **AWS Organizations SCPs** — https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps.html
 - **S3 Object Lambda access points** — https://docs.aws.amazon.com/AmazonS3/latest/userguide/transforming-objects.html
+

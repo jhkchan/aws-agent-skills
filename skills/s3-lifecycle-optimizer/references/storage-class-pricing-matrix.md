@@ -132,3 +132,26 @@ For 1 TB compliance archive (write-once, 7-year retention):
   charges that can net MORE expensive than Standard. Always model the
   minimum-duration cost if the workload deletes objects sooner than the tier
   minimum.
+
+---
+
+## Quick reference — verdict thresholds
+
+**Cost baseline summary (us-east-1, 2026, USD per GB-month):**
+
+| Tier | $/GB-mo | Min size / duration | Best for |
+|---|---|---|---|
+| Standard | 0.023 | — | Daily/weekly access |
+| Standard-IA | 0.0125 | 128 KB / 30-day | Monthly access |
+| Intelligent-Tiering | 0.023 entry + $0.0025/1K monitor | >128 KB avg | Unknown / mixed patterns |
+| Glacier Instant Retrieval | 0.004 | 90-day min | Quarterly access, ms retrieve |
+| Glacier Flexible Retrieval | 0.0036 | 90-day min | Archive, hours retrieve |
+| Glacier Deep Archive | 0.00099 | 180-day min | Long-term archive, 12h retrieve |
+
+One-Zone-IA ($0.01/GB, single-AZ risk), S3 Express One Zone ($0.16/GB,
+directory bucket, no lifecycle), and Reduced Redundancy (legacy, do not use)
+are documented in the reference. **Load `references/storage-class-pricing-matrix.md`
+before producing dollar estimates** — it contains full request/monitoring fees,
+retrieval-tier breakdowns, regional multipliers, and minimum-duration charge
+math that materially change the savings projection. The inline table above is
+a quick-selection aid, not a quoting source.

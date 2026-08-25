@@ -248,3 +248,19 @@ resource "aws_route53_health_check" "cell_a_arc" {
   routing_control_arn = aws_route53recoverycontrolconfig_routing_control.cell_a.arn
 }
 ```
+
+## Route 53 health check creation (from Step 9)
+
+```bash
+aws route53 create-health-check \
+  --caller-reference "arc-health-check-cell-a" \
+  --health-check-config '
+{
+  "Type": "RECOVERY_CONTROL",
+  "RoutingControlArn": "'"$RC_A_ARN"'"
+}'
+```
+
+When the routing control is ON, the health check returns HEALTHY.
+When OFF, it returns UNHEALTHY. Associate this health check with a
+Route 53 record set for automatic DNS-level failover.

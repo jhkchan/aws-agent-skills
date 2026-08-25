@@ -92,126 +92,28 @@ face matches to another stream with shard-level parallelism.
 Three misconceptions dominate Rekognition misdesign at provisioning
 time:
 
-- **"The default similarity threshold is fine."** The API default is
-  80%, but operators pass lower thresholds (50-60%) to get more
-  matches. This produces false positives at scale. For production face
-  matching, 80%+ is the minimum; below 80%, false positive rates rise
-  significantly as collection size grows.
-
-- **"Collections scale infinitely."** A single collection supports up
-  to 50 million faces, but search latency degrades as face count grows.
-  At 1M+ faces, consider partitioning by region or category into
-  multiple collections. Index-faces and search-faces-by-image also
-  share the same TPS quota.
-
-- **"The stream processor handles scaling."** The stream processor
-  reads from Kinesis shards. Throughput is bounded by shard count.
-  Shard-level parallelism is the scaling lever — more shards = more
-  parallel face searches. A single shard limits the processor to one
-  concurrent consumer.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#common-misconceptions-from-mindset).
+> Three provisioning misconceptions: default threshold, infinite collection scaling, self-scaling stream processor.
 
 ## Configuration dependency graph (novel heuristic)
 
-Rekognition configurations are NOT independent. The collection must
-exist before faces are indexed. Faces must be indexed before they can
-be searched. The stream processor needs BOTH a Kinesis input stream
-and a Kinesis output stream. KMS encryption must be configured at
-collection creation time (not retroactively). Custom labels models
-must be trained before they can be started.
-
-| Configuration | Hard dependencies | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| Collection | KMS key (if encrypted); IAM `rekognition:CreateCollection` | KMS encryption CANNOT be added after creation | face indexing, face search |
-| Face indexing | Collection exists; image in S3 or bytes | FaceId is server-generated; ExternalImageId recommended for traceability | face search by FaceId |
-| Face search (by image) | Collection has indexed faces; IAM `rekognition:SearchFacesByImage` | similarity threshold below 80% produces false positives at scale | face matching results |
-| Stream processor | Kinesis input stream; Kinesis output stream; IAM role with all three permissions | shard count determines parallelism; missing any IAM permission causes silent failure | real-time video face detection |
-| Content moderation | IAM `rekognition:DetectModerationLabels` | works without a collection | unsafe content flags |
-| Custom labels model | S3 training data; IAM role; dataset labeled | model MUST be started (start-project-version) after training; inference costs accrue hourly | custom label inference |
-| KMS encryption | KMS key with proper key policy | CANNOT be added after creation — MUST be set at create time | encryption at rest |
-| SNS notification | SNS topic; IAM role with `sns:Publish` | only async (Start*) operations support SNS | async job completion callbacks |
-
-**The KMS-at-creation row is the one a baseline model misses.** KMS
-encryption cannot be added to an existing collection. If encryption is
-required (compliance, GDPR, HIPAA), the KMS key ID MUST be specified at
-`create-collection` time. Re-creating an encrypted collection means
-re-indexing all faces.
-
-**Cross-dependency gotchas:**
-- The stream processor needs a Kinesis data stream (not Kinesis Video
-  Stream). Each record is a base64-encoded JPEG frame.
-- Face indexing and search share the same TPS quota. Heavy indexing
-  throttles search. Plan indexing during off-peak hours.
-- Custom labels models incur hourly charges while running. Stop the
-  model when not in use.
-- SNS notifications only work with async (Start*) operations, not
-  synchronous (Detect*, Search*) operations.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#configuration-dependency-graph-sequencing-notes).
+> Dependency table plus the KMS-at-creation trap and cross-dependency gotchas.
 
 ## Expert heuristic: similarity threshold 80%+ for face matching
 
-A baseline model says "search faces with the default threshold." The
-correct heuristic recognizes that threshold tuning is the single most
-important quality lever in production face matching.
-
-```text
-Similarity threshold guide:
-  99%+   → near-exact (identity verification, access control)
-  90-99% → strict matching (badge systems, attendance)
-  80-90% → production-grade (balanced; recommended default)
-  60-80% → loose matching (human-in-the-loop review only)
-  <60%   → NOT recommended (false positives dominate)
-
-Collection size impact on accuracy:
-  <10k faces      → 80% threshold is reliable
-  10k-100k faces  → 80% recommended; consider 85% for tighter matching
-  100k-1M faces   → 85%+ recommended; false positive rate rises
-  1M-10M faces    → 90%+ recommended; consider collection partitioning
-  10M+ faces      → MUST partition into multiple collections
-```
-
-**Key implication:** the threshold is not "set and forget." As the
-collection grows, the threshold may need to increase to maintain the
-same false-positive rate.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-similarity-threshold-80-for-face-matching).
+> Threshold guide by use case and collection size; threshold must rise as the collection grows.
 
 ## Expert heuristic: stream processor shard-level parallelism
 
-The stream processor reads from Kinesis shards. Each shard is processed
-by one consumer. More shards = more parallel face searches = higher
-throughput.
-
-```text
-Stream processor throughput scaling:
-  Input Kinesis stream shard count:
-    1 shard  → 1 concurrent face search
-    4 shards → 4 concurrent face searches
-    N shards → N concurrent face searches (linear scaling)
-
-  Output Kinesis stream:
-    Needs enough shards to absorb output rate
-    If output is throttled, processor backs up
-
-  Typical production setup:
-    Input: 4-8 shards (camera feeds at 1-5 fps per camera)
-    Output: 2-4 shards (match results, smaller payloads)
-```
-
-**Key implication:** the processor's throughput is NOT configurable via
-the Rekognition API — it is determined entirely by the input Kinesis
-stream's shard count.
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-stream-processor-shard-level-parallelism).
+> Input shard count is the only throughput lever; typical production shard counts.
 
 ## Expert heuristic: collection face count scaling
 
-A baseline model says "one collection for everything." The correct
-heuristic recognizes that search latency and false positive rates
-degrade as face count grows. Partitioning strategy should be decided
-BEFORE indexing begins.
-
-```text
-Collection size decision tree:
-  <1M faces    → single collection is fine; threshold 80%+
-  1M-10M faces → single collection works; increase threshold to 85-90%
-  10M+ faces   → MUST partition by region/category; 90%+ threshold
-  Multi-region → partition by region for data residency + latency
-```
+> Moved to [references/advanced-patterns.md](references/advanced-patterns.md#expert-heuristic-collection-face-count-scaling).
+> Collection size decision tree; partition above 10M faces and by data residency.
 
 ## Prerequisites (verify before provisioning)
 
@@ -333,16 +235,8 @@ aws rekognition create-stream-processor \
 
 **Start and monitor:**
 
-```bash
-aws rekognition start-stream-processor \
-  --name "camera-feed-processor" \
-  --start-selector '{"KVSStreamSelector":{"StartTimestamp":'"$(date +%s)"'}}' \
-  --stop-selector '{"MaxDurationInSeconds":3600}' \
-  --region us-east-1
-
-aws rekognition describe-stream-processor \
-  --name "camera-feed-processor" --region us-east-1
-```
+> Moved to [references/diagnostic-commands.md](references/diagnostic-commands.md#step-5--stream-processor-start-and-monitor-commands).
+> start-stream-processor and describe-stream-processor commands.
 
 **Stream processor IAM role MUST have all three permissions:**
 
@@ -498,11 +392,8 @@ operations (Detect*, Search*) do NOT support SNS.
 **Custom labels cost trap:** the model charges per hour while RUNNING,
 not per inference. Stop when not in use.
 
-### Rate limiting (TPS)
-
-Rekognition has per-account, per-region TPS limits. When exceeded,
-returns `ThrottlingException`. Implement exponential backoff. Index and
-search share the same TPS quota — heavy indexing throttles search.
+> Moved to [references/error-handling.md](references/error-handling.md#rate-limiting-tps).
+> Index and search share TPS quotas; use exponential backoff on ThrottlingException.
 
 ## NEVER do these things
 
@@ -602,29 +493,16 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Collection already exists
-- Use `describe-collection` to verify. Choose a different ID or delete
-  the existing one with `delete-collection` (removes all faces).
+> Moved to [references/error-handling.md](references/error-handling.md#error-handling).
+> Symptom-by-symptom fixes: existing collection, KMS denied, processor start, throttling, match quality, model cost.
 
-### KMS access denied
-- The KMS key policy must allow `rekognition.amazonaws.com` to call
-  `kms:Decrypt` and `kms:GenerateDataKey`.
+## References (load on demand)
 
-### Stream processor fails to start
-- Verify the IAM role has all three permissions. Check both Kinesis
-  streams are ACTIVE.
-
-### ThrottlingException
-- TPS limit exceeded. Implement exponential backoff. Schedule indexing
-  off-peak or request quota increase.
-
-### Low face match quality
-- Increase threshold to 85-90%. Verify image quality. Partition if
-  collection exceeds 1M faces.
-
-### Custom labels model too expensive
-- Stop model when not in use. Schedule inference windows via
-  EventBridge auto-start/stop.
+- [advanced-patterns](references/advanced-patterns.md) — misconceptions, dependency graph, expert-heuristics deep dives
+- [diagnostic-commands](references/diagnostic-commands.md) — stream processor start and monitor commands
+- [error-handling](references/error-handling.md) — symptom-by-symptom troubleshooting and rate limiting
+- [face-search-and-threshold](references/face-search-and-threshold.md) — face search + threshold detail (existing)
+- [stream-processor-and-async](references/stream-processor-and-async.md) — stream processor + async detail (existing)
 
 ## Domain
 

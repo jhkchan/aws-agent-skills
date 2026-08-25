@@ -171,28 +171,7 @@ manifests have no native pagination — estimate the object count from
 the file size (each line averages 80-120 bytes for `bucket,key`).
 
 **Live-account pre-flight (skip if offline plan audit):**
-1. `aws s3api head-object --bucket <manifest-bucket> --key <manifest-
-   key>` — confirm manifest exists and role can read it. For S3
-   inventory manifests, verify both `manifest.json` and
-   `manifest.checksum` are present.
-2. `aws s3api get-bucket-location --bucket <report-bucket>` — confirm
-   the report bucket is in the same Region as the planned job.
-3. `aws s3api get-bucket-versioning --bucket <target-bucket>` — capture
-   versioning state (relevant for copy-with-version and object-lock
-   operations).
-4. `aws iam list-attached-role-policies --role-name <role>` and
-   `aws iam list-role-policies --role-name <role>` — verify the role's
-   permission chain.
-5. `aws kms describe-key --key-id <source-key>` and
-   `aws kms get-key-policy --key-id <source-key> --policy-name default`
-   — confirm source KMS key `Enabled` and grants the role.
-6. For copy/re-encrypt: repeat #5 for the destination KMS key.
-7. For invoke operations: `aws lambda get-policy --function-name
-   <lambda>` — confirm `batchoperations.amazonaws.com` principal with
-   `lambda:InvokeFunction` scoped to the job role.
-8. For existing job diagnosis: `aws s3control describe-job --account-id
-   <account> --job-id <id>` — capture `Status`, `ProgressSummary`,
-   `FailureCodes` distribution.
+The eight live-account pre-flight probes (manifest head-object, report-bucket region, versioning capture, role policy chain, KMS key state, destination KMS, Lambda policy, describe-job): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 **Malformed input:** if the input JSON is invalid or missing required
 fields, emit `VERDICT: ERROR` with `REASON: Job spec is not valid JSON
@@ -218,72 +197,8 @@ operation-iam-matrix.md and re-plan.`
 
 These behaviors are easy to misjudge without operational experience.
 Each changes a plan if ignored:
+The 12 non-obvious behaviors (two-sided role, versioned-inventory requirement, no CSV header row, fixed Lambda payload, two-stage Glacier restore, ServerSideCopy re-encrypt, full-tagset replace, global priority, CompletionWindow hint, report scope, S3 Tables operations, transient throttling): [references/advanced-patterns.md](references/advanced-patterns.md).
 
-- **The role is two-sided.** The *caller* invoking `create-job` needs
-  `s3control:CreateJob` AND `iam:PassRole` on the role ARN. The *role
-  itself* needs the operation-specific grants (read source, write
-  target, KMS, Lambda invoke). A missing `iam:PassRole` surfaces as
-  `AccessDenied` on `create-job` itself, before any object processing.
-
-- **S3 inventory manifests must be the versioned flavor for version-
-  aware operations.** Object Lock retention, legal hold, and version-
-  aware copy require `version: "V2"` in the inventory configuration
-  AND `ManifestGenerator.OutputSchemaVersion: V2`. An unversioned
-  manifest silently picks the latest version, which may not be the
-  intended target.
-
-- **CSV manifests have no header row.** The first line is data. A
-  header row (`bucket,key`) is parsed as an object named `key` in a
-  bucket named `bucket`, producing a `NoSuchKey` failure in the
-  completion report.
-
-- **The Lambda invoke payload is fixed.** Batch Operations invokes the
-  Lambda once per object with a fixed event structure (`taskId`,
-  `s3Key`, `s3VersionArn`, `s3BucketArn`). The Lambda cannot stream
-  or batch — concurrency is controlled only by `RequestsPerSecond`.
-  Set the Lambda reserved concurrency to at least the rate limit.
-
-- **Glacier restore is a TWO-STAGE operation.** Batch Operations
-  submits restore requests; the actual restore happens asynchronously
-  on the Glacier side. `Status: Complete` means all restore requests
-  were submitted, NOT that all objects are restored. Verify with
-  `head-object --restore` on a sample.
-
-- **Bulk KMS re-encrypt is a ServerSideCopy with new encryption.**
-  There is no native "re-encrypt" operation. The pattern is a copy
-  operation with `NewObjectMetadata` SSE-KMS pointing at the new key,
-  replacing the source in place (same key, overwrite) or to a new
-  bucket. This means the role needs both `kms:Decrypt` on the old key
-  AND `kms:Encrypt` on the new key.
-
-- **Replace-tag replaces the entire tagset, not a single tag.** The
-  `ReplaceTags` operation takes a full tag set. A partial replacement
-  requires the Lambda operation with custom logic.
-
-- **Job priority is global within the account + Region.** A priority-
-  100 job preempts resource allocation from a priority-50 job. Setting
-  all jobs to the max value nullifies the priority system.
-
-- **`CompletionWindow` is a hint, not a guarantee.** Batch Operations
-  aims to finish within the window but does not abort if it exceeds
-  it. For hard deadlines, set a CloudWatch alarm on
-  `SecondsElapsed` or use `cancel-job` at a scheduled time.
-
-- **Completion report format depends on the report scope.** `Task`
-  scope writes one entry per object (success + failure). `FailedTasks
-  Only` scope writes only failures. Always use `FailedTasksOnly` for
-  billion-object jobs to avoid a multi-GB report.
-
-- **S3 Tables Batch Operations (2025-2026) targets table namespaces.**
-  The operation type `S3Table` runs against S3 Tables (Apache Iceberg)
-  rather than standard object buckets. The manifest format differs —
-  it enumerates table ARNs, not object keys.
-
-- **Large-job throttling surfaces as `Transient` failures in the
-  report.** When the source bucket or KMS key throttles, individual
-  objects fail with a transient code and ARE retried automatically
-  up to a limit. Persistent throttling exhausts the retry budget and
-  the objects end up in `Failed`.
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
@@ -317,18 +232,7 @@ is BLOCKED with the failed checks in PRE_CHECKS. Do NOT execute.
 | **PutObjectLockLegalHold** | Target bucket has Object Lock enabled. Role has `s3:PutObjectLegalHold`. `Status` is `ON` or `OFF`. |
 
 **Job failure-mode table (use during diagnose-job):**
-
-| Symptom in `describe-job` / completion report | Root cause | Fix |
-|---|---|---|
-| `Status: Failed` immediately after `Active` | Role could not be assumed, or manifest unreadable | Verify role trust policy allows `batchoperations.amazonaws.com`; verify `s3:GetObject` on manifest |
-| `Status: Complete`, `Failed` > 0 with `AccessDenied` | Role missing operation-specific grant on a subset of objects (KMS key, cross-account bucket) | Add grant for the affected objects; re-run a scoped job targeting only failures |
-| `Status: Complete`, `Failed` > 0 with `NoSuchKey` | Manifest references deleted objects, or CSV has a header row | Filter the manifest; never include a CSV header |
-| `Status: Complete`, `Failed` > 0 with `SlowDown` / `Throttling` | Source or destination bucket throttled | Lower `RequestsPerSecond`; re-run failed objects |
-| `Status: Active` for >> `CompletionWindow` | Manifest much larger than estimated, or persistent throttling | Check `ProgressSummary.TotalNumberOfTasks`; lower rate or cancel |
-| `Status: Suspended`, never goes `Active` | `ToggleEnabled: false` at creation | `update-job-status --status-update Ready` (also requires `RequestedJobStatus: Ready`) |
-| Lambda invoke failures with `ResourceConflictException` | Lambda reserved concurrency exhausted | `put-function-concurrency --reserved-concurrent-executions <rate>` |
-| Lambda invoke failures with `Timeout` | Lambda timeout too short for per-object work | `update-function-configuration --timeout 60` (or higher) |
-| Glacier restore "complete" but objects still `ongoing-request="true"` | Restore is asynchronous; `Status: Complete` only means requests were submitted | Poll `head-object --restore` per object; not a Batch Operations failure |
+The nine-row failure-mode table mapping `describe-job` symptoms and completion-report failure codes to root causes and fixes: [references/error-handling.md](references/error-handling.md).
 
 ### Step 2: READY — emit operation plan
 
@@ -444,63 +348,11 @@ NOTES:
 
 ### Worked example — diagnose-job (BLOCKED with remediation)
 
-```text
-OPERATION: diagnose-job
-VERDICT: BLOCKED
-TARGET: job a1b2c3d4-5678-90ef-ghij-klmnopqrstuv
-        (operation: Invoke, status: Complete with 8,400 failures)
-PRE_CHECKS:
-  - [PASS] Job exists, Status: Complete
-  - [PASS] Report bucket readable
-  - [FAIL] 8,400 tasks failed with ResourceConflictException
-    (Lambda reserved concurrency exhausted)
-  - [PASS] Manifest readable, format CSV
-STEPS: (none — root cause is Lambda reserved concurrency)
-POST_VERIFY: (none)
-NOTES:
-  - Root cause: Lambda MyObjectProcessor has ReservedConcurrentExecutions=10,
-    but the Batch Operations job ran at RequestsPerSecond=100. Every
-    invocation beyond 10 was throttled, producing ResourceConflictException
-    in the completion report.
-  - Fix: raise reserved concurrency to at least the RPS, or lower RPS.
-    Option A (raise concurrency):
-      aws lambda put-function-concurrency \
-        --function-name MyObjectProcessor \
-        --reserved-concurrent-executions 100
-    Option B (lower RPS): create a new job with the failed-objects
-      manifest at RequestsPerSecond=10.
-  - Re-run the failed objects only: extract the FAILED entries from
-    the completion report into a new CSV manifest, create a new job.
-```
+Full diagnose-job BLOCKED example (Lambda reserved-concurrency root cause, remediation options, re-run of failed objects): [references/worked-examples.md](references/worked-examples.md).
 
 ### Worked example — create-job (Glacier bulk restore, COMPLETED)
 
-```text
-OPERATION: create-job
-VERDICT: COMPLETED
-TARGET: s3://archive-inventory/2026-07-15/manifest.json
-        (operation: S3InitiateRestoreObject, GlacierJobTier: Bulk)
-PRE_CHECKS:
-  - [PASS] Manifest readable, 2,300,000 objects
-  - [PASS] All source objects in GLACIER (verified via inventory)
-  - [PASS] Role has s3:RestoreObject on archive-bucket
-  - [PASS] RequestsPerSecond: 1000
-STEPS:
-  1. (executed) aws s3control create-job ... --operation \
-       '{"S3InitiateRestoreObject":{"ExpirationInDays":30,"GlacierJobTier":"BULK"}}'
-  2. (executed) Polled describe-job every 5 min for 4 hours until Complete
-POST_VERIFY:
-  - [PASS] Status: Complete, NumberOfTasksSucceeded: 2,300,000,
-    NumberOfTasksFailed: 0
-  - [PASS] Completion report (FailedTasksOnly): empty file
-  - [PASS] Sample 5 objects: head-object --restore shows
-    ongoing-request="true" with expiry in 48h (Bulk tier expected)
-NOTES:
-  - Glacier Bulk restore can take up to 12 hours to materialize.
-    Status: Complete means restore REQUESTS were submitted, not that
-    objects are restored. Poll head-object --restore on a sample
-    before downstream processing.
-```
+Full Glacier bulk-restore COMPLETED example (two-stage restore verification): [references/worked-examples.md](references/worked-examples.md).
 
 ## Anti-Patterns — NEVER
 
@@ -571,136 +423,22 @@ NOTES:
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before `create-job`,
-  `update-job-status`, `update-job-priority`, or `delete-job`,
-  emit: `CONFIRM: About to <operation> on job <id-or-"new"> in
-  account <account> region <region>. This will <consequence>.
-  Proceed? (yes/no)`. Do NOT execute until the operator confirms.
-
-- **Cost estimation.** Before `create-job`, multiply the manifest
-  object count by the per-operation S3 request cost (GET + PUT for
-  copy, GET + restore for Glacier, GET + Lambda invocation for
-  invoke). Surface the estimate in the CONFIRM prompt.
-
-- **Manifest validation.** For CSV manifests, sample the first 5
-  lines and confirm each parses as `bucket,key[,versionId]`. For S3
-  inventory manifests, confirm both `manifest.json` and
-  `manifest.checksum` exist and the format matches the operation's
-  versioning requirement.
-
-- **Role trust policy.** Confirm the role's trust policy allows
-  `Service: batchoperations.amazonaws.com` to `sts:AssumeRole`.
-  Without it, the job cannot assume the role and fails immediately.
-
-- **KMS key state.** For SSE-KMS sources, `describe-key` to confirm
-  `Enabled`. For copy / re-encrypt, repeat on the destination key.
-  Cross-check the key policy grants the role.
-
-- **Lambda state (invoke operations).** `get-function-configuration`
-  to confirm `State: Active`, `Timeout >= 60`. `get-policy` to
-  confirm `batchoperations.amazonaws.com` principal. `get-function-
-  concurrency` to confirm reserved concurrency >= `RequestsPerSecond`.
-
-- **Report bucket region.** The report bucket MUST be in the same
-  Region as the job. Cross-region report writes fail silently.
-
-- **Rate-control sanity check.** For jobs over 100M objects, verify
-  `RequestsPerSecond` produces an ETA within `CompletionWindow` and
-  stays below the source bucket's documented request budget.
+All eight pre-flight safety checks (confirmation gate, cost estimation, manifest validation, role trust policy, KMS key state, Lambda state, report bucket region, rate-control sanity): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Expert heuristic: the silent-completion trap
 
-Batch Operations is asynchronous and per-object failures are silent.
-The single highest-leverage rule for operating it safely is:
-
-> A job with `Status: Complete` is a SCHEDULING claim, not a SUCCESS
-> claim. The only proof of a successful batch operation is a
-> completion report showing zero failures (or failures within an
-> explicitly-accepted threshold) PLUS a sample of objects verifying
-> the operation applied. Treat any dashboard that shows "job: Complete"
-> as a signal worth less than reading the report's first failure row.
-
-**Why this rule exists:** S3 Batch Operations processes objects
-individually. Each object's success or failure is recorded only in the
-completion report. The job's aggregate `Status` transitions to
-`Complete` regardless of how many objects failed. A job that processes
-zero objects successfully (e.g., wrong IAM role) still shows `Complete`.
-
-**Concrete verification techniques:**
-
-| Technique | Mechanism | What it proves |
-|---|---|---|
-| Read `ProgressSummary` | `describe-job --query ProgressSummary` | Aggregate success / failure counts |
-| Read completion report (FailedTasksOnly) | `s3 cp s3://<report-bucket>/<prefix>/result/<job-id>/... -` | Per-object failure codes |
-| Sample 5 objects with `head-object` / `get-object-tagging` | Direct inspection of processed objects | Operation actually applied |
-| KMS request CloudWatch metrics during job window | `get-metric-statistics` on Decrypt / Encrypt | Real request volume vs. expected |
-| Lambda CloudWatch Logs (invoke operations) | `filter-log-events ERROR` | Per-invocation errors |
-| Glacier restore `head-object --restore` | `ongoing-request` flag on a sample | Restore actually materialized |
-
-**Three-step verification protocol (apply on every completed job):**
-
-1. **Aggregate counts:** `describe-job` — `NumberOfTasksSucceeded`
-   matches the manifest count; `NumberOfTasksFailed` is within
-   threshold (typically 0).
-2. **Failure codes:** read the completion report. Group failures by
-   `FailureCode`. Any non-zero count needs a follow-up plan.
-3. **Sample inspection:** pick 5 random objects from the manifest.
-   Verify the operation applied (e.g., for KMS re-encrypt, the
-   `SSEKMSKeyId` matches the new key; for tag replace, the tagset
-   matches).
-
-**Surface in the output:** for any completed job, include
-`FAILURE_COUNT: <count>` and `SAMPLE_VERIFIED: <yes | no>`. If either
-is not acceptable, do NOT mark the operation COMPLETED.
-
-**Detection of silent job failure post-deploy:** CloudWatch alarm on
-`NumberOfTasksFailed > 0` (Batch Operations emits metrics to
-`AWS/S3Operations`), AND a daily audit Lambda that scans the latest
-completion reports for non-zero failure counts.
+The silent-completion trap in full (the rule, why it exists, verification-technique table, three-step verification protocol, FAILURE_COUNT/SAMPLE_VERIFIED surfacing, post-deploy detection): [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Recent AWS features (2024-2026)
 
-- **S3 Tables Batch Operations (2025-2026):** Batch Operations now
-  supports S3 Tables (Apache Iceberg) as a target. The operation type
-  runs against table namespaces rather than object keys. Manifest
-  format differs — enumerate table ARNs. Use for table compaction,
-  snapshot management, or schema migration across many tables.
+Recent AWS features detail (S3 Tables targets, server-side copy re-encrypt, FailedTasksOnly GA, per-job rate control, Glacier IR/Deep Archive tiers, Object Lock operations, cross-region jobs, AWS/S3Operations metrics): [references/advanced-patterns.md](references/advanced-patterns.md).
 
-- **Server-side copy with new encryption (2024-2025):** The copy
-  operation supports `NewObjectMetadata` with a new `SSEKMSKeyId`,
-  enabling in-place KMS key rotation without downloading + re-uploading.
-  The role needs `kms:Decrypt` on the old key and `kms:Encrypt` on the
-  new key.
+## References (load on demand)
 
-- **`FailedTasksOnly` report scope GA (2024):** The default report
-  scope writes one row per object, producing multi-GB reports for
-  billion-object jobs. `FailedTasksOnly` writes only failures,
-  reducing cost and improving signal-to-noise.
-
-- **Per-job rate control (2024-2025):** `RequestsPerSecond` in
-  `RateCriteria` allows explicit throttling per job. Combined with
-  job priority, this enables fair-share scheduling across many
-  concurrent jobs in the same account + Region.
-
-- **Glacier Instant Retrieval and Glacier Deep Archive restore tiers
-  (2024-2025):** `S3InitiateRestoreObject` now supports
-  `Tier: BULK | STANDARD | EXPEDITED` for Glacier IR / Glacier /
-  Deep Archive. Verify the source storage class supports the chosen
-  tier before creating the job.
-
-- **Object Lock Batch Operations (2024):** `PutObjectRetention` and
-  `PutObjectLegalHold` operations GA. Target bucket must have Object
-  Lock enabled at creation time (cannot be retrofitted).
-
-- **Cross-Region Batch Operations (2024-2025):** Jobs can target
-  buckets in a different Region from the job's Region, but the role
-  must be assumable in both Regions and the manifest / report must
-  be in the job's Region.
-
-- **CloudWatch Metrics for Batch Operations (2024-2026):** New
-  namespace `AWS/S3Operations` emits per-job metrics
-  (`NumberOfTasksSucceeded`, `NumberOfTasksFailed`, `BytesTransferred`).
-  Use for alarms and dashboards.
+- [Advanced patterns](references/advanced-patterns.md) — Step 0 non-obvious Batch Operations behaviors, pre-flight safety checks, the silent-completion trap, recent AWS features
+- [Worked examples](references/worked-examples.md) — diagnose-job BLOCKED and Glacier bulk-restore COMPLETED walkthroughs
+- [Error handling](references/error-handling.md) — job failure-mode table (`describe-job` symptom → root cause → fix)
+- [Diagnostic commands](references/diagnostic-commands.md) — the eight live-account pre-flight probes
 
 ## Domain
 

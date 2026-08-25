@@ -241,3 +241,38 @@ Example: 100M queries/month → ~18.6 GB → $9.28/month ingestion
 Route 53 pricing is global — the same rates apply in all regions. There
 is no regional multiplier for Route 53 hosted zones, health checks, or
 queries. KMS key costs (for DNSSEC) follow regional KMS pricing.
+
+## Query pricing tiers (us-east-1, 2026)
+
+**Query pricing tiers (us-east-1, 2026):**
+```
+Standard queries:
+  First 1B/month:   $0.40 per billion
+  Over 1B/month:    $0.20 per billion
+
+Latency-based routing queries:
+  Base + $0.20 per billion (on top of standard rate)
+
+Geolocation routing queries:
+  Base + $0.30 per billion (on top of standard rate)
+
+Weighted routing queries:
+  Base rate only (no surcharge)
+```
+
+## DNSSEC cost detail (KMS key + signing calls)
+
+DNSSEC signing requires a KMS key ($1/month for customer-managed key)
+plus KMS API calls for signing ($0.03 per 10,000 signatures). The
+fixed cost is the KMS key.
+
+## Query logging volume formula
+
+**Query logging formula:**
+```
+monthly_log_GB = (monthly_queries × 200) / (1024 × 1024 × 1024)
+monthly_ingestion_cost = monthly_log_GB × $0.50
+
+Example: 100M queries/month × 200 bytes = ~18.6 GB
+         18.6 GB × $0.50 = $9.28/month ingestion
+```

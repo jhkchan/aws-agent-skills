@@ -111,56 +111,7 @@ GAP: Re-supply bucket name, versioning status, and desired transition days per s
 
 ### Step 0: Expert knowledge — non-obvious S3 lifecycle behaviors
 
-- **Min-days constraints are silently enforced.** The
-  `put-bucket-lifecycle-configuration` API accepts rules that violate
-  min-days WITHOUT error. The rule appears in GET output but never
-  executes. Enforced minimums:
-
-  | Transition | Minimum days |
-  |---|---|
-  | Standard → Standard-IA | 30 days |
-  | Standard-IA → Glacier Instant Retrieval | 90 days total object age |
-  | Standard-IA → Glacier Flexible Retrieval | 91 days total (1 day after IA) |
-  | Any → Deep Archive | 180 days total object age |
-  | Standard → Glacier Flexible (direct) | 1 day |
-
-- **NoncurrentVersionTransition/Expiration are the ONLY way to manage
-  non-current versions.** When versioning is enabled, deleting an object
-  creates a delete marker; the prior version becomes non-current.
-  Without NoncurrentVersion rules, these accumulate forever.
-
-- **`put-bucket-lifecycle-configuration` is a full replacement.** Always
-  GET, merge, PUT. This is the most common cause of "my old lifecycle
-  rules disappeared."
-
-- **Filter precedence matters.** A rule with `Filter: {Prefix: 'logs/'}`
-  applies only to `logs/`. A rule with no filter applies to ALL objects.
-  Overlapping rules with conflicting transitions produce undefined
-  behavior. Design non-overlapping filters.
-
-- **Intelligent-Tiering has auto-tiering with no day configs.** Objects
-  auto-move between Frequent Access, Infrequent Access, Archive Instant,
-  Archive, and Deep Archive tiers based on access patterns. Archive
-  Instant requires 90 days consecutive non-access.
-
-- **S3 Batch Operations can retroactively change storage class.**
-  `CreateJob` with `S3SetStorageClass` moves existing objects. This is
-  the remediation path for objects that a new lifecycle policy only
-  applies to going forward.
-
-- **Lifecycle rules apply prospectively but catch existing objects on
-  the next daily cycle.** Objects already older than the transition day
-  are transitioned within 24 hours of policy deployment.
-
-- **Glacier Instant Retrieval (IR) and Glacier Flexible Retrieval are
-  DIFFERENT storage classes.** IR has millisecond latency and 90-day
-  minimum. Flexible Retrieval has minutes-to-hours latency and 1-day
-  minimum after IA.
-
-- **StackSets deploy lifecycle across accounts and regions.** The
-  StackSet administration role needs `s3:PutBucketLifecycleConfiguration`
-  in each target account.
-
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — non-obvious lifecycle behaviors deep dive.
 ### Step 1: Classify the lifecycle requirement
 
 | Requirement | Pattern | Transition schedule |
@@ -311,79 +262,13 @@ aws s3api put-bucket-intelligent-tiering-configuration \
 
 ### Step 6: Multi-account deployment via StackSets
 
-```yaml
-# lifecycle-stackset.yaml
-AWSTemplateFormatVersion: '2010-09-09'
-Parameters:
-  BucketName:
-    Type: String
-    Default: access-logs-bucket
-Resources:
-  LifecyclePolicy:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Ref BucketName
-      LifecycleConfiguration:
-        Rules:
-          - Id: log-archival
-            Status: Enabled
-            Transitions:
-              - StorageClass: STANDARD_IA
-                TransitionInDays: 30
-              - StorageClass: GLACIER_IR
-                TransitionInDays: 90
-              - StorageClass: DEEP_ARCHIVE
-                TransitionInDays: 180
-            NoncurrentVersionExpirationInDays: 120
-            AbortIncompleteMultipartUpload:
-              DaysAfterInitiation: 7
-```
-
-```bash
-aws cloudformation create-stack-set \
-  --stack-set-name s3-lifecycle-baseline \
-  --template-body file://lifecycle-stackset.yaml \
-  --permission-model SERVICE_MANAGED \
-  --auto-deployment '{"Enabled": true, "RetainStacksOnAccountRemoval": false}' \
-  --capabilities CAPABILITY_IAM
-
-aws cloudformation create-stack-instances \
-  --stack-set-name s3-lifecycle-baseline \
-  --deployment-targets '{"OrganizationalUnitIds": ["ou-xxxx-xxxxxxxx"]}'
-```
-
-Lambda alternative for tag-based bucket targeting — iterate buckets by
-tag and deploy lifecycle via `put-bucket-lifecycle-configuration`.
-
+→ Advanced pattern moved to [references/advanced-patterns.md](references/advanced-patterns.md) — multi-account StackSets deployment.
 ### Step 7: Identify lifecycle gaps via Storage Lens
 
-```bash
-aws s3control get-storage-lens-configuration \
-  --config-id org-storage-lens \
-  --account-id 111111111111
-```
-
-| Metric | What it reveals | Action |
-|---|---|---|
-| `LifecycleEnabled` | Buckets with lifecycle policy | Deploy to the gap |
-| `StorageClass` distribution | Objects by storage class | If 90%+ Standard, lifecycle missing |
-| `ObjectAge` distribution | Objects by age bucket | Drives transition day selection |
-| `NoncurrentVersionStorage` | Non-current version storage | Drives NoncurrentVersionExpiration |
-
+→ Moved to [references/storage-lens-and-batch-operations.md](references/storage-lens-and-batch-operations.md).
 ### Step 8: Retroactive tiering via S3 Batch Operations
 
-```bash
-aws s3control create-job \
-  --account-id 111111111111 \
-  --operation '{"S3SetStorageClass": {"TargetStorageClass": "GLACIER_IR"}}' \
-  --report '{"Bucket": "arn:aws:s3:::batch-ops-reports", "Format": "Report_CSV_20180820", "Enabled": true}' \
-  --manifest '{"Spec": {"Format": "S3BatchOperations_CSV_20180820", "Fields": ["Bucket", "Key"]}, "Location": {"ObjectArn": "arn:aws:s3:::batch-ops-manifests/manifest.csv"}}' \
-  --priority 10 \
-  --role-arn arn:aws:iam::111111111111:role/S3BatchOperationsRole
-```
-
-Monitor: `aws s3control describe-job --account-id 111111111111 --job-id <id>`
-
+→ Moved to [references/storage-lens-and-batch-operations.md](references/storage-lens-and-batch-operations.md).
 ### Step 9: Pre-deployment validation function
 
 ```python
@@ -491,27 +376,7 @@ TEMPLATE:
 
 ### Worked example — REVIEW_REQUIRED, invalid min-days
 
-```text
-LIFECYCLE: invalid-transition-days
-BUCKET: data-archive
-POLICY:
-  - Rule ID: archive-policy
-  - Status: Enabled
-  - Filter: all objects
-TRANSITIONS:
-  - Standard → Standard-IA: 15 days (min 30) — FAIL
-  - Standard-IA → Glacier IR: 60 days (min 90) — FAIL
-VERSIONING:
-  - NoncurrentVersionExpiration: NOT CONFIGURED
-VALIDATION:
-  - Min-days check: FAIL (2 violations)
-ENFORCEMENT:
-  - Deployment: NOT DEPLOYED (validation blocked)
-VERDICT: REVIEW_REQUIRED
-GAP: Two min-days violations. (1) Standard→Standard-IA at 15 days: minimum is 30. API will accept but NEVER execute. Set to 30+. (2) Standard-IA→Glacier IR at 60 days: minimum is 90. Set to 90+. Also add NoncurrentVersionExpiration if versioning is enabled.
-TEMPLATE: (corrected — set Days to 30 and 90 respectively, then re-deploy)
-```
-
+→ Secondary example moved to [references/worked-examples.md](references/worked-examples.md); the AUTOMATION_DEPLOYED example above is primary.
 ## Anti-Patterns — NEVER do these things
 
 - NEVER deploy lifecycle rules with transition days below the enforced
@@ -584,16 +449,7 @@ TEMPLATE: (corrected — set Days to 30 and 90 respectively, then re-deploy)
 
 ## Appendix A — Storage class reference
 
-| Storage class | Use case | Retrieval | Min lifecycle days | Cost (vs Standard) |
-|---|---|---|---|---|
-| `STANDARD` | Frequently accessed | Milliseconds | N/A | 1x baseline |
-| `STANDARD_IA` | Infrequent, long-lived | Milliseconds | 30 days | ~40% cheaper |
-| `ONEZONE_IA` | Infrequent, non-critical | Milliseconds | 30 days | ~52% cheaper |
-| `GLACIER_IR` | Archives, millisecond access | Milliseconds | 90 days | ~68% cheaper |
-| `GLACIER` (Flexible) | Long-term archives | 1-5 min to hours | 1 day after IA | ~80% cheaper |
-| `DEEP_ARCHIVE` | Compliance archives | 12 hours | 180 days | ~95% cheaper |
-| `INTELLIGENT_TIERING` | Unknown access patterns | Milliseconds (FA/IA) | 0 days | Varies |
-
+→ Storage class table moved to [references/storage-class-transition-rules.md](references/storage-class-transition-rules.md).
 ## Appendix B — Decision tree
 
 ```
@@ -618,68 +474,16 @@ Existing objects need immediate tiering?
 
 ## Recent AWS features (2024-2026)
 
-- **Intelligent-Tiering Archive Instant tier (2024):** New auto-tier
-  within Intelligent-Tiering that moves objects to archive after 90 days
-  of no access with millisecond retrieval. Bridges IA and Glacier.
-
-- **Glacier IR min-days clarification (2024-2025):** The 90-day minimum
-  for Glacier IR applies to total object age, not days in the prior tier.
-
-- **Storage Lens lifecycle metrics (2024-2025):** Enhanced metrics now
-  include per-bucket lifecycle status and object-age distribution. The
-  `LifecycleEnabled` metric directly identifies buckets without coverage.
-
-- **S3 Batch Operations enhanced reporting (2024):** Per-object status
-  in completion reports including failure reasons.
-
-- **Lifecycle policy versioning via CloudTrail (2025):** Full lifecycle
-  configuration payload captured on PutBucketLifecycleConfiguration
-  events for audit-trail reconstruction.
-
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md).
 ## Expert heuristic: the silent lifecycle failure
 
-The most dangerous pattern is the "invalid rule that deploys
-successfully." An operator sets Standard→IA at 15 days. The API accepts
-it. GET confirms the rule exists. Storage Lens shows lifecycle enabled.
-Everything looks correct — but objects never transition because 15 days
-violates the 30-day minimum.
+→ Moved to [references/advanced-patterns.md](references/advanced-patterns.md) — the silent lifecycle failure.
+## References (load on demand)
 
-**The rule (non-negotiable):**
-
-> ALWAYS validate lifecycle transition days against enforced minimums
-> BEFORE deployment. The API does not validate — it accepts and silently
-> ignores. A rule that violates min-days is dead configuration that gives
-> a false sense of cost optimization.
-
-**Why this rule exists:** The S3 lifecycle engine evaluates rules daily.
-When a transition day is below the minimum, the engine skips the
-transition. No error is logged. No metric is emitted. The object sits
-in Standard indefinitely while the operator believes lifecycle is active.
-
-**Verification protocol:**
-
-| Check | Command | Expected |
-|---|---|---|
-| Policy exists | `get-bucket-lifecycle-configuration` | Rules listed |
-| Min-days valid | Pre-deploy validation (Step 9) | All PASS |
-| Objects transitioning | Storage Lens `StorageClass` distribution | Non-Standard % increasing |
-| Noncurrent expiring | Storage Lens `NoncurrentVersionStorage` | Decreasing |
-| Multipart aborting | S3 Inventory `MultipartUpload` | No orphaned parts |
-
-**Pre-production validation (3-cycle rule):**
-
-1. **Cycle 1 — Non-prod test:** Deploy to a non-prod bucket with test
-   objects. After 48 hours, verify storage class via S3 Inventory or
-   `head-object`.
-2. **Cycle 2 — Production test:** Deploy to one production bucket.
-   Monitor Storage Lens for 1 week.
-3. **Cycle 3 — Fleet rollout:** Deploy via StackSets. Monitor org-level
-   dashboard for 2 weeks.
-
-**Surface in the output:** include `VALIDATION_STATUS: <validated |
-unvalidated>` and `COVERAGE_STATUS: <single-bucket | multi-account-
-stackset | batch-ops-retroactive>`. If `VALIDATION_STATUS` is not
-`validated`, do NOT mark the policy as deployable.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 expert knowledge, StackSets multi-account pattern, silent lifecycle failure, recent AWS features.
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked example (REVIEW_REQUIRED, invalid min-days).
+- [references/storage-class-transition-rules.md](references/storage-class-transition-rules.md) — pre-existing; extended with Appendix A storage class reference.
+- [references/storage-lens-and-batch-operations.md](references/storage-lens-and-batch-operations.md) — pre-existing; extended with Steps 7-8 (Storage Lens gaps, Batch Operations tiering).
 
 ## Domain
 

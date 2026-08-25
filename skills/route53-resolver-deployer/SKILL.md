@@ -156,26 +156,8 @@ Run before classification. Misclassifying these produces wrong plans.
 is paginated the same way.
 
 **Live-account pre-flight (skip if offline plan audit):**
-1. `aws route53resolver list-resolver-endpoints --max-results 100` —
-   confirm the endpoint name does not collide (for create) or matches
-   (for update).
-2. `aws route53resolver get-resolver-endpoint --resolver-endpoint-id <id>`
-   — capture the full endpoint config for snapshot/diff.
-3. `aws ec2 describe-subnets --subnet-ids <ids>` — confirm the subnets
-   exist, are in distinct AZs, and belong to the target VPC.
-4. `aws ec2 describe-security-groups --group-ids <sg-id>` — confirm the
-   security group exists and its ingress/egress rules cover UDP/TCP 53
-   on the expected CIDRs.
-5. `aws ec2 describe-vpc-attribute --vpc-id <vpc> --attribute enableDnsSupport`
-   and `--attribute enableDnsHostnames` — confirm both are `true`.
-6. `aws route53resolver list-resolver-rules --max-results 100` — for
-   forwarding rules, check domain-name overlap and priority.
-7. `aws route53resolver list-firewall-rule-group-associations --max-results 100`
-   — for DNS Firewall, check priority collisions on the target VPC.
-8. `aws logs describe-log-groups --log-group-name-prefix <name>` (for
-   CloudWatch) / `aws s3api head-bucket --bucket <name>` (for S3) /
-   `aws firehose describe-delivery-stream --delivery-stream-name <name>`
-   (for Kinesis) — verify the query log destination exists.
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Pre-flight — live-account command listing".
+> Load when: running the live-account pre-flight (endpoint name, subnets, security groups, VPC attributes, rules, firewall associations, log destinations)
 
 **Malformed input:** if the Resolver spec is missing required fields
 (`EndpointName`, `Direction`, `Subnets` (>= 2), or `SecurityGroupIds`),
@@ -200,50 +182,8 @@ https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver.html.`
 
 ### Step 0: Expert knowledge — non-obvious Resolver behaviors
 
-These behaviors are easy to misjudge without operational Resolver
-experience. Each changes a plan if ignored:
-
-- **Inbound endpoint IPs are the IPs on-prem forwards to.** The on-prem
-  DNS server's forwarder config must point at the inbound endpoint IPs,
-  not at the VPC CIDR. These IPs are assigned from the subnet CIDR and
-  are visible in `get-resolver-endpoint` after creation.
-
-- **Outbound endpoint IPs are the source IPs the on-prem DNS server
-  sees.** The on-prem firewall ACL must allow UDP/TCP 53 from the
-  outbound endpoint IPs (visible in `get-resolver-endpoint`). Mismatched
-  firewall rules are the #1 cause of "forwarding rule works from a test
-  EC2 instance but not from Resolver."
-
-- **Forwarding rules match by longest suffix.** A rule for
-  `corp.example.local.` matches `api.corp.example.local.` but NOT
-  `corp.example.com.`. The trailing dot is significant.
-
-- **Forwarding rules are SYSTEM or FORWARD.** `SYSTEM` (default AWS
-  rule) resolves internet domains via Route 53. `FORWARD` sends to
-  `TargetIps`. You cannot delete the SYSTEM rule; only associate or
-  disassociate per VPC.
-
-- **Rule associations are per-VPC.** Cross-account associations require
-  sharing via RAM (`share-resolver-rule`) first — the #2 cause of "rule
-  exists but my VPC does not use it" tickets.
-
-- **DNS Firewall evaluates rule groups in priority order.** Priority 1
-  is evaluated first; an ALLOW in priority 2 overrides a BLOCK in
-  priority 1 for the same domain. Plan ordering before associating.
-
-- **Firewall domain lists support wildcards.** `*.malware.example.`
-  matches subdomains; bare `malware.example.` matches apex only.
-
-- **BLOCK actions have a response.** `BlockResponse` is `NXDOMAIN`,
-  `NODATA`, or `OVERRIDE` (custom DNS record — requires
-  `BlockOverrideDnsType`, `BlockOverrideDnsValue`, `BlockOverrideTtl`).
-
-- **Query logging has one association per VPC.** Switching destinations
-  requires disassociating the old config first. Destinations need a
-  resource policy granting `route53resolver.amazonaws.com` write access.
-
-- **Resolver cache (2024-2026).** Configurable cache TTL on forwarding
-  rules via `ResolverConfig`. Lower TTL = fresher data but more traffic.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Step 0: Expert knowledge — non-obvious Resolver behaviors".
+> Load when: planning any operation — endpoint IP semantics, suffix matching, SYSTEM rules, RAM sharing, firewall priority, wildcard domains, query-log association
 
 ### Step 1: Pre-check gate — PREREQUISITES_MISSING if any check fails
 
@@ -364,122 +304,11 @@ After the operation finishes, run post-verification:
 
 ## Common resolver patterns (boilerplate)
 
-### Inbound endpoint — on-prem DNS forwarding to Route 53
+> **Moved verbatim** → [references/endpoints-and-forwarding-rules.md](references/endpoints-and-forwarding-rules.md) § "Common patterns — inbound / outbound / forwarding boilerplate".
+> Load when: assembling the create-endpoint / create-rule / associate-rule CLI sequence
 
-```bash
-aws route53resolver create-resolver-endpoint \
-  --creator-request-id inbound-$(date +%s) \
-  --name "prod-inbound" \
-  --security-group-ids sg-0abc123 \
-  --direction INBOUND \
-  --ip-addresses '[
-    {"SubnetId":"subnet-aaa","Ip":"10.0.1.10"},
-    {"SubnetId":"subnet-bbb","Ip":"10.0.2.10"}
-  ]' \
-  --tags '[{"Key":"Environment","Value":"prod"},{"Key":"Purpose","Value":"on-prem-to-route53"}]'
-```
-
-### Outbound endpoint + forwarding rule — VPC to on-prem DNS
-
-```bash
-aws route53resolver create-resolver-endpoint \
-  --creator-request-id outbound-$(date +%s) \
-  --name "prod-outbound" \
-  --security-group-ids sg-0def456 \
-  --direction OUTBOUND \
-  --ip-addresses '[
-    {"SubnetId":"subnet-aaa"},
-    {"SubnetId":"subnet-bbb"}
-  ]' \
-  --tags '[{"Key":"Environment","Value":"prod"},{"Key":"Purpose","Value":"vpc-to-onprem"}]
-
-aws route53resolver create-resolver-rule \
-  --creator-request-id rule-$(date +%s) \
-  --name "forward-corp-local" \
-  --rule-type FORWARD \
-  --domain-name "corp.example.local." \
-  --resolver-endpoint-id <outbound-endpoint-id> \
-  --target-ips '[{"Ip":"10.99.1.5","Port":53},{"Ip":"10.99.2.5","Port":53}]'
-
-aws route53resolver associate-resolver-rule \
-  --resolver-rule-id <rule-id> \
-  --vpc-id vpc-0abc123
-```
-
-### DNS Firewall — managed domain list block
-
-```bash
-# Use an AWS-managed domain list for malware/botnet domains
-aws route53resolver create-firewall-rule \
-  --firewall-rule-group-id <group-id> \
-  --firewall-domain-list-id "rslvr-fdl-aws-managed-domains-malware" \
-  --priority 1 \
-  --action BLOCK \
-  --block-response NXDOMAIN
-
-# Associate the rule group to a VPC (MutationProtection prevents accidental deletion)
-aws route53resolver create-firewall-rule-group-association \
-  --firewall-rule-group-id <group-id> \
-  --vpc-id vpc-0abc123 \
-  --priority 1 \
-  --name "prod-vpc-block-malware" \
-  --mutation-protection ENABLED
-```
-
-### DNS Firewall — custom domain list with ALERT
-
-```bash
-aws route53resolver create-firewall-domain-list \
-  --creator-request-id fdl-$(date +%s) \
-  --name "custom-alert-list" \
-  --tags '[{"Key":"Environment","Value":"prod"}]'
-
-aws route53resolver import-firewall-domains \
-  --firewall-domain-list-id <fdl-id> \
-  --domain-file file://domains.txt
-  # one domain per line: *.gambling.example. badsite.example.
-
-aws route53resolver create-firewall-rule \
-  --firewall-rule-group-id <group-id> \
-  --firewall-domain-list-id <fdl-id> \
-  --priority 2 \
-  --action ALERT
-```
-
-### Query logging — CloudWatch Logs
-
-```bash
-# Resource policy on the log group (run once)
-aws logs put-resource-policy \
-  --policy-name Route53ResolverQueryLogs \
-  --policy-document '{
-    "Version":"2012-10-17",
-    "Statement":[{"Effect":"Allow","Principal":{"Service":"route53resolver.amazonaws.com"},"Action":["logs:PutLogEvents","logs:CreateLogStream"],"Resource":"arn:aws:logs:us-east-1:111111111111:log-group:/aws/route53resolver/*:*"}]
-  }'
-
-aws logs create-log-group --log-group-name /aws/route53resolver/prod
-
-aws route53resolver put-resolver-query-log-config \
-  --name "prod-query-logs-cw" \
-  --destination-arn arn:aws:logs:us-east-1:111111111111:log-group:/aws/route53resolver/prod \
-  --creator-request-id qlc-$(date +%s)
-
-aws route53resolver associate-resolver-query-log-config \
-  --resolver-query-log-config-id <qlc-id> \
-  --resource-id vpc-0abc123
-```
-
-### Query logging — S3 bucket
-
-```bash
-aws s3api put-bucket-policy --bucket my-resolver-logs --policy file://bucket-policy.json
-# bucket-policy.json grants route53resolver.amazonaws.com s3:PutObject
-
-aws route53resolver put-resolver-query-log-config \
-  --name "prod-query-logs-s3" \
-  --destination-arn arn:aws:s3:::my-resolver-logs \
-  --creator-request-id qlc-$(date +%s)
-```
+> **Moved verbatim** → [references/dns-firewall-and-query-logging.md](references/dns-firewall-and-query-logging.md) § "Common patterns — DNS Firewall / query logging boilerplate".
+> Load when: assembling firewall domain-list/rule/association or query-log-config CLI sequences (CloudWatch resource policy included)
 
 ## STRICT output contract
 
@@ -655,30 +484,8 @@ serve the VPC.
 
 ## Recent AWS features (2024-2026)
 
-- **Route 53 Resolver DNS Firewall (GA, enhanced 2024-2026):** managed
-  domain lists for malware, botnet, and command-and-control domains,
-  auto-updated by AWS. Custom domain lists support wildcard matching and
-  bulk import. Rule group associations support `MutationProtection` to
-  prevent accidental deletion.
-- **Resolver cache (2024-2025):** configurable cache TTL on forwarding
-  rules via `ResolverConfig`. Reduces forwarding traffic to on-prem DNS
-  at the cost of stale-on-failover. Default remains uncached.
-- **DNS Firewall ALERT action with CloudWatch metrics (2024-2025):**
-  ALERT actions now emit CloudWatch metrics per rule group, enabling
-  dashboards and alarms on DNS policy violations without blocking.
-- **Query logging to Kinesis Data Firehose (2024-2025):** Firehose
-  destinations now support direct delivery to OpenSearch, S3, and
-  third-party SIEMs for long-term DNS query retention.
-- **Cross-account rule sharing via RAM (enhanced 2024-2025):** forwarding
-  rules can now be shared with OUs (not just individual accounts) via
-  AWS RAM, simplifying multi-account Resolver topologies.
-- **DNS Firewall OVERRIDE block response (2024-2025):** BLOCK actions can
-  return a custom DNS record (e.g., a walled-garden IP) instead of
-  NXDOMAIN/NODATA — useful for redirecting blocked domains to a
-  remediation portal.
-- **Resolver endpoint health checks via CloudWatch (2025-2026):**
-  per-endpoint health metrics (query count, error rate, latency) for
-  proactive monitoring and alarm automation.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Recent AWS features (2024-2026)".
+> Load when: deciding whether a newer Resolver feature (cache TTL, ALERT metrics, Firehose, RAM OU sharing, OVERRIDE, endpoint health metrics) applies
 
 ## AWS documentation
 
@@ -689,6 +496,14 @@ serve the VPC.
 - **Resolver query logging** — https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-query-logs.html
 - **Resolver CLI reference** — https://docs.aws.amazon.com/cli/latest/reference/route53resolver/
 
+## References (load on demand)
+
+- [references/endpoints-and-forwarding-rules.md](references/endpoints-and-forwarding-rules.md) — endpoint and forwarding-rule procedures, including the inbound/outbound/forwarding boilerplate moved from SKILL.md
+- [references/dns-firewall-and-query-logging.md](references/dns-firewall-and-query-logging.md) — DNS Firewall and query-logging procedures, including the firewall/query-log boilerplate moved from SKILL.md
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 non-obvious Resolver behaviors and recent AWS features
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — live-account pre-flight command listing
+
 ## Domain
 
 AWS CloudOps / Networking & Content Delivery — Route 53 Resolver Provisioning.
+

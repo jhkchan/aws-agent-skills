@@ -194,3 +194,57 @@ Both flips happen in the same call sequence; the safety rule prevents
 both being OFF simultaneously. For the execute-time procedure (with
 readiness pre-check and alarm acknowledgment), use the
 route53-failover-operator skill.
+
+## Step 6 — Traffic policy / ARC routing control CLIs
+
+#### 6a. Traffic policy (visual-editor, versioned routing-as-code)
+
+```bash
+aws route53 create-traffic-policy \
+  --name <POLICY_NAME> \
+  --document file://policy.json
+```
+
+The policy document encodes the routing graph (start record, endpoints,
+rules). To deploy, create an instance:
+
+```bash
+aws route53 create-traffic-policy-instance \
+  --hosted-zone-id <ZONE_ID> \
+  --name api.example.com. \
+  --ttl 60 \
+  --traffic-policy-id <POLICY_ID> \
+  --traffic-policy-version 1
+```
+
+**Common mistake:** updating the policy document creates a new version,
+but the existing instance continues pointing at version 1 until you
+explicitly `update-traffic-policy-instance`. The change looks like it
+did nothing.
+
+#### 6b. Application Recovery Controller
+
+```bash
+# Cluster + control panel (one-time)
+aws route53-recovery-control-config create-cluster --cluster-name <NAME>
+aws route53-recovery-control-config create-control-panel \
+  --cluster-arn <CLUSTER_ARN> --control-panel-name <NAME>
+
+# Routing control
+aws route53-recovery-control-config create-routing-control \
+  --cluster-arn <CLUSTER_ARN> \
+  --control-panel-arn <PANEL_ARN> \
+  --routing-control-name us-east-1-routing
+
+# Safety rule (MANDATORY)
+aws route53-recovery-control-config create-safety-rule \
+  --control-panel-arn <PANEL_ARN> \
+  --safety-rule-type ASSERTION \
+  --asserted-controls <CONTROL_ARN_1>,<CONTROL_ARN_2> \
+  --name prevent-all-off
+
+# Readiness check
+aws route53-recovery-readiness create-readiness-check \
+  --readiness-check-name <NAME> \
+  --resource-set-arn <RESOURCE_SET_ARN>
+```
