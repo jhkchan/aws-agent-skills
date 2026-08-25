@@ -1,74 +1,24 @@
 ---
 name: dynamodb-table-auditor
-description: >-
-  Audits DynamoDB table configurations for encryption-at-rest (KMS), point-in-
-  time recovery (PITR), capacity mode (on-demand vs provisioned with
-  autoscaling), TTL configuration, backup posture, and GSI/LSI quota risk.
-  Emits a deterministic verdict (UNENCRYPTED | NO_PITR | CAPACITY_MISMATCH |
-  CONFIG_GAP | OK) per table with enumerated findings and CLI remediation. Use
-  when reviewing a DynamoDB table before production deployment, validating
-  backup/encryption compliance, checking capacity mode suitability, or auditing
-  table hardening posture.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits DynamoDB table configurations for encryption-at-rest (KMS), point-in- time recovery (PITR), capacity mode (on-demand vs provisioned with autoscaling), TTL configuration, backup posture, and GSI/LSI quota risk. Emits a deterministic verdict (UNENCRYPTED | NO_PITR | CAPACITY_MISMATCH | CONFIG_GAP | OK) per table with enumerated findings and CLI remediation. Use when reviewing a DynamoDB table before production deployment, validating backup/encryption compliance, checking capacity mode suitability, or auditing table hardening posture.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline table-config classification.
-  Live-account audits use aws dynamodb describe-table, describe-continuous-
-  backups, describe-time-to-live, and aws application-autoscaling describe-
-  scaling-policies (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - DynamoDB
-  - table auditor
-  - SSE
-  - KMS encryption
-  - PITR
-  - point-in-time recovery
-  - continuous backups
-  - capacity mode
-  - provisioned
-  - on-demand
-  - PAY_PER_REQUEST
-  - autoscaling
-  - TTL
-  - time to live
-  - GSI
-  - LSI
-  - deletion protection
-  - backup
-  - DynamoDB Streams
-  - billing mode
-  - DynamoDB compliance
-tags: [dynamodb, databases, encryption, backup, capacity, compliance, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline table-config classification. Live-account audits use aws dynamodb describe-table, describe-continuous- backups, describe-time-to-live, and aws application-autoscaling describe- scaling-policies (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
-  verdict_shape: "UNENCRYPTED | NO_PITR | CAPACITY_MISMATCH | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a DynamoDB table before production deployment, checking encryption
-    compliance, validating PITR enablement, auditing capacity mode suitability,
-    evaluating GSI/LSI quota risk, or hardening table configuration posture.
-  activation_triggers:
-    - "audit this DynamoDB table"
-    - "is my DynamoDB table encrypted"
-    - "check PITR on DynamoDB"
-    - "DynamoDB capacity mode"
-    - "DynamoDB backup posture"
-    - "is deletion protection enabled"
-    - "GSI quota DynamoDB"
-    - "harden DynamoDB table"
-  invocation_schema: >-
-    Input: either (a) a DynamoDB table configuration (describe-table +
-    describe-continuous-backups + describe-time-to-live + autoscaling policies),
-    OR (b) a table name/ARN for live-account audit. Output: deterministic
-    TABLE/VERDICT/REASON/FINDINGS/REMEDIATION block per table, where
-    VERDICT ∈ {UNENCRYPTED, NO_PITR, CAPACITY_MISMATCH, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: UNENCRYPTED | NO_PITR | CAPACITY_MISMATCH | CONFIG_GAP | OK
+  when_to_use: Reviewing a DynamoDB table before production deployment, checking encryption compliance, validating PITR enablement, auditing capacity mode suitability, evaluating GSI/LSI quota risk, or hardening table configuration posture.
+  activation_triggers: audit this DynamoDB table, is my DynamoDB table encrypted, check PITR on DynamoDB, DynamoDB capacity mode, DynamoDB backup posture, is deletion protection enabled, GSI quota DynamoDB, harden DynamoDB table
+  invocation_schema: 'Input: either (a) a DynamoDB table configuration (describe-table + describe-continuous-backups + describe-time-to-live + autoscaling policies), OR (b) a table name/ARN for live-account audit. Output: deterministic TABLE/VERDICT/REASON/FINDINGS/REMEDIATION block per table, where VERDICT ∈ {UNENCRYPTED, NO_PITR, CAPACITY_MISMATCH, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: DynamoDB, table auditor, SSE, KMS encryption, PITR, point-in-time recovery, continuous backups, capacity mode, provisioned, on-demand, PAY_PER_REQUEST, autoscaling, TTL, time to live, GSI, LSI, deletion protection, backup, DynamoDB Streams, billing mode, DynamoDB compliance
+  tags: dynamodb, databases, encryption, backup, capacity, compliance, audit
 ---
 
 # DynamoDB Table Auditor

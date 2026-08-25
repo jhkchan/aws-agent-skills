@@ -1,110 +1,26 @@
 ---
 name: ec2-launch-template-deployer
-description: >-
-  Provisions EC2 Launch Templates with production defaults: AMI and
-  architecture validation (x86_64 / arm64 Graviton), instance type,
-  key pair, security groups, IAM instance profile, user data
-  (base64), block device mapping (EBS gp3 volume type/size/IOPS,
-  instance store), network interfaces (subnet, public IP, primary
-  IPv6), IMDSv2 (HttpTokens=required, hop limit), tag specs
-  (instance, volume, ENI), capacity-reservation targeting
-  (CapacityReservationSpecification: open|targeted|none), CPU
-  options, license specs. Emits a READY_TO_DEPLOY checklist with
-  verification commands. Use when creating or versioning a launch
-  template, requiring IMDSv2, targeting Graviton types, configuring
-  block devices, or binding a Capacity Reservation. Triggers:
-  create launch template, EC2 launch template version, IMDSv2
-  required, Graviton launch template, block device mapping,
-  capacity reservation targeting.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions EC2 Launch Templates with production defaults: AMI and architecture validation (x86_64 / arm64 Graviton), instance type, key pair, security groups, IAM instance profile, user data (base64), block device mapping (EBS gp3 volume type/size/IOPS, instance store), network interfaces (subnet, public IP, primary IPv6), IMDSv2 (HttpTokens=required, hop limit), tag specs (instance, volume, ENI), capacity-reservation targeting (CapacityReservationSpecification: open|targeted|none), CPU options, license specs. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating or versioning a launch template, requiring IMDSv2, targeting Graviton types, configuring block devices, or binding a Capacity Reservation. Triggers: create launch template, EC2 launch template version, IMDSv2 required, Graviton launch template, block device mapping, capacity reservation targeting.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Live provisioning uses AWS CLI v2 with ec2
-  (create-launch-template, create-launch-template-version,
-  describe-launch-templates, describe-launch-template-versions),
-  iam (describe-instance-profiles), and
-  ec2 describe-capacity-reservations. Works with Terraform
-  aws_launch_template and CloudFormation
-  AWS::EC2::LaunchTemplate.
-keywords:
-  - aws
-  - ec2
-  - launch template
-  - imdsv2
-  - graviton
-  - arm64
-  - block device
-  - ebs
-  - gp3
-  - instance store
-  - network interface
-  - capacity reservation
-  - tag specifications
-  - user data
-  - iam instance profile
-  - cloudops
-  - deploy
-tags:
-  - aws
-  - ec2
-  - launch-template
-  - imdsv2
-  - graviton
-  - cloudops
-  - deploy
-  - compute
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Live provisioning uses AWS CLI v2 with ec2 (create-launch-template, create-launch-template-version, describe-launch-templates, describe-launch-template-versions), iam (describe-instance-profiles), and ec2 describe-capacity-reservations. Works with Terraform aws_launch_template and CloudFormation AWS::EC2::LaunchTemplate.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - ec2
-    - launch-template
-    - imdsv2
-    - graviton
-    - cloudops
-    - deploy
-    - compute
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create launch template
-    - ec2 launch template version
-    - imdsv2 required
-    - graviton launch template
-    - block device mapping
-    - capacity reservation targeting
-    - tag specifications
-    - instance store
-  when_to_use: >-
-    Invoke when the user wants to create or version an EC2 Launch
-    Template: defining AMI + instance type + key pair + security
-    groups + IAM instance profile + user data, configuring block
-    device mappings (EBS gp3 / instance store), network interfaces
-    (subnet, public IP, IPv6), enforcing IMDSv2
-    (HttpTokens=required), targeting Graviton (arm64) instance types,
-    attaching tag specifications, or targeting a Capacity Reservation
-    (open | targeted | none). Do NOT invoke for EC2 Instance Connect
-    Endpoint creation (use vpc-network-deployer), for Spot Fleet
-    requests (use ec2-spot-fleet-deployer), for EC2 Auto Scaling group
-    configuration (use autoscaling-policy-deployer), or for auditing
-    existing launch templates (use ec2-security-group-auditor /
-    compute-optimizer-findings-auditor).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, ec2, launch-template, imdsv2, graviton, cloudops, deploy, compute
+  dependencies: aws-orchestrator
+  keywords: aws, ec2, launch template, imdsv2, graviton, arm64, block device, ebs, gp3, instance store, network interface, capacity reservation, tag specifications, user data, iam instance profile, cloudops, deploy
+  when_to_use: 'Invoke when the user wants to create or version an EC2 Launch Template: defining AMI + instance type + key pair + security groups + IAM instance profile + user data, configuring block device mappings (EBS gp3 / instance store), network interfaces (subnet, public IP, IPv6), enforcing IMDSv2 (HttpTokens=required), targeting Graviton (arm64) instance types, attaching tag specifications, or targeting a Capacity Reservation (open | targeted | none). Do NOT invoke for EC2 Instance Connect Endpoint creation (use vpc-network-deployer), for Spot Fleet requests (use ec2-spot-fleet-deployer), for EC2 Auto Scaling group configuration (use autoscaling-policy-deployer), or for auditing existing launch templates (use ec2-security-group-auditor / compute-optimizer-findings-auditor).'
 ---
 
 # EC2 Launch Template Deployer

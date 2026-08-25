@@ -1,85 +1,24 @@
 ---
 name: bedrock-guardrail-coverage-auditor
-description: >-
-  Audits Amazon Bedrock Guardrails configurations for model coverage gaps,
-  weak or disabled content filters (hate, insult, sexual, violence), missing
-  or low-threshold contextual grounding, absent denied topics and word
-  filters, DRAFT-vs-READY enforcement status, and per-application bypass
-  risk. Emits a deterministic verdict (NO_GUARDRAIL | INCOMPLETE_COVERAGE |
-  WEAK_FILTER | CONFIG_GAP | OK) per guardrail or Bedrock deployment with
-  enumerated findings and specific remediation. Use when reviewing Bedrock
-  Guardrails, checking which models are protected, validating content-filter
-  strength, auditing grounding thresholds, or hardening generative AI safety
-  posture before production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits Amazon Bedrock Guardrails configurations for model coverage gaps, weak or disabled content filters (hate, insult, sexual, violence), missing or low-threshold contextual grounding, absent denied topics and word filters, DRAFT-vs-READY enforcement status, and per-application bypass risk. Emits a deterministic verdict (NO_GUARDRAIL | INCOMPLETE_COVERAGE | WEAK_FILTER | CONFIG_GAP | OK) per guardrail or Bedrock deployment with enumerated findings and specific remediation. Use when reviewing Bedrock Guardrails, checking which models are protected, validating content-filter strength, auditing grounding thresholds, or hardening generative AI safety posture before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline guardrail-config classification.
-  Live-account audits use aws bedrock get-guardrail, aws bedrock
-  list-guardrails, aws bedrock list-agents, and aws bedrock
-  list-knowledge-bases (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Bedrock Guardrails
-  - content filter
-  - hate
-  - insult
-  - sexual
-  - violence
-  - contextual grounding
-  - grounding threshold
-  - relevance threshold
-  - denied topics
-  - word filter
-  - profanity filter
-  - PII filter
-  - model coverage
-  - guardrail status
-  - DRAFT guardrail
-  - READY guardrail
-  - guardrail version
-  - blocked messaging
-  - generative AI safety
-  - LLM guardrail audit
-  - Bedrock agent guardrail
-  - knowledge base guardrail
-  - hallucination detection
-tags: [bedrock, ai-ml, security, guardrails, content-filter, grounding, generative-ai, llm-safety, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline guardrail-config classification. Live-account audits use aws bedrock get-guardrail, aws bedrock list-guardrails, aws bedrock list-agents, and aws bedrock list-knowledge-bases (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AI/ML
-  verdict_shape: "NO_GUARDRAIL | INCOMPLETE_COVERAGE | WEAK_FILTER | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a Bedrock Guardrail configuration before production deployment,
-    checking which models or agents are protected by a guardrail, validating
-    content-filter strength levels, auditing contextual grounding thresholds,
-    inspecting denied-topic or word-filter coverage, or hardening generative
-    AI safety posture across a Bedrock deployment.
-  activation_triggers:
-    - "audit this Bedrock guardrail"
-    - "are my Bedrock models protected"
-    - "check guardrail coverage"
-    - "content filter too weak"
-    - "grounding threshold too low"
-    - "is this guardrail in DRAFT"
-    - "which models have guardrails"
-    - "Bedrock agent unguarded"
-    - "knowledge base guardrail missing"
-    - "LLM safety audit"
-  invocation_schema: >-
-    Input: either (a) a Bedrock Guardrail configuration (contentPolicy,
-    contextualGroundingPolicy, topicPolicy, wordPolicy, status, version)
-    optionally paired with a model/resource coverage manifest, OR (b) a
-    guardrail ID/ARN for live-account audit. Output: deterministic
-    GUARDRAIL/VERDICT/RISK/REASON/FINDINGS/REMEDIATION block per guardrail
-    or deployment, where VERDICT is one of NO_GUARDRAIL, INCOMPLETE_COVERAGE,
-    WEAK_FILTER, CONFIG_GAP, OK, or ERROR.
+  verdict_shape: NO_GUARDRAIL | INCOMPLETE_COVERAGE | WEAK_FILTER | CONFIG_GAP | OK
+  when_to_use: Reviewing a Bedrock Guardrail configuration before production deployment, checking which models or agents are protected by a guardrail, validating content-filter strength levels, auditing contextual grounding thresholds, inspecting denied-topic or word-filter coverage, or hardening generative AI safety posture across a Bedrock deployment.
+  activation_triggers: audit this Bedrock guardrail, are my Bedrock models protected, check guardrail coverage, content filter too weak, grounding threshold too low, is this guardrail in DRAFT, which models have guardrails, Bedrock agent unguarded, knowledge base guardrail missing, LLM safety audit
+  invocation_schema: 'Input: either (a) a Bedrock Guardrail configuration (contentPolicy, contextualGroundingPolicy, topicPolicy, wordPolicy, status, version) optionally paired with a model/resource coverage manifest, OR (b) a guardrail ID/ARN for live-account audit. Output: deterministic GUARDRAIL/VERDICT/RISK/REASON/FINDINGS/REMEDIATION block per guardrail or deployment, where VERDICT is one of NO_GUARDRAIL, INCOMPLETE_COVERAGE, WEAK_FILTER, CONFIG_GAP, OK, or ERROR.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Bedrock Guardrails, content filter, hate, insult, sexual, violence, contextual grounding, grounding threshold, relevance threshold, denied topics, word filter, profanity filter, PII filter, model coverage, guardrail status, DRAFT guardrail, READY guardrail, guardrail version, blocked messaging, generative AI safety, LLM guardrail audit, Bedrock agent guardrail, knowledge base guardrail, hallucination detection
+  tags: bedrock, ai-ml, security, guardrails, content-filter, grounding, generative-ai, llm-safety, audit
 ---
 
 # Bedrock Guardrail Coverage Auditor

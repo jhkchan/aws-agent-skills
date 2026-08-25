@@ -1,92 +1,27 @@
 ---
 name: datasync-task-operator
-description: Operates AWS DataSync task end-to-end — agent deployment (on-prem VM, EC2), location configuration for every supported source (NFS, SMB, S3, HDFS, Object Storage) and destination (S3, EFS,
-  FSx for Windows, FSx for Lustre, FSx for OpenZFS, FSx for NetApp ONTAP, Snowball Edge), task creation with the full Options surface (VerifyMode POINT_IN_TIME_CONSISTENT | ONLY_FILES_TRANSFERRED | NONE,
-  OverwriteMode ALWAYS | NEVER, PosixPermissions PRESERVE | PRESERVE_TRY | BEST_EFFORT | NONE, Acl PRESERVE | NONE, TransferMode CHANGED | ALL, Gid PRESERVE | NONE, Uid PRESERVE | NONE, Mtime PRESERVE |
-  NONE, SecurityDescriptorCopyFlags OWNER_DACL_SACL | OWNER_DACL | NONE, TaskQueueing ENABLED | DISABLED), scheduling (cron-like ScheduleExpression with up to 1-year horizon), bandwidth throttling (BandwidthLimitInMb),
-  Task Reports with report-level and report-code filters, DataSync Discovery for on-prem capacity assessment, and FSx for NetApp ONTAP destination support. Runs deterministic pre-checks behind a CONFIRM
-  gate and.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates AWS DataSync task end-to-end — agent deployment (on-prem VM, EC2), location configuration for every supported source (NFS, SMB, S3, HDFS, Object Storage) and destination (S3, EFS, FSx for Windows, FSx for Lustre, FSx for OpenZFS, FSx for NetApp ONTAP, Snowball Edge), task creation with the full Options surface (VerifyMode POINT_IN_TIME_CONSISTENT | ONLY_FILES_TRANSFERRED | NONE, OverwriteMode ALWAYS | NEVER, PosixPermissions PRESERVE | PRESERVE_TRY | BEST_EFFORT | NONE, Acl PRESERVE | NONE, TransferMode CHANGED | ALL, Gid PRESERVE | NONE, Uid PRESERVE | NONE, Mtime PRESERVE | NONE, SecurityDescriptorCopyFlags OWNER_DACL_SACL | OWNER_DACL | NONE, TaskQueueing ENABLED | DISABLED), scheduling (cron-like ScheduleExpression with up to 1-year horizon), bandwidth throttling (BandwidthLimitInMb), Task Reports with report-level and report-code filters, DataSync Discovery for on-prem capacity assessment, and FSx for NetApp ONTAP destination support. Runs deterministic pre-checks behind a CONFIRM gate and.
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws datasync create-agent,
-  create-location-nfs | create-location-smb | create-location-s3 | create-location-hdfs | create-location-object-storage | create-location-efs | create-location-fsx-windows | create-location-fsx-lustre
-  | create-location-fsx-openzfs | create-location-fsx-ontap, create-task, update-task, start-task-execution, describe-task, describe-task-execution, list-task-executions, update-task-schedule, start-discovery-job,
-  describe-discovery-job (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- AWS DataSync
-- DataSync task
-- DataSync agent
-- DataSync Discovery
-- NFS migration
-- SMB migration
-- HDFS migration
-- Object Storage migration
-- S3 transfer
-- EFS transfer
-- FSx transfer
-- FSx for NetApp ONTAP
-- verify data integrity
-- POINT_IN_TIME_CONSISTENT
-- ONLY_FILES_TRANSFERRED
-- bandwidth throttling
-- BandwidthLimitInMb
-- task schedule
-- Task Reports
-- overwrite mode
-- PosixPermissions preserve
-- on-prem to AWS migration
-- Snowball Edge
-- activation key
-tags:
-- aws
-- datasync
-- storage
-- migration
-- nfs
-- smb
-- hdfs
-- s3
-- efs
-- fsx
-- operate
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws datasync create-agent, create-location-nfs | create-location-smb | create-location-s3 | create-location-hdfs | create-location-object-storage | create-location-efs | create-location-fsx-windows | create-location-fsx-lustre | create-location-fsx-openzfs | create-location-fsx-ontap, create-task, update-task, start-task-execution...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: operate
   skill_class: capability
   lifecycle_status: active
   verdict_shape: READY | BLOCKED | COMPLETED
-  when_to_use: Creating or modifying a DataSync task, deploying or activating a DataSync agent (on-prem VM or EC2), configuring source/destination locations for NFS, SMB, S3, HDFS, Object Storage, EFS,
-    or FSx family destinations, setting task Options (VerifyMode, OverwriteMode, TransferMode, PosixPermissions, ACLs), creating a task Schedule with bandwidth throttling, diagnosing a failed or partial
-    task execution, configuring Task Reports, planning an on-prem assessment with DataSync Discovery, or transferring to FSx for NetApp ONTAP.
-  activation_triggers:
-  - create DataSync task
-  - deploy DataSync agent
-  - activate DataSync agent
-  - DataSync NFS to S3
-  - DataSync SMB to FSx
-  - DataSync HDFS migration
-  - DataSync schedule
-  - DataSync bandwidth throttle
-  - verify data integrity DataSync
-  - POINT_IN_TIME_CONSISTENT
-  - ONLY_FILES_TRANSFERRED
-  - DataSync task failing
-  - DataSync task execution error
-  - DataSync Discovery
-  - DataSync FSx for NetApp ONTAP
-  - DataSync Task Reports
-  - DataSync Snowball Edge
-  - DataSync overwrite mode
-  invocation_schema: 'Input: either (a) a DataSync task configuration (describe-task, describe-task-execution, describe-agent, list-locations) plus the intended operation (create-task, deploy-agent, update-task-options,
-    create-schedule, diagnose-failing-execution, run-discovery, transfer-to-fsx-ontap, configure-task-reports), OR (b) a source + destination location pair for live-account execution. Output: deterministic
-    OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  when_to_use: Creating or modifying a DataSync task, deploying or activating a DataSync agent (on-prem VM or EC2), configuring source/destination locations for NFS, SMB, S3, HDFS, Object Storage, EFS, or FSx family destinations, setting task Options (VerifyMode, OverwriteMode, TransferMode, PosixPermissions, ACLs), creating a task Schedule with bandwidth throttling, diagnosing a failed or partial task execution, configuring Task Reports, planning an on-prem assessment with DataSync Discovery, or transferring to FSx for NetApp ONTAP.
+  activation_triggers: create DataSync task, deploy DataSync agent, activate DataSync agent, DataSync NFS to S3, DataSync SMB to FSx, DataSync HDFS migration, DataSync schedule, DataSync bandwidth throttle, verify data integrity DataSync, POINT_IN_TIME_CONSISTENT, ONLY_FILES_TRANSFERRED, DataSync task failing, DataSync task execution error, DataSync Discovery, DataSync FSx for NetApp ONTAP, DataSync Task Reports, DataSync Snowball Edge, DataSync overwrite mode
+  invocation_schema: 'Input: either (a) a DataSync task configuration (describe-task, describe-task-execution, describe-agent, list-locations) plus the intended operation (create-task, deploy-agent, update-task-options, create-schedule, diagnose-failing-execution, run-discovery, transfer-to-fsx-ontap, configure-task-reports), OR (b) a source + destination location pair for live-account execution. Output: deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS DataSync, DataSync task, DataSync agent, DataSync Discovery, NFS migration, SMB migration, HDFS migration, Object Storage migration, S3 transfer, EFS transfer, FSx transfer, FSx for NetApp ONTAP, verify data integrity, POINT_IN_TIME_CONSISTENT, ONLY_FILES_TRANSFERRED, bandwidth throttling, BandwidthLimitInMb, task schedule, Task Reports, overwrite mode, PosixPermissions preserve, on-prem to AWS migration, Snowball Edge, activation key
+  tags: aws, datasync, storage, migration, nfs, smb, hdfs, s3, efs, fsx, operate
 ---
 
 # AWS DataSync Task Operator

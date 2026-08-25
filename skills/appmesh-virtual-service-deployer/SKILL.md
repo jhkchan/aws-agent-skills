@@ -1,146 +1,26 @@
 ---
 name: appmesh-virtual-service-deployer
-description: >-
-  Provisions AWS App Mesh virtual service layer resources with
-  production defaults: service mesh creation (egress filter
-  DROP_ALL vs ALLOW_ALL), virtual nodes with DNS service
-  discovery (hostname-based) vs Cloud Map service discovery
-  (namespace-based, auto-registration), virtual services backed
-  by virtual nodes or virtual routers, virtual routers with
-  weighted route configuration (HTTP / TCP / gRPC routes for
-  canary traffic shifting), timeout and retry policies
-  (per-route and per-virtual-node), circuit breaker via
-  connection pool limits and outlier detection, virtual gateway
-  for north-south ingress (ALB/NLB → gateway → mesh), Envoy
-  proxy injection (auto-inject on EKS via App Mesh mutating
-  admission webhook, ECS sidecar registration, EC2 manual
-  sidecar), xDS protocol (Envoy fetches configuration from App
-  Mesh control plane via xDS/streaming), mTLS via ACM Private
-  CA (listener and peer TLS, SDS secret discovery), CloudWatch
-  metrics and X-Ray tracing for mesh observability, mesh scope
-  (namespace-level on EKS vs cluster-wide), and traffic
-  shifting for canary deployments. Emits a READY_TO_DEPLOY
-  checklist with verification commands. Use when creating a
-  virtual service, configuring weighted routing for canary,
-  setting up a virtual gateway, enabling mTLS, or injecting
-  Envoy sidecars. Triggers: create app mesh virtual service,
-  app mesh virtual node, app mesh virtual router, weighted
-  routing canary, app mesh envoy inject, app mesh mTLS, virtual
-  gateway ingress, app mesh cloud map discovery, app mesh dns
-  discovery.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS App Mesh virtual service layer resources with production defaults: service mesh creation (egress filter DROP_ALL vs ALLOW_ALL), virtual nodes with DNS service discovery (hostname-based) vs Cloud Map service discovery (namespace-based, auto-registration), virtual services backed by virtual nodes or virtual routers, virtual routers with weighted route configuration (HTTP / TCP / gRPC routes for canary traffic shifting), timeout and retry policies (per-route and per-virtual-node), circuit breaker via connection pool limits and outlier detection, virtual gateway for north-south ingress (ALB/NLB → gateway → mesh), Envoy proxy injection (auto-inject on EKS via App Mesh mutating admission webhook, ECS sidecar registration, EC2 manual sidecar), xDS protocol (Envoy fetches. Triggers: create app mesh virtual service, app mesh virtual node, app mesh virtual router, weighted routing canary, app mesh envoy inject, app mesh mTLS, virtual gateway ingress, app mesh cloud map discovery, app mesh dns discovery.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with appmesh
-  create-mesh, create-virtual-node, create-virtual-router,
-  create-route, create-virtual-service, create-virtual-gateway,
-  create-gateway-route (AWS CLI v2, SSO or key-based credentials).
-  For EKS Envoy injection: kubectl and the App Mesh Controller
-  with mutating webhook configuration. For Cloud Map:
-  servicediscovery create-service, create-http-namespace. For mTLS:
-  acm-pca create-certificate-authority. For observability:
-  CloudWatch, X-Ray.
-keywords:
-  - aws
-  - app mesh
-  - service mesh
-  - virtual node
-  - virtual service
-  - virtual router
-  - virtual gateway
-  - weighted routing
-  - canary deploy
-  - traffic shifting
-  - envoy proxy
-  - envoy sidecar
-  - auto inject
-  - mutating webhook
-  - xds protocol
-  - cloud map
-  - dns service discovery
-  - service discovery
-  - circuit breaker
-  - outlier detection
-  - connection pool
-  - retry policy
-  - timeout policy
-  - mTLS
-  - acm private ca
-  - x-ray tracing
-  - cloudwatch metrics
-  - cloudops
-  - deploy
-  - networking
-tags:
-  - aws
-  - appmesh
-  - service-mesh
-  - virtual-service
-  - envoy
-  - networking
-  - deploy
-  - cloudops
-  - weighted-routing
-  - canary
-  - cloud-map
-  - mtls
-  - circuit-breaking
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with appmesh create-mesh, create-virtual-node, create-virtual-router, create-route, create-virtual-service, create-virtual-gateway, create-gateway-route (AWS CLI v2, SSO or key-based credentials). For EKS Envoy injection: kubectl and the App Mesh Controller with mutating webhook configuration. For Cloud Map: servicediscovery create-service, create-http-namespace. For mTLS:...'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - appmesh
-    - service-mesh
-    - virtual-service
-    - envoy
-    - networking
-    - deploy
-    - cloudops
-    - weighted-routing
-    - canary
-    - cloud-map
-    - mtls
-    - circuit-breaking
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create app mesh virtual service
-    - app mesh virtual node
-    - app mesh virtual router
-    - weighted routing canary
-    - app mesh envoy inject
-    - app mesh mtls
-    - virtual gateway ingress
-    - app mesh cloud map discovery
-    - app mesh dns discovery
-  when_to_use: >-
-    Invoke when the user wants to create an App Mesh service mesh
-    with virtual nodes, virtual services, and virtual routers,
-    configure weighted routing for canary traffic shifting, set
-    up a virtual gateway for north-south ingress, inject Envoy
-    sidecars (auto-inject on EKS via webhook, ECS sidecar, or EC2
-    manual), enable mTLS via ACM Private CA, configure circuit
-    breakers and outlier detection, or integrate CloudWatch metrics
-    and X-Ray tracing. Do NOT invoke for AWS Cloud Map service
-    discovery without App Mesh (use servicediscovery skills), Istio
-    service mesh (different control plane), or AWS Gateway Load
-    Balancer (different Layer 3/4 inspection service).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, appmesh, service-mesh, virtual-service, envoy, networking, deploy, cloudops, weighted-routing, canary, cloud-map, mtls, circuit-breaking
+  dependencies: aws-orchestrator
+  keywords: aws, app mesh, service mesh, virtual node, virtual service, virtual router, virtual gateway, weighted routing, canary deploy, traffic shifting, envoy proxy, envoy sidecar, auto inject, mutating webhook, xds protocol, cloud map, dns service discovery, service discovery, circuit breaker, outlier detection, connection pool, retry policy, timeout policy, mTLS, acm private ca, x-ray tracing, cloudwatch metrics, cloudops, deploy, networking
+  when_to_use: Invoke when the user wants to create an App Mesh service mesh with virtual nodes, virtual services, and virtual routers, configure weighted routing for canary traffic shifting, set up a virtual gateway for north-south ingress, inject Envoy sidecars (auto-inject on EKS via webhook, ECS sidecar, or EC2 manual), enable mTLS via ACM Private CA, configure circuit breakers and outlier detection, or integrate CloudWatch metrics and X-Ray tracing. Do NOT invoke for AWS Cloud Map service discovery without App Mesh (use servicediscovery skills), Istio service mesh (different control plane), or AWS Gateway Load Balancer (different Layer 3/4 inspection service).
 ---
 
 # App Mesh Virtual Service Deployer

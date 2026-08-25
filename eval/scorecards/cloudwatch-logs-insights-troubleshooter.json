@@ -1,5 +1,5 @@
 {
-  "skill": "cloudwatch-logs-insights-troubshooter",
+  "skill": "cloudwatch-logs-insights-troubleshooter",
   "model_id": "amazon.nova-pro-v1:0",
   "dimensions": [
     {

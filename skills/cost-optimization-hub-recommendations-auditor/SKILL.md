@@ -1,73 +1,24 @@
 ---
 name: cost-optimization-hub-recommendations-auditor
-description: >-
-  Audits AWS Cost Optimization Hub configuration for recommendation enablement,
-  member-account coverage in Organizations, effort-level distribution, and
-  stale high-value unactioned recommendations. Emits a deterministic verdict
-  (DISABLED | NO_MEMBER_ACCOUNTS | HIGH_EFFORT | CONFIG_GAP | OK) per account
-  with enumerated findings and CLI remediation. Use when checking whether Cost
-  Optimization Hub is enabled, whether member accounts are enrolled, whether
-  effort levels indicate missed quick wins, or whether high-savings
-  recommendations are going stale.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Cost Optimization Hub configuration for recommendation enablement, member-account coverage in Organizations, effort-level distribution, and stale high-value unactioned recommendations. Emits a deterministic verdict (DISABLED | NO_MEMBER_ACCOUNTS | HIGH_EFFORT | CONFIG_GAP | OK) per account with enumerated findings and CLI remediation. Use when checking whether Cost Optimization Hub is enabled, whether member accounts are enrolled, whether effort levels indicate missed quick wins, or whether high-savings recommendations are going stale.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline config-snapshot classification.
-  Live-account audits use aws ce get-preferences, aws ce
-  list-cost-optimization-recommendations, aws ce
-  list-cost-optimization-recommendation-summaries, and aws organizations
-  list-accounts (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Cost Optimization Hub
-  - cost optimization
-  - FinOps
-  - recommendations
-  - effort level
-  - member accounts
-  - savings estimation
-  - BEFORE_DISCOUNTS
-  - AFTER_DISCOUNTS
-  - unactioned recommendations
-  - right-sizing
-  - Organizations enrollment
-  - cost waste
-  - resource optimization
-  - savings plan
-  - Compute Optimizer integration
-  - member account coverage
-  - stale recommendations
-tags: [cost-optimization-hub, finops, cost-optimization, recommendations, organizations, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline config-snapshot classification. Live-account audits use aws ce get-preferences, aws ce list-cost-optimization-recommendations, aws ce list-cost-optimization-recommendation-summaries, and aws organizations list-accounts (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: FinOps
-  verdict_shape: "DISABLED | NO_MEMBER_ACCOUNTS | HIGH_EFFORT | CONFIG_GAP | OK"
-  when_to_use: >-
-    Auditing whether Cost Optimization Hub recommendations are enabled, checking
-    member-account enrollment in an Organizations context, evaluating effort-level
-    distribution for missed quick wins, or identifying stale high-value
-    recommendations that have gone unactioned beyond a savings-weighted threshold.
-  activation_triggers:
-    - "audit cost optimization hub"
-    - "are cost optimization recommendations enabled"
-    - "check member account enrollment cost optimization"
-    - "effort level distribution recommendations"
-    - "stale high-value recommendations"
-    - "unactioned cost optimization recommendations"
-    - "savings estimation mode check"
-    - "FinOps audit cost optimization hub"
-  invocation_schema: >-
-    Input: either (a) a Cost Optimization Hub configuration snapshot (preferences
-    + organization context + recommendation list), OR (b) an account/profile
-    for live-account audit. Output: deterministic VERDICT/REASON/FINDINGS/
-    REMEDIATION block where VERDICT is in {DISABLED, NO_MEMBER_ACCOUNTS,
-    HIGH_EFFORT, CONFIG_GAP, OK}.
+  verdict_shape: DISABLED | NO_MEMBER_ACCOUNTS | HIGH_EFFORT | CONFIG_GAP | OK
+  when_to_use: Auditing whether Cost Optimization Hub recommendations are enabled, checking member-account enrollment in an Organizations context, evaluating effort-level distribution for missed quick wins, or identifying stale high-value recommendations that have gone unactioned beyond a savings-weighted threshold.
+  activation_triggers: audit cost optimization hub, are cost optimization recommendations enabled, check member account enrollment cost optimization, effort level distribution recommendations, stale high-value recommendations, unactioned cost optimization recommendations, savings estimation mode check, FinOps audit cost optimization hub
+  invocation_schema: 'Input: either (a) a Cost Optimization Hub configuration snapshot (preferences + organization context + recommendation list), OR (b) an account/profile for live-account audit. Output: deterministic VERDICT/REASON/FINDINGS/ REMEDIATION block where VERDICT is in {DISABLED, NO_MEMBER_ACCOUNTS, HIGH_EFFORT, CONFIG_GAP, OK}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Cost Optimization Hub, cost optimization, FinOps, recommendations, effort level, member accounts, savings estimation, BEFORE_DISCOUNTS, AFTER_DISCOUNTS, unactioned recommendations, right-sizing, Organizations enrollment, cost waste, resource optimization, savings plan, Compute Optimizer integration, member account coverage, stale recommendations
+  tags: cost-optimization-hub, finops, cost-optimization, recommendations, organizations, audit
 ---
 
 # Cost Optimization Hub Recommendations Auditor

@@ -1,123 +1,29 @@
 ---
 name: ebs-volume-optimizer
-description: >-
-  Optimises EBS volume cost across six dimensions: volume type migration
-  (gp2 to gp3 is 20% cheaper with higher baseline IOPS; io1/io2 to gp3
-  when provisioned IOPS are unused; st1/sc1 for sequential and cold
-  workloads), capacity right-sizing (downsize volumes where actual data is
-  much smaller than provisioned), IOPS/throughput optimization (gp3 baseline
-  3000 IOPS + 125 MB/s free; detect over-provisioned io1/io2), snapshot
-  hygiene (automate deletion via DLM/AWS Backup; Snapshot Archive is 75%
-  cheaper; FSR is expensive and only for boot volumes), io2 multi-attach
-  consolidation, and impact estimation with dollar savings. Emits
-  OPPORTUNITY_FOUND with specific recommendation and estimated savings,
-  OPTIMIZED, or ALREADY_OPTIMAL. Use when reviewing EBS spend, planning a
-  gp2-to-gp3 migration sweep, auditing snapshot accumulation, or building a
-  storage FinOps savings plan.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Optimises EBS volume cost across six dimensions: volume type migration (gp2 to gp3 is 20% cheaper with higher baseline IOPS; io1/io2 to gp3 when provisioned IOPS are unused; st1/sc1 for sequential and cold workloads), capacity right-sizing (downsize volumes where actual data is much smaller than provisioned), IOPS/throughput optimization (gp3 baseline 3000 IOPS + 125 MB/s free; detect over-provisioned io1/io2), snapshot hygiene (automate deletion via DLM/AWS Backup; Snapshot Archive is 75% cheaper; FSR is expensive and only for boot volumes), io2 multi-attach consolidation, and impact estimation with dollar savings. Emits OPPORTUNITY_FOUND with specific recommendation and estimated savings, OPTIMIZED, or ALREADY_OPTIMAL. Use when reviewing EBS spend, planning a gp2-to-gp3 migration sweep, auditing snapshot accumulation, or building a storage FinOps savings plan.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Offline recommendation classification works from pasted volume
-  configuration and CloudWatch metrics. Live-account optimization uses aws
-  ec2 describe-volumes, aws ec2 describe-volume-attribute, aws ec2
-  describe-volumes-modifications, aws cloudwatch get-metric-statistics
-  (VolumeReadBytes, VolumeWriteBytes, VolumeReadOps, VolumeWriteOps,
-  VolumeQueueLength, VolumeThroughputPercentage, VolumeConsumedReadWriteOps),
-  aws ec2 describe-snapshots, aws backup list-backup-plans, aws dlm
-  get-lifecycle-policies, and aws ce get-cost-and-usage (AWS CLI v2, SSO or
-  key-based credentials). Pricing references us-east-1 published rates as
-  of 2026; re-state regional rates from the reference matrix for other
-  regions.
-keywords:
-  - EBS
-  - gp3
-  - gp2
-  - io1
-  - io2
-  - st1
-  - sc1
-  - volume type migration
-  - right-sizing
-  - IOPS
-  - throughput
-  - provisioned IOPS
-  - burst credits
-  - snapshot
-  - Snapshot Archive
-  - Fast Snapshot Restore
-  - FSR
-  - DLM
-  - AWS Backup
-  - multi-attach
-  - VolumeQueueLength
-  - cost optimization
-  - FinOps
-tags: [ebs, storage, cost-optimization, finops, gp3, snapshot, right-sizing, volume-type]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted volume configuration and CloudWatch metrics. Live-account optimization uses aws ec2 describe-volumes, aws ec2 describe-volume-attribute, aws ec2 describe-volumes-modifications, aws cloudwatch get-metric-statistics (VolumeReadBytes, VolumeWriteBytes, VolumeReadOps, VolumeWriteOps, VolumeQueueLength, VolumeThroughputPercentage, VolumeConsumedReadWriteOps)...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL"
-  when_to_use: >-
-    Optimising EBS volume cost, planning a gp2-to-gp3 migration sweep,
-    auditing snapshot accumulation, right-sizing volume capacity, tuning
-    provisioned IOPS on io1/io2 volumes, evaluating Snapshot Archive or
-    Fast Snapshot Restore, consolidating volumes via io2 multi-attach, or
-    building a storage FinOps savings plan.
-  when_not_to_use: >-
-    S3 storage cost (use s3-lifecycle-optimizer), EC2 instance rightsizing
-    (use ec2-rightsizing-optimizer), Lambda cost (use
-    lambda-cost-optimizer), or EBS performance troubleshooting (use the
-    EC2/EBS troubleshooter). This skill focuses on cost-driven volume
-    optimization decisions, not performance debugging.
-  activation_triggers:
-    - "optimise EBS volume cost"
-    - "gp2 to gp3 migration"
-    - "EBS volume right-sizing"
-    - "EBS snapshot cleanup"
-    - "provisioned IOPS unused"
-    - "io1 to gp3 migration"
-    - "EBS Snapshot Archive"
-    - "Fast Snapshot Restore cost"
-    - "EBS multi-attach consolidation"
-    - "EBS burst credits exhausted"
-    - "VolumeQueueLength high"
-    - "EBS FinOps savings"
-    - "EBS monthly savings estimate"
-    - "reduce EBS bill"
-    - "storage cost review"
-  invocation_schema: >-
-    Input: either (a) a volume identifier + live-account context, (b) a
-    volume configuration document (volume type, size, IOPS, throughput,
-    attached instance), OR (c) CloudWatch EBS metrics (VolumeReadBytes,
-    VolumeWriteBytes, VolumeReadOps, VolumeWriteOps, VolumeQueueLength)
-    with at least 14 days of observation. Output: a deterministic
-    TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/MIGRATION_STEPS
-    block per volume, where VERDICT is one of OPTIMIZED,
-    OPPORTUNITY_FOUND, ALREADY_OPTIMAL.
-  invocation_example: |-
-    # Minimal valid input (offline finding classification):
-    VolumeId: vol-0abc123
-    VolumeType: gp2
-    Size: 500 GB
-    Region: us-east-1
-    IOPS: 1500 (baseline for gp2 at this size)
-    Attached instance: i-prod-db-01 (PostgreSQL primary)
-    Metrics (last 30 days):
-      - VolumeReadOps + VolumeWriteOps: avg 250/s, max 400/s
-      - VolumeQueueLength: avg 0.2, max 0.8
-      - VolumeReadBytes + VolumeWriteBytes: avg 8 MB/s, max 15 MB/s
-    Emit the standard optimization block (TARGET, VERDICT, REASON,
-    RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+  verdict_shape: OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL
+  when_to_use: Optimising EBS volume cost, planning a gp2-to-gp3 migration sweep, auditing snapshot accumulation, right-sizing volume capacity, tuning provisioned IOPS on io1/io2 volumes, evaluating Snapshot Archive or Fast Snapshot Restore, consolidating volumes via io2 multi-attach, or building a storage FinOps savings plan.
+  when_not_to_use: S3 storage cost (use s3-lifecycle-optimizer), EC2 instance rightsizing (use ec2-rightsizing-optimizer), Lambda cost (use lambda-cost-optimizer), or EBS performance troubleshooting (use the EC2/EBS troubleshooter). This skill focuses on cost-driven volume optimization decisions, not performance debugging.
+  activation_triggers: optimise EBS volume cost, gp2 to gp3 migration, EBS volume right-sizing, EBS snapshot cleanup, provisioned IOPS unused, io1 to gp3 migration, EBS Snapshot Archive, Fast Snapshot Restore cost, EBS multi-attach consolidation, EBS burst credits exhausted, VolumeQueueLength high, EBS FinOps savings, EBS monthly savings estimate, reduce EBS bill, storage cost review
+  invocation_schema: 'Input: either (a) a volume identifier + live-account context, (b) a volume configuration document (volume type, size, IOPS, throughput, attached instance), OR (c) CloudWatch EBS metrics (VolumeReadBytes, VolumeWriteBytes, VolumeReadOps, VolumeWriteOps, VolumeQueueLength) with at least 14 days of observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/MIGRATION_STEPS block per volume, where VERDICT is one of OPTIMIZED, OPPORTUNITY_FOUND, ALREADY_OPTIMAL.'
+  invocation_example: "# Minimal valid input (offline finding classification):\nVolumeId: vol-0abc123\nVolumeType: gp2\nSize: 500 GB\nRegion: us-east-1\nIOPS: 1500 (baseline for gp2 at this size)\nAttached instance: i-prod-db-01 (PostgreSQL primary)\nMetrics (last 30 days):\n  - VolumeReadOps + VolumeWriteOps: avg 250/s, max 400/s\n  - VolumeQueueLength: avg 0.2, max 0.8\n  - VolumeReadBytes + VolumeWriteBytes: avg 8 MB/s, max 15 MB/s\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: EBS, gp3, gp2, io1, io2, st1, sc1, volume type migration, right-sizing, IOPS, throughput, provisioned IOPS, burst credits, snapshot, Snapshot Archive, Fast Snapshot Restore, FSR, DLM, AWS Backup, multi-attach, VolumeQueueLength, cost optimization, FinOps
+  tags: ebs, storage, cost-optimization, finops, gp3, snapshot, right-sizing, volume-type
 ---
 
 # EBS Volume Optimizer

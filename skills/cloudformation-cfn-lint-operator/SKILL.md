@@ -1,107 +1,26 @@
 ---
 name: cloudformation-cfn-lint-operator
-description: >-
-  Operates CloudFormation template linting and validation with
-  production defaults: cfn-lint integration (rule-based static
-  analysis), template pre-deploy validation (validate-template),
-  ChangeSet creation before update (exact resource change preview),
-  drift detection trigger (detect-stack-drift), stack policy
-  enforcement (prevent accidental resource deletion), nested stack
-  validation, resource import validation, macro expansion, SAM
-  transform validation (AWS::Serverless transforms), cost estimation
-  (infracost integration), template security scanning (cfn-nag for
-  IAM wildcard and unencrypted resources), IaC pipeline integration
-  (CodePipeline + cfn-lint gate), template version control, rollback
-  template archive. Emits an OPERATION_COMPLETED checklist with
-  verification commands. Use when validating a CloudFormation
-  template, running cfn-lint, creating a ChangeSet, detecting drift,
-  scanning with cfn-nag, or linting SAM templates. Triggers: cfn
-  lint, cloudformation validate template, changeset create, drift
-  detection, cfn-nag security scan, sam transform validation,
-  cloudformation stack policy, nested stack validation.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Operates CloudFormation template linting and validation with production defaults: cfn-lint integration (rule-based static analysis), template pre-deploy validation (validate-template), ChangeSet creation before update (exact resource change preview), drift detection trigger (detect-stack-drift), stack policy enforcement (prevent accidental resource deletion), nested stack validation, resource import validation, macro expansion, SAM transform validation (AWS::Serverless transforms), cost estimation (infracost integration), template security scanning (cfn-nag for IAM wildcard and unencrypted resources), IaC pipeline integration (CodePipeline + cfn-lint gate), template version control, rollback template archive. Emits an OPERATION_COMPLETED checklist with verification commands. Use when validating a CloudFormation. Triggers: cfn lint, cloudformation validate template, changeset create, drift detection, cfn-nag security scan, sam transform validation, cloudformation stack policy, nested stack validation.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live operations: AWS CLI v2 with CloudFormation
-  access, cfn-lint (pip install cfn-lint), cfn-nag (gem install
-  cfn-nag). Works with Terraform tflint (parallel pattern) and
-  CDK cdk-nag.
-keywords:
-  - aws
-  - cloudformation
-  - cfn-lint
-  - cfn-nag
-  - linting
-  - validation
-  - cloudops
-  - operate
-  - changeset
-  - drift detection
-  - stack policy
-  - security scanning
-  - sam
-  - nested stacks
-  - macro
-tags:
-  - aws
-  - cloudformation
-  - cfn-lint
-  - cfn-nag
-  - cloudops
-  - operate
-  - devtools
-  - linting
-  - validation
-  - security
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live operations: AWS CLI v2 with CloudFormation access, cfn-lint (pip install cfn-lint), cfn-nag (gem install cfn-nag). Works with Terraform tflint (parallel pattern) and CDK cdk-nag.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "OPERATION_COMPLETED | REVIEW_REQUIRED"
+  verdict_shape: OPERATION_COMPLETED | REVIEW_REQUIRED
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - cloudformation
-    - cfn-lint
-    - cfn-nag
-    - cloudops
-    - operate
-    - devtools
-    - linting
-    - validation
-    - security
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - cfn lint
-    - cloudformation validate template
-    - changeset create
-    - drift detection
-    - cfn nag security scan
-    - sam transform validation
-    - cloudformation stack policy
-    - nested stack validation
-  when_to_use: >-
-    Invoke when the user wants to validate a CloudFormation template
-    (cfn-lint, validate-template), create a ChangeSet before updating
-    a stack, detect stack drift, enforce a stack policy, scan a
-    template for security anti-patterns (cfn-nag), validate SAM
-    transforms or nested stacks, integrate CloudFormation linting into
-    a CI/CD pipeline, or archive a rollback template. Do NOT invoke
-    for Terraform validation (use tflint), AWS CDK synthesis (use cdk
-    synth), or general AWS resource auditing.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, cloudformation, cfn-lint, cfn-nag, cloudops, operate, devtools, linting, validation, security
+  dependencies: aws-orchestrator
+  keywords: aws, cloudformation, cfn-lint, cfn-nag, linting, validation, cloudops, operate, changeset, drift detection, stack policy, security scanning, sam, nested stacks, macro
+  when_to_use: Invoke when the user wants to validate a CloudFormation template (cfn-lint, validate-template), create a ChangeSet before updating a stack, detect stack drift, enforce a stack policy, scan a template for security anti-patterns (cfn-nag), validate SAM transforms or nested stacks, integrate CloudFormation linting into a CI/CD pipeline, or archive a rollback template. Do NOT invoke for Terraform validation (use tflint), AWS CDK synthesis (use cdk synth), or general AWS resource auditing.
 ---
 
 # CloudFormation cfn-lint Operator

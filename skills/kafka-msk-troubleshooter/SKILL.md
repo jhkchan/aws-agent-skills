@@ -1,105 +1,28 @@
 ---
 name: kafka-msk-troubleshooter
-description: >-
-  Diagnoses Amazon MSK (Managed Streaming for Apache Kafka) cluster issues via
-  a symptom-to-cause decision tree covering broker failures (describe-cluster,
-  broker node health, replacement), topic issues (under-replicated partitions,
-  ISR shrink, offline partitions), producer and consumer connectivity (security
-  groups, TLS client auth, SCRAM, IAM auth), ZooKeeper connectivity failures,
-  MSK configuration problems (auto-create topics, log.retention, num.partitions),
-  monitoring gaps (CloudWatch AWS/Kafka, Prometheus JMX), and storage exhaustion
-  (EBS volume full). Supports MSK Serverless, MSK Cluster Tier (Express /
-  Standard), and KRaft mode (KIP-833). Emits a deterministic verdict
-  (ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE) with evidence from
-  kafka-topics, kafka-consumer-groups, aws kafka describe-cluster, and
-  CloudWatch metrics. Use when brokers are unhealthy, partitions are
-  under-replicated, producers or consumers cannot connect, ZooKeeper session
-  expired, disk is full, or consumer lag spikes.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Diagnoses Amazon MSK (Managed Streaming for Apache Kafka) cluster issues via a symptom-to-cause decision tree covering broker failures (describe-cluster, broker node health, replacement), topic issues (under-replicated partitions, ISR shrink, offline partitions), producer and consumer connectivity (security groups, TLS client auth, SCRAM, IAM auth), ZooKeeper connectivity failures, MSK configuration problems (auto-create topics, log.retention, num.partitions), monitoring gaps (CloudWatch AWS/Kafka, Prometheus JMX), and storage exhaustion (EBS volume full). Supports MSK Serverless, MSK Cluster Tier (Express / Standard), and KRaft mode (KIP-833). Emits a deterministic verdict (ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE) with evidence from kafka-topics, kafka-consumer-groups, aws kafka describe-cluster, and CloudWatch metrics. Use when brokers are unhealthy, partitions are under-replicated, producers or consumers cannot connect, ZooKeeper session expired, disk is full, or consumer lag spikes.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Offline diagnosis works on pasted kafka-topics, kafka-consumer-groups,
-  aws kafka describe-cluster output, and CloudWatch metric snapshots. Live-cluster
-  diagnosis uses aws kafka describe-cluster, describe-configuration, list-nodes,
-  get-bootstrap-brokers, describe-cluster-v2 (Cluster Tier), aws cloudwatch
-  get-metric-statistics (AWS/Kafka namespace), kafka-topics.sh --describe
-  --under-replicated-partitions, kafka-consumer-groups.sh --describe, kafka-acls.sh,
-  and EC2/security-group inspection (AWS CLI v2, SSO or key-based credentials;
-  Kafka client tools v3.4+ for KRaft, v2.8+ for ZooKeeper mode).
-keywords:
-  - MSK
-  - Kafka
-  - Managed Streaming for Kafka
-  - under-replicated partitions
-  - ISR
-  - broker failure
-  - ZooKeeper
-  - KRaft
-  - MSK Serverless
-  - MSK Cluster Tier
-  - Express Class
-  - SCRAM
-  - SASL/PLAIN
-  - TLS client auth
-  - IAM auth
-  - consumer lag
-  - producer throughput
-  - log retention
-  - EBS volume full
-  - CloudWatch MSK metrics
-  - Prometheus JMX
-tags: [aws, msk, kafka, analytics, troubleshoot, broker, partition, isr, zookeeper, scram, tls]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works on pasted kafka-topics, kafka-consumer-groups, aws kafka describe-cluster output, and CloudWatch metric snapshots. Live-cluster diagnosis uses aws kafka describe-cluster, describe-configuration, list-nodes, get-bootstrap-brokers, describe-cluster-v2 (Cluster Tier), aws cloudwatch get-metric-statistics (AWS/Kafka namespace), kafka-topics.sh --describe --under-replicated-partitions...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
-  when_to_use: >-
-    Diagnosing why an Amazon MSK cluster has unhealthy brokers, under-replicated
-    partitions or shrinking ISR, producers or consumers that cannot connect,
-    ZooKeeper session expiries, disk-full EBS volumes, consumer lag spikes, or
-    configuration drift; interpreting kafka-topics --describe output, aws kafka
-    describe-cluster State, CloudWatch AWS/Kafka metrics, and broker logs.
-  when_not_to_use: >-
-    Provisioning a new MSK cluster (use a deploy skill), optimizing MSK cost
-    (use an optimize skill), auditing MSK security posture (use the
-    audit-msk-cluster skill), or application-level Kafka consumer code debugging.
-    This skill focuses on cluster-level operational diagnosis.
-  activation_triggers:
-    - "MSK broker unhealthy"
-    - "MSK under-replicated partitions"
-    - "MSK ISR shrink"
-    - "MSK producer cannot connect"
-    - "MSK consumer cannot connect"
-    - "MSK ZooKeeper session expired"
-    - "MSK disk full"
-    - "MSK consumer lag"
-    - "kafka-topics under-replicated"
-    - "MSK cluster HEALTH_ISSUE"
-    - "MSK SCRAM auth failed"
-    - "MSK TLS handshake failed"
-    - "MSK Serverless throttled"
-    - "MSK KRaft mode"
-    - "MSK Cluster Tier Express"
-  invocation_schema: >-
-    Input: either (a) a symptom description (cluster ARN, observed state, error
-    messages from kafka-topics / kafka-consumer-groups / client logs), OR (b) a
-    live-cluster scenario where the agent runs aws kafka describe-cluster,
-    kafka-topics --describe --under-replicated-partitions, and CloudWatch metric
-    queries to gather evidence. Output: a deterministic INCIDENT / VERDICT /
-    ROOT_CAUSE / EVIDENCE / REMEDIATION block where VERDICT in {ROOT_CAUSE_FOUND,
-    NEED_MORE_INFO, ESCALATE} and ROOT_CAUSE names the specific failure category
-    (BROKER_FAILURE / TOPIC_ISSUE / CONNECTIVITY / ZOOKEEPER / CONFIGURATION /
-    MONITORING / STORAGE) and the offending config element or resource.
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+  when_to_use: Diagnosing why an Amazon MSK cluster has unhealthy brokers, under-replicated partitions or shrinking ISR, producers or consumers that cannot connect, ZooKeeper session expiries, disk-full EBS volumes, consumer lag spikes, or configuration drift; interpreting kafka-topics --describe output, aws kafka describe-cluster State, CloudWatch AWS/Kafka metrics, and broker logs.
+  when_not_to_use: Provisioning a new MSK cluster (use a deploy skill), optimizing MSK cost (use an optimize skill), auditing MSK security posture (use the audit-msk-cluster skill), or application-level Kafka consumer code debugging. This skill focuses on cluster-level operational diagnosis.
+  activation_triggers: MSK broker unhealthy, MSK under-replicated partitions, MSK ISR shrink, MSK producer cannot connect, MSK consumer cannot connect, MSK ZooKeeper session expired, MSK disk full, MSK consumer lag, kafka-topics under-replicated, MSK cluster HEALTH_ISSUE, MSK SCRAM auth failed, MSK TLS handshake failed, MSK Serverless throttled, MSK KRaft mode, MSK Cluster Tier Express
+  invocation_schema: 'Input: either (a) a symptom description (cluster ARN, observed state, error messages from kafka-topics / kafka-consumer-groups / client logs), OR (b) a live-cluster scenario where the agent runs aws kafka describe-cluster, kafka-topics --describe --under-replicated-partitions, and CloudWatch metric queries to gather evidence. Output: a deterministic INCIDENT / VERDICT / ROOT_CAUSE / EVIDENCE / REMEDIATION block where VERDICT in {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and ROOT_CAUSE names the specific failure category (BROKER_FAILURE / TOPIC_ISSUE / CONNECTIVITY / ZOOKEEPER / CONFIGURATION / MONITORING / STORAGE) and the offending config element or resource.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: MSK, Kafka, Managed Streaming for Kafka, under-replicated partitions, ISR, broker failure, ZooKeeper, KRaft, MSK Serverless, MSK Cluster Tier, Express Class, SCRAM, SASL/PLAIN, TLS client auth, IAM auth, consumer lag, producer throughput, log retention, EBS volume full, CloudWatch MSK metrics, Prometheus JMX
+  tags: aws, msk, kafka, analytics, troubleshoot, broker, partition, isr, zookeeper, scram, tls
 ---
 
 # Kafka MSK Troubleshooter

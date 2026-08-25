@@ -1,65 +1,15 @@
 ---
 name: rds-failover-troubleshooter
-description: >-
-  Diagnoses RDS and Aurora failover issues through a thirteen-category
-  diagnostic tree: Multi-AZ failover not triggering (health check
-  threshold too conservative), failover taking too long (DNS
-  propagation, recovery mode full), Aurora writer endpoint not
-  redirecting (application using instance endpoint instead of cluster
-  endpoint), read replica promotion failures (network connectivity,
-  storage), storage-full preventing failover (allocated storage
-  exhausted), parameter group mismatch between primary and standby,
-  option group conflicts preventing standby from taking over, Aurora
-  cluster endpoint type confusion (writer vs reader vs custom vs
-  instance), failover priority tier misconfiguration (tier 0 vs tier
-  1 not set on the intended promotion target), Aurora Global DB
-  failover (managed vs unmanaged), RDS Proxy failover behavior
-  (connection pool not draining), application connection string not
-  using cluster endpoint, and CloudWatch failover event gaps. Walks
-  symptoms to a verified root cause with evidence-backed probes;
-  emits ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses RDS and Aurora failover issues through a thirteen-category diagnostic tree: Multi-AZ failover not triggering (health check threshold too conservative), failover taking too long (DNS propagation, recovery mode full), Aurora writer endpoint not redirecting (application using instance endpoint instead of cluster endpoint), read replica promotion failures (network connectivity, storage), storage-full preventing failover (allocated storage exhausted), parameter group mismatch between primary and standby, option group conflicts preventing standby from taking over, Aurora cluster endpoint type confusion (writer vs reader vs custom vs instance), failover priority tier misconfiguration (tier 0 vs tier 1 not set on the intended promotion target), Aurora Global DB failover (managed vs unmanaged), RDS Proxy failover behavior (connection pool not draining), application connection string not using cluster endpoint, and CloudWatch failover event gaps. Walks symptoms to a verified root cause with...'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and cluster configuration. Live-account
-  diagnosis uses aws rds describe-db-clusters, aws rds describe-db-instances, aws rds describe-db-cluster-endpoints, aws rds describe-db-cluster-parameter-groups, aws rds describe-events, aws cloudwatch get-metric-statistics,
-  aws ec2 describe-route-tables, aws ec2 describe-security-groups, and aws logs filter-log-events (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- RDS
-- Aurora
-- failover
-- Multi-AZ
-- writer endpoint
-- cluster endpoint
-- read replica promotion
-- storage-full
-- parameter group mismatch
-- option group conflict
-- failover priority
-- tier 0
-- Aurora Global DB
-- RDS Proxy
-- connection pool
-- DNS propagation
-- CloudWatch failover events
-- troubleshooting
-tags:
-- rds
-- aurora
-- databases
-- troubleshooting
-- failover
-- multi-az
-- high-availability
-- cluster-endpoint
-- rds-proxy
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and cluster configuration. Live-account diagnosis uses aws rds describe-db-clusters, aws rds describe-db-instances, aws rds describe-db-cluster-endpoints, aws rds describe-db-cluster-parameter-groups, aws rds describe-events, aws cloudwatch get-metric-statistics, aws ec2 describe-route-tables, aws ec2 describe-security-groups, and aws logs...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: troubleshoot
   skill_class: capability
@@ -67,24 +17,35 @@ metadata:
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
   when_to_use: Diagnosing an RDS or Aurora failover issue (Multi-AZ failover not triggering, failover taking too long, writer endpoint not redirecting, read replica promotion failure, storage-full preventing failover, parameter group mismatch, option group conflict, failover priority misconfiguration, Aurora Global DB failover, RDS Proxy failover, application connection issues), walking a symptom to the failed layer with verify commands, or triaging a "failover did not work" incident where the root cause may be endpoint configuration, health threshold, storage, parameter group, option group, failover tier, or application connection string — not necessarily the database engine itself.
   when_not_to_use: RDS connectivity debugging (use rds-connectivity-troubleshooter), RDS performance tuning (use rds-cost-optimizer for right-sizing), Aurora backup and restore (use rds-backup-restore-operator), or RDS instance creation (use rds-instance-deployer). This skill diagnoses failover-time issues; it does not tune query performance or audit steady-state security posture.
-  activation_triggers:
-  - RDS failover not working
-  - Aurora failover not triggering
-  - Multi-AZ failover failed
-  - Aurora writer endpoint not redirecting
-  - RDS failover taking too long
-  - Aurora failover priority
-  - read replica promotion failed
-  - storage-full failover
-  - parameter group mismatch failover
-  - option group conflict failover
-  - Aurora Global DB failover
-  - RDS Proxy failover
-  - application not connecting after failover
-  - Aurora cluster endpoint confusion
-  - troubleshoot RDS failover
+  activation_triggers: RDS failover not working, Aurora failover not triggering, Multi-AZ failover failed, Aurora writer endpoint not redirecting, RDS failover taking too long, Aurora failover priority, read replica promotion failed, storage-full failover, parameter group mismatch failover, option group conflict failover, Aurora Global DB failover, RDS Proxy failover, application not connecting after failover, Aurora cluster endpoint confusion, troubleshoot RDS failover
   invocation_schema: 'Input: either (a) a symptom description (error message, observed behaviour, "failover took 5 minutes", "writer endpoint still points to old instance"), optionally paired with the cluster configuration and recent RDS events, OR (b) a DB cluster identifier plus caller context (application connection string, observed error) for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/ROOT_CAUSE/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and ROOT_CAUSE ∈ {APP_NOT_CLUSTER_ENDPOINT, MULTI_AZ_HEALTH_THRESHOLD, FAILOVER_PRIORITY_TIER, STORAGE_FULL, PARAMETER_GROUP_MISMATCH, OPTION_GROUP_CONFLICT, DNS_PROPAGATION_DELAY, CONNECTION_POOL_CACHING, AURORA_GLOBAL_FAILOVER_MODE, RDS_PROXY_POOL_DRAIN, RECOVERY_MODE_FULL, CLOUDWATCH_EVENT_GAP, READ_REPLICA_PROMOTION_FAILURE, UNKNOWN}.'
-  invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"Aurora PostgreSQL cluster prod-db-cluster\nfailed over automatically at 03:17 UTC. The writer\nendpoint resolved to the new writer within 1 second,\nbut the application continued hitting the old writer\nfor 90 seconds, then connection errors cleared.\"\nDBClusterIdentifier: prod-db-cluster\nEngine: aurora-postgresql\nWriterEndpoint: prod-db-cluster.cluster-xxxxxxxxxxxx.us-east-1.rds.amazonaws.com\nApplication connection string: uses the instance endpoint\nprod-db-cluster-instance-1.xxxxxxxxxxxx.us-east-1.rds.amazonaws.com\ninstead of the cluster endpoint"
+  invocation_example: '# Minimal valid input (offline symptom classification):
+
+    Symptom: "Aurora PostgreSQL cluster prod-db-cluster
+
+    failed over automatically at 03:17 UTC. The writer
+
+    endpoint resolved to the new writer within 1 second,
+
+    but the application continued hitting the old writer
+
+    for 90 seconds, then connection errors cleared."
+
+    DBClusterIdentifier: prod-db-cluster
+
+    Engine: aurora-postgresql
+
+    WriterEndpoint: prod-db-cluster.cluster-xxxxxxxxxxxx.us-east-1.rds.amazonaws.com
+
+    Application connection string: uses the instance endpoint
+
+    prod-db-cluster-instance-1.xxxxxxxxxxxx.us-east-1.rds.amazonaws.com
+
+    instead of the cluster endpoint'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: RDS, Aurora, failover, Multi-AZ, writer endpoint, cluster endpoint, read replica promotion, storage-full, parameter group mismatch, option group conflict, failover priority, tier 0, Aurora Global DB, RDS Proxy, connection pool, DNS propagation, CloudWatch failover events, troubleshooting
+  tags: rds, aurora, databases, troubleshooting, failover, multi-az, high-availability, cluster-endpoint, rds-proxy
 ---
 
 # RDS Failover Troubleshooter

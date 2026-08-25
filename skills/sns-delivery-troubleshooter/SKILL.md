@@ -1,56 +1,15 @@
 ---
 name: sns-delivery-troubleshooter
-description: >-
-  Diagnoses SNS delivery failures through a twelve-category diagnostic
-  tree: HTTP/HTTPS endpoint delivery (subscription confirmation
-  pending, signature verification failure, 4xx/5xx retry policy with
-  4 immediate + delayed retries), Lambda subscription failures (async
-  invocation errors, DLQ routing), SQS subscription issues (message
-  size cap, redrive policy), email bounce/complaint, platform endpoint
-  (mobile push) disabled, subscription filter policy JSON scope
-  mismatch, message attribute preservation, FIFO topic vs standard
-  topic delivery ordering, cross-region delivery, CloudWatch delivery
-  metrics (NumberOfNotificationsDelivered / Failed), and DLQ for SNS.
-  Walks symptoms to a verified root cause with evidence-backed probes;
-  emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses SNS delivery failures through a twelve-category diagnostic tree: HTTP/HTTPS endpoint delivery (subscription confirmation pending, signature verification failure, 4xx/5xx retry policy with 4 immediate + delayed retries), Lambda subscription failures (async invocation errors, DLQ routing), SQS subscription issues (message size cap, redrive policy), email bounce/complaint, platform endpoint (mobile push) disabled, subscription filter policy JSON scope mismatch, message attribute preservation, FIFO topic vs standard topic delivery ordering, cross-region delivery, CloudWatch delivery metrics (NumberOfNotificationsDelivered / Failed), and DLQ for SNS. Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted delivery logs and subscription configuration. Live-account diagnosis uses aws sns get-topic-attributes, list-subscriptions-by-topic, get-subscription-attributes, list-endpoints-by-platform-application, aws cloudwatch get-metric-statistics on AWS/SNS
-  delivery metrics, aws logs filter-log-events for Lambda subscription
-  failures, and aws sqs receive-message / get-queue-attributes for SQS
-  subscription queues (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- SNS
-- delivery failure
-- subscription confirmation
-- signature verification
-- HTTP endpoint
-- Lambda subscription
-- SQS subscription
-- email bounce
-- platform endpoint
-- filter policy
-- message attributes
-- FIFO topic
-- cross-region
-- DLQ
-- troubleshooting
-tags:
-- sns
-- appintegration
-- troubleshooting
-- delivery
-- subscriptions
-- filter-policy
-- fifo-topic
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted delivery logs and subscription configuration. Live-account diagnosis uses aws sns get-topic-attributes, list-subscriptions-by-topic, get-subscription-attributes, list-endpoints-by-platform-application, aws cloudwatch get-metric-statistics on AWS/SNS delivery metrics, aws logs filter-log-events for Lambda subscription failures, and aws sqs receive-message /...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: troubleshoot
   skill_class: capability
@@ -58,25 +17,13 @@ metadata:
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
   when_to_use: Diagnosing an SNS delivery failure — HTTP/HTTPS endpoint receives nothing or receives out-of-order, Lambda subscription does not invoke or fails, SQS subscription queue is empty or filling, email notifications bounce or get complaint-flagged, mobile push endpoint not receiving, filter policy drops messages it should match, message attributes missing downstream, FIFO topic ordering broken, cross-region delivery lagging, or CloudWatch delivery metrics show failures. Use whenever the operator says "SNS is not delivering" and the root cause may be subscription state, endpoint policy, filter policy, message attribute shape, topic type, or delivery target configuration — not necessarily the SNS topic itself.
   when_not_to_use: Designing a new SNS topic / subscription topology from scratch (use sns-topic-deployer for creation, sns-topic-public-subscription-auditor for posture review), debugging the Lambda handler code that processes the SNS message (use lambda-invocation-troubleshooter), debugging the SQS consumer worker (use sqs-dlq-operator or sqs-throughput-optimizer), investigating SES sending limits or DKIM configuration (use ses-email-deployer), or building a full fan-out pipeline (use event-driven-automator). This skill diagnoses delivery-behaviour failures; it does not redesign the pub/sub topology or fix the downstream consumer.
-  activation_triggers:
-  - SNS delivery failure
-  - SNS not delivering messages
-  - SNS subscription confirmation pending
-  - SNS signature verification failure
-  - SNS HTTP endpoint 4xx 5xx
-  - SNS Lambda subscription not invoking
-  - SNS SQS subscription empty
-  - SNS email bounce complaint
-  - SNS platform endpoint disabled
-  - SNS mobile push failure
-  - SNS filter policy mismatch
-  - SNS message attributes missing
-  - SNS FIFO topic ordering
-  - SNS cross-region delivery
-  - SNS DLQ
-  - troubleshoot SNS delivery
+  activation_triggers: SNS delivery failure, SNS not delivering messages, SNS subscription confirmation pending, SNS signature verification failure, SNS HTTP endpoint 4xx 5xx, SNS Lambda subscription not invoking, SNS SQS subscription empty, SNS email bounce complaint, SNS platform endpoint disabled, SNS mobile push failure, SNS filter policy mismatch, SNS message attributes missing, SNS FIFO topic ordering, SNS cross-region delivery, SNS DLQ, troubleshoot SNS delivery
   invocation_schema: 'Input: either (a) a symptom description (topic name, subscription protocol, observed failure — endpoint receives nothing / Lambda not invoked / SQS empty / email bounced / push dropped, time window), optionally paired with the topic and subscription configuration for offline classification, OR (b) a TopicArn plus the subscription ARN / endpoint / protocol for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {HTTP_SUBSCRIPTION_CONFIRMATION, HTTP_SIGNATURE_VERIFICATION, HTTP_4XX_5XX_RETRY, LAMBDA_ASYNC_INVOCATION, LAMBDA_DLQ, SQS_MESSAGE_SIZE, SQS_REDRIVE, EMAIL_BOUNCE_COMPLAINT, PLATFORM_ENDPOINT_DISABLED, FILTER_POLICY_MISMATCH, MESSAGE_ATTRIBUTE_LOSS, FIFO_ORDERING, CROSS_REGION_DELIVERY, DLQ_MISSING, UNKNOWN}.'
   invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"SNS topic orders-events is publishing 200\nmessages/sec to an HTTP endpoint\nhttps://api.partner.com/webhook. The partner reports ~5% of\nmessages are never received. CloudWatch shows\nNumberOfNotificationsFailed at ~10/sec consistently.\"\nTopicArn: arn:aws:sns:us-east-1:111111111111:orders-events\nProtocol: https\nEndpoint: https://api.partner.com/webhook\nSubscription status: Confirmed (not PendingConfirmation)\nFilter policy: none\nDelivery policy: default (4 immediate retries + 3 delayed)\nCloudWatch metrics: NumberOfNotificationsPublished: 200/sec,\n  NumberOfNotificationsDelivered: 190/sec,\n  NumberOfNotificationsFailed: 10/sec"
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: SNS, delivery failure, subscription confirmation, signature verification, HTTP endpoint, Lambda subscription, SQS subscription, email bounce, platform endpoint, filter policy, message attributes, FIFO topic, cross-region, DLQ, troubleshooting
+  tags: sns, appintegration, troubleshooting, delivery, subscriptions, filter-policy, fifo-topic
 ---
 
 # SNS Delivery Troubleshooter

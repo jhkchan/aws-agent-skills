@@ -1,132 +1,29 @@
 ---
 name: codebuild-build-troubleshooter
-description: >-
-  Diagnoses AWS CodeBuild build failures through a stopped-phase-first
-  diagnostic tree: BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE (ECR auth, image
-  size, Docker Hub rate limit), phase-level command failures (INSTALL,
-  PRE_BUILD, BUILD, POST_BUILD), buildspec.yml syntax and version errors,
-  environment variable resolution (Plaintext, SecretsManager,
-  SSM Parameter Store), artifact upload failures (S3 permissions, KMS
-  encryption), VPC config errors (subnet, SG, NAT Gateway), runtime
-  version mismatch, build timeout, source checkout failures (CodeCommit
-  auth, GitHub token), caching issues (LOCAL_DOCKER_LAYER vs S3 cache),
-  privileged-mode Docker builds, secret manager integration, build badge
-  failures, queued builds, and batch configuration errors. Walks phase
-  status, logs, and project config to a verified root cause with
-  evidence-backed probes. Emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses AWS CodeBuild build failures through a stopped-phase-first diagnostic tree: BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE (ECR auth, image size, Docker Hub rate limit), phase-level command failures (INSTALL, PRE_BUILD, BUILD, POST_BUILD), buildspec.yml syntax and version errors, environment variable resolution (Plaintext, SecretsManager, SSM Parameter Store), artifact upload failures (S3 permissions, KMS encryption), VPC config errors (subnet, SG, NAT Gateway), runtime version mismatch, build timeout, source checkout failures (CodeCommit auth, GitHub token), caching issues (LOCAL_DOCKER_LAYER vs S3 cache), privileged-mode Docker builds, secret manager integration, build badge failures, queued builds, and batch configuration errors. Walks phase status, logs, and project config to a verified root cause with evidence-backed probes. Emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Offline diagnosis works on supplied batch-get-builds JSON, log
-  excerpts, and buildspec.yml. Live-account diagnosis uses aws codebuild
-  batch-get-builds, batch-get-projects, aws logs get-log-events /
-  filter-log-events, aws iam simulate-principal-policy, aws ecr
-  get-repository-policy / describe-images, aws s3api get-bucket-policy,
-  aws secretsmanager describe-secret, aws ssm get-parameter, aws ec2
-  describe-subnets / describe-security-groups / describe-route-tables
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - CodeBuild
-  - buildspec
-  - BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE
-  - phase error
-  - INSTALL phase
-  - PRE_BUILD phase
-  - BUILD phase
-  - Docker build
-  - privileged mode
-  - ECR pull
-  - artifact upload
-  - S3 artifact
-  - VPC config
-  - runtime version
-  - build timeout
-  - source checkout
-  - CodeCommit auth
-  - GitHub source
-  - local cache
-  - S3 cache
-  - Secrets Manager
-  - build badge
-  - queued build
-  - batch build
-tags:
-  - codebuild
-  - devtools
-  - troubleshoot
-  - build-failure
-  - buildspec
-  - ecr
-  - docker
-  - vpc
-  - caching
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works on supplied batch-get-builds JSON, log excerpts, and buildspec.yml. Live-account diagnosis uses aws codebuild batch-get-builds, batch-get-projects, aws logs get-log-events / filter-log-events, aws iam simulate-principal-policy, aws ecr get-repository-policy / describe-images, aws s3api get-bucket-policy, aws secretsmanager describe-secret, aws ssm get-parameter, aws ec2 describe-subnets...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA"
-  when_to_use: >-
-    Diagnosing why a CodeBuild build fails — phase command failures
-    (INSTALL/PRE_BUILD/BUILD/POST_BUILD), image pull errors
-    (BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE), buildspec syntax errors,
-    environment variable resolution failures, artifact upload errors,
-    VPC-related build failures, runtime version mismatch, build timeout,
-    source checkout failures (CodeCommit/GitHub), cache misconfiguration,
-    Docker-in-Docker build failures (privileged mode), Secrets Manager /
-    SSM Parameter Store integration errors, build badge failures, queued
-    build concurrency limits, or batch build configuration errors.
-  when_not_to_use: >-
-    Application code debugging inside a build (use build logs and
-    application tests), CodePipeline orchestration debugging (use
-    codepipeline-failure-troubleshooter), ECR repository policy audits
-    (use ecr-repository-auditor), IAM least-privilege audits on the
-    CodeBuild service role (use iam-least-privilege-advisor), or
-    steady-state project configuration audits (use codebuild-project-auditor).
-  activation_triggers:
-    - "CodeBuild build failed"
-    - "BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE"
-    - "CodeBuild phase error"
-    - "CodeBuild INSTALL failed"
-    - "CodeBuild BUILD phase failed"
-    - "CodeBuild buildspec error"
-    - "CodeBuild Docker build failed"
-    - "CodeBuild privileged mode"
-    - "CodeBuild artifact upload failed"
-    - "CodeBuild VPC build timeout"
-    - "CodeBuild source checkout failed"
-    - "CodeCommit clone failed"
-    - "CodeBuild cache miss"
-    - "CodeBuild Secrets Manager"
-    - "CodeBuild runtime version"
-    - "CodeBuild build timeout"
-    - "CodeBuild queued build"
-    - "CodeBuild batch build error"
-  invocation_schema: >-
-    Input: either (a) a symptom description (error message, failed phase
-    name, observed build behaviour) optionally paired with the project
-    name, build ID, and recent build logs, OR (b) a project name plus
-    build context for live-account diagnosis. Output: a deterministic
-    TARGET/VERDICT/REASON/ROOT_CAUSE/EVIDENCE/REMEDIATION block where
-    VERDICT is ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA, and ROOT_CAUSE
-    names the specific failure category.
-  invocation_example: >-
-    # Minimal valid input (offline symptom classification):
-    Symptom: "CodeBuild project cb-prod-api fails during the BUILD phase
-    with 'Docker daemon not found' on every build."
-    ProjectName: cb-prod-api
-    BuildId: cb-prod-api:abc12345
-    EnvironmentPrivilegedMode: false
-    BuildspecPhase: BUILD
-    LastPhaseStatus: FAILED
+  verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
+  when_to_use: Diagnosing why a CodeBuild build fails — phase command failures (INSTALL/PRE_BUILD/BUILD/POST_BUILD), image pull errors (BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE), buildspec syntax errors, environment variable resolution failures, artifact upload errors, VPC-related build failures, runtime version mismatch, build timeout, source checkout failures (CodeCommit/GitHub), cache misconfiguration, Docker-in-Docker build failures (privileged mode), Secrets Manager / SSM Parameter Store integration errors, build badge failures, queued build concurrency limits, or batch build configuration errors.
+  when_not_to_use: Application code debugging inside a build (use build logs and application tests), CodePipeline orchestration debugging (use codepipeline-failure-troubleshooter), ECR repository policy audits (use ecr-repository-auditor), IAM least-privilege audits on the CodeBuild service role (use iam-least-privilege-advisor), or steady-state project configuration audits (use codebuild-project-auditor).
+  activation_triggers: CodeBuild build failed, BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE, CodeBuild phase error, CodeBuild INSTALL failed, CodeBuild BUILD phase failed, CodeBuild buildspec error, CodeBuild Docker build failed, CodeBuild privileged mode, CodeBuild artifact upload failed, CodeBuild VPC build timeout, CodeBuild source checkout failed, CodeCommit clone failed, CodeBuild cache miss, CodeBuild Secrets Manager, CodeBuild runtime version, CodeBuild build timeout, CodeBuild queued build, CodeBuild batch build error
+  invocation_schema: 'Input: either (a) a symptom description (error message, failed phase name, observed build behaviour) optionally paired with the project name, build ID, and recent build logs, OR (b) a project name plus build context for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/ROOT_CAUSE/EVIDENCE/REMEDIATION block where VERDICT is ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA, and ROOT_CAUSE names the specific failure category.'
+  invocation_example: '# Minimal valid input (offline symptom classification): Symptom: "CodeBuild project cb-prod-api fails during the BUILD phase with ''Docker daemon not found'' on every build." ProjectName: cb-prod-api BuildId: cb-prod-api:abc12345 EnvironmentPrivilegedMode: false BuildspecPhase: BUILD LastPhaseStatus: FAILED'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CodeBuild, buildspec, BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE, phase error, INSTALL phase, PRE_BUILD phase, BUILD phase, Docker build, privileged mode, ECR pull, artifact upload, S3 artifact, VPC config, runtime version, build timeout, source checkout, CodeCommit auth, GitHub source, local cache, S3 cache, Secrets Manager, build badge, queued build, batch build
+  tags: codebuild, devtools, troubleshoot, build-failure, buildspec, ecr, docker, vpc, caching
 ---
 
 # CodeBuild Build Troubleshooter

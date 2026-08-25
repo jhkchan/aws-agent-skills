@@ -1,79 +1,24 @@
 ---
 name: eventbridge-bus-policy-auditor
-description: >-
-  Audits AWS EventBridge event buses for public event-injection exposure
-  (Principal:* or cross-account with events:PutEvents and no strong
-  condition), missing dead-letter queues on rule targets, absent
-  customer-managed KMS encryption, and archive/enrichment gaps. Emits a
-  deterministic verdict (PUBLIC_BUS | NO_DLQ | NO_ENCRYPTION | CONFIG_GAP |
-  OK) per bus with enumerated findings and specific remediation. Use when
-  reviewing EventBridge bus policies, checking for public event injection,
-  validating DLQ coverage on rules, auditing KMS encryption posture, or
-  hardening event-bus security before production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS EventBridge event buses for public event-injection exposure (Principal:* or cross-account with events:PutEvents and no strong condition), missing dead-letter queues on rule targets, absent customer-managed KMS encryption, and archive/enrichment gaps. Emits a deterministic verdict (PUBLIC_BUS | NO_DLQ | NO_ENCRYPTION | CONFIG_GAP | OK) per bus with enumerated findings and specific remediation. Use when reviewing EventBridge bus policies, checking for public event injection, validating DLQ coverage on rules, auditing KMS encryption posture, or hardening event-bus security before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline policy-document classification.
-  Live-account audits use aws events describe-event-bus, aws events
-  list-rules, aws events list-targets-by-rule, aws events list-archives,
-  and aws events describe-rule (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - EventBridge
-  - event bus
-  - bus policy
-  - events:PutEvents
-  - event injection
-  - cross-account
-  - wildcard permissions
-  - dead-letter queue
-  - DLQ
-  - KMS encryption
-  - customer-managed key
-  - KmsKeyIdentifier
-  - archive
-  - schema discovery
-  - event replay
-  - aws:PrincipalOrgID
-  - rule targets
-  - DeadLetterConfig
-  - PutPermission
-  - Principal:"*"
-tags: [eventbridge, security, event-bus, app-integration, dlq, encryption, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline policy-document classification. Live-account audits use aws events describe-event-bus, aws events list-rules, aws events list-targets-by-rule, aws events list-archives, and aws events describe-rule (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
-  verdict_shape: "PUBLIC_BUS | NO_DLQ | NO_ENCRYPTION | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing an EventBridge event bus policy before production deployment,
-    checking for public or cross-account event injection, validating DLQ
-    coverage on rule targets, auditing KMS encryption posture, inspecting
-    archive or schema-discovery configuration, or hardening event-bus
-    security across an account.
-  activation_triggers:
-    - "audit this event bridge bus"
-    - "is my event bus public"
-    - "check eventbridge bus policy"
-    - "event injection risk"
-    - "missing DLQ on rule"
-    - "is event bridge encrypted"
-    - "event bus cross-account"
-    - "Principal star eventbridge"
-    - "dead-letter queue check"
-    - "event bridge archive gap"
-  invocation_schema: >-
-    Input: either (a) an event bus policy JSON document, optionally paired
-    with bus metadata (KmsKeyIdentifier), rule/target configs, and
-    archive status, OR (b) a bus name/ARN for live-account audit. Output:
-    deterministic BUS/VERDICT/REASON/FINDINGS/REMEDIATION block per bus,
-    where VERDICT is one of PUBLIC_BUS, NO_DLQ, NO_ENCRYPTION,
-    CONFIG_GAP, OK.
+  verdict_shape: PUBLIC_BUS | NO_DLQ | NO_ENCRYPTION | CONFIG_GAP | OK
+  when_to_use: Reviewing an EventBridge event bus policy before production deployment, checking for public or cross-account event injection, validating DLQ coverage on rule targets, auditing KMS encryption posture, inspecting archive or schema-discovery configuration, or hardening event-bus security across an account.
+  activation_triggers: audit this event bridge bus, is my event bus public, check eventbridge bus policy, event injection risk, missing DLQ on rule, is event bridge encrypted, event bus cross-account, Principal star eventbridge, dead-letter queue check, event bridge archive gap
+  invocation_schema: 'Input: either (a) an event bus policy JSON document, optionally paired with bus metadata (KmsKeyIdentifier), rule/target configs, and archive status, OR (b) a bus name/ARN for live-account audit. Output: deterministic BUS/VERDICT/REASON/FINDINGS/REMEDIATION block per bus, where VERDICT is one of PUBLIC_BUS, NO_DLQ, NO_ENCRYPTION, CONFIG_GAP, OK.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: EventBridge, event bus, bus policy, events:PutEvents, event injection, cross-account, wildcard permissions, dead-letter queue, DLQ, KMS encryption, customer-managed key, KmsKeyIdentifier, archive, schema discovery, event replay, aws:PrincipalOrgID, rule targets, DeadLetterConfig, PutPermission, Principal:"*"
+  tags: eventbridge, security, event-bus, app-integration, dlq, encryption, audit
 ---
 
 # EventBridge Bus Policy Auditor

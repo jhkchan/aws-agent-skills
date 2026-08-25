@@ -1,116 +1,26 @@
 ---
 name: transfer-family-workflow-deployer
-description: >-
-  Provisions AWS Transfer Family servers and managed workflows with
-  production defaults: SFTP/FTPS/FTP protocol, identity provider
-  (service-managed, AWS Directory Service, custom Lambda), endpoint
-  type (PUBLIC, VPC, VPC_ENDPOINT), security groups and subnets,
-  Route 53 hosted zone DNS, user home directory mapping (logical vs
-  physical), S3 access via IAM role and session policy for per-user
-  scoping, AS2 connectors for trading partner exchange, Managed
-  Workflow with Step Functions for file processing, structured JSON
-  logging, server host key, trusted host keys. Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when
-  creating a Transfer Family SFTP server, configuring custom Lambda
-  authentication, setting up VPC endpoint for private SFTP, or
-  deploying managed workflows. Triggers: create transfer family sftp
-  server, transfer family custom lambda identity, transfer family vpc
-  endpoint, transfer family managed workflow, transfer family as2
-  connector, sftp user session policy.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Transfer Family servers and managed workflows with production defaults: SFTP/FTPS/FTP protocol, identity provider (service-managed, AWS Directory Service, custom Lambda), endpoint type (PUBLIC, VPC, VPC_ENDPOINT), security groups and subnets, Route 53 hosted zone DNS, user home directory mapping (logical vs physical), S3 access via IAM role and session policy for per-user scoping, AS2 connectors for trading partner exchange, Managed Workflow with Step Functions for file processing, structured JSON logging, server host key, trusted host keys. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Transfer Family SFTP server, configuring custom Lambda authentication, setting up VPC endpoint for private SFTP, or deploying managed workflows. Triggers: create transfer family sftp server, transfer family custom lambda identity, transfer family vpc endpoint, transfer family managed workflow, transfer family as2 connector, sftp user session policy.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with transfer
-  access, plus iam, s3, ec2, route53, and lambda access for custom
-  identity providers and VPC endpoints. Works with Terraform
-  aws_transfer_server / aws_transfer_user /
-  aws_transfer_workflow resources and CloudFormation
-  AWS::Transfer::Server / AWS::Transfer::User /
-  AWS::Transfer::Workflow templates.
-keywords:
-  - aws
-  - transfer family
-  - sftp
-  - ftps
-  - ftp
-  - storage
-  - cloudops
-  - deploy
-  - provisioning
-  - managed file transfer
-  - mft
-  - session policy
-  - as2
-  - managed workflow
-  - vpc endpoint
-  - identity provider
-  - custom lambda
-  - service managed
-  - home directory
-  - host key
-tags:
-  - aws
-  - transfer-family
-  - sftp
-  - cloudops
-  - deploy
-  - storage
-  - provisioning
-  - managed-file-transfer
-  - session-policy
-  - as2
-  - managed-workflow
-  - vpc-endpoint
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with transfer access, plus iam, s3, ec2, route53, and lambda access for custom identity providers and VPC endpoints. Works with Terraform aws_transfer_server / aws_transfer_user / aws_transfer_workflow resources and CloudFormation AWS::Transfer::Server / AWS::Transfer::User / AWS::Transfer::Workflow templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - transfer-family
-    - sftp
-    - cloudops
-    - deploy
-    - storage
-    - provisioning
-    - managed-file-transfer
-    - session-policy
-    - as2
-    - managed-workflow
-    - vpc-endpoint
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create transfer family sftp server
-    - transfer family custom lambda identity
-    - transfer family vpc endpoint
-    - transfer family managed workflow
-    - transfer family as2 connector
-    - sftp user session policy
-    - transfer family hosted zone route53
-  when_to_use: >-
-    Invoke when the user wants to create or configure an AWS Transfer
-    Family server (SFTP, FTPS, FTP), set up identity provider
-    (service-managed, Directory Service, custom Lambda), configure VPC
-    or VPC_ENDPOINT for private SFTP access, manage user home directory
-    mapping, configure per-user S3 access via session policy, deploy
-    managed workflows for file processing, or set up AS2 connectors
-    for B2B file exchange. Do NOT invoke for AWS DataSync (use
-    datasync skills), S3 direct access patterns, or Storage Gateway.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, transfer-family, sftp, cloudops, deploy, storage, provisioning, managed-file-transfer, session-policy, as2, managed-workflow, vpc-endpoint
+  dependencies: aws-orchestrator
+  keywords: aws, transfer family, sftp, ftps, ftp, storage, cloudops, deploy, provisioning, managed file transfer, mft, session policy, as2, managed workflow, vpc endpoint, identity provider, custom lambda, service managed, home directory, host key
+  when_to_use: Invoke when the user wants to create or configure an AWS Transfer Family server (SFTP, FTPS, FTP), set up identity provider (service-managed, Directory Service, custom Lambda), configure VPC or VPC_ENDPOINT for private SFTP access, manage user home directory mapping, configure per-user S3 access via session policy, deploy managed workflows for file processing, or set up AS2 connectors for B2B file exchange. Do NOT invoke for AWS DataSync (use datasync skills), S3 direct access patterns, or Storage Gateway.
 ---
 
 # Transfer Family Workflow Deployer

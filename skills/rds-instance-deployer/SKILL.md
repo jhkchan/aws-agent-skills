@@ -1,129 +1,26 @@
 ---
 name: rds-instance-deployer
-description: >-
-  Provisions RDS and Aurora databases with production-grade defaults: instance
-  class selection (burstable t-series vs memory-optimized r-series vs
-  general-purpose m-series), security group scoping to app SG on the correct
-  engine port (3306/5432/1433/1521), KMS encryption-at-creation (immutable),
-  Multi-AZ for HA with automatic failover, automated backups with 1-35 day
-  retention, Enhanced Monitoring + Performance Insights, parameter group
-  tuning, option group engine-specific options, Aurora Serverless v2 with
-  min/max capacity, Aurora Global Database for cross-region reads, Backtrack
-  for MySQL rewinds, deletion protection, Blue/Green deployments, and Aurora
-  LTES planning. Emits a READY_TO_DEPLOY checklist with verification commands.
-  Use when creating a new RDS instance, hardening Aurora clusters, sizing
-  instances, or generating IaC skeletons. Triggers: create RDS instance,
-  provision Aurora, Multi-AZ setup, Aurora Serverless v2, Aurora Global
-  Database, Blue/Green deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions RDS and Aurora databases with production-grade defaults: instance class selection (burstable t-series vs memory-optimized r-series vs general-purpose m-series), security group scoping to app SG on the correct engine port (3306/5432/1433/1521), KMS encryption-at-creation (immutable), Multi-AZ for HA with automatic failover, automated backups with 1-35 day retention, Enhanced Monitoring + Performance Insights, parameter group tuning, option group engine-specific options, Aurora Serverless v2 with min/max capacity, Aurora Global Database for cross-region reads, Backtrack for MySQL rewinds, deletion protection, Blue/Green deployments, and Aurora LTES planning. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a new RDS instance, hardening Aurora clusters, sizing instances, or generating IaC skeletons. Triggers: create RDS instance, provision Aurora, Multi-AZ setup, Aurora Serverless v2, Aurora Global Database, Blue/Green deployment.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). For live deployment: AWS CLI v2 with rds, ec2, kms, iam, and
-  cloudwatch access. Works with Terraform aws_db_instance / aws_rds_cluster
-  resources and CloudFormation AWS::RDS::DBInstance / AWS::RDS::DBCluster
-  templates.
-keywords:
-  - aws
-  - rds
-  - aurora
-  - cloudops
-  - deploy
-  - provisioning
-  - instance class
-  - burstable
-  - t-series
-  - memory-optimized
-  - r-series
-  - general-purpose
-  - m-series
-  - security group
-  - kms encryption
-  - multi-az
-  - standby
-  - automatic failover
-  - automated backups
-  - backup retention
-  - pitr
-  - enhanced monitoring
-  - performance insights
-  - parameter group
-  - option group
-  - aurora serverless v2
-  - aurora global database
-  - backtrack
-  - deletion protection
-  - blue/green deployment
-  - aurora ltes
-  - aurora dsql
-tags:
-  - aws
-  - rds
-  - aurora
-  - cloudops
-  - deploy
-  - databases
-  - provisioning
-  - multi-az
-  - encryption
-  - backups
-  - performance-insights
-  - parameter-group
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with rds, ec2, kms, iam, and cloudwatch access. Works with Terraform aws_db_instance / aws_rds_cluster resources and CloudFormation AWS::RDS::DBInstance / AWS::RDS::DBCluster templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: deploy
   skill_class: capability
   lifecycle_status: experimental
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - rds
-    - aurora
-    - cloudops
-    - deploy
-    - databases
-    - provisioning
-    - multi-az
-    - encryption
-    - backups
-    - performance-insights
-    - parameter-group
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create rds instance
-    - provision aurora
-    - multi-az setup
-    - performance insights
-    - aurora serverless v2
-    - parameter group tuning
-    - aurora global database
-    - backtrack mysql
-    - blue/green deployment
-    - aurora ltes
-    - aurora dsql
-    - deletion protection
-    - enhanced monitoring
-  when_to_use: >-
-    Invoke when the user wants to create a new RDS or Aurora database with
-    production defaults, harden an existing database for production, validate
-    Multi-AZ posture, size an instance class for a workload, design Aurora
-    Serverless v2 capacity bounds, set up Aurora Global Database, plan a
-    Blue/Green deployment, or generate provisioning CLI commands / IaC
-    templates. Do NOT invoke for auditing existing RDS posture (use
-    rds-instance-auditor), query tuning, certificate/TLS expiry, or
-    non-RDS databases (DynamoDB, ElastiCache, DocumentDB, Neptune).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, rds, aurora, cloudops, deploy, databases, provisioning, multi-az, encryption, backups, performance-insights, parameter-group
+  dependencies: aws-orchestrator
+  keywords: aws, rds, aurora, cloudops, deploy, provisioning, instance class, burstable, t-series, memory-optimized, r-series, general-purpose, m-series, security group, kms encryption, multi-az, standby, automatic failover, automated backups, backup retention, pitr, enhanced monitoring, performance insights, parameter group, option group, aurora serverless v2, aurora global database, backtrack, deletion protection, blue/green deployment, aurora ltes, aurora dsql
+  when_to_use: Invoke when the user wants to create a new RDS or Aurora database with production defaults, harden an existing database for production, validate Multi-AZ posture, size an instance class for a workload, design Aurora Serverless v2 capacity bounds, set up Aurora Global Database, plan a Blue/Green deployment, or generate provisioning CLI commands / IaC templates. Do NOT invoke for auditing existing RDS posture (use rds-instance-auditor), query tuning, certificate/TLS expiry, or non-RDS databases (DynamoDB, ElastiCache, DocumentDB, Neptune).
 ---
 
 # RDS Instance Deployer

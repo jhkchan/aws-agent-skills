@@ -1,107 +1,26 @@
 ---
 name: acm-private-ca-deployer
-description: >-
-  Provisions AWS Private Certificate Authority (ACM PCA) with production
-  defaults: CA creation (root vs subordinate), key algorithm (RSA_2048,
-  EC_prime256v1), signing algorithm (SHA256withRSA, SHA256withECDSA),
-  CRL configuration (S3 bucket, expiration, CNAME), certificate template
-  selection, CA certificate issuance (self-signed root vs parent-signed
-  subordinate), certificate revocation, audit via CloudTrail, CA deletion
-  (7-30 day mandatory waiting period), CA permissions for ACM integration,
-  and OCSP support. Emits a READY_TO_DEPLOY checklist with verification
-  commands. Use when creating a private CA, issuing private certificates,
-  configuring CRL revocation, setting up subordinate CA hierarchies,
-  integrating ACM PCA with ACM, or deleting a private CA. Triggers: create
-  private certificate authority, acm pca root ca, acm pca subordinate ca,
-  issue private certificate, crl configuration s3, revoke certificate acm
-  pca, ca deletion waiting period, acm pca permissions, acm managed
-  private cert.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Private Certificate Authority (ACM PCA) with production defaults: CA creation (root vs subordinate), key algorithm (RSA_2048, EC_prime256v1), signing algorithm (SHA256withRSA, SHA256withECDSA), CRL configuration (S3 bucket, expiration, CNAME), certificate template selection, CA certificate issuance (self-signed root vs parent-signed subordinate), certificate revocation, audit via CloudTrail, CA deletion (7-30 day mandatory waiting period), CA permissions for ACM integration, and OCSP support. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a private CA, issuing private certificates, configuring CRL revocation, setting up subordinate CA hierarchies, integrating ACM PCA with ACM, or deleting a private CA. Triggers: create private certificate authority, acm pca root ca, acm pca subordinate ca, issue private certificate, crl configuration s3, revoke certificate acm pca, ca deletion waiting period, acm pca permissions, acm managed private cert.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with acm-pca and acm
-  access. Works with Terraform aws_acmpca_certificate_authority /
-  aws_acmpca_certificate / aws_acmpca_certificate_authority_certificate
-  resources and CloudFormation AWS::ACMPCA::CertificateAuthority /
-  AWS::ACMPCA::Certificate templates.
-keywords:
-  - aws
-  - acm
-  - acm pca
-  - private certificate authority
-  - private ca
-  - cloudops
-  - deploy
-  - provisioning
-  - root ca
-  - subordinate ca
-  - certificate
-  - crl
-  - ocsp
-  - revocation
-  - pki
-tags:
-  - aws
-  - acm-pca
-  - private-ca
-  - cloudops
-  - deploy
-  - security
-  - provisioning
-  - pki
-  - certificates
-  - crl
-  - revocation
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with acm-pca and acm access. Works with Terraform aws_acmpca_certificate_authority / aws_acmpca_certificate / aws_acmpca_certificate_authority_certificate resources and CloudFormation AWS::ACMPCA::CertificateAuthority / AWS::ACMPCA::Certificate templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - acm-pca
-    - private-ca
-    - cloudops
-    - deploy
-    - security
-    - provisioning
-    - pki
-    - certificates
-    - crl
-    - revocation
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create private certificate authority
-    - acm pca root ca
-    - acm pca subordinate ca
-    - issue private certificate
-    - crl configuration s3
-    - revoke certificate acm pca
-    - ca deletion waiting period
-    - acm pca permissions
-    - acm managed private cert
-  when_to_use: >-
-    Invoke when the user wants to create a private certificate authority
-    (root or subordinate), issue private certificates, configure CRL
-    revocation, set up a subordinate CA hierarchy, integrate ACM PCA
-    with ACM for managed certificate lifecycle, delete a private CA,
-    or revoke certificates. Do NOT invoke for public TLS certificates
-    (use ACM public certificate skills), AWS Certificate Manager public
-    issuance, or AWS Secrets Manager certificate storage.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, acm-pca, private-ca, cloudops, deploy, security, provisioning, pki, certificates, crl, revocation
+  dependencies: aws-orchestrator
+  keywords: aws, acm, acm pca, private certificate authority, private ca, cloudops, deploy, provisioning, root ca, subordinate ca, certificate, crl, ocsp, revocation, pki
+  when_to_use: Invoke when the user wants to create a private certificate authority (root or subordinate), issue private certificates, configure CRL revocation, set up a subordinate CA hierarchy, integrate ACM PCA with ACM for managed certificate lifecycle, delete a private CA, or revoke certificates. Do NOT invoke for public TLS certificates (use ACM public certificate skills), AWS Certificate Manager public issuance, or AWS Secrets Manager certificate storage.
 ---
 
 # ACM Private CA Deployer

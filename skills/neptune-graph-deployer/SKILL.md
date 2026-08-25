@@ -1,119 +1,26 @@
 ---
 name: neptune-graph-deployer
-description: >-
-  Provisions Amazon Neptune graph database clusters with production
-  defaults: cluster creation (primary + read replicas), instance types,
-  Neptune ML integration, IAM database authentication, encryption at
-  rest (KMS), parameter groups (neptune_enforce_ssl,
-  neptune_query_timeout), subnet groups, security groups, Neptune
-  Streams (change log), Global Database (cross-region), Gremlin vs
-  SPARQL query language support, auto-scaling read replicas, bulk
-  loader, CloudWatch metrics (VolumeBytesUsed, EngineCPUUtilization,
-  GremlinRequestsPerSec), and snapshot management. Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when
-  creating a Neptune cluster, setting up graph database replicas,
-  enabling Neptune ML, configuring IAM database authentication, or
-  establishing a Neptune Global Database. Triggers: create neptune
-  cluster, neptune graph database, gremlin sparql cluster, neptune ml,
-  neptune global database, neptune streams, neptune iam auth, neptune
-  bulk loader, neptune read replica autoscaling.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon Neptune graph database clusters with production defaults: cluster creation (primary + read replicas), instance types, Neptune ML integration, IAM database authentication, encryption at rest (KMS), parameter groups (neptune_enforce_ssl, neptune_query_timeout), subnet groups, security groups, Neptune Streams (change log), Global Database (cross-region), Gremlin vs SPARQL query language support, auto-scaling read replicas, bulk loader, CloudWatch metrics (VolumeBytesUsed, EngineCPUUtilization, GremlinRequestsPerSec), and snapshot management. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Neptune cluster, setting up graph database replicas, enabling Neptune ML, configuring IAM database authentication, or establishing a Neptune Global Database. Triggers: create neptune cluster, neptune graph database, gremlin sparql cluster, neptune ml, neptune global database, neptune streams, neptune iam auth, neptune bulk loader, neptune read replica autoscaling.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with neptune and
-  rds access (Neptune uses RDS-style cluster APIs). Works with
-  Terraform aws_neptune_cluster / aws_neptune_cluster_instance /
-  aws_neptune_cluster_parameter_group resources and CloudFormation
-  AWS::Neptune::DBCluster / AWS::Neptune::DBInstance templates.
-keywords:
-  - aws
-  - neptune
-  - graph database
-  - gremlin
-  - sparql
-  - cloudops
-  - deploy
-  - provisioning
-  - read replica
-  - cluster
-  - neptune ml
-  - iam auth
-  - encryption
-  - kms
-  - neptune streams
-  - global database
-  - bulk loader
-  - auto scaling
-tags:
-  - aws
-  - neptune
-  - graph-database
-  - gremlin
-  - sparql
-  - cloudops
-  - deploy
-  - databases
-  - provisioning
-  - read-replica
-  - encryption
-  - neptune-ml
-  - global-database
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with neptune and rds access (Neptune uses RDS-style cluster APIs). Works with Terraform aws_neptune_cluster / aws_neptune_cluster_instance / aws_neptune_cluster_parameter_group resources and CloudFormation AWS::Neptune::DBCluster / AWS::Neptune::DBInstance templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - neptune
-    - graph-database
-    - gremlin
-    - sparql
-    - cloudops
-    - deploy
-    - databases
-    - provisioning
-    - read-replica
-    - encryption
-    - neptune-ml
-    - global-database
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create neptune cluster
-    - neptune graph database
-    - gremlin sparql cluster
-    - neptune ml
-    - neptune global database
-    - neptune streams
-    - neptune iam auth
-    - neptune bulk loader
-    - neptune read replica autoscaling
-  when_to_use: >-
-    Invoke when the user wants to create an Amazon Neptune graph
-    database cluster, configure primary and read replicas, enable
-    Neptune ML integration, configure IAM database authentication,
-    enable encryption at rest with KMS, set parameter groups
-    (neptune_enforce_ssl, neptune_query_timeout), configure Neptune
-    Streams for change logging, create a Neptune Global Database for
-    cross-region disaster recovery, choose between Gremlin and SPARQL
-    query languages, set up auto-scaling read replicas, or run the
-    Neptune bulk loader. Do NOT invoke for Amazon Neptune Analytics
-    (serverless graph analytics), Amazon RDS/Aurora (relational
-    databases), or Amazon OpenSearch (search/document databases).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, neptune, graph-database, gremlin, sparql, cloudops, deploy, databases, provisioning, read-replica, encryption, neptune-ml, global-database
+  dependencies: aws-orchestrator
+  keywords: aws, neptune, graph database, gremlin, sparql, cloudops, deploy, provisioning, read replica, cluster, neptune ml, iam auth, encryption, kms, neptune streams, global database, bulk loader, auto scaling
+  when_to_use: Invoke when the user wants to create an Amazon Neptune graph database cluster, configure primary and read replicas, enable Neptune ML integration, configure IAM database authentication, enable encryption at rest with KMS, set parameter groups (neptune_enforce_ssl, neptune_query_timeout), configure Neptune Streams for change logging, create a Neptune Global Database for cross-region disaster recovery, choose between Gremlin and SPARQL query languages, set up auto-scaling read replicas, or run the Neptune bulk loader. Do NOT invoke for Amazon Neptune Analytics (serverless graph analytics), Amazon RDS/Aurora (relational databases), or Amazon OpenSearch (search/document databases).
 ---
 
 # Neptune Graph Deployer

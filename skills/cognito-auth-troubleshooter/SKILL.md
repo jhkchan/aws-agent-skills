@@ -1,88 +1,15 @@
 ---
 name: cognito-auth-troubleshooter
-description: >-
-  Diagnoses Amazon Cognito authentication failures through a twelve-category
-  diagnostic tree: User Pool sign-in errors (wrong app client, wrong auth
-  flow, client secret mismatch on PUBLIC clients), token refresh failures
-  (refresh token expired, token revocation, JWKS mismatch), hosted UI
-  redirect mismatch (callback URL must match exactly), custom attribute
-  write permissions (writable vs readable attributes), pre-token-generation
-  Lambda trigger errors, identity pool (federated identities) role assumption
-  failures (unauthenticated role trust policy must allow cognito-identity),
-  social provider (Google/Facebook/Apple) misconfiguration, SAML provider
-  certificate mismatch, MFA setup and bypass issues, password policy
-  violations, account recovery flow errors, custom sender Lambda trigger
-  errors, domain prefix conflicts, and TLS certificate issues. Walks symptoms
-  to a verified root cause with evidence-backed probes; emits
-  ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses Amazon Cognito authentication failures through a twelve-category diagnostic tree: User Pool sign-in errors (wrong app client, wrong auth flow, client secret mismatch on PUBLIC clients), token refresh failures (refresh token expired, token revocation, JWKS mismatch), hosted UI redirect mismatch (callback URL must match exactly), custom attribute write permissions (writable vs readable attributes), pre-token-generation Lambda trigger errors, identity pool (federated identities) role assumption failures (unauthenticated role trust policy must allow cognito-identity), social provider (Google/Facebook/Apple) misconfiguration, SAML provider certificate mismatch, MFA setup and bypass issues, password policy violations, account recovery flow errors, custom sender Lambda trigger errors, domain prefix conflicts, and TLS certificate issues. Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and user-pool configuration. Live-account diagnosis uses aws cognito-idp describe-user-pool, describe-user-pool-client, describe-identity-pool, get-identity-pool-roles, list-user-pools, list-user-pool-clients, aws lambda get-function / get-policy (for triggers), aws iam simulate-principal-policy, aws cloudtrail lookup-events, aws logs filter-log-events, and dig / nslookup for domain verification (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- Cognito
-- User Pool
-- Identity Pool
-- authentication
-- authorization
-- token refresh
-- access token
-- ID token
-- refresh token
-- JWT
-- JWKS
-- hosted UI
-- callback URL
-- redirect URI
-- app client
-- client secret
-- PUBLIC client
-- CONFIDENTIAL client
-- auth flow
-- ALLOW_USER_PASSWORD_AUTH
-- ALLOW_USER_SRP_AUTH
-- ALLOW_REFRESH_TOKEN_AUTH
-- custom attributes
-- pre-token-generation
-- Lambda trigger
-- identity pool
-- federated identities
-- unauthenticated role
-- trust policy
-- cognito-identity
-- social provider
-- Google
-- Facebook
-- SignInWithApple
-- SAML
-- certificate mismatch
-- MFA
-- TOTP
-- SMS MFA
-- password policy
-- account recovery
-- custom sender
-- domain prefix
-- TLS certificate
-- troubleshooting
-tags:
-- cognito
-- security
-- troubleshooting
-- authentication
-- user-pool
-- identity-pool
-- hosted-ui
-- jwt
-- saml
-- mfa
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and user-pool configuration. Live-account diagnosis uses aws cognito-idp describe-user-pool, describe-user-pool-client, describe-identity-pool, get-identity-pool-roles, list-user-pools, list-user-pool-clients, aws lambda get-function / get-policy (for triggers), aws iam simulate-principal-policy, aws cloudtrail lookup-events, aws logs...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: troubleshoot
   skill_class: capability
@@ -90,34 +17,33 @@ metadata:
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
   when_to_use: Diagnosing a Cognito authentication failure (sign-in error, token refresh failure, hosted UI redirect mismatch, social or SAML provider error, MFA setup or bypass, identity pool role assumption failure, pre-token-generation Lambda error, domain prefix conflict, TLS error), walking a symptom to the failed layer with verify and fix commands, validating why a user cannot authenticate, or triaging a "users cannot log in" page where the root cause may be app client config, auth flow, token lifecycle, hosted UI, provider, trigger Lambda, or identity pool role trust — not necessarily the application code.
   when_not_to_use: Application-level session management beyond Cognito token exchange (use the application framework's auth docs), API Gateway custom authorizer debugging (use apigateway-http-troubleshooter), root-cause analysis of the user's device or browser (use browser developer tools and device logs), or IAM policy authoring for the authenticated/unauthenticated roles (use iam-least-privilege-advisor). This skill diagnoses Cognito authentication-time failures; it does not audit steady-state security posture or tune application session logic.
-  activation_triggers:
-  - Cognito authentication failed
-  - Cognito NotAuthorizedException
-  - Cognito UserLambdaValidationException
-  - Cognito InvalidParameterException
-  - Cognito redirect mismatch
-  - Cognito hosted UI callback URL
-  - Cognito token refresh failed
-  - Cognito refresh token expired
-  - Cognito InvalidGrantException
-  - Cognito pre-token-generation Lambda error
-  - Cognito identity pool role assumption
-  - Cognito unauthenticated role
-  - cognito-identity amazonaws com
-  - Cognito social provider Google
-  - Cognito Facebook login
-  - Cognito SignInWithApple
-  - Cognito SAML provider
-  - Cognito SAML certificate
-  - Cognito MFA setup failed
-  - Cognito MFA bypass
-  - Cognito password policy
-  - Cognito custom attributes
-  - Cognito domain prefix
-  - Cognito TLS certificate
-  - troubleshoot Cognito authentication
+  activation_triggers: Cognito authentication failed, Cognito NotAuthorizedException, Cognito UserLambdaValidationException, Cognito InvalidParameterException, Cognito redirect mismatch, Cognito hosted UI callback URL, Cognito token refresh failed, Cognito refresh token expired, Cognito InvalidGrantException, Cognito pre-token-generation Lambda error, Cognito identity pool role assumption, Cognito unauthenticated role, cognito-identity amazonaws com, Cognito social provider Google, Cognito Facebook login, Cognito SignInWithApple, Cognito SAML provider, Cognito SAML certificate, Cognito MFA setup failed, Cognito MFA bypass, Cognito password policy, Cognito custom attributes, Cognito domain prefix, Cognito TLS certificate, troubleshoot Cognito authentication
   invocation_schema: 'Input: either (a) a symptom description (error message, observed behaviour, "users cannot log in", "token refresh returns InvalidGrantException"), optionally paired with the User Pool / Identity Pool configuration and recent CloudWatch logs, OR (b) a UserPoolId / IdentityPoolId plus client context (AppClientId, auth flow, provider name, observed error) for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {APP_CLIENT_CONFIG, APP_CLIENT_SECRET, AUTH_FLOW, TOKEN_REFRESH, TOKEN_REVOCATION, HOSTED_UI_REDIRECT, CUSTOM_ATTRIBUTE, PRE_TOKEN_GEN_LAMBDA, IDENTITY_POOL_ROLE, IDENTITY_POOL_TRUST, SOCIAL_PROVIDER, SOCIAL_REDIRECT, SAML_PROVIDER, SAML_CERTIFICATE, MFA_CONFIG, MFA_TOTP, MFA_SMS, PASSWORD_POLICY, ACCOUNT_RECOVERY, CUSTOM_SENDER_LAMBDA, DOMAIN_PREFIX, TLS_CERTIFICATE, UNKNOWN}.'
-  invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"Users report 'redirect_mismatch' error after entering credentials\non the Cognito hosted UI. The callback URL in the browser bar shows\nhttps://app.example.com/auth/callback but the app client is configured\nwith https://app.example.com/callback.\"\nUserPoolId: us-east-1_AbCdEf123\nAppClientId: 1ab2cd3ef4gh5ij6lmn7opq8rs\nAuthFlow: code grant (hosted UI)\nDomain: auth.example.com (Cognito domain prefix)\nHostedUI callback URLs: https://app.example.com/callback\nExpected callback (from app config): https://app.example.com/auth/callback"
+  invocation_example: '# Minimal valid input (offline symptom classification):
+
+    Symptom: "Users report ''redirect_mismatch'' error after entering credentials
+
+    on the Cognito hosted UI. The callback URL in the browser bar shows
+
+    https://app.example.com/auth/callback but the app client is configured
+
+    with https://app.example.com/callback."
+
+    UserPoolId: us-east-1_AbCdEf123
+
+    AppClientId: 1ab2cd3ef4gh5ij6lmn7opq8rs
+
+    AuthFlow: code grant (hosted UI)
+
+    Domain: auth.example.com (Cognito domain prefix)
+
+    HostedUI callback URLs: https://app.example.com/callback
+
+    Expected callback (from app config): https://app.example.com/auth/callback'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Cognito, User Pool, Identity Pool, authentication, authorization, token refresh, access token, ID token, refresh token, JWT, JWKS, hosted UI, callback URL, redirect URI, app client, client secret, PUBLIC client, CONFIDENTIAL client, auth flow, ALLOW_USER_PASSWORD_AUTH, ALLOW_USER_SRP_AUTH, ALLOW_REFRESH_TOKEN_AUTH, custom attributes, pre-token-generation, Lambda trigger, identity pool, federated identities, unauthenticated role, trust policy, cognito-identity, social provider, Google, Facebook, SignInWithApple, SAML, certificate mismatch, MFA, TOTP, SMS MFA, password policy, account recovery, custom sender, domain prefix, TLS certificate, troubleshooting
+  tags: cognito, security, troubleshooting, authentication, user-pool, identity-pool, hosted-ui, jwt, saml, mfa
 ---
 
 # Cognito Auth Troubleshooter

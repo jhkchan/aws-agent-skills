@@ -1,104 +1,26 @@
 ---
 name: backup-audit-automator
-description: >-
-  Automates AWS Backup audit and compliance reporting with production
-  defaults: backup report plan creation (daily/weekly compliance
-  reports), report templates (BACKUP_JOB_REPORT, COMPLIANCE_REPORT,
-  RECOVERY_POINT_REPORT), report destination (S3 bucket delivery),
-  compliance framework mapping (CIS, NIST, SOC2), backup frequency
-  audit (identify resources without backup plans), encryption
-  verification (KMS key on all recovery points), retention compliance
-  (minimum retention days enforcement), cross-region replication
-  audit, Vault Lock compliance check (compliance mode is immutable,
-  governance mode is not), automated alerting for non-compliance
-  (SNS), and multi-account via AWS Organizations. Emits an
-  AUTOMATION_DEPLOYED checklist. Use when auditing backup compliance,
-  creating backup report plans, checking encryption on recovery
-  points, verifying Vault Lock status, or setting up automated backup
-  compliance alerts. Triggers: backup audit, backup compliance report,
-  backup report plan, vault lock check, backup encryption audit, backup
-  retention compliance, backup frequency audit, recovery point report.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Automates AWS Backup audit and compliance reporting with production defaults: backup report plan creation (daily/weekly compliance reports), report templates (BACKUP_JOB_REPORT, COMPLIANCE_REPORT, RECOVERY_POINT_REPORT), report destination (S3 bucket delivery), compliance framework mapping (CIS, NIST, SOC2), backup frequency audit (identify resources without backup plans), encryption verification (KMS key on all recovery points), retention compliance (minimum retention days enforcement), cross-region replication audit, Vault Lock compliance check (compliance mode is immutable, governance mode is not), automated alerting for non-compliance (SNS), and multi-account via AWS Organizations. Emits an AUTOMATION_DEPLOYED checklist. Use when auditing backup compliance, creating backup report plans, checking encryption on recovery. Triggers: backup audit, backup compliance report, backup report plan, vault lock check, backup encryption audit, backup retention compliance, backup frequency audit, recovery point report.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with backup and s3
-  access. Works with Terraform aws_backup_report_plan,
-  aws_backup_vault, and aws_cloudwatch_event_rule resources and
-  CloudFormation AWS::Backup::BackupPlan templates.
-keywords:
-  - aws
-  - backup
-  - audit
-  - compliance
-  - report plan
-  - vault lock
-  - encryption audit
-  - retention compliance
-  - backup frequency
-  - recovery point
-  - cloudops
-  - automate
-  - sns alerting
-tags:
-  - aws
-  - backup
-  - audit
-  - cloudops
-  - automate
-  - storage
-  - compliance
-  - vault-lock
-  - reporting
-  - sns
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with backup and s3 access. Works with Terraform aws_backup_report_plan, aws_backup_vault, and aws_cloudwatch_event_rule resources and CloudFormation AWS::Backup::BackupPlan templates.'
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATION_DEPLOYED | REVIEW_REQUIRED"
+  verdict_shape: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - backup
-    - audit
-    - cloudops
-    - automate
-    - storage
-    - compliance
-    - vault-lock
-    - reporting
-    - sns
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - backup audit
-    - backup compliance report
-    - backup report plan
-    - vault lock check
-    - backup encryption audit
-    - backup retention compliance
-    - backup frequency audit
-    - recovery point report
-  when_to_use: >-
-    Invoke when the user wants to automate AWS Backup auditing and
-    compliance — creating backup report plans, checking encryption on
-    recovery points, verifying Vault Lock status, identifying resources
-    without backup coverage, setting up automated compliance alerts via
-    SNS, or mapping to compliance frameworks (CIS, NIST, SOC2). Do NOT
-    invoke for creating backup plans themselves (use backup-plan skills),
-    restoring from backups (use backup-restore skills), or AWS Backup
-    pricing analysis.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, backup, audit, cloudops, automate, storage, compliance, vault-lock, reporting, sns
+  dependencies: aws-orchestrator
+  keywords: aws, backup, audit, compliance, report plan, vault lock, encryption audit, retention compliance, backup frequency, recovery point, cloudops, automate, sns alerting
+  when_to_use: Invoke when the user wants to automate AWS Backup auditing and compliance — creating backup report plans, checking encryption on recovery points, verifying Vault Lock status, identifying resources without backup coverage, setting up automated compliance alerts via SNS, or mapping to compliance frameworks (CIS, NIST, SOC2). Do NOT invoke for creating backup plans themselves (use backup-plan skills), restoring from backups (use backup-restore skills), or AWS Backup pricing analysis.
 ---
 
 # Backup Audit Automator

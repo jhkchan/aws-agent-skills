@@ -1,87 +1,27 @@
 ---
 name: cost-anomaly-detection-automator
-description: >-
-  Designs and implements automated AWS Cost Anomaly Detection workflows spanning
-  Cost Anomaly Monitor creation (service-level, linked account, dimension-based
-  monitor), anomaly alert subscription (SNS topic, email recipient, Lambda
-  webhook), severity-based anomaly routing (Critical = page on-call, High =
-  notify channel, Low = log to dashboard), auto-remediation Lambda functions
-  (tag untagged resources, right-size over-provisioned instances, shutdown
-  non-production environments after-hours), AWS Budgets integration for hard
-  spend limits with threshold alerts, Cost Explorer anomaly analysis for
-  deep-dive on detected anomalies, multi-account coverage via Organizations
-  Payer monitor, Slack and Microsoft Teams webhook notifications, anomaly
-  feedback submission (true positive versus false positive) to improve ML
-  model accuracy, and historical baseline establishment using contribution
-  analysis. Emits AUTOMATION_DEPLOYED with a fully wired monitor-alert-
-  remediation pipeline or REVIEW_REQUIRED with the specific gap. Use when
-  building cost anomaly detection automation, wiring Budgets to Cost Anomaly
-  Detection, designing severity-routed anomaly alerts, or adding auto-
-  remediation for spend spikes.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Designs and implements automated AWS Cost Anomaly Detection workflows spanning Cost Anomaly Monitor creation (service-level, linked account, dimension-based monitor), anomaly alert subscription (SNS topic, email recipient, Lambda webhook), severity-based anomaly routing (Critical = page on-call, High = notify channel, Low = log to dashboard), auto-remediation Lambda functions (tag untagged resources, right-size over-provisioned instances, shutdown non-production environments after-hours), AWS Budgets integration for hard spend limits with threshold alerts, Cost Explorer anomaly analysis for deep-dive on detected anomalies, multi-account coverage via Organizations Payer monitor, Slack and Microsoft Teams webhook notifications, anomaly feedback submission (true positive versus false positive) to improve ML model accuracy, and historical baseline establishment using contribution analysis. Emits AUTOMATION_DEPLOYED with a fully wired monitor-alert- remediation pipeline or REVIEW_REQUIRED with the specific...
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline workflow design. Live deployment
-  uses aws ce create-anomaly-monitor, create-anomaly-subscription,
-  get-anomalies, provide-anomaly-feedback, aws budgets create-budget, and
-  aws ce get-cost-and-usage — AWS CLI v2, SSO or key-based credentials.
-keywords:
-  - AWS Cost Anomaly Detection
-  - Cost Anomaly Monitor
-  - Anomaly Subscription
-  - AWS Budgets
-  - Cost Explorer
-  - contribution analysis
-  - service-level monitor
-  - linked account monitor
-  - Organizations Payer
-  - severity routing
-  - auto-remediation Lambda
-  - tag untagged resources
-  - Slack webhook
-  - anomaly feedback
-  - FinOps
-tags: [aws-cost-anomaly-detection, aws-budgets, cost-explorer, finops, auto-remediation, anomaly-detection, automate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline workflow design. Live deployment uses aws ce create-anomaly-monitor, create-anomaly-subscription, get-anomalies, provide-anomaly-feedback, aws budgets create-budget, and aws ce get-cost-and-usage — AWS CLI v2, SSO or key-based credentials.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: FinOps
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATION_DEPLOYED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Building cost anomaly detection automation, creating Cost Anomaly Monitors
-    (service, linked-account, or dimension-based), wiring severity-routed
-    alert subscriptions, integrating Budgets hard-limits with anomaly
-    detection, deploying auto-remediation Lambda for spend spikes, setting
-    up multi-account coverage via Organizations Payer, or adding Slack/Teams
-    webhook notifications for cost anomalies.
-  activation_triggers:
-    - "automate cost anomaly detection"
-    - "create Cost Anomaly Monitor"
-    - "create-anomaly-subscription"
-    - "severity routing cost anomaly"
-    - "Budgets integration anomaly"
-    - "auto-remediation cost spike"
-    - "tag untagged resources Lambda"
-    - "Organizations Payer anomaly"
-    - "Slack webhook cost alert"
-    - "anomaly feedback true positive"
-  invocation_schema: >-
-    Input: either (a) a cost anomaly detection requirement ("alert on EC2
-    spend spikes", "auto-tag untagged resources causing cost anomalies"),
-    OR (b) an existing Cost Anomaly Monitor configuration to extend with
-    severity routing or auto-remediation. Output: deterministic ANOMALY
-    block per monitor — MONITOR/SUBSCRIPTION/ROUTING/REMEDIATION/AUDIT/
-    VERDICT — where VERDICT is AUTOMATION_DEPLOYED (pipeline ready) or
-    REVIEW_REQUIRED (specific gap cited).
+  verdict_shape: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
+  when_to_use: Building cost anomaly detection automation, creating Cost Anomaly Monitors (service, linked-account, or dimension-based), wiring severity-routed alert subscriptions, integrating Budgets hard-limits with anomaly detection, deploying auto-remediation Lambda for spend spikes, setting up multi-account coverage via Organizations Payer, or adding Slack/Teams webhook notifications for cost anomalies.
+  activation_triggers: automate cost anomaly detection, create Cost Anomaly Monitor, create-anomaly-subscription, severity routing cost anomaly, Budgets integration anomaly, auto-remediation cost spike, tag untagged resources Lambda, Organizations Payer anomaly, Slack webhook cost alert, anomaly feedback true positive
+  invocation_schema: 'Input: either (a) a cost anomaly detection requirement ("alert on EC2 spend spikes", "auto-tag untagged resources causing cost anomalies"), OR (b) an existing Cost Anomaly Monitor configuration to extend with severity routing or auto-remediation. Output: deterministic ANOMALY block per monitor — MONITOR/SUBSCRIPTION/ROUTING/REMEDIATION/AUDIT/ VERDICT — where VERDICT is AUTOMATION_DEPLOYED (pipeline ready) or REVIEW_REQUIRED (specific gap cited).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Cost Anomaly Detection, Cost Anomaly Monitor, Anomaly Subscription, AWS Budgets, Cost Explorer, contribution analysis, service-level monitor, linked account monitor, Organizations Payer, severity routing, auto-remediation Lambda, tag untagged resources, Slack webhook, anomaly feedback, FinOps
+  tags: aws-cost-anomaly-detection, aws-budgets, cost-explorer, finops, auto-remediation, anomaly-detection, automate
 ---
 
 # Cost Anomaly Detection Automator

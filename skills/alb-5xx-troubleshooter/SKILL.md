@@ -1,114 +1,28 @@
 ---
 name: alb-5xx-troubleshooter
-description: >-
-  Diagnoses ALB and NLB 5xx errors (500 InternalServerError, 502
-  BadGateway, 503 ServiceUnavailable, 504 GatewayTimeout, 561
-  Unauthorized) through a systematic diagnostic tree covering target
-  health check failures (wrong path, port, matcher, timeout), target
-  security group misconfiguration (ALB SG cannot reach target SG on
-  target port), idle timeout exceeded (60s default), deregistration
-  draining stuck, listener rule misconfiguration (wrong target group,
-  wrong priority), WAF blocks, and invalid backend responses. Walks
-  symptoms to root cause with describe-target-health, ALB access logs
-  in S3 (target_processing_time, target_status_code, error_reason),
-  security group analysis, and listener rule inspection. Emits
-  ROOT_CAUSE_FOUND with the specific failure layer or ESCALATE. Use
-  when ALB returns 5xx errors, targets unhealthy, no healthy targets,
-  or intermittent target failures.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Diagnoses ALB and NLB 5xx errors (500 InternalServerError, 502 BadGateway, 503 ServiceUnavailable, 504 GatewayTimeout, 561 Unauthorized) through a systematic diagnostic tree covering target health check failures (wrong path, port, matcher, timeout), target security group misconfiguration (ALB SG cannot reach target SG on target port), idle timeout exceeded (60s default), deregistration draining stuck, listener rule misconfiguration (wrong target group, wrong priority), WAF blocks, and invalid backend responses. Walks symptoms to root cause with describe-target-health, ALB access logs in S3 (target_processing_time, target_status_code, error_reason), security group analysis, and listener rule inspection. Emits ROOT_CAUSE_FOUND with the specific failure layer or ESCALATE. Use when ALB returns 5xx errors, targets unhealthy, no healthy targets, or intermittent target failures.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline symptom classification works from pasted
-  error codes and target group metadata. Live-account diagnosis uses
-  aws elbv2 describe-target-health, describe-target-groups,
-  describe-listeners, describe-rules, describe-load-balancers,
-  describe-load-balancer-attributes, aws ec2 describe-security-groups,
-  aws s3 cp (for ALB access logs), and aws cloudwatch
-  get-metric-statistics (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - ALB
-  - NLB
-  - ELBv2
-  - load balancer
-  - 5xx
-  - 500
-  - 502
-  - 503
-  - 504
-  - 561
-  - BadGateway
-  - ServiceUnavailable
-  - GatewayTimeout
-  - target health
-  - target group
-  - health check
-  - security group
-  - idle timeout
-  - deregistration
-  - draining
-  - WAF
-  - listener rule
-  - access logs
-  - troubleshooting
-tags: [elbv2, alb, nlb, load-balancer, networking, troubleshooting, 5xx, target-health]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error codes and target group metadata. Live-account diagnosis uses aws elbv2 describe-target-health, describe-target-groups, describe-listeners, describe-rules, describe-load-balancers, describe-load-balancer-attributes, aws ec2 describe-security-groups, aws s3 cp (for ALB access logs), and aws cloudwatch get-metric-statistics (AWS CLI v2, SSO or key-based...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
-  when_to_use: >-
-    Diagnosing an ALB or NLB 5xx error (500, 502, 503, 504, 561), walking
-    a symptom to the failed target, security group, health check, or
-    listener layer with verify and fix commands, validating target health
-    failures, identifying unhealthy target groups, diagnosing idle
-    timeout exceeded, or triaging a "the load balancer returns 5xx" page
-    where the root cause may be target health, SG rules, health check
-    configuration, deregistration, WAF, or listener rules — not
-    necessarily the load balancer itself.
-  when_not_to_use: >-
-    Configuration posture audits (use elbv2-load-balancer-auditor for
-    TLS policy, access-log enablement, deletion protection, SG
-    exposure), TLS/cipher negotiation issues (use
-    elbv2-load-balancer-auditor INSECURE_LISTENER), or capacity/throughput
-    sizing (use the optimize task type). This skill diagnoses runtime
-    5xx failures and target health, not config posture.
-  activation_triggers:
-    - "ALB 5xx error"
-    - "ALB 502 BadGateway"
-    - "ALB 503 ServiceUnavailable"
-    - "ALB 504 GatewayTimeout"
-    - "ALB 561 Unauthorized"
-    - "NLB 5xx"
-    - "target unhealthy"
-    - "no healthy targets"
-    - "target group health check failed"
-    - "ALB access logs 5xx"
-    - "target security group blocked"
-    - "deregistration draining stuck"
-    - "WAF blocked request ALB"
-    - "troubleshoot ALB"
-    - "troubleshoot load balancer 5xx"
-  invocation_schema: >-
-    Input: either (a) a symptom description (5xx error code, observed
-    pattern, failing target group), optionally paired with the load
-    balancer and target group metadata (describe-load-balancers,
-    describe-target-groups, describe-target-health output), OR (b) a
-    load balancer ARN or target group ARN for live-account diagnosis.
-    Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/
-    REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO,
-    ESCALATE} and LAYER ∈ {TARGET_HEALTH_CHECK, TARGET_SG_BLOCKED,
-    TARGET_NONE_HEALTHY, TARGET_TIMEOUT, TARGET_INVALID_RESPONSE,
-    LISTENER_MISCONFIGURED, WAF_BLOCKED, DEREGISTRATION_STUCK,
-    ALB_INTERNAL, UNKNOWN}.
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+  when_to_use: Diagnosing an ALB or NLB 5xx error (500, 502, 503, 504, 561), walking a symptom to the failed target, security group, health check, or listener layer with verify and fix commands, validating target health failures, identifying unhealthy target groups, diagnosing idle timeout exceeded, or triaging a "the load balancer returns 5xx" page where the root cause may be target health, SG rules, health check configuration, deregistration, WAF, or listener rules — not necessarily the load balancer itself.
+  when_not_to_use: Configuration posture audits (use elbv2-load-balancer-auditor for TLS policy, access-log enablement, deletion protection, SG exposure), TLS/cipher negotiation issues (use elbv2-load-balancer-auditor INSECURE_LISTENER), or capacity/throughput sizing (use the optimize task type). This skill diagnoses runtime 5xx failures and target health, not config posture.
+  activation_triggers: ALB 5xx error, ALB 502 BadGateway, ALB 503 ServiceUnavailable, ALB 504 GatewayTimeout, ALB 561 Unauthorized, NLB 5xx, target unhealthy, no healthy targets, target group health check failed, ALB access logs 5xx, target security group blocked, deregistration draining stuck, WAF blocked request ALB, troubleshoot ALB, troubleshoot load balancer 5xx
+  invocation_schema: 'Input: either (a) a symptom description (5xx error code, observed pattern, failing target group), optionally paired with the load balancer and target group metadata (describe-load-balancers, describe-target-groups, describe-target-health output), OR (b) a load balancer ARN or target group ARN for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/ REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and LAYER ∈ {TARGET_HEALTH_CHECK, TARGET_SG_BLOCKED, TARGET_NONE_HEALTHY, TARGET_TIMEOUT, TARGET_INVALID_RESPONSE, LISTENER_MISCONFIGURED, WAF_BLOCKED, DEREGISTRATION_STUCK, ALB_INTERNAL, UNKNOWN}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: ALB, NLB, ELBv2, load balancer, 5xx, 500, 502, 503, 504, 561, BadGateway, ServiceUnavailable, GatewayTimeout, target health, target group, health check, security group, idle timeout, deregistration, draining, WAF, listener rule, access logs, troubleshooting
+  tags: elbv2, alb, nlb, load-balancer, networking, troubleshooting, 5xx, target-health
 ---
 
 # ALB 5xx Troubleshooter

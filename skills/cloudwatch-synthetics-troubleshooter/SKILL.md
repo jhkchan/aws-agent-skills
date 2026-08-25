@@ -1,112 +1,29 @@
 ---
 name: cloudwatch-synthetics-troubleshooter
-description: >-
-  Diagnoses CloudWatch Synthetics canary failures via a symptom-to-cause
-  decision tree covering all five canary types (GUI Selenium WebDriver,
-  HTTP ping, API HTTP, broken-link checker, multi-step), runtime
-  exceptions (Node.js and Python), canary timeout (exceeded max
-  duration), Visual Monitoring screenshot comparison baseline mismatch,
-  authentication failures (canary cannot log in), and blue/green
-  deployment artifact mismatches. Walks canary run logs, HAR files,
-  step-level screenshots, CloudWatch metrics (SuccessPercent, Duration),
-  and canary artifact locations to pinpoint the failure type. Emits a
-  deterministic verdict (ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE)
-  with the specific failure category, evidence from the run report,
-  and a concrete fix. Use when a Synthetics canary transitions to
-  FAILED state, SuccessPercent drops below threshold, Visual Monitoring
-  reports a baseline mismatch, or the canary logs show timeout, auth,
-  or runtime exceptions.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Diagnoses CloudWatch Synthetics canary failures via a symptom-to-cause decision tree covering all five canary types (GUI Selenium WebDriver, HTTP ping, API HTTP, broken-link checker, multi-step), runtime exceptions (Node.js and Python), canary timeout (exceeded max duration), Visual Monitoring screenshot comparison baseline mismatch, authentication failures (canary cannot log in), and blue/green deployment artifact mismatches. Walks canary run logs, HAR files, step-level screenshots, CloudWatch metrics (SuccessPercent, Duration), and canary artifact locations to pinpoint the failure type. Emits a deterministic verdict (ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE) with the specific failure category, evidence from the run report, and a concrete fix. Use when a Synthetics canary transitions to FAILED state, SuccessPercent drops below threshold, Visual Monitoring reports a baseline mismatch, or the canary logs show timeout, auth, or runtime exceptions.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline diagnosis works from pasted canary run
-  reports, error strings, and CloudWatch metric observations.
-  Live-account diagnosis uses aws synthetics describe-canaries,
-  describe-canary-runs, get-canary-runs, aws logs start-query, aws s3 ls
-  on the artifact bucket, and aws cloudwatch get-metric-statistics for
-  CloudWatchSynthetics metrics (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - CloudWatch Synthetics
-  - canary
-  - GUI Selenium
-  - WebDriver
-  - HTTP canary
-  - API canary
-  - broken-link checker
-  - multi-step canary
-  - Visual Monitoring
-  - screenshot comparison
-  - baseline mismatch
-  - canary timeout
-  - Node.js runtime
-  - Python runtime
-  - authentication failure
-  - blue/green deployment
-  - canary recording
-  - SuccessPercent
-  - troubleshooting
-tags: [cloudwatch, synthetics, canary, management, troubleshoot, visual-monitoring, selenium]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works from pasted canary run reports, error strings, and CloudWatch metric observations. Live-account diagnosis uses aws synthetics describe-canaries, describe-canary-runs, get-canary-runs, aws logs start-query, aws s3 ls on the artifact bucket, and aws cloudwatch get-metric-statistics for CloudWatchSynthetics metrics (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags: [cloudwatch, synthetics, canary, management, troubleshoot]
-  dependencies: [aws-orchestrator]
-  keywords:
-    - CloudWatch Synthetics
-    - canary
-    - Visual Monitoring
-    - screenshot comparison
-    - canary timeout
-    - authentication failure
-    - troubleshooting
-  when_to_use: >-
-    Diagnosing a CloudWatch Synthetics canary that has transitioned to
-    FAILED state, SuccessPercent below threshold, Visual Monitoring
-    baseline mismatch alerts, canary timeout errors, authentication
-    failures where the canary cannot log in, runtime exceptions in
-    Node.js or Python canary scripts, broken-link checker failures, or
-    blue/green deployment artifact mismatches.
-  when_not_to_use: >-
-    Canary provisioning or script authoring, CloudWatch alarm
-    configuration audits (use cloudwatch-alarm-auditor), IAM policy
-    authoring for the canary execution role. This skill diagnoses
-    canary failures; it does not author canary scripts.
-  activation_triggers:
-    - "CloudWatch Synthetics canary FAILED"
-    - "Synthetics canary failure"
-    - "canary SuccessPercent low"
-    - "Synthetics Visual Monitoring mismatch"
-    - "canary screenshot comparison failure"
-    - "canary timeout exceeded max duration"
-    - "Synthetics canary authentication failure"
-    - "canary cannot log in"
-    - "Synthetics canary runtime exception"
-    - "troubleshoot CloudWatch canary"
-  invocation_schema: >-
-    Input: either (a) a symptom description (canary name, failure state,
-    observed CloudWatch metric pattern, error string from the run
-    report), optionally paired with describe-canary output, OR (b) a
-    canary name plus caller context for live-account diagnosis. Output:
-    a deterministic CANARY / VERDICT / ROOT_CAUSE / FAILURE_TYPE /
-    EVIDENCE / REMEDIATION block where VERDICT is one of
-    {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and FAILURE_TYPE is one
-    of {TIMEOUT, AUTH_FAILURE, VISUAL_MONITORING_MISMATCH,
-    RUNTIME_EXCEPTION, TARGET_ENDPOINT_DOWN, NETWORK_ERROR, DNS_FAILURE,
-    ARTIFACT_MISMATCH, RATE_LIMITED, SCRIPT_BUG,
-    INSUFFICIENT_PERMISSIONS, UNKNOWN}.
+  author: Jacky Chan — AWS Community Builder
+  tags: cloudwatch, synthetics, canary, management, troubleshoot, visual-monitoring, selenium
+  dependencies: aws-orchestrator
+  keywords: CloudWatch Synthetics, canary, GUI Selenium, WebDriver, HTTP canary, API canary, broken-link checker, multi-step canary, Visual Monitoring, screenshot comparison, baseline mismatch, canary timeout, Node.js runtime, Python runtime, authentication failure, blue/green deployment, canary recording, SuccessPercent, troubleshooting
+  when_to_use: Diagnosing a CloudWatch Synthetics canary that has transitioned to FAILED state, SuccessPercent below threshold, Visual Monitoring baseline mismatch alerts, canary timeout errors, authentication failures where the canary cannot log in, runtime exceptions in Node.js or Python canary scripts, broken-link checker failures, or blue/green deployment artifact mismatches.
+  when_not_to_use: Canary provisioning or script authoring, CloudWatch alarm configuration audits (use cloudwatch-alarm-auditor), IAM policy authoring for the canary execution role. This skill diagnoses canary failures; it does not author canary scripts.
+  activation_triggers: CloudWatch Synthetics canary FAILED, Synthetics canary failure, canary SuccessPercent low, Synthetics Visual Monitoring mismatch, canary screenshot comparison failure, canary timeout exceeded max duration, Synthetics canary authentication failure, canary cannot log in, Synthetics canary runtime exception, troubleshoot CloudWatch canary
+  invocation_schema: 'Input: either (a) a symptom description (canary name, failure state, observed CloudWatch metric pattern, error string from the run report), optionally paired with describe-canary output, OR (b) a canary name plus caller context for live-account diagnosis. Output: a deterministic CANARY / VERDICT / ROOT_CAUSE / FAILURE_TYPE / EVIDENCE / REMEDIATION block where VERDICT is one of {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and FAILURE_TYPE is one of {TIMEOUT, AUTH_FAILURE, VISUAL_MONITORING_MISMATCH, RUNTIME_EXCEPTION, TARGET_ENDPOINT_DOWN, NETWORK_ERROR, DNS_FAILURE, ARTIFACT_MISMATCH, RATE_LIMITED, SCRIPT_BUG, INSUFFICIENT_PERMISSIONS, UNKNOWN}.'
 ---
 
 # CloudWatch Synthetics Troubleshooter

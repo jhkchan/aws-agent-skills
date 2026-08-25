@@ -1,101 +1,27 @@
 ---
-name: cloudwatch-logs-insights-troubshooter
-description: >-
-  Diagnoses CloudWatch Logs Insights problems across six categories:
-  query returns no results (wrong log group, time range outside
-  ingestion, filter case sensitivity, field not extracted), query
-  timeout/cancelled (scanning too much data, no early filter, missing
-  stats aggregation), query syntax errors (command ordering, stats
-  without aggregation, glob vs regex in like, parse pattern),
-  Contributor Insights not showing (must enable separately via
-  PutInsightRule; does not share Logs Insights syntax), metric filter
-  vs Logs Insights confusion (separate features with different
-  syntax/output), and pattern/anomaly detection issues. Walks a
-  symptom-to-cause decision tree using describe-log-groups,
-  describe-log-streams, start-query, get-query-results,
-  describe-queries, describe-contributor-insights. Emits a verdict
-  (ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE). Use when a Logs
-  Insights query returns nothing, times out, throws a syntax error,
-  Contributor Insights is blank, or pattern/anomaly detection fails.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+name: cloudwatch-logs-insights-troubleshooter
+description: 'Diagnoses CloudWatch Logs Insights problems across six categories: query returns no results (wrong log group, time range outside ingestion, filter case sensitivity, field not extracted), query timeout/cancelled (scanning too much data, no early filter, missing stats aggregation), query syntax errors (command ordering, stats without aggregation, glob vs regex in like, parse pattern), Contributor Insights not showing (must enable separately via PutInsightRule; does not share Logs Insights syntax), metric filter vs Logs Insights confusion (separate features with different syntax/output), and pattern/anomaly detection issues. Walks a symptom-to-cause decision tree using describe-log-groups, describe-log-streams, start-query, get-query-results, describe-queries, describe-contributor-insights. Emits a verdict (ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE). Use when a Logs Insights query returns nothing, times out, throws a syntax error, Contributor Insights is blank, or pattern/anomaly detection fails.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline diagnosis works on pasted query text, error
-  messages, and console screenshots. Live-account diagnosis uses aws
-  logs describe-log-groups, describe-log-streams, start-query,
-  get-query-results, describe-queries, stop-query,
-  describe-contributor-insights, get-log-record, and
-  filter-log-events (AWS CLI v2, SSO or key-based credentials,
-  logs:DescribeLogGroups, logs:StartQuery, logs:GetQueryResults,
-  logs:DescribeQueries, logs:StopQuery, logs:DescribeQueries
-  permissions).
-keywords:
-  - CloudWatch Logs
-  - Logs Insights
-  - query
-  - no results
-  - timeout
-  - syntax error
-  - filter pattern
-  - Contributor Insights
-  - metric filter
-  - pattern command
-  - anomaly detection
-  - parse
-  - stats
-  - sort
-  - limit
-  - fields
-  - display
-  - glob
-  - regular expression
-  - time range
-tags: [cloudwatch, logs, management, troubleshoot, query, insights, contributor-insights, pattern, anomaly]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works on pasted query text, error messages, and console screenshots. Live-account diagnosis uses aws logs describe-log-groups, describe-log-streams, start-query, get-query-results, describe-queries, stop-query, describe-contributor-insights, get-log-record, and filter-log-events (AWS CLI v2, SSO or key-based credentials, logs:DescribeLogGroups, logs:StartQuery, logs:GetQueryResults...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
-  when_to_use: >-
-    Diagnosing CloudWatch Logs Insights failures: query returns zero
-    rows, query is cancelled or times out, query throws a syntax /
-    parse error, Contributor Insights shows no data for a log group,
-    metric filters appear not to work (and the user is actually using
-    Logs Insights), or the new pattern / anomaly detection commands
-    do not produce expected output.
-  activation_triggers:
-    - "CloudWatch Logs Insights no results"
-    - "Logs Insights query timeout"
-    - "Logs Insights query cancelled"
-    - "Logs Insights syntax error"
-    - "Logs Insights parse error"
-    - "Contributor Insights not showing"
-    - "Contributor Insights blank"
-    - "Logs Insights filter pattern not matching"
-    - "Logs Insights pattern command"
-    - "Logs Insights anomaly detection"
-    - "metric filter vs Logs Insights"
-    - "CloudWatch Logs query returns nothing"
-  invocation_schema: >-
-    Input: either (a) a symptom description (query text, observed
-    result, error message, log group name), OR (b) a live-account
-    scenario where the agent runs aws logs describe-log-groups,
-    start-query, get-query-results, describe-queries to gather
-    evidence. Output: a deterministic INCIDENT / VERDICT /
-    ROOT_CAUSE / EVIDENCE / REMEDIATION block where VERDICT is one
-    of {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and ROOT_CAUSE
-    names the specific failure category (NO_RESULTS / TIMEOUT /
-    SYNTAX_ERROR / CONTRIBUTOR_INSIGHTS / METRIC_FILTER_CONFUSION /
-    PATTERN_ANOMALY) and the offending query element or config.
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+  when_to_use: 'Diagnosing CloudWatch Logs Insights failures: query returns zero rows, query is cancelled or times out, query throws a syntax / parse error, Contributor Insights shows no data for a log group, metric filters appear not to work (and the user is actually using Logs Insights), or the new pattern / anomaly detection commands do not produce expected output.'
+  activation_triggers: CloudWatch Logs Insights no results, Logs Insights query timeout, Logs Insights query cancelled, Logs Insights syntax error, Logs Insights parse error, Contributor Insights not showing, Contributor Insights blank, Logs Insights filter pattern not matching, Logs Insights pattern command, Logs Insights anomaly detection, metric filter vs Logs Insights, CloudWatch Logs query returns nothing
+  invocation_schema: 'Input: either (a) a symptom description (query text, observed result, error message, log group name), OR (b) a live-account scenario where the agent runs aws logs describe-log-groups, start-query, get-query-results, describe-queries to gather evidence. Output: a deterministic INCIDENT / VERDICT / ROOT_CAUSE / EVIDENCE / REMEDIATION block where VERDICT is one of {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and ROOT_CAUSE names the specific failure category (NO_RESULTS / TIMEOUT / SYNTAX_ERROR / CONTRIBUTOR_INSIGHTS / METRIC_FILTER_CONFUSION / PATTERN_ANOMALY) and the offending query element or config.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudWatch Logs, Logs Insights, query, no results, timeout, syntax error, filter pattern, Contributor Insights, metric filter, pattern command, anomaly detection, parse, stats, sort, limit, fields, display, glob, regular expression, time range
+  tags: cloudwatch, logs, management, troubleshoot, query, insights, contributor-insights, pattern, anomaly
 ---
 
 # CloudWatch Logs Insights Troubleshooter

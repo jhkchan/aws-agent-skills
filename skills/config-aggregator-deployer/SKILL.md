@@ -1,44 +1,15 @@
 ---
 name: config-aggregator-deployer
 description: 'Provisions AWS Config aggregators with correct production defaults: organization aggregator (AWS Organizations delegated administrator), authorized accounts (individual 12-digit account IDs with explicit authorization), aggregator-vs-individual-recorder decision, cross-region and cross-account visibility, conformance pack deployment at organization level, organization config rules, Lambda-based config rule processors, and proactive resource evaluation via StartResourceEvaluation. Emits a READY_TO_DEPLOY checklist. Use when creating a Config aggregator, enabling AWS Config across an organization, setting up delegated admin for Config, deploying conformance packs org-wide, authorizing source accounts, configuring multi-account compliance visibility, or enabling proactive compliance checks. Triggers: create Config aggregator, organization aggregator, authorized accounts aggregation, conformance pack, delegated administrator, AWS Config multi-account, proactive rules, Lambda processor config rules.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
 compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with configservice, organizations, sts, lambda, iam, and s3 access. Works with Terraform aws_config_configuration_aggregator / aws_config_conformance_pack / aws_config_organization_custom_rule resources, CloudFormation AWS::Config::ConfigurationAggregator / AWS::Config::ConformancePack / AWS::Config::OrganizationConformancePack, and SAM templates.'
-keywords:
-- aws
-- config
-- aws-config
-- config-aggregator
-- governance
-- compliance
-- cloudops
-- deploy
-- provisioning
-- organizations
-- conformance-pack
-- organization-config-rule
-- delegated-administrator
-- proactive-rules
-tags:
-- aws
-- config
-- config-aggregator
-- governance
-- compliance
-- cloudops
-- deploy
-- conformance-pack
-- organizations
-dependencies:
-- aws-orchestrator
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: deploy
   skill_class: capability
@@ -46,32 +17,10 @@ metadata:
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-  - aws
-  - config
-  - config-aggregator
-  - governance
-  - compliance
-  - cloudops
-  - deploy
-  - conformance-pack
-  - organizations
-  dependencies:
-  - aws-orchestrator
-  keywords:
-  - create config aggregator
-  - organization aggregator
-  - aws config delegated administrator
-  - authorized accounts aggregation
-  - conformance pack organization
-  - organization config rule
-  - proactive config rules
-  - config lambda processor
-  - cross-region config visibility
-  - config multi-account
-  - aws config compliance
-  - resource evaluation
-  when_to_use: "Invoke when the user wants to create a new AWS Config aggregator (organization or authorized-account), enable Config across an AWS Organization via delegated administrator, deploy conformance packs at the organization level, set up organization config rules, authorize individual source accounts for aggregation, configure cross-region/cross-account compliance visibility, or enable proactive resource evaluation. Do NOT invoke for individual account Config recorder setup without aggregation — use config-rule-deployer for single-account Config rules."
+  tags: aws, config, config-aggregator, governance, compliance, cloudops, deploy, conformance-pack, organizations
+  dependencies: aws-orchestrator
+  keywords: aws, config, aws-config, config-aggregator, governance, compliance, cloudops, deploy, provisioning, organizations, conformance-pack, organization-config-rule, delegated-administrator, proactive-rules
+  when_to_use: Invoke when the user wants to create a new AWS Config aggregator (organization or authorized-account), enable Config across an AWS Organization via delegated administrator, deploy conformance packs at the organization level, set up organization config rules, authorize individual source accounts for aggregation, configure cross-region/cross-account compliance visibility, or enable proactive resource evaluation. Do NOT invoke for individual account Config recorder setup without aggregation — use config-rule-deployer for single-account Config rules.
 ---
 
 # Config Aggregator Deployer

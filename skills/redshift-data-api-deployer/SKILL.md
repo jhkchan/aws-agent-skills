@@ -1,107 +1,26 @@
 ---
 name: redshift-data-api-deployer
-description: >-
-  Deploys AWS Redshift Data API configurations with production defaults:
-  query execution without persistent connection (ExecuteStatement,
-  BatchExecuteStatement, DescribeStatement, GetStatementResult),
-  database authentication via Secrets Manager (no password in code),
-  temporary credentials (GetClusterCredentials), statement lifecycle
-  (SUBMITTED/STARTED/FINISHED/FAILED/ABORTED), result pagination
-  (NextToken), abort statement (AbortStatement), ListStatements,
-  integration with Lambda (poll DescribeStatement or EventBridge
-  notification), cancel via StatementId, 24-hour timeout, 24-hour
-  result expiry after completion, CloudTrail audit logging, and zero
-  additional cost (free — standard Redshift charges apply). Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when
-  running Redshift queries without a persistent connection, executing
-  SQL from Lambda, batch-executing statements, or replacing JDBC/ODBC
-  drivers with API calls. Triggers: redshift data api, execute
-  statement, batch execute statement, describe statement, get statement
-  result, redshift lambda query, redshift secrets manager, redshift
-  temporary credentials, abort statement, redshift query without
-  connection.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Deploys AWS Redshift Data API configurations with production defaults: query execution without persistent connection (ExecuteStatement, BatchExecuteStatement, DescribeStatement, GetStatementResult), database authentication via Secrets Manager (no password in code), temporary credentials (GetClusterCredentials), statement lifecycle (SUBMITTED/STARTED/FINISHED/FAILED/ABORTED), result pagination (NextToken), abort statement (AbortStatement), ListStatements, integration with Lambda (poll DescribeStatement or EventBridge notification), cancel via StatementId, 24-hour timeout, 24-hour result expiry after completion, CloudTrail audit logging, and zero additional cost (free — standard Redshift charges apply). Emits a READY_TO_DEPLOY checklist with verification commands.. Triggers: redshift data api, execute statement, batch execute statement, describe statement, get statement result, redshift lambda query, redshift secrets manager, redshift temporary credentials, abort statement, redshift query without connection.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with redshift-data
-  access. Works with Terraform aws_redshiftdata_statement resources,
-  CloudFormation AWS::Redshift::Data, and boto3
-  redshift-data client.
-keywords:
-  - aws
-  - redshift
-  - data api
-  - execute statement
-  - batch execute
-  - describe statement
-  - get statement result
-  - secrets manager
-  - temporary credentials
-  - cloudops
-  - deploy
-  - serverless query
-  - statement lifecycle
-  - cloudtrail
-tags:
-  - aws
-  - redshift
-  - data-api
-  - cloudops
-  - deploy
-  - analytics
-  - serverless-query
-  - secrets-manager
-  - cloudtrail
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with redshift-data access. Works with Terraform aws_redshiftdata_statement resources, CloudFormation AWS::Redshift::Data, and boto3 redshift-data client.'
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - redshift
-    - data-api
-    - cloudops
-    - deploy
-    - analytics
-    - serverless-query
-    - secrets-manager
-    - cloudtrail
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - redshift data api
-    - execute statement
-    - batch execute statement
-    - describe statement
-    - get statement result
-    - redshift lambda query
-    - redshift secrets manager authentication
-    - redshift temporary credentials
-    - abort statement
-    - redshift query without connection
-  when_to_use: >-
-    Invoke when the user wants to run Redshift queries via the Data API
-    (no persistent connection), execute SQL from Lambda, batch-execute
-    statements, authenticate via Secrets Manager or temporary credentials,
-    poll statement lifecycle, paginate results, abort long-running queries,
-    or replace JDBC/ODBC connection management with API calls. Do NOT
-    invoke for Redshift cluster provisioning (use redshift-cluster-
-    deployer), Redshift Serverless (use redshift-serverless-deployer),
-    or query troubleshooting (use redshift-query-troubleshooter).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, redshift, data-api, cloudops, deploy, analytics, serverless-query, secrets-manager, cloudtrail
+  dependencies: aws-orchestrator
+  keywords: aws, redshift, data api, execute statement, batch execute, describe statement, get statement result, secrets manager, temporary credentials, cloudops, deploy, serverless query, statement lifecycle, cloudtrail
+  when_to_use: Invoke when the user wants to run Redshift queries via the Data API (no persistent connection), execute SQL from Lambda, batch-execute statements, authenticate via Secrets Manager or temporary credentials, poll statement lifecycle, paginate results, abort long-running queries, or replace JDBC/ODBC connection management with API calls. Do NOT invoke for Redshift cluster provisioning (use redshift-cluster- deployer), Redshift Serverless (use redshift-serverless-deployer), or query troubleshooting (use redshift-query-troubleshooter).
 ---
 
 # Redshift Data API Deployer

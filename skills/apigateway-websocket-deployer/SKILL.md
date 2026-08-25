@@ -1,113 +1,26 @@
 ---
 name: apigateway-websocket-deployer
-description: >-
-  Provisions Amazon API Gateway WebSocket APIs with production
-  defaults: route selection expression ($request.body.action),
-  connection routes ($connect, $disconnect), custom routes,
-  route responses (two-way communication), integration types
-  (Lambda, AWS Service, Mock, HTTP), deployment and stage
-  management, connection-level throttling, CloudWatch Logs
-  (execution + access logs), WAF integration, Lambda custom
-  authorizers, backend connection management (DynamoDB
-  ConnectionId table), ping/pong keepalive, cross-account
-  backend invocation, and 128 KB message size limit. Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use
-  when creating a WebSocket API, configuring route selection,
-  managing WebSocket connections, setting up Lambda authorizers
-  for WebSocket, deploying a WebSocket stage, or implementing
-  bidirectional real-time communication. Triggers: create
-  websocket api, configure route selection expression,
-  websocket connection management, lambda authorizer websocket,
-  websocket deployment stage, bidirectional communication api
-  gateway, websocket ping pong keepalive.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon API Gateway WebSocket APIs with production defaults: route selection expression ($request.body.action), connection routes ($connect, $disconnect), custom routes, route responses (two-way communication), integration types (Lambda, AWS Service, Mock, HTTP), deployment and stage management, connection-level throttling, CloudWatch Logs (execution + access logs), WAF integration, Lambda custom authorizers, backend connection management (DynamoDB ConnectionId table), ping/pong keepalive, cross-account backend invocation, and 128 KB message size limit. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a WebSocket API, configuring route selection, managing WebSocket connections, setting up Lambda authorizers for WebSocket, deploying a. Triggers: create websocket api, configure route selection expression, websocket connection management, lambda authorizer websocket, websocket deployment stage, bidirectional communication api gateway, websocket ping pong keepalive.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor,
-  Windsurf, Codex, Gemini). For live deployment: AWS CLI v2
-  with apigateway / lambda / dynamodb access. Works with
-  Terraform aws_apigatewayv2_api / aws_apigatewayv2_route /
-  aws_apigatewayv2_integration / aws_apigatewayv2_deployment
-  resources and CloudFormation AWS::ApiGatewayV2::Api templates.
-keywords:
-  - aws
-  - api gateway
-  - websocket
-  - cloudops
-  - deploy
-  - provisioning
-  - route selection
-  - connection management
-  - lambda authorizer
-  - waf
-  - bidirectional
-  - real-time
-  - dynamodb connections
-  - ping pong
-tags:
-  - aws
-  - api-gateway
-  - websocket
-  - cloudops
-  - deploy
-  - appintegration
-  - provisioning
-  - route-selection
-  - connection-management
-  - lambda-authorizer
-  - waf
-  - real-time
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with apigateway / lambda / dynamodb access. Works with Terraform aws_apigatewayv2_api / aws_apigatewayv2_route / aws_apigatewayv2_integration / aws_apigatewayv2_deployment resources and CloudFormation AWS::ApiGatewayV2::Api templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - api-gateway
-    - websocket
-    - cloudops
-    - deploy
-    - appintegration
-    - provisioning
-    - route-selection
-    - connection-management
-    - lambda-authorizer
-    - waf
-    - real-time
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create websocket api
-    - configure route selection expression
-    - websocket connection management
-    - lambda authorizer websocket
-    - websocket deployment stage
-    - bidirectional communication api gateway
-    - websocket ping pong keepalive
-  when_to_use: >-
-    Invoke when the user wants to create an API Gateway WebSocket
-    API, configure route selection expressions, manage WebSocket
-    connections ($connect/$disconnect), set up Lambda custom
-    authorizers for WebSocket auth, deploy a WebSocket stage,
-    implement bidirectional real-time communication, configure
-    connection management with DynamoDB, or integrate WAF with a
-    WebSocket API. Do NOT invoke for API Gateway REST APIs or HTTP
-    APIs (use apigateway-rest-deployer or apigateway-http-api-deployer),
-    for AppSync subscriptions (use appsync skills), or for IoT Core
-    (use iot skills).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, api-gateway, websocket, cloudops, deploy, appintegration, provisioning, route-selection, connection-management, lambda-authorizer, waf, real-time
+  dependencies: aws-orchestrator
+  keywords: aws, api gateway, websocket, cloudops, deploy, provisioning, route selection, connection management, lambda authorizer, waf, bidirectional, real-time, dynamodb connections, ping pong
+  when_to_use: Invoke when the user wants to create an API Gateway WebSocket API, configure route selection expressions, manage WebSocket connections ($connect/$disconnect), set up Lambda custom authorizers for WebSocket auth, deploy a WebSocket stage, implement bidirectional real-time communication, configure connection management with DynamoDB, or integrate WAF with a WebSocket API. Do NOT invoke for API Gateway REST APIs or HTTP APIs (use apigateway-rest-deployer or apigateway-http-api-deployer), for AppSync subscriptions (use appsync skills), or for IoT Core (use iot skills).
 ---
 
 # API Gateway WebSocket Deployer

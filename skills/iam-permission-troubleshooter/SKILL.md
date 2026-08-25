@@ -1,82 +1,26 @@
 ---
 name: iam-permission-troubleshooter
-description: >-
-  Diagnoses AWS IAM AccessDenied, ExplicitDeny, Client.UnauthorizedOperation,
-  and NotAuthorized sts:AssumeRole errors via a systematic policy-evaluation
-  decision tree — Organisation SCP, resource-based, identity-based, permissions
-  boundary, and session policy layers — and pinpoints the specific policy
-  statement that denied the request. Emits a deterministic verdict
-  (ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE) with the failing evaluation
-  path and the exact policy edit. Use when an AWS API call returns
-  AccessDenied, when sts:AssumeRole fails, when a Lambda/EC2/ECS task cannot
-  reach a cross-account resource, when a new SCP or permissions boundary
-  silently breaks a workload, or when iam simulate-principal-policy returns
-  an unexpected implicit deny.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Diagnoses AWS IAM AccessDenied, ExplicitDeny, Client.UnauthorizedOperation, and NotAuthorized sts:AssumeRole errors via a systematic policy-evaluation decision tree — Organisation SCP, resource-based, identity-based, permissions boundary, and session policy layers — and pinpoints the specific policy statement that denied the request. Emits a deterministic verdict (ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE) with the failing evaluation path and the exact policy edit. Use when an AWS API call returns AccessDenied, when sts:AssumeRole fails, when a Lambda/EC2/ECS task cannot reach a cross-account resource, when a new SCP or permissions boundary silently breaks a workload, or when iam simulate-principal-policy returns an unexpected implicit deny.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Offline diagnosis works on supplied policy JSON. Live-account
-  diagnosis uses aws iam simulate-principal-policy, aws iam
-  list-attached-role-policies / list-role-policies, aws organizations
-  describe-policy, aws cloudtrail lookup-events, aws sts get-caller-identity
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - IAM
-  - AccessDenied
-  - ExplicitDeny
-  - Client.UnauthorizedOperation
-  - NotAuthorized
-  - sts:AssumeRole
-  - trust policy
-  - SCP
-  - permissions boundary
-  - session policy
-  - policy evaluation
-  - cross-account
-  - KMS key policy
-  - PassRole
-  - simulate-principal-policy
-  - CloudTrail
-  - implicit deny
-tags: [iam, security, troubleshoot, access-denied, policy-evaluation, scp, permissions-boundary]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works on supplied policy JSON. Live-account diagnosis uses aws iam simulate-principal-policy, aws iam list-attached-role-policies / list-role-policies, aws organizations describe-policy, aws cloudtrail lookup-events, aws sts get-caller-identity (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: troubleshoot
   skill_class: capability
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
-  when_to_use: >-
-    Diagnosing an AWS AccessDenied / ExplicitDeny / Client.UnauthorizedOperation
-    error, debugging sts:AssumeRole failures, investigating why a Lambda or
-    ECS task cannot reach a cross-account resource, validating SCP or
-    permissions-boundary impact after a recent change, or interpreting an
-    unexpected implicit deny from iam simulate-principal-policy.
-  activation_triggers:
-    - "AccessDenied on"
-    - "why am I getting AccessDenied"
-    - "sts:AssumeRole failed"
-    - "NotAuthorized to perform"
-    - "Client.UnauthorizedOperation"
-    - "Lambda cannot access cross-account"
-    - "ECS task AccessDenied"
-    - "implicit deny on simulate-principal-policy"
-    - "SCP blocked the call"
-    - "permissions boundary blocking"
-  invocation_schema: >-
-    Input: either (a) a symptom description (the error string, the failing API
-    call, the principal ARN) plus any policy documents already gathered, OR
-    (b) a live-account scenario where the agent must run diagnostic CLI
-    commands to gather context. Output: a deterministic INCIDENT / VERDICT /
-    ROOT_CAUSE / EVIDENCE / REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_FOUND,
-    NEED_MORE_INFO, ESCALATE} and ROOT_CAUSE names the specific policy layer
-    and statement that produced the deny.
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+  when_to_use: Diagnosing an AWS AccessDenied / ExplicitDeny / Client.UnauthorizedOperation error, debugging sts:AssumeRole failures, investigating why a Lambda or ECS task cannot reach a cross-account resource, validating SCP or permissions-boundary impact after a recent change, or interpreting an unexpected implicit deny from iam simulate-principal-policy.
+  activation_triggers: AccessDenied on, why am I getting AccessDenied, sts:AssumeRole failed, NotAuthorized to perform, Client.UnauthorizedOperation, Lambda cannot access cross-account, ECS task AccessDenied, implicit deny on simulate-principal-policy, SCP blocked the call, permissions boundary blocking
+  invocation_schema: 'Input: either (a) a symptom description (the error string, the failing API call, the principal ARN) plus any policy documents already gathered, OR (b) a live-account scenario where the agent must run diagnostic CLI commands to gather context. Output: a deterministic INCIDENT / VERDICT / ROOT_CAUSE / EVIDENCE / REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and ROOT_CAUSE names the specific policy layer and statement that produced the deny.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: IAM, AccessDenied, ExplicitDeny, Client.UnauthorizedOperation, NotAuthorized, sts:AssumeRole, trust policy, SCP, permissions boundary, session policy, policy evaluation, cross-account, KMS key policy, PassRole, simulate-principal-policy, CloudTrail, implicit deny
+  tags: iam, security, troubleshoot, access-denied, policy-evaluation, scp, permissions-boundary
 ---
 
 # IAM Permission Troubleshooter

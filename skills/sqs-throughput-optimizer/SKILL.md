@@ -1,129 +1,29 @@
 ---
 name: sqs-throughput-optimizer
-description: >-
-  Optimises AWS SQS queue throughput and cost across seven dimensions: queue
-  type selection (Standard vs FIFO), polling strategy (long vs short to
-  eliminate empty receives), batch size tuning (max 10 messages per batch
-  API to cut request units 10x), visibility timeout right-sizing,
-  message retention period cost impact, DLQ redrive policy tuning, and FIFO
-  high-throughput mode (DeduplicationScope + ThroughputLimit). Reads
-  CloudWatch metrics (ApproximateNumberOfMessagesVisible,
-  ApproximateAgeOfOldestMessage, NumberOfEmptyReceives), evaluates
-  per-queue API request spend, and projects monthly savings. Emits
-  OPTIMIZED or FURTHER_OPTIMIZATION_AVAILABLE with a queue-specific
-  recommendation and estimated savings.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Optimises AWS SQS queue throughput and cost across seven dimensions: queue type selection (Standard vs FIFO), polling strategy (long vs short to eliminate empty receives), batch size tuning (max 10 messages per batch API to cut request units 10x), visibility timeout right-sizing, message retention period cost impact, DLQ redrive policy tuning, and FIFO high-throughput mode (DeduplicationScope + ThroughputLimit). Reads CloudWatch metrics (ApproximateNumberOfMessagesVisible, ApproximateAgeOfOldestMessage, NumberOfEmptyReceives), evaluates per-queue API request spend, and projects monthly savings. Emits OPTIMIZED or FURTHER_OPTIMIZATION_AVAILABLE with a queue-specific recommendation and estimated savings.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Offline recommendation classification works from pasted
-  CloudWatch metrics. Live-account optimization uses aws sqs list-queues,
-  aws sqs get-queue-attributes, aws sqs get-queue-url, aws cloudwatch
-  get-metric-statistics (ApproximateNumberOfMessagesVisible,
-  ApproximateAgeOfOldestMessage, NumberOfEmptyReceives,
-  NumberOfMessagesSent, NumberOfMessagesReceived, NumberOfMessagesDeleted),
-  aws ce get-cost-and-usage (AWS CLI v2, SSO or key-based credentials).
-  Pricing references us-east-1 published rates as of 2026; re-state
-  regional rates from the reference matrix for other regions.
-keywords:
-  - SQS
-  - throughput optimization
-  - cost optimization
-  - FIFO
-  - Standard queue
-  - long polling
-  - short polling
-  - batch size
-  - visibility timeout
-  - message retention
-  - DLQ
-  - dead-letter queue
-  - redrive policy
-  - high-throughput mode
-  - DeduplicationScope
-  - ThroughputLimit
-  - MessageGroupId
-  - SSE-KMS
-  - cross-region messaging
-  - FinOps
-  - AppIntegration
-tags:
-  - sqs
-  - messaging
-  - app-integration
-  - cost-optimization
-  - finops
-  - throughput
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted CloudWatch metrics. Live-account optimization uses aws sqs list-queues, aws sqs get-queue-attributes, aws sqs get-queue-url, aws cloudwatch get-metric-statistics (ApproximateNumberOfMessagesVisible, ApproximateAgeOfOldestMessage, NumberOfEmptyReceives, NumberOfMessagesSent, NumberOfMessagesReceived, NumberOfMessagesDeleted), aws ce get-cost-and-usage (AWS...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-  when_to_use: >-
-    Optimising SQS queue throughput, reducing empty receives via long
-    polling, tuning batch size on consumers, right-sizing visibility
-    timeout, reducing DLQ backlog via redrive policy adjustments,
-    enabling FIFO high-throughput mode, or reviewing per-queue SQS API
-    request spend.
-  when_not_to_use: >-
-    SNS topic cost (use sns-topic-optimizer), EventBridge bus cost (use
-    eventbridge-bus-optimizer), Kinesis Data Streams throughput (use
-    kinesis-stream-optimizer), or functional SQS troubleshooting
-    (message not arriving, permission denied — use the SQS
-    troubleshooter). This skill focuses on throughput and cost-driven
-    optimization decisions, not functional debugging of broken queues.
-  activation_triggers:
-    - optimise SQS throughput
-    - SQS cost optimization
-    - SQS long polling
-    - SQS batch size
-    - SQS empty receives
-    - SQS visibility timeout
-    - SQS DLQ redrive
-    - SQS FIFO high throughput
-    - SQS message retention cost
-    - SQS SSE-KMS cost
-    - SQS FinOps savings
-    - SQS request units
-    - reduce SQS bill
-    - queue throughput review
-  invocation_schema: >-
-    Input: either (a) a queue URL + live-account context, (b) a pasted set
-    of CloudWatch SQS metrics with at least 14 days of observation, OR (c)
-    a queue configuration document (queue type, attributes, redrive
-    policy, consumer batch settings). Output: a deterministic
-    TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/MIGRATION_STEPS
-    block per queue, where VERDICT is one of OPTIMIZED,
-    FURTHER_OPTIMIZATION_AVAILABLE.
-  invocation_example: >-
-    # Minimal valid input (offline metric classification):
-    QueueName: order-events-queue
-    QueueType: Standard
-    Region: us-east-1
-    Attributes:
-      ReceiveMessageWaitTimeSeconds: 0
-      VisibilityTimeout: 30
-      MessageRetentionPeriod: 345600 (4 days)
-      DelaySeconds: 0
-      RedrivePolicy: {"deadLetterTargetArn":"arn:...","maxReceiveCount":"3"}
-    Consumer config:
-      Lambda ESM BatchSize: 1
-      MaximumBatchingWindowInSeconds: 0
-    Metrics (last 30 days):
-      - NumberOfEmptyReceives: 85,000,000/month
-      - NumberOfMessagesReceived: 15,000,000/month
-      - ApproximateNumberOfMessagesVisible: 2,000 avg
-      - ApproximateAgeOfOldestMessage: 45 seconds avg
-    Emit the standard optimization block (TARGET, VERDICT, REASON,
-    RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+  when_to_use: Optimising SQS queue throughput, reducing empty receives via long polling, tuning batch size on consumers, right-sizing visibility timeout, reducing DLQ backlog via redrive policy adjustments, enabling FIFO high-throughput mode, or reviewing per-queue SQS API request spend.
+  when_not_to_use: SNS topic cost (use sns-topic-optimizer), EventBridge bus cost (use eventbridge-bus-optimizer), Kinesis Data Streams throughput (use kinesis-stream-optimizer), or functional SQS troubleshooting (message not arriving, permission denied — use the SQS troubleshooter). This skill focuses on throughput and cost-driven optimization decisions, not functional debugging of broken queues.
+  activation_triggers: optimise SQS throughput, SQS cost optimization, SQS long polling, SQS batch size, SQS empty receives, SQS visibility timeout, SQS DLQ redrive, SQS FIFO high throughput, SQS message retention cost, SQS SSE-KMS cost, SQS FinOps savings, SQS request units, reduce SQS bill, queue throughput review
+  invocation_schema: 'Input: either (a) a queue URL + live-account context, (b) a pasted set of CloudWatch SQS metrics with at least 14 days of observation, OR (c) a queue configuration document (queue type, attributes, redrive policy, consumer batch settings). Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/MIGRATION_STEPS block per queue, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
+  invocation_example: "# Minimal valid input (offline metric classification): QueueName: order-events-queue QueueType: Standard Region: us-east-1 Attributes:\n  ReceiveMessageWaitTimeSeconds: 0\n  VisibilityTimeout: 30\n  MessageRetentionPeriod: 345600 (4 days)\n  DelaySeconds: 0\n  RedrivePolicy: {\"deadLetterTargetArn\":\"arn:...\",\"maxReceiveCount\":\"3\"}\nConsumer config:\n  Lambda ESM BatchSize: 1\n  MaximumBatchingWindowInSeconds: 0\nMetrics (last 30 days):\n  - NumberOfEmptyReceives: 85,000,000/month\n  - NumberOfMessagesReceived: 15,000,000/month\n  - ApproximateNumberOfMessagesVisible: 2,000 avg\n  - ApproximateAgeOfOldestMessage: 45 seconds avg\nEmit the standard optimization block (TARGET, VERDICT, REASON, RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: SQS, throughput optimization, cost optimization, FIFO, Standard queue, long polling, short polling, batch size, visibility timeout, message retention, DLQ, dead-letter queue, redrive policy, high-throughput mode, DeduplicationScope, ThroughputLimit, MessageGroupId, SSE-KMS, cross-region messaging, FinOps, AppIntegration
+  tags: sqs, messaging, app-integration, cost-optimization, finops, throughput
 ---
 
 # SQS Throughput Optimizer

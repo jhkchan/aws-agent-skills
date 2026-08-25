@@ -1,84 +1,24 @@
 ---
 name: shield-advanced-coverage-auditor
-description: >-
-  Audits AWS Shield Advanced coverage posture — protected-resource coverage
-  (CloudFront/Route 53 auto-protection, ALB/NLB/CLB/EIP/EC2 explicit
-  protection), DDoS Response Team (DRT) role and log-bucket access,
-  health-based detection per protection, proactive engagement and emergency
-  contact list, and WAF Web ACL integration for L7 mitigation. Emits a
-  deterministic verdict (UNPROTECTED | NO_DRT_ACCESS | CONFIG_GAP | OK) with
-  enumerated findings and specific remediation. Use when reviewing Shield
-  Advanced coverage, checking which internet-facing resources are protected,
-  validating DRT access, auditing health-based detection, or hardening DDoS
-  posture before a launch or after an incident.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Shield Advanced coverage posture — protected-resource coverage (CloudFront/Route 53 auto-protection, ALB/NLB/CLB/EIP/EC2 explicit protection), DDoS Response Team (DRT) role and log-bucket access, health-based detection per protection, proactive engagement and emergency contact list, and WAF Web ACL integration for L7 mitigation. Emits a deterministic verdict (UNPROTECTED | NO_DRT_ACCESS | CONFIG_GAP | OK) with enumerated findings and specific remediation. Use when reviewing Shield Advanced coverage, checking which internet-facing resources are protected, validating DRT access, auditing health-based detection, or hardening DDoS posture before a launch or after an incident.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline config-document classification.
-  Live-account audits use aws shield get-subscription-state,
-  aws shield list-protections, aws shield describe-drt-access,
-  aws shield describe-emergency-contact-settings, and aws wafv2 get-web-acl
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Shield Advanced
-  - DDoS protection
-  - DRT
-  - DDoS Response Team
-  - Shield Standard
-  - proactive engagement
-  - health-based detection
-  - Route 53 health check
-  - CreateProtection
-  - AssociateDRTRole
-  - AssociateDRTLogBucket
-  - EnableProactiveEngagement
-  - EmergencyContactList
-  - WAF Web ACL
-  - L7 mitigation
-  - CloudFront auto-protection
-  - Elastic IP protection
-  - cost protection
-  - CreateSubscription
-  - application layer automatic response
-tags: [shield, security, ddos, drt, waf, cloudfront, route53, alb, eip, coverage, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline config-document classification. Live-account audits use aws shield get-subscription-state, aws shield list-protections, aws shield describe-drt-access, aws shield describe-emergency-contact-settings, and aws wafv2 get-web-acl (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
-  verdict_shape: "UNPROTECTED | NO_DRT_ACCESS | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing Shield Advanced coverage before a public launch, checking which
-    internet-facing resources (ALB, NLB, CLB, EIP, CloudFront, Route 53) are
-    protected, validating DRT role and log-bucket access, auditing
-    health-based detection wiring, verifying proactive engagement and
-    emergency contacts, or hardening DDoS posture after an incident.
-  activation_triggers:
-    - "audit Shield Advanced coverage"
-    - "is my ALB protected by Shield Advanced"
-    - "check DRT access"
-    - "is proactive engagement enabled"
-    - "Shield Advanced health-based detection"
-    - "which resources are DDoS protected"
-    - "Shield Advanced subscription state"
-    - "DDoS response team access"
-    - "harden DDoS posture"
-  invocation_schema: >-
-    Input — one of: (a) config_snapshot object with keys:
-    subscription_state (ACTIVE|INACTIVE), resource_inventory (list of
-    {type, arn}), protections (list of {id, name, resource_arn,
-    health_check_ids}), drt_access ({role_arn, log_buckets}),
-    proactive_engagement (ENABLED|DISABLED), emergency_contact_list (list),
-    web_acls (list of {resource_arn, web_acl_arn}); OR (b) account_id
-    (string) for live-account audit. Output — deterministic block:
-    SCOPE (string), VERDICT (enum: UNPROTECTED|NO_DRT_ACCESS|CONFIG_GAP|OK|ERROR),
-    REASON (string), FINDINGS (list of {severity, description, step}),
-    REMEDIATION (list of strings, one per finding).
+  verdict_shape: UNPROTECTED | NO_DRT_ACCESS | CONFIG_GAP | OK
+  when_to_use: Reviewing Shield Advanced coverage before a public launch, checking which internet-facing resources (ALB, NLB, CLB, EIP, CloudFront, Route 53) are protected, validating DRT role and log-bucket access, auditing health-based detection wiring, verifying proactive engagement and emergency contacts, or hardening DDoS posture after an incident.
+  activation_triggers: audit Shield Advanced coverage, is my ALB protected by Shield Advanced, check DRT access, is proactive engagement enabled, Shield Advanced health-based detection, which resources are DDoS protected, Shield Advanced subscription state, DDoS response team access, harden DDoS posture
+  invocation_schema: 'Input — one of: (a) config_snapshot object with keys: subscription_state (ACTIVE|INACTIVE), resource_inventory (list of {type, arn}), protections (list of {id, name, resource_arn, health_check_ids}), drt_access ({role_arn, log_buckets}), proactive_engagement (ENABLED|DISABLED), emergency_contact_list (list), web_acls (list of {resource_arn, web_acl_arn}); OR (b) account_id (string) for live-account audit. Output — deterministic block: SCOPE (string), VERDICT (enum: UNPROTECTED|NO_DRT_ACCESS|CONFIG_GAP|OK|ERROR), REASON (string), FINDINGS (list of {severity, description, step}), REMEDIATION (list of strings, one per finding).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Shield Advanced, DDoS protection, DRT, DDoS Response Team, Shield Standard, proactive engagement, health-based detection, Route 53 health check, CreateProtection, AssociateDRTRole, AssociateDRTLogBucket, EnableProactiveEngagement, EmergencyContactList, WAF Web ACL, L7 mitigation, CloudFront auto-protection, Elastic IP protection, cost protection, CreateSubscription, application layer automatic response
+  tags: shield, security, ddos, drt, waf, cloudfront, route53, alb, eip, coverage, audit
 ---
 
 # Shield Advanced Coverage Auditor

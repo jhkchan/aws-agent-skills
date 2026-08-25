@@ -1,69 +1,24 @@
 ---
 name: bedrock-model-access-inventory
-description: >-
-  Audits Amazon Bedrock model access posture — invocation logging coverage
-  (S3/CloudWatch/DataFirehose destinations and per-modality delivery flags),
-  customer-managed KMS encryption versus AWS-managed default, Anthropic
-  Claude geo-block risk in APAC jurisdictions (models list as enabled but
-  fail at invocation with ValidationException), provisioned throughput
-  commitment state, and guardrail coverage on enabled models. Emits a
-  deterministic verdict (NO_LOGGING | NO_ENCRYPTION | GEO_BLOCK_RISK |
-  CONFIG_GAP | OK) per Bedrock account inventory. Use when reviewing
-  Bedrock model access, checking invocation logging, validating KMS
-  encryption, assessing Claude geo-block exposure, or auditing provisioned
-  throughput commitments.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits Amazon Bedrock model access posture — invocation logging coverage (S3/CloudWatch/DataFirehose destinations and per-modality delivery flags), customer-managed KMS encryption versus AWS-managed default, Anthropic Claude geo-block risk in APAC jurisdictions (models list as enabled but fail at invocation with ValidationException), provisioned throughput commitment state, and guardrail coverage on enabled models. Emits a deterministic verdict (NO_LOGGING | NO_ENCRYPTION | GEO_BLOCK_RISK | CONFIG_GAP | OK) per Bedrock account inventory. Use when reviewing Bedrock model access, checking invocation logging, validating KMS encryption, assessing Claude geo-block exposure, or auditing provisioned throughput commitments.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline inventory-document classification.
-  Live-account audits use aws bedrock get-invocation-logging, aws bedrock
-  list-foundation-models, aws bedrock list-provisioned-model-throughputs,
-  and aws bedrock list-guardrails (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Bedrock
-  - model access
-  - invocation logging
-  - KMS encryption
-  - geo-block
-  - Claude APAC
-  - provisioned throughput
-  - guardrails
-  - Nova
-  - DataFirehose
-  - audit trail
-  - compliance
-  - model inventory
-tags: [bedrock, ai-ml, security, invocation-logging, kms-encryption, geo-block, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline inventory-document classification. Live-account audits use aws bedrock get-invocation-logging, aws bedrock list-foundation-models, aws bedrock list-provisioned-model-throughputs, and aws bedrock list-guardrails (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AI/ML
-  verdict_shape: "NO_LOGGING | NO_ENCRYPTION | GEO_BLOCK_RISK | CONFIG_GAP | OK | ERROR"
-  when_to_use: >-
-    Reviewing Bedrock model access before production deployment, auditing
-    invocation logging coverage, validating customer-managed KMS encryption,
-    assessing Anthropic Claude geo-block risk in APAC, checking provisioned
-    throughput commitment state, or hardening Bedrock security posture.
-  activation_triggers:
-    - "audit bedrock model access"
-    - "check bedrock invocation logging"
-    - "is bedrock kms encrypted"
-    - "claude geo-block apac"
-    - "bedrock provisioned throughput"
-    - "bedrock guardrail coverage"
-    - "bedrock inventory audit"
-  invocation_schema: >-
-    Input: a Bedrock Model Access inventory document (region, enabled models,
-    invocation logging config, KMS key, provisioned throughput, guardrails).
-    Output: deterministic INVENTORY/VERDICT/REASON/FINDINGS/REMEDIATION block
-    where VERDICT is one of {NO_LOGGING, NO_ENCRYPTION, GEO_BLOCK_RISK,
-    CONFIG_GAP, OK}.
+  verdict_shape: NO_LOGGING | NO_ENCRYPTION | GEO_BLOCK_RISK | CONFIG_GAP | OK | ERROR
+  when_to_use: Reviewing Bedrock model access before production deployment, auditing invocation logging coverage, validating customer-managed KMS encryption, assessing Anthropic Claude geo-block risk in APAC, checking provisioned throughput commitment state, or hardening Bedrock security posture.
+  activation_triggers: audit bedrock model access, check bedrock invocation logging, is bedrock kms encrypted, claude geo-block apac, bedrock provisioned throughput, bedrock guardrail coverage, bedrock inventory audit
+  invocation_schema: 'Input: a Bedrock Model Access inventory document (region, enabled models, invocation logging config, KMS key, provisioned throughput, guardrails). Output: deterministic INVENTORY/VERDICT/REASON/FINDINGS/REMEDIATION block where VERDICT is one of {NO_LOGGING, NO_ENCRYPTION, GEO_BLOCK_RISK, CONFIG_GAP, OK}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Bedrock, model access, invocation logging, KMS encryption, geo-block, Claude APAC, provisioned throughput, guardrails, Nova, DataFirehose, audit trail, compliance, model inventory
+  tags: bedrock, ai-ml, security, invocation-logging, kms-encryption, geo-block, audit
 ---
 
 # Bedrock Model Access Inventory Auditor

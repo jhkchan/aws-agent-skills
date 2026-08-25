@@ -1,76 +1,24 @@
 ---
 name: vpc-lattice-auth-auditor
-description: >-
-  Audits VPC Lattice service networks for auth-policy absence (default-open
-  posture), public Principal:"*" Invoke grants, NotAction inverse-wildcard
-  traps, cross-account principal exposure without strong conditions, target
-  group security (IP targets to untrusted CIDRs, type-mismatch health checks),
-  cross-account RAM share coverage, routing-rule catch-all exposure, and
-  service-level auth-policy overrides that silently bypass network-level
-  guards. Emits a deterministic verdict (NO_AUTH_POLICY |
-  PUBLIC_SERVICE_NETWORK | CONFIG_GAP | OK) per service network with enumerated
-  findings and CLI remediation. Use when reviewing VPC Lattice auth policies,
-  checking service-network access scope, validating cross-account sharing,
-  auditing target group security, or hardening service-network posture before
-  production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits VPC Lattice service networks for auth-policy absence (default-open posture), public Principal:"*" Invoke grants, NotAction inverse-wildcard traps, cross-account principal exposure without strong conditions, target group security (IP targets to untrusted CIDRs, type-mismatch health checks), cross-account RAM share coverage, routing-rule catch-all exposure, and service-level auth-policy overrides that silently bypass network-level guards. Emits a deterministic verdict (NO_AUTH_POLICY | PUBLIC_SERVICE_NETWORK | CONFIG_GAP | OK) per service network with enumerated findings and CLI remediation. Use when reviewing VPC Lattice auth policies, checking service-network access scope, validating cross-account sharing, auditing target group security, or hardening service-network posture before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline auth-policy-document classification.
-  Live-account audits use aws vpc-lattice get-auth-policy,
-  aws vpc-lattice list-service-networks, aws vpc-lattice list-target-groups,
-  and aws ram list-resources (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - VPC Lattice
-  - auth policy
-  - service network
-  - vpc-lattice:Invoke
-  - Principal:"*"
-  - cross-account
-  - RAM share
-  - target group
-  - routing rule
-  - resource policy
-  - NotAction
-  - service auth policy
-  - lattice security
-  - application networking
-  - invoke access
-  - auth policy override
-tags: [vpc-lattice, security, auth-policy, service-network, cross-account, ram, target-group, routing, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline auth-policy-document classification. Live-account audits use aws vpc-lattice get-auth-policy, aws vpc-lattice list-service-networks, aws vpc-lattice list-target-groups, and aws ram list-resources (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
-  verdict_shape: "NO_AUTH_POLICY | PUBLIC_SERVICE_NETWORK | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a VPC Lattice service network auth policy before production
-    deployment, checking for absent auth policy (default-open posture),
-    auditing public Principal:"*" Invoke grants, validating cross-account RAM
-    share coverage, inspecting target group security, or hardening
-    service-network access scope.
-  activation_triggers:
-    - "audit this VPC Lattice service network"
-    - "is my service network public"
-    - "check lattice auth policy"
-    - "vpc lattice cross-account access"
-    - "lattice target group security"
-    - "lattice RAM share audit"
-    - "no auth policy on service network"
-    - "vpc-lattice:Invoke exposure"
-  invocation_schema: >-
-    Input shape (one of): (a) auth-policy JSON + optional metadata
-    (associations, services, target groups, RAM shares) for offline
-    classification; (b) service-network identifier (sn-xxx) for live-account
-    audit. Output shape: { SERVICE_NETWORK, VERDICT, REASON, FINDINGS[],
-    REMEDIATION } where VERDICT ∈ { NO_AUTH_POLICY, PUBLIC_SERVICE_NETWORK,
-    CONFIG_GAP, OK, ERROR }.
+  verdict_shape: NO_AUTH_POLICY | PUBLIC_SERVICE_NETWORK | CONFIG_GAP | OK
+  when_to_use: Reviewing a VPC Lattice service network auth policy before production deployment, checking for absent auth policy (default-open posture), auditing public Principal:"*" Invoke grants, validating cross-account RAM share coverage, inspecting target group security, or hardening service-network access scope.
+  activation_triggers: audit this VPC Lattice service network, is my service network public, check lattice auth policy, vpc lattice cross-account access, lattice target group security, lattice RAM share audit, no auth policy on service network, vpc-lattice:Invoke exposure
+  invocation_schema: 'Input shape (one of): (a) auth-policy JSON + optional metadata (associations, services, target groups, RAM shares) for offline classification; (b) service-network identifier (sn-xxx) for live-account audit. Output shape: { SERVICE_NETWORK, VERDICT, REASON, FINDINGS[], REMEDIATION } where VERDICT ∈ { NO_AUTH_POLICY, PUBLIC_SERVICE_NETWORK, CONFIG_GAP, OK, ERROR }.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: VPC Lattice, auth policy, service network, vpc-lattice:Invoke, Principal:"*", cross-account, RAM share, target group, routing rule, resource policy, NotAction, service auth policy, lattice security, application networking, invoke access, auth policy override
+  tags: vpc-lattice, security, auth-policy, service-network, cross-account, ram, target-group, routing, audit
 ---
 
 # VPC Lattice Auth Auditor

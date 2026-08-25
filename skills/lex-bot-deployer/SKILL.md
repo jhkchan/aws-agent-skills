@@ -1,143 +1,26 @@
 ---
 name: lex-bot-deployer
-description: >-
-  Provisions Amazon Lex V2 conversational bots with production defaults:
-  bot creation (create-bot), locale setup (en-US and other supported
-  locales), intents (sample utterances, slots, slot priorities), slot
-  types (built-in AMAZON.Date/AMAZON.Number vs custom enumeration),
-  prompt configuration (elicitation, confirmation, closing, failure),
-  Lambda code hook (dialog and fulfillment DIALOG_CODE_HOOK and
-  FULFILLMENT_CODE_HOOK interception between every turn), fulfillment
-  (Lambda or ReturnIntent), conversation logs (text and audio with KMS
-  encryption), sentiment analysis (Amazon Comprehend integration), voice
-  (Amazon Polly integration, voice_id selection), bot versioning
-  (create-bot-version) and alias (create-resource-link) for blue-green
-  deployment, lexv2-models vs lexv2-runtime API separation, KMS CMK
-  encryption at rest, and channel integration (Twilio, Genesys, Slack,
-  Facebook Messenger, Web UI). Emits a READY_TO_DEPLOY checklist with
-  verification commands. Use when creating a Lex V2 bot, configuring
-  intents and slots, wiring a Lambda dialog code hook, enabling voice or
-  sentiment analysis, publishing a bot version and alias, or integrating
-  a messaging channel. Triggers: create lex bot, lex v2 intent, lex slot
-  type, lex lambda code hook, lex conversation logs, lex polly voice,
-  lex bot version alias, lexv2-models, lexv2-runtime, lex channel
-  integration.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon Lex V2 conversational bots with production defaults: bot creation (create-bot), locale setup (en-US and other supported locales), intents (sample utterances, slots, slot priorities), slot types (built-in AMAZON.Date/AMAZON.Number vs custom enumeration), prompt configuration (elicitation, confirmation, closing, failure), Lambda code hook (dialog and fulfillment DIALOG_CODE_HOOK and FULFILLMENT_CODE_HOOK interception between every turn), fulfillment (Lambda or ReturnIntent), conversation logs (text and audio with KMS encryption), sentiment analysis (Amazon Comprehend integration), voice (Amazon Polly integration, voice_id selection), bot versioning (create-bot-version) and alias (create-resource-link) for blue-green deployment, lexv2-models vs lexv2-runtime API separation, KMS CMK encryption at rest. Triggers: create lex bot, lex v2 intent, lex slot type, lex lambda code hook, lex conversation logs, lex polly voice, lex bot version alias, lexv2-models, lexv2-runtime, lex channel integration.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). For live deployment: AWS CLI v2 with lexv2-models (build-time
-  configuration) and lexv2-runtime (conversations) access, plus
-  lambda:AddPermission for code-hook wiring and iam:PassRole if a
-  service-linked role is customized. Works with Terraform
-  aws_lexv2models_bot / aws_lexv2models_bot_version /
-  aws_lexv2models_bot_alias resources and CloudFormation
-  AWS::Lex::Bot / AWS::Lex::ResourceLink templates.
-keywords:
-  - aws
-  - lex
-  - lex v2
-  - lexv2-models
-  - lexv2-runtime
-  - chatbot
-  - conversational ai
-  - cloudops
-  - deploy
-  - provisioning
-  - intent
-  - slot
-  - slot type
-  - utterance
-  - code hook
-  - lambda
-  - fulfillment
-  - elicitation prompt
-  - confirmation prompt
-  - closing prompt
-  - sentiment analysis
-  - amazon polly
-  - voice bot
-  - bot version
-  - bot alias
-  - blue-green
-  - kms encryption
-  - conversation logs
-  - channel integration
-  - twilio
-  - genesys
-  - slack
-tags:
-  - aws
-  - lex
-  - lexv2
-  - chatbot
-  - cloudops
-  - deploy
-  - conversational-ai
-  - ai-ml
-  - provisioning
-  - intent
-  - slot
-  - code-hook
-  - voice
-  - polly
-  - blue-green
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with lexv2-models (build-time configuration) and lexv2-runtime (conversations) access, plus lambda:AddPermission for code-hook wiring and iam:PassRole if a service-linked role is customized. Works with Terraform aws_lexv2models_bot / aws_lexv2models_bot_version / aws_lexv2models_bot_alias resources and CloudFormation AWS::Lex::Bot / AWS::Lex::ResourceLink templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AI/ML
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - lex
-    - lexv2
-    - chatbot
-    - cloudops
-    - deploy
-    - conversational-ai
-    - ai-ml
-    - provisioning
-    - intent
-    - slot
-    - code-hook
-    - voice
-    - polly
-    - blue-green
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create lex bot
-    - lex v2 intent
-    - lex slot type
-    - lex lambda code hook
-    - lex conversation logs
-    - lex polly voice
-    - lex bot version alias
-    - lexv2-models
-    - lexv2-runtime
-    - lex channel integration
-  when_to_use: >-
-    Invoke when the user wants to create an Amazon Lex V2 conversational
-    bot, configure intents and slots with elicitation prompts, wire a
-    Lambda dialog/fulfillment code hook, enable voice (Amazon Polly) or
-    sentiment analysis, publish a bot version and alias for blue-green
-    rollout, enable conversation logs with KMS encryption, or integrate
-    a third-party messaging channel (Twilio, Genesys, Slack). Do NOT
-    invoke for Amazon Lex V1 (the legacy build-bot API), Amazon Connect
-    flows (use connect skills), or Amazon Alexa skills (different
-    runtime).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, lex, lexv2, chatbot, cloudops, deploy, conversational-ai, ai-ml, provisioning, intent, slot, code-hook, voice, polly, blue-green
+  dependencies: aws-orchestrator
+  keywords: aws, lex, lex v2, lexv2-models, lexv2-runtime, chatbot, conversational ai, cloudops, deploy, provisioning, intent, slot, slot type, utterance, code hook, lambda, fulfillment, elicitation prompt, confirmation prompt, closing prompt, sentiment analysis, amazon polly, voice bot, bot version, bot alias, blue-green, kms encryption, conversation logs, channel integration, twilio, genesys, slack
+  when_to_use: Invoke when the user wants to create an Amazon Lex V2 conversational bot, configure intents and slots with elicitation prompts, wire a Lambda dialog/fulfillment code hook, enable voice (Amazon Polly) or sentiment analysis, publish a bot version and alias for blue-green rollout, enable conversation logs with KMS encryption, or integrate a third-party messaging channel (Twilio, Genesys, Slack). Do NOT invoke for Amazon Lex V1 (the legacy build-bot API), Amazon Connect flows (use connect skills), or Amazon Alexa skills (different runtime).
 ---
 
 # Lex Bot Deployer

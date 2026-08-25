@@ -1,79 +1,24 @@
 ---
 name: macie-data-classification-auditor
-description: >-
-  Audits Amazon Macie data-classification posture — classification job
-  coverage and status, automated sensitive data discovery (ASDD)
-  enablement, sensitive data finding triage state (PII / credentials /
-  financial), custom data identifiers, bucket_allow_list scope, findings
-  auto-archive filters, and Security Hub export integration. Emits a
-  deterministic verdict (NO_CLASSIFICATION | UNTRIAGED_FINDINGS |
-  CONFIG_GAP | OK) per account scope with enumerated findings and specific
-  CLI remediation. Use when reviewing Macie classification coverage,
-  triaging sensitive data discoveries, validating allow-list scope,
-  checking Security Hub integration, or auditing sensitive-data discovery
-  posture before a compliance review.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits Amazon Macie data-classification posture — classification job coverage and status, automated sensitive data discovery (ASDD) enablement, sensitive data finding triage state (PII / credentials / financial), custom data identifiers, bucket_allow_list scope, findings auto-archive filters, and Security Hub export integration. Emits a deterministic verdict (NO_CLASSIFICATION | UNTRIAGED_FINDINGS | CONFIG_GAP | OK) per account scope with enumerated findings and specific CLI remediation. Use when reviewing Macie classification coverage, triaging sensitive data discoveries, validating allow-list scope, checking Security Hub integration, or auditing sensitive-data discovery posture before a compliance review.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline posture classification. Live-
-  account audits use aws macie2 get-macie-session, list-classification-jobs,
-  list-findings, get-findings, list-allow-lists, and describe-organization-
-  configuration (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Macie
-  - data classification
-  - sensitive data
-  - PII
-  - credentials
-  - financial data
-  - classification job
-  - automated discovery
-  - ASDD
-  - allow list
-  - findings triage
-  - Security Hub
-  - custom data identifier
-  - data loss prevention
-  - DLP
-  - compliance
-  - S3 data security
-  - sensitive data discovery
-tags: [macie, security, data-classification, pii, sensitive-data, dlp, compliance, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline posture classification. Live- account audits use aws macie2 get-macie-session, list-classification-jobs, list-findings, get-findings, list-allow-lists, and describe-organization- configuration (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
-  verdict_shape: "NO_CLASSIFICATION | UNTRIAGED_FINDINGS | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing Macie classification coverage before a compliance audit,
-    triaging sensitive data findings (PII, credentials, financial),
-    validating bucket_allow_list scope, checking Security Hub export
-    integration, auditing automated sensitive data discovery posture, or
-    verifying that classification jobs are running and producing results.
-  activation_triggers:
-    - "audit macie classification"
-    - "check macie findings"
-    - "are there untriaged macie findings"
-    - "is sensitive data discovery enabled"
-    - "macie allow list too broad"
-    - "macie security hub export"
-    - "macie classification job failed"
-    - "sensitive data in s3"
-    - "pii audit macie"
-    - "macie posture check"
-  invocation_schema: >-
-    Input: either (a) a Macie posture snapshot (session status, ASDD
-    config, classification jobs, findings summary, allow list, Security
-    Hub integration), OR (b) an account / region for live-account audit.
-    Output: deterministic ACCOUNT / VERDICT / REASON / FINDINGS /
-    REMEDIATION block per account scope, where VERDICT belongs to
-    {NO_CLASSIFICATION, UNTRIAGED_FINDINGS, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: NO_CLASSIFICATION | UNTRIAGED_FINDINGS | CONFIG_GAP | OK
+  when_to_use: Reviewing Macie classification coverage before a compliance audit, triaging sensitive data findings (PII, credentials, financial), validating bucket_allow_list scope, checking Security Hub export integration, auditing automated sensitive data discovery posture, or verifying that classification jobs are running and producing results.
+  activation_triggers: audit macie classification, check macie findings, are there untriaged macie findings, is sensitive data discovery enabled, macie allow list too broad, macie security hub export, macie classification job failed, sensitive data in s3, pii audit macie, macie posture check
+  invocation_schema: 'Input: either (a) a Macie posture snapshot (session status, ASDD config, classification jobs, findings summary, allow list, Security Hub integration), OR (b) an account / region for live-account audit. Output: deterministic ACCOUNT / VERDICT / REASON / FINDINGS / REMEDIATION block per account scope, where VERDICT belongs to {NO_CLASSIFICATION, UNTRIAGED_FINDINGS, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Macie, data classification, sensitive data, PII, credentials, financial data, classification job, automated discovery, ASDD, allow list, findings triage, Security Hub, custom data identifier, data loss prevention, DLP, compliance, S3 data security, sensitive data discovery
+  tags: macie, security, data-classification, pii, sensitive-data, dlp, compliance, audit
 ---
 
 # Macie Data Classification Auditor

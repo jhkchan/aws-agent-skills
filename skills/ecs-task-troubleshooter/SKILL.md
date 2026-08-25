@@ -1,127 +1,28 @@
 ---
 name: ecs-task-troubleshooter
-description: >-
-  Diagnoses AWS ECS task failures via a stoppedReason-first decision tree
-  covering ResourceInitializationError (ENI trunking, subnet IP
-  exhaustion), CannotPullContainerError (ECR auth, throttle, size limit,
-  private-subnet ECR endpoint), EC2InstanceStateError, capacity provider
-  placement failures, task-role vs execution-role confusion, service
-  event messages (task failed to start, unable to place), CPU/memory
-  oversubscription, container health check failures, deregistered
-  container instances, Fargate platform version issues, and deployment
-  circuit breaker rollbacks. Walks describe-tasks stoppedReason +
-  containers[].reason + describe-services events to a verified root
-  cause with evidence-backed probes. Emits ROOT_CAUSE_IDENTIFIED or
-  INSUFFICIENT_DATA. Use when an ECS task is stuck in PROVISIONING,
-  transitions to STOPPED, fails placement, cannot pull an image, or
-  the deployment circuit breaker fires.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Diagnoses AWS ECS task failures via a stoppedReason-first decision tree covering ResourceInitializationError (ENI trunking, subnet IP exhaustion), CannotPullContainerError (ECR auth, throttle, size limit, private-subnet ECR endpoint), EC2InstanceStateError, capacity provider placement failures, task-role vs execution-role confusion, service event messages (task failed to start, unable to place), CPU/memory oversubscription, container health check failures, deregistered container instances, Fargate platform version issues, and deployment circuit breaker rollbacks. Walks describe-tasks stoppedReason + containers[].reason + describe-services events to a verified root cause with evidence-backed probes. Emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA. Use when an ECS task is stuck in PROVISIONING, transitions to STOPPED, fails placement, cannot pull an image, or the deployment circuit breaker fires.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Offline diagnosis works on supplied describe-tasks /
-  describe-services JSON. Live-account diagnosis uses aws ecs
-  describe-tasks, describe-services, describe-task-definition,
-  describe-container-instances, describe-capacity-providers, aws logs
-  get-log-events / filter-log-events, aws elbv2 describe-target-health,
-  aws ecr get-repository-policy / describe-images, aws ec2
-  describe-subnets / describe-network-interfaces (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - ECS
-  - Fargate
-  - EC2 launch type
-  - task stopped
-  - stoppedReason
-  - ResourceInitializationError
-  - CannotPullContainerError
-  - EC2InstanceStateError
-  - ENI trunking
-  - awsvpc
-  - task role
-  - execution role
-  - capacity provider
-  - placement failure
-  - service event
-  - unable to place
-  - CPU oversubscription
-  - memory oversubscription
-  - container health check
-  - deregistered container instance
-  - task definition validation
-  - Fargate platform version
-  - ECR image pull
-  - ECR auth
-  - ECR throttle
-  - ECR size limit
-  - deployment circuit breaker
-tags:
-  - ecs
-  - compute
-  - troubleshoot
-  - task-failure
-  - fargate
-  - ec2
-  - eni
-  - ecr
-  - circuit-breaker
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works on supplied describe-tasks / describe-services JSON. Live-account diagnosis uses aws ecs describe-tasks, describe-services, describe-task-definition, describe-container-instances, describe-capacity-providers, aws logs get-log-events / filter-log-events, aws elbv2 describe-target-health, aws ecr get-repository-policy / describe-images, aws ec2 describe-subnets /...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA"
-  when_to_use: >-
-    Diagnosing why an ECS task stays in PROVISIONING, transitions to
-    STOPPED, fails placement with "No ContainerInstances were found" or
-    "unable to place a task", cannot pull a container image
-    (CannotPullContainerError), fails container health checks, hits the
-    deployment circuit breaker, or exits with a non-zero code; interpreting
-    describe-tasks stoppedReason / containers[].reason / lastStatus, or
-    triaging an ECS service event message.
-  when_not_to_use: >-
-    Application-code debugging inside a running container (use CloudWatch
-    Logs and the application's own debugger); EKS pod troubleshooting
-    (use eks-pod-troubleshooter); Fargate capacity reservation sizing
-    (use fargate-cost-optimizer); ECS task-definition IAM posture audits
-    (use ecs-task-definition-auditor); steady-state service-auto-scaling
-    tuning (use autoscaling-policy-deployer).
-  activation_triggers:
-    - "ECS task stopped"
-    - "ECS task PROVISIONING stuck"
-    - "ECS task PENDING forever"
-    - "ResourceInitializationError"
-    - "CannotPullContainerError"
-    - "EC2InstanceStateError"
-    - "unable to place a task"
-    - "No ContainerInstances were found"
-    - "Essential container in task exited"
-    - "ECS health check failing"
-    - "ECS task crash loop"
-    - "ECS task OutOfMemory"
-    - "deployment circuit breaker"
-    - "service deregistered container instances"
-    - "Fargate platform version"
-  invocation_schema: >-
-    Input: either (a) a symptom description (the failing service/cluster,
-    the observed state, any error strings from the console), OR (b) a
-    live-account scenario where the agent runs aws ecs describe-tasks /
-    describe-services / describe-task-definition to gather evidence.
-    Output: a deterministic TARGET / VERDICT / ROOT_CAUSE / REASON /
-    EVIDENCE / REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED,
-    INSUFFICIENT_DATA} and ROOT_CAUSE names the specific failure category
-    (RESOURCE_INIT_ENI / RESOURCE_INIT_SUBNET_IP / IMAGE_PULL_AUTH /
-    IMAGE_PULL_ENDPOINT / IMAGE_PULL_SIZE / CAPACITY_PLACEMENT /
-    CAPACITY_DEREGISTERED / CONFIG_TASK_ROLE / CONFIG_EXECUTION_ROLE /
-    CONFIG_DEFINITION_INVALID / HEALTH_CHECK / OOM / ExitCode /
-    CIRCUIT_BREAKER / PLATFORM_VERSION / UNKNOWN).
+  verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
+  when_to_use: Diagnosing why an ECS task stays in PROVISIONING, transitions to STOPPED, fails placement with "No ContainerInstances were found" or "unable to place a task", cannot pull a container image (CannotPullContainerError), fails container health checks, hits the deployment circuit breaker, or exits with a non-zero code; interpreting describe-tasks stoppedReason / containers[].reason / lastStatus, or triaging an ECS service event message.
+  when_not_to_use: Application-code debugging inside a running container (use CloudWatch Logs and the application's own debugger); EKS pod troubleshooting (use eks-pod-troubleshooter); Fargate capacity reservation sizing (use fargate-cost-optimizer); ECS task-definition IAM posture audits (use ecs-task-definition-auditor); steady-state service-auto-scaling tuning (use autoscaling-policy-deployer).
+  activation_triggers: ECS task stopped, ECS task PROVISIONING stuck, ECS task PENDING forever, ResourceInitializationError, CannotPullContainerError, EC2InstanceStateError, unable to place a task, No ContainerInstances were found, Essential container in task exited, ECS health check failing, ECS task crash loop, ECS task OutOfMemory, deployment circuit breaker, service deregistered container instances, Fargate platform version
+  invocation_schema: 'Input: either (a) a symptom description (the failing service/cluster, the observed state, any error strings from the console), OR (b) a live-account scenario where the agent runs aws ecs describe-tasks / describe-services / describe-task-definition to gather evidence. Output: a deterministic TARGET / VERDICT / ROOT_CAUSE / REASON / EVIDENCE / REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and ROOT_CAUSE names the specific failure category (RESOURCE_INIT_ENI / RESOURCE_INIT_SUBNET_IP / IMAGE_PULL_AUTH / IMAGE_PULL_ENDPOINT / IMAGE_PULL_SIZE / CAPACITY_PLACEMENT / CAPACITY_DEREGISTERED / CONFIG_TASK_ROLE / CONFIG_EXECUTION_ROLE / CONFIG_DEFINITION_INVALID / HEALTH_CHECK / OOM / ExitCode / CIRCUIT_BREAKER / PLATFORM_VERSION / UNKNOWN).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: ECS, Fargate, EC2 launch type, task stopped, stoppedReason, ResourceInitializationError, CannotPullContainerError, EC2InstanceStateError, ENI trunking, awsvpc, task role, execution role, capacity provider, placement failure, service event, unable to place, CPU oversubscription, memory oversubscription, container health check, deregistered container instance, task definition validation, Fargate platform version, ECR image pull, ECR auth, ECR throttle, ECR size limit, deployment circuit breaker
+  tags: ecs, compute, troubleshoot, task-failure, fargate, ec2, eni, ecr, circuit-breaker
 ---
 
 # ECS Task Troubleshooter

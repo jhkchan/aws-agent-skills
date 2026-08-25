@@ -1,51 +1,15 @@
 ---
 name: lambda-cold-start-optimizer
 description: 'Optimises AWS Lambda cold-start latency across seven dimensions: memory allocation vs initialization time (Power Tuning latency-optimal memory), provisioned concurrency (allocation sizing and autoscaling for latency-critical paths), SnapStart (Java only — init snapshot eliminates 1-3 s of init), init phase optimization (lazy initialization, global-scope connection pooling), VPC cold start penalty (hyperplane ENI elimination since 2019), runtime selection (compiled vs interpreted, ARM64 Graviton), and deployment package size reduction (Layers, Proguarded JARs, slim ZIPs). Covers EFS mount latency, runtime deprecation impact, X-Ray overhead, and CloudWatch Lambda Insights init-duration telemetry. Emits OPTIMIZED when cold-start p95 < SLO and all init-phase levers applied, or FURTHER_OPTIMIZATION_AVAILABLE with the highest-leverage remaining lever.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted CloudWatch metrics and Lambda Insights traces. Live-account optimization uses aws lambda list-functions, aws lambda get-function-configuration, aws lambda get-function-event-invoke-config, aws lambda list-provisioned-concurrency-configs, aws lambda get-event-source-mapping, aws cloudwatch get-metric-statistics (Duration, InitDuration, Invocations, ColdStarts from Lambda Insights), and aws lambda get-runtime-management-config (AWS CLI v2, SSO or key-based credentials). Pricing references us-east-1 published rates as of 2026; re-state regional rates from the reference matrix for other regions.
-keywords:
-- Lambda
-- cold start
-- initialization time
-- InitDuration
-- provisioned concurrency
-- SnapStart
-- Java
-- power tuning
-- memory allocation
-- lazy initialization
-- connection pooling
-- VPC
-- hyperplane ENI
-- runtime selection
-- ARM64
-- Graviton
-- deployment package
-- Lambda Layers
-- Proguard
-- EFS mount
-- X-Ray overhead
-- Lambda Insights
-- runtime deprecation
-- latency optimization
-tags:
-- lambda
-- compute
-- serverless
-- performance
-- cold-start
-- latency
-- snapstart
-- provisioned-concurrency
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted CloudWatch metrics and Lambda Insights traces. Live-account optimization uses aws lambda list-functions, aws lambda get-function-configuration, aws lambda get-function-event-invoke-config, aws lambda list-provisioned-concurrency-configs, aws lambda get-event-source-mapping, aws cloudwatch get-metric-statistics (Duration, InitDuration, Invocations...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: optimize
   skill_class: capability
@@ -53,29 +17,13 @@ metadata:
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
   when_to_use: Reducing Lambda cold-start latency, sizing provisioned concurrency for latency-sensitive APIs, enabling SnapStart for Java functions, optimizing the init phase (lazy initialization, connection reuse), evaluating VPC cold-start impact, selecting a runtime for fast startup, trimming deployment package size, diagnosing EFS mount latency, assessing X-Ray tracing overhead, or reading Lambda Insights init-duration telemetry.
   when_not_to_use: Lambda cost optimization without a latency focus (use lambda-cost-optimizer), Lambda functional debugging (invocation errors, timeouts, configuration bugs — use the Lambda troubleshooter), or API Gateway latency optimization (use the API Gateway optimizer). This skill targets cold-start and init-phase latency, not dollar cost or functional correctness.
-  activation_triggers:
-  - optimise Lambda cold start
-  - Lambda init duration
-  - Lambda InitDuration
-  - Lambda provisioned concurrency
-  - Lambda SnapStart Java
-  - Lambda lazy initialization
-  - Lambda connection reuse
-  - Lambda VPC cold start
-  - Lambda hyperplane ENI
-  - Lambda runtime selection
-  - Lambda ARM64 Graviton
-  - Lambda deployment package size
-  - Lambda Layers cold start
-  - Lambda Proguard
-  - Lambda EFS mount latency
-  - Lambda X-Ray overhead
-  - Lambda Insights
-  - Lambda runtime deprecation
-  - reduce Lambda latency
-  - Lambda p95 latency
+  activation_triggers: optimise Lambda cold start, Lambda init duration, Lambda InitDuration, Lambda provisioned concurrency, Lambda SnapStart Java, Lambda lazy initialization, Lambda connection reuse, Lambda VPC cold start, Lambda hyperplane ENI, Lambda runtime selection, Lambda ARM64 Graviton, Lambda deployment package size, Lambda Layers cold start, Lambda Proguard, Lambda EFS mount latency, Lambda X-Ray overhead, Lambda Insights, Lambda runtime deprecation, reduce Lambda latency, Lambda p95 latency
   invocation_schema: 'Input: either (a) a function identifier + live-account context, (b) a Lambda Insights metrics export (Duration, InitDuration, Invocations, ColdStarts), OR (c) function metadata (Runtime, MemorySize, Architecture, VpcConfig, SnapStart config, ProvisionedConcurrency config, TracingConfig, package size). Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ ESTIMATED_LATENCY_IMPACT/MIGRATION_STEPS block per function, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
   invocation_example: "# Minimal valid input (offline classification):\nFunctionName: order-api-prod\nRuntime: java21\nMemorySize: 512 MB\nArchitecture: x86_64\nRegion: us-east-1\nSnapStart: NOT_ENABLED\nVpcConfig: subnet-aaa, subnet-bbb (VPC attached)\nTracingConfig: Active\nPackage size: 52 MB (fat JAR, untrimmed)\nProvisionedConcurrency: 0\nMetrics (last 30 days):\n  - Duration avg: 1800 ms, p95: 2400 ms\n  - InitDuration avg: 3200 ms (cold start), p95: 4100 ms\n  - Invocations: 8,000,000/month\n  - ColdStarts: ~120,000/month (1.5% of invocations)\n  - Errors: 0\nSLO: p95 end-to-end < 1000 ms\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_LATENCY_IMPACT, MIGRATION_STEPS)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Lambda, cold start, initialization time, InitDuration, provisioned concurrency, SnapStart, Java, power tuning, memory allocation, lazy initialization, connection pooling, VPC, hyperplane ENI, runtime selection, ARM64, Graviton, deployment package, Lambda Layers, Proguard, EFS mount, X-Ray overhead, Lambda Insights, runtime deprecation, latency optimization
+  tags: lambda, compute, serverless, performance, cold-start, latency, snapstart, provisioned-concurrency
 ---
 
 # Lambda Cold Start Optimizer

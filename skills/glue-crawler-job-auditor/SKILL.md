@@ -1,82 +1,24 @@
 ---
 name: glue-crawler-job-auditor
-description: >-
-  Audits AWS Glue crawlers and jobs (plus their data-catalog encryption, JDBC
-  connections, IAM execution roles, security configurations, job bookmarks,
-  and S3 source encryption) for data-at-rest exposure, over-permissive
-  pass-role blast radius, and configuration gaps. Emits a deterministic
-  verdict — NO_ENCRYPTION | OVERPERMISSIVE_ROLE | CONFIG_GAP | OK — per
-  crawler or job with enumerated findings and CLI remediation. Use when
-  reviewing Glue crawlers/jobs before production, checking catalog encryption,
-  validating JDBC SSL, tightening the execution role, or hardening ETL
-  security posture.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Glue crawlers and jobs (plus their data-catalog encryption, JDBC connections, IAM execution roles, security configurations, job bookmarks, and S3 source encryption) for data-at-rest exposure, over-permissive pass-role blast radius, and configuration gaps. Emits a deterministic verdict — NO_ENCRYPTION | OVERPERMISSIVE_ROLE | CONFIG_GAP | OK — per crawler or job with enumerated findings and CLI remediation. Use when reviewing Glue crawlers/jobs before production, checking catalog encryption, validating JDBC SSL, tightening the execution role, or hardening ETL security posture.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline config classification. Live-account
-  audits use aws glue get-data-catalog-encryption-settings, get-security-
-  configuration, get-job, get-crawler, get-connection, and aws s3api
-  get-bucket-encryption (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Glue
-  - crawler
-  - Glue job
-  - data catalog encryption
-  - EncryptionAtRest
-  - SecurityConfiguration
-  - JDBC SSL
-  - JDBC_ENFORCE_SSL
-  - job bookmarks
-  - S3 source encryption
-  - execution role
-  - PassRole
-  - glue:CreateJob
-  - glue:CreateCrawler
-  - over-permissive role
-  - Glue 0.9
-  - EOL runtime
-  - CloudWatch encryption
-  - S3Encryptions
-  - LakeFormation
-  - ConnectionPasswordEncryption
-  - ETL audit
-tags: [glue, analytics, security, encryption, iam-role, jdbc, bookmarks, security-configuration, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline config classification. Live-account audits use aws glue get-data-catalog-encryption-settings, get-security- configuration, get-job, get-crawler, get-connection, and aws s3api get-bucket-encryption (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
-  verdict_shape: "NO_ENCRYPTION | OVERPERMISSIVE_ROLE | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a Glue crawler or job before production deployment, checking
-    data-catalog encryption (EncryptionAtRest / ConnectionPasswordEncryption),
-    validating JDBC connection SSL, auditing the execution role for pass-role
-    or wildcard blast radius, inspecting a SecurityConfiguration for log /
-    bookmark / spill encryption, flagging an EOL Glue version, or hardening
-    ETL security posture across an account.
-  activation_triggers:
-    - "audit this Glue crawler"
-    - "audit this Glue job"
-    - "is my Glue catalog encrypted"
-    - "check JDBC SSL on the Glue connection"
-    - "Glue execution role too permissive"
-    - "is the SecurityConfiguration set on the job"
-    - "are Glue bookmarks encrypted"
-    - "is the S3 source encrypted"
-    - "harden Glue ETL"
-    - "Glue 0.9 end of life"
-  invocation_schema: >-
-    Input: either (a) a Glue crawler or job configuration (JSON / describe
-    output) plus the DataCatalogEncryptionSettings, SecurityConfiguration,
-    Connection, and IAM role policy documents, OR (b) a crawler / job name
-    for live-account audit. Output: deterministic RESOURCE/VERDICT/REASON/
-    FINDINGS/REMEDIATION block per crawler or job, where VERDICT is in
-    {NO_ENCRYPTION, OVERPERMISSIVE_ROLE, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: NO_ENCRYPTION | OVERPERMISSIVE_ROLE | CONFIG_GAP | OK
+  when_to_use: Reviewing a Glue crawler or job before production deployment, checking data-catalog encryption (EncryptionAtRest / ConnectionPasswordEncryption), validating JDBC connection SSL, auditing the execution role for pass-role or wildcard blast radius, inspecting a SecurityConfiguration for log / bookmark / spill encryption, flagging an EOL Glue version, or hardening ETL security posture across an account.
+  activation_triggers: audit this Glue crawler, audit this Glue job, is my Glue catalog encrypted, check JDBC SSL on the Glue connection, Glue execution role too permissive, is the SecurityConfiguration set on the job, are Glue bookmarks encrypted, is the S3 source encrypted, harden Glue ETL, Glue 0.9 end of life
+  invocation_schema: 'Input: either (a) a Glue crawler or job configuration (JSON / describe output) plus the DataCatalogEncryptionSettings, SecurityConfiguration, Connection, and IAM role policy documents, OR (b) a crawler / job name for live-account audit. Output: deterministic RESOURCE/VERDICT/REASON/ FINDINGS/REMEDIATION block per crawler or job, where VERDICT is in {NO_ENCRYPTION, OVERPERMISSIVE_ROLE, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Glue, crawler, Glue job, data catalog encryption, EncryptionAtRest, SecurityConfiguration, JDBC SSL, JDBC_ENFORCE_SSL, job bookmarks, S3 source encryption, execution role, PassRole, glue:CreateJob, glue:CreateCrawler, over-permissive role, Glue 0.9, EOL runtime, CloudWatch encryption, S3Encryptions, LakeFormation, ConnectionPasswordEncryption, ETL audit
+  tags: glue, analytics, security, encryption, iam-role, jdbc, bookmarks, security-configuration, audit
 ---
 
 # Glue Crawler & Job Auditor

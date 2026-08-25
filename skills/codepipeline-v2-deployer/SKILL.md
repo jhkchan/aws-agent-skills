@@ -1,110 +1,27 @@
 ---
 name: codepipeline-v2-deployer
-description: >-
-  Provisions production-grade CodePipeline V2-type pipelines with
-  event-driven triggers (no polling), structure (stages and actions),
-  source actions (CodeCommit, S3, GitHub via CodeConnections),
-  build actions (CodeBuild), deploy actions (CloudFormation
-  CREATE_CHANGE_SET / ECS deploy, S3 deploy, Service Catalog),
-  manual approval actions, namespace variables passed between stages,
-  cross-account deployment via KMS key policy + IAM roles, artifact
-  bucket security (block public access, KMS encryption), and
-  EC2/CodeDeploy deployments. Emits a READY_TO_DEPLOY checklist and
-  ordered aws codepipeline create-pipeline commands. Use when
-  provisioning a V2 pipeline, configuring event-based triggers with
-  branch filter, wiring cross-account CloudFormation deploy, setting
-  up manual approval gates, or replacing V1 polling pipelines with V2
-  event-driven.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Provisions production-grade CodePipeline V2-type pipelines with event-driven triggers (no polling), structure (stages and actions), source actions (CodeCommit, S3, GitHub via CodeConnections), build actions (CodeBuild), deploy actions (CloudFormation CREATE_CHANGE_SET / ECS deploy, S3 deploy, Service Catalog), manual approval actions, namespace variables passed between stages, cross-account deployment via KMS key policy + IAM roles, artifact bucket security (block public access, KMS encryption), and EC2/CodeDeploy deployments. Emits a READY_TO_DEPLOY checklist and ordered aws codepipeline create-pipeline commands. Use when provisioning a V2 pipeline, configuring event-based triggers with branch filter, wiring cross-account CloudFormation deploy, setting up manual approval gates, or replacing V1 polling pipelines with V2 event-driven.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline architecture
-  planning. Live deployment uses aws codepipeline create-pipeline,
-  update-pipeline, create-connection (CodeConnections), put-job-
-  approval-result, aws kms create-key / put-key-policy, aws iam
-  create-role / attach-role-policy, and aws s3api create-bucket with
-  block-public-access (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - CodePipeline
-  - CodePipeline V2
-  - pipeline type V2
-  - event-driven pipeline
-  - trigger
-  - Git trigger
-  - branch filter
-  - CodeConnections
-  - source action
-  - CodeCommit source
-  - S3 source
-  - GitHub source
-  - CodeBuild
-  - build action
-  - deploy action
-  - CloudFormation deploy
-  - ECS deploy
-  - S3 deploy
-  - Service Catalog deploy
-  - CodeDeploy
-  - EC2 deploy
-  - manual approval
-  - namespace variables
-  - pipeline variables
-  - cross-account
-  - KMS key
-  - artifact bucket
-  - IAM role
-  - CloudWatch Events
-  - EventBridge
-tags: [codepipeline, dev-tools, deploy, pipeline-v2, event-driven, triggers, codebuild, cloudformation-deploy, ecs-deploy, cross-account, manual-approval, namespace-variables, codeconnections, kms-artifacts]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline architecture planning. Live deployment uses aws codepipeline create-pipeline, update-pipeline, create-connection (CodeConnections), put-job- approval-result, aws kms create-key / put-key-policy, aws iam create-role / attach-role-policy, and aws s3api create-bucket with block-public-access (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Provisioning a new CodePipeline V2-type pipeline for production,
-    configuring event-driven triggers with branch / path filter,
-    wiring cross-account CloudFormation deploy via KMS-encrypted
-    artifacts, setting up manual approval gates between stages, using
-    namespace variables to pass data between stages, configuring ECS
-    or S3 or Service Catalog deploy actions, replacing V1 polling
-    pipelines with V2 event-driven triggers, or hardening the artifact
-    bucket (block public access + KMS).
-  activation_triggers:
-    - "create a CodePipeline"
-    - "provision pipeline V2"
-    - "event-driven pipeline"
-    - "CodePipeline trigger"
-    - "CodePipeline branch filter"
-    - "CodePipeline manual approval"
-    - "cross-account deployment"
-    - "namespace variables CodePipeline"
-    - "CodePipeline GitHub source"
-    - "CodeConnections pipeline"
-    - "CodePipeline ECS deploy"
-    - "CodePipeline CloudFormation deploy"
-    - "CodePipeline CodeDeploy"
-    - "V1 to V2 migration"
-  invocation_schema: >-
-    Input shape (one of): (a) a deployment specification including
-    pipeline type (V2), source (CodeCommit / S3 / GitHub /
-    CodeConnections), build (CodeBuild), deploy (CloudFormation / ECS
-    / S3 / Service Catalog / CodeDeploy), triggers (event filter),
-    namespace variables, cross-account targets, manual approval
-    stages; (b) a partial spec for interactive refinement; (c) an
-    existing V1 pipeline for V2 migration review. Output shape:
-    { PIPELINE_SPEC, VERDICT, ARCHITECTURE, CHECKLIST[], FINDINGS[],
-    DEPLOY_COMMANDS } where VERDICT ∈ { READY_TO_DEPLOY,
-    PREREQUISITES_MISSING, ERROR }.
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Provisioning a new CodePipeline V2-type pipeline for production, configuring event-driven triggers with branch / path filter, wiring cross-account CloudFormation deploy via KMS-encrypted artifacts, setting up manual approval gates between stages, using namespace variables to pass data between stages, configuring ECS or S3 or Service Catalog deploy actions, replacing V1 polling pipelines with V2 event-driven triggers, or hardening the artifact bucket (block public access + KMS).
+  activation_triggers: create a CodePipeline, provision pipeline V2, event-driven pipeline, CodePipeline trigger, CodePipeline branch filter, CodePipeline manual approval, cross-account deployment, namespace variables CodePipeline, CodePipeline GitHub source, CodeConnections pipeline, CodePipeline ECS deploy, CodePipeline CloudFormation deploy, CodePipeline CodeDeploy, V1 to V2 migration
+  invocation_schema: 'Input shape (one of): (a) a deployment specification including pipeline type (V2), source (CodeCommit / S3 / GitHub / CodeConnections), build (CodeBuild), deploy (CloudFormation / ECS / S3 / Service Catalog / CodeDeploy), triggers (event filter), namespace variables, cross-account targets, manual approval stages; (b) a partial spec for interactive refinement; (c) an existing V1 pipeline for V2 migration review. Output shape: { PIPELINE_SPEC, VERDICT, ARCHITECTURE, CHECKLIST[], FINDINGS[], DEPLOY_COMMANDS } where VERDICT ∈ { READY_TO_DEPLOY, PREREQUISITES_MISSING, ERROR }.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CodePipeline, CodePipeline V2, pipeline type V2, event-driven pipeline, trigger, Git trigger, branch filter, CodeConnections, source action, CodeCommit source, S3 source, GitHub source, CodeBuild, build action, deploy action, CloudFormation deploy, ECS deploy, S3 deploy, Service Catalog deploy, CodeDeploy, EC2 deploy, manual approval, namespace variables, pipeline variables, cross-account, KMS key, artifact bucket, IAM role, CloudWatch Events, EventBridge
+  tags: codepipeline, dev-tools, deploy, pipeline-v2, event-driven, triggers, codebuild, cloudformation-deploy, ecs-deploy, cross-account, manual-approval, namespace-variables, codeconnections, kms-artifacts
 ---
 
 # CodePipeline V2 Deployer

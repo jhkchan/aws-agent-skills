@@ -1,81 +1,24 @@
 ---
 name: ce-cost-anomaly-auditor
-description: >-
-  Audits AWS Cost Explorer (CE) anomaly-detection subscriptions, Savings
-  Plan/RI coverage gaps, idle-resource detection readiness, and report-
-  subscription cadence. Emits a deterministic FinOps verdict
-  (NO_ANOMALY_SUB | LOW_RI_COVERAGE | CONFIG_GAP | OK) per account with
-  enumerated findings and specific CLI remediation. Use when reviewing Cost
-  Anomaly Detection (CAD) wiring, checking RI/SP commitment coverage on
-  steady-state compute, validating anomaly subscription threshold and
-  frequency calibration, auditing idle-resource detection readiness (CUR
-  resource-ID gating), or hardening spend-visibility posture before a
-  billing review.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Cost Explorer (CE) anomaly-detection subscriptions, Savings Plan/RI coverage gaps, idle-resource detection readiness, and report- subscription cadence. Emits a deterministic FinOps verdict (NO_ANOMALY_SUB | LOW_RI_COVERAGE | CONFIG_GAP | OK) per account with enumerated findings and specific CLI remediation. Use when reviewing Cost Anomaly Detection (CAD) wiring, checking RI/SP commitment coverage on steady-state compute, validating anomaly subscription threshold and frequency calibration, auditing idle-resource detection readiness (CUR resource-ID gating), or hardening spend-visibility posture before a billing review.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline CE-document classification.
-  Live-account audits use aws ce list-cost-anomaly-monitors, aws ce
-  get-anomaly-subscriptions, aws ce get-reservation-coverage, aws ce
-  get-savings-plans-coverage, and aws ce get-anomalies (AWS CLI v2, SSO or
-  key-based credentials). All CE/CAD API endpoints are region-pinned to
-  us-east-1.
-keywords:
-  - Cost Explorer
-  - Cost Anomaly Detection
-  - CAD
-  - anomaly subscription
-  - RI coverage
-  - Savings Plan coverage
-  - idle resource
-  - report subscription
-  - IMMEDIATE monitor
-  - DAILY monitor
-  - threshold calibration
-  - FinOps
-  - commitment gap
-  - on-demand leak
-  - spend visibility
-  - ce list-cost-anomaly-monitors
-  - ce get-anomaly-subscriptions
-  - free tier anomaly
-tags: [cost-explorer, finops, anomaly-detection, ri-coverage, savings-plans, idle-resources, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline CE-document classification. Live-account audits use aws ce list-cost-anomaly-monitors, aws ce get-anomaly-subscriptions, aws ce get-reservation-coverage, aws ce get-savings-plans-coverage, and aws ce get-anomalies (AWS CLI v2, SSO or key-based credentials). All CE/CAD API endpoints are region-pinned to us-east-1.
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: FinOps
-  verdict_shape: "NO_ANOMALY_SUB | LOW_RI_COVERAGE | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing Cost Anomaly Detection wiring before a billing review, checking
-    that CAD subscriptions deliver on an IMMEDIATE cadence, auditing RI/SP
-    coverage on a steady-state compute fleet, validating that the anomaly
-    threshold is calibrated to spend (not the $100 default), or confirming
-    that idle-resource detection has the CUR resource-ID foundation it needs.
-  activation_triggers:
-    - "audit Cost Anomaly Detection"
-    - "check my anomaly subscription"
-    - "is CAD wired correctly"
-    - "RI coverage gap"
-    - "Savings Plan coverage"
-    - "anomaly threshold too high"
-    - "idle resource detection"
-    - "IMMEDIATE vs DAILY monitor"
-    - "cost spike alerting"
-    - "commitment gap"
-    - "on-demand leak"
-  invocation_schema: >-
-    Input: either (a) a CE/CAD inventory (anomaly monitors, anomaly
-    subscriptions, RI/SP coverage percentages, CUR config, account spend
-    profile), OR (b) an account-id for live-account audit. Output:
-    deterministic ACCOUNT/VERDICT/REASON/FINDINGS/REMEDIATION block per
-    account, where VERDICT is one of NO_ANOMALY_SUB, LOW_RI_COVERAGE,
-    CONFIG_GAP, OK, or ERROR (CE not enabled).
+  verdict_shape: NO_ANOMALY_SUB | LOW_RI_COVERAGE | CONFIG_GAP | OK
+  when_to_use: Reviewing Cost Anomaly Detection wiring before a billing review, checking that CAD subscriptions deliver on an IMMEDIATE cadence, auditing RI/SP coverage on a steady-state compute fleet, validating that the anomaly threshold is calibrated to spend (not the $100 default), or confirming that idle-resource detection has the CUR resource-ID foundation it needs.
+  activation_triggers: audit Cost Anomaly Detection, check my anomaly subscription, is CAD wired correctly, RI coverage gap, Savings Plan coverage, anomaly threshold too high, idle resource detection, IMMEDIATE vs DAILY monitor, cost spike alerting, commitment gap, on-demand leak
+  invocation_schema: 'Input: either (a) a CE/CAD inventory (anomaly monitors, anomaly subscriptions, RI/SP coverage percentages, CUR config, account spend profile), OR (b) an account-id for live-account audit. Output: deterministic ACCOUNT/VERDICT/REASON/FINDINGS/REMEDIATION block per account, where VERDICT is one of NO_ANOMALY_SUB, LOW_RI_COVERAGE, CONFIG_GAP, OK, or ERROR (CE not enabled).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Cost Explorer, Cost Anomaly Detection, CAD, anomaly subscription, RI coverage, Savings Plan coverage, idle resource, report subscription, IMMEDIATE monitor, DAILY monitor, threshold calibration, FinOps, commitment gap, on-demand leak, spend visibility, ce list-cost-anomaly-monitors, ce get-anomaly-subscriptions, free tier anomaly
+  tags: cost-explorer, finops, anomaly-detection, ri-coverage, savings-plans, idle-resources, audit
 ---
 
 # CE Cost Anomaly Auditor

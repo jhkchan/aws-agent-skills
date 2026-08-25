@@ -1,114 +1,26 @@
 ---
 name: timestream-database-deployer
-description: >-
-  Provisions Amazon Timestream databases and tables with production
-  defaults: database creation (create-database), table creation
-  (create-table) with retention properties (memory store TTL vs
-  magnetic store TTL), magnetic store write properties (enable writes
-  with S3 destination), partition key enforcement, scheduled query
-  creation (notification config, target SNS/SQS, error reporting),
-  CloudWatch metrics (CUMULATIVE metering vs interval), query API
-  (raw vs scheduled), magnetic store S3 bucket integration, tagging,
-  IAM policies for Timestream (database/table/scheduled query resource
-  types), and batch load task. Emits a READY_TO_DEPLOY checklist with
-  verification commands. Use when creating a Timestream database or
-  table, configuring retention TTLs, setting up scheduled queries for
-  materialized views, enabling magnetic store writes to S3, or
-  configuring partition keys. Triggers: create timestream database,
-  create timestream table, timestream retention properties, timestream
-  memory store TTL, timestream magnetic store TTL, timestream scheduled
-  query, timestream magnetic store write, timestream partition key,
-  timestream batch load.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon Timestream databases and tables with production defaults: database creation (create-database), table creation (create-table) with retention properties (memory store TTL vs magnetic store TTL), magnetic store write properties (enable writes with S3 destination), partition key enforcement, scheduled query creation (notification config, target SNS/SQS, error reporting), CloudWatch metrics (CUMULATIVE metering vs interval), query API (raw vs scheduled), magnetic store S3 bucket integration, tagging, IAM policies for Timestream (database/table/scheduled query resource types), and batch load task. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Timestream database or table, configuring retention TTLs. Triggers: create timestream database, create timestream table, timestream retention properties, timestream memory store TTL, timestream magnetic store TTL, timestream scheduled query, timestream magnetic store write, timestream partition key, timestream batch load.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with timestream-write
-  and timestream-query access. Works with Terraform
-  aws_timestreamwrite_database / aws_timestreamwrite_table /
-  aws_timestreamquery_scheduled_query resources and CloudFormation
-  AWS::Timestream::Database / AWS::Timestream::Table /
-  AWS::Timestream::ScheduledQuery templates.
-keywords:
-  - aws
-  - timestream
-  - time series
-  - database
-  - table
-  - cloudops
-  - deploy
-  - provisioning
-  - memory store
-  - magnetic store
-  - retention
-  - scheduled query
-  - partition key
-  - batch load
-tags:
-  - aws
-  - timestream
-  - time-series
-  - cloudops
-  - deploy
-  - databases
-  - provisioning
-  - retention
-  - scheduled-query
-  - magnetic-store
-  - memory-store
-  - partition-key
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with timestream-write and timestream-query access. Works with Terraform aws_timestreamwrite_database / aws_timestreamwrite_table / aws_timestreamquery_scheduled_query resources and CloudFormation AWS::Timestream::Database / AWS::Timestream::Table / AWS::Timestream::ScheduledQuery templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - timestream
-    - time-series
-    - cloudops
-    - deploy
-    - databases
-    - provisioning
-    - retention
-    - scheduled-query
-    - magnetic-store
-    - memory-store
-    - partition-key
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create timestream database
-    - create timestream table
-    - timestream retention properties
-    - timestream memory store ttl
-    - timestream magnetic store ttl
-    - timestream scheduled query
-    - timestream magnetic store write
-    - timestream partition key
-    - timestream batch load
-  when_to_use: >-
-    Invoke when the user wants to create an Amazon Timestream database
-    or table, configure memory store and magnetic store retention TTLs,
-    set up scheduled queries for materialized views, enable magnetic
-    store write properties with S3 object store integration, configure
-    partition key enforcement for query performance, create a batch load
-    task for bulk ingestion, or deploy IAM policies for Timestream
-    resource types. Do NOT invoke for DynamoDB (use DynamoDB skills),
-    for Aurora/RDS (use RDS skills), or for general S3 bucket
-    provisioning (use S3 skills).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, timestream, time-series, cloudops, deploy, databases, provisioning, retention, scheduled-query, magnetic-store, memory-store, partition-key
+  dependencies: aws-orchestrator
+  keywords: aws, timestream, time series, database, table, cloudops, deploy, provisioning, memory store, magnetic store, retention, scheduled query, partition key, batch load
+  when_to_use: Invoke when the user wants to create an Amazon Timestream database or table, configure memory store and magnetic store retention TTLs, set up scheduled queries for materialized views, enable magnetic store write properties with S3 object store integration, configure partition key enforcement for query performance, create a batch load task for bulk ingestion, or deploy IAM policies for Timestream resource types. Do NOT invoke for DynamoDB (use DynamoDB skills), for Aurora/RDS (use RDS skills), or for general S3 bucket provisioning (use S3 skills).
 ---
 
 # Timestream Database Deployer

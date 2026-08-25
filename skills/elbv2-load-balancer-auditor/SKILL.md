@@ -1,80 +1,24 @@
 ---
 name: elbv2-load-balancer-auditor
-description: >-
-  Audits AWS ELBv2 load balancers (ALB/NLB) for insecure TLS listener policies
-  (TLS 1.0/1.1, weak ciphers, cleartext HTTP), disabled access logs, permissive
-  security groups (all-ports-open, internal-LB-exposed-to-internet), idle load
-  balancers with zero healthy targets, disabled cross-zone load balancing (NLB),
-  and missing deletion protection. Emits a deterministic categorical verdict
-  (INSECURE_LISTENER | NO_ACCESS_LOGS | PERMISSIVE_SG | IDLE | CONFIG_GAP | OK)
-  per load balancer with enumerated findings and specific CLI remediation. Use
-  when reviewing ALB or NLB configurations, checking listener TLS posture,
-  validating access-log enablement, auditing security group exposure, finding
-  idle or abandoned load balancers, or hardening load balancer posture before
-  production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS ELBv2 load balancers (ALB/NLB) for insecure TLS listener policies (TLS 1.0/1.1, weak ciphers, cleartext HTTP), disabled access logs, permissive security groups (all-ports-open, internal-LB-exposed-to-internet), idle load balancers with zero healthy targets, disabled cross-zone load balancing (NLB), and missing deletion protection. Emits a deterministic categorical verdict (INSECURE_LISTENER | NO_ACCESS_LOGS | PERMISSIVE_SG | IDLE | CONFIG_GAP | OK) per load balancer with enumerated findings and specific CLI remediation. Use when reviewing ALB or NLB configurations, checking listener TLS posture, validating access-log enablement, auditing security group exposure, finding idle or abandoned load balancers, or hardening load balancer posture before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline config classification. Live-account
-  audits use aws elbv2 describe-load-balancers, describe-listeners,
-  describe-target-groups, describe-target-health, and describe-tags (AWS CLI v2,
-  SSO or key-based credentials).
-keywords:
-  - ELBv2
-  - ALB
-  - NLB
-  - load balancer
-  - TLS
-  - SSL policy
-  - security policy
-  - access logs
-  - security group
-  - cross-zone
-  - deletion protection
-  - idle load balancer
-  - listener
-  - cipher suite
-  - TLS 1.0
-  - TLS 1.1
-  - PCI-DSS
-  - ELBSecurityPolicy
-  - network exposure
-  - load balancer audit
-tags: [elbv2, alb, nlb, load-balancer, tls, security-group, networking, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline config classification. Live-account audits use aws elbv2 describe-load-balancers, describe-listeners, describe-target-groups, describe-target-health, and describe-tags (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
-  verdict_shape: "INSECURE_LISTENER | NO_ACCESS_LOGS | PERMISSIVE_SG | IDLE | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing an ALB or NLB configuration before production deployment, checking
-    listener TLS protocol/cipher posture, validating access-log enablement,
-    auditing security group exposure, finding idle or abandoned load balancers,
-    checking NLB cross-zone load balancing, or verifying deletion protection.
-  activation_triggers:
-    - "audit this load balancer"
-    - "check ALB TLS policy"
-    - "is my NLB secure"
-    - "load balancer access logs disabled"
-    - "permissive security group ALB"
-    - "idle load balancer no targets"
-    - "cross-zone load balancing NLB"
-    - "deletion protection load balancer"
-    - "ELBSecurityPolicy TLS 1.0"
-    - "hardening load balancer"
-  invocation_schema: >-
-    Input: either (a) an ELBv2 load balancer configuration (type, scheme,
-    listeners with protocols/SSL policies, security group rules, target group
-    health, attributes), OR (b) a load-balancer ARN for live-account audit.
-    Output: deterministic LB/VERDICT/REASON/FINDINGS/REMEDIATION block per
-    load balancer, where VERDICT is from
-    {INSECURE_LISTENER, NO_ACCESS_LOGS, PERMISSIVE_SG, IDLE, CONFIG_GAP, OK}.
+  verdict_shape: INSECURE_LISTENER | NO_ACCESS_LOGS | PERMISSIVE_SG | IDLE | CONFIG_GAP | OK
+  when_to_use: Reviewing an ALB or NLB configuration before production deployment, checking listener TLS protocol/cipher posture, validating access-log enablement, auditing security group exposure, finding idle or abandoned load balancers, checking NLB cross-zone load balancing, or verifying deletion protection.
+  activation_triggers: audit this load balancer, check ALB TLS policy, is my NLB secure, load balancer access logs disabled, permissive security group ALB, idle load balancer no targets, cross-zone load balancing NLB, deletion protection load balancer, ELBSecurityPolicy TLS 1.0, hardening load balancer
+  invocation_schema: 'Input: either (a) an ELBv2 load balancer configuration (type, scheme, listeners with protocols/SSL policies, security group rules, target group health, attributes), OR (b) a load-balancer ARN for live-account audit. Output: deterministic LB/VERDICT/REASON/FINDINGS/REMEDIATION block per load balancer, where VERDICT is from {INSECURE_LISTENER, NO_ACCESS_LOGS, PERMISSIVE_SG, IDLE, CONFIG_GAP, OK}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: ELBv2, ALB, NLB, load balancer, TLS, SSL policy, security policy, access logs, security group, cross-zone, deletion protection, idle load balancer, listener, cipher suite, TLS 1.0, TLS 1.1, PCI-DSS, ELBSecurityPolicy, network exposure, load balancer audit
+  tags: elbv2, alb, nlb, load-balancer, tls, security-group, networking, audit
 ---
 
 # ELBv2 Load Balancer Auditor

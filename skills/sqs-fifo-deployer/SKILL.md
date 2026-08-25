@@ -1,110 +1,26 @@
 ---
 name: sqs-fifo-deployer
-description: >-
-  Provisions Amazon SQS FIFO queues with production defaults: FIFO
-  queue attributes (FifoQueue=true, ContentBasedDeduplication,
-  DeduplicationScope, ThroughputLimit mode), message group ID for
-  ordering, deduplication (content-based vs explicit), high-throughput
-  FIFO mode, DLQ for FIFO, visibility timeout tuning, SSE-KMS
-  encryption, access policy, redrive policy, and cross-account
-  delivery. Emits a READY_TO_DEPLOY checklist with verification
-  commands. Use when creating an SQS FIFO queue, setting up message
-  group ordering, configuring deduplication, enabling high-throughput
-  FIFO, attaching a DLQ, tuning visibility timeout, or configuring
-  cross-account delivery. Triggers: create sqs fifo queue, fifo queue
-  deduplication, sqs message group id, high throughput fifo, sqs dlq
-  redrive, sqs visibility timeout, sqs sse kms, sqs fifo cross
-  account.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon SQS FIFO queues with production defaults: FIFO queue attributes (FifoQueue=true, ContentBasedDeduplication, DeduplicationScope, ThroughputLimit mode), message group ID for ordering, deduplication (content-based vs explicit), high-throughput FIFO mode, DLQ for FIFO, visibility timeout tuning, SSE-KMS encryption, access policy, redrive policy, and cross-account delivery. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating an SQS FIFO queue, setting up message group ordering, configuring deduplication, enabling high-throughput FIFO, attaching a DLQ, tuning visibility timeout, or configuring cross-account delivery. Triggers: create sqs fifo queue, fifo queue deduplication, sqs message group id, high throughput fifo, sqs dlq redrive, sqs visibility timeout, sqs sse kms, sqs fifo cross account.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with sqs access.
-  Works with Terraform aws_sqs_queue resources and CloudFormation
-  AWS::SQS::Queue templates.
-keywords:
-  - aws
-  - sqs
-  - fifo
-  - message queue
-  - cloudops
-  - deploy
-  - provisioning
-  - deduplication
-  - message group
-  - high throughput
-  - dlq
-  - redrive
-  - visibility timeout
-  - sse kms
-  - cross account
-tags:
-  - aws
-  - sqs
-  - fifo
-  - message-queue
-  - cloudops
-  - deploy
-  - provisioning
-  - deduplication
-  - message-group
-  - high-throughput
-  - dlq
-  - redrive
-  - visibility-timeout
-  - sse-kms
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with sqs access. Works with Terraform aws_sqs_queue resources and CloudFormation AWS::SQS::Queue templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - sqs
-    - fifo
-    - message-queue
-    - cloudops
-    - deploy
-    - provisioning
-    - deduplication
-    - message-group
-    - high-throughput
-    - dlq
-    - redrive
-    - visibility-timeout
-    - sse-kms
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create sqs fifo queue
-    - fifo queue deduplication
-    - sqs message group id
-    - high throughput fifo
-    - sqs dlq redrive
-    - sqs visibility timeout
-    - sqs sse kms
-    - sqs fifo cross account
-  when_to_use: >-
-    Invoke when the user wants to create an SQS FIFO queue, configure
-    message group ID ordering, set up content-based or explicit
-    deduplication, enable high-throughput FIFO mode, attach a dead-
-    letter queue (DLQ), tune visibility timeout, configure SSE-KMS
-    encryption, set up access policies, configure redrive policies, or
-    enable cross-account delivery to a FIFO queue. Do NOT invoke for
-    SQS Standard queues (use standard queue skills), SNS topics, or
-    Amazon MQ.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, sqs, fifo, message-queue, cloudops, deploy, provisioning, deduplication, message-group, high-throughput, dlq, redrive, visibility-timeout, sse-kms
+  dependencies: aws-orchestrator
+  keywords: aws, sqs, fifo, message queue, cloudops, deploy, provisioning, deduplication, message group, high throughput, dlq, redrive, visibility timeout, sse kms, cross account
+  when_to_use: Invoke when the user wants to create an SQS FIFO queue, configure message group ID ordering, set up content-based or explicit deduplication, enable high-throughput FIFO mode, attach a dead- letter queue (DLQ), tune visibility timeout, configure SSE-KMS encryption, set up access policies, configure redrive policies, or enable cross-account delivery to a FIFO queue. Do NOT invoke for SQS Standard queues (use standard queue skills), SNS topics, or Amazon MQ.
 ---
 
 # SQS FIFO Deployer

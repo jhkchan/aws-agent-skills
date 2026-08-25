@@ -1,124 +1,26 @@
 ---
 name: pinpoint-journey-deployer
-description: >-
-  Provisions Amazon Pinpoint journeys with production defaults: journey
-  creation (activity-based vs segment-based entry), conditional activity
-  (yes/no split based on event attributes), multivariate split (random
-  percentage), wait activity (time-based hold until a specific time or
-  duration), send message (email/SMS/push/in-app), holdout percentage
-  (suppress a fraction of participants for A/B control), journey
-  schedule (start date/time, end, timezone), quiet time (hours and days
-  of week during which messages are held), journey limits (max
-  contacts, max per participant), rate limits, custom channel (Lambda
-  webhook for non-native destinations), A/B test within journey (multivariate
-  with holdout), journey analytics, and integration with segments and
-  campaigns. Emits a READY_TO_DEPLOY checklist with verification
-  commands. Use when creating a Pinpoint journey, configuring
-  conditional splits, setting up wait activities, enabling quiet time,
-  defining journey limits, or building an A/B test. Triggers: create
-  pinpoint journey, journey conditional split, journey wait activity,
-  journey quiet time, journey holdout, multivariate split journey,
-  journey schedule, journey limits, custom channel lambda, pinpoint
-  journey analytics.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon Pinpoint journeys with production defaults: journey creation (activity-based vs segment-based entry), conditional activity (yes/no split based on event attributes), multivariate split (random percentage), wait activity (time-based hold until a specific time or duration), send message (email/SMS/push/in-app), holdout percentage (suppress a fraction of participants for A/B control), journey schedule (start date/time, end, timezone), quiet time (hours and days of week during which messages are held), journey limits (max contacts, max per participant), rate limits, custom channel (Lambda webhook for non-native destinations), A/B test within journey (multivariate with holdout), journey analytics, and integration with segments and campaigns. Emits a READY_TO_DEPLOY. Triggers: create pinpoint journey, journey conditional split, journey wait activity, journey quiet time, journey holdout, multivariate split journey, journey schedule, journey limits, custom channel lambda, pinpoint journey analytics.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). For live deployment: AWS CLI v2 with pinpoint access
-  (create-journey, update-journey, describe-journey, delete-journey),
-  plus lambda:AddPermission for custom channel wiring and IAM
-  permissions for segment and channel configuration. Works with
-  Terraform aws_pinpoint_journey resource and CloudFormation
-  AWS::Pinpoint::Journey templates.
-keywords:
-  - aws
-  - pinpoint
-  - journey
-  - appintegration
-  - cloudops
-  - deploy
-  - provisioning
-  - conditional split
-  - multivariate split
-  - wait activity
-  - quiet time
-  - holdout
-  - journey schedule
-  - journey limits
-  - rate limit
-  - custom channel
-  - lambda webhook
-  - a/b test
-  - journey analytics
-  - segment-based entry
-  - event-based entry
-tags:
-  - aws
-  - pinpoint
-  - journey
-  - appintegration
-  - cloudops
-  - deploy
-  - messaging
-  - personalization
-  - multivariate
-  - quiet-time
-  - holdout
-  - ab-testing
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with pinpoint access (create-journey, update-journey, describe-journey, delete-journey), plus lambda:AddPermission for custom channel wiring and IAM permissions for segment and channel configuration. Works with Terraform aws_pinpoint_journey resource and CloudFormation AWS::Pinpoint::Journey templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - pinpoint
-    - journey
-    - appintegration
-    - cloudops
-    - deploy
-    - messaging
-    - personalization
-    - multivariate
-    - quiet-time
-    - holdout
-    - ab-testing
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create pinpoint journey
-    - journey conditional split
-    - journey wait activity
-    - journey quiet time
-    - journey holdout
-    - multivariate split journey
-    - journey schedule
-    - journey limits
-    - custom channel lambda
-    - pinpoint journey analytics
-  when_to_use: >-
-    Invoke when the user wants to create an Amazon Pinpoint journey,
-    configure conditional (yes/no) splits based on event attributes,
-    set up wait activities (time-based holds), enable quiet time,
-    define holdout percentages for A/B control, configure journey
-    limits (max contacts, max per participant), build a multivariate
-    split, wire a custom Lambda channel, or integrate with existing
-    segments. Do NOT invoke for Pinpoint campaigns (single-message
-    blasts — use pinpoint-campaign-deployer), Pinpoint segments
-    (use pinpoint-segment-deployer), or Pinpoint channel configuration
-    (email/SMS/push setup).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, pinpoint, journey, appintegration, cloudops, deploy, messaging, personalization, multivariate, quiet-time, holdout, ab-testing
+  dependencies: aws-orchestrator
+  keywords: aws, pinpoint, journey, appintegration, cloudops, deploy, provisioning, conditional split, multivariate split, wait activity, quiet time, holdout, journey schedule, journey limits, rate limit, custom channel, lambda webhook, a/b test, journey analytics, segment-based entry, event-based entry
+  when_to_use: Invoke when the user wants to create an Amazon Pinpoint journey, configure conditional (yes/no) splits based on event attributes, set up wait activities (time-based holds), enable quiet time, define holdout percentages for A/B control, configure journey limits (max contacts, max per participant), build a multivariate split, wire a custom Lambda channel, or integrate with existing segments. Do NOT invoke for Pinpoint campaigns (single-message blasts — use pinpoint-campaign-deployer), Pinpoint segments (use pinpoint-segment-deployer), or Pinpoint channel configuration (email/SMS/push setup).
 ---
 
 # Pinpoint Journey Deployer

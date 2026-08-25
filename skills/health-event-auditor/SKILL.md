@@ -1,101 +1,24 @@
 ---
 name: health-event-auditor
-description: >-
-  Audits AWS Health for active (open) issue events, upcoming scheduled
-  changes, affected-resource entity status, closed-event resolution, Health
-  Dashboard organization-view enablement, and EventBridge aws.health
-  integration. Emits a deterministic verdict (UNRESOLVED_EVENT |
-  SCHEDULED_CHANGE | CONFIG_GAP | OK) per event or per account/org scope
-  with enumerated findings and specific CLI remediation. Use when reviewing
-  AWS Health events, validating Health Organizational View coverage,
-  diagnosing affected-resource entity status, checking scheduled-change
-  deadlines, auditing EventBridge Health-event wiring, or assessing overall
-  Health posture before an operational review or incident triage.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Health for active (open) issue events, upcoming scheduled changes, affected-resource entity status, closed-event resolution, Health Dashboard organization-view enablement, and EventBridge aws.health integration. Emits a deterministic verdict (UNRESOLVED_EVENT | SCHEDULED_CHANGE | CONFIG_GAP | OK) per event or per account/org scope with enumerated findings and specific CLI remediation. Use when reviewing AWS Health events, validating Health Organizational View coverage, diagnosing affected-resource entity status, checking scheduled-change deadlines, auditing EventBridge Health-event wiring, or assessing overall Health posture before an operational review or incident triage.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline event-document classification.
-  Live-account audits use aws health describe-events, describe-affected-
-  entities, describe-entity-aggregates, describe-health-service-status-for-
-  organization, and aws events list-rules (AWS CLI v2, SSO or key-based
-  credentials, Business/Enterprise/Enterprise On-Ramp support required for
-  the Health API itself).
-keywords:
-  - AWS Health
-  - Health Dashboard
-  - Health API
-  - Personal Health Dashboard
-  - scheduled change
-  - account event
-  - ongoing event
-  - affected entities
-  - entity status
-  - IMPAIRED
-  - UNIMPAIRED
-  - RESOLVED
-  - open event
-  - upcoming event
-  - closed event
-  - eventTypeCategory
-  - scheduledChange
-  - accountNotification
-  - issue
-  - AWS_EC2_INSTANCE_RETIREMENT_SCHEDULED
-  - retirement scheduled
-  - degraded performance
-  - operational event
-  - EventBridge
-  - aws.health
-  - default-rule-Health
-  - Organizational View
-  - healthServiceAccessStatusForOrganization
-  - delegated administrator
-  - Business Support
-  - Enterprise Support
-  - Basic Support
-  - SubscriptionRequiredException
-  - Health event audit
-  - operational readiness
-tags: [aws-health, health-dashboard, eventbridge, management, governance, audit, incident, scheduled-change, organizational-view]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline event-document classification. Live-account audits use aws health describe-events, describe-affected- entities, describe-entity-aggregates, describe-health-service-status-for- organization, and aws events list-rules (AWS CLI v2, SSO or key-based credentials, Business/Enterprise/Enterprise On-Ramp support required for the Health API itself).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
-  verdict_shape: "UNRESOLVED_EVENT | SCHEDULED_CHANGE | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing AWS Health events before an operational review or incident
-    triage, validating Health Organizational View coverage, diagnosing
-    affected-entity statusCode (IMPAIRED/RESOLVED), checking scheduled-change
-    deadlines, auditing EventBridge aws.health rule wiring, or assessing
-    overall Health posture across an account or organization.
-  activation_triggers:
-    - "audit AWS Health events"
-    - "check Health Dashboard"
-    - "ongoing Health events"
-    - "scheduled change deadline"
-    - "EC2 instance retirement"
-    - "affected entities impaired"
-    - "is Health Organizational View enabled"
-    - "EventBridge aws.health rule"
-    - "Personal Health Dashboard"
-    - "AWS Health posture"
-  invocation_schema: >-
-    Input: either (a) one or more AWS Health event records (JSON or text,
-    including eventArn, eventTypeCategory, eventStatus, service,
-    eventTypeCode, startTime, lastUpdatedTime, eventScopeCode, and the
-    affected-entity list with statusCode), optionally paired with account
-    posture (support tier, Health Org View status, EventBridge rule
-    inventory), OR (b) a request to audit live Health posture (the auditor
-    invokes aws health describe-events and the supporting API surface).
-    Output: deterministic EVENT/VERDICT/REASON/FINDINGS/REMEDIATION block
-    per event (or per account/org scope for CONFIG_GAP), where VERDICT is in
-    {UNRESOLVED_EVENT, SCHEDULED_CHANGE, CONFIG_GAP, OK}.
+  verdict_shape: UNRESOLVED_EVENT | SCHEDULED_CHANGE | CONFIG_GAP | OK
+  when_to_use: Reviewing AWS Health events before an operational review or incident triage, validating Health Organizational View coverage, diagnosing affected-entity statusCode (IMPAIRED/RESOLVED), checking scheduled-change deadlines, auditing EventBridge aws.health rule wiring, or assessing overall Health posture across an account or organization.
+  activation_triggers: audit AWS Health events, check Health Dashboard, ongoing Health events, scheduled change deadline, EC2 instance retirement, affected entities impaired, is Health Organizational View enabled, EventBridge aws.health rule, Personal Health Dashboard, AWS Health posture
+  invocation_schema: 'Input: either (a) one or more AWS Health event records (JSON or text, including eventArn, eventTypeCategory, eventStatus, service, eventTypeCode, startTime, lastUpdatedTime, eventScopeCode, and the affected-entity list with statusCode), optionally paired with account posture (support tier, Health Org View status, EventBridge rule inventory), OR (b) a request to audit live Health posture (the auditor invokes aws health describe-events and the supporting API surface). Output: deterministic EVENT/VERDICT/REASON/FINDINGS/REMEDIATION block per event (or per account/org scope for CONFIG_GAP), where VERDICT is in {UNRESOLVED_EVENT, SCHEDULED_CHANGE, CONFIG_GAP, OK}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Health, Health Dashboard, Health API, Personal Health Dashboard, scheduled change, account event, ongoing event, affected entities, entity status, IMPAIRED, UNIMPAIRED, RESOLVED, open event, upcoming event, closed event, eventTypeCategory, scheduledChange, accountNotification, issue, AWS_EC2_INSTANCE_RETIREMENT_SCHEDULED, retirement scheduled, degraded performance, operational event, EventBridge, aws.health, default-rule-Health, Organizational View, healthServiceAccessStatusForOrganization, delegated administrator, Business Support, Enterprise Support, Basic Support, SubscriptionRequiredException, Health event audit, operational readiness
+  tags: aws-health, health-dashboard, eventbridge, management, governance, audit, incident, scheduled-change, organizational-view
 ---
 
 # AWS Health Event Auditor

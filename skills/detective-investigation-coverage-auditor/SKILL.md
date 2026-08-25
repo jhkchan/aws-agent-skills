@@ -1,75 +1,24 @@
 ---
 name: detective-investigation-coverage-auditor
-description: >-
-  Audits Amazon Detective behavior graph coverage, member-account ingestion
-  health, data-source package states (DETECTIVE_CORE, EKS_AUDIT, EKS_RUNTIME),
-  data freshness lag, GuardDuty integration dependency, and Organizations
-  delegated-admin posture. Emits a deterministic verdict
-  (NO_GRAPH | INCOMPLETE_INGESTION | STALE_DATA | CONFIG_GAP | OK) per
-  behavior graph or region with enumerated findings and CLI remediation. Use
-  when validating Detective investigation readiness, checking member-account
-  ingestion gaps, auditing data freshness, verifying GuardDuty integration,
-  or hardening security-investigation coverage before an incident.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits Amazon Detective behavior graph coverage, member-account ingestion health, data-source package states (DETECTIVE_CORE, EKS_AUDIT, EKS_RUNTIME), data freshness lag, GuardDuty integration dependency, and Organizations delegated-admin posture. Emits a deterministic verdict (NO_GRAPH | INCOMPLETE_INGESTION | STALE_DATA | CONFIG_GAP | OK) per behavior graph or region with enumerated findings and CLI remediation. Use when validating Detective investigation readiness, checking member-account ingestion gaps, auditing data freshness, verifying GuardDuty integration, or hardening security-investigation coverage before an incident.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline configuration classification.
-  Live-account audits use aws detective list-graphs, list-members,
-  batch-get-graph-member-datasources, batch-get-graph-datasources,
-  describe-organization-configuration, and aws guardduty list-detectors /
-  get-detector (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Amazon Detective
-  - behavior graph
-  - investigation coverage
-  - GuardDuty integration
-  - member account ingestion
-  - data freshness
-  - DETECTIVE_CORE
-  - EKS_AUDIT
-  - EKS_RUNTIME
-  - Organizations delegated admin
-  - source graph
-  - security investigation
-  - incident response readiness
-  - data source packages
-  - VPC Flow Logs
-  - CloudTrail ingestion
-tags: [detective, security, behavior-graph, investigation, guardduty, ingestion, freshness, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline configuration classification. Live-account audits use aws detective list-graphs, list-members, batch-get-graph-member-datasources, batch-get-graph-datasources, describe-organization-configuration, and aws guardduty list-detectors / get-detector (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
-  verdict_shape: "NO_GRAPH | INCOMPLETE_INGESTION | STALE_DATA | CONFIG_GAP | OK"
-  when_to_use: >-
-    Validating Amazon Detective investigation readiness, checking member-account
-    ingestion completeness, auditing data freshness lag, verifying GuardDuty
-    integration, reviewing data-source package coverage, or confirming
-    Organizations delegated-admin posture before a security incident.
-  activation_triggers:
-    - "audit Detective behavior graph"
-    - "is Detective enabled"
-    - "Detective member accounts not ingesting"
-    - "Detective data freshness check"
-    - "GuardDuty Detective integration"
-    - "Detective source graph coverage"
-    - "Detective investigation readiness"
-    - "check Detective Organizations admin"
-    - "Detective data source packages"
-  invocation_schema: >-
-    Input: either (a) a Detective behavior-graph configuration snapshot
-    (graph ARN, member list, data-source package states, lastDataReceived
-    timestamps), optionally paired with GuardDuty detector status, OR
-    (b) a region/account identifier for live-account audit.
-    Output: deterministic GRAPH/VERDICT/REASON/FINDINGS/REMEDIATION block per
-    behavior graph, where VERDICT is NO_GRAPH | INCOMPLETE_INGESTION |
-    STALE_DATA | CONFIG_GAP | OK.
+  verdict_shape: NO_GRAPH | INCOMPLETE_INGESTION | STALE_DATA | CONFIG_GAP | OK
+  when_to_use: Validating Amazon Detective investigation readiness, checking member-account ingestion completeness, auditing data freshness lag, verifying GuardDuty integration, reviewing data-source package coverage, or confirming Organizations delegated-admin posture before a security incident.
+  activation_triggers: audit Detective behavior graph, is Detective enabled, Detective member accounts not ingesting, Detective data freshness check, GuardDuty Detective integration, Detective source graph coverage, Detective investigation readiness, check Detective Organizations admin, Detective data source packages
+  invocation_schema: 'Input: either (a) a Detective behavior-graph configuration snapshot (graph ARN, member list, data-source package states, lastDataReceived timestamps), optionally paired with GuardDuty detector status, OR (b) a region/account identifier for live-account audit. Output: deterministic GRAPH/VERDICT/REASON/FINDINGS/REMEDIATION block per behavior graph, where VERDICT is NO_GRAPH | INCOMPLETE_INGESTION | STALE_DATA | CONFIG_GAP | OK.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Amazon Detective, behavior graph, investigation coverage, GuardDuty integration, member account ingestion, data freshness, DETECTIVE_CORE, EKS_AUDIT, EKS_RUNTIME, Organizations delegated admin, source graph, security investigation, incident response readiness, data source packages, VPC Flow Logs, CloudTrail ingestion
+  tags: detective, security, behavior-graph, investigation, guardduty, ingestion, freshness, audit
 ---
 
 # Detective Investigation Coverage Auditor

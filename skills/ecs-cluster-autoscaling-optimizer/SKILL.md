@@ -1,96 +1,29 @@
 ---
 name: ecs-cluster-autoscaling-optimizer
-description: 'Optimises Amazon ECS cluster autoscaling across eleven dimensions: capacity provider strategy (spot vs on-demand weight and base — the spot base + on-demand burst pattern), managed EC2 capacity provider
-  auto-scaling (replaces the legacy Cluster Autoscaler / cluster-autoscaler project with native ECS managed scaling), target tracking metric selection (ECSServiceAverageCPUUtilization vs ECSServiceAverageMemoryUtilization vs ALB
-  RequestCountPerTarget), scale-in cooldown tuning (default 300 s is too long for spiky workloads), bin-packing efficiency (detecting empty hosts and stranded resources), Fargate capacity provider (no capacity planning needed for
-  serverless tasks), EC2 instance warm-up time (AMI boot + container agent registration delay), drain instance lifecycle (DRAINING to DEPROVISIONING state management for graceful task migration), desired count vs running count
-  gap analysis (detecting stuck or pending tasks), task placement strategy (spread vs binpack vs random for optimal host utilization), and service auto-scaling vs scheduled scaling for predictable workload patterns. Reads
-  ECS DescribeClusters, DescribeServices, DescribeCapacityProviders, DescribeContainerInstances, CloudWatch ECS/EKS metrics, and CapacityProviderReservation metrics. Emits OPTIMIZED or FURTHER_OPTIMIZATION_AVAILABLE with specific
-  capacity provider reconfiguration, placement strategy changes, and dollar-denominated utilization improvement. Use when reviewing ECS cluster autoscaling, tuning capacity providers, triaging bin-packing waste, or running an
-  ECS FinOps review.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Optimises Amazon ECS cluster autoscaling across eleven dimensions: capacity provider strategy (spot vs on-demand weight and base — the spot base + on-demand burst pattern), managed EC2 capacity provider auto-scaling (replaces the legacy Cluster Autoscaler / cluster-autoscaler project with native ECS managed scaling), target tracking metric selection (ECSServiceAverageCPUUtilization vs ECSServiceAverageMemoryUtilization vs ALB RequestCountPerTarget), scale-in cooldown tuning (default 300 s is too long for spiky workloads), bin-packing efficiency (detecting empty hosts and stranded resources), Fargate capacity provider (no capacity planning needed for serverless tasks), EC2 instance warm-up time (AMI boot + container agent registration delay), drain instance lifecycle (DRAINING to DEPROVISIONING state management for graceful task migration), desired count vs running count gap analysis (detecting stuck or pending tasks), task placement strategy (spread vs binpack vs random for optimal host utilization), and...'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted ECS describe-clusters/describe-services output, capacity provider JSON,
-  and CloudWatch ECSInsights metrics. Live-account optimization uses aws ecs describe-clusters, aws ecs describe-services, aws ecs describe-capacity-providers, aws ecs describe-container-instances, aws ecs describe-tasks, aws
-  application-autoscaling describe-scaling-policies, aws cloudwatch get-metric-statistics (CPUUtilization, MemoryUtilization, RunningTaskCount, DesiredTaskCount, CapacityProviderReservation, ALBRequestCountPerTarget), aws ec2
-  describe-instances, and aws ce get-cost-and-usage (AWS CLI v2, SSO or key-based credentials). Pricing references us-east-1 published rates as of 2026; re-state regional rates for other regions.
-keywords:
-- ECS
-- ECS cluster
-- capacity provider
-- managed scaling
-- Cluster Autoscaler
-- spot instances
-- on-demand
-- bin-packing
-- binpack
-- task placement
-- spread strategy
-- Fargate
-- target tracking
-- ECSServiceAverageCPUUtilization
-- scale-in cooldown
-- drain instances
-- DRAINING
-- DEPROVISIONING
-- scheduled scaling
-- service autoscaling
-- capacity provider strategy
-- Compute
-- FinOps
-tags:
-- ecs
-- compute
-- autoscaling
-- capacity-provider
-- cost-optimization
-- finops
-- bin-packing
-- spot-instances
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted ECS describe-clusters/describe-services output, capacity provider JSON, and CloudWatch ECSInsights metrics. Live-account optimization uses aws ecs describe-clusters, aws ecs describe-services, aws ecs describe-capacity-providers, aws ecs describe-container-instances, aws ecs describe-tasks, aws application-autoscaling describe-scaling-policies, aws...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-  when_to_use: Optimising ECS cluster autoscaling, switching from Cluster Autoscaler to managed EC2 capacity provider, tuning capacity provider strategy (spot vs on-demand), selecting target tracking metrics, tuning scale-in
-    cooldown, detecting bin-packing waste and empty hosts, managing drain instance lifecycle, evaluating Fargate vs EC2 capacity provider, choosing service auto-scaling vs scheduled scaling, or improving task placement strategy.
-  when_not_to_use: EC2 instance rightsizing (use ec2-rightsizing-optimizer), EKS cluster autoscaling (use eks-autoscaling-optimizer — different API surface), ECS task-level troubleshooting (container crashes, task failures,
-    health-check issues — use the ECS troubleshooter), ECS service mesh or App Mesh configuration, or Fargate capacity provisioning (Fargate has no capacity planning surface). This skill focuses on cluster-level autoscaling
-    optimization, not functional debugging of broken tasks.
-  activation_triggers:
-  - optimise ECS autoscaling
-  - ECS capacity provider
-  - ECS managed scaling
-  - ECS Cluster Autoscaler migration
-  - ECS spot capacity provider
-  - ECS bin-packing
-  - ECS binpack placement
-  - ECS task placement strategy
-  - ECS scale-in cooldown
-  - ECS drain instances
-  - ECS DRAINING lifecycle
-  - ECS target tracking
-  - ECS Fargate capacity provider
-  - ECS scheduled scaling
-  - ECS service autoscaling
-  - ECS empty host detection
-  - ECS FinOps
-  - ECS cluster utilization
-  invocation_schema: 'Input: either (a) a cluster name + live-account context, (b) a describe-clusters/describe-services/describe-capacity-providers JSON payload, OR (c) CloudWatch CapacityProviderReservation and
-    ECSServiceAverageCPUUtilization metrics with at least 14 days of observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ ESTIMATED_IMPACT/MIGRATION_STEPS block per cluster, where VERDICT is one of OPTIMIZED,
-    FURTHER_OPTIMIZATION_AVAILABLE.'
-  invocation_example: "# Minimal valid input (offline capacity provider classification):\nClusterName: ecs-prod-cluster\nLaunch type: EC2 (2 capacity providers: on-demand, spot)\nCapacity provider strategy: on-demand weight=4,\
-    \ base=2; spot weight=1, base=0\nManaged scaling: disabled (using legacy cluster-autoscaler)\nPlacement strategy: spread by az\nScale-in cooldown: 300 s (default)\nMetrics (last 30 days):\n  - CPUUtilization avg: 35%, p95:\
-    \ 55%\n  - MemoryUtilization avg: 28%, p95: 45%\n  - CapacityProviderReservation (on-demand): avg 60%\n  - RunningEC2Tasks avg: 40, DesiredTasks avg: 40\n  - Empty container instances: 8 of 20 (40% stranded)\nEmit the\
-    \ standard optimization block (TARGET, VERDICT, REASON, RECOMMENDATION, ESTIMATED_IMPACT, MIGRATION_STEPS)."
+  when_to_use: Optimising ECS cluster autoscaling, switching from Cluster Autoscaler to managed EC2 capacity provider, tuning capacity provider strategy (spot vs on-demand), selecting target tracking metrics, tuning scale-in cooldown, detecting bin-packing waste and empty hosts, managing drain instance lifecycle, evaluating Fargate vs EC2 capacity provider, choosing service auto-scaling vs scheduled scaling, or improving task placement strategy.
+  when_not_to_use: EC2 instance rightsizing (use ec2-rightsizing-optimizer), EKS cluster autoscaling (use eks-autoscaling-optimizer — different API surface), ECS task-level troubleshooting (container crashes, task failures, health-check issues — use the ECS troubleshooter), ECS service mesh or App Mesh configuration, or Fargate capacity provisioning (Fargate has no capacity planning surface). This skill focuses on cluster-level autoscaling optimization, not functional debugging of broken tasks.
+  activation_triggers: optimise ECS autoscaling, ECS capacity provider, ECS managed scaling, ECS Cluster Autoscaler migration, ECS spot capacity provider, ECS bin-packing, ECS binpack placement, ECS task placement strategy, ECS scale-in cooldown, ECS drain instances, ECS DRAINING lifecycle, ECS target tracking, ECS Fargate capacity provider, ECS scheduled scaling, ECS service autoscaling, ECS empty host detection, ECS FinOps, ECS cluster utilization
+  invocation_schema: 'Input: either (a) a cluster name + live-account context, (b) a describe-clusters/describe-services/describe-capacity-providers JSON payload, OR (c) CloudWatch CapacityProviderReservation and ECSServiceAverageCPUUtilization metrics with at least 14 days of observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ ESTIMATED_IMPACT/MIGRATION_STEPS block per cluster, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
+  invocation_example: "# Minimal valid input (offline capacity provider classification):\nClusterName: ecs-prod-cluster\nLaunch type: EC2 (2 capacity providers: on-demand, spot)\nCapacity provider strategy: on-demand weight=4, base=2; spot weight=1, base=0\nManaged scaling: disabled (using legacy cluster-autoscaler)\nPlacement strategy: spread by az\nScale-in cooldown: 300 s (default)\nMetrics (last 30 days):\n  - CPUUtilization avg: 35%, p95: 55%\n  - MemoryUtilization avg: 28%, p95: 45%\n  - CapacityProviderReservation (on-demand): avg 60%\n  - RunningEC2Tasks avg: 40, DesiredTasks avg: 40\n  - Empty container instances: 8 of 20 (40% stranded)\nEmit the standard optimization block (TARGET, VERDICT, REASON, RECOMMENDATION, ESTIMATED_IMPACT, MIGRATION_STEPS)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: ECS, ECS cluster, capacity provider, managed scaling, Cluster Autoscaler, spot instances, on-demand, bin-packing, binpack, task placement, spread strategy, Fargate, target tracking, ECSServiceAverageCPUUtilization, scale-in cooldown, drain instances, DRAINING, DEPROVISIONING, scheduled scaling, service autoscaling, capacity provider strategy, Compute, FinOps
+  tags: ecs, compute, autoscaling, capacity-provider, cost-optimization, finops, bin-packing, spot-instances
 ---
 
 # ECS Cluster Autoscaling Optimizer

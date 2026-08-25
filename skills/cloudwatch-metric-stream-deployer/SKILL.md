@@ -1,119 +1,26 @@
 ---
 name: cloudwatch-metric-stream-deployer
-description: >-
-  Deploys Amazon CloudWatch Metric Streams with production defaults:
-  stream creation (name, output format), Kinesis Data Firehose ARN
-  configuration, metric namespace filter (include/exclude filter),
-  statistics (Average, Sum, SampleCount, Min, Max, p99, etc.),
-  output format (JSON or OpenTelemetry), Firehose to S3 delivery
-  pipeline, CloudWatch to Kinesis Data Firehose to S3 continuous
-  export, cross-account metric streaming, cost-per-metric-stream
-  pricing awareness, CloudWatch API (PutMetricStream, GetMetricStream,
-  DeleteMetricStream, ListMetricStreams), stream statistics auto-
-  aggregation, IAM role permissions (cloudwatch.amazonaws.com service
-  principal writing to Firehose, Firehose writing to S3 with KMS),
-  Firehose buffering latency (1-5 minute delivery delay), and the
-  cost-benefit tradeoff vs GetMetricData API polling (metric streams
-  are cost-effective for >1000 metrics). Emits a READY_TO_DEPLOY
-  checklist with verification commands or PREREQUISITES_MISSING with
-  a specific gap citation. Use when creating a CloudWatch metric
-  stream, exporting metrics to S3 continuously, replacing GetMetricData
-  polling with a stream, streaming metrics in JSON or OpenTelemetry
-  format, filtering by namespace, or configuring cross-account metric
-  streaming. Triggers: create cloudwatch metric stream, metric stream
-  firehose, cloudwatch to s3 metrics, metric stream namespace filter,
-  metric stream opentelemetry, metric stream json, cloudwatch export
-  metrics, metric stream cost, replace getmetricdata polling.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Deploys Amazon CloudWatch Metric Streams with production defaults: stream creation (name, output format), Kinesis Data Firehose ARN configuration, metric namespace filter (include/exclude filter), statistics (Average, Sum, SampleCount, Min, Max, p99, etc.), output format (JSON or OpenTelemetry), Firehose to S3 delivery pipeline, CloudWatch to Kinesis Data Firehose to S3 continuous export, cross-account metric streaming, cost-per-metric-stream pricing awareness, CloudWatch API (PutMetricStream, GetMetricStream, DeleteMetricStream, ListMetricStreams), stream statistics auto- aggregation, IAM role permissions (cloudwatch.amazonaws.com service principal writing to Firehose, Firehose writing to S3 with KMS), Firehose buffering latency (1-5 minute delivery delay). Triggers: create cloudwatch metric stream, metric stream firehose, cloudwatch to s3 metrics, metric stream namespace filter, metric stream opentelemetry, metric stream json, cloudwatch export metrics, metric stream cost, replace getmetricdata polling.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with cloudwatch,
-  firehose, iam, and s3 access. Works with Terraform
-  aws_cloudwatch_metric_stream resource and CloudFormation
-  AWS::CloudWatch::MetricStream templates.
-keywords:
-  - aws
-  - cloudwatch
-  - metric stream
-  - metrics
-  - kinesis data firehose
-  - firehose
-  - s3 delivery
-  - output format
-  - json
-  - opentelemetry
-  - namespace filter
-  - statistics
-  - average
-  - sum
-  - samplecount
-  - p99
-  - getmetricdata
-  - putmetricstream
-  - cross-account
-  - cloudops
-  - deploy
-tags:
-  - aws
-  - cloudwatch
-  - metric-stream
-  - metrics
-  - firehose
-  - opentelemetry
-  - cloudops
-  - deploy
-  - observability
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with cloudwatch, firehose, iam, and s3 access. Works with Terraform aws_cloudwatch_metric_stream resource and CloudFormation AWS::CloudWatch::MetricStream templates.'
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - cloudwatch
-    - metric-stream
-    - metrics
-    - firehose
-    - opentelemetry
-    - cloudops
-    - deploy
-    - observability
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create cloudwatch metric stream
-    - metric stream firehose
-    - cloudwatch to s3 metrics
-    - metric stream namespace filter
-    - metric stream opentelemetry
-    - metric stream json
-    - cloudwatch export metrics
-    - metric stream cost
-    - replace getmetricdata polling
-  when_to_use: >-
-    Invoke when the user wants to create a CloudWatch metric stream —
-    continuously export CloudWatch metrics to S3 via Kinesis Data
-    Firehose, replace GetMetricData API polling with a stream, filter
-    by namespace (include/exclude), choose JSON or OpenTelemetry
-    output format, configure statistics (Average, Sum, p99),
-    configure cross-account metric streaming, or understand metric
-    stream cost (per-metric pricing). Do NOT invoke for CloudWatch
-    Logs subscriptions (use logs skills), CloudWatch dashboards
-    (use dashboard skills), CloudWatch alarms (use alarm skills), or
-    X-Ray tracing (use tracing skills).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, cloudwatch, metric-stream, metrics, firehose, opentelemetry, cloudops, deploy, observability
+  dependencies: aws-orchestrator
+  keywords: aws, cloudwatch, metric stream, metrics, kinesis data firehose, firehose, s3 delivery, output format, json, opentelemetry, namespace filter, statistics, average, sum, samplecount, p99, getmetricdata, putmetricstream, cross-account, cloudops, deploy
+  when_to_use: Invoke when the user wants to create a CloudWatch metric stream — continuously export CloudWatch metrics to S3 via Kinesis Data Firehose, replace GetMetricData API polling with a stream, filter by namespace (include/exclude), choose JSON or OpenTelemetry output format, configure statistics (Average, Sum, p99), configure cross-account metric streaming, or understand metric stream cost (per-metric pricing). Do NOT invoke for CloudWatch Logs subscriptions (use logs skills), CloudWatch dashboards (use dashboard skills), CloudWatch alarms (use alarm skills), or X-Ray tracing (use tracing skills).
 ---
 
 # CloudWatch Metric Stream Deployer

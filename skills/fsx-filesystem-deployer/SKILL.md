@@ -1,105 +1,26 @@
 ---
 name: fsx-filesystem-deployer
-description: >-
-  Provisions Amazon FSx file systems with production defaults:
-  FSx for Windows (storage type SSD/HDD, throughput capacity,
-  deployment Multi-AZ/Single-AZ, AD integration, DNS aliases,
-  shadow copies, dedup, backups), FSx for Lustre (PERSISTENT/
-  SCRATCH, SSD/HDD, metadata config, S3 export, compression),
-  FSx for ONTAP (SVM, volume tiering), FSx for OpenZFS, KMS
-  encryption, backup/restore, IOPS, maintenance window. Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when
-  creating FSx for Windows, FSx for Lustre, FSx for ONTAP, or
-  FSx for OpenZFS. Triggers: create fsx windows, fsx lustre, fsx
-  ontap, fsx openzfs, multi-az file system, fsx backup, s3 export
-  lustre, dedup, throughput capacity.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon FSx file systems with production defaults: FSx for Windows (storage type SSD/HDD, throughput capacity, deployment Multi-AZ/Single-AZ, AD integration, DNS aliases, shadow copies, dedup, backups), FSx for Lustre (PERSISTENT/ SCRATCH, SSD/HDD, metadata config, S3 export, compression), FSx for ONTAP (SVM, volume tiering), FSx for OpenZFS, KMS encryption, backup/restore, IOPS, maintenance window. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating FSx for Windows, FSx for Lustre, FSx for ONTAP, or FSx for OpenZFS. Triggers: create fsx windows, fsx lustre, fsx ontap, fsx openzfs, multi-az file system, fsx backup, s3 export lustre, dedup, throughput capacity.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with fsx and ec2
-  access (and ds access for AD-integrated Windows deployments).
-  Works with Terraform aws_fsx_windows_file_system /
-  aws_fsx_lustre_file_system / aws_fsx_ontap_file_system /
-  aws_fsx_openzfs_file_system resources and CloudFormation
-  AWS::FSx::FileSystem templates.
-keywords:
-  - aws
-  - fsx
-  - fsx for windows
-  - fsx for lustre
-  - fsx for ontap
-  - fsx for openzfs
-  - cloudops
-  - deploy
-  - provisioning
-  - multi-az
-  - single-az
-  - throughput capacity
-  - dedup
-  - s3 export
-  - kms encryption
-tags:
-  - aws
-  - fsx
-  - storage
-  - cloudops
-  - deploy
-  - provisioning
-  - multi-az
-  - throughput-capacity
-  - dedup
-  - kms-encryption
-  - backup
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with fsx and ec2 access (and ds access for AD-integrated Windows deployments). Works with Terraform aws_fsx_windows_file_system / aws_fsx_lustre_file_system / aws_fsx_ontap_file_system / aws_fsx_openzfs_file_system resources and CloudFormation AWS::FSx::FileSystem templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - fsx
-    - storage
-    - cloudops
-    - deploy
-    - provisioning
-    - multi-az
-    - throughput-capacity
-    - dedup
-    - kms-encryption
-    - backup
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create fsx windows
-    - fsx lustre
-    - fsx ontap
-    - fsx openzfs
-    - multi-az file system
-    - fsx backup
-    - s3 export lustre
-    - dedup
-    - throughput capacity
-  when_to_use: >-
-    Invoke when the user wants to create an Amazon FSx file system
-    (FSx for Windows, FSx for Lustre, FSx for ONTAP, or FSx for
-    OpenZFS), configure Multi-AZ vs Single-AZ deployment, set up AD
-    integration for Windows file systems, configure S3 export for
-    Lustre, enable dedup, configure backups, or set throughput
-    capacity. Do NOT invoke for EFS, EBS, or S3 (use the relevant
-    storage skills).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, fsx, storage, cloudops, deploy, provisioning, multi-az, throughput-capacity, dedup, kms-encryption, backup
+  dependencies: aws-orchestrator
+  keywords: aws, fsx, fsx for windows, fsx for lustre, fsx for ontap, fsx for openzfs, cloudops, deploy, provisioning, multi-az, single-az, throughput capacity, dedup, s3 export, kms encryption
+  when_to_use: Invoke when the user wants to create an Amazon FSx file system (FSx for Windows, FSx for Lustre, FSx for ONTAP, or FSx for OpenZFS), configure Multi-AZ vs Single-AZ deployment, set up AD integration for Windows file systems, configure S3 export for Lustre, enable dedup, configure backups, or set throughput capacity. Do NOT invoke for EFS, EBS, or S3 (use the relevant storage skills).
 ---
 
 # FSx Filesystem Deployer

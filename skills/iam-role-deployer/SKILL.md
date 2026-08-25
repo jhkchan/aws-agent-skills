@@ -1,105 +1,26 @@
 ---
 name: iam-role-deployer
-description: >-
-  Creates production-grade IAM roles with correct trust policies and least-
-  privilege permissions across all principal types: AWS service roles
-  (lambda, ecs-tasks, ec2, etc.), cross-account roles with ExternalId and
-  MFA enforcement, Web Identity / OIDC federation (GitHub Actions, Cognito),
-  and SAML federation. Covers permission boundaries for delegation, managed
-  vs inline policies (prefer managed), condition keys for security
-  (aws:SourceIp, aws:SourceVpc, aws:SourceVpce, aws:MultiFactorAuthPresent,
-  aws:RequestedRegion, aws:CalledVia), role chaining patterns, session
-  policies for scoped access, maximum session duration tuning, common role
-  templates (read-only, deploy, admin-delegated), and verification via
-  simulate-principal-policy, get-role, and list-attached-role-policies.
-  Emits a deterministic deployment plan with a READY_TO_DEPLOY checklist,
-  trust-policy validation, and permission-scope assessment. Use when
-  creating IAM roles for AWS services, designing cross-account access,
-  setting up OIDC/SAML federation, scoping deploy roles for CI/CD, applying
-  permission boundaries for delegation, or hardening IAM role posture
-  before production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Creates production-grade IAM roles with correct trust policies and least- privilege permissions across all principal types: AWS service roles (lambda, ecs-tasks, ec2, etc.), cross-account roles with ExternalId and MFA enforcement, Web Identity / OIDC federation (GitHub Actions, Cognito), and SAML federation. Covers permission boundaries for delegation, managed vs inline policies (prefer managed), condition keys for security (aws:SourceIp, aws:SourceVpc, aws:SourceVpce, aws:MultiFactorAuthPresent, aws:RequestedRegion, aws:CalledVia), role chaining patterns, session policies for scoped access, maximum session duration tuning, common role templates (read-only, deploy, admin-delegated), and verification via simulate-principal-policy, get-role, and list-attached-role-policies. Emits a deterministic deployment plan with a READY_TO_DEPLOY checklist, trust-policy validation, and permission-scope assessment. Use when creating IAM roles for AWS services, designing cross-account access, setting up OIDC/SAML...'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline trust-policy and permission
-  document authoring. Live deployment uses aws iam create-role,
-  put-role-policy, attach-role-policy, create-policy, simulate-principal-
-  policy, get-role, and list-attached-role-policies (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - IAM
-  - IAM role
-  - trust policy
-  - assume role
-  - AssumeRolePolicyDocument
-  - least privilege
-  - cross-account
-  - ExternalId
-  - MFA enforcement
-  - Web Identity
-  - OIDC
-  - GitHub Actions
-  - Cognito
-  - SAML federation
-  - permission boundary
-  - managed policy
-  - inline policy
-  - condition keys
-  - aws:SourceIp
-  - aws:SourceVpc
-  - aws:SourceVpce
-  - aws:MultiFactorAuthPresent
-  - aws:RequestedRegion
-  - aws:CalledVia
-  - role chaining
-  - session policy
-  - session duration
-  - sts:AssumeRole
-  - simulate-principal-policy
-tags: [iam, security, deploy, trust-policy, cross-account, oidc, saml, permission-boundary, least-privilege, condition-keys, role-chaining]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline trust-policy and permission document authoring. Live deployment uses aws iam create-role, put-role-policy, attach-role-policy, create-policy, simulate-principal- policy, get-role, and list-attached-role-policies (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: deploy
   skill_class: capability
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Creating an IAM role for an AWS service (Lambda, ECS, EC2, etc.),
-    designing cross-account access with ExternalId or MFA, setting up OIDC
-    federation for GitHub Actions or Cognito, configuring SAML federation,
-    scoping a CI/CD deploy role with permission boundaries, applying
-    condition keys (aws:SourceVpc, aws:RequestedRegion, aws:CalledVia),
-    tuning session duration, building role-chaining patterns, or hardening
-    IAM role posture before production deployment.
-  activation_triggers:
-    - "create an IAM role"
-    - "trust policy for Lambda"
-    - "cross-account role with ExternalId"
-    - "OIDC role for GitHub Actions"
-    - "SAML federation role"
-    - "permission boundary for delegation"
-    - "deploy role for CI/CD"
-    - "MFA enforcement on assume role"
-    - "role chaining pattern"
-    - "session policy for scoped access"
-    - "maximum session duration"
-    - "simulate principal policy"
-  invocation_schema: >-
-    Input shape (one of): (a) a role specification including principal
-    type, trusted entities, required permissions, condition keys, session
-    duration, and permission boundary; (b) a partial spec for interactive
-    refinement (e.g., "Lambda role that reads from S3 and writes to
-    DynamoDB"); (c) an existing role ARN for trust-policy and permission-
-    scope review. Output shape: { ROLE_SPEC, VERDICT, TRUST_POLICY,
-    PERMISSIONS, CHECKLIST[], FINDINGS[], DEPLOY_COMMANDS } where
-    VERDICT ∈ { READY_TO_DEPLOY, PREREQUISITES_MISSING, ERROR }.
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Creating an IAM role for an AWS service (Lambda, ECS, EC2, etc.), designing cross-account access with ExternalId or MFA, setting up OIDC federation for GitHub Actions or Cognito, configuring SAML federation, scoping a CI/CD deploy role with permission boundaries, applying condition keys (aws:SourceVpc, aws:RequestedRegion, aws:CalledVia), tuning session duration, building role-chaining patterns, or hardening IAM role posture before production deployment.
+  activation_triggers: create an IAM role, trust policy for Lambda, cross-account role with ExternalId, OIDC role for GitHub Actions, SAML federation role, permission boundary for delegation, deploy role for CI/CD, MFA enforcement on assume role, role chaining pattern, session policy for scoped access, maximum session duration, simulate principal policy
+  invocation_schema: 'Input shape (one of): (a) a role specification including principal type, trusted entities, required permissions, condition keys, session duration, and permission boundary; (b) a partial spec for interactive refinement (e.g., "Lambda role that reads from S3 and writes to DynamoDB"); (c) an existing role ARN for trust-policy and permission- scope review. Output shape: { ROLE_SPEC, VERDICT, TRUST_POLICY, PERMISSIONS, CHECKLIST[], FINDINGS[], DEPLOY_COMMANDS } where VERDICT ∈ { READY_TO_DEPLOY, PREREQUISITES_MISSING, ERROR }.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: IAM, IAM role, trust policy, assume role, AssumeRolePolicyDocument, least privilege, cross-account, ExternalId, MFA enforcement, Web Identity, OIDC, GitHub Actions, Cognito, SAML federation, permission boundary, managed policy, inline policy, condition keys, aws:SourceIp, aws:SourceVpc, aws:SourceVpce, aws:MultiFactorAuthPresent, aws:RequestedRegion, aws:CalledVia, role chaining, session policy, session duration, sts:AssumeRole, simulate-principal-policy
+  tags: iam, security, deploy, trust-policy, cross-account, oidc, saml, permission-boundary, least-privilege, condition-keys, role-chaining
 ---
 
 # IAM Role Deployer

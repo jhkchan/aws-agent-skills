@@ -1,111 +1,26 @@
 ---
 name: firewall-manager-deployer
-description: >-
-  Provisions AWS Firewall Manager (FMS) policies with production defaults:
-  policy creation (WAF, Security Group, Network Firewall, Shield
-  Advanced), managed service administrator account setup, AWS
-  Organizations integration (OU-based targeting), remediation mode
-  (auto-apply vs monitor-only), resource tagging for inclusion and
-  exclusion, WAF managed rule group association, security group policies
-  (common vs content audit), Network Firewall policy deployment,
-  compliance status via AWS Config, resource group scoped policies,
-  cross-account and cross-Region resource scope, and policy priority
-  ordering. Emits a READY_TO_DEPLOY checklist with verification commands.
-  Use when creating an FMS policy, managing firewall rules across an AWS
-  Organization, setting up WAF managed rules org-wide, enforcing
-  security group policies centrally, deploying Network Firewall at scale,
-  or enabling Shield Advanced protection organization-wide. Triggers:
-  create fms policy, firewall manager policy, fms waf policy, fms security
-  group policy, fms network firewall policy, fms shield advanced, fms
-  remediation, fms managed rule groups, fms ou targeting, fms policy
-  priority, fms resource tags.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Firewall Manager (FMS) policies with production defaults: policy creation (WAF, Security Group, Network Firewall, Shield Advanced), managed service administrator account setup, AWS Organizations integration (OU-based targeting), remediation mode (auto-apply vs monitor-only), resource tagging for inclusion and exclusion, WAF managed rule group association, security group policies (common vs content audit), Network Firewall policy deployment, compliance status via AWS Config, resource group scoped policies, cross-account and cross-Region resource scope, and policy priority ordering. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating an FMS policy, managing firewall rules across an AWS Organization, setting up WAF managed. Triggers: create fms policy, firewall manager policy, fms waf policy, fms security group policy, fms network firewall policy, fms shield advanced, fms remediation, fms managed rule groups, fms ou targeting, fms policy priority, fms resource tags.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with fms, wafv2,
-  ec2, network-firewall, shield, organizations, and config access.
-  Requires the FMS administrator account to be delegated in AWS
-  Organizations. Works with Terraform aws_fms_policy /
-  aws_fms_admin_account resources and CloudFormation
-  AWS::FMS::Policy templates.
-keywords:
-  - aws
-  - firewall manager
-  - fms
-  - waf
-  - security group
-  - network firewall
-  - shield advanced
-  - cloudops
-  - deploy
-  - provisioning
-  - organizations
-  - remediation
-  - managed rule groups
-  - policy priority
-  - compliance
-tags:
-  - aws
-  - firewall-manager
-  - fms
-  - cloudops
-  - deploy
-  - security
-  - provisioning
-  - organizations
-  - remediation
-  - compliance
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with fms, wafv2, ec2, network-firewall, shield, organizations, and config access. Requires the FMS administrator account to be delegated in AWS Organizations. Works with Terraform aws_fms_policy / aws_fms_admin_account resources and CloudFormation AWS::FMS::Policy templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - firewall-manager
-    - fms
-    - cloudops
-    - deploy
-    - security
-    - provisioning
-    - organizations
-    - remediation
-    - compliance
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create fms policy
-    - firewall manager policy
-    - fms waf policy
-    - fms security group policy
-    - fms network firewall policy
-    - fms remediation
-    - fms ou targeting
-    - fms policy priority
-  when_to_use: >-
-    Invoke when the user wants to create an AWS Firewall Manager policy
-    (WAF, Security Group, Network Firewall, or Shield Advanced), set up
-    the FMS administrator account, target an Organization OU, configure
-    remediation (auto-apply or monitor-only), manage WAF managed rule
-    groups centrally, enforce security group policies across accounts,
-    deploy Network Firewall policies at scale, or configure resource
-    inclusion/exclusion via tags. Do NOT invoke for standalone WAFv2 Web
-    ACL deployment (use wafv2-web-acl-deployer), standalone Network
-    Firewall rule deployment (use network-firewall skills), or Shield
-    Advanced configuration without FMS orchestration.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, firewall-manager, fms, cloudops, deploy, security, provisioning, organizations, remediation, compliance
+  dependencies: aws-orchestrator
+  keywords: aws, firewall manager, fms, waf, security group, network firewall, shield advanced, cloudops, deploy, provisioning, organizations, remediation, managed rule groups, policy priority, compliance
+  when_to_use: Invoke when the user wants to create an AWS Firewall Manager policy (WAF, Security Group, Network Firewall, or Shield Advanced), set up the FMS administrator account, target an Organization OU, configure remediation (auto-apply or monitor-only), manage WAF managed rule groups centrally, enforce security group policies across accounts, deploy Network Firewall policies at scale, or configure resource inclusion/exclusion via tags. Do NOT invoke for standalone WAFv2 Web ACL deployment (use wafv2-web-acl-deployer), standalone Network Firewall rule deployment (use network-firewall skills), or Shield Advanced configuration without FMS orchestration.
 ---
 
 # Firewall Manager Deployer

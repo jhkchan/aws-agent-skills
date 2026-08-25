@@ -1,85 +1,27 @@
 ---
 name: eks-autoscaling-automator
-description: >-
-  Designs and implements EKS cluster autoscaling automation. Compares and
-  deploys Cluster Autoscaler vs Karpenter (provisioner node templates,
-  consolidation policies, disruption budgets), configures node-group
-  scaling policies, builds HPA (Horizontal Pod Autoscaler) with custom
-  and external metrics, explains VPA (Vertical Pod Autoscaler) caveats
-  and incompatibilities, deploys KEDA for event-driven scaling (Kafka,
-  SQS, Prometheus), handles spot instance interruption (termination
-  handler, graceful drain), configures overprovisioning pause-pods for
-  fast scale-up, sets up pod disruption budgets to protect quorum,
-  defines priority classes for workload preemption, and deploys
-  descheduler for bin-packing optimization. Emits AUTOMATION_DEPLOYED
-  with ready-to-apply Helm values + manifests or REVIEW_REQUIRED with
-  the specific gap. Use when building EKS autoscaling, choosing Karpenter
-  vs Cluster Autoscaler, or optimizing an existing scaling setup.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Designs and implements EKS cluster autoscaling automation. Compares and deploys Cluster Autoscaler vs Karpenter (provisioner node templates, consolidation policies, disruption budgets), configures node-group scaling policies, builds HPA (Horizontal Pod Autoscaler) with custom and external metrics, explains VPA (Vertical Pod Autoscaler) caveats and incompatibilities, deploys KEDA for event-driven scaling (Kafka, SQS, Prometheus), handles spot instance interruption (termination handler, graceful drain), configures overprovisioning pause-pods for fast scale-up, sets up pod disruption budgets to protect quorum, defines priority classes for workload preemption, and deploys descheduler for bin-packing optimization. Emits AUTOMATION_DEPLOYED with ready-to-apply Helm values + manifests or REVIEW_REQUIRED with the specific gap. Use when building EKS autoscaling, choosing Karpenter vs Cluster Autoscaler, or optimizing an existing scaling setup.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI or kubectl required for offline workflow design.
-  Live deployment uses helm install/upgrade (Cluster Autoscaler, Karpenter,
-  KEDA, descheduler), kubectl apply (HPA, VPA, PDB, priority classes,
-  Karpenter NodePool/NodeClaim), aws eks update-nodegroup-config (managed
-  node group scaling) — AWS CLI v2, kubectl, helm v3.
-keywords:
-  - EKS autoscaling
-  - Karpenter
-  - Cluster Autoscaler
-  - Horizontal Pod Autoscaler
-  - HPA
-  - Vertical Pod Autoscaler
-  - VPA
-  - KEDA
-  - spot instance interruption
-  - overprovisioning
-  - pod disruption budget
-  - priority class
-  - descheduler
-  - consolidation
-  - disruption budget
-tags: [eks, karpenter, cluster-autoscaler, hpa, keda, spot, autoscaling, automate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI or kubectl required for offline workflow design. Live deployment uses helm install/upgrade (Cluster Autoscaler, Karpenter, KEDA, descheduler), kubectl apply (HPA, VPA, PDB, priority classes, Karpenter NodePool/NodeClaim), aws eks update-nodegroup-config (managed node group scaling) — AWS CLI v2, kubectl, helm v3.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATION_DEPLOYED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Building EKS autoscaling (Karpenter or Cluster Autoscaler), configuring
-    HPA/VPA/KEDA for workload scaling, handling spot instance interruptions,
-    optimizing scale-up latency with overprovisioning, protecting workloads
-    with PDBs and priority classes, or improving bin-packing with
-    descheduler.
-  activation_triggers:
-    - "EKS autoscaling"
-    - "Karpenter setup"
-    - "Cluster Autoscaler"
-    - "horizontal pod autoscaler"
-    - "KEDA event-driven scaling"
-    - "spot interruption handling"
-    - "overprovisioning pause pods"
-    - "pod disruption budget"
-    - "descheduler bin-packing"
-    - "node group scaling policy"
-  invocation_schema: >-
-    Input: either (a) an EKS cluster description (version, node count,
-    workload mix, scaling requirements, spot/on-demand ratio) plus
-    observability metrics, OR (b) an autoscaling request ("set up
-    Karpenter with spot diversification", "configure HPA with custom
-    metrics for the API deployment"). Output: deterministic AUTOSCALING
-    block — TOOLING/PROVISIONING/POD_SCALING/SPOT/SAFETY/VERDICT —
-    where VERDICT is AUTOMATION_DEPLOYED (Helm values + manifests ready)
-    or REVIEW_REQUIRED (specific gap cited).
+  verdict_shape: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
+  when_to_use: Building EKS autoscaling (Karpenter or Cluster Autoscaler), configuring HPA/VPA/KEDA for workload scaling, handling spot instance interruptions, optimizing scale-up latency with overprovisioning, protecting workloads with PDBs and priority classes, or improving bin-packing with descheduler.
+  activation_triggers: EKS autoscaling, Karpenter setup, Cluster Autoscaler, horizontal pod autoscaler, KEDA event-driven scaling, spot interruption handling, overprovisioning pause pods, pod disruption budget, descheduler bin-packing, node group scaling policy
+  invocation_schema: 'Input: either (a) an EKS cluster description (version, node count, workload mix, scaling requirements, spot/on-demand ratio) plus observability metrics, OR (b) an autoscaling request ("set up Karpenter with spot diversification", "configure HPA with custom metrics for the API deployment"). Output: deterministic AUTOSCALING block — TOOLING/PROVISIONING/POD_SCALING/SPOT/SAFETY/VERDICT — where VERDICT is AUTOMATION_DEPLOYED (Helm values + manifests ready) or REVIEW_REQUIRED (specific gap cited).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: EKS autoscaling, Karpenter, Cluster Autoscaler, Horizontal Pod Autoscaler, HPA, Vertical Pod Autoscaler, VPA, KEDA, spot instance interruption, overprovisioning, pod disruption budget, priority class, descheduler, consolidation, disruption budget
+  tags: eks, karpenter, cluster-autoscaler, hpa, keda, spot, autoscaling, automate
 ---
 
 # EKS Autoscaling Automator

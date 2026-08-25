@@ -1,110 +1,26 @@
 ---
 name: directory-service-deployer
-description: >-
-  Provisions AWS Directory Service with production defaults: directory
-  type selection (Managed Microsoft AD, Simple AD, AD Connector),
-  edition sizing (Standard vs Enterprise), VPC/subnet placement
-  (multi-AZ), DNS configuration (conditional forwarders, on-prem
-  resolution), trust relationships (forest trust, external trust,
-  one-way vs two-way), SSO via IAM Identity Center, cross-account
-  directory sharing, LDAPS (secure LDAP with certificate authority),
-  certificate-based auth, snapshot/restore, Multi-Region replication,
-  password policies, security group association. Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when
-  creating a Managed AD, deploying Simple AD, configuring AD
-  Connector, setting up trust relationships, enabling LDAPS, or
-  integrating with IAM Identity Center. Triggers: create managed
-  microsoft ad, simple ad, ad connector, directory service trust,
-  ldaps, sso iam identity center, directory sharing, multi-region
-  replication.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Directory Service with production defaults: directory type selection (Managed Microsoft AD, Simple AD, AD Connector), edition sizing (Standard vs Enterprise), VPC/subnet placement (multi-AZ), DNS configuration (conditional forwarders, on-prem resolution), trust relationships (forest trust, external trust, one-way vs two-way), SSO via IAM Identity Center, cross-account directory sharing, LDAPS (secure LDAP with certificate authority), certificate-based auth, snapshot/restore, Multi-Region replication, password policies, security group association. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Managed AD, deploying Simple AD, configuring AD Connector, setting up trust relationships, enabling LDAPS, or integrating with IAM Identity Center. Triggers: create managed microsoft ad, simple ad, ad connector, directory service trust, ldaps, sso iam identity center, directory sharing, multi-region replication.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with ds and ec2
-  access (and cross-account STS assume-role if directory sharing).
-  Works with Terraform aws_directory_service_directory /
-  aws_directory_service_conditional_forwarder /
-  aws_directory_service_log_subscription resources and CloudFormation
-  AWS::DirectoryService::MicrosoftAD /
-  AWS::DirectoryService::SimpleAD templates.
-keywords:
-  - aws
-  - directory service
-  - managed microsoft ad
-  - simple ad
-  - ad connector
-  - cloudops
-  - deploy
-  - provisioning
-  - trust relationship
-  - ldaps
-  - iam identity center
-  - sso
-  - multi-region replication
-  - directory sharing
-tags:
-  - aws
-  - directory-service
-  - managed-ad
-  - cloudops
-  - deploy
-  - security
-  - provisioning
-  - ldaps
-  - sso
-  - trust-relationship
-  - multi-region
-  - directory-sharing
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with ds and ec2 access (and cross-account STS assume-role if directory sharing). Works with Terraform aws_directory_service_directory / aws_directory_service_conditional_forwarder / aws_directory_service_log_subscription resources and CloudFormation AWS::DirectoryService::MicrosoftAD / AWS::DirectoryService::SimpleAD templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - directory-service
-    - managed-ad
-    - cloudops
-    - deploy
-    - security
-    - provisioning
-    - ldaps
-    - sso
-    - trust-relationship
-    - multi-region
-    - directory-sharing
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create managed microsoft ad
-    - simple ad
-    - ad connector
-    - directory service trust
-    - ldaps
-    - sso iam identity center
-    - directory sharing
-    - multi-region replication
-  when_to_use: >-
-    Invoke when the user wants to create an AWS Directory Service
-    directory (Managed Microsoft AD, Simple AD, or AD Connector),
-    configure trust relationships (forest or external), enable LDAPS
-    (secure LDAP), set up SSO via IAM Identity Center, share a
-    directory across accounts, configure Multi-Region replication,
-    or manage password policies. Do NOT invoke for self-managed AD on
-    EC2, AWS Managed Workstations, or third-party LDAP servers.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, directory-service, managed-ad, cloudops, deploy, security, provisioning, ldaps, sso, trust-relationship, multi-region, directory-sharing
+  dependencies: aws-orchestrator
+  keywords: aws, directory service, managed microsoft ad, simple ad, ad connector, cloudops, deploy, provisioning, trust relationship, ldaps, iam identity center, sso, multi-region replication, directory sharing
+  when_to_use: Invoke when the user wants to create an AWS Directory Service directory (Managed Microsoft AD, Simple AD, or AD Connector), configure trust relationships (forest or external), enable LDAPS (secure LDAP), set up SSO via IAM Identity Center, share a directory across accounts, configure Multi-Region replication, or manage password policies. Do NOT invoke for self-managed AD on EC2, AWS Managed Workstations, or third-party LDAP servers.
 ---
 
 # Directory Service Deployer

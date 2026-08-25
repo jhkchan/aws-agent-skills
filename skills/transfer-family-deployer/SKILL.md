@@ -1,125 +1,28 @@
 ---
 name: transfer-family-deployer
-description: >-
-  Provisions AWS Transfer Family servers with secure defaults — SFTP,
-  FTPS, and FTP protocols, server endpoint types (public vs VPC vs
-  VPC_ENDPOINT), identity providers (Service Managed, API Gateway
-  Lambda custom IdP, AWS Directory Service), S3 storage backend with
-  scoped-down IAM roles and session policies, EFS-backed users,
-  CloudWatch logging, security groups for VPC endpoints, AS2
-  app-level B2B messaging, managed workflows (copy, delete, tag),
-  tags, and structured logging. Runs pre-checks (S3 bucket policy,
-  IAM role session policy scope, ACM cert for FTPS, API Gateway
-  invocation permissions for custom IdP, VPC subnet/security group
-  reachability, Directory Service user population), emits
-  create-server and create-user CLIs behind a CONFIRM gate, and
-  verifies via describe-server. Emits READY_TO_DEPLOY |
-  PREREQUISITES_MISSING. Use when creating SFTP/FTPS servers,
-  configuring custom IdPs, or setting up managed workflows.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Provisions AWS Transfer Family servers with secure defaults — SFTP, FTPS, and FTP protocols, server endpoint types (public vs VPC vs VPC_ENDPOINT), identity providers (Service Managed, API Gateway Lambda custom IdP, AWS Directory Service), S3 storage backend with scoped-down IAM roles and session policies, EFS-backed users, CloudWatch logging, security groups for VPC endpoints, AS2 app-level B2B messaging, managed workflows (copy, delete, tag), tags, and structured logging. Runs pre-checks (S3 bucket policy, IAM role session policy scope, ACM cert for FTPS, API Gateway invocation permissions for custom IdP, VPC subnet/security group reachability, Directory Service user population), emits create-server and create-user CLIs behind a CONFIRM gate, and verifies via describe-server. Emits READY_TO_DEPLOY | PREREQUISITES_MISSING. Use when creating SFTP/FTPS servers, configuring custom IdPs, or setting up managed workflows.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws transfer create-server, create-user, update-server,
-  describe-server, create-access, create-workflow (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - Transfer Family
-  - AWS Transfer
-  - SFTP
-  - FTPS
-  - FTP
-  - AS2
-  - file transfer
-  - service managed
-  - custom IdP
-  - API Gateway
-  - Lambda IdP
-  - Directory Service
-  - Managed Microsoft AD
-  - S3 backend
-  - EFS backend
-  - session policy
-  - IAM role
-  - VPC endpoint
-  - security group
-  - managed workflows
-  - CloudWatch logging
-  - structured logging
-tags: [transfer-family, sftp, ftps, storage, file-transfer, deploy, vpc, as2]
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws transfer create-server, create-user, update-server, describe-server, create-access, create-workflow (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - transfer-family
-    - sftp
-    - ftps
-    - storage
-    - file-transfer
-    - deploy
-    - vpc
-    - as2
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - Transfer Family
-    - SFTP
-    - FTPS
-    - custom IdP
-    - API Gateway
-    - session policy
-    - managed workflows
-    - AS2
-  when_to_use: >-
-    Creating an AWS Transfer Family server (SFTP, FTPS, FTP, AS2),
-    configuring an identity provider (Service Managed, API Gateway
-    Lambda custom IdP, AWS Directory Service), scoping IAM roles for
-    per-user S3 access, deploying a VPC-attached server with security
-    groups, enabling structured CloudWatch logging, or setting up
-    managed workflows for inbound/outbound file processing.
-  activation_triggers:
-    - "create Transfer Family server"
-    - "provision SFTP server"
-    - "deploy FTPS server"
-    - "Transfer Family custom IdP"
-    - "API Gateway Lambda identity"
-    - "Directory Service SFTP"
-    - "Managed Microsoft AD SFTP"
-    - "session policy S3"
-    - "scoped-down IAM role"
-    - "VPC endpoint Transfer Family"
-    - "security group SFTP"
-    - "EFS-backed users"
-    - "Transfer Family managed workflow"
-    - "AS2 app-level messaging"
-    - "Transfer Family structured logging"
-    - "create-server transfer"
-    - "create-user transfer"
-    - "Transfer Family tags"
-  invocation_schema: >-
-    Input: either (a) a Transfer Family deployment intent (create,
-    update) with target server name, protocols (SFTP/FTPS/FTP/AS2),
-    endpoint type (public/VPC/VPC_ENDPOINT), identity provider config,
-    storage backend (S3 bucket or EFS), IAM role and session policy,
-    logging config, security groups, and tags; OR (b) a server-id for
-    live-account update or validation. Output: deterministic
-    SERVER/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation,
-    where VERDICT is one of READY_TO_DEPLOY, PREREQUISITES_MISSING.
+  author: Jacky Chan — AWS Community Builder
+  tags: transfer-family, sftp, ftps, storage, file-transfer, deploy, vpc, as2
+  dependencies: aws-orchestrator
+  keywords: Transfer Family, AWS Transfer, SFTP, FTPS, FTP, AS2, file transfer, service managed, custom IdP, API Gateway, Lambda IdP, Directory Service, Managed Microsoft AD, S3 backend, EFS backend, session policy, IAM role, VPC endpoint, security group, managed workflows, CloudWatch logging, structured logging
+  when_to_use: Creating an AWS Transfer Family server (SFTP, FTPS, FTP, AS2), configuring an identity provider (Service Managed, API Gateway Lambda custom IdP, AWS Directory Service), scoping IAM roles for per-user S3 access, deploying a VPC-attached server with security groups, enabling structured CloudWatch logging, or setting up managed workflows for inbound/outbound file processing.
+  activation_triggers: create Transfer Family server, provision SFTP server, deploy FTPS server, Transfer Family custom IdP, API Gateway Lambda identity, Directory Service SFTP, Managed Microsoft AD SFTP, session policy S3, scoped-down IAM role, VPC endpoint Transfer Family, security group SFTP, EFS-backed users, Transfer Family managed workflow, AS2 app-level messaging, Transfer Family structured logging, create-server transfer, create-user transfer, Transfer Family tags
+  invocation_schema: 'Input: either (a) a Transfer Family deployment intent (create, update) with target server name, protocols (SFTP/FTPS/FTP/AS2), endpoint type (public/VPC/VPC_ENDPOINT), identity provider config, storage backend (S3 bucket or EFS), IAM role and session policy, logging config, security groups, and tags; OR (b) a server-id for live-account update or validation. Output: deterministic SERVER/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation, where VERDICT is one of READY_TO_DEPLOY, PREREQUISITES_MISSING.'
 ---
 
 # Transfer Family Deployer

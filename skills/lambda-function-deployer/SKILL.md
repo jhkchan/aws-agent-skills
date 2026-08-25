@@ -1,90 +1,25 @@
 ---
 name: lambda-function-deployer
-description: 'Deploys AWS Lambda functions with production-grade configuration: least-privilege execution IAM role, supported runtime selection, right-sized memory and timeout, KMS-encrypted environment
-  variables, VPC configuration with NAT Gateway for internet access, dead-letter queues and on-failure destinations, provisioned vs on-demand concurrency, Lambda Layers, code signing with Signer, ECR image
-  vs zip packaging, CloudWatch logging with retention, X-Ray tracing, and latest features (SnapStart, Web Adapter, response streaming). Emits a READY_TO_DEPLOY checklist with every configuration item verified.
-  Use when creating a new Lambda function, deploying a function to production, validating a function configuration, or generating deployment commands and IaC templates. Triggers: create Lambda, deploy function,
-  serverless, IAM role, VPC config, provisioned concurrency, layers, SnapStart, container image.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Deploys AWS Lambda functions with production-grade configuration: least-privilege execution IAM role, supported runtime selection, right-sized memory and timeout, KMS-encrypted environment variables, VPC configuration with NAT Gateway for internet access, dead-letter queues and on-failure destinations, provisioned vs on-demand concurrency, Lambda Layers, code signing with Signer, ECR image vs zip packaging, CloudWatch logging with retention, X-Ray tracing, and latest features (SnapStart, Web Adapter, response streaming). Emits a READY_TO_DEPLOY checklist with every configuration item verified. Use when creating a new Lambda function, deploying a function to production, validating a function configuration, or generating deployment commands and IaC templates. Triggers: create Lambda, deploy function, serverless, IAM role, VPC config, provisioned concurrency, layers, SnapStart, container image.'
 license: Apache-2.0
-compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with lambda, iam, kms, ec2, sqs, sns, ecr, logs, and signer access. Works with
-  Terraform aws_lambda_function resources, CloudFormation AWS::Lambda::Function, and SAM templates.'
-keywords:
-- aws
-- lambda
-- cloudops
-- deploy
-- provisioning
-- serverless
-- compute
-- iam-role
-- runtime
-- vpc
-- concurrency
-- layers
-- code-signing
-- x-ray
-- snapstart
-tags:
-- aws
-- lambda
-- cloudops
-- deploy
-- serverless
-- compute
-- iam-role
-- vpc
-- concurrency
-- layers
-- code-signing
-- x-ray
-dependencies:
-- aws-orchestrator
+compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with lambda, iam, kms, ec2, sqs, sns, ecr, logs, and signer access. Works with Terraform aws_lambda_function resources, CloudFormation AWS::Lambda::Function, and SAM templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: deploy
   skill_class: capability
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-  - aws
-  - lambda
-  - cloudops
-  - deploy
-  - serverless
-  - compute
-  - iam-role
-  - vpc
-  - concurrency
-  - layers
-  - code-signing
-  - x-ray
-  dependencies:
-  - aws-orchestrator
-  keywords:
-  - create lambda function
-  - deploy lambda
-  - lambda configuration
-  - lambda iam role
-  - lambda runtime
-  - lambda vpc
-  - lambda concurrency
-  - lambda layers
-  - lambda code signing
-  - lambda ecr
-  - lambda x-ray
-  - lambda snapstart
-  when_to_use: Invoke when the user wants to create a new Lambda function, deploy a function to production, validate a function configuration against best practices, generate deployment CLI commands or
-    IaC templates, or troubleshoot a deployment failure caused by missing prerequisites (IAM role, VPC, ECR image, KMS key). Do NOT invoke for ECS/Fargate deployments (use ecs-task-definition-auditor) or
-    for Lambda runtime deprecation audits (use lambda-runtime-deprecation-auditor).
+  tags: aws, lambda, cloudops, deploy, serverless, compute, iam-role, vpc, concurrency, layers, code-signing, x-ray
+  dependencies: aws-orchestrator
+  keywords: aws, lambda, cloudops, deploy, provisioning, serverless, compute, iam-role, runtime, vpc, concurrency, layers, code-signing, x-ray, snapstart
+  when_to_use: Invoke when the user wants to create a new Lambda function, deploy a function to production, validate a function configuration against best practices, generate deployment CLI commands or IaC templates, or troubleshoot a deployment failure caused by missing prerequisites (IAM role, VPC, ECR image, KMS key). Do NOT invoke for ECS/Fargate deployments (use ecs-task-definition-auditor) or for Lambda runtime deprecation audits (use lambda-runtime-deprecation-auditor).
 ---
 
 # Lambda Function Deployer

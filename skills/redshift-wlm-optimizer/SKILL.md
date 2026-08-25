@@ -1,95 +1,29 @@
 ---
 name: redshift-wlm-optimizer
-description: 'Optimises Amazon Redshift Workload Management (WLM) across eleven dimensions: WLM queue configuration (auto vs manual WLM with static concurrency slots), concurrency scaling (automatic additional clusters
-  that elastically scale query throughput), query priority (Highest/High/Normal/Low for ranked queue processing), queue assignment rules (user/group/query-label based routing), Short Query Acceleration (SQA — isolates
-  short queries from long-running ones without a dedicated queue), workload management concurrency tuning (slots per queue, memory % per queue), memory allocation per queue (explicit % of cluster memory for manual WLM),
-  query monitoring rules (QMR — metrics-based abort for runaway queries with CPU time, row count, query duration, and memory thresholds), AQUA (Advanced Query Accelerator for compute-heavy scans), materialized views
-  (pre-computed aggregates for dashboard workloads with auto-refresh), data catalog external table optimization (Spectrum pushdown and partition pruning), and COPY command bulk load optimization (COMPUPDATE, MAXROWS,
-  parallel ingestion). Reads STL_QUERY, STV_WLM_QUERY_STATE, STL_QUERY_METRICS, SYS_QUERY_HISTORY, and redshift-api describe-cluster-configuration. Emits OPTIMIZED or FURTHER_OPTIMIZATION_AVAILABLE with specific WLM
-  reconfiguration steps, projected queue throughput improvement, and dollar-denominated cluster efficiency gain. Use when reviewing Redshift WLM, tuning concurrency, triaging queue stalls, or running a Redshift FinOps review.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Optimises Amazon Redshift Workload Management (WLM) across eleven dimensions: WLM queue configuration (auto vs manual WLM with static concurrency slots), concurrency scaling (automatic additional clusters that elastically scale query throughput), query priority (Highest/High/Normal/Low for ranked queue processing), queue assignment rules (user/group/query-label based routing), Short Query Acceleration (SQA — isolates short queries from long-running ones without a dedicated queue), workload management concurrency tuning (slots per queue, memory % per queue), memory allocation per queue (explicit % of cluster memory for manual WLM), query monitoring rules (QMR — metrics-based abort for runaway queries with CPU time, row count, query duration, and memory thresholds), AQUA (Advanced Query Accelerator for compute-heavy scans), materialized views (pre-computed aggregates for dashboard workloads with auto-refresh), data catalog external table optimization (Spectrum pushdown and partition pruning), and COPY...'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted STL/SYS system table query output, WLM configuration JSON,
-  and CloudWatch RedshiftInsights metrics. Live-account optimization uses aws redshift describe-clusters, aws redshift describe-cluster-configuration, aws redshift describe-query, aws redshift describe-queries, aws
-  redshift modify-cluster, aws cloudwatch get-metric-statistics (CPUUtilization, QueryDuration, QueryThroughput, ConcurrencyScalingClustersActive, WLMQueueLength, MaintenanceMode), aws redshift-data execute-statement
-  (SYS_QUERY_HISTORY, STL_QUERY, STL_QUERY_METRICS, STV_WLM_QUERY_STATE), and aws ce get-cost-and-usage (AWS CLI v2, SSO or key-based credentials). Pricing references us-east-1 published rates as of 2026; re-state
-  regional rates for other regions.
-keywords:
-- Redshift
-- WLM
-- Workload Management
-- auto WLM
-- concurrency scaling
-- Short Query Acceleration
-- SQA
-- query priority
-- queue assignment rules
-- query monitoring rules
-- QMR
-- materialized views
-- AQUA
-- COPY command
-- bulk load
-- Spectrum
-- external tables
-- data catalog
-- slot count
-- memory allocation
-- Analytics
-- FinOps
-tags:
-- redshift
-- analytics
-- workload-management
-- wlm
-- cost-optimization
-- finops
-- concurrency-scaling
-- query-priority
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted STL/SYS system table query output, WLM configuration JSON, and CloudWatch RedshiftInsights metrics. Live-account optimization uses aws redshift describe-clusters, aws redshift describe-cluster-configuration, aws redshift describe-query, aws redshift describe-queries, aws redshift modify-cluster, aws cloudwatch get-metric-statistics (CPUUtilization...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-  when_to_use: Optimising Redshift WLM queue configuration, switching from manual WLM to auto WLM with concurrency scaling, enabling Short Query Acceleration, defining queue assignment rules, tuning queue concurrency
-    and memory %, writing query monitoring rules to abort runaway queries, evaluating AQUA for compute-heavy scans, adding materialized views for dashboard workloads, optimising Spectrum external table queries,
-    or tuning COPY command bulk loads.
-  when_not_to_use: Redshift cluster rightsizing or node type migration (use redshift-node-optimizer), Redshift Serverless capacity tuning (different configuration surface), Redshift data lake formation setup,
-    Redshift ML model lifecycle, or Redshift troubleshooting (connection failures, query errors, node events — use the Redshift troubleshooter). This skill focuses on WLM and query-throughput optimization, not
-    functional debugging of broken clusters.
-  activation_triggers:
-  - optimise Redshift WLM
-  - Redshift auto WLM
-  - Redshift concurrency scaling
-  - Redshift Short Query Acceleration
-  - Redshift SQA
-  - Redshift query priority
-  - Redshift queue assignment rules
-  - Redshift query monitoring rules
-  - Redshift QMR runaway query
-  - Redshift materialized views
-  - Redshift AQUA
-  - Redshift COPY command optimization
-  - Redshift Spectrum external tables
-  - Redshift slot count tuning
-  - Redshift memory allocation per queue
-  - Redshift queue stalls
-  - Redshift FinOps
-  - Redshift query throughput
-  invocation_schema: 'Input: either (a) a cluster identifier + live-account context, (b) a describe-cluster-configuration WLM JSON payload, OR (c) STL_QUERY / STV_WLM_QUERY_STATE / STL_QUERY_METRICS query output
-    with at least 14 days of observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ ESTIMATED_IMPACT/MIGRATION_STEPS block per cluster, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
-  invocation_example: "# Minimal valid input (offline WLM classification):\nClusterIdentifier: analytics-cluster-prod\nNodeType: ra3.16xlarge\nNumberOfNodes: 4\nRegion: us-east-1\nWLM mode: manual (3 static\
-    \ queues)\nConcurrency scaling: disabled\nSQA: disabled\nMetrics (last 30 days):\n  - CPUUtilization avg: 88%, p95: 97%\n  - QueryDuration avg: 45 s, p95: 180 s\n  - QueryThroughput avg: 12/s, peak: 18/s\n\
-    \  - WLMQueueLength avg: 4, p99: 22\n  - ConcurrencyScalingClustersActive: 0\nTop queries: dashboard aggregation (4 joins, GROUP BY date, 12B row scan)\nMaterialized views: none\nEmit the standard optimization\
-    \ block (TARGET, VERDICT, REASON, RECOMMENDATION, ESTIMATED_IMPACT, MIGRATION_STEPS)."
+  when_to_use: Optimising Redshift WLM queue configuration, switching from manual WLM to auto WLM with concurrency scaling, enabling Short Query Acceleration, defining queue assignment rules, tuning queue concurrency and memory %, writing query monitoring rules to abort runaway queries, evaluating AQUA for compute-heavy scans, adding materialized views for dashboard workloads, optimising Spectrum external table queries, or tuning COPY command bulk loads.
+  when_not_to_use: Redshift cluster rightsizing or node type migration (use redshift-node-optimizer), Redshift Serverless capacity tuning (different configuration surface), Redshift data lake formation setup, Redshift ML model lifecycle, or Redshift troubleshooting (connection failures, query errors, node events — use the Redshift troubleshooter). This skill focuses on WLM and query-throughput optimization, not functional debugging of broken clusters.
+  activation_triggers: optimise Redshift WLM, Redshift auto WLM, Redshift concurrency scaling, Redshift Short Query Acceleration, Redshift SQA, Redshift query priority, Redshift queue assignment rules, Redshift query monitoring rules, Redshift QMR runaway query, Redshift materialized views, Redshift AQUA, Redshift COPY command optimization, Redshift Spectrum external tables, Redshift slot count tuning, Redshift memory allocation per queue, Redshift queue stalls, Redshift FinOps, Redshift query throughput
+  invocation_schema: 'Input: either (a) a cluster identifier + live-account context, (b) a describe-cluster-configuration WLM JSON payload, OR (c) STL_QUERY / STV_WLM_QUERY_STATE / STL_QUERY_METRICS query output with at least 14 days of observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ ESTIMATED_IMPACT/MIGRATION_STEPS block per cluster, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
+  invocation_example: "# Minimal valid input (offline WLM classification):\nClusterIdentifier: analytics-cluster-prod\nNodeType: ra3.16xlarge\nNumberOfNodes: 4\nRegion: us-east-1\nWLM mode: manual (3 static queues)\nConcurrency scaling: disabled\nSQA: disabled\nMetrics (last 30 days):\n  - CPUUtilization avg: 88%, p95: 97%\n  - QueryDuration avg: 45 s, p95: 180 s\n  - QueryThroughput avg: 12/s, peak: 18/s\n  - WLMQueueLength avg: 4, p99: 22\n  - ConcurrencyScalingClustersActive: 0\nTop queries: dashboard aggregation (4 joins, GROUP BY date, 12B row scan)\nMaterialized views: none\nEmit the standard optimization block (TARGET, VERDICT, REASON, RECOMMENDATION, ESTIMATED_IMPACT, MIGRATION_STEPS)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Redshift, WLM, Workload Management, auto WLM, concurrency scaling, Short Query Acceleration, SQA, query priority, queue assignment rules, query monitoring rules, QMR, materialized views, AQUA, COPY command, bulk load, Spectrum, external tables, data catalog, slot count, memory allocation, Analytics, FinOps
+  tags: redshift, analytics, workload-management, wlm, cost-optimization, finops, concurrency-scaling, query-priority
 ---
 
 # Redshift WLM Optimizer

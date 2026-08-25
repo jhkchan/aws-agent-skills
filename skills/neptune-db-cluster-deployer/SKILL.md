@@ -1,128 +1,26 @@
 ---
 name: neptune-db-cluster-deployer
-description: >-
-  Provisions Amazon Neptune DB clusters (graph database) with production
-  defaults: cluster creation (instance type, cluster size, reader
-  replicas), VPC networking (DB subnet group across >=3 AZs, security
-  groups on port 8182), encryption (KMS at creation — immutable),
-  auto-failover (Multi-AZ with reader promotion), parameter groups
-  (neptune_enforce_ssl, neptune_query_timeout), IAM database auth,
-  loading data (bulk load from S3 via the Neptune Loader), querying
-  (Gremlin, SPARQL, openCypher), Neptune Streams, snapshot/restore,
-  and the Neptune Analytics boundary. Emits a READY_TO_DEPLOY
-  checklist. Use when creating a Neptune DB cluster, sizing
-  writer/reader instances, designing a Multi-AZ graph topology,
-  hardening TLS/IAM, loading graph data from S3, or choosing between
-  Neptune DB and Neptune Analytics. Triggers: create Neptune,
-  provision graph database, Neptune cluster, Gremlin, SPARQL,
-  openCypher, Neptune bulk load, Neptune Streams, neptune_enforce_ssl,
-  Neptune Multi-AZ.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon Neptune DB clusters (graph database) with production defaults: cluster creation (instance type, cluster size, reader replicas), VPC networking (DB subnet group across >=3 AZs, security groups on port 8182), encryption (KMS at creation — immutable), auto-failover (Multi-AZ with reader promotion), parameter groups (neptune_enforce_ssl, neptune_query_timeout), IAM database auth, loading data (bulk load from S3 via the Neptune Loader), querying (Gremlin, SPARQL, openCypher), Neptune Streams, snapshot/restore, and the Neptune Analytics boundary. Emits a READY_TO_DEPLOY checklist. Use when creating a Neptune DB cluster, sizing writer/reader instances, designing a Multi-AZ graph topology, hardening TLS/IAM, loading graph data from S3, or choosing between Neptune DB and Neptune Analytics. Triggers: create Neptune, provision graph database, Neptune cluster, Gremlin, SPARQL, openCypher, Neptune bulk load, Neptune Streams, neptune_enforce_ssl, Neptune Multi-AZ.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with neptune, ec2,
-  kms, iam, and s3 access. Works with Terraform aws_neptune_cluster /
-  aws_neptune_cluster_instance resources and CloudFormation
-  AWS::Neptune::DBCluster / AWS::Neptune::DBInstance templates.
-keywords:
-  - aws
-  - neptune
-  - graph database
-  - cloudops
-  - deploy
-  - provisioning
-  - gremlin
-  - sparql
-  - opencypher
-  - multi-az
-  - failover
-  - encryption at rest
-  - tls
-  - iam database auth
-  - subnet group
-  - parameter group
-  - neptune_enforce_ssl
-  - neptune_query_timeout
-  - bulk load
-  - neptune loader
-  - neptune streams
-  - reader instance
-tags:
-  - aws
-  - neptune
-  - graph-database
-  - cloudops
-  - deploy
-  - databases
-  - provisioning
-  - gremlin
-  - sparql
-  - opencypher
-  - multi-az
-  - encryption
-  - iam-db-auth
-  - neptune-streams
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with neptune, ec2, kms, iam, and s3 access. Works with Terraform aws_neptune_cluster / aws_neptune_cluster_instance resources and CloudFormation AWS::Neptune::DBCluster / AWS::Neptune::DBInstance templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - neptune
-    - graph-database
-    - cloudops
-    - deploy
-    - databases
-    - provisioning
-    - gremlin
-    - sparql
-    - opencypher
-    - multi-az
-    - encryption
-    - iam-db-auth
-    - neptune-streams
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create neptune cluster
-    - provision graph database
-    - neptune multi-az
-    - neptune reader instance
-    - neptune bulk load
-    - neptune streams
-    - gremlin endpoint
-    - sparql endpoint
-    - opencypher endpoint
-    - neptune_enforce_ssl
-    - neptune iam database auth
-    - neptune parameter group
-    - neptune subnet group
-    - neptune kms encryption
-  when_to_use: >-
-    Invoke when the user wants to create a new Amazon Neptune DB cluster
-    (graph database), size writer and reader instances, design a
-    Multi-AZ topology with reader promotion, harden TLS via
-    neptune_enforce_ssl, enable IAM database auth, load graph data from
-    S3 via the Neptune Loader, query via Gremlin / SPARQL / openCypher,
-    enable Neptune Streams for change capture, or generate
-    provisioning CLI commands / IaC templates. Do NOT invoke for
-    Neptune Analytics (analytics graph service, separate API), for
-    self-managed Neo4j / JanusGraph on EC2, or for auditing an existing
-    Neptune cluster's posture.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, neptune, graph-database, cloudops, deploy, databases, provisioning, gremlin, sparql, opencypher, multi-az, encryption, iam-db-auth, neptune-streams
+  dependencies: aws-orchestrator
+  keywords: aws, neptune, graph database, cloudops, deploy, provisioning, gremlin, sparql, opencypher, multi-az, failover, encryption at rest, tls, iam database auth, subnet group, parameter group, neptune_enforce_ssl, neptune_query_timeout, bulk load, neptune loader, neptune streams, reader instance
+  when_to_use: Invoke when the user wants to create a new Amazon Neptune DB cluster (graph database), size writer and reader instances, design a Multi-AZ topology with reader promotion, harden TLS via neptune_enforce_ssl, enable IAM database auth, load graph data from S3 via the Neptune Loader, query via Gremlin / SPARQL / openCypher, enable Neptune Streams for change capture, or generate provisioning CLI commands / IaC templates. Do NOT invoke for Neptune Analytics (analytics graph service, separate API), for self-managed Neo4j / JanusGraph on EC2, or for auditing an existing Neptune cluster's posture.
 ---
 
 # Neptune DB Cluster Deployer

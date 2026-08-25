@@ -1,126 +1,28 @@
 ---
 name: iac-template-automator
-description: >-
-  Generates and validates Infrastructure-as-Code templates for common AWS
-  patterns across CloudFormation (template structure, nested stacks,
-  cross-stack refs, drift detection, change sets), CDK v2 (L1/L2/L3
-  constructs, Apps, Stacks, aspects), and Terraform (HCL, modules, S3
-  backend with DynamoDB lock, workspaces, plan/apply/destroy). Covers
-  VPC+subnets+NAT+routes, Lambda+API Gateway+DynamoDB, ECS Fargate+ALB,
-  RDS Aurora+Secrets Manager rotation, CloudFront+S3+WAF. Enforces
-  security defaults: no hardcoded secrets, least-privilege IAM (no
-  Action:*, Resource:*), encryption by default, deletion protection,
-  cost-allocation tags. Validates with cfn-lint, cfn-nag, tflint,
-  checkov. Handles drift detection and state pitfalls (CFN
-  Replacement=TRUE, Terraform manual changes outside IaC). Emits a
-  deterministic verdict AUTOMATED with IaC template or
-  MANUAL_STEP_REQUIRED with specific gap. Use when generating AWS
-  infrastructure templates, scaffolding a new service, or validating
-  IaC for security before deploy.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Generates and validates Infrastructure-as-Code templates for common AWS patterns across CloudFormation (template structure, nested stacks, cross-stack refs, drift detection, change sets), CDK v2 (L1/L2/L3 constructs, Apps, Stacks, aspects), and Terraform (HCL, modules, S3 backend with DynamoDB lock, workspaces, plan/apply/destroy). Covers VPC+subnets+NAT+routes, Lambda+API Gateway+DynamoDB, ECS Fargate+ALB, RDS Aurora+Secrets Manager rotation, CloudFront+S3+WAF. Enforces security defaults: no hardcoded secrets, least-privilege IAM (no Action:*, Resource:*), encryption by default, deletion protection, cost-allocation tags. Validates with cfn-lint, cfn-nag, tflint, checkov. Handles drift detection and state pitfalls (CFN Replacement=TRUE, Terraform manual changes outside IaC). Emits a deterministic verdict AUTOMATED with IaC template or MANUAL_STEP_REQUIRED with specific gap. Use when generating AWS infrastructure templates, scaffolding a new service, or validating IaC for security before deploy.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline template authoring. Live
-  validation uses aws cloudformation validate-template, create-change-set,
-  describe-stack-drift-detection-status; aws cdk synth/assertions; terraform
-  validate/plan. Requires AWS CLI v2, CDK v2, or Terraform 1.5+ installed
-  for live validation flows.
-keywords:
-  - Infrastructure as Code
-  - IaC
-  - CloudFormation
-  - CDK
-  - Cloud Development Kit
-  - Terraform
-  - HCL
-  - nested stacks
-  - cross-stack references
-  - drift detection
-  - change sets
-  - cfn-lint
-  - cfn-nag
-  - tflint
-  - checkov
-  - serverless
-  - VPC
-  - ECS Fargate
-  - RDS Aurora
-  - Secrets Manager
-  - CloudFront
-  - WAF
-  - least-privilege IAM
-  - template validation
-tags: [cloudformation, cdk, terraform, iac, devtools, automation, security, validate, cfn-lint, checkov]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline template authoring. Live validation uses aws cloudformation validate-template, create-change-set, describe-stack-drift-detection-status; aws cdk synth/assertions; terraform validate/plan. Requires AWS CLI v2, CDK v2, or Terraform 1.5+ installed for live validation flows.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATED | MANUAL_STEP_REQUIRED"
-  when_to_use: >-
-    Generating an AWS infrastructure template (CloudFormation, CDK, or
-    Terraform) for a common pattern (VPC, serverless, containerized service,
-    data store, CDN), validating an existing template for security and
-    correctness, scaffolding a new service with safe defaults, converting
-    manually-provisioned resources to IaC, or preparing a template for a
-    pull request / pipeline gate.
-  when_not_to_use:
-    - "AWS SAM transformer-specific questions (use a SAM-specific tool — SAM is a CloudFormation macro, the generated template still validates here)."
-    - "AWS Application Composer visual editing sessions (this skill generates text templates, not visual canvas files)."
-    - "Cross-provider Terraform (multi-cloud) orchestration — this skill is AWS-resource focused."
-    - "Running terraform apply / cdk deploy against production (use an operate-type skill)."
-    - "CDK v1 migration (use a migration-specific tool — this skill targets CDK v2)."
-  activation_triggers:
-    - "generate CloudFormation template for"
-    - "write CDK code for"
-    - "Terraform module for AWS"
-    - "IaC for VPC with NAT"
-    - "serverless template Lambda API Gateway DynamoDB"
-    - "ECS Fargate service template"
-    - "RDS Aurora with secret rotation IaC"
-    - "validate this CloudFormation template"
-    - "cfn-lint findings on"
-    - "terraform plan shows"
-    - "drift detection on stack"
-    - "convert manual AWS resources to IaC"
-  invocation_schema:
-    type: object
-    required: [pattern, tool]
-    properties:
-      pattern:
-        type: string
-        description: >-
-          The AWS pattern to scaffold. One of: vpc, serverless-lambda-apigw,
-          ecs-fargate-alb, rds-aurora-secret-rotation, cloudfront-s3-waf,
-          or a free-form description.
-      tool:
-        type: enum
-        enum: [cloudformation, cdk, terraform]
-        description: The IaC tool to target.
-      existing_template:
-        type: string
-        description: >-
-          An existing template to validate (CFN YAML/JSON, CDK TS/Python,
-          or Terraform HCL). When provided, the skill runs the validation
-          + security gates and emits AUTOMATED or MANUAL_STEP_REQUIRED.
-      env:
-        type: string
-        description: Target environment token (dev/stage/prod) for workspace or stack naming.
-    output: >-
-      Deterministic block: PATTERN / TOOL / VERDICT / TEMPLATE /
-      VALIDATION / SECURITY / FINDINGS / REMEDIATION. VERDICT is one of
-      AUTOMATED | MANUAL_STEP_REQUIRED. AUTOMATED means the template is
-      complete, passes static validation, and meets the security baseline.
-      MANUAL_STEP_REQUIRED means one or more gates failed — the output
-      enumerates the specific gap and the required manual fix.
+  verdict_shape: AUTOMATED | MANUAL_STEP_REQUIRED
+  when_to_use: Generating an AWS infrastructure template (CloudFormation, CDK, or Terraform) for a common pattern (VPC, serverless, containerized service, data store, CDN), validating an existing template for security and correctness, scaffolding a new service with safe defaults, converting manually-provisioned resources to IaC, or preparing a template for a pull request / pipeline gate.
+  when_not_to_use: AWS SAM transformer-specific questions (use a SAM-specific tool — SAM is a CloudFormation macro, the generated template still validates here)., AWS Application Composer visual editing sessions (this skill generates text templates, not visual canvas files)., Cross-provider Terraform (multi-cloud) orchestration — this skill is AWS-resource focused., Running terraform apply / cdk deploy against production (use an operate-type skill)., CDK v1 migration (use a migration-specific tool — this skill targets CDK v2).
+  activation_triggers: generate CloudFormation template for, write CDK code for, Terraform module for AWS, IaC for VPC with NAT, serverless template Lambda API Gateway DynamoDB, ECS Fargate service template, RDS Aurora with secret rotation IaC, validate this CloudFormation template, cfn-lint findings on, terraform plan shows, drift detection on stack, convert manual AWS resources to IaC
+  invocation_schema: "{output: \"Deterministic block: PATTERN / TOOL / VERDICT / TEMPLATE / VALIDATION /\\\n    \\ SECURITY / FINDINGS / REMEDIATION. VERDICT is one of AUTOMATED | MANUAL_STEP_REQUIRED.\\\n    \\ AUTOMATED means the template is complete, passes static validation, and meets\\\n    \\ the security baseline. MANUAL_STEP_REQUIRED means one or more gates failed \\u2014\\\n    \\ the output enumerates the specific gap and the required manual fix.\", properties: {\n    env: {description: Target environment token (dev/stage/prod) for workspace or\n        stack naming., type: string}, existing_template: {description: 'An existing\n        template to validate (CFN YAML/JSON, CDK TS/Python, or Terraform HCL). When\n        provided, the skill runs the validation + security gates and emits AUTOMATED\n        or MANUAL_STEP_REQUIRED.', type: string}, pattern: {description: 'The AWS\n        pattern to scaffold. One of: vpc, serverless-lambda-apigw, ecs-fargate-alb,\n        rds-aurora-secret-rotation, cloudfront-s3-waf, or a free-form description.',\n      type: string}, tool: {description: The IaC tool to target., enum: [cloudformation,\n        cdk, terraform], type: enum}}, required: [pattern, tool], type: object}"
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Infrastructure as Code, IaC, CloudFormation, CDK, Cloud Development Kit, Terraform, HCL, nested stacks, cross-stack references, drift detection, change sets, cfn-lint, cfn-nag, tflint, checkov, serverless, VPC, ECS Fargate, RDS Aurora, Secrets Manager, CloudFront, WAF, least-privilege IAM, template validation
+  tags: cloudformation, cdk, terraform, iac, devtools, automation, security, validate, cfn-lint, checkov
 ---
 
 # IaC Template Automator

@@ -1,85 +1,29 @@
 ---
 name: data-transfer-optimizer
-description: Optimizes AWS data transfer costs across seven dimensions — cross-AZ transfer ($0.01/GB each direction; pin consumers to data-source AZ), cross-region transfer ($0.02-0.09/GB; use CloudFront
-  for global viewers, VPC peering for intra-region, S3 CRR only for DR), internet egress ($0.09/GB first 10TB; optimize via CloudFront with free S3-to-CF egress, S3 Multi-Region Access Points, Direct
-  Connect), NAT Gateway data processing ($0.045/GB; route S3/DynamoDB via FREE VPC Gateway Endpoints), VPC peering (free intra-region) vs Transit Gateway ($0.02/GB), RDS Multi-AZ ($0.01/GB) vs Aurora
-  (free replication), and Direct Connect break-even math. Emits OPPORTUNITY_FOUND with per-dimension savings, OPTIMIZED, or ALREADY_OPTIMAL. Use when triaging surprise data-transfer bills, auditing CUR
-  USAGE_TYPE line items, deciding peering vs TGW, or sizing Direct Connect.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Optimizes AWS data transfer costs across seven dimensions — cross-AZ transfer ($0.01/GB each direction; pin consumers to data-source AZ), cross-region transfer ($0.02-0.09/GB; use CloudFront for global viewers, VPC peering for intra-region, S3 CRR only for DR), internet egress ($0.09/GB first 10TB; optimize via CloudFront with free S3-to-CF egress, S3 Multi-Region Access Points, Direct Connect), NAT Gateway data processing ($0.045/GB; route S3/DynamoDB via FREE VPC Gateway Endpoints), VPC peering (free intra-region) vs Transit Gateway ($0.02/GB), RDS Multi-AZ ($0.01/GB) vs Aurora (free replication), and Direct Connect break-even math. Emits OPPORTUNITY_FOUND with per-dimension savings, OPTIMIZED, or ALREADY_OPTIMAL. Use when triaging surprise data-transfer bills, auditing CUR USAGE_TYPE line items, deciding peering vs TGW, or sizing Direct Connect.
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation-document classification works from pasted Cost and Usage Report (CUR) line items and
-  VPC/topology diagrams. Live-account optimization uses aws ce get-cost-and-usage (filtered by USAGE_TYPE for data-transfer dimensions), aws ec2 describe-vpc-peering-connections, describe -transit-gateways,
-  describe-nat-gateways, describe-vpc-endpoints, aws s3api get-bucket-location, aws rds describe-db-instances, and aws directconnect describe-connections (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- data transfer
-- cross-AZ
-- cross-region
-- NAT Gateway
-- VPC peering
-- Transit Gateway
-- internet egress
-- S3 Transfer Acceleration
-- Direct Connect
-- VPC Gateway Endpoint
-- VPC Interface Endpoint
-- PrivateLink
-- S3 Multi-Region Access Point
-- RDS Multi-AZ
-- Aurora replication
-- Cost and Usage Report
-- CUR
-- FinOps
-- surprise bill
-tags:
-- data-transfer
-- networking
-- cost-optimization
-- finops
-- vpc
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation-document classification works from pasted Cost and Usage Report (CUR) line items and VPC/topology diagrams. Live-account optimization uses aws ce get-cost-and-usage (filtered by USAGE_TYPE for data-transfer dimensions), aws ec2 describe-vpc-peering-connections, describe -transit-gateways, describe-nat-gateways, describe-vpc-endpoints, aws s3api get-bucket-location, aws rds...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: FinOps
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
   verdict_shape: OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL
-  when_to_use: Optimizing AWS data transfer costs, triaging a surprise data-transfer bill, auditing CUR data-transfer line items, deciding between VPC peering and Transit Gateway, evaluating NAT Gateway
-    alternatives (Gateway/Interface endpoints), sizing a Direct Connect commitment, evaluating S3 Multi-Region Access Points, or building a monthly data-transfer cost projection.
-  when_not_to_use: CloudFront-specific cost optimization (use cloudfront-cost-optimizer for Price Class, cache policy, Origin Shield), EC2 instance rightsizing (use ec2-rightsizing-optimizer), S3 storage
-    lifecycle optimization (use s3-lifecycle-optimizer), RDS instance rightsizing (use rds-cost-optimizer), NAT Gateway high-availability troubleshooting (use nat-gateway-troubleshooter). This skill focuses
-    on data-transfer cost optimization across the seven networking dimensions, not on instance/storage rightsizing or CloudFront-specific decisions.
-  activation_triggers:
-  - reduce data transfer cost
-  - AWS surprise bill
-  - cross-AZ data transfer
-  - cross-region data transfer
-  - NAT Gateway cost
-  - VPC peering vs Transit Gateway
-  - internet egress cost
-  - Direct Connect break-even
-  - VPC Gateway Endpoint
-  - VPC Interface Endpoint
-  - S3 Multi-Region Access Point
-  - CUR data transfer audit
-  - FinOps data transfer review
-  - RDS Multi-AZ data transfer
-  - Aurora cross-region replication cost
-  - Transit Gateway cost
-  invocation_schema: 'Input: either (a) an AWS account context with access to Cost Explorer / CUR, (b) a pasted Cost and Usage Report extract filtered to data-transfer USAGE_TYPEs, OR (c) a network topology
-    description (VPCs, regions, AZs, NAT Gateways, VPC peering connections, Transit Gateway, Direct Connect, S3 buckets, RDS instances). Output: a deterministic TARGET / VERDICT / REASON / RECOMMENDATION
-    / ESTIMATED_SAVINGS / MIGRATION_STEPS block per account (or per top-cost dimension), where VERDICT ∈ {OPTIMIZED, OPPORTUNITY_FOUND, ALREADY_OPTIMAL} and RECOMMENDATION lists the per-dimension actions
-    (cross-AZ, cross-region, internet egress, NAT Gateway, VPC topology, RDS, Direct Connect).'
-  invocation_example: "# Minimal valid input (offline CUR classification):\nAccount: 123456789012\nRegion: us-east-1 primary; us-west-2 secondary\nMonthly data transfer costs (Cost Explorer, last 30 days):\n\
-    \  - NAT Gateway DataProcessed: 12,000 GB × $0.045 = $540\n  - EC2 cross-AZ data transfer: 8,000 GB × $0.02 = $160\n  - S3 cross-region replication: 1,500 GB × $0.02 = $30\n  - CloudFront egress (already\
-    \ optimized)\nVPC topology:\n  - VPC-A in us-east-1 (3 AZs; primary app)\n  - VPC-B in us-east-1 (3 AZs; analytics)\n  - VPC peering: A↔B (intra-region, free)\n  - Transit Gateway: not in use\nNAT Gateway:\
-    \ 1 per AZ in VPC-A (3 total)\nVPC endpoints: only S3 Gateway Endpoint in VPC-A\nWorkload context: microservices in VPC-A pulling from S3 and\nDynamoDB; analytics EMR cluster in VPC-B reading same S3\n\
-    buckets and writing cross-AZ back to VPC-A database.\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  when_to_use: Optimizing AWS data transfer costs, triaging a surprise data-transfer bill, auditing CUR data-transfer line items, deciding between VPC peering and Transit Gateway, evaluating NAT Gateway alternatives (Gateway/Interface endpoints), sizing a Direct Connect commitment, evaluating S3 Multi-Region Access Points, or building a monthly data-transfer cost projection.
+  when_not_to_use: CloudFront-specific cost optimization (use cloudfront-cost-optimizer for Price Class, cache policy, Origin Shield), EC2 instance rightsizing (use ec2-rightsizing-optimizer), S3 storage lifecycle optimization (use s3-lifecycle-optimizer), RDS instance rightsizing (use rds-cost-optimizer), NAT Gateway high-availability troubleshooting (use nat-gateway-troubleshooter). This skill focuses on data-transfer cost optimization across the seven networking dimensions, not on instance/storage rightsizing or CloudFront-specific decisions.
+  activation_triggers: reduce data transfer cost, AWS surprise bill, cross-AZ data transfer, cross-region data transfer, NAT Gateway cost, VPC peering vs Transit Gateway, internet egress cost, Direct Connect break-even, VPC Gateway Endpoint, VPC Interface Endpoint, S3 Multi-Region Access Point, CUR data transfer audit, FinOps data transfer review, RDS Multi-AZ data transfer, Aurora cross-region replication cost, Transit Gateway cost
+  invocation_schema: 'Input: either (a) an AWS account context with access to Cost Explorer / CUR, (b) a pasted Cost and Usage Report extract filtered to data-transfer USAGE_TYPEs, OR (c) a network topology description (VPCs, regions, AZs, NAT Gateways, VPC peering connections, Transit Gateway, Direct Connect, S3 buckets, RDS instances). Output: a deterministic TARGET / VERDICT / REASON / RECOMMENDATION / ESTIMATED_SAVINGS / MIGRATION_STEPS block per account (or per top-cost dimension), where VERDICT ∈ {OPTIMIZED, OPPORTUNITY_FOUND, ALREADY_OPTIMAL} and RECOMMENDATION lists the per-dimension actions (cross-AZ, cross-region, internet egress, NAT Gateway, VPC topology, RDS, Direct Connect).'
+  invocation_example: "# Minimal valid input (offline CUR classification):\nAccount: 123456789012\nRegion: us-east-1 primary; us-west-2 secondary\nMonthly data transfer costs (Cost Explorer, last 30 days):\n  - NAT Gateway DataProcessed: 12,000 GB × $0.045 = $540\n  - EC2 cross-AZ data transfer: 8,000 GB × $0.02 = $160\n  - S3 cross-region replication: 1,500 GB × $0.02 = $30\n  - CloudFront egress (already optimized)\nVPC topology:\n  - VPC-A in us-east-1 (3 AZs; primary app)\n  - VPC-B in us-east-1 (3 AZs; analytics)\n  - VPC peering: A↔B (intra-region, free)\n  - Transit Gateway: not in use\nNAT Gateway: 1 per AZ in VPC-A (3 total)\nVPC endpoints: only S3 Gateway Endpoint in VPC-A\nWorkload context: microservices in VPC-A pulling from S3 and\nDynamoDB; analytics EMR cluster in VPC-B reading same S3\nbuckets and writing cross-AZ back to VPC-A database.\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: data transfer, cross-AZ, cross-region, NAT Gateway, VPC peering, Transit Gateway, internet egress, S3 Transfer Acceleration, Direct Connect, VPC Gateway Endpoint, VPC Interface Endpoint, PrivateLink, S3 Multi-Region Access Point, RDS Multi-AZ, Aurora replication, Cost and Usage Report, CUR, FinOps, surprise bill
+  tags: data-transfer, networking, cost-optimization, finops, vpc
 ---
 
 # Data Transfer Optimizer

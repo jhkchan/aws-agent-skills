@@ -1,115 +1,28 @@
 ---
 name: fis-experiment-deployer
-description: >-
-  Provisions AWS Fault Injection Service (FIS) experiment templates with
-  production-safe defaults: action targets (tags, ARNs, filters), fault
-  actions across EC2 (stop-instances, send-api-error, terminate),
-  ECS (stop-task), network (blackhole/latency/loss via SSM), Aurora
-  (failover-db-cluster), Lambda (invoke-async), CloudWatch alarm-based
-  stop conditions, IAM execution role with FIS trust + least-privilege
-  tag-scoped permissions, experiment logging to S3 + CloudWatch Logs,
-  and latest primitives (Aurora failover, EKS pod disruption, network
-  faults). Emits READY_TO_DEPLOY / PREREQUISITES_MISSING with verified
-  targets, actions, stop conditions, and copy-pasteable fis + cloudwatch
-  commands. Use when provisioning chaos experiments for game days, DR
-  drills, resilience validation, or pre-prod gates. Triggers: FIS, fault
-  injection, chaos engineering, experiment template, stop condition,
-  Aurora failover, EKS pod kill, network blackhole, game day.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Fault Injection Service (FIS) experiment templates with production-safe defaults: action targets (tags, ARNs, filters), fault actions across EC2 (stop-instances, send-api-error, terminate), ECS (stop-task), network (blackhole/latency/loss via SSM), Aurora (failover-db-cluster), Lambda (invoke-async), CloudWatch alarm-based stop conditions, IAM execution role with FIS trust + least-privilege tag-scoped permissions, experiment logging to S3 + CloudWatch Logs, and latest primitives (Aurora failover, EKS pod disruption, network faults). Emits READY_TO_DEPLOY / PREREQUISITES_MISSING with verified targets, actions, stop conditions, and copy-pasteable fis + cloudwatch commands. Use when provisioning chaos experiments for game days, DR drills, resilience validation, or pre-prod gates. Triggers: FIS, fault injection, chaos engineering, experiment template, stop condition, Aurora failover, EKS pod kill, network blackhole, game day.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Live provisioning uses AWS CLI v2 with fis
-  (create-experiment-template, get-experiment-template, start-experiment),
-  iam (create-role, put-role-policy), cloudwatch (describe-alarms),
-  s3 (create-bucket, put-bucket-policy) and logs (create-log-group).
-  Works with Terraform aws_fis_experiment_template /
-  aws_iam_role and CloudFormation AWS::FIS::ExperimentTemplate.
-keywords:
-- aws
-- fis
-- fault injection
-- chaos engineering
-- experiment template
-- stop condition
-- alarm-based stop
-- aurora failover
-- rds failover
-- eks pod disruption
-- ecs stop-task
-- ec2 stop-instances
-- ec2 send-api-error
-- network blackhole
-- network latency
-- network loss
-- lambda invoke-async
-- game day
-- resilience validation
-- cloudops
-- deploy
-tags:
-- aws
-- fis
-- fault-injection
-- chaos-engineering
-- experiment-template
-- stop-condition
-- aurora-failover
-- eks-disruption
-- deploy
-- management
-dependencies:
-- aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Live provisioning uses AWS CLI v2 with fis (create-experiment-template, get-experiment-template, start-experiment), iam (create-role, put-role-policy), cloudwatch (describe-alarms), s3 (create-bucket, put-bucket-policy) and logs (create-log-group). Works with Terraform aws_fis_experiment_template / aws_iam_role and CloudFormation AWS::FIS::ExperimentTemplate.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
-  when_to_use: >-
-    Provisioning an FIS experiment template for a game day, DR drill,
-    or resilience gate; configuring CloudWatch alarms as stop conditions;
-    scoping IAM permissions for FIS to run a specific action against a
-    specific target; setting up Aurora failover, EKS pod disruption,
-    ECS task stop, EC2 API error injection, network blackhole/latency/loss,
-    or Lambda async invocation experiments; or wiring experiment logging
-    to S3 and CloudWatch Logs. Do NOT invoke for production traffic
-    reversal, incident command, or post-incident RCA — use the
-    appropriate troubleshoot or operate skill.
-  activation_triggers:
-  - FIS experiment template
-  - fault injection experiment
-  - chaos engineering
-  - game day drill
-  - resilience validation
-  - Aurora failover test
-  - RDS failover experiment
-  - EKS pod disruption
-  - ECS stop task experiment
-  - EC2 stop instances experiment
-  - EC2 send API error
-  - network blackhole experiment
-  - network latency injection
-  - network packet loss
-  - Lambda invoke async experiment
-  - FIS stop condition
-  - alarm-based stop
-  invocation_schema: >-
-    Input: either (a) an experiment spec including target resource tags/
-    ARNs/filters, one or more fault actions with parameters, optional
-    CloudWatch alarm stop conditions, optional logging config, and
-    budgetDuration; or (b) a partial spec for interactive refinement
-    (e.g., "FIS experiment to fail over an Aurora cluster"). Output: a
-    deterministic EXPERIMENT_TEMPLATE / VERDICT / CHECKLIST /
-    VERIFICATION_COMMANDS block per the STRICT output contract, where
-    VERDICT is READY_TO_DEPLOY or PREREQUISITES_MISSING.
+  when_to_use: Provisioning an FIS experiment template for a game day, DR drill, or resilience gate; configuring CloudWatch alarms as stop conditions; scoping IAM permissions for FIS to run a specific action against a specific target; setting up Aurora failover, EKS pod disruption, ECS task stop, EC2 API error injection, network blackhole/latency/loss, or Lambda async invocation experiments; or wiring experiment logging to S3 and CloudWatch Logs. Do NOT invoke for production traffic reversal, incident command, or post-incident RCA — use the appropriate troubleshoot or operate skill.
+  activation_triggers: FIS experiment template, fault injection experiment, chaos engineering, game day drill, resilience validation, Aurora failover test, RDS failover experiment, EKS pod disruption, ECS stop task experiment, EC2 stop instances experiment, EC2 send API error, network blackhole experiment, network latency injection, network packet loss, Lambda invoke async experiment, FIS stop condition, alarm-based stop
+  invocation_schema: 'Input: either (a) an experiment spec including target resource tags/ ARNs/filters, one or more fault actions with parameters, optional CloudWatch alarm stop conditions, optional logging config, and budgetDuration; or (b) a partial spec for interactive refinement (e.g., "FIS experiment to fail over an Aurora cluster"). Output: a deterministic EXPERIMENT_TEMPLATE / VERDICT / CHECKLIST / VERIFICATION_COMMANDS block per the STRICT output contract, where VERDICT is READY_TO_DEPLOY or PREREQUISITES_MISSING.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: aws, fis, fault injection, chaos engineering, experiment template, stop condition, alarm-based stop, aurora failover, rds failover, eks pod disruption, ecs stop-task, ec2 stop-instances, ec2 send-api-error, network blackhole, network latency, network loss, lambda invoke-async, game day, resilience validation, cloudops, deploy
+  tags: aws, fis, fault-injection, chaos-engineering, experiment-template, stop-condition, aurora-failover, eks-disruption, deploy, management
+  dependencies: aws-orchestrator
 ---
 
 # FIS Experiment Deployer

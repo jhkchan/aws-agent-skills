@@ -1,115 +1,26 @@
 ---
 name: qldb-ledger-deployer
-description: >-
-  Provisions Amazon QLDB (Quantum Ledger Database) ledgers with
-  production defaults: ledger creation (create-ledger), permissions mode
-  (STANDARD vs ALLOW_ALL), deletion protection, KMS encryption, PartiQL
-  query language, Amazon Ion data format, journal export to S3, stream
-  to Kinesis Data Streams, cryptographic verification (digest + proof),
-  revision hash chains, indexed fields, table creation, document model,
-  and CloudWatch metrics. Emits a READY_TO_DEPLOY checklist with
-  verification commands. Use when creating a QLDB ledger, configuring
-  permissions mode, enabling deletion protection, setting up journal
-  export, streaming to Kinesis, verifying data integrity with digests
-  and proofs, creating tables and indexes, or writing PartiQL queries.
-  Triggers: create qldb ledger, qldb permissions mode, qldb deletion
-  protection, qldb journal export, qldb stream to kinesis, qldb
-  cryptographic verification, qldb digest, qldb proof, qldb partiql,
-  qldb ion data format, qldb hash chain, qldb index, qldb table
-  creation.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon QLDB (Quantum Ledger Database) ledgers with production defaults: ledger creation (create-ledger), permissions mode (STANDARD vs ALLOW_ALL), deletion protection, KMS encryption, PartiQL query language, Amazon Ion data format, journal export to S3, stream to Kinesis Data Streams, cryptographic verification (digest + proof), revision hash chains, indexed fields, table creation, document model, and CloudWatch metrics. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a QLDB ledger, configuring permissions mode, enabling deletion protection, setting up journal export, streaming to Kinesis, verifying data integrity with digests and proofs, creating tables and indexes, or writing PartiQL queries. Triggers: create qldb ledger, qldb permissions mode, qldb deletion protection, qldb journal export, qldb stream to kinesis, qldb cryptographic verification, qldb digest, qldb proof, qldb partiql, qldb ion data format, qldb hash chain, qldb index, qldb table creation.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with qldb access.
-  Works with Terraform aws_qldb_ledger / aws_qldb_stream /
-  aws_qldb_s3_export_task resources and the AWS SDK for PartiQL
-  (qldb-session, qldb APIs).
-keywords:
-  - aws
-  - qldb
-  - quantum ledger database
-  - immutable ledger
-  - cloudops
-  - deploy
-  - provisioning
-  - partiql
-  - amazon ion
-  - hash chain
-  - cryptographic verification
-  - journal export
-  - kinesis stream
-  - deletion protection
-  - digest
-  - proof
-tags:
-  - aws
-  - qldb
-  - ledger
-  - cloudops
-  - deploy
-  - databases
-  - provisioning
-  - immutable
-  - cryptographic
-  - partiql
-  - ion
-  - hash-chain
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with qldb access. Works with Terraform aws_qldb_ledger / aws_qldb_stream / aws_qldb_s3_export_task resources and the AWS SDK for PartiQL (qldb-session, qldb APIs).'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - qldb
-    - ledger
-    - cloudops
-    - deploy
-    - databases
-    - provisioning
-    - immutable
-    - cryptographic
-    - partiql
-    - ion
-    - hash-chain
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create qldb ledger
-    - qldb permissions mode
-    - qldb deletion protection
-    - qldb journal export
-    - qldb kinesis stream
-    - qldb cryptographic verification
-    - qldb digest
-    - qldb proof
-    - qldb partiql
-    - qldb ion data format
-    - qldb hash chain
-    - qldb index
-    - qldb table creation
-  when_to_use: >-
-    Invoke when the user wants to create an Amazon QLDB ledger, configure
-    permissions mode (STANDARD vs ALLOW_ALL), enable deletion protection,
-    set up journal export to S3, stream journal data to Kinesis for
-    real-time CDC, verify data integrity using cryptographic digests and
-    proofs, create tables and indexes, or write PartiQL queries against
-    Ion-format documents. Do NOT invoke for Amazon DynamoDB (use DynamoDB
-    skills), Amazon DocumentDB (use DocumentDB skills), Amazon Timestream
-    (use Timestream skills), or Amazon RDS (use RDS skills).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, qldb, ledger, cloudops, deploy, databases, provisioning, immutable, cryptographic, partiql, ion, hash-chain
+  dependencies: aws-orchestrator
+  keywords: aws, qldb, quantum ledger database, immutable ledger, cloudops, deploy, provisioning, partiql, amazon ion, hash chain, cryptographic verification, journal export, kinesis stream, deletion protection, digest, proof
+  when_to_use: Invoke when the user wants to create an Amazon QLDB ledger, configure permissions mode (STANDARD vs ALLOW_ALL), enable deletion protection, set up journal export to S3, stream journal data to Kinesis for real-time CDC, verify data integrity using cryptographic digests and proofs, create tables and indexes, or write PartiQL queries against Ion-format documents. Do NOT invoke for Amazon DynamoDB (use DynamoDB skills), Amazon DocumentDB (use DocumentDB skills), Amazon Timestream (use Timestream skills), or Amazon RDS (use RDS skills).
 ---
 
 # QLDB Ledger Deployer

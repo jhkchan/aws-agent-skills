@@ -1,105 +1,26 @@
 ---
 name: sns-topic-deployer
-description: >-
-  Provisions AWS SNS topics with production-grade configuration: correct topic
-  type (Standard vs FIFO), subscriptions (HTTP/S, SQS, Lambda, Email, Firehose,
-  mobile push), subscription filter policies (MessageAttributes and MessageBody
-  scope), cross-account access policy, SSE-KMS encryption with subscriber
-  decrypt requirements, delivery status logging per protocol, subscription-level
-  dead-letter queues, FIFO deduplication and ordering, mobile push (APNS, FCM,
-  Baidu), and latest features (message archiving, SNS-to-EventBridge). Emits a
-  READY_TO_DEPLOY checklist with every configuration item verified. Use when
-  creating a new SNS topic, deploying a topic to production, configuring
-  subscriptions, or generating deployment CLI commands. Triggers: create SNS
-  topic, deploy topic, FIFO topic, subscription filter policy, delivery status
-  logging, SNS DLQ, mobile push, cross-account publishing.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS SNS topics with production-grade configuration: correct topic type (Standard vs FIFO), subscriptions (HTTP/S, SQS, Lambda, Email, Firehose, mobile push), subscription filter policies (MessageAttributes and MessageBody scope), cross-account access policy, SSE-KMS encryption with subscriber decrypt requirements, delivery status logging per protocol, subscription-level dead-letter queues, FIFO deduplication and ordering, mobile push (APNS, FCM, Baidu), and latest features (message archiving, SNS-to-EventBridge). Emits a READY_TO_DEPLOY checklist with every configuration item verified. Use when creating a new SNS topic, deploying a topic to production, configuring subscriptions, or generating deployment CLI commands. Triggers: create SNS topic, deploy topic, FIFO topic, subscription filter policy, delivery status logging, SNS DLQ, mobile push, cross-account publishing.'
 license: Apache-2.0
-compatibility: >-
-  Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini).
-  For live deployment: AWS CLI v2 with sns, iam, kms, sqs, lambda, firehose, and
-  logs access. Works with Terraform aws_sns_topic resources, CloudFormation
-  AWS::SNS::Topic, and SAM templates.
-keywords:
-  - aws
-  - sns
-  - cloudops
-  - deploy
-  - provisioning
-  - messaging
-  - app-integration
-  - pub-sub
-  - fanout
-  - standard topic
-  - fifo topic
-  - subscription
-  - filter policy
-  - delivery status logging
-  - SSE-KMS
-  - cross-account
-  - mobile push
-  - APNS
-  - FCM
-  - message archiving
-  - SNS-to-EventBridge
-tags:
-  - aws
-  - sns
-  - cloudops
-  - deploy
-  - messaging
-  - app-integration
-  - pub-sub
-  - fifo
-  - encryption
-  - delivery-logging
-dependencies:
-  - aws-orchestrator
+compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with sns, iam, kms, sqs, lambda, firehose, and logs access. Works with Terraform aws_sns_topic resources, CloudFormation AWS::SNS::Topic, and SAM templates.'
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-    - aws
-    - sns
-    - cloudops
-    - deploy
-    - messaging
-    - app-integration
-    - pub-sub
-    - fifo
-    - encryption
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create sns topic
-    - deploy sns topic
-    - fifo topic
-    - subscription filter policy
-    - delivery status logging
-    - sns dlq
-    - mobile push
-    - cross-account publishing
-    - message archiving
-    - sns to eventbridge
-  when_to_use: >-
-    Invoke when the user wants to create a new SNS topic, deploy a topic to
-    production, configure subscriptions and filter policies, set up delivery
-    status logging, enable mobile push notifications, or generate deployment CLI
-    commands and IaC templates. Do NOT invoke for SNS security audits (use
-    sns-topic-public-subscription-auditor) or for SQS queue deployment (use
-    sqs-queue-deployer).
+  tags: aws, sns, cloudops, deploy, messaging, app-integration, pub-sub, fifo, encryption, delivery-logging
+  dependencies: aws-orchestrator
+  keywords: aws, sns, cloudops, deploy, provisioning, messaging, app-integration, pub-sub, fanout, standard topic, fifo topic, subscription, filter policy, delivery status logging, SSE-KMS, cross-account, mobile push, APNS, FCM, message archiving, SNS-to-EventBridge
+  when_to_use: Invoke when the user wants to create a new SNS topic, deploy a topic to production, configure subscriptions and filter policies, set up delivery status logging, enable mobile push notifications, or generate deployment CLI commands and IaC templates. Do NOT invoke for SNS security audits (use sns-topic-public-subscription-auditor) or for SQS queue deployment (use sqs-queue-deployer).
 ---
 
 # SNS Topic Deployer

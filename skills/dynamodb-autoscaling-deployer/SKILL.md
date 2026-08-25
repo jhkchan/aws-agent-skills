@@ -1,111 +1,26 @@
 ---
 name: dynamodb-autoscaling-deployer
-description: >-
-  Provisions DynamoDB auto-scaling with production defaults: target
-  tracking for table (read/write capacity), target tracking for GSI
-  (read/write capacity), auto-scaling role (application-autoscaling
-  service-linked role), on-demand vs provisioned with auto-scaling
-  decision, throttle metrics, scaling policy configuration (target
-  utilization, scale-in cooldown, scale-out cooldown), CloudWatch
-  alarms for throttling, latest DynamoDB on-demand vs provisioned
-  capacity mode auto-switching. Emits a READY_TO_DEPLOY checklist
-  with verification commands. Use when configuring DynamoDB auto-
-  scaling for a table or GSI, setting up target tracking policies,
-  choosing between on-demand and provisioned with auto-scaling, or
-  monitoring throttle metrics. Triggers: dynamodb autoscaling,
-  dynamodb target tracking, dynamodb capacity auto-scaling, gsi
-  autoscaling, provisioned capacity autoscaling, dynamodb
-  throttling, application autoscaling dynamodb, dynamodb on-demand
-  vs provisioned.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions DynamoDB auto-scaling with production defaults: target tracking for table (read/write capacity), target tracking for GSI (read/write capacity), auto-scaling role (application-autoscaling service-linked role), on-demand vs provisioned with auto-scaling decision, throttle metrics, scaling policy configuration (target utilization, scale-in cooldown, scale-out cooldown), CloudWatch alarms for throttling, latest DynamoDB on-demand vs provisioned capacity mode auto-switching. Emits a READY_TO_DEPLOY checklist with verification commands. Use when configuring DynamoDB auto- scaling for a table or GSI, setting up target tracking policies, choosing between on-demand and provisioned with auto-scaling, or monitoring throttle metrics. Triggers: dynamodb autoscaling, dynamodb target tracking, dynamodb capacity auto-scaling, gsi autoscaling, provisioned capacity autoscaling, dynamodb throttling, application autoscaling dynamodb, dynamodb on-demand vs provisioned.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with dynamodb,
-  application-autoscaling, iam, and cloudwatch access. Works with
-  Terraform aws_appautoscaling_policy / aws_appautoscaling_target
-  resources and CloudFormation AWS::ApplicationAutoScaling::ScalingPolicy
-  templates.
-keywords:
-  - aws
-  - dynamodb
-  - autoscaling
-  - auto-scaling
-  - application autoscaling
-  - cloudops
-  - deploy
-  - provisioning
-  - target tracking
-  - provisioned capacity
-  - on-demand
-  - gsi
-  - global secondary index
-  - throttle
-  - capacity units
-  - read capacity
-  - write capacity
-  - scaling policy
-  - cloudwatch
-tags:
-  - aws
-  - dynamodb
-  - autoscaling
-  - cloudops
-  - deploy
-  - databases
-  - provisioning
-  - target-tracking
-  - capacity
-  - application-autoscaling
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with dynamodb, application-autoscaling, iam, and cloudwatch access. Works with Terraform aws_appautoscaling_policy / aws_appautoscaling_target resources and CloudFormation AWS::ApplicationAutoScaling::ScalingPolicy templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - dynamodb
-    - autoscaling
-    - cloudops
-    - deploy
-    - databases
-    - provisioning
-    - target-tracking
-    - capacity
-    - application-autoscaling
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - dynamodb autoscaling
-    - dynamodb target tracking
-    - dynamodb capacity auto-scaling
-    - gsi autoscaling
-    - provisioned capacity autoscaling
-    - dynamodb throttling
-    - application autoscaling dynamodb
-    - dynamodb on-demand vs provisioned
-  when_to_use: >-
-    Invoke when the user wants to configure DynamoDB auto-scaling
-    (target tracking scaling policies) for a table or GSI, set up
-    the application-autoscaling service role, choose between on-
-    demand and provisioned capacity mode, configure scaling policy
-    parameters (target utilization, cooldowns), or monitor throttle
-    metrics. Do NOT invoke for creating a DynamoDB table from
-    scratch (use deploy-dynamodb-table), for auditing table
-    configuration (use a DynamoDB auditor), or for DynamoDB Global
-    Tables multi-region replication (separate feature).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, dynamodb, autoscaling, cloudops, deploy, databases, provisioning, target-tracking, capacity, application-autoscaling
+  dependencies: aws-orchestrator
+  keywords: aws, dynamodb, autoscaling, auto-scaling, application autoscaling, cloudops, deploy, provisioning, target tracking, provisioned capacity, on-demand, gsi, global secondary index, throttle, capacity units, read capacity, write capacity, scaling policy, cloudwatch
+  when_to_use: Invoke when the user wants to configure DynamoDB auto-scaling (target tracking scaling policies) for a table or GSI, set up the application-autoscaling service role, choose between on- demand and provisioned capacity mode, configure scaling policy parameters (target utilization, cooldowns), or monitor throttle metrics. Do NOT invoke for creating a DynamoDB table from scratch (use deploy-dynamodb-table), for auditing table configuration (use a DynamoDB auditor), or for DynamoDB Global Tables multi-region replication (separate feature).
 ---
 
 # DynamoDB Auto-Scaling Deployer

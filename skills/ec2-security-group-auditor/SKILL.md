@@ -1,83 +1,22 @@
 ---
 name: ec2-security-group-auditor
-description: >-
-  Classifies each EC2 security group's inbound exposure as OPEN,
-  PUBLIC_NONCRITICAL, or RESTRICTED (worst-case per-rule aggregation) and
-  emits remediation mapped to CIS AWS Foundations / PCI-DSS / NIST SP 800-53.
-  Invoke when: (a) pre-production SG review, (b) periodic CIS/PCI-DSS
-  compliance audit, (c) incident response involving suspected network
-  exposure, or (d) VPC/account security-baseline validation. Recognizes
-  port ranges, non-TCP protocols, managed prefix lists, IPv6 sources,
-  split-horizon CIDR pairs, and overlapping rules. Keywords: security group,
-  SG, ec2, inbound rule, port exposure, 0.0.0.0/0, CIDR audit, attack
-  surface, compliance check, VPC security.
-version: 0.4.0
+description: 'Classifies each EC2 security group''s inbound exposure as OPEN, PUBLIC_NONCRITICAL, or RESTRICTED (worst-case per-rule aggregation) and emits remediation mapped to CIS AWS Foundations / PCI-DSS / NIST SP 800-53. Invoke when: (a) pre-production SG review, (b) periodic CIS/PCI-DSS compliance audit, (c) incident response involving suspected network exposure, or (d) VPC/account security-baseline validation. Recognizes port ranges, non-TCP protocols, managed prefix lists, IPv6 sources, split-horizon CIDR pairs, and overlapping rules. Keywords: security group, SG, ec2, inbound rule, port exposure, 0.0.0.0/0, CIDR audit, attack surface, compliance check, VPC security.'
 license: Apache-2.0
-author: Jacky Chan — AWS Community Builder
-compatibility: >-
-  Requires an LLM-based agent runtime (Claude Code, Cursor, Windsurf) or
-  direct invocation. No AWS CLI calls needed for classification — the skill
-  operates on provided SG rule data. For live AWS audits, requires aws-cli
-  >= 2.0 with ec2:DescribeSecurityGroups and ec2:GetManagedPrefixListEntries
-  permissions.
-keywords:
-  - security group
-  - SG
-  - ec2
-  - inbound rule
-  - port exposure
-  - 0.0.0.0/0
-  - CIDR audit
-  - attack surface
-  - compliance check
-  - VPC security
-  - CIS benchmark
-  - PCI-DSS
-  - NIST SP 800-53
-  - network exposure
-  - prefix list
-tags:
-  - aws
-  - ec2
-  - security-group
-  - network-security
-  - compliance
-  - audit
-dependencies:
-  - aws-orchestrator
+compatibility: Requires an LLM-based agent runtime (Claude Code, Cursor, Windsurf) or direct invocation. No AWS CLI calls needed for classification — the skill operates on provided SG rule data. For live AWS audits, requires aws-cli >= 2.0 with ec2:DescribeSecurityGroups and ec2:GetManagedPrefixListEntries permissions.
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
   family: Security
-  verdict_shape: "OPEN | PUBLIC_NONCRITICAL | RESTRICTED"
+  verdict_shape: OPEN | PUBLIC_NONCRITICAL | RESTRICTED
   version: 0.4.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-    - aws
-    - ec2
-    - security-group
-    - network-security
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - security group
-    - SG
-    - ec2
-    - inbound rule
-    - port exposure
-    - 0.0.0.0/0
-    - CIDR audit
-    - attack surface
-    - compliance check
-    - VPC security
-  when_to_use: >-
-    Use when reviewing EC2 security group inbound rules for public exposure,
-    compliance auditing against CIS AWS Foundations Benchmark / PCI-DSS / NIST
-    SP 800-53, incident response involving suspected network exposure, or
-    onboarding a new VPC or account for security baseline validation.
+  tags: aws, ec2, security-group, network-security, compliance, audit
+  dependencies: aws-orchestrator
+  keywords: security group, SG, ec2, inbound rule, port exposure, 0.0.0.0/0, CIDR audit, attack surface, compliance check, VPC security, CIS benchmark, PCI-DSS, NIST SP 800-53, network exposure, prefix list
+  when_to_use: Use when reviewing EC2 security group inbound rules for public exposure, compliance auditing against CIS AWS Foundations Benchmark / PCI-DSS / NIST SP 800-53, incident response involving suspected network exposure, or onboarding a new VPC or account for security baseline validation.
 ---
 
 # EC2 Security-Group Auditor

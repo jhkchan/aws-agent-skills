@@ -1,73 +1,24 @@
 ---
 name: cur-cost-usage-report-auditor
-description: >-
-  Audits AWS Cost and Usage Report (CUR) configurations for coverage gaps,
-  data staleness, report-version drift, missing Athena integration, disabled
-  S3 bucket versioning, and time-horizon limits. Emits a deterministic
-  verdict (NO_CUR | STALE | CONFIG_GAP | OK) per report definition or payer
-  account. Use when reviewing CUR health, checking whether Athena cost
-  queries are wired, validating hourly refresh cadence, or auditing FinOps
-  data pipeline posture before a cost-optimization initiative.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Cost and Usage Report (CUR) configurations for coverage gaps, data staleness, report-version drift, missing Athena integration, disabled S3 bucket versioning, and time-horizon limits. Emits a deterministic verdict (NO_CUR | STALE | CONFIG_GAP | OK) per report definition or payer account. Use when reviewing CUR health, checking whether Athena cost queries are wired, validating hourly refresh cadence, or auditing FinOps data pipeline posture before a cost-optimization initiative.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline config classification. Live-account
-  audits use aws cur describe-report-definitions, aws s3api get-bucket-versioning,
-  aws glue get-table, and aws s3api head-object (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-  - CUR
-  - Cost and Usage Report
-  - billing
-  - FinOps
-  - cost visibility
-  - Athena integration
-  - Parquet
-  - cur-1.0
-  - hourly refresh
-  - S3 versioning
-  - Glue Data Catalog
-  - cost allocation
-  - report staleness
-  - payer account
-  - Resource IDs
-  - manifest file
-  - RefreshClosedReports
-tags: [cur, finops, cost-optimization, billing, athena, s3, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline config classification. Live-account audits use aws cur describe-report-definitions, aws s3api get-bucket-versioning, aws glue get-table, and aws s3api head-object (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: FinOps
-  verdict_shape: "NO_CUR | STALE | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a CUR configuration for FinOps pipeline health, checking whether
-    Athena integration is wired, validating hourly refresh cadence, auditing
-    S3 bucket versioning for CUR data, or diagnosing why Athena cost queries
-    return empty or stale results.
-  activation_triggers:
-    - "audit this Cost and Usage Report"
-    - "is my CUR configured correctly"
-    - "check CUR Athena integration"
-    - "why is my CUR stale"
-    - "CUR report version check"
-    - "is hourly refresh enabled"
-    - "CUR S3 bucket versioning"
-    - "FinOps data pipeline audit"
-    - "CUR not delivering to S3"
-    - "Athena cost query empty"
-  invocation_schema: >-
-    Input: either (a) a CUR report definition JSON (from aws cur
-    describe-report-definitions) optionally paired with S3 bucket metadata
-    (versioning status, latest manifest timestamp) and Glue table status,
-    OR (b) a payer account id for live-account audit. Output: deterministic
-    REPORT/VERDICT/REASON/FINDINGS/REMEDIATION block per report definition,
-    where VERDICT ∈ {NO_CUR, STALE, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: NO_CUR | STALE | CONFIG_GAP | OK
+  when_to_use: Reviewing a CUR configuration for FinOps pipeline health, checking whether Athena integration is wired, validating hourly refresh cadence, auditing S3 bucket versioning for CUR data, or diagnosing why Athena cost queries return empty or stale results.
+  activation_triggers: audit this Cost and Usage Report, is my CUR configured correctly, check CUR Athena integration, why is my CUR stale, CUR report version check, is hourly refresh enabled, CUR S3 bucket versioning, FinOps data pipeline audit, CUR not delivering to S3, Athena cost query empty
+  invocation_schema: 'Input: either (a) a CUR report definition JSON (from aws cur describe-report-definitions) optionally paired with S3 bucket metadata (versioning status, latest manifest timestamp) and Glue table status, OR (b) a payer account id for live-account audit. Output: deterministic REPORT/VERDICT/REASON/FINDINGS/REMEDIATION block per report definition, where VERDICT ∈ {NO_CUR, STALE, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CUR, Cost and Usage Report, billing, FinOps, cost visibility, Athena integration, Parquet, cur-1.0, hourly refresh, S3 versioning, Glue Data Catalog, cost allocation, report staleness, payer account, Resource IDs, manifest file, RefreshClosedReports
+  tags: cur, finops, cost-optimization, billing, athena, s3, audit
 ---
 
 # CUR Cost and Usage Report Auditor

@@ -1,113 +1,28 @@
 ---
 name: guardduty-finding-investigator
-description: >-
-  Investigates Amazon GuardDuty findings through a finding-type-driven
-  diagnostic tree covering Recon:IAMUser, UnauthorizedAccess:EC2,
-  Backdoor:EC2, CryptoCurrency, Persistence:IAMUser, Policy:IAMUser,
-  and Exfiltration families. Walks each finding to root cause by
-  collecting evidence from CloudTrail (API actor, source IP,
-  user-agent), VPC Flow Logs (egress patterns, foreign IPs), and
-  CloudWatch (runtime metrics). Identifies false positives (authorized
-  scanners, SaaS CIDR ranges, deployment pipelines), applies
-  suppression rules via create-filter, and recommends auto-remediation
-  via EventBridge to Lambda (isolate EC2, revoke IAM credentials,
-  snapshot volumes for Malware Protection). Covers severity triage
-  Low/Medium/High, Runtime Monitoring for ECS/EKS, EKS Protection, and
-  Malware Protection chains. Emits ROOT_CAUSE_FOUND with the specific
-  threat layer, NEED_MORE_INFO, or ESCALATE. Use when triaging a
-  GuardDuty finding for security diagnosis, false-positive filtering,
-  or containment decisions.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Investigates Amazon GuardDuty findings through a finding-type-driven diagnostic tree covering Recon:IAMUser, UnauthorizedAccess:EC2, Backdoor:EC2, CryptoCurrency, Persistence:IAMUser, Policy:IAMUser, and Exfiltration families. Walks each finding to root cause by collecting evidence from CloudTrail (API actor, source IP, user-agent), VPC Flow Logs (egress patterns, foreign IPs), and CloudWatch (runtime metrics). Identifies false positives (authorized scanners, SaaS CIDR ranges, deployment pipelines), applies suppression rules via create-filter, and recommends auto-remediation via EventBridge to Lambda (isolate EC2, revoke IAM credentials, snapshot volumes for Malware Protection). Covers severity triage Low/Medium/High, Runtime Monitoring for ECS/EKS, EKS Protection, and Malware Protection chains. Emits ROOT_CAUSE_FOUND with the specific threat layer, NEED_MORE_INFO, or ESCALATE. Use when triaging a GuardDuty finding for security diagnosis, false-positive filtering, or containment decisions.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline investigation works from pasted finding JSON
-  or ASFF. Live-account investigation uses aws guardduty list-findings,
-  get-findings, get-findings-statistics, aws cloudtrail lookup-events,
-  aws ec2 describe-flow-logs, aws logs filter-log-events/get-query-results,
-  aws ec2 describe-instances, aws iam get-access-key-last-used, aws s3api
-  get-bucket-acl, and aws malware-scan (AWS CLI v2, SSO or key-based).
-keywords:
-  - GuardDuty
-  - finding
-  - threat detection
-  - Recon:IAMUser
-  - UnauthorizedAccess:EC2
-  - Backdoor:EC2
-  - CryptoCurrency
-  - Persistence:IAMUser
-  - Policy:IAMUser
-  - Exfiltration
-  - Runtime Monitoring
-  - EKS Protection
-  - Malware Protection
-  - CloudTrail
-  - VPC Flow Logs
-  - false positive
-  - suppression
-  - auto-remediation
-  - EventBridge
-  - incident response
-tags: [guardduty, security, threat-detection, incident-response, cloudtrail, vpc-flow-logs, troubleshooting, malware-protection, runtime-monitoring]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline investigation works from pasted finding JSON or ASFF. Live-account investigation uses aws guardduty list-findings, get-findings, get-findings-statistics, aws cloudtrail lookup-events, aws ec2 describe-flow-logs, aws logs filter-log-events/get-query-results, aws ec2 describe-instances, aws iam get-access-key-last-used, aws s3api get-bucket-acl, and aws malware-scan (AWS CLI v2, SSO or key-based).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
-  when_to_use: >-
-    Investigating a GuardDuty finding (single finding JSON, finding ID, or
-    a list of findings from list-findings) for root cause, walking the
-    finding-type family to the specific threat layer (credential abuse,
-    crypto mining, SSH brute force, IAM persistence, S3 exfiltration,
-    runtime process anomaly), collecting corroborating CloudTrail, VPC
-    Flow Log, and CloudWatch evidence, identifying false positives
-    (authorized scanners, known-safe SaaS CIDRs, deployment pipelines),
-    applying suppression via create-filter, or recommending
-    auto-remediation (isolate EC2, revoke IAM credentials, trigger
-    Malware Protection scan). Diagnoses runtime threats — not config
-    posture.
-  when_not_to_use: >-
-    Posture audits of GuardDuty configuration (use
-    guardduty-finding-severity-triage for numeric severity
-    classification, or the auditor family for detector enablement,
-    trusted IP list, and org-level coverage). Non-GuardDuty detections
-    (Inspector, Macie, Detective) use their own skills. Forensic chain
-    of custody and disk imaging belong to incident-response-automator.
-  activation_triggers:
-    - "GuardDuty finding"
-    - "GuardDuty alert"
-    - "investigate GuardDuty"
-    - "Recon:IAMUser"
-    - "UnauthorizedAccess:EC2"
-    - "Backdoor:EC2"
-    - "CryptoCurrency"
-    - "Persistence:IAMUser"
-    - "Policy:IAMUser"
-    - "Exfiltration"
-    - "GuardDuty Runtime Monitoring"
-    - "EKS Protection finding"
-    - "Malware Protection scan"
-    - "GuardDuty false positive"
-    - "GuardDuty suppression filter"
-    - "isolate EC2 from GuardDuty"
-  invocation_schema: >-
-    Input: either (a) a GuardDuty finding JSON (or finding ID + detector
-    ID for live lookup), optionally paired with correlated CloudTrail,
-    VPC Flow Log, or CloudWatch evidence; OR (b) a finding-type family
-    and resource ARN for live-account investigation. Output: a
-    deterministic FINDING/VERDICT/REASON/LAYER/EVIDENCE/SUPPRESSION/
-    REMEDIATION block where VERDICT in {ROOT_CAUSE_FOUND, NEED_MORE_INFO,
-    ESCALATE} and LAYER in {CREDENTIAL_ABUSE, CRYPTO_MINING,
-    SSH_BRUTE_FORCE, IAM_PERSISTENCE, POLICY_CHANGE, DATA_EXFILTRATION,
-    RUNTIME_ANOMALY, FALSE_POSITIVE, SUPPRESSED, AWS_SIDE, UNKNOWN}.
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+  when_to_use: Investigating a GuardDuty finding (single finding JSON, finding ID, or a list of findings from list-findings) for root cause, walking the finding-type family to the specific threat layer (credential abuse, crypto mining, SSH brute force, IAM persistence, S3 exfiltration, runtime process anomaly), collecting corroborating CloudTrail, VPC Flow Log, and CloudWatch evidence, identifying false positives (authorized scanners, known-safe SaaS CIDRs, deployment pipelines), applying suppression via create-filter, or recommending auto-remediation (isolate EC2, revoke IAM credentials, trigger Malware Protection scan). Diagnoses runtime threats — not config posture.
+  when_not_to_use: Posture audits of GuardDuty configuration (use guardduty-finding-severity-triage for numeric severity classification, or the auditor family for detector enablement, trusted IP list, and org-level coverage). Non-GuardDuty detections (Inspector, Macie, Detective) use their own skills. Forensic chain of custody and disk imaging belong to incident-response-automator.
+  activation_triggers: GuardDuty finding, GuardDuty alert, investigate GuardDuty, Recon:IAMUser, UnauthorizedAccess:EC2, Backdoor:EC2, CryptoCurrency, Persistence:IAMUser, Policy:IAMUser, Exfiltration, GuardDuty Runtime Monitoring, EKS Protection finding, Malware Protection scan, GuardDuty false positive, GuardDuty suppression filter, isolate EC2 from GuardDuty
+  invocation_schema: 'Input: either (a) a GuardDuty finding JSON (or finding ID + detector ID for live lookup), optionally paired with correlated CloudTrail, VPC Flow Log, or CloudWatch evidence; OR (b) a finding-type family and resource ARN for live-account investigation. Output: a deterministic FINDING/VERDICT/REASON/LAYER/EVIDENCE/SUPPRESSION/ REMEDIATION block where VERDICT in {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and LAYER in {CREDENTIAL_ABUSE, CRYPTO_MINING, SSH_BRUTE_FORCE, IAM_PERSISTENCE, POLICY_CHANGE, DATA_EXFILTRATION, RUNTIME_ANOMALY, FALSE_POSITIVE, SUPPRESSED, AWS_SIDE, UNKNOWN}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: GuardDuty, finding, threat detection, Recon:IAMUser, UnauthorizedAccess:EC2, Backdoor:EC2, CryptoCurrency, Persistence:IAMUser, Policy:IAMUser, Exfiltration, Runtime Monitoring, EKS Protection, Malware Protection, CloudTrail, VPC Flow Logs, false positive, suppression, auto-remediation, EventBridge, incident response
+  tags: guardduty, security, threat-detection, incident-response, cloudtrail, vpc-flow-logs, troubleshooting, malware-protection, runtime-monitoring
 ---
 
 # GuardDuty Finding Investigator

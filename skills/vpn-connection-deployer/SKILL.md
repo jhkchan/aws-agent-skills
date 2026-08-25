@@ -1,116 +1,26 @@
 ---
 name: vpn-connection-deployer
-description: >-
-  Provisions AWS Site-to-Site VPN connections with production defaults:
-  customer gateway (CGW), virtual private gateway (VPG) vs transit
-  gateway (TGW) VPN attachment, VPN connection (IPSec), routing (static
-  vs dynamic/BGP), tunnel options (IKE versions, encryption algorithms,
-  Phase 1/2 SA lifetimes, dead peer detection), dual-tunnel redundancy,
-  CloudWatch monitoring (TunnelState, TunnelDataIn/Out), acceleration
-  via Global Accelerator, redundant VPN connections, IPv6 support, and
-  outside IP address types (public vs private NAT). Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when
-  creating a Site-to-Site VPN, connecting an on-premises network to
-  AWS, configuring BGP over VPN, setting up dual-tunnel redundancy, or
-  attaching a VPN to a transit gateway. Triggers: create site-to-site
-  vpn, customer gateway, virtual private gateway, vpn connection ipsec,
-  bgp over vpn, dual tunnel redundancy, transit gateway vpn attachment,
-  vpn cloudwatch monitoring, global accelerator vpn, vpn ipv6.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Site-to-Site VPN connections with production defaults: customer gateway (CGW), virtual private gateway (VPG) vs transit gateway (TGW) VPN attachment, VPN connection (IPSec), routing (static vs dynamic/BGP), tunnel options (IKE versions, encryption algorithms, Phase 1/2 SA lifetimes, dead peer detection), dual-tunnel redundancy, CloudWatch monitoring (TunnelState, TunnelDataIn/Out), acceleration via Global Accelerator, redundant VPN connections, IPv6 support, and outside IP address types (public vs private NAT). Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Site-to-Site VPN, connecting an on-premises network to AWS, configuring BGP over VPN, setting up dual-tunnel redundancy, or attaching a VPN to a transit gateway. Triggers: create site-to-site vpn, customer gateway, virtual private gateway, vpn connection ipsec, bgp over vpn, dual tunnel redundancy, transit gateway vpn attachment, vpn cloudwatch monitoring, global accelerator vpn, vpn ipv6.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with ec2 access (and
-  cross-account STS assume-role if CGW is in another account). Works
-  with Terraform aws_customer_gateway / aws_vpn_gateway /
-  aws_vpn_connection / aws_vpn_connection_route /
-  aws_ec2_transit_gateway_vpn_attachment resources and CloudFormation
-  AWS::EC2::CustomerGateway / AWS::EC2::VPNGateway /
-  AWS::EC2::VPNConnection templates.
-keywords:
-  - aws
-  - site-to-site vpn
-  - vpn connection
-  - customer gateway
-  - virtual private gateway
-  - transit gateway vpn attachment
-  - cloudops
-  - deploy
-  - provisioning
-  - ipsec
-  - bgp
-  - dual tunnel
-  - ike
-  - encryption
-  - cloudwatch
-  - global accelerator
-  - ipv6
-tags:
-  - aws
-  - site-to-site-vpn
-  - vpn-connection
-  - customer-gateway
-  - virtual-private-gateway
-  - cloudops
-  - deploy
-  - networking
-  - provisioning
-  - ipsec
-  - bgp
-  - dual-tunnel
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with ec2 access (and cross-account STS assume-role if CGW is in another account). Works with Terraform aws_customer_gateway / aws_vpn_gateway / aws_vpn_connection / aws_vpn_connection_route / aws_ec2_transit_gateway_vpn_attachment resources and CloudFormation AWS::EC2::CustomerGateway / AWS::EC2::VPNGateway / AWS::EC2::VPNConnection templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - site-to-site-vpn
-    - vpn-connection
-    - customer-gateway
-    - virtual-private-gateway
-    - cloudops
-    - deploy
-    - networking
-    - provisioning
-    - ipsec
-    - bgp
-    - dual-tunnel
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create site-to-site vpn
-    - customer gateway
-    - virtual private gateway
-    - vpn connection ipsec
-    - bgp over vpn
-    - dual tunnel redundancy
-    - transit gateway vpn attachment
-    - vpn cloudwatch monitoring
-    - global accelerator vpn
-    - vpn ipv6
-  when_to_use: >-
-    Invoke when the user wants to create an AWS Site-to-Site VPN
-    connection (IPSec) between an on-premises network and AWS, configure
-    BGP or static routing over VPN, set up dual-tunnel redundancy,
-    attach a VPN to a transit gateway, customize tunnel options (IKE,
-    encryption, lifetimes, DPD), accelerate VPN traffic via Global
-    Accelerator, or monitor VPN tunnels via CloudWatch. Do NOT invoke
-    for AWS Client VPN (use client-vpn-endpoint-deployer), VPC peering
-    (use vpc-peering-deployer), Direct Connect (use direct-connect
-    skills), or VPC endpoints / PrivateLink.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, site-to-site-vpn, vpn-connection, customer-gateway, virtual-private-gateway, cloudops, deploy, networking, provisioning, ipsec, bgp, dual-tunnel
+  dependencies: aws-orchestrator
+  keywords: aws, site-to-site vpn, vpn connection, customer gateway, virtual private gateway, transit gateway vpn attachment, cloudops, deploy, provisioning, ipsec, bgp, dual tunnel, ike, encryption, cloudwatch, global accelerator, ipv6
+  when_to_use: Invoke when the user wants to create an AWS Site-to-Site VPN connection (IPSec) between an on-premises network and AWS, configure BGP or static routing over VPN, set up dual-tunnel redundancy, attach a VPN to a transit gateway, customize tunnel options (IKE, encryption, lifetimes, DPD), accelerate VPN traffic via Global Accelerator, or monitor VPN tunnels via CloudWatch. Do NOT invoke for AWS Client VPN (use client-vpn-endpoint-deployer), VPC peering (use vpc-peering-deployer), Direct Connect (use direct-connect skills), or VPC endpoints / PrivateLink.
 ---
 
 # VPN Connection Deployer

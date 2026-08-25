@@ -1,101 +1,53 @@
 ---
 name: s3-access-denied-troubleshooter
-description: >-
-  Diagnoses Amazon S3 Access Denied errors through a thirteen-category
-  diagnostic tree: explicit deny in bucket policy overriding an IAM
-  allow, object ownership mismatch (bucket owner vs uploader),
-  bucket owner enforcement (RequestAccount condition), KMS key policy
-  missing kms:DecryptObject grant, VPC endpoint policy restricting S3
-  actions, presigned URL expiry or signature mismatch, ACL vs bucket
-  policy conflict, Block Public Access settings, Object Lock retention
-  preventing overwrite or delete, cross-account access requiring both
-  bucket policy and IAM permission, STS assumed-role permission
-  boundary narrowing effective permissions, Service Control Policy
-  denying S3 at the org level, and S3 Object Lambda access point
-  routing. Walks symptoms to a verified root cause with evidence-backed
-  probes; emits ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses Amazon S3 Access Denied errors through a thirteen-category diagnostic tree: explicit deny in bucket policy overriding an IAM allow, object ownership mismatch (bucket owner vs uploader), bucket owner enforcement (RequestAccount condition), KMS key policy missing kms:DecryptObject grant, VPC endpoint policy restricting S3 actions, presigned URL expiry or signature mismatch, ACL vs bucket policy conflict, Block Public Access settings, Object Lock retention preventing overwrite or delete, cross-account access requiring both bucket policy and IAM permission, STS assumed-role permission boundary narrowing effective permissions, Service Control Policy denying S3 at the org level, and S3 Object Lambda access point routing. Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and bucket configuration. Live-account
-  diagnosis uses aws s3api get-bucket-policy, aws s3api get-object-acl, aws s3api get-public-access-block, aws s3api get-object-lock-configuration, aws kms describe-key / get-key-policy, aws ec2 describe-vpc-endpoints,
-  aws iam simulate-principal-policy, aws cloudtrail lookup-events, aws sts get-caller-identity, and aws organizations list-policies-for-target (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- S3
-- AccessDenied
-- bucket policy
-- IAM policy
-- explicit deny
-- object ownership
-- bucket owner enforcement
-- RequestAccount
-- KMS key policy
-- kms:DecryptObject
-- VPC endpoint policy
-- presigned URL
-- ACL
-- Block Public Access
-- Object Lock
-- cross-account
-- permission boundary
-- SCP
-- Object Lambda
-- access point
-- troubleshooting
-tags:
-- s3
-- storage
-- troubleshooting
-- access-denied
-- iam-policy
-- bucket-policy
-- kms
-- vpc-endpoint
-- scp
-- object-lock
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and bucket configuration. Live-account diagnosis uses aws s3api get-bucket-policy, aws s3api get-object-acl, aws s3api get-public-access-block, aws s3api get-object-lock-configuration, aws kms describe-key / get-key-policy, aws ec2 describe-vpc-endpoints, aws iam simulate-principal-policy, aws cloudtrail lookup-events, aws sts get-caller-identity...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
-  when_to_use: Diagnosing an S3 Access Denied error (GetObject, PutObject, DeleteObject, ListBucket, HeadBucket), walking a symptom to the failing authorization layer with verify commands, validating why a
-    role or user cannot access an object or bucket, or triaging a "cannot read from S3" incident where the root cause may be bucket policy, IAM policy, KMS, SCP, VPC endpoint, ownership, ACL, Block Public Access,
-    Object Lock, presigned URL, cross-account, permission boundary, or Object Lambda access point — not necessarily the application code.
-  when_not_to_use: S3 performance or latency optimisation (use s3-lifecycle-optimizer), S3 bucket creation (use s3-secure-bucket-deployer), S3 replication troubleshooting (use s3-replication-operator), or IAM policy
-    authoring for least-privilege posture audits (use iam-least-privilege-advisor). This skill diagnoses Access Denied failures at access time; it does not audit steady-state security posture.
-  activation_triggers:
-  - S3 AccessDenied
-  - Access Denied S3
-  - s3:GetObject AccessDenied
-  - s3:PutObject AccessDenied
-  - 403 Forbidden S3
-  - bucket policy explicit deny
-  - S3 cross-account access denied
-  - S3 KMS AccessDenied
-  - kms:DecryptObject denied
-  - S3 VPC endpoint denied
-  - presigned URL expired
-  - S3 Object Lock denied
-  - S3 Block Public Access
-  - S3 object ownership denied
-  - S3 permission boundary denied
-  - SCP denying S3
-  - S3 Object Lambda access denied
-  - troubleshoot S3 access
-  invocation_schema: 'Input: either (a) a symptom description (error message, observed behaviour, "application gets 403 on S3 GetObject"), optionally paired with the bucket name, key prefix, caller IAM principal,
-    and CloudTrail event, OR (b) a bucket name plus caller context (IAM role ARN, source IP, VPC endpoint ID) for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/ROOT_CAUSE/EVIDENCE/REMEDIATION
-    block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and ROOT_CAUSE ∈ {EXPLICIT_DENY_BUCKET_POLICY, IMPLICIT_DENY_IAM, KMS_KEY_POLICY, SCP_DENY, VPC_ENDPOINT_POLICY, CROSS_ACCOUNT_MISSING_BUCKET_POLICY,
-    OBJECT_OWNERSHIP, ACL_CONFLICT, BLOCK_PUBLIC_ACCESS, OBJECT_LOCK_RETENTION, PRESIGNED_URL_EXPIRED, PERMISSION_BOUNDARY, OBJECT_LAMBDA_ROUTING, REQUEST_ACCOUNT_MISMATCH, UNKNOWN}.'
-  invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"Application role arn:aws:iam::111111111111:role/app-role\ngets AccessDenied on s3:GetObject for\ns3://prod-data-bucket/orders/2024/order-001.json.\"\n\
-    Bucket: prod-data-bucket\nKey: orders/2024/order-001.json\nCaller: arn:aws:iam::111111111111:role/app-role\nAction: s3:GetObject\nError: \"Access Denied\" (HTTP 403)\nCloudTrail eventSource: s3.amazonaws.com\n\
-    CloudTrail errorMessage: \"Access Denied\"\nKMS encryption: SSE-KMS with customer-managed key\narn:aws:kms:us-east-1:111111111111:key/abc-123"
+  when_to_use: Diagnosing an S3 Access Denied error (GetObject, PutObject, DeleteObject, ListBucket, HeadBucket), walking a symptom to the failing authorization layer with verify commands, validating why a role or user cannot access an object or bucket, or triaging a "cannot read from S3" incident where the root cause may be bucket policy, IAM policy, KMS, SCP, VPC endpoint, ownership, ACL, Block Public Access, Object Lock, presigned URL, cross-account, permission boundary, or Object Lambda access point — not necessarily the application code.
+  when_not_to_use: S3 performance or latency optimisation (use s3-lifecycle-optimizer), S3 bucket creation (use s3-secure-bucket-deployer), S3 replication troubleshooting (use s3-replication-operator), or IAM policy authoring for least-privilege posture audits (use iam-least-privilege-advisor). This skill diagnoses Access Denied failures at access time; it does not audit steady-state security posture.
+  activation_triggers: S3 AccessDenied, Access Denied S3, s3:GetObject AccessDenied, s3:PutObject AccessDenied, 403 Forbidden S3, bucket policy explicit deny, S3 cross-account access denied, S3 KMS AccessDenied, kms:DecryptObject denied, S3 VPC endpoint denied, presigned URL expired, S3 Object Lock denied, S3 Block Public Access, S3 object ownership denied, S3 permission boundary denied, SCP denying S3, S3 Object Lambda access denied, troubleshoot S3 access
+  invocation_schema: 'Input: either (a) a symptom description (error message, observed behaviour, "application gets 403 on S3 GetObject"), optionally paired with the bucket name, key prefix, caller IAM principal, and CloudTrail event, OR (b) a bucket name plus caller context (IAM role ARN, source IP, VPC endpoint ID) for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/ROOT_CAUSE/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and ROOT_CAUSE ∈ {EXPLICIT_DENY_BUCKET_POLICY, IMPLICIT_DENY_IAM, KMS_KEY_POLICY, SCP_DENY, VPC_ENDPOINT_POLICY, CROSS_ACCOUNT_MISSING_BUCKET_POLICY, OBJECT_OWNERSHIP, ACL_CONFLICT, BLOCK_PUBLIC_ACCESS, OBJECT_LOCK_RETENTION, PRESIGNED_URL_EXPIRED, PERMISSION_BOUNDARY, OBJECT_LAMBDA_ROUTING, REQUEST_ACCOUNT_MISMATCH, UNKNOWN}.'
+  invocation_example: '# Minimal valid input (offline symptom classification):
+
+    Symptom: "Application role arn:aws:iam::111111111111:role/app-role
+
+    gets AccessDenied on s3:GetObject for
+
+    s3://prod-data-bucket/orders/2024/order-001.json."
+
+    Bucket: prod-data-bucket
+
+    Key: orders/2024/order-001.json
+
+    Caller: arn:aws:iam::111111111111:role/app-role
+
+    Action: s3:GetObject
+
+    Error: "Access Denied" (HTTP 403)
+
+    CloudTrail eventSource: s3.amazonaws.com
+
+    CloudTrail errorMessage: "Access Denied"
+
+    KMS encryption: SSE-KMS with customer-managed key
+
+    arn:aws:kms:us-east-1:111111111111:key/abc-123'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: S3, AccessDenied, bucket policy, IAM policy, explicit deny, object ownership, bucket owner enforcement, RequestAccount, KMS key policy, kms:DecryptObject, VPC endpoint policy, presigned URL, ACL, Block Public Access, Object Lock, cross-account, permission boundary, SCP, Object Lambda, access point, troubleshooting
+  tags: s3, storage, troubleshooting, access-denied, iam-policy, bucket-policy, kms, vpc-endpoint, scp, object-lock
 ---
 
 # S3 Access Denied Troubleshooter

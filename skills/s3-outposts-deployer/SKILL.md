@@ -1,99 +1,26 @@
 ---
 name: s3-outposts-deployer
-description: >-
-  Provisions Amazon S3 on Outposts with production defaults: S3 outpost
-  bucket creation, endpoint (required for accessing S3 on Outpost from
-  on-prem via VPC), access point (regional vs outpost), storage class
-  (STANDARD only on Outpost — no IA, no GLACIER), versioning, lifecycle
-  (transition to S3 on Outpost only, no cloud tier transition),
-  replication (from Outpost to cloud S3, one-way only), object lock
-  (WORM), encryption (SSE-S3 only, no KMS on Outpost), access via VPC
-  endpoint, networking requirements (PrivateLink), CloudWatch metrics,
-  and capacity management (Outpost storage is finite and physically
-  constrained). Emits a READY_TO_DEPLOY checklist with verification
-  commands. Use when creating an S3 on Outposts bucket, configuring
-  endpoints for on-prem access, setting up replication from Outpost to
-  cloud, or managing Outpost storage capacity. Triggers: s3 outposts,
-  s3 on outpost, outpost bucket, s3 outpost endpoint, s3 outpost access
-  point, s3 outpost replication, object lock outpost, s3 outpost
-  capacity, s3 outpost encryption.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon S3 on Outposts with production defaults: S3 outpost bucket creation, endpoint (required for accessing S3 on Outpost from on-prem via VPC), access point (regional vs outpost), storage class (STANDARD only on Outpost — no IA, no GLACIER), versioning, lifecycle (transition to S3 on Outpost only, no cloud tier transition), replication (from Outpost to cloud S3, one-way only), object lock (WORM), encryption (SSE-S3 only, no KMS on Outpost), access via VPC endpoint, networking requirements (PrivateLink), CloudWatch metrics, and capacity management (Outpost storage is finite and physically constrained). Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating an S3 on Outposts bucket, configuring endpoints for on-prem access, setting up replication from Outpost to cloud, or managing. Triggers: s3 outposts, s3 on outpost, outpost bucket, s3 outpost endpoint, s3 outpost access point, s3 outpost replication, object lock outpost, s3 outpost capacity, s3 outpost encryption.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with s3control and
-  ec2 access. Works with Terraform aws_s3control_bucket,
-  aws_s3control_access_point, and aws_s3_outposts_endpoint resources
-  and CloudFormation AWS::S3Outposts::* templates.
-keywords:
-  - aws
-  - s3 outposts
-  - s3 on outpost
-  - outpost bucket
-  - outpost endpoint
-  - s3 outpost access point
-  - s3 outpost replication
-  - object lock outpost
-  - sse-s3 outpost
-  - cloudops
-  - deploy
-  - provisioning
-  - storage
-  - outposts
-tags:
-  - aws
-  - s3-outposts
-  - cloudops
-  - deploy
-  - storage
-  - outposts
-  - on-premises
-  - hybrid
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with s3control and ec2 access. Works with Terraform aws_s3control_bucket, aws_s3control_access_point, and aws_s3_outposts_endpoint resources and CloudFormation AWS::S3Outposts::* templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - s3-outposts
-    - cloudops
-    - deploy
-    - storage
-    - outposts
-    - on-premises
-    - hybrid
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - s3 outposts
-    - s3 on outpost
-    - outpost bucket
-    - s3 outpost endpoint
-    - s3 outpost access point
-    - s3 outpost replication
-    - object lock outpost
-    - sse-s3 outpost
-    - s3 outpost capacity
-  when_to_use: >-
-    Invoke when the user wants to create S3 on Outposts — provisioning
-    outpost buckets, endpoints (required for VPC access), access points,
-    replication from Outpost to cloud S3, object lock (WORM), encryption
-    (SSE-S3 only), lifecycle rules, or capacity management. Do NOT
-    invoke for standard S3 (use s3 skills), S3 on Outposts rack (same
-    skill applies), or FSx on Outposts (use fsx skills).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, s3-outposts, cloudops, deploy, storage, outposts, on-premises, hybrid
+  dependencies: aws-orchestrator
+  keywords: aws, s3 outposts, s3 on outpost, outpost bucket, outpost endpoint, s3 outpost access point, s3 outpost replication, object lock outpost, sse-s3 outpost, cloudops, deploy, provisioning, storage, outposts
+  when_to_use: Invoke when the user wants to create S3 on Outposts — provisioning outpost buckets, endpoints (required for VPC access), access points, replication from Outpost to cloud S3, object lock (WORM), encryption (SSE-S3 only), lifecycle rules, or capacity management. Do NOT invoke for standard S3 (use s3 skills), S3 on Outposts rack (same skill applies), or FSx on Outposts (use fsx skills).
 ---
 
 # S3 Outposts Deployer

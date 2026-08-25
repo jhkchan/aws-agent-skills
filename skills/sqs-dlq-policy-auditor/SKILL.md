@@ -1,77 +1,24 @@
 ---
 name: sqs-dlq-policy-auditor
-description: >-
-  Audits AWS SQS queues for dead-letter-queue (DLQ) configuration gaps, public
-  access via Principal:* queue policies, encryption-at-rest status (SSE-SQS /
-  SSE-KMS), maxReceiveCount tuning, message-retention periods, and cross-account
-  DLQ accessibility. Emits a deterministic verdict (NO_DLQ | PUBLIC_ACCESS |
-  NO_ENCRYPTION | CONFIG_GAP | OK) per queue with enumerated findings and
-  specific CLI remediation. Use when reviewing SQS queue configurations,
-  checking for missing or misconfigured dead-letter queues, validating
-  encryption posture, auditing queue policies for public exposure, or tuning
-  redrive-policy parameters before production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS SQS queues for dead-letter-queue (DLQ) configuration gaps, public access via Principal:* queue policies, encryption-at-rest status (SSE-SQS / SSE-KMS), maxReceiveCount tuning, message-retention periods, and cross-account DLQ accessibility. Emits a deterministic verdict (NO_DLQ | PUBLIC_ACCESS | NO_ENCRYPTION | CONFIG_GAP | OK) per queue with enumerated findings and specific CLI remediation. Use when reviewing SQS queue configurations, checking for missing or misconfigured dead-letter queues, validating encryption posture, auditing queue policies for public exposure, or tuning redrive-policy parameters before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline attribute-document classification.
-  Live-account audits use aws sqs get-queue-attributes, aws sqs list-queues,
-  and aws sqs get-queue-url (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - SQS
-  - dead-letter queue
-  - DLQ
-  - redrive policy
-  - maxReceiveCount
-  - queue policy
-  - Principal:"*"
-  - public access
-  - SSE-SQS
-  - SSE-KMS
-  - KmsMasterKeyId
-  - SqsManagedSseEnabled
-  - message retention
-  - cross-account DLQ
-  - FIFO queue
-  - poison pill
-  - RedriveAllowPolicy
-  - VisibilityTimeout
-  - SQS audit
-  - queue security
-tags: [sqs, app-integration, dead-letter-queue, redrive-policy, encryption, queue-policy, public-access, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline attribute-document classification. Live-account audits use aws sqs get-queue-attributes, aws sqs list-queues, and aws sqs get-queue-url (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
-  verdict_shape: "NO_DLQ | PUBLIC_ACCESS | NO_ENCRYPTION | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing an SQS queue configuration before production deployment, checking
-    for a missing dead-letter queue, auditing a queue policy for public access,
-    validating encryption-at-rest, tuning maxReceiveCount, inspecting DLQ
-    retention, or hardening SQS posture across an account.
-  activation_triggers:
-    - "audit this SQS queue"
-    - "is my SQS queue missing a DLQ"
-    - "check SQS redrive policy"
-    - "is my SQS queue public"
-    - "SQS queue encryption"
-    - "maxReceiveCount tuning"
-    - "DLQ retention period"
-    - "cross-account DLQ"
-    - "poison pill SQS"
-    - "harden SQS queue"
-  invocation_schema: >-
-    Input: either (a) an SQS queue attribute document (Policy, RedrivePolicy,
-    KmsMasterKeyId, SqsManagedSseEnabled, MessageRetentionPeriod,
-    VisibilityTimeout), optionally paired with DLQ attributes, OR (b) a queue
-    URL/ARN for live-account audit. Output: deterministic QUEUE/VERDICT/REASON/
-    FINDINGS/REMEDIATION block per queue, where VERDICT is one of NO_DLQ,
-    PUBLIC_ACCESS, NO_ENCRYPTION, CONFIG_GAP, OK.
+  verdict_shape: NO_DLQ | PUBLIC_ACCESS | NO_ENCRYPTION | CONFIG_GAP | OK
+  when_to_use: Reviewing an SQS queue configuration before production deployment, checking for a missing dead-letter queue, auditing a queue policy for public access, validating encryption-at-rest, tuning maxReceiveCount, inspecting DLQ retention, or hardening SQS posture across an account.
+  activation_triggers: audit this SQS queue, is my SQS queue missing a DLQ, check SQS redrive policy, is my SQS queue public, SQS queue encryption, maxReceiveCount tuning, DLQ retention period, cross-account DLQ, poison pill SQS, harden SQS queue
+  invocation_schema: 'Input: either (a) an SQS queue attribute document (Policy, RedrivePolicy, KmsMasterKeyId, SqsManagedSseEnabled, MessageRetentionPeriod, VisibilityTimeout), optionally paired with DLQ attributes, OR (b) a queue URL/ARN for live-account audit. Output: deterministic QUEUE/VERDICT/REASON/ FINDINGS/REMEDIATION block per queue, where VERDICT is one of NO_DLQ, PUBLIC_ACCESS, NO_ENCRYPTION, CONFIG_GAP, OK.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: SQS, dead-letter queue, DLQ, redrive policy, maxReceiveCount, queue policy, Principal:"*", public access, SSE-SQS, SSE-KMS, KmsMasterKeyId, SqsManagedSseEnabled, message retention, cross-account DLQ, FIFO queue, poison pill, RedriveAllowPolicy, VisibilityTimeout, SQS audit, queue security
+  tags: sqs, app-integration, dead-letter-queue, redrive-policy, encryption, queue-policy, public-access, audit
 ---
 
 # SQS DLQ Policy Auditor

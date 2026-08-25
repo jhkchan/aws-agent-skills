@@ -1,57 +1,15 @@
 ---
 name: cloudwatch-logs-not-ingesting-troubleshooter
-description: >-
-  Diagnoses CloudWatch Logs not-ingesting scenarios through a thirteen-category
-  diagnostic tree: log group vs log stream naming, IAM permissions for
-  PutLogEvents (logs:CreateLogStream, logs:PutLogEvents), sequence token
-  validation errors, CloudWatch agent misconfiguration (Windows vs Linux,
-  JSON vs text), VPC Flow Logs delivery delays, Lambda log group
-  auto-creation, retention policy auto-expiring logs, subscription filter
-  (Kinesis/Lambda) consuming all capacity, metric filter pattern syntax
-  errors, log group resource policy conflicts, account-level data
-  protection policy blocking content, and cross-account log delivery
-  (resource-based policy on destination). Walks symptoms to a verified
-  root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED or
-  INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses CloudWatch Logs not-ingesting scenarios through a thirteen-category diagnostic tree: log group vs log stream naming, IAM permissions for PutLogEvents (logs:CreateLogStream, logs:PutLogEvents), sequence token validation errors, CloudWatch agent misconfiguration (Windows vs Linux, JSON vs text), VPC Flow Logs delivery delays, Lambda log group auto-creation, retention policy auto-expiring logs, subscription filter (Kinesis/Lambda) consuming all capacity, metric filter pattern syntax errors, log group resource policy conflicts, account-level data protection policy blocking content, and cross-account log delivery (resource-based policy on destination). Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted agent / application error output and log-group configuration. Live-account
-  diagnosis uses aws logs describe-log-groups, describe-log-streams, get-log-events, describe-metric-filters, describe-subscription-filters, describe-resource-policies, get-data-protection-policy, aws iam simulate-principal-policy, aws cloudtrail lookup-events, aws ec2 describe-flow-logs, aws lambda get-function-configuration, and aws ec2 describe-network-interfaces (AWS CLI v2, SSO or key credentials).
-keywords:
-- CloudWatch Logs
-- log group
-- log stream
-- PutLogEvents
-- CreateLogStream
-- sequence token
-- InvalidSequenceTokenException
-- CloudWatch agent
-- VPC Flow Logs
-- retention policy
-- subscription filter
-- metric filter
-- resource policy
-- data protection
-- cross-account logs
-- logs not ingesting
-- troubleshoot
-tags:
-- cloudwatch
-- management
-- troubleshooting
-- logs
-- iam
-- agent
-- retention
-- subscription-filter
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted agent / application error output and log-group configuration. Live-account diagnosis uses aws logs describe-log-groups, describe-log-streams, get-log-events, describe-metric-filters, describe-subscription-filters, describe-resource-policies, get-data-protection-policy, aws iam simulate-principal-policy, aws cloudtrail lookup-events, aws ec2 describe-flow-logs...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: troubleshoot
   skill_class: capability
@@ -59,24 +17,13 @@ metadata:
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
   when_to_use: Diagnosing a CloudWatch Logs not-ingesting scenario (logs not appearing in a log group, sequence token errors blocking PutLogEvents, CloudWatch agent not shipping, VPC Flow Logs not arriving, Lambda logs missing after the first invocation, retention auto-expiring before the SIEM pull, subscription filter consuming all Lambda concurrency, metric filter not firing, data-protection policy redacting content, cross-account delivery failing), walking a symptom to the failing layer with verify commands.
   when_not_to_use: Authoring a new CloudWatch agent configuration from scratch (use the cloudwatch-agent deployer), CloudWatch Logs Insights query tuning (use cloudwatch-logs-insights-troubshooter), CloudWatch alarm configuration (use cloudwatch-alarm-troubleshooter), or debugging application logging frameworks (use the application logs).
-  activation_triggers:
-  - CloudWatch Logs not ingesting
-  - logs not appearing in log group
-  - PutLogEvents AccessDenied
-  - logs CreateLogStream denied
-  - InvalidSequenceTokenException
-  - sequence token already accepted
-  - CloudWatch agent not sending logs
-  - VPC Flow Logs not arriving
-  - Lambda logs missing
-  - retention policy expiring logs
-  - subscription filter Lambda concurrency
-  - metric filter not firing
-  - data protection policy CloudWatch
-  - cross-account log delivery
-  - troubleshoot CloudWatch Logs
+  activation_triggers: CloudWatch Logs not ingesting, logs not appearing in log group, PutLogEvents AccessDenied, logs CreateLogStream denied, InvalidSequenceTokenException, sequence token already accepted, CloudWatch agent not sending logs, VPC Flow Logs not arriving, Lambda logs missing, retention policy expiring logs, subscription filter Lambda concurrency, metric filter not firing, data protection policy CloudWatch, cross-account log delivery, troubleshoot CloudWatch Logs
   invocation_schema: 'Input: either (a) a symptom description (agent / application / aws logs error string, observed behaviour, "logs stopped at 03:00"), optionally paired with the log group name and the emitter IAM principal, OR (b) a log group name plus the source (application, Lambda, VPC Flow Logs, CloudWatch agent) for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {LOG_GROUP_NAMING, LOG_STREAM_NAMING, IAM_PERMISSIONS, SEQUENCE_TOKEN, AGENT_MISCONFIG, VPC_FLOW_LOGS_DELIVERY, LAMBDA_AUTO_CREATE, RETENTION_EXPIRED, SUBSCRIPTION_FILTER_CAPACITY, METRIC_FILTER_PATTERN, RESOURCE_POLICY_CONFLICT, DATA_PROTECTION_BLOCKING, CROSS_ACCOUNT_POLICY, UNKNOWN}.'
   invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"application logs stopped appearing in\n  /aws/lambda/fn-prod-processor at 03:00 UTC; PutLogEvents returns\n  InvalidSequenceTokenException on every attempt.\"\nLogGroup: /aws/lambda/fn-prod-processor\nSource: Lambda (auto-publishes to /aws/lambda/<name>)\nEmitter IAM principal: the Lambda service principal\nLast successful PutLogEvents: 03:00 UTC (2 hours ago)"
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudWatch Logs, log group, log stream, PutLogEvents, CreateLogStream, sequence token, InvalidSequenceTokenException, CloudWatch agent, VPC Flow Logs, retention policy, subscription filter, metric filter, resource policy, data protection, cross-account logs, logs not ingesting, troubleshoot
+  tags: cloudwatch, management, troubleshooting, logs, iam, agent, retention, subscription-filter
 ---
 
 # CloudWatch Logs Not-Ingesting Troubleshooter

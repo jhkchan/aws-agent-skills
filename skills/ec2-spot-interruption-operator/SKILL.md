@@ -1,107 +1,27 @@
 ---
 name: ec2-spot-interruption-operator
-description: >-
-  Operates Amazon EC2 Spot Instance interruption handling workflows end-to-end
-  — EventBridge Instance Interruption Warning (2-minute notice), Spot Instance
-  Interruption Queue (SQS), Lambda functions for graceful shutdown (drain from
-  ELB, checkpoint state to S3 or DynamoDB), capacity rebalance notifications,
-  replacement strategy selection (capacity-optimized vs diversified vs
-  lowest-price), Spot Fleet auto-replacement, Auto Scaling Group capacity
-  rebalance, stateful workload checkpointing patterns (S3 multipart, DynamoDB
-  point-in-time), Spot Block deprecation awareness, Spot placement score for
-  capacity assessment, instance diversification across families and AZs
-  (minimum 3 families for 99.9% availability), hibernate vs stop vs terminate
-  on interruption behavior, and integration with Application Load Balancer /
-  Network Load Balancer connection draining. Runs deterministic pre-checks
-  (EventBridge rule health, SQS queue depth, Lambda concurrency, deregister
-  delay, lifecycle hook timeout) behind a CONFIRM gate and emits
-  OPERATION_COMPLETED or REVIEW_REQUIRED per operation. Use when handling a
-  live Spot interruption warning, configuring a graceful-shutdown pipeline,
-  tuning a Spot Fleet or ASG for interruption resilience, validating capacity
-  placement score, or auditing diversification coverage.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates Amazon EC2 Spot Instance interruption handling workflows end-to-end — EventBridge Instance Interruption Warning (2-minute notice), Spot Instance Interruption Queue (SQS), Lambda functions for graceful shutdown (drain from ELB, checkpoint state to S3 or DynamoDB), capacity rebalance notifications, replacement strategy selection (capacity-optimized vs diversified vs lowest-price), Spot Fleet auto-replacement, Auto Scaling Group capacity rebalance, stateful workload checkpointing patterns (S3 multipart, DynamoDB point-in-time), Spot Block deprecation awareness, Spot placement score for capacity assessment, instance diversification across families and AZs (minimum 3 families for 99.9% availability), hibernate vs stop vs terminate on interruption behavior, and integration with Application Load Balancer / Network Load Balancer connection draining. Runs deterministic pre-checks (EventBridge rule health, SQS queue depth, Lambda concurrency, deregister delay, lifecycle hook timeout) behind a CONFIRM gate...
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws ec2 describe-spot-instance-requests, describe-spot-fleet-
-  requests, describe-instances, modify-spot-fleet-request, aws events
-  put-rule, put-targets, aws sqs receive-message, delete-message,
-  get-queue-attributes, aws lambda get-function-configuration, invoke, aws
-  autoscaling describe-auto-scaling-groups, put-lifecycle-hook, aws elbv2
-  deregister-targets, describe-target-health (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-  - Spot Instance
-  - Spot interruption
-  - 2-minute warning
-  - Instance Interruption Warning
-  - EventBridge Spot
-  - SQS interruption queue
-  - graceful shutdown
-  - drain from ELB
-  - checkpoint state
-  - capacity rebalance
-  - capacity-optimized
-  - diversified allocation
-  - Spot Fleet
-  - ASG capacity rebalance
-  - stateful checkpointing
-  - Spot placement score
-  - instance diversification
-  - hibernate on interruption
-  - Spot Block deprecation
-  - Spot two-minute warning
-tags: [aws, ec2, spot, compute, interruption, autoscaling, eventbridge, operate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws ec2 describe-spot-instance-requests, describe-spot-fleet- requests, describe-instances, modify-spot-fleet-request, aws events put-rule, put-targets, aws sqs receive-message, delete-message, get-queue-attributes, aws lambda get-function-configuration, invoke, aws autoscaling describe-auto-scaling-groups, put-lifecycle-hook, aws...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "OPERATION_COMPLETED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Handling a live Spot Instance Interruption Warning (the 2-minute notice),
-    configuring an EventBridge rule plus SQS queue plus Lambda pipeline for
-    graceful shutdown, tuning a Spot Fleet or ASG for capacity rebalance and
-    auto-replacement, selecting a replacement strategy (capacity-optimized,
-    diversified, lowest-price), validating Spot placement score before a launch,
-    auditing instance diversification across families and AZs (target: minimum
-    3 instance families for 99.9% availability), configuring stateful workload
-    checkpointing to S3 or DynamoDB, or auditing the interruption-handling
-    pipeline health.
-  activation_triggers:
-    - "Spot interruption warning"
-    - "Spot Instance interrupted"
-    - "2-minute warning Spot"
-    - "graceful shutdown Spot"
-    - "drain Spot from ELB"
-    - "checkpoint Spot instance"
-    - "capacity rebalance Spot"
-    - "Spot Fleet replacement"
-    - "ASG capacity rebalance"
-    - "Spot placement score"
-    - "instance diversification Spot"
-    - "Spot Block deprecation"
-    - "hibernate Spot instance"
-    - "Spot graceful shutdown pipeline"
-    - "Spot interruption queue"
-  invocation_schema: >-
-    Input: either (a) a Spot Instance or Spot Fleet configuration
-    (describe-spot-instance-requests, describe-spot-fleet-requests, or
-    describe-auto-scaling-groups output) plus the intended operation
-    (handle-interruption, configure-pipeline, tune-replacement-strategy,
-    audit-diversification, validate-placement-score, configure-checkpointing,
-    audit-pipeline-health), OR (b) an EventBridge Instance Interruption
-    Warning event for live handling. Output: deterministic OPERATION / VERDICT
-    / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per operation, where
-    VERDICT is OPERATION_COMPLETED or REVIEW_REQUIRED.
+  verdict_shape: OPERATION_COMPLETED | REVIEW_REQUIRED
+  when_to_use: 'Handling a live Spot Instance Interruption Warning (the 2-minute notice), configuring an EventBridge rule plus SQS queue plus Lambda pipeline for graceful shutdown, tuning a Spot Fleet or ASG for capacity rebalance and auto-replacement, selecting a replacement strategy (capacity-optimized, diversified, lowest-price), validating Spot placement score before a launch, auditing instance diversification across families and AZs (target: minimum 3 instance families for 99.9% availability), configuring stateful workload checkpointing to S3 or DynamoDB, or auditing the interruption-handling pipeline health.'
+  activation_triggers: Spot interruption warning, Spot Instance interrupted, 2-minute warning Spot, graceful shutdown Spot, drain Spot from ELB, checkpoint Spot instance, capacity rebalance Spot, Spot Fleet replacement, ASG capacity rebalance, Spot placement score, instance diversification Spot, Spot Block deprecation, hibernate Spot instance, Spot graceful shutdown pipeline, Spot interruption queue
+  invocation_schema: 'Input: either (a) a Spot Instance or Spot Fleet configuration (describe-spot-instance-requests, describe-spot-fleet-requests, or describe-auto-scaling-groups output) plus the intended operation (handle-interruption, configure-pipeline, tune-replacement-strategy, audit-diversification, validate-placement-score, configure-checkpointing, audit-pipeline-health), OR (b) an EventBridge Instance Interruption Warning event for live handling. Output: deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per operation, where VERDICT is OPERATION_COMPLETED or REVIEW_REQUIRED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Spot Instance, Spot interruption, 2-minute warning, Instance Interruption Warning, EventBridge Spot, SQS interruption queue, graceful shutdown, drain from ELB, checkpoint state, capacity rebalance, capacity-optimized, diversified allocation, Spot Fleet, ASG capacity rebalance, stateful checkpointing, Spot placement score, instance diversification, hibernate on interruption, Spot Block deprecation, Spot two-minute warning
+  tags: aws, ec2, spot, compute, interruption, autoscaling, eventbridge, operate
 ---
 
 # EC2 Spot Instance Interruption Operator

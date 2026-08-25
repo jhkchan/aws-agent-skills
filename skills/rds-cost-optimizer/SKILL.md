@@ -1,124 +1,29 @@
 ---
 name: rds-cost-optimizer
-description: >-
-  Optimises RDS and Aurora database cost through instance-class right-sizing
-  (CloudWatch CPUUtilization, FreeableMemory, DatabaseConnections plus
-  Performance Insights DBLoad), storage-class selection (gp3 vs io2),
-  Multi-AZ gating by environment, pricing-model evaluation (On-Demand / RI
-  1yr-3yr / Savings Plans), engine choice (open-source vs commercial, BYOL),
-  Aurora Serverless v2 ACU tuning, and idle-database detection (0 connections
-  for 7+ days). Emits a deterministic verdict (OPTIMIZED | OPPORTUNITY_FOUND
-  | ALREADY_OPTIMAL) per database with specific recommendation and estimated
-  monthly savings. Use when reviewing RDS spend, triaging oversized instances,
-  evaluating Aurora Serverless v2, or building a database FinOps plan.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Optimises RDS and Aurora database cost through instance-class right-sizing (CloudWatch CPUUtilization, FreeableMemory, DatabaseConnections plus Performance Insights DBLoad), storage-class selection (gp3 vs io2), Multi-AZ gating by environment, pricing-model evaluation (On-Demand / RI 1yr-3yr / Savings Plans), engine choice (open-source vs commercial, BYOL), Aurora Serverless v2 ACU tuning, and idle-database detection (0 connections for 7+ days). Emits a deterministic verdict (OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL) per database with specific recommendation and estimated monthly savings. Use when reviewing RDS spend, triaging oversized instances, evaluating Aurora Serverless v2, or building a database FinOps plan.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Offline configuration classification works from pasted RDS
-  instance metadata, CloudWatch metrics, and Performance Insights summaries.
-  Live-account optimisation uses aws rds describe-db-instances, aws
-  cloudwatch get-metric-statistics for CPUUtilization/FreeableMemory/
-  DatabaseConnections, aws pi describe-dimension-keys for DBLoad top SQL,
-  aws rds describe-reserved-db-instances, aws ce get-cost-and-usage with
-  RDS Service filter, and aws rds describe-db-snapshots for manual snapshot
-  cleanup (AWS CLI v2, SSO or key-based credentials). Pricing is us-east-1
-  published rates as of 2026; re-state regional rates before producing dollar
-  estimates for other regions.
-keywords:
-  - RDS
-  - Aurora
-  - Aurora Serverless v2
-  - ACU
-  - instance right-sizing
-  - gp3
-  - io2
-  - Multi-AZ
-  - Reserved Instance
-  - Savings Plans
-  - PostgreSQL
-  - MySQL
-  - Oracle
-  - SQL Server
-  - BYOL
-  - License-included
-  - Performance Insights
-  - DBLoad
-  - CloudWatch
-  - FreeableMemory
-  - DatabaseConnections
-  - cost optimization
-  - FinOps
-  - idle database
-tags: [rds, aurora, databases, cost-optimization, finops, right-sizing, reserved-instance, aurora-serverless]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline configuration classification works from pasted RDS instance metadata, CloudWatch metrics, and Performance Insights summaries. Live-account optimisation uses aws rds describe-db-instances, aws cloudwatch get-metric-statistics for CPUUtilization/FreeableMemory/ DatabaseConnections, aws pi describe-dimension-keys for DBLoad top SQL, aws rds describe-reserved-db-instances, aws ce get-cost-and-usage with RDS...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL"
-  when_to_use: >-
-    Reviewing RDS or Aurora spend, right-sizing database instance classes,
-    evaluating Multi-AZ necessity by environment, choosing between RI and
-    Savings Plans for steady-state databases, tuning Aurora Serverless v2
-    ACU min/max, deciding between open-source and commercial engines,
-    detecting idle databases for deletion, or cleaning up manual snapshots.
-  when_not_to_use: >-
-    Performance troubleshooting for a slow database query (use Performance
-    Insights directly or a query-tuning specialist), schema design or index
-    optimisation (DBA work, not cost-driven), RDS migration planning (use
-    DMS tooling), or Aurora Global Database design (architectural, not
-    cost). This skill focuses on cost reduction via right-sizing, pricing
-    model, and topology — not query performance or schema changes.
-  activation_triggers:
-    - "optimise RDS cost"
-    - "right-size RDS instance"
-    - "Aurora Serverless v2 ACU"
-    - "RDS Multi-AZ cost"
-    - "RDS Reserved Instance"
-    - "RDS Savings Plan"
-    - "idle database detection"
-    - "gp3 vs io2 RDS"
-    - "Oracle to PostgreSQL migration"
-    - "BYOL vs License-included"
-    - "RDS storage autoscaling"
-    - "manual snapshot cleanup"
-    - "database FinOps review"
-    - "Aurora ACU tuning"
-    - "RDS downsize recommendation"
-  invocation_schema: >-
-    Input: either (a) an RDS/Aurora instance identifier + live-account context,
-    (b) a database configuration document (instance class, engine, storage,
-    Multi-AZ, pricing model, CloudWatch metrics, Performance Insights
-    summary), OR (c) a fleet description for batch optimisation. Output: a
-    deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/
-    MIGRATION_STEPS block per database, where VERDICT ∈ {OPTIMIZED,
-    OPPORTUNITY_FOUND, ALREADY_OPTIMAL}.
-  invocation_example: |-
-    # Minimal valid input (offline classification):
-    DBInstanceIdentifier: db-overprovisioned-prod
-    Engine: postgres
-    DBInstanceClass: db.r6i.2xlarge
-    Region: us-east-1
-    Multi-AZ: true
-    Storage: 500 GB gp3
-    AllocatedStorage: 500 GB, Used: 120 GB
-    Pricing: On-Demand (no RI/Savings Plan)
-    CloudWatch metrics (last 30 days):
-      - CPUUtilization: avg=12%, max=25%
-      - FreeableMemory: avg=28 GB (of 64 GB), high and stable
-      - DatabaseConnections: avg=15, max=30
-    Performance Insights:
-      - DBLoad: avg=2, max=8 (low for 8 vCPUs)
-    Emit the standard optimisation block (TARGET, VERDICT, REASON,
-    RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+  verdict_shape: OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL
+  when_to_use: Reviewing RDS or Aurora spend, right-sizing database instance classes, evaluating Multi-AZ necessity by environment, choosing between RI and Savings Plans for steady-state databases, tuning Aurora Serverless v2 ACU min/max, deciding between open-source and commercial engines, detecting idle databases for deletion, or cleaning up manual snapshots.
+  when_not_to_use: Performance troubleshooting for a slow database query (use Performance Insights directly or a query-tuning specialist), schema design or index optimisation (DBA work, not cost-driven), RDS migration planning (use DMS tooling), or Aurora Global Database design (architectural, not cost). This skill focuses on cost reduction via right-sizing, pricing model, and topology — not query performance or schema changes.
+  activation_triggers: optimise RDS cost, right-size RDS instance, Aurora Serverless v2 ACU, RDS Multi-AZ cost, RDS Reserved Instance, RDS Savings Plan, idle database detection, gp3 vs io2 RDS, Oracle to PostgreSQL migration, BYOL vs License-included, RDS storage autoscaling, manual snapshot cleanup, database FinOps review, Aurora ACU tuning, RDS downsize recommendation
+  invocation_schema: 'Input: either (a) an RDS/Aurora instance identifier + live-account context, (b) a database configuration document (instance class, engine, storage, Multi-AZ, pricing model, CloudWatch metrics, Performance Insights summary), OR (c) a fleet description for batch optimisation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/ MIGRATION_STEPS block per database, where VERDICT ∈ {OPTIMIZED, OPPORTUNITY_FOUND, ALREADY_OPTIMAL}.'
+  invocation_example: "# Minimal valid input (offline classification):\nDBInstanceIdentifier: db-overprovisioned-prod\nEngine: postgres\nDBInstanceClass: db.r6i.2xlarge\nRegion: us-east-1\nMulti-AZ: true\nStorage: 500 GB gp3\nAllocatedStorage: 500 GB, Used: 120 GB\nPricing: On-Demand (no RI/Savings Plan)\nCloudWatch metrics (last 30 days):\n  - CPUUtilization: avg=12%, max=25%\n  - FreeableMemory: avg=28 GB (of 64 GB), high and stable\n  - DatabaseConnections: avg=15, max=30\nPerformance Insights:\n  - DBLoad: avg=2, max=8 (low for 8 vCPUs)\nEmit the standard optimisation block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: RDS, Aurora, Aurora Serverless v2, ACU, instance right-sizing, gp3, io2, Multi-AZ, Reserved Instance, Savings Plans, PostgreSQL, MySQL, Oracle, SQL Server, BYOL, License-included, Performance Insights, DBLoad, CloudWatch, FreeableMemory, DatabaseConnections, cost optimization, FinOps, idle database
+  tags: rds, aurora, databases, cost-optimization, finops, right-sizing, reserved-instance, aurora-serverless
 ---
 
 # RDS Cost Optimizer

@@ -1,129 +1,29 @@
 ---
 name: glue-job-troubleshooter
-description: >-
-  Diagnoses AWS Glue ETL job failures through a seven-category diagnostic
-  tree — Python script exceptions (KeyError, AttributeError, import
-  errors), job timeout (insufficient DPU, long-running transforms, skewed
-  reads), JDBC connection errors (VPC security group, subnet, network ACL,
-  self-referencing rule), job bookmark errors (not advancing, reprocessing
-  data, partition format change), Data Catalog errors (table not found,
-  partition not found, stale crawler), Spark errors (executor OOM, stage
-  failures, data skew, GC overhead), and DynamicFrame errors (schema
-  mismatch, type coercion). Reads get-job-run ErrorMessage and
-  ExecutionTime, CloudWatch logs (/aws-glue/jobs/), Spark UI exported to
-  S3, and get-job-bookmark state. Emits ROOT_CAUSE_FOUND with the failing
-  probe and positive evidence, NEED_MORE_INFO when a probe requires
-  operator input, or ESCALATE for AWS-side incidents. Use when a Glue job
-  shows FAILED, TIMEOUT, RUNNING past expected duration, or is
-  reprocessing data the bookmark should have skipped.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Diagnoses AWS Glue ETL job failures through a seven-category diagnostic tree — Python script exceptions (KeyError, AttributeError, import errors), job timeout (insufficient DPU, long-running transforms, skewed reads), JDBC connection errors (VPC security group, subnet, network ACL, self-referencing rule), job bookmark errors (not advancing, reprocessing data, partition format change), Data Catalog errors (table not found, partition not found, stale crawler), Spark errors (executor OOM, stage failures, data skew, GC overhead), and DynamicFrame errors (schema mismatch, type coercion). Reads get-job-run ErrorMessage and ExecutionTime, CloudWatch logs (/aws-glue/jobs/), Spark UI exported to S3, and get-job-bookmark state. Emits ROOT_CAUSE_FOUND with the failing probe and positive evidence, NEED_MORE_INFO when a probe requires operator input, or ESCALATE for AWS-side incidents. Use when a Glue job shows FAILED, TIMEOUT, RUNNING past expected duration, or is reprocessing data the bookmark should have skipped.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Offline classification works from a pasted job-run ErrorMessage,
-  CloudWatch Logs excerpt, or Spark stage failure summary. Live-account
-  diagnosis uses aws glue get-job-run, get-job-runs, get-job-bookmark,
-  get-connection, aws logs filter-log-events on /aws-glue/jobs, aws s3 cp
-  for Spark UI event logs, aws glue get-table and get-partitions for
-  catalog validation, and aws ec2 describe-security-groups /
-  describe-network-acls / describe-route-tables for JDBC VPC verification
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - AWS Glue
-  - Glue ETL
-  - Glue job failure
-  - Glue job timeout
-  - Glue bookmark
-  - DynamicFrame
-  - Spark OOM
-  - data skew
-  - JDBC connection
-  - Glue Data Catalog
-  - Glue version 4.0
-  - DPU capacity
-  - Glue Spark UI
-  - CloudWatch logs
-  - Glue connection
-  - crawler
-  - partition pruning
-  - Python shell job
-  - Ray job
-  - Analytics
-tags:
-  - glue
-  - analytics
-  - etl
-  - troubleshoot
-  - spark
-  - data-catalog
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline classification works from a pasted job-run ErrorMessage, CloudWatch Logs excerpt, or Spark stage failure summary. Live-account diagnosis uses aws glue get-job-run, get-job-runs, get-job-bookmark, get-connection, aws logs filter-log-events on /aws-glue/jobs, aws s3 cp for Spark UI event logs, aws glue get-table and get-partitions for catalog validation, and aws ec2 describe-security-groups /...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
-  when_to_use: >-
-    Diagnosing an AWS Glue ETL job that FAILED, hit TIMEOUT, is RUNNING
-    past its expected duration, is reprocessing data the bookmark should
-    have skipped, is throwing Python exceptions, is unable to reach a JDBC
-    source in a VPC, is reporting Spark executor OOM or stage failures, or
-    is surfacing Data Catalog "table not found" / "partition not found"
-    errors.
-  when_not_to_use: >-
-    Glue Data Quality rule evaluation (use the Data Quality service
-    directly), AWS Lake Formation permission errors (use Lake Formation
-    admin tooling), Glue Studio notebook interactive development (not a
-    job-run diagnosis), or Glue crawler schema inference tuning (use a
-    crawler classification specialist). This skill diagnoses job-run
-    failures, not data quality or governance.
-  activation_triggers:
-    - "Glue job failed"
-    - "Glue job timeout"
-    - "Glue bookmark not advancing"
-    - "Glue reprocessing data"
-    - "Glue JDBC connection error"
-    - "Glue Spark OOM"
-    - "Glue stage failure"
-    - "Glue table not found"
-    - "Glue partition not found"
-    - "DynamicFrame schema mismatch"
-    - "Glue DPU capacity"
-    - "Glue job RUNNING too long"
-    - "Glue version 2.0 vs 3.0 vs 4.0"
-    - "diagnose Glue ETL failure"
-    - "Spark UI Glue"
-  invocation_schema: >-
-    Input: either (a) a Glue JobName + RunId + live-account context, (b)
-    a pasted ErrorMessage from glue:get-job-run, OR (c) a CloudWatch Logs
-    / Spark stage failure excerpt. Output: a deterministic TARGET /
-    VERDICT / REASON / CATEGORY / EVIDENCE / REMEDIATION block per job
-    run, where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and
-    CATEGORY ∈ {SCRIPT_EXCEPTION, TIMEOUT_DPU, TIMEOUT_SKEW, JDBC_VPC,
-    JDBC_CRED, BOOKMARK_STALL, CATALOG_MISSING, CATALOG_PARTITION,
-    SPARK_OOM, SPARK_STAGE, DYNAMICFRAME_SCHEMA, DYNAMICFRAME_TYPE,
-    UNKNOWN}.
-  invocation_example: |-
-    # Minimal valid input (offline classification from ErrorMessage):
-    JobName: nightly-sales-aggregation
-    RunId: jr_abc123def456
-    State: FAILED
-    ErrorMessage: "Traceback (most recent call last):
-      File \"tmp/script.py\", line 47, in <module>
-        df = df.withColumn('revenue', col('price') * col('qty'))
-      ... AttributeError: 'NoneType' object has no attribute '_jvc'"
-    ExecutionTime: 42
-    GlueVersion: 4.0
-    WorkerType: G.1X
-    NumberOfWorkers: 5
-    Emit the standard diagnostic block (TARGET, VERDICT, REASON,
-    CATEGORY, EVIDENCE, REMEDIATION).
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+  when_to_use: Diagnosing an AWS Glue ETL job that FAILED, hit TIMEOUT, is RUNNING past its expected duration, is reprocessing data the bookmark should have skipped, is throwing Python exceptions, is unable to reach a JDBC source in a VPC, is reporting Spark executor OOM or stage failures, or is surfacing Data Catalog "table not found" / "partition not found" errors.
+  when_not_to_use: Glue Data Quality rule evaluation (use the Data Quality service directly), AWS Lake Formation permission errors (use Lake Formation admin tooling), Glue Studio notebook interactive development (not a job-run diagnosis), or Glue crawler schema inference tuning (use a crawler classification specialist). This skill diagnoses job-run failures, not data quality or governance.
+  activation_triggers: Glue job failed, Glue job timeout, Glue bookmark not advancing, Glue reprocessing data, Glue JDBC connection error, Glue Spark OOM, Glue stage failure, Glue table not found, Glue partition not found, DynamicFrame schema mismatch, Glue DPU capacity, Glue job RUNNING too long, Glue version 2.0 vs 3.0 vs 4.0, diagnose Glue ETL failure, Spark UI Glue
+  invocation_schema: 'Input: either (a) a Glue JobName + RunId + live-account context, (b) a pasted ErrorMessage from glue:get-job-run, OR (c) a CloudWatch Logs / Spark stage failure excerpt. Output: a deterministic TARGET / VERDICT / REASON / CATEGORY / EVIDENCE / REMEDIATION block per job run, where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and CATEGORY ∈ {SCRIPT_EXCEPTION, TIMEOUT_DPU, TIMEOUT_SKEW, JDBC_VPC, JDBC_CRED, BOOKMARK_STALL, CATALOG_MISSING, CATALOG_PARTITION, SPARK_OOM, SPARK_STAGE, DYNAMICFRAME_SCHEMA, DYNAMICFRAME_TYPE, UNKNOWN}.'
+  invocation_example: "# Minimal valid input (offline classification from ErrorMessage):\nJobName: nightly-sales-aggregation\nRunId: jr_abc123def456\nState: FAILED\nErrorMessage: \"Traceback (most recent call last):\n  File \\\"tmp/script.py\\\", line 47, in <module>\n    df = df.withColumn('revenue', col('price') * col('qty'))\n  ... AttributeError: 'NoneType' object has no attribute '_jvc'\"\nExecutionTime: 42\nGlueVersion: 4.0\nWorkerType: G.1X\nNumberOfWorkers: 5\nEmit the standard diagnostic block (TARGET, VERDICT, REASON,\nCATEGORY, EVIDENCE, REMEDIATION)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Glue, Glue ETL, Glue job failure, Glue job timeout, Glue bookmark, DynamicFrame, Spark OOM, data skew, JDBC connection, Glue Data Catalog, Glue version 4.0, DPU capacity, Glue Spark UI, CloudWatch logs, Glue connection, crawler, partition pruning, Python shell job, Ray job, Analytics
+  tags: glue, analytics, etl, troubleshoot, spark, data-catalog
 ---
 
 # Glue Job Troubleshooter

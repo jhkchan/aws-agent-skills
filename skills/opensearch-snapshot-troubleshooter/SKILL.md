@@ -1,60 +1,15 @@
 ---
 name: opensearch-snapshot-troubleshooter
-description: >-
-  Diagnoses Amazon OpenSearch Service snapshot failures through a
-  thirteen-category diagnostic tree: S3 repository registration
-  errors (PUT _snapshot), repository verification failure, IAM role
-  missing s3:PutObject / s3:ListBucket / s3:GetObject on the
-  snapshot bucket, snapshot stuck or timeout (unassigned shards,
-  cluster red), restore into a different domain (engine-version
-  mismatch — restore requires same version or higher), index alias
-  conflict during restore, snapshot to UltraWarm / Cold storage,
-  S3 bucket lifecycle policy deleting snapshot blobs, cross-region
-  async replication stalls, shard allocation throttling during
-  restore, snapshot manifest corruption, concurrent snapshot limit
-  (one per repository — ConcurrentSnapshotExecutionException), and
-  Cost and Usage Report / audit-log snapshot configuration. Walks
-  symptoms to a verified root cause with evidence-backed probes;
-  emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses Amazon OpenSearch Service snapshot failures through a thirteen-category diagnostic tree: S3 repository registration errors (PUT _snapshot), repository verification failure, IAM role missing s3:PutObject / s3:ListBucket / s3:GetObject on the snapshot bucket, snapshot stuck or timeout (unassigned shards, cluster red), restore into a different domain (engine-version mismatch — restore requires same version or higher), index alias conflict during restore, snapshot to UltraWarm / Cold storage, S3 bucket lifecycle policy deleting snapshot blobs, cross-region async replication stalls, shard allocation throttling during restore, snapshot manifest corruption, concurrent snapshot limit (one per repository — ConcurrentSnapshotExecutionException), and Cost and Usage Report / audit-log snapshot configuration. Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and domain configuration. Live-account diagnosis uses aws opensearch describe-domain, describe-domain-config, list-domain-names, aws es describe-elasticsearch-domain (legacy), aws s3api get-bucket-policy / get-bucket-lifecycle-configuration, aws iam get-role / simulate-principal-policy, aws logs filter-log-events on /aws/opensearch/domains/<domain>/application-logs, curl against the domain endpoint for _snapshot, _cat/recovery, _cat/shards, _cluster/health, and aws cloudwatch get-metric-statistics on AWS/ES (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- OpenSearch
-- snapshot
-- repository
-- S3
-- PUT _snapshot
-- verification
-- restore
-- UltraWarm
-- Cold storage
-- shard allocation
-- manifest corruption
-- ConcurrentSnapshotExecutionException
-- cross-region replication
-- lifecycle policy
-- alias conflict
-- troubleshooting
-tags:
-- opensearch
-- analytics
-- troubleshooting
-- snapshot
-- s3
-- backup
-- restore
-- ultrawarm
-- iam-role
-- repository
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and domain configuration. Live-account diagnosis uses aws opensearch describe-domain, describe-domain-config, list-domain-names, aws es describe-elasticsearch-domain (legacy), aws s3api get-bucket-policy / get-bucket-lifecycle-configuration, aws iam get-role / simulate-principal-policy, aws logs filter-log-events on...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: troubleshoot
   skill_class: capability
@@ -62,30 +17,37 @@ metadata:
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
   when_to_use: Diagnosing an OpenSearch Service snapshot failure (S3 repository registration error, repository verification failure, snapshot stuck or timeout, restore failure, alias conflict on restore, UltraWarm/Cold migration failure, snapshots missing due to S3 lifecycle, cross-region replication lag, shard allocation failure during restore, manifest corruption, concurrent snapshot rejection, audit-log/CUR snapshot misconfig), walking a symptom to the failed layer with verify and fix commands, or triaging a "OpenSearch snapshots are broken" page where the root cause may be repository registration, IAM role, bucket lifecycle, cluster state, or version compatibility — not necessarily the OpenSearch domain itself.
   when_not_to_use: Cluster-level stability incidents not tied to snapshots (use opensearch-cluster-troubleshooter), OpenSearch Serverless collection backup (Serverless uses a different snapshot model), index mapping / query performance tuning, S3 bucket public-access posture audits (use s3-public-access-auditor), or VPC endpoint posture audits for the OpenSearch domain. This skill diagnoses snapshot and restore failures; it does not tune shard count for indexing throughput or audit steady-state configuration posture.
-  activation_triggers:
-  - OpenSearch snapshot failed
-  - OpenSearch snapshot stuck
-  - OpenSearch snapshot timeout
-  - PUT _snapshot failed
-  - repository verification failed
-  - repository_verification_exception
-  - ConcurrentSnapshotExecutionException
-  - OpenSearch restore failed
-  - restore version_not_supported
-  - OpenSearch alias conflict restore
-  - resource_already_allocated_exception
-  - UltraWarm migration failed
-  - Cold storage migration_failed
-  - SnapshotMissingException
-  - cross-region replication lag
-  - shard allocation restore
-  - snapshot manifest corruption
-  - CorruptedIndexException snapshot
-  - OpenSearch audit logs S3
-  - troubleshoot OpenSearch snapshot
+  activation_triggers: OpenSearch snapshot failed, OpenSearch snapshot stuck, OpenSearch snapshot timeout, PUT _snapshot failed, repository verification failed, repository_verification_exception, ConcurrentSnapshotExecutionException, OpenSearch restore failed, restore version_not_supported, OpenSearch alias conflict restore, resource_already_allocated_exception, UltraWarm migration failed, Cold storage migration_failed, SnapshotMissingException, cross-region replication lag, shard allocation restore, snapshot manifest corruption, CorruptedIndexException snapshot, OpenSearch audit logs S3, troubleshoot OpenSearch snapshot
   invocation_schema: 'Input: either (a) a symptom description (error message, observed behaviour, "snapshot stays IN_PROGRESS for hours", "restore returns 400"), optionally paired with the domain configuration (describe-domain output) and recent OpenSearch application logs, OR (b) a DomainName plus snapshot/repository context (repository name, snapshot id, S3 bucket, IAM role ARN, source/target domain for restore) for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {REPOSITORY_REGISTRATION, REPOSITORY_VERIFICATION, IAM_ROLE_S3_ACCESS, SNAPSHOT_TIMEOUT, RESTORE_VERSION_CONFLICT, RESTORE_ALIAS_CONFLICT, COLD_STORAGE_MIGRATION, S3_LIFECYCLE_DELETION, CROSS_REGION_REPLICATION, SHARD_ALLOCATION_RESTORE, MANIFEST_CORRUPTION, CONCURRENT_SNAPSHOT_LIMIT, CUR_AUDIT_LOG_CONFIG, UNKNOWN}.'
-  invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"OpenSearch domain prod-logs-cluster fails to register\nthe manual S3 repository. PUT _snapshot/s3-backups returns\n500 with 'repository_verification_exception' and the IAM role\narn:aws:iam::111111111111:role/opensearch-snapshot-role is\nlisted in the trust policy of the domain but the S3 bucket\npolicy does not list the snapshot role ARN.\"\nDomainName: prod-logs-cluster\nEngineVersion: OpenSearch_2.13\nRepository: s3-backups\nBucket: prod-os-snapshots-us-east-1\nSnapshotRoleArn: arn:aws:iam::111111111111:role/opensearch-snapshot-role\nLast log line: \"repository_verification_exception: [[s3-backups]]
-    verification failed\""
+  invocation_example: '# Minimal valid input (offline symptom classification):
+
+    Symptom: "OpenSearch domain prod-logs-cluster fails to register
+
+    the manual S3 repository. PUT _snapshot/s3-backups returns
+
+    500 with ''repository_verification_exception'' and the IAM role
+
+    arn:aws:iam::111111111111:role/opensearch-snapshot-role is
+
+    listed in the trust policy of the domain but the S3 bucket
+
+    policy does not list the snapshot role ARN."
+
+    DomainName: prod-logs-cluster
+
+    EngineVersion: OpenSearch_2.13
+
+    Repository: s3-backups
+
+    Bucket: prod-os-snapshots-us-east-1
+
+    SnapshotRoleArn: arn:aws:iam::111111111111:role/opensearch-snapshot-role
+
+    Last log line: "repository_verification_exception: [[s3-backups]] verification failed"'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: OpenSearch, snapshot, repository, S3, PUT _snapshot, verification, restore, UltraWarm, Cold storage, shard allocation, manifest corruption, ConcurrentSnapshotExecutionException, cross-region replication, lifecycle policy, alias conflict, troubleshooting
+  tags: opensearch, analytics, troubleshooting, snapshot, s3, backup, restore, ultrawarm, iam-role, repository
 ---
 
 # OpenSearch Snapshot Troubleshooter

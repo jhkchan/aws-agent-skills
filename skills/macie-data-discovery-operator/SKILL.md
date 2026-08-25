@@ -1,116 +1,26 @@
 ---
 name: macie-data-discovery-operator
-description: >-
-  Operates Amazon Macie data discovery lifecycle — enables Macie (org-level
-  delegated admin), creates classification jobs (one-time vs scheduled, S3
-  scope), configures managed data identifiers (PII, financial, credentials),
-  creates custom data identifiers (Regex patterns), manages findings
-  (policy:IAMUser/S3, sensitiveData:S3Object), configures suppression rules,
-  enables automated ML-based discovery, integrates with Security Hub, wires
-  Lambda / Step Functions for auto-remediation. Runs deterministic pre-checks
-  (Macie enabled, delegated admin, S3 scope, IAM), emits exact CLI behind a
-  CONFIRM gate, verifies post-apply state. Emits a verdict (READY | BLOCKED |
-  COMPLETED) per operation. Use when enabling Macie, creating classification
-  jobs, writing custom regex identifiers, suppressing findings, forwarding to
-  Security Hub, or building PII auto-remediation. Triggers: enable Macie,
-  delegated admin, classification job, custom data identifier, Macie findings,
-  Security Hub, automated discovery, remediation Lambda.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Operates Amazon Macie data discovery lifecycle — enables Macie (org-level delegated admin), creates classification jobs (one-time vs scheduled, S3 scope), configures managed data identifiers (PII, financial, credentials), creates custom data identifiers (Regex patterns), manages findings (policy:IAMUser/S3, sensitiveData:S3Object), configures suppression rules, enables automated ML-based discovery, integrates with Security Hub, wires Lambda / Step Functions for auto-remediation. Runs deterministic pre-checks (Macie enabled, delegated admin, S3 scope, IAM), emits exact CLI behind a CONFIRM gate, verifies post-apply state. Emits a verdict (READY | BLOCKED | COMPLETED) per operation. Use when enabling Macie, creating classification jobs, writing custom regex identifiers, suppressing findings, forwarding to Security Hub, or building PII auto-remediation. Triggers: enable Macie, delegated admin, classification job, custom data identifier, Macie findings, Security Hub, automated discovery, remediation Lambda.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). For live operations: AWS CLI v2 with macie2, s3, iam, sts,
-  securityhub, lambda, and stepfunctions access. Works with Terraform
-  aws_macie2_account / aws_macie2_classification_job /
-  aws_macie2_custom_data_identifier resources and CloudFormation
-  AWS::Macie::* templates.
-keywords:
-  - aws
-  - macie
-  - data discovery
-  - cloudops
-  - operate
-  - classification
-  - pii
-  - managed data identifiers
-  - custom data identifiers
-  - regex
-  - findings
-  - suppression rules
-  - automated discovery
-  - security hub
-  - lambda remediation
-  - step functions
-  - delegated admin
-  - s3 scanning
-  - sensitive data
-  - data loss prevention
-tags:
-  - aws
-  - macie
-  - security
-  - cloudops
-  - operate
-  - data-discovery
-  - pii-detection
-  - classification
-  - remediation
-  - security-hub
-  - sensitive-data
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live operations: AWS CLI v2 with macie2, s3, iam, sts, securityhub, lambda, and stepfunctions access. Works with Terraform aws_macie2_account / aws_macie2_classification_job / aws_macie2_custom_data_identifier resources and CloudFormation AWS::Macie::* templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
+  verdict_shape: READY | BLOCKED | COMPLETED
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - macie
-    - security
-    - cloudops
-    - operate
-    - data-discovery
-    - pii-detection
-    - classification
-    - remediation
-    - security-hub
-    - sensitive-data
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - enable macie
-    - macie delegated admin
-    - macie classification job
-    - macie custom data identifier
-    - macie findings
-    - macie security hub
-    - macie automated discovery
-    - macie remediation lambda
-    - macie suppression rules
-    - macie sensitive data
-    - macie s3 scanning
-  when_to_use: >-
-    Invoke when the user wants to enable Macie (standalone or org-level
-    delegated admin), create or manage classification jobs (one-time or
-    scheduled), configure managed data identifiers, create custom regex-based
-    data identifiers, manage findings (policy or sensitive-data types),
-    configure suppression rules, enable automated ML-based discovery, forward
-    findings to Security Hub, wire Lambda or Step Functions for auto-remediation
-    of exposed PII, or aggregate cross-account Macie findings. Do NOT invoke
-    for Amazon GuardDuty threat detection, AWS Config rule evaluation, or
-    Security Hub control management (use guardduty-finding-triage or
-    securityhub-finding-triage).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, macie, security, cloudops, operate, data-discovery, pii-detection, classification, remediation, security-hub, sensitive-data
+  dependencies: aws-orchestrator
+  keywords: aws, macie, data discovery, cloudops, operate, classification, pii, managed data identifiers, custom data identifiers, regex, findings, suppression rules, automated discovery, security hub, lambda remediation, step functions, delegated admin, s3 scanning, sensitive data, data loss prevention
+  when_to_use: Invoke when the user wants to enable Macie (standalone or org-level delegated admin), create or manage classification jobs (one-time or scheduled), configure managed data identifiers, create custom regex-based data identifiers, manage findings (policy or sensitive-data types), configure suppression rules, enable automated ML-based discovery, forward findings to Security Hub, wire Lambda or Step Functions for auto-remediation of exposed PII, or aggregate cross-account Macie findings. Do NOT invoke for Amazon GuardDuty threat detection, AWS Config rule evaluation, or Security Hub control management (use guardduty-finding-triage or securityhub-finding-triage).
 ---
 
 # Macie Data Discovery Operator

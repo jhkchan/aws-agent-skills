@@ -1,98 +1,27 @@
 ---
 name: kms-key-rotation-operator
-description: >-
-  Operates AWS KMS key rotation workflows end-to-end — key type
-  classification (AWS-managed, customer-managed symmetric,
-  asymmetric RSA/ECDSA, HMAC, Multi-Region primary/replica, custom key
-  store / CloudHSM), automatic annual backing-key rotation enablement
-  and verification, manual key rotation (create new CMK + re-encrypt),
-  cryptographic material lifecycle (old material retained for decrypt,
-  new encrypts transparently), and diagnostic loops (describe-key,
-  get-key-rotation-status, CloudTrail EnableKeyRotation events,
-  list-grants, key-policy diff). Runs deterministic pre-checks
-  (key Enabled, key state not PendingDeletion, symmetric
-  SYMMETRIC_DEFAULT usage, multi-Region primary not replica,
-  EnableKeyRotation permission in key policy) behind a CONFIRM gate
-  and emits a READY, BLOCKED, or COMPLETED verdict per rotation. Use
-  when enabling automatic rotation, verifying rotation ran, planning a
-  manual rotation, or diagnosing why rotation cannot be enabled.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates AWS KMS key rotation workflows end-to-end — key type classification (AWS-managed, customer-managed symmetric, asymmetric RSA/ECDSA, HMAC, Multi-Region primary/replica, custom key store / CloudHSM), automatic annual backing-key rotation enablement and verification, manual key rotation (create new CMK + re-encrypt), cryptographic material lifecycle (old material retained for decrypt, new encrypts transparently), and diagnostic loops (describe-key, get-key-rotation-status, CloudTrail EnableKeyRotation events, list-grants, key-policy diff). Runs deterministic pre-checks (key Enabled, key state not PendingDeletion, symmetric SYMMETRIC_DEFAULT usage, multi-Region primary not replica, EnableKeyRotation permission in key policy) behind a CONFIRM gate and emits a READY, BLOCKED, or COMPLETED verdict per rotation. Use when enabling automatic rotation, verifying rotation ran, planning a manual rotation, or diagnosing why rotation cannot be enabled.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline plan classification.
-  Live-account operations use aws kms describe-key, get-key-rotation-
-  status, enable-key-rotation, disable-key-rotation, list-grants,
-  get-key-policy, list-resource-tags, aws cloudtrail lookup-events
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - KMS
-  - key rotation
-  - backing key
-  - cryptographic material
-  - customer managed key
-  - CMK
-  - AWS managed key
-  - Multi-Region key
-  - replica key
-  - asymmetric key
-  - RSA_2048
-  - ECC_NIST_P256
-  - HMAC_256
-  - SYMMETRIC_DEFAULT
-  - EnableKeyRotation
-  - GetKeyRotationStatus
-  - CloudHSM custom key store
-  - key policy
-  - re-encrypt
-  - cryptographic agility
-tags: [aws, kms, security, encryption, key-management, rotation, compliance, operate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws kms describe-key, get-key-rotation- status, enable-key-rotation, disable-key-rotation, list-grants, get-key-policy, list-resource-tags, aws cloudtrail lookup-events (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Enabling automatic backing-key rotation on a customer-managed KMS
-    key, verifying a key's rotation status and last rotation date,
-    planning a manual rotation for asymmetric/HMAC keys that do not
-    support automatic rotation, diagnosing why EnableKeyRotation fails
-    (Disabled/PendingDeletion key, asymmetric usage, replica key,
-    missing key-policy permission), confirming CloudTrail
-    EnableKeyRotation events, or validating cryptographic-agility
-    posture across a fleet of CMKs.
-  activation_triggers:
-    - "enable KMS key rotation"
-    - "rotate KMS key"
-    - "verify key rotation"
-    - "GetKeyRotationStatus"
-    - "EnableKeyRotation"
-    - "automatic key rotation"
-    - "manual key rotation"
-    - "backing key"
-    - "Multi-Region key rotation"
-    - "replica key rotation"
-    - "asymmetric key rotation"
-    - "HMAC key rotation"
-    - "re-encrypt with new key"
-    - "cryptographic agility"
-    - "KMS rotation failed"
-  invocation_schema: >-
-    Input: either (a) a KMS key configuration (describe-key output)
-    plus the intended operation (enable-rotation, verify-rotation,
-    disable-rotation, plan-manual-rotation, diagnose-rotation), OR
-    (b) a key-id + operation for live-account execution. Output:
-    deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS /
-    POST_VERIFY / NOTES block per rotation, where VERDICT is one of
-    READY, BLOCKED, COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Enabling automatic backing-key rotation on a customer-managed KMS key, verifying a key's rotation status and last rotation date, planning a manual rotation for asymmetric/HMAC keys that do not support automatic rotation, diagnosing why EnableKeyRotation fails (Disabled/PendingDeletion key, asymmetric usage, replica key, missing key-policy permission), confirming CloudTrail EnableKeyRotation events, or validating cryptographic-agility posture across a fleet of CMKs.
+  activation_triggers: enable KMS key rotation, rotate KMS key, verify key rotation, GetKeyRotationStatus, EnableKeyRotation, automatic key rotation, manual key rotation, backing key, Multi-Region key rotation, replica key rotation, asymmetric key rotation, HMAC key rotation, re-encrypt with new key, cryptographic agility, KMS rotation failed
+  invocation_schema: 'Input: either (a) a KMS key configuration (describe-key output) plus the intended operation (enable-rotation, verify-rotation, disable-rotation, plan-manual-rotation, diagnose-rotation), OR (b) a key-id + operation for live-account execution. Output: deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per rotation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: KMS, key rotation, backing key, cryptographic material, customer managed key, CMK, AWS managed key, Multi-Region key, replica key, asymmetric key, RSA_2048, ECC_NIST_P256, HMAC_256, SYMMETRIC_DEFAULT, EnableKeyRotation, GetKeyRotationStatus, CloudHSM custom key store, key policy, re-encrypt, cryptographic agility
+  tags: aws, kms, security, encryption, key-management, rotation, compliance, operate
 ---
 
 # KMS Key Rotation Operator

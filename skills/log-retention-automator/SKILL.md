@@ -1,92 +1,27 @@
 ---
 name: log-retention-automator
-description: >-
-  Designs and implements CloudWatch Logs retention automation workflows.
-  Maps tag-based retention policies (Environment=prod to 90d, dev to 7d),
-  deploys EventBridge rules for auto-retention on CreateLogGroup,
-  validates retention tier mapping against the 22 allowed values
-  (1d/3d/5d/7d/14d/30d/60d/90d/120d/150d/180d/365d/400d/545d/731d/
-  1096d/1827d/2192d/2557d/2922d/3288d/3653d), manages subscription
-  filter cleanup and metric filter preservation during retention changes,
-  enforces account-level default retention, configures S3 export via
-  Kinesis Firehose for long-term archival, estimates cost per retention
-  tier, and supports multi-account rollout via AWS Organizations. Emits
-  AUTOMATION_DEPLOYED with deployment templates or REVIEW_REQUIRED with
-  the specific gap. Use when automating log retention, building tag-driven
-  retention policies, wiring CreateLogGroup EventBridge rules, or
-  replacing never-expire log groups with S3 archival.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Designs and implements CloudWatch Logs retention automation workflows. Maps tag-based retention policies (Environment=prod to 90d, dev to 7d), deploys EventBridge rules for auto-retention on CreateLogGroup, validates retention tier mapping against the 22 allowed values (1d/3d/5d/7d/14d/30d/60d/90d/120d/150d/180d/365d/400d/545d/731d/ 1096d/1827d/2192d/2557d/2922d/3288d/3653d), manages subscription filter cleanup and metric filter preservation during retention changes, enforces account-level default retention, configures S3 export via Kinesis Firehose for long-term archival, estimates cost per retention tier, and supports multi-account rollout via AWS Organizations. Emits AUTOMATION_DEPLOYED with deployment templates or REVIEW_REQUIRED with the specific gap. Use when automating log retention, building tag-driven retention policies, wiring CreateLogGroup EventBridge rules, or replacing never-expire log groups with S3 archival.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline workflow design. Live deployment
-  uses aws logs put-retention-policy, describe-log-groups, delete-retention-policy,
-  put-subscription-filter, delete-subscription-filter, describe-metric-filters,
-  aws events put-rule, put-targets, aws firehose create-delivery-stream,
-  describe-delivery-stream, and aws organizations list-accounts — AWS CLI v2,
-  SSO or key-based credentials.
-keywords:
-  - CloudWatch Logs
-  - retention policy
-  - put-retention-policy
-  - EventBridge
-  - CreateLogGroup
-  - tag-based retention
-  - log group automation
-  - Kinesis Firehose
-  - S3 archival
-  - subscription filter
-  - metric filter
-  - CloudWatch Logs Insights
-  - multi-account logging
-  - AWS Organizations
-  - retention tier
-  - cost estimation
-  - never-expire replacement
-  - compliance logging
-  - log lifecycle
-tags: [cloudwatch-logs, retention, eventbridge, firehose, s3-archival, log-management, automate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline workflow design. Live deployment uses aws logs put-retention-policy, describe-log-groups, delete-retention-policy, put-subscription-filter, delete-subscription-filter, describe-metric-filters, aws events put-rule, put-targets, aws firehose create-delivery-stream, describe-delivery-stream, and aws organizations list-accounts — AWS CLI v2, SSO or key-based credentials.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATION_DEPLOYED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Automating CloudWatch Logs retention, building tag-driven retention
-    policies, wiring EventBridge on CreateLogGroup for auto-retention,
-    replacing never-expire log groups with S3 Firehose archival, auditing
-    subscription/metric filter impact before retention changes, estimating
-    log storage cost per tier, or enforcing retention across an
-    Organizations account fleet.
-  activation_triggers:
-    - "automate log retention"
-    - "tag-based retention policy"
-    - "put-retention-policy"
-    - "CreateLogGroup EventBridge"
-    - "auto-retention new log groups"
-    - "S3 Firehose log archival"
-    - "never-expire replacement"
-    - "subscription filter cleanup"
-    - "metric filter preservation"
-    - "account-level default retention"
-    - "multi-account log retention"
-    - "retention tier cost estimation"
-  invocation_schema: >-
-    Input: either (a) a tag-to-retention mapping (e.g.,
-    Environment=prod to 90d, dev to 7d) plus target log groups, OR (b) a
-    retention automation requirement ("auto-set retention on all new log
-    groups", "archive expired logs to S3 before deletion"). Output:
-    deterministic RETENTION block per policy — POLICY/TRIGGER/ARCHIVAL/
-    VERDICT — where VERDICT is AUTOMATION_DEPLOYED (templates ready) or
-    REVIEW_REQUIRED (specific gap cited).
+  verdict_shape: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
+  when_to_use: Automating CloudWatch Logs retention, building tag-driven retention policies, wiring EventBridge on CreateLogGroup for auto-retention, replacing never-expire log groups with S3 Firehose archival, auditing subscription/metric filter impact before retention changes, estimating log storage cost per tier, or enforcing retention across an Organizations account fleet.
+  activation_triggers: automate log retention, tag-based retention policy, put-retention-policy, CreateLogGroup EventBridge, auto-retention new log groups, S3 Firehose log archival, never-expire replacement, subscription filter cleanup, metric filter preservation, account-level default retention, multi-account log retention, retention tier cost estimation
+  invocation_schema: 'Input: either (a) a tag-to-retention mapping (e.g., Environment=prod to 90d, dev to 7d) plus target log groups, OR (b) a retention automation requirement ("auto-set retention on all new log groups", "archive expired logs to S3 before deletion"). Output: deterministic RETENTION block per policy — POLICY/TRIGGER/ARCHIVAL/ VERDICT — where VERDICT is AUTOMATION_DEPLOYED (templates ready) or REVIEW_REQUIRED (specific gap cited).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudWatch Logs, retention policy, put-retention-policy, EventBridge, CreateLogGroup, tag-based retention, log group automation, Kinesis Firehose, S3 archival, subscription filter, metric filter, CloudWatch Logs Insights, multi-account logging, AWS Organizations, retention tier, cost estimation, never-expire replacement, compliance logging, log lifecycle
+  tags: cloudwatch-logs, retention, eventbridge, firehose, s3-archival, log-management, automate
 ---
 
 # Log Retention Automator

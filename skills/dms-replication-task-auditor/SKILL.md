@@ -1,72 +1,24 @@
 ---
 name: dms-replication-task-auditor
-description: >-
-  Audits AWS DMS replication tasks for SSL/TLS gaps on source and target
-  endpoints, missing CDC and task logging, replication instance exposure
-  (public accessibility, single-AZ, missing KMS), endpoint encryption
-  configuration, and task settings integrity (validation, recovery
-  checkpointing, deletion protection). Emits a deterministic verdict
-  (NO_TLS | NO_LOGGING | CONFIG_GAP | OK) per task with enumerated findings
-  and specific CLI remediation. Use when reviewing DMS replication tasks,
-  checking migration endpoint SSL/TLS, validating CDC logging posture,
-  auditing replication instance configuration, or hardening database
-  migration security before production cutover.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS DMS replication tasks for SSL/TLS gaps on source and target endpoints, missing CDC and task logging, replication instance exposure (public accessibility, single-AZ, missing KMS), endpoint encryption configuration, and task settings integrity (validation, recovery checkpointing, deletion protection). Emits a deterministic verdict (NO_TLS | NO_LOGGING | CONFIG_GAP | OK) per task with enumerated findings and specific CLI remediation. Use when reviewing DMS replication tasks, checking migration endpoint SSL/TLS, validating CDC logging posture, auditing replication instance configuration, or hardening database migration security before production cutover.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline task/endpoint config
-  classification. Live-account audits use aws dms describe-replication-tasks,
-  describe-endpoints, and describe-replication-instances (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - DMS
-  - Database Migration Service
-  - replication task
-  - SSL/TLS
-  - CDC
-  - change data capture
-  - replication instance
-  - endpoint encryption
-  - task settings
-  - CloudWatch logging
-  - SslMode
-  - verify-full
-  - PubliclyAccessible
-  - migration security
-  - data-in-transit
-  - deletion protection
-  - task validation
-tags: [dms, migration, security, ssl-tls, cdc, replication, endpoint, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline task/endpoint config classification. Live-account audits use aws dms describe-replication-tasks, describe-endpoints, and describe-replication-instances (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Migration
-  verdict_shape: "NO_TLS | NO_LOGGING | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a DMS replication task before production cutover, checking
-    endpoint SSL/TLS configuration, validating CDC or task logging posture,
-    auditing replication instance exposure, verifying endpoint encryption,
-    or hardening database migration security.
-  activation_triggers:
-    - "audit this DMS replication task"
-    - "check DMS endpoint SSL"
-    - "is my DMS task encrypted"
-    - "DMS CDC logging"
-    - "replication instance public"
-    - "hardening DMS migration"
-    - "DMS task settings"
-  invocation_schema: >-
-    Input: either (a) a DMS replication task configuration (task settings +
-    endpoint configs + replication instance metadata), OR (b) a task ARN for
-    live-account audit. Output: deterministic TASK/VERDICT/REASON/FINDINGS/
-    REMEDIATION block per task, where VERDICT in {NO_TLS, NO_LOGGING,
-    CONFIG_GAP, OK, ERROR}.
+  verdict_shape: NO_TLS | NO_LOGGING | CONFIG_GAP | OK
+  when_to_use: Reviewing a DMS replication task before production cutover, checking endpoint SSL/TLS configuration, validating CDC or task logging posture, auditing replication instance exposure, verifying endpoint encryption, or hardening database migration security.
+  activation_triggers: audit this DMS replication task, check DMS endpoint SSL, is my DMS task encrypted, DMS CDC logging, replication instance public, hardening DMS migration, DMS task settings
+  invocation_schema: 'Input: either (a) a DMS replication task configuration (task settings + endpoint configs + replication instance metadata), OR (b) a task ARN for live-account audit. Output: deterministic TASK/VERDICT/REASON/FINDINGS/ REMEDIATION block per task, where VERDICT in {NO_TLS, NO_LOGGING, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: DMS, Database Migration Service, replication task, SSL/TLS, CDC, change data capture, replication instance, endpoint encryption, task settings, CloudWatch logging, SslMode, verify-full, PubliclyAccessible, migration security, data-in-transit, deletion protection, task validation
+  tags: dms, migration, security, ssl-tls, cdc, replication, endpoint, audit
 ---
 
 # DMS Replication Task Auditor

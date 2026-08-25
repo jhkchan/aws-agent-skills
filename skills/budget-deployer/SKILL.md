@@ -1,119 +1,26 @@
 ---
 name: budget-deployer
-description: >-
-  Provisions AWS Budgets and Cost Anomaly Detection with production
-  defaults: cost budgets (fixed/threshold, actual vs forecast alerts),
-  usage budgets (RI/SP utilization, RI/SP coverage), cost anomaly
-  detection (service monitors, subscriptions), budget actions
-  (apply/remove IAM policy, stop EC2/RDS, SNS), threshold tiering
-  (80/90/100%), cost filters (service, linked account, tag, region).
-  Emits READY_TO_DEPLOY | PREREQUISITES_MISSING. Use when creating a
-  budget, configuring budget actions, hardening spend guardrails on a
-  new account, setting RI/SP utilization targets, or wiring cost
-  anomaly subscriptions.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Budgets and Cost Anomaly Detection with production defaults: cost budgets (fixed/threshold, actual vs forecast alerts), usage budgets (RI/SP utilization, RI/SP coverage), cost anomaly detection (service monitors, subscriptions), budget actions (apply/remove IAM policy, stop EC2/RDS, SNS), threshold tiering (80/90/100%), cost filters (service, linked account, tag, region). Emits READY_TO_DEPLOY | PREREQUISITES_MISSING. Use when creating a budget, configuring budget actions, hardening spend guardrails on a new account, setting RI/SP utilization targets, or wiring cost anomaly subscriptions.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). For live deployment: AWS CLI v2 with budgets, ce, sns, iam,
-  sts, and ec2 access. Works with Terraform aws_budgets_budget,
-  aws_ce_anomaly_monitor, and aws_sns_topic resources and
-  CloudFormation AWS::Budgets::Budget templates.
-keywords:
-  - aws
-  - budgets
-  - cloudops
-  - deploy
-  - provisioning
-  - cost budget
-  - usage budget
-  - ri utilization
-  - ri coverage
-  - savings plan
-  - savings plan utilization
-  - savings plan coverage
-  - cost anomaly detection
-  - budget actions
-  - iam policy apply
-  - ec2 stop
-  - sns notification
-  - forecast
-  - actual
-  - threshold
-  - cost filters
-  - linked account
-  - consolidated billing
-tags:
-  - aws
-  - budgets
-  - cloudops
-  - deploy
-  - finops
-  - provisioning
-  - cost-budget
-  - usage-budget
-  - ri-utilization
-  - savings-plan
-  - anomaly-detection
-  - budget-actions
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with budgets, ce, sns, iam, sts, and ec2 access. Works with Terraform aws_budgets_budget, aws_ce_anomaly_monitor, and aws_sns_topic resources and CloudFormation AWS::Budgets::Budget templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: FinOps
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - budgets
-    - cloudops
-    - deploy
-    - finops
-    - provisioning
-    - cost-budget
-    - usage-budget
-    - ri-utilization
-    - savings-plan
-    - anomaly-detection
-    - budget-actions
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create aws budget
-    - provision budget
-    - cost budget
-    - usage budget
-    - ri utilization budget
-    - savings plan utilization
-    - savings plan coverage
-    - cost anomaly detection
-    - budget actions
-    - budget alert
-    - sns notification
-    - threshold
-    - forecast
-    - cost filters
-    - linked account filter
-  when_to_use: >-
-    Invoke when the user wants to create an AWS Budget (cost, usage, RI
-    utilization, RI coverage, Savings Plan utilization, Savings Plan
-    coverage), configure Budget Actions (apply/remove IAM policy, stop EC2,
-    SNS), enable Cost Anomaly Detection with subscriptions and monitors,
-    wire SNS notifications for budget alerts, scope a budget to a linked
-    account / service / tag / region, or generate provisioning CLI commands
-    / IaC templates for spend guardrails. Do NOT invoke for auditing
-    existing budgets posture (use budgets-auditor), or for Cost Explorer
-    forecast analysis without a deployment intent.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, budgets, cloudops, deploy, finops, provisioning, cost-budget, usage-budget, ri-utilization, savings-plan, anomaly-detection, budget-actions
+  dependencies: aws-orchestrator
+  keywords: aws, budgets, cloudops, deploy, provisioning, cost budget, usage budget, ri utilization, ri coverage, savings plan, savings plan utilization, savings plan coverage, cost anomaly detection, budget actions, iam policy apply, ec2 stop, sns notification, forecast, actual, threshold, cost filters, linked account, consolidated billing
+  when_to_use: Invoke when the user wants to create an AWS Budget (cost, usage, RI utilization, RI coverage, Savings Plan utilization, Savings Plan coverage), configure Budget Actions (apply/remove IAM policy, stop EC2, SNS), enable Cost Anomaly Detection with subscriptions and monitors, wire SNS notifications for budget alerts, scope a budget to a linked account / service / tag / region, or generate provisioning CLI commands / IaC templates for spend guardrails. Do NOT invoke for auditing existing budgets posture (use budgets-auditor), or for Cost Explorer forecast analysis without a deployment intent.
 ---
 
 # AWS Budget Deployer

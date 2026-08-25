@@ -1,123 +1,26 @@
 ---
 name: dynamodb-table-deployer
-description: >-
-  Provisions DynamoDB tables with production-grade defaults: partition key design
-  (random suffix, composite keys), sort key design (range queries, hierarchical
-  data), GSI design (sparse indexes, ALL/KEYS_ONLY/INCLUDE projection), on-demand
-  vs provisioned capacity choice, PITR enabled by default, SSE-KMS with
-  customer-managed CMK for compliance, TTL configuration, DynamoDB Streams
-  (NEW_AND_OLD_IMAGES for CDC), table class (Standard vs Standard-IA), deletion
-  protection, and resource-based policies. Emits a READY_TO_DEPLOY checklist with
-  verification commands. Use when creating a new DynamoDB table, hardening an
-  existing table for production, validating schema/key design before go-live,
-  designing GSIs for alternate access patterns, or generating a Terraform /
-  CloudFormation skeleton. Triggers: create DynamoDB table, provision DynamoDB,
-  partition key design, GSI design, DynamoDB Streams, TTL configuration, global
-  tables, Aurora zero-ETL, OpenSearch zero-ETL.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions DynamoDB tables with production-grade defaults: partition key design (random suffix, composite keys), sort key design (range queries, hierarchical data), GSI design (sparse indexes, ALL/KEYS_ONLY/INCLUDE projection), on-demand vs provisioned capacity choice, PITR enabled by default, SSE-KMS with customer-managed CMK for compliance, TTL configuration, DynamoDB Streams (NEW_AND_OLD_IMAGES for CDC), table class (Standard vs Standard-IA), deletion protection, and resource-based policies. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a new DynamoDB table, hardening an existing table for production, validating schema/key design before go-live, designing GSIs for alternate access patterns, or generating a Terraform / CloudFormation skeleton. Triggers: create DynamoDB table, provision DynamoDB, partition key design, GSI design, DynamoDB Streams, TTL configuration, global tables, Aurora zero-ETL, OpenSearch zero-ETL.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). For live deployment: AWS CLI v2 with dynamodb, application-
-  autoscaling, kms, and iam access. Works with Terraform aws_dynamodb_table
-  resources and CloudFormation AWS::DynamoDB::Table templates.
-keywords:
-  - aws
-  - dynamodb
-  - cloudops
-  - deploy
-  - provisioning
-  - partition key
-  - sort key
-  - gsi
-  - global secondary index
-  - lsi
-  - on-demand
-  - provisioned
-  - pay per request
-  - autoscaling
-  - pitr
-  - point-in-time recovery
-  - sse-kms
-  - ttl
-  - time to live
-  - dynamodb streams
-  - cdc
-  - table class
-  - standard-ia
-  - deletion protection
-  - global tables
-  - zero-etl
-  - aurora zero-etl
-  - opensearch zero-etl
-tags:
-  - aws
-  - dynamodb
-  - cloudops
-  - deploy
-  - databases
-  - provisioning
-  - partition-key
-  - gsi
-  - pitr
-  - sse-kms
-  - ttl
-  - streams
-  - deletion-protection
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with dynamodb, application- autoscaling, kms, and iam access. Works with Terraform aws_dynamodb_table resources and CloudFormation AWS::DynamoDB::Table templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: deploy
   skill_class: capability
   lifecycle_status: experimental
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - dynamodb
-    - cloudops
-    - deploy
-    - databases
-    - provisioning
-    - partition-key
-    - gsi
-    - pitr
-    - sse-kms
-    - ttl
-    - streams
-    - deletion-protection
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create dynamodb table
-    - provision dynamodb
-    - partition key design
-    - sort key design
-    - gsi design
-    - dynamodb streams
-    - dynamodb ttl
-    - global tables
-    - aurora zero-etl
-    - opensearch zero-etl
-    - deletion protection
-    - point-in-time recovery
-  when_to_use: >-
-    Invoke when the user wants to create a new DynamoDB table with production
-    defaults, design a partition/sort key scheme, plan GSI access patterns,
-    harden an existing table before production, validate key/schema design
-    before go-live, plan CDC pipelines via DynamoDB Streams, set up global
-    tables, or generate provisioning CLI commands / IaC templates. Do NOT
-    invoke for auditing existing table posture (use dynamodb-table-auditor),
-    or for non-DynamoDB NoSQL (DocumentDB, ElastiCache, Neptune, Timestream).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, dynamodb, cloudops, deploy, databases, provisioning, partition-key, gsi, pitr, sse-kms, ttl, streams, deletion-protection
+  dependencies: aws-orchestrator
+  keywords: aws, dynamodb, cloudops, deploy, provisioning, partition key, sort key, gsi, global secondary index, lsi, on-demand, provisioned, pay per request, autoscaling, pitr, point-in-time recovery, sse-kms, ttl, time to live, dynamodb streams, cdc, table class, standard-ia, deletion protection, global tables, zero-etl, aurora zero-etl, opensearch zero-etl
+  when_to_use: Invoke when the user wants to create a new DynamoDB table with production defaults, design a partition/sort key scheme, plan GSI access patterns, harden an existing table before production, validate key/schema design before go-live, plan CDC pipelines via DynamoDB Streams, set up global tables, or generate provisioning CLI commands / IaC templates. Do NOT invoke for auditing existing table posture (use dynamodb-table-auditor), or for non-DynamoDB NoSQL (DocumentDB, ElastiCache, Neptune, Timestream).
 ---
 
 # DynamoDB Table Deployer

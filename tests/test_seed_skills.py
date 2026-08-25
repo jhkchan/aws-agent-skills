@@ -37,7 +37,7 @@ def test_skill_has_skill_md_with_frontmatter(skill_name: str) -> None:
     frontmatter = _parse_frontmatter(skill_md.read_text())
     assert frontmatter.get("name") == skill_name
     assert "description" in frontmatter
-    assert "version" in frontmatter
+    assert frontmatter.get("metadata", {}).get("version") or "version" in frontmatter
 
 
 @pytest.mark.parametrize("skill_name", SEED_SKILLS)

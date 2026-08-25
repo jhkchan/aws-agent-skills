@@ -1,83 +1,24 @@
 ---
 name: ssm-managed-instance-auditor
-description: >-
-  Audits AWS Systems Manager (SSM) managed instances across six dimensions —
-  instance coverage (SSM Agent reachable + IAM profile attached), association
-  compliance, patch baseline adherence, Session Manager vs SSH exposure,
-  inventory collection, and Run Command posture — then emits a deterministic
-  verdict (UNMANAGED | NONCOMPLIANT | NO_SESSION_MANAGER | CONFIG_GAP | OK)
-  per instance with enumerated findings and CLI remediation. Use when
-  reviewing SSM fleet health, checking why an instance is "ConnectionLost"
-  or "Inactive", validating patch compliance, verifying Session Manager
-  coverage (versus open SSH), confirming inventory collection, or
-  hardening operational posture before a compliance gate.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Systems Manager (SSM) managed instances across six dimensions — instance coverage (SSM Agent reachable + IAM profile attached), association compliance, patch baseline adherence, Session Manager vs SSH exposure, inventory collection, and Run Command posture — then emits a deterministic verdict (UNMANAGED | NONCOMPLIANT | NO_SESSION_MANAGER | CONFIG_GAP | OK) per instance with enumerated findings and CLI remediation. Use when reviewing SSM fleet health, checking why an instance is "ConnectionLost" or "Inactive", validating patch compliance, verifying Session Manager coverage (versus open SSH), confirming inventory collection, or hardening operational posture before a compliance gate.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline instance-config classification.
-  Live-account audits use aws ssm describe-instance-information,
-  describe-instance-associations-status, describe-patch-states,
-  describe-sessions, get-inventory, and aws ec2 describe-instances /
-  describe-security-groups (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Systems Manager
-  - SSM
-  - SSM Agent
-  - managed instance
-  - Session Manager
-  - patch baseline
-  - association compliance
-  - inventory collection
-  - Run Command
-  - hybrid activation
-  - mi- instance
-  - AmazonSSMManagedInstanceCore
-  - PingStatus
-  - ConnectionLost
-  - NON_COMPLIANT
-  - AWS-ApplyPatchBaseline
-  - AWS-GatherSoftwareInventory
-  - AWS-UpdateSSMAgent
-  - Patch Group
-  - EC2 IAM profile
-  - ssmmessages VPC endpoint
-  - fleet visibility
-  - operational posture
-tags: [ssm, systems-manager, management, patch-compliance, session-manager, inventory, managed-instance, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline instance-config classification. Live-account audits use aws ssm describe-instance-information, describe-instance-associations-status, describe-patch-states, describe-sessions, get-inventory, and aws ec2 describe-instances / describe-security-groups (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
-  verdict_shape: "UNMANAGED | NONCOMPLIANT | NO_SESSION_MANAGER | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing SSM managed-instance fleet health, diagnosing why an instance
-    stopped pinging (ConnectionLost / Inactive), validating patch baseline
-    compliance, confirming Session Manager coverage (no SSH exposure),
-    checking inventory collection, or hardening operational posture before
-    a compliance gate (CIS, PCI-DSS, SOC 2).
-  activation_triggers:
-    - "audit my SSM managed instances"
-    - "why is this instance ConnectionLost"
-    - "is Session Manager enabled"
-    - "patch compliance status"
-    - "is the SSM agent running"
-    - "SSM NON_COMPLIANT count"
-    - "is inventory collection enabled"
-    - "AWS-ApplyPatchbaseline failed"
-    - "open SSH instead of Session Manager"
-    - "audit hybrid activation instances"
-  invocation_schema: >-
-    Input: either (a) an SSM instance-info document (describe-instance-information
-    output) paired with association, patch, session, and inventory snapshots,
-    OR (b) an instance-id for live-account audit. Output: deterministic
-    INSTANCE/VERDICT/REASON/FINDINGS/REMEDIATION block per instance, where
-    VERDICT ∈ {UNMANAGED, NONCOMPLIANT, NO_SESSION_MANAGER, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: UNMANAGED | NONCOMPLIANT | NO_SESSION_MANAGER | CONFIG_GAP | OK
+  when_to_use: Reviewing SSM managed-instance fleet health, diagnosing why an instance stopped pinging (ConnectionLost / Inactive), validating patch baseline compliance, confirming Session Manager coverage (no SSH exposure), checking inventory collection, or hardening operational posture before a compliance gate (CIS, PCI-DSS, SOC 2).
+  activation_triggers: audit my SSM managed instances, why is this instance ConnectionLost, is Session Manager enabled, patch compliance status, is the SSM agent running, SSM NON_COMPLIANT count, is inventory collection enabled, AWS-ApplyPatchbaseline failed, open SSH instead of Session Manager, audit hybrid activation instances
+  invocation_schema: 'Input: either (a) an SSM instance-info document (describe-instance-information output) paired with association, patch, session, and inventory snapshots, OR (b) an instance-id for live-account audit. Output: deterministic INSTANCE/VERDICT/REASON/FINDINGS/REMEDIATION block per instance, where VERDICT ∈ {UNMANAGED, NONCOMPLIANT, NO_SESSION_MANAGER, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Systems Manager, SSM, SSM Agent, managed instance, Session Manager, patch baseline, association compliance, inventory collection, Run Command, hybrid activation, mi- instance, AmazonSSMManagedInstanceCore, PingStatus, ConnectionLost, NON_COMPLIANT, AWS-ApplyPatchBaseline, AWS-GatherSoftwareInventory, AWS-UpdateSSMAgent, Patch Group, EC2 IAM profile, ssmmessages VPC endpoint, fleet visibility, operational posture
+  tags: ssm, systems-manager, management, patch-compliance, session-manager, inventory, managed-instance, audit
 ---
 
 # SSM Managed Instance Auditor

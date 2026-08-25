@@ -1,76 +1,24 @@
 ---
 name: ecs-task-definition-auditor
-description: >-
-  Audits ECS task definitions for privileged containers, plaintext secrets in
-  environment variables (instead of Secrets Manager / SSM), host network mode,
-  root-user execution, and missing resource limits (CPU / memory / logging).
-  Emits a deterministic verdict (PRIVILEGED | SECRET_LEAK | INSECURE |
-  CONFIG_GAP | OK) per task definition with enumerated findings and specific
-  remediation. Use when reviewing ECS task definitions, checking container
-  privilege escalation exposure, validating secret-handling posture, hardening
-  Fargate or EC2 launch-type tasks before production deployment, or auditing
-  ECS security controls.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits ECS task definitions for privileged containers, plaintext secrets in environment variables (instead of Secrets Manager / SSM), host network mode, root-user execution, and missing resource limits (CPU / memory / logging). Emits a deterministic verdict (PRIVILEGED | SECRET_LEAK | INSECURE | CONFIG_GAP | OK) per task definition with enumerated findings and specific remediation. Use when reviewing ECS task definitions, checking container privilege escalation exposure, validating secret-handling posture, hardening Fargate or EC2 launch-type tasks before production deployment, or auditing ECS security controls.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline task-definition classification.
-  Live-account audits use aws ecs describe-task-definition, aws ecs
-  list-task-definitions, and aws ecs list-containers (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - ECS
-  - task definition
-  - Fargate
-  - EC2 launch type
-  - privileged container
-  - secret leak
-  - environment variables
-  - Secrets Manager
-  - SSM Parameter Store
-  - host network mode
-  - awsvpc
-  - root user
-  - non-root container
-  - resource limits
-  - CPU limit
-  - memory limit
-  - readonlyRootFilesystem
-  - linux capabilities
-  - container security
-  - defense in depth
-tags: [ecs, compute, security, task-definition, fargate, privileged, secrets, container-hardening, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline task-definition classification. Live-account audits use aws ecs describe-task-definition, aws ecs list-task-definitions, and aws ecs list-containers (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
-  verdict_shape: "PRIVILEGED | SECRET_LEAK | INSECURE | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing an ECS task definition before production deployment, checking for
-    privileged containers, auditing secret-handling posture, validating that
-    containers run as non-root, hardening network isolation, verifying resource
-    limits are set, or auditing ECS container security controls across an
-    account.
-  activation_triggers:
-    - "audit this ECS task definition"
-    - "is my ECS container privileged"
-    - "check ECS task for secrets in env vars"
-    - "ECS task host network mode"
-    - "is my container running as root"
-    - "ECS resource limits missing"
-    - "harden my Fargate task"
-    - "ECS security audit"
-  invocation_schema: >-
-    Input: either (a) an ECS task definition JSON document (the
-    containerDefinitions + networkMode + launch-type metadata), OR (b) a
-    task-definition family/ARN for live-account audit. Output: deterministic
-    TASK/VERDICT/REASON/FINDINGS/REMEDIATION block per task definition, where
-    VERDICT ∈ {PRIVILEGED, SECRET_LEAK, INSECURE, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: PRIVILEGED | SECRET_LEAK | INSECURE | CONFIG_GAP | OK
+  when_to_use: Reviewing an ECS task definition before production deployment, checking for privileged containers, auditing secret-handling posture, validating that containers run as non-root, hardening network isolation, verifying resource limits are set, or auditing ECS container security controls across an account.
+  activation_triggers: audit this ECS task definition, is my ECS container privileged, check ECS task for secrets in env vars, ECS task host network mode, is my container running as root, ECS resource limits missing, harden my Fargate task, ECS security audit
+  invocation_schema: 'Input: either (a) an ECS task definition JSON document (the containerDefinitions + networkMode + launch-type metadata), OR (b) a task-definition family/ARN for live-account audit. Output: deterministic TASK/VERDICT/REASON/FINDINGS/REMEDIATION block per task definition, where VERDICT ∈ {PRIVILEGED, SECRET_LEAK, INSECURE, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: ECS, task definition, Fargate, EC2 launch type, privileged container, secret leak, environment variables, Secrets Manager, SSM Parameter Store, host network mode, awsvpc, root user, non-root container, resource limits, CPU limit, memory limit, readonlyRootFilesystem, linux capabilities, container security, defense in depth
+  tags: ecs, compute, security, task-definition, fargate, privileged, secrets, container-hardening, audit
 ---
 
 # ECS Task Definition Auditor

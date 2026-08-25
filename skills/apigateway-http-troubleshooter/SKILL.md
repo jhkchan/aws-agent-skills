@@ -1,110 +1,53 @@
 ---
 name: apigateway-http-troubleshooter
-description: >-
-  Diagnoses Amazon API Gateway HTTP API failures through a ten-category
-  diagnostic tree: 4xx routing errors ($default route, catch-all route
-  priority, ANY vs explicit method), 5xx integration failures (Lambda
-  proxy 502, private integration 502, timeout at 29s hard cap), JWT
-  authorizer failures (issuer, audience, claim mapping, scope), CORS
-  preflight errors (Access-Control-Allow-Origin, OPTIONS method,
-  AllowHeaders), payload format version mismatches (1.0 vs 2.0 event
-  body base64 decode, isBase64Encoded, requestContext shape), stage
-  deployment issues (changes not live without deployment, auto-deploy
-  vs manual), throttling and burst limits (rate, burst, per-route),
-  access logging vs execution logging confusion, VPC link integration
-  problems (NLB target health, private integration connectivity), and
-  integration parameter mapping errors. Walks symptoms to a verified
-  root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED
-  or INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses Amazon API Gateway HTTP API failures through a ten-category diagnostic tree: 4xx routing errors ($default route, catch-all route priority, ANY vs explicit method), 5xx integration failures (Lambda proxy 502, private integration 502, timeout at 29s hard cap), JWT authorizer failures (issuer, audience, claim mapping, scope), CORS preflight errors (Access-Control-Allow-Origin, OPTIONS method, AllowHeaders), payload format version mismatches (1.0 vs 2.0 event body base64 decode, isBase64Encoded, requestContext shape), stage deployment issues (changes not live without deployment, auto-deploy vs manual), throttling and burst limits (rate, burst, per-route), access logging vs execution logging confusion, VPC link integration problems (NLB target health, private integration connectivity), and integration parameter mapping errors. Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error responses and API configuration. Live-account
-  diagnosis uses aws apigatewayv2 get-api, get-route, get-integration, get-stage, get-authorizer, export-api, aws apigateway get-rest-api / get-resources / get-stage / get-method (for REST APIs), aws logs
-  filter-log-events, aws elbv2 describe-target-health, and aws cloudwatch get-metric-statistics (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- API Gateway
-- HTTP API
-- REST API
-- 4xx
-- 5xx
-- routing
-- $default route
-- catch-all
-- JWT authorizer
-- CORS
-- preflight
-- payload format version
-- isBase64Encoded
-- Lambda proxy
-- 502 Bad Gateway
-- integration timeout
-- VPC link
-- NLB
-- private integration
-- stage deployment
-- auto-deploy
-- throttling
-- burst limit
-- access logging
-- execution logging
-tags:
-- apigateway
-- networking
-- app-integration
-- troubleshooting
-- http-api
-- jwt
-- cors
-- vpclink
-- throttling
-- routing
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error responses and API configuration. Live-account diagnosis uses aws apigatewayv2 get-api, get-route, get-integration, get-stage, get-authorizer, export-api, aws apigateway get-rest-api / get-resources / get-stage / get-method (for REST APIs), aws logs filter-log-events, aws elbv2 describe-target-health, and aws cloudwatch get-metric-statistics (AWS CLI v2, SSO...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
-  when_to_use: Diagnosing an API Gateway HTTP API failure (4xx routing error, 5xx integration failure, JWT authorizer denial, CORS preflight rejection, payload format version mismatch, Lambda proxy 502,
-    integration timeout, VPC link connectivity, stage deployment not live, throttling), walking a symptom to the failed layer with verify and fix commands, validating why a client request returns an error,
-    or triaging a "the API is broken" page where the root cause may be route config, authorizer, CORS, integration mapping, stage, or network.
-  when_not_to_use: Application-level debugging of the Lambda handler (use lambda-invocation-troubleshooter), CloudFront distribution or edge issues (use CloudFront logs), AppSync GraphQL resolver debugging
-    (use AppSync resolver logs), or WAF rule tuning (use waf-rule-auditor). This skill diagnoses API-Gateway-layer failures; it does not debug the backend handler code or audit IAM posture of API callers.
-  activation_triggers:
-  - API Gateway 4xx
-  - API Gateway 5xx
-  - API Gateway 502 Bad Gateway
-  - API Gateway routing error
-  - $default route
-  - API Gateway catch-all route
-  - JWT authorizer denied
-  - API Gateway CORS error
-  - Access-Control-Allow-Origin missing
-  - payload format version mismatch
-  - isBase64Encoded Lambda
-  - API Gateway Lambda proxy 502
-  - API Gateway integration timeout
-  - VPC link integration 502
-  - API Gateway stage deployment
-  - API Gateway auto-deploy
-  - API Gateway throttling 429
-  - API Gateway burst limit exceeded
-  - access logging vs execution logging
-  - troubleshoot API Gateway HTTP API
-  invocation_schema: 'Input: either (a) a symptom description (HTTP status code, error response body, client-side error, "API returns 403", "POST returns 502") optionally paired with the API configuration
-    (get-api/get-rest-api output, route list, integration config, stage config, authorizer config), OR (b) an API identifier (api-id) plus request context (method, path, headers, caller identity) for live-account
-    diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {ROUTE_MATCHING, ROUTE_PRIORITY_CATCHALL,
-    JWT_AUTHORIZER, CORS_MISCONFIG, PAYLOAD_FORMAT_VERSION, INTEGRATION_LAMBDA_PROXY, INTEGRATION_TIMEOUT, STAGE_DEPLOYMENT, THROTTLING_BURST, VPCLINK_CONNECTIVITY, LOGGING_MISCONFIG, PARAMETER_MAPPING,
-    UNKNOWN}.'
-  invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"HTTP API abc1234 returns 502 Bad Gateway on POST /orders\nonly when the request body exceeds 1 KB; GET requests
-    to the\nsame route succeed.\"\nApiId: abc1234\nProtocolType: HTTP\nIntegrationType: AWS_PROXY\nIntegrationSubtype: Lambda\nPayloadFormatVersion: \"2.0\"\nRouteKey: POST /orders\nStage: $default\nAutoDeploy:
-    true\nLastError: \"Internal Server Error\""
+  when_to_use: Diagnosing an API Gateway HTTP API failure (4xx routing error, 5xx integration failure, JWT authorizer denial, CORS preflight rejection, payload format version mismatch, Lambda proxy 502, integration timeout, VPC link connectivity, stage deployment not live, throttling), walking a symptom to the failed layer with verify and fix commands, validating why a client request returns an error, or triaging a "the API is broken" page where the root cause may be route config, authorizer, CORS, integration mapping, stage, or network.
+  when_not_to_use: Application-level debugging of the Lambda handler (use lambda-invocation-troubleshooter), CloudFront distribution or edge issues (use CloudFront logs), AppSync GraphQL resolver debugging (use AppSync resolver logs), or WAF rule tuning (use waf-rule-auditor). This skill diagnoses API-Gateway-layer failures; it does not debug the backend handler code or audit IAM posture of API callers.
+  activation_triggers: API Gateway 4xx, API Gateway 5xx, API Gateway 502 Bad Gateway, API Gateway routing error, $default route, API Gateway catch-all route, JWT authorizer denied, API Gateway CORS error, Access-Control-Allow-Origin missing, payload format version mismatch, isBase64Encoded Lambda, API Gateway Lambda proxy 502, API Gateway integration timeout, VPC link integration 502, API Gateway stage deployment, API Gateway auto-deploy, API Gateway throttling 429, API Gateway burst limit exceeded, access logging vs execution logging, troubleshoot API Gateway HTTP API
+  invocation_schema: 'Input: either (a) a symptom description (HTTP status code, error response body, client-side error, "API returns 403", "POST returns 502") optionally paired with the API configuration (get-api/get-rest-api output, route list, integration config, stage config, authorizer config), OR (b) an API identifier (api-id) plus request context (method, path, headers, caller identity) for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {ROUTE_MATCHING, ROUTE_PRIORITY_CATCHALL, JWT_AUTHORIZER, CORS_MISCONFIG, PAYLOAD_FORMAT_VERSION, INTEGRATION_LAMBDA_PROXY, INTEGRATION_TIMEOUT, STAGE_DEPLOYMENT, THROTTLING_BURST, VPCLINK_CONNECTIVITY, LOGGING_MISCONFIG, PARAMETER_MAPPING, UNKNOWN}.'
+  invocation_example: '# Minimal valid input (offline symptom classification):
+
+    Symptom: "HTTP API abc1234 returns 502 Bad Gateway on POST /orders
+
+    only when the request body exceeds 1 KB; GET requests to the
+
+    same route succeed."
+
+    ApiId: abc1234
+
+    ProtocolType: HTTP
+
+    IntegrationType: AWS_PROXY
+
+    IntegrationSubtype: Lambda
+
+    PayloadFormatVersion: "2.0"
+
+    RouteKey: POST /orders
+
+    Stage: $default
+
+    AutoDeploy: true
+
+    LastError: "Internal Server Error"'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: API Gateway, HTTP API, REST API, 4xx, 5xx, routing, $default route, catch-all, JWT authorizer, CORS, preflight, payload format version, isBase64Encoded, Lambda proxy, 502 Bad Gateway, integration timeout, VPC link, NLB, private integration, stage deployment, auto-deploy, throttling, burst limit, access logging, execution logging
+  tags: apigateway, networking, app-integration, troubleshooting, http-api, jwt, cors, vpclink, throttling, routing
 ---
 
 # API Gateway HTTP API Troubleshooter

@@ -1,108 +1,26 @@
 ---
 name: client-vpn-endpoint-deployer
-description: >-
-  Provisions AWS Client VPN endpoints with production defaults:
-  mutual TLS certificate auth via ACM, Active Directory and SAML
-  federation, authorization rules (network CIDR + group access,
-  first-match ordering), route table target subnet associations, DNS
-  custom servers, connection logging to CloudWatch, split-tunnel vs
-  full-tunnel, transport protocol (UDP/TCP), port selection, security
-  group for target resources, self-service portal, session duration,
-  and CloudWatch metrics (ActiveConnections, AuthenticationFailures).
-  Emits a READY_TO_DEPLOY checklist with verification commands. Use
-  when creating a Client VPN endpoint, configuring authorization
-  rules, setting up mutual TLS, enabling SAML federation, or
-  associating subnets. Triggers: create client vpn endpoint, client
-  vpn authorization rule, client vpn mutual tls, client vpn saml,
-  client vpn split tunnel, client vpn dns, client vpn connection
-  logging, client vpn self-service portal.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Client VPN endpoints with production defaults: mutual TLS certificate auth via ACM, Active Directory and SAML federation, authorization rules (network CIDR + group access, first-match ordering), route table target subnet associations, DNS custom servers, connection logging to CloudWatch, split-tunnel vs full-tunnel, transport protocol (UDP/TCP), port selection, security group for target resources, self-service portal, session duration, and CloudWatch metrics (ActiveConnections, AuthenticationFailures). Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Client VPN endpoint, configuring authorization rules, setting up mutual TLS, enabling SAML federation, or associating subnets. Triggers: create client vpn endpoint, client vpn authorization rule, client vpn mutual tls, client vpn saml, client vpn split tunnel, client vpn dns, client vpn connection logging, client vpn self-service portal.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with ec2, acm, and
-  cloudwatch access. Works with Terraform aws_ec2_client_vpn_endpoint
-  / aws_ec2_client_vpn_network_association /
-  aws_ec2_client_vpn_authorization_rule resources and CloudFormation
-  AWS::EC2::ClientVpnEndpoint templates.
-keywords:
-  - aws
-  - client vpn
-  - vpn endpoint
-  - cloudops
-  - deploy
-  - provisioning
-  - mutual tls
-  - acm
-  - saml
-  - active directory
-  - authorization rule
-  - split tunnel
-  - full tunnel
-  - connection logging
-  - self-service portal
-tags:
-  - aws
-  - client-vpn
-  - vpn-endpoint
-  - cloudops
-  - deploy
-  - networking
-  - provisioning
-  - mutual-tls
-  - saml
-  - authorization-rules
-  - split-tunnel
-  - connection-logging
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with ec2, acm, and cloudwatch access. Works with Terraform aws_ec2_client_vpn_endpoint / aws_ec2_client_vpn_network_association / aws_ec2_client_vpn_authorization_rule resources and CloudFormation AWS::EC2::ClientVpnEndpoint templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - client-vpn
-    - vpn-endpoint
-    - cloudops
-    - deploy
-    - networking
-    - provisioning
-    - mutual-tls
-    - saml
-    - authorization-rules
-    - split-tunnel
-    - connection-logging
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create client vpn endpoint
-    - client vpn authorization rule
-    - client vpn mutual tls
-    - client vpn saml federation
-    - client vpn split tunnel
-    - client vpn route table
-    - client vpn connection logging
-    - client vpn self-service portal
-  when_to_use: >-
-    Invoke when the user wants to create an AWS Client VPN endpoint,
-    configure authentication (mutual TLS via ACM, Active Directory, or
-    SAML federation), set up authorization rules for network access,
-    associate target subnets, configure split-tunnel vs full-tunnel,
-    enable connection logging, or enable the self-service VPN portal.
-    Do NOT invoke for AWS Site-to-Site VPN (use vpn-connection-deployer),
-    Transit Gateway VPN attachments, or Client VPN auditing/troubleshooting.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, client-vpn, vpn-endpoint, cloudops, deploy, networking, provisioning, mutual-tls, saml, authorization-rules, split-tunnel, connection-logging
+  dependencies: aws-orchestrator
+  keywords: aws, client vpn, vpn endpoint, cloudops, deploy, provisioning, mutual tls, acm, saml, active directory, authorization rule, split tunnel, full tunnel, connection logging, self-service portal
+  when_to_use: Invoke when the user wants to create an AWS Client VPN endpoint, configure authentication (mutual TLS via ACM, Active Directory, or SAML federation), set up authorization rules for network access, associate target subnets, configure split-tunnel vs full-tunnel, enable connection logging, or enable the self-service VPN portal. Do NOT invoke for AWS Site-to-Site VPN (use vpn-connection-deployer), Transit Gateway VPN attachments, or Client VPN auditing/troubleshooting.
 ---
 
 # Client VPN Endpoint Deployer

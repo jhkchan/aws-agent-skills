@@ -1,108 +1,27 @@
 ---
 name: cloudwatch-dashboards-operator
-description: >-
-  Operates Amazon CloudWatch dashboards end-to-end — dashboard creation
-  and update via JSON model (PutDashboard/GetDashboard API), custom
-  widgets backed by Lambda functions, cross-account dashboards via
-  CloudWatch Observability Access Manager (OAM) shared observability,
-  metric math expressions for derived calculations, anomaly detection
-  bands, alarm integration in dashboard widgets, dashboard sharing via
-  resource-based policy, dashboard variables and parameters, auto-refresh
-  intervals, cross-section (account and region switching), dashboard
-  templates for common AWS services (RDS, EC2, Lambda, ECS), dashboard
-  API automation for version-controlled IaC, and CloudWatch Metrics
-  Insights for SQL-like metric queries. Runs deterministic pre-checks
-  (dashboard JSON validity, Lambda widget permissions, OAM sink/source
-  configuration, metric namespace existence) behind a CONFIRM gate and
-  emits OPERATION_COMPLETED or REVIEW_REQUIRED per operation. Use when
-  creating service dashboards, adding metric math or anomaly detection,
-  enabling cross-account visibility, templating dashboards for IaC,
-  or automating dashboard lifecycle via API.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates Amazon CloudWatch dashboards end-to-end — dashboard creation and update via JSON model (PutDashboard/GetDashboard API), custom widgets backed by Lambda functions, cross-account dashboards via CloudWatch Observability Access Manager (OAM) shared observability, metric math expressions for derived calculations, anomaly detection bands, alarm integration in dashboard widgets, dashboard sharing via resource-based policy, dashboard variables and parameters, auto-refresh intervals, cross-section (account and region switching), dashboard templates for common AWS services (RDS, EC2, Lambda, ECS), dashboard API automation for version-controlled IaC, and CloudWatch Metrics Insights for SQL-like metric queries. Runs deterministic pre-checks (dashboard JSON validity, Lambda widget permissions, OAM sink/source configuration, metric namespace existence) behind a CONFIRM gate and emits OPERATION_COMPLETED or REVIEW_REQUIRED per operation. Use when creating service dashboards, adding metric math or anomaly...
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws cloudwatch put-dashboard, get-dashboard,
-  delete-dashboards, list-dashboards, put-metric-alarm,
-  describe-alarms-for-metric, aws oam create-sink, create-link,
-  aws lambda add-permission (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - CloudWatch dashboard
-  - PutDashboard
-  - GetDashboard
-  - dashboard JSON
-  - custom widget
-  - Lambda widget
-  - metric math
-  - anomaly detection
-  - alarm integration
-  - cross-account dashboard
-  - OAM
-  - observability access manager
-  - shared observability
-  - dashboard sharing
-  - dashboard variables
-  - dashboard template
-  - Metrics Insights
-  - RDS dashboard
-  - EC2 dashboard
-  - Lambda dashboard
-  - ECS dashboard
-  - auto-refresh
-  - dashboard IaC
-tags: [aws, cloudwatch, dashboard, monitoring, observability, metrics, oam, management, operate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws cloudwatch put-dashboard, get-dashboard, delete-dashboards, list-dashboards, put-metric-alarm, describe-alarms-for-metric, aws oam create-sink, create-link, aws lambda add-permission (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "OPERATION_COMPLETED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Creating or updating a CloudWatch dashboard via JSON model, adding
-    metric math expressions or anomaly detection bands, integrating
-    alarms into dashboard widgets, building cross-account dashboards via
-    OAM, creating Lambda-backed custom widgets, sharing dashboards via
-    resource-based policy, templating dashboards for common services
-    (RDS, EC2, Lambda, ECS), running Metrics Insights queries in
-    dashboards, or automating dashboard lifecycle via PutDashboard API
-    for version-controlled IaC.
-  activation_triggers:
-    - "create CloudWatch dashboard"
-    - "update dashboard JSON"
-    - "PutDashboard API"
-    - "metric math expression"
-    - "anomaly detection band"
-    - "add alarm to dashboard"
-    - "cross-account dashboard"
-    - "OAM shared observability"
-    - "dashboard sharing"
-    - "dashboard variables"
-    - "custom widget Lambda"
-    - "dashboard template"
-    - "RDS monitoring dashboard"
-    - "EC2 monitoring dashboard"
-    - "Lambda monitoring dashboard"
-    - "ECS monitoring dashboard"
-    - "Metrics Insights query"
-    - "version-controlled dashboard"
-    - "dashboard IaC"
-  invocation_schema: >-
-    Input: either (a) a dashboard specification (service type, metric
-    names, layout preference) plus the intended operation (create-
-    dashboard, update-dashboard, add-metric-math, add-anomaly-detection,
-    share-dashboard, enable-cross-account, add-custom-widget, delete-
-    dashboard), OR (b) a dashboard name + operation for live-account
-    execution. Output: deterministic OPERATION / VERDICT / PRE_CHECKS /
-    STEPS / POST_VERIFY / NOTES block per dashboard operation, where
-    VERDICT is OPERATION_COMPLETED or REVIEW_REQUIRED.
+  verdict_shape: OPERATION_COMPLETED | REVIEW_REQUIRED
+  when_to_use: Creating or updating a CloudWatch dashboard via JSON model, adding metric math expressions or anomaly detection bands, integrating alarms into dashboard widgets, building cross-account dashboards via OAM, creating Lambda-backed custom widgets, sharing dashboards via resource-based policy, templating dashboards for common services (RDS, EC2, Lambda, ECS), running Metrics Insights queries in dashboards, or automating dashboard lifecycle via PutDashboard API for version-controlled IaC.
+  activation_triggers: create CloudWatch dashboard, update dashboard JSON, PutDashboard API, metric math expression, anomaly detection band, add alarm to dashboard, cross-account dashboard, OAM shared observability, dashboard sharing, dashboard variables, custom widget Lambda, dashboard template, RDS monitoring dashboard, EC2 monitoring dashboard, Lambda monitoring dashboard, ECS monitoring dashboard, Metrics Insights query, version-controlled dashboard, dashboard IaC
+  invocation_schema: 'Input: either (a) a dashboard specification (service type, metric names, layout preference) plus the intended operation (create- dashboard, update-dashboard, add-metric-math, add-anomaly-detection, share-dashboard, enable-cross-account, add-custom-widget, delete- dashboard), OR (b) a dashboard name + operation for live-account execution. Output: deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per dashboard operation, where VERDICT is OPERATION_COMPLETED or REVIEW_REQUIRED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudWatch dashboard, PutDashboard, GetDashboard, dashboard JSON, custom widget, Lambda widget, metric math, anomaly detection, alarm integration, cross-account dashboard, OAM, observability access manager, shared observability, dashboard sharing, dashboard variables, dashboard template, Metrics Insights, RDS dashboard, EC2 dashboard, Lambda dashboard, ECS dashboard, auto-refresh, dashboard IaC
+  tags: aws, cloudwatch, dashboard, monitoring, observability, metrics, oam, management, operate
 ---
 
 # CloudWatch Dashboards Operator

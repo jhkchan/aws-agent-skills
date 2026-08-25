@@ -1,114 +1,59 @@
 ---
 name: route53-health-check-troubleshooter
-description: >-
-  Diagnoses Amazon Route 53 health check and DNS failover failures
-  through a ten-category diagnostic tree: endpoint health check
-  failures (HTTP/HTTPS/TCP protocol mismatch, certificate mismatch),
-  calculated health check logic errors (AND/OR/NOT inverted logic,
-  child aggregation), health check interval and failure threshold
-  misconfiguration (consecutive failures, fast/standard interval),
-  DNS failover routing issues (active-active, active-passive,
-  weighted, latency-based, geolocation), health check region
-  selection and caller IP visibility (15+ regions, health checker
-  IPs external to VPC), CloudWatch alarm-based health check threshold
-  ambiguity (alarm period, datapoints, evaluation periods), DNS
-  resolution verification (NS delegation glue records, TTL caching),
-  and hosted zone delegation issues (glue record propagation).
-  Walks symptoms to a verified root cause with evidence-backed probes;
-  emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses Amazon Route 53 health check and DNS failover failures through a ten-category diagnostic tree: endpoint health check failures (HTTP/HTTPS/TCP protocol mismatch, certificate mismatch), calculated health check logic errors (AND/OR/NOT inverted logic, child aggregation), health check interval and failure threshold misconfiguration (consecutive failures, fast/standard interval), DNS failover routing issues (active-active, active-passive, weighted, latency-based, geolocation), health check region selection and caller IP visibility (15+ regions, health checker IPs external to VPC), CloudWatch alarm-based health check threshold ambiguity (alarm period, datapoints, evaluation periods), DNS resolution verification (NS delegation glue records, TTL caching), and hosted zone delegation issues (glue record propagation). Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted health check status and DNS failover behaviour. Live-account
-  diagnosis uses aws route53 get-health-check, get-health-check-status, list-health-checks, get-routing-policy, list-resource-record-sets, aws cloudwatch get-metric-statistics (AWS/Route53 namespace), aws ec2
-  describe-network-interfaces, and dig/nslookup for DNS resolution verification (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- Route 53
-- health check
-- DNS failover
-- endpoint health
-- HTTP health check
-- HTTPS health check
-- TCP health check
-- calculated health check
-- AND OR NOT
-- health check interval
-- failure threshold
-- consecutive failures
-- latency measurement
-- DNS routing policy
-- active-active
-- active-passive
-- weighted routing
-- latency-based routing
-- geolocation routing
-- health check regions
-- caller IP
-- CloudWatch alarm
-- alarm-based health check
-- DNS resolution
-- NS delegation
-- hosted zone
-- glue record
-- troubleshooting
-tags:
-- route53
-- networking
-- troubleshooting
-- dns
-- health-check
-- failover
-- high-availability
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted health check status and DNS failover behaviour. Live-account diagnosis uses aws route53 get-health-check, get-health-check-status, list-health-checks, get-routing-policy, list-resource-record-sets, aws cloudwatch get-metric-statistics (AWS/Route53 namespace), aws ec2 describe-network-interfaces, and dig/nslookup for DNS resolution verification (AWS CLI v2, SSO or...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
-  when_to_use: Diagnosing a Route 53 health check failure or DNS failover problem (endpoint health check unhealthy, calculated health check logic error, failover not triggering, wrong record served, health check
-    region mismatch, CloudWatch alarm-based health check ambiguity, DNS resolution or NS delegation failure), walking a symptom to the failed layer with verify and fix commands, validating why traffic is not
-    failing over or why a health check reports unhealthy, or triaging a "DNS failover is broken" page.
-  when_not_to_use: Application-level health endpoint debugging (use the application logs and app-specific health check logic), CloudFront origin failover configuration (use CloudFront origin groups), Global
-    Accelerator endpoint health (use Global Accelerator health checks), or VPC route table / peering posture audits (use ec2-security-group-auditor). This skill diagnoses Route 53 health check and DNS failover
-    layer failures; it does not debug the application endpoint code or audit VPC network posture.
-  activation_triggers:
-  - Route 53 health check unhealthy
-  - Route 53 health check failure
-  - DNS failover not working
-  - Route 53 failover not triggering
-  - DNS failover active-passive
-  - calculated health check AND OR NOT
-  - Route 53 endpoint health check
-  - Route 53 HTTP health check
-  - Route 53 HTTPS health check
-  - Route 53 TCP health check
-  - health check failure threshold
-  - consecutive health check failures
-  - Route 53 health check interval
-  - DNS failover weighted routing
-  - DNS failover latency-based routing
-  - Route 53 geolocation failover
-  - health check regions
-  - Route 53 caller IP
-  - CloudWatch alarm-based health check
-  - DNS resolution NS delegation
-  - hosted zone delegation issue
-  - glue record propagation
-  - troubleshoot Route 53 health check
-  invocation_schema: 'Input: either (a) a symptom description (health check status, observed DNS response, failover behaviour, "health check is unhealthy", "secondary endpoint is not receiving traffic",
-    "DNS still resolves to the primary after failover") optionally paired with the health check configuration (get-health-check output, routing policy, record sets), OR (b) a health check ID or hosted zone ID
-    plus DNS context (domain name, record type, routing policy) for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED,
-    INSUFFICIENT_DATA} and LAYER ∈ {ENDPOINT_HEALTH, PROTOCOL_MISMATCH, CERTIFICATE_MISMATCH, CALCULATED_HC_LOGIC, HC_INTERVAL_THRESHOLD, DNS_FAILOVER_ROUTING, DNS_RESOLUTION, NS_DELEGATION,
-    HC_REGION_SELECTION, ALARM_BASED_HC, LATENCY_MEASUREMENT, UNKNOWN}.'
-  invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"Route 53 health check hc-abc123 reports\nunhealthy. The endpoint at 10.0.1.10:443 is\nreachable from within
-    the VPC via curl. DNS failover\nshould redirect to the secondary, but the\nprimary record is still being served.\"\nHealthCheckId: hc-abc123\nType: HTTPS\nFullyQualifiedDomainName: api.example.com\nIPAddress:
-    10.0.1.10\nPort: 443\nRequestInterval: 30\nFailureThreshold: 3\nRoutingPolicy: FAILOVER\nHealthCheckStatus: Unhealthy\nDNSResolution: still returns primary IP"
+  when_to_use: Diagnosing a Route 53 health check failure or DNS failover problem (endpoint health check unhealthy, calculated health check logic error, failover not triggering, wrong record served, health check region mismatch, CloudWatch alarm-based health check ambiguity, DNS resolution or NS delegation failure), walking a symptom to the failed layer with verify and fix commands, validating why traffic is not failing over or why a health check reports unhealthy, or triaging a "DNS failover is broken" page.
+  when_not_to_use: Application-level health endpoint debugging (use the application logs and app-specific health check logic), CloudFront origin failover configuration (use CloudFront origin groups), Global Accelerator endpoint health (use Global Accelerator health checks), or VPC route table / peering posture audits (use ec2-security-group-auditor). This skill diagnoses Route 53 health check and DNS failover layer failures; it does not debug the application endpoint code or audit VPC network posture.
+  activation_triggers: Route 53 health check unhealthy, Route 53 health check failure, DNS failover not working, Route 53 failover not triggering, DNS failover active-passive, calculated health check AND OR NOT, Route 53 endpoint health check, Route 53 HTTP health check, Route 53 HTTPS health check, Route 53 TCP health check, health check failure threshold, consecutive health check failures, Route 53 health check interval, DNS failover weighted routing, DNS failover latency-based routing, Route 53 geolocation failover, health check regions, Route 53 caller IP, CloudWatch alarm-based health check, DNS resolution NS delegation, hosted zone delegation issue, glue record propagation, troubleshoot Route 53 health check
+  invocation_schema: 'Input: either (a) a symptom description (health check status, observed DNS response, failover behaviour, "health check is unhealthy", "secondary endpoint is not receiving traffic", "DNS still resolves to the primary after failover") optionally paired with the health check configuration (get-health-check output, routing policy, record sets), OR (b) a health check ID or hosted zone ID plus DNS context (domain name, record type, routing policy) for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {ENDPOINT_HEALTH, PROTOCOL_MISMATCH, CERTIFICATE_MISMATCH, CALCULATED_HC_LOGIC, HC_INTERVAL_THRESHOLD, DNS_FAILOVER_ROUTING, DNS_RESOLUTION, NS_DELEGATION, HC_REGION_SELECTION, ALARM_BASED_HC, LATENCY_MEASUREMENT, UNKNOWN}.'
+  invocation_example: '# Minimal valid input (offline symptom classification):
+
+    Symptom: "Route 53 health check hc-abc123 reports
+
+    unhealthy. The endpoint at 10.0.1.10:443 is
+
+    reachable from within the VPC via curl. DNS failover
+
+    should redirect to the secondary, but the
+
+    primary record is still being served."
+
+    HealthCheckId: hc-abc123
+
+    Type: HTTPS
+
+    FullyQualifiedDomainName: api.example.com
+
+    IPAddress: 10.0.1.10
+
+    Port: 443
+
+    RequestInterval: 30
+
+    FailureThreshold: 3
+
+    RoutingPolicy: FAILOVER
+
+    HealthCheckStatus: Unhealthy
+
+    DNSResolution: still returns primary IP'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Route 53, health check, DNS failover, endpoint health, HTTP health check, HTTPS health check, TCP health check, calculated health check, AND OR NOT, health check interval, failure threshold, consecutive failures, latency measurement, DNS routing policy, active-active, active-passive, weighted routing, latency-based routing, geolocation routing, health check regions, caller IP, CloudWatch alarm, alarm-based health check, DNS resolution, NS delegation, hosted zone, glue record, troubleshooting
+  tags: route53, networking, troubleshooting, dns, health-check, failover, high-availability
 ---
 
 # Route 53 Health Check Troubleshooter

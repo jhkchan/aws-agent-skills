@@ -1,65 +1,15 @@
 ---
 name: cloudwatch-cross-account-observability-deployer
-description: >-
-  Provisions CloudWatch cross-account observability via
-  Observability Access Manager (OAM) — creates the monitoring
-  account sink, attaches source accounts, configures the link
-  (metrics / logs / traces / Application Signals sharing), wires
-  IAM roles, and validates the topology. Wires Amazon Managed
-  Grafana cross-account data-source queries, integrates
-  CloudWatch cross-account with AMP (Managed Prometheus), and
-  surfaces cross-account Application Signals service maps. Emits
-  a READY_TO_DEPLOY checklist. Use when creating an OAM sink,
-  linking source accounts, sharing CloudWatch metrics / logs /
-  traces across accounts, attaching AMP workspaces cross-account,
-  enabling cross-account Application Signals, or wiring Managed
-  Grafana across accounts. Triggers: cloudwatch cross-account,
-  observability access manager, oam, oam sink, oam link,
-  cross-account observability, monitoring account, cross-account
-  metrics / logs / traces / application signals, managed grafana
-  cross-account, amp cross-account, cloudwatch multi-account.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions CloudWatch cross-account observability via Observability Access Manager (OAM) — creates the monitoring account sink, attaches source accounts, configures the link (metrics / logs / traces / Application Signals sharing), wires IAM roles, and validates the topology. Wires Amazon Managed Grafana cross-account data-source queries, integrates CloudWatch cross-account with AMP (Managed Prometheus), and surfaces cross-account Application Signals service maps. Emits a READY_TO_DEPLOY checklist. Use when creating an OAM sink, linking source accounts, sharing CloudWatch metrics / logs / traces across accounts, attaching AMP workspaces cross-account, enabling cross-account Application Signals, or wiring Managed Grafana across accounts. Triggers: cloudwatch cross-account, observability access manager, oam, oam sink, oam link, cross-account observability, monitoring account, cross-account metrics / logs / traces / application signals, managed grafana cross-account, amp cross-account, cloudwatch multi-account.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with
-  oam, cloudwatch, iam, logs, xray, application-signals, amp,
-  grafana, and organizations access. Works with Terraform
-  aws_oam_sink / aws_oam_link, CloudFormation
-  AWS::Oam::Sink / AWS::Oam::Link, and AWS CloudFormation StackSets
-  for multi-account link deployment.
-keywords:
-  - aws
-  - cloudwatch
-  - oam
-  - observability-access-manager
-  - cross-account
-  - multi-account
-  - observability
-  - cloudops
-  - deploy
-  - provisioning
-  - managed-grafana
-  - amp
-  - managed-prometheus
-  - application-signals
-tags:
-  - aws
-  - cloudwatch
-  - oam
-  - cross-account
-  - observability
-  - deploy
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with oam, cloudwatch, iam, logs, xray, application-signals, amp, grafana, and organizations access. Works with Terraform aws_oam_sink / aws_oam_link, CloudFormation AWS::Oam::Sink / AWS::Oam::Link, and AWS CloudFormation StackSets for multi-account link deployment.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: deploy
   skill_class: capability
@@ -67,48 +17,10 @@ metadata:
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-    - aws
-    - cloudwatch
-    - oam
-    - cross-account
-    - observability
-    - deploy
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - cloudwatch cross-account
-    - observability access manager
-    - oam sink
-    - oam link
-    - cross-account observability
-    - monitoring account
-    - source account observability
-    - cross-account metrics
-    - cross-account logs
-    - cross-account traces
-    - cross-account application signals
-    - managed grafana cross-account
-    - amp cross-account
-    - cloudwatch multi-account
-  when_to_use: >-
-    Invoke when the user wants to create a CloudWatch cross-account
-    observability topology — a monitoring (aggregator) account with
-    an OAM sink and one or more source accounts with OAM links
-    sharing metrics, logs, traces, or Application Signals data. Use
-    for provisioning the OAM sink, attaching source accounts,
-    scoping the sharing model (which namespaces, which log groups,
-    which X-Ray services), wiring Amazon Managed Grafana to query
-    across accounts via the sink, attaching AMP (Managed
-    Prometheus) workspaces to the OAM sink, or enabling
-    cross-account Application Signals service maps. Do NOT invoke
-    for single-account CloudWatch dashboards / alarms
-    (cloudwatch-dashboard-deployer / cloudwatch-alarm-operator), for
-    IAM cross-account role assumption patterns
-    (iam-role-deployer), for CloudTrail org trails
-    (cloudtrail-org-trail-auditor), or for single-account
-    Application Signals enablement
-    (cloudwatch-application-signals-deployer).
+  tags: aws, cloudwatch, oam, cross-account, observability, deploy
+  dependencies: aws-orchestrator
+  keywords: aws, cloudwatch, oam, observability-access-manager, cross-account, multi-account, observability, cloudops, deploy, provisioning, managed-grafana, amp, managed-prometheus, application-signals
+  when_to_use: Invoke when the user wants to create a CloudWatch cross-account observability topology — a monitoring (aggregator) account with an OAM sink and one or more source accounts with OAM links sharing metrics, logs, traces, or Application Signals data. Use for provisioning the OAM sink, attaching source accounts, scoping the sharing model (which namespaces, which log groups, which X-Ray services), wiring Amazon Managed Grafana to query across accounts via the sink, attaching AMP (Managed Prometheus) workspaces to the OAM sink, or enabling cross-account Application Signals service maps. Do NOT invoke for single-account CloudWatch dashboards / alarms (cloudwatch-dashboard-deployer / cloudwatch-alarm-operator), for IAM cross-account role assumption patterns (iam-role-deployer), for CloudTrail org trails (cloudtrail-org-trail-auditor), or for single-account Application Signals enablement (cloudwatch-application-signals-deployer).
 ---
 
 # CloudWatch Cross-Account Observability Deployer

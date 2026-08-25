@@ -1,98 +1,27 @@
 ---
 name: grafana-dashboard-deployer
-description: >-
-  Provisions Amazon Managed Grafana workspaces and dashboards with production
-  defaults: workspace creation (authentication via SSO or IAM Identity Center),
-  data sources (CloudWatch, Prometheus/AMP, Timestream, OpenSearch, X-Ray),
-  dashboard JSON model (panels, templating variables, time range), alerting
-  (alert rules, notification policies, contact points), IAM role for data
-  source access, AMP workspace integration, and latest features (Grafana
-  Enterprise, Incident, OnCall). Emits a READY_TO_DEPLOY checklist with
-  verification commands. Use when creating a Grafana workspace, adding data
-  sources, building dashboards, configuring alerting, or integrating AMP.
-  Triggers: create Grafana workspace, Grafana dashboard, Grafana data source,
-  Grafana alerting, AMP integration, Grafana Enterprise, Grafana Incident.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon Managed Grafana workspaces and dashboards with production defaults: workspace creation (authentication via SSO or IAM Identity Center), data sources (CloudWatch, Prometheus/AMP, Timestream, OpenSearch, X-Ray), dashboard JSON model (panels, templating variables, time range), alerting (alert rules, notification policies, contact points), IAM role for data source access, AMP workspace integration, and latest features (Grafana Enterprise, Incident, OnCall). Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Grafana workspace, adding data sources, building dashboards, configuring alerting, or integrating AMP. Triggers: create Grafana workspace, Grafana dashboard, Grafana data source, Grafana alerting, AMP integration, Grafana Enterprise, Grafana Incident.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). For live deployment: AWS CLI v2 with grafana, amps, iam, ec2,
-  cloudwatch, timestream, opensearch, and xray access. Works with Terraform
-  aws_grafana_workspace / aws_grafana_workspace_api_key / aws_prometheus_workspace
-  resources and CloudFormation AWS::Grafana::Workspace templates.
-keywords:
-  - aws
-  - grafana
-  - dashboard
-  - managed grafana
-  - deploy
-  - cloudops
-  - observability
-  - data source
-  - cloudwatch
-  - prometheus
-  - amp
-  - timestream
-  - opensearch
-  - x-ray
-  - alerting
-  - notification
-  - iam identity center
-  - sso
-  - grafana enterprise
-  - grafana incident
-  - grafana oncall
-tags:
-  - aws
-  - grafana
-  - observability
-  - deploy
-  - management
-  - dashboard
-  - cloudwatch
-  - prometheus
-  - alerting
-  - amp
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with grafana, amps, iam, ec2, cloudwatch, timestream, opensearch, and xray access. Works with Terraform aws_grafana_workspace / aws_grafana_workspace_api_key / aws_prometheus_workspace resources and CloudFormation AWS::Grafana::Workspace templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Invoke when the user wants to create an Amazon Managed Grafana workspace,
-    configure data sources (CloudWatch, AMP, Timestream, OpenSearch, X-Ray),
-    build dashboard JSON models with panels and templating variables, set up
-    alerting rules and notification policies, integrate AMP workspaces, or
-    adopt Grafana Enterprise features (Incident, OnCall). Do NOT invoke for
-    self-managed Grafana on EC2/EKS, Prometheus configuration, or CloudWatch
-    dashboard creation (use deploy-cloudwatch-dashboard).
-  activation_triggers:
-    - "create grafana workspace"
-    - "deploy grafana dashboard"
-    - "grafana data source"
-    - "grafana cloudwatch"
-    - "grafana prometheus"
-    - "grafana amp"
-    - "grafana timestream"
-    - "grafana opensearch"
-    - "grafana x-ray"
-    - "grafana alerting"
-    - "grafana notification policy"
-    - "grafana contact point"
-    - "grafana enterprise"
-    - "grafana incident"
-    - "grafana oncall"
-    - "grafana iam role"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Invoke when the user wants to create an Amazon Managed Grafana workspace, configure data sources (CloudWatch, AMP, Timestream, OpenSearch, X-Ray), build dashboard JSON models with panels and templating variables, set up alerting rules and notification policies, integrate AMP workspaces, or adopt Grafana Enterprise features (Incident, OnCall). Do NOT invoke for self-managed Grafana on EC2/EKS, Prometheus configuration, or CloudWatch dashboard creation (use deploy-cloudwatch-dashboard).
+  activation_triggers: create grafana workspace, deploy grafana dashboard, grafana data source, grafana cloudwatch, grafana prometheus, grafana amp, grafana timestream, grafana opensearch, grafana x-ray, grafana alerting, grafana notification policy, grafana contact point, grafana enterprise, grafana incident, grafana oncall, grafana iam role
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: aws, grafana, dashboard, managed grafana, deploy, cloudops, observability, data source, cloudwatch, prometheus, amp, timestream, opensearch, x-ray, alerting, notification, iam identity center, sso, grafana enterprise, grafana incident, grafana oncall
+  tags: aws, grafana, observability, deploy, management, dashboard, cloudwatch, prometheus, alerting, amp
+  dependencies: aws-orchestrator
 ---
 
 # Grafana Dashboard Deployer

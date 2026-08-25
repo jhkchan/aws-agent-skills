@@ -1,117 +1,26 @@
 ---
 name: account-factory-deployer
-description: >-
-  Deploys AWS Control Tower Account Factory accounts with production
-  defaults: account creation via Service Catalog product
-  (provision-product), Organizational Unit placement, SSO assignment
-  via permission sets, Guardrail inheritance (SCP, Detective, Config),
-  landing zone baseline conformance, email and account name uniqueness,
-  alternate contacts, compliance status verification, account
-  customization via custom product (CloudFormation StackSets), vending
-  new accounts, terminating accounts, and updating account baselines.
-  Emits a READY_TO_DEPLOY checklist with verification commands. Use
-  when creating AWS accounts via Control Tower, vending accounts to
-  teams, assigning SSO permission sets, verifying Guardrail
-  inheritance, customizing account baselines, or managing the account
-  lifecycle. Triggers: create aws account control tower, account
-  factory provision, vending new account, control tower account
-  enrollment, sso permission set assignment, guardrail scp inheritance,
-  account factory service catalog, control tower landing zone baseline,
-  terminate aws account, custom account baseline.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Deploys AWS Control Tower Account Factory accounts with production defaults: account creation via Service Catalog product (provision-product), Organizational Unit placement, SSO assignment via permission sets, Guardrail inheritance (SCP, Detective, Config), landing zone baseline conformance, email and account name uniqueness, alternate contacts, compliance status verification, account customization via custom product (CloudFormation StackSets), vending new accounts, terminating accounts, and updating account baselines. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating AWS accounts via Control Tower, vending accounts to teams, assigning SSO permission sets, verifying Guardrail. Triggers: create aws account control tower, account factory provision, vending new account, control tower account enrollment, sso permission set assignment, guardrail scp inheritance, account factory service catalog, control tower landing zone baseline, terminate aws account, custom account baseline.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with
-  servicecatalog, controltower, organizations, and sso-admin access.
-  Works with Terraform aws_controltower_account / aws_organizations_
-  account / aws_ssoadmin_permission_set resources and CloudFormation
-  AWS::ServiceCatalog::CloudFormationProvisionedProduct templates.
-keywords:
-  - aws
-  - control tower
-  - account factory
-  - service catalog
-  - cloudops
-  - deploy
-  - provisioning
-  - landing zone
-  - scp
-  - guardrails
-  - sso
-  - permission set
-  - organizations
-  - stacksets
-  - baseline
-  - account vending
-  - compliance
-  - alternate contacts
-tags:
-  - aws
-  - control-tower
-  - account-factory
-  - cloudops
-  - deploy
-  - governance
-  - provisioning
-  - landing-zone
-  - scp
-  - guardrails
-  - sso
-  - organizations
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with servicecatalog, controltower, organizations, and sso-admin access. Works with Terraform aws_controltower_account / aws_organizations_ account / aws_ssoadmin_permission_set resources and CloudFormation AWS::ServiceCatalog::CloudFormationProvisionedProduct templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - control-tower
-    - account-factory
-    - cloudops
-    - deploy
-    - governance
-    - provisioning
-    - landing-zone
-    - scp
-    - guardrails
-    - sso
-    - organizations
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create aws account control tower
-    - account factory provision
-    - vending new account
-    - control tower account enrollment
-    - sso permission set assignment
-    - guardrail scp inheritance
-    - account factory service catalog
-    - control tower landing zone baseline
-    - terminate aws account
-    - custom account baseline
-  when_to_use: >-
-    Invoke when the user wants to create AWS accounts via Control Tower
-    Account Factory, vend accounts to teams, place accounts in
-    Organizational Units, assign SSO permission sets, verify Guardrail
-    (SCP/Detective/Config) inheritance, customize account baselines
-    via CloudFormation StackSets, update account baselines, or
-    terminate accounts. Do NOT invoke for AWS Organizations account
-    creation outside Control Tower (use organizations-account-deployer),
-    Control Tower landing zone setup/upgrade (use controltower-control-
-    auditor), or SCP authoring (use organizations-scp-deployer).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, control-tower, account-factory, cloudops, deploy, governance, provisioning, landing-zone, scp, guardrails, sso, organizations
+  dependencies: aws-orchestrator
+  keywords: aws, control tower, account factory, service catalog, cloudops, deploy, provisioning, landing zone, scp, guardrails, sso, permission set, organizations, stacksets, baseline, account vending, compliance, alternate contacts
+  when_to_use: Invoke when the user wants to create AWS accounts via Control Tower Account Factory, vend accounts to teams, place accounts in Organizational Units, assign SSO permission sets, verify Guardrail (SCP/Detective/Config) inheritance, customize account baselines via CloudFormation StackSets, update account baselines, or terminate accounts. Do NOT invoke for AWS Organizations account creation outside Control Tower (use organizations-account-deployer), Control Tower landing zone setup/upgrade (use controltower-control- auditor), or SCP authoring (use organizations-scp-deployer).
 ---
 
 # AWS Control Tower Account Factory Deployer

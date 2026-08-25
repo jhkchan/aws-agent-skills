@@ -1,106 +1,28 @@
 ---
 name: s3-access-points-deployer
-description: >-
-  Provisions S3 Access Points and dependent primitives with production
-  defaults: network-origin selection (Internet vs VPC), VPC endpoint +
-  private DNS, the through-AP-only bucket invariant via
-  s3:DataAccessPointArn bucket-policy Deny, per-AP prefix-scoped policies
-  distinct from the bucket policy, Object Lambda APs (supporting AP +
-  transform Lambda + reserved concurrency), Multi-Region Access Points
-  (MRAP) with failover, DNS-compatible aliases, per-AP Block Public
-  Access, cross-account AP delegation with containment, and S3 on
-  Outposts APs. Emits READY_TO_DEPLOY / PREREQUISITES_MISSING with every
-  item verified and copy-pasteable s3control / s3api / ec2 / lambda
-  commands. Use when creating a per-team or per-application access point,
-  enforcing VPC-only access, transforming objects on retrieval, building
-  a multi-region active-active or failover data plane, or hardening an
-  existing AP. Triggers: S3 access point, create access point, VPC-only
-  bucket, Object Lambda, MRAP, alias, cross-account AP, Outposts AP.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions S3 Access Points and dependent primitives with production defaults: network-origin selection (Internet vs VPC), VPC endpoint + private DNS, the through-AP-only bucket invariant via s3:DataAccessPointArn bucket-policy Deny, per-AP prefix-scoped policies distinct from the bucket policy, Object Lambda APs (supporting AP + transform Lambda + reserved concurrency), Multi-Region Access Points (MRAP) with failover, DNS-compatible aliases, per-AP Block Public Access, cross-account AP delegation with containment, and S3 on Outposts APs. Emits READY_TO_DEPLOY / PREREQUISITES_MISSING with every item verified and copy-pasteable s3control / s3api / ec2 / lambda commands. Use when creating a per-team or per-application access point, enforcing VPC-only access, transforming objects on retrieval, building a multi-region active-active or failover data plane, or hardening an existing AP. Triggers: S3 access point, create access point, VPC-only bucket, Object Lambda, MRAP, alias, cross-account AP, Outposts AP.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Live provisioning uses AWS CLI v2 with s3control (create-access-
-  point, put-access-point-policy, get-access-point, create-multi-region-
-  access-point, create-access-point-for-object-lambda), s3api
-  (put-bucket-policy), lambda (create-function, put-function-event-invoke-
-  config), ec2 (describe-vpc-endpoints, modify-vpc-endpoint), and
-  cloudformation / terraform aws_s3_access_point equivalents.
-keywords:
-  - aws
-  - s3
-  - s3-access-points
-  - access-point
-  - object-lambda
-  - mrap
-  - multi-region
-  - vpc-endpoint
-  - private-dns
-  - network-origin
-  - vpc-only
-  - bucket-policy
-  - access-point-policy
-  - cross-account
-  - s3-on-outposts
-  - alias
-  - cloudops
-  - deploy
-tags:
-  - aws
-  - s3
-  - access-point
-  - object-lambda
-  - mrap
-  - vpc-endpoint
-  - deploy
-  - storage
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Live provisioning uses AWS CLI v2 with s3control (create-access- point, put-access-point-policy, get-access-point, create-multi-region- access-point, create-access-point-for-object-lambda), s3api (put-bucket-policy), lambda (create-function, put-function-event-invoke- config), ec2 (describe-vpc-endpoints, modify-vpc-endpoint), and cloudformation / terraform aws_s3_access_point equivalents.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Provisioning a new S3 Access Point (Internet or VPC network origin),
-    enforcing VPC-only access to a shared bucket via VPC endpoint + private
-    DNS + bucket-policy Deny, creating an Object Lambda access point to
-    transform objects on retrieval, building a Multi-Region Access Point
-    for active-active or failover data access, scoping per-team or
-    per-application access via prefix-scoped access point policies,
-    configuring cross-account access point delegation, hardening an
-    existing access point with BPA, or generating IaC (CloudFormation /
-    Terraform) for any of the above. Do NOT invoke for plain bucket
-    hardening without an access point (use s3-secure-bucket-deployer), or
-    for S3 Tables / S3 Catalog (separate primitives).
-  activation_triggers:
-    - "S3 access point"
-    - "create access point"
-    - "VPC-only bucket access"
-    - "Object Lambda"
-    - "multi-region access point"
-    - "MRAP"
-    - "S3 access point alias"
-    - "access point policy"
-    - "cross-account access point"
-    - "S3 on Outposts access point"
-    - "Block Public Access on access point"
-  invocation_schema: >-
-    Input: either (a) a bucket ARN/name + access point name + network
-    origin (Internet|VPC) + optional VPC ID, or (b) an Object Lambda
-    spec (supporting AP + Lambda transform), or (c) a Multi-Region
-    Access Point spec (regions + failover). Output: deterministic
-    ACCESS_POINT / VERDICT / CHECKLIST / VERIFICATION_COMMANDS block per
-    the STRICT output contract, where VERDICT is READY_TO_DEPLOY or
-    PREREQUISITES_MISSING.
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Provisioning a new S3 Access Point (Internet or VPC network origin), enforcing VPC-only access to a shared bucket via VPC endpoint + private DNS + bucket-policy Deny, creating an Object Lambda access point to transform objects on retrieval, building a Multi-Region Access Point for active-active or failover data access, scoping per-team or per-application access via prefix-scoped access point policies, configuring cross-account access point delegation, hardening an existing access point with BPA, or generating IaC (CloudFormation / Terraform) for any of the above. Do NOT invoke for plain bucket hardening without an access point (use s3-secure-bucket-deployer), or for S3 Tables / S3 Catalog (separate primitives).
+  activation_triggers: S3 access point, create access point, VPC-only bucket access, Object Lambda, multi-region access point, MRAP, S3 access point alias, access point policy, cross-account access point, S3 on Outposts access point, Block Public Access on access point
+  invocation_schema: 'Input: either (a) a bucket ARN/name + access point name + network origin (Internet|VPC) + optional VPC ID, or (b) an Object Lambda spec (supporting AP + Lambda transform), or (c) a Multi-Region Access Point spec (regions + failover). Output: deterministic ACCESS_POINT / VERDICT / CHECKLIST / VERIFICATION_COMMANDS block per the STRICT output contract, where VERDICT is READY_TO_DEPLOY or PREREQUISITES_MISSING.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: aws, s3, s3-access-points, access-point, object-lambda, mrap, multi-region, vpc-endpoint, private-dns, network-origin, vpc-only, bucket-policy, access-point-policy, cross-account, s3-on-outposts, alias, cloudops, deploy
+  tags: aws, s3, access-point, object-lambda, mrap, vpc-endpoint, deploy, storage
+  dependencies: aws-orchestrator
 ---
 
 # S3 Access Points Deployer

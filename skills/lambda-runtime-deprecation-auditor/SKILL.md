@@ -1,81 +1,24 @@
 ---
 name: lambda-runtime-deprecation-auditor
-description: >-
-  Audits AWS Lambda functions for deprecated/EOL runtimes (python3.9,
-  nodejs16.x, etc.), over-permissioned execution roles (admin wildcards,
-  privilege-escalation actions), public function URL exposure (AuthType
-  NONE), and observability config gaps (missing X-Ray tracing, missing DLQ,
-  log retention). Emits a deterministic verdict (DEPRECATED_RUNTIME |
-  OVERPERMISSIVE | PUBLIC_EXPOSURE | CONFIG_GAP | OK) per function with
-  enumerated findings and CLI remediation. Use when reviewing Lambda
-  functions, checking runtime deprecation status, auditing execution-role
-  scope, validating function-URL exposure, or hardening Lambda posture
-  before production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Lambda functions for deprecated/EOL runtimes (python3.9, nodejs16.x, etc.), over-permissioned execution roles (admin wildcards, privilege-escalation actions), public function URL exposure (AuthType NONE), and observability config gaps (missing X-Ray tracing, missing DLQ, log retention). Emits a deterministic verdict (DEPRECATED_RUNTIME | OVERPERMISSIVE | PUBLIC_EXPOSURE | CONFIG_GAP | OK) per function with enumerated findings and CLI remediation. Use when reviewing Lambda functions, checking runtime deprecation status, auditing execution-role scope, validating function-URL exposure, or hardening Lambda posture before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline config-document classification.
-  Live-account audits use aws lambda get-function, get-function-url-config,
-  get-policy, and list-functions (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Lambda
-  - runtime deprecation
-  - EOL runtime
-  - python3.9
-  - nodejs16
-  - deprecated runtime
-  - execution role
-  - over-permissive
-  - AdministratorAccess
-  - function URL
-  - AuthType NONE
-  - public exposure
-  - X-Ray tracing
-  - TracingConfig
-  - PassThrough
-  - Active tracing
-  - dead letter queue
-  - DLQ
-  - Lambda audit
-  - serverless security
-  - runtime block
-  - function hardening
-tags: [lambda, security, runtime-deprecation, execution-role, function-url, tracing, audit, compute]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline config-document classification. Live-account audits use aws lambda get-function, get-function-url-config, get-policy, and list-functions (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
-  verdict_shape: "DEPRECATED_RUNTIME | OVERPERMISSIVE | PUBLIC_EXPOSURE | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a Lambda function before production deployment, checking for
-    deprecated or EOL runtimes, auditing an execution role for wildcard
-    permissions, validating function-URL public exposure, or hardening
-    observability configuration (tracing, DLQ, log retention) across a
-    serverless fleet.
-  activation_triggers:
-    - "audit this Lambda function"
-    - "is my Lambda runtime deprecated"
-    - "check Lambda execution role"
-    - "is my function URL public"
-    - "Lambda AuthType NONE"
-    - "missing X-Ray tracing Lambda"
-    - "Lambda runtime EOL"
-    - "hardening Lambda function"
-    - "Lambda admin role"
-  invocation_schema: >-
-    Input: either (a) a Lambda function configuration (Runtime, Handler,
-    TracingConfig, DeadLetterConfig, Execution role + policies, Function URL
-    config), OR (b) a function name/ARN for live-account audit.
-    Output: deterministic FUNCTION/VERDICT/REASON/FINDINGS/REMEDIATION block
-    per function, where VERDICT ∈ {DEPRECATED_RUNTIME, OVERPERMISSIVE,
-    PUBLIC_EXPOSURE, CONFIG_GAP, OK}. ERROR is emitted only for malformed
-    input and is not a classification verdict.
+  verdict_shape: DEPRECATED_RUNTIME | OVERPERMISSIVE | PUBLIC_EXPOSURE | CONFIG_GAP | OK
+  when_to_use: Reviewing a Lambda function before production deployment, checking for deprecated or EOL runtimes, auditing an execution role for wildcard permissions, validating function-URL public exposure, or hardening observability configuration (tracing, DLQ, log retention) across a serverless fleet.
+  activation_triggers: audit this Lambda function, is my Lambda runtime deprecated, check Lambda execution role, is my function URL public, Lambda AuthType NONE, missing X-Ray tracing Lambda, Lambda runtime EOL, hardening Lambda function, Lambda admin role
+  invocation_schema: 'Input: either (a) a Lambda function configuration (Runtime, Handler, TracingConfig, DeadLetterConfig, Execution role + policies, Function URL config), OR (b) a function name/ARN for live-account audit. Output: deterministic FUNCTION/VERDICT/REASON/FINDINGS/REMEDIATION block per function, where VERDICT ∈ {DEPRECATED_RUNTIME, OVERPERMISSIVE, PUBLIC_EXPOSURE, CONFIG_GAP, OK}. ERROR is emitted only for malformed input and is not a classification verdict.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Lambda, runtime deprecation, EOL runtime, python3.9, nodejs16, deprecated runtime, execution role, over-permissive, AdministratorAccess, function URL, AuthType NONE, public exposure, X-Ray tracing, TracingConfig, PassThrough, Active tracing, dead letter queue, DLQ, Lambda audit, serverless security, runtime block, function hardening
+  tags: lambda, security, runtime-deprecation, execution-role, function-url, tracing, audit, compute
 ---
 
 # Lambda Runtime Deprecation Auditor

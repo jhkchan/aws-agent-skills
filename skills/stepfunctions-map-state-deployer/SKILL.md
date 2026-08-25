@@ -1,108 +1,26 @@
 ---
 name: stepfunctions-map-state-deployer
-description: >-
-  Deploys AWS Step Functions Map state configurations with production defaults:
-  Inline Map (synchronous, max 5000 items, shares parent execution context),
-  Distributed Map (async, max 10000 items via child executions), Map state
-  configuration (ItemsPath, MaxConcurrencyPath, MaxItemsPath, ItemBatchSize,
-  ItemBatcher), ItemProcessor vs Iterator (ItemProcessor is current), batch
-  processing with ItemBatchSize/ItemBatcher for throughput, Distributed Map
-  with S3 input (CSV/JSON/JSONL from S3 via ReaderConfig), child execution
-  quota, ResultSelector/ResultPath, error handling (Retry/Catch per
-  iteration), Parallel state vs Map state (fan-out vs iteration), cost model
-  (Inline = no extra cost, Distributed = child execution cost), and
-  Timestream/Firehose as input source. Emits a READY_TO_DEPLOY checklist
-  with verification commands. Use when configuring a Map state, processing
-  arrays in Step Functions, batch processing items, scaling beyond 5000
-  items, or reading large datasets from S3. Triggers: step functions map
-  state, inline map, distributed map, itemprocessor, itembatchsize,
-  maxconcurrency, step functions batch processing, distributed map s3,
-  step functions fan-out, map state error handling.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Deploys AWS Step Functions Map state configurations with production defaults: Inline Map (synchronous, max 5000 items, shares parent execution context), Distributed Map (async, max 10000 items via child executions), Map state configuration (ItemsPath, MaxConcurrencyPath, MaxItemsPath, ItemBatchSize, ItemBatcher), ItemProcessor vs Iterator (ItemProcessor is current), batch processing with ItemBatchSize/ItemBatcher for throughput, Distributed Map with S3 input (CSV/JSON/JSONL from S3 via ReaderConfig), child execution quota, ResultSelector/ResultPath, error handling (Retry/Catch per iteration), Parallel state vs Map state (fan-out vs iteration), cost model (Inline = no extra cost, Distributed = child execution cost), and Timestream/Firehose as input source. Emits a READY_TO_DEPLOY checklist with. Triggers: step functions map state, inline map, distributed map, itemprocessor, itembatchsize, maxconcurrency, step functions batch processing, distributed map s3, step functions fan-out, map state error handling.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with stepfunctions
-  access. Works with Terraform aws_sfn_state_machine resources and
-  CloudFormation AWS::StepFunctions::StateMachine templates.
-keywords:
-  - aws
-  - step functions
-  - map state
-  - inline map
-  - distributed map
-  - itemprocessor
-  - itembatchsize
-  - maxconcurrency
-  - cloudops
-  - deploy
-  - batch processing
-  - s3 input
-  - fan-out
-  - child execution
-tags:
-  - aws
-  - step-functions
-  - map-state
-  - distributed-map
-  - cloudops
-  - deploy
-  - app-integration
-  - batch-processing
-  - s3-input
-  - itemprocessor
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with stepfunctions access. Works with Terraform aws_sfn_state_machine resources and CloudFormation AWS::StepFunctions::StateMachine templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - step-functions
-    - map-state
-    - distributed-map
-    - cloudops
-    - deploy
-    - app-integration
-    - batch-processing
-    - s3-input
-    - itemprocessor
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - step functions map state
-    - inline map state
-    - distributed map state
-    - itemprocessor
-    - itembatchsize
-    - maxconcurrency
-    - step functions batch processing
-    - distributed map s3 input
-    - map state error handling
-    - parallel state vs map state
-  when_to_use: >-
-    Invoke when the user wants to configure a Step Functions Map state
-    for array iteration (Inline or Distributed), process items in batches,
-    scale beyond 5000 items with Distributed Map, read large datasets from
-    S3 (CSV/JSON/JSONL), configure MaxConcurrency or ItemBatchSize, set up
-    per-iteration error handling (Retry/Catch), or choose between Inline
-    Map, Distributed Map, and Parallel state. Do NOT invoke for Step
-    Functions Express Workflow cost analysis (use stepfunctions-express-
-    deployer), general state machine creation (use stepfunctions-
-    statemachine-deployer), or execution troubleshooting (use
-    stepfunctions-execution-troubleshooter).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, step-functions, map-state, distributed-map, cloudops, deploy, app-integration, batch-processing, s3-input, itemprocessor
+  dependencies: aws-orchestrator
+  keywords: aws, step functions, map state, inline map, distributed map, itemprocessor, itembatchsize, maxconcurrency, cloudops, deploy, batch processing, s3 input, fan-out, child execution
+  when_to_use: Invoke when the user wants to configure a Step Functions Map state for array iteration (Inline or Distributed), process items in batches, scale beyond 5000 items with Distributed Map, read large datasets from S3 (CSV/JSON/JSONL), configure MaxConcurrency or ItemBatchSize, set up per-iteration error handling (Retry/Catch), or choose between Inline Map, Distributed Map, and Parallel state. Do NOT invoke for Step Functions Express Workflow cost analysis (use stepfunctions-express- deployer), general state machine creation (use stepfunctions- statemachine-deployer), or execution troubleshooting (use stepfunctions-execution-troubleshooter).
 ---
 
 # Step Functions Map State Deployer

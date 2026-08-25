@@ -1,91 +1,27 @@
 ---
 name: s3-lifecycle-automator
-description: >-
-  Designs and implements automated S3 lifecycle policy deployment across
-  single and multi-account environments. Covers tag-based lifecycle policy
-  deployment via CloudFormation StackSets and Lambda, bucket inventory
-  collection for lifecycle audit, automated storage class transitions
-  (Standard to IA to Glacier to Deep Archive) based on object age patterns,
-  versioning lifecycle rules (NoncurrentVersionTransition and
-  NoncurrentVersionExpiration), Intelligent-Tiering opt-in automation,
-  Storage Lens analysis for identifying buckets without lifecycle policies,
-  S3 Batch Operations for retroactive storage-class tiering of existing
-  objects, lifecycle policy validation enforcing minimum-days rules per
-  tier (30 days for IA, 90 days for Glacier Instant Retrieval), multi-
-  account lifecycle enforcement via StackSets, and EventBridge
-  notifications on lifecycle policy changes. Emits AUTOMATION_DEPLOYED
-  with a fully validated lifecycle configuration or REVIEW_REQUIRED with
-  the specific validation gap. Use when building S3 lifecycle automation,
-  deploying tiering policies across accounts, validating lifecycle min-
-  days rules, or remediating Storage Lens gaps.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Designs and implements automated S3 lifecycle policy deployment across single and multi-account environments. Covers tag-based lifecycle policy deployment via CloudFormation StackSets and Lambda, bucket inventory collection for lifecycle audit, automated storage class transitions (Standard to IA to Glacier to Deep Archive) based on object age patterns, versioning lifecycle rules (NoncurrentVersionTransition and NoncurrentVersionExpiration), Intelligent-Tiering opt-in automation, Storage Lens analysis for identifying buckets without lifecycle policies, S3 Batch Operations for retroactive storage-class tiering of existing objects, lifecycle policy validation enforcing minimum-days rules per tier (30 days for IA, 90 days for Glacier Instant Retrieval), multi- account lifecycle enforcement via StackSets, and EventBridge notifications on lifecycle policy changes. Emits AUTOMATION_DEPLOYED with a fully validated lifecycle configuration or REVIEW_REQUIRED with the specific validation gap. Use when building S3...
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline workflow design. Live deployment
-  uses aws s3api put-bucket-lifecycle-configuration, get-bucket-lifecycle-
-  configuration, put-bucket-intelligent-tiering-configuration, aws s3control
-  create-job, get-storage-lens-configuration, and aws cloudformation
-  create-stack-set, create-stack-instances — AWS CLI v2, SSO or key-based
-  credentials.
-keywords:
-  - S3 lifecycle
-  - lifecycle policy
-  - storage class transition
-  - Standard to IA
-  - Glacier
-  - Deep Archive
-  - Intelligent-Tiering
-  - NoncurrentVersionTransition
-  - NoncurrentVersionExpiration
-  - S3 Batch Operations
-  - Storage Lens
-  - CloudFormation StackSets
-  - lifecycle validation
-  - min-days rules
-  - multi-account lifecycle
-  - tag-based lifecycle
-tags: [aws-s3, s3-lifecycle, storage-tiering, intelligent-tiering, storage-lens, batch-operations, automate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline workflow design. Live deployment uses aws s3api put-bucket-lifecycle-configuration, get-bucket-lifecycle- configuration, put-bucket-intelligent-tiering-configuration, aws s3control create-job, get-storage-lens-configuration, and aws cloudformation create-stack-set, create-stack-instances — AWS CLI v2, SSO or key-based credentials.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATION_DEPLOYED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Building S3 lifecycle automation, deploying tiering policies (Standard
-    to IA to Glacier to Deep Archive), setting up versioning lifecycle
-    rules (NoncurrentVersionTransition, NoncurrentVersionExpiration),
-    enabling Intelligent-Tiering at scale, remediating Storage Lens gaps,
-    running S3 Batch Operations for retroactive tiering, validating
-    lifecycle min-days rules, or deploying multi-account lifecycle via
-    StackSets.
-  activation_triggers:
-    - "automate S3 lifecycle policy"
-    - "deploy lifecycle StackSets"
-    - "put-bucket-lifecycle-configuration"
-    - "Standard to IA to Glacier transition"
-    - "NoncurrentVersionTransition"
-    - "Intelligent-Tiering opt-in"
-    - "S3 Batch Operations tiering"
-    - "Storage Lens lifecycle gap"
-    - "lifecycle min-days validation"
-    - "multi-account lifecycle enforcement"
-  invocation_schema: >-
-    Input: either (a) an S3 lifecycle requirement ("transition objects to
-    IA after 30 days, Glacier after 90 days", "expire non-current versions
-    after 60 days"), OR (b) a Storage Lens report identifying buckets
-    without lifecycle policies. Output: deterministic LIFECYCLE block per
-    bucket — POLICY/TRANSITIONS/VERSIONING/VALIDATION/ENFORCEMENT/
-    VERDICT — where VERDICT is AUTOMATION_DEPLOYED (policy validated and
-    ready) or REVIEW_REQUIRED (specific gap cited).
+  verdict_shape: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
+  when_to_use: Building S3 lifecycle automation, deploying tiering policies (Standard to IA to Glacier to Deep Archive), setting up versioning lifecycle rules (NoncurrentVersionTransition, NoncurrentVersionExpiration), enabling Intelligent-Tiering at scale, remediating Storage Lens gaps, running S3 Batch Operations for retroactive tiering, validating lifecycle min-days rules, or deploying multi-account lifecycle via StackSets.
+  activation_triggers: automate S3 lifecycle policy, deploy lifecycle StackSets, put-bucket-lifecycle-configuration, Standard to IA to Glacier transition, NoncurrentVersionTransition, Intelligent-Tiering opt-in, S3 Batch Operations tiering, Storage Lens lifecycle gap, lifecycle min-days validation, multi-account lifecycle enforcement
+  invocation_schema: 'Input: either (a) an S3 lifecycle requirement ("transition objects to IA after 30 days, Glacier after 90 days", "expire non-current versions after 60 days"), OR (b) a Storage Lens report identifying buckets without lifecycle policies. Output: deterministic LIFECYCLE block per bucket — POLICY/TRANSITIONS/VERSIONING/VALIDATION/ENFORCEMENT/ VERDICT — where VERDICT is AUTOMATION_DEPLOYED (policy validated and ready) or REVIEW_REQUIRED (specific gap cited).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: S3 lifecycle, lifecycle policy, storage class transition, Standard to IA, Glacier, Deep Archive, Intelligent-Tiering, NoncurrentVersionTransition, NoncurrentVersionExpiration, S3 Batch Operations, Storage Lens, CloudFormation StackSets, lifecycle validation, min-days rules, multi-account lifecycle, tag-based lifecycle
+  tags: aws-s3, s3-lifecycle, storage-tiering, intelligent-tiering, storage-lens, batch-operations, automate
 ---
 
 # S3 Lifecycle Automator

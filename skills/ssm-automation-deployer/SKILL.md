@@ -1,120 +1,26 @@
 ---
 name: ssm-automation-deployer
-description: >-
-  Provisions AWS Systems Manager (SSM) Automation documents with
-  production defaults: document type (Automation, Command, Session),
-  schema version, parameters, mainSteps (aws:executeAwsApi,
-  aws:runInstances, aws:invokeLambdaFunction, aws:sleep,
-  aws:changeInstanceState, aws:branch), targets via resource groups
-  and tags, rate control (concurrency, error threshold), automation
-  execution role trust policy, SNS notifications, document sharing,
-  version management, nested runbook, and EventBridge integration.
-  Emits a READY_TO_DEPLOY checklist with verification commands. Use
-  when creating an SSM Automation runbook, designing multi-step
-  remediation workflows, setting up aws:branch conditional routing,
-  configuring rate control, or integrating EventBridge schedules.
-  Triggers: create SSM Automation document, SSM runbook,
-  aws:executeAwsApi, aws:invokeLambdaFunction, aws:branch, SSM rate
-  control, SSM execution role, EventBridge SSM automation, nested
-  runbook, SSM document version management.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Systems Manager (SSM) Automation documents with production defaults: document type (Automation, Command, Session), schema version, parameters, mainSteps (aws:executeAwsApi, aws:runInstances, aws:invokeLambdaFunction, aws:sleep, aws:changeInstanceState, aws:branch), targets via resource groups and tags, rate control (concurrency, error threshold), automation execution role trust policy, SNS notifications, document sharing, version management, nested runbook, and EventBridge integration. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating an SSM Automation runbook, designing multi-step remediation workflows, setting up aws:branch conditional routing, configuring rate control, or integrating EventBridge schedules. Triggers: create SSM Automation document, SSM runbook, aws:executeAwsApi, aws:invokeLambdaFunction, aws:branch, SSM rate control, SSM execution role, EventBridge SSM automation, nested runbook, SSM document version management.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with ssm, iam,
-  lambda, events, and sns access. Works with Terraform
-  aws_ssm_document resources and CloudFormation
-  AWS::SSM::Document templates.
-keywords:
-  - aws
-  - systems manager
-  - ssm
-  - automation
-  - runbook
-  - document
-  - cloudops
-  - deploy
-  - provisioning
-  - aws:executeAwsApi
-  - aws:invokeLambdaFunction
-  - aws:runInstances
-  - aws:changeInstanceState
-  - aws:sleep
-  - aws:branch
-  - rate control
-  - concurrency
-  - error threshold
-  - resource groups
-  - targets
-  - execution role
-  - sns notification
-  - eventbridge
-  - nested runbook
-  - version management
-tags:
-  - aws
-  - ssm
-  - automation
-  - runbook
-  - cloudops
-  - deploy
-  - management
-  - provisioning
-  - remediation
-  - eventbridge
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with ssm, iam, lambda, events, and sns access. Works with Terraform aws_ssm_document resources and CloudFormation AWS::SSM::Document templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - ssm
-    - automation
-    - runbook
-    - cloudops
-    - deploy
-    - management
-    - provisioning
-    - remediation
-    - eventbridge
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create ssm automation document
-    - ssm runbook
-    - aws:executeawsapi
-    - aws:invokelambdafunction
-    - aws:branch conditional
-    - ssm rate control
-    - ssm automation execution role
-    - eventbridge ssm automation
-    - nested runbook
-    - ssm document version management
-  when_to_use: >-
-    Invoke when the user wants to create an SSM Automation document
-    (runbook), design multi-step remediation or operational workflows,
-    use aws:branch for conditional step routing, configure rate
-    control (concurrency and error threshold) for target execution,
-    set up the automation execution role with correct trust policy,
-    wire SNS notifications on success/failure, share documents
-    (private vs public), manage document versions, build nested
-    runbooks, or integrate with EventBridge for scheduled automations.
-    Do NOT invoke for SSM Session Manager (use session skills), SSM
-    Patch Manager (use patch skills), or SSM Parameter Store (use
-    parameter skills).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, ssm, automation, runbook, cloudops, deploy, management, provisioning, remediation, eventbridge
+  dependencies: aws-orchestrator
+  keywords: aws, systems manager, ssm, automation, runbook, document, cloudops, deploy, provisioning, aws:executeAwsApi, aws:invokeLambdaFunction, aws:runInstances, aws:changeInstanceState, aws:sleep, aws:branch, rate control, concurrency, error threshold, resource groups, targets, execution role, sns notification, eventbridge, nested runbook, version management
+  when_to_use: Invoke when the user wants to create an SSM Automation document (runbook), design multi-step remediation or operational workflows, use aws:branch for conditional step routing, configure rate control (concurrency and error threshold) for target execution, set up the automation execution role with correct trust policy, wire SNS notifications on success/failure, share documents (private vs public), manage document versions, build nested runbooks, or integrate with EventBridge for scheduled automations. Do NOT invoke for SSM Session Manager (use session skills), SSM Patch Manager (use patch skills), or SSM Parameter Store (use parameter skills).
 ---
 
 # SSM Automation Deployer

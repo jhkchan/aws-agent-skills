@@ -1,114 +1,26 @@
 ---
 name: eks-add-on-deployer
-description: >-
-  Provisions Amazon EKS add-ons with production defaults: add-on types
-  (vpc-cni, coredns, kube-proxy, aws-ebs-csi-driver, metrics-server,
-  adot, guardduty-agent), version management (EKS-managed vs self-managed
-  add-ons and conflict resolution), configuration values (override
-  existing add-on config via --configuration-values), IAM roles for
-  service accounts (IRSA), EKS Pod Identity (newest credential method),
-  EKS Auto Mode add-ons (auto-managed lifecycle), and EKS Hybrid Nodes
-  add-on support. Emits a READY_TO_DEPLOY checklist with verification
-  commands. Use when provisioning EKS add-ons, resolving EKS-managed vs
-  self-managed conflicts, configuring IRSA for add-ons, migrating to EKS
-  Pod Identity, or enabling EKS Auto Mode add-ons. Triggers: create EKS
-  add-on, vpc-cni, coredns, kube-proxy, aws-ebs-csi-driver, EKS Pod
-  Identity, EKS Auto Mode, EKS Hybrid Nodes, IRSA add-on, adot
-  guardduty-agent, metrics-server EKS.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon EKS add-ons with production defaults: add-on types (vpc-cni, coredns, kube-proxy, aws-ebs-csi-driver, metrics-server, adot, guardduty-agent), version management (EKS-managed vs self-managed add-ons and conflict resolution), configuration values (override existing add-on config via --configuration-values), IAM roles for service accounts (IRSA), EKS Pod Identity (newest credential method), EKS Auto Mode add-ons (auto-managed lifecycle), and EKS Hybrid Nodes add-on support. Emits a READY_TO_DEPLOY checklist with verification commands. Use when provisioning EKS add-ons, resolving EKS-managed vs self-managed conflicts, configuring IRSA for add-ons, migrating to EKS Pod Identity, or enabling EKS Auto Mode add-ons. Triggers: create EKS add-on, vpc-cni, coredns, kube-proxy, aws-ebs-csi-driver, EKS Pod Identity, EKS Auto Mode, EKS Hybrid Nodes, IRSA add-on, adot guardduty-agent, metrics-server EKS.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). For live deployment: AWS CLI v2 with eks, iam access. Works
-  with Terraform aws_eks_add_on resource and CloudFormation
-  AWS::EKS::Addon templates. Requires kubectl for post-deploy verification.
-keywords:
-  - aws
-  - eks
-  - kubernetes
-  - add-on
-  - addon
-  - vpc-cni
-  - coredns
-  - kube-proxy
-  - aws-ebs-csi-driver
-  - metrics-server
-  - adot
-  - guardduty-agent
-  - cloudops
-  - deploy
-  - provisioning
-  - irsa
-  - iam roles for service accounts
-  - eks pod identity
-  - eks auto mode
-  - eks hybrid nodes
-  - configuration values
-tags:
-  - aws
-  - eks
-  - kubernetes
-  - addon
-  - compute
-  - cloudops
-  - deploy
-  - provisioning
-  - irsa
-  - eks-pod-identity
-  - eks-auto-mode
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with eks, iam access. Works with Terraform aws_eks_add_on resource and CloudFormation AWS::EKS::Addon templates. Requires kubectl for post-deploy verification.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - eks
-    - kubernetes
-    - addon
-    - compute
-    - cloudops
-    - deploy
-    - provisioning
-    - irsa
-    - eks-pod-identity
-    - eks-auto-mode
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create eks add-on
-    - vpc-cni eks add-on
-    - coredns eks add-on
-    - kube-proxy eks add-on
-    - aws-ebs-csi-driver eks
-    - eks pod identity add-on
-    - eks auto mode add-on
-    - eks hybrid nodes add-on
-    - irsa eks add-on
-    - eks add-on configuration values
-  when_to_use: >-
-    Invoke when the user wants to create or update EKS add-ons (vpc-cni,
-    coredns, kube-proxy, aws-ebs-csi-driver, metrics-server, adot,
-    guardduty-agent), resolve EKS-managed vs self-managed add-on
-    conflicts, configure IAM roles for add-ons (IRSA or EKS Pod Identity),
-    set add-on configuration values, enable EKS Auto Mode add-ons, or
-    deploy add-ons for EKS Hybrid Nodes. Do NOT invoke for creating the
-    EKS cluster itself (use eks-cluster-deployer if available), for
-    installing Helm charts that are not EKS add-ons, for self-managed
-    Kubernetes controllers outside the EKS add-on framework, or for
-    auditing EKS add-on versions (use eks-cluster-auditor).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, eks, kubernetes, addon, compute, cloudops, deploy, provisioning, irsa, eks-pod-identity, eks-auto-mode
+  dependencies: aws-orchestrator
+  keywords: aws, eks, kubernetes, add-on, addon, vpc-cni, coredns, kube-proxy, aws-ebs-csi-driver, metrics-server, adot, guardduty-agent, cloudops, deploy, provisioning, irsa, iam roles for service accounts, eks pod identity, eks auto mode, eks hybrid nodes, configuration values
+  when_to_use: Invoke when the user wants to create or update EKS add-ons (vpc-cni, coredns, kube-proxy, aws-ebs-csi-driver, metrics-server, adot, guardduty-agent), resolve EKS-managed vs self-managed add-on conflicts, configure IAM roles for add-ons (IRSA or EKS Pod Identity), set add-on configuration values, enable EKS Auto Mode add-ons, or deploy add-ons for EKS Hybrid Nodes. Do NOT invoke for creating the EKS cluster itself (use eks-cluster-deployer if available), for installing Helm charts that are not EKS add-ons, for self-managed Kubernetes controllers outside the EKS add-on framework, or for auditing EKS add-on versions (use eks-cluster-auditor).
 ---
 
 # EKS Add-On Deployer

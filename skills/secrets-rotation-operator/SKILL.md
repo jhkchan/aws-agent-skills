@@ -1,95 +1,27 @@
 ---
 name: secrets-rotation-operator
-description: >-
-  Operates AWS Secrets Manager rotation workflows end-to-end — rotation
-  Lambda setup (Python template + IAM), rotation configuration (Lambda ARN,
-  cron schedule, automatic vs manual), the four-step rotation cycle
-  (createSecret, setSecret, testSecret, finishSecret with AWSPENDING and
-  AWSCURRENT stage transitions), cross-account Lambda resource-based
-  policies, RDS managed templates vs custom, and full diagnostic loops
-  (describe-secret, get-resource-policy, lambda get-function-configuration,
-  CloudWatch Logs). Runs deterministic pre-checks (Lambda state, execution
-  role, KMS decrypt, VPC ENI reachability, AWSPENDING stuck versions,
-  reserved concurrency) behind a CONFIRM gate and emits a READY, BLOCKED,
-  or COMPLETED verdict per rotation. Use when enabling rotation, debugging
-  a failed rotation, recovering a stuck AWSPENDING version, rotating RDS
-  credentials, or wiring a cross-account rotation Lambda.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates AWS Secrets Manager rotation workflows end-to-end — rotation Lambda setup (Python template + IAM), rotation configuration (Lambda ARN, cron schedule, automatic vs manual), the four-step rotation cycle (createSecret, setSecret, testSecret, finishSecret with AWSPENDING and AWSCURRENT stage transitions), cross-account Lambda resource-based policies, RDS managed templates vs custom, and full diagnostic loops (describe-secret, get-resource-policy, lambda get-function-configuration, CloudWatch Logs). Runs deterministic pre-checks (Lambda state, execution role, KMS decrypt, VPC ENI reachability, AWSPENDING stuck versions, reserved concurrency) behind a CONFIRM gate and emits a READY, BLOCKED, or COMPLETED verdict per rotation. Use when enabling rotation, debugging a failed rotation, recovering a stuck AWSPENDING version, rotating RDS credentials, or wiring a cross-account rotation Lambda.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws secretsmanager describe-secret, get-resource-policy,
-  list-secret-version-ids, rotate-secret, update-secret-version-stage, aws
-  lambda get-function-configuration, get-function-concurrency, get-policy,
-  aws logs filter-log-events, and aws kms describe-key (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - Secrets Manager
-  - secret rotation
-  - rotation Lambda
-  - createSecret
-  - setSecret
-  - testSecret
-  - finishSecret
-  - AWSPENDING
-  - AWSCURRENT
-  - AWSPREVIOUS
-  - rotate-secret
-  - rotation-rules
-  - ScheduleExpression
-  - AutomaticallyAfterDays
-  - RDS credentials
-  - rotation template
-  - cross-account rotation
-  - resource-based policy
-  - Lambda timeout
-  - VPC ENI
-  - reserved concurrency
-  - KMS decrypt
-  - HostedRotationLambda
-tags: [aws, secretsmanager, security, rotation, credentials, lambda, rds, compliance, operate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws secretsmanager describe-secret, get-resource-policy, list-secret-version-ids, rotate-secret, update-secret-version-stage, aws lambda get-function-configuration, get-function-concurrency, get-policy, aws logs filter-log-events, and aws kms describe-key (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Enabling rotation on a Secrets Manager secret, wiring a rotation Lambda
-    (custom or managed template), scheduling rotation via cron or
-    AutomaticallyAfterDays, triggering a manual rotation, diagnosing a
-    failed or stuck (AWSPENDING) rotation, recovering from a credential
-    mismatch, configuring cross-account rotation Lambda access, or
-    validating that RDS database credentials rotate end-to-end.
-  activation_triggers:
-    - "enable secret rotation"
-    - "rotate this secret"
-    - "trigger rotation now"
-    - "configure rotation Lambda"
-    - "rotation Lambda setup"
-    - "rotation failed"
-    - "AWSPENDING stuck"
-    - "credential mismatch after rotation"
-    - "RDS password rotation"
-    - "rotation schedule cron"
-    - "cross-account rotation Lambda"
-    - "diagnose rotation failure"
-    - "Secrets Manager rotation"
-  invocation_schema: >-
-    Input: either (a) a secret configuration (describe-secret output) plus
-    the intended operation (enable-rotation, trigger-rotation, diagnose-
-    rotation, recover-pending, update-config), OR (b) a secret-id +
-    operation for live-account execution. Output: deterministic OPERATION /
-    VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per rotation,
-    where VERDICT is one of READY, BLOCKED, COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Enabling rotation on a Secrets Manager secret, wiring a rotation Lambda (custom or managed template), scheduling rotation via cron or AutomaticallyAfterDays, triggering a manual rotation, diagnosing a failed or stuck (AWSPENDING) rotation, recovering from a credential mismatch, configuring cross-account rotation Lambda access, or validating that RDS database credentials rotate end-to-end.
+  activation_triggers: enable secret rotation, rotate this secret, trigger rotation now, configure rotation Lambda, rotation Lambda setup, rotation failed, AWSPENDING stuck, credential mismatch after rotation, RDS password rotation, rotation schedule cron, cross-account rotation Lambda, diagnose rotation failure, Secrets Manager rotation
+  invocation_schema: 'Input: either (a) a secret configuration (describe-secret output) plus the intended operation (enable-rotation, trigger-rotation, diagnose- rotation, recover-pending, update-config), OR (b) a secret-id + operation for live-account execution. Output: deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per rotation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Secrets Manager, secret rotation, rotation Lambda, createSecret, setSecret, testSecret, finishSecret, AWSPENDING, AWSCURRENT, AWSPREVIOUS, rotate-secret, rotation-rules, ScheduleExpression, AutomaticallyAfterDays, RDS credentials, rotation template, cross-account rotation, resource-based policy, Lambda timeout, VPC ENI, reserved concurrency, KMS decrypt, HostedRotationLambda
+  tags: aws, secretsmanager, security, rotation, credentials, lambda, rds, compliance, operate
 ---
 
 # Secrets Manager Rotation Operator

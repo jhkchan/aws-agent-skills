@@ -1,118 +1,28 @@
 ---
 name: service-catalog-portfolio-deployer
-description: >-
-  Provisions AWS Service Catalog portfolios and products with
-  production-safe defaults: portfolio creation (DisplayName,
-  ProviderName, description), product creation from CloudFormation
-  templates (CLOUDFORMATION_TEMPLATE, semantic versions, provisioning
-  artifacts), constraints (LAUNCH stack/template-based roles,
-  STACK_UPDATE, TAG_UPDATE, NOTIFICATION), launch paths (local +
-  shared via Organizations), portfolio sharing (org, account, OU),
-  TagOptions (key-value pairs applied to launched products), and
-  latest primitives (Terraform Open Source, Service App Registry,
-  Terraform Cloud). Emits READY_TO_DEPLOY / PREREQUISITES_MISSING
-  with verified portfolios, products, constraints, and copy-pasteable
-  servicecatalog + iam + sns commands. Use when provisioning Service
-  Catalog for self-service launchpad, governance-gated distribution,
-  or cross-account template distribution. Triggers: Service Catalog,
-  portfolio, product, launch constraint, TagOptions, organizational
-  sharing, self-service launchpad.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Service Catalog portfolios and products with production-safe defaults: portfolio creation (DisplayName, ProviderName, description), product creation from CloudFormation templates (CLOUDFORMATION_TEMPLATE, semantic versions, provisioning artifacts), constraints (LAUNCH stack/template-based roles, STACK_UPDATE, TAG_UPDATE, NOTIFICATION), launch paths (local + shared via Organizations), portfolio sharing (org, account, OU), TagOptions (key-value pairs applied to launched products), and latest primitives (Terraform Open Source, Service App Registry, Terraform Cloud). Emits READY_TO_DEPLOY / PREREQUISITES_MISSING with verified portfolios, products, constraints, and copy-pasteable servicecatalog + iam + sns commands. Use when provisioning Service Catalog for self-service launchpad, governance-gated distribution, or cross-account template distribution. Triggers: Service Catalog, portfolio, product, launch constraint, TagOptions, organizational sharing, self-service launchpad.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Live provisioning uses AWS CLI v2 with
-  servicecatalog (create-portfolio, create-product, create-constraint,
-  associate-product-with-portfolio, create-portfolio-share,
-  create-tag-option, associate-tag-option-with-resource),
-  cloudformation (validate-template), iam (create-role, pass-role),
-  sns (create-topic), and organizations (enable-aws-service-access,
-  list-delegated-administrators). Works with Terraform
-  aws_servicecatalog_portfolio / aws_servicecatalog_product and
-  CloudFormation AWS::ServiceCatalog::* resources.
-keywords:
-- aws
-- service catalog
-- portfolio
-- product
-- provisioning artifact
-- launch constraint
-- stack-based constraint
-- template-based constraint
-- tag-update constraint
-- notification constraint
-- launch path
-- portfolio share
-- organizational sharing
-- tagoptions
-- self-service launchpad
-- cloudformation product
-- product versioning
-- service app registry
-- cloudops
-- deploy
-tags:
-- aws
-- service-catalog
-- portfolio
-- product
-- launch-constraint
-- tagoptions
-- governance
-- deploy
-dependencies:
-- aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Live provisioning uses AWS CLI v2 with servicecatalog (create-portfolio, create-product, create-constraint, associate-product-with-portfolio, create-portfolio-share, create-tag-option, associate-tag-option-with-resource), cloudformation (validate-template), iam (create-role, pass-role), sns (create-topic), and organizations (enable-aws-service-access, list-delegated-administrators). Works with Terraform...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
-  when_to_use: >-
-    Provisioning a Service Catalog portfolio for self-service product
-    distribution; creating a product from a CloudFormation template;
-    applying constraints (launch role, tag update, stack update,
-    notification); configuring launch paths for a local account or
-    sharing a portfolio via AWS Organizations; setting up TagOptions
-    for governed tag application; integrating Service Catalog with
-    Service App Registry for application inventory tagging; or
-    provisioning Service Catalog with Terraform Open Source. Do NOT
-    invoke for launching a product instance (use the appropriate
-    operate skill), for AWS Marketplace integration (separate workflow),
-    or for non-Service-Catalog CloudFormation deployment.
-  activation_triggers:
-  - Service Catalog portfolio
-  - Service Catalog product
-  - launch constraint
-  - stack-based constraint
-  - template-based constraint
-  - tag-update constraint
-  - notification constraint
-  - launch path
-  - portfolio share
-  - organizational sharing
-  - TagOptions
-  - self-service launchpad
-  - CloudFormation product
-  - product versioning
-  - Service App Registry
-  - Service Catalog Terraform
-  invocation_schema: >-
-    Input: either (a) a portfolio spec including DisplayName,
-    ProviderName, products (name + CloudFormation URL + version),
-    constraints, launch paths, TagOptions, and sharing target; or
-    (b) a partial spec for interactive refinement (e.g., "Service
-    Catalog portfolio with a curated S3-bucket product and a launch
-    role"). Output: a deterministic PORTFOLIO / VERDICT / CHECKLIST /
-    VERIFICATION_COMMANDS block per the STRICT output contract, where
-    VERDICT is READY_TO_DEPLOY or PREREQUISITES_MISSING.
+  when_to_use: Provisioning a Service Catalog portfolio for self-service product distribution; creating a product from a CloudFormation template; applying constraints (launch role, tag update, stack update, notification); configuring launch paths for a local account or sharing a portfolio via AWS Organizations; setting up TagOptions for governed tag application; integrating Service Catalog with Service App Registry for application inventory tagging; or provisioning Service Catalog with Terraform Open Source. Do NOT invoke for launching a product instance (use the appropriate operate skill), for AWS Marketplace integration (separate workflow), or for non-Service-Catalog CloudFormation deployment.
+  activation_triggers: Service Catalog portfolio, Service Catalog product, launch constraint, stack-based constraint, template-based constraint, tag-update constraint, notification constraint, launch path, portfolio share, organizational sharing, TagOptions, self-service launchpad, CloudFormation product, product versioning, Service App Registry, Service Catalog Terraform
+  invocation_schema: 'Input: either (a) a portfolio spec including DisplayName, ProviderName, products (name + CloudFormation URL + version), constraints, launch paths, TagOptions, and sharing target; or (b) a partial spec for interactive refinement (e.g., "Service Catalog portfolio with a curated S3-bucket product and a launch role"). Output: a deterministic PORTFOLIO / VERDICT / CHECKLIST / VERIFICATION_COMMANDS block per the STRICT output contract, where VERDICT is READY_TO_DEPLOY or PREREQUISITES_MISSING.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: aws, service catalog, portfolio, product, provisioning artifact, launch constraint, stack-based constraint, template-based constraint, tag-update constraint, notification constraint, launch path, portfolio share, organizational sharing, tagoptions, self-service launchpad, cloudformation product, product versioning, service app registry, cloudops, deploy
+  tags: aws, service-catalog, portfolio, product, launch-constraint, tagoptions, governance, deploy
+  dependencies: aws-orchestrator
 ---
 
 # Service Catalog Portfolio Deployer

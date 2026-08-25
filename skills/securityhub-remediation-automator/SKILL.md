@@ -1,85 +1,27 @@
 ---
 name: securityhub-remediation-automator
-description: >-
-  Designs automated remediation workflows for AWS Security Hub findings using
-  EventBridge rules, SSM Automation runbooks, and Lambda remediation functions.
-  Routes findings by severity (Critical/High auto-remediate, Medium/Low
-  notify-only), maps finding types to runbooks or custom Lambda fixers, manages
-  workflow status updates (NEW to NOTIFIED to RESOLVED via
-  batch-update-findings), configures suppression rules with expiration, deploys
-  Security Hub insights for tracking, enables control standards (FSBP, CIS, PCI
-  DSS), integrates with Systems Manager Incident Manager for critical
-  escalation, and orchestrates multi-account remediation via Organizations
-  delegation. Emits AUTOMATION_DEPLOYED or REVIEW_REQUIRED with the specific gap.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Designs automated remediation workflows for AWS Security Hub findings using EventBridge rules, SSM Automation runbooks, and Lambda remediation functions. Routes findings by severity (Critical/High auto-remediate, Medium/Low notify-only), maps finding types to runbooks or custom Lambda fixers, manages workflow status updates (NEW to NOTIFIED to RESOLVED via batch-update-findings), configures suppression rules with expiration, deploys Security Hub insights for tracking, enables control standards (FSBP, CIS, PCI DSS), integrates with Systems Manager Incident Manager for critical escalation, and orchestrates multi-account remediation via Organizations delegation. Emits AUTOMATION_DEPLOYED or REVIEW_REQUIRED with the specific gap.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline workflow design. Live deployment
-  uses aws securityhub enable-security-hub, update-standards, create-action-target,
-  batch-update-findings, create-insight, aws events put-rule, put-targets,
-  aws ssm start-automation-execution, aws lambda create-function, and
-  aws cloudformation deploy — AWS CLI v2, SSO or key-based credentials.
-keywords:
-  - AWS Security Hub
-  - Security Hub remediation
-  - custom action
-  - EventBridge finding
-  - SSM Automation runbook
-  - Lambda remediation
-  - finding severity routing
-  - batch-update-findings
-  - workflow status
-  - suppression rule
-  - Security Hub insight
-  - CIS benchmark
-  - PCI DSS
-  - AWS Foundational Security Best Practices
-  - FSBP
-  - Systems Manager Incident Manager
-  - Organizations delegation
-  - control enablement
-  - compliance standard
-tags: [aws-security-hub, security-hub, eventbridge, ssm-automation, lambda-remediation, compliance, automate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline workflow design. Live deployment uses aws securityhub enable-security-hub, update-standards, create-action-target, batch-update-findings, create-insight, aws events put-rule, put-targets, aws ssm start-automation-execution, aws lambda create-function, and aws cloudformation deploy — AWS CLI v2, SSO or key-based credentials.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATION_DEPLOYED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Designing auto-remediation for Security Hub findings, wiring EventBridge
-    custom actions to findings, building severity-based remediation routing
-    (Critical/High auto-fix, Medium/Low notify), enabling compliance standards
-    (CIS, PCI DSS, FSBP) with automated enforcement, configuring suppression
-    rules for accepted risks, deploying Security Hub insights for remediation
-    tracking, or orchestrating multi-account remediation via Organizations
-    delegated administrator.
-  activation_triggers:
-    - "automate Security Hub remediation"
-    - "Security Hub custom action"
-    - "EventBridge finding to runbook"
-    - "severity-based remediation SLA"
-    - "batch-update-findings workflow status"
-    - "Security Hub suppression rule"
-    - "Security Hub insight for tracking"
-    - "enable CIS PCI FSBP standard"
-    - "Systems Manager Incident Manager integration"
-    - "Security Hub multi-account delegation"
-  invocation_schema: >-
-    Input: either (a) a Security Hub finding type or standard control identifier
-    plus target resource context, OR (b) a remediation requirement. Output:
-    deterministic REMEDIATION block per finding type —
-    FINDING_TYPE/SEVERITY_ROUTE/RUNBOOK/TRIGGER/SAFETY/SUPPRESSION/VERDICT —
-    where VERDICT is AUTOMATION_DEPLOYED (deployment-ready template) or
-    REVIEW_REQUIRED (specific gap cited).
+  verdict_shape: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
+  when_to_use: Designing auto-remediation for Security Hub findings, wiring EventBridge custom actions to findings, building severity-based remediation routing (Critical/High auto-fix, Medium/Low notify), enabling compliance standards (CIS, PCI DSS, FSBP) with automated enforcement, configuring suppression rules for accepted risks, deploying Security Hub insights for remediation tracking, or orchestrating multi-account remediation via Organizations delegated administrator.
+  activation_triggers: automate Security Hub remediation, Security Hub custom action, EventBridge finding to runbook, severity-based remediation SLA, batch-update-findings workflow status, Security Hub suppression rule, Security Hub insight for tracking, enable CIS PCI FSBP standard, Systems Manager Incident Manager integration, Security Hub multi-account delegation
+  invocation_schema: 'Input: either (a) a Security Hub finding type or standard control identifier plus target resource context, OR (b) a remediation requirement. Output: deterministic REMEDIATION block per finding type — FINDING_TYPE/SEVERITY_ROUTE/RUNBOOK/TRIGGER/SAFETY/SUPPRESSION/VERDICT — where VERDICT is AUTOMATION_DEPLOYED (deployment-ready template) or REVIEW_REQUIRED (specific gap cited).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Security Hub, Security Hub remediation, custom action, EventBridge finding, SSM Automation runbook, Lambda remediation, finding severity routing, batch-update-findings, workflow status, suppression rule, Security Hub insight, CIS benchmark, PCI DSS, AWS Foundational Security Best Practices, FSBP, Systems Manager Incident Manager, Organizations delegation, control enablement, compliance standard
+  tags: aws-security-hub, security-hub, eventbridge, ssm-automation, lambda-remediation, compliance, automate
 ---
 
 # Security Hub Remediation Automator

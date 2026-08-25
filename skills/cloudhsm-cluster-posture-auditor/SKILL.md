@@ -1,76 +1,24 @@
 ---
 name: cloudhsm-cluster-posture-auditor
-description: >-
-  Audits AWS CloudHSM clusters for high-availability posture (HSM count and
-  cross-AZ distribution), backup/restore readiness (retention policy, backup
-  recency, restorability), PKCS#11 user management (default CO password,
-  quorum), cluster initialization (certificate signing chain), and subnet/
-  security-group network exposure. Emits a deterministic verdict (SINGLE_AZ |
-  NO_BACKUP | CONFIG_GAP | OK) per cluster with enumerated findings and
-  specific remediation. Use when reviewing CloudHSM cluster configuration,
-  checking HA readiness, validating backup posture, auditing PKCS#11 user
-  hygiene, or hardening HSM security before production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS CloudHSM clusters for high-availability posture (HSM count and cross-AZ distribution), backup/restore readiness (retention policy, backup recency, restorability), PKCS#11 user management (default CO password, quorum), cluster initialization (certificate signing chain), and subnet/ security-group network exposure. Emits a deterministic verdict (SINGLE_AZ | NO_BACKUP | CONFIG_GAP | OK) per cluster with enumerated findings and specific remediation. Use when reviewing CloudHSM cluster configuration, checking HA readiness, validating backup posture, auditing PKCS#11 user hygiene, or hardening HSM security before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline cluster-config classification.
-  Live-account audits use aws cloudhsm describe-clusters, aws cloudhsm
-  describe-backups, and cloudhsm_mgmt_util (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-  - CloudHSM
-  - cluster posture
-  - high availability
-  - HSM
-  - PKCS#11
-  - backup
-  - cross-AZ
-  - single-AZ
-  - certificate signing
-  - InitializeCluster
-  - Crypto Officer
-  - CO password
-  - quorum
-  - subnet routing
-  - security group
-  - FIPS 140-2
-  - key management
-  - hardware security module
-  - backup retention
-  - cluster initialization
-tags: [cloudhsm, security, ha, backup, pkcs11, hsm, fips, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline cluster-config classification. Live-account audits use aws cloudhsm describe-clusters, aws cloudhsm describe-backups, and cloudhsm_mgmt_util (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
-  verdict_shape: "SINGLE_AZ | NO_BACKUP | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a CloudHSM cluster before production deployment, checking HA
-    readiness across availability zones, validating backup posture and
-    retention, auditing PKCS#11 user management, inspecting cluster
-    initialization state, or hardening HSM network exposure.
-  activation_triggers:
-    - "audit this CloudHSM cluster"
-    - "check CloudHSM HA posture"
-    - "is my CloudHSM cluster highly available"
-    - "CloudHSM backup readiness"
-    - "CloudHSM PKCS#11 user audit"
-    - "CloudHSM single AZ risk"
-    - "CloudHSM cluster initialized"
-    - "harden CloudHSM cluster"
-  invocation_schema: >-
-    Input: either (a) a CloudHSM cluster configuration (describe-clusters
-    output plus PKCS#11 management metadata), optionally paired with backup
-    details, OR (b) a cluster-id for live-account audit.
-    Output: deterministic CLUSTER/VERDICT/REASON/FINDINGS/REMEDIATION block
-    per cluster, where VERDICT is one of SINGLE_AZ, NO_BACKUP, CONFIG_GAP,
-    OK, or ERROR.
+  verdict_shape: SINGLE_AZ | NO_BACKUP | CONFIG_GAP | OK
+  when_to_use: Reviewing a CloudHSM cluster before production deployment, checking HA readiness across availability zones, validating backup posture and retention, auditing PKCS#11 user management, inspecting cluster initialization state, or hardening HSM network exposure.
+  activation_triggers: audit this CloudHSM cluster, check CloudHSM HA posture, is my CloudHSM cluster highly available, CloudHSM backup readiness, CloudHSM PKCS#11 user audit, CloudHSM single AZ risk, CloudHSM cluster initialized, harden CloudHSM cluster
+  invocation_schema: 'Input: either (a) a CloudHSM cluster configuration (describe-clusters output plus PKCS#11 management metadata), optionally paired with backup details, OR (b) a cluster-id for live-account audit. Output: deterministic CLUSTER/VERDICT/REASON/FINDINGS/REMEDIATION block per cluster, where VERDICT is one of SINGLE_AZ, NO_BACKUP, CONFIG_GAP, OK, or ERROR.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudHSM, cluster posture, high availability, HSM, PKCS#11, backup, cross-AZ, single-AZ, certificate signing, InitializeCluster, Crypto Officer, CO password, quorum, subnet routing, security group, FIPS 140-2, key management, hardware security module, backup retention, cluster initialization
+  tags: cloudhsm, security, ha, backup, pkcs11, hsm, fips, audit
 ---
 
 # CloudHSM Cluster Posture Auditor

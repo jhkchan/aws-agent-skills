@@ -1,129 +1,28 @@
 ---
 name: cost-anomaly-response-automator
-description: >-
-  Designs automated AWS cost-anomaly detection and response workflows
-  across AWS Cost Anomaly Detection (CAD) monitors (service, linked
-  account, daily/weekly/monthly cadence), anomaly subscriptions (SNS),
-  automated response patterns (EventBridge to Lambda: notify Slack or
-  Teams, tag suspect resources, trigger a Budgets action), AWS Budgets
-  cost-budget auto-actions (IAM policy attach, EC2 stop), Cost Explorer
-  anomaly views, and CUR (Cost and Usage Report) analysis automation
-  (Athena top-spenders queries). Layers in the latest: CAD with ML
-  impact evaluation, Amazon Q cost-optimization recommendations, and
-  Budgets advanced actions. Enforces guardrails: dry-run first,
-  human-approval gate for any resource-stopping action, scoped IAM,
-  idempotency, full CloudTrail audit. Emits AUTOMATED with response
-  plan or MANUAL_STEP_REQUIRED with the specific gap. Use when wiring
-  Cost Anomaly Detection or Budgets to a notification or remediation
-  pipeline.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Designs automated AWS cost-anomaly detection and response workflows across AWS Cost Anomaly Detection (CAD) monitors (service, linked account, daily/weekly/monthly cadence), anomaly subscriptions (SNS), automated response patterns (EventBridge to Lambda: notify Slack or Teams, tag suspect resources, trigger a Budgets action), AWS Budgets cost-budget auto-actions (IAM policy attach, EC2 stop), Cost Explorer anomaly views, and CUR (Cost and Usage Report) analysis automation (Athena top-spenders queries). Layers in the latest: CAD with ML impact evaluation, Amazon Q cost-optimization recommendations, and Budgets advanced actions. Enforces guardrails: dry-run first, human-approval gate for any resource-stopping action, scoped IAM, idempotency, full CloudTrail audit. Emits AUTOMATED with response plan or MANUAL_STEP_REQUIRED with the specific gap. Use when wiring Cost Anomaly Detection or Budgets to a notification or remediation pipeline.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline plan authoring. Live
-  deployment uses aws ce create-anomaly-monitor, create-anomaly-
-  subscription, get-anomalies; aws budgets create-budget,
-  put-budget-action; aws cur describe-report-definitions; aws athena
-  start-query-execution; aws sns create-topic / subscribe; aws
-  events put-rule / put-targets; aws lambda create-function; aws
-  resourcegroupstaggingapi tag-resources; aws cost-optimization-hub
-  get-recommendations. Requires AWS CLI v2 with ce, budgets, cur,
-  athena, sns, events, lambda, iam, ec2, s3, and
-  resourcegroupstaggingapi access (SSO or key-based).
-keywords:
-  - Cost Anomaly Detection
-  - CAD
-  - AWS Budgets
-  - cost budget
-  - budget action
-  - anomaly subscription
-  - SNS alert
-  - Cost Explorer
-  - Cost and Usage Report
-  - CUR
-  - Athena top spenders
-  - Amazon Q cost optimization
-  - EventBridge
-  - Lambda remediation
-  - Slack notification
-  - Teams notification
-  - FinOps
-  - cost governance
-  - EC2 stop budget action
-  - IAM policy budget action
-  - spend automation
-tags:
-  - finops
-  - cost-anomaly
-  - budgets
-  - automation
-  - cost-explorer
-  - cur
-  - eventbridge
-  - lambda
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan authoring. Live deployment uses aws ce create-anomaly-monitor, create-anomaly- subscription, get-anomalies; aws budgets create-budget, put-budget-action; aws cur describe-report-definitions; aws athena start-query-execution; aws sns create-topic / subscribe; aws events put-rule / put-targets; aws lambda create-function; aws resourcegroupstaggingapi tag-resources; aws...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: FinOps
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATED | MANUAL_STEP_REQUIRED"
-  when_to_use: >-
-    Designing an automated cost-anomaly response for AWS, wiring Cost
-    Anomaly Detection or AWS Budgets to a notification (Slack, Teams,
-    email) or remediation (tag suspect resources, attach an IAM deny
-    policy, stop EC2), building the CUR Athena top-spenders query that
-    feeds the response pipeline, layering Amazon Q cost-optimization
-    recommendations onto anomaly alerts, or hardening an existing
-    spend-response workflow with dry-run, approval gate, and audit.
-  when_not_to_use:
-    - "Manual cost triage — this skill designs automation; use a human-driven cost review for one-off investigations."
-    - "RI/SP purchasing strategy — commitment decisions are strategic; use a Savings Plan negotiation skill, not a real-time response pipeline."
-    - "Billing accuracy disputes — use AWS Support; this skill automates response, not charge correction."
-    - "Showback/chargeback reporting — use CUR + Athena + QuickSight; this skill is for anomaly response, not periodic reporting."
-  activation_triggers:
-    - "automate cost anomaly response"
-    - "Cost Anomaly Detection to Slack"
-    - "Budgets action on cost overrun"
-    - "SNS alert on spend anomaly"
-    - "EventBridge Lambda cost remediation"
-    - "stop EC2 on budget breach"
-    - "IAM deny policy budget action"
-    - "CUR Athena top spenders"
-    - "Amazon Q cost optimization"
-    - "cost budget auto-action"
-    - "tag resources on anomaly"
-    - "anomaly subscription SNS"
-  invocation_schema:
-    type: object
-    required: [detection_source, response_scope]
-    properties:
-      detection_source:
-        type: enum
-        enum: [cad, budgets, ce-anomaly, cur, q-recommendations]
-        description: The detection source that triggers the workflow.
-      response_scope:
-        type: enum
-        enum: [notify, tag, budget-action, full-playbook, cur-analysis]
-        description: Which response phases to automate.
-      severity_threshold:
-        type: number
-        description: USD impact (CAD) or % of budget (Budgets). Default 100 USD / 80%.
-      existing_workflow:
-        type: object
-        description: Existing EventBridge rule + Lambda or Step Functions definition. When provided, runs the guardrail + audit gate.
-    output: >-
-      Deterministic block: DETECTION_SOURCE / RESPONSE_SCOPE / VERDICT /
-      WORKFLOW / GUARDRAILS / AUDIT / FINDINGS / REMEDIATION. VERDICT is
-      AUTOMATED when complete with dry-run, scoped IAM, approval gate
-      before resource-stopping actions, and CloudTrail-auditable record;
-      MANUAL_STEP_REQUIRED when a guardrail or coverage gate fails.
+  verdict_shape: AUTOMATED | MANUAL_STEP_REQUIRED
+  when_to_use: Designing an automated cost-anomaly response for AWS, wiring Cost Anomaly Detection or AWS Budgets to a notification (Slack, Teams, email) or remediation (tag suspect resources, attach an IAM deny policy, stop EC2), building the CUR Athena top-spenders query that feeds the response pipeline, layering Amazon Q cost-optimization recommendations onto anomaly alerts, or hardening an existing spend-response workflow with dry-run, approval gate, and audit.
+  when_not_to_use: Manual cost triage — this skill designs automation; use a human-driven cost review for one-off investigations., RI/SP purchasing strategy — commitment decisions are strategic; use a Savings Plan negotiation skill, not a real-time response pipeline., Billing accuracy disputes — use AWS Support; this skill automates response, not charge correction., Showback/chargeback reporting — use CUR + Athena + QuickSight; this skill is for anomaly response, not periodic reporting.
+  activation_triggers: automate cost anomaly response, Cost Anomaly Detection to Slack, Budgets action on cost overrun, SNS alert on spend anomaly, EventBridge Lambda cost remediation, stop EC2 on budget breach, IAM deny policy budget action, CUR Athena top spenders, Amazon Q cost optimization, cost budget auto-action, tag resources on anomaly, anomaly subscription SNS
+  invocation_schema: "{output: 'Deterministic block: DETECTION_SOURCE / RESPONSE_SCOPE / VERDICT / WORKFLOW\n    / GUARDRAILS / AUDIT / FINDINGS / REMEDIATION. VERDICT is AUTOMATED when complete\n    with dry-run, scoped IAM, approval gate before resource-stopping actions, and\n    CloudTrail-auditable record; MANUAL_STEP_REQUIRED when a guardrail or coverage\n    gate fails.', properties: {detection_source: {description: The detection source\n        that triggers the workflow., enum: [cad, budgets, ce-anomaly, cur, q-recommendations],\n      type: enum}, existing_workflow: {description: 'Existing EventBridge rule + Lambda\n        or Step Functions definition. When provided, runs the guardrail + audit gate.',\n      type: object}, response_scope: {description: Which response phases to automate.,\n      enum: [notify, tag, budget-action, full-playbook, cur-analysis], type: enum},\n    severity_threshold: {description: USD impact (CAD) or % of budget (Budgets). Default\n        100 USD / 80%., type: number}}, required: [detection_source, response_scope],\n  type: object}"
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Cost Anomaly Detection, CAD, AWS Budgets, cost budget, budget action, anomaly subscription, SNS alert, Cost Explorer, Cost and Usage Report, CUR, Athena top spenders, Amazon Q cost optimization, EventBridge, Lambda remediation, Slack notification, Teams notification, FinOps, cost governance, EC2 stop budget action, IAM policy budget action, spend automation
+  tags: finops, cost-anomaly, budgets, automation, cost-explorer, cur, eventbridge, lambda
 ---
 
 # Cost Anomaly Response Automator

@@ -1,128 +1,51 @@
 ---
 name: cloudfront-502-troubleshooter
-description: >-
-  Diagnoses CloudFront 502 and 504 errors via a fourteen-layer decision
-  tree covering origin connection timeouts to ALB/NLB/S3 custom origins,
-  SSL/TLS protocol and cipher mismatch between CloudFront and the origin,
-  origin response too large, custom origin header validation failure,
-  Lambda@Edge function runtime errors, S3 origin access control (OAC)
-  misconfiguration, multi-origin failover, geographic restriction
-  blocking, field-level encryption errors, response timeout (504),
-  origin shield routing, distribution deployment state, and cached error
-  responses where a Custom Error Response with high TTL hides a
-  transient origin failure. Walks x-edge-result-type and x-cache headers,
-  origin probe results, and distribution config to a verified root cause.
-  Emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA with the specific
-  failure layer and the probe output that confirms it.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Diagnoses CloudFront 502 and 504 errors via a fourteen-layer decision tree covering origin connection timeouts to ALB/NLB/S3 custom origins, SSL/TLS protocol and cipher mismatch between CloudFront and the origin, origin response too large, custom origin header validation failure, Lambda@Edge function runtime errors, S3 origin access control (OAC) misconfiguration, multi-origin failover, geographic restriction blocking, field-level encryption errors, response timeout (504), origin shield routing, distribution deployment state, and cached error responses where a Custom Error Response with high TTL hides a transient origin failure. Walks x-edge-result-type and x-cache headers, origin probe results, and distribution config to a verified root cause. Emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA with the specific failure layer and the probe output that confirms it.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline diagnosis works from pasted CloudFront
-  access-log excerpts, response headers, and distribution config JSON.
-  Live-account diagnosis uses aws cloudfront get-distribution-config /
-  get-distribution / list-origin-access-controls, aws logs
-  filter-log-events on the us-east-1 CloudFront and Lambda@Edge log
-  groups, aws s3api get-bucket-policy / head-object, aws elbv2
-  describe-load-balancers / describe-target-health, and curl with
-  --resolve against both the distribution domain and the origin host
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - CloudFront
-  - 502
-  - 504
-  - Bad Gateway
-  - Gateway Timeout
-  - origin connection timeout
-  - TLS negotiation failure
-  - SSL protocol mismatch
-  - cipher suite mismatch
-  - Lambda@Edge
-  - Origin Access Control
-  - OAC
-  - multi-origin failover
-  - geographic restriction
-  - field-level encryption
-  - origin shield
-  - cached error response
-  - troubleshoot CloudFront
-tags:
-  - cloudfront
-  - networking
-  - cdn
-  - troubleshooting
-  - 502
-  - tls
-  - lambda-at-edge
-  - oac
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works from pasted CloudFront access-log excerpts, response headers, and distribution config JSON. Live-account diagnosis uses aws cloudfront get-distribution-config / get-distribution / list-origin-access-controls, aws logs filter-log-events on the us-east-1 CloudFront and Lambda@Edge log groups, aws s3api get-bucket-policy / head-object, aws elbv2 describe-load-balancers /...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
-  when_to_use: >-
-    Diagnosing a CloudFront distribution returning 502 Bad Gateway or
-    504 Gateway Timeout — including origin connection failures, TLS
-    handshake errors, Lambda@Edge runtime exceptions, S3 OAC
-    misconfiguration, failover routing, geographic blocks, field-level
-    encryption failures, origin-shield errors, deployment-state
-    artefacts, or stale error-cache entries hiding a now-recovered
-    origin.
-  when_not_to_use: >-
-    Cache hit ratio / stale content without 502/504 (use
-    cloudfront-cache-troubleshooter), cost analysis (use
-    cloudfront-cost-optimizer), distribution creation (use
-    cloudfront-distribution-deployer), or WAF 403 blocks (use
-    wafv2-web-acl-deployer). This skill is scoped to 502/504-class
-    origin and edge failures.
-  activation_triggers:
-    - CloudFront 502
-    - CloudFront 504
-    - CloudFront Bad Gateway
-    - CloudFront origin connection failed
-    - CloudFront TLS handshake failure
-    - CloudFront Lambda@Edge error
-    - CloudFront OAC 502
-    - CloudFront failover 502
-    - CloudFront geographic block
-    - CloudFront origin shield 502
-    - CloudFront cached 502
-    - troubleshoot CloudFront 502
-  invocation_schema: >-
-    Input: either (a) a symptom description (502/504 status, the
-    x-edge-result-type and x-cache values from access logs, viewer
-    error message) optionally paired with the distribution
-    configuration and curl reproduction, OR (b) a DistributionId plus
-    viewer context for live-account diagnosis. Output: a deterministic
-    TARGET / VERDICT / REASON / LAYER / EVIDENCE / REMEDIATION block
-    where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and
-    LAYER ∈ {ORIGIN_CONNECTION_TIMEOUT,
-    ORIGIN_TLS_PROTOCOL_MISMATCH, ORIGIN_TLS_CIPHER_MISMATCH,
-    ORIGIN_RESPONSE_TOO_LARGE, CUSTOM_HEADER_VALIDATION,
-    LAMBDA_AT_EDGE_ERROR, OAC_MISCONFIGURATION, FAILOVER_MISCONFIGURATION,
-    GEO_RESTRICTION_BLOCKING, FIELD_LEVEL_ENCRYPTION_ERROR,
-    ORIGIN_RESPONSE_TIMEOUT, ORIGIN_SHIELD_MISCONFIGURATION,
-    DISTRIBUTION_NOT_DEPLOYED, CACHED_ERROR_RESPONSE, UNKNOWN}.
-  invocation_example: |
-    # Minimal valid input (offline symptom classification):
+  when_to_use: Diagnosing a CloudFront distribution returning 502 Bad Gateway or 504 Gateway Timeout — including origin connection failures, TLS handshake errors, Lambda@Edge runtime exceptions, S3 OAC misconfiguration, failover routing, geographic blocks, field-level encryption failures, origin-shield errors, deployment-state artefacts, or stale error-cache entries hiding a now-recovered origin.
+  when_not_to_use: Cache hit ratio / stale content without 502/504 (use cloudfront-cache-troubleshooter), cost analysis (use cloudfront-cost-optimizer), distribution creation (use cloudfront-distribution-deployer), or WAF 403 blocks (use wafv2-web-acl-deployer). This skill is scoped to 502/504-class origin and edge failures.
+  activation_triggers: CloudFront 502, CloudFront 504, CloudFront Bad Gateway, CloudFront origin connection failed, CloudFront TLS handshake failure, CloudFront Lambda@Edge error, CloudFront OAC 502, CloudFront failover 502, CloudFront geographic block, CloudFront origin shield 502, CloudFront cached 502, troubleshoot CloudFront 502
+  invocation_schema: 'Input: either (a) a symptom description (502/504 status, the x-edge-result-type and x-cache values from access logs, viewer error message) optionally paired with the distribution configuration and curl reproduction, OR (b) a DistributionId plus viewer context for live-account diagnosis. Output: a deterministic TARGET / VERDICT / REASON / LAYER / EVIDENCE / REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {ORIGIN_CONNECTION_TIMEOUT, ORIGIN_TLS_PROTOCOL_MISMATCH, ORIGIN_TLS_CIPHER_MISMATCH, ORIGIN_RESPONSE_TOO_LARGE, CUSTOM_HEADER_VALIDATION, LAMBDA_AT_EDGE_ERROR, OAC_MISCONFIGURATION, FAILOVER_MISCONFIGURATION, GEO_RESTRICTION_BLOCKING, FIELD_LEVEL_ENCRYPTION_ERROR, ORIGIN_RESPONSE_TIMEOUT, ORIGIN_SHIELD_MISCONFIGURATION, DISTRIBUTION_NOT_DEPLOYED, CACHED_ERROR_RESPONSE, UNKNOWN}.'
+  invocation_example: '# Minimal valid input (offline symptom classification):
+
     Symptom: "CloudFront distribution d111111abcdef8.cloudfront.net
+
     returns HTTP 502 to all viewers on /api/* since 14:10 UTC.
+
     Origin is an ALB in us-east-1."
+
     DistributionId: E1Q2W3R4Y5Z6A7
+
     DomainName: d111111abcdef8.cloudfront.net
+
     Origin: api.alb.example.com (ALB, HTTPS-only)
+
     OriginProtocolPolicy: https-only
+
     x-edge-result-type from logs: Error
+
     x-cache from logs: Error from origin
+
     Last deployment: 1 hour ago (added OriginProtocolPolicy: https-only)
+
+    '
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudFront, 502, 504, Bad Gateway, Gateway Timeout, origin connection timeout, TLS negotiation failure, SSL protocol mismatch, cipher suite mismatch, Lambda@Edge, Origin Access Control, OAC, multi-origin failover, geographic restriction, field-level encryption, origin shield, cached error response, troubleshoot CloudFront
+  tags: cloudfront, networking, cdn, troubleshooting, 502, tls, lambda-at-edge, oac
 ---
 
 # CloudFront 502 Troubleshooter

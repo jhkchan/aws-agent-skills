@@ -1,113 +1,26 @@
 ---
 name: cloudhsm-cluster-deployer
-description: >-
-  Provisions AWS CloudHSM clusters with production defaults: cluster
-  creation in a VPC with subnets across 2+ AZs for HA, HSM instance
-  creation, one-time cluster activation (CSR signing, self-signed
-  cert), crypto officer/user management (mu, password policies),
-  HSM backups (daily automatic + on-demand), cross-region backup
-  copy, HA across AZs, PKCS#11/JCE/PCSC library integration,
-  SSL/TLS offload, FIPS 140-2 Level 3 compliance, network security
-  group (sg-xxx), CN-to-cluster-ID mapping, and degradation
-  recovery (create replacement, sync). Emits a READY_TO_DEPLOY
-  checklist with verification commands. Use when creating a
-  CloudHSM cluster, activating an HSM, managing crypto officers,
-  configuring backups, or recovering from HSM degradation.
-  Triggers: create cloudhsm cluster, activate cloudhsm, HSM
-  instance, crypto officer, cloudhsm backup, cross-region backup,
-  PKCS#11, JCE, FIPS 140-2 Level 3, CN-to-cluster-ID.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS CloudHSM clusters with production defaults: cluster creation in a VPC with subnets across 2+ AZs for HA, HSM instance creation, one-time cluster activation (CSR signing, self-signed cert), crypto officer/user management (mu, password policies), HSM backups (daily automatic + on-demand), cross-region backup copy, HA across AZs, PKCS#11/JCE/PCSC library integration, SSL/TLS offload, FIPS 140-2 Level 3 compliance, network security group (sg-xxx), CN-to-cluster-ID mapping, and degradation recovery (create replacement, sync). Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a CloudHSM cluster, activating an HSM, managing crypto officers, configuring backups, or recovering from HSM degradation. Triggers: create cloudhsm cluster, activate cloudhsm, HSM instance, crypto officer, cloudhsm backup, cross-region backup, PKCS#11, JCE, FIPS 140-2 Level 3, CN-to-cluster-ID.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with cloudhsm,
-  ec2, iam, sts access, plus the CloudHSM client (config -a) and
-  key_mgmt_util / cloudhsm_mgmt_util for crypto officer workflows.
-  Works with Terraform aws_cloudhsm_v2_cluster /
-  aws_cloudhsm_v2_hsm resources and CloudFormation
-  AWS::CloudHSM::Cluster / AWS::CloudHSM::HSM templates.
-keywords:
-  - aws
-  - cloudhsm
-  - hsm
-  - cloudops
-  - deploy
-  - provisioning
-  - security
-  - fips 140-2
-  - pkcs#11
-  - jce
-  - crypto officer
-  - cluster activation
-  - hsm backup
-  - cross-region backup
-  - ha
-tags:
-  - aws
-  - cloudhsm
-  - hsm
-  - cloudops
-  - deploy
-  - security
-  - provisioning
-  - fips-140-2
-  - pkcs11
-  - jce
-  - cluster-activation
-  - hsm-backup
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with cloudhsm, ec2, iam, sts access, plus the CloudHSM client (config -a) and key_mgmt_util / cloudhsm_mgmt_util for crypto officer workflows. Works with Terraform aws_cloudhsm_v2_cluster / aws_cloudhsm_v2_hsm resources and CloudFormation AWS::CloudHSM::Cluster / AWS::CloudHSM::HSM templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - cloudhsm
-    - hsm
-    - cloudops
-    - deploy
-    - security
-    - provisioning
-    - fips-140-2
-    - pkcs11
-    - jce
-    - cluster-activation
-    - hsm-backup
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create cloudhsm cluster
-    - activate cloudhsm cluster
-    - hsm instance
-    - crypto officer
-    - cloudhsm backup
-    - cross-region backup
-    - pkcs#11 library
-    - jce library
-    - fips 140-2 level 3
-    - cn-to-cluster-id mapping
-    - hsm degradation recovery
-  when_to_use: >-
-    Invoke when the user wants to create an AWS CloudHSM cluster,
-    activate an HSM (CSR → self-signed cert), create HSM instances
-    across 2+ AZs for HA, manage crypto officers and users,
-    configure backups (daily + on-demand + cross-region copy),
-    integrate PKCS#11/JCE/PCSC libraries, offload SSL/TLS, or
-    recover from HSM degradation. Do NOT invoke for AWS KMS
-    (use kms-key-deployer), ACM (use acm-certificate-deployer),
-    or AWS Signer (use signer-signing-profile-deployer).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, cloudhsm, hsm, cloudops, deploy, security, provisioning, fips-140-2, pkcs11, jce, cluster-activation, hsm-backup
+  dependencies: aws-orchestrator
+  keywords: aws, cloudhsm, hsm, cloudops, deploy, provisioning, security, fips 140-2, pkcs#11, jce, crypto officer, cluster activation, hsm backup, cross-region backup, ha
+  when_to_use: Invoke when the user wants to create an AWS CloudHSM cluster, activate an HSM (CSR → self-signed cert), create HSM instances across 2+ AZs for HA, manage crypto officers and users, configure backups (daily + on-demand + cross-region copy), integrate PKCS#11/JCE/PCSC libraries, offload SSL/TLS, or recover from HSM degradation. Do NOT invoke for AWS KMS (use kms-key-deployer), ACM (use acm-certificate-deployer), or AWS Signer (use signer-signing-profile-deployer).
 ---
 
 # CloudHSM Cluster Deployer

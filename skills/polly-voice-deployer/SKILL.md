@@ -1,108 +1,26 @@
 ---
 name: polly-voice-deployer
-description: >-
-  Deploys Amazon Polly text-to-speech configurations with production
-  defaults: engine selection (standard vs neural vs long-form vs
-  generative), voice selection by language, SSML processing
-  (phoneme, emphasis, break, prosody, say-as), lexicon management
-  (custom pronunciation via PLS lexicons), speech marks generation
-  for lip-sync and visual media sync, synthesize-speech API for
-  real-time synthesis, start-speech-synthesis-task for asynchronous
-  batch synthesis to S3, output formats (mp3, ogg_vorbis, pcm,
-  json), sample rates (8000/16000/22050/24000), CloudWatch metrics
-  monitoring, and pricing-per-character budgeting. Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when
-  configuring Polly TTS, synthesizing speech from text, deploying
-  neural TTS voices, creating custom pronunciation lexicons,
-  generating speech marks for lip-sync, or running batch TTS jobs
-  to S3. Triggers: synthesize speech, polly neural voice, polly
-  ssml, polly lexicon, speech marks, start speech synthesis task,
-  polly engine selection, polly pricing per character.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Deploys Amazon Polly text-to-speech configurations with production defaults: engine selection (standard vs neural vs long-form vs generative), voice selection by language, SSML processing (phoneme, emphasis, break, prosody, say-as), lexicon management (custom pronunciation via PLS lexicons), speech marks generation for lip-sync and visual media sync, synthesize-speech API for real-time synthesis, start-speech-synthesis-task for asynchronous batch synthesis to S3, output formats (mp3, ogg_vorbis, pcm, json), sample rates (8000/16000/22050/24000), CloudWatch metrics monitoring, and pricing-per-character budgeting. Emits a READY_TO_DEPLOY checklist with verification commands. Use when configuring Polly TTS, synthesizing speech from text, deploying neural TTS voices, creating custom pronunciation lexicons, generating speech marks for lip-sync. Triggers: synthesize speech, polly neural voice, polly ssml, polly lexicon, speech marks, start speech synthesis task, polly engine selection, polly pricing per character.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with polly access
-  and s3 PutObject on the output bucket. Works with Terraform
-  aws_polly_lexicon resources and CloudFormation custom resources
-  for Polly configurations.
-keywords:
-  - aws
-  - polly
-  - text to speech
-  - tts
-  - neural voice
-  - cloudops
-  - deploy
-  - provisioning
-  - ssml
-  - lexicon
-  - speech marks
-  - synthesize speech
-  - lip sync
-  - pricing per character
-tags:
-  - aws
-  - polly
-  - tts
-  - cloudops
-  - deploy
-  - ai-ml
-  - provisioning
-  - neural-voice
-  - ssml
-  - lexicon
-  - speech-marks
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with polly access and s3 PutObject on the output bucket. Works with Terraform aws_polly_lexicon resources and CloudFormation custom resources for Polly configurations.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AI/ML
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - polly
-    - tts
-    - cloudops
-    - deploy
-    - ai-ml
-    - provisioning
-    - neural-voice
-    - ssml
-    - lexicon
-    - speech-marks
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - synthesize speech
-    - polly neural voice
-    - polly ssml
-    - polly lexicon
-    - speech marks
-    - start speech synthesis task
-    - polly engine selection
-    - polly pricing per character
-  when_to_use: >-
-    Invoke when the user wants to configure Amazon Polly for
-    text-to-speech synthesis, select between standard/neural/long-form/
-    generative engines, use SSML tags for prosody control, create
-    custom pronunciation lexicons, generate speech marks for
-    lip-sync or captioning, run real-time synthesis via
-    synthesize-speech, or batch-synthesize long text to S3 via
-    start-speech-synthesis-task. Do NOT invoke for Amazon Transcribe
-    (speech-to-text), Amazon Lex (conversational bots), or AWS
-    Lambda function deployment.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, polly, tts, cloudops, deploy, ai-ml, provisioning, neural-voice, ssml, lexicon, speech-marks
+  dependencies: aws-orchestrator
+  keywords: aws, polly, text to speech, tts, neural voice, cloudops, deploy, provisioning, ssml, lexicon, speech marks, synthesize speech, lip sync, pricing per character
+  when_to_use: Invoke when the user wants to configure Amazon Polly for text-to-speech synthesis, select between standard/neural/long-form/ generative engines, use SSML tags for prosody control, create custom pronunciation lexicons, generate speech marks for lip-sync or captioning, run real-time synthesis via synthesize-speech, or batch-synthesize long text to S3 via start-speech-synthesis-task. Do NOT invoke for Amazon Transcribe (speech-to-text), Amazon Lex (conversational bots), or AWS Lambda function deployment.
 ---
 
 # Polly Voice Deployer

@@ -1,89 +1,29 @@
 ---
 name: cloudfront-cost-optimizer
-description: Optimizes CloudFront distribution costs across nine cost dimensions — Price Class (PriceClass_100 vs PriceClass_200 vs PriceClass_All, where PriceClass_100 saves 20-40% when viewers
-  are US/EU-only), cache hit ratio (target >90% for static content via longer TTLs and minimal cache key), origin choice (S3 + OAC is cheapest; custom origins incur $0.02/GB egress), compression (free,
-  50-90% byte savings via Brotli/gzip), Origin Shield ($0.0125/GB, cuts origin load 95%+), CloudFront Functions ($1/M) vs Lambda@Edge ($0.60/M + compute), security cost (WAF $5/rule + $1/M req, Shield
-  Standard free, Shield Advanced $3K/mo), data-transfer matrix, and impact estimation. Emits OPPORTUNITY_FOUND with per-dimension savings, OPTIMIZED, or ALREADY_OPTIMAL. Use when reviewing CloudFront
-  bills, triaging data-transfer charges, choosing Functions vs Lambda@Edge, or evaluating Origin Shield break-even.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Optimizes CloudFront distribution costs across nine cost dimensions — Price Class (PriceClass_100 vs PriceClass_200 vs PriceClass_All, where PriceClass_100 saves 20-40% when viewers are US/EU-only), cache hit ratio (target >90% for static content via longer TTLs and minimal cache key), origin choice (S3 + OAC is cheapest; custom origins incur $0.02/GB egress), compression (free, 50-90% byte savings via Brotli/gzip), Origin Shield ($0.0125/GB, cuts origin load 95%+), CloudFront Functions ($1/M) vs Lambda@Edge ($0.60/M + compute), security cost (WAF $5/rule + $1/M req, Shield Standard free, Shield Advanced $3K/mo), data-transfer matrix, and impact estimation. Emits OPPORTUNITY_FOUND with per-dimension savings, OPTIMIZED, or ALREADY_OPTIMAL. Use when reviewing CloudFront bills, triaging data-transfer charges, choosing Functions vs Lambda@Edge, or evaluating Origin Shield break-even.
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation-document classification works from pasted distribution config and CloudFront metrics.
-  Live-account optimization uses aws cloudfront get-distribution-config, get-distribution-metrics, list-cache-policies, list-origin-request -policies, aws cloudwatch get-metric-statistics (CacheHitRate,
-  Requests, BytesDownloaded, OriginLatency), aws wafv2 list-web-acls, aws ce get-cost-and-usage, and aws cloudfront list-distributions (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- CloudFront
-- CDN
-- Price Class
-- PriceClass_100
-- cache hit ratio
-- Origin Shield
-- Origin Access Control
-- OAC
-- compression
-- Brotli
-- gzip
-- CloudFront Functions
-- Lambda@Edge
-- WAF
-- Shield Advanced
-- data transfer
-- S3 origin
-- custom origin
-- cache policy
-- origin request policy
-- TTL
-- FinOps
-- edge computing
-tags:
-- cloudfront
-- networking
-- cost-optimization
-- finops
-- cdn
-- edge
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation-document classification works from pasted distribution config and CloudFront metrics. Live-account optimization uses aws cloudfront get-distribution-config, get-distribution-metrics, list-cache-policies, list-origin-request -policies, aws cloudwatch get-metric-statistics (CacheHitRate, Requests, BytesDownloaded, OriginLatency), aws wafv2 list-web-acls, aws ce get-cost-and-usage, and aws...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
   verdict_shape: OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL
-  when_to_use: Optimizing CloudFront distribution costs, reviewing Price Class against viewer geography, raising cache hit ratio, choosing between S3 origin and custom origin, evaluating Origin Shield break-even,
-    deciding between CloudFront Functions and Lambda@Edge, sizing the WAF rule budget, or building a monthly CloudFront cost projection.
-  when_not_to_use: Troubleshooting a 5xx or cache-miss root cause (use cloudfront-cache-troubleshooter), auditing the distribution security posture (use cloudfront-distribution-auditor for OAC, field-level
-    encryption, IAM), deploying a new distribution (use cloudfront-distribution-deployer), S3 bucket lifecycle optimization (use s3-lifecycle-optimizer), or EC2/ALB data-transfer optimization that does
-    not involve CloudFront (use data-transfer-optimizer). This skill focuses on cost optimization of an existing CloudFront distribution, not on deployment, security audit, or generic data-transfer patterns.
-  activation_triggers:
-  - optimize CloudFront cost
-  - CloudFront monthly bill
-  - PriceClass recommendation
-  - CloudFront cache hit ratio
-  - Origin Shield break-even
-  - CloudFront Functions vs Lambda@Edge
-  - S3 origin vs custom origin cost
-  - CloudFront data transfer cost
-  - CloudFront WAF cost
-  - CDN cost optimization
-  - reduce CloudFront bill
-  - Brotli compression CloudFront
-  - CloudFront PriceClass_All
-  - cache policy TTL optimization
-  - FinOps CDN review
-  invocation_schema: 'Input: either (a) a distribution identifier + live-account context, (b) a pasted distribution configuration (origins, default_cache_behavior including price_class, viewer_protocol_policy,
-    trusted_key_groups, lambda_function_associations, cache_policy_id, origin_request_policy_id), OR (c) aggregated CloudFront usage (monthly requests, GB transferred, edge regions, cache hit ratio). Output:
-    a deterministic TARGET / VERDICT / REASON / RECOMMENDATION / ESTIMATED_SAVINGS / MIGRATION_STEPS block per distribution, where VERDICT ∈ {OPTIMIZED, OPPORTUNITY_FOUND, ALREADY_OPTIMAL} and RECOMMENDATION
-    lists the per-dimension actions (price_class, cache_policy, origin, compression, origin_shield, edge_compute, security).'
-  invocation_example: "# Minimal valid input (offline config classification):\nDistributionId: E1ABC23DEF456G\nRegion: us-east-1 (distribution); viewers primarily US + EU\nPriceClass: PriceClass_All\nOrigins:\n\
-    \  - S3 origin with OAC: s3-prod-assets (us-east-1)\n  - Custom origin: ALB in us-east-1 (app.example.com)\nDefault cache behavior:\n  Target origin: ALB custom origin\n  Cache policy: CachingOptimized\
-    \ (TTL 31536000)\n  Origin request policy: AllViewerExceptInternal\n  Viewer protocol policy: redirect-to-https\n  Compress: false\n  Lambda@Edge associations: 1 viewer-request (Node 18, 50ms avg)\n\
-    CloudFront Functions associations: 0\nWAF: 5 rules, ~500M requests/month\nMetrics (last 30 days):\n  CacheHitRate: 62%\n  Requests: 800,000,000\n  BytesDownloaded: 4,800 GB\n  OriginLatency: 250ms p50\n\
-    Emit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  when_to_use: Optimizing CloudFront distribution costs, reviewing Price Class against viewer geography, raising cache hit ratio, choosing between S3 origin and custom origin, evaluating Origin Shield break-even, deciding between CloudFront Functions and Lambda@Edge, sizing the WAF rule budget, or building a monthly CloudFront cost projection.
+  when_not_to_use: Troubleshooting a 5xx or cache-miss root cause (use cloudfront-cache-troubleshooter), auditing the distribution security posture (use cloudfront-distribution-auditor for OAC, field-level encryption, IAM), deploying a new distribution (use cloudfront-distribution-deployer), S3 bucket lifecycle optimization (use s3-lifecycle-optimizer), or EC2/ALB data-transfer optimization that does not involve CloudFront (use data-transfer-optimizer). This skill focuses on cost optimization of an existing CloudFront distribution, not on deployment, security audit, or generic data-transfer patterns.
+  activation_triggers: optimize CloudFront cost, CloudFront monthly bill, PriceClass recommendation, CloudFront cache hit ratio, Origin Shield break-even, CloudFront Functions vs Lambda@Edge, S3 origin vs custom origin cost, CloudFront data transfer cost, CloudFront WAF cost, CDN cost optimization, reduce CloudFront bill, Brotli compression CloudFront, CloudFront PriceClass_All, cache policy TTL optimization, FinOps CDN review
+  invocation_schema: 'Input: either (a) a distribution identifier + live-account context, (b) a pasted distribution configuration (origins, default_cache_behavior including price_class, viewer_protocol_policy, trusted_key_groups, lambda_function_associations, cache_policy_id, origin_request_policy_id), OR (c) aggregated CloudFront usage (monthly requests, GB transferred, edge regions, cache hit ratio). Output: a deterministic TARGET / VERDICT / REASON / RECOMMENDATION / ESTIMATED_SAVINGS / MIGRATION_STEPS block per distribution, where VERDICT ∈ {OPTIMIZED, OPPORTUNITY_FOUND, ALREADY_OPTIMAL} and RECOMMENDATION lists the per-dimension actions (price_class, cache_policy, origin, compression, origin_shield, edge_compute, security).'
+  invocation_example: "# Minimal valid input (offline config classification):\nDistributionId: E1ABC23DEF456G\nRegion: us-east-1 (distribution); viewers primarily US + EU\nPriceClass: PriceClass_All\nOrigins:\n  - S3 origin with OAC: s3-prod-assets (us-east-1)\n  - Custom origin: ALB in us-east-1 (app.example.com)\nDefault cache behavior:\n  Target origin: ALB custom origin\n  Cache policy: CachingOptimized (TTL 31536000)\n  Origin request policy: AllViewerExceptInternal\n  Viewer protocol policy: redirect-to-https\n  Compress: false\n  Lambda@Edge associations: 1 viewer-request (Node 18, 50ms avg)\nCloudFront Functions associations: 0\nWAF: 5 rules, ~500M requests/month\nMetrics (last 30 days):\n  CacheHitRate: 62%\n  Requests: 800,000,000\n  BytesDownloaded: 4,800 GB\n  OriginLatency: 250ms p50\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudFront, CDN, Price Class, PriceClass_100, cache hit ratio, Origin Shield, Origin Access Control, OAC, compression, Brotli, gzip, CloudFront Functions, Lambda@Edge, WAF, Shield Advanced, data transfer, S3 origin, custom origin, cache policy, origin request policy, TTL, FinOps, edge computing
+  tags: cloudfront, networking, cost-optimization, finops, cdn, edge
 ---
 
 # CloudFront Cost Optimizer

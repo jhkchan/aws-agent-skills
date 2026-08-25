@@ -1,124 +1,49 @@
 ---
 name: s3-performance-optimizer
-description: >-
-  Optimises Amazon S3 performance across eleven dimensions: prefix
-  distribution for partition allocation (auto-scale post-2018/2023),
-  S3 Transfer Acceleration for cross-region uploads, multipart upload
-  parallelism for large objects (>100 MB), byte-range fetches for
-  partial reads, S3 Select for query pushdown (CSV/JSON/Parquet), S3
-  inventory for audit, CloudWatch request metrics (429 Slow Down, 503
-  throttling, FirstByteLatency), S3 Batch Operations for bulk
-  processing, HTTP/2 connection reuse, pre-signed URL expiry tuning,
-  S3 Object Lambda for on-demand transformation, S3 Express One Zone
-  for single-digit-ms latency, multipart copy for large-object
-  relocation, and content-encoding for transfer reduction. Distinguishes
-  latency-bound from throughput-bound from request-rate-bound workloads.
-  Emits OPTIMIZED or FURTHER_OPTIMIZATION_AVAILABLE per workload.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Optimises Amazon S3 performance across eleven dimensions: prefix distribution for partition allocation (auto-scale post-2018/2023), S3 Transfer Acceleration for cross-region uploads, multipart upload parallelism for large objects (>100 MB), byte-range fetches for partial reads, S3 Select for query pushdown (CSV/JSON/Parquet), S3 inventory for audit, CloudWatch request metrics (429 Slow Down, 503 throttling, FirstByteLatency), S3 Batch Operations for bulk processing, HTTP/2 connection reuse, pre-signed URL expiry tuning, S3 Object Lambda for on-demand transformation, S3 Express One Zone for single-digit-ms latency, multipart copy for large-object relocation, and content-encoding for transfer reduction. Distinguishes latency-bound from throughput-bound from request-rate-bound workloads. Emits OPTIMIZED or FURTHER_OPTIMIZATION_AVAILABLE per workload.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline classification works from pasted S3 access
-  patterns, CloudWatch S3 metrics, and Storage Lens excerpts. Live-
-  account optimisation uses aws s3api list-buckets / get-bucket-location
-  / get-bucket-accelerate-configuration, aws s3control
-  get-storage-lens-configuration, aws cloudwatch get-metric-statistics
-  on AWS/S3 (FirstByteLatency, TotalRequestLatency, 4xxErrors,
-  5xxErrors), aws s3 ls / head-object / copy-object, aws s3 presign,
-  and aws s3api select-object-content (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-  - Amazon S3
-  - S3 performance
-  - multipart upload
-  - Transfer Acceleration
-  - byte-range fetch
-  - S3 Select
-  - S3 Express One Zone
-  - prefix distribution
-  - partition allocation
-  - S3 Object Lambda
-  - S3 Batch Operations
-  - HTTP/2
-  - 429 Slow Down
-  - 503 throttling
-  - pre-signed URL
-tags:
-  - s3
-  - storage
-  - performance-optimization
-  - latency
-  - throughput
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline classification works from pasted S3 access patterns, CloudWatch S3 metrics, and Storage Lens excerpts. Live- account optimisation uses aws s3api list-buckets / get-bucket-location / get-bucket-accelerate-configuration, aws s3control get-storage-lens-configuration, aws cloudwatch get-metric-statistics on AWS/S3 (FirstByteLatency, TotalRequestLatency, 4xxErrors, 5xxErrors), aws s3 ls / head-object /...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-  when_to_use: >-
-    Optimising an S3-backed workload for latency, throughput, or
-    request-rate — including prefix distribution for high-request-rate
-    buckets, multipart upload for large PUTs, byte-range GETs for
-    partial reads, S3 Select to push filtering into S3, S3 Express One
-    Zone for single-digit-ms latency, Transfer Acceleration for
-    cross-region uploads, HTTP/2 connection reuse, pre-signed URL
-    expiry sizing, S3 Object Lambda for on-demand transformation, S3
-    Batch Operations for bulk processing, multipart copy for large
-    object relocation, or content-encoding for transfer reduction.
-  when_not_to_use: >-
-    Cost-only optimisation of storage class / lifecycle (use
-    s3-storage-class-optimizer, s3-lifecycle-optimizer, or
-    s3-intelligent-tiering-optimizer), bucket policy / Block Public
-    Access audits (use s3-public-access-auditor or s3-bucket-policy-
-    deployer), access pattern troubleshooting (use s3-access-
-    troubleshooter), replication setup (use s3-replication-operator),
-    or Glacier restore workflows (use s3-glacier-restore-operator).
-  activation_triggers:
-    - S3 performance
-    - S3 latency
-    - S3 throughput
-    - S3 Slow Down 429
-    - S3 503 throttling
-    - S3 multipart upload
-    - S3 Transfer Acceleration
-    - S3 byte-range
-    - S3 Select
-    - S3 Express One Zone
-    - S3 prefix distribution
-    - S3 Object Lambda
-    - S3 Batch Operations
-    - S3 pre-signed URL
-    - optimize S3 performance
-  invocation_schema: >-
-    Input: either (a) a workload description (bucket, prefix, object
-    size profile, request rate, client geography, latency target)
-    optionally paired with CloudWatch S3 metrics and Storage Lens
-    excerpts, OR (b) a BucketName plus workload context for live-account
-    optimisation. Output: a deterministic TARGET / VERDICT / REASON /
-    LAYER / EVIDENCE / REMEDIATION block where VERDICT is in {OPTIMIZED,
-    FURTHER_OPTIMIZATION_AVAILABLE} and LAYER is in {PREFIX_DISTRIBUTION,
-    MULTIPART_UPLOAD, BYTE_RANGE_FETCH, S3_SELECT, TRANSFER_ACCELERATION,
-    EXPRESS_ONE_ZONE, HTTP2_CONNECTION, PRESIGNED_URL, OBJECT_LAMBDA,
-    BATCH_OPERATIONS, MULTIPART_COPY, CONTENT_ENCODING,
-    ALREADY_OPTIMIZED, UNKNOWN}.
-  invocation_example: |
-    # Minimal valid input (offline classification):
+  when_to_use: Optimising an S3-backed workload for latency, throughput, or request-rate — including prefix distribution for high-request-rate buckets, multipart upload for large PUTs, byte-range GETs for partial reads, S3 Select to push filtering into S3, S3 Express One Zone for single-digit-ms latency, Transfer Acceleration for cross-region uploads, HTTP/2 connection reuse, pre-signed URL expiry sizing, S3 Object Lambda for on-demand transformation, S3 Batch Operations for bulk processing, multipart copy for large object relocation, or content-encoding for transfer reduction.
+  when_not_to_use: Cost-only optimisation of storage class / lifecycle (use s3-storage-class-optimizer, s3-lifecycle-optimizer, or s3-intelligent-tiering-optimizer), bucket policy / Block Public Access audits (use s3-public-access-auditor or s3-bucket-policy- deployer), access pattern troubleshooting (use s3-access- troubleshooter), replication setup (use s3-replication-operator), or Glacier restore workflows (use s3-glacier-restore-operator).
+  activation_triggers: S3 performance, S3 latency, S3 throughput, S3 Slow Down 429, S3 503 throttling, S3 multipart upload, S3 Transfer Acceleration, S3 byte-range, S3 Select, S3 Express One Zone, S3 prefix distribution, S3 Object Lambda, S3 Batch Operations, S3 pre-signed URL, optimize S3 performance
+  invocation_schema: 'Input: either (a) a workload description (bucket, prefix, object size profile, request rate, client geography, latency target) optionally paired with CloudWatch S3 metrics and Storage Lens excerpts, OR (b) a BucketName plus workload context for live-account optimisation. Output: a deterministic TARGET / VERDICT / REASON / LAYER / EVIDENCE / REMEDIATION block where VERDICT is in {OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE} and LAYER is in {PREFIX_DISTRIBUTION, MULTIPART_UPLOAD, BYTE_RANGE_FETCH, S3_SELECT, TRANSFER_ACCELERATION, EXPRESS_ONE_ZONE, HTTP2_CONNECTION, PRESIGNED_URL, OBJECT_LAMBDA, BATCH_OPERATIONS, MULTIPART_COPY, CONTENT_ENCODING, ALREADY_OPTIMIZED, UNKNOWN}.'
+  invocation_example: '# Minimal valid input (offline classification):
+
     Symptom: "S3 bucket receiving 8,000 PUT/sec; CloudWatch shows
+
     occasional 503 errors; p99 FirstByteLatency 250 ms."
+
     Bucket: prod-telemetry-ingest
+
     Region: us-east-1
+
     Workload: write-heavy ingest
+
     RequestRate: 8,000 PUT/sec
+
     AvgObjectSize: 12 KB
+
     ClientGeography: us-east-1 EC2
+
     TargetLatency: <50 ms p99
+
+    '
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Amazon S3, S3 performance, multipart upload, Transfer Acceleration, byte-range fetch, S3 Select, S3 Express One Zone, prefix distribution, partition allocation, S3 Object Lambda, S3 Batch Operations, HTTP/2, 429 Slow Down, 503 throttling, pre-signed URL
+  tags: s3, storage, performance-optimization, latency, throughput
 ---
 
 # S3 Performance Optimizer

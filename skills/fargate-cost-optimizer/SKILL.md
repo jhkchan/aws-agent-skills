@@ -1,102 +1,28 @@
 ---
 name: fargate-cost-optimizer
-description: >-
-  Optimises AWS Fargate cost across seven dimensions: task right-sizing
-  (CPU/memory from 28 allowed combos, CloudWatch CPUUtilization and
-  MemoryUtilization analysis), Fargate Spot vs On-Demand (up to 70%
-  savings for fault-tolerant workloads), ARM64/Graviton migration (20%
-  cheaper), task scheduling/bin-packing via capacity providers, Savings
-  Plans (1yr/3yr commitment for steady-state), and latest features
-  (Fargate EFA for HPC/ML, Fargate instance storage for high-I/O).
-  Reads CloudWatch metrics, ECS configs, and Cost Explorer data. Emits
-  OPPORTUNITY_FOUND with recommendation and estimated savings,
-  OPTIMIZED, or ALREADY_OPTIMAL. Use when reviewing Fargate spend,
-  right-sizing ECS tasks, evaluating Spot/ARM64 migration, or a FinOps
-  review of container spend.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Optimises AWS Fargate cost across seven dimensions: task right-sizing (CPU/memory from 28 allowed combos, CloudWatch CPUUtilization and MemoryUtilization analysis), Fargate Spot vs On-Demand (up to 70% savings for fault-tolerant workloads), ARM64/Graviton migration (20% cheaper), task scheduling/bin-packing via capacity providers, Savings Plans (1yr/3yr commitment for steady-state), and latest features (Fargate EFA for HPC/ML, Fargate instance storage for high-I/O). Reads CloudWatch metrics, ECS configs, and Cost Explorer data. Emits OPPORTUNITY_FOUND with recommendation and estimated savings, OPTIMIZED, or ALREADY_OPTIMAL. Use when reviewing Fargate spend, right-sizing ECS tasks, evaluating Spot/ARM64 migration, or a FinOps review of container spend.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline recommendation classification works from
-  pasted CloudWatch metrics, ECS task definitions, and Cost Explorer
-  data. Live-account optimization uses aws ecs describe-task-definition,
-  describe-services, describe-capacity-providers, aws cloudwatch
-  get-metric-statistics (CPUUtilization, MemoryUtilization),
-  aws ce get-cost-and-usage, aws ce get-reservation-utilization, and
-  aws compute-optimizer get-ec2-recommendations (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - Fargate
-  - ECS
-  - cost optimization
-  - right-sizing
-  - task definition
-  - CPU
-  - memory
-  - Fargate Spot
-  - On-Demand
-  - capacity provider
-  - ARM64
-  - Graviton
-  - Savings Plans
-  - bin-packing
-  - task scheduling
-  - EFA
-  - instance storage
-  - FinOps
-  - Compute Optimizer
-  - container
-tags: [fargate, ecs, compute, cost-optimization, finops, rightsizing, graviton, spot, savings-plans]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted CloudWatch metrics, ECS task definitions, and Cost Explorer data. Live-account optimization uses aws ecs describe-task-definition, describe-services, describe-capacity-providers, aws cloudwatch get-metric-statistics (CPUUtilization, MemoryUtilization), aws ce get-cost-and-usage, aws ce get-reservation-utilization, and aws compute-optimizer...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
   verdict_shape: OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL
-  when_to_use: >-
-    Optimising Fargate cost, right-sizing ECS task definitions (CPU
-    and memory), evaluating Fargate Spot vs On-Demand capacity provider
-    strategy, migrating x86_64 tasks to ARM64/Graviton, tuning task
-    scheduling efficiency (bin-packing, capacity providers), evaluating
-    Savings Plans for Fargate, or a FinOps review of container spend.
-  when_not_to_use: >-
-    EC2 instance rightsizing (use ec2-rightsizing-optimizer), Lambda
-    cost optimization (use lambda-cost-optimizer), EKS cost
-    optimization (use eks-cost-optimizer), or ECS task troubleshooting
-    (task failures, deployment issues — use ecs-task-troubleshooter).
-    This skill focuses on cost-driven optimization, not functional
-    debugging.
-  activation_triggers:
-    - "optimise Fargate cost"
-    - "Fargate right-sizing"
-    - "Fargate CPU memory combo"
-    - "Fargate Spot savings"
-    - "Fargate capacity provider"
-    - "Fargate ARM64 Graviton"
-    - "Fargate Savings Plans"
-    - "Fargate bin-packing"
-    - "Fargate task scheduling"
-    - "Fargate FinOps"
-    - "reduce Fargate bill"
-    - "Fargate cost review"
-    - "ECS task over-provisioned"
-    - "Fargate EFA"
-    - "Fargate instance storage"
-  invocation_schema: >-
-    Input: either (a) a task definition ARN + live-account context,
-    (b) CloudWatch metrics (CPUUtilization, MemoryUtilization) with at
-    least 14 days of observation, OR (c) an ECS service configuration
-    with capacity provider strategy. Output: a deterministic TARGET /
-    VERDICT / REASON / RECOMMENDATION / ESTIMATED_SAVINGS /
-    MIGRATION_STEPS block per task definition or service, where VERDICT
-    is one of {OPTIMIZED, OPPORTUNITY_FOUND, ALREADY_OPTIMAL}.
+  when_to_use: Optimising Fargate cost, right-sizing ECS task definitions (CPU and memory), evaluating Fargate Spot vs On-Demand capacity provider strategy, migrating x86_64 tasks to ARM64/Graviton, tuning task scheduling efficiency (bin-packing, capacity providers), evaluating Savings Plans for Fargate, or a FinOps review of container spend.
+  when_not_to_use: EC2 instance rightsizing (use ec2-rightsizing-optimizer), Lambda cost optimization (use lambda-cost-optimizer), EKS cost optimization (use eks-cost-optimizer), or ECS task troubleshooting (task failures, deployment issues — use ecs-task-troubleshooter). This skill focuses on cost-driven optimization, not functional debugging.
+  activation_triggers: optimise Fargate cost, Fargate right-sizing, Fargate CPU memory combo, Fargate Spot savings, Fargate capacity provider, Fargate ARM64 Graviton, Fargate Savings Plans, Fargate bin-packing, Fargate task scheduling, Fargate FinOps, reduce Fargate bill, Fargate cost review, ECS task over-provisioned, Fargate EFA, Fargate instance storage
+  invocation_schema: 'Input: either (a) a task definition ARN + live-account context, (b) CloudWatch metrics (CPUUtilization, MemoryUtilization) with at least 14 days of observation, OR (c) an ECS service configuration with capacity provider strategy. Output: a deterministic TARGET / VERDICT / REASON / RECOMMENDATION / ESTIMATED_SAVINGS / MIGRATION_STEPS block per task definition or service, where VERDICT is one of {OPTIMIZED, OPPORTUNITY_FOUND, ALREADY_OPTIMAL}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Fargate, ECS, cost optimization, right-sizing, task definition, CPU, memory, Fargate Spot, On-Demand, capacity provider, ARM64, Graviton, Savings Plans, bin-packing, task scheduling, EFA, instance storage, FinOps, Compute Optimizer, container
+  tags: fargate, ecs, compute, cost-optimization, finops, rightsizing, graviton, spot, savings-plans
 ---
 
 # Fargate Cost Optimizer

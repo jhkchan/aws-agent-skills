@@ -1,81 +1,27 @@
 ---
 name: config-rule-compliance-automator
-description: >-
-  Designs and deploys AWS Config rule compliance automation across an AWS
-  estate. Selects from 80+ managed rules or designs custom Lambda rules,
-  wires SSM Automation remediation with trigger semantics, deploys
-  conformance packs for CIS/PCI/NIST via CloudFormation StackSets,
-  configures multi-account visibility via Config Aggregator, implements
-  organizational config rules, deploys custom policy rules (Git-based via
-  CodeCommit), sets up SNS compliance notifications, and detects
-  configuration drift. Emits AUTOMATION_DEPLOYED or REVIEW_REQUIRED.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Designs and deploys AWS Config rule compliance automation across an AWS estate. Selects from 80+ managed rules or designs custom Lambda rules, wires SSM Automation remediation with trigger semantics, deploys conformance packs for CIS/PCI/NIST via CloudFormation StackSets, configures multi-account visibility via Config Aggregator, implements organizational config rules, deploys custom policy rules (Git-based via CodeCommit), sets up SNS compliance notifications, and detects configuration drift. Emits AUTOMATION_DEPLOYED or REVIEW_REQUIRED.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline compliance-design. Live
-  deployment uses aws configservice put-config-rule,
-  put-remediation-configurations, put-conformance-pack,
-  describe-configuration-aggregators, aws ssm create-document,
-  start-automation-execution, aws cloudformation create-stack-set —
-  AWS CLI v2, SSO or key-based credentials.
-keywords:
-  - AWS Config
-  - Config rules
-  - managed rules
-  - custom Lambda rules
-  - conformance packs
-  - CIS benchmark
-  - PCI-DSS
-  - NIST 800-53
-  - SSM Automation remediation
-  - Config Aggregator
-  - organizational config rules
-  - custom policy rules
-  - compliance dashboard
-  - drift detection
-  - StackSets
-  - governance automation
-tags: [aws-config, conformance-packs, ssm-automation, cis, compliance, governance, automate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline compliance-design. Live deployment uses aws configservice put-config-rule, put-remediation-configurations, put-conformance-pack, describe-configuration-aggregators, aws ssm create-document, start-automation-execution, aws cloudformation create-stack-set — AWS CLI v2, SSO or key-based credentials.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATION_DEPLOYED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Designing Config rule compliance automation, selecting managed rules
-    for a compliance framework, building custom Lambda rules, deploying
-    conformance packs via StackSets, wiring SSM remediation to compliance
-    findings, configuring Config Aggregator for multi-account visibility,
-    implementing organizational config rules, or detecting configuration
-    drift.
-  activation_triggers:
-    - "automate Config compliance"
-    - "managed vs custom Config rule"
-    - "conformance pack deployment"
-    - "CIS benchmark Config rules"
-    - "PCI-DSS Config rules"
-    - "NIST 800-53 Config rules"
-    - "SSM remediation for Config"
-    - "Config Aggregator multi-account"
-    - "organizational config rule"
-    - "custom policy rule CodeCommit"
-    - "compliance dashboard"
-    - "drift detection Config"
-    - "StackSets conformance pack"
-  invocation_schema: >-
-    Input: either (a) a compliance framework or set of requirements plus
-    the target accounts/regions, OR (b) an existing Config setup to audit.
-    Output: deterministic COMPLIANCE block per rule set — RULES/
-    REMEDIATION/FRAMEWORK/AGGREGATOR/VERDICT.
+  verdict_shape: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
+  when_to_use: Designing Config rule compliance automation, selecting managed rules for a compliance framework, building custom Lambda rules, deploying conformance packs via StackSets, wiring SSM remediation to compliance findings, configuring Config Aggregator for multi-account visibility, implementing organizational config rules, or detecting configuration drift.
+  activation_triggers: automate Config compliance, managed vs custom Config rule, conformance pack deployment, CIS benchmark Config rules, PCI-DSS Config rules, NIST 800-53 Config rules, SSM remediation for Config, Config Aggregator multi-account, organizational config rule, custom policy rule CodeCommit, compliance dashboard, drift detection Config, StackSets conformance pack
+  invocation_schema: 'Input: either (a) a compliance framework or set of requirements plus the target accounts/regions, OR (b) an existing Config setup to audit. Output: deterministic COMPLIANCE block per rule set — RULES/ REMEDIATION/FRAMEWORK/AGGREGATOR/VERDICT.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Config, Config rules, managed rules, custom Lambda rules, conformance packs, CIS benchmark, PCI-DSS, NIST 800-53, SSM Automation remediation, Config Aggregator, organizational config rules, custom policy rules, compliance dashboard, drift detection, StackSets, governance automation
+  tags: aws-config, conformance-packs, ssm-automation, cis, compliance, governance, automate
 ---
 
 # Config Rule Compliance Automator

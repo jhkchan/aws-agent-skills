@@ -1,110 +1,29 @@
 ---
 name: aurora-failover-operator
-description: >-
-  Operates Aurora cluster failover and recovery workflows safely — automatic
-  Multi-AZ failover (30s detection, 60s promotion), planned failover to
-  promote a specific replica, unplanned failover when the primary is
-  unreachable, failback to the original primary, Aurora Global Database
-  managed failover, RDS Proxy connection pooling that survives failover
-  without dropping connections, writer/reader endpoint behavior, application
-  connection-string cutover, and full post-failover verification (cluster
-  status, instance roles, replica lag). Runs deterministic pre-checks
-  (healthy replica count, Global DB membership, writer endpoint reachability,
-  replication health), executes behind a CONFIRM gate, and emits READY,
-  BLOCKED, or COMPLETED per operation with the exact CLI sequence, endpoint
-  behavior, and verification commands. Use for Aurora failover planning,
-  promoting a replica, failing back, or verifying post-failover health.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates Aurora cluster failover and recovery workflows safely — automatic Multi-AZ failover (30s detection, 60s promotion), planned failover to promote a specific replica, unplanned failover when the primary is unreachable, failback to the original primary, Aurora Global Database managed failover, RDS Proxy connection pooling that survives failover without dropping connections, writer/reader endpoint behavior, application connection-string cutover, and full post-failover verification (cluster status, instance roles, replica lag). Runs deterministic pre-checks (healthy replica count, Global DB membership, writer endpoint reachability, replication health), executes behind a CONFIRM gate, and emits READY, BLOCKED, or COMPLETED per operation with the exact CLI sequence, endpoint behavior, and verification commands. Use for Aurora failover planning, promoting a replica, failing back, or verifying post-failover health.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws rds describe-db-clusters, aws rds failover-db-cluster,
-  aws rds describe-global-clusters, aws rds failover-global-cluster, aws rds
-  describe-db-instances, aws rds describe-db-proxy-target-groups, and aws rds
-  wait db-cluster-available (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Aurora
-  - failover
-  - Multi-AZ
-  - planned failover
-  - unplanned failover
-  - failback
-  - RDS Proxy
-  - Aurora Global Database
-  - writer endpoint
-  - reader endpoint
-  - connection pooling
-  - replica promotion
-  - split-brain
-  - DNS cache
-  - replica lag
-  - high availability
-  - disaster recovery
-tags: [aurora, databases, failover, high-availability, disaster-recovery, rds-proxy, multi-az]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws rds describe-db-clusters, aws rds failover-db-cluster, aws rds describe-global-clusters, aws rds failover-global-cluster, aws rds describe-db-instances, aws rds describe-db-proxy-target-groups, and aws rds wait db-cluster-available (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Planning or executing an Aurora cluster failover (automatic, planned, or
-    unplanned), failing back to the original primary, promoting a specific
-    replica, managing an Aurora Global Database failover, configuring RDS
-    Proxy to survive failover, verifying post-failover cluster health, or
-    recovering from a primary outage.
-  when_not_to_use: >-
-    RDS backup and restore operations (use rds-backup-restore-operator), RDS
-    instance rightsizing or cost optimization (use the optimize skills), RDS
-    security audits (use the audit skills), or non-Aurora RDS failover
-    (standard RDS Multi-AZ failover is automatic only — no manual failover
-    CLI). This skill is Aurora-specific (cluster-level failover, Global
-    Database, writer/reader endpoints).
-  activation_triggers:
-    - "Aurora failover"
-    - "promote Aurora replica"
-    - "planned failover Aurora"
-    - "unplanned failover Aurora"
-    - "failback Aurora cluster"
-    - "Aurora Global Database failover"
-    - "RDS Proxy failover"
-    - "Aurora writer endpoint"
-    - "Aurora reader endpoint"
-    - "Aurora primary unreachable"
-    - "Aurora Multi-AZ failover"
-    - "verify Aurora failover"
-    - "Aurora split-brain"
-    - "Aurora DNS cache failover"
-    - "Aurora connection string update"
-  invocation_schema: >-
-    Input: either (a) an Aurora cluster configuration with the intended
-    failover operation (automatic, planned, unplanned, failback, global), OR
-    (b) a cluster-id + operation for live-account execution. Output: a
-    deterministic OPERATION/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per
-    operation, where VERDICT is one of READY, BLOCKED, COMPLETED.
-  invocation_example: |-
-    # Minimal valid input (offline plan classification):
-    Cluster: prod-orders-cluster
-    Region: us-east-1
-    Operation: planned-failover
-    Target replica to promote: prod-orders-cluster-node-2
-    Cluster configuration:
-      - Engine: aurora-mysql
-      - DBClusterStatus: available
-      - MultiAZ: true
-      - Writer: prod-orders-cluster-node-1 (us-east-1a)
-      - Readers: prod-orders-cluster-node-2 (us-east-1b), prod-orders-cluster-node-3 (us-east-1c)
-      - GlobalClusterMember: false
-      - RDSProxy: prod-orders-proxy (connected)
-    Emit the standard VERDICT block.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Planning or executing an Aurora cluster failover (automatic, planned, or unplanned), failing back to the original primary, promoting a specific replica, managing an Aurora Global Database failover, configuring RDS Proxy to survive failover, verifying post-failover cluster health, or recovering from a primary outage.
+  when_not_to_use: RDS backup and restore operations (use rds-backup-restore-operator), RDS instance rightsizing or cost optimization (use the optimize skills), RDS security audits (use the audit skills), or non-Aurora RDS failover (standard RDS Multi-AZ failover is automatic only — no manual failover CLI). This skill is Aurora-specific (cluster-level failover, Global Database, writer/reader endpoints).
+  activation_triggers: Aurora failover, promote Aurora replica, planned failover Aurora, unplanned failover Aurora, failback Aurora cluster, Aurora Global Database failover, RDS Proxy failover, Aurora writer endpoint, Aurora reader endpoint, Aurora primary unreachable, Aurora Multi-AZ failover, verify Aurora failover, Aurora split-brain, Aurora DNS cache failover, Aurora connection string update
+  invocation_schema: 'Input: either (a) an Aurora cluster configuration with the intended failover operation (automatic, planned, unplanned, failback, global), OR (b) a cluster-id + operation for live-account execution. Output: a deterministic OPERATION/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  invocation_example: "# Minimal valid input (offline plan classification):\nCluster: prod-orders-cluster\nRegion: us-east-1\nOperation: planned-failover\nTarget replica to promote: prod-orders-cluster-node-2\nCluster configuration:\n  - Engine: aurora-mysql\n  - DBClusterStatus: available\n  - MultiAZ: true\n  - Writer: prod-orders-cluster-node-1 (us-east-1a)\n  - Readers: prod-orders-cluster-node-2 (us-east-1b), prod-orders-cluster-node-3 (us-east-1c)\n  - GlobalClusterMember: false\n  - RDSProxy: prod-orders-proxy (connected)\nEmit the standard VERDICT block."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Aurora, failover, Multi-AZ, planned failover, unplanned failover, failback, RDS Proxy, Aurora Global Database, writer endpoint, reader endpoint, connection pooling, replica promotion, split-brain, DNS cache, replica lag, high availability, disaster recovery
+  tags: aurora, databases, failover, high-availability, disaster-recovery, rds-proxy, multi-az
 ---
 
 # Aurora Failover Operator

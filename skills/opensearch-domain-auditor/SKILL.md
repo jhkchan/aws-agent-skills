@@ -1,82 +1,24 @@
 ---
 name: opensearch-domain-auditor
-description: >-
-  Audits Amazon OpenSearch Service (provisioned, not Serverless) domains for
-  encryption-at-rest (KMS), node-to-node encryption, fine-grained access
-  control (FGAC), public access via resource-policy Principal "*", dedicated
-  master node sizing, and slow-log publishing to CloudWatch Logs. Emits a
-  deterministic verdict (NO_ENCRYPTION | PUBLIC_ACCESS | NO_FGAC | CONFIG_GAP |
-  OK) per domain with enumerated findings and CLI remediation. Use when
-  reviewing an OpenSearch domain before production deployment, validating
-  encryption/compliance posture, checking for public data-plane exposure, or
-  hardening a cluster that grew out of a dev sandbox.
-version: 0.3.0
-author: Jacky Chan — AWS Community Builder
+description: Audits Amazon OpenSearch Service (provisioned, not Serverless) domains for encryption-at-rest (KMS), node-to-node encryption, fine-grained access control (FGAC), public access via resource-policy Principal "*", dedicated master node sizing, and slow-log publishing to CloudWatch Logs. Emits a deterministic verdict (NO_ENCRYPTION | PUBLIC_ACCESS | NO_FGAC | CONFIG_GAP | OK) per domain with enumerated findings and CLI remediation. Use when reviewing an OpenSearch domain before production deployment, validating encryption/compliance posture, checking for public data-plane exposure, or hardening a cluster that grew out of a dev sandbox.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline config classification. Live-account
-  audits use aws opensearch describe-domain, describe-domain-config,
-  list-domain-names, and describe-domain-access-policy (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - OpenSearch
-  - Elasticsearch
-  - AES
-  - Amazon OpenSearch Service
-  - encryption at rest
-  - KMS
-  - node-to-node encryption
-  - fine-grained access control
-  - FGAC
-  - Advanced Security
-  - public access
-  - Principal star
-  - es:ESHttp*
-  - dedicated master
-  - master node type
-  - t3.small.search
-  - slow logs
-  - SEARCH_SLOW_LOGS
-  - INDEX_SLOW_LOGS
-  - LogPublishingOptions
-  - VPC domain
-  - cluster config
-  - OpenSearch compliance
-  - OpenSearch hardening
-tags: [opensearch, analytics, encryption, security, fgac, master-node, slow-logs, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline config classification. Live-account audits use aws opensearch describe-domain, describe-domain-config, list-domain-names, and describe-domain-access-policy (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
-  verdict_shape: "NO_ENCRYPTION | PUBLIC_ACCESS | NO_FGAC | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing an OpenSearch domain before production deployment, validating
-    encryption compliance, checking for public data-plane exposure via resource
-    policy, auditing fine-grained access control coverage, sizing dedicated
-    master nodes, or wiring slow-log publishing to CloudWatch Logs.
-  activation_triggers:
-    - "audit this OpenSearch domain"
-    - "is my OpenSearch domain public"
-    - "check OpenSearch encryption at rest"
-    - "OpenSearch node-to-node encryption off"
-    - "OpenSearch FGAC disabled"
-    - "is Advanced Security enabled"
-    - "OpenSearch Principal star"
-    - "dedicated master node too small"
-    - "OpenSearch slow logs not published"
-    - "harden OpenSearch domain"
-  invocation_schema: >-
-    Input: either (a) an OpenSearch domain configuration (describe-domain +
-    describe-domain-config + describe-domain-access-policy +
-    list-domain-names), OR (b) a domain name/ARN for live-account audit.
-    Output: deterministic DOMAIN/VERDICT/REASON/FINDINGS/REMEDIATION block per
-    domain, where VERDICT ∈ {NO_ENCRYPTION, PUBLIC_ACCESS, NO_FGAC, CONFIG_GAP,
-    OK, ERROR}.
+  verdict_shape: NO_ENCRYPTION | PUBLIC_ACCESS | NO_FGAC | CONFIG_GAP | OK
+  when_to_use: Reviewing an OpenSearch domain before production deployment, validating encryption compliance, checking for public data-plane exposure via resource policy, auditing fine-grained access control coverage, sizing dedicated master nodes, or wiring slow-log publishing to CloudWatch Logs.
+  activation_triggers: audit this OpenSearch domain, is my OpenSearch domain public, check OpenSearch encryption at rest, OpenSearch node-to-node encryption off, OpenSearch FGAC disabled, is Advanced Security enabled, OpenSearch Principal star, dedicated master node too small, OpenSearch slow logs not published, harden OpenSearch domain
+  invocation_schema: 'Input: either (a) an OpenSearch domain configuration (describe-domain + describe-domain-config + describe-domain-access-policy + list-domain-names), OR (b) a domain name/ARN for live-account audit. Output: deterministic DOMAIN/VERDICT/REASON/FINDINGS/REMEDIATION block per domain, where VERDICT ∈ {NO_ENCRYPTION, PUBLIC_ACCESS, NO_FGAC, CONFIG_GAP, OK, ERROR}.'
+  version: 0.3.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: OpenSearch, Elasticsearch, AES, Amazon OpenSearch Service, encryption at rest, KMS, node-to-node encryption, fine-grained access control, FGAC, Advanced Security, public access, Principal star, es:ESHttp*, dedicated master, master node type, t3.small.search, slow logs, SEARCH_SLOW_LOGS, INDEX_SLOW_LOGS, LogPublishingOptions, VPC domain, cluster config, OpenSearch compliance, OpenSearch hardening
+  tags: opensearch, analytics, encryption, security, fgac, master-node, slow-logs, audit
 ---
 
 # OpenSearch Domain Auditor

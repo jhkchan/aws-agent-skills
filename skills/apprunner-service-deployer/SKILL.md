@@ -1,45 +1,15 @@
 ---
 name: apprunner-service-deployer
 description: 'Deploys AWS App Runner services with production-grade configuration: source selection (ECR image vs source code repository), right-sized compute (CPU/memory combos), instance config (port, env vars, secrets via Secrets Manager / SSM), auto-scaling (min/max instances, concurrency), VPC connector for private resources (RDS, ElastiCache), custom domain with managed TLS, observability (CloudWatch Logs, X-Ray tracing), deployment control (automatic vs manual), health check policy, and latest features (VPC ingress, ALB integration, ARM64/Graviton). Emits a READY_TO_DEPLOY checklist with every configuration item verified. Use when creating a new App Runner service, deploying a container web app or API, validating an App Runner configuration, or generating deployment CLI and IaC templates. Triggers: App Runner, ECR source, source code repository, auto-scaling, VPC connector, custom domain, App Runner deploy.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
 compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with apprunner, ecr, iam, ec2, servicediscovery, secretsmanager, ssm, logs, and route53 access. Works with Terraform aws_apprunner_* resources, CloudFormation AWS::AppRunner::* resources, and the AWS Console App Runner wizard.'
-keywords:
-- aws
-- app-runner
-- apprunner
-- cloudops
-- deploy
-- provisioning
-- containers
-- ecr
-- source-code
-- auto-scaling
-- vpc-connector
-- custom-domain
-- health-check
-- observability
-- xray
-tags:
-- aws
-- app-runner
-- apprunner
-- cloudops
-- deploy
-- containers
-- ecr
-- auto-scaling
-- vpc-connector
-dependencies:
-- aws-orchestrator
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: deploy
   skill_class: capability
@@ -47,29 +17,9 @@ metadata:
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-  - aws
-  - app-runner
-  - apprunner
-  - cloudops
-  - deploy
-  - containers
-  - ecr
-  - auto-scaling
-  - vpc-connector
-  dependencies:
-  - aws-orchestrator
-  keywords:
-  - create app runner service
-  - deploy app runner
-  - app runner ecr source
-  - app runner source code
-  - app runner vpc connector
-  - app runner auto scaling
-  - app runner custom domain
-  - app runner health check
-  - app runner observability
-  - app runner deployment
+  tags: aws, app-runner, apprunner, cloudops, deploy, containers, ecr, auto-scaling, vpc-connector
+  dependencies: aws-orchestrator
+  keywords: aws, app-runner, apprunner, cloudops, deploy, provisioning, containers, ecr, source-code, auto-scaling, vpc-connector, custom-domain, health-check, observability, xray
   when_to_use: Invoke when the user wants to create a new App Runner service, deploy a containerized web app or API to App Runner, validate an existing App Runner configuration against best practices, generate deployment CLI commands or IaC templates, or troubleshoot an App Runner deployment failure caused by missing prerequisites (ECR access role, VPC connector, instance role, encryption KMS key). Do NOT invoke for ECS Fargate (use ecs-fargate-deployer), Lambda (use lambda-function-deployer), or EC2-based deployments.
 ---
 

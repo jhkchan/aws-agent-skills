@@ -1,82 +1,27 @@
 ---
 name: s3-access-troubleshooter
-description: 'Diagnoses AWS S3 access failures via a systematic six-symptom diagnostic decision tree covering 403 Access Denied on GetObject (object ARN vs bucket ARN, KMS key policy, BPA, Object Ownership),
-  403 on PutObject (SSE enforcement, Object Lock retention, bucket full, KMS GenerateDataKey), 403 on ListBucket (bucket ARN, prefix-scoped resources), cross-account failures (identity + bucket policy intersection,
-  KMS in both accounts), presigned URL failures (expiry, SigV4 credential scope, region), and unexpected public access (BPA hierarchy, legacy ACL, Access Point policy). Maps each symptom to a specific policy
-  layer (account BPA, bucket BPA, bucket policy, KMS key policy, Object Ownership, ACL, VPC endpoint policy, CloudFront OAC, Access Point policy) with the BPA hierarchy: account-level > bucket -level >
-  ACL > bucket policy > IAM identity policy. Emits ROOT_CAUSE_FOUND with the specific policy layer and evidence, or NEED_MORE_INFO / ESCALATE. Use when an S3 API call returns 403, when cross-account S3
-  access.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses AWS S3 access failures via a systematic six-symptom diagnostic decision tree covering 403 Access Denied on GetObject (object ARN vs bucket ARN, KMS key policy, BPA, Object Ownership), 403 on PutObject (SSE enforcement, Object Lock retention, bucket full, KMS GenerateDataKey), 403 on ListBucket (bucket ARN, prefix-scoped resources), cross-account failures (identity + bucket policy intersection, KMS in both accounts), presigned URL failures (expiry, SigV4 credential scope, region), and unexpected public access (BPA hierarchy, legacy ACL, Access Point policy). Maps each symptom to a specific policy layer (account BPA, bucket BPA, bucket policy, KMS key policy, Object Ownership, ACL, VPC endpoint policy, CloudFront OAC, Access Point policy) with the BPA hierarchy: account-level > bucket -level > ACL > bucket policy > IAM identity policy. Emits ROOT_CAUSE_FOUND with the specific policy layer and evidence, or NEED_MORE_INFO / ESCALATE. Use when an S3 API call returns 403, when cross-account S3 access.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works on supplied policy JSON. Live-account diagnosis uses aws s3api get-bucket-policy,
-  get-public-access-block, get-bucket-ownership-controls, get-object-acl, get-bucket-acl, aws kms describe-key, aws iam simulate-principal-policy, aws cloudtrail lookup-events, and aws ec2 describe-vpc-endpoints
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- S3
-- AccessDenied
-- 403
-- GetObject
-- PutObject
-- ListBucket
-- cross-account
-- KMS key policy
-- presigned URL
-- Block Public Access
-- BPA
-- Object Ownership
-- BucketOwnerEnforced
-- ACL
-- bucket policy
-- VPC endpoint policy
-- CloudFront OAC
-- S3 Access Point
-- Object Lock
-- SigV4
-- simulate-principal-policy
-- CloudTrail
-tags:
-- s3
-- storage
-- troubleshoot
-- access-denied
-- bpa
-- kms
-- cross-account
-- presigned-url
-- object-ownership
-- acl
-- bucket-policy
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works on supplied policy JSON. Live-account diagnosis uses aws s3api get-bucket-policy, get-public-access-block, get-bucket-ownership-controls, get-object-acl, get-bucket-acl, aws kms describe-key, aws iam simulate-principal-policy, aws cloudtrail lookup-events, and aws ec2 describe-vpc-endpoints (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
   verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
-  when_to_use: Diagnosing an S3 403 Access Denied on GetObject, PutObject, or ListBucket, debugging cross-account S3 access failures, investigating a presigned URL that returns AccessDenied, finding the
-    cause of unexpected public S3 access, validating BPA hierarchy interaction (account-level vs bucket-level), or determining why a KMS-encrypted object cannot be read by an otherwise-authorized principal.
-  activation_triggers:
-  - AccessDenied on s3:GetObject
-  - 403 on S3 PutObject
-  - ListBucket AccessDenied
-  - cross-account S3 access
-  - presigned URL 403
-  - S3 unexpectedly public
-  - KMS-encrypted object AccessDenied
-  - BPA hierarchy
-  - bucket policy Deny
-  - Object Lock retention
-  - CloudFront OAC origin
-  - S3 Access Point policy
-  invocation_schema: 'Input: either (a) a symptom description (the error string, the failing S3 API, the caller''s principal ARN, the bucket/key affected) plus any policy documents already gathered, OR
-    (b) a live-account scenario where the agent must run diagnostic CLI commands to gather context. Output: a deterministic INCIDENT / VERDICT / ROOT_CAUSE / EVIDENCE / REMEDIATION block where VERDICT ∈
-    { ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE } and ROOT_CAUSE names the specific policy layer and the specific statement or missing permission that produced the deny.'
+  when_to_use: Diagnosing an S3 403 Access Denied on GetObject, PutObject, or ListBucket, debugging cross-account S3 access failures, investigating a presigned URL that returns AccessDenied, finding the cause of unexpected public S3 access, validating BPA hierarchy interaction (account-level vs bucket-level), or determining why a KMS-encrypted object cannot be read by an otherwise-authorized principal.
+  activation_triggers: AccessDenied on s3:GetObject, 403 on S3 PutObject, ListBucket AccessDenied, cross-account S3 access, presigned URL 403, S3 unexpectedly public, KMS-encrypted object AccessDenied, BPA hierarchy, bucket policy Deny, Object Lock retention, CloudFront OAC origin, S3 Access Point policy
+  invocation_schema: 'Input: either (a) a symptom description (the error string, the failing S3 API, the caller''s principal ARN, the bucket/key affected) plus any policy documents already gathered, OR (b) a live-account scenario where the agent must run diagnostic CLI commands to gather context. Output: a deterministic INCIDENT / VERDICT / ROOT_CAUSE / EVIDENCE / REMEDIATION block where VERDICT ∈ { ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE } and ROOT_CAUSE names the specific policy layer and the specific statement or missing permission that produced the deny.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: S3, AccessDenied, 403, GetObject, PutObject, ListBucket, cross-account, KMS key policy, presigned URL, Block Public Access, BPA, Object Ownership, BucketOwnerEnforced, ACL, bucket policy, VPC endpoint policy, CloudFront OAC, S3 Access Point, Object Lock, SigV4, simulate-principal-policy, CloudTrail
+  tags: s3, storage, troubleshoot, access-denied, bpa, kms, cross-account, presigned-url, object-ownership, acl, bucket-policy
 ---
 
 # S3 Access Troubleshooter

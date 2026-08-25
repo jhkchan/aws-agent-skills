@@ -1,85 +1,29 @@
 ---
 name: nat-gateway-traffic-optimizer
-description: 'Optimises NAT Gateway cost through traffic analysis (BytesOutToDestination vs BytesInFromDestination), VPC endpoint elimination of NAT traffic (S3 Gateway Endpoint, DynamoDB Gateway Endpoint, Interface Endpoints for SSM/STS/ECR/SQS), NAT Gateway vs NAT Instance cost comparison, single NAT Gateway consolidation for non-production environments, subnet routing optimization to avoid double-NAT, S3 Gateway Endpoint as a free persistent route, PrivateLink for SaaS API traffic, CloudFront-to-origin via VPC endpoint, cross-AZ data transfer cost analysis, and the $0.045/hr hourly + $0.045/GB per-GB pricing model. Uses VPC Flow Logs and CloudWatch to quantify per-service NAT traffic, compute VPC endpoint break-even thresholds, and project monthly savings. Emits OPTIMIZED when all dimensions pass, or FURTHER_OPTIMIZATION_AVAILABLE when a concrete endpoint-creation, topology-consolidation, or NAT Instance substitution opportunity exists with a dollar savings estimate.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Optimises NAT Gateway cost through traffic analysis (BytesOutToDestination vs BytesInFromDestination), VPC endpoint elimination of NAT traffic (S3 Gateway Endpoint, DynamoDB Gateway Endpoint, Interface Endpoints for SSM/STS/ECR/SQS), NAT Gateway vs NAT Instance cost comparison, single NAT Gateway consolidation for non-production environments, subnet routing optimization to avoid double-NAT, S3 Gateway Endpoint as a free persistent route, PrivateLink for SaaS API traffic, CloudFront-to-origin via VPC endpoint, cross-AZ data transfer cost analysis, and the $0.045/hr hourly + $0.045/GB per-GB pricing model. Uses VPC Flow Logs and CloudWatch to quantify per-service NAT traffic, compute VPC endpoint break-even thresholds, and project monthly savings. Emits OPTIMIZED when all dimensions pass, or FURTHER_OPTIMIZATION_AVAILABLE when a concrete endpoint-creation, topology-consolidation, or NAT Instance substitution opportunity exists with a dollar savings estimate.
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted VPC Flow Logs, NAT Gateway CloudWatch metrics, and Cost Explorer NAT spend data.
-  Live-account optimization uses aws ec2 describe-nat-gateways, aws ec2 describe-vpc-endpoints, aws ec2 describe-route-tables, aws cloudwatch get-metric-statistics (BytesOutToDestination, BytesInFromDestination,
-  BytesOutToSource, BytesInFromSource, ConnectionEstablishedCount, ErrorPortAllocation), aws ec2 describe-flow-logs, aws logs start-query (VPC Flow Logs), and aws ce get-cost-and-usage (AWS CLI v2, SSO or key-based credentials).
-  Pricing references us-east-1 published rates as of 2026; re-state regional rates from the pricing matrix for other regions.
-keywords:
-- NAT Gateway
-- cost optimization
-- VPC endpoint
-- S3 Gateway Endpoint
-- DynamoDB Gateway Endpoint
-- Interface Endpoint
-- PrivateLink
-- NAT Instance
-- single NAT Gateway
-- multi-AZ NAT
-- cross-AZ data transfer
-- VPC Flow Logs
-- subnet routing
-- double NAT
-- CloudFront origin
-- ECR VPC endpoint
-- SSM VPC endpoint
-- STS VPC endpoint
-- data processing charge
-- hourly charge
-- FinOps
-- networking cost
-tags:
-- nat-gateway
-- networking
-- cost-optimization
-- finops
-- vpc-endpoint
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted VPC Flow Logs, NAT Gateway CloudWatch metrics, and Cost Explorer NAT spend data. Live-account optimization uses aws ec2 describe-nat-gateways, aws ec2 describe-vpc-endpoints, aws ec2 describe-route-tables, aws cloudwatch get-metric-statistics (BytesOutToDestination, BytesInFromDestination, BytesOutToSource, BytesInFromSource, ConnectionEstablishedCount...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-  when_to_use: Optimising NAT Gateway cost, analysing VPC Flow Logs for NAT traffic patterns, evaluating VPC endpoint creation (S3, DynamoDB, SSM, STS, ECR, SQS), consolidating multi-AZ NAT Gateways to single NAT for
-    non-prod, comparing NAT Instance vs NAT Gateway for dev/test, diagnosing unexpected data transfer charges, or running a FinOps networking cost review.
-  when_not_to_use: VPC peering or Transit Gateway topology design (use vpc-peering-deployer or transit-gateway-deployer), NAT Gateway troubleshooting (connection errors, port exhaustion — use the VPC troubleshooter),
-    or Security Group auditing (use ec2-security-group-auditor). This skill focuses on cost-driven traffic optimization, not connectivity debugging.
-  activation_triggers:
-  - optimise NAT Gateway cost
-  - NAT Gateway data processing charge
-  - VPC endpoint cost benefit
-  - S3 traffic through NAT
-  - create Gateway VPC Endpoint
-  - single NAT Gateway vs multi-AZ
-  - NAT Instance alternative
-  - reduce NAT Gateway bill
-  - VPC Flow Logs traffic breakdown
-  - FinOps networking review
-  - PrivateLink endpoint savings
-  - ECR traffic through NAT
-  - DynamoDB VPC endpoint
-  - unexpected AWS data transfer charge
-  - cross-AZ data transfer cost
-  - subnet routing optimization
-  - double NAT detection
-  - S3 Gateway Endpoint free
-  - CloudFront origin VPC endpoint
-  - NAT Gateway hourly charge
-  invocation_schema: 'Input: either (a) a VPC ID + live-account context, (b) a NAT Gateway CloudWatch metrics document with 7-30 day BytesOutToDestination/BytesInFromDestination data, OR (c) VPC Flow Logs
-    summarised by destination service. Output: a deterministic VPC/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/MIGRATION_STEPS block per VPC, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
-  invocation_example: "# Minimal valid input (offline finding classification):\nVPC: vpc-0abc123def\nNAT Gateways: 2 (us-east-1a, us-east-1b)\nEnvironment: non-production (staging)\nRegion: us-east-1\nNAT\
-    \ Monthly Spend:\n  - Hourly: 2 × $0.045 × 730 = $65.70\n  - Data processing: 450 GB × $0.045 = $20.25\n  - Total: $85.95/month\nExisting VPC Endpoints: none\nVPC Flow Logs (last 7 days):\n  - S3 traffic:\
-    \ 180 GB (40% of total)\n  - DynamoDB traffic: 45 GB (10% of total)\n  - ECR traffic: 90 GB (20% of total)\n  - SSM traffic: 22 GB (5% of total)\nEmit the standard optimization block (VPC, VERDICT,\n\
-    REASON, RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  when_to_use: Optimising NAT Gateway cost, analysing VPC Flow Logs for NAT traffic patterns, evaluating VPC endpoint creation (S3, DynamoDB, SSM, STS, ECR, SQS), consolidating multi-AZ NAT Gateways to single NAT for non-prod, comparing NAT Instance vs NAT Gateway for dev/test, diagnosing unexpected data transfer charges, or running a FinOps networking cost review.
+  when_not_to_use: VPC peering or Transit Gateway topology design (use vpc-peering-deployer or transit-gateway-deployer), NAT Gateway troubleshooting (connection errors, port exhaustion — use the VPC troubleshooter), or Security Group auditing (use ec2-security-group-auditor). This skill focuses on cost-driven traffic optimization, not connectivity debugging.
+  activation_triggers: optimise NAT Gateway cost, NAT Gateway data processing charge, VPC endpoint cost benefit, S3 traffic through NAT, create Gateway VPC Endpoint, single NAT Gateway vs multi-AZ, NAT Instance alternative, reduce NAT Gateway bill, VPC Flow Logs traffic breakdown, FinOps networking review, PrivateLink endpoint savings, ECR traffic through NAT, DynamoDB VPC endpoint, unexpected AWS data transfer charge, cross-AZ data transfer cost, subnet routing optimization, double NAT detection, S3 Gateway Endpoint free, CloudFront origin VPC endpoint, NAT Gateway hourly charge
+  invocation_schema: 'Input: either (a) a VPC ID + live-account context, (b) a NAT Gateway CloudWatch metrics document with 7-30 day BytesOutToDestination/BytesInFromDestination data, OR (c) VPC Flow Logs summarised by destination service. Output: a deterministic VPC/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/MIGRATION_STEPS block per VPC, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
+  invocation_example: "# Minimal valid input (offline finding classification):\nVPC: vpc-0abc123def\nNAT Gateways: 2 (us-east-1a, us-east-1b)\nEnvironment: non-production (staging)\nRegion: us-east-1\nNAT Monthly Spend:\n  - Hourly: 2 × $0.045 × 730 = $65.70\n  - Data processing: 450 GB × $0.045 = $20.25\n  - Total: $85.95/month\nExisting VPC Endpoints: none\nVPC Flow Logs (last 7 days):\n  - S3 traffic: 180 GB (40% of total)\n  - DynamoDB traffic: 45 GB (10% of total)\n  - ECR traffic: 90 GB (20% of total)\n  - SSM traffic: 22 GB (5% of total)\nEmit the standard optimization block (VPC, VERDICT,\nREASON, RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: NAT Gateway, cost optimization, VPC endpoint, S3 Gateway Endpoint, DynamoDB Gateway Endpoint, Interface Endpoint, PrivateLink, NAT Instance, single NAT Gateway, multi-AZ NAT, cross-AZ data transfer, VPC Flow Logs, subnet routing, double NAT, CloudFront origin, ECR VPC endpoint, SSM VPC endpoint, STS VPC endpoint, data processing charge, hourly charge, FinOps, networking cost
+  tags: nat-gateway, networking, cost-optimization, finops, vpc-endpoint
 ---
 
 # NAT Gateway Traffic Optimizer

@@ -1,109 +1,27 @@
 ---
 name: apigateway-rest-deployer
-description: >-
-  Provisions production-grade API Gateway REST APIs with correct
-  resource/method models, AWS_PROXY Lambda integrations, IAM/Cognito/Lambda
-  authorizers, stage-level throttling (rate + burst), usage plans with API
-  keys for per-consumer rate limiting, WAFv2 Web ACL association, VPC Link
-  for NLB-backed private integrations, Velocity mapping templates, canary
-  deployments with percentage-based traffic shifting, CloudWatch access
-  logging in JSON, custom domain names via ACM with base path mapping, and
-  REST vs HTTP API (v2) trade-offs. Emits a deployment plan with a
-  READY_TO_DEPLOY checklist. Use when provisioning a new REST API,
-  configuring Lambda proxy with authorizers, setting up usage plans for
-  per-consumer quotas, deploying private integrations via VPC Link, or
-  choosing between REST and HTTP API.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Provisions production-grade API Gateway REST APIs with correct resource/method models, AWS_PROXY Lambda integrations, IAM/Cognito/Lambda authorizers, stage-level throttling (rate + burst), usage plans with API keys for per-consumer rate limiting, WAFv2 Web ACL association, VPC Link for NLB-backed private integrations, Velocity mapping templates, canary deployments with percentage-based traffic shifting, CloudWatch access logging in JSON, custom domain names via ACM with base path mapping, and REST vs HTTP API (v2) trade-offs. Emits a deployment plan with a READY_TO_DEPLOY checklist. Use when provisioning a new REST API, configuring Lambda proxy with authorizers, setting up usage plans for per-consumer quotas, deploying private integrations via VPC Link, or choosing between REST and HTTP API.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline architecture planning. Live
-  deployment uses aws apigateway create-rest-api, create-resource,
-  put-method, put-integration, create-authorizer, create-usage-plan,
-  create-api-key, create-vpc-link, create-deployment, create-stage,
-  update-stage, aws apigatewayv2 create-api / create-domain-name, and
-  aws wafv2 associate-web-acl (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - API Gateway
-  - REST API
-  - HTTP API
-  - API Gateway v2
-  - resource method
-  - AWS_PROXY
-  - Lambda proxy
-  - AWS integration
-  - HTTP integration
-  - MOCK integration
-  - IAM authorization
-  - COGNITO_USER_POOLS
-  - Lambda authorizer
-  - request authorizer
-  - token authorizer
-  - usage plan
-  - API key
-  - throttle
-  - rate limit
-  - burst limit
-  - WAFv2
-  - Web ACL
-  - mapping template
-  - Velocity template
-  - VPC Link
-  - NLB integration
-  - private integration
-  - stage variables
-  - deployment
-  - canary deployment
-  - access logging
-  - custom domain
-  - base path mapping
-  - REST vs HTTP API
-tags: [apigateway, app-integration, deploy, rest-api, lambda-proxy, authorizer, usage-plan, throttling, vpc-link, canary, access-logging, custom-domain, waf]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline architecture planning. Live deployment uses aws apigateway create-rest-api, create-resource, put-method, put-integration, create-authorizer, create-usage-plan, create-api-key, create-vpc-link, create-deployment, create-stage, update-stage, aws apigatewayv2 create-api / create-domain-name, and aws wafv2 associate-web-acl (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: deploy
   skill_class: capability
   lifecycle_status: experimental
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Provisioning a new API Gateway REST API for production, configuring
-    Lambda proxy (AWS_PROXY) integrations with IAM/Cognito/Lambda
-    authorizers, setting up usage plans with API keys for per-consumer
-    rate limiting and quotas, deploying private integrations via VPC Link
-    to an NLB, configuring canary deployments with traffic shifting,
-    enabling access logging to CloudWatch, mapping a custom domain name
-    via ACM, or choosing between REST API (v1) and HTTP API (v2).
-  activation_triggers:
-    - "create a REST API"
-    - "provision API Gateway"
-    - "Lambda proxy integration"
-    - "API Gateway Cognito authorizer"
-    - "API Gateway usage plan"
-    - "API Gateway rate limiting"
-    - "API Gateway VPC Link"
-    - "canary deployment API Gateway"
-    - "API Gateway custom domain"
-    - "REST API vs HTTP API"
-    - "API Gateway WAF"
-    - "API Gateway access logging"
-  invocation_schema: >-
-    Input shape (one of): (a) a deployment specification including API
-    type (REST vs HTTP), endpoint type (EDGE/REGIONAL/PRIVATE), resource
-    and method layout, integration type (AWS_PROXY/AWS/HTTP/MOCK),
-    authorization model, throttling/usage plan requirements, WAF
-    requirements, VPC Link requirements, custom domain requirements, and
-    logging requirements; (b) a partial spec for interactive refinement;
-    (c) an existing REST API ID for architecture review against the
-    well-architected checklist. Output shape: { API_SPEC, VERDICT,
-    ARCHITECTURE, CHECKLIST[], FINDINGS[], DEPLOY_COMMANDS } where
-    VERDICT ∈ { READY_TO_DEPLOY, PREREQUISITES_MISSING, ERROR }.
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Provisioning a new API Gateway REST API for production, configuring Lambda proxy (AWS_PROXY) integrations with IAM/Cognito/Lambda authorizers, setting up usage plans with API keys for per-consumer rate limiting and quotas, deploying private integrations via VPC Link to an NLB, configuring canary deployments with traffic shifting, enabling access logging to CloudWatch, mapping a custom domain name via ACM, or choosing between REST API (v1) and HTTP API (v2).
+  activation_triggers: create a REST API, provision API Gateway, Lambda proxy integration, API Gateway Cognito authorizer, API Gateway usage plan, API Gateway rate limiting, API Gateway VPC Link, canary deployment API Gateway, API Gateway custom domain, REST API vs HTTP API, API Gateway WAF, API Gateway access logging
+  invocation_schema: 'Input shape (one of): (a) a deployment specification including API type (REST vs HTTP), endpoint type (EDGE/REGIONAL/PRIVATE), resource and method layout, integration type (AWS_PROXY/AWS/HTTP/MOCK), authorization model, throttling/usage plan requirements, WAF requirements, VPC Link requirements, custom domain requirements, and logging requirements; (b) a partial spec for interactive refinement; (c) an existing REST API ID for architecture review against the well-architected checklist. Output shape: { API_SPEC, VERDICT, ARCHITECTURE, CHECKLIST[], FINDINGS[], DEPLOY_COMMANDS } where VERDICT ∈ { READY_TO_DEPLOY, PREREQUISITES_MISSING, ERROR }.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: API Gateway, REST API, HTTP API, API Gateway v2, resource method, AWS_PROXY, Lambda proxy, AWS integration, HTTP integration, MOCK integration, IAM authorization, COGNITO_USER_POOLS, Lambda authorizer, request authorizer, token authorizer, usage plan, API key, throttle, rate limit, burst limit, WAFv2, Web ACL, mapping template, Velocity template, VPC Link, NLB integration, private integration, stage variables, deployment, canary deployment, access logging, custom domain, base path mapping, REST vs HTTP API
+  tags: apigateway, app-integration, deploy, rest-api, lambda-proxy, authorizer, usage-plan, throttling, vpc-link, canary, access-logging, custom-domain, waf
 ---
 
 # API Gateway REST Deployer

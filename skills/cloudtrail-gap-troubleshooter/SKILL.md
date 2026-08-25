@@ -1,83 +1,27 @@
 ---
 name: cloudtrail-gap-troubleshooter
-description: >-
-  Diagnoses AWS CloudTrail logging gaps and missing events. Covers
-  events missing because data events (S3/Lambda/DynamoDB) were never
-  configured, multi-region scope mismatches, trails that report
-  IsLogging true but never deliver (S3 bucket policy missing
-  bucket-owner-full-control, KMS key policy missing the cloudtrail
-  principal, explicit deny), silently stopped trails (inadvertent
-  stop-logging, IaC that omitted start-logging), delayed delivery
-  beyond the 5-15 minute window, CloudTrail Insights not firing
-  (selectors missing, baseline not elapsed), and org trails
-  that miss specific member accounts (member shadow trail stopped,
-  delegated-admin confusion, member left org). Emits a deterministic
-  verdict (ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE) with evidence
-  from describe-trails, get-trail-status, get-event-selectors,
-  lookup-events, list-insights-selectors, and get-bucket-policy. Use
-  when a trail is silent, events are missing, Insights is not firing,
-  or a member account is not being logged by the org trail.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Diagnoses AWS CloudTrail logging gaps and missing events. Covers events missing because data events (S3/Lambda/DynamoDB) were never configured, multi-region scope mismatches, trails that report IsLogging true but never deliver (S3 bucket policy missing bucket-owner-full-control, KMS key policy missing the cloudtrail principal, explicit deny), silently stopped trails (inadvertent stop-logging, IaC that omitted start-logging), delayed delivery beyond the 5-15 minute window, CloudTrail Insights not firing (selectors missing, baseline not elapsed), and org trails that miss specific member accounts (member shadow trail stopped, delegated-admin confusion, member left org). Emits a deterministic verdict (ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE) with evidence from describe-trails, get-trail-status, get-event-selectors, lookup-events, list-insights-selectors, and get-bucket-policy. Use when a trail is silent, events are missing, Insights is not firing, or a member account is not being logged by the org trail.
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works on supplied describe-trails / get-trail-status / get-bucket-policy JSON. Live-account
-  diagnosis uses aws cloudtrail describe-trails, get-trail-status, lookup-events, get-insight-selectors, list-insights-selectors, aws s3api get-bucket-policy, aws organizations list-delegated-administrators,
-  and aws logs filter-log-events (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- CloudTrail
-- audit logging
-- data events
-- management events
-- missing events
-- trail not logging
-- log delivery delay
-- CloudTrail Insights
-- CloudTrail Lake
-- organization trail
-- delegated admin
-- S3 bucket policy
-- log file validation
-- multi-region trail
-tags:
-- cloudtrail
-- governance
-- troubleshoot
-- logging-gap
-- audit
-- compliance
-- org-trail
-- insights
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works on supplied describe-trails / get-trail-status / get-bucket-policy JSON. Live-account diagnosis uses aws cloudtrail describe-trails, get-trail-status, lookup-events, get-insight-selectors, list-insights-selectors, aws s3api get-bucket-policy, aws organizations list-delegated-administrators, and aws logs filter-log-events (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
   verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
-  when_to_use: Diagnosing why a CloudTrail trail is silent (no log files being delivered to S3), why specific API calls are missing from a trail (data events not configured, single-region trail in the wrong
-    region), why log delivery is delayed beyond the expected 5-15 minute window, why CloudTrail Insights is not firing on suspicious write activity, or why an organization trail is not logging for one or
-    more member accounts.
-  activation_triggers:
-  - CloudTrail missing events
-  - CloudTrail not logging
-  - CloudTrail trail stopped
-  - CloudTrail log delivery delayed
-  - CloudTrail data events missing
-  - CloudTrail Insights not working
-  - CloudTrail org trail gap
-  - CloudTrail member account not logged
-  - CloudTrail S3 bucket policy
-  - CloudTrail lookup-events returns empty
-  - CloudTrail audit gap
-  invocation_schema: 'Input: either (a) a symptom description (trail name, observed gap, any error strings from the console or lookup-events), OR (b) a live-account scenario where the agent runs aws cloudtrail
-    describe-trails / get-trail-status / lookup-events / list-insights-selectors / aws s3api get-bucket-policy to gather evidence. Output: a deterministic INCIDENT / VERDICT / ROOT_CAUSE / EVIDENCE / REMEDIATION
-    block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and ROOT_CAUSE names the specific failure category (MISSING_DATA_EVENTS / TRAIL_NOT_LOGGING / DELIVERY_DELAYED / INSIGHTS_DISABLED
-    / ORG_TRAIL_GAP / MULTI_REGION_GAP / BUCKET_POLICY_BLOCKING) and the offending config element.'
+  when_to_use: Diagnosing why a CloudTrail trail is silent (no log files being delivered to S3), why specific API calls are missing from a trail (data events not configured, single-region trail in the wrong region), why log delivery is delayed beyond the expected 5-15 minute window, why CloudTrail Insights is not firing on suspicious write activity, or why an organization trail is not logging for one or more member accounts.
+  activation_triggers: CloudTrail missing events, CloudTrail not logging, CloudTrail trail stopped, CloudTrail log delivery delayed, CloudTrail data events missing, CloudTrail Insights not working, CloudTrail org trail gap, CloudTrail member account not logged, CloudTrail S3 bucket policy, CloudTrail lookup-events returns empty, CloudTrail audit gap
+  invocation_schema: 'Input: either (a) a symptom description (trail name, observed gap, any error strings from the console or lookup-events), OR (b) a live-account scenario where the agent runs aws cloudtrail describe-trails / get-trail-status / lookup-events / list-insights-selectors / aws s3api get-bucket-policy to gather evidence. Output: a deterministic INCIDENT / VERDICT / ROOT_CAUSE / EVIDENCE / REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and ROOT_CAUSE names the specific failure category (MISSING_DATA_EVENTS / TRAIL_NOT_LOGGING / DELIVERY_DELAYED / INSIGHTS_DISABLED / ORG_TRAIL_GAP / MULTI_REGION_GAP / BUCKET_POLICY_BLOCKING) and the offending config element.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudTrail, audit logging, data events, management events, missing events, trail not logging, log delivery delay, CloudTrail Insights, CloudTrail Lake, organization trail, delegated admin, S3 bucket policy, log file validation, multi-region trail
+  tags: cloudtrail, governance, troubleshoot, logging-gap, audit, compliance, org-trail, insights
 ---
 
 # CloudTrail Gap Troubleshooter

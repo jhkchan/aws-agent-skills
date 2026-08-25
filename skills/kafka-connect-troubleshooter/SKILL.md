@@ -1,125 +1,28 @@
 ---
 name: kafka-connect-troubleshooter
-description: >-
-  Diagnoses Kafka Connect and Amazon MSK Connect issues through a
-  nine-category diagnostic tree — task FAILED status (task
-  exceptions), worker rebalance storms (consumer group coordinator
-  churn), source connector lag (LagMax, offset not advancing), sink
-  connector errors (DLQ config, retry exhaustion), schema registry
-  connectivity (Avro/JSON/Protobuf, Confluent, Glue Schema Registry),
-  IAM auth for MSK (kafka-cluster principal), plugin or connector
-  class not found (custom plugin, Debezium), config errors (wrong
-  topics, bootstrap servers, converter mismatch), and
-  Single Message Transforms (SMT chain, Cast, ExtractTopic). Reads
-  describe-connector or REST API status, CloudWatch logs
-  (/aws/kafkaconnect/), and MSK describe-cluster for bootstrap and
-  IAM validation. Emits ROOT_CAUSE_FOUND with the failing probe,
-  NEED_MORE_INFO when a probe requires operator input, or ESCALATE
-  for AWS-side incidents. Use when a connector shows FAILED, task
-  FAILED, source lag grows, sink DLQ fills, or a plugin will not
-  start.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Diagnoses Kafka Connect and Amazon MSK Connect issues through a nine-category diagnostic tree — task FAILED status (task exceptions), worker rebalance storms (consumer group coordinator churn), source connector lag (LagMax, offset not advancing), sink connector errors (DLQ config, retry exhaustion), schema registry connectivity (Avro/JSON/Protobuf, Confluent, Glue Schema Registry), IAM auth for MSK (kafka-cluster principal), plugin or connector class not found (custom plugin, Debezium), config errors (wrong topics, bootstrap servers, converter mismatch), and Single Message Transforms (SMT chain, Cast, ExtractTopic). Reads describe-connector or REST API status, CloudWatch logs (/aws/kafkaconnect/), and MSK describe-cluster for bootstrap and IAM validation. Emits ROOT_CAUSE_FOUND with the failing probe, NEED_MORE_INFO when a probe requires operator input, or ESCALATE for AWS-side incidents. Use when a connector shows FAILED, task FAILED, source lag grows, sink DLQ fills, or a plugin will not start.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline classification works from a pasted
-  connector status JSON, CloudWatch Logs excerpt, or worker error.
-  Live-account diagnosis uses aws kafkaconnect describe-connector /
-  list-connectors / update-connector; aws kafka describe-cluster /
-  get-bootstrap-brokers; aws logs filter-log-events on
-  /aws/kafkaconnect/; aws ec2 describe-security-groups; aws glue
-  get-schema-registry or the Confluent Schema Registry REST API;
-  aws iam simulate-principal-policy for MSK IAM (AWS CLI v2, SSO or
-  key-based).
-keywords:
-  - Kafka Connect
-  - MSK Connect
-  - connector failure
-  - task FAILED
-  - worker rebalance
-  - source connector lag
-  - LagMax
-  - consumer group
-  - sink connector
-  - dead letter queue
-  - DLQ
-  - retry exhaustion
-  - schema registry
-  - Avro
-  - Confluent
-  - Glue Schema Registry
-  - IAM auth
-  - MSK IAM
-  - plugin not found
-  - connector class not found
-  - custom plugin
-  - Debezium
-  - Single Message Transforms
-  - SMT
-  - bootstrap servers
-  - Analytics
-tags:
-  - kafka-connect
-  - msk
-  - analytics
-  - troubleshoot
-  - streaming
-  - debezium
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline classification works from a pasted connector status JSON, CloudWatch Logs excerpt, or worker error. Live-account diagnosis uses aws kafkaconnect describe-connector / list-connectors / update-connector; aws kafka describe-cluster / get-bootstrap-brokers; aws logs filter-log-events on /aws/kafkaconnect/; aws ec2 describe-security-groups; aws glue get-schema-registry or the Confluent Schema Registry REST...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
-  when_to_use: >-
-    Diagnosing a Kafka Connect or Amazon MSK Connect connector that
-    FAILED, has tasks in FAILED state, is stuck in worker rebalance,
-    is showing growing source lag (LagMax climbing), is filling the
-    DLQ, is failing schema-registry lookups (Avro/JSON/Protobuf), is
-    unable to authenticate to MSK via IAM, is reporting class not
-    found for a custom plugin or Debezium connector, or is surfacing
-    Single Message Transforms errors.
-  when_not_to_use:
-    - "MSK cluster creation / capacity planning — use an MSK deploy skill, not a diagnostic."
-    - "Kafka producer / consumer application bugs outside Connect — use a Kafka client troubleshooter."
-    - "Kafka topic configuration (partitions, retention) — use an MSK admin skill."
-    - "Schema evolution compatibility strategy — use a Schema Registry design skill; this skill diagnoses connectivity."
-  activation_triggers:
-    - "Kafka Connect failed"
-    - "MSK Connect connector FAILED"
-    - "Kafka Connect task FAILED"
-    - "connector class not found"
-    - "Kafka Connect worker rebalance"
-    - "source connector lag growing"
-    - "LagMax Kafka Connect"
-    - "sink connector DLQ full"
-    - "dead letter queue overflow"
-    - "schema registry connection refused"
-    - "Avro serializer error"
-    - "MSK IAM authentication failed"
-    - "Debezium connector not starting"
-    - "Single Message Transform error"
-    - "SMT Cast error"
-    - "custom plugin upload failed"
-    - "bootstrap servers wrong"
-    - "diagnose Kafka Connect failure"
-  invocation_schema: >-
-    Input: either (a) a connector name + live-account context (MSK
-    Connect), (b) a pasted connector status JSON from the REST API
-    or describe-connector, OR (c) a CloudWatch Logs excerpt from
-    /aws/kafkaconnect/. Output: a deterministic TARGET / VERDICT /
-    REASON / CATEGORY / EVIDENCE / REMEDIATION block per connector,
-    where VERDICT is {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and
-    CATEGORY is {TASK_EXCEPTION, WORKER_REBALANCE, SOURCE_LAG,
-    SINK_DLQ, SINK_RETRY, SCHEMA_REGISTRY, IAM_AUTH, PLUGIN_MISSING,
-    CONFIG_ERROR, SMT_ERROR, DEBEZIUM_CDC, UNKNOWN}.
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+  when_to_use: Diagnosing a Kafka Connect or Amazon MSK Connect connector that FAILED, has tasks in FAILED state, is stuck in worker rebalance, is showing growing source lag (LagMax climbing), is filling the DLQ, is failing schema-registry lookups (Avro/JSON/Protobuf), is unable to authenticate to MSK via IAM, is reporting class not found for a custom plugin or Debezium connector, or is surfacing Single Message Transforms errors.
+  when_not_to_use: MSK cluster creation / capacity planning — use an MSK deploy skill, not a diagnostic., Kafka producer / consumer application bugs outside Connect — use a Kafka client troubleshooter., Kafka topic configuration (partitions, retention) — use an MSK admin skill., Schema evolution compatibility strategy — use a Schema Registry design skill; this skill diagnoses connectivity.
+  activation_triggers: Kafka Connect failed, MSK Connect connector FAILED, Kafka Connect task FAILED, connector class not found, Kafka Connect worker rebalance, source connector lag growing, LagMax Kafka Connect, sink connector DLQ full, dead letter queue overflow, schema registry connection refused, Avro serializer error, MSK IAM authentication failed, Debezium connector not starting, Single Message Transform error, SMT Cast error, custom plugin upload failed, bootstrap servers wrong, diagnose Kafka Connect failure
+  invocation_schema: 'Input: either (a) a connector name + live-account context (MSK Connect), (b) a pasted connector status JSON from the REST API or describe-connector, OR (c) a CloudWatch Logs excerpt from /aws/kafkaconnect/. Output: a deterministic TARGET / VERDICT / REASON / CATEGORY / EVIDENCE / REMEDIATION block per connector, where VERDICT is {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and CATEGORY is {TASK_EXCEPTION, WORKER_REBALANCE, SOURCE_LAG, SINK_DLQ, SINK_RETRY, SCHEMA_REGISTRY, IAM_AUTH, PLUGIN_MISSING, CONFIG_ERROR, SMT_ERROR, DEBEZIUM_CDC, UNKNOWN}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Kafka Connect, MSK Connect, connector failure, task FAILED, worker rebalance, source connector lag, LagMax, consumer group, sink connector, dead letter queue, DLQ, retry exhaustion, schema registry, Avro, Confluent, Glue Schema Registry, IAM auth, MSK IAM, plugin not found, connector class not found, custom plugin, Debezium, Single Message Transforms, SMT, bootstrap servers, Analytics
+  tags: kafka-connect, msk, analytics, troubleshoot, streaming, debezium
 ---
 
 # Kafka Connect Troubleshooter

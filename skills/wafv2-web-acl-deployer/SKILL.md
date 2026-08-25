@@ -1,46 +1,15 @@
 ---
 name: wafv2-web-acl-deployer
 description: 'Provisions AWS WAFv2 Web ACLs with correct production defaults: scope selection (CLOUDFRONT vs REGIONAL), managed rule groups (AWSManagedRulesCommonRuleSet, SQLiRuleSet, LinuxRuleSet, WindowsRuleSet, IPReputationList, BotControlRuleSet, AmazonIpReputationList, ATP), custom rules (byte match, IP set, regex pattern, geo match, size constraint, rate-based), rule priority ordering, logging destinations (Kinesis Firehose, CloudWatch Logs, S3), resource association (ALB, API Gateway, CloudFront), rate-based rules with aggregate keys (IP, forwarded IP), Challenge and CAPTCHA actions, and account takeover prevention. Emits a READY_TO_DEPLOY checklist. Use when creating a Web ACL, attaching managed rules, configuring rate limiting, enabling WAF logging, associating a Web ACL with an ALB/API Gateway/CloudFront, or configuring CAPTCHA/Challenge actions. Triggers: create WAF Web ACL, WAFv2, managed rule groups, WAF rate limiting, WAF logging, WAF CAPTCHA, WAF Challenge action, bot control, ATP managed rules.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
 compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with wafv2, cloudfront, elasticloadbalancingv2, apigateway, firehose, logs, and s3 access. Works with Terraform aws_wafv2_web_acl / aws_wafv2_web_acl_association resources, CloudFormation AWS::WAFv2::WebACL / AWS::WAFv2::WebACLAssociation, and SAM templates.'
-keywords:
-- aws
-- waf
-- wafv2
-- security
-- cloudops
-- deploy
-- provisioning
-- web-acl
-- managed-rules
-- rate-limiting
-- bot-control
-- captcha
-- challenge
-- atp
-- cloudfront
-- regional
-tags:
-- aws
-- waf
-- wafv2
-- security
-- cloudops
-- deploy
-- web-acl
-- managed-rules
-- rate-limiting
-dependencies:
-- aws-orchestrator
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: deploy
   skill_class: capability
@@ -48,38 +17,9 @@ metadata:
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-  - aws
-  - waf
-  - wafv2
-  - security
-  - cloudops
-  - deploy
-  - web-acl
-  - managed-rules
-  - rate-limiting
-  dependencies:
-  - aws-orchestrator
-  keywords:
-  - create waf web acl
-  - wafv2 web acl
-  - waf managed rule groups
-  - waf rate limiting
-  - waf logging
-  - waf captcha
-  - waf challenge action
-  - bot control rule set
-  - account takeover prevention
-  - waf custom rules
-  - waf ip set
-  - waf geo match
-  - waf byte match
-  - waf regex pattern
-  - waf size constraint
-  - cloudfront waf
-  - regional waf
-  - alb waf association
-  - api gateway waf
+  tags: aws, waf, wafv2, security, cloudops, deploy, web-acl, managed-rules, rate-limiting
+  dependencies: aws-orchestrator
+  keywords: aws, waf, wafv2, security, cloudops, deploy, provisioning, web-acl, managed-rules, rate-limiting, bot-control, captcha, challenge, atp, cloudfront, regional
   when_to_use: Invoke when the user wants to create a new WAFv2 Web ACL, attach AWS managed rule groups, configure custom rules (byte match, IP set, regex, geo, size, rate-based), enable WAF logging to Kinesis Firehose / CloudWatch Logs / S3, associate a Web ACL with an ALB / API Gateway / CloudFront distribution, or configure CAPTCHA / Challenge actions for bot defense. Do NOT invoke for AWS WAF Classic (waf-regional / waf) — only WAFv2. For Shield Advanced protections, use the shield-advanced skill.
 ---
 

@@ -1,107 +1,26 @@
 ---
 name: iot-core-thing-deployer
-description: >-
-  Provisions AWS IoT Core things and device pipelines: thing creation,
-  thing type, thing group, device certificate (X.509) with key pair
-  generation, IoT policy attachment (pub/sub to MQTT topics), topic
-  rule (SQL SELECT republish to Lambda/S3/SQS/DynamoDB/Timestream),
-  device shadow (classic vs named), IoT jobs (OTA firmware update),
-  fleet indexing, custom authorizer (Lambda), mutual TLS, message
-  broker (MQTT vs HTTPS), rules engine SQL, Greengrass component
-  deployment, CloudWatch metrics (Connect, PublishIn, PublishOut), and
-  thing-to-policy binding. Emits a READY_TO_DEPLOY checklist.
-  Triggers: create iot thing, device certificate x509, iot policy
-  pub sub, topic rule sql republish, device shadow classic named, iot
-  jobs ota firmware, fleet indexing, custom authorizer lambda, mutual
-  tls mqtt https, greengrass component deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS IoT Core things and device pipelines: thing creation, thing type, thing group, device certificate (X.509) with key pair generation, IoT policy attachment (pub/sub to MQTT topics), topic rule (SQL SELECT republish to Lambda/S3/SQS/DynamoDB/Timestream), device shadow (classic vs named), IoT jobs (OTA firmware update), fleet indexing, custom authorizer (Lambda), mutual TLS, message broker (MQTT vs HTTPS), rules engine SQL, Greengrass component deployment, CloudWatch metrics (Connect, PublishIn, PublishOut), and thing-to-policy binding. Emits a READY_TO_DEPLOY checklist. Triggers: create iot thing, device certificate x509, iot policy pub sub, topic rule sql republish, device shadow classic named, iot jobs ota firmware, fleet indexing, custom authorizer lambda, mutual tls mqtt https, greengrass component deployment.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with iot access.
-  Works with Terraform aws_iot_thing / aws_iot_certificate /
-  aws_iot_policy / aws_iot_topic_rule resources and CloudFormation
-  AWS::IoT::Thing / AWS::IoT::TopicRule templates.
-keywords:
-  - aws
-  - iot core
-  - iot thing
-  - device certificate
-  - x.509
-  - iot policy
-  - topic rule
-  - device shadow
-  - cloudops
-  - deploy
-  - provisioning
-  - mqtt
-  - greengrass
-  - fleet indexing
-  - custom authorizer
-tags:
-  - aws
-  - iot-core
-  - iot-thing
-  - cloudops
-  - deploy
-  - networking
-  - provisioning
-  - mqtt
-  - x509
-  - device-shadow
-  - topic-rule
-  - greengrass
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with iot access. Works with Terraform aws_iot_thing / aws_iot_certificate / aws_iot_policy / aws_iot_topic_rule resources and CloudFormation AWS::IoT::Thing / AWS::IoT::TopicRule templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - iot-core
-    - iot-thing
-    - cloudops
-    - deploy
-    - networking
-    - provisioning
-    - mqtt
-    - x509
-    - device-shadow
-    - topic-rule
-    - greengrass
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create iot thing
-    - device certificate x509
-    - iot policy pub sub
-    - topic rule sql republish
-    - device shadow classic named
-    - iot jobs ota firmware
-    - fleet indexing
-    - custom authorizer lambda
-    - mutual tls mqtt https
-    - greengrass component deployment
-  when_to_use: >-
-    Invoke when the user wants to create an IoT thing, provision device
-    certificates, attach IoT policies for MQTT pub/sub, create topic
-    rules with SQL SELECT to republish to Lambda/S3/SQS/DynamoDB/
-    Timestream, configure device shadows, deploy IoT jobs for OTA
-    firmware, enable fleet indexing, set up custom authorizers, or
-    deploy Greengrass components. Do NOT invoke for AWS IoT Greengrass
-    standalone, AWS IoT Events, or AWS IoT SiteWise.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, iot-core, iot-thing, cloudops, deploy, networking, provisioning, mqtt, x509, device-shadow, topic-rule, greengrass
+  dependencies: aws-orchestrator
+  keywords: aws, iot core, iot thing, device certificate, x.509, iot policy, topic rule, device shadow, cloudops, deploy, provisioning, mqtt, greengrass, fleet indexing, custom authorizer
+  when_to_use: Invoke when the user wants to create an IoT thing, provision device certificates, attach IoT policies for MQTT pub/sub, create topic rules with SQL SELECT to republish to Lambda/S3/SQS/DynamoDB/ Timestream, configure device shadows, deploy IoT jobs for OTA firmware, enable fleet indexing, set up custom authorizers, or deploy Greengrass components. Do NOT invoke for AWS IoT Greengrass standalone, AWS IoT Events, or AWS IoT SiteWise.
 ---
 
 # IoT Core Thing Deployer

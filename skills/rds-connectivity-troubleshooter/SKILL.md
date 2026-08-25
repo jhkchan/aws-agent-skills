@@ -1,145 +1,28 @@
 ---
 name: rds-connectivity-troubleshooter
-description: >-
-  Diagnoses RDS and Aurora connection failures through a bidirectional-
-  SG-first decision tree covering security group misconfiguration
-  (wrong SG attached, missing inbound on the RDS SG, missing egress
-  on the client SG), subnet group errors, DNS resolution (custom vs
-  cluster vs writer vs reader endpoint), IAM database auth failures
-  (token expiry, policy scope), SSL/TLS issues (force_ssl, CA bundle
-  rds-ca-2019/e2022, TLS version mismatch), max_connections reached
-  (parameter group override, Aurora derived limit), storage-full
-  status (auto-scaling not enabled), CPU/memory exhaustion, read
-  replica lag, Aurora global database replication issues, RDS Proxy
-  connectivity, parameter group and option group conflicts. Walks
-  describe-db-instances + describe-security-groups to a verified root
-  cause. Emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA. Use when an
-  application cannot reach an RDS or Aurora database, intermittent
-  connectivity, auth/TLS errors, pool exhaustion, or DNS lookup
-  failures against an RDS endpoint.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Diagnoses RDS and Aurora connection failures through a bidirectional- SG-first decision tree covering security group misconfiguration (wrong SG attached, missing inbound on the RDS SG, missing egress on the client SG), subnet group errors, DNS resolution (custom vs cluster vs writer vs reader endpoint), IAM database auth failures (token expiry, policy scope), SSL/TLS issues (force_ssl, CA bundle rds-ca-2019/e2022, TLS version mismatch), max_connections reached (parameter group override, Aurora derived limit), storage-full status (auto-scaling not enabled), CPU/memory exhaustion, read replica lag, Aurora global database replication issues, RDS Proxy connectivity, parameter group and option group conflicts. Walks describe-db-instances + describe-security-groups to a verified root cause. Emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA. Use when an application cannot reach an RDS or Aurora database, intermittent connectivity, auth/TLS errors, pool exhaustion, or DNS lookup failures against an RDS endpoint.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline symptom classification works from pasted
-  error messages and instance metadata. Live-account diagnosis uses
-  aws rds describe-db-instances, describe-db-clusters, describe-events,
-  describe-db-subnet-groups, describe-db-parameter-groups,
-  describe-option-groups, aws ec2 describe-security-groups,
-  describe-network-acls, describe-route-tables, describe-vpc-endpoints,
-  aws logs get-log-events / filter-log-events, aws pi
-  get-resource-metrics (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - RDS
-  - Aurora
-  - connection timeout
-  - security group
-  - bidirectional SG
-  - subnet group
-  - DB subnet group
-  - DNS resolution
-  - custom endpoint
-  - cluster endpoint
-  - writer endpoint
-  - reader endpoint
-  - IAM database auth
-  - SSL
-  - TLS
-  - force_ssl
-  - require_secure_transport
-  - CA bundle
-  - rds-ca-2019
-  - rds-ca-e2022
-  - max_connections
-  - Aurora derived limit
-  - storage-full
-  - storage auto-scaling
-  - CPU exhaustion
-  - memory exhaustion
-  - read replica lag
-  - Aurora global database
-  - RDS Proxy
-  - parameter group
-  - option group
-tags:
-  - rds
-  - aurora
-  - databases
-  - troubleshoot
-  - connectivity
-  - security-group
-  - tls
-  - iam-db-auth
-  - storage-full
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and instance metadata. Live-account diagnosis uses aws rds describe-db-instances, describe-db-clusters, describe-events, describe-db-subnet-groups, describe-db-parameter-groups, describe-option-groups, aws ec2 describe-security-groups, describe-network-acls, describe-route-tables, describe-vpc-endpoints, aws logs get-log-events / filter-log-events...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA"
-  when_to_use: >-
-    Diagnosing why an application cannot reach an RDS or Aurora
-    database — connection timeout (SG, subnet, NACL, route table),
-    authentication failure (master credentials, IAM database auth,
-    expired password), SSL/TLS handshake error (force_ssl, CA bundle,
-    TLS version), connection refused (instance unavailable, Multi-AZ
-    failover, maintenance window, storage-full), too many connections
-    (max_connections, Aurora derived limit, RDS Proxy), high latency
-    (CPU/memory exhaustion, read replica lag), DNS resolution failure
-    (custom endpoint, cluster endpoint, cross-region), or RDS Proxy
-    connectivity issues.
-  when_not_to_use: >-
-    Query-level performance tuning (use Performance Insights + slow
-    query log); RDS instance configuration posture audits (use
-    rds-instance-auditor); Aurora failover automation (use
-    aurora-failover-operator); RDS backup and restore operations (use
-    rds-backup-restore-operator); parameter group authoring (use
-    rds-parameter-group-deployer).
-  activation_triggers:
-    - "RDS connection timeout"
-    - "cannot connect to RDS"
-    - "Aurora connection failed"
-    - "authentication failed for database"
-    - "FATAL password authentication failed"
-    - "Access denied for user"
-    - "SSL connection required"
-    - "TLS handshake failed RDS"
-    - "connection refused RDS"
-    - "too many connections RDS"
-    - "FATAL too many connections"
-    - "RDS storage-full"
-    - "RDS CPU exhaustion"
-    - "read replica lag"
-    - "Aurora global database replication"
-    - "RDS Proxy unreachable"
-    - "parameter group max_connections override"
-    - "option group conflict"
-    - "RDS DNS not resolving"
-  invocation_schema: >-
-    Input: either (a) a symptom description (the error string or
-    observed behaviour, the DB instance or cluster identifier), OR (b)
-    a live-account scenario where the agent runs aws rds
-    describe-db-instances / describe-db-clusters / describe-events /
-    describe-security-groups to gather evidence. Output: a
-    deterministic TARGET / VERDICT / ROOT_CAUSE / REASON / EVIDENCE /
-    REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED,
-    INSUFFICIENT_DATA} and ROOT_CAUSE names the specific failure
-    category (NETWORK_SG_INBOUND / NETWORK_SG_EGRESS / NETWORK_NACL /
-    NETWORK_ROUTE / NETWORK_SUBNET_GROUP / NETWORK_CROSS_VPC /
-    DNS_CUSTOM_ENDPOINT / DNS_CLUSTER_ENDPOINT / AUTH_CREDENTIALS /
-    AUTH_IAM_DB / AUTH_EXPIRED / TLS_CONFIG / TLS_CERT /
-    INSTANCE_UNAVAILABLE / INSTANCE_FAILOVER / INSTANCE_MAINTENANCE /
-    INSTANCE_STORAGE_FULL / CAPACITY_MAX_CONNECTIONS /
-    CAPACITY_DERIVED_LIMIT / CAPACITY_PROXY / RESOURCE_CPU /
-    RESOURCE_MEMORY / REPLICATION_LAG / GLOBAL_DB_REPLICATION /
-    PARAM_GROUP_OVERRIDE / OPTION_GROUP_CONFLICT / UNKNOWN).
+  verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
+  when_to_use: Diagnosing why an application cannot reach an RDS or Aurora database — connection timeout (SG, subnet, NACL, route table), authentication failure (master credentials, IAM database auth, expired password), SSL/TLS handshake error (force_ssl, CA bundle, TLS version), connection refused (instance unavailable, Multi-AZ failover, maintenance window, storage-full), too many connections (max_connections, Aurora derived limit, RDS Proxy), high latency (CPU/memory exhaustion, read replica lag), DNS resolution failure (custom endpoint, cluster endpoint, cross-region), or RDS Proxy connectivity issues.
+  when_not_to_use: Query-level performance tuning (use Performance Insights + slow query log); RDS instance configuration posture audits (use rds-instance-auditor); Aurora failover automation (use aurora-failover-operator); RDS backup and restore operations (use rds-backup-restore-operator); parameter group authoring (use rds-parameter-group-deployer).
+  activation_triggers: RDS connection timeout, cannot connect to RDS, Aurora connection failed, authentication failed for database, FATAL password authentication failed, Access denied for user, SSL connection required, TLS handshake failed RDS, connection refused RDS, too many connections RDS, FATAL too many connections, RDS storage-full, RDS CPU exhaustion, read replica lag, Aurora global database replication, RDS Proxy unreachable, parameter group max_connections override, option group conflict, RDS DNS not resolving
+  invocation_schema: 'Input: either (a) a symptom description (the error string or observed behaviour, the DB instance or cluster identifier), OR (b) a live-account scenario where the agent runs aws rds describe-db-instances / describe-db-clusters / describe-events / describe-security-groups to gather evidence. Output: a deterministic TARGET / VERDICT / ROOT_CAUSE / REASON / EVIDENCE / REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and ROOT_CAUSE names the specific failure category (NETWORK_SG_INBOUND / NETWORK_SG_EGRESS / NETWORK_NACL / NETWORK_ROUTE / NETWORK_SUBNET_GROUP / NETWORK_CROSS_VPC / DNS_CUSTOM_ENDPOINT / DNS_CLUSTER_ENDPOINT / AUTH_CREDENTIALS / AUTH_IAM_DB / AUTH_EXPIRED / TLS_CONFIG / TLS_CERT / INSTANCE_UNAVAILABLE / INSTANCE_FAILOVER / INSTANCE_MAINTENANCE / INSTANCE_STORAGE_FULL / CAPACITY_MAX_CONNECTIONS / CAPACITY_DERIVED_LIMIT / CAPACITY_PROXY / RESOURCE_CPU / RESOURCE_MEMORY / REPLICATION_LAG / GLOBAL_DB_REPLICATION / PARAM_GROUP_OVERRIDE / OPTION_GROUP_CONFLICT / UNKNOWN).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: RDS, Aurora, connection timeout, security group, bidirectional SG, subnet group, DB subnet group, DNS resolution, custom endpoint, cluster endpoint, writer endpoint, reader endpoint, IAM database auth, SSL, TLS, force_ssl, require_secure_transport, CA bundle, rds-ca-2019, rds-ca-e2022, max_connections, Aurora derived limit, storage-full, storage auto-scaling, CPU exhaustion, memory exhaustion, read replica lag, Aurora global database, RDS Proxy, parameter group, option group
+  tags: rds, aurora, databases, troubleshoot, connectivity, security-group, tls, iam-db-auth, storage-full
 ---
 
 # RDS Connectivity Troubleshooter

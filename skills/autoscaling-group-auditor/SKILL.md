@@ -1,79 +1,24 @@
 ---
 name: autoscaling-group-auditor
-description: >-
-  Audits AWS Auto Scaling Groups for launch-template health (legacy launch
-  configuration, IMDSv2), ELB health-check integrity (missing target group,
-  grace-period timing), mixed-instances policy (single Spot instance type,
-  allocation strategy), capacity bounds (desired vs min/max), and unhealthy
-  termination behavior (EC2-only checks behind an ELB, capacity rebalance).
-  Emits a deterministic verdict (MISCONFIGURED | CONFIG_GAP | OK) per ASG
-  with enumerated findings and specific remediation. Use when reviewing ASG
-  configurations, checking launch-template wiring, validating ELB health
-  checks, auditing Spot diversification, or hardening capacity posture.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Auto Scaling Groups for launch-template health (legacy launch configuration, IMDSv2), ELB health-check integrity (missing target group, grace-period timing), mixed-instances policy (single Spot instance type, allocation strategy), capacity bounds (desired vs min/max), and unhealthy termination behavior (EC2-only checks behind an ELB, capacity rebalance). Emits a deterministic verdict (MISCONFIGURED | CONFIG_GAP | OK) per ASG with enumerated findings and specific remediation. Use when reviewing ASG configurations, checking launch-template wiring, validating ELB health checks, auditing Spot diversification, or hardening capacity posture.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline ASG-config classification.
-  Live-account audits use aws autoscaling describe-auto-scaling-groups,
-  aws ec2 describe-launch-templates, and aws elbv2 describe-target-groups
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Auto Scaling
-  - ASG
-  - launch template
-  - launch configuration
-  - ELB health check
-  - target group
-  - mixed instances
-  - Spot
-  - capacity
-  - unhealthy termination
-  - IMDSv2
-  - CapacityRebalance
-  - HealthCheckGracePeriod
-  - SpotAllocationStrategy
-  - OnDemandPercentageAboveBaseCapacity
-  - TerminationPolicies
-  - AvailabilityZones
-  - fleet split
-  - ASG audit
-  - auto scaling remediation
-tags: [autoscaling, compute, launch-template, elb-health, spot, capacity, mixed-instances, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline ASG-config classification. Live-account audits use aws autoscaling describe-auto-scaling-groups, aws ec2 describe-launch-templates, and aws elbv2 describe-target-groups (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
-  verdict_shape: "MISCONFIGURED | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing an ASG configuration before production deployment, checking
-    launch-template or launch-configuration wiring, validating ELB health
-    checks and grace-period timing, auditing Spot instance diversification,
-    verifying capacity bounds, or investigating unhealthy-instance
-    replacement loops.
-  activation_triggers:
-    - "audit this auto scaling group"
-    - "check ASG health check"
-    - "is my ASG misconfigured"
-    - "launch template vs launch configuration"
-    - "ELB health check no target group"
-    - "spot single instance type"
-    - "ASG capacity bounds"
-    - "health check grace period too short"
-    - "capacity rebalance spot"
-    - "ASG infinite replacement loop"
-  invocation_schema: >-
-    Input: either (a) an ASG configuration (launch template/config, capacity
-    bounds, health check settings, mixed-instances policy, AZs), optionally
-    paired with launch-template metadata, OR (b) an ASG name/ARN for
-    live-account audit. Output: deterministic ASG/VERDICT/REASON/FINDINGS/
-    REMEDIATION block per group, where VERDICT is MISCONFIGURED, CONFIG_GAP,
-    OK, or ERROR.
+  verdict_shape: MISCONFIGURED | CONFIG_GAP | OK
+  when_to_use: Reviewing an ASG configuration before production deployment, checking launch-template or launch-configuration wiring, validating ELB health checks and grace-period timing, auditing Spot instance diversification, verifying capacity bounds, or investigating unhealthy-instance replacement loops.
+  activation_triggers: audit this auto scaling group, check ASG health check, is my ASG misconfigured, launch template vs launch configuration, ELB health check no target group, spot single instance type, ASG capacity bounds, health check grace period too short, capacity rebalance spot, ASG infinite replacement loop
+  invocation_schema: 'Input: either (a) an ASG configuration (launch template/config, capacity bounds, health check settings, mixed-instances policy, AZs), optionally paired with launch-template metadata, OR (b) an ASG name/ARN for live-account audit. Output: deterministic ASG/VERDICT/REASON/FINDINGS/ REMEDIATION block per group, where VERDICT is MISCONFIGURED, CONFIG_GAP, OK, or ERROR.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Auto Scaling, ASG, launch template, launch configuration, ELB health check, target group, mixed instances, Spot, capacity, unhealthy termination, IMDSv2, CapacityRebalance, HealthCheckGracePeriod, SpotAllocationStrategy, OnDemandPercentageAboveBaseCapacity, TerminationPolicies, AvailabilityZones, fleet split, ASG audit, auto scaling remediation
+  tags: autoscaling, compute, launch-template, elb-health, spot, capacity, mixed-instances, audit
 ---
 
 # Auto Scaling Group Auditor

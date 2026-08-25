@@ -1,120 +1,26 @@
 ---
 name: datazone-domain-deployer
-description: >-
-  Provisions Amazon DataZone data domains with production defaults:
-  domain creation (create-datazone-domain), project management, data
-  source connections (S3, Redshift, RDS), asset management (data
-  inventory, glossary terms), metadata enrichment via Lambda-based
-  auto-classification, subscription workflows (request-approve model),
-  cross-account IAM role chaining for data access, blueprints (data
-  lake, data warehouse), environment profiles, SSO federation for
-  user management, and metadata forms. Emits a READY_TO_DEPLOY
-  checklist with verification commands. Use when creating a DataZone
-  domain, setting up projects, configuring data source connections,
-  establishing subscription workflows, configuring cross-account IAM
-  roles, or deploying blueprints. Triggers: create datazone domain,
-  datazone project, data source connection, subscription workflow,
-  cross-account data access, datazone blueprint, environment profile,
-  glossary governance, metadata enrichment, SSO federation datazone.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon DataZone data domains with production defaults: domain creation (create-datazone-domain), project management, data source connections (S3, Redshift, RDS), asset management (data inventory, glossary terms), metadata enrichment via Lambda-based auto-classification, subscription workflows (request-approve model), cross-account IAM role chaining for data access, blueprints (data lake, data warehouse), environment profiles, SSO federation for user management, and metadata forms. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a DataZone domain, setting up projects, configuring data source connections, establishing subscription workflows, configuring cross-account IAM roles, or deploying blueprints. Triggers: create datazone domain, datazone project, data source connection, subscription workflow, cross-account data access, datazone blueprint, environment profile, glossary governance, metadata enrichment, SSO federation datazone.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with datazone and
-  ram access. Works with Terraform aws_datazone_domain /
-  aws_datazone_project / aws_datazone_environment_blueprint
-  resources and CloudFormation AWS::DataZone::Domain /
-  AWS::DataZone::Project templates. Cross-account data access
-  requires RAM resource share and IAM role trust policies.
-keywords:
-  - aws
-  - datazone
-  - data catalog
-  - cloudops
-  - deploy
-  - provisioning
-  - domain
-  - project
-  - data source
-  - subscription
-  - glossary
-  - metadata
-  - blueprint
-  - environment profile
-  - cross-account
-  - iam role chaining
-  - sso federation
-  - asset management
-tags:
-  - aws
-  - datazone
-  - cloudops
-  - deploy
-  - analytics
-  - provisioning
-  - domain
-  - project
-  - subscription
-  - glossary
-  - blueprint
-  - cross-account
-  - iam-role-chaining
-  - metadata
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with datazone and ram access. Works with Terraform aws_datazone_domain / aws_datazone_project / aws_datazone_environment_blueprint resources and CloudFormation AWS::DataZone::Domain / AWS::DataZone::Project templates. Cross-account data access requires RAM resource share and IAM role trust policies.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - datazone
-    - cloudops
-    - deploy
-    - analytics
-    - provisioning
-    - domain
-    - project
-    - subscription
-    - glossary
-    - blueprint
-    - cross-account
-    - iam-role-chaining
-    - metadata
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create datazone domain
-    - datazone project
-    - data source connection
-    - subscription workflow
-    - cross-account data access
-    - datazone blueprint
-    - environment profile
-    - glossary governance
-    - metadata enrichment
-    - sso federation datazone
-  when_to_use: >-
-    Invoke when the user wants to create an Amazon DataZone domain,
-    manage projects, configure data source connections (S3, Redshift,
-    RDS), set up subscription workflows (request-approve model),
-    configure cross-account IAM role chaining for data access, deploy
-    blueprints (data lake, data warehouse), configure environment
-    profiles, establish glossary-driven governance, or enable
-    metadata enrichment. Do NOT invoke for AWS Lake Formation (use
-    Lake Formation skills), AWS Glue Data Catalog (use Glue skills),
-    or Amazon Athena (use Athena skills).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, datazone, cloudops, deploy, analytics, provisioning, domain, project, subscription, glossary, blueprint, cross-account, iam-role-chaining, metadata
+  dependencies: aws-orchestrator
+  keywords: aws, datazone, data catalog, cloudops, deploy, provisioning, domain, project, data source, subscription, glossary, metadata, blueprint, environment profile, cross-account, iam role chaining, sso federation, asset management
+  when_to_use: Invoke when the user wants to create an Amazon DataZone domain, manage projects, configure data source connections (S3, Redshift, RDS), set up subscription workflows (request-approve model), configure cross-account IAM role chaining for data access, deploy blueprints (data lake, data warehouse), configure environment profiles, establish glossary-driven governance, or enable metadata enrichment. Do NOT invoke for AWS Lake Formation (use Lake Formation skills), AWS Glue Data Catalog (use Glue skills), or Amazon Athena (use Athena skills).
 ---
 
 # Amazon DataZone Domain Deployer

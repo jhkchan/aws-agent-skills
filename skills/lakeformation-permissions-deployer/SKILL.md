@@ -1,43 +1,15 @@
 ---
 name: lakeformation-permissions-deployer
 description: 'Deploys AWS Lake Formation permissions with production-grade config: LF-tag based access control (tag keys and values, tag-based grants on databases, tables, columns), database and table permissions (DESCRIBE, SELECT, INSERT, DROP, ALTER), column-level security (column grant and deny, data cells filter for row and column filtering), data lake admin registration (IAM principals), resource links (cross-database table references), external data filtering, and latest features (Lake Formation with IAM Identity Center, LF-tags with Amazon DataZone, hybrid access mode, Governed Tables). Emits a READY_TO_DEPLOY checklist. Use when granting Lake Formation permissions, setting up LF-tag based access control, configuring column-level security, registering a data lake admin, or creating resource links. Triggers: Lake Formation, LF-tags, LF-tag based access control, data lake permissions, column-level security, data cells filter, resource links, IAM Identity Center, DataZone, data lake admin.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
 compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with lakeformation, glue, iam, ram, and s3 access. Works with Terraform aws_lakeformation_* resources, CloudFormation AWS::LakeFormation::* resources, and the AWS Console Lake Formation Permissions wizard.'
-keywords:
-- aws
-- lakeformation
-- lake-formation
-- lf-tags
-- data-lake
-- cloudops
-- deploy
-- governance
-- permissions
-- column-level-security
-- data-cells-filter
-- resource-links
-- iam-identity-center
-- datazone
-- data-lake-admin
-tags:
-- aws
-- lakeformation
-- lake-formation
-- cloudops
-- deploy
-- governance
-- permissions
-dependencies:
-- aws-orchestrator
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: deploy
   skill_class: capability
@@ -45,27 +17,9 @@ metadata:
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-  - aws
-  - lakeformation
-  - lake-formation
-  - cloudops
-  - deploy
-  - governance
-  - permissions
-  dependencies:
-  - aws-orchestrator
-  keywords:
-  - grant lake formation permissions
-  - lf-tag based access control
-  - lake formation column-level security
-  - lake formation data cells filter
-  - lake formation resource links
-  - register data lake admin
-  - lake formation iam identity center
-  - lake formation datazone
-  - lake formation database permissions
-  - lake formation table permissions
+  tags: aws, lakeformation, lake-formation, cloudops, deploy, governance, permissions
+  dependencies: aws-orchestrator
+  keywords: aws, lakeformation, lake-formation, lf-tags, data-lake, cloudops, deploy, governance, permissions, column-level-security, data-cells-filter, resource-links, iam-identity-center, datazone, data-lake-admin
   when_to_use: Invoke when the user wants to grant Lake Formation permissions on databases or tables, set up LF-tag based access control, configure column-level or row-level security via data cells filter, register a data lake admin IAM principal, create resource links for cross-database table access, integrate Lake Formation with IAM Identity Center, or configure LF-tags for Amazon DataZone. Do NOT invoke for Glue Data Catalog setup without Lake Formation (use glue-crawler-job-auditor), S3 bucket policy provisioning (use s3-bucket-policy-deployer), or Macie data classification (use macie-data-classification-auditor).
 ---
 

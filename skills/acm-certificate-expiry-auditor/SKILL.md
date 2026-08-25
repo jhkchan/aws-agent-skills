@@ -1,78 +1,24 @@
 ---
 name: acm-certificate-expiry-auditor
-description: >-
-  Audits AWS Certificate Manager (ACM) certificates for expiry risk, renewal
-  health, validation method, and key-algorithm strength. Emits a deterministic
-  verdict (EXPIRED | EXPIRING_SOON | RENEWAL_FAILED | ERROR | OK) per
-  certificate with risk level and specific remediation. Use when reviewing
-  ACM certificate expiry, diagnosing FAILED_AUTORENEWAL root causes (CAA_ERROR,
-  DOMAIN_VALIDATION_DENIED, NO_AVAILABLE_CONTACTS, PCA_* errors), checking
-  CloudFront certificate region placement, validating imported-certificate
-  re-import windows, or auditing TLS posture before production deployment.
-version: 0.2.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Certificate Manager (ACM) certificates for expiry risk, renewal health, validation method, and key-algorithm strength. Emits a deterministic verdict (EXPIRED | EXPIRING_SOON | RENEWAL_FAILED | ERROR | OK) per certificate with risk level and specific remediation. Use when reviewing ACM certificate expiry, diagnosing FAILED_AUTORENEWAL root causes (CAA_ERROR, DOMAIN_VALIDATION_DENIED, NO_AVAILABLE_CONTACTS, PCA_* errors), checking CloudFront certificate region placement, validating imported-certificate re-import windows, or auditing TLS posture before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline certificate-doc classification.
-  Live-account audits use aws acm describe-certificate and
-  aws acm list-certificates (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - ACM
-  - certificate expiry
-  - TLS certificate
-  - FAILED_AUTORENEWAL
-  - CAA_ERROR
-  - renewal failure
-  - NotAfter
-  - AMAZON_ISSUED
-  - IMPORTED
-  - DNS validation
-  - CloudFront certificate
-  - us-east-1
-  - RSA_1024
-  - EC_prime256v1
-  - 397-day certificate
-  - certificate transparency
-  - private certificate authority
-  - wildcard certificate
-  - certificate audit
-tags: [acm, security, certificate, tls, expiry, renewal, pki, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline certificate-doc classification. Live-account audits use aws acm describe-certificate and aws acm list-certificates (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
-  verdict_shape: "EXPIRED | EXPIRING_SOON | RENEWAL_FAILED | ERROR | OK"
-  when_to_use: >-
-    Reviewing an ACM certificate before production deployment, diagnosing a
-    FAILED_AUTORENEWAL event, checking whether an imported certificate is
-    inside the 60-day re-import window, validating CloudFront certificate
-    region placement, or auditing account-wide TLS certificate posture.
-  activation_triggers:
-    - "audit this ACM certificate"
-    - "is my certificate expiring"
-    - "why did ACM renewal fail"
-    - "certificate renewal failed"
-    - "imported certificate expiring"
-    - "CAA_ERROR renewal"
-    - "DNS validation renewal"
-    - "TLS certificate health"
-    - "RSA_1024 compliance"
-    - "CloudFront certificate region"
-    - "FAILED_AUTORENEWAL"
-    - "certificate NotAfter"
-    - "ACM certificate audit"
-  invocation_schema: >-
-    Input: either (a) an ACM certificate configuration document (Type, Status,
-    NotAfter, RenewalEligibility, RenewalSummary, KeyAlgorithm,
-    DomainValidationOptions, InUseBy), OR (b) a certificate ARN for live-account
-    audit. Output: deterministic CERTIFICATE/VERDICT/RISK/REASON/REMEDIATION
-    block per certificate, where VERDICT is in {EXPIRED, EXPIRING_SOON,
-    RENEWAL_FAILED, ERROR, OK}, followed by EXACTLY ONE POSTURE SUMMARY.
+  verdict_shape: EXPIRED | EXPIRING_SOON | RENEWAL_FAILED | ERROR | OK
+  when_to_use: Reviewing an ACM certificate before production deployment, diagnosing a FAILED_AUTORENEWAL event, checking whether an imported certificate is inside the 60-day re-import window, validating CloudFront certificate region placement, or auditing account-wide TLS certificate posture.
+  activation_triggers: audit this ACM certificate, is my certificate expiring, why did ACM renewal fail, certificate renewal failed, imported certificate expiring, CAA_ERROR renewal, DNS validation renewal, TLS certificate health, RSA_1024 compliance, CloudFront certificate region, FAILED_AUTORENEWAL, certificate NotAfter, ACM certificate audit
+  invocation_schema: 'Input: either (a) an ACM certificate configuration document (Type, Status, NotAfter, RenewalEligibility, RenewalSummary, KeyAlgorithm, DomainValidationOptions, InUseBy), OR (b) a certificate ARN for live-account audit. Output: deterministic CERTIFICATE/VERDICT/RISK/REASON/REMEDIATION block per certificate, where VERDICT is in {EXPIRED, EXPIRING_SOON, RENEWAL_FAILED, ERROR, OK}, followed by EXACTLY ONE POSTURE SUMMARY.'
+  version: 0.2.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: ACM, certificate expiry, TLS certificate, FAILED_AUTORENEWAL, CAA_ERROR, renewal failure, NotAfter, AMAZON_ISSUED, IMPORTED, DNS validation, CloudFront certificate, us-east-1, RSA_1024, EC_prime256v1, 397-day certificate, certificate transparency, private certificate authority, wildcard certificate, certificate audit
+  tags: acm, security, certificate, tls, expiry, renewal, pki, audit
 ---
 
 # ACM Certificate Expiry Auditor

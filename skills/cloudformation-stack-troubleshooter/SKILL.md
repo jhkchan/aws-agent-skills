@@ -1,108 +1,27 @@
 ---
 name: cloudformation-stack-troubleshooter
-description: >-
-  Diagnoses AWS CloudFormation stack failures across the lifecycle.
-  Covers CREATE_FAILED (IAM permission denied, service limit exceeded,
-  resource already exists, invalid property), UPDATE_FAILED (Replacement
-  required, immutable property change, rollback in progress),
-  DELETE_FAILED (dependent resources, S3 bucket not empty,
-  DeletionPolicy: Retain), ROLLBACK_FAILED (stack stuck in
-  ROLLBACK_COMPLETE, requires delete + recreate), UPDATE_ROLLBACK_FAILED
-  (nested stack cannot roll back). Walks describe-stack-events
-  ResourceStatusReason, describe-stacks, describe-change-set, drift
-  detection. Common: cfn-lint validation, DependsOn cycle, missing
-  CAPABILITY_IAM, Replacement: true in ChangeSet, CreationPolicy signal
-  timeout. Emits ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE. Use when
-  a CloudFormation stack fails to create, update, delete, or roll back,
-  or is stuck in ROLLBACK_COMPLETE / UPDATE_ROLLBACK_FAILED.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses AWS CloudFormation stack failures across the lifecycle. Covers CREATE_FAILED (IAM permission denied, service limit exceeded, resource already exists, invalid property), UPDATE_FAILED (Replacement required, immutable property change, rollback in progress), DELETE_FAILED (dependent resources, S3 bucket not empty, DeletionPolicy: Retain), ROLLBACK_FAILED (stack stuck in ROLLBACK_COMPLETE, requires delete + recreate), UPDATE_ROLLBACK_FAILED (nested stack cannot roll back). Walks describe-stack-events ResourceStatusReason, describe-stacks, describe-change-set, drift detection. Common: cfn-lint validation, DependsOn cycle, missing CAPABILITY_IAM, Replacement: true in ChangeSet, CreationPolicy signal timeout. Emits ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE. Use when a CloudFormation stack fails to create, update, delete, or roll back, or is stuck in ROLLBACK_COMPLETE / UPDATE_ROLLBACK_FAILED.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline diagnosis works on supplied
-  describe-stack-events / describe-stacks / describe-change-set JSON.
-  Live-account diagnosis uses aws cloudformation describe-stacks,
-  describe-stack-events, describe-stack-resources, describe-change-set,
-  detect-stack-drift, aws iam simulate-principal-policy, and
-  aws logs filter-log-events for Lambda-backed custom resources
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - CloudFormation
-  - stack
-  - CREATE_FAILED
-  - UPDATE_FAILED
-  - DELETE_FAILED
-  - ROLLBACK_COMPLETE
-  - UPDATE_ROLLBACK_FAILED
-  - ResourceStatusReason
-  - ChangeSet
-  - Replacement
-  - DeletionPolicy
-  - DependsOn
-  - CAPABILITY_IAM
-  - cfn-lint
-  - drift
-  - nested stack
-  - stack events
-  - rollback
-tags:
-  - cloudformation
-  - devtools
-  - troubleshoot
-  - stack-failure
-  - changeset
-  - rollback
-  - drift
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works on supplied describe-stack-events / describe-stacks / describe-change-set JSON. Live-account diagnosis uses aws cloudformation describe-stacks, describe-stack-events, describe-stack-resources, describe-change-set, detect-stack-drift, aws iam simulate-principal-policy, and aws logs filter-log-events for Lambda-backed custom resources (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
-  when_to_use: >-
-    Diagnosing why a CloudFormation stack went CREATE_FAILED,
-    UPDATE_FAILED, DELETE_FAILED, ROLLBACK_FAILED, or
-    UPDATE_ROLLBACK_FAILED; why a stack is stuck in ROLLBACK_COMPLETE
-    or UPDATE_ROLLBACK_COMPLETE; why a ChangeSet reports
-    Replacement: true; why a resource failed to send a signal within
-    CreationPolicy; or why a stack delete is blocked by a non-empty S3
-    bucket or DeletionPolicy: Retain.
-  activation_triggers:
-    - "CloudFormation stack failed"
-    - "CREATE_FAILED"
-    - "UPDATE_FAILED"
-    - "DELETE_FAILED"
-    - "ROLLBACK_FAILED"
-    - "ROLLBACK_COMPLETE"
-    - "UPDATE_ROLLBACK_FAILED"
-    - "UPDATE_ROLLBACK_COMPLETE"
-    - "CloudFormation ResourceStatusReason"
-    - "stack stuck in ROLLBACK_COMPLETE"
-    - "ChangeSet Replacement true"
-    - "CloudFormation CAPABILITY_IAM"
-    - "CloudFormation circular dependency"
-    - "CloudFormation stack delete failed"
-    - "CloudFormation drift"
-  invocation_schema: >-
-    Input: either (a) a symptom description (stack name or ARN, region,
-    observed StackStatus and ResourceStatusReason, failing resource
-    logical id), OR (b) a live-account scenario where the agent runs
-    aws cloudformation describe-stacks / describe-stack-events /
-    describe-stack-resources / describe-change-set and aws iam
-    simulate-principal-policy to gather evidence. Output: a
-    deterministic INCIDENT / VERDICT / ROOT_CAUSE / EVIDENCE /
-    ROOT_CAUSE_CATALOG / REMEDIATION block where VERDICT ∈
-    {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and ROOT_CAUSE names
-    the specific failure category (CREATE_FAILED / UPDATE_FAILED /
-    DELETE_FAILED / ROLLBACK_FAILED / UPDATE_ROLLBACK_FAILED) and the
-    offending configuration element.
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+  when_to_use: 'Diagnosing why a CloudFormation stack went CREATE_FAILED, UPDATE_FAILED, DELETE_FAILED, ROLLBACK_FAILED, or UPDATE_ROLLBACK_FAILED; why a stack is stuck in ROLLBACK_COMPLETE or UPDATE_ROLLBACK_COMPLETE; why a ChangeSet reports Replacement: true; why a resource failed to send a signal within CreationPolicy; or why a stack delete is blocked by a non-empty S3 bucket or DeletionPolicy: Retain.'
+  activation_triggers: CloudFormation stack failed, CREATE_FAILED, UPDATE_FAILED, DELETE_FAILED, ROLLBACK_FAILED, ROLLBACK_COMPLETE, UPDATE_ROLLBACK_FAILED, UPDATE_ROLLBACK_COMPLETE, CloudFormation ResourceStatusReason, stack stuck in ROLLBACK_COMPLETE, ChangeSet Replacement true, CloudFormation CAPABILITY_IAM, CloudFormation circular dependency, CloudFormation stack delete failed, CloudFormation drift
+  invocation_schema: 'Input: either (a) a symptom description (stack name or ARN, region, observed StackStatus and ResourceStatusReason, failing resource logical id), OR (b) a live-account scenario where the agent runs aws cloudformation describe-stacks / describe-stack-events / describe-stack-resources / describe-change-set and aws iam simulate-principal-policy to gather evidence. Output: a deterministic INCIDENT / VERDICT / ROOT_CAUSE / EVIDENCE / ROOT_CAUSE_CATALOG / REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and ROOT_CAUSE names the specific failure category (CREATE_FAILED / UPDATE_FAILED / DELETE_FAILED / ROLLBACK_FAILED / UPDATE_ROLLBACK_FAILED) and the offending configuration element.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudFormation, stack, CREATE_FAILED, UPDATE_FAILED, DELETE_FAILED, ROLLBACK_COMPLETE, UPDATE_ROLLBACK_FAILED, ResourceStatusReason, ChangeSet, Replacement, DeletionPolicy, DependsOn, CAPABILITY_IAM, cfn-lint, drift, nested stack, stack events, rollback
+  tags: cloudformation, devtools, troubleshoot, stack-failure, changeset, rollback, drift
 ---
 
 # CloudFormation Stack Troubleshooter

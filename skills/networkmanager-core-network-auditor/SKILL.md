@@ -1,76 +1,24 @@
 ---
 name: networkmanager-core-network-auditor
-description: >-
-  Audits AWS Network Manager (Cloud WAN) core networks for detached
-  attachments, permissive resource and segment policies, CIDR overlap
-  across VPC attachments, and configuration gaps (LATEST vs LIVE policy
-  mismatch, missing edge locations, orphaned segments). Emits a
-  deterministic verdict (DETACHED_ATTACHMENT | PERMISSIVE_POLICY |
-  CIDR_OVERLAP | CONFIG_GAP | OK) per core network with enumerated
-  findings and specific CLI remediation. Use when reviewing Cloud WAN
-  core network policies, checking attachment health, validating CIDR
-  isolation between segments, auditing cross-account resource policies,
-  or hardening core network posture before production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Network Manager (Cloud WAN) core networks for detached attachments, permissive resource and segment policies, CIDR overlap across VPC attachments, and configuration gaps (LATEST vs LIVE policy mismatch, missing edge locations, orphaned segments). Emits a deterministic verdict (DETACHED_ATTACHMENT | PERMISSIVE_POLICY | CIDR_OVERLAP | CONFIG_GAP | OK) per core network with enumerated findings and specific CLI remediation. Use when reviewing Cloud WAN core network policies, checking attachment health, validating CIDR isolation between segments, auditing cross-account resource policies, or hardening core network posture before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline policy-document classification.
-  Live-account audits use aws networkmanager get-core-network,
-  get-core-network-policy, list-attachments, and get-resource-policy
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Network Manager
-  - Cloud WAN
-  - core network
-  - attachment
-  - DETACHED
-  - resource policy
-  - cross-account
-  - CIDR overlap
-  - segment policy
-  - segment isolation
-  - LATEST vs LIVE
-  - policy generation
-  - edge location
-  - network function group
-  - VPC attachment
-  - transit gateway
-  - routing
-  - require-acceptance
-  - core network audit
-tags: [networkmanager, cloud-wan, networking, core-network, segment, cidr, attachment, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline policy-document classification. Live-account audits use aws networkmanager get-core-network, get-core-network-policy, list-attachments, and get-resource-policy (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
-  verdict_shape: "DETACHED_ATTACHMENT | PERMISSIVE_POLICY | CIDR_OVERLAP | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a Cloud WAN core network policy before production deployment,
-    checking for detached or rejected attachments, validating CIDR isolation
-    between segments, auditing cross-account resource policies, inspecting
-    segment routing for isolation gaps, or verifying that the LIVE policy
-    matches the LATEST committed policy.
-  activation_triggers:
-    - "audit this core network"
-    - "check Cloud WAN attachment status"
-    - "CIDR overlap in core network"
-    - "segment isolation check"
-    - "core network resource policy"
-    - "LATEST vs LIVE policy"
-    - "detached VPC attachment"
-    - "core network audit"
-  invocation_schema: >-
-    Input: either (a) a core network policy document plus attachment list
-    and resource policy JSON, OR (b) a core-network-id for live-account
-    audit. Output: deterministic CORE_NETWORK/VERDICT/REASON/FINDINGS/
-    REMEDIATION block per core network, where VERDICT is one of
-    DETACHED_ATTACHMENT, PERMISSIVE_POLICY, CIDR_OVERLAP, CONFIG_GAP, OK.
+  verdict_shape: DETACHED_ATTACHMENT | PERMISSIVE_POLICY | CIDR_OVERLAP | CONFIG_GAP | OK
+  when_to_use: Reviewing a Cloud WAN core network policy before production deployment, checking for detached or rejected attachments, validating CIDR isolation between segments, auditing cross-account resource policies, inspecting segment routing for isolation gaps, or verifying that the LIVE policy matches the LATEST committed policy.
+  activation_triggers: audit this core network, check Cloud WAN attachment status, CIDR overlap in core network, segment isolation check, core network resource policy, LATEST vs LIVE policy, detached VPC attachment, core network audit
+  invocation_schema: 'Input: either (a) a core network policy document plus attachment list and resource policy JSON, OR (b) a core-network-id for live-account audit. Output: deterministic CORE_NETWORK/VERDICT/REASON/FINDINGS/ REMEDIATION block per core network, where VERDICT is one of DETACHED_ATTACHMENT, PERMISSIVE_POLICY, CIDR_OVERLAP, CONFIG_GAP, OK.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Network Manager, Cloud WAN, core network, attachment, DETACHED, resource policy, cross-account, CIDR overlap, segment policy, segment isolation, LATEST vs LIVE, policy generation, edge location, network function group, VPC attachment, transit gateway, routing, require-acceptance, core network audit
+  tags: networkmanager, cloud-wan, networking, core-network, segment, cidr, attachment, audit
 ---
 
 # Network Manager Core Network Auditor

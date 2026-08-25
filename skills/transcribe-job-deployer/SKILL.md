@@ -1,111 +1,26 @@
 ---
 name: transcribe-job-deployer
-description: >-
-  Deploys Amazon Transcribe configurations with production defaults:
-  transcription job types (batch from S3 via start-transcription-job
-  async, real-time streaming), language identification vs specified
-  language, custom vocabulary (custom word pronunciation), vocabulary
-  filter (mask/remove unwanted words), speaker identification
-  (diarization), channel identification (stereo), medical
-  transcription (MedicalTranscriptionJob), custom language model
-  (domain-specific accuracy boost), content identification and
-  redaction (PII masking), output formats (JSON, TXT, SRT, VTT) to
-  S3, CloudWatch metrics monitoring, and pricing per second of
-  audio. Emits a READY_TO_DEPLOY checklist with verification
-  commands. Use when configuring Amazon Transcribe, transcribing
-  audio from S3, enabling speaker diarization, creating custom
-  vocabularies, filtering profanity, redacting PII, running medical
-  transcription, or deploying custom language models. Triggers:
-  start transcription job, transcribe audio to text, speaker
-  diarization, custom vocabulary transcribe, vocabulary filter,
-  medical transcription job, transcribe pii redaction, custom
-  language model, transcribe pricing per second.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Deploys Amazon Transcribe configurations with production defaults: transcription job types (batch from S3 via start-transcription-job async, real-time streaming), language identification vs specified language, custom vocabulary (custom word pronunciation), vocabulary filter (mask/remove unwanted words), speaker identification (diarization), channel identification (stereo), medical transcription (MedicalTranscriptionJob), custom language model (domain-specific accuracy boost), content identification and redaction (PII masking), output formats (JSON, TXT, SRT, VTT) to S3, CloudWatch metrics monitoring, and pricing per second of audio. Emits a READY_TO_DEPLOY checklist with verification commands. Use when configuring Amazon Transcribe, transcribing audio from S3, enabling. Triggers: start transcription job, transcribe audio to text, speaker diarization, custom vocabulary transcribe, vocabulary filter, medical transcription job, transcribe pii redaction, custom language model, transcribe pricing per second.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with transcribe
-  access and s3 read on input bucket + s3 PutObject on output
-  bucket. Works with Terraform aws_transcribe_* resources and
-  CloudFormation custom resources for Transcribe configurations.
-keywords:
-  - aws
-  - transcribe
-  - speech to text
-  - transcription
-  - diarization
-  - cloudops
-  - deploy
-  - provisioning
-  - custom vocabulary
-  - vocabulary filter
-  - medical transcription
-  - pii redaction
-  - custom language model
-  - pricing per second
-tags:
-  - aws
-  - transcribe
-  - stt
-  - cloudops
-  - deploy
-  - ai-ml
-  - provisioning
-  - diarization
-  - vocabulary
-  - pii-redaction
-  - medical-transcription
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with transcribe access and s3 read on input bucket + s3 PutObject on output bucket. Works with Terraform aws_transcribe_* resources and CloudFormation custom resources for Transcribe configurations.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AI/ML
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - transcribe
-    - stt
-    - cloudops
-    - deploy
-    - ai-ml
-    - provisioning
-    - diarization
-    - vocabulary
-    - pii-redaction
-    - medical-transcription
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - start transcription job
-    - transcribe audio to text
-    - speaker diarization
-    - custom vocabulary transcribe
-    - vocabulary filter
-    - medical transcription job
-    - transcribe pii redaction
-    - custom language model
-    - transcribe pricing per second
-  when_to_use: >-
-    Invoke when the user wants to configure Amazon Transcribe for
-    speech-to-text transcription, run batch transcription jobs from
-    S3, enable speaker diarization, create custom vocabularies for
-    domain-specific terms, filter unwanted words, redact PII from
-    transcripts, run medical transcription, deploy custom language
-    models for improved accuracy, or select output formats (JSON,
-    TXT, SRT, VTT). Do NOT invoke for Amazon Polly (text-to-speech),
-    Amazon Lex (conversational bots), or Amazon Comprehend (NLP text
-    analysis).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, transcribe, stt, cloudops, deploy, ai-ml, provisioning, diarization, vocabulary, pii-redaction, medical-transcription
+  dependencies: aws-orchestrator
+  keywords: aws, transcribe, speech to text, transcription, diarization, cloudops, deploy, provisioning, custom vocabulary, vocabulary filter, medical transcription, pii redaction, custom language model, pricing per second
+  when_to_use: Invoke when the user wants to configure Amazon Transcribe for speech-to-text transcription, run batch transcription jobs from S3, enable speaker diarization, create custom vocabularies for domain-specific terms, filter unwanted words, redact PII from transcripts, run medical transcription, deploy custom language models for improved accuracy, or select output formats (JSON, TXT, SRT, VTT). Do NOT invoke for Amazon Polly (text-to-speech), Amazon Lex (conversational bots), or Amazon Comprehend (NLP text analysis).
 ---
 
 # Transcribe Job Deployer

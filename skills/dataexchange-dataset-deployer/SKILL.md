@@ -1,121 +1,26 @@
 ---
 name: dataexchange-dataset-deployer
-description: >-
-  Deploys AWS Data Exchange data sets with production defaults:
-  subscription creation (data product from providers), asset export
-  to S3, revision auto-export (EventBridge triggered on new data
-  revision), data set entitlement (share with specific AWS accounts
-  — entitlement is the sharing mechanism, NOT IAM), job creation
-  (export jobs, import jobs), asset structure (S3 objects, DynamoDB
-  tables, REST API assets), Lake Formation integration for governed
-  data access, auto-export to S3 for BI tool consumption, revision
-  lifecycle (create revision, add assets, finalize, publish),
-  CloudWatch monitoring for job status and data freshness. Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when
-  subscribing to a data product, exporting data exchange assets to
-  S3, setting up auto-export for new revisions, sharing a data set
-  with another account, creating an export or import job, or
-  integrating Data Exchange with Lake Formation. Triggers: create
-  data exchange subscription, data exchange asset export, data
-  exchange revision auto-export, data exchange entitlement, data
-  exchange export job, data exchange import job, data exchange lake
-  formation, data exchange API asset, data exchange revision
-  lifecycle, data exchange S3 auto-export.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Deploys AWS Data Exchange data sets with production defaults: subscription creation (data product from providers), asset export to S3, revision auto-export (EventBridge triggered on new data revision), data set entitlement (share with specific AWS accounts — entitlement is the sharing mechanism, NOT IAM), job creation (export jobs, import jobs), asset structure (S3 objects, DynamoDB tables, REST API assets), Lake Formation integration for governed data access, auto-export to S3 for BI tool consumption, revision lifecycle (create revision, add assets, finalize, publish), CloudWatch monitoring for job status and data freshness. Emits a READY_TO_DEPLOY checklist with verification commands. Use when subscribing. Triggers: create data exchange subscription, data exchange asset export, data exchange revision auto-export, data exchange entitlement, data exchange export job, data exchange import job, data exchange lake formation, data exchange API asset, data exchange revision lifecycle, data exchange S3...'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with dataexchange
-  and s3 access, plus EventBridge for auto-export rules. Works with
-  Terraform aws_dataexchange_dataset / aws_dataexchange_revision
-  resources and CloudFormation AWS::DataExchange::DataSet /
-  AWS::DataExchange::Job templates.
-keywords:
-  - aws
-  - data exchange
-  - dataexchange
-  - data set
-  - dataset
-  - subscription
-  - analytics
-  - cloudops
-  - deploy
-  - provisioning
-  - revision
-  - asset
-  - entitlement
-  - auto-export
-  - lake formation
-  - export job
-  - api asset
-  - eventbridge
-tags:
-  - aws
-  - data-exchange
-  - analytics
-  - cloudops
-  - deploy
-  - provisioning
-  - subscription
-  - revision
-  - entitlement
-  - auto-export
-  - lake-formation
-  - eventbridge
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with dataexchange and s3 access, plus EventBridge for auto-export rules. Works with Terraform aws_dataexchange_dataset / aws_dataexchange_revision resources and CloudFormation AWS::DataExchange::DataSet / AWS::DataExchange::Job templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - data-exchange
-    - analytics
-    - cloudops
-    - deploy
-    - provisioning
-    - subscription
-    - revision
-    - entitlement
-    - auto-export
-    - lake-formation
-    - eventbridge
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create data exchange subscription
-    - data exchange asset export
-    - data exchange revision auto-export
-    - data exchange entitlement
-    - data exchange export job
-    - data exchange import job
-    - data exchange lake formation
-    - data exchange api asset
-    - data exchange revision lifecycle
-    - data exchange s3 auto-export
-  when_to_use: >-
-    Invoke when the user wants to subscribe to an AWS Data Exchange
-    data product, export data exchange assets to S3, set up auto-
-    export for new revisions, share a data set with another AWS
-    account via entitlement, create an export or import job,
-    integrate Data Exchange with Lake Formation for governed data,
-    consume API assets as REST endpoints, or configure revision
-    auto-export with EventBridge. Do NOT invoke for AWS Glue data
-    catalogs (use Glue skills), AWS Lake Formation table grants
-    without Data Exchange (use Lake Formation skills), or S3 data
-    transfer without Data Exchange (use S3 skills).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, data-exchange, analytics, cloudops, deploy, provisioning, subscription, revision, entitlement, auto-export, lake-formation, eventbridge
+  dependencies: aws-orchestrator
+  keywords: aws, data exchange, dataexchange, data set, dataset, subscription, analytics, cloudops, deploy, provisioning, revision, asset, entitlement, auto-export, lake formation, export job, api asset, eventbridge
+  when_to_use: Invoke when the user wants to subscribe to an AWS Data Exchange data product, export data exchange assets to S3, set up auto- export for new revisions, share a data set with another AWS account via entitlement, create an export or import job, integrate Data Exchange with Lake Formation for governed data, consume API assets as REST endpoints, or configure revision auto-export with EventBridge. Do NOT invoke for AWS Glue data catalogs (use Glue skills), AWS Lake Formation table grants without Data Exchange (use Lake Formation skills), or S3 data transfer without Data Exchange (use S3 skills).
 ---
 
 # Data Exchange Dataset Deployer

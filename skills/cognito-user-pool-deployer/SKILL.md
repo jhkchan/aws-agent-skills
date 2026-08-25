@@ -1,137 +1,28 @@
 ---
 name: cognito-user-pool-deployer
-description: >-
-  Provisions Amazon Cognito user pools with secure defaults — user pool
-  attributes (standard and custom), password policy, MFA (SMS/TOTP),
-  app clients (OAuth code+PKCE, client credentials), hosted UI
-  customization, identity providers (SAML/OIDC/Social), Lambda triggers
-  (pre-signup, post-confirmation, custom message, pre-token-generation),
-  user pool groups, resource servers with custom scopes, domain
-  (Cognito or custom), advanced security features (ASF ENFORCED), and
-  hosted UI branding. Runs pre-checks (attribute schema, MFA SNS
-  prerequisites, Lambda ARNs, custom domain ACM cert, IdP metadata, IAM
-  permissions), emits create-user-pool and create-user-pool-client CLIs
-  behind a CONFIRM gate, verifies via describe-user-pool. Emits
-  READY_TO_DEPLOY | PREREQUISITES_MISSING. Use when creating user pools,
-  configuring OAuth clients, federating SAML/OIDC, or enabling advanced
-  security features.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Provisions Amazon Cognito user pools with secure defaults — user pool attributes (standard and custom), password policy, MFA (SMS/TOTP), app clients (OAuth code+PKCE, client credentials), hosted UI customization, identity providers (SAML/OIDC/Social), Lambda triggers (pre-signup, post-confirmation, custom message, pre-token-generation), user pool groups, resource servers with custom scopes, domain (Cognito or custom), advanced security features (ASF ENFORCED), and hosted UI branding. Runs pre-checks (attribute schema, MFA SNS prerequisites, Lambda ARNs, custom domain ACM cert, IdP metadata, IAM permissions), emits create-user-pool and create-user-pool-client CLIs behind a CONFIRM gate, verifies via describe-user-pool. Emits READY_TO_DEPLOY | PREREQUISITES_MISSING. Use when creating user pools, configuring OAuth clients, federating SAML/OIDC, or enabling advanced security features.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws cognito-idp create-user-pool, create-user-pool-client,
-  create-identity-provider, create-resource-server, create-group,
-  create-user-pool-domain, update-user-pool, describe-user-pool (AWS CLI v2,
-  SSO or key-based credentials).
-keywords:
-  - Cognito
-  - user pool
-  - identity provider
-  - IdP
-  - MFA
-  - TOTP
-  - SMS MFA
-  - password policy
-  - app client
-  - OAuth
-  - code flow
-  - PKCE
-  - client credentials
-  - SAML
-  - OIDC
-  - social login
-  - hosted UI
-  - branding
-  - Lambda triggers
-  - pre-signup
-  - post-confirmation
-  - custom message
-  - pre-token-generation
-  - resource server
-  - custom scopes
-  - user pool groups
-  - custom domain
-  - advanced security features
-  - ASF
-  - cognito-idp
-tags: [cognito, security, identity, mfa, oauth, saml, oidc, deploy, user-pool, hosted-ui]
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws cognito-idp create-user-pool, create-user-pool-client, create-identity-provider, create-resource-server, create-group, create-user-pool-domain, update-user-pool, describe-user-pool (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - cognito
-    - security
-    - identity
-    - mfa
-    - oauth
-    - saml
-    - oidc
-    - deploy
-    - user-pool
-    - hosted-ui
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - Cognito
-    - user pool
-    - MFA
-    - OAuth
-    - SAML
-    - OIDC
-    - hosted UI
-    - Lambda triggers
-    - advanced security features
-  when_to_use: >-
-    Creating a new Cognito user pool, configuring an OAuth app client,
-    federating with SAML/OIDC/social identity providers, setting up
-    hosted UI branding, wiring Lambda triggers (pre-signup, post-
-    confirmation, custom message, pre-token-generation), enabling
-    advanced security features (ASF ENFORCED), or registering a custom
-    domain for the hosted UI.
-  activation_triggers:
-    - "create Cognito user pool"
-    - "provision user pool"
-    - "deploy Cognito"
-    - "OAuth app client"
-    - "code flow with PKCE"
-    - "client credentials grant"
-    - "SAML federation"
-    - "OIDC identity provider"
-    - "social login"
-    - "hosted UI"
-    - "Cognito branding"
-    - "pre-signup trigger"
-    - "post-confirmation trigger"
-    - "custom message trigger"
-    - "pre-token-generation trigger"
-    - "resource server custom scopes"
-    - "user pool groups"
-    - "custom domain Cognito"
-    - "advanced security features"
-    - "cognito-idp create-user-pool"
-  invocation_schema: >-
-    Input: either (a) a user pool deployment intent (create, update) with
-    target pool name, attribute schema, password policy, MFA mode, app
-    client OAuth config, identity providers, Lambda triggers, resource
-    servers, groups, and domain; OR (b) a user pool id for live-account
-    update or validation. Output: deterministic POOL/VERDICT/PRE_CHECKS/
-    STEPS/POST_VERIFY block per operation, where VERDICT is one of
-    READY_TO_DEPLOY, PREREQUISITES_MISSING.
+  author: Jacky Chan — AWS Community Builder
+  tags: cognito, security, identity, mfa, oauth, saml, oidc, deploy, user-pool, hosted-ui
+  dependencies: aws-orchestrator
+  keywords: Cognito, user pool, identity provider, IdP, MFA, TOTP, SMS MFA, password policy, app client, OAuth, code flow, PKCE, client credentials, SAML, OIDC, social login, hosted UI, branding, Lambda triggers, pre-signup, post-confirmation, custom message, pre-token-generation, resource server, custom scopes, user pool groups, custom domain, advanced security features, ASF, cognito-idp
+  when_to_use: Creating a new Cognito user pool, configuring an OAuth app client, federating with SAML/OIDC/social identity providers, setting up hosted UI branding, wiring Lambda triggers (pre-signup, post- confirmation, custom message, pre-token-generation), enabling advanced security features (ASF ENFORCED), or registering a custom domain for the hosted UI.
+  activation_triggers: create Cognito user pool, provision user pool, deploy Cognito, OAuth app client, code flow with PKCE, client credentials grant, SAML federation, OIDC identity provider, social login, hosted UI, Cognito branding, pre-signup trigger, post-confirmation trigger, custom message trigger, pre-token-generation trigger, resource server custom scopes, user pool groups, custom domain Cognito, advanced security features, cognito-idp create-user-pool
+  invocation_schema: 'Input: either (a) a user pool deployment intent (create, update) with target pool name, attribute schema, password policy, MFA mode, app client OAuth config, identity providers, Lambda triggers, resource servers, groups, and domain; OR (b) a user pool id for live-account update or validation. Output: deterministic POOL/VERDICT/PRE_CHECKS/ STEPS/POST_VERIFY block per operation, where VERDICT is one of READY_TO_DEPLOY, PREREQUISITES_MISSING.'
 ---
 
 # Cognito User Pool Deployer

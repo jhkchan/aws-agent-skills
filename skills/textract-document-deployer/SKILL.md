@@ -1,132 +1,26 @@
 ---
 name: textract-document-deployer
-description: >-
-  Deploys Amazon Textract document-analysis pipelines with production
-  defaults: synchronous APIs (DetectDocumentText, AnalyzeDocument) for
-  single-page real-time extraction, asynchronous APIs
-  (StartDocumentAnalysis, StartDocumentTextDetection,
-  StartExpenseAnalysis) for multipage PDFs up to 3000 pages, S3 document
-  source and output config, SNS notification for async job completion,
-  KMS encryption for input and output, feature selection
-  (Forms, Tables, Queries, Signatures, Expense, Identity), bounding-box
-  geometry and confidence-score handling, Lambda integration for
-  real-time extraction, document splitting for oversized PDFs, service
-  quotas, Comprehend integration for downstream NLP on extracted text.
-  Emits a READY_TO_DEPLOY checklist with verification commands. Use when
-  extracting text from documents, analyzing forms or tables, processing
-  invoices or receipts, asking natural-language questions of forms
-  (Queries), detecting signatures, identity-document analysis, building
-  real-time extraction behind Lambda, or running multipage async batch
-  extraction. Triggers: analyze document, detect document text, extract
-  form fields, extract tables, textract queries, textract expense
-  analysis, textract signature detection, textract identity documents,
-  start document analysis, textract lambda, textract s3 output, textract
-  kms encryption, textract sns notification.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Deploys Amazon Textract document-analysis pipelines with production defaults: synchronous APIs (DetectDocumentText, AnalyzeDocument) for single-page real-time extraction, asynchronous APIs (StartDocumentAnalysis, StartDocumentTextDetection, StartExpenseAnalysis) for multipage PDFs up to 3000 pages, S3 document source and output config, SNS notification for async job completion, KMS encryption for input and output, feature selection (Forms, Tables, Queries, Signatures, Expense, Identity), bounding-box geometry and confidence-score handling, Lambda integration for real-time extraction, document splitting for oversized PDFs, service quotas, Comprehend integration for downstream NLP on extracted text. Emits a. Triggers: analyze document, detect document text, extract form fields, extract tables, textract queries, textract expense analysis, textract signature detection, textract identity documents, start document analysis, textract lambda, textract s3 output, textract kms encryption, textract sns notification.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with textract access
-  and an IAM role granting s3:GetObject on the input bucket,
-  s3:PutObject on the output bucket, textract:Start* / Get* /
-  Notify* actions, kms:Decrypt / kms:GenerateDataKey on the KMS key,
-  and sns:Publish if SNS notification is used. Works with Lambda
-  runtimes (boto3 textract client), Step Functions orchestrations,
-  Terraform aws_textract_* data sources, and CloudFormation
-  AWS::Textract::* resources.
-keywords:
-  - aws
-  - textract
-  - document analysis
-  - ocr
-  - forms
-  - tables
-  - queries
-  - signatures
-  - expense
-  - identity documents
-  - ml
-  - deploy
-  - provisioning
-  - synchronous
-  - asynchronous
-  - lambda
-  - kms
-  - sns
-  - s3
-  - comprehend
-tags:
-  - aws
-  - textract
-  - document-analysis
-  - ml
-  - deploy
-  - provisioning
-  - forms
-  - tables
-  - queries
-  - expense
-  - lambda
-  - kms
-  - sns
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with textract access and an IAM role granting s3:GetObject on the input bucket, s3:PutObject on the output bucket, textract:Start* / Get* / Notify* actions, kms:Decrypt / kms:GenerateDataKey on the KMS key, and sns:Publish if SNS notification is used. Works with Lambda runtimes (boto3 textract client), Step Functions orchestrations, Terraform aws_textract_* data sources, and...'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AI/ML
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - textract
-    - document-analysis
-    - ml
-    - deploy
-    - provisioning
-    - forms
-    - tables
-    - queries
-    - expense
-    - lambda
-    - kms
-    - sns
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - analyze document
-    - detect document text
-    - extract form fields
-    - extract tables
-    - textract queries
-    - textract expense analysis
-    - textract signature detection
-    - textract identity documents
-    - start document analysis
-    - textract lambda
-    - textract s3 output
-    - textract kms encryption
-    - textract sns notification
-  when_to_use: >-
-    Invoke when the user wants to extract text, forms, tables, signatures,
-    expense, or identity data from documents (PDF, TIFF, PNG, JPEG) using
-    Amazon Textract. Covers both synchronous APIs for single-page real-time
-    extraction (DetectDocumentText, AnalyzeDocument) and asynchronous APIs
-    for multipage batch extraction (StartDocumentAnalysis,
-    StartExpenseAnalysis, StartDocumentTextDetection) with S3 input/output,
-    SNS completion notification, KMS encryption, Lambda integration, and
-    Comprehend downstream NLP. Do NOT invoke for Amazon Transcribe (audio),
-    Amazon Rekognition (image/video ML), or pure OCR via Textract
-    DetectDocumentText without downstream analysis.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, textract, document-analysis, ml, deploy, provisioning, forms, tables, queries, expense, lambda, kms, sns
+  dependencies: aws-orchestrator
+  keywords: aws, textract, document analysis, ocr, forms, tables, queries, signatures, expense, identity documents, ml, deploy, provisioning, synchronous, asynchronous, lambda, kms, sns, s3, comprehend
+  when_to_use: Invoke when the user wants to extract text, forms, tables, signatures, expense, or identity data from documents (PDF, TIFF, PNG, JPEG) using Amazon Textract. Covers both synchronous APIs for single-page real-time extraction (DetectDocumentText, AnalyzeDocument) and asynchronous APIs for multipage batch extraction (StartDocumentAnalysis, StartExpenseAnalysis, StartDocumentTextDetection) with S3 input/output, SNS completion notification, KMS encryption, Lambda integration, and Comprehend downstream NLP. Do NOT invoke for Amazon Transcribe (audio), Amazon Rekognition (image/video ML), or pure OCR via Textract DetectDocumentText without downstream analysis.
 ---
 
 # Textract Document Deployer

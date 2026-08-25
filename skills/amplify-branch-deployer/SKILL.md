@@ -1,113 +1,26 @@
 ---
 name: amplify-branch-deployer
-description: >-
-  Configures AWS Amplify branch deployments with production defaults:
-  app creation from a Git repository (GitHub/GitLab/Bitbucket),
-  branch configuration (production/staging/dev with stage tags), build
-  settings (amplify.yml — NOT buildspec.yml, environment variables,
-  build instance type, cache configuration), custom headers, redirects
-  (SPA rewrite vs SSR function routes), basic auth and password
-  protection per branch, custom domain via Route 53 (domain association
-  with sub-domain mapping), backend deployment via Amplify CLI (one
-  backend per branch), CI/CD build frequency (continuous vs manual),
-  notifications on build result (Slack/email), pull request preview
-  (ephemeral environment per PR), monorepo app detection (amplify.yml
-  in subdir + appRoot), SSR (Next.js Lambda serverless) vs SSG support,
-  and Lambda serverless functions. Emits a READY_TO_DEPLOY checklist
-  with verification commands. Use when creating an Amplify app,
-  configuring a branch, setting up PR preview, wiring a custom domain,
-  enabling basic auth, configuring SPA/SSR redirects, or detecting a
-  monorepo app. Triggers: create amplify app, configure amplify branch,
-  amplify pull request preview, amplify custom domain, amplify basic
-  auth, amplify monorepo, amplify redirects spa ssr, amplify buildspec,
-  amplify nextjs ssr, amplify serverless functions.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Configures AWS Amplify branch deployments with production defaults: app creation from a Git repository (GitHub/GitLab/Bitbucket), branch configuration (production/staging/dev with stage tags), build settings (amplify.yml — NOT buildspec.yml, environment variables, build instance type, cache configuration), custom headers, redirects (SPA rewrite vs SSR function routes), basic auth and password protection per branch, custom domain via Route 53 (domain association with sub-domain mapping), backend deployment via Amplify CLI (one backend per branch), CI/CD build frequency (continuous vs manual), notifications on build result (Slack/email), pull request preview (ephemeral environment per PR), monorepo app detection (amplify.yml in subdir + appRoot), SSR (Next.js Lambda. Triggers: create amplify app, configure amplify branch, amplify pull request preview, amplify custom domain, amplify basic auth, amplify monorepo, amplify redirects spa ssr, amplify buildspec, amplify nextjs ssr, amplify serverless functions.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with amplify access
-  and an existing Git provider connection (OAuth via console). Works
-  with Terraform aws_amplify_app / aws_amplify_branch /
-  aws_amplify_domain_association resources and CloudFormation
-  AWS::Amplify::App / Branch / Domain templates.
-keywords:
-  - aws
-  - amplify
-  - branch
-  - cloudops
-  - deploy
-  - devtools
-  - git
-  - build
-  - pr preview
-  - custom domain
-  - basic auth
-  - monorepo
-  - redirects
-  - ssr
-  - nextjs
-  - serverless functions
-  - route 53
-tags:
-  - aws
-  - amplify
-  - amplify-branch
-  - cloudops
-  - deploy
-  - devtools
-  - cicd
-  - ssr
-  - monorepo
-  - custom-domain
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with amplify access and an existing Git provider connection (OAuth via console). Works with Terraform aws_amplify_app / aws_amplify_branch / aws_amplify_domain_association resources and CloudFormation AWS::Amplify::App / Branch / Domain templates.'
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - amplify
-    - amplify-branch
-    - cloudops
-    - deploy
-    - devtools
-    - cicd
-    - ssr
-    - monorepo
-    - custom-domain
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create amplify app
-    - configure amplify branch
-    - amplify pull request preview
-    - amplify custom domain
-    - amplify basic auth
-    - amplify monorepo
-    - amplify redirects spa ssr
-    - amplify buildspec
-    - amplify nextjs ssr
-    - amplify serverless functions
-  when_to_use: >-
-    Invoke when the user wants to create an AWS Amplify app from a Git
-    repository, configure a branch (production/staging/dev), enable pull
-    request preview, wire a custom domain via Route 53, configure basic
-    auth or password protection per branch, set up SPA or SSR redirects,
-    detect a monoreto app via appRoot, or configure Next.js SSR with
-    Lambda serverless functions. Do NOT invoke for Amplify Studio
-    data modeling (use amplify-studio skills), AppSync API creation in
-    isolation, or Cognito user pool configuration outside of an Amplify
-    backend.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, amplify, amplify-branch, cloudops, deploy, devtools, cicd, ssr, monorepo, custom-domain
+  dependencies: aws-orchestrator
+  keywords: aws, amplify, branch, cloudops, deploy, devtools, git, build, pr preview, custom domain, basic auth, monorepo, redirects, ssr, nextjs, serverless functions, route 53
+  when_to_use: Invoke when the user wants to create an AWS Amplify app from a Git repository, configure a branch (production/staging/dev), enable pull request preview, wire a custom domain via Route 53, configure basic auth or password protection per branch, set up SPA or SSR redirects, detect a monoreto app via appRoot, or configure Next.js SSR with Lambda serverless functions. Do NOT invoke for Amplify Studio data modeling (use amplify-studio skills), AppSync API creation in isolation, or Cognito user pool configuration outside of an Amplify backend.
 ---
 
 # Amplify Branch Deployer

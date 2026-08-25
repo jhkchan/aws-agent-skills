@@ -1,70 +1,24 @@
 ---
 name: kms-key-policy-auditor
-description: >-
-  Audits AWS KMS key policies and key metadata for cross-account or external
-  principals, wildcard kms:* grants, the kms:Decrypt blast-radius multiplier,
-  automatic-key-rotation status, and key-deletion window exposure. Emits a
-  deterministic severity verdict (CRITICAL | HIGH | MEDIUM | OK) per key with
-  enumerated findings and specific remediation. Use when reviewing KMS key
-  policies, checking for cross-account decrypt access, validating rotation
-  enablement, auditing key deletion windows, or hardening encryption key
-  posture before production deployment.
-version: 0.2.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS KMS key policies and key metadata for cross-account or external principals, wildcard kms:* grants, the kms:Decrypt blast-radius multiplier, automatic-key-rotation status, and key-deletion window exposure. Emits a deterministic severity verdict (CRITICAL | HIGH | MEDIUM | OK) per key with enumerated findings and specific remediation. Use when reviewing KMS key policies, checking for cross-account decrypt access, validating rotation enablement, auditing key deletion windows, or hardening encryption key posture before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline policy-document classification.
-  Live-account audits use aws kms describe-key, aws kms get-key-policy, and
-  aws kms list-keys (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - KMS
-  - key policy
-  - cross-account
-  - kms:Decrypt
-  - kms:*
-  - wildcard permissions
-  - key rotation
-  - key deletion
-  - PendingDeletion
-  - EnableKeyRotation
-  - kms:CreateGrant
-  - kms:ScheduleKeyDeletion
-  - encryption key audit
-  - data-at-rest
-  - blast radius
-  - kms:ViaService
-  - Principal:"*"
-  - key policy remediation
-tags: [kms, security, key-policy, cross-account, rotation, deletion-window, encryption, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline policy-document classification. Live-account audits use aws kms describe-key, aws kms get-key-policy, and aws kms list-keys (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
-  verdict_shape: "CRITICAL | HIGH | MEDIUM | OK"
-  when_to_use: >-
-    Reviewing a KMS key policy before production deployment, checking for
-    cross-account or external principal access, auditing wildcard kms:*
-    grants, validating automatic key rotation, inspecting a key deletion
-    window, or hardening encryption-key posture across an account.
-  activation_triggers:
-    - "audit this KMS key policy"
-    - "is my KMS key exposed cross-account"
-    - "check kms:Decrypt blast radius"
-    - "review key deletion window"
-    - "is key rotation enabled"
-    - "harden KMS key policy"
-    - "who can kms:Decrypt"
-    - "kms key policy too permissive"
-  invocation_schema: >-
-    Input: either (a) a KMS key policy JSON document, optionally paired with
-    describe-key metadata, OR (b) a key-id/ARN for live-account audit.
-    Output: deterministic KEY/VERDICT/REASON/FINDINGS/REMEDIATION block per
-    key, where VERDICT ∈ {CRITICAL, HIGH, MEDIUM, OK, ERROR}.
+  verdict_shape: CRITICAL | HIGH | MEDIUM | OK
+  when_to_use: Reviewing a KMS key policy before production deployment, checking for cross-account or external principal access, auditing wildcard kms:* grants, validating automatic key rotation, inspecting a key deletion window, or hardening encryption-key posture across an account.
+  activation_triggers: audit this KMS key policy, is my KMS key exposed cross-account, check kms:Decrypt blast radius, review key deletion window, is key rotation enabled, harden KMS key policy, who can kms:Decrypt, kms key policy too permissive
+  invocation_schema: 'Input: either (a) a KMS key policy JSON document, optionally paired with describe-key metadata, OR (b) a key-id/ARN for live-account audit. Output: deterministic KEY/VERDICT/REASON/FINDINGS/REMEDIATION block per key, where VERDICT ∈ {CRITICAL, HIGH, MEDIUM, OK, ERROR}.'
+  version: 0.2.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: KMS, key policy, cross-account, kms:Decrypt, kms:*, wildcard permissions, key rotation, key deletion, PendingDeletion, EnableKeyRotation, kms:CreateGrant, kms:ScheduleKeyDeletion, encryption key audit, data-at-rest, blast radius, kms:ViaService, Principal:"*", key policy remediation
+  tags: kms, security, key-policy, cross-account, rotation, deletion-window, encryption, audit
 ---
 
 # KMS Key Policy Auditor

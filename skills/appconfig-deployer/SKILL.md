@@ -1,105 +1,26 @@
 ---
 name: appconfig-deployer
-description: >-
-  Provisions AWS AppConfig resources with production defaults: application
-  creation, environments, configuration profiles (free form, JSON, YAML),
-  deployment strategies (linear, exponential, all-at-once), bake time with
-  CloudWatch alarms, deployment validation (Lambda validators), feature
-  flags, dynamic JSON schema validation, configuration version management,
-  rollback on alarm, and integration with Lambda/EventBridge. Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when creating
-  an AppConfig application, setting up configuration profiles, defining
-  deployment strategies, enabling feature flags, adding Lambda validators,
-  or configuring alarm-based rollback. Triggers: create appconfig
-  application, appconfig deployment strategy, appconfig configuration
-  profile, appconfig feature flags, appconfig lambda validator, appconfig
-  rollback on alarm, appconfig bake time, appconfig environment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS AppConfig resources with production defaults: application creation, environments, configuration profiles (free form, JSON, YAML), deployment strategies (linear, exponential, all-at-once), bake time with CloudWatch alarms, deployment validation (Lambda validators), feature flags, dynamic JSON schema validation, configuration version management, rollback on alarm, and integration with Lambda/EventBridge. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating an AppConfig application, setting up configuration profiles, defining deployment strategies, enabling feature flags, adding Lambda validators, or configuring alarm-based rollback. Triggers: create appconfig application, appconfig deployment strategy, appconfig configuration profile, appconfig feature flags, appconfig lambda validator, appconfig rollback on alarm, appconfig bake time, appconfig environment.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with appconfig access.
-  Works with Terraform aws_appconfig_application /
-  aws_appconfig_environment / aws_appconfig_configuration_profile /
-  aws_appconfig_deployment_strategy / aws_appconfig_deployment /
-  aws_appconfig_extension resources and CloudFormation
-  AWS::AppConfig::Application / Environment / ConfigurationProfile /
-  DeploymentStrategy / Deployment templates.
-keywords:
-  - aws
-  - appconfig
-  - feature flags
-  - cloudops
-  - deploy
-  - provisioning
-  - deployment strategy
-  - linear
-  - exponential
-  - all-at-once
-  - bake time
-  - cloudwatch alarm
-  - lambda validator
-  - rollback
-  - configuration profile
-  - schema validation
-tags:
-  - aws
-  - appconfig
-  - feature-flags
-  - cloudops
-  - deploy
-  - provisioning
-  - deployment-strategy
-  - lambda-validator
-  - rollback
-  - configuration-profile
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with appconfig access. Works with Terraform aws_appconfig_application / aws_appconfig_environment / aws_appconfig_configuration_profile / aws_appconfig_deployment_strategy / aws_appconfig_deployment / aws_appconfig_extension resources and CloudFormation AWS::AppConfig::Application / Environment / ConfigurationProfile / DeploymentStrategy / Deployment templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - appconfig
-    - feature-flags
-    - cloudops
-    - deploy
-    - provisioning
-    - deployment-strategy
-    - lambda-validator
-    - rollback
-    - configuration-profile
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create appconfig application
-    - appconfig deployment strategy
-    - appconfig configuration profile
-    - appconfig feature flags
-    - appconfig lambda validator
-    - appconfig rollback on alarm
-    - appconfig bake time
-    - appconfig environment
-  when_to_use: >-
-    Invoke when the user wants to create an AppConfig application, configure
-    environments and configuration profiles, define deployment strategies
-    (linear, exponential, all-at-once), set up feature flags, add Lambda
-    validators for deployment validation, configure CloudWatch alarm-based
-    rollback, manage configuration versions, or integrate AppConfig with
-    Lambda and EventBridge. Do NOT invoke for AWS Systems Manager Parameter
-    Store (use SSM skills), or for Secrets Manager (use secrets skills).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, appconfig, feature-flags, cloudops, deploy, provisioning, deployment-strategy, lambda-validator, rollback, configuration-profile
+  dependencies: aws-orchestrator
+  keywords: aws, appconfig, feature flags, cloudops, deploy, provisioning, deployment strategy, linear, exponential, all-at-once, bake time, cloudwatch alarm, lambda validator, rollback, configuration profile, schema validation
+  when_to_use: Invoke when the user wants to create an AppConfig application, configure environments and configuration profiles, define deployment strategies (linear, exponential, all-at-once), set up feature flags, add Lambda validators for deployment validation, configure CloudWatch alarm-based rollback, manage configuration versions, or integrate AppConfig with Lambda and EventBridge. Do NOT invoke for AWS Systems Manager Parameter Store (use SSM skills), or for Secrets Manager (use secrets skills).
 ---
 
 # AppConfig Deployer

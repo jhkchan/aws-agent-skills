@@ -1,107 +1,27 @@
 ---
 name: rds-upgrade-operator
-description: >-
-  Operates Amazon RDS and Aurora engine upgrade workflows end-to-end — major
-  version upgrades (explicit opt-in, pre-check: snapshot, parameter group
-  compatibility, application driver support), minor version upgrades
-  (auto-minor-version flag, patch schedule), Aurora MySQL 5.7 to 8.0,
-  PostgreSQL 13 to 14 to 15 upgrade paths, blue/green deployments for zero-
-  downtime upgrades, custom parameter group migration for the target engine
-  version, option group migration, application connection string validation,
-  post-upgrade verification (query performance regression, feature parity,
-  analyzer changes), rollback strategy via point-in-time recovery, global
-  database upgrade sequencing (primary then secondaries), multi-AZ upgrade
-  behavior (rolling failover), and maintenance window scheduling. Runs
-  deterministic pre-checks (available state, pending actions, snapshot
-  exists, param group compatibility, option group compatibility, replication
-  topology, storage type, free storage headroom) behind a CONFIRM gate and
-  emits OPERATION_COMPLETED or REVIEW_REQUIRED per operation. Use when
-  upgrading RDS or Aurora engine versions, planning a major version cut-over,
-  configuring blue/green for zero downtime, migrating parameter groups across
-  versions, sequencing a global database upgrade, or verifying post-upgrade
-  query performance.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Operates Amazon RDS and Aurora engine upgrade workflows end-to-end — major version upgrades (explicit opt-in, pre-check: snapshot, parameter group compatibility, application driver support), minor version upgrades (auto-minor-version flag, patch schedule), Aurora MySQL 5.7 to 8.0, PostgreSQL 13 to 14 to 15 upgrade paths, blue/green deployments for zero- downtime upgrades, custom parameter group migration for the target engine version, option group migration, application connection string validation, post-upgrade verification (query performance regression, feature parity, analyzer changes), rollback strategy via point-in-time recovery, global database upgrade sequencing (primary then secondaries), multi-AZ upgrade behavior (rolling failover), and maintenance window scheduling. Runs deterministic pre-checks (available state, pending actions, snapshot exists, param group compatibility, option group compatibility, replication topology, storage type, free storage headroom) behind a CONFIRM gate and emits...'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws rds modify-db-instance --engine-version, modify-db-cluster
-  --engine-version, create-blue-green-deployment, switchover-blue-green-deployment,
-  describe-db-engine-versions, describe-db-instances, describe-db-clusters,
-  create-db-snapshot, describe-db-snapshots, modify-db-instance
-  --auto-minor-version-upgrade, promote-read-replica, aws ec2 describe-security-groups
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - RDS upgrade
-  - Aurora upgrade
-  - major version upgrade
-  - minor version upgrade
-  - engine version
-  - auto-minor-version-upgrade
-  - Aurora MySQL 8.0
-  - PostgreSQL 15
-  - blue/green deployment
-  - zero-downtime upgrade
-  - parameter group migration
-  - option group migration
-  - connection string validation
-  - post-upgrade verification
-  - query performance regression
-  - point-in-time recovery
-  - rollback strategy
-  - global database upgrade
-  - multi-AZ upgrade
-  - maintenance window
-  - switchover
-  - UpgradeInProgress
-tags: [aws, rds, aurora, database, upgrade, mysql, postgresql, blue-green, operate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws rds modify-db-instance --engine-version, modify-db-cluster --engine-version, create-blue-green-deployment, switchover-blue-green-deployment, describe-db-engine-versions, describe-db-instances, describe-db-clusters, create-db-snapshot, describe-db-snapshots, modify-db-instance --auto-minor-version-upgrade, promote-read-replica...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "OPERATION_COMPLETED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Upgrading an RDS instance or Aurora cluster engine version (major or
-    minor), planning a major version cut-over with pre-checks and rollback,
-    deploying blue/green for zero-downtime upgrade, migrating parameter or
-    option groups to a target engine version, sequencing a global database
-    upgrade across Regions, scheduling a maintenance-window upgrade, enabling
-    or disabling auto-minor-version-upgrade, validating application connection
-    strings after an upgrade, or verifying post-upgrade query performance and
-    feature parity.
-  activation_triggers:
-    - "upgrade RDS engine"
-    - "major version upgrade"
-    - "minor version upgrade"
-    - "Aurora MySQL 8.0 upgrade"
-    - "PostgreSQL 15 upgrade"
-    - "blue/green deploy RDS"
-    - "zero-downtime database upgrade"
-    - "parameter group migration"
-    - "option group migration"
-    - "global database upgrade"
-    - "maintenance window upgrade"
-    - "auto minor version upgrade"
-    - "post-upgrade verification"
-    - "rollback RDS upgrade"
-    - "RDS engine version"
-  invocation_schema: >-
-    Input: either (a) a database/cluster configuration (describe-db-instances
-    or describe-db-clusters output) plus the intended operation (major-upgrade,
-    minor-upgrade, blue-green-upgrade, param-group-migrate, global-upgrade,
-    configure-auto-minor, post-upgrade-verify, rollback), OR (b) a DB instance
-    or cluster identifier + operation for live-account execution. Output:
-    deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY /
-    NOTES block per upgrade, where VERDICT is OPERATION_COMPLETED or
-    REVIEW_REQUIRED.
+  verdict_shape: OPERATION_COMPLETED | REVIEW_REQUIRED
+  when_to_use: Upgrading an RDS instance or Aurora cluster engine version (major or minor), planning a major version cut-over with pre-checks and rollback, deploying blue/green for zero-downtime upgrade, migrating parameter or option groups to a target engine version, sequencing a global database upgrade across Regions, scheduling a maintenance-window upgrade, enabling or disabling auto-minor-version-upgrade, validating application connection strings after an upgrade, or verifying post-upgrade query performance and feature parity.
+  activation_triggers: upgrade RDS engine, major version upgrade, minor version upgrade, Aurora MySQL 8.0 upgrade, PostgreSQL 15 upgrade, blue/green deploy RDS, zero-downtime database upgrade, parameter group migration, option group migration, global database upgrade, maintenance window upgrade, auto minor version upgrade, post-upgrade verification, rollback RDS upgrade, RDS engine version
+  invocation_schema: 'Input: either (a) a database/cluster configuration (describe-db-instances or describe-db-clusters output) plus the intended operation (major-upgrade, minor-upgrade, blue-green-upgrade, param-group-migrate, global-upgrade, configure-auto-minor, post-upgrade-verify, rollback), OR (b) a DB instance or cluster identifier + operation for live-account execution. Output: deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per upgrade, where VERDICT is OPERATION_COMPLETED or REVIEW_REQUIRED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: RDS upgrade, Aurora upgrade, major version upgrade, minor version upgrade, engine version, auto-minor-version-upgrade, Aurora MySQL 8.0, PostgreSQL 15, blue/green deployment, zero-downtime upgrade, parameter group migration, option group migration, connection string validation, post-upgrade verification, query performance regression, point-in-time recovery, rollback strategy, global database upgrade, multi-AZ upgrade, maintenance window, switchover, UpgradeInProgress
+  tags: aws, rds, aurora, database, upgrade, mysql, postgresql, blue-green, operate
 ---
 
 # RDS and Aurora Engine Upgrade Operator

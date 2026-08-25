@@ -1,88 +1,27 @@
 ---
 name: s3-intelligent-tiering-optimizer
-description: >-
-  Optimises S3 storage cost with Intelligent-Tiering: enables
-  bucket-level IntelligentTieringConfiguration, tunes the Archive Access
-  (90-day) and Deep Archive Access (180-day) tiers, models the $0.0025
-  per-1,000-objects monitoring fee, and emits a deterministic verdict
-  (OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL) per bucket with the
-  exact put-bucket-intelligent-tiering-configuration payload and a net
-  dollar savings estimate. Use when deciding whether to enable
-  Intelligent-Tiering on a bucket with unknown or mixed access
-  patterns, when the monitoring fee might exceed the saving on small
-  objects (<128 KB), when predictable access patterns make
-  lifecycle rules cheaper, or when archive-tier timing needs tuning.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Optimises S3 storage cost with Intelligent-Tiering: enables bucket-level IntelligentTieringConfiguration, tunes the Archive Access (90-day) and Deep Archive Access (180-day) tiers, models the $0.0025 per-1,000-objects monitoring fee, and emits a deterministic verdict (OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL) per bucket with the exact put-bucket-intelligent-tiering-configuration payload and a net dollar savings estimate. Use when deciding whether to enable Intelligent-Tiering on a bucket with unknown or mixed access patterns, when the monitoring fee might exceed the saving on small objects (<128 KB), when predictable access patterns make lifecycle rules cheaper, or when archive-tier timing needs tuning.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline configuration
-  classification. Live-account audits use aws s3api
-  list-bucket-intelligent-tiering-configurations,
-  put-bucket-intelligent-tiering-configuration,
-  get-bucket-intelligent-tiering-configuration,
-  list-objects-v2 (with --page-size for inventory), and aws s3control
-  get-storage-lens-configuration (AWS CLI v2, SSO or key-based
-  credentials). Pricing is us-east-1 published rates as of 2026;
-  re-state the regional rates from the reference matrix before
-  producing dollar estimates for other regions.
-keywords:
-  - S3
-  - Intelligent-Tiering
-  - storage class
-  - IntelligentTieringConfiguration
-  - Archive Access
-  - Deep Archive Access
-  - monitoring fee
-  - small object fee aggregation
-  - Frequent Access tier
-  - Infrequent Access tier
-  - storage cost optimization
-  - access pattern analysis
-  - put-bucket-intelligent-tiering-configuration
-  - Storage Lens
-  - lifecycle vs Intelligent-Tiering
-  - S3 Batch Operations
-tags: [s3, storage, cost-optimization, intelligent-tiering, access-pattern, finops]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline configuration classification. Live-account audits use aws s3api list-bucket-intelligent-tiering-configurations, put-bucket-intelligent-tiering-configuration, get-bucket-intelligent-tiering-configuration, list-objects-v2 (with --page-size for inventory), and aws s3control get-storage-lens-configuration (AWS CLI v2, SSO or key-based credentials). Pricing is us-east-1 published...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL"
-  when_to_use: >-
-    Deciding whether to enable S3 Intelligent-Tiering on a bucket with
-    unknown or mixed access patterns, tuning the Archive Access and
-    Deep Archive Access tier timing, modelling the $0.0025/1,000-objects
-    monitoring fee against savings, deciding between Intelligent-Tiering
-    and a fixed lifecycle policy for predictable workloads, or auditing
-    whether an existing Intelligent-Tiering configuration is optimal.
-  activation_triggers:
-    - "enable S3 Intelligent-Tiering"
-    - "Intelligent-Tiering monitoring fee"
-    - "S3 Intelligent-Tiering vs lifecycle"
-    - "S3 archive tier configuration"
-    - "S3 Deep Archive Access tier"
-    - "S3 access pattern analysis"
-    - "should I use Intelligent-Tiering"
-    - "IntelligentTieringConfiguration"
-    - "put-bucket-intelligent-tiering-configuration"
-    - "S3 small object fee aggregation"
-    - "S3 storage cost optimization"
-  invocation_schema: >-
-    Input: either (a) a bucket configuration (IntelligentTieringConfiguration
-    JSON, Storage Lens metrics summary, optional object-size histogram),
-    OR (b) a bucket name for live-account optimisation. Output:
-    deterministic BUCKET/VERDICT/REASON/RECOMMENDATION/SAVINGS/IMPLEMENTATION
-    block per bucket, where VERDICT is one of OPTIMIZED,
-    OPPORTUNITY_FOUND, ALREADY_OPTIMAL.
+  verdict_shape: OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL
+  when_to_use: Deciding whether to enable S3 Intelligent-Tiering on a bucket with unknown or mixed access patterns, tuning the Archive Access and Deep Archive Access tier timing, modelling the $0.0025/1,000-objects monitoring fee against savings, deciding between Intelligent-Tiering and a fixed lifecycle policy for predictable workloads, or auditing whether an existing Intelligent-Tiering configuration is optimal.
+  activation_triggers: enable S3 Intelligent-Tiering, Intelligent-Tiering monitoring fee, S3 Intelligent-Tiering vs lifecycle, S3 archive tier configuration, S3 Deep Archive Access tier, S3 access pattern analysis, should I use Intelligent-Tiering, IntelligentTieringConfiguration, put-bucket-intelligent-tiering-configuration, S3 small object fee aggregation, S3 storage cost optimization
+  invocation_schema: 'Input: either (a) a bucket configuration (IntelligentTieringConfiguration JSON, Storage Lens metrics summary, optional object-size histogram), OR (b) a bucket name for live-account optimisation. Output: deterministic BUCKET/VERDICT/REASON/RECOMMENDATION/SAVINGS/IMPLEMENTATION block per bucket, where VERDICT is one of OPTIMIZED, OPPORTUNITY_FOUND, ALREADY_OPTIMAL.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: S3, Intelligent-Tiering, storage class, IntelligentTieringConfiguration, Archive Access, Deep Archive Access, monitoring fee, small object fee aggregation, Frequent Access tier, Infrequent Access tier, storage cost optimization, access pattern analysis, put-bucket-intelligent-tiering-configuration, Storage Lens, lifecycle vs Intelligent-Tiering, S3 Batch Operations
+  tags: s3, storage, cost-optimization, intelligent-tiering, access-pattern, finops
 ---
 
 # S3 Intelligent-Tiering Optimizer

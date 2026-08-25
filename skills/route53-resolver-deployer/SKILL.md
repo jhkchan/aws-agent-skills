@@ -1,127 +1,28 @@
 ---
 name: route53-resolver-deployer
-description: >-
-  Provisions Route 53 Resolver endpoints, forwarding rules, DNS Firewall,
-  and query logging with secure networking defaults. Supports inbound
-  endpoints (on-prem DNS to Route 53), outbound endpoints (VPC to
-  on-prem DNS), forwarding rules with VPC associations, Resolver DNS
-  Firewall (managed/custom domain lists, block/alert actions), and query
-  logging to CloudWatch, S3, or Kinesis. Runs pre-checks (subnet AZ
-  diversity, security group port 53 rules, IAM permissions, query log
-  destination policies), emits create-resolver-endpoint, create-resolver
-  -rule, create-firewall-rule, put-resolver-query-log-config CLIs behind
-  a CONFIRM gate, verifies via get-resolver-endpoint. Emits
-  READY_TO_DEPLOY | PREREQUISITES_MISSING. Use when provisioning Resolver
-  endpoints, forwarding rules, DNS Firewall policies, or query logging.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Provisions Route 53 Resolver endpoints, forwarding rules, DNS Firewall, and query logging with secure networking defaults. Supports inbound endpoints (on-prem DNS to Route 53), outbound endpoints (VPC to on-prem DNS), forwarding rules with VPC associations, Resolver DNS Firewall (managed/custom domain lists, block/alert actions), and query logging to CloudWatch, S3, or Kinesis. Runs pre-checks (subnet AZ diversity, security group port 53 rules, IAM permissions, query log destination policies), emits create-resolver-endpoint, create-resolver -rule, create-firewall-rule, put-resolver-query-log-config CLIs behind a CONFIRM gate, verifies via get-resolver-endpoint. Emits READY_TO_DEPLOY | PREREQUISITES_MISSING. Use when provisioning Resolver endpoints, forwarding rules, DNS Firewall policies, or query logging.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws route53resolver create-resolver-endpoint,
-  create-resolver-rule, associate-resolver-rule, create-firewall-domain-list,
-  create-firewall-rule, create-firewall-rule-group-association,
-  put-resolver-query-log-config, associate-resolver-query-log-config,
-  get-resolver-endpoint, list-resolver-rule-associations (AWS CLI v2,
-  SSO or key-based credentials).
-keywords:
-  - Route 53 Resolver
-  - Resolver endpoint
-  - inbound endpoint
-  - outbound endpoint
-  - forwarding rule
-  - conditional forwarding
-  - DNS Firewall
-  - firewall domain list
-  - firewall rule group
-  - managed domain list
-  - custom domain list
-  - query logging
-  - CloudWatch Logs
-  - S3 logging
-  - Kinesis Firehose
-  - DNS
-  - hybrid DNS
-  - on-prem DNS
-  - VPC DNS
-  - route53resolver
-  - rule association
-tags: [route53, resolver, dns, networking, firewall, query-logging, deploy, hybrid-dns, vpc]
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws route53resolver create-resolver-endpoint, create-resolver-rule, associate-resolver-rule, create-firewall-domain-list, create-firewall-rule, create-firewall-rule-group-association, put-resolver-query-log-config, associate-resolver-query-log-config, get-resolver-endpoint, list-resolver-rule-associations (AWS CLI v2, SSO or...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - route53
-    - resolver
-    - dns
-    - networking
-    - firewall
-    - query-logging
-    - deploy
-    - hybrid-dns
-    - vpc
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - Route 53 Resolver
-    - Resolver endpoint
-    - inbound endpoint
-    - outbound endpoint
-    - forwarding rule
-    - DNS Firewall
-    - firewall domain list
-    - query logging
-    - hybrid DNS
-    - on-prem DNS
-  when_to_use: >-
-    Creating a Route 53 Resolver inbound endpoint (on-prem resolvers
-    forwarding to Route 53), outbound endpoint (VPC forwarding to on-prem
-    DNS), conditional forwarding rules with VPC associations, Resolver DNS
-    Firewall policies (managed or custom domain lists), or Resolver query
-    logging to CloudWatch Logs, S3, or Kinesis Data Firehose.
-  activation_triggers:
-    - "create Resolver endpoint"
-    - "provision Resolver inbound endpoint"
-    - "provision Resolver outbound endpoint"
-    - "deploy Route 53 Resolver"
-    - "conditional forwarding rule"
-    - "forwarding rule association"
-    - "DNS Firewall"
-    - "firewall domain list"
-    - "firewall rule group"
-    - "managed domain list"
-    - "custom domain list"
-    - "block DNS domains"
-    - "Resolver query logging"
-    - "DNS query logs CloudWatch"
-    - "DNS query logs S3"
-    - "hybrid DNS setup"
-    - "on-prem DNS forwarding"
-    - "route53resolver create-resolver-endpoint"
-    - "route53resolver create-resolver-rule"
-    - "route53resolver create-firewall-rule"
-  invocation_schema: >-
-    Input: either (a) a Resolver deployment intent (create inbound endpoint,
-    outbound endpoint, forwarding rule, DNS Firewall policy, or query log
-    config) with target VPC, subnets, security groups, IP addresses, and
-    forwarding targets; OR (b) an endpoint/rule ID for live-account update
-    or validation. Output: deterministic RESOLVER/VERDICT/PRE_CHECKS/
-    STEPS/POST_VERIFY block per operation, where VERDICT is one of
-    READY_TO_DEPLOY, PREREQUISITES_MISSING.
+  author: Jacky Chan — AWS Community Builder
+  tags: route53, resolver, dns, networking, firewall, query-logging, deploy, hybrid-dns, vpc
+  dependencies: aws-orchestrator
+  keywords: Route 53 Resolver, Resolver endpoint, inbound endpoint, outbound endpoint, forwarding rule, conditional forwarding, DNS Firewall, firewall domain list, firewall rule group, managed domain list, custom domain list, query logging, CloudWatch Logs, S3 logging, Kinesis Firehose, DNS, hybrid DNS, on-prem DNS, VPC DNS, route53resolver, rule association
+  when_to_use: Creating a Route 53 Resolver inbound endpoint (on-prem resolvers forwarding to Route 53), outbound endpoint (VPC forwarding to on-prem DNS), conditional forwarding rules with VPC associations, Resolver DNS Firewall policies (managed or custom domain lists), or Resolver query logging to CloudWatch Logs, S3, or Kinesis Data Firehose.
+  activation_triggers: create Resolver endpoint, provision Resolver inbound endpoint, provision Resolver outbound endpoint, deploy Route 53 Resolver, conditional forwarding rule, forwarding rule association, DNS Firewall, firewall domain list, firewall rule group, managed domain list, custom domain list, block DNS domains, Resolver query logging, DNS query logs CloudWatch, DNS query logs S3, hybrid DNS setup, on-prem DNS forwarding, route53resolver create-resolver-endpoint, route53resolver create-resolver-rule, route53resolver create-firewall-rule
+  invocation_schema: 'Input: either (a) a Resolver deployment intent (create inbound endpoint, outbound endpoint, forwarding rule, DNS Firewall policy, or query log config) with target VPC, subnets, security groups, IP addresses, and forwarding targets; OR (b) an endpoint/rule ID for live-account update or validation. Output: deterministic RESOLVER/VERDICT/PRE_CHECKS/ STEPS/POST_VERIFY block per operation, where VERDICT is one of READY_TO_DEPLOY, PREREQUISITES_MISSING.'
 ---
 
 # Route 53 Resolver Deployer

@@ -1,104 +1,28 @@
 ---
 name: cloudfront-cache-troubleshooter
-description: >-
-  Diagnoses CloudFront caching issues via a symptom-to-cause decision
-  tree covering cache misses on every request, stale content served,
-  unexpected cache key variation, 403/404 errors from cache, and low
-  cache hit ratio. Walks Cache-Control headers from origin, cache
-  policy configuration (managed vs custom), TTL settings, query
-  string/header/cookie inclusion in cache key, x-edge-result-type and
-  x-cache headers in access logs, Lambda@Edge response modifications,
-  and WAF blocks. Emits a deterministic verdict (ROOT_CAUSE_FOUND |
-  NEED_MORE_INFO | ESCALATE) with the specific cache issue and evidence
-  from CloudFront access logs, cache policy inspection, and curl
-  response headers. Use when content is not cached, stale content is
-  served, hit ratio is low, or CloudFront returns 403/404 unexpectedly.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Diagnoses CloudFront caching issues via a symptom-to-cause decision tree covering cache misses on every request, stale content served, unexpected cache key variation, 403/404 errors from cache, and low cache hit ratio. Walks Cache-Control headers from origin, cache policy configuration (managed vs custom), TTL settings, query string/header/cookie inclusion in cache key, x-edge-result-type and x-cache headers in access logs, Lambda@Edge response modifications, and WAF blocks. Emits a deterministic verdict (ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE) with the specific cache issue and evidence from CloudFront access logs, cache policy inspection, and curl response headers. Use when content is not cached, stale content is served, hit ratio is low, or CloudFront returns 403/404 unexpectedly.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Offline diagnosis works from pasted response headers, access
-  log excerpts, and cache policy JSON. Live-account diagnosis uses aws
-  cloudfront get-distribution-config, get-cache-policy, aws cloudfront
-  get-monitoring-sample, curl -I against the distribution and origin, and
-  CloudFront access logs via aws logs get-log-events (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - CloudFront
-  - caching
-  - cache miss
-  - cache hit ratio
-  - stale content
-  - cache key
-  - cache policy
-  - Cache-Control
-  - max-age
-  - no-cache
-  - no-store
-  - TTL
-  - x-edge-result-type
-  - x-cache
-  - Lambda@Edge
-  - origin shield
-  - managed policy
-  - AllViewerExceptReservedHeader
-  - invalidation
-  - troubleshooting
-tags: [cloudfront, networking, troubleshoot, caching, cdn, cache-policy, ttl, lambda-at-edge]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works from pasted response headers, access log excerpts, and cache policy JSON. Live-account diagnosis uses aws cloudfront get-distribution-config, get-cache-policy, aws cloudfront get-monitoring-sample, curl -I against the distribution and origin, and CloudFront access logs via aws logs get-log-events (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: troubleshoot
   skill_class: capability
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
   lifecycle_status: active
-  when_to_use: >-
-    Diagnosing CloudFront cache misses on every request, stale content
-    being served, unexpected cache key variation (different content per
-    user), 403/404 errors from the cache edge, low cache hit ratio with
-    elevated origin load, or Lambda@Edge / WAF interference with caching;
-    validating whether the root cause is origin headers, cache policy
-    misconfiguration, TTL settings, invalidation gaps, or cache key bloat.
-  when_not_to_use: >-
-    CloudFront distribution configuration posture audits (use
-    cloudfront-distribution-auditor), origin failover / multi-origin
-    setup (use cloudfront-distribution-deployer), TLS certificate issues
-    on the distribution (use acm-certificate-expiry-auditor), or WAF rule
-    authoring (use wafv2-web-acl-auditor). This skill diagnoses caching
-    root cause; it does not audit distribution security posture.
-  activation_triggers:
-    - "CloudFront cache miss every request"
-    - "CloudFront not caching"
-    - "CloudFront stale content"
-    - "CloudFront content not updating"
-    - "CloudFront cache hit ratio low"
-    - "CloudFront origin load high"
-    - "CloudFront 403 from cache"
-    - "CloudFront 404 from edge"
-    - "CloudFront different content per user"
-    - "CloudFront cache key variation"
-    - "CloudFront cache policy misconfigured"
-    - "x-cache Miss from cloudfront"
-    - "x-edge-result-type Miss"
-    - "troubleshoot CloudFront caching"
-  invocation_schema: >-
-    Input: either (a) a symptom description (cache miss pattern, stale
-    content report, hit-ratio drop), optionally paired with cache policy
-    JSON and response headers, OR (b) a distribution ID plus caller
-    context (origin URL, observed x-cache header, access log excerpt) for
-    live-account diagnosis. Output: a deterministic
-    DISTRIBUTION / VERDICT / ROOT_CAUSE / CACHE_ISSUE / EVIDENCE /
-    REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO,
-    ESCALATE} and CACHE_ISSUE ∈ {ORIGIN_NO_CACHE, ORIGIN_NO_STORE,
-    CACHE_POLICY_TOO_NARROW, CACHE_KEY_BLOAT, TTL_TOO_SHORT,
-    STALE_NO_INVALIDATION, ORIGIN_HEADER_OVERRIDE, LAMBDA_EDGE_MUTATION,
-    WAF_BLOCK, COMPRESSION_CACHE_KEY, ORIGIN_ERROR, UNKNOWN}.
+  when_to_use: Diagnosing CloudFront cache misses on every request, stale content being served, unexpected cache key variation (different content per user), 403/404 errors from the cache edge, low cache hit ratio with elevated origin load, or Lambda@Edge / WAF interference with caching; validating whether the root cause is origin headers, cache policy misconfiguration, TTL settings, invalidation gaps, or cache key bloat.
+  when_not_to_use: CloudFront distribution configuration posture audits (use cloudfront-distribution-auditor), origin failover / multi-origin setup (use cloudfront-distribution-deployer), TLS certificate issues on the distribution (use acm-certificate-expiry-auditor), or WAF rule authoring (use wafv2-web-acl-auditor). This skill diagnoses caching root cause; it does not audit distribution security posture.
+  activation_triggers: CloudFront cache miss every request, CloudFront not caching, CloudFront stale content, CloudFront content not updating, CloudFront cache hit ratio low, CloudFront origin load high, CloudFront 403 from cache, CloudFront 404 from edge, CloudFront different content per user, CloudFront cache key variation, CloudFront cache policy misconfigured, x-cache Miss from cloudfront, x-edge-result-type Miss, troubleshoot CloudFront caching
+  invocation_schema: 'Input: either (a) a symptom description (cache miss pattern, stale content report, hit-ratio drop), optionally paired with cache policy JSON and response headers, OR (b) a distribution ID plus caller context (origin URL, observed x-cache header, access log excerpt) for live-account diagnosis. Output: a deterministic DISTRIBUTION / VERDICT / ROOT_CAUSE / CACHE_ISSUE / EVIDENCE / REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and CACHE_ISSUE ∈ {ORIGIN_NO_CACHE, ORIGIN_NO_STORE, CACHE_POLICY_TOO_NARROW, CACHE_KEY_BLOAT, TTL_TOO_SHORT, STALE_NO_INVALIDATION, ORIGIN_HEADER_OVERRIDE, LAMBDA_EDGE_MUTATION, WAF_BLOCK, COMPRESSION_CACHE_KEY, ORIGIN_ERROR, UNKNOWN}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudFront, caching, cache miss, cache hit ratio, stale content, cache key, cache policy, Cache-Control, max-age, no-cache, no-store, TTL, x-edge-result-type, x-cache, Lambda@Edge, origin shield, managed policy, AllViewerExceptReservedHeader, invalidation, troubleshooting
+  tags: cloudfront, networking, troubleshoot, caching, cdn, cache-policy, ttl, lambda-at-edge
 ---
 
 # CloudFront Cache Troubleshooter

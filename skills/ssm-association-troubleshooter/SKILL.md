@@ -1,117 +1,27 @@
 ---
 name: ssm-association-troubleshooter
-description: >-
-  Diagnoses AWS Systems Manager (SSM) association failures via a
-  systematic 5-symptom decision tree: association status Failed,
-  TimedOut, instance not appearing in SSM (not managed),
-  association never runs (wrong schedule or targets), and document
-  execution fails mid-run. Maps each symptom to root cause via
-  diagnostic commands (describe-instance-information,
-  list-associations, describe-association-executions,
-  describe-association-execution-targets, SSM agent logs), common
-  causes (invalid parameters, document not found, S3 bucket access
-  denied, SSM agent unreachable, instance offline, network
-  connectivity, IAM role missing AmazonSSMManagedInstanceCore,
-  cron expression wrong, tag mismatch, association enabled=False,
-  rate limiting, script error, platform unsupported), and
-  specific fixes. Emits ROOT_CAUSE_FOUND with a fix plan,
-  NEED_MORE_INFO with the next diagnostic, or ESCALATE with the
-  escalation path. Use when an SSM association is failing,
-  timing out, not running, or producing errors.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses AWS Systems Manager (SSM) association failures via a systematic 5-symptom decision tree: association status Failed, TimedOut, instance not appearing in SSM (not managed), association never runs (wrong schedule or targets), and document execution fails mid-run. Maps each symptom to root cause via diagnostic commands (describe-instance-information, list-associations, describe-association-executions, describe-association-execution-targets, SSM agent logs), common causes (invalid parameters, document not found, S3 bucket access denied, SSM agent unreachable, instance offline, network connectivity, IAM role missing AmazonSSMManagedInstanceCore, cron expression wrong, tag mismatch, association enabled=False, rate limiting, script error, platform unsupported), and specific fixes. Emits ROOT_CAUSE_FOUND with a fix plan, NEED_MORE_INFO with the next diagnostic, or ESCALATE with the escalation path. Use when an SSM association is failing, timing out, not running, or producing errors.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline diagnosis. Live-
-  account troubleshooting uses aws ssm describe-instance-information,
-  list-associations, describe-association, describe-association-
-  executions, describe-association-execution-targets, list-association-
-  versions, describe-instance-associations-status, describe-document,
-  describe-activations, list-command-invocations, aws ec2 describe-
-  instances, describe-instance-profile, and IAM/CloudTrail queries
-  (AWS CLI v2, SSO or key-based credentials). SSM agent logs at
-  /var/log/amazon/ssm/amazon-ssm-agent.log on the host.
-keywords:
-  - Systems Manager
-  - SSM
-  - SSM Association
-  - association failed
-  - association TimedOut
-  - association never runs
-  - SSM Agent
-  - PingStatus
-  - ConnectionLost
-  - Inactive
-  - AmazonSSMManagedInstanceCore
-  - association execution
-  - document execution
-  - SSM Document
-  - patch baseline
-  - hybrid activation
-  - SSM VPC endpoints
-  - ssmmesages
-  - ec2messages
-  - cron expression
-  - association targets
-  - instance profile
-  - S3 output bucket
-  - rate limiting
-tags: [ssm, systems-manager, management, troubleshoot, association, agent, diagnostic]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline diagnosis. Live- account troubleshooting uses aws ssm describe-instance-information, list-associations, describe-association, describe-association- executions, describe-association-execution-targets, list-association- versions, describe-instance-associations-status, describe-document, describe-activations, list-command-invocations, aws ec2 describe- instances...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
-  when_to_use: >-
-    Diagnosing an SSM association that is failing, timing out,
-    never running, or producing errors mid-execution. Covers the
-    five primary symptom categories: association status Failed,
-    TimedOut, instance not appearing in SSM (unmanaged),
-    association never runs (schedule/target mismatch), document
-    execution fails (script/permission/platform). Use when an
-    association shows red in the console, an instance is missing
-    from SSM, a patch or inventory run failed, or a custom
-    document run produced errors.
-  activation_triggers:
-    - "SSM association failed"
-    - "association TimedOut"
-    - "association never runs"
-    - "association not running"
-    - "instance not in SSM"
-    - "instance not managed"
-    - "SSM agent unreachable"
-    - "SSM ConnectionLost"
-    - "association execution failed"
-    - "document execution fails"
-    - "patch association failed"
-    - "inventory association failed"
-    - "association wrong schedule"
-    - "association targets wrong"
-    - "association enabled false"
-    - "SSM rate limiting"
-    - "IAM role missing SSM"
-    - "AmazonSSMManagedInstanceCore"
-    - "hybrid activation"
-    - "SSM VPC endpoints"
-  invocation_schema: >-
-    Input: either (a) an association-id or association name with
-    observed symptom (Failed / TimedOut / never-runs / document-
-    error / instance-missing), optionally with execution-id, OR
-    (b) live-account diagnostic output from describe-instance-
-    information, describe-association-executions, etc. Output:
-    deterministic DIAGNOSIS block per association — SYMPTOM/
-    ROOT_CAUSE/EVIDENCE/FIX/VERDICT — where VERDICT is
-    ROOT_CAUSE_FOUND (cause identified + fix actionable),
-    NEED_MORE_INFO (specific next diagnostic cited), or ESCALATE
-    (requires AWS Support or out-of-band action).
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+  when_to_use: 'Diagnosing an SSM association that is failing, timing out, never running, or producing errors mid-execution. Covers the five primary symptom categories: association status Failed, TimedOut, instance not appearing in SSM (unmanaged), association never runs (schedule/target mismatch), document execution fails (script/permission/platform). Use when an association shows red in the console, an instance is missing from SSM, a patch or inventory run failed, or a custom document run produced errors.'
+  activation_triggers: SSM association failed, association TimedOut, association never runs, association not running, instance not in SSM, instance not managed, SSM agent unreachable, SSM ConnectionLost, association execution failed, document execution fails, patch association failed, inventory association failed, association wrong schedule, association targets wrong, association enabled false, SSM rate limiting, IAM role missing SSM, AmazonSSMManagedInstanceCore, hybrid activation, SSM VPC endpoints
+  invocation_schema: 'Input: either (a) an association-id or association name with observed symptom (Failed / TimedOut / never-runs / document- error / instance-missing), optionally with execution-id, OR (b) live-account diagnostic output from describe-instance- information, describe-association-executions, etc. Output: deterministic DIAGNOSIS block per association — SYMPTOM/ ROOT_CAUSE/EVIDENCE/FIX/VERDICT — where VERDICT is ROOT_CAUSE_FOUND (cause identified + fix actionable), NEED_MORE_INFO (specific next diagnostic cited), or ESCALATE (requires AWS Support or out-of-band action).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Systems Manager, SSM, SSM Association, association failed, association TimedOut, association never runs, SSM Agent, PingStatus, ConnectionLost, Inactive, AmazonSSMManagedInstanceCore, association execution, document execution, SSM Document, patch baseline, hybrid activation, SSM VPC endpoints, ssmmesages, ec2messages, cron expression, association targets, instance profile, S3 output bucket, rate limiting
+  tags: ssm, systems-manager, management, troubleshoot, association, agent, diagnostic
 ---
 
 # SSM Association Troubleshooter

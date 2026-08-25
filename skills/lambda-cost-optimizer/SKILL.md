@@ -1,91 +1,29 @@
 ---
 name: lambda-cost-optimizer
-description: 'Optimises AWS Lambda function cost across six dimensions: memory tuning (CPU scales with memory at 1769 MB = 1 vCPU; more memory can REDUCE total cost when faster execution offsets the higher
-  per-GB-second rate), provisioned concurrency right-sizing (on-demand vs provisioned break-even math), duration reduction (SnapStart for Java, lazy init, connection reuse, package trim), invocation-frequency
-  analysis (SQS/Kinesis/DynamoDB Streams batch size and batch window tuning), architecture migration (ARM64 Graviton2 is 20% cheaper; Fargate for >15-min workloads; Step Functions for orchestration chains),
-  and Lambda Layers. Uses AWS Lambda Power Tuning (open-source Step Functions) to empirically find the cost-optimal memory, reads Compute Optimizer Lambda findings, and projects monthly savings. Emits OPPORTUNITY_FOUND
-  with specific recommendation and estimated savings, OPTIMIZED, or ALREADY_OPTIMAL. Use when reviewing Lambda spend, planning a memory tuning sweep, sizing provisioned concurrency, or a FinOps review.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Optimises AWS Lambda function cost across six dimensions: memory tuning (CPU scales with memory at 1769 MB = 1 vCPU; more memory can REDUCE total cost when faster execution offsets the higher per-GB-second rate), provisioned concurrency right-sizing (on-demand vs provisioned break-even math), duration reduction (SnapStart for Java, lazy init, connection reuse, package trim), invocation-frequency analysis (SQS/Kinesis/DynamoDB Streams batch size and batch window tuning), architecture migration (ARM64 Graviton2 is 20% cheaper; Fargate for >15-min workloads; Step Functions for orchestration chains), and Lambda Layers. Uses AWS Lambda Power Tuning (open-source Step Functions) to empirically find the cost-optimal memory, reads Compute Optimizer Lambda findings, and projects monthly savings. Emits OPPORTUNITY_FOUND with specific recommendation and estimated savings, OPTIMIZED, or ALREADY_OPTIMAL. Use when reviewing Lambda spend, planning a memory tuning sweep, sizing provisioned concurrency, or a FinOps review.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted CloudWatch metrics and Compute Optimizer findings.
-  Live-account optimization uses aws lambda list-functions, aws lambda get-function-configuration, aws cloudwatch get-metric-statistics (Duration, Invocations, Errors, Throttles, ConcurrentExecutions),
-  aws lambda get-event-source-mapping, aws lambda list-provisioned-concurrency-configs, aws compute-optimizer get-lambda-function-recommendations, and aws ce get-cost-and-usage (AWS CLI v2, SSO or key-based
-  credentials). Pricing references us-east-1 published rates as of 2026; re-state regional rates from the reference matrix for other regions.
-keywords:
-- Lambda
-- memory configuration
-- cost optimization
-- Power Tuning
-- provisioned concurrency
-- on-demand
-- duration
-- cold start
-- SnapStart
-- invocation frequency
-- batch size
-- batch window
-- event source mapping
-- SQS
-- DynamoDB Streams
-- Kinesis
-- Lambda Layers
-- ARM64
-- Graviton2
-- Fargate migration
-- Step Functions
-- FinOps
-- Compute Optimizer
-- serverless
-tags:
-- lambda
-- compute
-- serverless
-- cost-optimization
-- finops
-- memory-tuning
-- power-tuning
-- graviton
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted CloudWatch metrics and Compute Optimizer findings. Live-account optimization uses aws lambda list-functions, aws lambda get-function-configuration, aws cloudwatch get-metric-statistics (Duration, Invocations, Errors, Throttles, ConcurrentExecutions), aws lambda get-event-source-mapping, aws lambda list-provisioned-concurrency-configs, aws compute-optimizer...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
   verdict_shape: OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL
-  when_to_use: Optimising Lambda function cost, triaging Compute Optimizer Lambda findings, planning a memory tuning sweep (Power Tuning), sizing provisioned concurrency vs on-demand, reducing function
-    duration, tuning SQS/DynamoDB/Kinesis event source mapping batch size, evaluating ARM64 (Graviton2) migration, or migrating long-running Lambda workloads to Fargate or Step Functions.
-  when_not_to_use: EC2 instance rightsizing (use ec2-rightsizing-optimizer), EBS volume cost (use ebs-volume-optimizer), S3 storage cost (use s3-lifecycle-optimizer), or Lambda troubleshooting (invocation
-    errors, timeouts, configuration bugs — use the Lambda troubleshooter). This skill focuses on cost-driven optimization decisions, not functional debugging of broken functions.
-  activation_triggers:
-  - optimise Lambda cost
-  - Lambda memory tuning
-  - Lambda Power Tuning
-  - Lambda Compute Optimizer recommendations
-  - Lambda provisioned concurrency
-  - Lambda duration optimization
-  - Lambda cold start
-  - Lambda SnapStart Java
-  - Lambda batch size SQS
-  - Lambda ARM64 Graviton2
-  - Lambda Layers shared code
-  - Lambda invocation frequency
-  - Lambda FinOps savings
-  - Lambda to Fargate migration
-  - Lambda monthly savings estimate
-  - reduce Lambda bill
-  - serverless cost review
-  invocation_schema: 'Input: either (a) a function identifier + live-account context, (b) a Compute Optimizer Lambda finding document, OR (c) CloudWatch Lambda Insights metrics (Duration, Invocations, Memory
-    utilization, ConcurrentExecutions, Errors) with at least 14 days of observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ ESTIMATED_SAVINGS/MIGRATION_STEPS block per function, where
-    VERDICT is one of OPTIMIZED, OPPORTUNITY_FOUND, ALREADY_OPTIMAL.'
-  invocation_example: "# Minimal valid input (offline finding classification):\nFunctionName: order-processor-prod\nRuntime: nodejs20.x\nMemorySize: 128 MB\nArchitecture: x86_64\nRegion: us-east-1\nPricing:\
-    \ on-demand (no provisioned concurrency)\nMetrics (last 30 days):\n  - Duration avg: 5200 ms, p95: 6100 ms\n  - Invocations: 50,000,000/month\n  - Errors: 12,000 (0.024%)\n  - Memory utilization: avg\
-    \ 38 MB (30% of 128 MB)\nCompute Optimizer finding: Overprovisioned (memory)\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  when_to_use: Optimising Lambda function cost, triaging Compute Optimizer Lambda findings, planning a memory tuning sweep (Power Tuning), sizing provisioned concurrency vs on-demand, reducing function duration, tuning SQS/DynamoDB/Kinesis event source mapping batch size, evaluating ARM64 (Graviton2) migration, or migrating long-running Lambda workloads to Fargate or Step Functions.
+  when_not_to_use: EC2 instance rightsizing (use ec2-rightsizing-optimizer), EBS volume cost (use ebs-volume-optimizer), S3 storage cost (use s3-lifecycle-optimizer), or Lambda troubleshooting (invocation errors, timeouts, configuration bugs — use the Lambda troubleshooter). This skill focuses on cost-driven optimization decisions, not functional debugging of broken functions.
+  activation_triggers: optimise Lambda cost, Lambda memory tuning, Lambda Power Tuning, Lambda Compute Optimizer recommendations, Lambda provisioned concurrency, Lambda duration optimization, Lambda cold start, Lambda SnapStart Java, Lambda batch size SQS, Lambda ARM64 Graviton2, Lambda Layers shared code, Lambda invocation frequency, Lambda FinOps savings, Lambda to Fargate migration, Lambda monthly savings estimate, reduce Lambda bill, serverless cost review
+  invocation_schema: 'Input: either (a) a function identifier + live-account context, (b) a Compute Optimizer Lambda finding document, OR (c) CloudWatch Lambda Insights metrics (Duration, Invocations, Memory utilization, ConcurrentExecutions, Errors) with at least 14 days of observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ ESTIMATED_SAVINGS/MIGRATION_STEPS block per function, where VERDICT is one of OPTIMIZED, OPPORTUNITY_FOUND, ALREADY_OPTIMAL.'
+  invocation_example: "# Minimal valid input (offline finding classification):\nFunctionName: order-processor-prod\nRuntime: nodejs20.x\nMemorySize: 128 MB\nArchitecture: x86_64\nRegion: us-east-1\nPricing: on-demand (no provisioned concurrency)\nMetrics (last 30 days):\n  - Duration avg: 5200 ms, p95: 6100 ms\n  - Invocations: 50,000,000/month\n  - Errors: 12,000 (0.024%)\n  - Memory utilization: avg 38 MB (30% of 128 MB)\nCompute Optimizer finding: Overprovisioned (memory)\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Lambda, memory configuration, cost optimization, Power Tuning, provisioned concurrency, on-demand, duration, cold start, SnapStart, invocation frequency, batch size, batch window, event source mapping, SQS, DynamoDB Streams, Kinesis, Lambda Layers, ARM64, Graviton2, Fargate migration, Step Functions, FinOps, Compute Optimizer, serverless
+  tags: lambda, compute, serverless, cost-optimization, finops, memory-tuning, power-tuning, graviton
 ---
 
 # Lambda Cost Optimizer

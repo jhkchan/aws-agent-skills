@@ -1,7 +1,7 @@
 # Baseline (no-skill) response: syntax-error-command-ordering
 
 This file captures what a generic assistant produces WITHOUT the
-cloudwatch-logs-insights-troubshooter skill loaded.
+cloudwatch-logs-insights-troubleshooter skill loaded.
 
 ---
 

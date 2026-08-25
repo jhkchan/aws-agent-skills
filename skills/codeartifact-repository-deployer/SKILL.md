@@ -1,48 +1,15 @@
 ---
 name: codeartifact-repository-deployer
 description: 'Provisions AWS CodeArtifact repositories: domain creation, repository creation across package formats (npm, pip, maven, nuget, cargo, rubygems, generic, swift), upstream repositories (public: npmjs, pypi, maven-central, nuget-org), external connections, package ingestion via copy-package, cross-account domain sharing via RAM, repository IAM policies (read/write/consume), codeartifact login CLI for npm/pip/maven, package versions, and lifecycle policies. Emits a READY_TO_DEPLOY checklist with every prerequisite verified. Use when creating a CodeArtifact domain or repository, configuring upstreams, sharing a domain across accounts, or wiring a package build to CodeArtifact. Triggers: codeartifact domain, codeartifact repository, npm pip maven nuget cargo rubygems swift repository, codeartifact upstream, codeartifact external connection, codeartifact login, codeartifact copy-package, codeartifact domain sharing, RAM codeartifact, codeartifact IAM policy.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
 compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with codeartifact, ram, iam, sts, and resourcegroupstaggingapi access. Works with Terraform aws_codeartifact_domain / aws_codeartifact_repository / aws_codeartifact_domain_permissions_policy resources, CloudFormation AWS::CodeArtifact::Domain / AWS::CodeArtifact::Repository, and the CodeArtifact login CLI for npm / pip / maven.'
-keywords:
-- aws
-- codeartifact
-- devtools
-- cloudops
-- deploy
-- provisioning
-- package-repository
-- npm
-- pip
-- maven
-- nuget
-- cargo
-- rubygems
-- swift
-- upstream
-- external-connection
-- domain-sharing
-- ram
-tags:
-- aws
-- codeartifact
-- devtools
-- cloudops
-- deploy
-- package-repository
-- npm
-- pip
-- maven
-dependencies:
-- aws-orchestrator
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
   task_type: deploy
   skill_class: capability
@@ -50,35 +17,9 @@ metadata:
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-  - aws
-  - codeartifact
-  - devtools
-  - cloudops
-  - deploy
-  - package-repository
-  - npm
-  - maven
-  dependencies:
-  - aws-orchestrator
-  keywords:
-  - codeartifact domain
-  - codeartifact repository
-  - npm codeartifact
-  - pip codeartifact
-  - maven codeartifact
-  - nuget codeartifact
-  - cargo codeartifact
-  - rubygems codeartifact
-  - swift codeartifact
-  - codeartifact upstream
-  - codeartifact external connection
-  - codeartifact login
-  - codeartifact copy-package
-  - codeartifact domain sharing
-  - ram codeartifact
-  - codeartifact iam policy
-  - cross-account codeartifact
+  tags: aws, codeartifact, devtools, cloudops, deploy, package-repository, npm, pip, maven
+  dependencies: aws-orchestrator
+  keywords: aws, codeartifact, devtools, cloudops, deploy, provisioning, package-repository, npm, pip, maven, nuget, cargo, rubygems, swift, upstream, external-connection, domain-sharing, ram
   when_to_use: Invoke when the user wants to create a CodeArtifact domain or repository, configure upstream repositories (npmjs, pypi, maven-central, nuget-org), share a domain across AWS accounts via RAM, set repository permissions (read/write/consume), wire a CI build to CodeArtifact via the login CLI, or ingest packages from upstream. Do NOT invoke for plain S3-backed package storage, GitHub Packages (separate service), or for general artifact management outside CodeArtifact.
 ---
 

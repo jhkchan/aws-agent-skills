@@ -1,71 +1,15 @@
 ---
 name: route53-dns-troubleshooter
-description: >-
-  Diagnoses Amazon Route 53 DNS resolution failures through a twelve-category
-  diagnostic tree: NS delegation errors (glue records, NS mismatch between
-  registrar and hosted zone), SOA serial mismatch, DNSSEC signing errors
-  (KSK/ZSK key status, DS record at parent zone), alias record vs CNAME
-  conflict, routing policy evaluation errors (geolocation, latency,
-  weighted, failover), private hosted zone VPC association missing,
-  split-horizon DNS conflicts, Route 53 Resolver inbound/outbound endpoint
-  misconfiguration, health check associated with record but failing,
-  DNS query logging analysis, domain transfer DNS disruption, and wildcard
-  certificate validation CNAME (_acme-challenge) conflicts. Walks symptoms
-  to a verified root cause with evidence-backed probes; emits
-  ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses Amazon Route 53 DNS resolution failures through a twelve-category diagnostic tree: NS delegation errors (glue records, NS mismatch between registrar and hosted zone), SOA serial mismatch, DNSSEC signing errors (KSK/ZSK key status, DS record at parent zone), alias record vs CNAME conflict, routing policy evaluation errors (geolocation, latency, weighted, failover), private hosted zone VPC association missing, split-horizon DNS conflicts, Route 53 Resolver inbound/outbound endpoint misconfiguration, health check associated with record but failing, DNS query logging analysis, domain transfer DNS disruption, and wildcard certificate validation CNAME (_acme-challenge) conflicts. Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and hosted zone configuration. Live-account diagnosis uses aws route53 list-hosted-zones / get-hosted-zone / list-resource-record-sets / get-health-check / get-dnssec, aws route53resolver list-resolver-endpoints / list-resolver-rule-associations, aws ec2 describe-vpcs / describe-dhcp-options, aws logs filter-log-events (CloudWatch Logs for Route 53 query logging), dig / nslookup / delv for live DNS resolution, and aws cloudtrail lookup-events (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- Route 53
-- DNS
-- hosted zone
-- NS delegation
-- glue records
-- SOA serial
-- DNSSEC
-- KSK
-- ZSK
-- DS record
-- alias record
-- CNAME
-- routing policy
-- geolocation
-- latency
-- weighted
-- failover
-- private hosted zone
-- VPC association
-- split-horizon DNS
-- Route 53 Resolver
-- inbound endpoint
-- outbound endpoint
-- health check
-- DNS query logging
-- domain transfer
-- wildcard certificate
-- _acme-challenge
-- TTL
-- DNS cache
-- troubleshooting
-tags:
-- route53
-- networking
-- troubleshooting
-- dns
-- dnssec
-- hosted-zone
-- health-check
-- resolver
-- private-hosted-zone
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and hosted zone configuration. Live-account diagnosis uses aws route53 list-hosted-zones / get-hosted-zone / list-resource-record-sets / get-health-check / get-dnssec, aws route53resolver list-resolver-endpoints / list-resolver-rule-associations, aws ec2 describe-vpcs / describe-dhcp-options, aws logs filter-log-events (CloudWatch Logs for Route 53...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: troubleshoot
   skill_class: capability
@@ -73,36 +17,33 @@ metadata:
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
   when_to_use: Diagnosing a Route 53 DNS resolution failure (NS delegation broken, DNSSEC signing error, alias vs CNAME conflict, routing policy not resolving as expected, private hosted zone not resolving in VPC, health check failing causing failover, Resolver endpoint misconfiguration, split-horizon DNS conflict, domain transfer disruption, wildcard certificate validation CNAME conflict), walking a symptom to the failed layer with verify and fix commands, validating why a domain does not resolve, or triaging a "DNS is broken" page where the root cause may be delegation, DNSSEC, record config, VPC association, health check, or Resolver — not necessarily the application or the web server.
   when_not_to_use: Application-level HTTP errors once DNS resolves correctly (use the application logs and alb-unhealthy-target-troubleshooter), CDN/CloudFront cache behaviour (use the CloudFront distribution logs), TLS handshake errors after DNS resolves (use acm-certificate-expiry-auditor), or VPC subnet routing / NACL posture audits (use ec2-security-group-auditor). This skill diagnoses DNS resolution-time failures; it does not audit steady-state network posture or tune application delivery.
-  activation_triggers:
-  - Route 53 DNS resolution failed
-  - DNS does not resolve
-  - Route 53 NS delegation
-  - Route 53 glue records
-  - Route 53 NS mismatch
-  - Route 53 DNSSEC
-  - Route 53 KSK
-  - Route 53 ZSK
-  - Route 53 DS record
-  - Route 53 alias record CNAME conflict
-  - Route 53 routing policy
-  - Route 53 geolocation routing
-  - Route 53 latency routing
-  - Route 53 weighted routing
-  - Route 53 failover routing
-  - Route 53 private hosted zone
-  - Route 53 VPC association
-  - Route 53 split-horizon DNS
-  - Route 53 Resolver endpoint
-  - Route 53 health check failing
-  - Route 53 DNS query logging
-  - Route 53 domain transfer
-  - Route 53 wildcard certificate
-  - _acme-challenge CNAME
-  - troubleshoot Route 53 DNS
-  - DNS NXDOMAIN
-  - DNS SERVFAIL
+  activation_triggers: Route 53 DNS resolution failed, DNS does not resolve, Route 53 NS delegation, Route 53 glue records, Route 53 NS mismatch, Route 53 DNSSEC, Route 53 KSK, Route 53 ZSK, Route 53 DS record, Route 53 alias record CNAME conflict, Route 53 routing policy, Route 53 geolocation routing, Route 53 latency routing, Route 53 weighted routing, Route 53 failover routing, Route 53 private hosted zone, Route 53 VPC association, Route 53 split-horizon DNS, Route 53 Resolver endpoint, Route 53 health check failing, Route 53 DNS query logging, Route 53 domain transfer, Route 53 wildcard certificate, _acme-challenge CNAME, troubleshoot Route 53 DNS, DNS NXDOMAIN, DNS SERVFAIL
   invocation_schema: 'Input: either (a) a symptom description (error message, observed behaviour, "domain does not resolve", "DNS returns wrong IP"), optionally paired with the hosted zone configuration and dig output, OR (b) a HostedZoneId / domain name plus resolver context (VPC, resolver endpoint, client region) for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {NS_DELEGATION, GLUE_RECORD, SOA_SERIAL, DNSSEC_KSK, DNSSEC_ZSK, DNSSEC_DS, ALIAS_CNAME_CONFLICT, ROUTING_POLICY, ROUTING_GEOLOCATION, ROUTING_LATENCY, ROUTING_WEIGHTED, ROUTING_FAILOVER, PHZ_VPC_ASSOCIATION, SPLIT_HORIZON, RESOLVER_INBOUND, RESOLVER_OUTBOUND, HEALTH_CHECK, DNS_CACHE_TTL, DOMAIN_TRANSFER, WILDCARD_CERT, UNKNOWN}.'
-  invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"The domain api.example.com resolves to the old\nIP 203.0.113.10 instead of the new ALB DNS name. The new ALIAS\nrecord was added to the hosted zone but dig still returns the\nold IP after 2 hours.\"\nHostedZoneId: Z2 ABCDEFGHIJ\nDomain: api.example.com\nRecord type: A (ALIAS to ALB)\nTTL: 300\nExpected: resolves to dualstack.alb-xxx.us-east-1.elb.amazonaws.com\nActual: resolves to 203.0.113.10 (stale)"
+  invocation_example: '# Minimal valid input (offline symptom classification):
+
+    Symptom: "The domain api.example.com resolves to the old
+
+    IP 203.0.113.10 instead of the new ALB DNS name. The new ALIAS
+
+    record was added to the hosted zone but dig still returns the
+
+    old IP after 2 hours."
+
+    HostedZoneId: Z2 ABCDEFGHIJ
+
+    Domain: api.example.com
+
+    Record type: A (ALIAS to ALB)
+
+    TTL: 300
+
+    Expected: resolves to dualstack.alb-xxx.us-east-1.elb.amazonaws.com
+
+    Actual: resolves to 203.0.113.10 (stale)'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Route 53, DNS, hosted zone, NS delegation, glue records, SOA serial, DNSSEC, KSK, ZSK, DS record, alias record, CNAME, routing policy, geolocation, latency, weighted, failover, private hosted zone, VPC association, split-horizon DNS, Route 53 Resolver, inbound endpoint, outbound endpoint, health check, DNS query logging, domain transfer, wildcard certificate, _acme-challenge, TTL, DNS cache, troubleshooting
+  tags: route53, networking, troubleshooting, dns, dnssec, hosted-zone, health-check, resolver, private-hosted-zone
 ---
 
 # Route 53 DNS Troubleshooter

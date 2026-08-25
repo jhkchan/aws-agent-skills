@@ -108,7 +108,11 @@ def test_skill_has_minimal_format(skill_dir: Path) -> None:
     match = FRONTMATTER_RE.match(body)
     assert match is not None, f"SKILL.md for {skill_dir.name} missing YAML frontmatter"
     frontmatter = match.group("yaml")
-    for field in ("name", "description", "version"):
+    for field in ("name", "description"):
         assert re.search(rf"^{field}\s*:", frontmatter, re.MULTILINE), (
             f"SKILL.md for {skill_dir.name} missing frontmatter field: {field}"
         )
+    # version lives under metadata (agentskills.io spec: only string values in metadata)
+    assert re.search(r"^metadata\s*:", frontmatter, re.MULTILINE) and re.search(
+        r"^\s+version\s*:", frontmatter, re.MULTILINE
+    ), f"SKILL.md for {skill_dir.name} missing metadata.version"

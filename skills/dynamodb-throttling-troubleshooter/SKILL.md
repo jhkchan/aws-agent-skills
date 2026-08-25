@@ -1,100 +1,28 @@
 ---
 name: dynamodb-throttling-troubleshooter
-description: >-
-  Diagnoses DynamoDB ProvisionedThroughputExceededException and throttle
-  events via a symptom-to-cause decision tree covering read throttling,
-  write throttling, GSI hot-key throttling, burst capacity exhaustion,
-  and adaptive capacity lag. Walks CloudWatch consumed vs provisioned
-  capacity units, per-GSI metrics, partition key distribution, scan vs
-  query patterns, and BatchGetItem/BatchWriteItem limits. Emits a
-  deterministic verdict (ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE)
-  with the specific throttle type and evidence from
-  ConsumedReadCapacityUnits, ConsumedWriteCapacityUnits,
-  ThrottledRequests, and ReturnConsumedCapacity. Use when DynamoDB
-  returns throttle errors, CloudWatch shows ThrottledRequests > 0,
-  or an application sees intermittent ProvisionedThroughputExceededException.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Diagnoses DynamoDB ProvisionedThroughputExceededException and throttle events via a symptom-to-cause decision tree covering read throttling, write throttling, GSI hot-key throttling, burst capacity exhaustion, and adaptive capacity lag. Walks CloudWatch consumed vs provisioned capacity units, per-GSI metrics, partition key distribution, scan vs query patterns, and BatchGetItem/BatchWriteItem limits. Emits a deterministic verdict (ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE) with the specific throttle type and evidence from ConsumedReadCapacityUnits, ConsumedWriteCapacityUnits, ThrottledRequests, and ReturnConsumedCapacity. Use when DynamoDB returns throttle errors, CloudWatch shows ThrottledRequests > 0, or an application sees intermittent ProvisionedThroughputExceededException.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Offline diagnosis works from pasted CloudWatch metrics, error
-  strings, and table/GSI metadata. Live-account diagnosis uses aws dynamodb
-  describe-table, aws cloudwatch get-metric-statistics, aws dynamodb scan
-  (with --select), and ReturnConsumedCapacity on API responses (AWS CLI v2,
-  SSO or key-based credentials).
-keywords:
-  - DynamoDB
-  - throttling
-  - ProvisionedThroughputExceededException
-  - ThrottledRequests
-  - ConsumedReadCapacityUnits
-  - ConsumedWriteCapacityUnits
-  - hot partition
-  - GSI hot key
-  - burst capacity
-  - adaptive capacity
-  - partition key
-  - scan
-  - query
-  - on-demand
-  - provisioned capacity
-  - RCU
-  - WCU
-  - BatchGetItem
-  - BatchWriteItem
-  - troubleshooting
-tags: [dynamodb, databases, troubleshoot, throttling, capacity, hot-partition, gsi]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works from pasted CloudWatch metrics, error strings, and table/GSI metadata. Live-account diagnosis uses aws dynamodb describe-table, aws cloudwatch get-metric-statistics, aws dynamodb scan (with --select), and ReturnConsumedCapacity on API responses (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: troubleshoot
   skill_class: capability
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
   lifecycle_status: active
-  when_to_use: >-
-    Diagnosing a DynamoDB ProvisionedThroughputExceededException, elevated
-    ThrottledRequests in CloudWatch, intermittent throttle errors under
-    spiky traffic, GSI-related table-wide throttling, or post-scale-up
-    throttling from adaptive capacity lag; validating whether the root
-    cause is hot partition, GSI hot key, insufficient provisioned capacity,
-    burst exhaustion, scan misuse, or batch operation limits.
-  when_not_to_use: >-
-    DynamoDB table configuration posture audits (use dynamodb-table-auditor),
-    IAM policy authoring for fine-grained access control (use
-    iam-least-privilege-advisor), KMS key access for encrypted tables (use
-    kms-key-policy-auditor), or DynamoDB Streams/Kinesis consumer lag
-    diagnosis. This skill diagnoses throttling root cause; it does not audit
-    table configuration posture.
-  activation_triggers:
-    - "DynamoDB ProvisionedThroughputExceededException"
-    - "DynamoDB throttling"
-    - "DynamoDB ThrottledRequests"
-    - "DynamoDB hot partition"
-    - "DynamoDB GSI throttling"
-    - "DynamoDB burst capacity exhausted"
-    - "DynamoDB request rate too high"
-    - "DynamoDB write throttled"
-    - "DynamoDB read throttled"
-    - "DynamoDB intermittent throttling"
-    - "DynamoDB adaptive capacity"
-    - "troubleshoot DynamoDB throttling"
-  invocation_schema: >-
-    Input: either (a) a symptom description (the throttle error string, the
-    table name, observed CloudWatch metric pattern), optionally paired with
-    describe-table output, OR (b) a table name plus caller context (access
-    pattern, partition key distribution, recent traffic change) for
-    live-account diagnosis. Output: a deterministic
-    TABLE / VERDICT / ROOT_CAUSE / THROTTLE_TYPE / EVIDENCE / REMEDIATION
-    block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and
-    THROTTLE_TYPE ∈ {HOT_PARTITION, GSI_HOT_KEY, READ_CAPACITY_LOW,
-    WRITE_CAPACITY_LOW, BURST_EXHAUSTED, ADAPTIVE_LAG, SCAN_MISUSE,
-    BATCH_LIMIT, ON_DEMAND_BREACH, UNKNOWN}.
+  when_to_use: Diagnosing a DynamoDB ProvisionedThroughputExceededException, elevated ThrottledRequests in CloudWatch, intermittent throttle errors under spiky traffic, GSI-related table-wide throttling, or post-scale-up throttling from adaptive capacity lag; validating whether the root cause is hot partition, GSI hot key, insufficient provisioned capacity, burst exhaustion, scan misuse, or batch operation limits.
+  when_not_to_use: DynamoDB table configuration posture audits (use dynamodb-table-auditor), IAM policy authoring for fine-grained access control (use iam-least-privilege-advisor), KMS key access for encrypted tables (use kms-key-policy-auditor), or DynamoDB Streams/Kinesis consumer lag diagnosis. This skill diagnoses throttling root cause; it does not audit table configuration posture.
+  activation_triggers: DynamoDB ProvisionedThroughputExceededException, DynamoDB throttling, DynamoDB ThrottledRequests, DynamoDB hot partition, DynamoDB GSI throttling, DynamoDB burst capacity exhausted, DynamoDB request rate too high, DynamoDB write throttled, DynamoDB read throttled, DynamoDB intermittent throttling, DynamoDB adaptive capacity, troubleshoot DynamoDB throttling
+  invocation_schema: 'Input: either (a) a symptom description (the throttle error string, the table name, observed CloudWatch metric pattern), optionally paired with describe-table output, OR (b) a table name plus caller context (access pattern, partition key distribution, recent traffic change) for live-account diagnosis. Output: a deterministic TABLE / VERDICT / ROOT_CAUSE / THROTTLE_TYPE / EVIDENCE / REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and THROTTLE_TYPE ∈ {HOT_PARTITION, GSI_HOT_KEY, READ_CAPACITY_LOW, WRITE_CAPACITY_LOW, BURST_EXHAUSTED, ADAPTIVE_LAG, SCAN_MISUSE, BATCH_LIMIT, ON_DEMAND_BREACH, UNKNOWN}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: DynamoDB, throttling, ProvisionedThroughputExceededException, ThrottledRequests, ConsumedReadCapacityUnits, ConsumedWriteCapacityUnits, hot partition, GSI hot key, burst capacity, adaptive capacity, partition key, scan, query, on-demand, provisioned capacity, RCU, WCU, BatchGetItem, BatchWriteItem, troubleshooting
+  tags: dynamodb, databases, troubleshoot, throttling, capacity, hot-partition, gsi
 ---
 
 # DynamoDB Throttling Troubleshooter

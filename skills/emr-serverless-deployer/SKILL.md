@@ -1,44 +1,15 @@
 ---
 name: emr-serverless-deployer
 description: 'Deploys Amazon EMR Serverless applications with production-grade configuration: application creation (release label, type: Spark or Hive), capacity configuration (pre-initialized capacity for warm starts, maximum capacity for burst limits), VPC access (subnets, security groups for private resources), IAM execution role (S3, Glue, CloudWatch scoped), job submission (entry point, arguments, configuration overrides), interactive endpoints (Spark Connect, Jupyter), and latest features (Spark Connect remote sessions, interactive endpoints for notebooks, automated start/stop, Lake Formation integration, gang scheduling). Emits a READY_TO_DEPLOY checklist with every configuration item verified. Use when creating an EMR Serverless application, deploying a Spark or Hive job, validating a configuration, or generating deployment CLI and IaC templates. Triggers: EMR Serverless, serverless Spark, serverless Hive, pre-initialized capacity, Spark Connect, interactive endpoints, job submission.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
 compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with emr-serverless, s3, iam, ec2, logs, and glue access. Works with Terraform aws_emrserverless_* resources, CloudFormation AWS::EMRServerless::* resources, and the AWS Console EMR Serverless wizard.'
-keywords:
-- aws
-- emr
-- emr-serverless
-- cloudops
-- deploy
-- provisioning
-- analytics
-- spark
-- hive
-- pre-initialized-capacity
-- spark-connect
-- interactive-endpoints
-- job-submission
-- execution-role
-- vpc-access
-tags:
-- aws
-- emr
-- emr-serverless
-- cloudops
-- deploy
-- analytics
-- spark
-- hive
-dependencies:
-- aws-orchestrator
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: deploy
   skill_class: capability
@@ -46,28 +17,9 @@ metadata:
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-  - aws
-  - emr
-  - emr-serverless
-  - cloudops
-  - deploy
-  - analytics
-  - spark
-  - hive
-  dependencies:
-  - aws-orchestrator
-  keywords:
-  - create emr serverless
-  - deploy emr serverless
-  - emr serverless spark application
-  - emr serverless hive application
-  - emr serverless pre-initialized capacity
-  - emr serverless execution role
-  - emr serverless job submission
-  - emr serverless vpc access
-  - emr serverless spark connect
-  - emr serverless interactive endpoints
+  tags: aws, emr, emr-serverless, cloudops, deploy, analytics, spark, hive
+  dependencies: aws-orchestrator
+  keywords: aws, emr, emr-serverless, cloudops, deploy, provisioning, analytics, spark, hive, pre-initialized-capacity, spark-connect, interactive-endpoints, job-submission, execution-role, vpc-access
   when_to_use: Invoke when the user wants to create a new EMR Serverless application, deploy a serverless Spark or Hive workload, validate an existing EMR Serverless configuration against best practices, generate deployment CLI commands or IaC templates, or troubleshoot an EMR Serverless deployment failure caused by missing prerequisites (execution role, VPC subnets, S3 log bucket). Do NOT invoke for provisioned EMR clusters (use emr-cluster-deployer), Glue jobs (use glue-job-troubleshooter), or Athena (use athena-query-optimizer).
 ---
 

@@ -70,7 +70,7 @@ def test_seed_frontmatter_has_metadata_fields(skill_name: str) -> None:
     metadata = fm.get("metadata", {})
 
     assert fm.get("name") == skill_name
-    assert fm.get("version"), f"{skill_name} missing version"
+    assert (fm.get("metadata", {}).get("version") or fm.get("version")), f"{skill_name} missing version"
     assert fm.get("license"), f"{skill_name} missing license"
     assert "domain" in metadata, f"{skill_name} missing metadata.domain"
     assert "phase" in metadata, f"{skill_name} missing metadata.phase"

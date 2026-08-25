@@ -1,77 +1,15 @@
 ---
 name: cloudtrail-missing-events-troubleshooter
-description: >-
-  Diagnoses AWS CloudTrail missing-events incidents across eleven
-  failure categories: trail logging inadvertently disabled
-  (stop-logging, IaC that omitted start-logging), S3 bucket policy
-  missing cloudtrail.amazonaws.com write permission, organization
-  trail vs member account trail overlap (org trail shadows member),
-  management events vs data events vs Insight events filtering
-  (data events must be explicitly enabled), read-only vs write-only
-  event selector mismatch, multi-region trail vs single-region
-  scope, log file validation (S3 digest integrity failures),
-  CloudWatch Logs delivery delay beyond the 5-15 minute window,
-  CloudTrail Lake event data store query issues, AWS service not
-  logging (not all services in all regions), event source filtering
-  / log file prefix errors, and KMS key disabled preventing log
-  encryption. Walks symptoms to a verified root cause with
-  evidence-backed probes and emits ROOT_CAUSE_IDENTIFIED or
-  INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses AWS CloudTrail missing-events incidents across eleven failure categories: trail logging inadvertently disabled (stop-logging, IaC that omitted start-logging), S3 bucket policy missing cloudtrail.amazonaws.com write permission, organization trail vs member account trail overlap (org trail shadows member), management events vs data events vs Insight events filtering (data events must be explicitly enabled), read-only vs write-only event selector mismatch, multi-region trail vs single-region scope, log file validation (S3 digest integrity failures), CloudWatch Logs delivery delay beyond the 5-15 minute window, CloudTrail Lake event data store query issues, AWS service not logging (not all services in all regions), event source filtering / log file prefix errors, and KMS key disabled preventing log encryption. Walks symptoms to a verified root cause with evidence-backed probes and emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and describe-trails / get-trail-status / get-event-selectors JSON. Live-account diagnosis uses aws cloudtrail describe-trails, get-trail-status, get-event-selectors, get-insight-selectors, lookup-events, aws s3api get-bucket-policy, get-bucket-location, aws kms describe-key, aws organizations
-  list-delegated-administrators, describe-organization, and aws logs filter-log-events (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- CloudTrail
-- audit logging
-- missing events
-- trail not logging
-- trail disabled
-- stop-logging
-- S3 bucket policy
-- cloudtrail.amazonaws.com
-- organization trail
-- member account trail
-- org trail shadows member
-- management events
-- data events
-- S3 data events
-- Lambda data events
-- DynamoDB data events
-- CloudTrail Insights
-- read-only events
-- write-only events
-- event selector
-- advanced event selector
-- multi-region trail
-- single-region trail
-- log file validation
-- S3 digest
-- CloudWatch Logs delivery
-- CloudTrail Lake
-- event data store
-- KMS key disabled
-- log encryption
-- log file prefix
-- AWS service not logging
-- troubleshooting
-tags:
-- cloudtrail
-- governance
-- troubleshoot
-- missing-events
-- audit
-- compliance
-- org-trail
-- event-selectors
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and describe-trails / get-trail-status / get-event-selectors JSON. Live-account diagnosis uses aws cloudtrail describe-trails, get-trail-status, get-event-selectors, get-insight-selectors, lookup-events, aws s3api get-bucket-policy, get-bucket-location, aws kms describe-key, aws organizations list-delegated-administrators, describe-organization...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: troubleshoot
   skill_class: capability
@@ -79,36 +17,13 @@ metadata:
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
   when_to_use: Diagnosing why CloudTrail events are missing — a specific API call is not appearing in lookup-events, the S3 bucket is not receiving log files, an organisation trail is not logging a member account, data events (S3 / Lambda / DynamoDB) are absent despite the trail being IsLogging true, CloudTrail Insights is silent, log file validation digest is failing, CloudWatch Logs delivery is delayed, CloudTrail Lake query returns empty, a regional service is not logging, or KMS-disabled log encryption is blocking delivery. Use whenever the symptom is "events that should be in CloudTrail are not".
   when_not_to_use: Steady-state CloudTrail posture audits (use cloudtrail-org-trail-auditor), IAM policy authoring for the CloudTrail service role (use iam-least-privilege-advisor), CloudTrail Lake event-data-store provisioning (use cloudtrail-lake-operator), Security Hub finding triage (use securityhub-finding-troubleshooter), or CloudWatch Logs ingestion from non-CloudTrail sources. This skill diagnoses missing-events incidents; it does not audit steady-state configuration posture or provision new trails.
-  activation_triggers:
-  - CloudTrail missing events
-  - CloudTrail events not appearing
-  - CloudTrail trail not logging
-  - CloudTrail IsLogging false
-  - CloudTrail stop-logging
-  - CloudTrail S3 bucket policy
-  - CloudTrail bucket policy missing cloudtrail.amazonaws.com
-  - CloudTrail data events missing
-  - CloudTrail S3 data events
-  - CloudTrail Lambda data events
-  - CloudTrail management events
-  - CloudTrail Insights not firing
-  - CloudTrail read-only events
-  - CloudTrail write-only events
-  - CloudTrail event selector
-  - CloudTrail multi-region trail
-  - CloudTrail single-region
-  - CloudTrail log file validation
-  - CloudTrail digest
-  - CloudTrail CloudWatch Logs delivery delay
-  - CloudTrail Lake empty query
-  - CloudTrail KMS key disabled
-  - CloudTrail log encryption blocked
-  - CloudTrail org trail not logging member
-  - CloudTrail log file prefix
-  - CloudTrail service not logging
-  - troubleshoot CloudTrail missing events
+  activation_triggers: CloudTrail missing events, CloudTrail events not appearing, CloudTrail trail not logging, CloudTrail IsLogging false, CloudTrail stop-logging, CloudTrail S3 bucket policy, CloudTrail bucket policy missing cloudtrail.amazonaws.com, CloudTrail data events missing, CloudTrail S3 data events, CloudTrail Lambda data events, CloudTrail management events, CloudTrail Insights not firing, CloudTrail read-only events, CloudTrail write-only events, CloudTrail event selector, CloudTrail multi-region trail, CloudTrail single-region, CloudTrail log file validation, CloudTrail digest, CloudTrail CloudWatch Logs delivery delay, CloudTrail Lake empty query, CloudTrail KMS key disabled, CloudTrail log encryption blocked, CloudTrail org trail not logging member, CloudTrail log file prefix, CloudTrail service not logging, troubleshoot CloudTrail missing events
   invocation_schema: 'Input: either (a) a symptom description (trail name, the missing event source or eventName, any error strings from the console), optionally paired with describe-trails / get-trail-status / get-event-selectors output, OR (b) a TrailName plus caller context (region, expected event) for live-account diagnosis. Output: a deterministic TARGET / VERDICT / ROOT_CAUSE / LAYER / EVIDENCE / REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {TRAIL_DISABLED, BUCKET_POLICY_BLOCKING, ORG_TRAIL_SHADOWS_MEMBER, DATA_EVENTS_NOT_ENABLED, EVENT_SELECTOR_READONLY, MULTI_REGION_SCOPE_GAP, LOG_FILE_VALIDATION_FAILED, CW_LOGS_DELIVERY_DELAYED, LAKE_EDS_QUERY_ISSUE, SERVICE_NOT_IN_REGION, KMS_KEY_DISABLED, LOG_FILE_PREFIX_ERROR, UNKNOWN}.'
   invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"CloudTrail trail prod-org-trail shows IsLogging true but S3 GetObject events from account 222222222222 are not\nappearing in lookup-events for the last 24 hours.\"\nTrailName: prod-org-trail\nIsOrganizationTrails: true\nIsLogging: true\nRegions: multi-region (us-east-1 home)\nEventSelectors:\n  - ManagementEvents: Source = aws.amazonaws.com, ReadWriteType = All\n  - DataEvents: (none configured)\nExpectedEventSource: s3.amazonaws.com\nExpectedEventName: GetObject\nCallerAccount: 222222222222"
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudTrail, audit logging, missing events, trail not logging, trail disabled, stop-logging, S3 bucket policy, cloudtrail.amazonaws.com, organization trail, member account trail, org trail shadows member, management events, data events, S3 data events, Lambda data events, DynamoDB data events, CloudTrail Insights, read-only events, write-only events, event selector, advanced event selector, multi-region trail, single-region trail, log file validation, S3 digest, CloudWatch Logs delivery, CloudTrail Lake, event data store, KMS key disabled, log encryption, log file prefix, AWS service not logging, troubleshooting
+  tags: cloudtrail, governance, troubleshoot, missing-events, audit, compliance, org-trail, event-selectors
 ---
 
 # CloudTrail Missing Events Troubleshooter

@@ -1,107 +1,27 @@
 ---
 name: migration-hub-strategy-deployer
-description: >-
-  Deploys AWS Migration Hub Strategy Recommendations assessments:
-  assessment creation and group-by-application analysis, data collection
-  via Application Discovery Service (agent-based for dependency telemetry
-  vs agentless Collector VM for inventory), the 6R strategy
-  classification (rehost, replatform, refactor, repurchase, retain,
-  retire) from runtime telemetry, anti-pattern detection (EOL OS,
-  deprecated DB engines), TCO analysis, right-sizing from utilization
-  percentiles, migration wave planning from dependency mapping, and
-  handoff to Application Migration Service (MGN) for rehost and Database
-  Migration Service (DMS) for replatform. Emits READY_TO_DEPLOY with a
-  Collector deployment plan and assessment schedule or
-  PREREQUISITES_MISSING with the specific gap. Use when planning a
-  migration assessment, deploying the Collector, interpreting 6R results,
-  or sequencing migration waves.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Deploys AWS Migration Hub Strategy Recommendations assessments: assessment creation and group-by-application analysis, data collection via Application Discovery Service (agent-based for dependency telemetry vs agentless Collector VM for inventory), the 6R strategy classification (rehost, replatform, refactor, repurchase, retain, retire) from runtime telemetry, anti-pattern detection (EOL OS, deprecated DB engines), TCO analysis, right-sizing from utilization percentiles, migration wave planning from dependency mapping, and handoff to Application Migration Service (MGN) for rehost and Database Migration Service (DMS) for replatform. Emits READY_TO_DEPLOY with a Collector deployment plan and assessment schedule or PREREQUISITES_MISSING with the specific gap. Use when planning a migration assessment, deploying the Collector, interpreting 6R results, or sequencing migration waves.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline assessment planning. Live
-  deployment uses aws migrationhub-strategy start-assessment,
-  get-assessment, list-assessment, aws discovery describe-agents,
-  describe-configurations, list-configurations, start-import-task,
-  get-import-task, aws migrationhuborchestrator create-workflow,
-  and aws mgn create-launch-template-template — AWS CLI v2, SSO or
-  key-based credentials, Discovery and Migration Hub permissions in the
-  home region.
-keywords:
-  - AWS Migration Hub
-  - Strategy Recommendations
-  - Application Discovery Service
-  - ADS
-  - Agent-based discovery
-  - Agentless discovery
-  - Collector VM
-  - vCenter
-  - 6R strategy
-  - rehost
-  - replatform
-  - refactor
-  - repurchase
-  - retain
-  - retire
-  - anti-pattern detection
-  - end-of-life OS
-  - deprecated DB engine
-  - TCO analysis
-  - right-sizing
-  - migration wave planning
-  - dependency mapping
-  - Application Migration Service
-  - MGN
-  - Database Migration Service
-  - DMS
-tags: [aws-migration-hub, strategy-recommendations, application-discovery-service, collector, 6r-strategy, wave-planning, mgn, dms, deploy]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline assessment planning. Live deployment uses aws migrationhub-strategy start-assessment, get-assessment, list-assessment, aws discovery describe-agents, describe-configurations, list-configurations, start-import-task, get-import-task, aws migrationhuborchestrator create-workflow, and aws mgn create-launch-template-template — AWS CLI v2, SSO or key-based credentials, Discovery and...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Migration
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Planning a Migration Hub Strategy Recommendations assessment,
-    deploying the Application Discovery Service Collector (agent-based
-    or agentless), interpreting 6R strategy classifications from runtime
-    telemetry, detecting anti-patterns (end-of-life OS, deprecated DB
-    engines), running a TCO analysis, right-sizing instances from
-    utilization data, planning migration waves from dependency maps, or
-    handing off to Application Migration Service (MGN) and Database
-    Migration Service (DMS) for execution.
-  activation_triggers:
-    - "create Migration Hub Strategy assessment"
-    - "deploy Discovery Collector"
-    - "agent-based vs agentless discovery"
-    - "6R strategy classification"
-    - "rehost replatform refactor repurchase retain retire"
-    - "anti-pattern detection end-of-life OS"
-    - "deprecated DB engine migration"
-    - "TCO analysis migration"
-    - "right-sizing recommendations"
-    - "migration wave planning"
-    - "dependency mapping migration"
-    - "Application Migration Service MGN handoff"
-    - "Database Migration Service DMS replatform"
-  invocation_schema: >-
-    Input shape (one of): (a) a migration assessment specification
-    including data source (agent-based, agentless import, or existing
-    Discovery data), target applications or servers, assessment duration,
-    and strategy preferences; (b) a partial spec for interactive
-    refinement ("assess 200 vCenter VMs for 6R strategy"); (c) existing
-    assessment results for interpretation and wave planning. Output shape:
-    { ASSESSMENT_SPEC, VERDICT, COLLECTOR_PLAN, ASSESSMENT_SCHEDULE,
-    STRATEGY_GROUPS[], ANTI_PATTERNS[], WAVE_PLAN, FINDINGS[] } where
-    VERDICT is READY_TO_DEPLOY (Collector plan and assessment ready) or
-    PREREQUISITES_MISSING (specific gap cited).
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Planning a Migration Hub Strategy Recommendations assessment, deploying the Application Discovery Service Collector (agent-based or agentless), interpreting 6R strategy classifications from runtime telemetry, detecting anti-patterns (end-of-life OS, deprecated DB engines), running a TCO analysis, right-sizing instances from utilization data, planning migration waves from dependency maps, or handing off to Application Migration Service (MGN) and Database Migration Service (DMS) for execution.
+  activation_triggers: create Migration Hub Strategy assessment, deploy Discovery Collector, agent-based vs agentless discovery, 6R strategy classification, rehost replatform refactor repurchase retain retire, anti-pattern detection end-of-life OS, deprecated DB engine migration, TCO analysis migration, right-sizing recommendations, migration wave planning, dependency mapping migration, Application Migration Service MGN handoff, Database Migration Service DMS replatform
+  invocation_schema: 'Input shape (one of): (a) a migration assessment specification including data source (agent-based, agentless import, or existing Discovery data), target applications or servers, assessment duration, and strategy preferences; (b) a partial spec for interactive refinement ("assess 200 vCenter VMs for 6R strategy"); (c) existing assessment results for interpretation and wave planning. Output shape: { ASSESSMENT_SPEC, VERDICT, COLLECTOR_PLAN, ASSESSMENT_SCHEDULE, STRATEGY_GROUPS[], ANTI_PATTERNS[], WAVE_PLAN, FINDINGS[] } where VERDICT is READY_TO_DEPLOY (Collector plan and assessment ready) or PREREQUISITES_MISSING (specific gap cited).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Migration Hub, Strategy Recommendations, Application Discovery Service, ADS, Agent-based discovery, Agentless discovery, Collector VM, vCenter, 6R strategy, rehost, replatform, refactor, repurchase, retain, retire, anti-pattern detection, end-of-life OS, deprecated DB engine, TCO analysis, right-sizing, migration wave planning, dependency mapping, Application Migration Service, MGN, Database Migration Service, DMS
+  tags: aws-migration-hub, strategy-recommendations, application-discovery-service, collector, 6r-strategy, wave-planning, mgn, dms, deploy
 ---
 
 # Migration Hub Strategy Deployer

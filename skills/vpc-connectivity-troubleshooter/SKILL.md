@@ -1,107 +1,29 @@
 ---
 name: vpc-connectivity-troubleshooter
-description: >-
-  Diagnoses AWS VPC network connectivity issues through a systematic
-  OSI-layered diagnostic tree: Layer 3 routing (missing route, wrong
-  target IGW/NAT/TGW/peering/VPN, overlapping CIDRs on peered VPCs),
-  Layer 4 security groups (stateful inbound, outbound return path,
-  SG references that silently fail cross-VPC), Layer 4 NACLs
-  (stateless both directions, ephemeral range 1024-65535), Layer 7
-  DNS (Route 53 private hosted zones, VPC DNS resolution settings),
-  VPC endpoint policies, and application-level auth/SSL. Cross-VPC
-  coverage: VPC peering (DNS flag, SG references), Transit Gateway
-  (route table associations, propagation), and PrivateLink (interface
-  endpoint NLB). Uses Reachability Analyzer and VPC Flow Logs. Emits
-  ROOT_CAUSE_FOUND, NEED_MORE_INFO, or ESCALATE.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses AWS VPC network connectivity issues through a systematic OSI-layered diagnostic tree: Layer 3 routing (missing route, wrong target IGW/NAT/TGW/peering/VPN, overlapping CIDRs on peered VPCs), Layer 4 security groups (stateful inbound, outbound return path, SG references that silently fail cross-VPC), Layer 4 NACLs (stateless both directions, ephemeral range 1024-65535), Layer 7 DNS (Route 53 private hosted zones, VPC DNS resolution settings), VPC endpoint policies, and application-level auth/SSL. Cross-VPC coverage: VPC peering (DNS flag, SG references), Transit Gateway (route table associations, propagation), and PrivateLink (interface endpoint NLB). Uses Reachability Analyzer and VPC Flow Logs. Emits ROOT_CAUSE_FOUND, NEED_MORE_INFO, or ESCALATE.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and topology descriptions. Live-account diagnosis
-  uses aws ec2 describe-route-tables, aws ec2 describe-security-groups, aws ec2 describe-network-acls, aws ec2 describe-vpc-endpoints, aws ec2 describe-vpc-peering-connections, aws ec2 describe-transit-
-  gateway-attachments, aws ec2 describe-transit-gateway-route-tables, aws ec2 create-network-insights-path / describe-network-insights- analyses (Reachability Analyzer), aws ec2 get-flow-logs-integration-
-  template, aws route53 list-resolver-endpoints / list-resolver-rules, aws route53 list-hosted-zones-by-vpc, and aws ec2 describe-vpcs (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- VPC
-- connectivity
-- routing
-- route table
-- security group
-- NACL
-- network ACL
-- ephemeral port
-- DNS
-- Route 53
-- private hosted zone
-- resolver
-- VPC endpoint
-- endpoint policy
-- VPC peering
-- Transit Gateway
-- TGW
-- PrivateLink
-- Reachability Analyzer
-- VPC Flow Logs
-- overlapping CIDR
-- troubleshooting
-tags:
-- vpc
-- networking
-- troubleshooting
-- routing
-- security-groups
-- nacl
-- dns
-- vpc-peering
-- transit-gateway
-- privatelink
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and topology descriptions. Live-account diagnosis uses aws ec2 describe-route-tables, aws ec2 describe-security-groups, aws ec2 describe-network-acls, aws ec2 describe-vpc-endpoints, aws ec2 describe-vpc-peering-connections, aws ec2 describe-transit- gateway-attachments, aws ec2 describe-transit-gateway-route-tables, aws ec2...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
   verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
-  when_to_use: Diagnosing a VPC network connectivity issue (cannot reach an endpoint, intermittent connectivity, port blocked, DNS resolution failure, cross-VPC traffic failure, VPC endpoint policy block,
-    peering asymmetry, TGW route propagation gap), walking a symptom to the failed layer with verify and fix commands, validating why an EC2 instance / Lambda / ECS task / on-prem host cannot reach a destination,
-    or triaging a "the network is down" page where the root cause may be routing, security groups, NACLs, DNS, endpoint policy, or cross-VPC plumbing — not necessarily the destination service itself.
-  when_not_to_use: Internet egress cost audits (use vpc-flow-logs-auditor or cost- anomaly detectors), RDS-specific auth and TLS issues (use rds- connectivity-troubleshooter which specialises the L7 layer
-    for database engines), IAM execution-role diagnostics (use iam- permission-troubleshooter), or Direct Connect / Site-to-Site VPN hardware configuration (use the carrier / device-side tooling). This
-    skill diagnoses packet-path connectivity; it does not audit configuration posture or replace dedicated per-service troubleshooters.
-  activation_triggers:
-  - VPC connection timeout
-  - cannot reach EC2 instance
-  - EC2 port unreachable
-  - Lambda VPC timeout
-  - ECS task cannot reach
-  - security group blocking traffic
-  - NACL dropping packets
-  - route table missing
-  - VPC peering not working
-  - Transit Gateway routing
-  - TGW routes not propagating
-  - VPC endpoint policy blocked
-  - DNS not resolving in VPC
-  - Route 53 private hosted zone
-  - cross-VPC connectivity
-  - PrivateLink endpoint service
-  - Reachability Analyzer
-  - VPC Flow Logs analysis
-  - overlapping CIDR peering
-  - troubleshoot VPC connectivity
-  invocation_schema: 'Input: either (a) a symptom description (error message, observed behaviour, "host cannot reach destination on port X", intermittent vs persistent pattern), optionally paired with the
-    source and destination context (instance/subnet/VPC IDs, ports, protocol), OR (b) a source-destination pair plus caller context (region, AZ, observed error) for live-account diagnosis. Output: a deterministic
-    TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and LAYER ∈ {ROUTE_TABLE_MISSING, ROUTE_TABLE_WRONG_TARGET, ROUTE_OVERLAPPING_CIDR,
-    SG_INBOUND, SG_OUTBOUND, SG_REFERENCE_CROSS_VPC, NACL_STATELESS, DNS_RESOLUTION, DNS_PHZ_ASSOCIATION, ENDPOINT_POLICY, PEERING_INACTIVE, PEERING_DNS_RESOLUTION, PEERING_SG_REFERENCE, TGW_ROUTE_PROPAGATION,
-    TGW_ASSOCIATION_MISSING, PRIVATELINK_ENDPOINT_SERVICE, PRIVATELINK_SG, APP_AUTH, UNKNOWN}.'
-  invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"application on EC2 instance i-app (subnet subnet-aaa,\nSG sg-app, AZ us-east-1a, VPC vpc-source) cannot reach EC2\n\
-    instance i-db (subnet subnet-bbb, SG sg-db, AZ us-east-1b, VPC\nvpc-target) on tcp/5432. nc -vz returns 'Connection timed out'.\nThe two VPCs are peered (pcx-aaa) and the peering status is\nActive.\"\
-    \nSource: i-app, subnet-aaa (CIDR 10.0.1.0/24 in vpc-source\n  10.0.0.0/16), SG sg-app\nDestination: i-db, subnet-bbb (CIDR 172.16.1.0/24 in vpc-target\n  172.16.0.0/16), SG sg-db\nPath: same region\
-    \ (us-east-1), VPC peering pcx-aaa (Active)\nObserved error: nc -vz 172.16.1.10 5432 → \"Connection timed out\""
+  when_to_use: Diagnosing a VPC network connectivity issue (cannot reach an endpoint, intermittent connectivity, port blocked, DNS resolution failure, cross-VPC traffic failure, VPC endpoint policy block, peering asymmetry, TGW route propagation gap), walking a symptom to the failed layer with verify and fix commands, validating why an EC2 instance / Lambda / ECS task / on-prem host cannot reach a destination, or triaging a "the network is down" page where the root cause may be routing, security groups, NACLs, DNS, endpoint policy, or cross-VPC plumbing — not necessarily the destination service itself.
+  when_not_to_use: Internet egress cost audits (use vpc-flow-logs-auditor or cost- anomaly detectors), RDS-specific auth and TLS issues (use rds- connectivity-troubleshooter which specialises the L7 layer for database engines), IAM execution-role diagnostics (use iam- permission-troubleshooter), or Direct Connect / Site-to-Site VPN hardware configuration (use the carrier / device-side tooling). This skill diagnoses packet-path connectivity; it does not audit configuration posture or replace dedicated per-service troubleshooters.
+  activation_triggers: VPC connection timeout, cannot reach EC2 instance, EC2 port unreachable, Lambda VPC timeout, ECS task cannot reach, security group blocking traffic, NACL dropping packets, route table missing, VPC peering not working, Transit Gateway routing, TGW routes not propagating, VPC endpoint policy blocked, DNS not resolving in VPC, Route 53 private hosted zone, cross-VPC connectivity, PrivateLink endpoint service, Reachability Analyzer, VPC Flow Logs analysis, overlapping CIDR peering, troubleshoot VPC connectivity
+  invocation_schema: 'Input: either (a) a symptom description (error message, observed behaviour, "host cannot reach destination on port X", intermittent vs persistent pattern), optionally paired with the source and destination context (instance/subnet/VPC IDs, ports, protocol), OR (b) a source-destination pair plus caller context (region, AZ, observed error) for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and LAYER ∈ {ROUTE_TABLE_MISSING, ROUTE_TABLE_WRONG_TARGET, ROUTE_OVERLAPPING_CIDR, SG_INBOUND, SG_OUTBOUND, SG_REFERENCE_CROSS_VPC, NACL_STATELESS, DNS_RESOLUTION, DNS_PHZ_ASSOCIATION, ENDPOINT_POLICY, PEERING_INACTIVE, PEERING_DNS_RESOLUTION, PEERING_SG_REFERENCE, TGW_ROUTE_PROPAGATION, TGW_ASSOCIATION_MISSING, PRIVATELINK_ENDPOINT_SERVICE, PRIVATELINK_SG, APP_AUTH, UNKNOWN}.'
+  invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"application on EC2 instance i-app (subnet subnet-aaa,\nSG sg-app, AZ us-east-1a, VPC vpc-source) cannot reach EC2\ninstance i-db (subnet subnet-bbb, SG sg-db, AZ us-east-1b, VPC\nvpc-target) on tcp/5432. nc -vz returns 'Connection timed out'.\nThe two VPCs are peered (pcx-aaa) and the peering status is\nActive.\"\nSource: i-app, subnet-aaa (CIDR 10.0.1.0/24 in vpc-source\n  10.0.0.0/16), SG sg-app\nDestination: i-db, subnet-bbb (CIDR 172.16.1.0/24 in vpc-target\n  172.16.0.0/16), SG sg-db\nPath: same region (us-east-1), VPC peering pcx-aaa (Active)\nObserved error: nc -vz 172.16.1.10 5432 → \"Connection timed out\""
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: VPC, connectivity, routing, route table, security group, NACL, network ACL, ephemeral port, DNS, Route 53, private hosted zone, resolver, VPC endpoint, endpoint policy, VPC peering, Transit Gateway, TGW, PrivateLink, Reachability Analyzer, VPC Flow Logs, overlapping CIDR, troubleshooting
+  tags: vpc, networking, troubleshooting, routing, security-groups, nacl, dns, vpc-peering, transit-gateway, privatelink
 ---
 
 # VPC Connectivity Troubleshooter

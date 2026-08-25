@@ -1,95 +1,27 @@
 ---
 name: route53-failover-operator
-description: >-
-  Operates Route 53 health checks and DNS failover workflows end-to-end —
-  health-check configuration (endpoint HTTP/HTTPS/TCP, CloudWatch alarm,
-  calculated AND/OR, insulated child checks), the five failover routing
-  policies (failover, latency, geolocation, multivalue, weighted), planned
-  vs emergency failover and failback sequences, TTL strategy (60s for fast
-  failover vs 300s for stability), cross-account hosted zone IAM, and full
-  diagnostic loops (get-health-check-status, list-resource-record-sets,
-  test-dns-answer, CloudWatch HealthCheckMetrics). Runs deterministic
-  pre-checks (health check healthy, secondary reachable, TTL appropriate,
-  CloudWatch alarm exists, cross-account IAM grant) behind a CONFIRM gate
-  and emits a READY, BLOCKED, or COMPLETED verdict per failover. Use when
-  executing a planned weighted failover, emergency failover, failback,
-  diagnosing a failover that did not switch, or wiring cross-account
-  Route 53.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates Route 53 health checks and DNS failover workflows end-to-end — health-check configuration (endpoint HTTP/HTTPS/TCP, CloudWatch alarm, calculated AND/OR, insulated child checks), the five failover routing policies (failover, latency, geolocation, multivalue, weighted), planned vs emergency failover and failback sequences, TTL strategy (60s for fast failover vs 300s for stability), cross-account hosted zone IAM, and full diagnostic loops (get-health-check-status, list-resource-record-sets, test-dns-answer, CloudWatch HealthCheckMetrics). Runs deterministic pre-checks (health check healthy, secondary reachable, TTL appropriate, CloudWatch alarm exists, cross-account IAM grant) behind a CONFIRM gate and emits a READY, BLOCKED, or COMPLETED verdict per failover. Use when executing a planned weighted failover, emergency failover, failback, diagnosing a failover that did not switch, or wiring cross-account Route 53.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws route53 list-health-checks, get-health-check,
-  get-health-check-status, list-resource-record-sets, change-resource-record-
-  sets, get-traffic-policy-instance, test-dns-answer, aws cloudwatch
-  describe-alarms, and dig/nslookup (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-  - Route 53
-  - DNS failover
-  - health check
-  - failover routing
-  - latency routing
-  - geolocation routing
-  - multivalue answer
-  - weighted routing
-  - primary secondary
-  - DNS TTL
-  - planned failover
-  - emergency failover
-  - failback
-  - cross-account hosted zone
-  - CloudWatch alarm
-  - calculated health check
-  - insulated health check
-  - test-dns-answer
-  - change-resource-record-sets
-tags: [aws, route53, networking, dns, failover, health-check, dr, operate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws route53 list-health-checks, get-health-check, get-health-check-status, list-resource-record-sets, change-resource-record- sets, get-traffic-policy-instance, test-dns-answer, aws cloudwatch describe-alarms, and dig/nslookup (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Executing a planned DNS failover (weighted 100/0 to 0/100, or swapping
-    failover primary/secondary), running an emergency failover, failing
-    back to primary after a failover, diagnosing why a failover did not
-    switch traffic, creating or updating a health check, choosing between
-    failover/latency/geolocation/multivalue/weighted routing for DR, setting
-    TTL for fast failover, or wiring cross-account Route 53 hosted zone
-    access.
-  activation_triggers:
-    - "failover DNS"
-    - "switch Route 53 primary secondary"
-    - "planned failover weighted"
-    - "emergency failover"
-    - "failback to primary"
-    - "Route 53 health check"
-    - "DNS failover did not switch"
-    - "traffic not failing over"
-    - "multivalue answer routing"
-    - "weighted routing canary"
-    - "geolocation DR routing"
-    - "cross-account Route 53 hosted zone"
-    - "TTL for failover"
-    - "test-dns-answer"
-  invocation_schema: >-
-    Input: either (a) a hosted zone + record set configuration plus the
-    intended operation (planned-failover, emergency-failover, failback,
-    create-health-check, update-health-check, diagnose-failover, update-
-    routing), OR (b) a hosted-zone-id + record-name + operation for live-
-    account execution. Output: deterministic OPERATION / VERDICT /
-    PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per failover, where
-    VERDICT is one of READY, BLOCKED, COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Executing a planned DNS failover (weighted 100/0 to 0/100, or swapping failover primary/secondary), running an emergency failover, failing back to primary after a failover, diagnosing why a failover did not switch traffic, creating or updating a health check, choosing between failover/latency/geolocation/multivalue/weighted routing for DR, setting TTL for fast failover, or wiring cross-account Route 53 hosted zone access.
+  activation_triggers: failover DNS, switch Route 53 primary secondary, planned failover weighted, emergency failover, failback to primary, Route 53 health check, DNS failover did not switch, traffic not failing over, multivalue answer routing, weighted routing canary, geolocation DR routing, cross-account Route 53 hosted zone, TTL for failover, test-dns-answer
+  invocation_schema: 'Input: either (a) a hosted zone + record set configuration plus the intended operation (planned-failover, emergency-failover, failback, create-health-check, update-health-check, diagnose-failover, update- routing), OR (b) a hosted-zone-id + record-name + operation for live- account execution. Output: deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per failover, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Route 53, DNS failover, health check, failover routing, latency routing, geolocation routing, multivalue answer, weighted routing, primary secondary, DNS TTL, planned failover, emergency failover, failback, cross-account hosted zone, CloudWatch alarm, calculated health check, insulated health check, test-dns-answer, change-resource-record-sets
+  tags: aws, route53, networking, dns, failover, health-check, dr, operate
 ---
 
 # Route 53 Failover Operator

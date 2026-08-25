@@ -1,76 +1,24 @@
 ---
 name: controltower-control-auditor
-description: >-
-  Audits AWS Control Tower landing-zone state, enabled controls (preventive,
-  detective, proactive), guardrail enforcement integrity, and account-factory
-  baseline health. Detects landing-zone drift, disabled mandatory controls,
-  SCP and Config-Rule modifications, missing execution roles, and Config
-  recorder gaps. Emits a deterministic verdict (DRIFT | DISABLED_CONTROL |
-  CONFIG_GAP | OK) per OU or landing zone with enumerated findings and CLI
-  remediation. Use when reviewing Control Tower posture, checking guardrail
-  enforcement, auditing landing-zone drift, validating control enablement, or
-  inspecting account-factory baselines before governance reviews.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Control Tower landing-zone state, enabled controls (preventive, detective, proactive), guardrail enforcement integrity, and account-factory baseline health. Detects landing-zone drift, disabled mandatory controls, SCP and Config-Rule modifications, missing execution roles, and Config recorder gaps. Emits a deterministic verdict (DRIFT | DISABLED_CONTROL | CONFIG_GAP | OK) per OU or landing zone with enumerated findings and CLI remediation. Use when reviewing Control Tower posture, checking guardrail enforcement, auditing landing-zone drift, validating control enablement, or inspecting account-factory baselines before governance reviews.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline classification of Control Tower
-  audit snapshots. Live-account audits use aws controltower
-  list-enabled-controls, aws controltower get-enabled-control, aws
-  organizations list-policies, and aws configservice
-  describe-config-recorders (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Control Tower
-  - landing zone
-  - guardrails
-  - controls
-  - SCP
-  - preventive controls
-  - detective controls
-  - proactive controls
-  - control drift
-  - landing zone drift
-  - account factory
-  - AWSControlTowerExecutionRole
-  - mandatory controls
-  - strongly recommended controls
-  - organizational units
-  - governance
-  - compliance
-tags: [control-tower, governance, landing-zone, guardrails, scp, config-rules, compliance, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline classification of Control Tower audit snapshots. Live-account audits use aws controltower list-enabled-controls, aws controltower get-enabled-control, aws organizations list-policies, and aws configservice describe-config-recorders (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
-  verdict_shape: "DRIFT | DISABLED_CONTROL | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing Control Tower governance posture, checking for landing-zone
-    drift, auditing guardrail enforcement, validating mandatory control
-    enablement, inspecting account-factory baselines, or verifying Config
-    recorder health across managed accounts.
-  activation_triggers:
-    - "audit control tower"
-    - "check landing zone drift"
-    - "control tower guardrails"
-    - "enabled controls status"
-    - "control drift detection"
-    - "account factory baseline"
-    - "mandatory controls disabled"
-    - "SCP drift control tower"
-    - "config recorder gap"
-    - "AWSControlTowerExecutionRole missing"
-  invocation_schema: >-
-    Input: either (a) a Control Tower audit snapshot (landing-zone state,
-    enabled-controls list, SCP verification, Config recorder status, account-
-    factory info), OR (b) a landing-zone identifier or OU ARN for live-account
-    audit. Output: deterministic LANDING_ZONE/OU/VERDICT/REASON/FINDINGS/
-    REMEDIATION block, where VERDICT ∈ {DRIFT, DISABLED_CONTROL, CONFIG_GAP,
-    OK, ERROR}.
+  verdict_shape: DRIFT | DISABLED_CONTROL | CONFIG_GAP | OK
+  when_to_use: Reviewing Control Tower governance posture, checking for landing-zone drift, auditing guardrail enforcement, validating mandatory control enablement, inspecting account-factory baselines, or verifying Config recorder health across managed accounts.
+  activation_triggers: audit control tower, check landing zone drift, control tower guardrails, enabled controls status, control drift detection, account factory baseline, mandatory controls disabled, SCP drift control tower, config recorder gap, AWSControlTowerExecutionRole missing
+  invocation_schema: 'Input: either (a) a Control Tower audit snapshot (landing-zone state, enabled-controls list, SCP verification, Config recorder status, account- factory info), OR (b) a landing-zone identifier or OU ARN for live-account audit. Output: deterministic LANDING_ZONE/OU/VERDICT/REASON/FINDINGS/ REMEDIATION block, where VERDICT ∈ {DRIFT, DISABLED_CONTROL, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Control Tower, landing zone, guardrails, controls, SCP, preventive controls, detective controls, proactive controls, control drift, landing zone drift, account factory, AWSControlTowerExecutionRole, mandatory controls, strongly recommended controls, organizational units, governance, compliance
+  tags: control-tower, governance, landing-zone, guardrails, scp, config-rules, compliance, audit
 ---
 
 # Control Tower Control Auditor

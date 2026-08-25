@@ -1,123 +1,28 @@
 ---
 name: config-rule-deployer
-description: >-
-  Provisions AWS Config rules with compliance coverage: managed rules
-  (100+ AWS-managed like s3-bucket-public-read-prohibited,
-  iam-user-no-policies), custom Lambda rules, rule scope, evaluation
-  mode (config-change vs periodic), compliance reporting, Security Hub
-  integration, SSM Automation remediation, conformance packs (bulk
-  deployment), organization config rules (org-wide), configuration
-  recorder and delivery channel setup, and proactive rules (evaluate
-  before deployment via CloudFormation hooks). Runs pre-checks
-  (recorder status, delivery channel, IAM, Lambda function existence,
-  SSM document existence), emits put-config-rule / put-conformance-pack
-  / put-organization-config-rule CLI behind CONFIRM gate, verifies
-  compliance evaluation. Emits READY_TO_DEPLOY | PREREQUISITES_MISSING.
-  Use for security baselines (CIS, PCI-DSS), tagging enforcement,
-  drift detection, or automated remediation.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Config rules with compliance coverage: managed rules (100+ AWS-managed like s3-bucket-public-read-prohibited, iam-user-no-policies), custom Lambda rules, rule scope, evaluation mode (config-change vs periodic), compliance reporting, Security Hub integration, SSM Automation remediation, conformance packs (bulk deployment), organization config rules (org-wide), configuration recorder and delivery channel setup, and proactive rules (evaluate before deployment via CloudFormation hooks). Runs pre-checks (recorder status, delivery channel, IAM, Lambda function existence, SSM document existence), emits put-config-rule / put-conformance-pack / put-organization-config-rule CLI behind CONFIRM gate, verifies compliance evaluation. Emits READY_TO_DEPLOY | PREREQUISITES_MISSING. Use for security baselines (CIS, PCI-DSS), tagging enforcement, drift detection, or automated remediation.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws configservice put-config-rule, put-conformance-pack,
-  put-organization-config-rule, describe-config-rules,
-  describe-configuration-recorders, describe-delivery-channels,
-  start-config-rules-evaluation, get-compliance-summary (AWS CLI v2,
-  SSO or key-based credentials).
-keywords:
-  - AWS Config
-  - config rules
-  - managed rules
-  - custom rules
-  - Lambda evaluation
-  - conformance packs
-  - organization config rules
-  - compliance
-  - remediation
-  - SSM Automation
-  - Security Hub
-  - configuration recorder
-  - delivery channel
-  - proactive rules
-  - CloudFormation hooks
-  - drift detection
-  - CIS benchmark
-  - PCI-DSS
-  - tagging enforcement
-  - put-config-rule
-  - put-conformance-pack
-tags: [aws-config, compliance, governance, deploy, config-rules, conformance-packs, remediation]
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws configservice put-config-rule, put-conformance-pack, put-organization-config-rule, describe-config-rules, describe-configuration-recorders, describe-delivery-channels, start-config-rules-evaluation, get-compliance-summary (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws-config
-    - compliance
-    - governance
-    - deploy
-    - config-rules
-    - conformance-packs
-    - remediation
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - AWS Config
-    - config rules
-    - managed rules
-    - conformance packs
-    - remediation
-    - compliance
-  when_to_use: >-
-    Creating AWS Config rules (managed, custom Lambda, organization-wide),
-    deploying conformance packs for bulk compliance baselines (CIS, PCI-DSS,
-    NIST), configuring SSM Automation remediation, integrating Config with
-    Security Hub, setting up the configuration recorder and delivery channel,
-    deploying proactive rules for CloudFormation pre-deployment evaluation,
-    or auditing existing Config rule compliance coverage.
-  activation_triggers:
-    - "create config rule"
-    - "deploy config rule"
-    - "managed config rule"
-    - "custom config rule"
-    - "Lambda config rule"
-    - "conformance pack"
-    - "organization config rule"
-    - "org config rule"
-    - "config rule remediation"
-    - "SSM Automation remediation"
-    - "Security Hub integration"
-    - "configuration recorder"
-    - "delivery channel"
-    - "proactive config rule"
-    - "CloudFormation hooks"
-    - "CIS benchmark config"
-    - "PCI-DSS config rules"
-    - "tagging enforcement rule"
-    - "config compliance"
-    - "put-config-rule"
-  invocation_schema: >-
-    Input: either (a) a rule deployment intent (create managed, create
-    custom, deploy conformance pack, deploy org rule) with target rule
-    name, managed rule identifier or Lambda function ARN, resource scope,
-    evaluation mode, and optional remediation, OR (b) a rule name for
-    live-account update or compliance validation. Output: deterministic
-    RULE/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation, where
-    VERDICT is one of READY_TO_DEPLOY, PREREQUISITES_MISSING.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws-config, compliance, governance, deploy, config-rules, conformance-packs, remediation
+  dependencies: aws-orchestrator
+  keywords: AWS Config, config rules, managed rules, custom rules, Lambda evaluation, conformance packs, organization config rules, compliance, remediation, SSM Automation, Security Hub, configuration recorder, delivery channel, proactive rules, CloudFormation hooks, drift detection, CIS benchmark, PCI-DSS, tagging enforcement, put-config-rule, put-conformance-pack
+  when_to_use: Creating AWS Config rules (managed, custom Lambda, organization-wide), deploying conformance packs for bulk compliance baselines (CIS, PCI-DSS, NIST), configuring SSM Automation remediation, integrating Config with Security Hub, setting up the configuration recorder and delivery channel, deploying proactive rules for CloudFormation pre-deployment evaluation, or auditing existing Config rule compliance coverage.
+  activation_triggers: create config rule, deploy config rule, managed config rule, custom config rule, Lambda config rule, conformance pack, organization config rule, org config rule, config rule remediation, SSM Automation remediation, Security Hub integration, configuration recorder, delivery channel, proactive config rule, CloudFormation hooks, CIS benchmark config, PCI-DSS config rules, tagging enforcement rule, config compliance, put-config-rule
+  invocation_schema: 'Input: either (a) a rule deployment intent (create managed, create custom, deploy conformance pack, deploy org rule) with target rule name, managed rule identifier or Lambda function ARN, resource scope, evaluation mode, and optional remediation, OR (b) a rule name for live-account update or compliance validation. Output: deterministic RULE/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation, where VERDICT is one of READY_TO_DEPLOY, PREREQUISITES_MISSING.'
 ---
 
 # AWS Config Rule Deployer

@@ -1,31 +1,8 @@
 ---
 name: eventbridge-rule-not-firing-troubleshooter
 description: 'Diagnoses Amazon EventBridge rules that fail to fire through a ten-category diagnostic tree: event pattern mismatch (source, detail-type, detail JSON path), content-based filtering errors (prefix, numeric, exists, anything-but, nested path depth limits), input transformer malformed templates, dead-letter queue configuration gaps, custom bus vs default bus mismatch, schedule expression syntax errors (cron vs rate vs fixed-rate), IAM role for target invocation (cross-account events.amazonaws.com principal), EventBus resource-based policy blocking PutEvents, target Lambda resource-based policy missing EventBridge principal, and event source mapping for Kinesis/Stream targets. Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline pattern classification works from pasted rule definitions and event samples. Live-account diagnosis uses aws events describe-rule, describe-event-bus, list-targets-by-rule, test-event-pattern, put-events (dry validate), aws lambda get-policy, aws cloudtrail lookup-events, aws iam simulate-principal-policy, aws logs filter-log-events, and aws events list-archives / replay (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- EventBridge
-- event pattern
-- rule not firing
-- content-based filtering
-- input transformer
-- dead-letter queue
-- DLQ
-- custom bus
-- default bus
-- schedule expression
-- cron
-- rate
-- PutEvents
-- events.amazonaws.com
-- target Lambda permissions
-- cross-account
-- EventBus policy
-- event source mapping
-- Kinesis
-- troubleshooting
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline pattern classification works from pasted rule definitions and event samples. Live-account diagnosis uses aws events describe-rule, describe-event-bus, list-targets-by-rule, test-event-pattern, put-events (dry validate), aws lambda get-policy, aws cloudtrail lookup-events, aws iam simulate-principal-policy, aws logs filter-log-events, and aws events list-archives / replay (AWS CLI v2, SSO or key-based...
 metadata:
   domain: aws-cloudops
   complexity: high
@@ -43,6 +20,9 @@ metadata:
   activation_triggers: ''
   invocation_schema: '''Input: either (a) a symptom description ("rule not firing", "DLQ filling", "target Lambda never invoked"), optionally paired with the rule definition (describe-rule output), the event bus name, and a sample event payload, OR (b) a RuleName plus EventBusName for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {PATTERN_SOURCE_MISMATCH, PATTERN_DETAIL_TYPE_MISMATCH, PATTERN_DETAIL_PATH_MISMATCH, CONTENT_FILTER_TOO_STRICT, CONTENT_FILTER_NESTED_DEPTH, INPUT_TRANSFORMER_ERROR, DLQ_MISCONFIGURED, BUS_MISMATCH, SCHEDULE_SYNTAX, TARGET_IAM_ROLE, TARGET_LAMBDA_PERMISSION, EVENTBUS_POLICY, EVENT_SOURCE_MAPPING, UNKNOWN}.'''
   invocation_example: '"# Minimal valid input (offline pattern classification):\nSymptom: \"EventBridge rule ev-orders-prod-rule\nis not firing. Events are being put on the bus successfully (200\nOK from PutEvents) but the target Lambda is never invoked.\"\nEventBusName: custom.orders-bus\nRuleName: ev-orders-prod-rule\nEventPattern:\n  source: [\"myapp.orders\"]\n  detail-type: [\"Order Created\"]\n  detail:\n    status: [\"confirmed\"]\nSampleEvent:\n  source: \"myapp.orders\"\n  detail-type: \"Order Created\"\n  detail: { \"status\": \"pending\", \"orderId\": \"12345\" }"'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: EventBridge, event pattern, rule not firing, content-based filtering, input transformer, dead-letter queue, DLQ, custom bus, default bus, schedule expression, cron, rate, PutEvents, events.amazonaws.com, target Lambda permissions, cross-account, EventBus policy, event source mapping, Kinesis, troubleshooting
 ---
 
 # EventBridge Rule Not Firing Troubleshooter

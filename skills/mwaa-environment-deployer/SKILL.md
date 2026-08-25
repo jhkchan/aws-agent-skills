@@ -1,106 +1,26 @@
 ---
 name: mwaa-environment-deployer
-description: >-
-  Provisions Amazon Managed Workflows for Apache Airflow (MWAA)
-  environments with production defaults: environment creation
-  (create-environment), Airflow version selection, execution class
-  sizing (mw1.small/medium/large), min/max workers, webserver access
-  mode (PUBLIC_ONLY vs PRIVATE_ONLY), VPC networking (2 private
-  subnets + 1 public subnet for MWAA), security groups, S3 bucket for
-  DAGs (requirements.txt, plugins folder, startup script), DAG upload
-  lifecycle, KMS encryption, CloudWatch Logs (DAG processing, scheduler,
-  webserver, worker), Airflow configuration overrides, startup/stop
-  time, requirements.txt version constraints and plugin ZIP management,
-  IAM execution role. Emits a READY_TO_DEPLOY checklist with
-  verification commands. Use when creating an MWAA environment,
-  configuring Airflow on AWS, sizing execution class, or managing DAGs.
-  Triggers: MWAA environment, Managed Airflow, Airflow execution class,
-  mw1.small, mw1.medium, mw1.large, MWAA VPC, Airflow requirements.txt,
-  MWAA CloudWatch Logs.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon Managed Workflows for Apache Airflow (MWAA) environments with production defaults: environment creation (create-environment), Airflow version selection, execution class sizing (mw1.small/medium/large), min/max workers, webserver access mode (PUBLIC_ONLY vs PRIVATE_ONLY), VPC networking (2 private subnets + 1 public subnet for MWAA), security groups, S3 bucket for DAGs (requirements.txt, plugins folder, startup script), DAG upload lifecycle, KMS encryption, CloudWatch Logs (DAG processing, scheduler, webserver, worker), Airflow configuration overrides, startup/stop time, requirements.txt version constraints and plugin ZIP management, IAM execution role. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating an MWAA environment, configuring Airflow on AWS, sizing execution class, or managing DAGs. Triggers: MWAA environment, Managed Airflow, Airflow execution class, mw1.small, mw1.medium, mw1.large, MWAA VPC, Airflow requirements.txt, MWAA CloudWatch Logs.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with mwaa access
-  (create-environment, get-environment, update-environment,
-  list-environments), iam (create-role, attach-role-policy), s3
-  (create-bucket, put-object), kms (create-key), ec2 (describe-subnets,
-  describe-security-groups), and cloudwatch (create-log-group). Works
-  with Terraform aws_mwaa_environment resource and CloudFormation
-  AWS::MWAA::Environment templates.
-keywords:
-  - aws
-  - mwaa
-  - airflow
-  - managed airflow
-  - environment
-  - execution class
-  - mw1.small
-  - mw1.medium
-  - mw1.large
-  - dag
-  - requirements.txt
-  - plugins
-  - vpc
-  - kms
-  - cloudwatch logs
-  - cloudops
-  - deploy
-  - analytics
-tags:
-  - aws
-  - mwaa
-  - airflow
-  - managed-airflow
-  - analytics
-  - deploy
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with mwaa access (create-environment, get-environment, update-environment, list-environments), iam (create-role, attach-role-policy), s3 (create-bucket, put-object), kms (create-key), ec2 (describe-subnets, describe-security-groups), and cloudwatch (create-log-group). Works with Terraform aws_mwaa_environment resource and CloudFormation AWS::MWAA::Environment templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - mwaa
-    - airflow
-    - managed-airflow
-    - analytics
-    - deploy
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - MWAA environment creation
-    - managed airflow deployment
-    - MWAA execution class sizing
-    - MWAA VPC subnets
-    - Airflow requirements.txt
-    - MWAA CloudWatch Logs
-    - MWAA webserver access mode
-    - MWAA plugin ZIP
-    - Airflow configuration overrides
-    - MWAA IAM execution role
-  when_to_use: >-
-    Invoke when the user wants to create an Amazon MWAA environment,
-    select an execution class (mw1.small/medium/large), configure VPC
-    networking (2 private subnets + security group), set up the S3 DAG
-    bucket with requirements.txt and plugins, configure CloudWatch Logs,
-    define Airflow configuration overrides, manage the IAM execution
-    role, configure KMS encryption, choose webserver access mode
-    (PUBLIC_ONLY vs PRIVATE_ONLY), or update an existing MWAA
-    environment. Do NOT invoke for self-managed Airflow on EC2/ECS, Amazon
-    EMR scheduling, AWS Step Functions, or Apache Airflow on EKS.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, mwaa, airflow, managed-airflow, analytics, deploy
+  dependencies: aws-orchestrator
+  keywords: aws, mwaa, airflow, managed airflow, environment, execution class, mw1.small, mw1.medium, mw1.large, dag, requirements.txt, plugins, vpc, kms, cloudwatch logs, cloudops, deploy, analytics
+  when_to_use: Invoke when the user wants to create an Amazon MWAA environment, select an execution class (mw1.small/medium/large), configure VPC networking (2 private subnets + security group), set up the S3 DAG bucket with requirements.txt and plugins, configure CloudWatch Logs, define Airflow configuration overrides, manage the IAM execution role, configure KMS encryption, choose webserver access mode (PUBLIC_ONLY vs PRIVATE_ONLY), or update an existing MWAA environment. Do NOT invoke for self-managed Airflow on EC2/ECS, Amazon EMR scheduling, AWS Step Functions, or Apache Airflow on EKS.
 ---
 
 # MWAA Environment Deployer

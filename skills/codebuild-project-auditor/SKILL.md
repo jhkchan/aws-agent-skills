@@ -1,83 +1,24 @@
 ---
 name: codebuild-project-auditor
-description: >-
-  Audits AWS CodeBuild projects for privileged mode (Docker-in-Docker host
-  kernel access), plaintext secrets in environment variables, unencrypted S3
-  logs and build artifacts, over-permissive service-role blast radius
-  (PassRole, admin wildcard), VPC/network exposure, and public build-status
-  badge leakage. Emits a deterministic verdict (PRIVILEGED | SECRET_LEAK |
-  NO_ENCRYPTION | OVERPERMISSIVE_ROLE | CONFIG_GAP | OK) per project with
-  enumerated findings and specific remediation. Use when reviewing CodeBuild
-  projects, checking for privileged build containers, validating secret
-  injection posture, auditing build-role IAM scope, hardening build-network
-  isolation, or verifying encryption of logs and artifacts before production
-  deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS CodeBuild projects for privileged mode (Docker-in-Docker host kernel access), plaintext secrets in environment variables, unencrypted S3 logs and build artifacts, over-permissive service-role blast radius (PassRole, admin wildcard), VPC/network exposure, and public build-status badge leakage. Emits a deterministic verdict (PRIVILEGED | SECRET_LEAK | NO_ENCRYPTION | OVERPERMISSIVE_ROLE | CONFIG_GAP | OK) per project with enumerated findings and specific remediation. Use when reviewing CodeBuild projects, checking for privileged build containers, validating secret injection posture, auditing build-role IAM scope, hardening build-network isolation, or verifying encryption of logs and artifacts before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline project-config classification.
-  Live-account audits use aws codebuild batch-get-projects, aws iam
-  list-attached-role-policies, aws iam list-role-policies, and aws iam
-  get-role-policy (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - CodeBuild
-  - build project
-  - privileged mode
-  - Docker-in-Docker
-  - DinD
-  - secret leak
-  - environment variables
-  - Secrets Manager
-  - SSM Parameter Store
-  - S3 logs encryption
-  - SSE-KMS
-  - build artifacts
-  - service role
-  - IAM blast radius
-  - PassRole
-  - admin wildcard
-  - VPC config
-  - build badge
-  - badge enabled
-  - public leak
-  - build hardening
-  - container security
-tags: [codebuild, devtools, security, build-pipeline, privileged-mode, secrets, iam, encryption, vpc, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline project-config classification. Live-account audits use aws codebuild batch-get-projects, aws iam list-attached-role-policies, aws iam list-role-policies, and aws iam get-role-policy (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
-  verdict_shape: "PRIVILEGED | SECRET_LEAK | NO_ENCRYPTION | OVERPERMISSIVE_ROLE | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a CodeBuild project before production deployment, checking for
-    privileged build containers, auditing secret-handling posture, validating
-    that S3 logs and build artifacts are SSE-KMS encrypted, scoping down the
-    CodeBuild service role, hardening VPC isolation for build network
-    egress, or auditing the public build-status badge exposure across an
-    account.
-  activation_triggers:
-    - "audit this CodeBuild project"
-    - "is my CodeBuild container privileged"
-    - "check CodeBuild for secrets in env vars"
-    - "CodeBuild S3 logs unencrypted"
-    - "CodeBuild service role too permissive"
-    - "CodeBuild build badge public"
-    - "harden my CodeBuild project"
-    - "CodeBuild VPC config missing"
-    - "CodeBuild IAM blast radius"
-  invocation_schema: >-
-    Input: either (a) a CodeBuild project configuration JSON document
-    (describe-project output) optionally paired with the service-role
-    identity-based policy, OR (b) a project name/ARN for live-account audit.
-    Output: deterministic PROJECT/VERDICT/REASON/FINDINGS/REMEDIATION block
-    per project, where VERDICT is in {PRIVILEGED, SECRET_LEAK, NO_ENCRYPTION,
-    OVERPERMISSIVE_ROLE, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: PRIVILEGED | SECRET_LEAK | NO_ENCRYPTION | OVERPERMISSIVE_ROLE | CONFIG_GAP | OK
+  when_to_use: Reviewing a CodeBuild project before production deployment, checking for privileged build containers, auditing secret-handling posture, validating that S3 logs and build artifacts are SSE-KMS encrypted, scoping down the CodeBuild service role, hardening VPC isolation for build network egress, or auditing the public build-status badge exposure across an account.
+  activation_triggers: audit this CodeBuild project, is my CodeBuild container privileged, check CodeBuild for secrets in env vars, CodeBuild S3 logs unencrypted, CodeBuild service role too permissive, CodeBuild build badge public, harden my CodeBuild project, CodeBuild VPC config missing, CodeBuild IAM blast radius
+  invocation_schema: 'Input: either (a) a CodeBuild project configuration JSON document (describe-project output) optionally paired with the service-role identity-based policy, OR (b) a project name/ARN for live-account audit. Output: deterministic PROJECT/VERDICT/REASON/FINDINGS/REMEDIATION block per project, where VERDICT is in {PRIVILEGED, SECRET_LEAK, NO_ENCRYPTION, OVERPERMISSIVE_ROLE, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CodeBuild, build project, privileged mode, Docker-in-Docker, DinD, secret leak, environment variables, Secrets Manager, SSM Parameter Store, S3 logs encryption, SSE-KMS, build artifacts, service role, IAM blast radius, PassRole, admin wildcard, VPC config, build badge, badge enabled, public leak, build hardening, container security
+  tags: codebuild, devtools, security, build-pipeline, privileged-mode, secrets, iam, encryption, vpc, audit
 ---
 
 # CodeBuild Project Auditor

@@ -1,102 +1,27 @@
 ---
 name: backup-cross-region-operator
-description: >-
-  Operates AWS Backup cross-region and cross-account operations —
-  adds cross-region copy rules to backup plans (destination region,
-  KMS, lifecycle), configures cross-account copy via AWS
-  Organizations backup policies, restores from cross-region
-  recovery points (destination IAM, vault, KMS), deploys DR vault
-  locks, and operates the latest features (continuous backups
-  cross-region, Backup Vault Lock cross-region, cross-account
-  restore with external key). Runs deterministic pre-checks
-  (destination vault + KMS, source role grants
-  backup:CopyIntoBackupVault, accounts in same org, recovery point
-  COMPLETED, region opt-in), emits the exact
-  backup:create-backup-plan / start-copy-job / start-restore-job
-  CLI behind a CONFIRM gate, and verifies state post-apply. Emits
-  a verdict (READY | BLOCKED | COMPLETED). Use when adding a DR
-  copy rule, running cross-region restore drills, configuring
-  cross-account backup, locking DR vaults, or enabling continuous
-  cross-region backups.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates AWS Backup cross-region and cross-account operations — adds cross-region copy rules to backup plans (destination region, KMS, lifecycle), configures cross-account copy via AWS Organizations backup policies, restores from cross-region recovery points (destination IAM, vault, KMS), deploys DR vault locks, and operates the latest features (continuous backups cross-region, Backup Vault Lock cross-region, cross-account restore with external key). Runs deterministic pre-checks (destination vault + KMS, source role grants backup:CopyIntoBackupVault, accounts in same org, recovery point COMPLETED, region opt-in), emits the exact backup:create-backup-plan / start-copy-job / start-restore-job CLI behind a CONFIRM gate, and verifies state post-apply. Emits a verdict (READY | BLOCKED | COMPLETED). Use when adding a DR copy rule, running cross-region restore drills, configuring cross-account backup, locking DR vaults, or enabling continuous cross-region backups.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws backup create-backup-plan, start-copy-job,
-  describe-copy-job, list-copy-jobs, start-restore-job,
-  describe-restore-job, put-backup-vault-lock-configuration,
-  describe-backup-vault, list-recovery-points-by-backup-vault,
-  describe-recovery-point, list-legal-holds, put-backup-vault-access-policy,
-  create-backup-vault (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - AWS Backup
-  - cross-region copy
-  - cross-account backup
-  - DR copy
-  - disaster recovery
-  - backup plan copy action
-  - CopyActions
-  - destination region
-  - destination vault
-  - KMS key
-  - backup vault lock
-  - compliance mode
-  - governance mode
-  - continuous backup cross-region
-  - PITR cross-region
-  - AWS Organizations
-  - backup policy
-  - cross-account restore
-  - external KMS key
-  - backup vault access policy
-tags: [aws-backup, storage, operate, cross-region-copy, cross-account, dr, backup-plan, vault-lock, continuous-backup, kms, organizations, restore]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws backup create-backup-plan, start-copy-job, describe-copy-job, list-copy-jobs, start-restore-job, describe-restore-job, put-backup-vault-lock-configuration, describe-backup-vault, list-recovery-points-by-backup-vault, describe-recovery-point, list-legal-holds, put-backup-vault-access-policy, create-backup-vault (AWS CLI v2, SSO...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Adding cross-region copy rules to backup plans, configuring
-    cross-account backup via Organizations backup policies,
-    restoring from cross-region recovery points, deploying DR
-    vaults with vault lock, enabling continuous backups across
-    regions, or running cross-region restore drills.
-  activation_triggers:
-    - "cross-region copy backup"
-    - "DR copy backup plan"
-    - "cross-account backup"
-    - "AWS Organizations backup policy"
-    - "cross-region restore"
-    - "restore from DR region"
-    - "destination region backup"
-    - "destination vault backup"
-    - "backup vault lock cross-region"
-    - "DR vault compliance"
-    - "continuous backup cross-region"
-    - "PITR cross-region"
-    - "copy action backup plan"
-    - "external KMS key backup"
-    - "cross-account restore"
-    - "backup start-copy-job"
-  invocation_schema: >-
-    Input: either (a) a cross-region operation intent (add-copy-rule,
-    start-copy, cross-account-enable, start-cross-region-restore,
-    lock-dr-vault, enable-continuous-cross-region, diagnose) with
-    target source vault, destination region, destination vault,
-    KMS key, lifecycle, and resource scope; OR (b) an existing
-    recovery point ARN in the DR region for live-account restore.
-    Output: deterministic OPERATION/VERDICT/PRE_CHECKS/STEPS/
-    POST_VERIFY block per operation, where VERDICT is one of
-    READY, BLOCKED, COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Adding cross-region copy rules to backup plans, configuring cross-account backup via Organizations backup policies, restoring from cross-region recovery points, deploying DR vaults with vault lock, enabling continuous backups across regions, or running cross-region restore drills.
+  activation_triggers: cross-region copy backup, DR copy backup plan, cross-account backup, AWS Organizations backup policy, cross-region restore, restore from DR region, destination region backup, destination vault backup, backup vault lock cross-region, DR vault compliance, continuous backup cross-region, PITR cross-region, copy action backup plan, external KMS key backup, cross-account restore, backup start-copy-job
+  invocation_schema: 'Input: either (a) a cross-region operation intent (add-copy-rule, start-copy, cross-account-enable, start-cross-region-restore, lock-dr-vault, enable-continuous-cross-region, diagnose) with target source vault, destination region, destination vault, KMS key, lifecycle, and resource scope; OR (b) an existing recovery point ARN in the DR region for live-account restore. Output: deterministic OPERATION/VERDICT/PRE_CHECKS/STEPS/ POST_VERIFY block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Backup, cross-region copy, cross-account backup, DR copy, disaster recovery, backup plan copy action, CopyActions, destination region, destination vault, KMS key, backup vault lock, compliance mode, governance mode, continuous backup cross-region, PITR cross-region, AWS Organizations, backup policy, cross-account restore, external KMS key, backup vault access policy
+  tags: aws-backup, storage, operate, cross-region-copy, cross-account, dr, backup-plan, vault-lock, continuous-backup, kms, organizations, restore
 ---
 
 # Backup Cross-Region Operator

@@ -1,91 +1,29 @@
 ---
 name: cloudformation-stack-rollback-troubleshooter
-description: >-
-  Diagnoses AWS CloudFormation stack rollback failures through a
-  rollback-focused decision tree: UPDATE_ROLLBACK_FAILED state requiring
-  ContinueUpdateRollback, custom resource Lambda timeout (no response to
-  CFN signal — the #1 rollback blocker), nested stack rollback cascade,
-  IAM policy replacement requiring full resource recreation, drift
-  detection blocking clean rollback, stack policy preventing rollback
-  update, dependent resources in-use (cannot delete), RDS/Aurora
-  snapshot requirement before rollback, DisableRollback after partial
-  failure, rollback vs update-with-rollback semantics, stack delete vs
-  rollback, and ChangeSet preview before rollback. Walks symptoms to a
-  verified root cause with evidence-backed probes; emits
-  ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses AWS CloudFormation stack rollback failures through a rollback-focused decision tree: UPDATE_ROLLBACK_FAILED state requiring ContinueUpdateRollback, custom resource Lambda timeout (no response to CFN signal — the #1 rollback blocker), nested stack rollback cascade, IAM policy replacement requiring full resource recreation, drift detection blocking clean rollback, stack policy preventing rollback update, dependent resources in-use (cannot delete), RDS/Aurora snapshot requirement before rollback, DisableRollback after partial failure, rollback vs update-with-rollback semantics, stack delete vs rollback, and ChangeSet preview before rollback. Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted stack events and describe-stacks output. Live-account diagnosis uses aws cloudformation describe-stacks, describe-stack-events, describe-stack-resources, get-template-summary, describe-stack-resource-drifts, get-stack-policy, create-change-set, execute-change-set, continue-update-rollback, list-change-sets, and aws lambda get-function-configuration for custom resource verification (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- CloudFormation
-- stack rollback
-- UPDATE_ROLLBACK_FAILED
-- rollback failure
-- ContinueUpdateRollback
-- custom resource timeout
-- custom resource Lambda
-- nested stack rollback
-- nested stack cascade
-- IAM replacement
-- drift detection
-- stack drift
-- stack policy
-- dependent resources
-- RDS snapshot
-- Aurora snapshot
-- DisableRollback
-- ChangeSet
-- rollback vs update
-- stack delete
-- CloudFormation troubleshooting
-tags:
-- cloudformation
-- devtools
-- troubleshooting
-- rollback
-- update-rollback-failed
-- custom-resource
-- nested-stack
-- drift
-- stack-policy
-- changeset
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted stack events and describe-stacks output. Live-account diagnosis uses aws cloudformation describe-stacks, describe-stack-events, describe-stack-resources, get-template-summary, describe-stack-resource-drifts, get-stack-policy, create-change-set, execute-change-set, continue-update-rollback, list-change-sets, and aws lambda get-function-configuration for custom...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
-  when_to_use: Diagnosing a CloudFormation stack rollback failure where the root cause may be custom resource Lambda timeout (no CFN signal — the #1 blocker), UPDATE_ROLLBACK_FAILED state requiring ContinueUpdateRollback, nested stack rollback cascade, IAM policy replacement requiring full recreation, drift detection blocking clean rollback, stack policy Deny preventing rollback update, dependent resources in-use (cannot delete), RDS/Aurora snapshot requirement, DisableRollback after partial failure, or rollback vs update-with-rollback confusion — walking the symptom to the failed resource and layer with verify commands, validating why a stack rollback failed, or triaging a "stack stuck in UPDATE_ROLLBACK_FAILED" page where the root cause is a specific resource that cannot be rolled back, not the stack itself.
+  when_to_use: Diagnosing a CloudFormation stack rollback failure where the root cause may be custom resource Lambda timeout (no CFN signal — the
   when_not_to_use: Initial CloudFormation deployment failures (use cloudformation-stack-troubleshooter), CloudFormation drift posture audits (use cloudformation-drift-troubleshooter), Terraform or CDK-level debugging (use the IaC tool's own diagnostics), or IAM policy authoring (use iam-least-privilege-advisor). This skill diagnoses rollback failures; it does not author templates or audit steady-state drift posture.
-  activation_triggers:
-  - CloudFormation UPDATE_ROLLBACK_FAILED
-  - CloudFormation rollback failed
-  - stack stuck UPDATE_ROLLBACK_FAILED
-  - ContinueUpdateRollback
-  - custom resource Lambda timeout CloudFormation
-  - custom resource no response CloudFormation
-  - nested stack rollback cascade
-  - CloudFormation rollback cascade
-  - IAM replacement rollback CloudFormation
-  - drift blocking rollback CloudFormation
-  - stack policy preventing rollback
-  - dependent resources cannot delete CloudFormation
-  - RDS snapshot rollback CloudFormation
-  - Aurora snapshot rollback
-  - DisableRollback CloudFormation
-  - ChangeSet rollback preview
-  - rollback vs update CloudFormation
-  - stack delete vs rollback
-  - diagnose CloudFormation rollback
+  activation_triggers: CloudFormation UPDATE_ROLLBACK_FAILED, CloudFormation rollback failed, stack stuck UPDATE_ROLLBACK_FAILED, ContinueUpdateRollback, custom resource Lambda timeout CloudFormation, custom resource no response CloudFormation, nested stack rollback cascade, CloudFormation rollback cascade, IAM replacement rollback CloudFormation, drift blocking rollback CloudFormation, stack policy preventing rollback, dependent resources cannot delete CloudFormation, RDS snapshot rollback CloudFormation, Aurora snapshot rollback, DisableRollback CloudFormation, ChangeSet rollback preview, rollback vs update CloudFormation, stack delete vs rollback, diagnose CloudFormation rollback
   invocation_schema: 'Input: either (a) a rollback failure symptom description (stack status, StackId, error event message from describe-stack-events), optionally paired with the stack configuration (describe-stacks output, template summary, recent events), OR (b) a StackName or StackId plus the specific resource that failed to roll back for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {UPDATE_ROLLBACK_FAILED, CUSTOM_RESOURCE_TIMEOUT, NESTED_STACK_CASCADE, IAM_REPLACEMENT, DRIFT_DETECTION, STACK_POLICY_BLOCKING, DEPENDENT_RESOURCE_IN_USE, RDS_SNAPSHOT_REQUIRED, DISABLE_ROLLBACK_PARTIAL, CHANGESET_REJECTED, UNKNOWN}.'
   invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"CloudFormation stack prod-infrastructure is stuck in\nUPDATE_ROLLBACK_FAILED after a failed update. The stack event shows\n'CustomResource' timed out waiting for response from the Lambda\nfunction. I need to unblock the rollback.\"\nStackName: prod-infrastructure\nStackStatus: UPDATE_ROLLBACK_FAILED\nStackId: arn:aws:cloudformation:us-east-1:111111111111:stack/prod-infrastructure/abc-123\nFailedResource: Custom::AppConfig (LogicalId: AppConfigCustomResource)\nErrorEvent: \"Custom resource failed: Provider Lambda function timed out\n  (60s) without sending a response to the CloudFormation signal URL\""
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudFormation, stack rollback, UPDATE_ROLLBACK_FAILED, rollback failure, ContinueUpdateRollback, custom resource timeout, custom resource Lambda, nested stack rollback, nested stack cascade, IAM replacement, drift detection, stack drift, stack policy, dependent resources, RDS snapshot, Aurora snapshot, DisableRollback, ChangeSet, rollback vs update, stack delete, CloudFormation troubleshooting
+  tags: cloudformation, devtools, troubleshooting, rollback, update-rollback-failed, custom-resource, nested-stack, drift, stack-policy, changeset
 ---
 
 # CloudFormation Stack Rollback Troubleshooter

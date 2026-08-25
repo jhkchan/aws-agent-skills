@@ -1,46 +1,15 @@
 ---
 name: s3-storage-class-optimizer
 description: 'Optimises S3 storage cost across six dimensions: lifecycle policy configuration (Standard to Standard-IA to Glacier Instant to Glacier Flexible to Glacier Deep Archive transition timing with minimum-days constraints), Intelligent-Tiering activation with Archive Access and Deep Archive Access tiers, Storage Lens analysis for object-age distribution and prefix-level cost allocation, versioning cost impact (noncurrent object churn and delete-marker accumulation), retrieval-pattern matching (Glacier Instant vs Flexible vs Deep Archive trade-offs), and S3 Batch Operations for bulk storage-class migration. Uses S3 Storage Lens, object-level age metrics, and Cost Explorer S3 usage breakdown to project per-TB savings. Emits FURTHER_OPTIMIZATION_AVAILABLE with tier transitions and dollar savings, OPTIMIZED, or ALREADY_OPTIMAL.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline classification works from pasted Storage Lens exports and Cost Explorer data. Live-account optimization uses aws s3api list-buckets, aws s3api get-bucket-lifecycle-configuration, aws s3api get-bucket-versioning, aws s3api get-bucket-intelligent-tiering-configuration, aws s3control get-storage-lens-configuration, aws ce get-cost-and-usage, and aws s3api list-objects-v2 with --query for object-age sampling (AWS CLI v2, SSO or key-based credentials). Pricing references us-east-1 published rates as of 2026; re-state regional rates for other regions.
-keywords:
-- S3
-- storage class
-- lifecycle policy
-- Intelligent-Tiering
-- Glacier
-- Deep Archive
-- Standard-IA
-- Glacier Instant Retrieval
-- Storage Lens
-- object age
-- versioning cost
-- noncurrent objects
-- S3 Batch Operations
-- cost optimization
-- FinOps
-- prefix grouping
-- MFA delete
-- delete markers
-- storage cost
-- per TB
-tags:
-- s3
-- storage
-- cost-optimization
-- finops
-- lifecycle
-- intelligent-tiering
-- glacier
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline classification works from pasted Storage Lens exports and Cost Explorer data. Live-account optimization uses aws s3api list-buckets, aws s3api get-bucket-lifecycle-configuration, aws s3api get-bucket-versioning, aws s3api get-bucket-intelligent-tiering-configuration, aws s3control get-storage-lens-configuration, aws ce get-cost-and-usage, and aws s3api list-objects-v2 with --query for object-age...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: optimize
   skill_class: capability
@@ -48,25 +17,13 @@ metadata:
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
   when_to_use: Optimising S3 storage cost, deploying lifecycle policies, evaluating Intelligent-Tiering activation, analysing Storage Lens object-age distribution, diagnosing versioning bloat, choosing Glacier Instant vs Flexible vs Deep Archive, planning S3 Batch Operations for class migration, or running a storage FinOps review.
   when_not_to_use: S3 security or access-control auditing (use the S3 auditor skill), S3 performance optimisation for latency-sensitive workloads (Transfer Acceleration, CloudFront — use the CDN skills), or EBS volume cost optimisation (use ebs-volume-optimizer). This skill focuses on storage-class cost reduction, not access governance.
-  activation_triggers:
-  - optimise S3 storage cost
-  - S3 lifecycle policy
-  - S3 Intelligent-Tiering
-  - S3 Glacier migration
-  - S3 Deep Archive
-  - S3 Storage Lens analysis
-  - S3 versioning cost
-  - S3 noncurrent objects
-  - S3 Batch Operations
-  - S3 cost per TB
-  - S3 Standard-IA transition
-  - S3 delete marker cleanup
-  - S3 prefix cost allocation
-  - S3 FinOps review
-  - reduce S3 bill
-  - S3 storage class review
+  activation_triggers: optimise S3 storage cost, S3 lifecycle policy, S3 Intelligent-Tiering, S3 Glacier migration, S3 Deep Archive, S3 Storage Lens analysis, S3 versioning cost, S3 noncurrent objects, S3 Batch Operations, S3 cost per TB, S3 Standard-IA transition, S3 delete marker cleanup, S3 prefix cost allocation, S3 FinOps review, reduce S3 bill, S3 storage class review
   invocation_schema: 'Input: either (a) a bucket identifier + live-account context, (b) a Storage Lens export or Cost Explorer S3 usage breakdown, OR (c) bucket configuration metadata (lifecycle config, versioning status, Intelligent-Tiering config) with object-age distribution. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ ESTIMATED_SAVINGS/MIGRATION_STEPS block per bucket, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE, ALREADY_OPTIMAL.'
   invocation_example: "# Minimal valid input (offline classification):\nBucketName: data-lake-raw-prod\nRegion: us-east-1\nStorage (total): 45 TB\nStorage class distribution:\n  - Standard: 32 TB (71%)\n  - Standard-IA: 8 TB (18%)\n  - Glacier Instant Retrieval: 0 TB\n  - Glacier Flexible Retrieval: 3 TB (7%)\n  - Glacier Deep Archive: 2 TB (4%)\nVersioning: Enabled\nLifecycle policy: none\nIntelligent-Tiering: not configured\nStorage Lens (last 30 days):\n  - Objects aged 0-30 days: 12 TB\n  - Objects aged 31-90 days: 9 TB\n  - Objects aged 91-180 days: 6 TB\n  - Objects aged 181-365 days: 5 TB\n  - Objects aged >365 days: 13 TB\nRetrieval frequency: <1% of objects accessed after 90 days\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: S3, storage class, lifecycle policy, Intelligent-Tiering, Glacier, Deep Archive, Standard-IA, Glacier Instant Retrieval, Storage Lens, object age, versioning cost, noncurrent objects, S3 Batch Operations, cost optimization, FinOps, prefix grouping, MFA delete, delete markers, storage cost, per TB
+  tags: s3, storage, cost-optimization, finops, lifecycle, intelligent-tiering, glacier
 ---
 
 # S3 Storage Class Optimizer

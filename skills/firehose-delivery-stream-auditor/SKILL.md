@@ -1,86 +1,24 @@
 ---
 name: firehose-delivery-stream-auditor
-description: >-
-  Audits Amazon Kinesis Data Firehose (firehose) delivery streams for
-  encryption-at-rest gaps (explicit NoEncryption, missing CMK, or
-  absent EncryptionConfiguration defaulting to bucket policy),
-  S3-destination BufferingHints quota violations, Lambda transformation
-  backup/DLQ posture, CloudWatch error-logging silence (LoggingConfig
-  disabled or absent — transformation failures become invisible),
-  source-backup absence under dynamic partitioning (silent data-loss
-  vector), and dynamic-partitioning structural integrity (metadata
-  extraction wiring, ExtendedS3 requirement, RetryDuration=0 trap).
-  Emits a deterministic first-fail-wins verdict
-  (NO_ENCRYPTION | CONFIG_GAP | OK) per delivery stream with enumerated
-  findings and CLI remediation. Use when reviewing Firehose delivery
-  streams, validating SSE-KMS CMK coverage, auditing Lambda
-  transformation resilience, checking dynamic-partitioning source
-  backup, or hardening stream posture before production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits Amazon Kinesis Data Firehose (firehose) delivery streams for encryption-at-rest gaps (explicit NoEncryption, missing CMK, or absent EncryptionConfiguration defaulting to bucket policy), S3-destination BufferingHints quota violations, Lambda transformation backup/DLQ posture, CloudWatch error-logging silence (LoggingConfig disabled or absent — transformation failures become invisible), source-backup absence under dynamic partitioning (silent data-loss vector), and dynamic-partitioning structural integrity (metadata extraction wiring, ExtendedS3 requirement, RetryDuration=0 trap). Emits a deterministic first-fail-wins verdict (NO_ENCRYPTION | CONFIG_GAP | OK) per delivery stream with enumerated findings and CLI remediation. Use when reviewing Firehose delivery streams, validating SSE-KMS CMK coverage, auditing Lambda transformation resilience, checking dynamic-partitioning source backup, or hardening stream posture before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline configuration classification.
-  Live-account audits use aws firehose describe-delivery-stream,
-  list-delivery-streams, list-tags-for-delivery-stream, and aws kms
-  describe-key (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Kinesis Data Firehose
-  - delivery stream
-  - firehose
-  - SSE-KMS
-  - SSE-S3
-  - NoEncryption
-  - KMSEncryptionConfig
-  - BufferingHints
-  - Lambda transformation
-  - ProcessingConfiguration
-  - LoggingConfig
-  - CloudWatch error logging
-  - S3BackupConfiguration
-  - source backup
-  - DynamicPartitioningConfiguration
-  - MetadataExtraction
-  - ExtendedS3DestinationConfiguration
-  - S3DestinationConfiguration
-  - data loss vector
-  - silent failure
-  - StartDeliveryStreamEncryption
-  - firehose audit
-tags: [firehose, kinesis, analytics, encryption, kms, lambda-transform, dynamic-partitioning, s3-destination, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline configuration classification. Live-account audits use aws firehose describe-delivery-stream, list-delivery-streams, list-tags-for-delivery-stream, and aws kms describe-key (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
-  verdict_shape: "NO_ENCRYPTION | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a Firehose delivery stream before production deployment,
-    checking for NoEncryption plaintext destinations, validating SSE-KMS
-    CMK coverage on S3 destinations, auditing Lambda transformation
-    resilience (buffer, DLQ, source backup), checking dynamic-partitioning
-    source-backup posture, or hardening stream posture for compliance.
-  activation_triggers:
-    - "audit this Firehose delivery stream"
-    - "is my Firehose stream encrypted"
-    - "check Firehose Lambda transformation"
-    - "is dynamic partitioning configured correctly"
-    - "Firehose source backup missing"
-    - "CloudWatch error logging disabled Firehose"
-    - "BufferingHints out of range"
-    - "firehose data loss vector"
-    - "firehose NoEncryption destination"
-  invocation_schema: >-
-    Input: either (a) a Firehose delivery-stream configuration JSON
-    (describe-delivery-stream output), optionally paired with related KMS
-    key + S3 bucket metadata, OR (b) a delivery-stream name/ARN for
-    live-account audit. Output: deterministic STREAM/VERDICT/REASON/
-    FINDINGS/REMEDIATION block per stream, where
-    VERDICT ∈ {NO_ENCRYPTION, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: NO_ENCRYPTION | CONFIG_GAP | OK
+  when_to_use: Reviewing a Firehose delivery stream before production deployment, checking for NoEncryption plaintext destinations, validating SSE-KMS CMK coverage on S3 destinations, auditing Lambda transformation resilience (buffer, DLQ, source backup), checking dynamic-partitioning source-backup posture, or hardening stream posture for compliance.
+  activation_triggers: audit this Firehose delivery stream, is my Firehose stream encrypted, check Firehose Lambda transformation, is dynamic partitioning configured correctly, Firehose source backup missing, CloudWatch error logging disabled Firehose, BufferingHints out of range, firehose data loss vector, firehose NoEncryption destination
+  invocation_schema: 'Input: either (a) a Firehose delivery-stream configuration JSON (describe-delivery-stream output), optionally paired with related KMS key + S3 bucket metadata, OR (b) a delivery-stream name/ARN for live-account audit. Output: deterministic STREAM/VERDICT/REASON/ FINDINGS/REMEDIATION block per stream, where VERDICT ∈ {NO_ENCRYPTION, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Kinesis Data Firehose, delivery stream, firehose, SSE-KMS, SSE-S3, NoEncryption, KMSEncryptionConfig, BufferingHints, Lambda transformation, ProcessingConfiguration, LoggingConfig, CloudWatch error logging, S3BackupConfiguration, source backup, DynamicPartitioningConfiguration, MetadataExtraction, ExtendedS3DestinationConfiguration, S3DestinationConfiguration, data loss vector, silent failure, StartDeliveryStreamEncryption, firehose audit
+  tags: firehose, kinesis, analytics, encryption, kms, lambda-transform, dynamic-partitioning, s3-destination, audit
 ---
 
 # Kinesis Data Firehose Delivery Stream Auditor

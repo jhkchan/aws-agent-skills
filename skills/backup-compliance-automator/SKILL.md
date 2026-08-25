@@ -1,113 +1,28 @@
 ---
 name: backup-compliance-automator
-description: >-
-  Designs AWS Backup compliance automation across the four pillars: AWS
-  Backup Audit Manager (audit framework, audit template, manual and
-  automated controls), backup reporting (job summary report, compliance
-  report, coverage report), legal hold automation (litigation hold via
-  EventBridge on s3:ObjectSent to evidence locker, BackupLegalHold resource
-  for immutable recovery points), cross-account / cross-region backup
-  auditing via AWS Organizations backup vault, latest: AWS Backup Search
-  (search across backups), Backup cost allocation tags. Includes AWS
-  Backup Report Stream, Backup Audit Manager control library, and
-  EventBridge Scheduler for periodic audit runs. Emits AUTOMATED with the
-  compliance playbook or MANUAL_STEP_REQUIRED with the gap. Use when
-  designing backup compliance, legal hold workflows, or cross-account
-  backup audit.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Designs AWS Backup compliance automation across the four pillars: AWS Backup Audit Manager (audit framework, audit template, manual and automated controls), backup reporting (job summary report, compliance report, coverage report), legal hold automation (litigation hold via EventBridge on s3:ObjectSent to evidence locker, BackupLegalHold resource for immutable recovery points), cross-account / cross-region backup auditing via AWS Organizations backup vault, latest: AWS Backup Search (search across backups), Backup cost allocation tags. Includes AWS Backup Report Stream, Backup Audit Manager control library, and EventBridge Scheduler for periodic audit runs. Emits AUTOMATED with the compliance playbook or MANUAL_STEP_REQUIRED with the gap. Use when designing backup compliance, legal hold workflows, or cross-account backup audit.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan authoring. Live deployment
-  uses aws backup audit-manager create-framework / create-report-plan,
-  aws backup start-backup-job / start-restore-job,
-  aws backup create-legal-hold / start-legal-hold,
-  aws backup create-backup-vault (cross-account),
-  aws backup-gateway list-hypervisors (VMware),
-  aws backup list-tags / tag-resource (cost allocation),
-  aws backup search (Backup Search),
-  aws events put-rule / put-targets (legal hold triggers),
-  aws organizations list-delegated-administrators
-  (backup-gateway delegated admin) — AWS CLI v2, SSO or key-based,
-  Organizations backup vault access role.
-keywords:
-  - AWS Backup
-  - Backup Audit Manager
-  - audit framework
-  - audit template
-  - compliance report
-  - job summary report
-  - coverage report
-  - legal hold
-  - litigation hold
-  - immutability
-  - Backup Vault Lock
-  - cross-account backup
-  - cross-region backup
-  - AWS Organizations
-  - Backup Search
-  - cost allocation tags
-  - backup reporting
-  - Backup Report Stream
-  - EventBridge Scheduler
-  - control library
-tags:
-  - aws-backup
-  - audit-manager
-  - legal-hold
-  - backup-vault
-  - automate
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan authoring. Live deployment uses aws backup audit-manager create-framework / create-report-plan, aws backup start-backup-job / start-restore-job, aws backup create-legal-hold / start-legal-hold, aws backup create-backup-vault (cross-account), aws backup-gateway list-hypervisors (VMware), aws backup list-tags / tag-resource (cost allocation), aws backup search (Backup Search)...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: automate
   skill_class: capability
   lifecycle_status: active
   verdict_shape: AUTOMATED | MANUAL_STEP_REQUIRED
-  when_to_use: >-
-    Designing backup compliance automation, configuring AWS Backup Audit
-    Manager frameworks and templates, building legal hold workflows,
-    centralizing cross-account backup auditing, deploying Backup Search,
-    configuring backup cost allocation tags, or automating compliance
-    report generation on a schedule.
-  when_not_to_use:
-    - Designing the backup plan itself (use backup-plan-auditor or operate-backup-vault — this skill audits compliance, not the plan).
-    - Executing a restore (use rds-backup-restore-operator / ec2-backup-operator — this skill does not perform restores).
-    - General storage cost optimization (use ebs-volume-optimizer or s3-storage-lens — Backup is one input).
-    - Disaster recovery failover design (use dr-failover-automator — Backup is one DR input, not the strategy).
-  activation_triggers:
-    - "Backup compliance automation"
-    - "Backup Audit Manager"
-    - "audit framework"
-    - "audit template"
-    - "legal hold"
-    - "litigation hold"
-    - "Backup Vault Lock"
-    - "compliance report"
-    - "job summary report"
-    - "cross-account backup audit"
-    - "Backup Search"
-    - "cost allocation tags backup"
-    - "Backup Report Stream"
-    - "EventBridge legal hold"
-    - "Organizations backup vault"
-  invocation_schema: >-
-    Input: either (a) a backup compliance requirement ("build a Backup
-    Audit Manager framework for SOC2 with daily compliance reports and
-    legal hold on demand"), OR (b) an existing Backup Audit Manager
-    configuration / legal hold workflow / cross-account vault setup to
-    audit and harden. Output: deterministic Backup compliance block per
-    requirement — FRAMEWORK/REPORTING/LEGAL_HOLD/CROSS_ACCOUNT/SEARCH/
-    VERIFICATION/VERDICT — where VERDICT is AUTOMATED (compliance
-    playbook complete with all gates passing) or MANUAL_STEP_REQUIRED
-    (specific gap cited, e.g., no legal hold tested, audit framework
-    missing control, cross-account vault not configured).
+  when_to_use: Designing backup compliance automation, configuring AWS Backup Audit Manager frameworks and templates, building legal hold workflows, centralizing cross-account backup auditing, deploying Backup Search, configuring backup cost allocation tags, or automating compliance report generation on a schedule.
+  when_not_to_use: Designing the backup plan itself (use backup-plan-auditor or operate-backup-vault — this skill audits compliance, not the plan)., Executing a restore (use rds-backup-restore-operator / ec2-backup-operator — this skill does not perform restores)., General storage cost optimization (use ebs-volume-optimizer or s3-storage-lens — Backup is one input)., Disaster recovery failover design (use dr-failover-automator — Backup is one DR input, not the strategy).
+  activation_triggers: Backup compliance automation, Backup Audit Manager, audit framework, audit template, legal hold, litigation hold, Backup Vault Lock, compliance report, job summary report, cross-account backup audit, Backup Search, cost allocation tags backup, Backup Report Stream, EventBridge legal hold, Organizations backup vault
+  invocation_schema: 'Input: either (a) a backup compliance requirement ("build a Backup Audit Manager framework for SOC2 with daily compliance reports and legal hold on demand"), OR (b) an existing Backup Audit Manager configuration / legal hold workflow / cross-account vault setup to audit and harden. Output: deterministic Backup compliance block per requirement — FRAMEWORK/REPORTING/LEGAL_HOLD/CROSS_ACCOUNT/SEARCH/ VERIFICATION/VERDICT — where VERDICT is AUTOMATED (compliance playbook complete with all gates passing) or MANUAL_STEP_REQUIRED (specific gap cited, e.g., no legal hold tested, audit framework missing control, cross-account vault not configured).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Backup, Backup Audit Manager, audit framework, audit template, compliance report, job summary report, coverage report, legal hold, litigation hold, immutability, Backup Vault Lock, cross-account backup, cross-region backup, AWS Organizations, Backup Search, cost allocation tags, backup reporting, Backup Report Stream, EventBridge Scheduler, control library
+  tags: aws-backup, audit-manager, legal-hold, backup-vault, automate
 ---
 
 # Backup Compliance Automator

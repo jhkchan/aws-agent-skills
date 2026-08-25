@@ -1,41 +1,15 @@
 ---
 name: kms-key-rotation-optimizer
 description: 'Optimises AWS KMS key rotation and lifecycle cost across seven dimensions: key inventory audit (orphaned keys at $1/key/month, unused key detection via CloudTrail API call analysis), rotation strategy (enable automatic annual rotation on customer-managed keys — free and transparent, same key ARN), grant optimization (retire expired grants on deleted IAM principals), alias management for rotation transparency (aliases survive key changes), cross-account key usage (grant token lifecycle, shared vs per-account keys), multi-region keys for DR (replica keys cost $1/key/month per region, detect unused replicas), and deletion window management (7-30 day pending deletion window, billing continues until expiry). Emits FURTHER_OPTIMIZATION_AVAILABLE, OPTIMIZED, or ALREADY_OPTIMAL. Use when reviewing KMS spend, auditing key inventory, or planning rotation strategy.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted KMS key configurations and CloudTrail API call summaries. Live-account optimization uses aws kms list-keys, aws kms describe-key, aws kms get-key-rotation-status, aws kms list-aliases, aws kms list-grants, aws kms list-resource-tags, aws cloudtrail lookup-events (Decrypt, Encrypt, GenerateDataKey), aws ce get-cost-and-usage (AWS CLI v2, SSO or key-based credentials). Pricing references us-east-1 published rates as of 2026.
-keywords:
-- KMS
-- key rotation
-- cost optimization
-- customer managed keys
-- AWS managed keys
-- key lifecycle
-- grant management
-- alias management
-- multi-region keys
-- key deletion
-- CloudTrail
-- cross-account
-- FinOps
-- CloudOps
-- security
-tags:
-- kms
-- security
-- cost-optimization
-- finops
-- key-management
-- encryption
-- key-rotation
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted KMS key configurations and CloudTrail API call summaries. Live-account optimization uses aws kms list-keys, aws kms describe-key, aws kms get-key-rotation-status, aws kms list-aliases, aws kms list-grants, aws kms list-resource-tags, aws cloudtrail lookup-events (Decrypt, Encrypt, GenerateDataKey), aws ce get-cost-and-usage (AWS CLI v2, SSO or key-based...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: optimize
   skill_class: capability
@@ -43,23 +17,13 @@ metadata:
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
   when_to_use: Optimising KMS key cost, auditing key inventory, detecting unused or orphaned keys, evaluating rotation strategy (automatic vs manual), cleaning up stale grants, analysing cross-account key usage, reviewing multi-region key replicas, or managing key deletion windows.
   when_not_to_use: KMS key policy security auditing (use kms-key-policy-auditor), KMS key deployment (use kms-key-deployer), KMS key operational rotation execution (use kms-key-rotation-operator), or Secrets Manager rotation (use secrets-rotation-operator). This skill focuses on cost-driven optimization decisions, not security policy review or functional rotation execution.
-  activation_triggers:
-  - optimise KMS cost
-  - KMS key inventory audit
-  - KMS unused keys
-  - KMS key rotation strategy
-  - KMS grant cleanup
-  - KMS stale grants
-  - KMS cross-account cost
-  - KMS multi-region keys cost
-  - KMS key deletion window
-  - KMS FinOps savings
-  - reduce KMS bill
-  - KMS orphaned keys
-  - KMS API call analysis
-  - KMS monthly savings estimate
+  activation_triggers: optimise KMS cost, KMS key inventory audit, KMS unused keys, KMS key rotation strategy, KMS grant cleanup, KMS stale grants, KMS cross-account cost, KMS multi-region keys cost, KMS key deletion window, KMS FinOps savings, reduce KMS bill, KMS orphaned keys, KMS API call analysis, KMS monthly savings estimate
   invocation_schema: 'Input: either (a) a key identifier + live-account context, (b) a Cost Explorer KMS cost breakdown, OR (c) a CloudTrail KMS API call summary with at least 14 days of observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/REMEDIATION_STEPS block per key or key group, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
   invocation_example: "# Minimal valid input (offline finding classification):\nKeyId: arn:aws:kms:us-east-1:123456789012:key/abcd-1234\nKeyState: Enabled\nKeyManager: CUSTOMER\nKeySpec: SYMMETRIC_DEFAULT\nRotationStatus: Enabled (annual)\nAlias: alias/app-data-encryption\nGrants: 15 active (3 expired, not retired)\nCloudTrail (last 30 days):\n  - Decrypt: 50 calls\n  - Encrypt: 20 calls\n  - GenerateDataKey: 10 calls\nMultiRegion: False\nRegion: us-east-1\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, REMEDIATION_STEPS)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: KMS, key rotation, cost optimization, customer managed keys, AWS managed keys, key lifecycle, grant management, alias management, multi-region keys, key deletion, CloudTrail, cross-account, FinOps, CloudOps, security
+  tags: kms, security, cost-optimization, finops, key-management, encryption, key-rotation
 ---
 
 # KMS Key Rotation Optimizer

@@ -1,103 +1,27 @@
 ---
 name: eks-upgrade-operator
-description: >-
-  Operates EKS cluster and node group upgrade workflows safely — pre-
-  upgrade checks (current Kubernetes version, addon compatibility
-  matrices, node group version drift, pod disruption budgets, deprecated
-  API usage via kubent), control plane upgrade sequence (update-cluster-
-  version first, wait, then node groups), managed node group upgrade
-  strategies (rolling update default, force update with maxUnavailable
-  and maxSurge surge parameters), self-managed node drain and cordon,
-  EKS add-on upgrades (VPC-CNI, CoreDNS, kube-proxy) BEFORE nodes, and
-  full post-upgrade verification (all nodes Ready, no CrashLoopBackOff,
-  addon versions match new Kubernetes). Emits READY with pre-checks,
-  BLOCKED with specific blocker, or COMPLETED with verification. Use
-  when upgrading an EKS cluster, refreshing managed node groups, aligning
-  add-ons to a new Kubernetes version, or recovering from a failed
-  upgrade.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates EKS cluster and node group upgrade workflows safely — pre- upgrade checks (current Kubernetes version, addon compatibility matrices, node group version drift, pod disruption budgets, deprecated API usage via kubent), control plane upgrade sequence (update-cluster- version first, wait, then node groups), managed node group upgrade strategies (rolling update default, force update with maxUnavailable and maxSurge surge parameters), self-managed node drain and cordon, EKS add-on upgrades (VPC-CNI, CoreDNS, kube-proxy) BEFORE nodes, and full post-upgrade verification (all nodes Ready, no CrashLoopBackOff, addon versions match new Kubernetes). Emits READY with pre-checks, BLOCKED with specific blocker, or COMPLETED with verification. Use when upgrading an EKS cluster, refreshing managed node groups, aligning add-ons to a new Kubernetes version, or recovering from a failed upgrade.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline plan classification.
-  Live-account operations use aws eks describe-cluster, update-cluster-
-  version, describe-addon, describe-addon-versions, update-addon,
-  describe-nodegroup, update-nodegroup-version, describe-update, aws ec2
-  describe-instances, kubectl get nodes / drain / cordon / uncordon,
-  kubectl get poddisruptionbudgets, and kubent (kubernetes deprecation
-  checker) (AWS CLI v2, SSO or key-based credentials, kubectl 1.28+).
-keywords:
-  - EKS
-  - Kubernetes
-  - cluster upgrade
-  - version upgrade
-  - update-cluster-version
-  - update-nodegroup-version
-  - managed node group
-  - self-managed nodes
-  - kops
-  - fargate
-  - VPC-CNI
-  - CoreDNS
-  - kube-proxy
-  - EKS add-ons
-  - pod disruption budget
-  - PDB
-  - deprecated API
-  - kubent
-  - kubectl drain
-  - kubectl cordon
-  - maxUnavailable
-  - maxSurge
-  - force update
-  - rolling update
-  - EKS Auto Mode
-  - EKS hybrid nodes
-tags: [eks, kubernetes, compute, upgrade, node-group, addons, pdb, kubent, operate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws eks describe-cluster, update-cluster- version, describe-addon, describe-addon-versions, update-addon, describe-nodegroup, update-nodegroup-version, describe-update, aws ec2 describe-instances, kubectl get nodes / drain / cordon / uncordon, kubectl get poddisruptionbudgets, and kubent (kubernetes deprecation checker) (AWS CLI...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Upgrading an EKS cluster to a new Kubernetes version, refreshing
-    managed node groups, aligning EKS add-ons (VPC-CNI, CoreDNS, kube-
-    proxy) to a new Kubernetes version, draining self-managed nodes for
-    upgrade, diagnosing a stuck node group upgrade, recovering from a
-    failed upgrade, or validating post-upgrade cluster health.
-  activation_triggers:
-    - "upgrade EKS cluster"
-    - "upgrade Kubernetes version"
-    - "update-cluster-version"
-    - "upgrade node group"
-    - "update-nodegroup-version"
-    - "upgrade EKS addons"
-    - "VPC-CNI upgrade"
-    - "CoreDNS upgrade"
-    - "kube-proxy upgrade"
-    - "pod disruption budget blocking"
-    - "PDB blocking drain"
-    - "deprecated API check"
-    - "kubent"
-    - "kubectl drain nodes"
-    - "EKS Auto Mode upgrade"
-    - "EKS hybrid nodes upgrade"
-  invocation_schema: >-
-    Input: either (a) an EKS cluster configuration (describe-cluster
-    output) plus the intended operation (pre-upgrade-check, upgrade-
-    control-plane, upgrade-nodegroup, upgrade-addon, post-upgrade-
-    verify), OR (b) a cluster-name + operation for live-account
-    execution. Output: deterministic OPERATION / VERDICT / PRE_CHECKS /
-    STEPS / POST_VERIFY / NOTES block per upgrade, where VERDICT is one
-    of READY, BLOCKED, COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Upgrading an EKS cluster to a new Kubernetes version, refreshing managed node groups, aligning EKS add-ons (VPC-CNI, CoreDNS, kube- proxy) to a new Kubernetes version, draining self-managed nodes for upgrade, diagnosing a stuck node group upgrade, recovering from a failed upgrade, or validating post-upgrade cluster health.
+  activation_triggers: upgrade EKS cluster, upgrade Kubernetes version, update-cluster-version, upgrade node group, update-nodegroup-version, upgrade EKS addons, VPC-CNI upgrade, CoreDNS upgrade, kube-proxy upgrade, pod disruption budget blocking, PDB blocking drain, deprecated API check, kubent, kubectl drain nodes, EKS Auto Mode upgrade, EKS hybrid nodes upgrade
+  invocation_schema: 'Input: either (a) an EKS cluster configuration (describe-cluster output) plus the intended operation (pre-upgrade-check, upgrade- control-plane, upgrade-nodegroup, upgrade-addon, post-upgrade- verify), OR (b) a cluster-name + operation for live-account execution. Output: deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per upgrade, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: EKS, Kubernetes, cluster upgrade, version upgrade, update-cluster-version, update-nodegroup-version, managed node group, self-managed nodes, kops, fargate, VPC-CNI, CoreDNS, kube-proxy, EKS add-ons, pod disruption budget, PDB, deprecated API, kubent, kubectl drain, kubectl cordon, maxUnavailable, maxSurge, force update, rolling update, EKS Auto Mode, EKS hybrid nodes
+  tags: eks, kubernetes, compute, upgrade, node-group, addons, pdb, kubent, operate
 ---
 
 # EKS Upgrade Operator

@@ -1,115 +1,26 @@
 ---
 name: dms-endpoint-deployer
-description: >-
-  Provisions AWS DMS endpoints with production defaults: source endpoint
-  (Oracle, MySQL, PostgreSQL, SQL Server, MongoDB, S3), target endpoint
-  (same set plus Redshift, OpenSearch, Kinesis, Kafka, Neptune),
-  connection attributes (port, database name, credentials via Secrets
-  Manager), SSL mode (require, verify-ca, verify-full), extra connection
-  attributes for engine-specific tuning, KMS encryption, certificate
-  authority for TLS, replication instance requirements, engine version
-  compatibility, and source-specific CDC prerequisites (PostgreSQL
-  wal_level=logical, Oracle supplemental logging). Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when
-  creating a DMS endpoint, configuring connection attributes, setting up
-  CDC, managing DMS certificates, or tuning extra connection attributes.
-  Triggers: create dms endpoint, dms source endpoint, dms target
-  endpoint, dms ssl, dms cdc, dms secrets manager, dms certificate.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS DMS endpoints with production defaults: source endpoint (Oracle, MySQL, PostgreSQL, SQL Server, MongoDB, S3), target endpoint (same set plus Redshift, OpenSearch, Kinesis, Kafka, Neptune), connection attributes (port, database name, credentials via Secrets Manager), SSL mode (require, verify-ca, verify-full), extra connection attributes for engine-specific tuning, KMS encryption, certificate authority for TLS, replication instance requirements, engine version compatibility, and source-specific CDC prerequisites (PostgreSQL wal_level=logical, Oracle supplemental logging). Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a DMS endpoint, configuring connection attributes, setting up CDC, managing DMS certificates, or tuning extra connection attributes. Triggers: create dms endpoint, dms source endpoint, dms target endpoint, dms ssl, dms cdc, dms secrets manager, dms certificate.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with dms access
-  (and secretsmanager:GetSecretValue if using Secrets Manager for
-  credentials). Works with Terraform aws_dms_endpoint resources and
-  CloudFormation AWS::DMS::Endpoint templates.
-keywords:
-  - aws
-  - dms
-  - database migration service
-  - endpoint
-  - source endpoint
-  - target endpoint
-  - cdc
-  - change data capture
-  - ssl
-  - secrets manager
-  - cloudops
-  - deploy
-  - provisioning
-  - oracle
-  - mysql
-  - postgresql
-  - sql server
-  - mongodb
-  - redshift
-  - opensearch
-  - kinesis
-  - kafka
-tags:
-  - aws
-  - dms
-  - endpoint
-  - migration
-  - cloudops
-  - deploy
-  - provisioning
-  - cdc
-  - ssl
-  - secrets-manager
-  - source-endpoint
-  - target-endpoint
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with dms access (and secretsmanager:GetSecretValue if using Secrets Manager for credentials). Works with Terraform aws_dms_endpoint resources and CloudFormation AWS::DMS::Endpoint templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Migration
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - dms
-    - endpoint
-    - migration
-    - cloudops
-    - deploy
-    - provisioning
-    - cdc
-    - ssl
-    - secrets-manager
-    - source-endpoint
-    - target-endpoint
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create dms endpoint
-    - dms source endpoint
-    - dms target endpoint
-    - dms connection attributes
-    - dms ssl
-    - dms cdc
-    - dms secrets manager
-    - dms extra connection attributes
-    - dms certificate
-  when_to_use: >-
-    Invoke when the user wants to create a DMS endpoint (source or
-    target), configure connection attributes, set up CDC replication
-    prerequisites, manage DMS certificates and SSL, use Secrets Manager
-    for endpoint credentials, or tune extra connection attributes for
-    engine-specific behavior. Do NOT invoke for DMS replication task
-    configuration (use dms-replication-task skills), DMS replication
-    instance provisioning (use replication-instance skills), or SCT
-    (Schema Conversion Tool) operations.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, dms, endpoint, migration, cloudops, deploy, provisioning, cdc, ssl, secrets-manager, source-endpoint, target-endpoint
+  dependencies: aws-orchestrator
+  keywords: aws, dms, database migration service, endpoint, source endpoint, target endpoint, cdc, change data capture, ssl, secrets manager, cloudops, deploy, provisioning, oracle, mysql, postgresql, sql server, mongodb, redshift, opensearch, kinesis, kafka
+  when_to_use: Invoke when the user wants to create a DMS endpoint (source or target), configure connection attributes, set up CDC replication prerequisites, manage DMS certificates and SSL, use Secrets Manager for endpoint credentials, or tune extra connection attributes for engine-specific behavior. Do NOT invoke for DMS replication task configuration (use dms-replication-task skills), DMS replication instance provisioning (use replication-instance skills), or SCT (Schema Conversion Tool) operations.
 ---
 
 # DMS Endpoint Deployer

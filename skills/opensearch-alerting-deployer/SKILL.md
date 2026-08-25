@@ -1,131 +1,26 @@
 ---
 name: opensearch-alerting-deployer
-description: >-
-  Provisions Amazon OpenSearch Service alerting configurations with
-  production defaults: monitor creation (query monitor vs cluster
-  metrics monitor vs per-document monitor), trigger conditions
-  (threshold, anomaly detection with Random Cut Forest), actions
-  (Slack webhook, Amazon SNS, custom webhook, Amazon Chime),
-  destination configuration and validation, notification message
-  templating (Mustache), alert history, acknowledge alert workflow,
-  per-query monitor scheduling (cron vs interval), per-cluster
-  metrics monitor (CPU, JVM heap, disk usage), per-document monitor
-  for extracted query results, alerting dashboards, alert severity
-  levels (1=high to 5=low), and the notification plugin
-  (notification.yaml) requirement for SNS actions. Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when
-  creating an OpenSearch alerting monitor, configuring a trigger on
-  a query threshold, setting up anomaly detection alerts, adding a
-  Slack or SNS notification destination, scheduling a monitor with
-  cron or interval, or acknowledging an alert. Triggers: create
-  OpenSearch monitor, OpenSearch alerting trigger, OpenSearch
-  anomaly detection alert, OpenSearch alert destination, OpenSearch
-  SNS notification, OpenSearch Slack webhook alert, OpenSearch
-  per-query monitor, OpenSearch cluster metrics monitor, OpenSearch
-  per-document monitor, OpenSearch alert severity, OpenSearch
-  acknowledge alert, OpenSearch alerting dashboard, OpenSearch
-  monitor cron schedule.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon OpenSearch Service alerting configurations with production defaults: monitor creation (query monitor vs cluster metrics monitor vs per-document monitor), trigger conditions (threshold, anomaly detection with Random Cut Forest), actions (Slack webhook, Amazon SNS, custom webhook, Amazon Chime), destination configuration and validation, notification message templating (Mustache), alert history, acknowledge alert workflow, per-query monitor scheduling (cron vs interval), per-cluster metrics monitor (CPU, JVM heap, disk usage), per-document monitor for extracted query results, alerting. Triggers: create OpenSearch monitor, OpenSearch alerting trigger, OpenSearch anomaly detection alert, OpenSearch alert destination, OpenSearch SNS notification, OpenSearch Slack webhook alert, OpenSearch per-query monitor, OpenSearch cluster metrics monitor, OpenSearch per-document monitor, OpenSearch alert severity, OpenSearch acknowledge alert, OpenSearch alerting dashboard, OpenSearch monitor cron schedule.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with opensearch,
-  sns, lambda, and secretsmanager access; the OpenSearch cluster
-  endpoint must be reachable; the alerting plugin must be enabled
-  (default on managed OpenSearch); the notification plugin
-  (notification.yaml) must be configured for SNS actions. Works
-  with Terraform opensearch_index / opensearch_domain resources
-  (alerting via the OpenSearch API or aws_opensearch_domain
-  log_publishing_options).
-keywords:
-  - aws
-  - opensearch
-  - alerting
-  - monitor
-  - trigger
-  - anomaly detection
-  - random cut forest
-  - sns
-  - slack
-  - chime
-  - webhook
-  - destination
-  - notification
-  - per-query monitor
-  - cluster metrics monitor
-  - per-document monitor
-  - alert severity
-  - acknowledge alert
-  - cron schedule
-  - cloudops
-  - deploy
-  - analytics
-tags:
-  - aws
-  - opensearch
-  - alerting
-  - monitor
-  - analytics
-  - cloudops
-  - deploy
-  - sns
-  - anomaly-detection
-  - notification
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with opensearch, sns, lambda, and secretsmanager access; the OpenSearch cluster endpoint must be reachable; the alerting plugin must be enabled (default on managed OpenSearch); the notification plugin (notification.yaml) must be configured for SNS actions. Works with Terraform opensearch_index / opensearch_domain resources (alerting via the OpenSearch API or aws_opensearch_domain...'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - opensearch
-    - alerting
-    - monitor
-    - analytics
-    - cloudops
-    - deploy
-    - sns
-    - anomaly-detection
-    - notification
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create opensearch monitor
-    - opensearch alerting trigger
-    - opensearch anomaly detection alert
-    - opensearch alert destination
-    - opensearch sns notification
-    - opensearch slack webhook alert
-    - opensearch per-query monitor
-    - opensearch cluster metrics monitor
-    - opensearch per-document monitor
-    - opensearch alert severity
-    - opensearch acknowledge alert
-    - opensearch alerting dashboard
-    - opensearch monitor cron schedule
-  when_to_use: >-
-    Invoke when the user wants to create an OpenSearch alerting
-    monitor (per-query, per-cluster-metrics, or per-document),
-    configure a trigger with a threshold or anomaly detection
-    condition, set up notification actions (Slack, SNS, Chime,
-    custom webhook), configure a destination, schedule a monitor
-    with cron or interval, acknowledge an alert, or configure alert
-    severity levels. Do NOT invoke for OpenSearch domain
-    provisioning (use opensearch-domain-deployer), index creation
-    (use opensearch-index-deployer), or cluster troubleshooting
-    (use opensearch-cluster-troubleshooter).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, opensearch, alerting, monitor, analytics, cloudops, deploy, sns, anomaly-detection, notification
+  dependencies: aws-orchestrator
+  keywords: aws, opensearch, alerting, monitor, trigger, anomaly detection, random cut forest, sns, slack, chime, webhook, destination, notification, per-query monitor, cluster metrics monitor, per-document monitor, alert severity, acknowledge alert, cron schedule, cloudops, deploy, analytics
+  when_to_use: Invoke when the user wants to create an OpenSearch alerting monitor (per-query, per-cluster-metrics, or per-document), configure a trigger with a threshold or anomaly detection condition, set up notification actions (Slack, SNS, Chime, custom webhook), configure a destination, schedule a monitor with cron or interval, acknowledge an alert, or configure alert severity levels. Do NOT invoke for OpenSearch domain provisioning (use opensearch-domain-deployer), index creation (use opensearch-index-deployer), or cluster troubleshooting (use opensearch-cluster-troubleshooter).
 ---
 
 # OpenSearch Alerting Deployer

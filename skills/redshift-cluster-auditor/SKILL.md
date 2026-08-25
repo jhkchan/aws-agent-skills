@@ -1,85 +1,24 @@
 ---
 name: redshift-cluster-auditor
-description: >-
-  Audits Amazon Redshift provisioned clusters for security posture and
-  configuration gaps — public accessibility (internet-exposed cluster),
-  KMS encryption-at-rest (immutable post-creation), require_ssl parameter
-  group enforcement, S3 audit logging, VPC security-group ingress on the
-  cluster port, automated-snapshot retention (PITR), and enhanced VPC
-  routing (COPY/UNLOAD traffic path). Emits a deterministic categorical
-  verdict (PUBLIC | NO_ENCRYPTION | NO_SSL | NO_AUDIT_LOG | CONFIG_GAP | OK)
-  per cluster with enumerated findings and specific remediation. Use when
-  reviewing a Redshift cluster before production deployment, auditing
-  encryption or SSL posture, checking S3 audit logging coverage, validating
-  snapshot retention, or hardening data-warehouse security.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits Amazon Redshift provisioned clusters for security posture and configuration gaps — public accessibility (internet-exposed cluster), KMS encryption-at-rest (immutable post-creation), require_ssl parameter group enforcement, S3 audit logging, VPC security-group ingress on the cluster port, automated-snapshot retention (PITR), and enhanced VPC routing (COPY/UNLOAD traffic path). Emits a deterministic categorical verdict (PUBLIC | NO_ENCRYPTION | NO_SSL | NO_AUDIT_LOG | CONFIG_GAP | OK) per cluster with enumerated findings and specific remediation. Use when reviewing a Redshift cluster before production deployment, auditing encryption or SSL posture, checking S3 audit logging coverage, validating snapshot retention, or hardening data-warehouse security.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline metadata classification.
-  Live-account audits use aws redshift describe-clusters, describe-logging-status,
-  describe-cluster-parameter-groups (with describe-cluster-parameters for the
-  PG), aws ec2 describe-security-groups, and aws kms describe-key (AWS CLI v2,
-  SSO or key-based credentials).
-keywords:
-  - Redshift
-  - data warehouse
-  - PubliclyAccessible
-  - encryption
-  - KMS
-  - require_ssl
-  - SSL
-  - TLS
-  - parameter group
-  - audit logging
-  - S3 audit log
-  - enable_user_activity_logging
-  - automated snapshots
-  - AutomatedSnapshotRetentionPeriod
-  - enhanced VPC routing
-  - EnhancedVPCRouting
-  - COPY
-  - UNLOAD
-  - VPC security group
-  - cluster port 5439
-  - data-warehouse hardening
-  - compliance
-  - Redshift Serverless
-tags: [redshift, analytics, security, encryption, ssl, audit-logging, snapshots, vpc, compliance, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline metadata classification. Live-account audits use aws redshift describe-clusters, describe-logging-status, describe-cluster-parameter-groups (with describe-cluster-parameters for the PG), aws ec2 describe-security-groups, and aws kms describe-key (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
-  verdict_shape: "PUBLIC | NO_ENCRYPTION | NO_SSL | NO_AUDIT_LOG | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a Redshift provisioned cluster before production deployment,
-    auditing encryption-at-rest, validating require_ssl enforcement, checking
-    S3 audit logging coverage, inspecting automated-snapshot retention,
-    evaluating enhanced VPC routing posture, or hardening a data warehouse
-    for a compliance review.
-  activation_triggers:
-    - "audit this Redshift cluster"
-    - "is my Redshift cluster public"
-    - "is encryption enabled on Redshift"
-    - "is require_ssl on"
-    - "is Redshift audit logging configured"
-    - "are automated snapshots enabled"
-    - "enhanced VPC routing Redshift"
-    - "Redshift security group audit"
-    - "harden this data warehouse"
-  invocation_schema: >-
-    Input: either (a) a describe-clusters Cluster block, optionally paired
-    with describe-logging-status, describe-cluster-parameters (for the
-    attached parameter group), and describe-security-groups outputs, OR
-    (b) a ClusterIdentifier for live-account audit.
-    Output: deterministic CLUSTER/VERDICT/REASON/FINDINGS/REMEDIATION block
-    per cluster, where VERDICT ∈ {PUBLIC, NO_ENCRYPTION, NO_SSL,
-    NO_AUDIT_LOG, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: PUBLIC | NO_ENCRYPTION | NO_SSL | NO_AUDIT_LOG | CONFIG_GAP | OK
+  when_to_use: Reviewing a Redshift provisioned cluster before production deployment, auditing encryption-at-rest, validating require_ssl enforcement, checking S3 audit logging coverage, inspecting automated-snapshot retention, evaluating enhanced VPC routing posture, or hardening a data warehouse for a compliance review.
+  activation_triggers: audit this Redshift cluster, is my Redshift cluster public, is encryption enabled on Redshift, is require_ssl on, is Redshift audit logging configured, are automated snapshots enabled, enhanced VPC routing Redshift, Redshift security group audit, harden this data warehouse
+  invocation_schema: 'Input: either (a) a describe-clusters Cluster block, optionally paired with describe-logging-status, describe-cluster-parameters (for the attached parameter group), and describe-security-groups outputs, OR (b) a ClusterIdentifier for live-account audit. Output: deterministic CLUSTER/VERDICT/REASON/FINDINGS/REMEDIATION block per cluster, where VERDICT ∈ {PUBLIC, NO_ENCRYPTION, NO_SSL, NO_AUDIT_LOG, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Redshift, data warehouse, PubliclyAccessible, encryption, KMS, require_ssl, SSL, TLS, parameter group, audit logging, S3 audit log, enable_user_activity_logging, automated snapshots, AutomatedSnapshotRetentionPeriod, enhanced VPC routing, EnhancedVPCRouting, COPY, UNLOAD, VPC security group, cluster port 5439, data-warehouse hardening, compliance, Redshift Serverless
+  tags: redshift, analytics, security, encryption, ssl, audit-logging, snapshots, vpc, compliance, audit
 ---
 
 # Redshift Cluster Auditor

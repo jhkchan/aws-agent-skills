@@ -1,81 +1,24 @@
 ---
 name: budgets-auditor
-description: >-
-  Audits AWS Budgets for cost-overrun blind spots: accounts with zero budgets,
-  budgets configured without notifications (decorative budgets), single-
-  threshold alerts that leave no time to react, ACTUAL-only alerts with no
-  FORECASTED warning, SNS topic policies that silently block delivery
-  (missing budgets.amazonaws.com publish principal), breached or on-track-to-
-  breach actual-vs-forecast spend, and missing zero-spend guardrails for new
-  or sandbox accounts. Emits a deterministic verdict
-  (NO_BUDGET | NO_ALERT | CONFIG_GAP | OK) per account with enumerated
-  findings and specific CLI remediation. Use when reviewing cost budgets,
-  checking budget alert thresholds, validating SNS notification wiring,
-  auditing spend posture, or hardening cost controls before a billing review.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Audits AWS Budgets for cost-overrun blind spots: accounts with zero budgets, budgets configured without notifications (decorative budgets), single- threshold alerts that leave no time to react, ACTUAL-only alerts with no FORECASTED warning, SNS topic policies that silently block delivery (missing budgets.amazonaws.com publish principal), breached or on-track-to- breach actual-vs-forecast spend, and missing zero-spend guardrails for new or sandbox accounts. Emits a deterministic verdict (NO_BUDGET | NO_ALERT | CONFIG_GAP | OK) per account with enumerated findings and specific CLI remediation. Use when reviewing cost budgets, checking budget alert thresholds, validating SNS notification wiring, auditing spend posture, or hardening cost controls before a billing review.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline budget-document classification.
-  Live-account audits use aws budgets describe-budget, aws budgets
-  describe-budgets, aws budgets describe-notifications-for-budget, aws budgets
-  describe-subscribers-for-notification, and aws sns get-topic-attributes
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - AWS Budgets
-  - cost budget
-  - budget alert
-  - notification threshold
-  - FORECASTED
-  - ACTUAL
-  - SNS topic policy
-  - budgets.amazonaws.com
-  - zero-spend budget
-  - cost overrun
-  - FinOps
-  - billing alarm
-  - cost control
-  - spend posture
-  - budget action
-  - RI coverage
-  - Consolidated Billing
-  - budget audit
-  - threshold gap
-tags: [budgets, finops, cost-control, alerting, sns, spend, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline budget-document classification. Live-account audits use aws budgets describe-budget, aws budgets describe-budgets, aws budgets describe-notifications-for-budget, aws budgets describe-subscribers-for-notification, and aws sns get-topic-attributes (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: FinOps
-  verdict_shape: "NO_BUDGET | NO_ALERT | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing cost budgets before a billing review or production cutover,
-    checking that budget alerts are wired to a real SNS topic, validating
-    threshold coverage (early-warning vs over-budget), auditing actual-vs-
-    forecast breach posture, or hardening spend controls for a new or sandbox
-    account.
-  activation_triggers:
-    - "audit my AWS budgets"
-    - "check budget alerts"
-    - "is my budget wired to SNS"
-    - "budget notification threshold"
-    - "zero-spend budget"
-    - "cost overrun alert"
-    - "budget forecast exceeded"
-    - "spend posture audit"
-    - "budget SNS policy"
-    - "decorative budget"
-  invocation_schema: >-
-    Input: either (a) an account budget inventory (list of budgets, each with
-    notifications, subscribers, SNS topic policies, and calculated spend), OR
-    (b) an account-id for live-account audit. Output: deterministic
-    BUDGET/VERDICT/REASON/FINDINGS/REMEDIATION block per budget plus an
-    account-level aggregate verdict, where VERDICT is one of NO_BUDGET,
-    NO_ALERT, CONFIG_GAP, OK.
+  verdict_shape: NO_BUDGET | NO_ALERT | CONFIG_GAP | OK
+  when_to_use: Reviewing cost budgets before a billing review or production cutover, checking that budget alerts are wired to a real SNS topic, validating threshold coverage (early-warning vs over-budget), auditing actual-vs- forecast breach posture, or hardening spend controls for a new or sandbox account.
+  activation_triggers: audit my AWS budgets, check budget alerts, is my budget wired to SNS, budget notification threshold, zero-spend budget, cost overrun alert, budget forecast exceeded, spend posture audit, budget SNS policy, decorative budget
+  invocation_schema: 'Input: either (a) an account budget inventory (list of budgets, each with notifications, subscribers, SNS topic policies, and calculated spend), OR (b) an account-id for live-account audit. Output: deterministic BUDGET/VERDICT/REASON/FINDINGS/REMEDIATION block per budget plus an account-level aggregate verdict, where VERDICT is one of NO_BUDGET, NO_ALERT, CONFIG_GAP, OK.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Budgets, cost budget, budget alert, notification threshold, FORECASTED, ACTUAL, SNS topic policy, budgets.amazonaws.com, zero-spend budget, cost overrun, FinOps, billing alarm, cost control, spend posture, budget action, RI coverage, Consolidated Billing, budget audit, threshold gap
+  tags: budgets, finops, cost-control, alerting, sns, spend, audit
 ---
 
 # Budgets Auditor

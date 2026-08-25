@@ -1,120 +1,26 @@
 ---
 name: elasticache-cluster-deployer
-description: >-
-  Provisions Amazon ElastiCache clusters with production defaults: Redis
-  OSS self-designed clusters vs cluster mode enabled (shards and
-  replicas), Memcached clusters, replication groups (primary + read
-  replicas), multi-AZ with automatic failover, node type sizing, subnet
-  group creation, security groups, parameter groups, at-rest encryption
-  (KMS), in-transit encryption (TLS), Redis AUTH tokens, Redis
-  shard/slot mapping, backup and snapshot management (automated +
-  manual), Global Datastore (cross-region replication), auto-scaling,
-  and online cluster resizing (scale up/down with use-online-resharding).
-  Emits a READY_TO_DEPLOY checklist with verification commands. Use
-  when creating an ElastiCache cluster, setting up Redis replication
-  groups, enabling multi-AZ failover, configuring encryption, creating
-  a Global Datastore, or scaling an ElastiCache cluster online. Triggers:
-  create elasticache cluster, redis replication group, cluster mode
-  enabled, elasticache multi-az failover, elasticache encryption kms tls,
-  redis auth token, elasticache global datastore, online resharding,
-  elasticache auto scaling, memcached cluster.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon ElastiCache clusters with production defaults: Redis OSS self-designed clusters vs cluster mode enabled (shards and replicas), Memcached clusters, replication groups (primary + read replicas), multi-AZ with automatic failover, node type sizing, subnet group creation, security groups, parameter groups, at-rest encryption (KMS), in-transit encryption (TLS), Redis AUTH tokens, Redis shard/slot mapping, backup and snapshot management (automated + manual), Global Datastore (cross-region replication), auto-scaling, and online cluster resizing (scale up/down with use-online-resharding). Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating an ElastiCache cluster, setting up Redis replication groups, enabling multi-AZ. Triggers: create elasticache cluster, redis replication group, cluster mode enabled, elasticache multi-az failover, elasticache encryption kms tls, redis auth token, elasticache global datastore, online resharding, elasticache auto scaling, memcached...'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with elasticache
-  access. Works with Terraform aws_elasticache_replication_group /
-  aws_elasticache_cluster / aws_elasticache_subnet_group resources and
-  CloudFormation AWS::ElastiCache::ReplicationGroup /
-  AWS::ElastiCache::CacheCluster /
-  AWS::ElastiCache::SubnetGroup templates.
-keywords:
-  - aws
-  - elasticache
-  - redis
-  - memcached
-  - cloudops
-  - deploy
-  - provisioning
-  - replication group
-  - cluster mode
-  - multi-az
-  - failover
-  - encryption
-  - kms
-  - tls
-  - auth token
-  - global datastore
-  - online resharding
-  - auto scaling
-tags:
-  - aws
-  - elasticache
-  - redis
-  - memcached
-  - cloudops
-  - deploy
-  - databases
-  - provisioning
-  - replication-group
-  - cluster-mode
-  - multi-az
-  - encryption
-  - global-datastore
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with elasticache access. Works with Terraform aws_elasticache_replication_group / aws_elasticache_cluster / aws_elasticache_subnet_group resources and CloudFormation AWS::ElastiCache::ReplicationGroup / AWS::ElastiCache::CacheCluster / AWS::ElastiCache::SubnetGroup templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - elasticache
-    - redis
-    - memcached
-    - cloudops
-    - deploy
-    - databases
-    - provisioning
-    - replication-group
-    - cluster-mode
-    - multi-az
-    - encryption
-    - global-datastore
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create elasticache cluster
-    - redis replication group
-    - cluster mode enabled
-    - elasticache multi-az failover
-    - elasticache encryption kms tls
-    - redis auth token
-    - elasticache global datastore
-    - online resharding
-    - elasticache auto scaling
-    - memcached cluster
-  when_to_use: >-
-    Invoke when the user wants to create an Amazon ElastiCache cluster
-    (Redis OSS or Memcached), configure a Redis replication group with
-    multi-AZ automatic failover, enable cluster mode with shards and
-    read replicas, configure at-rest encryption (KMS) or in-transit
-    encryption (TLS), set Redis AUTH tokens, create a Global Datastore
-    for cross-region replication, perform online cluster resizing, or
-    configure ElastiCache auto-scaling. Do NOT invoke for Amazon
-    MemoryDB for Redis, Amazon DynamoDB, or self-managed Redis/Memcached
-    on EC2.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, elasticache, redis, memcached, cloudops, deploy, databases, provisioning, replication-group, cluster-mode, multi-az, encryption, global-datastore
+  dependencies: aws-orchestrator
+  keywords: aws, elasticache, redis, memcached, cloudops, deploy, provisioning, replication group, cluster mode, multi-az, failover, encryption, kms, tls, auth token, global datastore, online resharding, auto scaling
+  when_to_use: Invoke when the user wants to create an Amazon ElastiCache cluster (Redis OSS or Memcached), configure a Redis replication group with multi-AZ automatic failover, enable cluster mode with shards and read replicas, configure at-rest encryption (KMS) or in-transit encryption (TLS), set Redis AUTH tokens, create a Global Datastore for cross-region replication, perform online cluster resizing, or configure ElastiCache auto-scaling. Do NOT invoke for Amazon MemoryDB for Redis, Amazon DynamoDB, or self-managed Redis/Memcached on EC2.
 ---
 
 # ElastiCache Cluster Deployer

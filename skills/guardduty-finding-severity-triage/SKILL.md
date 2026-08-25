@@ -1,53 +1,22 @@
 ---
 name: guardduty-finding-severity-triage
-description: >-
-  Classifies Amazon GuardDuty findings into a context-aware triage severity
-  (CRITICAL | HIGH | MEDIUM | LOW | LIKELY_FALSE_POSITIVE) by overlaying
-  finding-type threat taxonomy, false-positive signals, aggregation counts,
-  and resource criticality on top of GuardDuty's numeric severity. Detects
-  authorized-scanner port sweeps, Tor traffic to public services, known-safe
-  DNS domains, and AWS service-linked role activity as false-positives.
-  Provides per-verdict incident-response remediation steps. Use when
-  triaging GuardDuty findings (JSON or structured text) for SOC
-  prioritization, false-positive filtering, or escalation decisions.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Classifies Amazon GuardDuty findings into a context-aware triage severity (CRITICAL | HIGH | MEDIUM | LOW | LIKELY_FALSE_POSITIVE) by overlaying finding-type threat taxonomy, false-positive signals, aggregation counts, and resource criticality on top of GuardDuty's numeric severity. Detects authorized-scanner port sweeps, Tor traffic to public services, known-safe DNS domains, and AWS service-linked role activity as false-positives. Provides per-verdict incident-response remediation steps. Use when triaging GuardDuty findings (JSON or structured text) for SOC prioritization, false-positive filtering, or escalation decisions.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf). No AWS
-  CLI required for offline finding classification — the skill reasons over
-  provided finding JSON or structured text. Live-account triage uses
-  aws guardduty list-findings / get-findings and aws guardduty archive-finders
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - GuardDuty
-  - finding severity
-  - threat triage
-  - false positive
-  - PortSweepUnusual
-  - TorIPCaller
-  - CryptocurrencyClient
-  - SSHBruteForce
-  - MaliciousIPCaller
-  - credential exfiltration
-  - suppression filter
-tags: [guardduty, security, threat-detection, triage, false-positive, incident-response, mitre-attack]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf). No AWS CLI required for offline finding classification — the skill reasons over provided finding JSON or structured text. Live-account triage uses aws guardduty list-findings / get-findings and aws guardduty archive-finders (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
-  verdict_shape: "CRITICAL | HIGH | MEDIUM | LOW | LIKELY_FALSE_POSITIVE"
-  when_to_use: >-
-    Triage a GuardDuty finding (JSON or structured text) to determine its
-    real-world response priority, check whether a finding is a likely
-    false-positive (authorized scanner, known-safe DNS, public service Tor
-    traffic), decide which findings to escalate to incident response,
-    prioritize findings for a SOC queue, or determine whether to archive or
-    suppress a recurring finding pattern.
+  verdict_shape: CRITICAL | HIGH | MEDIUM | LOW | LIKELY_FALSE_POSITIVE
+  when_to_use: Triage a GuardDuty finding (JSON or structured text) to determine its real-world response priority, check whether a finding is a likely false-positive (authorized scanner, known-safe DNS, public service Tor traffic), decide which findings to escalate to incident response, prioritize findings for a SOC queue, or determine whether to archive or suppress a recurring finding pattern.
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: GuardDuty, finding severity, threat triage, false positive, PortSweepUnusual, TorIPCaller, CryptocurrencyClient, SSHBruteForce, MaliciousIPCaller, credential exfiltration, suppression filter
+  tags: guardduty, security, threat-detection, triage, false-positive, incident-response, mitre-attack
 ---
 
 # GuardDuty Finding Severity Triage

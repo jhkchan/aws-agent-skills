@@ -1,4 +1,4 @@
-# End-to-end usage scenario: cloudwatch-logs-insights-troubshooter
+# End-to-end usage scenario: cloudwatch-logs-insights-troubleshooter
 
 A walkthrough showing the skill diagnosing a Logs Insights query that
 returns no results due to a wrong log group name. This exercises Step 1
@@ -70,7 +70,7 @@ You: "Logs Insights query on my-api returns nothing, but the app is logging erro
 ```
 
 The orchestrator emits `[Phase: Troubleshoot | Skills routed:
-cloudwatch-logs-insights-troubshooter]` and hands off to this skill
+cloudwatch-logs-insights-troubleshooter]` and hands off to this skill
 for the VERDICT.
 
 ## Live-account diagnostic flow (requires AWS CLI)

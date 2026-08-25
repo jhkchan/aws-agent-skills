@@ -1,111 +1,28 @@
 ---
 name: efs-access-point-deployer
-description: >-
-  Provisions EFS Access Points and dependent primitives with production
-  defaults: root-directory auto-creation, POSIX user identity (uid, gid,
-  secondary groups), directory ownership and permission bits, per-AZ
-  mount targets in every compute subnet, IAM file-system policy with
-  elasticfilesystem:AccessPointArn enforcement, amazon-efs-utils mount
-  helper with TLS encryption in transit, EFS Intelligent-Tiering
-  lifecycle for cost control, ECS/EKS integration via the EFS CSI
-  driver (access-point-per-pod), and Lambda file-system mounts. Emits
-  READY_TO_DEPLOY / PREREQUISITES_MISSING with every item verified and
-  copy-pasteable efs / elasticfilesystem / ecs / eks / lambda CLI.
-  Use when creating an application-specific EFS entry point, enforcing
-  IAM-based access, mounting EFS from ECS/EKS/Lambda, enabling
-  encryption in transit, or hardening an existing access point.
-  Triggers: EFS access point, mount EFS, POSIX identity, EFS CSI
-  driver, EFS file system policy, encryption in transit, EFS Lambda.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions EFS Access Points and dependent primitives with production defaults: root-directory auto-creation, POSIX user identity (uid, gid, secondary groups), directory ownership and permission bits, per-AZ mount targets in every compute subnet, IAM file-system policy with elasticfilesystem:AccessPointArn enforcement, amazon-efs-utils mount helper with TLS encryption in transit, EFS Intelligent-Tiering lifecycle for cost control, ECS/EKS integration via the EFS CSI driver (access-point-per-pod), and Lambda file-system mounts. Emits READY_TO_DEPLOY / PREREQUISITES_MISSING with every item verified and copy-pasteable efs / elasticfilesystem / ecs / eks / lambda CLI. Use when creating an application-specific EFS entry point, enforcing IAM-based access, mounting EFS from ECS/EKS/Lambda, enabling encryption in transit, or hardening an existing access point. Triggers: EFS access point, mount EFS, POSIX identity, EFS CSI driver, EFS file system policy, encryption in transit, EFS Lambda.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Live provisioning uses AWS CLI v2 with efs
-  (create-access-point, put-file-system-policy, describe-mount-targets,
-  describe-file-systems, describe-lifecycle-configuration), ec2
-  (describe-subnets, describe-availability-zones), ecs, eks, lambda
-  (create-function, update-function-configuration), and cloudformation
-  / terraform aws_efs_access_point / aws_efs_mount_target equivalents.
-keywords:
-  - aws
-  - efs
-  - elastic-file-system
-  - access-point
-  - posix
-  - mount-target
-  - amazon-efs-utils
-  - efs-csi-driver
-  - file-system-policy
-  - encryption-in-transit
-  - tls
-  - intelligent-tiering
-  - efs-ia
-  - ecs
-  - eks
-  - lambda
-  - cloudops
-  - deploy
-tags:
-  - aws
-  - efs
-  - access-point
-  - posix
-  - mount-target
-  - encryption-in-transit
-  - deploy
-  - storage
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Live provisioning uses AWS CLI v2 with efs (create-access-point, put-file-system-policy, describe-mount-targets, describe-file-systems, describe-lifecycle-configuration), ec2 (describe-subnets, describe-availability-zones), ecs, eks, lambda (create-function, update-function-configuration), and cloudformation / terraform aws_efs_access_point / aws_efs_mount_target equivalents.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Provisioning a new EFS Access Point (with root directory, POSIX
-    user identity, and directory permissions), enforcing IAM-based
-    access to EFS via a file-system policy keyed on
-    elasticfilesystem:AccessPointArn, deploying per-AZ mount targets
-    across all compute subnets, mounting EFS from ECS/EKS via the EFS
-    CSI driver (one access point per pod), mounting EFS from a Lambda
-    function with VPC config, enabling TLS encryption in transit via
-    amazon-efs-utils, or configuring EFS Intelligent-Tiering lifecycle
-    for cost control. Do NOT invoke for plain EFS file-system creation
-    without access points (use efs-file-system-deployer), for FSx
-    (separate primitives), or for EFS access-point troubleshooting
-    (use efs-mount-troubleshooter).
-  activation_triggers:
-    - "EFS access point"
-    - "create access point EFS"
-    - "mount EFS"
-    - "POSIX identity EFS"
-    - "EFS CSI driver"
-    - "EFS file system policy"
-    - "elasticfilesystem AccessPointArn"
-    - "encryption in transit EFS"
-    - "amazon-efs-utils"
-    - "EFS mount target"
-    - "EFS Lambda mount"
-    - "EFS Intelligent-Tiering"
-    - "ECS EFS volume"
-    - "EKS EFS persistent volume"
-  invocation_schema: >-
-    Input: either (a) a file-system ID + access point name + root
-    directory path + POSIX identity (uid/gid) + directory permissions,
-    or (b) a multi-AZ mount-target spec (subnet list + security
-    groups), or (c) a container/Lambda integration spec (ECS task,
-    EKS storage class, or Lambda function ARN). Output: deterministic
-    ACCESS_POINT / VERDICT / CHECKLIST / VERIFICATION_COMMANDS block
-    per the STRICT output contract, where VERDICT is READY_TO_DEPLOY
-    or PREREQUISITES_MISSING.
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Provisioning a new EFS Access Point (with root directory, POSIX user identity, and directory permissions), enforcing IAM-based access to EFS via a file-system policy keyed on elasticfilesystem:AccessPointArn, deploying per-AZ mount targets across all compute subnets, mounting EFS from ECS/EKS via the EFS CSI driver (one access point per pod), mounting EFS from a Lambda function with VPC config, enabling TLS encryption in transit via amazon-efs-utils, or configuring EFS Intelligent-Tiering lifecycle for cost control. Do NOT invoke for plain EFS file-system creation without access points (use efs-file-system-deployer), for FSx (separate primitives), or for EFS access-point troubleshooting (use efs-mount-troubleshooter).
+  activation_triggers: EFS access point, create access point EFS, mount EFS, POSIX identity EFS, EFS CSI driver, EFS file system policy, elasticfilesystem AccessPointArn, encryption in transit EFS, amazon-efs-utils, EFS mount target, EFS Lambda mount, EFS Intelligent-Tiering, ECS EFS volume, EKS EFS persistent volume
+  invocation_schema: 'Input: either (a) a file-system ID + access point name + root directory path + POSIX identity (uid/gid) + directory permissions, or (b) a multi-AZ mount-target spec (subnet list + security groups), or (c) a container/Lambda integration spec (ECS task, EKS storage class, or Lambda function ARN). Output: deterministic ACCESS_POINT / VERDICT / CHECKLIST / VERIFICATION_COMMANDS block per the STRICT output contract, where VERDICT is READY_TO_DEPLOY or PREREQUISITES_MISSING.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: aws, efs, elastic-file-system, access-point, posix, mount-target, amazon-efs-utils, efs-csi-driver, file-system-policy, encryption-in-transit, tls, intelligent-tiering, efs-ia, ecs, eks, lambda, cloudops, deploy
+  tags: aws, efs, access-point, posix, mount-target, encryption-in-transit, deploy, storage
+  dependencies: aws-orchestrator
 ---
 
 # EFS Access Points Deployer

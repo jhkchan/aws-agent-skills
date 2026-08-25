@@ -69,8 +69,8 @@ class TestContributing:
         text = _read(CONTRIBUTING).lower()
         # Minimal skill format (aws/agent-toolkit alignment).
         assert "skill.md" in text
-        for field in ("name", "description", "version"):
-            assert field in text, f"CONTRIBUTING must document frontmatter: {field}"
+        for field in ("name", "description", "metadata"):
+            assert field in text, f"CONTRIBUTING must document frontmatter: {field}"  # version documented under metadata
 
     def test_documents_license(self) -> None:
         text = _read(CONTRIBUTING).lower()

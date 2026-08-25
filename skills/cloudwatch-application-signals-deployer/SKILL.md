@@ -1,47 +1,15 @@
 ---
 name: cloudwatch-application-signals-deployer
 description: 'Enables CloudWatch Application Signals on ECS / EKS / EC2 / Lambda with auto-instrumentation (Java, Python), service discovery from CloudMap and Kubernetes services, SLO creation (latency, availability, custom), service map visualization, ServiceLevelObjective (period, target, alarm), and RED metrics extraction (Rate, Errors, Duration) from X-Ray traces. Emits a READY_TO_DEPLOY checklist with every prerequisite verified. Use when enabling Application Signals on a service, instrumenting a Java/Python app for auto-derived RED metrics, creating ServiceLevelObjective (period, target, alarm), wiring service discovery, or wiring a CloudWatch SLO alarm. Triggers: application signals, service map, service-level objective, SLO, X-Ray RED metrics, auto-instrument application signals, CloudMap service discovery, EKS service map, ECS application signals, OpenTelemetry AWS distro, Java Python application signals.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
 compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with application-signals, xray, cloudwatch, ecs, eks, ec2, lambda, iam, and ssm access. Works with Terraform aws_cloudwatch_service_level_objective, CloudFormation AWS::ApplicationSignals::ServiceLevelObjective, and the CloudWatch agent / AWS Distro for OpenTelemetry.'
-keywords:
-- aws
-- cloudwatch
-- application-signals
-- observability
-- cloudops
-- deploy
-- provisioning
-- slo
-- service-level-objective
-- service-map
-- xray
-- red-metrics
-- opentelemetry
-- instrumentation
-- ecs
-- eks
-- ec2
-- lambda
-tags:
-- aws
-- cloudwatch
-- application-signals
-- observability
-- deploy
-- slo
-- service-map
-- instrumentation
-dependencies:
-- aws-orchestrator
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: deploy
   skill_class: capability
@@ -49,33 +17,9 @@ metadata:
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-  - aws
-  - cloudwatch
-  - application-signals
-  - observability
-  - deploy
-  - slo
-  - service-map
-  - instrumentation
-  dependencies:
-  - aws-orchestrator
-  keywords:
-  - application signals
-  - cloudwatch slo
-  - service-level objective
-  - service map
-  - red metrics
-  - x-ray traces
-  - application signals ecs
-  - application signals eks
-  - application signals ec2
-  - application signals lambda
-  - opentelemetry aws distro
-  - cloudmap service discovery
-  - java application signals
-  - python application signals
-  - cloudwatch service level objective
+  tags: aws, cloudwatch, application-signals, observability, deploy, slo, service-map, instrumentation
+  dependencies: aws-orchestrator
+  keywords: aws, cloudwatch, application-signals, observability, cloudops, deploy, provisioning, slo, service-level-objective, service-map, xray, red-metrics, opentelemetry, instrumentation, ecs, eks, ec2, lambda
   when_to_use: Invoke when the user wants to enable CloudWatch Application Signals on a workload (ECS, EKS, EC2, or Lambda), instrument a Java or Python application for auto-derived RED metrics, create a CloudWatch ServiceLevelObjective (period, target, alarm), wire service discovery from CloudMap or Kubernetes services, or visualize the application service map. Do NOT invoke for plain CloudWatch dashboards/alarms (use cloudwatch-dashboard-deployer / cloudwatch-alarm-operator), for X-Ray-only tracing without Application Signals, or for CloudWatch Container Insights (separate feature).
 ---
 

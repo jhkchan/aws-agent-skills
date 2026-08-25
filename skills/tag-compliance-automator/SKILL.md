@@ -1,104 +1,27 @@
 ---
 name: tag-compliance-automator
-description: >-
-  Automates AWS tag compliance end-to-end: Organizations tag policies
-  with case-sensitive key/value validation and enforced_for scoping,
-  Resource Groups Tagging API bulk operations, Config managed rules
-  (required-tags, allowed-tag-values) plus custom Lambda rules for 6+
-  keys, EventBridge + Lambda auto-tagging on EC2/S3/Lambda creation
-  with inherited-tag propagation (EC2 to EBS and ENIs), tag drift
-  detection via Config CI change events, remediation via SSM Automation,
-  cost allocation tag activation via Cost Explorer API, and cross-account
-  consistency via CloudFormation StackSets. Emits AUTOMATION_DEPLOYED
-  with deployment templates or REVIEW_REQUIRED with the specific gap.
-  Use when building tag compliance automation, enforcing a tag schema,
-  wiring auto-tagging, or remediating tag drift across an organization.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Automates AWS tag compliance end-to-end: Organizations tag policies with case-sensitive key/value validation and enforced_for scoping, Resource Groups Tagging API bulk operations, Config managed rules (required-tags, allowed-tag-values) plus custom Lambda rules for 6+ keys, EventBridge + Lambda auto-tagging on EC2/S3/Lambda creation with inherited-tag propagation (EC2 to EBS and ENIs), tag drift detection via Config CI change events, remediation via SSM Automation, cost allocation tag activation via Cost Explorer API, and cross-account consistency via CloudFormation StackSets. Emits AUTOMATION_DEPLOYED with deployment templates or REVIEW_REQUIRED with the specific gap. Use when building tag compliance automation, enforcing a tag schema, wiring auto-tagging, or remediating tag drift across an organization.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline policy design. Live deployment
-  uses aws organizations enable-policy-type, create-policy, update-policy,
-  attach-policy, aws resourcegroupstaggingapi tag-resources, untag-resources,
-  get-resources, aws configservice put-config-rule, put-remediation-configurations,
-  aws ce update-cost-allocation-tags-status, aws ssm create-document,
-  start-automation-execution, aws lambda create-function, aws events put-rule,
-  put-targets, and aws cloudformation create-stack-set — AWS CLI v2, SSO or
-  key-based credentials, Organizations management or delegated-administrator
-  permissions.
-keywords:
-  - AWS Organizations
-  - Tag Policy
-  - TagPolicy
-  - case_sensitive
-  - enforced_for
-  - allowed_values
-  - Resource Groups Tagging API
-  - tag-resources
-  - untag-resources
-  - get-resources
-  - AWS Config
-  - required-tags
-  - allowed-tag-values
-  - tag drift
-  - EventBridge
-  - Lambda auto-tagging
-  - tag propagation
-  - EC2 EBS ENI
-  - cost allocation tags
-  - Cost Explorer API
-  - CloudFormation StackSets
-  - SSM Automation
-  - tag compliance
-  - tag schema
-  - Environment Owner CostCenter Project
-tags: [aws-organizations, tag-policy, resource-groups-tagging-api, aws-config, eventbridge, lambda, cost-explorer, cloudformation-stacksets, ssm-automation, automate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline policy design. Live deployment uses aws organizations enable-policy-type, create-policy, update-policy, attach-policy, aws resourcegroupstaggingapi tag-resources, untag-resources, get-resources, aws configservice put-config-rule, put-remediation-configurations, aws ce update-cost-allocation-tags-status, aws ssm create-document, start-automation-execution, aws lambda...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATION_DEPLOYED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Designing Organizations tag policies with case-sensitive key/value
-    validation, building EventBridge + Lambda auto-tagging pipelines with
-    inherited-tag propagation (EC2 to EBS/ENI), running Resource Groups
-    Tagging API bulk operations, wiring Config required-tags and
-    allowed-tag-values rules with drift detection, remediating tag drift
-    via SSM Automation, activating cost allocation tags programmatically,
-    or enforcing cross-account tag consistency via CloudFormation StackSets.
-  activation_triggers:
-    - "tag compliance automation"
-    - "Organizations tag policy case_sensitive"
-    - "auto-tag on creation EventBridge Lambda"
-    - "tag propagation EC2 EBS ENI"
-    - "Resource Groups Tagging API bulk"
-    - "tag-resources untag-resources get-resources"
-    - "required-tags allowed-tag-values Config rule"
-    - "tag drift detection remediation"
-    - "cost allocation tag activation"
-    - "cross-account tag consistency StackSets"
-    - "tag schema enforcement"
-    - "Environment Owner CostCenter Project tags"
-  invocation_schema: >-
-    Input: either (a) a tag compliance requirement ("enforce Environment,
-    Owner, CostCenter, Project tags on all EC2, S3, and RDS resources with
-    auto-tagging and drift remediation", "propagate tags from EC2 to EBS
-    volumes and ENIs on creation", "activate cost allocation tags
-    programmatically"), OR (b) an existing tag policy, Config rule, or
-    EventBridge auto-tagger to audit and harden. Output: deterministic
-    COMPLIANCE block per requirement — POLICY/DETECTION/AUTOMATION/
-    PROPAGATION/REMEDIATION/COST/VERDICT — where VERDICT is
-    AUTOMATION_DEPLOYED (templates ready and validated) or REVIEW_REQUIRED
-    (specific gap cited, e.g., manual Billing-console step or untested
-    custom runbook).
+  verdict_shape: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
+  when_to_use: Designing Organizations tag policies with case-sensitive key/value validation, building EventBridge + Lambda auto-tagging pipelines with inherited-tag propagation (EC2 to EBS/ENI), running Resource Groups Tagging API bulk operations, wiring Config required-tags and allowed-tag-values rules with drift detection, remediating tag drift via SSM Automation, activating cost allocation tags programmatically, or enforcing cross-account tag consistency via CloudFormation StackSets.
+  activation_triggers: tag compliance automation, Organizations tag policy case_sensitive, auto-tag on creation EventBridge Lambda, tag propagation EC2 EBS ENI, Resource Groups Tagging API bulk, tag-resources untag-resources get-resources, required-tags allowed-tag-values Config rule, tag drift detection remediation, cost allocation tag activation, cross-account tag consistency StackSets, tag schema enforcement, Environment Owner CostCenter Project tags
+  invocation_schema: 'Input: either (a) a tag compliance requirement ("enforce Environment, Owner, CostCenter, Project tags on all EC2, S3, and RDS resources with auto-tagging and drift remediation", "propagate tags from EC2 to EBS volumes and ENIs on creation", "activate cost allocation tags programmatically"), OR (b) an existing tag policy, Config rule, or EventBridge auto-tagger to audit and harden. Output: deterministic COMPLIANCE block per requirement — POLICY/DETECTION/AUTOMATION/ PROPAGATION/REMEDIATION/COST/VERDICT — where VERDICT is AUTOMATION_DEPLOYED (templates ready and validated) or REVIEW_REQUIRED (specific gap cited, e.g., manual Billing-console step or untested custom runbook).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Organizations, Tag Policy, TagPolicy, case_sensitive, enforced_for, allowed_values, Resource Groups Tagging API, tag-resources, untag-resources, get-resources, AWS Config, required-tags, allowed-tag-values, tag drift, EventBridge, Lambda auto-tagging, tag propagation, EC2 EBS ENI, cost allocation tags, Cost Explorer API, CloudFormation StackSets, SSM Automation, tag compliance, tag schema, Environment Owner CostCenter Project
+  tags: aws-organizations, tag-policy, resource-groups-tagging-api, aws-config, eventbridge, lambda, cost-explorer, cloudformation-stacksets, ssm-automation, automate
 ---
 
 # Tag Compliance Automator

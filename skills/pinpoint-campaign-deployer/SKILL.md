@@ -1,119 +1,28 @@
 ---
 name: pinpoint-campaign-deployer
-description: >-
-  Provisions Amazon Pinpoint campaigns and engagement workflows — project
-  creation, channels (email, SMS, push, voice), segments (demographic,
-  dynamic, imported), campaigns (schedule, quiet time, A/B test holdout),
-  message templates (email, SMS, push with Liquid), journeys (multi-step
-  with wait, yes-no split, multivariate, random split), event streams
-  (Kinesis), ML-powered segment recommendations, and in-app messaging.
-  Runs deterministic pre-checks (SES verified identities, SMS origination
-  numbers, APNs/FCM credentials, segment resolution, template validation,
-  IAM permissions for Kinesis), emits create-campaign and create-journey
-  CLIs behind a CONFIRM gate, verifies via get-campaign. Emits
-  READY_TO_DEPLOY | PREREQUISITES_MISSING. Use when provisioning Pinpoint
-  projects, building multi-step journeys, or setting up cross-channel
-  campaigns.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Provisions Amazon Pinpoint campaigns and engagement workflows — project creation, channels (email, SMS, push, voice), segments (demographic, dynamic, imported), campaigns (schedule, quiet time, A/B test holdout), message templates (email, SMS, push with Liquid), journeys (multi-step with wait, yes-no split, multivariate, random split), event streams (Kinesis), ML-powered segment recommendations, and in-app messaging. Runs deterministic pre-checks (SES verified identities, SMS origination numbers, APNs/FCM credentials, segment resolution, template validation, IAM permissions for Kinesis), emits create-campaign and create-journey CLIs behind a CONFIRM gate, verifies via get-campaign. Emits READY_TO_DEPLOY | PREREQUISITES_MISSING. Use when provisioning Pinpoint projects, building multi-step journeys, or setting up cross-channel campaigns.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws pinpoint create-app, update-email-channel, update-sms-channel,
-  update-apns-channel, update-gcm-channel, create-segment, create-campaign,
-  create-journey, create-message-template, put-event-stream (AWS CLI v2, SSO
-  or key-based credentials).
-keywords:
-  - Pinpoint
-  - campaign
-  - journey
-  - segment
-  - email channel
-  - SMS channel
-  - push channel
-  - voice channel
-  - message template
-  - A/B test
-  - holdout
-  - quiet time
-  - multivariate
-  - in-app messaging
-  - event stream
-  - Kinesis
-  - ML recommendations
-  - demographic segment
-  - dynamic segment
-  - imported segment
-tags: [pinpoint, appintegration, deploy, campaign, journey, segment, multi-channel, messaging, personalization]
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws pinpoint create-app, update-email-channel, update-sms-channel, update-apns-channel, update-gcm-channel, create-segment, create-campaign, create-journey, create-message-template, put-event-stream (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - pinpoint
-    - appintegration
-    - deploy
-    - campaign
-    - journey
-    - segment
-    - multi-channel
-    - messaging
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - Pinpoint
-    - campaign
-    - journey
-    - segment
-    - email channel
-    - SMS channel
-    - push channel
-    - message template
-    - A/B test
-    - in-app messaging
-    - event stream
-  when_to_use: >-
-    Provisioning a new Pinpoint project, configuring channels (email, SMS,
-    push, voice), creating segments (demographic, dynamic, imported),
-    building campaigns with schedules and quiet time, setting up A/B tests,
-    creating multi-step journeys (wait, yes-no, multivariate), deploying
-    message templates, wiring Kinesis event streams, or enabling ML-powered
-    segment recommendations and in-app messaging.
-  activation_triggers:
-    - "create Pinpoint project"
-    - "provision Pinpoint campaign"
-    - "Pinpoint journey"
-    - "Pinpoint segment"
-    - "Pinpoint email channel"
-    - "Pinpoint SMS channel"
-    - "Pinpoint push notification"
-    - "Pinpoint message template"
-    - "A/B test campaign"
-    - "Pinpoint in-app messaging"
-    - "Pinpoint event stream Kinesis"
-    - "ML segment recommendations"
-    - "multivariate journey"
-    - "pinpoint create-campaign"
-  invocation_schema: >-
-    Input: either (a) a campaign or journey deployment intent (create,
-    update) with target project id, channel, segment, templates, schedule,
-    journey activity graph, and event stream target; OR (b) a project id
-    for live-account update or validation. Output: deterministic CAMPAIGN/
-    VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation, where VERDICT
-    is one of READY_TO_DEPLOY, PREREQUISITES_MISSING.
+  author: Jacky Chan — AWS Community Builder
+  tags: pinpoint, appintegration, deploy, campaign, journey, segment, multi-channel, messaging, personalization
+  dependencies: aws-orchestrator
+  keywords: Pinpoint, campaign, journey, segment, email channel, SMS channel, push channel, voice channel, message template, A/B test, holdout, quiet time, multivariate, in-app messaging, event stream, Kinesis, ML recommendations, demographic segment, dynamic segment, imported segment
+  when_to_use: Provisioning a new Pinpoint project, configuring channels (email, SMS, push, voice), creating segments (demographic, dynamic, imported), building campaigns with schedules and quiet time, setting up A/B tests, creating multi-step journeys (wait, yes-no, multivariate), deploying message templates, wiring Kinesis event streams, or enabling ML-powered segment recommendations and in-app messaging.
+  activation_triggers: create Pinpoint project, provision Pinpoint campaign, Pinpoint journey, Pinpoint segment, Pinpoint email channel, Pinpoint SMS channel, Pinpoint push notification, Pinpoint message template, A/B test campaign, Pinpoint in-app messaging, Pinpoint event stream Kinesis, ML segment recommendations, multivariate journey, pinpoint create-campaign
+  invocation_schema: 'Input: either (a) a campaign or journey deployment intent (create, update) with target project id, channel, segment, templates, schedule, journey activity graph, and event stream target; OR (b) a project id for live-account update or validation. Output: deterministic CAMPAIGN/ VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation, where VERDICT is one of READY_TO_DEPLOY, PREREQUISITES_MISSING.'
 ---
 
 # Pinpoint Campaign Deployer

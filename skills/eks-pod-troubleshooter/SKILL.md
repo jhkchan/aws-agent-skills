@@ -1,90 +1,27 @@
 ---
 name: eks-pod-troubleshooter
-description: >-
-  Diagnoses why Kubernetes pods fail on Amazon EKS — CrashLoopBackOff,
-  ImagePullBackOff / ErrImagePull, Pending (FailedScheduling), OOMKilled,
-  unhealthy probes (Liveness/Readiness), and Init:CrashLoopBackOff — via a
-  symptom-to-cause decision tree that combines kubectl describe pod events,
-  container lastState (exit code, OOMKilled), kubectl logs --previous for
-  application errors, kubectl get events timeline, ECR auth and node-role
-  permissions, node taints and resource pressure, and probe path/port
-  misconfiguration. Emits a deterministic verdict
-  (ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE) with the specific failure
-  category and evidence from kubectl describe / logs / get-events /
-  aws eks describe-cluster. Use when a pod is stuck in Pending, crash-looping,
-  cannot pull an image, fails liveness/readiness probes, is OOMKilled, or has
-  a failing init container.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Diagnoses why Kubernetes pods fail on Amazon EKS — CrashLoopBackOff, ImagePullBackOff / ErrImagePull, Pending (FailedScheduling), OOMKilled, unhealthy probes (Liveness/Readiness), and Init:CrashLoopBackOff — via a symptom-to-cause decision tree that combines kubectl describe pod events, container lastState (exit code, OOMKilled), kubectl logs --previous for application errors, kubectl get events timeline, ECR auth and node-role permissions, node taints and resource pressure, and probe path/port misconfiguration. Emits a deterministic verdict (ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE) with the specific failure category and evidence from kubectl describe / logs / get-events / aws eks describe-cluster. Use when a pod is stuck in Pending, crash-looping, cannot pull an image, fails liveness/readiness probes, is OOMKilled, or has a failing init container.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Offline diagnosis works on supplied kubectl describe / logs /
-  get-events output. Live-cluster diagnosis uses kubectl get pods, describe
-  pod, logs (incl. --previous and -c <container>), get events, top nodes,
-  top pods, aws eks describe-cluster, aws ec2 describe-vpc-endpoints, and
-  aws ecr describe-images (kubectl v1.27+, AWS CLI v2, SSO or key-based
-  credentials, kubeconfig pointing at the EKS cluster).
-keywords:
-  - EKS
-  - Kubernetes
-  - pod
-  - CrashLoopBackOff
-  - ImagePullBackOff
-  - ErrImagePull
-  - Pending
-  - FailedScheduling
-  - OOMKilled
-  - Liveness probe
-  - Readiness probe
-  - Init container
-  - ECR
-  - kubectl
-  - pod lifecycle
-  - taints
-  - tolerations
-  - node affinity
-tags: [eks, kubernetes, compute, troubleshoot, pod-failure, crashloop, oom, image-pull, health-check]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works on supplied kubectl describe / logs / get-events output. Live-cluster diagnosis uses kubectl get pods, describe pod, logs (incl. --previous and -c <container>), get events, top nodes, top pods, aws eks describe-cluster, aws ec2 describe-vpc-endpoints, and aws ecr describe-images (kubectl v1.27+, AWS CLI v2, SSO or key-based credentials, kubeconfig pointing at the EKS cluster).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
-  when_to_use: >-
-    Diagnosing why a Kubernetes pod on EKS is stuck Pending, crash-looping
-    (CrashLoopBackOff), cannot pull a container image (ImagePullBackOff /
-    ErrImagePull), is repeatedly OOMKilled, fails liveness or readiness
-    probes while Running, or has an init container stuck in
-    Init:CrashLoopBackOff; interpreting kubectl describe pod events,
-    container lastState.exitCode, lastState.reason, and conditions.
-  activation_triggers:
-    - "EKS pod CrashLoopBackOff"
-    - "EKS pod ImagePullBackOff"
-    - "EKS pod ErrImagePull"
-    - "EKS pod Pending"
-    - "EKS pod FailedScheduling"
-    - "EKS pod OOMKilled"
-    - "EKS pod liveness probe failing"
-    - "EKS pod readiness probe failing"
-    - "EKS init container failing"
-    - "EKS pod keeps restarting"
-    - "kubectl pod status"
-  invocation_schema: >-
-    Input: either (a) a symptom description (pod name, namespace, observed
-    state, restart count, any error strings from kubectl get pods), OR (b)
-    a live-cluster scenario where the agent runs kubectl describe pod /
-    logs / get events to gather evidence. Output: a deterministic INCIDENT
-    / VERDICT / ROOT_CAUSE / EVIDENCE / REMEDIATION block where VERDICT ∈
-    {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and ROOT_CAUSE names the
-    specific failure category (CRASH_LOOP / IMAGE_PULL / PENDING / OOM /
-    PROBE_FAILURE / INIT_FAILURE) and the offending config element.
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+  when_to_use: Diagnosing why a Kubernetes pod on EKS is stuck Pending, crash-looping (CrashLoopBackOff), cannot pull a container image (ImagePullBackOff / ErrImagePull), is repeatedly OOMKilled, fails liveness or readiness probes while Running, or has an init container stuck in Init:CrashLoopBackOff; interpreting kubectl describe pod events, container lastState.exitCode, lastState.reason, and conditions.
+  activation_triggers: EKS pod CrashLoopBackOff, EKS pod ImagePullBackOff, EKS pod ErrImagePull, EKS pod Pending, EKS pod FailedScheduling, EKS pod OOMKilled, EKS pod liveness probe failing, EKS pod readiness probe failing, EKS init container failing, EKS pod keeps restarting, kubectl pod status
+  invocation_schema: 'Input: either (a) a symptom description (pod name, namespace, observed state, restart count, any error strings from kubectl get pods), OR (b) a live-cluster scenario where the agent runs kubectl describe pod / logs / get events to gather evidence. Output: a deterministic INCIDENT / VERDICT / ROOT_CAUSE / EVIDENCE / REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and ROOT_CAUSE names the specific failure category (CRASH_LOOP / IMAGE_PULL / PENDING / OOM / PROBE_FAILURE / INIT_FAILURE) and the offending config element.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: EKS, Kubernetes, pod, CrashLoopBackOff, ImagePullBackOff, ErrImagePull, Pending, FailedScheduling, OOMKilled, Liveness probe, Readiness probe, Init container, ECR, kubectl, pod lifecycle, taints, tolerations, node affinity
+  tags: eks, kubernetes, compute, troubleshoot, pod-failure, crashloop, oom, image-pull, health-check
 ---
 
 # EKS Pod Troubleshooter

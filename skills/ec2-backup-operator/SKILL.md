@@ -1,133 +1,28 @@
 ---
 name: ec2-backup-operator
-description: >-
-  Operates EC2 backup and snapshot workflows safely — EBS snapshot
-  create and cross-region/cross-account copy, AMI creation and
-  deregistration lifecycle, AWS Backup plans and vaults with vault
-  lock, Data Lifecycle Manager (DLM) automated policies, point-in-
-  time recovery for EC2, application-consistent vs crash-consistent
-  snapshot verification, and full restore procedures. Runs
-  deterministic pre-checks (instance state, volume attached,
-  snapshot quota, KMS key policy for cross-account copy, AMI
-  references for snapshot delete, FSR status, vault lock mode),
-  executes the operation behind a CONFIRM gate, and emits a verdict
-  (READY | BLOCKED | COMPLETED) per operation with the exact CLI
-  sequence, expected side-effects, and post-verification. Use when
-  creating a pre-migration AMI, scheduling a DLM policy, enabling
-  AWS Backup vault lock, restoring a volume from a snapshot,
-  launching from an AMI, or diagnosing a snapshot stuck in pending.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates EC2 backup and snapshot workflows safely — EBS snapshot create and cross-region/cross-account copy, AMI creation and deregistration lifecycle, AWS Backup plans and vaults with vault lock, Data Lifecycle Manager (DLM) automated policies, point-in- time recovery for EC2, application-consistent vs crash-consistent snapshot verification, and full restore procedures. Runs deterministic pre-checks (instance state, volume attached, snapshot quota, KMS key policy for cross-account copy, AMI references for snapshot delete, FSR status, vault lock mode), executes the operation behind a CONFIRM gate, and emits a verdict (READY | BLOCKED | COMPLETED) per operation with the exact CLI sequence, expected side-effects, and post-verification. Use when creating a pre-migration AMI, scheduling a DLM policy, enabling AWS Backup vault lock, restoring a volume from a snapshot, launching from an AMI, or diagnosing a snapshot stuck in pending.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws ec2 create-snapshot, describe-snapshots, copy-snapshot,
-  create-image, describe-images, deregister-image, delete-snapshot,
-  create-volume, run-instances, modify-snapshot-tier, describe-fast-snapshot-
-  restores; aws backup create-backup-plan, create-backup-vault,
-  put-backup-vault-lock-config, start-backup-job, start-restore-job,
-  describe-restore-job; aws dlm create-lifecycle-policy (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - EC2
-  - EBS
-  - EBS snapshot
-  - AMI
-  - create-image
-  - create-snapshot
-  - copy-snapshot
-  - deregister-image
-  - delete-snapshot
-  - AWS Backup
-  - backup plan
-  - backup vault
-  - vault lock
-  - compliance mode
-  - backup selection
-  - Data Lifecycle Manager
-  - DLM
-  - lifecycle policy
-  - point-in-time recovery
-  - PITR
-  - continuous backup
-  - snapshot chain
-  - incremental snapshot
-  - Fast Snapshot Restore
-  - FSR
-  - snapshot archive
-  - snapshot tiering
-  - fsfreeze
-  - application-consistent
-  - crash-consistent
-  - create-volume-from-snapshot
-  - launch-from-AMI
-  - cross-region copy
-  - cross-account share
-  - KMS key policy
-  - snapshot attribute
-tags: [ec2, ebs, ami, aws-backup, dlm, storage, backup, restore, snapshot, disaster-recovery, operate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws ec2 create-snapshot, describe-snapshots, copy-snapshot, create-image, describe-images, deregister-image, delete-snapshot, create-volume, run-instances, modify-snapshot-tier, describe-fast-snapshot- restores; aws backup create-backup-plan, create-backup-vault, put-backup-vault-lock-config, start-backup-job, start-restore-job...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
+  verdict_shape: READY | BLOCKED | COMPLETED
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags: [ec2, ebs, ami, aws-backup, dlm, storage, backup, restore, snapshot, disaster-recovery, operate]
-  dependencies: [aws-orchestrator]
-  keywords:
-    - EC2
-    - EBS
-    - snapshot
-    - AMI
-    - AWS Backup
-    - DLM
-    - vault lock
-    - Fast Snapshot Restore
-  when_to_use: >-
-    Creating a pre-migration AMI from a running or stopped EC2 instance,
-    taking a manual EBS snapshot before a risky change, copying snapshots
-    cross-region or cross-account, building or modifying an AWS Backup plan
-    with vault lock (compliance mode), creating a DLM lifecycle policy for
-    automated snapshot retention, restoring a volume from a snapshot,
-    launching a new instance from an AMI, starting an AWS Backup restore
-    job, diagnosing a snapshot stuck in pending, or enabling Fast Snapshot
-    Restore for latency-sensitive restores.
-  activation_triggers:
-    - "create AMI from instance"
-    - "create EBS snapshot"
-    - "copy snapshot cross-region"
-    - "share snapshot cross-account"
-    - "deregister AMI"
-    - "delete AMI snapshot"
-    - "create AWS Backup plan"
-    - "enable backup vault lock"
-    - "create DLM lifecycle policy"
-    - "restore volume from snapshot"
-    - "launch instance from AMI"
-    - "start AWS Backup restore job"
-    - "snapshot stuck in pending"
-    - "enable Fast Snapshot Restore"
-    - "tier snapshot to archive"
-    - "application-consistent snapshot"
-  invocation_schema: >-
-    Input: either (a) an EC2 backup/restore operation request
-    (operation=create-snapshot | copy-snapshot | create-image |
-    deregister-image | delete-snapshot | create-backup-plan |
-    enable-vault-lock | create-dlm-policy | restore-volume |
-    restore-from-ami | start-restore-job) paired with the target
-    instance/volume/snapshot/AMI/plan-id, OR (b) the resource-id +
-    operation for live-account execution. Output: deterministic
-    OPERATION/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation,
-    where VERDICT is one of READY, BLOCKED, COMPLETED.
+  author: Jacky Chan — AWS Community Builder
+  tags: ec2, ebs, ami, aws-backup, dlm, storage, backup, restore, snapshot, disaster-recovery, operate
+  dependencies: aws-orchestrator
+  keywords: EC2, EBS, EBS snapshot, AMI, create-image, create-snapshot, copy-snapshot, deregister-image, delete-snapshot, AWS Backup, backup plan, backup vault, vault lock, compliance mode, backup selection, Data Lifecycle Manager, DLM, lifecycle policy, point-in-time recovery, PITR, continuous backup, snapshot chain, incremental snapshot, Fast Snapshot Restore, FSR, snapshot archive, snapshot tiering, fsfreeze, application-consistent, crash-consistent, create-volume-from-snapshot, launch-from-AMI, cross-region copy, cross-account share, KMS key policy, snapshot attribute
+  when_to_use: Creating a pre-migration AMI from a running or stopped EC2 instance, taking a manual EBS snapshot before a risky change, copying snapshots cross-region or cross-account, building or modifying an AWS Backup plan with vault lock (compliance mode), creating a DLM lifecycle policy for automated snapshot retention, restoring a volume from a snapshot, launching a new instance from an AMI, starting an AWS Backup restore job, diagnosing a snapshot stuck in pending, or enabling Fast Snapshot Restore for latency-sensitive restores.
+  activation_triggers: create AMI from instance, create EBS snapshot, copy snapshot cross-region, share snapshot cross-account, deregister AMI, delete AMI snapshot, create AWS Backup plan, enable backup vault lock, create DLM lifecycle policy, restore volume from snapshot, launch instance from AMI, start AWS Backup restore job, snapshot stuck in pending, enable Fast Snapshot Restore, tier snapshot to archive, application-consistent snapshot
+  invocation_schema: 'Input: either (a) an EC2 backup/restore operation request (operation=create-snapshot | copy-snapshot | create-image | deregister-image | delete-snapshot | create-backup-plan | enable-vault-lock | create-dlm-policy | restore-volume | restore-from-ami | start-restore-job) paired with the target instance/volume/snapshot/AMI/plan-id, OR (b) the resource-id + operation for live-account execution. Output: deterministic OPERATION/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
 ---
 
 # EC2 Backup Operator

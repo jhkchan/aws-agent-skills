@@ -1,115 +1,26 @@
 ---
 name: elastic-beanstalk-environment-optimizer
-description: >-
-  Optimizes AWS Elastic Beanstalk environments for cost and
-  performance. Covers instance type right-sizing (single-instance vs
-  load-balanced), t3/t4g burstable instances for dev, managed platform
-  update scheduling, .ebextensions cleanup, deployment policy selection
-  (immutable for zero-downtime but 2x cost during deploy), worker tier,
-  health check tuning, auto-scaling policy tuning, RDS integration
-  cost (shared vs dedicated), NAT Gateway elimination for single-
-  instance, and termination protection cleanup. Emits an OPTIMIZED
-  assessment with cost savings estimates or
-  FURTHER_OPTIMIZATION_AVAILABLE with specific recommendations. Use
-  when optimizing Beanstalk cost, right-sizing EB instances, reducing
-  deployment cost, tuning auto-scaling, eliminating NAT Gateway for
-  dev, or scheduling managed platform updates. Triggers - optimize
-  elastic beanstalk, eb cost optimization, beanstalk right-size,
-  single-instance vs load-balanced, immutable deployment cost, nat
-  gateway elimination, ebextensions cleanup, rds shared cost.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Optimizes AWS Elastic Beanstalk environments for cost and performance. Covers instance type right-sizing (single-instance vs load-balanced), t3/t4g burstable instances for dev, managed platform update scheduling, .ebextensions cleanup, deployment policy selection (immutable for zero-downtime but 2x cost during deploy), worker tier, health check tuning, auto-scaling policy tuning, RDS integration cost (shared vs dedicated), NAT Gateway elimination for single- instance, and termination protection cleanup. Emits an OPTIMIZED assessment with cost savings estimates or FURTHER_OPTIMIZATION_AVAILABLE with specific recommendations. Use when optimizing Beanstalk cost, right-sizing EB instances, reducing deployment cost, tuning auto-scaling, eliminating NAT Gateway for dev, or scheduling managed platform updates. Triggers - optimize elastic beanstalk, eb cost optimization, beanstalk right-size, single-instance vs load-balanced, immutable deployment cost, nat gateway elimination, ebextensions cleanup, rds shared cost.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live optimization - AWS CLI v2 with elasticbeanstalk,
-  ec2, rds, elasticloadbalancing, and cloudwatch access. Works with
-  Terraform aws_elastic_beanstalk_environment resources and
-  CloudFormation AWS::ElasticBeanstalk templates.
-keywords:
-  - aws
-  - elastic beanstalk
-  - cost optimization
-  - instance right-sizing
-  - single-instance
-  - load-balanced
-  - t3 burstable
-  - t4g burstable
-  - managed platform update
-  - ebextensions
-  - deployment policy
-  - immutable deploy
-  - rolling deploy
-  - worker tier
-  - auto-scaling
-  - nat gateway
-  - rds
-  - health check
-  - cloudops
-  - optimize
-tags:
-  - aws
-  - elastic-beanstalk
-  - cost-optimization
-  - cloudops
-  - optimize
-  - compute
-  - right-sizing
-  - auto-scaling
-  - deployment-policy
-  - managed-platform
-  - nat-gateway
-  - ebextensions
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live optimization - AWS CLI v2 with elasticbeanstalk, ec2, rds, elasticloadbalancing, and cloudwatch access. Works with Terraform aws_elastic_beanstalk_environment resources and CloudFormation AWS::ElasticBeanstalk templates.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE"
+  verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - elastic-beanstalk
-    - cost-optimization
-    - cloudops
-    - optimize
-    - compute
-    - right-sizing
-    - auto-scaling
-    - deployment-policy
-    - managed-platform
-    - nat-gateway
-    - ebextensions
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - optimize elastic beanstalk
-    - eb cost optimization
-    - beanstalk right-size instances
-    - single-instance vs load-balanced
-    - immutable deployment cost
-    - managed platform update schedule
-    - nat gateway elimination
-    - ebextensions cleanup
-    - beanstalk auto-scaling tune
-    - rds shared cost
-  when_to_use: >-
-    Invoke when the user wants to optimize Elastic Beanstalk environments
-    for cost, right-size instance types, choose single-instance vs load-
-    balanced topology, reduce deployment costs, tune auto-scaling policies,
-    eliminate NAT Gateway for dev/staging, schedule managed platform
-    updates, clean up .ebextensions, or optimize RDS integration costs.
-    Do NOT invoke for ECS/EKS optimization, Lambda optimization, or EC2
-    Auto Scaling Groups (non-Beanstalk).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, elastic-beanstalk, cost-optimization, cloudops, optimize, compute, right-sizing, auto-scaling, deployment-policy, managed-platform, nat-gateway, ebextensions
+  dependencies: aws-orchestrator
+  keywords: aws, elastic beanstalk, cost optimization, instance right-sizing, single-instance, load-balanced, t3 burstable, t4g burstable, managed platform update, ebextensions, deployment policy, immutable deploy, rolling deploy, worker tier, auto-scaling, nat gateway, rds, health check, cloudops, optimize
+  when_to_use: Invoke when the user wants to optimize Elastic Beanstalk environments for cost, right-size instance types, choose single-instance vs load- balanced topology, reduce deployment costs, tune auto-scaling policies, eliminate NAT Gateway for dev/staging, schedule managed platform updates, clean up .ebextensions, or optimize RDS integration costs. Do NOT invoke for ECS/EKS optimization, Lambda optimization, or EC2 Auto Scaling Groups (non-Beanstalk).
 ---
 
 # Elastic Beanstalk Environment Optimizer

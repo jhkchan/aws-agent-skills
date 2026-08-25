@@ -1,145 +1,26 @@
 ---
 name: opensearch-domain-deployer
-description: >-
-  Provisions Amazon OpenSearch Service domains with production
-  defaults: deployment type (managed cluster vs Serverless), instance
-  type (t3.small.search dev to r6g.4xlarge.search production), data
-  nodes vs dedicated masters vs UltraWarm vs cold storage, Multi-AZ
-  3-zone, EBS (gp3 default, io1 for high IOPS), encryption at-rest
-  (KMS, must enable at creation) and in-transit (TLS), VPC-only vs
-  public access, fine-grained access control (FGAC) with IAM or
-  Cognito master user, snapshots (automated + manual to S3), shard
-  and replica count, OpenSearch Serverless, vector search, streaming
-  ingestion. Emits a READY_TO_DEPLOY checklist with verification
-  commands. Use when creating an OpenSearch domain, choosing managed
-  vs Serverless, designing Multi-AZ topology, sizing shards and
-  instances, enabling FGAC, or generating provisioning CLI / IaC
-  templates. Triggers: create OpenSearch, provision OpenSearch,
-  OpenSearch Serverless, OpenSearch FGAC, UltraWarm, vector search.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon OpenSearch Service domains with production defaults: deployment type (managed cluster vs Serverless), instance type (t3.small.search dev to r6g.4xlarge.search production), data nodes vs dedicated masters vs UltraWarm vs cold storage, Multi-AZ 3-zone, EBS (gp3 default, io1 for high IOPS), encryption at-rest (KMS, must enable at creation) and in-transit (TLS), VPC-only vs public access, fine-grained access control (FGAC) with IAM or Cognito master user, snapshots (automated + manual to S3), shard and replica count, OpenSearch Serverless, vector search, streaming ingestion. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating an OpenSearch domain, choosing managed vs Serverless, designing Multi-AZ topology, sizing shards and instances, enabling FGAC, or generating provisioning CLI / IaC templates. Triggers: create OpenSearch, provision OpenSearch, OpenSearch Serverless, OpenSearch FGAC, UltraWarm, vector search.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with opensearch,
-  opensearchserverless, ec2, kms, iam, and cognito-idp access. Works
-  with Terraform aws_opensearch_domain /
-  aws_opensearchserverless_collection resources and CloudFormation
-  AWS::OpenSearchService::Domain templates.
-keywords:
-  - aws
-  - opensearch
-  - elasticsearch
-  - cloudops
-  - deploy
-  - provisioning
-  - search
-  - analytics
-  - domain
-  - managed cluster
-  - serverless
-  - data nodes
-  - dedicated master
-  - ultrawarm
-  - cold storage
-  - multi-az
-  - 3-zone
-  - ebs
-  - gp3
-  - io1
-  - encryption at rest
-  - encryption in transit
-  - tls
-  - kms
-  - vpc
-  - public access
-  - fine-grained access control
-  - fgac
-  - iam master user
-  - cognito
-  - snapshot
-  - repository
-  - shard count
-  - replica count
-  - vector search
-  - streaming ingestion
-tags:
-  - aws
-  - opensearch
-  - elasticsearch
-  - cloudops
-  - deploy
-  - analytics
-  - search
-  - provisioning
-  - managed-cluster
-  - serverless
-  - multi-az
-  - encryption
-  - fgac
-  - ultrawarm
-  - vector-search
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with opensearch, opensearchserverless, ec2, kms, iam, and cognito-idp access. Works with Terraform aws_opensearch_domain / aws_opensearchserverless_collection resources and CloudFormation AWS::OpenSearchService::Domain templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - opensearch
-    - elasticsearch
-    - cloudops
-    - deploy
-    - analytics
-    - search
-    - provisioning
-    - managed-cluster
-    - serverless
-    - multi-az
-    - encryption
-    - fgac
-    - ultrawarm
-    - vector-search
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create opensearch domain
-    - provision opensearch
-    - set up opensearch serverless
-    - opensearch managed cluster
-    - opensearch multi-az
-    - opensearch encryption
-    - opensearch vpc
-    - opensearch fgac
-    - opensearch ultrawarm
-    - opensearch cold storage
-    - opensearch shards
-    - opensearch vector search
-    - opensearch streaming ingestion
-    - opensearch cognito
-    - opensearch snapshot repository
-  when_to_use: >-
-    Invoke when the user wants to create a new OpenSearch Service
-    domain (managed cluster or Serverless), design a Multi-AZ production
-    topology with dedicated master nodes, size data nodes and shard
-    count, enable fine-grained access control (FGAC), configure UltraWarm
-    or cold storage for cost optimization, set up vector search
-    collections, configure snapshot repositories, or generate
-    provisioning CLI commands / IaC templates. Do NOT invoke for
-    auditing existing domain posture (use opensearch-domain-auditor),
-    or for non-OpenSearch search/analytics (Athena, CloudSearch,
-    self-managed Elasticsearch on EC2).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, opensearch, elasticsearch, cloudops, deploy, analytics, search, provisioning, managed-cluster, serverless, multi-az, encryption, fgac, ultrawarm, vector-search
+  dependencies: aws-orchestrator
+  keywords: aws, opensearch, elasticsearch, cloudops, deploy, provisioning, search, analytics, domain, managed cluster, serverless, data nodes, dedicated master, ultrawarm, cold storage, multi-az, 3-zone, ebs, gp3, io1, encryption at rest, encryption in transit, tls, kms, vpc, public access, fine-grained access control, fgac, iam master user, cognito, snapshot, repository, shard count, replica count, vector search, streaming ingestion
+  when_to_use: Invoke when the user wants to create a new OpenSearch Service domain (managed cluster or Serverless), design a Multi-AZ production topology with dedicated master nodes, size data nodes and shard count, enable fine-grained access control (FGAC), configure UltraWarm or cold storage for cost optimization, set up vector search collections, configure snapshot repositories, or generate provisioning CLI commands / IaC templates. Do NOT invoke for auditing existing domain posture (use opensearch-domain-auditor), or for non-OpenSearch search/analytics (Athena, CloudSearch, self-managed Elasticsearch on EC2).
 ---
 
 # OpenSearch Domain Deployer

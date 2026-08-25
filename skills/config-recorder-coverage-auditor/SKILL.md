@@ -1,78 +1,24 @@
 ---
 name: config-recorder-coverage-auditor
-description: >-
-  Audits AWS Config posture across all four coverage layers — configuration
-  recorder (existence, status, resource-type scope), delivery channel (S3
-  delivery health, bucket accessibility), Config rules (deployed count, rule
-  type), and conformance packs (deployment status). Detects silent coverage
-  gaps: allSupported=false losing new resource types, includeGlobalResourceTypes
-  false in every region (global resources never recorded), delivery channel
-  FAILURE status (deleted bucket or missing bucket policy), and custom Lambda
-  rules whose Lambda was deleted (rule frozen, no evaluations). Emits a
-  deterministic verdict per region: INCOMPLETE_COVERAGE | NO_RULES |
-  DELIVERY_GAP | CONFIG_GAP | OK. Use when checking Config recorder coverage,
-  validating delivery-channel health, auditing conformance-pack deployment,
-  or verifying multi-region Config completeness.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Audits AWS Config posture across all four coverage layers — configuration recorder (existence, status, resource-type scope), delivery channel (S3 delivery health, bucket accessibility), Config rules (deployed count, rule type), and conformance packs (deployment status). Detects silent coverage gaps: allSupported=false losing new resource types, includeGlobalResourceTypes false in every region (global resources never recorded), delivery channel FAILURE status (deleted bucket or missing bucket policy), and custom Lambda rules whose Lambda was deleted (rule frozen, no evaluations). Emits a deterministic verdict per region: INCOMPLETE_COVERAGE | NO_RULES | DELIVERY_GAP | CONFIG_GAP | OK. Use when checking Config recorder coverage, validating delivery-channel health, auditing conformance-pack deployment, or verifying multi-region Config completeness.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline configuration-data classification.
-  Live-account audits use aws configservice describe-configuration-recorders,
-  describe-configuration-recorder-status, describe-delivery-channels,
-  describe-delivery-channel-status, describe-config-rules, and
-  describe-conformance-packs (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - AWS Config
-  - configuration recorder
-  - delivery channel
-  - conformance packs
-  - Config rules
-  - allSupported
-  - includeGlobalResourceTypes
-  - recorder status
-  - delivery channel status
-  - global resource types
-  - compliance posture
-  - coverage audit
-  - multi-region Config
-  - Config aggregator
-  - AWSServiceRoleForConfig
-  - governance
-tags: [aws-config, governance, compliance, recorder, delivery-channel, conformance-packs, coverage-audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline configuration-data classification. Live-account audits use aws configservice describe-configuration-recorders, describe-configuration-recorder-status, describe-delivery-channels, describe-delivery-channel-status, describe-config-rules, and describe-conformance-packs (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
-  verdict_shape: "INCOMPLETE_COVERAGE | NO_RULES | DELIVERY_GAP | CONFIG_GAP | OK"
-  when_to_use: >-
-    Auditing AWS Config recorder coverage before a compliance assessment,
-    validating delivery-channel health, checking whether all resource types
-    and regions are recorded, verifying conformance-pack deployment, or
-    diagnosing why Config rules show stale compliance results.
-  activation_triggers:
-    - "audit AWS Config coverage"
-    - "check Config recorder status"
-    - "is Config recording all resources"
-    - "Config delivery channel health"
-    - "conformance pack deployment status"
-    - "multi-region Config audit"
-    - "Config rules coverage gap"
-    - "Config recorder not recording"
-  invocation_schema: >-
-    Input: either (a) a set of AWS Config API responses
-    (describe-configuration-recorders, describe-configuration-recorder-status,
-    describe-delivery-channels, describe-delivery-channel-status,
-    describe-config-rules, describe-conformance-packs) for one or more
-    regions, OR (b) a region/account identifier for live-account audit.
-    Output: deterministic AUDIT/REGION/VERDICT/REASON/FINDINGS/REMEDIATION
-    block per region, where VERDICT is one of {CONFIG_GAP, DELIVERY_GAP,
-    INCOMPLETE_COVERAGE, NO_RULES, OK}.
+  verdict_shape: INCOMPLETE_COVERAGE | NO_RULES | DELIVERY_GAP | CONFIG_GAP | OK
+  when_to_use: Auditing AWS Config recorder coverage before a compliance assessment, validating delivery-channel health, checking whether all resource types and regions are recorded, verifying conformance-pack deployment, or diagnosing why Config rules show stale compliance results.
+  activation_triggers: audit AWS Config coverage, check Config recorder status, is Config recording all resources, Config delivery channel health, conformance pack deployment status, multi-region Config audit, Config rules coverage gap, Config recorder not recording
+  invocation_schema: 'Input: either (a) a set of AWS Config API responses (describe-configuration-recorders, describe-configuration-recorder-status, describe-delivery-channels, describe-delivery-channel-status, describe-config-rules, describe-conformance-packs) for one or more regions, OR (b) a region/account identifier for live-account audit. Output: deterministic AUDIT/REGION/VERDICT/REASON/FINDINGS/REMEDIATION block per region, where VERDICT is one of {CONFIG_GAP, DELIVERY_GAP, INCOMPLETE_COVERAGE, NO_RULES, OK}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Config, configuration recorder, delivery channel, conformance packs, Config rules, allSupported, includeGlobalResourceTypes, recorder status, delivery channel status, global resource types, compliance posture, coverage audit, multi-region Config, Config aggregator, AWSServiceRoleForConfig, governance
+  tags: aws-config, governance, compliance, recorder, delivery-channel, conformance-packs, coverage-audit
 ---
 
 # Config Recorder Coverage Auditor

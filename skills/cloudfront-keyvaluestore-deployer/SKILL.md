@@ -1,111 +1,26 @@
 ---
 name: cloudfront-keyvaluestore-deployer
-description: >-
-  Provisions CloudFront KeyValueStore (KVS) with production defaults: KVS
-  creation and key-value pair management, CloudFront Functions integration
-  (read KVS data at the edge without redeploy), A/B testing request routing
-  via KVS, feature flag toggles at the edge, IP allowlists and blocklists,
-  URL redirects and rewrites driven by KVS, KVS size limits (1 MB max store,
-  key/value constraints), KVS propagation and eventual consistency model,
-  and the latest CloudFront Functions KVS API (cloudfront-js-2.0 with
-  cf.openKvs). Emits a READY_TO_DEPLOY checklist with verification commands.
-  Use when provisioning a CloudFront KeyValueStore, integrating CloudFront
-  Functions with KVS for edge-side routing, implementing A/B testing or
-  feature flags at the CDN edge, or building IP allowlist logic. Triggers:
-  create CloudFront KeyValueStore, KVS CloudFront Functions, edge A/B testing,
-  feature flags KVS, IP allowlist KVS, cf.openKvs, cloudfront-js-2.0.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions CloudFront KeyValueStore (KVS) with production defaults: KVS creation and key-value pair management, CloudFront Functions integration (read KVS data at the edge without redeploy), A/B testing request routing via KVS, feature flag toggles at the edge, IP allowlists and blocklists, URL redirects and rewrites driven by KVS, KVS size limits (1 MB max store, key/value constraints), KVS propagation and eventual consistency model, and the latest CloudFront Functions KVS API (cloudfront-js-2.0 with cf.openKvs). Emits a READY_TO_DEPLOY checklist with verification commands. Use when provisioning a CloudFront KeyValueStore, integrating CloudFront Functions with KVS for edge-side routing, implementing A/B testing or feature flags at the CDN edge, or building IP allowlist logic. Triggers: create CloudFront KeyValueStore, KVS CloudFront Functions, edge A/B testing, feature flags KVS, IP allowlist KVS, cf.openKvs, cloudfront-js-2.0.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). For live deployment: AWS CLI v2 with cloudfront and
-  cloudfront-keyvaluestore access. Works with Terraform
-  aws_cloudfront_key_value_store / aws_cloudfront_function resources and
-  CloudFormation AWS::CloudFront::KeyValueStore templates.
-keywords:
-  - aws
-  - cloudfront
-  - keyvaluestore
-  - kvs
-  - cloudfront functions
-  - edge computing
-  - cloudops
-  - deploy
-  - provisioning
-  - a/b testing
-  - feature flags
-  - ip allowlist
-  - ip blocklist
-  - url redirect
-  - edge routing
-  - cloudfront-js-2.0
-  - cf.openkvs
-  - eventual consistency
-tags:
-  - aws
-  - cloudfront
-  - keyvaluestore
-  - cloudfront-functions
-  - networking
-  - cloudops
-  - deploy
-  - edge-computing
-  - provisioning
-  - feature-flags
-  - ab-testing
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with cloudfront and cloudfront-keyvaluestore access. Works with Terraform aws_cloudfront_key_value_store / aws_cloudfront_function resources and CloudFormation AWS::CloudFront::KeyValueStore templates.'
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - cloudfront
-    - keyvaluestore
-    - cloudfront-functions
-    - networking
-    - cloudops
-    - deploy
-    - edge-computing
-    - provisioning
-    - feature-flags
-    - ab-testing
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create cloudfront keyvaluestore
-    - kvs cloudfront functions
-    - cloudfront ab testing edge
-    - edge feature flags
-    - cloudfront ip allowlist kvs
-    - cf.openkvs
-    - cloudfront-js-2.0
-    - kvs 1mb limit
-    - kvs propagation
-    - cloudfront key value store
-  when_to_use: >-
-    Invoke when the user wants to create a CloudFront KeyValueStore (KVS),
-    integrate CloudFront Functions with KVS for edge-side data lookup,
-    implement A/B testing or canary routing at the CDN edge, deploy feature
-    flags that toggle without function redeployment, build IP allowlist or
-    blocklist logic in CloudFront Functions, or drive URL redirects/rewrites
-    from externally managed key-value data. Do NOT invoke for Lambda@Edge
-    (different runtime, no KVS access), for CloudFront origin failover
-    (use origin groups, not KVS), for caching behavior changes (use cache
-    policies, not KVS), or for auditing existing CloudFront distributions
-    (use cloudfront-distribution-auditor).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, cloudfront, keyvaluestore, cloudfront-functions, networking, cloudops, deploy, edge-computing, provisioning, feature-flags, ab-testing
+  dependencies: aws-orchestrator
+  keywords: aws, cloudfront, keyvaluestore, kvs, cloudfront functions, edge computing, cloudops, deploy, provisioning, a/b testing, feature flags, ip allowlist, ip blocklist, url redirect, edge routing, cloudfront-js-2.0, cf.openkvs, eventual consistency
+  when_to_use: Invoke when the user wants to create a CloudFront KeyValueStore (KVS), integrate CloudFront Functions with KVS for edge-side data lookup, implement A/B testing or canary routing at the CDN edge, deploy feature flags that toggle without function redeployment, build IP allowlist or blocklist logic in CloudFront Functions, or drive URL redirects/rewrites from externally managed key-value data. Do NOT invoke for Lambda@Edge (different runtime, no KVS access), for CloudFront origin failover (use origin groups, not KVS), for caching behavior changes (use cache policies, not KVS), or for auditing existing CloudFront distributions (use cloudfront-distribution-auditor).
 ---
 
 # CloudFront KeyValueStore Deployer

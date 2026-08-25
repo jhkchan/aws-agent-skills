@@ -1,31 +1,8 @@
 ---
 name: ecr-push-pull-troubleshooter
 description: 'Diagnoses Amazon ECR push and pull failures through a fourteen-category diagnostic tree: authentication (docker login token expiry, IAM ecr:GetAuthorizationToken), repository policy vs IAM policy precedence, lifecycle policy prematurely deleting images, image size limit (10 GB), cross-region replication lag, KMS encryption key access denied, registry alias confusion (public vs private), scan-on-push findings blocking deployment, image tag immutability conflicts, docker manifest errors, pull-through cache misconfiguration, Fargate/ECS platform version vs image architecture mismatch (arm64 vs x86_64), layer download failures, and throttling. Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
 compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted docker / aws ecr error output. Live-account diagnosis uses aws ecr
-keywords:
-- ECR
-- docker login
-- authorization token
-- ecr:GetAuthorizationToken
-- repository policy
-- lifecycle policy
-- tag immutability
-- image size limit
-- cross-region replication
-- KMS encryption
-- registry alias
-- public registry
-- scan on push
-- manifest
-- pull-through cache
-- Fargate architecture
-- arm64
-- x86_64
-- layer download
-- troubleshoot
 metadata:
   domain: aws-cloudops
   complexity: high
@@ -43,6 +20,9 @@ metadata:
   activation_triggers: ''
   invocation_schema: '''Input: either (a) a symptom description (docker / aws ecr error string, observed behaviour, "push started failing after the role change"), optionally paired with the registry / repository'
   invocation_example: '"# Minimal valid input (offline symptom classification):\nSymptom: \"docker push\n  111111111111.dkr.ecr.us-east-1.amazonaws.com/app:v1 returns\\n\\\"denied: Your authorization token has\'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: ECR, docker login, authorization token, ecr:GetAuthorizationToken, repository policy, lifecycle policy, tag immutability, image size limit, cross-region replication, KMS encryption, registry alias, public registry, scan on push, manifest, pull-through cache, Fargate architecture, arm64, x86_64, layer download, troubleshoot
 ---
 
 # ECR Push/Pull Troubleshooter

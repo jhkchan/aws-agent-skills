@@ -1,117 +1,26 @@
 ---
 name: organizations-policy-deployer
-description: >-
-  Deploys AWS Organizations policy artifacts with production defaults:
-  Service Control Policy (SCP) creation (JSON policy via
-  create-policy), attachment to root/OU/account (attach-policy),
-  SCP inheritance (intersection of parent and child SCPs along the
-  OU tree), SCP effect (Allow list strategy requiring
-  FullAWSAccess + Deny list strategy), the FullAWSAccess managed
-  policy (required on every entity by default), SCP evaluation
-  (explicit Deny wins; intersection applies at every level), tag
-  policy integration, backup policy integration, AI services
-  opt-out policy, multi-OU deployment, policy simulation
-  (simulate-custom-policy), SCP exceptions (break-glass accounts),
-  CloudTrail logging for SCP-denied actions, and Organizations
-  delegated administrator. Emits a READY_TO_DEPLOY checklist with
-  verification commands. Triggers: create scp, attach scp,
-  organizations policy, scp inheritance, allow list scp, deny list
-  scp, fullawsaccess managed policy, scp simulation, break-glass
-  account, organizations delegated administrator.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Deploys AWS Organizations policy artifacts with production defaults: Service Control Policy (SCP) creation (JSON policy via create-policy), attachment to root/OU/account (attach-policy), SCP inheritance (intersection of parent and child SCPs along the OU tree), SCP effect (Allow list strategy requiring FullAWSAccess + Deny list strategy), the FullAWSAccess managed policy (required on every entity by default), SCP evaluation (explicit Deny wins; intersection applies at every level), tag policy integration, backup policy integration, AI services opt-out policy, multi-OU deployment, policy simulation (simulate-custom-policy), SCP exceptions (break-glass accounts), CloudTrail logging for SCP-denied actions, and Organizations delegated administrator. Emits a READY_TO_DEPLOY checklist with verification. Triggers: create scp, attach scp, organizations policy, scp inheritance, allow list scp, deny list scp, fullawsaccess managed policy, scp simulation, break-glass account, organizations delegated administrator.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with
-  organizations:CreatePolicy, organizations:AttachPolicy,
-  organizations:DescribePolicy, organizations:ListPoliciesForTarget.
-  Works with Terraform aws_organizations_policy /
-  aws_organizations_policy_attachment resources and CloudFormation
-  AWS::Organizations::Policy templates.
-keywords:
-  - aws
-  - organizations
-  - scp
-  - service control policy
-  - cloudops
-  - deploy
-  - governance
-  - allow list
-  - deny list
-  - fullawsaccess
-  - inheritance
-  - permission boundary
-  - tag policy
-  - backup policy
-  - ai services opt-out
-  - break-glass
-  - delegated administrator
-tags:
-  - aws
-  - organizations
-  - scp
-  - service-control-policy
-  - cloudops
-  - deploy
-  - governance
-  - allow-list
-  - deny-list
-  - fullawsaccess
-  - inheritance
-  - permission-boundary
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with organizations:CreatePolicy, organizations:AttachPolicy, organizations:DescribePolicy, organizations:ListPoliciesForTarget. Works with Terraform aws_organizations_policy / aws_organizations_policy_attachment resources and CloudFormation AWS::Organizations::Policy templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - organizations
-    - scp
-    - service-control-policy
-    - cloudops
-    - deploy
-    - governance
-    - allow-list
-    - deny-list
-    - fullawsaccess
-    - inheritance
-    - permission-boundary
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create scp
-    - attach scp
-    - organizations policy
-    - scp inheritance
-    - allow list scp
-    - deny list scp
-    - fullawsaccess managed policy
-    - scp simulation
-    - break-glass account
-    - organizations delegated administrator
-  when_to_use: >-
-    Invoke when the user wants to create or attach an AWS
-    Organizations SCP, design Allow list vs Deny list strategy,
-    configure FullAWSAccess managed policy, reason about SCP
-    inheritance across the OU tree, integrate tag policy / backup
-    policy / AI services opt-out policy, simulate policy effect,
-    exclude break-glass accounts, audit SCP-denied API calls, or
-    delegate Organizations administration. Do NOT invoke for IAM
-    permission boundaries within a single account, Resource Access
-    Manager (RAM) sharing, or AWS Control Tower guardrails.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, organizations, scp, service-control-policy, cloudops, deploy, governance, allow-list, deny-list, fullawsaccess, inheritance, permission-boundary
+  dependencies: aws-orchestrator
+  keywords: aws, organizations, scp, service control policy, cloudops, deploy, governance, allow list, deny list, fullawsaccess, inheritance, permission boundary, tag policy, backup policy, ai services opt-out, break-glass, delegated administrator
+  when_to_use: Invoke when the user wants to create or attach an AWS Organizations SCP, design Allow list vs Deny list strategy, configure FullAWSAccess managed policy, reason about SCP inheritance across the OU tree, integrate tag policy / backup policy / AI services opt-out policy, simulate policy effect, exclude break-glass accounts, audit SCP-denied API calls, or delegate Organizations administration. Do NOT invoke for IAM permission boundaries within a single account, Resource Access Manager (RAM) sharing, or AWS Control Tower guardrails.
 ---
 
 # Organizations Policy Deployer

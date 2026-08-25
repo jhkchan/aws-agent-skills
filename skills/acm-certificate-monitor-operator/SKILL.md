@@ -1,109 +1,26 @@
 ---
 name: acm-certificate-monitor-operator
-description: >-
-  Operates AWS ACM certificate monitoring and expiry tracking with
-  production defaults: DaysToExpiry CloudWatch alarm creation
-  (threshold <30 days warning, <7 days critical), multi-region
-  certificate inventory, certificate renewal status tracking
-  (PENDING_VALIDATION, ISSUED, EXPIRED), DNS validation record
-  verification, CAA record conflict detection, multi-account
-  certificate audit via Organizations, certificate-to-load-balancer
-  mapping, automated renewal failure detection, SNS notification on
-  expiry alarm, wildcard vs SAN coverage audit, and private
-  certificate (ACM PCA) monitoring. Emits an OPERATION_COMPLETED
-  report with verification commands. Use when auditing ACM
-  certificate expiry, setting up expiry alarms, verifying renewal,
-  detecting CAA conflicts, or mapping certificates to resources.
-  Triggers acm certificate monitoring, certificate expiry alarm,
-  days to expiry, caa record conflict, multi-account audit, acm pca.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Operates AWS ACM certificate monitoring and expiry tracking with production defaults: DaysToExpiry CloudWatch alarm creation (threshold <30 days warning, <7 days critical), multi-region certificate inventory, certificate renewal status tracking (PENDING_VALIDATION, ISSUED, EXPIRED), DNS validation record verification, CAA record conflict detection, multi-account certificate audit via Organizations, certificate-to-load-balancer mapping, automated renewal failure detection, SNS notification on expiry alarm, wildcard vs SAN coverage audit, and private certificate (ACM PCA) monitoring. Emits an OPERATION_COMPLETED report with verification commands. Use when auditing ACM certificate expiry, setting up expiry alarms, verifying renewal, detecting CAA conflicts, or mapping certificates to resources. Triggers acm certificate monitoring, certificate expiry alarm, days to expiry, caa record conflict, multi-account audit, acm pca.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live operations: AWS CLI v2 with acm, acm-pca,
-  cloudwatch, elasticloadbalancingv2, cloudfront, apigateway, and
-  organizations access. Works with Terraform
-  aws_acm_certificate, aws_cloudwatch_metric_alarm, and
-  aws_sns_topic resources and CloudFormation
-  AWS::CertificateManager::Certificate templates.
-keywords:
-  - aws
-  - acm
-  - certificate
-  - certificate manager
-  - expiry
-  - days to expiry
-  - cloudops
-  - operate
-  - monitoring
-  - renewal
-  - caa record
-  - dns validation
-  - multi-account
-  - wildcard
-  - san
-  - acm pca
-tags:
-  - aws
-  - acm
-  - certificate-manager
-  - certificate-expiry
-  - cloudops
-  - operate
-  - monitoring
-  - renewal
-  - caa-record
-  - dns-validation
-  - multi-account
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live operations: AWS CLI v2 with acm, acm-pca, cloudwatch, elasticloadbalancingv2, cloudfront, apigateway, and organizations access. Works with Terraform aws_acm_certificate, aws_cloudwatch_metric_alarm, and aws_sns_topic resources and CloudFormation AWS::CertificateManager::Certificate templates.'
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "OPERATION_COMPLETED | REVIEW_REQUIRED"
+  verdict_shape: OPERATION_COMPLETED | REVIEW_REQUIRED
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - acm
-    - certificate-manager
-    - certificate-expiry
-    - cloudops
-    - operate
-    - monitoring
-    - renewal
-    - caa-record
-    - dns-validation
-    - multi-account
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - acm certificate monitoring
-    - certificate expiry alarm
-    - days to expiry
-    - certificate renewal status
-    - caa record conflict
-    - multi-account certificate audit
-    - certificate load balancer mapping
-    - acm pca monitoring
-  when_to_use: >-
-    Invoke when the user wants to audit ACM certificate expiry, set up
-    DaysToExpiry CloudWatch alarms, verify certificate renewal status,
-    detect CAA record conflicts, perform multi-account or multi-region
-    certificate inventory, map certificates to load balancers, monitor
-    private certificates via ACM PCA, or verify DNS validation records.
-    Do NOT invoke for issuing/provisioning new certificates (use ACM
-    provisioning skills), IAM server certificates (non-ACM), or
-    third-party CA certificate management.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, acm, certificate-manager, certificate-expiry, cloudops, operate, monitoring, renewal, caa-record, dns-validation, multi-account
+  dependencies: aws-orchestrator
+  keywords: aws, acm, certificate, certificate manager, expiry, days to expiry, cloudops, operate, monitoring, renewal, caa record, dns validation, multi-account, wildcard, san, acm pca
+  when_to_use: Invoke when the user wants to audit ACM certificate expiry, set up DaysToExpiry CloudWatch alarms, verify certificate renewal status, detect CAA record conflicts, perform multi-account or multi-region certificate inventory, map certificates to load balancers, monitor private certificates via ACM PCA, or verify DNS validation records. Do NOT invoke for issuing/provisioning new certificates (use ACM provisioning skills), IAM server certificates (non-ACM), or third-party CA certificate management.
 ---
 
 # ACM Certificate Monitor Operator

@@ -1,125 +1,26 @@
 ---
 name: amazon-mq-broker-deployer
-description: >-
-  Provisions Amazon MQ brokers (ActiveMQ or RabbitMQ) with production defaults:
-  engine selection (ActiveMQ for JMS/OpenWire/STOMP/MQTT/AMQP/WS, RabbitMQ for
-  AMQP 0-9-1/MQTT/STOMP high-throughput), deployment mode (single instance,
-  active/standby HA, cluster for RabbitMQ horizontal scale), instance type
-  sizing (mq.t3.micro to mq.m5.16xl), EBS storage with KMS encryption, VPC
-  networking, authentication (LDAP, AWS IAM for RabbitMQ, mTLS), configuration
-  (ActiveMQ XML, RabbitMQ definitions JSON), automatic minor version upgrades,
-  CloudWatch general and audit logs, RabbitMQ transit gateway cross-account.
-  Emits a READY_TO_DEPLOY checklist with verification commands. Use when
-  creating an Amazon MQ broker, choosing ActiveMQ vs RabbitMQ, designing HA
-  topology, wiring RabbitMQ IAM auth, or generating provisioning CLI / IaC
-  templates. Triggers: create Amazon MQ, provision ActiveMQ, provision
-  RabbitMQ, Amazon MQ active/standby, mq.t3, mq.m5, Amazon MQ LDAP, RabbitMQ
-  IAM auth, transit gateway, audit logging.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon MQ brokers (ActiveMQ or RabbitMQ) with production defaults: engine selection (ActiveMQ for JMS/OpenWire/STOMP/MQTT/AMQP/WS, RabbitMQ for AMQP 0-9-1/MQTT/STOMP high-throughput), deployment mode (single instance, active/standby HA, cluster for RabbitMQ horizontal scale), instance type sizing (mq.t3.micro to mq.m5.16xl), EBS storage with KMS encryption, VPC networking, authentication (LDAP, AWS IAM for RabbitMQ, mTLS), configuration (ActiveMQ XML, RabbitMQ definitions JSON), automatic minor version upgrades, CloudWatch general and audit logs, RabbitMQ transit gateway cross-account. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating an Amazon MQ broker, choosing ActiveMQ vs RabbitMQ, designing HA topology, wiring RabbitMQ IAM auth, or generating provisioning CLI / IaC templates. Triggers: create Amazon MQ, provision ActiveMQ, provision RabbitMQ, Amazon MQ active/standby, mq.t3, mq.m5, Amazon MQ LDAP, RabbitMQ IAM auth, transit gateway, audit logging.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). For live deployment: AWS CLI v2 with mq, ec2, kms, iam, and
-  secretsmanager access. Works with Terraform aws_mq_broker /
-  aws_mq_configuration resources and CloudFormation AWS::AmazonMQ::Broker
-  templates.
-keywords:
-  - aws
-  - amazon mq
-  - activemq
-  - rabbitmq
-  - cloudops
-  - deploy
-  - provisioning
-  - message broker
-  - active/standby
-  - cluster
-  - single instance
-  - mq.t3
-  - mq.m5
-  - ldap
-  - iam authentication
-  - mutual tls
-  - stomp
-  - mqtt
-  - amqp
-  - ws
-  - openwire
-  - transit gateway
-  - audit logging
-  - broker.xml
-  - definitions json
-  - automatic minor version upgrade
-tags:
-  - aws
-  - amazon-mq
-  - activemq
-  - rabbitmq
-  - cloudops
-  - deploy
-  - appintegration
-  - messaging
-  - provisioning
-  - active-standby
-  - broker-cluster
-  - encryption
-  - audit-logging
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with mq, ec2, kms, iam, and secretsmanager access. Works with Terraform aws_mq_broker / aws_mq_configuration resources and CloudFormation AWS::AmazonMQ::Broker templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - amazon-mq
-    - activemq
-    - rabbitmq
-    - cloudops
-    - deploy
-    - appintegration
-    - messaging
-    - provisioning
-    - active-standby
-    - broker-cluster
-    - encryption
-    - audit-logging
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create amazon mq broker
-    - provision activemq
-    - provision rabbitmq
-    - amazon mq active/standby
-    - amazon mq cluster
-    - amazon mq broker type
-    - amazon mq ldap
-    - rabbitmq iam auth
-    - amazon mq audit logging
-    - amazon mq transit gateway
-    - activemq stomp mqtt amqp
-    - amazon mq encryption
-  when_to_use: >-
-    Invoke when the user wants to create a new Amazon MQ broker (ActiveMQ or
-    RabbitMQ), design an active/standby HA topology, choose between ActiveMQ and
-    RabbitMQ for a workload, wire RabbitMQ with AWS IAM authentication, configure
-    ActiveMQ with LDAP / JAAS, enable audit logging, size broker instance types,
-    set up cross-account access via transit gateway, harden a broker before
-    production (encryption, MUTUAL TLS, audit logs), or generate provisioning CLI
-    commands / IaC templates. Do NOT invoke for self-managed ActiveMQ / RabbitMQ
-    on EC2, Amazon MSK (Kafka), Amazon SNS/SQS, or Amazon MQ event auditing
-    (use amazon-mq-broker-auditor).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, amazon-mq, activemq, rabbitmq, cloudops, deploy, appintegration, messaging, provisioning, active-standby, broker-cluster, encryption, audit-logging
+  dependencies: aws-orchestrator
+  keywords: aws, amazon mq, activemq, rabbitmq, cloudops, deploy, provisioning, message broker, active/standby, cluster, single instance, mq.t3, mq.m5, ldap, iam authentication, mutual tls, stomp, mqtt, amqp, ws, openwire, transit gateway, audit logging, broker.xml, definitions json, automatic minor version upgrade
+  when_to_use: Invoke when the user wants to create a new Amazon MQ broker (ActiveMQ or RabbitMQ), design an active/standby HA topology, choose between ActiveMQ and RabbitMQ for a workload, wire RabbitMQ with AWS IAM authentication, configure ActiveMQ with LDAP / JAAS, enable audit logging, size broker instance types, set up cross-account access via transit gateway, harden a broker before production (encryption, MUTUAL TLS, audit logs), or generate provisioning CLI commands / IaC templates. Do NOT invoke for self-managed ActiveMQ / RabbitMQ on EC2, Amazon MSK (Kafka), Amazon SNS/SQS, or Amazon MQ event auditing (use amazon-mq-broker-auditor).
 ---
 
 # Amazon MQ Broker Deployer

@@ -1,116 +1,26 @@
 ---
 name: cloudformation-stackset-deployer
-description: >-
-  Provisions AWS CloudFormation StackSets with production defaults:
-  StackSet creation (template, parameters, capabilities), permission
-  model (SELF_MANAGED admin+execution roles vs SERVICE_MANAGED with
-  Organizations trusted access), deployment targets (OUs, accounts,
-  regions), operation preferences (failure tolerance, max concurrent
-  accounts/regions), drift detection per instance and StackSet-level,
-  StackSet vs nested stacks, managed execution, CloudFormation IaC
-  generator. Emits a READY_TO_DEPLOY checklist. Use when deploying a
-  template across many accounts and/or regions, choosing self vs
-  service-managed, scoping OU targets, tuning blast radius, or
-  enabling drift detection. Triggers: create stackset, cloudformation
-  stackset, service-managed stackset, self-managed stackset, StackSet
-  Organizations, stackset drift detection, IaC generator.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS CloudFormation StackSets with production defaults: StackSet creation (template, parameters, capabilities), permission model (SELF_MANAGED admin+execution roles vs SERVICE_MANAGED with Organizations trusted access), deployment targets (OUs, accounts, regions), operation preferences (failure tolerance, max concurrent accounts/regions), drift detection per instance and StackSet-level, StackSet vs nested stacks, managed execution, CloudFormation IaC generator. Emits a READY_TO_DEPLOY checklist. Use when deploying a template across many accounts and/or regions, choosing self vs service-managed, scoping OU targets, tuning blast radius, or enabling drift detection. Triggers: create stackset, cloudformation stackset, service-managed stackset, self-managed stackset, StackSet Organizations, stackset drift detection, IaC generator.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with
-  cloudformation, organizations, and iam access; AWS Organizations
-  must have CloudFormation trusted access enabled for the
-  SERVICE_MANAGED permission model. Works with Terraform
-  aws_cloudformation_stack_set / aws_cloudformation_stack_set_instance
-  resources and CloudFormation AWS::CloudFormation::StackSet templates.
-keywords:
-  - aws
-  - cloudformation
-  - stackset
-  - stack set
-  - cloudops
-  - deploy
-  - provisioning
-  - multi-account
-  - multi-region
-  - organizations
-  - self-managed
-  - service-managed
-  - drift detection
-  - stack instances
-  - operation preferences
-  - failure tolerance
-  - max concurrent
-  - nested stacks
-  - iac generator
-  - infrastructure as code
-tags:
-  - aws
-  - cloudformation
-  - stackset
-  - cloudops
-  - deploy
-  - devtools
-  - provisioning
-  - multi-account
-  - organizations
-  - drift-detection
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with cloudformation, organizations, and iam access; AWS Organizations must have CloudFormation trusted access enabled for the SERVICE_MANAGED permission model. Works with Terraform aws_cloudformation_stack_set / aws_cloudformation_stack_set_instance resources and CloudFormation AWS::CloudFormation::StackSet templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - cloudformation
-    - stackset
-    - cloudops
-    - deploy
-    - devtools
-    - provisioning
-    - multi-account
-    - organizations
-    - drift-detection
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create stackset
-    - cloudformation stackset
-    - service managed stackset
-    - self managed stackset
-    - stackset organizations
-    - stackset drift detection
-    - stack instances
-    - deploy template multiple accounts
-    - stackset operation preferences
-    - iac generator cloudformation
-  when_to_use: >-
-    Invoke when the user wants to create or update a CloudFormation
-    StackSet to deploy a single template across many AWS accounts
-    and/or regions, choose between SELF_MANAGED and SERVICE_MANAGED
-    permission models, target organizational units for automatic
-    member-account deployment, configure operation preferences
-    (failure tolerance, max concurrent accounts/regions), enable
-    StackSet or per-instance drift detection, decide between
-    StackSets and nested stacks, or generate CloudFormation templates
-    from existing AWS resources via the IaC generator. Do NOT invoke
-    for single-account single-region stacks (use aws cloudformation
-    deploy directly), for drift detection on a standalone stack
-    (use cloudformation-drift-troubleshooter), or for raw stack
-    failures (use cloudformation-stack-troubleshooter).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, cloudformation, stackset, cloudops, deploy, devtools, provisioning, multi-account, organizations, drift-detection
+  dependencies: aws-orchestrator
+  keywords: aws, cloudformation, stackset, stack set, cloudops, deploy, provisioning, multi-account, multi-region, organizations, self-managed, service-managed, drift detection, stack instances, operation preferences, failure tolerance, max concurrent, nested stacks, iac generator, infrastructure as code
+  when_to_use: Invoke when the user wants to create or update a CloudFormation StackSet to deploy a single template across many AWS accounts and/or regions, choose between SELF_MANAGED and SERVICE_MANAGED permission models, target organizational units for automatic member-account deployment, configure operation preferences (failure tolerance, max concurrent accounts/regions), enable StackSet or per-instance drift detection, decide between StackSets and nested stacks, or generate CloudFormation templates from existing AWS resources via the IaC generator. Do NOT invoke for single-account single-region stacks (use aws cloudformation deploy directly), for drift detection on a standalone stack (use cloudformation-drift-troubleshooter), or for raw stack failures (use cloudformation-stack-troubleshooter).
 ---
 
 # CloudFormation StackSet Deployer

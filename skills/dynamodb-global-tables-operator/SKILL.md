@@ -1,115 +1,29 @@
 ---
 name: dynamodb-global-tables-operator
-description: >-
-  Operates DynamoDB Global Tables safely across the full lifecycle:
-  creating replicated tables in multiple regions, managing replication
-  configuration, adding and removing replica regions, monitoring
-  ReplicationLatency and ReplicaLag, executing application-level regional
-  failover, and managing per-region PITR. Runs deterministic pre-checks
-  (table ACTIVE in all regions, same key schema, PITR consistent, IAM
-  permissions, no in-progress updates) before any state-changing CLI,
-  executes the operation behind a CONFIRM gate, and verifies the result.
-  Covers Global Tables v2 (standard, single-writer), LAST_WRITER_WINS
-  conflict resolution, and per-region PITR enablement. Emits a verdict
-  (READY | BLOCKED | COMPLETED) per operation with the exact CLI
-  sequence, expected side-effects, and verification commands. Use when
-  creating a global table, adding or removing replica regions,
-  monitoring cross-region replication latency, failing over to another
-  region, or managing per-region continuous backups.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Operates DynamoDB Global Tables safely across the full lifecycle: creating replicated tables in multiple regions, managing replication configuration, adding and removing replica regions, monitoring ReplicationLatency and ReplicaLag, executing application-level regional failover, and managing per-region PITR. Runs deterministic pre-checks (table ACTIVE in all regions, same key schema, PITR consistent, IAM permissions, no in-progress updates) before any state-changing CLI, executes the operation behind a CONFIRM gate, and verifies the result. Covers Global Tables v2 (standard, single-writer), LAST_WRITER_WINS conflict resolution, and per-region PITR enablement. Emits a verdict (READY | BLOCKED | COMPLETED) per operation with the exact CLI sequence, expected side-effects, and verification commands. Use when creating a global table, adding or removing replica regions, monitoring cross-region replication latency, failing over to another region, or managing per-region continuous backups.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline plan classification.
-  Live-account operations use aws dynamodb create-global-table,
-  update-global-table, describe-global-table, describe-global-table-settings,
-  describe-table, update-table, describe-continuous-backups,
-  aws cloudwatch get-metric-statistics for AWS/DynamoDB metrics, and
-  aws application-autoscaling describe-scaling-policies (AWS CLI v2,
-  SSO or key-based credentials).
-keywords:
-  - DynamoDB
-  - Global Tables
-  - Global Tables v2
-  - multi-region
-  - replication
-  - replica
-  - ReplicationLatency
-  - ReplicaLag
-  - conflict resolution
-  - LAST_WRITER_WINS
-  - LWW
-  - regional failover
-  - application-level failover
-  - add replica
-  - remove replica
-  - PITR
-  - per-region PITR
-  - continuous backups
-  - cross-region
-  - disaster recovery
-tags: [dynamodb, databases, global-tables, multi-region, replication, operate, failover]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws dynamodb create-global-table, update-global-table, describe-global-table, describe-global-table-settings, describe-table, update-table, describe-continuous-backups, aws cloudwatch get-metric-statistics for AWS/DynamoDB metrics, and aws application-autoscaling describe-scaling-policies (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
+  verdict_shape: READY | BLOCKED | COMPLETED
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags: [dynamodb, databases, global-tables, multi-region, replication]
-  dependencies: [aws-orchestrator]
-  keywords:
-    - DynamoDB
-    - Global Tables
-    - multi-region replication
-    - add replica
-    - remove replica
-    - regional failover
-    - ReplicationLatency
-    - PITR
-  when_to_use: >-
-    Creating a DynamoDB Global Table replicated across multiple regions,
-    adding a new replica region to an existing global table, removing a
-    replica region, monitoring cross-region replication latency, failing
-    over application traffic to a different region, enabling or
-    verifying per-region PITR on a global table, or planning a
-    multi-region disaster recovery drill.
-  when_not_to_use: >-
-    DynamoDB table configuration posture audits (use dynamodb-table-
-    auditor), single-region backup/restore operations (use dynamodb-
-    backup-operator), IAM policy authoring for fine-grained access
-    control, or DynamoDB throttling diagnosis (use dynamodb-throttling-
-    troubleshooter). This skill operates global table replication; it
-    does not audit table posture or diagnose throttling.
-  activation_triggers:
-    - "create DynamoDB Global Table"
-    - "add replica region DynamoDB"
-    - "remove replica region DynamoDB"
-    - "DynamoDB multi-region replication"
-    - "DynamoDB Global Tables failover"
-    - "DynamoDB replication latency"
-    - "DynamoDB ReplicationLatency high"
-    - "DynamoDB Global Tables v2"
-    - "DynamoDB LAST_WRITER_WINS"
-    - "enable PITR global table"
-    - "DynamoDB cross-region replication"
-    - "DynamoDB disaster recovery multi-region"
-    - "operate DynamoDB Global Tables"
-  invocation_schema: >-
-    Input: either (a) a DynamoDB table configuration with the intended
-    operation (create-global-table, add-replica, remove-replica, failover,
-    enable-pitr, verify-replication), OR (b) a table-name + operation
-    for live-account execution. Output: deterministic
-    OPERATION/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation,
-    where VERDICT is one of READY, BLOCKED, COMPLETED.
+  author: Jacky Chan — AWS Community Builder
+  tags: dynamodb, databases, global-tables, multi-region, replication, operate, failover
+  dependencies: aws-orchestrator
+  keywords: DynamoDB, Global Tables, Global Tables v2, multi-region, replication, replica, ReplicationLatency, ReplicaLag, conflict resolution, LAST_WRITER_WINS, LWW, regional failover, application-level failover, add replica, remove replica, PITR, per-region PITR, continuous backups, cross-region, disaster recovery
+  when_to_use: Creating a DynamoDB Global Table replicated across multiple regions, adding a new replica region to an existing global table, removing a replica region, monitoring cross-region replication latency, failing over application traffic to a different region, enabling or verifying per-region PITR on a global table, or planning a multi-region disaster recovery drill.
+  when_not_to_use: DynamoDB table configuration posture audits (use dynamodb-table- auditor), single-region backup/restore operations (use dynamodb- backup-operator), IAM policy authoring for fine-grained access control, or DynamoDB throttling diagnosis (use dynamodb-throttling- troubleshooter). This skill operates global table replication; it does not audit table posture or diagnose throttling.
+  activation_triggers: create DynamoDB Global Table, add replica region DynamoDB, remove replica region DynamoDB, DynamoDB multi-region replication, DynamoDB Global Tables failover, DynamoDB replication latency, DynamoDB ReplicationLatency high, DynamoDB Global Tables v2, DynamoDB LAST_WRITER_WINS, enable PITR global table, DynamoDB cross-region replication, DynamoDB disaster recovery multi-region, operate DynamoDB Global Tables
+  invocation_schema: 'Input: either (a) a DynamoDB table configuration with the intended operation (create-global-table, add-replica, remove-replica, failover, enable-pitr, verify-replication), OR (b) a table-name + operation for live-account execution. Output: deterministic OPERATION/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
 ---
 
 # DynamoDB Global Tables Operator

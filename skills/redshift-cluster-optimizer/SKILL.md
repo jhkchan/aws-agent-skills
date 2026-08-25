@@ -1,124 +1,29 @@
 ---
 name: redshift-cluster-optimizer
-description: >-
-  Optimises Amazon Redshift cluster cost and performance through node-type
-  selection (RA3 managed-storage compute-separated vs DC2 local-storage
-  dense-compute), right-sizing (CloudWatch CPUUtilization and
-  QueryQueueLength), storage optimisation (columnar compression, VACUUM,
-  ANALYZE), workload management (WLM queues, query prioritisation, Short
-  Query Acceleration), data sharing (cross-cluster queries without data
-  copy), Concurrency Scaling (auto-add clusters for peak loads), Reserved
-  Node pricing (1yr/3yr), Redshift Serverless (base capacity RPU and
-  auto-scaling), Redshift ML (AUTO ON), materialized views, and data lake
-  export. Emits a deterministic verdict (OPTIMIZED | OPPORTUNITY_FOUND |
-  ALREADY_OPTIMAL) per cluster with specific recommendation and estimated
-  monthly savings. Use when reviewing Redshift spend, triaging oversized
-  clusters, evaluating RA3 vs DC2, tuning WLM queues, or migrating to
-  Serverless.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Optimises Amazon Redshift cluster cost and performance through node-type selection (RA3 managed-storage compute-separated vs DC2 local-storage dense-compute), right-sizing (CloudWatch CPUUtilization and QueryQueueLength), storage optimisation (columnar compression, VACUUM, ANALYZE), workload management (WLM queues, query prioritisation, Short Query Acceleration), data sharing (cross-cluster queries without data copy), Concurrency Scaling (auto-add clusters for peak loads), Reserved Node pricing (1yr/3yr), Redshift Serverless (base capacity RPU and auto-scaling), Redshift ML (AUTO ON), materialized views, and data lake export. Emits a deterministic verdict (OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL) per cluster with specific recommendation and estimated monthly savings. Use when reviewing Redshift spend, triaging oversized clusters, evaluating RA3 vs DC2, tuning WLM queues, or migrating to Serverless.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Offline configuration classification works from pasted Redshift
-  cluster metadata, CloudWatch metrics, and query performance summaries.
-  Live-account optimisation uses aws redshift describe-clusters, aws
-  cloudwatch get-metric-statistics for CPUUtilization/QueryQueueLength/
-  DatabaseConnections, aws redshift describe-cluster-subnet-groups, aws
-  redshift describe-reserved-nodes, aws ce get-cost-and-usage with Redshift
-  Service filter, aws redshift-serverless get-workgroup, and aws redshift
-  describe-workgroups (AWS CLI v2, SSO or key-based credentials). Pricing is
-  us-east-1 published rates as of 2026; re-state regional rates before
-  producing dollar estimates for other regions.
-keywords:
-  - Redshift
-  - RA3
-  - DC2
-  - Redshift Serverless
-  - RPU
-  - right-sizing
-  - workload management
-  - WLM
-  - Short Query Acceleration
-  - Concurrency Scaling
-  - data sharing
-  - materialized views
-  - Redshift ML
-  - columnar compression
-  - VACUUM
-  - ANALYZE
-  - Reserved Nodes
-  - data lake export
-  - Spectrum
-  - cost optimization
-  - FinOps
-tags: [redshift, analytics, cost-optimization, finops, right-sizing, ra3, serverless, wlm]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline configuration classification works from pasted Redshift cluster metadata, CloudWatch metrics, and query performance summaries. Live-account optimisation uses aws redshift describe-clusters, aws cloudwatch get-metric-statistics for CPUUtilization/QueryQueueLength/ DatabaseConnections, aws redshift describe-cluster-subnet-groups, aws redshift describe-reserved-nodes, aws ce get-cost-and-usage with...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL"
-  when_to_use: >-
-    Reviewing Redshift cluster spend, right-sizing node types, evaluating RA3
-    vs DC2, tuning WLM queues and query prioritisation, enabling Concurrency
-    Scaling or Short Query Acceleration, deciding between provisioned and
-    Serverless, purchasing Reserved Nodes, optimising storage with compression
-    and VACUUM/ANALYZE, or leveraging Redshift ML and materialized views.
-  when_not_to_use: >-
-    Individual query tuning beyond the WLM level (use query explain plans and
-    distribution key analysis directly), ETL pipeline design (use Glue or
-    DMS tooling), data lake architecture decisions (use Lake Formation),
-    or IAM and network security audits (use the audit skills). This skill
-    focuses on cost reduction and cluster-level performance — not ETL
-    engineering or security posture.
-  activation_triggers:
-    - "optimise Redshift cost"
-    - "right-size Redshift cluster"
-    - "RA3 vs DC2"
-    - "Redshift Serverless migration"
-    - "Redshift WLM tuning"
-    - "Redshift Concurrency Scaling"
-    - "Short Query Acceleration"
-    - "Redshift Reserved Nodes"
-    - "Redshift data sharing"
-    - "Redshift materialized views"
-    - "Redshift ML AUTO ON"
-    - "Redshift columnar compression"
-    - "VACUUM ANALYZE Redshift"
-    - "Redshift data lake export"
-    - "Redshift FinOps review"
-  invocation_schema: >-
-    Input: either (a) a Redshift cluster identifier + live-account context,
-    (b) a cluster configuration document (node type, node count, storage,
-    WLM config, CloudWatch metrics, query performance summary), OR (c) a
-    fleet description for batch optimisation. Output: a deterministic
-    TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/MIGRATION_STEPS
-    block per cluster, where VERDICT is one of OPTIMIZED, OPPORTUNITY_FOUND,
-    ALREADY_OPTIMAL.
-  invocation_example: |-
-    # Minimal valid input (offline classification):
-    ClusterIdentifier: analytics-prod-cluster
-    NodeType: ra3.4xlarge
-    NumberOfNodes: 4
-    Region: us-east-1
-    Pricing: On-Demand (no Reserved Node)
-    CloudWatch metrics (last 30 days):
-      - CPUUtilization: avg=15%, max=30%
-      - QueryQueueLength: avg=0, max=2
-      - DatabaseConnections: avg=20, max=50
-    WLM: Default queue, no Short Query Acceleration
-    Concurrency Scaling: off
-    Storage: 12 TB managed storage (RA3)
-    Compression: several uncompressed columns detected
-    Emit the standard optimisation block (TARGET, VERDICT, REASON,
-    RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+  verdict_shape: OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL
+  when_to_use: Reviewing Redshift cluster spend, right-sizing node types, evaluating RA3 vs DC2, tuning WLM queues and query prioritisation, enabling Concurrency Scaling or Short Query Acceleration, deciding between provisioned and Serverless, purchasing Reserved Nodes, optimising storage with compression and VACUUM/ANALYZE, or leveraging Redshift ML and materialized views.
+  when_not_to_use: Individual query tuning beyond the WLM level (use query explain plans and distribution key analysis directly), ETL pipeline design (use Glue or DMS tooling), data lake architecture decisions (use Lake Formation), or IAM and network security audits (use the audit skills). This skill focuses on cost reduction and cluster-level performance — not ETL engineering or security posture.
+  activation_triggers: optimise Redshift cost, right-size Redshift cluster, RA3 vs DC2, Redshift Serverless migration, Redshift WLM tuning, Redshift Concurrency Scaling, Short Query Acceleration, Redshift Reserved Nodes, Redshift data sharing, Redshift materialized views, Redshift ML AUTO ON, Redshift columnar compression, VACUUM ANALYZE Redshift, Redshift data lake export, Redshift FinOps review
+  invocation_schema: 'Input: either (a) a Redshift cluster identifier + live-account context, (b) a cluster configuration document (node type, node count, storage, WLM config, CloudWatch metrics, query performance summary), OR (c) a fleet description for batch optimisation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/MIGRATION_STEPS block per cluster, where VERDICT is one of OPTIMIZED, OPPORTUNITY_FOUND, ALREADY_OPTIMAL.'
+  invocation_example: "# Minimal valid input (offline classification):\nClusterIdentifier: analytics-prod-cluster\nNodeType: ra3.4xlarge\nNumberOfNodes: 4\nRegion: us-east-1\nPricing: On-Demand (no Reserved Node)\nCloudWatch metrics (last 30 days):\n  - CPUUtilization: avg=15%, max=30%\n  - QueryQueueLength: avg=0, max=2\n  - DatabaseConnections: avg=20, max=50\nWLM: Default queue, no Short Query Acceleration\nConcurrency Scaling: off\nStorage: 12 TB managed storage (RA3)\nCompression: several uncompressed columns detected\nEmit the standard optimisation block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Redshift, RA3, DC2, Redshift Serverless, RPU, right-sizing, workload management, WLM, Short Query Acceleration, Concurrency Scaling, data sharing, materialized views, Redshift ML, columnar compression, VACUUM, ANALYZE, Reserved Nodes, data lake export, Spectrum, cost optimization, FinOps
+  tags: redshift, analytics, cost-optimization, finops, right-sizing, ra3, serverless, wlm
 ---
 
 # Redshift Cluster Optimizer

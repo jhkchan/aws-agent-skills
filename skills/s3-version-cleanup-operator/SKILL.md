@@ -1,106 +1,28 @@
 ---
 name: s3-version-cleanup-operator
-description: >-
-  Operates S3 version cleanup for cost optimization and compliance —
-  NoncurrentVersionExpiration, NoncurrentVersionTransition,
-  NewerNoncurrentVersions, AbortIncompleteMultipartUpload lifecycle
-  rules, S3 Batch Operations for immediate version delete, Object
-  Lock (Compliance vs Governance mode) and legal-hold handling,
-  versioning-state pre-checks (Enabled vs Suspended), Storage Lens
-  impact estimation, and post-apply verification. Runs deterministic
-  pre-checks (versioning enabled, Object Lock mode and retention,
-  legal holds, existing lifecycle rule conflicts, BucketKeyEnabled
-  for cost), executes the operation behind a CONFIRM gate, and emits
-  a verdict (READY | BLOCKED | COMPLETED) per bucket with the exact
-  CLI/JSON sequence, estimated monthly savings, and verification
-  commands. Use when auditing noncurrent version accumulation,
-  configuring version cleanup lifecycle rules, planning immediate
-  cleanup via Batch Operations, handling Object Lock retention, or
-  estimating S3 version cleanup savings.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates S3 version cleanup for cost optimization and compliance — NoncurrentVersionExpiration, NoncurrentVersionTransition, NewerNoncurrentVersions, AbortIncompleteMultipartUpload lifecycle rules, S3 Batch Operations for immediate version delete, Object Lock (Compliance vs Governance mode) and legal-hold handling, versioning-state pre-checks (Enabled vs Suspended), Storage Lens impact estimation, and post-apply verification. Runs deterministic pre-checks (versioning enabled, Object Lock mode and retention, legal holds, existing lifecycle rule conflicts, BucketKeyEnabled for cost), executes the operation behind a CONFIRM gate, and emits a verdict (READY | BLOCKED | COMPLETED) per bucket with the exact CLI/JSON sequence, estimated monthly savings, and verification commands. Use when auditing noncurrent version accumulation, configuring version cleanup lifecycle rules, planning immediate cleanup via Batch Operations, handling Object Lock retention, or estimating S3 version cleanup savings.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline plan classification.
-  Live-account operations use aws s3api get-bucket-versioning,
-  put-bucket-versioning, get-bucket-lifecycle-configuration,
-  put-bucket-lifecycle-configuration, get-object-lock-configuration,
-  get-object-legal-hold, list-object-versions, delete-objects, and
-  aws s3control create-job (S3 Batch Operations) (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - S3
-  - versioning
-  - noncurrent versions
-  - NoncurrentVersionExpiration
-  - NoncurrentVersionTransition
-  - NewerNoncurrentVersions
-  - lifecycle rule
-  - AbortIncompleteMultipartUpload
-  - S3 Batch Operations
-  - Object Lock
-  - Compliance mode
-  - Governance mode
-  - legal hold
-  - S3 Storage Lens
-  - cost optimization
-  - version cleanup
-  - delete markers
-  - BucketKeyEnabled
-tags: [s3, storage, versioning, lifecycle, cost-optimization, object-lock, batch-operations]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws s3api get-bucket-versioning, put-bucket-versioning, get-bucket-lifecycle-configuration, put-bucket-lifecycle-configuration, get-object-lock-configuration, get-object-legal-hold, list-object-versions, delete-objects, and aws s3control create-job (S3 Batch Operations) (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
+  verdict_shape: READY | BLOCKED | COMPLETED
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags: [s3, storage, versioning, lifecycle, cost-optimization, object-lock]
-  dependencies: [aws-orchestrator]
-  keywords:
-    - S3
-    - versioning
-    - noncurrent versions
-    - lifecycle rule
-    - Object Lock
-    - S3 Batch Operations
-    - cost optimization
-  when_to_use: >-
-    Auditing S3 noncurrent version accumulation, configuring version
-    cleanup lifecycle rules (NoncurrentVersionExpiration,
-    NoncurrentVersionTransition, NewerNoncurrentVersions), planning
-    immediate version cleanup via S3 Batch Operations, handling Object
-    Lock retention before cleanup, estimating S3 version cleanup
-    savings, or hardening S3 cost posture on versioned buckets.
-  activation_triggers:
-    - "clean up S3 versions"
-    - "S3 noncurrent versions cost"
-    - "configure S3 lifecycle NoncurrentVersionExpiration"
-    - "S3 version cleanup"
-    - "S3 Object Lock retention"
-    - "S3 legal hold"
-    - "S3 Batch Operations delete versions"
-    - "S3 cost optimization versions"
-    - "S3 Storage Lens noncurrent"
-    - "abort multipart upload S3"
-    - "S3 NewerNoncurrentVersions"
-    - "versioned bucket cleanup"
-    - "S3 lifecycle configuration"
-  invocation_schema: >-
-    Input: either (a) a bucket configuration with the intended
-    operation (configure-lifecycle, batch-delete-versions, audit-
-    versions, estimate-savings), OR (b) a bucket name + operation for
-    live-account execution. Output: deterministic OPERATION/VERDICT/
-    PRE_CHECKS/STEPS/POST_VERIFY block per operation, where VERDICT
-    is one of READY, BLOCKED, COMPLETED.
+  author: Jacky Chan — AWS Community Builder
+  tags: s3, storage, versioning, lifecycle, cost-optimization, object-lock, batch-operations
+  dependencies: aws-orchestrator
+  keywords: S3, versioning, noncurrent versions, NoncurrentVersionExpiration, NoncurrentVersionTransition, NewerNoncurrentVersions, lifecycle rule, AbortIncompleteMultipartUpload, S3 Batch Operations, Object Lock, Compliance mode, Governance mode, legal hold, S3 Storage Lens, cost optimization, version cleanup, delete markers, BucketKeyEnabled
+  when_to_use: Auditing S3 noncurrent version accumulation, configuring version cleanup lifecycle rules (NoncurrentVersionExpiration, NoncurrentVersionTransition, NewerNoncurrentVersions), planning immediate version cleanup via S3 Batch Operations, handling Object Lock retention before cleanup, estimating S3 version cleanup savings, or hardening S3 cost posture on versioned buckets.
+  activation_triggers: clean up S3 versions, S3 noncurrent versions cost, configure S3 lifecycle NoncurrentVersionExpiration, S3 version cleanup, S3 Object Lock retention, S3 legal hold, S3 Batch Operations delete versions, S3 cost optimization versions, S3 Storage Lens noncurrent, abort multipart upload S3, S3 NewerNoncurrentVersions, versioned bucket cleanup, S3 lifecycle configuration
+  invocation_schema: 'Input: either (a) a bucket configuration with the intended operation (configure-lifecycle, batch-delete-versions, audit- versions, estimate-savings), OR (b) a bucket name + operation for live-account execution. Output: deterministic OPERATION/VERDICT/ PRE_CHECKS/STEPS/POST_VERIFY block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
 ---
 
 # S3 Version Cleanup Operator

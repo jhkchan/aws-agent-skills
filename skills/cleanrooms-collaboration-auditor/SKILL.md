@@ -1,87 +1,24 @@
 ---
 name: cleanrooms-collaboration-auditor
-description: >-
-  Audits AWS Clean Rooms collaborations for membership-status gaps (INVITED
-  or REMOVED members), privacy-budget risks (differential privacy disabled,
-  epsilon spend exhausted, aggregate constraints missing), analysis-template
-  SQL-validation defects (unresolved parameters, dangling table references),
-  and configured-audience activation gaps (audience model untrained or
-  stale). Emits a deterministic verdict (MEMBERSHIP_GAP | PRIVACY_RISK |
-  CONFIG_GAP | OK) per collaboration with enumerated findings and specific
-  CLI remediation. Use when reviewing Clean Rooms collaborations, checking
-  member activation status, validating analysis templates, auditing the
-  protected-query privacy budget, verifying configured-audience readiness,
-  or hardening collaboration posture before production query traffic.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Clean Rooms collaborations for membership-status gaps (INVITED or REMOVED members), privacy-budget risks (differential privacy disabled, epsilon spend exhausted, aggregate constraints missing), analysis-template SQL-validation defects (unresolved parameters, dangling table references), and configured-audience activation gaps (audience model untrained or stale). Emits a deterministic verdict (MEMBERSHIP_GAP | PRIVACY_RISK | CONFIG_GAP | OK) per collaboration with enumerated findings and specific CLI remediation. Use when reviewing Clean Rooms collaborations, checking member activation status, validating analysis templates, auditing the protected-query privacy budget, verifying configured-audience readiness, or hardening collaboration posture before production query traffic.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline config-doc classification.
-  Live-account audits use aws cleanrooms get-collaboration,
-  aws cleanrooms list-members, aws cleanrooms get-analysis-template,
-  aws cleanrooms get-protected-query, aws cleanrooms list-configured-tables,
-  aws cleanrooms get-membership, and aws cleanroomsml
-  get-configured-audience-model (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Clean Rooms
-  - collaboration
-  - membership status
-  - differential privacy
-  - epsilon budget
-  - privacy budget
-  - analysis template
-  - SQL validation
-  - protected query
-  - aggregate constraints
-  - configured audience
-  - Clean Rooms ML
-  - audience activation
-  - INVITED member
-  - REMOVED member
-  - collaboration audit
-  - data collaboration
-  - privacy controls
-  - cleanroomsml
-  - join columns
-  - configured table
-tags: [cleanrooms, analytics, security, privacy, differential-privacy, collaboration, membership, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline config-doc classification. Live-account audits use aws cleanrooms get-collaboration, aws cleanrooms list-members, aws cleanrooms get-analysis-template, aws cleanrooms get-protected-query, aws cleanrooms list-configured-tables, aws cleanrooms get-membership, and aws cleanroomsml get-configured-audience-model (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
-  verdict_shape: "MEMBERSHIP_GAP | PRIVACY_RISK | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a Clean Rooms collaboration before production query traffic,
-    checking member activation status (INVITED vs ACTIVE vs REMOVED),
-    validating differential-privacy budget posture (epsilon spend vs cap),
-    auditing analysis-template SQL validity, auditing protected-query
-    privacy controls, or validating configured-audience readiness for
-    audience activation.
-  activation_triggers:
-    - "audit this Clean Rooms collaboration"
-    - "check Clean Rooms member status"
-    - "is differential privacy enabled"
-    - "epsilon budget exhausted"
-    - "validate analysis template SQL"
-    - "is my audience model trained"
-    - "Clean Rooms membership gap"
-    - "configured audience ready"
-    - "privacy budget audit"
-    - "protected query failed"
-    - "Clean Rooms collaboration posture"
-  invocation_schema: >-
-    Input: either (a) a Clean Rooms collaboration configuration snapshot
-    (collaboration metadata + member list + analysis-template body +
-    differential-privacy config + configured-audience state), OR (b) a
-    collaboration ARN or ID for live-account audit. Output: deterministic
-    COLLABORATION/VERDICT/REASON/FINDINGS/REMEDIATION block per
-    collaboration, where VERDICT ∈ {MEMBERSHIP_GAP, PRIVACY_RISK,
-    CONFIG_GAP, OK, ERROR}.
+  verdict_shape: MEMBERSHIP_GAP | PRIVACY_RISK | CONFIG_GAP | OK
+  when_to_use: Reviewing a Clean Rooms collaboration before production query traffic, checking member activation status (INVITED vs ACTIVE vs REMOVED), validating differential-privacy budget posture (epsilon spend vs cap), auditing analysis-template SQL validity, auditing protected-query privacy controls, or validating configured-audience readiness for audience activation.
+  activation_triggers: audit this Clean Rooms collaboration, check Clean Rooms member status, is differential privacy enabled, epsilon budget exhausted, validate analysis template SQL, is my audience model trained, Clean Rooms membership gap, configured audience ready, privacy budget audit, protected query failed, Clean Rooms collaboration posture
+  invocation_schema: 'Input: either (a) a Clean Rooms collaboration configuration snapshot (collaboration metadata + member list + analysis-template body + differential-privacy config + configured-audience state), OR (b) a collaboration ARN or ID for live-account audit. Output: deterministic COLLABORATION/VERDICT/REASON/FINDINGS/REMEDIATION block per collaboration, where VERDICT ∈ {MEMBERSHIP_GAP, PRIVACY_RISK, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Clean Rooms, collaboration, membership status, differential privacy, epsilon budget, privacy budget, analysis template, SQL validation, protected query, aggregate constraints, configured audience, Clean Rooms ML, audience activation, INVITED member, REMOVED member, collaboration audit, data collaboration, privacy controls, cleanroomsml, join columns, configured table
+  tags: cleanrooms, analytics, security, privacy, differential-privacy, collaboration, membership, audit
 ---
 
 # Clean Rooms Collaboration Auditor

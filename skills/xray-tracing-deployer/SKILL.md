@@ -1,43 +1,15 @@
 ---
 name: xray-tracing-deployer
 description: 'Deploys AWS X-Ray distributed tracing with production-grade configuration: X-Ray daemon deployment (EC2 systemd, ECS sidecar, EKS DaemonSet, Lambda built-in), SDK instrumentation (Java, Python, Node.js, Go, .NET) with annotations and metadata, sampling rules (default reservoir + rate vs custom rules with URL / method / service-name predicates), service map generation, trace query and retrieval, groups and insights, CloudWatch ServiceLens integration, IAM permissions (PutTraceSegments, GetSamplingRules), and latest features (Lambda Powertools tracing, OpenTelemetry / ADOT Collector support, W3C trace context). Emits a READY_TO_DEPLOY checklist with every configuration item verified. Use when enabling X-Ray on a new application, adding tracing to ECS / EKS / Lambda, validating a sampling configuration, or generating daemon deployment CLI and IaC templates. Triggers: X-Ray, distributed tracing, X-Ray daemon, sampling rules, service map, X-Ray SDK, OpenTelemetry, ADOT, Lambda Powertools, CloudWatch ServiceLens.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
 compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with xray, ec2, ecs, eks, lambda, iam, logs, and servicediscovery access. Works with Terraform aws_xray_* resources, CloudFormation AWS::XRay::* resources, and the AWS Distro for OpenTelemetry (ADOT) Collector.'
-keywords:
-- aws
-- xray
-- x-ray
-- distributed-tracing
-- cloudops
-- deploy
-- provisioning
-- observability
-- daemon
-- sampling-rules
-- service-map
-- opentelemetry
-- adot
-- servicelens
-tags:
-- aws
-- xray
-- distributed-tracing
-- cloudops
-- deploy
-- observability
-- sampling-rules
-- opentelemetry
-dependencies:
-- aws-orchestrator
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: deploy
   skill_class: capability
@@ -45,29 +17,9 @@ metadata:
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-  - aws
-  - xray
-  - distributed-tracing
-  - cloudops
-  - deploy
-  - observability
-  - sampling-rules
-  - opentelemetry
-  dependencies:
-  - aws-orchestrator
-  keywords:
-  - enable x ray tracing
-  - deploy x ray daemon
-  - x ray sampling rules
-  - x ray sdk instrumentation
-  - x ray service map
-  - x ray ecs sidecar
-  - x ray eks daemonset
-  - x ray lambda layer
-  - opentelemetry adot collector
-  - lambda powertools tracing
-  - cloudwatch servicelens
+  tags: aws, xray, distributed-tracing, cloudops, deploy, observability, sampling-rules, opentelemetry
+  dependencies: aws-orchestrator
+  keywords: aws, xray, x-ray, distributed-tracing, cloudops, deploy, provisioning, observability, daemon, sampling-rules, service-map, opentelemetry, adot, servicelens
   when_to_use: Invoke when the user wants to enable X-Ray distributed tracing on a new application, add the X-Ray daemon to ECS / EKS / EC2 / Lambda, create or validate custom sampling rules, instrument an SDK (Java, Python, Node.js, Go, .NET), set up CloudWatch ServiceLens, or migrate from X-Ray SDK to OpenTelemetry / ADOT. Do NOT invoke for CloudWatch Logs metrics alone (use cloudwatch-alarm-auditor), for application performance monitoring without tracing (use cloudwatch-application-signals-deployer), or for pure log aggregation.
 ---
 

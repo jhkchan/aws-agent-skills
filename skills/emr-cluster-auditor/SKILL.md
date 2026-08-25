@@ -1,78 +1,24 @@
 ---
 name: emr-cluster-auditor
-description: >-
-  Audits AWS EMR clusters for security configuration across three encryption
-  layers (S3 at-rest, local-disk at-rest, in-transit TLS), IAM roles (service,
-  EC2 instance profile, AutoScaling), Kerberos authentication, block public
-  access, debug logging, and instance-group posture. Emits a deterministic
-  verdict (NO_ENCRYPTION | OVERPERMISSIVE_ROLE | CONFIG_GAP | OK) per cluster
-  with enumerated findings and specific remediation. Use when reviewing EMR
-  clusters for encryption gaps, over-permissive roles, Kerberos coverage,
-  block-public-access state, or hardening before production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS EMR clusters for security configuration across three encryption layers (S3 at-rest, local-disk at-rest, in-transit TLS), IAM roles (service, EC2 instance profile, AutoScaling), Kerberos authentication, block public access, debug logging, and instance-group posture. Emits a deterministic verdict (NO_ENCRYPTION | OVERPERMISSIVE_ROLE | CONFIG_GAP | OK) per cluster with enumerated findings and specific remediation. Use when reviewing EMR clusters for encryption gaps, over-permissive roles, Kerberos coverage, block-public-access state, or hardening before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline config-document classification.
-  Live-account audits use aws emr describe-cluster, aws emr
-  describe-security-configuration, aws emr get-block-public-access-configuration,
-  and aws iam list-attached-role-policies (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-  - EMR
-  - EMR encryption
-  - in-transit encryption
-  - S3 SSE-KMS
-  - local disk encryption
-  - LUKS
-  - SecurityConfiguration
-  - Kerberos
-  - block public access
-  - instance profile role
-  - EMR service role
-  - AutoScaling role
-  - iam:PassRole
-  - debug logging
-  - EMR audit
-  - data-at-rest
-  - data-in-transit
-  - Spark
-  - Hive
-  - instance group
-  - Hadoop
-tags: [emr, security, encryption, iam-roles, kerberos, analytics, audit, compliance]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline config-document classification. Live-account audits use aws emr describe-cluster, aws emr describe-security-configuration, aws emr get-block-public-access-configuration, and aws iam list-attached-role-policies (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
-  verdict_shape: "NO_ENCRYPTION | OVERPERMISSIVE_ROLE | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing an EMR cluster configuration before production deployment,
-    checking for encryption gaps (S3, local disk, in-transit), auditing IAM
-    roles attached to the cluster, validating Kerberos authentication, checking
-    block-public-access posture, or hardening EMR security configuration.
-  activation_triggers:
-    - "audit this EMR cluster"
-    - "check EMR encryption"
-    - "is my EMR cluster encrypted"
-    - "EMR security configuration"
-    - "EMR IAM role too permissive"
-    - "Kerberos EMR"
-    - "block public access EMR"
-    - "harden EMR cluster"
-    - "EMR local disk encryption"
-    - "EMR in-transit encryption"
-  invocation_schema: >-
-    Input: either (a) an EMR cluster configuration (describe-cluster output +
-    describe-security-configuration output + IAM role policies), OR (b) a
-    cluster-id for live-account audit. Output: deterministic
-    CLUSTER/VERDICT/REASON/FINDINGS/REMEDIATION block per cluster, where
-    VERDICT ∈ {NO_ENCRYPTION, OVERPERMISSIVE_ROLE, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: NO_ENCRYPTION | OVERPERMISSIVE_ROLE | CONFIG_GAP | OK
+  when_to_use: Reviewing an EMR cluster configuration before production deployment, checking for encryption gaps (S3, local disk, in-transit), auditing IAM roles attached to the cluster, validating Kerberos authentication, checking block-public-access posture, or hardening EMR security configuration.
+  activation_triggers: audit this EMR cluster, check EMR encryption, is my EMR cluster encrypted, EMR security configuration, EMR IAM role too permissive, Kerberos EMR, block public access EMR, harden EMR cluster, EMR local disk encryption, EMR in-transit encryption
+  invocation_schema: 'Input: either (a) an EMR cluster configuration (describe-cluster output + describe-security-configuration output + IAM role policies), OR (b) a cluster-id for live-account audit. Output: deterministic CLUSTER/VERDICT/REASON/FINDINGS/REMEDIATION block per cluster, where VERDICT ∈ {NO_ENCRYPTION, OVERPERMISSIVE_ROLE, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: EMR, EMR encryption, in-transit encryption, S3 SSE-KMS, local disk encryption, LUKS, SecurityConfiguration, Kerberos, block public access, instance profile role, EMR service role, AutoScaling role, iam:PassRole, debug logging, EMR audit, data-at-rest, data-in-transit, Spark, Hive, instance group, Hadoop
+  tags: emr, security, encryption, iam-roles, kerberos, analytics, audit, compliance
 ---
 
 # EMR Cluster Auditor

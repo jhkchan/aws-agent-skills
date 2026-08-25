@@ -1,43 +1,15 @@
 ---
 name: ram-resource-share-deployer
 description: 'Provisions AWS RAM (Resource Access Manager) resource shares with correct production defaults: resource type selection (Subnet, Transit Gateway, License Manager, Dedicated Host, Capacity Reservation, Route53 Resolver rules, Image Builder components/images), principal association (account IDs, OU ARNs, organization ARN), permission association (AWS managed and customer-managed permissions), resource share vs VPC peering decision, allow-external-principals control, resource share status and promotion. Emits a READY_TO_DEPLOY checklist. Use when creating a RAM resource share, sharing subnets across accounts, sharing a Transit Gateway, sharing Route53 Resolver rules, sharing Dedicated Hosts or Capacity Reservations, sharing with an entire Organization or OU, or associating managed permissions. Triggers: create RAM resource share, share subnet, share transit gateway, RAM principals, RAM permission association, share Route53 Resolver rules, RAM organization share, customer-managed permissions.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
 compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with ram, ec2, route53resolver, license-manager, imagebuilder, organizations, and sts access. Works with Terraform aws_ram_resource_share / aws_ram_principal_association / aws_ram_resource_association / aws_ram_permission resources, CloudFormation AWS::RAM::ResourceShare, and SAM templates.'
-keywords:
-- aws
-- ram
-- resource-access-manager
-- resource-share
-- governance
-- cloudops
-- deploy
-- provisioning
-- organizations
-- transit-gateway
-- subnet-sharing
-- route53-resolver
-- license-manager
-- dedicated-host
-tags:
-- aws
-- ram
-- resource-share
-- governance
-- cloudops
-- deploy
-- transit-gateway
-- subnet-sharing
-dependencies:
-- aws-orchestrator
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: deploy
   skill_class: capability
@@ -45,33 +17,10 @@ metadata:
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-  - aws
-  - ram
-  - resource-share
-  - governance
-  - cloudops
-  - deploy
-  - transit-gateway
-  - subnet-sharing
-  dependencies:
-  - aws-orchestrator
-  keywords:
-  - create ram resource share
-  - share subnet across accounts
-  - share transit gateway
-  - ram principal association
-  - ram permission association
-  - share route53 resolver rules
-  - ram organization share
-  - customer managed permissions ram
-  - ram ou principal
-  - license manager sharing
-  - dedicated host sharing
-  - capacity reservation sharing
-  - image builder sharing
-  - ram vs vpc peering
-  when_to_use: "Invoke when the user wants to create a new RAM resource share, share subnets across accounts, share a Transit Gateway, share Route53 Resolver rules, share Dedicated Hosts or Capacity Reservations, share with an entire Organization or OU, associate managed or customer-managed permissions, or compare resource sharing vs VPC peering. Do NOT invoke for VPC peering connections (use vpc-network-deployer) or IAM cross-account roles (use iam-role-deployer)."
+  tags: aws, ram, resource-share, governance, cloudops, deploy, transit-gateway, subnet-sharing
+  dependencies: aws-orchestrator
+  keywords: aws, ram, resource-access-manager, resource-share, governance, cloudops, deploy, provisioning, organizations, transit-gateway, subnet-sharing, route53-resolver, license-manager, dedicated-host
+  when_to_use: Invoke when the user wants to create a new RAM resource share, share subnets across accounts, share a Transit Gateway, share Route53 Resolver rules, share Dedicated Hosts or Capacity Reservations, share with an entire Organization or OU, associate managed or customer-managed permissions, or compare resource sharing vs VPC peering. Do NOT invoke for VPC peering connections (use vpc-network-deployer) or IAM cross-account roles (use iam-role-deployer).
 ---
 
 # RAM Resource Share Deployer

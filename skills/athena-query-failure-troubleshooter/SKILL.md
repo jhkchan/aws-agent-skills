@@ -1,66 +1,15 @@
 ---
 name: athena-query-failure-troubleshooter
-description: >-
-  Diagnoses Amazon Athena query failures through a thirteen-category
-  diagnostic tree: S3 bucket access denied (Glue Data Catalog vs S3
-  data bucket permissions), SerDe mismatch (OpenCSVSerDe vs
-  LazySimpleSerDe vs ParquetHiveSerDe), column type mismatch (STRING
-  vs INT vs DOUBLE), partition projection errors, incorrect table
-  location, stale Glue Catalog partitions (MSCK REPAIR), CTAS (CREATE
-  TABLE AS) destination bucket permissions, workgroup output location,
-  service query timeout (30-min limit), data format inference errors,
-  SerDe property misconfiguration (quoteChar, escapeChar,
-  separatorChar), ARRAY/STRUCT nested type issues, and date format
-  parsing. Walks symptoms to a verified root cause with evidence-backed
-  probes; emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses Amazon Athena query failures through a thirteen-category diagnostic tree: S3 bucket access denied (Glue Data Catalog vs S3 data bucket permissions), SerDe mismatch (OpenCSVSerDe vs LazySimpleSerDe vs ParquetHiveSerDe), column type mismatch (STRING vs INT vs DOUBLE), partition projection errors, incorrect table location, stale Glue Catalog partitions (MSCK REPAIR), CTAS (CREATE TABLE AS) destination bucket permissions, workgroup output location, service query timeout (30-min limit), data format inference errors, SerDe property misconfiguration (quoteChar, escapeChar, separatorChar), ARRAY/STRUCT nested type issues, and date format parsing. Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 license: Apache-2.0
 compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages, DDL, and query text. Live-account diagnosis uses aws athena get-query-execution, aws athena get-work-group, aws glue get-table, aws glue get-partitions, aws glue get-database, aws s3 ls / api head-bucket, aws cloudwatch get-metric-statistics on AWS/Athena, and aws logs get-query-results (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- Athena
-- SerDe
-- OpenCSVSerDe
-- LazySimpleSerDe
-- ParquetHiveSerDe
-- quoteChar
-- separatorChar
-- escapeChar
-- column type mismatch
-- STRING vs INT
-- partition projection
-- MSCK REPAIR
-- stale partitions
-- table location
-- CTAS
-- CREATE TABLE AS SELECT
-- workgroup output location
-- query timeout
-- 30 minute timeout
-- format inference
-- nested type
-- ARRAY
-- STRUCT
-- date parsing
-- S3 access denied
-- Glue Data Catalog
-- troubleshooting
-tags:
-- athena
-- analytics
-- troubleshooting
-- serde
-- glue
-- s3
-- partition-projection
-- ctas
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: troubleshoot
   skill_class: capability
@@ -68,32 +17,13 @@ metadata:
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
   when_to_use: Diagnosing an Athena query failure (column returns NULL or wrong values, query returns zero rows unexpectedly, S3 access denied, serde parsing error, column type mismatch, partition projection stale partitions, CTAS destination permission denied, workgroup output location misconfigured, query exceeds 30-minute service timeout, format inference fails, nested ARRAY/STRUCT type error, or date parsing error), walking a symptom to the failed config layer with verify commands, validating why a "SELECT * FROM table LIMIT 10" returns garbled data or empty results, or triaging a "the Athena query broke" page where the root cause may be the SerDe, the Glue table definition, the partition metadata, the S3 permission, or the workgroup config — not necessarily the query SQL itself.
   when_not_to_use: Athena query performance optimization (use the athena-query-optimizer skill), Athena workgroup configuration posture audit (use the athena-workgroup-auditor skill), Glue crawler design or ETL pipeline debugging (use the glue-crawler-job-auditor or glue-job-troubleshooter skills), or Spark on Athena (Athena for Apache Spark) notebook debugging (use the Athena Spark documentation). This skill diagnoses query-time failures; it does not optimize slow-but-successful queries or audit workgroup security posture.
-  activation_triggers:
-  - Athena query failed
-  - Athena COLUMN_NOT_FOUND
-  - Athena column returns NULL
-  - Athena zero rows
-  - Athena access denied S3
-  - Athena SerDe error
-  - OpenCSVSerDe Athena
-  - LazySimpleSerDe Athena
-  - column type mismatch Athena
-  - STRING vs INT Athena
-  - partition projection Athena
-  - MSCK REPAIR Athena
-  - stale partitions Athena
-  - CTAS Athena permission denied
-  - CREATE TABLE AS SELECT Athena
-  - workgroup output location Athena
-  - Athena query timeout
-  - Athena 30 minute limit
-  - Athena format inference
-  - nested type ARRAY STRUCT Athena
-  - date parsing Athena
-  - Athena SYNTAX_ERROR
-  - troubleshoot Athena query
+  activation_triggers: Athena query failed, Athena COLUMN_NOT_FOUND, Athena column returns NULL, Athena zero rows, Athena access denied S3, Athena SerDe error, OpenCSVSerDe Athena, LazySimpleSerDe Athena, column type mismatch Athena, STRING vs INT Athena, partition projection Athena, MSCK REPAIR Athena, stale partitions Athena, CTAS Athena permission denied, CREATE TABLE AS SELECT Athena, workgroup output location Athena, Athena query timeout, Athena 30 minute limit, Athena format inference, nested type ARRAY STRUCT Athena, date parsing Athena, Athena SYNTAX_ERROR, troubleshoot Athena query
   invocation_schema: 'Input: either (a) a symptom description (error message from get-query-execution, observed behaviour "column returns NULL", "query returns zero rows", "CTAS failed with access denied"), optionally paired with the DDL (CREATE TABLE statement), the query text, and the workgroup name, OR (b) a QueryExecutionId plus region for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {S3_PERMISSION, GLUE_PERMISSION, SERDE_MISMATCH, COLUMN_TYPE_MISMATCH, PARTITION_PROJECTION, TABLE_LOCATION, STALE_PARTITIONS, CTAS_OUTPUT_LOCATION, WORKGROUP_OUTPUT, QUERY_TIMEOUT, FORMAT_INFERENCE, SERDE_PROPERTY, NESTED_TYPE_ERROR, DATE_PARSE_ERROR, UNKNOWN}.'
   invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"Athena query on table orders_csv returns NULL for every\ncolumn except the first. The underlying S3 data is a CSV file with\ntab separators.\"\nDatabase: analytics\nTable: orders_csv\nQuery: SELECT * FROM analytics.orders_csv LIMIT 10\nDDL:\n  CREATE EXTERNAL TABLE orders_csv (\n    order_id STRING, customer_id STRING, amount STRING\n  )\n  ROW FORMAT SERDE\n    'org.apache.hadoop.hive.serde2.OpenCSVSerDe'\n  WITH SERDEPROPERTIES (\n    'separatorChar' = ','\n  )\n  STORED AS INPUTFORMAT\n    'org.apache.hadoop.mapred.TextInputFormat'\n  OUTPUTFORMAT\n    'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'\n  LOCATION 's3://prod-analytics/orders/'\nWorkgroup: primary\nQueryExecutionId: (offline — no live query)"
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Athena, SerDe, OpenCSVSerDe, LazySimpleSerDe, ParquetHiveSerDe, quoteChar, separatorChar, escapeChar, column type mismatch, STRING vs INT, partition projection, MSCK REPAIR, stale partitions, table location, CTAS, CREATE TABLE AS SELECT, workgroup output location, query timeout, 30 minute timeout, format inference, nested type, ARRAY, STRUCT, date parsing, S3 access denied, Glue Data Catalog, troubleshooting
+  tags: athena, analytics, troubleshooting, serde, glue, s3, partition-projection, ctas
 ---
 
 # Athena Query Failure Troubleshooter

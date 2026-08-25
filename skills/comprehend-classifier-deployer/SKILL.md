@@ -1,107 +1,26 @@
 ---
 name: comprehend-classifier-deployer
-description: >-
-  Provisions Amazon Comprehend custom document classifiers with
-  production defaults: multi-class vs multi-label mode, training data
-  formats (CSV + Augmented Manifest from Ground Truth), classifier
-  input mode (PLAIN_TEXT vs Native PDF), training job
-  (create-document-classifier), evaluation metrics (precision, recall,
-  F1), endpoint deployment for real-time inference with auto-scaling,
-  batch inference jobs, KMS encryption for model artifacts and volume,
-  VPC endpoint for private inference, IAM roles for training and
-  deployment, model versioning, cost per training and inference hour.
-  Emits a READY_TO_DEPLOY checklist with verification commands. Use
-  when training a custom classifier, deploying a Comprehend endpoint,
-  running batch classification, or choosing multi-class vs multi-label.
-  Triggers: Comprehend custom classifier, document classifier training,
-  multi-class multi-label, Comprehend endpoint, augmented manifest,
-  native PDF classifier, batch inference.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon Comprehend custom document classifiers with production defaults: multi-class vs multi-label mode, training data formats (CSV + Augmented Manifest from Ground Truth), classifier input mode (PLAIN_TEXT vs Native PDF), training job (create-document-classifier), evaluation metrics (precision, recall, F1), endpoint deployment for real-time inference with auto-scaling, batch inference jobs, KMS encryption for model artifacts and volume, VPC endpoint for private inference, IAM roles for training and deployment, model versioning, cost per training and inference hour. Emits a READY_TO_DEPLOY checklist with verification commands. Use when training a custom classifier, deploying a Comprehend endpoint, running batch classification, or choosing multi-class vs multi-label. Triggers: Comprehend custom classifier, document classifier training, multi-class multi-label, Comprehend endpoint, augmented manifest, native PDF classifier, batch inference.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with comprehend
-  access (create-document-classifier, describe-document-classifier,
-  create-endpoint, describe-endpoint, start-topics-detection-job), iam
-  (create-role, attach-role-policy), kms (create-key), and ec2
-  (create-vpc-endpoint). Works with Terraform
-  aws_comprehend_document_classifier / aws_comprehend_endpoint resources
-  and CloudFormation AWS::Comprehend::DocumentClassifier templates.
-keywords:
-  - aws
-  - comprehend
-  - document classifier
-  - custom classifier
-  - multi-class
-  - multi-label
-  - augmented manifest
-  - native pdf
-  - endpoint
-  - batch inference
-  - kms encryption
-  - vpc endpoint
-  - model evaluation
-  - precision recall f1
-  - cloudops
-  - deploy
-  - ai-ml
-tags:
-  - aws
-  - comprehend
-  - document-classifier
-  - nlp
-  - machine-learning
-  - deploy
-  - ai-ml
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with comprehend access (create-document-classifier, describe-document-classifier, create-endpoint, describe-endpoint, start-topics-detection-job), iam (create-role, attach-role-policy), kms (create-key), and ec2 (create-vpc-endpoint). Works with Terraform aws_comprehend_document_classifier / aws_comprehend_endpoint resources and CloudFormation AWS::Comprehend::DocumentClassifier...'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AI/ML
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - comprehend
-    - document-classifier
-    - nlp
-    - machine-learning
-    - deploy
-    - ai-ml
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - comprehend custom classifier
-    - document classifier training
-    - multi-class classifier
-    - multi-label classifier
-    - comprehend endpoint deployment
-    - augmented manifest training data
-    - native PDF classifier
-    - batch classification job
-    - comprehend KMS encryption
-    - comprehend VPC endpoint
-  when_to_use: >-
-    Invoke when the user wants to train an Amazon Comprehend custom
-    document classifier (multi-class or multi-label), prepare training
-    data in CSV or Augmented Manifest format, choose between plain text
-    and native PDF input mode, deploy a real-time inference endpoint,
-    run a batch classification job, configure KMS encryption for model
-    artifacts, set up a VPC endpoint for private inference, define IAM
-    roles for training and deployment, or evaluate model metrics
-    (precision, recall, F1). Do NOT invoke for Comprehend pre-trained
-    APIs (KeyPhraseExtraction, Sentiment), Comprehend Custom Entity
-    Recognition, or Comprehend Topic Modeling (unsupervised).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, comprehend, document-classifier, nlp, machine-learning, deploy, ai-ml
+  dependencies: aws-orchestrator
+  keywords: aws, comprehend, document classifier, custom classifier, multi-class, multi-label, augmented manifest, native pdf, endpoint, batch inference, kms encryption, vpc endpoint, model evaluation, precision recall f1, cloudops, deploy, ai-ml
+  when_to_use: Invoke when the user wants to train an Amazon Comprehend custom document classifier (multi-class or multi-label), prepare training data in CSV or Augmented Manifest format, choose between plain text and native PDF input mode, deploy a real-time inference endpoint, run a batch classification job, configure KMS encryption for model artifacts, set up a VPC endpoint for private inference, define IAM roles for training and deployment, or evaluate model metrics (precision, recall, F1). Do NOT invoke for Comprehend pre-trained APIs (KeyPhraseExtraction, Sentiment), Comprehend Custom Entity Recognition, or Comprehend Topic Modeling (unsupervised).
 ---
 
 # Comprehend Classifier Deployer

@@ -1,100 +1,26 @@
 ---
 name: vpc-network-deployer
-description: >-
-  Provisions production-grade VPCs with secure, well-architected network
-  infrastructure: RFC 1918 CIDR planning with growth headroom, multi-AZ
-  public/private/database subnet tiers, NAT Gateway HA placement (1-per-AZ
-  vs single for cost), Internet Gateway vs Egress-Only Gateway (IPv6),
-  least-privilege route table design (public→IGW, private→NAT, database→
-  local-only), Security Groups that reference by name not CIDR, stateless
-  NACLs for defense-in-depth, VPC Flow Logs with long retention, Gateway
-  (S3/DynamoDB — free) vs Interface VPC Endpoints (private DNS, per-AZ
-  cost), DHCP option sets and Route 53 Resolver DNS resolution, VPC peering
-  vs Transit Gateway for multi-VPC, and IPv6 dual-stack considerations.
-  Emits a deterministic deployment plan with a READY_TO_DEPLOY checklist
-  and network architecture validation. Use when provisioning a new VPC,
-  designing multi-tier subnet layouts, planning CIDR ranges to avoid
-  overlaps, configuring NAT Gateway topology, setting up VPC endpoints
-  for private connectivity, or hardening VPC network posture before
-  production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions production-grade VPCs with secure, well-architected network infrastructure: RFC 1918 CIDR planning with growth headroom, multi-AZ public/private/database subnet tiers, NAT Gateway HA placement (1-per-AZ vs single for cost), Internet Gateway vs Egress-Only Gateway (IPv6), least-privilege route table design (public→IGW, private→NAT, database→ local-only), Security Groups that reference by name not CIDR, stateless NACLs for defense-in-depth, VPC Flow Logs with long retention, Gateway (S3/DynamoDB — free) vs Interface VPC Endpoints (private DNS, per-AZ cost), DHCP option sets and Route 53 Resolver DNS resolution, VPC peering vs Transit Gateway for multi-VPC, and IPv6 dual-stack considerations. Emits a deterministic deployment plan with a READY_TO_DEPLOY checklist and network architecture validation. Use when provisioning a new VPC, designing multi-tier subnet layouts, planning CIDR ranges to avoid overlaps, configuring NAT Gateway topology, setting up VPC endpoints for private connectivity, or...'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline architecture planning. Live
-  deployment uses aws ec2 create-vpc, create-subnet, create-route-table,
-  create-nat-gateway, create-security-group, create-flow-logs,
-  create-vpc-endpoint, and describe-* verification commands (AWS CLI v2,
-  SSO or key-based credentials).
-keywords:
-  - VPC
-  - CIDR planning
-  - RFC 1918
-  - subnet design
-  - multi-AZ
-  - public subnet
-  - private subnet
-  - database subnet
-  - NAT Gateway
-  - Internet Gateway
-  - Egress-Only Gateway
-  - route table
-  - Security Group
-  - NACL
-  - VPC Flow Logs
-  - VPC Endpoint
-  - Gateway Endpoint
-  - Interface Endpoint
-  - PrivateLink
-  - DHCP options
-  - Route 53 Resolver
-  - VPC peering
-  - Transit Gateway
-  - IPv6 dual-stack
-  - network architecture
-tags: [vpc, networking, deploy, subnets, nat-gateway, route-tables, security-groups, nacl, flow-logs, vpc-endpoints, ipv6, transit-gateway]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline architecture planning. Live deployment uses aws ec2 create-vpc, create-subnet, create-route-table, create-nat-gateway, create-security-group, create-flow-logs, create-vpc-endpoint, and describe-* verification commands (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: deploy
   skill_class: capability
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Provisioning a new VPC for production, designing a multi-tier subnet
-    layout (public/private/database), planning CIDR ranges to avoid overlaps
-    with existing networks, selecting NAT Gateway topology for HA vs cost,
-    configuring VPC endpoints for private S3/DynamoDB connectivity, setting
-    up VPC Flow Logs for security forensics, designing route tables for
-    least-privilege traffic flow, hardening VPC security groups and NACLs,
-    or planning IPv6 dual-stack support.
-  activation_triggers:
-    - "create a new VPC"
-    - "provision VPC network"
-    - "plan CIDR ranges for VPC"
-    - "design multi-AZ subnets"
-    - "NAT gateway HA topology"
-    - "VPC endpoint configuration"
-    - "VPC flow logs setup"
-    - "security group and NACL design"
-    - "VPC route table design"
-    - "IPv6 dual-stack VPC"
-    - "Transit Gateway vs VPC peering"
-  invocation_schema: >-
-    Input shape (one of): (a) a deployment specification including region,
-    AZ count, CIDR range, tier requirements (public/private/database), NAT
-    strategy (HA vs cost), endpoint requirements, and flow-log destination;
-    (b) a partial spec for interactive refinement (e.g., "3-AZ VPC in
-    us-east-1 with /16 CIDR, private-only"); (c) an existing VPC ID for
-    architecture review against the well-architected checklist. Output
-    shape: { VPC_SPEC, VERDICT, ARCHITECTURE, CHECKLIST[], FINDINGS[],
-    DEPLOY_COMMANDS } where VERDICT ∈ { READY_TO_DEPLOY, PREREQUISITES_MISSING,
-    ERROR }.
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Provisioning a new VPC for production, designing a multi-tier subnet layout (public/private/database), planning CIDR ranges to avoid overlaps with existing networks, selecting NAT Gateway topology for HA vs cost, configuring VPC endpoints for private S3/DynamoDB connectivity, setting up VPC Flow Logs for security forensics, designing route tables for least-privilege traffic flow, hardening VPC security groups and NACLs, or planning IPv6 dual-stack support.
+  activation_triggers: create a new VPC, provision VPC network, plan CIDR ranges for VPC, design multi-AZ subnets, NAT gateway HA topology, VPC endpoint configuration, VPC flow logs setup, security group and NACL design, VPC route table design, IPv6 dual-stack VPC, Transit Gateway vs VPC peering
+  invocation_schema: 'Input shape (one of): (a) a deployment specification including region, AZ count, CIDR range, tier requirements (public/private/database), NAT strategy (HA vs cost), endpoint requirements, and flow-log destination; (b) a partial spec for interactive refinement (e.g., "3-AZ VPC in us-east-1 with /16 CIDR, private-only"); (c) an existing VPC ID for architecture review against the well-architected checklist. Output shape: { VPC_SPEC, VERDICT, ARCHITECTURE, CHECKLIST[], FINDINGS[], DEPLOY_COMMANDS } where VERDICT ∈ { READY_TO_DEPLOY, PREREQUISITES_MISSING, ERROR }.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: VPC, CIDR planning, RFC 1918, subnet design, multi-AZ, public subnet, private subnet, database subnet, NAT Gateway, Internet Gateway, Egress-Only Gateway, route table, Security Group, NACL, VPC Flow Logs, VPC Endpoint, Gateway Endpoint, Interface Endpoint, PrivateLink, DHCP options, Route 53 Resolver, VPC peering, Transit Gateway, IPv6 dual-stack, network architecture
+  tags: vpc, networking, deploy, subnets, nat-gateway, route-tables, security-groups, nacl, flow-logs, vpc-endpoints, ipv6, transit-gateway
 ---
 
 # VPC Network Deployer

@@ -1,113 +1,26 @@
 ---
 name: elastic-beanstalk-deployer
-description: >-
-  Provisions AWS Elastic Beanstalk environments with production
-  defaults: application creation, environment tier (web server vs
-  worker), platform (Amazon Linux 2023, Node.js/Python/Java/Go/.NET),
-  deployment policies (all at once, rolling, rolling with additional
-  batch, immutable, traffic splitting), managed platform updates,
-  enhanced health reporting, load balancer (ALB vs NLB), EC2 instance
-  profile, service role, VPC configuration, security groups, auto
-  scaling group, RDS integration, CNAME swap for blue-green,
-  .ebextensions and .platform for infrastructure as code. Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when
-  creating an Elastic Beanstalk environment, configuring blue-green
-  with CNAME swap, setting up worker tier with SQS, or managing
-  platform updates. Triggers: create elastic beanstalk environment,
-  deploy beanstalk application, beanstalk blue-green cname swap,
-  beanstalk worker tier sqs, beanstalk immutable deployment,
-  ebextensions, beanstalk managed updates.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Elastic Beanstalk environments with production defaults: application creation, environment tier (web server vs worker), platform (Amazon Linux 2023, Node.js/Python/Java/Go/.NET), deployment policies (all at once, rolling, rolling with additional batch, immutable, traffic splitting), managed platform updates, enhanced health reporting, load balancer (ALB vs NLB), EC2 instance profile, service role, VPC configuration, security groups, auto scaling group, RDS integration, CNAME swap for blue-green, .ebextensions and .platform for infrastructure as code. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating an Elastic Beanstalk environment, configuring blue-green with CNAME swap, setting up worker tier with SQS, or managing platform updates. Triggers: create elastic beanstalk environment, deploy beanstalk application, beanstalk blue-green cname swap, beanstalk worker tier sqs, beanstalk immutable deployment, ebextensions, beanstalk managed updates.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with elasticbeanstalk
-  and iam access, plus S3 for application version source bundles. Works
-  with Terraform aws_elastic_beanstalk_application /
-  aws_elastic_beanstalk_environment resources and CloudFormation
-  AWS::ElasticBeanstalk::Application /
-  AWS::ElasticBeanstalk::Environment templates.
-keywords:
-  - aws
-  - elastic beanstalk
-  - beanstalk
-  - compute
-  - cloudops
-  - deploy
-  - provisioning
-  - blue-green
-  - cname swap
-  - worker tier
-  - web server tier
-  - ebextensions
-  - platform
-  - amazon linux 2023
-  - immutable deployment
-  - rolling deployment
-  - managed updates
-  - application version
-  - environment tier
-tags:
-  - aws
-  - elastic-beanstalk
-  - cloudops
-  - deploy
-  - compute
-  - provisioning
-  - blue-green
-  - worker-tier
-  - ebextensions
-  - amazon-linux-2023
-  - immutable-deployment
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with elasticbeanstalk and iam access, plus S3 for application version source bundles. Works with Terraform aws_elastic_beanstalk_application / aws_elastic_beanstalk_environment resources and CloudFormation AWS::ElasticBeanstalk::Application / AWS::ElasticBeanstalk::Environment templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - elastic-beanstalk
-    - cloudops
-    - deploy
-    - compute
-    - provisioning
-    - blue-green
-    - worker-tier
-    - ebextensions
-    - amazon-linux-2023
-    - immutable-deployment
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create elastic beanstalk environment
-    - deploy beanstalk application
-    - beanstalk blue-green cname swap
-    - beanstalk worker tier sqs
-    - beanstalk immutable deployment
-    - ebextensions
-    - beanstalk managed updates
-    - beanstalk platform amazon linux 2023
-  when_to_use: >-
-    Invoke when the user wants to create or configure an AWS Elastic
-    Beanstalk application or environment (web server or worker tier),
-    deploy an application version, configure blue-green deployment via
-    CNAME swap, set up .ebextensions for infrastructure as code, choose
-    a deployment policy, configure managed platform updates, integrate
-    RDS, or manage the application version lifecycle. Do NOT invoke for
-    Amazon ECS/EKS (use container skills), AWS App Runner (use apprunner
-    skills), or EC2 auto scaling groups standalone (use EC2 skills).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, elastic-beanstalk, cloudops, deploy, compute, provisioning, blue-green, worker-tier, ebextensions, amazon-linux-2023, immutable-deployment
+  dependencies: aws-orchestrator
+  keywords: aws, elastic beanstalk, beanstalk, compute, cloudops, deploy, provisioning, blue-green, cname swap, worker tier, web server tier, ebextensions, platform, amazon linux 2023, immutable deployment, rolling deployment, managed updates, application version, environment tier
+  when_to_use: Invoke when the user wants to create or configure an AWS Elastic Beanstalk application or environment (web server or worker tier), deploy an application version, configure blue-green deployment via CNAME swap, set up .ebextensions for infrastructure as code, choose a deployment policy, configure managed platform updates, integrate RDS, or manage the application version lifecycle. Do NOT invoke for Amazon ECS/EKS (use container skills), AWS App Runner (use apprunner skills), or EC2 auto scaling groups standalone (use EC2 skills).
 ---
 
 # Elastic Beanstalk Deployer

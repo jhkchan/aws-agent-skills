@@ -1,123 +1,26 @@
 ---
 name: keyspaces-keyspace-deployer
-description: >-
-  Provisions Amazon Keyspaces (Cassandra-compatible) keyspaces and tables
-  with production defaults: keyspace creation (create-keyspace), table
-  creation (create-table) with partition key, clustering key, and regular
-  columns, capacity mode selection (on-demand vs provisioned with auto-
-  scaling), point-in-time recovery (PITR), TTL (time-to-live), encryption
-  at rest with KMS, client-side encryption via KMS envelope encryption,
-  schema management through CQL, VPC endpoints for private access,
-  CloudWatch metrics (ConsumedWriteCapacityUnits, ConsumedReadCapacityUnits),
-  and the RU-based cost model. Emits a READY_TO_DEPLOY checklist with
-  verification commands. Use when creating a Keyspace, creating a
-  Cassandra table, configuring on-demand or provisioned capacity, enabling
-  PITR, setting TTL, configuring KMS encryption, connecting via Cassandra
-  driver, or setting up a VPC endpoint for Keyspaces. Triggers: create
-  keyspace, create cassandra table, amazon keyspaces, on-demand capacity,
-  provisioned autoscaling, point-in-time recovery, cassandra CQL,
-  partition key, clustering key, keyspace VPC endpoint, client-side
-  encryption KMS.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon Keyspaces (Cassandra-compatible) keyspaces and tables with production defaults: keyspace creation (create-keyspace), table creation (create-table) with partition key, clustering key, and regular columns, capacity mode selection (on-demand vs provisioned with auto- scaling), point-in-time recovery (PITR), TTL (time-to-live), encryption at rest with KMS, client-side encryption via KMS envelope encryption, schema management through CQL, VPC endpoints for private access, CloudWatch metrics (ConsumedWriteCapacityUnits, ConsumedReadCapacityUnits), and the RU-based cost model. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Keyspace, creating a Cassandra table, configuring on-demand or provisioned capacity, enabling PITR, setting. Triggers: create keyspace, create cassandra table, amazon keyspaces, on-demand capacity, provisioned autoscaling, point-in-time recovery, cassandra CQL, partition key, clustering key, keyspace VPC endpoint, client-side encryption KMS.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with keyspaces access.
-  Works with Terraform aws_keyspaces_keyspace / aws_keyspaces_table
-  resources and CloudFormation AWS::Cassandra::Keyspace /
-  AWS::Cassandra::Table templates. CQL access via the open-source
-  DataStax cassandra-driver with SigV4 authentication.
-keywords:
-  - aws
-  - keyspaces
-  - cassandra
-  - cloudops
-  - deploy
-  - provisioning
-  - keyspace
-  - table
-  - partition key
-  - clustering key
-  - on-demand
-  - provisioned
-  - autoscaling
-  - pitr
-  - ttl
-  - kms encryption
-  - client-side encryption
-  - vpc endpoint
-  - cql
-  - cloudwatch metrics
-tags:
-  - aws
-  - keyspaces
-  - cassandra
-  - cloudops
-  - deploy
-  - databases
-  - provisioning
-  - partition-key
-  - clustering-key
-  - on-demand
-  - provisioned
-  - pitr
-  - kms
-  - vpc-endpoint
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with keyspaces access. Works with Terraform aws_keyspaces_keyspace / aws_keyspaces_table resources and CloudFormation AWS::Cassandra::Keyspace / AWS::Cassandra::Table templates. CQL access via the open-source DataStax cassandra-driver with SigV4 authentication.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - keyspaces
-    - cassandra
-    - cloudops
-    - deploy
-    - databases
-    - provisioning
-    - partition-key
-    - clustering-key
-    - on-demand
-    - provisioned
-    - pitr
-    - kms
-    - vpc-endpoint
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create keyspace
-    - create cassandra table
-    - amazon keyspaces
-    - on-demand capacity
-    - provisioned autoscaling
-    - point-in-time recovery
-    - cassandra CQL
-    - partition key
-    - clustering key
-    - keyspace vpc endpoint
-    - client-side encryption kms
-  when_to_use: >-
-    Invoke when the user wants to create an Amazon Keyspaces keyspace or
-    table, configure capacity mode (on-demand or provisioned with auto-
-    scaling), enable point-in-time recovery, set TTL, configure KMS
-    encryption at rest, set up client-side envelope encryption, connect
-    via the Cassandra driver with SigV4, or create a VPC endpoint for
-    private Keyspaces access. Do NOT invoke for Amazon DynamoDB (use
-    DynamoDB skills), Amazon ElastiCache (use ElastiCache skills), or
-    self-managed Cassandra on EC2/EKS.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, keyspaces, cassandra, cloudops, deploy, databases, provisioning, partition-key, clustering-key, on-demand, provisioned, pitr, kms, vpc-endpoint
+  dependencies: aws-orchestrator
+  keywords: aws, keyspaces, cassandra, cloudops, deploy, provisioning, keyspace, table, partition key, clustering key, on-demand, provisioned, autoscaling, pitr, ttl, kms encryption, client-side encryption, vpc endpoint, cql, cloudwatch metrics
+  when_to_use: Invoke when the user wants to create an Amazon Keyspaces keyspace or table, configure capacity mode (on-demand or provisioned with auto- scaling), enable point-in-time recovery, set TTL, configure KMS encryption at rest, set up client-side envelope encryption, connect via the Cassandra driver with SigV4, or create a VPC endpoint for private Keyspaces access. Do NOT invoke for Amazon DynamoDB (use DynamoDB skills), Amazon ElastiCache (use ElastiCache skills), or self-managed Cassandra on EC2/EKS.
 ---
 
 # Amazon Keyspaces Keyspace Deployer

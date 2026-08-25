@@ -1,83 +1,27 @@
 ---
 name: cloudtrail-alert-automator
-description: >-
-  Designs and deploys CloudTrail alerting automation across an AWS estate.
-  Builds EventBridge rules for security-critical API calls (root console
-  login, IAM policy changes, security group modifications, CloudTrail
-  disabling), wires SNS topic routing by severity, deploys Lambda
-  enrichment functions that use lookup-events to attach actor context,
-  source IP correlation, and recent activity. Integrates with Security
-  Hub via BatchImportFindings, delivers to Slack/Teams via webhook,
-  implements deduplication by event identity, and suppresses known CI/CD
-  service-role alerts. Supports multi-account via Organizations trail and
-  CloudTrail Insights anomaly alerting. Emits AUTOMATION_DEPLOYED with
-  deployable IaC or REVIEW_REQUIRED with the specific gap.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Designs and deploys CloudTrail alerting automation across an AWS estate. Builds EventBridge rules for security-critical API calls (root console login, IAM policy changes, security group modifications, CloudTrail disabling), wires SNS topic routing by severity, deploys Lambda enrichment functions that use lookup-events to attach actor context, source IP correlation, and recent activity. Integrates with Security Hub via BatchImportFindings, delivers to Slack/Teams via webhook, implements deduplication by event identity, and suppresses known CI/CD service-role alerts. Supports multi-account via Organizations trail and CloudTrail Insights anomaly alerting. Emits AUTOMATION_DEPLOYED with deployable IaC or REVIEW_REQUIRED with the specific gap.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline alert-design. Live deployment
-  uses aws events put-rule, put-targets, aws sns create-topic, subscribe,
-  aws lambda create-function, aws securityhub batch-import-findings, and
-  aws cloudtrail lookup-events, create-event-data-store, start-query —
-  AWS CLI v2, SSO or key-based credentials.
-keywords:
-  - AWS CloudTrail
-  - EventBridge
-  - SNS alerting
-  - Security Hub
-  - lookup-events
-  - CloudTrail Lake
-  - CloudTrail Insights
-  - root login alert
-  - IAM change alert
-  - security group change
-  - Slack webhook
-  - alert deduplication
-  - alert suppression
-  - Organizations trail
-  - governance automation
-tags: [aws-cloudtrail, eventbridge, sns, security-hub, lambda, governance, automate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline alert-design. Live deployment uses aws events put-rule, put-targets, aws sns create-topic, subscribe, aws lambda create-function, aws securityhub batch-import-findings, and aws cloudtrail lookup-events, create-event-data-store, start-query — AWS CLI v2, SSO or key-based credentials.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATION_DEPLOYED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Designing CloudTrail alerting automation, wiring EventBridge rules for
-    security-critical API calls, building Lambda enrichment with
-    lookup-events context, integrating CloudTrail alerts with Security Hub
-    custom findings, routing alerts to Slack or Teams, suppressing known
-    CI/CD automation noise, or deploying multi-account CloudTrail alerting
-    via an Organizations trail.
-  activation_triggers:
-    - "automate CloudTrail alerts"
-    - "EventBridge rule for root login"
-    - "IAM change alert"
-    - "security group change notification"
-    - "CloudTrail SNS alert"
-    - "Security Hub custom finding from CloudTrail"
-    - "CloudTrail Lake query"
-    - "Slack webhook CloudTrail"
-    - "alert deduplication"
-    - "suppress CI/CD service role alerts"
-    - "CloudTrail Insights anomaly"
-    - "Organizations trail alerting"
-  invocation_schema: >-
-    Input: either (a) a set of CloudTrail event names or categories to
-    alert on plus the desired notification targets (SNS, Security Hub,
-    Slack, Teams), OR (b) an existing alerting setup to audit. Output:
-    deterministic ALERT block per rule — RULE/ENRICHMENT/ROUTING/DEDUP/
-    SUPPRESSION/VERDICT — where VERDICT is AUTOMATION_DEPLOYED or
-    REVIEW_REQUIRED.
+  verdict_shape: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
+  when_to_use: Designing CloudTrail alerting automation, wiring EventBridge rules for security-critical API calls, building Lambda enrichment with lookup-events context, integrating CloudTrail alerts with Security Hub custom findings, routing alerts to Slack or Teams, suppressing known CI/CD automation noise, or deploying multi-account CloudTrail alerting via an Organizations trail.
+  activation_triggers: automate CloudTrail alerts, EventBridge rule for root login, IAM change alert, security group change notification, CloudTrail SNS alert, Security Hub custom finding from CloudTrail, CloudTrail Lake query, Slack webhook CloudTrail, alert deduplication, suppress CI/CD service role alerts, CloudTrail Insights anomaly, Organizations trail alerting
+  invocation_schema: 'Input: either (a) a set of CloudTrail event names or categories to alert on plus the desired notification targets (SNS, Security Hub, Slack, Teams), OR (b) an existing alerting setup to audit. Output: deterministic ALERT block per rule — RULE/ENRICHMENT/ROUTING/DEDUP/ SUPPRESSION/VERDICT — where VERDICT is AUTOMATION_DEPLOYED or REVIEW_REQUIRED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS CloudTrail, EventBridge, SNS alerting, Security Hub, lookup-events, CloudTrail Lake, CloudTrail Insights, root login alert, IAM change alert, security group change, Slack webhook, alert deduplication, alert suppression, Organizations trail, governance automation
+  tags: aws-cloudtrail, eventbridge, sns, security-hub, lambda, governance, automate
 ---
 
 # CloudTrail Alert Automator

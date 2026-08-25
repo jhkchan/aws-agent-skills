@@ -1,46 +1,15 @@
 ---
 name: dynamodb-capacity-optimizer
 description: 'Optimises DynamoDB table cost across seven dimensions: on-demand vs provisioned capacity mode crossover analysis (30% utilization break-even), RCU/WCU sizing from CloudWatch ConsumedReadCapacityUnits and ConsumedWriteCapacityUnits, auto-scaling target utilization tuning (70% default vs 50-60% for headroom), partition key design for even distribution (hot partition detection via CloudWatch), GSI projection size optimization (sparse index strategy), table class selection (Standard vs Standard-Infrequent Access for low-traffic tables), and TTL for data lifecycle cost reduction. DynamoDB Streams cost impact evaluated. Emits FURTHER_OPTIMIZATION_AVAILABLE with capacity mode recommendation and dollar savings, OPTIMIZED, or ALREADY_OPTIMAL.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline classification works from pasted CloudWatch metrics and table configuration. Live-account optimization uses aws dynamodb describe-table, aws dynamodb describe-continuous-backups, aws application-autoscaling describe-scaling-policies, aws cloudwatch get-metric-statistics (ConsumedReadCapacityUnits, ConsumedWriteCapacityUnits, ThrottledRequests, SystemErrors), aws ce get-cost-and-usage, and aws dynamodb describe-time-to-live (AWS CLI v2, SSO or key-based credentials). Pricing references us-east-1 published rates as of 2026; re-state regional rates for other regions.
-keywords:
-- DynamoDB
-- capacity optimization
-- on-demand vs provisioned
-- RCU
-- WCU
-- auto-scaling
-- target utilization
-- partition key
-- hot partition
-- GSI
-- sparse index
-- adaptive capacity
-- table class
-- Standard-Infrequent Access
-- TTL
-- DynamoDB Streams
-- cost optimization
-- FinOps
-- consumed capacity
-- partition skew
-tags:
-- dynamodb
-- databases
-- cost-optimization
-- finops
-- capacity
-- autoscaling
-- gsi
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline classification works from pasted CloudWatch metrics and table configuration. Live-account optimization uses aws dynamodb describe-table, aws dynamodb describe-continuous-backups, aws application-autoscaling describe-scaling-policies, aws cloudwatch get-metric-statistics (ConsumedReadCapacityUnits, ConsumedWriteCapacityUnits, ThrottledRequests, SystemErrors), aws ce get-cost-and-usage, and aws dynamodb...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: optimize
   skill_class: capability
@@ -48,25 +17,13 @@ metadata:
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
   when_to_use: Optimising DynamoDB table cost, evaluating on-demand vs provisioned capacity mode, sizing RCU/WCU from CloudWatch consumed capacity metrics, tuning auto-scaling target utilization, diagnosing hot partitions via partition skew, optimising GSI projection size, selecting table class (Standard vs Standard-IA), deploying TTL for data lifecycle, or running a database FinOps review.
   when_not_to_use: DynamoDB table security or IAM auditing (use dynamodb-table-auditor), DynamoDB troubleshooting (throttling diagnosis without cost context — use the DynamoDB troubleshooter), or DynamoDB schema design from scratch (use a data modeling specialist). This skill focuses on cost-driven capacity optimization for existing tables, not greenfield schema design.
-  activation_triggers:
-  - optimise DynamoDB cost
-  - DynamoDB on-demand vs provisioned
-  - DynamoDB RCU WCU sizing
-  - DynamoDB auto-scaling target
-  - DynamoDB hot partition
-  - DynamoDB partition skew
-  - DynamoDB GSI cost
-  - DynamoDB sparse index
-  - DynamoDB table class
-  - DynamoDB Standard-Infrequent Access
-  - DynamoDB TTL cost
-  - DynamoDB Streams cost
-  - DynamoDB adaptive capacity
-  - DynamoDB FinOps review
-  - reduce DynamoDB bill
-  - DynamoDB capacity review
+  activation_triggers: optimise DynamoDB cost, DynamoDB on-demand vs provisioned, DynamoDB RCU WCU sizing, DynamoDB auto-scaling target, DynamoDB hot partition, DynamoDB partition skew, DynamoDB GSI cost, DynamoDB sparse index, DynamoDB table class, DynamoDB Standard-Infrequent Access, DynamoDB TTL cost, DynamoDB Streams cost, DynamoDB adaptive capacity, DynamoDB FinOps review, reduce DynamoDB bill, DynamoDB capacity review
   invocation_schema: 'Input: either (a) a table identifier + live-account context, (b) a CloudWatch consumed-capacity metrics export with table configuration, OR (c) table metadata (BillingMode, ProvisionedThroughput, GSIs, AutoScaling policies, TTL status). Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ ESTIMATED_SAVINGS/MIGRATION_STEPS block per table, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE, ALREADY_OPTIMAL.'
   invocation_example: "# Minimal valid input (offline classification):\nTableName: user-events-prod\nRegion: us-east-1\nBillingMode: PROVISIONED\nProvisionedThroughput:\n  ReadCapacityUnits: 5000\n  WriteCapacityUnits: 2000\nAutoScaling:\n  Read: target=70, min=1000, max=10000\n  Write: target=70, min=500, max=5000\nGSIs: 2 (total projected size: 120 GB)\nTTL: not enabled\nTable Class: STANDARD\nStreams: NEW_AND_OLD_IMAGES\nMetrics (last 30 days):\n  - ConsumedReadCapacityUnits: avg 850/s, max 1200/s\n  - ConsumedWriteCapacityUnits: avg 400/s, max 600/s\n  - ThrottledRequests: 12,000 (on Read)\n  - SystemErrors: 0\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: DynamoDB, capacity optimization, on-demand vs provisioned, RCU, WCU, auto-scaling, target utilization, partition key, hot partition, GSI, sparse index, adaptive capacity, table class, Standard-Infrequent Access, TTL, DynamoDB Streams, cost optimization, FinOps, consumed capacity, partition skew
+  tags: dynamodb, databases, cost-optimization, finops, capacity, autoscaling, gsi
 ---
 
 # DynamoDB Capacity Optimizer

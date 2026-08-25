@@ -1,121 +1,26 @@
 ---
 name: kinesis-stream-deployer
-description: >-
-  Provisions Amazon Kinesis Data Streams with production defaults: stream
-  creation (shard count, stream mode provisioned vs on-demand), enhanced
-  fan-out (consumer registration, SubscribeToShard), server-side encryption
-  (KMS CMK, key policy, aws/kinesis alias), resource-level IAM policies
-  (PutRecord, GetRecords, SubscribeToShard), and CloudWatch monitoring
-  (IteratorAgeMilliseconds, WriteProvisionedThroughputExceeded). Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when creating
-  a Kinesis data stream, switching stream mode to on-demand, registering
-  enhanced fan-out consumers, enabling SSE-KMS encryption, sizing shard
-  count for throughput, or wiring CloudWatch alarms for iterator age and
-  throttling. Triggers: create kinesis stream, kinesis on-demand capacity,
-  kinesis enhanced fan-out, kinesis SSE-KMS, kinesis shard count, kinesis
-  IAM policy, kinesis CloudWatch iterator age, SubscribeToShard consumer,
-  kinesis throughput provisioning.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon Kinesis Data Streams with production defaults: stream creation (shard count, stream mode provisioned vs on-demand), enhanced fan-out (consumer registration, SubscribeToShard), server-side encryption (KMS CMK, key policy, aws/kinesis alias), resource-level IAM policies (PutRecord, GetRecords, SubscribeToShard), and CloudWatch monitoring (IteratorAgeMilliseconds, WriteProvisionedThroughputExceeded). Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Kinesis data stream, switching stream mode to on-demand, registering enhanced fan-out consumers, enabling SSE-KMS encryption, sizing shard count for throughput, or wiring CloudWatch alarms for iterator age and throttling. Triggers: create kinesis stream, kinesis on-demand capacity, kinesis enhanced fan-out, kinesis SSE-KMS, kinesis shard count, kinesis IAM policy, kinesis CloudWatch iterator age, SubscribeToShard consumer, kinesis throughput provisioning.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with kinesis, iam,
-  kms, and cloudwatch access. Works with Terraform
-  aws_kinesis_stream / aws_kinesis_stream_consumer resources and
-  CloudFormation AWS::Kinesis::Stream / AWS::Kinesis::StreamConsumer
-  templates.
-keywords:
-  - aws
-  - kinesis
-  - kinesis data streams
-  - cloudops
-  - deploy
-  - provisioning
-  - stream mode
-  - on-demand
-  - provisioned
-  - shard count
-  - enhanced fan-out
-  - subscribe to shard
-  - sse-kms
-  - server-side encryption
-  - kms
-  - iam policy
-  - resource-level iam
-  - cloudwatch
-  - iterator age
-  - throughput exceeded
-  - put record
-  - get records
-  - stream consumer
-tags:
-  - aws
-  - kinesis
-  - kinesis-data-streams
-  - cloudops
-  - deploy
-  - analytics
-  - provisioning
-  - stream-mode
-  - on-demand
-  - enhanced-fanout
-  - sse-kms
-  - iam
-  - cloudwatch
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with kinesis, iam, kms, and cloudwatch access. Works with Terraform aws_kinesis_stream / aws_kinesis_stream_consumer resources and CloudFormation AWS::Kinesis::Stream / AWS::Kinesis::StreamConsumer templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - kinesis
-    - kinesis-data-streams
-    - cloudops
-    - deploy
-    - analytics
-    - provisioning
-    - stream-mode
-    - on-demand
-    - enhanced-fanout
-    - sse-kms
-    - iam
-    - cloudwatch
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create kinesis stream
-    - kinesis on-demand capacity
-    - kinesis enhanced fan-out
-    - kinesis sse-kms
-    - kinesis shard count
-    - kinesis iam policy
-    - kinesis cloudwatch iterator age
-    - subscribetoshard consumer
-    - kinesis throughput provisioning
-    - kinesis stream mode
-  when_to_use: >-
-    Invoke when the user wants to create an Amazon Kinesis Data Stream,
-    choose between provisioned (shard-based) and on-demand capacity mode,
-    register enhanced fan-out consumers for dedicated read throughput,
-    enable server-side encryption with KMS, define resource-level IAM
-    policies for producer/consumer applications, or set up CloudWatch
-    monitoring for iterator age and write throttling. Do NOT invoke for
-    Kinesis Data Firehose delivery streams (use firehose skills), Kinesis
-    Video Streams, or auditing existing stream configurations (use
-    kinesis-stream-auditor).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, kinesis, kinesis-data-streams, cloudops, deploy, analytics, provisioning, stream-mode, on-demand, enhanced-fanout, sse-kms, iam, cloudwatch
+  dependencies: aws-orchestrator
+  keywords: aws, kinesis, kinesis data streams, cloudops, deploy, provisioning, stream mode, on-demand, provisioned, shard count, enhanced fan-out, subscribe to shard, sse-kms, server-side encryption, kms, iam policy, resource-level iam, cloudwatch, iterator age, throughput exceeded, put record, get records, stream consumer
+  when_to_use: Invoke when the user wants to create an Amazon Kinesis Data Stream, choose between provisioned (shard-based) and on-demand capacity mode, register enhanced fan-out consumers for dedicated read throughput, enable server-side encryption with KMS, define resource-level IAM policies for producer/consumer applications, or set up CloudWatch monitoring for iterator age and write throttling. Do NOT invoke for Kinesis Data Firehose delivery streams (use firehose skills), Kinesis Video Streams, or auditing existing stream configurations (use kinesis-stream-auditor).
 ---
 
 # Kinesis Stream Deployer

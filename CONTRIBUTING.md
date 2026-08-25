@@ -9,7 +9,7 @@ harness. A skill without an eval is considered incomplete.
 
 ```text
 skills/<name>/
-  SKILL.md            # minimal skill format: name/description/version frontmatter + body
+  SKILL.md            # agentskills.io spec frontmatter: name/description/license/compatibility/metadata + body
   references/         # optional supplementary docs
   eval/
     test-cases.yaml   # co-located eval spec (the eval-backed contract)
@@ -21,7 +21,7 @@ eval/
 ## How to add a skill
 
 1. Create `skills/<your-skill-name>/SKILL.md` with the minimal frontmatter
-   (`name`, `description`, `version`) — the same format used by
+   (`name`, `description`, `license`, `compatibility`, `metadata`) with `version` under `metadata` — the agentskills.io spec format used by
    [aws/agent-toolkit-for-aws](https://github.com/aws/agent-toolkit-for-aws).
 2. Add `skills/<your-skill-name>/eval/test-cases.yaml` with deterministic test
    cases and `must_contain` / `must_not_contain` assertions (see existing

@@ -1,107 +1,26 @@
 ---
 name: glue-crawler-deployer
-description: >-
-  Provisions AWS Glue Crawlers with production defaults: data source
-  configuration (S3, DynamoDB, JDBC), IAM role with least-privilege
-  permissions, classifier configuration with correct ordering (Grok,
-  JSON, CSV — first match wins), schema merge policy, partitioning
-  strategy (folder partitioning vs partition projection for cost
-  reduction), Lake Formation integration, catalog database target,
-  scheduling (cron, event-driven via S3 Event Notifications),
-  incremental vs full crawl trade-off, schema evolution handling, and
-  DynamoDB export crawling. Emits a READY_TO_DEPLOY checklist with
-  verification commands. Use when creating a Glue Crawler, configuring
-  crawl schedules, setting up custom classifiers, integrating with
-  Lake Formation, or configuring partition projection. Triggers:
-  create glue crawler, glue crawler classifier, glue crawler
-  schedule, glue crawler lake formation, glue crawler partition
-  projection, glue dynamodb crawler, glue jdbc crawler.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Glue Crawlers with production defaults: data source configuration (S3, DynamoDB, JDBC), IAM role with least-privilege permissions, classifier configuration with correct ordering (Grok, JSON, CSV — first match wins), schema merge policy, partitioning strategy (folder partitioning vs partition projection for cost reduction), Lake Formation integration, catalog database target, scheduling (cron, event-driven via S3 Event Notifications), incremental vs full crawl trade-off, schema evolution handling, and DynamoDB export crawling. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Glue Crawler, configuring crawl schedules, setting up custom classifiers, integrating with Lake Formation, or configuring partition projection. Triggers: create glue crawler, glue crawler classifier, glue crawler schedule, glue crawler lake formation, glue crawler partition projection, glue dynamodb crawler, glue jdbc crawler.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with glue access
-  (glue:CreateCrawler, glue:StartCrawler, iam:PassRole). Works with
-  Terraform aws_glue_crawler / aws_glue_classifier resources and
-  CloudFormation AWS::Glue::Crawler templates.
-keywords:
-  - aws
-  - glue
-  - glue crawler
-  - crawler
-  - data catalog
-  - classifier
-  - cloudops
-  - deploy
-  - provisioning
-  - lake formation
-  - partition projection
-  - schema discovery
-  - s3 crawler
-  - dynamodb crawler
-  - jdbc crawler
-tags:
-  - aws
-  - glue
-  - glue-crawler
-  - cloudops
-  - deploy
-  - analytics
-  - provisioning
-  - classifier
-  - partition-projection
-  - lake-formation
-  - data-catalog
-  - schema-discovery
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with glue access (glue:CreateCrawler, glue:StartCrawler, iam:PassRole). Works with Terraform aws_glue_crawler / aws_glue_classifier resources and CloudFormation AWS::Glue::Crawler templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - glue
-    - glue-crawler
-    - cloudops
-    - deploy
-    - analytics
-    - provisioning
-    - classifier
-    - partition-projection
-    - lake-formation
-    - data-catalog
-    - schema-discovery
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create glue crawler
-    - glue crawler classifier
-    - glue crawler schedule
-    - glue crawler lake formation
-    - glue crawler partition projection
-    - glue dynamodb crawler
-    - glue jdbc crawler
-  when_to_use: >-
-    Invoke when the user wants to create a Glue Crawler, configure
-    custom classifiers (Grok, JSON, CSV), set up crawl schedules (cron
-    or event-driven via S3 Event Notifications), integrate with Lake
-    Formation, configure partition projection for cost reduction,
-    handle schema evolution, choose incremental vs full crawl, or
-    configure DynamoDB/JDBC data source crawling. Do NOT invoke for
-    Glue ETL jobs (use glue-job-troubleshooter), Glue DataBrew, or
-    auditing existing Glue crawlers (use glue-crawler-job-auditor).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, glue, glue-crawler, cloudops, deploy, analytics, provisioning, classifier, partition-projection, lake-formation, data-catalog, schema-discovery
+  dependencies: aws-orchestrator
+  keywords: aws, glue, glue crawler, crawler, data catalog, classifier, cloudops, deploy, provisioning, lake formation, partition projection, schema discovery, s3 crawler, dynamodb crawler, jdbc crawler
+  when_to_use: Invoke when the user wants to create a Glue Crawler, configure custom classifiers (Grok, JSON, CSV), set up crawl schedules (cron or event-driven via S3 Event Notifications), integrate with Lake Formation, configure partition projection for cost reduction, handle schema evolution, choose incremental vs full crawl, or configure DynamoDB/JDBC data source crawling. Do NOT invoke for Glue ETL jobs (use glue-job-troubleshooter), Glue DataBrew, or auditing existing Glue crawlers (use glue-crawler-job-auditor).
 ---
 
 # Glue Crawler Deployer

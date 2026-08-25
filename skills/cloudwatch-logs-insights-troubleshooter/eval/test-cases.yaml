@@ -1,7 +1,7 @@
-# Eval test cases for cloudwatch-logs-insights-troubshooter
+# Eval test cases for cloudwatch-logs-insights-troubleshooter
 # Co-located per the eval-backed contract (spec S-002, S-E04).
 # Discovered by eval/run_eval.py via skills/*/eval/*.yaml glob.
-skill: cloudwatch-logs-insights-troubshooter
+skill: cloudwatch-logs-insights-troubleshooter
 model_id: amazon.nova-pro-v1:0
 profile: default
 region: us-east-1

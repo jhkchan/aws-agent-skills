@@ -1,110 +1,27 @@
 ---
 name: lightsail-instance-deployer
-description: >-
-  Provisions production-grade Amazon Lightsail instances with secure
-  defaults: blueprint selection (OS-only vs app+OS bundle), bundle
-  (plan) sizing for CPU/RAM/SSD/transfer, static IP attachment, DNS
-  via Lightsail DNS zones, VPC peering to the default EC2-VPC for
-  private access to RDS/ElastiCache, automatic and manual snapshots,
-  Lightsail load balancers (Layer 4 with TLS), container services,
-  Lightsail distributions (CloudFront-backed CDN), and multi-AZ
-  managed databases. Emits a deployment plan with a READY_TO_DEPLOY
-  checklist. Use when provisioning a new Lightsail instance, attaching
-  a static IP, configuring a DNS zone, peering to EC2-VPC for private
-  resource access, setting up snapshots, deploying a Lightsail load
-  balancer, creating a container service, fronting an instance with a
-  distribution, or provisioning a multi-AZ Lightsail database.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions production-grade Amazon Lightsail instances with secure defaults: blueprint selection (OS-only vs app+OS bundle), bundle (plan) sizing for CPU/RAM/SSD/transfer, static IP attachment, DNS via Lightsail DNS zones, VPC peering to the default EC2-VPC for private access to RDS/ElastiCache, automatic and manual snapshots, Lightsail load balancers (Layer 4 with TLS), container services, Lightsail distributions (CloudFront-backed CDN), and multi-AZ managed databases. Emits a deployment plan with a READY_TO_DEPLOY checklist. Use when provisioning a new Lightsail instance, attaching a static IP, configuring a DNS zone, peering to EC2-VPC for private resource access, setting up snapshots, deploying a Lightsail load balancer, creating a container service, fronting an instance with a distribution, or provisioning a multi-AZ Lightsail database.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline architecture
-  planning. Live deployment uses aws lightsail create-instances,
-  create-instance-snapshot, create-disk-from-snapshot,
-  attach-static-ip, create-load-balancer, create-container-service,
-  create-distribution, create-relational-database,
-  enable-add-on (automatic snapshots), create-dnszone,
-  is-vpc-peered, peer-vpc, and aws ec2 describe-vpc-peering-connections
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Lightsail
-  - instance deploy
-  - blueprint
-  - bundle
-  - plan
-  - OS-only
-  - app blueprint
-  - WordPress
-  - LAMP
-  - Node.js
-  - static IP
-  - DNS zone
-  - VPC peering
-  - EC2-VPC peering
-  - private access
-  - RDS private
-  - snapshot
-  - automatic snapshot
-  - manual snapshot
-  - load balancer
-  - container service
-  - Lightsail distribution
-  - CDN
-  - multi-AZ database
-  - Lightsail database
-  - availability zone
-  - user data
-  - cloud-init
-  - SSH key
-  - firewall
-tags: [lightsail, compute, deploy, static-ip, dns, vpc-peering, snapshot, load-balancer, container, distribution, database]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline architecture planning. Live deployment uses aws lightsail create-instances, create-instance-snapshot, create-disk-from-snapshot, attach-static-ip, create-load-balancer, create-container-service, create-distribution, create-relational-database, enable-add-on (automatic snapshots), create-dnszone, is-vpc-peered, peer-vpc, and aws ec2 describe-vpc-peering-connections (AWS CLI v2...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Provisioning a new Lightsail instance for production, attaching a
-    static IP for stable DNS, configuring a Lightsail DNS zone, peering
-    the Lightsail VPC to the default EC2-VPC for private access to RDS
-    or ElastiCache, configuring automatic and manual snapshots, deploying
-    a Lightsail load balancer for HA, creating a container service,
-    fronting an instance with a Lightsail distribution (CDN), or
-    provisioning a multi-AZ managed database.
-  activation_triggers:
-    - "create a Lightsail instance"
-    - "provision a Lightsail instance with static IP"
-    - "Lightsail blueprint selection"
-    - "Lightsail bundle plan sizing"
-    - "Lightsail DNS zone"
-    - "Lightsail VPC peering to EC2-VPC"
-    - "Lightsail RDS private access"
-    - "Lightsail automatic snapshots"
-    - "Lightsail load balancer"
-    - "Lightsail container service"
-    - "Lightsail distribution CDN"
-    - "Lightsail multi-AZ database"
-    - "WordPress on Lightsail"
-  invocation_schema: >-
-    Input shape (one of): (a) a deployment specification including
-    blueprint (OS-only or app+OS), bundle (plan), availability zone,
-    static IP requirement, DNS zone, VPC peering requirement, snapshot
-    schedule, load balancer, container service, distribution, and
-    database requirements; (b) a partial spec for interactive
-    refinement (e.g., "WordPress on Lightsail with a static IP and
-    daily snapshots"); (c) an existing instance name for architecture
-    review against the well-architected checklist. Output shape:
-    { INSTANCE_SPEC, VERDICT, ARCHITECTURE, CHECKLIST[], FINDINGS[],
-    DEPLOY_COMMANDS } where VERDICT ∈ { READY_TO_DEPLOY,
-    PREREQUISITES_MISSING }.
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Provisioning a new Lightsail instance for production, attaching a static IP for stable DNS, configuring a Lightsail DNS zone, peering the Lightsail VPC to the default EC2-VPC for private access to RDS or ElastiCache, configuring automatic and manual snapshots, deploying a Lightsail load balancer for HA, creating a container service, fronting an instance with a Lightsail distribution (CDN), or provisioning a multi-AZ managed database.
+  activation_triggers: create a Lightsail instance, provision a Lightsail instance with static IP, Lightsail blueprint selection, Lightsail bundle plan sizing, Lightsail DNS zone, Lightsail VPC peering to EC2-VPC, Lightsail RDS private access, Lightsail automatic snapshots, Lightsail load balancer, Lightsail container service, Lightsail distribution CDN, Lightsail multi-AZ database, WordPress on Lightsail
+  invocation_schema: 'Input shape (one of): (a) a deployment specification including blueprint (OS-only or app+OS), bundle (plan), availability zone, static IP requirement, DNS zone, VPC peering requirement, snapshot schedule, load balancer, container service, distribution, and database requirements; (b) a partial spec for interactive refinement (e.g., "WordPress on Lightsail with a static IP and daily snapshots"); (c) an existing instance name for architecture review against the well-architected checklist. Output shape: { INSTANCE_SPEC, VERDICT, ARCHITECTURE, CHECKLIST[], FINDINGS[], DEPLOY_COMMANDS } where VERDICT ∈ { READY_TO_DEPLOY, PREREQUISITES_MISSING }.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Lightsail, instance deploy, blueprint, bundle, plan, OS-only, app blueprint, WordPress, LAMP, Node.js, static IP, DNS zone, VPC peering, EC2-VPC peering, private access, RDS private, snapshot, automatic snapshot, manual snapshot, load balancer, container service, Lightsail distribution, CDN, multi-AZ database, Lightsail database, availability zone, user data, cloud-init, SSH key, firewall
+  tags: lightsail, compute, deploy, static-ip, dns, vpc-peering, snapshot, load-balancer, container, distribution, database
 ---
 
 # Lightsail Instance Deployer

@@ -1,103 +1,26 @@
 ---
 name: rekognition-collection-deployer
-description: >-
-  Provisions Amazon Rekognition face collections and detection
-  pipelines: collection creation with KMS encryption (must be set at
-  create time), face indexing (index-faces, FaceId, ExternalImageId),
-  face search by image and by FaceId with similarity threshold tuning
-  (80%+ for production), stream processor for video analysis (Kinesis
-  shard-level parallelism), celebrity recognition, content moderation,
-  text in image, label detection, PPE detection, custom labels model
-  training and deployment, SNS notification for async jobs, KMS
-  encryption, IAM roles, cost per image/video, rate limiting (TPS), and
-  collection size limits. Emits a READY_TO_DEPLOY checklist. Triggers:
-  create rekognition collection, index faces, search faces by image,
-  face search similarity threshold, rekognition stream processor,
-  celebrity recognition, content moderation, ppe detection, custom
-  labels model training, rekognition kms encryption.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon Rekognition face collections and detection pipelines: collection creation with KMS encryption (must be set at create time), face indexing (index-faces, FaceId, ExternalImageId), face search by image and by FaceId with similarity threshold tuning (80%+ for production), stream processor for video analysis (Kinesis shard-level parallelism), celebrity recognition, content moderation, text in image, label detection, PPE detection, custom labels model training and deployment, SNS notification for async jobs, KMS encryption, IAM roles, cost per image/video, rate limiting (TPS), and collection size limits. Emits a READY_TO_DEPLOY checklist. Triggers: create rekognition collection, index faces, search faces by image, face search similarity threshold, rekognition stream processor, celebrity recognition, content moderation, ppe detection, custom labels model training, rekognition kms encryption.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with rekognition
-  access. Works with Terraform aws_rekognition_collection /
-  aws_rekognition_stream_processor resources and CloudFormation
-  AWS::Rekognition::Collection templates.
-keywords:
-  - aws
-  - rekognition
-  - face collection
-  - face search
-  - cloudops
-  - deploy
-  - provisioning
-  - stream processor
-  - celebrity recognition
-  - content moderation
-  - label detection
-  - custom labels
-  - kms encryption
-tags:
-  - aws
-  - rekognition
-  - face-collection
-  - cloudops
-  - deploy
-  - ai-ml
-  - provisioning
-  - stream-processor
-  - content-moderation
-  - celebrity-recognition
-  - custom-labels
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with rekognition access. Works with Terraform aws_rekognition_collection / aws_rekognition_stream_processor resources and CloudFormation AWS::Rekognition::Collection templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AI/ML
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - rekognition
-    - face-collection
-    - cloudops
-    - deploy
-    - ai-ml
-    - provisioning
-    - stream-processor
-    - content-moderation
-    - custom-labels
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create rekognition collection
-    - index faces
-    - search faces by image
-    - face search similarity threshold
-    - rekognition stream processor
-    - celebrity recognition
-    - content moderation
-    - ppe detection
-    - custom labels model training
-    - rekognition kms encryption
-  when_to_use: >-
-    Invoke when the user wants to create a Rekognition face collection,
-    index faces, search faces by image or FaceId, set up a stream
-    processor for video analysis, detect labels or text, run content
-    moderation, detect PPE, train and deploy custom labels models,
-    configure celebrity recognition, or integrate Rekognition with
-    Kinesis, SNS, and KMS. Do NOT invoke for Amazon Textract, Amazon
-    Transcribe, or Amazon Comprehend — those are separate services.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, rekognition, face-collection, cloudops, deploy, ai-ml, provisioning, stream-processor, content-moderation, celebrity-recognition, custom-labels
+  dependencies: aws-orchestrator
+  keywords: aws, rekognition, face collection, face search, cloudops, deploy, provisioning, stream processor, celebrity recognition, content moderation, label detection, custom labels, kms encryption
+  when_to_use: Invoke when the user wants to create a Rekognition face collection, index faces, search faces by image or FaceId, set up a stream processor for video analysis, detect labels or text, run content moderation, detect PPE, train and deploy custom labels models, configure celebrity recognition, or integrate Rekognition with Kinesis, SNS, and KMS. Do NOT invoke for Amazon Textract, Amazon Transcribe, or Amazon Comprehend — those are separate services.
 ---
 
 # Rekognition Collection Deployer

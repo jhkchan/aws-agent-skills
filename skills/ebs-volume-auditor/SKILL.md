@@ -1,82 +1,24 @@
 ---
 name: ebs-volume-auditor
-description: >-
-  Audits AWS EBS volumes and EBS snapshots for unencrypted volumes, unattached
-  cost-drift volumes, legacy gp2 volume types (gp3 upgrade path), stale
-  snapshots accumulating storage cost, and public snapshots exposing block
-  data to every AWS account. Emits a deterministic verdict
-  (UNENCRYPTED | UNATTACHED | LEGACY_TYPE | STALE_SNAPSHOT | PUBLIC_SNAPSHOT | OK)
-  per resource with enumerated findings and specific CLI remediation. Use
-  when reviewing EBS volume posture, checking for unencrypted volumes,
-  hunting unattached cost-waste volumes, validating gp2->gp3 upgrade
-  candidates, pruning stale snapshots, or detecting public-snapshot data
-  exposure.
-version: 0.1.1
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS EBS volumes and EBS snapshots for unencrypted volumes, unattached cost-drift volumes, legacy gp2 volume types (gp3 upgrade path), stale snapshots accumulating storage cost, and public snapshots exposing block data to every AWS account. Emits a deterministic verdict (UNENCRYPTED | UNATTACHED | LEGACY_TYPE | STALE_SNAPSHOT | PUBLIC_SNAPSHOT | OK) per resource with enumerated findings and specific CLI remediation. Use when reviewing EBS volume posture, checking for unencrypted volumes, hunting unattached cost-waste volumes, validating gp2->gp3 upgrade candidates, pruning stale snapshots, or detecting public-snapshot data exposure.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline configuration classification.
-  Live-account audits use aws ec2 describe-volumes, aws ec2
-  describe-snapshots, aws ec2 describe-snapshot-tier-status, and aws ec2
-  describe-fast-snapshot-restores (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - EBS
-  - Elastic Block Store
-  - EBS volume
-  - EBS snapshot
-  - unencrypted volume
-  - encryption-by-default
-  - unattached volume
-  - gp2
-  - gp3
-  - io1
-  - io2
-  - provisioned IOPS
-  - stale snapshot
-  - public snapshot
-  - CreateVolumePermission
-  - fast snapshot restore
-  - FSR
-  - cross-region snapshot copy
-  - KMS encryption
-  - volume type upgrade
-  - storage cost optimization
-  - block storage audit
-tags: [ebs, storage, security, encryption, cost-optimization, snapshot, volume-type, public-snapshot, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline configuration classification. Live-account audits use aws ec2 describe-volumes, aws ec2 describe-snapshots, aws ec2 describe-snapshot-tier-status, and aws ec2 describe-fast-snapshot-restores (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
-  verdict_shape: "UNENCRYPTED | UNATTACHED | LEGACY_TYPE | STALE_SNAPSHOT | PUBLIC_SNAPSHOT | OK"
-  when_to_use: >-
-    Reviewing an EBS volume or snapshot before production deployment, hunting
-    unencrypted volumes under compliance mandates (PCI/SOC2/HIPAA), pruning
-    unattached cost-waste volumes, validating gp2->gp3 upgrade candidates,
-    detecting public-snapshot block-data exposure, or auditing EBS encryption
-    and volume-type posture across an account.
-  activation_triggers:
-    - "audit this EBS volume"
-    - "is my EBS volume encrypted"
-    - "unattached EBS volumes"
-    - "gp2 to gp3 upgrade"
-    - "stale EBS snapshots"
-    - "public snapshot exposure"
-    - "EBS cost optimization"
-    - "CreateVolumePermission public"
-    - "EBS encryption and volume-type audit"
-    - "EBS snapshot public access check"
-  invocation_schema: >-
-    Input: either (a) an EBS volume or snapshot configuration (describe-volumes
-    or describe-snapshots JSON, optionally paired with CreateVolumePermissions),
-    OR (b) a volume-id / snapshot-id for live-account audit. Output:
-    deterministic RESOURCE/VERDICT/REASON/FINDINGS/REMEDIATION block per
-    resource, where VERDICT ∈ {UNENCRYPTED, UNATTACHED, LEGACY_TYPE,
-    STALE_SNAPSHOT, PUBLIC_SNAPSHOT, OK, ERROR}.
+  verdict_shape: UNENCRYPTED | UNATTACHED | LEGACY_TYPE | STALE_SNAPSHOT | PUBLIC_SNAPSHOT | OK
+  when_to_use: Reviewing an EBS volume or snapshot before production deployment, hunting unencrypted volumes under compliance mandates (PCI/SOC2/HIPAA), pruning unattached cost-waste volumes, validating gp2->gp3 upgrade candidates, detecting public-snapshot block-data exposure, or auditing EBS encryption and volume-type posture across an account.
+  activation_triggers: audit this EBS volume, is my EBS volume encrypted, unattached EBS volumes, gp2 to gp3 upgrade, stale EBS snapshots, public snapshot exposure, EBS cost optimization, CreateVolumePermission public, EBS encryption and volume-type audit, EBS snapshot public access check
+  invocation_schema: 'Input: either (a) an EBS volume or snapshot configuration (describe-volumes or describe-snapshots JSON, optionally paired with CreateVolumePermissions), OR (b) a volume-id / snapshot-id for live-account audit. Output: deterministic RESOURCE/VERDICT/REASON/FINDINGS/REMEDIATION block per resource, where VERDICT ∈ {UNENCRYPTED, UNATTACHED, LEGACY_TYPE, STALE_SNAPSHOT, PUBLIC_SNAPSHOT, OK, ERROR}.'
+  version: 0.1.1
+  author: Jacky Chan — AWS Community Builder
+  keywords: EBS, Elastic Block Store, EBS volume, EBS snapshot, unencrypted volume, encryption-by-default, unattached volume, gp2, gp3, io1, io2, provisioned IOPS, stale snapshot, public snapshot, CreateVolumePermission, fast snapshot restore, FSR, cross-region snapshot copy, KMS encryption, volume type upgrade, storage cost optimization, block storage audit
+  tags: ebs, storage, security, encryption, cost-optimization, snapshot, volume-type, public-snapshot, audit
 ---
 
 # EBS Volume Auditor

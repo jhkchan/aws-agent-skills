@@ -1,103 +1,26 @@
 ---
 name: cloud9-environment-deployer
-description: >-
-  Provisions AWS Cloud9 environments with production defaults: EC2
-  instance type selection, platform (Amazon Linux, Ubuntu), connection
-  mode (SSH, SSM), subnet and security group configuration, automatic
-  hibernation (idle timeout), IAM role (instance profile), SSH key for
-  external access, environment sharing (read/write permissions), EC2
-  lifecycle (start/stop/delete), CloudWatch monitoring, cost
-  optimization (auto-hibernate), no-ingress SSM connection (no public
-  key needed), integration with CodeCommit/GitHub, Node.js/Python/Go
-  runtime pre-installed. Emits a READY_TO_DEPLOY checklist with
-  verification commands. Use when creating a Cloud9 environment,
-  setting up SSM-based no-ingress Cloud9, configuring auto-hibernation,
-  sharing a Cloud9 environment with a team, or managing Cloud9 EC2
-  lifecycle. Triggers: create cloud9 environment, ssm cloud9 no ingress,
-  cloud9 auto hibernate, cloud9 team sharing, cloud9 ec2 lifecycle,
-  cloud9 ubuntu, cloud9 amazon linux, cloud9 cost optimization.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Cloud9 environments with production defaults: EC2 instance type selection, platform (Amazon Linux, Ubuntu), connection mode (SSH, SSM), subnet and security group configuration, automatic hibernation (idle timeout), IAM role (instance profile), SSH key for external access, environment sharing (read/write permissions), EC2 lifecycle (start/stop/delete), CloudWatch monitoring, cost optimization (auto-hibernate), no-ingress SSM connection (no public key needed), integration with CodeCommit/GitHub, Node.js/Python/Go runtime pre-installed. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Cloud9 environment, setting up SSM-based no-ingress Cloud9, configuring auto-hibernation, sharing a Cloud9 environment with a team, or managing Cloud9 EC2 lifecycle. Triggers: create cloud9 environment, ssm cloud9 no ingress, cloud9 auto hibernate, cloud9 team sharing, cloud9 ec2 lifecycle, cloud9 ubuntu, cloud9 amazon linux, cloud9 cost optimization.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with cloud9 and ec2
-  access (and iam:PassRole for instance profile, ssm for SSM connection
-  mode). Works with Terraform aws_cloud9_environment_ec2 resource and
-  CloudFormation AWS::Cloud9::EnvironmentEC2 templates.
-keywords:
-  - aws
-  - cloud9
-  - cloud9 environment
-  - cloudops
-  - deploy
-  - provisioning
-  - ssm connection
-  - ssh connection
-  - auto hibernate
-  - environment sharing
-  - ec2 lifecycle
-  - cost optimization
-  - no ingress
-  - instance profile
-  - codecommit
-tags:
-  - aws
-  - cloud9
-  - cloudops
-  - deploy
-  - devtools
-  - ide
-  - provisioning
-  - ssm
-  - cost-optimization
-  - sharing
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with cloud9 and ec2 access (and iam:PassRole for instance profile, ssm for SSM connection mode). Works with Terraform aws_cloud9_environment_ec2 resource and CloudFormation AWS::Cloud9::EnvironmentEC2 templates.'
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - cloud9
-    - cloudops
-    - deploy
-    - devtools
-    - ide
-    - provisioning
-    - ssm
-    - cost-optimization
-    - sharing
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create cloud9 environment
-    - ssm cloud9 no ingress
-    - cloud9 auto hibernate
-    - cloud9 team sharing
-    - cloud9 ec2 lifecycle
-    - cloud9 ubuntu
-    - cloud9 amazon linux
-    - cloud9 cost optimization
-  when_to_use: >-
-    Invoke when the user wants to create an AWS Cloud9 environment,
-    configure SSM-based no-ingress connection, set up auto-hibernation
-    for cost optimization, share a Cloud9 environment with team members,
-    manage Cloud9 EC2 lifecycle (start/stop/delete), or integrate
-    Cloud9 with CodeCommit/GitHub. Do NOT invoke for AWS CloudShell
-    (browser-based shell, no provisioning needed), AWS CodeBuild (CI/CD
-    build service), or AWS CodeStar (project management).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, cloud9, cloudops, deploy, devtools, ide, provisioning, ssm, cost-optimization, sharing
+  dependencies: aws-orchestrator
+  keywords: aws, cloud9, cloud9 environment, cloudops, deploy, provisioning, ssm connection, ssh connection, auto hibernate, environment sharing, ec2 lifecycle, cost optimization, no ingress, instance profile, codecommit
+  when_to_use: Invoke when the user wants to create an AWS Cloud9 environment, configure SSM-based no-ingress connection, set up auto-hibernation for cost optimization, share a Cloud9 environment with team members, manage Cloud9 EC2 lifecycle (start/stop/delete), or integrate Cloud9 with CodeCommit/GitHub. Do NOT invoke for AWS CloudShell (browser-based shell, no provisioning needed), AWS CodeBuild (CI/CD build service), or AWS CodeStar (project management).
 ---
 
 # Cloud9 Environment Deployer

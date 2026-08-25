@@ -1,77 +1,24 @@
 ---
 name: ecr-repository-auditor
-description: >-
-  Audits AWS ECR private repositories for public-access exposure via
-  repositoryPolicy, image-scan configuration gaps (scanOnPush off + unscanned
-  images), lifecycle-policy absence, tag-immutability gaps, and encryption
-  posture. Emits a deterministic verdict (PUBLIC | NO_SCAN | NO_LIFECYCLE |
-  CONFIG_GAP | OK) per repository with enumerated findings and specific CLI
-  remediation. Use when reviewing ECR repository policies, checking for public
-  image access, validating scan-on-push enablement, auditing lifecycle rules,
-  or hardening container-image supply-chain posture before production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS ECR private repositories for public-access exposure via repositoryPolicy, image-scan configuration gaps (scanOnPush off + unscanned images), lifecycle-policy absence, tag-immutability gaps, and encryption posture. Emits a deterministic verdict (PUBLIC | NO_SCAN | NO_LIFECYCLE | CONFIG_GAP | OK) per repository with enumerated findings and specific CLI remediation. Use when reviewing ECR repository policies, checking for public image access, validating scan-on-push enablement, auditing lifecycle rules, or hardening container-image supply-chain posture before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline config classification. Live-account
-  audits use aws ecr describe-repositories, aws ecr get-repository-policy,
-  aws ecr describe-images, aws ecr get-lifecycle-policy, and
-  aws ecr put-image-scanning-configuration (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-  - ECR
-  - container registry
-  - repository policy
-  - scanOnPush
-  - image scanning
-  - lifecycle policy
-  - tag immutability
-  - Principal:"*"
-  - cross-account ECR
-  - supply chain security
-  - container image audit
-  - unscanned images
-  - ecr:GetDownloadUrlForLayer
-  - ecr:BatchGetImage
-  - ecr:PutImage
-  - aws:SourceVpce
-  - image vulnerability
-  - KMS encryption ECR
-  - ECR public access
-tags: [ecr, storage, security, container, supply-chain, image-scanning, lifecycle, tag-immutability, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline config classification. Live-account audits use aws ecr describe-repositories, aws ecr get-repository-policy, aws ecr describe-images, aws ecr get-lifecycle-policy, and aws ecr put-image-scanning-configuration (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
-  verdict_shape: "PUBLIC | NO_SCAN | NO_LIFECYCLE | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing an ECR repository before production deployment, checking for
-    public image access via repositoryPolicy, validating scan-on-push
-    enablement, auditing lifecycle-policy coverage, hardening tag immutability,
-    or assessing container supply-chain posture across an account.
-  activation_triggers:
-    - "audit this ECR repository"
-    - "is my ECR repo public"
-    - "check ECR repository policy"
-    - "ECR scanOnPush enabled"
-    - "ECR lifecycle policy"
-    - "unscanned container images"
-    - "tag immutability check"
-    - "ECR cross-account access"
-    - "container image vulnerability scan"
-    - "hardening ECR repository"
-  invocation_schema: >-
-    Input: either (a) an ECR repository configuration bundle (repositoryPolicy
-    JSON + imageScanningConfiguration + imageTagMutability + lifecyclePolicyText
-    + image metadata), OR (b) a repository name/ARN for live-account audit.
-    Output: deterministic REPO/VERDICT/REASON/FINDINGS/REMEDIATION block per
-    repository, where VERDICT is one of {PUBLIC, NO_SCAN, NO_LIFECYCLE,
-    CONFIG_GAP, OK}.
+  verdict_shape: PUBLIC | NO_SCAN | NO_LIFECYCLE | CONFIG_GAP | OK
+  when_to_use: Reviewing an ECR repository before production deployment, checking for public image access via repositoryPolicy, validating scan-on-push enablement, auditing lifecycle-policy coverage, hardening tag immutability, or assessing container supply-chain posture across an account.
+  activation_triggers: audit this ECR repository, is my ECR repo public, check ECR repository policy, ECR scanOnPush enabled, ECR lifecycle policy, unscanned container images, tag immutability check, ECR cross-account access, container image vulnerability scan, hardening ECR repository
+  invocation_schema: 'Input: either (a) an ECR repository configuration bundle (repositoryPolicy JSON + imageScanningConfiguration + imageTagMutability + lifecyclePolicyText + image metadata), OR (b) a repository name/ARN for live-account audit. Output: deterministic REPO/VERDICT/REASON/FINDINGS/REMEDIATION block per repository, where VERDICT is one of {PUBLIC, NO_SCAN, NO_LIFECYCLE, CONFIG_GAP, OK}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: ECR, container registry, repository policy, scanOnPush, image scanning, lifecycle policy, tag immutability, Principal:"*", cross-account ECR, supply chain security, container image audit, unscanned images, ecr:GetDownloadUrlForLayer, ecr:BatchGetImage, ecr:PutImage, aws:SourceVpce, image vulnerability, KMS encryption ECR, ECR public access
+  tags: ecr, storage, security, container, supply-chain, image-scanning, lifecycle, tag-immutability, audit
 ---
 
 # ECR Repository Auditor

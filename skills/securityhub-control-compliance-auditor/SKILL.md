@@ -1,61 +1,22 @@
 ---
 name: securityhub-control-compliance-auditor
-description: >-
-  Audits AWS Security Hub control compliance findings and maps each to a
-  deterministic compliance verdict (FAILED | WARNING | PASSED | NOT_APPLICABLE),
-  then maps every FAILED / WARNING control to a specific fix action. Handles
-  the full Security Hub finding lifecycle — active findings, suppressed
-  findings, resolved-but-still-failing, archived findings, NOT_AVAILABLE with
-  StatusReasons, multi-account aggregation, and cross-standard control
-  families (FSBP, CIS, PCI-DSS, NIST 800-53). Use when reviewing Security Hub
-  control status, triaging a compliance gap report, mapping findings to
-  remediation runbooks, or preparing for an audit / executive compliance
-  summary.
-version: 0.2.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Security Hub control compliance findings and maps each to a deterministic compliance verdict (FAILED | WARNING | PASSED | NOT_APPLICABLE), then maps every FAILED / WARNING control to a specific fix action. Handles the full Security Hub finding lifecycle — active findings, suppressed findings, resolved-but-still-failing, archived findings, NOT_AVAILABLE with StatusReasons, multi-account aggregation, and cross-standard control families (FSBP, CIS, PCI-DSS, NIST 800-53). Use when reviewing Security Hub control status, triaging a compliance gap report, mapping findings to remediation runbooks, or preparing for an audit / executive compliance summary.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline classification — the skill reasons
-  over provided Security Hub finding JSON (ASFF). For live-account audits,
-  AWS CLI v2 with securityhub access (ListEnabledStandards,
-  GetEnabledStandards, GetFindings, batch-update-findings) and SSO or
-  key-based credentials.
-keywords:
-  - Security Hub
-  - compliance
-  - control status
-  - FSBP
-  - Foundational Security Best Practices
-  - CIS Benchmark
-  - PCI-DSS
-  - NIST 800-53
-  - ASFF
-  - finding lifecycle
-  - suppression
-  - remediation runbook
-  - compliance verdict
-  - NOT_AVAILABLE
-  - StatusReasons
-  - Workflow Status
-  - Record State
-  - delegated administrator
-tags: [aws, securityhub, security, compliance, fsbp, cis, pci-dss, nist, audit, remediation, asff]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline classification — the skill reasons over provided Security Hub finding JSON (ASFF). For live-account audits, AWS CLI v2 with securityhub access (ListEnabledStandards, GetEnabledStandards, GetFindings, batch-update-findings) and SSO or key-based credentials.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
-  verdict_shape: "FAILED | WARNING | PASSED | NOT_APPLICABLE"
-  when_to_use: >-
-    Reviewing Security Hub control compliance status, triaging a compliance gap
-    report, mapping findings to remediation actions, auditing finding lifecycle
-    states (suppressed / resolved / archived), preparing for a compliance
-    audit, or generating an executive compliance summary across FSBP / CIS /
-    PCI-DSS / NIST standards.
+  verdict_shape: FAILED | WARNING | PASSED | NOT_APPLICABLE
+  when_to_use: Reviewing Security Hub control compliance status, triaging a compliance gap report, mapping findings to remediation actions, auditing finding lifecycle states (suppressed / resolved / archived), preparing for a compliance audit, or generating an executive compliance summary across FSBP / CIS / PCI-DSS / NIST standards.
+  version: 0.2.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Security Hub, compliance, control status, FSBP, Foundational Security Best Practices, CIS Benchmark, PCI-DSS, NIST 800-53, ASFF, finding lifecycle, suppression, remediation runbook, compliance verdict, NOT_AVAILABLE, StatusReasons, Workflow Status, Record State, delegated administrator
+  tags: aws, securityhub, security, compliance, fsbp, cis, pci-dss, nist, audit, remediation, asff
 ---
 
 # Security Hub Control-Compliance Auditor

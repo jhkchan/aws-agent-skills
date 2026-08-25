@@ -1,55 +1,15 @@
 ---
 name: sqs-dead-letter-troubleshooter
-description: >-
-  Diagnoses Amazon SQS messages accumulating in dead-letter queues through a
-  ten-category diagnostic tree: redrive policy maxReceiveCount too low,
-  processing time exceeding visibility timeout, message size exceeding
-  256 KB, batch receive failures, FIFO message group stuck (poison message
-  blocks entire MessageGroupId), DLQ queue type mismatch (standard DLQ
-  for FIFO source), redrive configuration via StartMessageMoveTask v2,
-  approximate number of messages visible vs not visible, visibility
-  timeout reset semantics, receive request attempt count, Lambda trigger
-  concurrency limits causing throttling and DLQ overflow, and message
-  retention expiry before processing. Walks symptoms to a verified root
-  cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED,
-  INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses Amazon SQS messages accumulating in dead-letter queues through a ten-category diagnostic tree: redrive policy maxReceiveCount too low, processing time exceeding visibility timeout, message size exceeding 256 KB, batch receive failures, FIFO message group stuck (poison message blocks entire MessageGroupId), DLQ queue type mismatch (standard DLQ for FIFO source), redrive configuration via StartMessageMoveTask v2, approximate number of messages visible vs not visible, visibility timeout reset semantics, receive request attempt count, Lambda trigger concurrency limits causing throttling and DLQ overflow, and message retention expiry before processing. Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA.'
 license: Apache-2.0
 compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline queue classification works from pasted queue attributes and message samples. Live-account diagnosis uses aws sqs get-queue-attributes, list-dead-letter-source-queues, receive-message, get-queue-url, aws lambda get-event-source-mapping, aws cloudwatch get-metric-statistics, aws cloudtrail lookup-events, and aws sqs start-message-move-task (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- SQS
-- dead-letter queue
-- DLQ
-- maxReceiveCount
-- redrive policy
-- visibility timeout
-- poison message
-- FIFO
-- MessageGroupId
-- StartMessageMoveTask
-- message redrive
-- approximateNumberOfMessages
-- Lambda trigger
-- throttling
-- message retention
-- troubleshooting
-tags:
-- sqs
-- appintegration
-- troubleshooting
-- dead-letter
-- fifo
-- visibility-timeout
-- redrive
-- lambda-trigger
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: troubleshoot
   skill_class: capability
@@ -57,25 +17,13 @@ metadata:
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
   when_to_use: Diagnosing SQS messages accumulating in a dead-letter queue (maxReceiveCount too low, visibility timeout exceeded, FIFO poison message blocking a group, DLQ type mismatch, Lambda concurrency throttling, message retention expiry), walking a symptom to the failed layer with verify and fix commands, validating why messages are being moved to the DLQ prematurely or in bulk, or planning a redrive from DLQ back to the source queue using StartMessageMoveTask.
   when_not_to_use: SQS queue creation and IaC (use the CloudFormation or Terraform SQS resource docs), SNS-to-SQS subscription debugging (use sns-delivery-troubleshooter), Lambda handler code debugging for message processing failures (use application logs and a debugger), EventBridge-to-SQS target delivery issues (use eventbridge-rule-not-firing-troubleshooter), or IAM policy authoring for SQS access (use iam-least-privilege-advisor). This skill diagnoses DLQ accumulation patterns; it does not author queue policies or debug application handler logic.
-  activation_triggers:
-  - SQS dead-letter queue
-  - SQS DLQ filling
-  - SQS messages in DLQ
-  - SQS maxReceiveCount
-  - SQS redrive policy
-  - SQS visibility timeout exceeded
-  - SQS poison message
-  - SQS FIFO message group stuck
-  - SQS MessageGroupId blocked
-  - SQS start-message-move-task
-  - SQS redrive from DLQ
-  - SQS message retention expired
-  - SQS Lambda throttling DLQ
-  - SQS approximateNumberOfMessages
-  - SQS DLQ not FIFO
-  - troubleshoot SQS dead-letter
+  activation_triggers: SQS dead-letter queue, SQS DLQ filling, SQS messages in DLQ, SQS maxReceiveCount, SQS redrive policy, SQS visibility timeout exceeded, SQS poison message, SQS FIFO message group stuck, SQS MessageGroupId blocked, SQS start-message-move-task, SQS redrive from DLQ, SQS message retention expired, SQS Lambda throttling DLQ, SQS approximateNumberOfMessages, SQS DLQ not FIFO, troubleshoot SQS dead-letter
   invocation_schema: 'Input: either (a) a symptom description ("DLQ filling", "messages not processing", "FIFO queue stuck"), optionally paired with the source queue and DLQ attributes (get-queue-attributes output), OR (b) a QueueURL plus DLQArn for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {MAX_RECEIVE_COUNT_TOO_LOW, VISIBILITY_TIMEOUT_EXCEEDED, MESSAGE_SIZE_LIMIT, BATCH_RECEIVE_FAILURE, FIFO_POISON_MESSAGE, DLQ_TYPE_MISMATCH, REDRIVE_MISCONFIGURED, VISIBILITY_TIMEOUT_RESET, LAMBDA_CONCURRENCY_THROTTLE, MESSAGE_RETENTION_EXPIRED, UNKNOWN}.'
   invocation_example: "# Minimal valid input (offline queue classification):\nSymptom: \"SQS source queue orders-queue is draining slowly\nand its DLQ orders-dlq has accumulated 8000 messages in the\nlast hour. The consumer is a Lambda function with a 30s\ntimeout. maxReceiveCount is set to 3.\"\nSourceQueueURL: https://sqs.us-east-1.amazonaws.com/111111111111/orders-queue\nDLQArn: arn:aws:sqs:us-east-1:111111111111:orders-dlq\nRedrivePolicy: {deadLetterTargetArn: \"arn:...orders-dlq\",\n  maxReceiveCount: \"3\"}\nVisibilityTimeout: 30\nMessageRetentionPeriod: 1209600\nLambda Timeout: 30\nLambda EventSourceMapping BatchSize: 10"
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: SQS, dead-letter queue, DLQ, maxReceiveCount, redrive policy, visibility timeout, poison message, FIFO, MessageGroupId, StartMessageMoveTask, message redrive, approximateNumberOfMessages, Lambda trigger, throttling, message retention, troubleshooting
+  tags: sqs, appintegration, troubleshooting, dead-letter, fifo, visibility-timeout, redrive, lambda-trigger
 ---
 
 # SQS Dead-Letter Troubleshooter

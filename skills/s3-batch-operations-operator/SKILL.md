@@ -1,108 +1,27 @@
 ---
 name: s3-batch-operations-operator
-description: >-
-  Operates S3 Batch Operations at scale — job creation across operation
-  types (copy, replace tag, restore from Glacier, replicate, invoke
-  Lambda, put ACL, put object lock retention, put legal hold), manifest
-  formats (S3 inventory report or CSV), completion reports, job priority
-  and rate control (RequestsPerSecond), IAM permissions (batchoperations:*
-  plus operation-specific grants), Lambda invoke for custom per-object
-  processing, bulk storage class transition, bulk ACL fix, bulk
-  replication backfill, bulk decrypt + re-encrypt with new KMS key, S3
-  Tables Batch Operations, and large-job handling for billion-object
-  manifests. Runs deterministic pre-checks (manifest readability, report
-  bucket writability, IAM chain, KMS decrypt/encrypt, Lambda invoke,
-  rate-control) behind a CONFIRM gate and emits READY, BLOCKED, or
-  COMPLETED per job. Use when running bulk object transformations,
-  restoring Glacier archives at scale, backfilling replication, rotating
-  KMS keys, or invoking a custom Lambda across billions of objects.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates S3 Batch Operations at scale — job creation across operation types (copy, replace tag, restore from Glacier, replicate, invoke Lambda, put ACL, put object lock retention, put legal hold), manifest formats (S3 inventory report or CSV), completion reports, job priority and rate control (RequestsPerSecond), IAM permissions (batchoperations:* plus operation-specific grants), Lambda invoke for custom per-object processing, bulk storage class transition, bulk ACL fix, bulk replication backfill, bulk decrypt + re-encrypt with new KMS key, S3 Tables Batch Operations, and large-job handling for billion-object manifests. Runs deterministic pre-checks (manifest readability, report bucket writability, IAM chain, KMS decrypt/encrypt, Lambda invoke, rate-control) behind a CONFIRM gate and emits READY, BLOCKED, or COMPLETED per job. Use when running bulk object transformations, restoring Glacier archives at scale, backfilling replication, rotating KMS keys, or invoking a custom Lambda across billions of objects.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws s3control create-job, describe-job, update-job-priority,
-  update-job-status, aws s3api list-bucket-inventory-configurations,
-  get-bucket-location, get-bucket-versioning, aws lambda get-policy,
-  aws iam list-attached-role-policies / list-role-policies, aws kms
-  describe-key / get-key-policy, and aws logs filter-log-events (AWS CLI
-  v2, SSO or key-based credentials).
-keywords:
-  - S3 Batch Operations
-  - create-job
-  - manifest
-  - S3 inventory report
-  - CSV manifest
-  - completion report
-  - job priority
-  - RequestsPerSecond
-  - rate control
-  - copy operation
-  - replace tag
-  - restore from Glacier
-  - replicate operation
-  - invoke Lambda
-  - put ACL
-  - object lock retention
-  - object lock legal hold
-  - bulk storage class transition
-  - bulk ACL fix
-  - bulk replication backfill
-  - bulk KMS re-encrypt
-  - S3 Tables
-  - billion objects
-  - batchoperations
-  - s3:GetObject
-  - s3:PutObject
-tags: [aws, s3, s3control, storage, batch, bulk, glacier, kms, lambda, object-lock, replication, operate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws s3control create-job, describe-job, update-job-priority, update-job-status, aws s3api list-bucket-inventory-configurations, get-bucket-location, get-bucket-versioning, aws lambda get-policy, aws iam list-attached-role-policies / list-role-policies, aws kms describe-key / get-key-policy, and aws logs filter-log-events (AWS CLI...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Creating an S3 Batch Operations job (copy, replace tag, restore from
-    Glacier, replicate, invoke Lambda, put ACL, put object lock retention,
-    put object lock legal hold), diagnosing a failed or stalled job,
-    cancelling a runaway job, adjusting job priority or rate control,
-    backfilling replication across existing objects, bulk-transitioning
-    storage class, bulk-rotating KMS keys via decrypt + re-encrypt, invoking
-    a custom Lambda across a manifest of objects, or planning a billion-
-    object batch run with safe rate limits.
-  activation_triggers:
-    - "S3 Batch Operations"
-    - "batch copy objects"
-    - "bulk restore Glacier"
-    - "bulk replace tags"
-    - "batch invoke Lambda"
-    - "bulk replication backfill"
-    - "bulk KMS re-encrypt"
-    - "bulk storage class transition"
-    - "put object lock retention batch"
-    - "batch operations manifest"
-    - "S3 inventory manifest"
-    - "CSV manifest"
-    - "completion report"
-    - "RequestsPerSecond batch"
-    - "cancel batch job"
-    - "update job priority"
-    - "S3 Tables batch operations"
-    - "billion objects batch"
-  invocation_schema: >-
-    Input: either (a) a job specification (operation type, source bucket,
-    manifest format and location, report bucket, IAM role ARN, operation-
-    specific parameters, priority, rate control) for plan classification,
-    OR (b) a JobId for live-account diagnose or cancel operations. Output:
-    deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY /
-    NOTES block per job, where VERDICT is one of READY, BLOCKED, COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Creating an S3 Batch Operations job (copy, replace tag, restore from Glacier, replicate, invoke Lambda, put ACL, put object lock retention, put object lock legal hold), diagnosing a failed or stalled job, cancelling a runaway job, adjusting job priority or rate control, backfilling replication across existing objects, bulk-transitioning storage class, bulk-rotating KMS keys via decrypt + re-encrypt, invoking a custom Lambda across a manifest of objects, or planning a billion- object batch run with safe rate limits.
+  activation_triggers: S3 Batch Operations, batch copy objects, bulk restore Glacier, bulk replace tags, batch invoke Lambda, bulk replication backfill, bulk KMS re-encrypt, bulk storage class transition, put object lock retention batch, batch operations manifest, S3 inventory manifest, CSV manifest, completion report, RequestsPerSecond batch, cancel batch job, update job priority, S3 Tables batch operations, billion objects batch
+  invocation_schema: 'Input: either (a) a job specification (operation type, source bucket, manifest format and location, report bucket, IAM role ARN, operation- specific parameters, priority, rate control) for plan classification, OR (b) a JobId for live-account diagnose or cancel operations. Output: deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per job, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: S3 Batch Operations, create-job, manifest, S3 inventory report, CSV manifest, completion report, job priority, RequestsPerSecond, rate control, copy operation, replace tag, restore from Glacier, replicate operation, invoke Lambda, put ACL, object lock retention, object lock legal hold, bulk storage class transition, bulk ACL fix, bulk replication backfill, bulk KMS re-encrypt, S3 Tables, billion objects, batchoperations, s3:GetObject, s3:PutObject
+  tags: aws, s3, s3control, storage, batch, bulk, glacier, kms, lambda, object-lock, replication, operate
 ---
 
 # S3 Batch Operations Operator

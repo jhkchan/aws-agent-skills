@@ -1,100 +1,28 @@
 ---
 name: athena-query-optimizer
-description: >-
-  Optimizes Amazon Athena query performance and cost via a layered analysis
-  framework covering partitioning (partition projection, dynamic partition
-  pruning), file format selection (Parquet vs CSV vs JSON — Parquet is 10-100x
-  faster via columnar pruning), compression (Snappy vs GZIP vs ZSTD),
-  bucketing for JOIN optimization, workgroup settings (data scanned limits,
-  query timeout), CTAS (CREATE TABLE AS SELECT for materialization), query
-  rewriting (avoid SELECT *, enforce partition filters, use APPROXIMATE
-  functions), and cost modeling ($5/TB scanned). Supports Athena query result
-  reuse, Athena federated queries, and Spark notebook integration. Emits a
-  deterministic verdict (OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL) with
-  estimated cost and performance impact. Use for Athena cost reduction, slow
-  query tuning, partition projection setup, file format migration, or workgroup
-  spend limits.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Optimizes Amazon Athena query performance and cost via a layered analysis framework covering partitioning (partition projection, dynamic partition pruning), file format selection (Parquet vs CSV vs JSON — Parquet is 10-100x faster via columnar pruning), compression (Snappy vs GZIP vs ZSTD), bucketing for JOIN optimization, workgroup settings (data scanned limits, query timeout), CTAS (CREATE TABLE AS SELECT for materialization), query rewriting (avoid SELECT *, enforce partition filters, use APPROXIMATE functions), and cost modeling ($5/TB scanned). Supports Athena query result reuse, Athena federated queries, and Spark notebook integration. Emits a deterministic verdict (OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL) with estimated cost and performance impact. Use for Athena cost reduction, slow query tuning, partition projection setup, file format migration, or workgroup spend limits.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Offline recommendation classification works from pasted DDL, EXPLAIN
-  output, and query history. Live-account optimization uses aws athena
-  get-query-execution, start-query-execution, batch-get-query-execution,
-  get-work-group, aws ce get-cost-and-usage for Athena spend, aws glue
-  get-table, get-partitions for table metadata, and aws s3 ls for data lake
-  layout inspection (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Athena
-  - query optimization
-  - partitioning
-  - partition projection
-  - Parquet
-  - columnar format
-  - Snappy
-  - compression
-  - bucketing
-  - workgroup
-  - data scanned
-  - CTAS
-  - materialization
-  - SELECT *
-  - APPROXIMATE
-  - $5/TB
-  - result reuse
-  - federated queries
-  - Spark notebook
-tags: [aws, athena, analytics, optimize, query-performance, cost-optimization, partitioning, parquet]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted DDL, EXPLAIN output, and query history. Live-account optimization uses aws athena get-query-execution, start-query-execution, batch-get-query-execution, get-work-group, aws ce get-cost-and-usage for Athena spend, aws glue get-table, get-partitions for table metadata, and aws s3 ls for data lake layout inspection (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL"
-  when_to_use: >-
-    Optimizing Athena query performance and cost: reducing data scanned via
-    partitioning and columnar formats, setting up partition projection,
-    evaluating CTAS for materialization, tuning workgroup settings (data
-    scanned limits, query timeout), rewriting queries (avoid SELECT *, add
-    partition filters, use APPROXIMATE functions), or planning a file format
-    migration from CSV/JSON to Parquet.
-  when_not_to_use: >-
-    Troubleshooting Athena query failures (use a troubleshoot skill), auditing
-    Athena workgroup security (use the audit-athena-workgroup skill), building
-    a data lake from scratch (use a deploy skill), or Athena Glue crawler
-    troubleshooting (use a Glue troubleshoot skill). This skill focuses on
-    performance and cost optimization.
-  activation_triggers:
-    - "optimize Athena query"
-    - "Athena query slow"
-    - "Athena cost reduction"
-    - "Athena partition projection"
-    - "Athena file format Parquet"
-    - "Athena CTAS optimization"
-    - "Athena data scanned limit"
-    - "Athena workgroup settings"
-    - "Athena SELECT * optimization"
-    - "Athena $5/TB scanned"
-    - "Athena result reuse"
-    - "Athena federated query"
-    - "reduce Athena spend"
-    - "Athena query timeout"
-    - "Athena bucketing"
-  invocation_schema: >-
-    Input: either (a) an Athena query or workload description with table DDL
-    and query patterns, OR (b) live-account context with workgroup, database,
-    table, and query history. Output: a deterministic TARGET / VERDICT / REASON
-    / RECOMMENDATION / ESTIMATED_SAVINGS / MIGRATION_STEPS block where VERDICT
-    is one of {OPTIMIZED, OPPORTUNITY_FOUND, ALREADY_OPTIMAL} and
-    RECOMMENDATION includes file format, partitioning strategy, query rewrite,
-    workgroup config, and materialization (CTAS) guidance.
+  verdict_shape: OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL
+  when_to_use: 'Optimizing Athena query performance and cost: reducing data scanned via partitioning and columnar formats, setting up partition projection, evaluating CTAS for materialization, tuning workgroup settings (data scanned limits, query timeout), rewriting queries (avoid SELECT *, add partition filters, use APPROXIMATE functions), or planning a file format migration from CSV/JSON to Parquet.'
+  when_not_to_use: Troubleshooting Athena query failures (use a troubleshoot skill), auditing Athena workgroup security (use the audit-athena-workgroup skill), building a data lake from scratch (use a deploy skill), or Athena Glue crawler troubleshooting (use a Glue troubleshoot skill). This skill focuses on performance and cost optimization.
+  activation_triggers: optimize Athena query, Athena query slow, Athena cost reduction, Athena partition projection, Athena file format Parquet, Athena CTAS optimization, Athena data scanned limit, Athena workgroup settings, Athena SELECT * optimization, Athena $5/TB scanned, Athena result reuse, Athena federated query, reduce Athena spend, Athena query timeout, Athena bucketing
+  invocation_schema: 'Input: either (a) an Athena query or workload description with table DDL and query patterns, OR (b) live-account context with workgroup, database, table, and query history. Output: a deterministic TARGET / VERDICT / REASON / RECOMMENDATION / ESTIMATED_SAVINGS / MIGRATION_STEPS block where VERDICT is one of {OPTIMIZED, OPPORTUNITY_FOUND, ALREADY_OPTIMAL} and RECOMMENDATION includes file format, partitioning strategy, query rewrite, workgroup config, and materialization (CTAS) guidance.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Athena, query optimization, partitioning, partition projection, Parquet, columnar format, Snappy, compression, bucketing, workgroup, data scanned, CTAS, materialization, SELECT *, APPROXIMATE, $5/TB, result reuse, federated queries, Spark notebook
+  tags: aws, athena, analytics, optimize, query-performance, cost-optimization, partitioning, parquet
 ---
 
 # Athena Query Optimizer

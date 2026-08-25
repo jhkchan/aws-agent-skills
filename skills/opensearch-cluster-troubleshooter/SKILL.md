@@ -1,120 +1,49 @@
 ---
 name: opensearch-cluster-troubleshooter
-description: >-
-  Diagnoses Amazon OpenSearch Service cluster incidents across eleven
-  failure categories: ClusterBlockException from disk watermark
-  breach (85% flood-stage read-only block, 90% / 95% allocation
-  freeze), JVM heap pressure above 75% triggering old-gen GC storms
-  and OutOfMemoryError, thread-pool rejections on the search and write
-  queues, shard allocation failures and unassigned shards, cluster
-  yellow / red status, split-brain from lost quorum, slow-log analysis
-  for heavy queries and mapping explosion (too many fields), circuit
-  breaker errors (parent, fielddata, request), index deletion during
-  snapshot, cold-node to hot-node migration failures, and version
-  upgrade rollback scenarios. Walks symptoms to a verified root cause
-  with evidence-backed probes and emits ROOT_CAUSE_IDENTIFIED or
-  INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses Amazon OpenSearch Service cluster incidents across eleven failure categories: ClusterBlockException from disk watermark breach (85% flood-stage read-only block, 90% / 95% allocation freeze), JVM heap pressure above 75% triggering old-gen GC storms and OutOfMemoryError, thread-pool rejections on the search and write queues, shard allocation failures and unassigned shards, cluster yellow / red status, split-brain from lost quorum, slow-log analysis for heavy queries and mapping explosion (too many fields), circuit breaker errors (parent, fielddata, request), index deletion during snapshot, cold-node to hot-node migration failures, and version upgrade rollback scenarios. Walks symptoms to a verified root cause with evidence-backed probes and emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and cluster health output. Live-account diagnosis uses
-  aws opensearch describe-domain, describe-domain-config, list-domain-names, aws es describe-elasticsearch-domain (legacy), aws cloudwatch get-metric-statistics on the AWS/ES namespace, aws s3 ls for snapshot
-  repositories, the _cluster/health, _cat/shards, _cat/allocation, _cat/thread_pool, _nodes/stats, and _cluster/settings OS APIs, and aws logs filter-log-events on the OpenSearch application logs (AWS CLI v2, SSO
-  or key-based credentials).
-keywords:
-- OpenSearch
-- Elasticsearch
-- ClusterBlockException
-- disk watermark
-- flood stage
-- JVM heap pressure
-- old gen GC
-- OutOfMemoryError
-- thread pool rejection
-- search queue
-- write queue
-- unassigned shards
-- cluster red
-- cluster yellow
-- split-brain
-- slow log
-- mapping explosion
-- circuit breaker
-- parent circuit breaker
-- fielddata circuit breaker
-- index deletion during snapshot
-- cold node
-- hot node
-- UltraWarm
-- migration failure
-- upgrade rollback
-- troubleshooting
-tags:
-- opensearch
-- analytics
-- troubleshooting
-- cluster-health
-- disk-watermark
-- jvm-heap
-- thread-pool
-- shard-allocation
-- circuit-breaker
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and cluster health output. Live-account diagnosis uses aws opensearch describe-domain, describe-domain-config, list-domain-names, aws es describe-elasticsearch-domain (legacy), aws cloudwatch get-metric-statistics on the AWS/ES namespace, aws s3 ls for snapshot repositories, the _cluster/health, _cat/shards, _cat/allocation, _cat/thread_pool...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
-  when_to_use: Diagnosing an Amazon OpenSearch Service cluster incident — ClusterBlockException (read-only block, write block), cluster status red or yellow, JVM heap pressure alarms, search or write thread-pool
-    rejections, unassigned shards, shard allocation failures, circuit breaker trips (parent / fielddata / request), slow-query investigations, mapping explosion (too many fields), index deletion blocked by an
-    in-progress snapshot, cold-to-hot storage migration failures, an in-place upgrade rollback, or a split-brain event. Use whenever the symptom is cluster-wide (not a single index mapping question) and the
-    operator needs the failing subsystem named with positive evidence.
-  when_not_to_use: Index mapping design or analyzer tuning (use the OpenSearch _mapping API and the index mapping reference), application-side query authoring (use the search DSL and slow logs), OpenSearch
-    Serverless collection incidents (use a Serverless-specific skill — this skill targets managed OpenSearch Service domains only), VPC endpoint posture audits for the OpenSearch domain (use
-    ec2-security-group-auditor), or IAM fine-grained-access-control user/role provisioning (use iam-least-privilege-advisor). This skill diagnoses cluster-health incidents; it does not design mappings or audit
-    steady-state access posture.
-  activation_triggers:
-  - OpenSearch ClusterBlockException
-  - OpenSearch cluster red
-  - OpenSearch cluster yellow
-  - OpenSearch disk watermark
-  - OpenSearch flood stage disk.watermark.flood
-  - OpenSearch JVM heap pressure
-  - OpenSearch OutOfMemoryError
-  - OpenSearch old gen GC
-  - OpenSearch thread pool rejected
-  - OpenSearch search queue rejected
-  - OpenSearch write queue rejected
-  - OpenSearch unassigned shards
-  - OpenSearch shard allocation failed
-  - OpenSearch circuit breaker
-  - OpenSearch parent breaker tripped
-  - OpenSearch fielddata circuit breaker
-  - OpenSearch mapping explosion
-  - OpenSearch too many fields
-  - OpenSearch slow query
-  - OpenSearch slow log
-  - OpenSearch index delete during snapshot
-  - OpenSearch snapshot in progress
-  - OpenSearch UltraWarm migration failed
-  - OpenSearch cold node to hot node
-  - OpenSearch upgrade rollback
-  - OpenSearch split-brain
-  - troubleshoot OpenSearch cluster
-  invocation_schema: 'Input: either (a) a symptom description (error message from a client, observed cluster status, an alarm name), optionally paired with the _cluster/health output, _cat/shards output, and recent
-    CloudWatch metrics, OR (b) a DomainName plus caller context (region, observed error) for live-account diagnosis. Output: a deterministic TARGET / VERDICT / ROOT_CAUSE / LAYER / EVIDENCE / REMEDIATION block
-    where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {DISK_WATERMARK_FLOOD, DISK_WATERMARK_HIGH, JVM_HEAP_PRESSURE, JVM_OOM, THREAD_POOL_SEARCH, THREAD_POOL_WRITE, SHARD_ALLOCATION,
-    CLUSTER_YELLOW, CLUSTER_RED, SPLIT_BRAIN, SLOW_QUERY, MAPPING_EXPLOSION, CIRCUIT_BREAKER_PARENT, CIRCUIT_BREAKER_FIELDDATA, CIRCUIT_BREAKER_REQUEST, SNAPSHOT_BLOCKING_DELETE, COLD_HOT_MIGRATION,
-    UPGRADE_ROLLBACK, UNKNOWN}.'
-  invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"OpenSearch domain prod-logs-cluster returns\nClusterBlockException: blocked by: [FORBIDDEN/12/index read-only / delete\n\
-    admin api];\" the cluster status is yellow and writes are failing.\nDomainName: prod-logs-cluster\nEngineVersion: OpenSearch_2.13\nClusterStatus: yellow\nHotDataNodes: 3 (r6g.large.search)\nMasterNodes:\
-    \ 3\nEBSVolumeSize: 100 GB per node\nLastCloudWatchAlarm: ClusterIndexWritesBlocked > 0 for 12 minutes"
+  when_to_use: Diagnosing an Amazon OpenSearch Service cluster incident — ClusterBlockException (read-only block, write block), cluster status red or yellow, JVM heap pressure alarms, search or write thread-pool rejections, unassigned shards, shard allocation failures, circuit breaker trips (parent / fielddata / request), slow-query investigations, mapping explosion (too many fields), index deletion blocked by an in-progress snapshot, cold-to-hot storage migration failures, an in-place upgrade rollback, or a split-brain event. Use whenever the symptom is cluster-wide (not a single index mapping question) and the operator needs the failing subsystem named with positive evidence.
+  when_not_to_use: Index mapping design or analyzer tuning (use the OpenSearch _mapping API and the index mapping reference), application-side query authoring (use the search DSL and slow logs), OpenSearch Serverless collection incidents (use a Serverless-specific skill — this skill targets managed OpenSearch Service domains only), VPC endpoint posture audits for the OpenSearch domain (use ec2-security-group-auditor), or IAM fine-grained-access-control user/role provisioning (use iam-least-privilege-advisor). This skill diagnoses cluster-health incidents; it does not design mappings or audit steady-state access posture.
+  activation_triggers: OpenSearch ClusterBlockException, OpenSearch cluster red, OpenSearch cluster yellow, OpenSearch disk watermark, OpenSearch flood stage disk.watermark.flood, OpenSearch JVM heap pressure, OpenSearch OutOfMemoryError, OpenSearch old gen GC, OpenSearch thread pool rejected, OpenSearch search queue rejected, OpenSearch write queue rejected, OpenSearch unassigned shards, OpenSearch shard allocation failed, OpenSearch circuit breaker, OpenSearch parent breaker tripped, OpenSearch fielddata circuit breaker, OpenSearch mapping explosion, OpenSearch too many fields, OpenSearch slow query, OpenSearch slow log, OpenSearch index delete during snapshot, OpenSearch snapshot in progress, OpenSearch UltraWarm migration failed, OpenSearch cold node to hot node, OpenSearch upgrade rollback, OpenSearch split-brain, troubleshoot OpenSearch cluster
+  invocation_schema: 'Input: either (a) a symptom description (error message from a client, observed cluster status, an alarm name), optionally paired with the _cluster/health output, _cat/shards output, and recent CloudWatch metrics, OR (b) a DomainName plus caller context (region, observed error) for live-account diagnosis. Output: a deterministic TARGET / VERDICT / ROOT_CAUSE / LAYER / EVIDENCE / REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {DISK_WATERMARK_FLOOD, DISK_WATERMARK_HIGH, JVM_HEAP_PRESSURE, JVM_OOM, THREAD_POOL_SEARCH, THREAD_POOL_WRITE, SHARD_ALLOCATION, CLUSTER_YELLOW, CLUSTER_RED, SPLIT_BRAIN, SLOW_QUERY, MAPPING_EXPLOSION, CIRCUIT_BREAKER_PARENT, CIRCUIT_BREAKER_FIELDDATA, CIRCUIT_BREAKER_REQUEST, SNAPSHOT_BLOCKING_DELETE, COLD_HOT_MIGRATION, UPGRADE_ROLLBACK, UNKNOWN}.'
+  invocation_example: '# Minimal valid input (offline symptom classification):
+
+    Symptom: "OpenSearch domain prod-logs-cluster returns
+
+    ClusterBlockException: blocked by: [FORBIDDEN/12/index read-only / delete
+
+    admin api];" the cluster status is yellow and writes are failing.
+
+    DomainName: prod-logs-cluster
+
+    EngineVersion: OpenSearch_2.13
+
+    ClusterStatus: yellow
+
+    HotDataNodes: 3 (r6g.large.search)
+
+    MasterNodes: 3
+
+    EBSVolumeSize: 100 GB per node
+
+    LastCloudWatchAlarm: ClusterIndexWritesBlocked > 0 for 12 minutes'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: OpenSearch, Elasticsearch, ClusterBlockException, disk watermark, flood stage, JVM heap pressure, old gen GC, OutOfMemoryError, thread pool rejection, search queue, write queue, unassigned shards, cluster red, cluster yellow, split-brain, slow log, mapping explosion, circuit breaker, parent circuit breaker, fielddata circuit breaker, index deletion during snapshot, cold node, hot node, UltraWarm, migration failure, upgrade rollback, troubleshooting
+  tags: opensearch, analytics, troubleshooting, cluster-health, disk-watermark, jvm-heap, thread-pool, shard-allocation, circuit-breaker
 ---
 
 # OpenSearch Cluster Troubleshooter

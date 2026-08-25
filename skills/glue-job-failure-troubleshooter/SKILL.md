@@ -1,72 +1,15 @@
 ---
 name: glue-job-failure-troubleshooter
-description: >-
-  Diagnoses AWS Glue job failures through a fifteen-layer diagnostic
-  tree: ETL script errors (PySpark/Scala exceptions), DPU allocation
-  insufficient (executor YARN OOM, max capacity reached), Python shell
-  vs Spark shell errors, Data Catalog table not found, S3 source data
-  path wrong, partition not loaded (MSCK REPAIR missing), bookmark
-  errors (state corrupted or partition-key mismatch), JDBC connection
-  errors (Glue connection / security group to RDS/Redshift), dynamic
-  frame vs RDD performance, CloudWatch Logs not enabled, job timeout
-  (default 2.5h), worker type mismatch (G.1X vs G.2X vs G.025X), job
-  metrics analysis, and Spark UI DAG inspection. Walks symptoms to a
-  verified root cause with evidence-backed read-only probes; emits
-  ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses AWS Glue job failures through a fifteen-layer diagnostic tree: ETL script errors (PySpark/Scala exceptions), DPU allocation insufficient (executor YARN OOM, max capacity reached), Python shell vs Spark shell errors, Data Catalog table not found, S3 source data path wrong, partition not loaded (MSCK REPAIR missing), bookmark errors (state corrupted or partition-key mismatch), JDBC connection errors (Glue connection / security group to RDS/Redshift), dynamic frame vs RDD performance, CloudWatch Logs not enabled, job timeout (default 2.5h), worker type mismatch (G.1X vs G.2X vs G.025X), job metrics analysis, and Spark UI DAG inspection. Walks symptoms to a verified root cause with evidence-backed read-only probes; emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 license: Apache-2.0
 compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and job configuration. Live-account diagnosis uses aws glue get-job, get-job-run, get-job-runs, get-security-configuration, batch-get-jobs, aws logs get-log-events / filter-log-events, aws glue get-table / get-partitions, aws glue get-connection, aws ec2 describe-security-groups, and aws s3 ls / head-object (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- AWS Glue
-- Glue job
-- PySpark
-- Scala
-- DPU
-- executor
-- YARN
-- out of memory
-- Python shell
-- Spark shell
-- Data Catalog
-- table not found
-- S3 source path
-- partition
-- MSCK REPAIR
-- job bookmark
-- bookmark corrupted
-- JDBC connection
-- RDS
-- Redshift
-- security group
-- dynamic frame
-- CloudWatch Logs
-- job timeout
-- worker type
-- G.1X
-- G.2X
-- G.025X
-- job metrics
-- Spark UI
-- troubleshooting
-tags:
-- glue
-- analytics
-- troubleshooting
-- etl
-- spark
-- job-failure
-- dpu
-- bookmark
-- jdbc
-- worker-type
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: troubleshoot
   skill_class: capability
@@ -74,27 +17,37 @@ metadata:
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
   when_to_use: Diagnosing an AWS Glue job failure (job run transitions to FAILED, executor YARN kills container for OOM, Data Catalog table not found, S3 source path returns no data, partitions not loaded after MSCK REPAIR, job bookmark reprocessing all data on every run, JDBC connection to RDS/Redshift times out, job exceeds the 2.5h default timeout, G.025X worker too weak for the Spark workload, or CloudWatch Logs are empty). Use when the symptom is "the Glue job failed" and the cause may be DPU allocation, worker type, bookmark state, JDBC connection, partition loading, script error, or worker-type mismatch.
   when_not_to_use: Provisioning a new Glue job (use glue-crawler-deployer for crawlers or the job deployer), Glue Data Quality rule evaluation (use the Data Quality skill), Glue Studio notebook interactive development (use the notebook tooling), or Athena query failures (use athena-query-optimizer). This skill diagnoses job-run failures at execution time; it does not provision or tune steady-state ETL pipelines.
-  activation_triggers:
-  - Glue job FAILED
-  - Glue executor YARN killed container
-  - Glue out of memory
-  - Glue container killed by YARN
-  - Glue Data Catalog table not found
-  - Glue S3 source path wrong
-  - Glue partition not loaded
-  - MSCK REPAIR TABLE
-  - Glue job bookmark corrupted
-  - Glue bookmark reprocessing all data
-  - Glue JDBC connection error
-  - Glue cannot connect to RDS
-  - Glue cannot connect to Redshift
-  - Glue job timeout
-  - Glue worker type wrong
-  - Glue G.025X too weak
-  - Glue CloudWatch Logs empty
-  - troubleshoot Glue job failure
+  activation_triggers: Glue job FAILED, Glue executor YARN killed container, Glue out of memory, Glue container killed by YARN, Glue Data Catalog table not found, Glue S3 source path wrong, Glue partition not loaded, MSCK REPAIR TABLE, Glue job bookmark corrupted, Glue bookmark reprocessing all data, Glue JDBC connection error, Glue cannot connect to RDS, Glue cannot connect to Redshift, Glue job timeout, Glue worker type wrong, Glue G.025X too weak, Glue CloudWatch Logs empty, troubleshoot Glue job failure
   invocation_schema: 'Input: either (a) a symptom description ("Glue job failed with executor OOM", "bookmark reprocesses all data every run", "JDBC connection times out"), optionally paired with the job configuration (JobName, worker type, DPU count, script path), OR (b) a JobName plus JobRunId and the CloudWatch Logs error for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {GLUE_ETL_SCRIPT_ERROR, GLUE_DPU_INSUFFICIENT, GLUE_PYTHON_SHELL_ERROR, GLUE_SPARK_SHELL_ERROR, GLUE_DATA_CATALOG_TABLE_NOT_FOUND, GLUE_S3_SOURCE_PATH_WRONG, GLUE_PARTITION_NOT_LOADED, GLUE_BOOKMARK_CORRUPTED, GLUE_JDBC_CONNECTION_ERROR, GLUE_DYNAMIC_FRAME_PERFORMANCE, GLUE_CLOUDWATCH_LOGS_DISABLED, GLUE_JOB_TIMEOUT, GLUE_WORKER_TYPE_WRONG, GLUE_JOB_METRICS_ANALYSIS, GLUE_SPARK_UI_DAG, UNKNOWN}.'
-  invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"Glue job etl-daily-orders failed at 03:17 UTC. CloudWatch\nLogs show 'Container killed by YARN for exceeding memory limits'.\nThe job runs on G.1X with 10 workers. The same job succeeded last\nweek on a smaller dataset.\"\nJobName: etl-daily-orders\nJobRunId: jr_abc123\nWorkerType: G.1X\nNumberOfWorkers: 10\nTimeout: 150 (minutes, default 2.5h)\nGlueVersion: glue-4.0\nLast successful run: 2026-08-03 (dataset was 50 GB)\nFailed run dataset: 250 GB (5x growth)"
+  invocation_example: '# Minimal valid input (offline symptom classification):
+
+    Symptom: "Glue job etl-daily-orders failed at 03:17 UTC. CloudWatch
+
+    Logs show ''Container killed by YARN for exceeding memory limits''.
+
+    The job runs on G.1X with 10 workers. The same job succeeded last
+
+    week on a smaller dataset."
+
+    JobName: etl-daily-orders
+
+    JobRunId: jr_abc123
+
+    WorkerType: G.1X
+
+    NumberOfWorkers: 10
+
+    Timeout: 150 (minutes, default 2.5h)
+
+    GlueVersion: glue-4.0
+
+    Last successful run: 2026-08-03 (dataset was 50 GB)
+
+    Failed run dataset: 250 GB (5x growth)'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Glue, Glue job, PySpark, Scala, DPU, executor, YARN, out of memory, Python shell, Spark shell, Data Catalog, table not found, S3 source path, partition, MSCK REPAIR, job bookmark, bookmark corrupted, JDBC connection, RDS, Redshift, security group, dynamic frame, CloudWatch Logs, job timeout, worker type, G.1X, G.2X, G.025X, job metrics, Spark UI, troubleshooting
+  tags: glue, analytics, troubleshooting, etl, spark, job-failure, dpu, bookmark, jdbc, worker-type
 ---
 
 # Glue Job Failure Troubleshooter

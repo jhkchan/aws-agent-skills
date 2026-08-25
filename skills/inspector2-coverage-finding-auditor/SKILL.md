@@ -1,76 +1,22 @@
 ---
 name: inspector2-coverage-finding-auditor
-description: >-
-  Audits Amazon Inspector2 coverage gaps and finding severity to determine
-  whether EC2 instances, ECR repositories, and Lambda functions are
-  effectively scanned and free of exploitable vulnerabilities or
-  misconfigurations. Classifies each resource into a single
-  CRITICAL / HIGH / MEDIUM / LOW / COVERED verdict by reasoning over
-  Inspector2 enablement state, per-resource coverage status (SSM-agent
-  dependency for EC2, scanOnPush for ECR, Lambda code-scanning opt-in),
-  network-reachability amplification of CVEs, finding lifecycle (OPEN vs
-  SUPPRESSED), and resource criticality tier (production vs non-prod).
-  Use when reviewing Inspector2 findings, checking scan coverage, auditing
-  vulnerability posture before production deployment, validating that EC2
-  instances are enrolled in Inspector2, or triaging which findings to
-  remediate first. Triggers: Inspector, Inspector2, vulnerability scan,
-  coverage gap, CVE, CVSS, package vulnerability, network reachability,
-  ECR scanOnPush, Lambda code scan, SSM agent, scan coverage, finding
-  severity, exploit, KEV, CISA, security posture.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Audits Amazon Inspector2 coverage gaps and finding severity to determine whether EC2 instances, ECR repositories, and Lambda functions are effectively scanned and free of exploitable vulnerabilities or misconfigurations. Classifies each resource into a single CRITICAL / HIGH / MEDIUM / LOW / COVERED verdict by reasoning over Inspector2 enablement state, per-resource coverage status (SSM-agent dependency for EC2, scanOnPush for ECR, Lambda code-scanning opt-in), network-reachability amplification of CVEs, finding lifecycle (OPEN vs SUPPRESSED), and resource criticality tier (production vs non-prod). Use when reviewing Inspector2 findings, checking scan coverage, auditing vulnerability posture before production deployment, validating that EC2 instances are enrolled in. Triggers: Inspector, Inspector2, vulnerability scan, coverage gap, CVE, CVSS, package vulnerability, network reachability, ECR scanOnPush, Lambda code scan, SSM agent, scan coverage, finding severity, exploit, KEV, CISA, security posture.'
 license: Apache-2.0
-compatibility: >-
-  Requires an LLM-based agent runtime (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI calls needed for classification — the skill
-  reasons over provided Inspector2 state, coverage data, and finding
-  records. For live-account audits, AWS CLI v2 with
-  inspector2:ListCoverage, inspector2:ListFindings,
-  inspector2:BatchGetAccountStatus, and ecr:DescribeRepositories
-  permissions.
-keywords:
-  - Inspector2
-  - Amazon Inspector
-  - vulnerability scanning
-  - coverage gap
-  - CVE
-  - CVSS
-  - package vulnerability
-  - network reachability
-  - ECR scanOnPush
-  - Lambda code scan
-  - SSM agent
-  - scan coverage
-  - finding severity
-  - exploit
-  - KEV
-  - CISA
-  - security posture
-  - misconfiguration
-tags:
-  - aws
-  - inspector2
-  - security
-  - vulnerability-management
-  - coverage-audit
-  - cve
-  - network-reachability
-dependencies:
-  - aws-orchestrator
+compatibility: Requires an LLM-based agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI calls needed for classification — the skill reasons over provided Inspector2 state, coverage data, and finding records. For live-account audits, AWS CLI v2 with inspector2:ListCoverage, inspector2:ListFindings, inspector2:BatchGetAccountStatus, and ecr:DescribeRepositories permissions.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
-when_to_use: >-
-  Reviewing Inspector2 findings or coverage status, auditing vulnerability
-  posture before production deployment, checking whether EC2 instances are
-  enrolled in Inspector2, validating ECR scanOnPush configuration, triaging
-  which findings to remediate first, or performing a compliance audit of
-  vulnerability-management coverage.
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Inspector2, Amazon Inspector, vulnerability scanning, coverage gap, CVE, CVSS, package vulnerability, network reachability, ECR scanOnPush, Lambda code scan, SSM agent, scan coverage, finding severity, exploit, KEV, CISA, security posture, misconfiguration
+  tags: aws, inspector2, security, vulnerability-management, coverage-audit, cve, network-reachability
+  dependencies: aws-orchestrator
+  when_to_use: Reviewing Inspector2 findings or coverage status, auditing vulnerability posture before production deployment, checking whether EC2 instances are enrolled in Inspector2, validating ECR scanOnPush configuration, triaging which findings to remediate first, or performing a compliance audit of vulnerability-management coverage.
 ---
 
 # Inspector2 Coverage + Finding Auditor

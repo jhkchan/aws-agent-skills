@@ -1,105 +1,28 @@
 ---
 name: drift-detection-automator
-description: >-
-  Designs and implements automated CloudFormation drift detection
-  workflows across single-account and multi-account environments. Wires
-  scheduled EventBridge rules for periodic drift detection runs,
-  AWS Config rules for individual resource drift, Lambda comparison
-  functions for desired-vs-actual state analysis, SNS notifications with
-  severity-based routing, SSM Automation remediation (CloudFormation
-  update or custom Lambda), multi-account via CloudFormation StackSets,
-  drift suppression for known-acceptable changes, drift report export
-  to S3 with Athena query, IaC pipeline integration (Terraform plan as
-  drift check), and Config Aggregator cross-account visibility. Emits
-  AUTOMATION_DEPLOYED with the full detection+notification pipeline or
-  REVIEW_REQUIRED with the specific gap. Use when building drift
-  detection automation, scheduling drift checks, integrating drift
-  detection with IaC pipelines, or setting up multi-account drift
-  visibility.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Designs and implements automated CloudFormation drift detection workflows across single-account and multi-account environments. Wires scheduled EventBridge rules for periodic drift detection runs, AWS Config rules for individual resource drift, Lambda comparison functions for desired-vs-actual state analysis, SNS notifications with severity-based routing, SSM Automation remediation (CloudFormation update or custom Lambda), multi-account via CloudFormation StackSets, drift suppression for known-acceptable changes, drift report export to S3 with Athena query, IaC pipeline integration (Terraform plan as drift check), and Config Aggregator cross-account visibility. Emits AUTOMATION_DEPLOYED with the full detection+notification pipeline or REVIEW_REQUIRED with the specific gap. Use when building drift detection automation, scheduling drift checks, integrating drift detection with IaC pipelines, or setting up multi-account drift visibility.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Gemini). No AWS CLI required for offline workflow design. Live
-  deployment uses aws cloudformation detect-stack-drift,
-  describe-stack-drift-detection-status, describe-stack-resource-drifts,
-  aws configservice put-config-rule, describe-config-rules,
-  aws events put-rule, put-targets, aws lambda create-function,
-  aws sns create-topic, subscribe, aws ssm create-document,
-  start-automation-execution, aws cloudformation create-stack-set,
-  create-stack-instances, and aws athena start-query-execution —
-  AWS CLI v2, SSO or key-based credentials.
-keywords:
-  - AWS CloudFormation
-  - drift detection
-  - stack drift
-  - resource drift
-  - EventBridge scheduled
-  - AWS Config
-  - Config Aggregator
-  - desired state
-  - actual state
-  - Lambda comparison
-  - SNS notification
-  - SSM Automation
-  - CloudFormation StackSets
-  - drift suppression
-  - drift report
-  - Amazon Athena
-  - Terraform plan
-  - IaC pipeline
-  - governance automation
-tags: [cloudformation, drift-detection, config, eventbridge, lambda, governance, ssm-automation, stacksets, automate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Gemini). No AWS CLI required for offline workflow design. Live deployment uses aws cloudformation detect-stack-drift, describe-stack-drift-detection-status, describe-stack-resource-drifts, aws configservice put-config-rule, describe-config-rules, aws events put-rule, put-targets, aws lambda create-function, aws sns create-topic, subscribe, aws ssm create-document, start-automation-execution, aws cloudformation...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATION_DEPLOYED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Building automated CloudFormation drift detection, scheduling periodic
-    drift checks via EventBridge, wiring Config rules for resource drift,
-    designing Lambda desired-vs-actual comparison functions, setting up
-    SSM Automation remediation for drifted stacks, configuring multi-account
-    drift detection via StackSets, suppressing known-acceptable drift,
-    exporting drift reports to S3/Athena, integrating drift checks into
-    IaC pipelines (Terraform plan), or establishing Config Aggregator
-    cross-account drift visibility.
-  when_not_to_use: >-
-    Investigating a specific CloudFormation stack failure or rollback
-    (use cloudformation-stack-troubleshooter or cloudformation-stack-
-    rollback-troubleshooter). Deploying new CloudFormation stacks (use
-    the deployer family). Troubleshooting drift on a single stack without
-    automation (use cloudformation-drift-troubleshooter). Terraform state
-    management and import belong to the Terraform toolchain.
-  activation_triggers:
-    - "automate drift detection"
-    - "schedule drift check"
-    - "CloudFormation drift automation"
-    - "Config rule resource drift"
-    - "drift detection EventBridge"
-    - "Lambda desired vs actual"
-    - "drift remediation SSM"
-    - "drift suppression"
-    - "multi-account drift StackSets"
-    - "drift report S3 Athena"
-    - "Terraform plan drift check"
-    - "Config Aggregator drift"
-  invocation_schema: >-
-    Input: either (a) a CloudFormation stack name or set of stacks plus
-    desired detection cadence, OR (b) a drift automation requirement
-    ("detect drift hourly and notify", "auto-remediate drift on
-    non-production stacks"). Output: deterministic DRIFT_AUTOMATION block
-    per stack set — DETECTION/COMPARISON/NOTIFICATION/REMEDIATION/
-    INTEGRATION/SAFETY/VERDICT — where VERDICT is AUTOMATION_DEPLOYED
-    (pipeline ready) or REVIEW_REQUIRED (specific gap cited).
+  verdict_shape: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
+  when_to_use: Building automated CloudFormation drift detection, scheduling periodic drift checks via EventBridge, wiring Config rules for resource drift, designing Lambda desired-vs-actual comparison functions, setting up SSM Automation remediation for drifted stacks, configuring multi-account drift detection via StackSets, suppressing known-acceptable drift, exporting drift reports to S3/Athena, integrating drift checks into IaC pipelines (Terraform plan), or establishing Config Aggregator cross-account drift visibility.
+  when_not_to_use: Investigating a specific CloudFormation stack failure or rollback (use cloudformation-stack-troubleshooter or cloudformation-stack- rollback-troubleshooter). Deploying new CloudFormation stacks (use the deployer family). Troubleshooting drift on a single stack without automation (use cloudformation-drift-troubleshooter). Terraform state management and import belong to the Terraform toolchain.
+  activation_triggers: automate drift detection, schedule drift check, CloudFormation drift automation, Config rule resource drift, drift detection EventBridge, Lambda desired vs actual, drift remediation SSM, drift suppression, multi-account drift StackSets, drift report S3 Athena, Terraform plan drift check, Config Aggregator drift
+  invocation_schema: 'Input: either (a) a CloudFormation stack name or set of stacks plus desired detection cadence, OR (b) a drift automation requirement ("detect drift hourly and notify", "auto-remediate drift on non-production stacks"). Output: deterministic DRIFT_AUTOMATION block per stack set — DETECTION/COMPARISON/NOTIFICATION/REMEDIATION/ INTEGRATION/SAFETY/VERDICT — where VERDICT is AUTOMATION_DEPLOYED (pipeline ready) or REVIEW_REQUIRED (specific gap cited).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS CloudFormation, drift detection, stack drift, resource drift, EventBridge scheduled, AWS Config, Config Aggregator, desired state, actual state, Lambda comparison, SNS notification, SSM Automation, CloudFormation StackSets, drift suppression, drift report, Amazon Athena, Terraform plan, IaC pipeline, governance automation
+  tags: cloudformation, drift-detection, config, eventbridge, lambda, governance, ssm-automation, stacksets, automate
 ---
 
 # Drift Detection Automator

@@ -1,114 +1,26 @@
 ---
 name: devops-guru-troubleshooter
-description: >-
-  Diagnoses Amazon DevOps Guru insights across Proactive and Reactive
-  categories. Covers insight types (Proactive=anomalous behavior,
-  Reactive=operational issue), severity (High/Medium/Low), resource
-  coverage (CloudFormation stacks, Auto Scaling groups, ALB, RDS,
-  DynamoDB, Lambda, ECS, CodeBuild), analysis categories (performance,
-  availability, cost, configuration), recommendation implementation,
-  false positive suppression. Latest: DevOps Guru for RDS/CodeBuild/
-  Lambda, server-side encryption analysis, event-based insights.
-  Emits ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE. Use when a
-  DevOps Guru insight is OPEN or investigating performance/availability
-  anomalies flagged by the service.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses Amazon DevOps Guru insights across Proactive and Reactive categories. Covers insight types (Proactive=anomalous behavior, Reactive=operational issue), severity (High/Medium/Low), resource coverage (CloudFormation stacks, Auto Scaling groups, ALB, RDS, DynamoDB, Lambda, ECS, CodeBuild), analysis categories (performance, availability, cost, configuration), recommendation implementation, false positive suppression. Latest: DevOps Guru for RDS/CodeBuild/ Lambda, server-side encryption analysis, event-based insights. Emits ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE. Use when a DevOps Guru insight is OPEN or investigating performance/availability anomalies flagged by the service.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline diagnosis works on supplied
-  describe-insight / list-recommendations JSON. Live-account
-  diagnosis uses aws devops-guru describe-insight,
-  list-anomalies-for-insight, list-recommendations,
-  describe-resource-health, and aws logs filter-log-events for
-  correlated CloudWatch Logs (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-  - DevOps Guru
-  - insight
-  - Proactive
-  - Reactive
-  - anomalous behavior
-  - operational issue
-  - severity
-  - High
-  - Medium
-  - Low
-  - CloudFormation
-  - Auto Scaling group
-  - ALB
-  - RDS
-  - DynamoDB
-  - Lambda
-  - ECS
-  - CodeBuild
-  - performance
-  - availability
-  - cost
-  - configuration
-  - recommendation
-  - false positive
-  - server-side encryption
-tags:
-  - devops-guru
-  - management
-  - troubleshoot
-  - insight
-  - proactive
-  - reactive
-  - anomaly
-  - recommendation
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works on supplied describe-insight / list-recommendations JSON. Live-account diagnosis uses aws devops-guru describe-insight, list-anomalies-for-insight, list-recommendations, describe-resource-health, and aws logs filter-log-events for correlated CloudWatch Logs (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - devops-guru
-    - management
-    - troubleshoot
-    - insight
-    - proactive
-    - reactive
-    - anomaly
-    - recommendation
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - devops guru insight
-    - proactive insight
-    - reactive insight
-    - anomalous behavior
-    - operational issue
-    - devops guru recommendation
-    - devops guru false positive
-    - devops guru for rds
-    - devops guru for lambda
-    - devops guru codebuild
-    - server-side encryption analysis
-    - insight severity high
-    - resource collection
-  when_to_use: >-
-    Invoke when the user is investigating an Amazon DevOps Guru insight
-    (OPEN or recently resolved), needs to map an insight to a root
-    cause, wants to implement or validate a DevOps Guru recommendation,
-    needs to suppress false positives, or is onboarding DevOps Guru to
-    a new resource set (CloudFormation stacks, Auto Scaling groups, RDS,
-    Lambda, ECS). Do NOT invoke for CloudWatch alarm triage (use
-    cloudwatch-alarm-operator), or for general performance analysis
-    without a DevOps Guru insight context.
+  author: Jacky Chan — AWS Community Builder
+  tags: devops-guru, management, troubleshoot, insight, proactive, reactive, anomaly, recommendation
+  dependencies: aws-orchestrator
+  keywords: DevOps Guru, insight, Proactive, Reactive, anomalous behavior, operational issue, severity, High, Medium, Low, CloudFormation, Auto Scaling group, ALB, RDS, DynamoDB, Lambda, ECS, CodeBuild, performance, availability, cost, configuration, recommendation, false positive, server-side encryption
+  when_to_use: Invoke when the user is investigating an Amazon DevOps Guru insight (OPEN or recently resolved), needs to map an insight to a root cause, wants to implement or validate a DevOps Guru recommendation, needs to suppress false positives, or is onboarding DevOps Guru to a new resource set (CloudFormation stacks, Auto Scaling groups, RDS, Lambda, ECS). Do NOT invoke for CloudWatch alarm triage (use cloudwatch-alarm-operator), or for general performance analysis without a DevOps Guru insight context.
 ---
 
 # DevOps Guru Troubleshooter

@@ -1,127 +1,26 @@
 ---
 name: eventbridge-scheduler-deployer
-description: >-
-  Provisions Amazon EventBridge Scheduler schedules with production
-  defaults: schedule creation (rate-based vs cron-based), flexible
-  time window (OFF vs MAXIMUM), target types (Lambda, Step
-  Functions, SNS, SQS, Kinesis, Inspector, CodeBuild, and more),
-  one-time vs recurring schedules, timezone specification, group
-  management for bulk enable/disable, automatic schedule deletion
-  after completion, retry policy with exponential backoff,
-  dead-letter queue (DLQ), IAM role for target invocation (Scheduler
-  creates and manages its own role), start/after and end/before time
-  windows, target input (constant JSON), schedule state (ENABLED /
-  DISABLED), and CloudWatch metrics. Emits a READY_TO_DEPLOY
-  checklist with verification commands. Use when creating an
-  EventBridge schedule, configuring rate or cron expressions, setting
-  up flexible time windows for cost optimization, managing schedule
-  groups, configuring retry and DLQ, or wiring one-time schedules.
-  Triggers: eventbridge scheduler, eventbridge schedule, rate
-  schedule, cron schedule, flexible time window, one-time schedule,
-  schedule group, scheduler retry policy, scheduler DLQ, scheduler
-  timezone, scheduler target lambda step functions sns sqs, scheduler
-  IAM role.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon EventBridge Scheduler schedules with production defaults: schedule creation (rate-based vs cron-based), flexible time window (OFF vs MAXIMUM), target types (Lambda, Step Functions, SNS, SQS, Kinesis, Inspector, CodeBuild, and more), one-time vs recurring schedules, timezone specification, group management for bulk enable/disable, automatic schedule deletion after completion, retry policy with exponential backoff, dead-letter queue (DLQ), IAM role for target invocation (Scheduler creates and manages its own role), start/after and end/before time windows, target input (constant JSON), schedule state (ENABLED / DISABLED), and CloudWatch metrics. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating an. Triggers: eventbridge scheduler, eventbridge schedule, rate schedule, cron schedule, flexible time window, one-time schedule, schedule group, scheduler retry policy, scheduler DLQ, scheduler timezone, scheduler target lambda step functions sns sqs, scheduler IAM role.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with scheduler,
-  iam, sqs, lambda, stepfunctions, sns, kms, and cloudwatch access.
-  Works with Terraform aws_scheduler_schedule /
-  aws_scheduler_schedule_group resources, CloudFormation
-  AWS::Scheduler::Schedule / AWS::Scheduler::ScheduleGroup templates,
-  and the EventBridge Scheduler API (create-schedule,
-  create-schedule-group).
-keywords:
-  - aws
-  - eventbridge
-  - scheduler
-  - schedule
-  - appintegration
-  - cloudops
-  - deploy
-  - provisioning
-  - rate
-  - cron
-  - flexible-time-window
-  - one-time-schedule
-  - schedule-group
-  - retry-policy
-  - dead-letter-queue
-  - timezone
-  - target-invocation
-tags:
-  - aws
-  - eventbridge
-  - scheduler
-  - appintegration
-  - cloudops
-  - deploy
-  - provisioning
-  - rate
-  - cron
-  - flexible-time-window
-  - one-time-schedule
-  - schedule-group
-  - retry-policy
-  - dead-letter-queue
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with scheduler, iam, sqs, lambda, stepfunctions, sns, kms, and cloudwatch access. Works with Terraform aws_scheduler_schedule / aws_scheduler_schedule_group resources, CloudFormation AWS::Scheduler::Schedule / AWS::Scheduler::ScheduleGroup templates, and the EventBridge Scheduler API (create-schedule, create-schedule-group).'
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - eventbridge
-    - scheduler
-    - appintegration
-    - cloudops
-    - deploy
-    - provisioning
-    - rate
-    - cron
-    - flexible-time-window
-    - one-time-schedule
-    - schedule-group
-    - retry-policy
-    - dead-letter-queue
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - eventbridge scheduler
-    - eventbridge schedule
-    - rate schedule
-    - cron schedule
-    - flexible time window
-    - one-time schedule
-    - schedule group
-    - scheduler retry policy
-    - scheduler dlq
-    - scheduler timezone
-    - scheduler target lambda step functions sns sqs
-    - scheduler iam role
-  when_to_use: >-
-    Invoke when the user wants to create an EventBridge Scheduler
-    schedule (rate or cron based), configure a flexible time window
-    for cost optimization, set up a one-time schedule, manage schedule
-    groups for bulk enable/disable, configure retry policy and DLQ,
-    specify a timezone, or wire a target (Lambda, Step Functions, SNS,
-    SQS, Kinesis, Inspector, CodeBuild, etc.). Do NOT invoke for
-    EventBridge event bus rules (use eventbridge-rule-deployer),
-    EventBridge Pipes (use eventbridge-pipe-deployer), or CloudWatch
-    Events (legacy — use Scheduler instead).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, eventbridge, scheduler, appintegration, cloudops, deploy, provisioning, rate, cron, flexible-time-window, one-time-schedule, schedule-group, retry-policy, dead-letter-queue
+  dependencies: aws-orchestrator
+  keywords: aws, eventbridge, scheduler, schedule, appintegration, cloudops, deploy, provisioning, rate, cron, flexible-time-window, one-time-schedule, schedule-group, retry-policy, dead-letter-queue, timezone, target-invocation
+  when_to_use: Invoke when the user wants to create an EventBridge Scheduler schedule (rate or cron based), configure a flexible time window for cost optimization, set up a one-time schedule, manage schedule groups for bulk enable/disable, configure retry policy and DLQ, specify a timezone, or wire a target (Lambda, Step Functions, SNS, SQS, Kinesis, Inspector, CodeBuild, etc.). Do NOT invoke for EventBridge event bus rules (use eventbridge-rule-deployer), EventBridge Pipes (use eventbridge-pipe-deployer), or CloudWatch Events (legacy — use Scheduler instead).
 ---
 
 # EventBridge Scheduler Deployer

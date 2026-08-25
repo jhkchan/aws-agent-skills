@@ -1,126 +1,29 @@
 ---
 name: eks-nodegroup-troubleshooter
-description: >-
-  Diagnoses Amazon EKS managed node group issues through a node-state-
-  driven diagnostic tree: nodes stuck NotReady (kubelet errors,
-  container runtime crash, AMI version mismatch), taints blocking pod
-  placement, ASG launch failures (InsufficientInstanceCapacity, launch
-  template misconfig), VPC CNI IP exhaustion (warm ENI pool, prefix
-  delegation, subnet CIDR too small), node group scaling failures,
-  pod scheduling failures (insufficient CPU/memory), kubelet pressure
-  (DiskPressure, MemoryPressure, PIDPressure), container runtime issues
-  (containerd vs dockerd), node IAM role missing permissions (ECR pull,
-  SSM, CloudWatch), security group misconfiguration, ECR image pull
-  from worker nodes, and custom AMI bootstrap script errors. Combines
-  AWS API (describe-nodegroup, describe-auto-scaling-groups) with
-  kubectl (get nodes, describe node, get pods) to a verified root cause.
-  Emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses Amazon EKS managed node group issues through a node-state- driven diagnostic tree: nodes stuck NotReady (kubelet errors, container runtime crash, AMI version mismatch), taints blocking pod placement, ASG launch failures (InsufficientInstanceCapacity, launch template misconfig), VPC CNI IP exhaustion (warm ENI pool, prefix delegation, subnet CIDR too small), node group scaling failures, pod scheduling failures (insufficient CPU/memory), kubelet pressure (DiskPressure, MemoryPressure, PIDPressure), container runtime issues (containerd vs dockerd), node IAM role missing permissions (ECR pull, SSM, CloudWatch), security group misconfiguration, ECR image pull from worker nodes, and custom AMI bootstrap script errors. Combines AWS API (describe-nodegroup, describe-auto-scaling-groups) with kubectl (get nodes, describe node, get pods) to a verified root cause. Emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Offline diagnosis works on supplied kubectl get/describe output
-  and AWS CLI JSON. Live-cluster diagnosis uses aws eks describe-nodegroup,
-  describe-cluster, aws autoscaling describe-auto-scaling-groups,
-  aws ec2 describe-subnets / describe-security-groups, kubectl get nodes /
-  describe node / get pods / describe pod / get events / top nodes
-  (AWS CLI v2, kubectl v1.27+, SSO or key-based credentials, kubeconfig
-  pointing at the EKS cluster).
-keywords:
-  - EKS
-  - node group
-  - managed node group
-  - nodes NotReady
-  - kubelet
-  - container runtime
-  - containerd
-  - VPC CNI
-  - IP exhaustion
-  - warm IP pool
-  - prefix delegation
-  - taints
-  - ASG launch failure
-  - InsufficientInstanceCapacity
-  - AMI version
-  - node IAM role
-  - ECR pull
-  - security group
-  - DiskPressure
-  - cluster autoscaler
-  - Karpenter
-  - bootstrap script
-  - custom AMI
-tags:
-  - eks
-  - kubernetes
-  - compute
-  - troubleshoot
-  - nodegroup
-  - vpc-cni
-  - asg
-  - kubelet
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works on supplied kubectl get/describe output and AWS CLI JSON. Live-cluster diagnosis uses aws eks describe-nodegroup, describe-cluster, aws autoscaling describe-auto-scaling-groups, aws ec2 describe-subnets / describe-security-groups, kubectl get nodes / describe node / get pods / describe pod / get events / top nodes (AWS CLI v2, kubectl v1.27+, SSO or key-based credentials, kubeconfig...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA"
-  when_to_use: >-
-    Diagnosing why EKS managed node group nodes are NotReady, fail to
-    join the cluster, cannot schedule pods due to taints or resource
-    pressure, experience VPC CNI IP exhaustion, fail ASG launches, have
-    AMI version mismatch with the control plane, have missing IAM
-    permissions for ECR or SSM, encounter container runtime errors, or
-    fail scaling operations (cluster autoscaler / Karpenter).
-  when_not_to_use: >-
-    Application-level pod crash debugging (use eks-pod-troubleshooter),
-    EKS control plane / API server issues (use eks-cluster-auditor),
-    EKS add-on installation or version issues (use eks-add-on-deployer),
-    EKS upgrade orchestration (use eks-upgrade-operator), or steady-state
-    node group cost optimization (use eks-cost-optimizer).
-  activation_triggers:
-    - "EKS nodes NotReady"
-    - "EKS node group failed"
-    - "EKS node not joining cluster"
-    - "EKS VPC CNI IP exhaustion"
-    - "EKS NoSchedule taint"
-    - "EKS ASG launch failure"
-    - "EKS InsufficientInstanceCapacity"
-    - "EKS AMI version mismatch"
-    - "EKS node IAM role"
-    - "EKS ECR image pull"
-    - "EKS security group"
-    - "EKS kubelet error"
-    - "EKS container runtime"
-    - "EKS DiskPressure"
-    - "EKS cluster autoscaler"
-    - "EKS Karpenter"
-    - "EKS custom AMI bootstrap"
-    - "EKS node group scaling"
-  invocation_schema: >-
-    Input: either (a) a symptom description (nodes NotReady, pods stuck
-    Pending, scaling failures, error strings from kubectl or AWS Console)
-    optionally paired with the cluster name, node group name, and kubectl
-    output, OR (b) a cluster + node group name for live-cluster diagnosis.
-    Output: a deterministic TARGET/VERDICT/REASON/ROOT_CAUSE/EVIDENCE/
-    REMEDIATION block where VERDICT is ROOT_CAUSE_IDENTIFIED or
-    INSUFFICIENT_DATA, and ROOT_CAUSE names the specific failure category.
-  invocation_example: >-
-    # Minimal valid input (offline symptom classification):
-    Symptom: "3 of 5 nodes in the EKS managed node group are NotReady
-    after an AMI upgrade. Pods are stuck Pending with FailedScheduling."
-    ClusterName: prod-cluster
-    NodeGroupName: prod-ng-1
-    ClusterKubernetesVersion: "1.30"
-    NodeGroupAmiVersion: "1.29.3-20240807"
-    NodeStatus: 3 NotReady, 2 Ready
+  verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
+  when_to_use: Diagnosing why EKS managed node group nodes are NotReady, fail to join the cluster, cannot schedule pods due to taints or resource pressure, experience VPC CNI IP exhaustion, fail ASG launches, have AMI version mismatch with the control plane, have missing IAM permissions for ECR or SSM, encounter container runtime errors, or fail scaling operations (cluster autoscaler / Karpenter).
+  when_not_to_use: Application-level pod crash debugging (use eks-pod-troubleshooter), EKS control plane / API server issues (use eks-cluster-auditor), EKS add-on installation or version issues (use eks-add-on-deployer), EKS upgrade orchestration (use eks-upgrade-operator), or steady-state node group cost optimization (use eks-cost-optimizer).
+  activation_triggers: EKS nodes NotReady, EKS node group failed, EKS node not joining cluster, EKS VPC CNI IP exhaustion, EKS NoSchedule taint, EKS ASG launch failure, EKS InsufficientInstanceCapacity, EKS AMI version mismatch, EKS node IAM role, EKS ECR image pull, EKS security group, EKS kubelet error, EKS container runtime, EKS DiskPressure, EKS cluster autoscaler, EKS Karpenter, EKS custom AMI bootstrap, EKS node group scaling
+  invocation_schema: 'Input: either (a) a symptom description (nodes NotReady, pods stuck Pending, scaling failures, error strings from kubectl or AWS Console) optionally paired with the cluster name, node group name, and kubectl output, OR (b) a cluster + node group name for live-cluster diagnosis. Output: a deterministic TARGET/VERDICT/REASON/ROOT_CAUSE/EVIDENCE/ REMEDIATION block where VERDICT is ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA, and ROOT_CAUSE names the specific failure category.'
+  invocation_example: '# Minimal valid input (offline symptom classification): Symptom: "3 of 5 nodes in the EKS managed node group are NotReady after an AMI upgrade. Pods are stuck Pending with FailedScheduling." ClusterName: prod-cluster NodeGroupName: prod-ng-1 ClusterKubernetesVersion: "1.30" NodeGroupAmiVersion: "1.29.3-20240807" NodeStatus: 3 NotReady, 2 Ready'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: EKS, node group, managed node group, nodes NotReady, kubelet, container runtime, containerd, VPC CNI, IP exhaustion, warm IP pool, prefix delegation, taints, ASG launch failure, InsufficientInstanceCapacity, AMI version, node IAM role, ECR pull, security group, DiskPressure, cluster autoscaler, Karpenter, bootstrap script, custom AMI
+  tags: eks, kubernetes, compute, troubleshoot, nodegroup, vpc-cni, asg, kubelet
 ---
 
 # EKS NodeGroup Troubleshooter

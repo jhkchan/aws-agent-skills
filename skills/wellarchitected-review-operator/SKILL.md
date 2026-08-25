@@ -1,121 +1,26 @@
 ---
 name: wellarchitected-review-operator
-description: >-
-  Operates AWS Well-Architected Tool reviews end-to-end —
-  creates workloads, runs pillar reviews (operational
-  excellence, security, reliability, performance, cost
-  optimization, sustainability, Prosperity), answers
-  questions with risk-tier rationale, generates reports and
-  improvement plans, creates milestones, and integrates with
-  Trusted Advisor and Well-Architected Labs. Runs deterministic
-  pre-checks (workload existence, lens availability, pillar
-  coverage), emits the exact update-answer /
-  get-consolidated-report CLI behind a CONFIRM gate, and
-  verifies risk-tier transitions. Emits READY | BLOCKED |
-  COMPLETED. Use when creating a workload, answering pillar
-  questions, generating an improvement plan, creating a
-  milestone, or integrating with Trusted Advisor. Triggers:
-  well-architected tool, well architected review, workload
-  review, pillar, operational excellence, security,
-  reliability, performance, cost optimization, sustainability,
-  prosperity, improvement plan, milestone, trusted advisor.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Operates AWS Well-Architected Tool reviews end-to-end — creates workloads, runs pillar reviews (operational excellence, security, reliability, performance, cost optimization, sustainability, Prosperity), answers questions with risk-tier rationale, generates reports and improvement plans, creates milestones, and integrates with Trusted Advisor and Well-Architected Labs. Runs deterministic pre-checks (workload existence, lens availability, pillar coverage), emits the exact update-answer / get-consolidated-report CLI behind a CONFIRM gate, and verifies risk-tier transitions. Emits READY | BLOCKED | COMPLETED. Use when creating a workload, answering pillar questions, generating an improvement plan, creating a milestone, or integrating with Trusted Advisor. Triggers: well-architected tool, well architected review, workload review, pillar, operational excellence, security, reliability, performance, cost optimization, sustainability, prosperity, improvement plan, milestone, trusted advisor.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor,
-  Windsurf, Codex, Gemini). No AWS CLI required for offline plan
-  classification. Live-account operations use aws wellarchitected
-  create-workload, update-workload, get-workload, list-workloads,
-  get-answer, update-answer, get-consolidated-report,
-  create-milestone, list-milestones, associate-logs,
-  import-lens, list-lenses, and aws trustedadvisor
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - aws
-  - well-architected
-  - wellarchitected
-  - governance
-  - cloudops
-  - operate
-  - review
-  - pillar
-  - operational-excellence
-  - security
-  - reliability
-  - performance
-  - cost-optimization
-  - sustainability
-  - prosperity
-  - improvement-plan
-  - milestone
-  - trusted-advisor
-  - lens
-tags:
-  - aws
-  - well-architected
-  - governance
-  - operate
-  - review
-  - pillar
-  - improvement-plan
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws wellarchitected create-workload, update-workload, get-workload, list-workloads, get-answer, update-answer, get-consolidated-report, create-milestone, list-milestones, associate-logs, import-lens, list-lenses, and aws trustedadvisor (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
+  verdict_shape: READY | BLOCKED | COMPLETED
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-    - aws
-    - well-architected
-    - governance
-    - operate
-    - review
-    - pillar
-    - improvement-plan
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - well-architected tool
-    - well architected review
-    - workload review
-    - pillar review
-    - operational excellence
-    - security pillar
-    - reliability pillar
-    - performance efficiency
-    - cost optimization pillar
-    - sustainability pillar
-    - prosperity pillar
-    - improvement plan
-    - milestone
-    - consolidated report
-    - trusted advisor integration
-    - wellarchitected labs
-    - well architected lens
-  when_to_use: >-
-    Invoke when the user wants to create or operate a Well-
-    Architected Tool workload (name, environment, description,
-    lenses), answer pillar questions (operational excellence,
-    security, reliability, performance efficiency, cost
-    optimization, sustainability, Prosperity), generate a
-    consolidated report, draft an improvement plan, create a
-    milestone, integrate with Trusted Advisor, or pull
-    Well-Architected Labs runbooks. Do NOT invoke for plain
-    AWS Config conformance packs (use config-rule-deployer),
-    for Security Hub control finding triage (use
-    securityhub-control-compliance-auditor), or for audit
-    evidence collection (use auditmanager-assessment-auditor).
+  tags: aws, well-architected, governance, operate, review, pillar, improvement-plan
+  dependencies: aws-orchestrator
+  keywords: aws, well-architected, wellarchitected, governance, cloudops, operate, review, pillar, operational-excellence, security, reliability, performance, cost-optimization, sustainability, prosperity, improvement-plan, milestone, trusted-advisor, lens
+  when_to_use: Invoke when the user wants to create or operate a Well- Architected Tool workload (name, environment, description, lenses), answer pillar questions (operational excellence, security, reliability, performance efficiency, cost optimization, sustainability, Prosperity), generate a consolidated report, draft an improvement plan, create a milestone, integrate with Trusted Advisor, or pull Well-Architected Labs runbooks. Do NOT invoke for plain AWS Config conformance packs (use config-rule-deployer), for Security Hub control finding triage (use securityhub-control-compliance-auditor), or for audit evidence collection (use auditmanager-assessment-auditor).
 ---
 
 # Well-Architected Review Operator

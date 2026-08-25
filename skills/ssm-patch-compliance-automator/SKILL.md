@@ -1,87 +1,27 @@
 ---
 name: ssm-patch-compliance-automator
-description: >-
-  Designs and implements SSM Patch Manager automation workflows for EC2
-  fleets. Creates OS-specific patch baselines (Amazon Linux 2/2023, Ubuntu,
-  Windows Server), configures patch groups via tag-based targeting
-  (Patch Group key), sets up maintenance windows with cron schedules and
-  per-instance concurrency, wires Scan vs Install operations, integrates
-  Patch Manager with Inventory for compliance reporting, builds
-  EventBridge-driven auto-remediation on NonCompliant state transitions,
-  manages snapshots before patching, controls reboot behavior
-  (RebootOption: RebootIfNeeded vs NoReboot), and rolls out multi-account
-  patching via Organizations + CloudFormation StackSets. Covers compliance
-  reporting (Compliant, NonCompliant, NotApplicable), exception lists for
-  critical instances, and SNS notification/approval for patch rollouts.
-  Emits AUTOMATION_DEPLOYED with a ready-to-apply baseline + maintenance
-  window + compliance monitoring template or REVIEW_REQUIRED with the
-  specific gap. Use when automating patch compliance, building maintenance
-  windows, or hardening an existing patch rollout.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Designs and implements SSM Patch Manager automation workflows for EC2 fleets. Creates OS-specific patch baselines (Amazon Linux 2/2023, Ubuntu, Windows Server), configures patch groups via tag-based targeting (Patch Group key), sets up maintenance windows with cron schedules and per-instance concurrency, wires Scan vs Install operations, integrates Patch Manager with Inventory for compliance reporting, builds EventBridge-driven auto-remediation on NonCompliant state transitions, manages snapshots before patching, controls reboot behavior (RebootOption: RebootIfNeeded vs NoReboot), and rolls out multi-account patching via Organizations + CloudFormation StackSets. Covers compliance reporting (Compliant, NonCompliant, NotApplicable), exception lists for critical instances, and SNS notification/approval for patch rollouts. Emits AUTOMATION_DEPLOYED with a ready-to-apply baseline + maintenance window + compliance monitoring template or REVIEW_REQUIRED with the specific gap. Use when automating patch...'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline workflow design. Live deployment
-  uses aws ssm create-patch-baseline, register-patch-baseline-for-patch-group,
-  create-maintenance-window, register-task-with-maintenance-window,
-  describe-instance-patch-states, send-command (AWS-RunPatchBaseline),
-  aws cloudformation create-stack-set (multi-account), and aws events
-  put-rule/put-targets (EventBridge auto-remediation) — AWS CLI v2, SSO
-  or key-based credentials.
-keywords:
-  - SSM Patch Manager
-  - patch baseline
-  - patch group
-  - maintenance window
-  - patch compliance
-  - AWS-RunPatchBaseline
-  - RebootOption
-  - EventBridge
-  - CloudFormation StackSets
-  - AWS Organizations
-  - compliance reporting
-  - NonCompliant
-tags: [ssm, patch-manager, maintenance-window, compliance, multi-account, eventbridge, automate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline workflow design. Live deployment uses aws ssm create-patch-baseline, register-patch-baseline-for-patch-group, create-maintenance-window, register-task-with-maintenance-window, describe-instance-patch-states, send-command (AWS-RunPatchBaseline), aws cloudformation create-stack-set (multi-account), and aws events put-rule/put-targets (EventBridge auto-remediation) — AWS CLI v2, SSO...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATION_DEPLOYED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Automating OS patching for EC2 fleets, creating patch baselines for
-    Amazon Linux 2/2023/Ubuntu/Windows, configuring maintenance windows
-    with per-instance concurrency, building EventBridge auto-remediation
-    for NonCompliant patch states, rolling out multi-account patching via
-    StackSets, or hardening an existing patch workflow with snapshots,
-    approval gates, and compliance reporting.
-  activation_triggers:
-    - "automate patch compliance"
-    - "create patch baseline"
-    - "maintenance window patching"
-    - "AWS-RunPatchBaseline"
-    - "patch group tag"
-    - "SSM Patch Manager setup"
-    - "multi-account patching"
-    - "NonCompliant patch auto-remediation"
-    - "patch compliance reporting"
-    - "RebootOption NoReboot"
-  invocation_schema: >-
-    Input: either (a) a fleet description (OS mix, instance count,
-    environment, patch cadence) plus compliance requirements, OR (b) a
-    patch automation request ("patch all Amazon Linux 2023 instances every
-    Saturday", "scan for missing Windows updates daily"). Output:
-    deterministic PATCH block — BASELINE/PATCH_GROUP/MAINTENANCE_WINDOW/
-    COMPLIANCE_MONITORING/SAFETY/VERDICT — where VERDICT is
-    AUTOMATION_DEPLOYED (templates ready) or REVIEW_REQUIRED (specific gap
-    cited).
+  verdict_shape: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
+  when_to_use: Automating OS patching for EC2 fleets, creating patch baselines for Amazon Linux 2/2023/Ubuntu/Windows, configuring maintenance windows with per-instance concurrency, building EventBridge auto-remediation for NonCompliant patch states, rolling out multi-account patching via StackSets, or hardening an existing patch workflow with snapshots, approval gates, and compliance reporting.
+  activation_triggers: automate patch compliance, create patch baseline, maintenance window patching, AWS-RunPatchBaseline, patch group tag, SSM Patch Manager setup, multi-account patching, NonCompliant patch auto-remediation, patch compliance reporting, RebootOption NoReboot
+  invocation_schema: 'Input: either (a) a fleet description (OS mix, instance count, environment, patch cadence) plus compliance requirements, OR (b) a patch automation request ("patch all Amazon Linux 2023 instances every Saturday", "scan for missing Windows updates daily"). Output: deterministic PATCH block — BASELINE/PATCH_GROUP/MAINTENANCE_WINDOW/ COMPLIANCE_MONITORING/SAFETY/VERDICT — where VERDICT is AUTOMATION_DEPLOYED (templates ready) or REVIEW_REQUIRED (specific gap cited).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: SSM Patch Manager, patch baseline, patch group, maintenance window, patch compliance, AWS-RunPatchBaseline, RebootOption, EventBridge, CloudFormation StackSets, AWS Organizations, compliance reporting, NonCompliant
+  tags: ssm, patch-manager, maintenance-window, compliance, multi-account, eventbridge, automate
 ---
 
 # SSM Patch Compliance Automator

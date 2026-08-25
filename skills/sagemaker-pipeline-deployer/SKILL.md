@@ -1,119 +1,26 @@
 ---
 name: sagemaker-pipeline-deployer
-description: >-
-  Defines Amazon SageMaker Pipelines for ML workflows with production
-  defaults: step collection (ProcessingStep with sklearn/Spark container,
-  TrainingStep with built-in or custom algorithm, TuningStep for
-  hyperparameter optimization, CreateModelStep registering model
-  artifacts, ConditionStep branching on metrics, TransformStep for batch
-  inference, RegisterModelStep integrating with the Model Registry),
-  StartPipelineExecution, parameter passing between steps via Properties,
-  caching configuration (per-step cache key), parallelism configuration
-  (ParallelismConfiguration), Pipeline as Code (SageMaker Python SDK vs
-  JSON definition), and EventBridge-driven automated triggers. Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when creating
-  a SageMaker Pipeline, building an ML workflow DAG, wiring up training
-  and tuning steps, registering model versions, adding conditional
-  branching on metrics, configuring batch transform, or triggering
-  pipelines from EventBridge. Triggers: create sagemaker pipeline,
-  sagemaker pipeline steps, sagemaker pipeline caching, sagemaker tuning
-  step, sagemaker model register step, sagemaker condition step, sagemaker
-  transform step, start pipeline execution, sagemaker pipeline parallelism,
-  sagemaker pipeline eventbridge, sagemaker pipeline as code.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Defines Amazon SageMaker Pipelines for ML workflows with production defaults: step collection (ProcessingStep with sklearn/Spark container, TrainingStep with built-in or custom algorithm, TuningStep for hyperparameter optimization, CreateModelStep registering model artifacts, ConditionStep branching on metrics, TransformStep for batch inference, RegisterModelStep integrating with the Model Registry), StartPipelineExecution, parameter passing between steps via Properties, caching configuration (per-step cache key), parallelism configuration (ParallelismConfiguration), Pipeline as Code (SageMaker Python SDK vs JSON definition), and EventBridge-driven automated triggers. Emits a READY_TO_DEPLOY. Triggers: create sagemaker pipeline, sagemaker pipeline steps, sagemaker pipeline caching, sagemaker tuning step, sagemaker model register step, sagemaker condition step, sagemaker transform step, start pipeline execution, sagemaker pipeline parallelism, sagemaker pipeline eventbridge, sagemaker pipeline as code.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with sagemaker access
-  and an IAM execution role that can be passed to underlying jobs. Works
-  with SageMaker Python SDK (sagemaker.Pipeline / sagemaker.workflow
-  steps), Terraform aws_sagemaker_pipeline /
-  aws_sagemaker_pipeline_definition resources, and CloudFormation
-  AWS::SageMaker::Pipeline templates.
-keywords:
-  - aws
-  - sagemaker
-  - pipeline
-  - dag
-  - cloudops
-  - deploy
-  - ml
-  - processing step
-  - training step
-  - tuning step
-  - hyperparameter optimization
-  - condition step
-  - transform step
-  - model register step
-  - model registry
-  - caching
-  - parallelism
-  - eventbridge
-tags:
-  - aws
-  - sagemaker
-  - sagemaker-pipeline
-  - cloudops
-  - deploy
-  - ml
-  - mlops
-  - model-registry
-  - eventbridge
-  - caching
-  - dag
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with sagemaker access and an IAM execution role that can be passed to underlying jobs. Works with SageMaker Python SDK (sagemaker.Pipeline / sagemaker.workflow steps), Terraform aws_sagemaker_pipeline / aws_sagemaker_pipeline_definition resources, and CloudFormation AWS::SageMaker::Pipeline templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AI/ML
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - sagemaker
-    - sagemaker-pipeline
-    - cloudops
-    - deploy
-    - ml
-    - mlops
-    - model-registry
-    - eventbridge
-    - caching
-    - dag
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create sagemaker pipeline
-    - sagemaker pipeline steps
-    - sagemaker pipeline caching
-    - sagemaker tuning step
-    - sagemaker model register step
-    - sagemaker condition step
-    - sagemaker transform step
-    - start pipeline execution
-    - sagemaker pipeline parallelism
-    - sagemaker pipeline eventbridge
-    - sagemaker pipeline as code
-  when_to_use: >-
-    Invoke when the user wants to build or update an Amazon SageMaker
-    Pipeline (the workflow orchestration service for ML), compose step
-    collections (Processing, Training, Tuning, CreateModel, Condition,
-    Transform, RegisterModel), wire parameters between steps via
-    Properties, configure per-step caching or pipeline-wide parallelism,
-    drive executions from EventBridge, or gate production deployment via
-    the Model Registry approval workflow. Do NOT invoke for SageMaker
-    Studio operations, single TrainingJob/TransformJob without a pipeline
-    (use sagemaker-training-job-operator), real-time Endpoint deployment
-    (use sagemaker-endpoint-deployer), or non-SageMaker orchestrators
-    (Step Functions, Airflow).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, sagemaker, sagemaker-pipeline, cloudops, deploy, ml, mlops, model-registry, eventbridge, caching, dag
+  dependencies: aws-orchestrator
+  keywords: aws, sagemaker, pipeline, dag, cloudops, deploy, ml, processing step, training step, tuning step, hyperparameter optimization, condition step, transform step, model register step, model registry, caching, parallelism, eventbridge
+  when_to_use: Invoke when the user wants to build or update an Amazon SageMaker Pipeline (the workflow orchestration service for ML), compose step collections (Processing, Training, Tuning, CreateModel, Condition, Transform, RegisterModel), wire parameters between steps via Properties, configure per-step caching or pipeline-wide parallelism, drive executions from EventBridge, or gate production deployment via the Model Registry approval workflow. Do NOT invoke for SageMaker Studio operations, single TrainingJob/TransformJob without a pipeline (use sagemaker-training-job-operator), real-time Endpoint deployment (use sagemaker-endpoint-deployer), or non-SageMaker orchestrators (Step Functions, Airflow).
 ---
 
 # SageMaker Pipeline Deployer

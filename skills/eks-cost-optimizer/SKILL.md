@@ -1,120 +1,29 @@
 ---
 name: eks-cost-optimizer
-description: >-
-  Optimizes EKS cluster costs via a layered analysis framework — right-sizes
-  EC2 managed node groups from 14-30 day CloudWatch and Container Insights
-  utilization, evaluates Fargate vs EC2 nodes (Fargate pay-per-pod at
-  $0.04048/vCPU-hr + $0.004445/GB-hr; EC2 cheaper for steady-state dense
-  scheduling), assesses Spot Instance node groups (up to 90% off, requires
-  PodDisruptionBudget + graceful drain), compares Cluster Autoscaler vs
-  Karpenter (consolidation, bin-packing, faster scale-up, 20-40% savings),
-  finds bin-packing waste (requests vs limits gap, over-provisioned
-  namespaces), and layers pricing-model optimization (Compute Savings Plans
-  for the EC2 node baseline; control plane is fixed $73/month). Emits
-  OPTIMIZED, OPPORTUNITY_FOUND with estimated monthly savings, or
-  ALREADY_OPTIMAL. Use for EKS spend reviews, managed node group rightsizing,
-  Karpenter evaluation, Fargate migration analysis, or FinOps Kubernetes plans.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Optimizes EKS cluster costs via a layered analysis framework — right-sizes EC2 managed node groups from 14-30 day CloudWatch and Container Insights utilization, evaluates Fargate vs EC2 nodes (Fargate pay-per-pod at $0.04048/vCPU-hr + $0.004445/GB-hr; EC2 cheaper for steady-state dense scheduling), assesses Spot Instance node groups (up to 90% off, requires PodDisruptionBudget + graceful drain), compares Cluster Autoscaler vs Karpenter (consolidation, bin-packing, faster scale-up, 20-40% savings), finds bin-packing waste (requests vs limits gap, over-provisioned namespaces), and layers pricing-model optimization (Compute Savings Plans for the EC2 node baseline; control plane is fixed $73/month). Emits OPTIMIZED, OPPORTUNITY_FOUND with estimated monthly savings, or ALREADY_OPTIMAL. Use for EKS spend reviews, managed node group rightsizing, Karpenter evaluation, Fargate migration analysis, or FinOps Kubernetes plans.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Offline recommendation classification works from pasted Container
-  Insights metrics and node group configurations. Live-account optimization
-  uses aws eks describe-nodegroup, aws eks list-fargate-profiles, aws
-  cloudwatch get-metric-statistics, aws ce get-cost-and-usage, aws ec2
-  describe-instance-types, and aws ce get-savings-plans-coverage (AWS CLI v2,
-  SSO or key-based credentials). kubectl top nodes / kubectl describe nodes
-  for in-cluster signals.
-keywords:
-  - EKS
-  - Kubernetes
-  - cost optimization
-  - managed node group
-  - Fargate
-  - Spot Instances
-  - Karpenter
-  - Cluster Autoscaler
-  - bin-packing
-  - PodDisruptionBudget
-  - requests
-  - limits
-  - Container Insights
-  - Compute Savings Plans
-  - FinOps
-  - node group right-sizing
-  - EKS Auto Mode
-  - consolidation
-  - Graviton
-  - Vertical Pod Autoscaler
-tags: [eks, kubernetes, compute, cost-optimization, finops, fargate, karpenter, spot]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted Container Insights metrics and node group configurations. Live-account optimization uses aws eks describe-nodegroup, aws eks list-fargate-profiles, aws cloudwatch get-metric-statistics, aws ce get-cost-and-usage, aws ec2 describe-instance-types, and aws ce get-savings-plans-coverage (AWS CLI v2, SSO or key-based credentials). kubectl top nodes / kubectl...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL"
-  when_to_use: >-
-    Right-sizing EKS managed node groups for cost, evaluating Fargate vs EC2
-    for a workload, planning a Spot node group migration, comparing Cluster
-    Autoscaler vs Karpenter, identifying bin-packing waste (requests vs limits
-    gap), planning a Compute Savings Plan for EKS nodes, or building a
-    monthly savings estimate for an EKS FinOps initiative.
-  when_not_to_use: >-
-    Auditing a single pod's resource requests (use VPA recommendations
-    directly), troubleshooting a pod crash or OOMKill (use kubectl describe
-    and application logs), EC2 instance rightsizing outside EKS (use
-    ec2-rightsizing-optimizer), EKS security or RBAC audits (use the
-    security audit skills), or EKS upgrade planning (use the deploy/operate
-    skills). This skill focuses on cost-driven EKS optimization decisions.
-  activation_triggers:
-    - "optimize EKS cluster cost"
-    - "right-size EKS node group"
-    - "Fargate vs EC2 nodes"
-    - "EKS Spot Instance node group"
-    - "Karpenter vs Cluster Autoscaler"
-    - "Karpenter consolidation savings"
-    - "EKS bin-packing optimization"
-    - "Kubernetes requests vs limits"
-    - "EKS Compute Savings Plan"
-    - "EKS FinOps savings"
-    - "reduce EKS node spend"
-    - "EKS Graviton node group"
-    - "EKS Auto Mode cost"
-    - "EKS node group downsize"
-    - "Kubernetes cost optimization"
-  invocation_schema: >-
-    Input: either (a) an EKS cluster identifier + live-account context, (b)
-    a managed node group configuration with utilization data, OR (c)
-    Container Insights metrics (node CPU, node memory, pod CPU, pod memory)
-    for one or more node groups with at least 14 days of observation. Output:
-    a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/
-    MIGRATION_STEPS block per node group or cluster, where VERDICT is one of
-    {OPTIMIZED, OPPORTUNITY_FOUND, ALREADY_OPTIMAL} and RECOMMENDATION
-    includes the target node type, compute model (EC2/Fargate/Spot), autoscaler
-    strategy, and pricing model.
-  invocation_example: |-
-    # Minimal valid input (offline finding classification):
-    Cluster: prod-cluster
-    Region: us-east-1
-    Node group: prod-general-purpose
-    Instance type: m5.2xlarge
-    Desired size: 4 nodes (min 3, max 10)
-    Compute model: EC2 On-Demand managed node group
-    Autoscaler: Cluster Autoscaler
-    Utilization (Container Insights, last 30 days):
-      - node_cpu_utilization: avg=12%, max=20%
-      - node_memory_utilization: avg=25%, max=35%
-      - Average pods per node: 8 (capacity ~30)
-    Workload: mixed microservices (Java, Python, Go), multi-arch
-    Docker images available.
-    Emit the standard optimization block.
+  verdict_shape: OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL
+  when_to_use: Right-sizing EKS managed node groups for cost, evaluating Fargate vs EC2 for a workload, planning a Spot node group migration, comparing Cluster Autoscaler vs Karpenter, identifying bin-packing waste (requests vs limits gap), planning a Compute Savings Plan for EKS nodes, or building a monthly savings estimate for an EKS FinOps initiative.
+  when_not_to_use: Auditing a single pod's resource requests (use VPA recommendations directly), troubleshooting a pod crash or OOMKill (use kubectl describe and application logs), EC2 instance rightsizing outside EKS (use ec2-rightsizing-optimizer), EKS security or RBAC audits (use the security audit skills), or EKS upgrade planning (use the deploy/operate skills). This skill focuses on cost-driven EKS optimization decisions.
+  activation_triggers: optimize EKS cluster cost, right-size EKS node group, Fargate vs EC2 nodes, EKS Spot Instance node group, Karpenter vs Cluster Autoscaler, Karpenter consolidation savings, EKS bin-packing optimization, Kubernetes requests vs limits, EKS Compute Savings Plan, EKS FinOps savings, reduce EKS node spend, EKS Graviton node group, EKS Auto Mode cost, EKS node group downsize, Kubernetes cost optimization
+  invocation_schema: 'Input: either (a) an EKS cluster identifier + live-account context, (b) a managed node group configuration with utilization data, OR (c) Container Insights metrics (node CPU, node memory, pod CPU, pod memory) for one or more node groups with at least 14 days of observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/ MIGRATION_STEPS block per node group or cluster, where VERDICT is one of {OPTIMIZED, OPPORTUNITY_FOUND, ALREADY_OPTIMAL} and RECOMMENDATION includes the target node type, compute model (EC2/Fargate/Spot), autoscaler strategy, and pricing model.'
+  invocation_example: "# Minimal valid input (offline finding classification):\nCluster: prod-cluster\nRegion: us-east-1\nNode group: prod-general-purpose\nInstance type: m5.2xlarge\nDesired size: 4 nodes (min 3, max 10)\nCompute model: EC2 On-Demand managed node group\nAutoscaler: Cluster Autoscaler\nUtilization (Container Insights, last 30 days):\n  - node_cpu_utilization: avg=12%, max=20%\n  - node_memory_utilization: avg=25%, max=35%\n  - Average pods per node: 8 (capacity ~30)\nWorkload: mixed microservices (Java, Python, Go), multi-arch\nDocker images available.\nEmit the standard optimization block."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: EKS, Kubernetes, cost optimization, managed node group, Fargate, Spot Instances, Karpenter, Cluster Autoscaler, bin-packing, PodDisruptionBudget, requests, limits, Container Insights, Compute Savings Plans, FinOps, node group right-sizing, EKS Auto Mode, consolidation, Graviton, Vertical Pod Autoscaler
+  tags: eks, kubernetes, compute, cost-optimization, finops, fargate, karpenter, spot
 ---
 
 # EKS Cost Optimizer

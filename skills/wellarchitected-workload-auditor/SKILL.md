@@ -1,55 +1,23 @@
 ---
 name: wellarchitected-workload-auditor
-description: >-
-  Audits AWS Well-Architected Tool workloads for review staleness, per-pillar
-  high-risk issue counts, milestone tracking gaps, and remediation plan
-  completeness. Emits a deterministic verdict (STALE_REVIEW | HIGH_RISK |
-  CONFIG_GAP | OK) per workload with per-pillar risk breakdown, milestone
-  trend analysis, and specific remediation. Use when reviewing Well-Architected
-  workloads, checking WA review freshness, auditing high-risk issues per
-  pillar, validating milestone coverage, or tracking remediation plans.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Well-Architected Tool workloads for review staleness, per-pillar high-risk issue counts, milestone tracking gaps, and remediation plan completeness. Emits a deterministic verdict (STALE_REVIEW | HIGH_RISK | CONFIG_GAP | OK) per workload with per-pillar risk breakdown, milestone trend analysis, and specific remediation. Use when reviewing Well-Architected workloads, checking WA review freshness, auditing high-risk issues per pillar, validating milestone coverage, or tracking remediation plans.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline workload-document classification.
-  Live-account audits use aws wellarchitected describe-workload,
-  list-milestones, list-answers, and list-workload-shares (AWS CLI v2, SSO
-  or key-based credentials).
-keywords:
-  - Well-Architected Tool
-  - workload review
-  - staleness
-  - high-risk issues
-  - pillar risk
-  - milestone tracking
-  - remediation plan
-  - Well-Architected Framework
-  - risk counts
-  - lens audit
-  - workload auditor
-  - WA review
-  - improvement plan
-  - UNANSWERED
-  - review freshness
-  - RiskCounts
-tags: [wellarchitected, governance, review-audit, risk-assessment, milestones, remediation, compliance]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline workload-document classification. Live-account audits use aws wellarchitected describe-workload, list-milestones, list-answers, and list-workload-shares (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
-  verdict_shape: "STALE_REVIEW | HIGH_RISK | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a Well-Architected Tool workload for staleness or freshness,
-    auditing high-risk issues per pillar, checking milestone coverage, tracking
-    remediation plan progress, validating lens coverage, or preparing a
-    workload for a compliance gate or executive review.
-  trigger_regex: '(?i)(well[-\s]?architected|WA[-\s]?(?:tool|review|workload)|pillar[-\s]?risk|review[-\s]?(?:stale|fresh)|milestone[-\s]?track|remediation[-\s]?plan|RiskCounts|list-answers|describe-workload)'
+  verdict_shape: STALE_REVIEW | HIGH_RISK | CONFIG_GAP | OK
+  when_to_use: Reviewing a Well-Architected Tool workload for staleness or freshness, auditing high-risk issues per pillar, checking milestone coverage, tracking remediation plan progress, validating lens coverage, or preparing a workload for a compliance gate or executive review.
+  trigger_regex: (?i)(well[-\s]?architected|WA[-\s]?(?:tool|review|workload)|pillar[-\s]?risk|review[-\s]?(?:stale|fresh)|milestone[-\s]?track|remediation[-\s]?plan|RiskCounts|list-answers|describe-workload)
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Well-Architected Tool, workload review, staleness, high-risk issues, pillar risk, milestone tracking, remediation plan, Well-Architected Framework, risk counts, lens audit, workload auditor, WA review, improvement plan, UNANSWERED, review freshness, RiskCounts
+  tags: wellarchitected, governance, review-audit, risk-assessment, milestones, remediation, compliance
 ---
 
 # Well-Architected Workload Auditor

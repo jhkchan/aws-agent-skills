@@ -1,110 +1,26 @@
 ---
 name: sqs-queue-deployer
-description: >-
-  Provisions AWS SQS queues with production-grade configuration: correct queue
-  type (Standard vs FIFO), dead-letter queue with tuned maxReceiveCount, right-
-  sized visibility timeout, message retention period, long polling, SSE-SQS or
-  SSE-KMS encryption, least-privilege access policy, FIFO deduplication, high-
-  throughput FIFO batching, and Lambda partial batch responses. Emits a
-  READY_TO_DEPLOY checklist with every configuration item verified. Use when
-  creating a new SQS queue, deploying a queue to production, validating a queue
-  configuration, wiring a DLQ, or generating deployment CLI commands and IaC
-  templates. Triggers: create SQS queue, deploy queue, FIFO queue, dead-letter
-  queue, redrive policy, visibility timeout, long polling, SSE-SQS, SSE-KMS,
-  ContentBasedDeduplication, MessageGroupId, partial batch responses.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS SQS queues with production-grade configuration: correct queue type (Standard vs FIFO), dead-letter queue with tuned maxReceiveCount, right- sized visibility timeout, message retention period, long polling, SSE-SQS or SSE-KMS encryption, least-privilege access policy, FIFO deduplication, high- throughput FIFO batching, and Lambda partial batch responses. Emits a READY_TO_DEPLOY checklist with every configuration item verified. Use when creating a new SQS queue, deploying a queue to production, validating a queue configuration, wiring a DLQ, or generating deployment CLI commands and IaC templates. Triggers: create SQS queue, deploy queue, FIFO queue, dead-letter queue, redrive policy, visibility timeout, long polling, SSE-SQS, SSE-KMS, ContentBasedDeduplication, MessageGroupId, partial batch responses.'
 license: Apache-2.0
-compatibility: >-
-  Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini).
-  For live deployment: AWS CLI v2 with sqs, iam, kms, lambda, and sns access.
-  Works with Terraform aws_sqs_queue resources, CloudFormation
-  AWS::SQS::Queue, and SAM templates.
-keywords:
-  - aws
-  - sqs
-  - cloudops
-  - deploy
-  - provisioning
-  - messaging
-  - app-integration
-  - standard queue
-  - fifo queue
-  - dead-letter queue
-  - DLQ
-  - redrive policy
-  - maxReceiveCount
-  - visibility timeout
-  - message retention
-  - long polling
-  - SSE-SQS
-  - SSE-KMS
-  - queue policy
-  - ContentBasedDeduplication
-  - MessageGroupId
-  - high-throughput FIFO
-  - partial batch responses
-tags:
-  - aws
-  - sqs
-  - cloudops
-  - deploy
-  - messaging
-  - app-integration
-  - dead-letter-queue
-  - fifo
-  - encryption
-  - queue-policy
-dependencies:
-  - aws-orchestrator
+compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with sqs, iam, kms, lambda, and sns access. Works with Terraform aws_sqs_queue resources, CloudFormation AWS::SQS::Queue, and SAM templates.'
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-    - aws
-    - sqs
-    - cloudops
-    - deploy
-    - messaging
-    - app-integration
-    - dead-letter-queue
-    - fifo
-    - encryption
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create sqs queue
-    - deploy sqs queue
-    - fifo queue
-    - dead-letter queue
-    - redrive policy
-    - visibility timeout
-    - long polling
-    - SSE-SQS
-    - SSE-KMS
-    - ContentBasedDeduplication
-    - MessageGroupId
-    - high-throughput FIFO
-    - partial batch responses
-  when_to_use: >-
-    Invoke when the user wants to create a new SQS queue, deploy a queue to
-    production, configure a dead-letter queue, validate a queue configuration
-    against best practices, generate deployment CLI commands or IaC templates,
-    or troubleshoot a deployment failure caused by missing prerequisites (DLQ
-    type mismatch, KMS key, IAM permissions). Do NOT invoke for SQS security
-    audits (use sqs-dlq-policy-auditor) or for SNS topic deployment (use
-    sns-topic-deployer).
+  tags: aws, sqs, cloudops, deploy, messaging, app-integration, dead-letter-queue, fifo, encryption, queue-policy
+  dependencies: aws-orchestrator
+  keywords: aws, sqs, cloudops, deploy, provisioning, messaging, app-integration, standard queue, fifo queue, dead-letter queue, DLQ, redrive policy, maxReceiveCount, visibility timeout, message retention, long polling, SSE-SQS, SSE-KMS, queue policy, ContentBasedDeduplication, MessageGroupId, high-throughput FIFO, partial batch responses
+  when_to_use: Invoke when the user wants to create a new SQS queue, deploy a queue to production, configure a dead-letter queue, validate a queue configuration against best practices, generate deployment CLI commands or IaC templates, or troubleshoot a deployment failure caused by missing prerequisites (DLQ type mismatch, KMS key, IAM permissions). Do NOT invoke for SQS security audits (use sqs-dlq-policy-auditor) or for SNS topic deployment (use sns-topic-deployer).
 ---
 
 # SQS Queue Deployer

@@ -1,131 +1,26 @@
 ---
 name: organizations-account-deployer
-description: >-
-  Provisions AWS Organizations member accounts with production defaults:
-  account creation (create-account with unique root email, IAM role name),
-  Control Tower Account Factory (automation, blueprints, landing zone
-  vending), cross-account role (OrganizationAccountAccessRole),
-  consolidated billing, SCP and tag policy attachment at correct scope,
-  CloudTrail organization trail propagation, IAM Identity Center SSO
-  permission sets, and latest features (Terraform aws_organizations_account,
-  Account Factory custom baselines). Emits a READY_TO_DEPLOY checklist
-  with verification commands. Use when provisioning a new AWS account via
-  Organizations or Control Tower, vending a landing-zone account, wiring
-  cross-account admin, attaching SCPs and tag policies, propagating an org
-  trail, or assigning SSO permission sets. Triggers: create AWS account,
-  Organizations create-account, Account Factory,
-  OrganizationAccountAccessRole, consolidated billing, SSO,
-  org trail, account baseline.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Organizations member accounts with production defaults: account creation (create-account with unique root email, IAM role name), Control Tower Account Factory (automation, blueprints, landing zone vending), cross-account role (OrganizationAccountAccessRole), consolidated billing, SCP and tag policy attachment at correct scope, CloudTrail organization trail propagation, IAM Identity Center SSO permission sets, and latest features (Terraform aws_organizations_account, Account Factory custom baselines). Emits a READY_TO_DEPLOY checklist with verification commands. Use when provisioning a new AWS account via Organizations or Control Tower, vending a landing-zone account, wiring cross-account admin, attaching SCPs and tag policies, propagating an org trail, or assigning SSO permission sets. Triggers: create AWS account, Organizations create-account, Account Factory, OrganizationAccountAccessRole, consolidated billing, SSO, org trail, account baseline.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with organizations,
-  controltower, sso-admin, cloudtrail, ram, sts, and iam access. Works
-  with Terraform aws_organizations_account / aws_controltower_account /
-  aws_ssoadmin_permission_set resources and CloudFormation
-  AWS::Organizations::Account templates.
-keywords:
-  - aws
-  - aws organizations
-  - organizations create-account
-  - control tower
-  - account factory
-  - landing zone
-  - organizationaccountaccessrole
-  - cross-account role
-  - consolidated billing
-  - sso permission set
-  - iam identity center
-  - scp assignment
-  - tag policy
-  - org trail
-  - cloudtrail organization trail
-  - account baseline
-  - account vending
-  - aws_organizations_account
-  - aws_controltower_account
-  - terraform organizations
-tags:
-  - aws
-  - aws-organizations
-  - control-tower
-  - account-factory
-  - cloudops
-  - deploy
-  - governance
-  - landing-zone
-  - sso
-  - iam-identity-center
-  - consolidated-billing
-  - scp
-  - tag-policy
-  - org-trail
-  - account-vending
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with organizations, controltower, sso-admin, cloudtrail, ram, sts, and iam access. Works with Terraform aws_organizations_account / aws_controltower_account / aws_ssoadmin_permission_set resources and CloudFormation AWS::Organizations::Account templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - aws-organizations
-    - control-tower
-    - account-factory
-    - cloudops
-    - deploy
-    - governance
-    - landing-zone
-    - sso
-    - iam-identity-center
-    - consolidated-billing
-    - scp
-    - tag-policy
-    - org-trail
-    - account-vending
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create aws account
-    - organizations create-account
-    - control tower account factory
-    - account vending
-    - landing zone
-    - organizationaccountaccessrole
-    - consolidated billing
-    - sso permission set
-    - iam identity center
-    - scp assignment
-    - tag policy
-    - org trail
-    - account baseline
-    - aws_organizations_account
-    - aws_controltower_account
-  when_to_use: >-
-    Invoke when the user wants to create a new AWS member account through
-    AWS Organizations (create-account) or Control Tower Account Factory,
-    design an account-vending / landing-zone workflow with custom
-    baselines, wire OrganizationAccountAccessRole cross-account admin
-    access, attach SCPs and tag policies to a new account, propagate a
-    CloudTrail organization trail across the org, assign IAM Identity
-    Center SSO permission sets and account assignments to a new account,
-    set up consolidated billing, or generate provisioning CLI / Terraform
-    templates for account creation. Do NOT invoke for SCP authoring (use
-    organizations-scp-deployer), account-level security auditing (use
-    organizations-scp-auditor), or standalone CloudTrail configuration
-    outside the org context.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, aws-organizations, control-tower, account-factory, cloudops, deploy, governance, landing-zone, sso, iam-identity-center, consolidated-billing, scp, tag-policy, org-trail, account-vending
+  dependencies: aws-orchestrator
+  keywords: aws, aws organizations, organizations create-account, control tower, account factory, landing zone, organizationaccountaccessrole, cross-account role, consolidated billing, sso permission set, iam identity center, scp assignment, tag policy, org trail, cloudtrail organization trail, account baseline, account vending, aws_organizations_account, aws_controltower_account, terraform organizations
+  when_to_use: Invoke when the user wants to create a new AWS member account through AWS Organizations (create-account) or Control Tower Account Factory, design an account-vending / landing-zone workflow with custom baselines, wire OrganizationAccountAccessRole cross-account admin access, attach SCPs and tag policies to a new account, propagate a CloudTrail organization trail across the org, assign IAM Identity Center SSO permission sets and account assignments to a new account, set up consolidated billing, or generate provisioning CLI / Terraform templates for account creation. Do NOT invoke for SCP authoring (use organizations-scp-deployer), account-level security auditing (use organizations-scp-auditor), or standalone CloudTrail configuration outside the org context.
 ---
 
 # Organizations Account Deployer

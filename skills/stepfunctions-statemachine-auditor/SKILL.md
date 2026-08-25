@@ -1,90 +1,24 @@
 ---
 name: stepfunctions-statemachine-auditor
-description: >-
-  Audits AWS Step Functions state machines for execution logging coverage
-  (level ALL + includeExecutionData), X-Ray tracing enablement (including
-  the Express-workflow no-op trap), execution-role blast radius (wildcard
-  actions, states:StartExecution chaining, iam:PassRole), and ASL
-  definition validation (missing Catch/Retry on fallible Tasks, missing
-  TimeoutSeconds, unreachable states, cyclic references without exit). Emits
-  a deterministic verdict (NO_LOGGING | NO_TRACING | OVERPERMISSIVE_ROLE |
-  CONFIG_GAP | OK) per state machine with enumerated findings and specific
-  remediation. Use when reviewing Step Functions state machines, checking
-  logging coverage, validating X-Ray tracing, auditing execution-role
-  scope, validating ASL definitions, or hardening state machine
-  observability and security posture before production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Step Functions state machines for execution logging coverage (level ALL + includeExecutionData), X-Ray tracing enablement (including the Express-workflow no-op trap), execution-role blast radius (wildcard actions, states:StartExecution chaining, iam:PassRole), and ASL definition validation (missing Catch/Retry on fallible Tasks, missing TimeoutSeconds, unreachable states, cyclic references without exit). Emits a deterministic verdict (NO_LOGGING | NO_TRACING | OVERPERMISSIVE_ROLE | CONFIG_GAP | OK) per state machine with enumerated findings and specific remediation. Use when reviewing Step Functions state machines, checking logging coverage, validating X-Ray tracing, auditing execution-role scope, validating ASL definitions, or hardening state machine observability and security posture before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline state-machine classification.
-  Live-account audits use aws stepfunctions describe-state-machine,
-  aws stepfunctions describe-execution, aws iam get-role-policy, and
-  aws stepfunctions validate-state-machine-definition (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - Step Functions
-  - state machine
-  - ASL
-  - Amazon States Language
-  - execution logging
-  - CloudWatch Logs
-  - X-Ray tracing
-  - distributed tracing
-  - Express workflow
-  - Standard workflow
-  - execution role
-  - IAM blast radius
-  - states:StartExecution
-  - iam:PassRole
-  - definition validation
-  - circular states
-  - unreachable states
-  - Catch block
-  - Retry block
-  - TimeoutSeconds
-  - HeartbeatSeconds
-  - error handling
-  - Task state
-  - Choice state
-  - Map state
-  - Parallel state
-  - state machine audit
-tags: [stepfunctions, app-integration, security, observability, state-machine, asl, xray, logging, iam, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline state-machine classification. Live-account audits use aws stepfunctions describe-state-machine, aws stepfunctions describe-execution, aws iam get-role-policy, and aws stepfunctions validate-state-machine-definition (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
-  verdict_shape: "NO_LOGGING | NO_TRACING | OVERPERMISSIVE_ROLE | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a Step Functions state machine before production deployment,
-    checking execution logging coverage, validating X-Ray tracing enablement,
-    auditing the execution role's blast radius, validating ASL definition
-    correctness (unreachable/cyclic states, missing error handling), or
-    hardening state machine observability and security posture.
-  activation_triggers:
-    - "audit this state machine"
-    - "check Step Functions logging"
-    - "is X-Ray tracing enabled"
-    - "state machine execution role too broad"
-    - "validate ASL definition"
-    - "missing Catch block"
-    - "Express workflow tracing"
-    - "state machine error handling"
-    - "unreachable states in ASL"
-    - "Step Functions blast radius"
-  invocation_schema: >-
-    Input: either (a) a Step Functions state machine configuration
-    (definition + type + loggingConfiguration + tracingConfiguration +
-    roleArn + role policy), OR (b) a state-machine ARN for live-account
-    audit. Output: deterministic STATE_MACHINE/VERDICT/REASON/FINDINGS/
-    REMEDIATION block per state machine, where VERDICT is one of NO_LOGGING,
-    NO_TRACING, OVERPERMISSIVE_ROLE, CONFIG_GAP, OK, or ERROR.
+  verdict_shape: NO_LOGGING | NO_TRACING | OVERPERMISSIVE_ROLE | CONFIG_GAP | OK
+  when_to_use: Reviewing a Step Functions state machine before production deployment, checking execution logging coverage, validating X-Ray tracing enablement, auditing the execution role's blast radius, validating ASL definition correctness (unreachable/cyclic states, missing error handling), or hardening state machine observability and security posture.
+  activation_triggers: audit this state machine, check Step Functions logging, is X-Ray tracing enabled, state machine execution role too broad, validate ASL definition, missing Catch block, Express workflow tracing, state machine error handling, unreachable states in ASL, Step Functions blast radius
+  invocation_schema: 'Input: either (a) a Step Functions state machine configuration (definition + type + loggingConfiguration + tracingConfiguration + roleArn + role policy), OR (b) a state-machine ARN for live-account audit. Output: deterministic STATE_MACHINE/VERDICT/REASON/FINDINGS/ REMEDIATION block per state machine, where VERDICT is one of NO_LOGGING, NO_TRACING, OVERPERMISSIVE_ROLE, CONFIG_GAP, OK, or ERROR.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Step Functions, state machine, ASL, Amazon States Language, execution logging, CloudWatch Logs, X-Ray tracing, distributed tracing, Express workflow, Standard workflow, execution role, IAM blast radius, states:StartExecution, iam:PassRole, definition validation, circular states, unreachable states, Catch block, Retry block, TimeoutSeconds, HeartbeatSeconds, error handling, Task state, Choice state, Map state, Parallel state, state machine audit
+  tags: stepfunctions, app-integration, security, observability, state-machine, asl, xray, logging, iam, audit
 ---
 
 # Step Functions State Machine Auditor

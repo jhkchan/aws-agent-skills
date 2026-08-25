@@ -1,117 +1,26 @@
 ---
 name: ec2-spot-fleet-deployer
-description: >-
-  Provisions EC2 Spot Fleets with production defaults: launch template
-  configuration, Spot Fleet request (target capacity, allocation
-  strategy: lowestPrice/capacityOptimized/diversified/
-  priceCapacityOptimized), instance pools, fleet type
-  (request/maintain), replacement strategies, capacity rebalance,
-  Spot placement score, capacity reservations. Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when
-  creating a Spot Fleet request, choosing an allocation strategy,
-  configuring instance diversification, enabling capacity rebalance,
-  or integrating Spot Fleets with capacity reservations. Triggers:
-  create spot fleet, EC2 Spot Fleet request, spot instance pool,
-  allocation strategy, capacity rebalance, spot placement score,
-  priceCapacityOptimized, lowestPrice spot, capacityOptimized spot,
-  diversified spot fleet, maintain spot fleet.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions EC2 Spot Fleets with production defaults: launch template configuration, Spot Fleet request (target capacity, allocation strategy: lowestPrice/capacityOptimized/diversified/ priceCapacityOptimized), instance pools, fleet type (request/maintain), replacement strategies, capacity rebalance, Spot placement score, capacity reservations. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Spot Fleet request, choosing an allocation strategy, configuring instance diversification, enabling capacity rebalance, or integrating Spot Fleets with capacity reservations. Triggers: create spot fleet, EC2 Spot Fleet request, spot instance pool, allocation strategy, capacity rebalance, spot placement score, priceCapacityOptimized, lowestPrice spot, capacityOptimized spot, diversified spot fleet, maintain spot fleet.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with ec2, iam,
-  and service-roles access. Works with Terraform
-  aws_spot_fleet_request resources and CloudFormation
-  AWS::EC2::SpotFleet templates.
-keywords:
-  - aws
-  - ec2
-  - spot fleet
-  - spot instances
-  - cloudops
-  - deploy
-  - provisioning
-  - allocation strategy
-  - lowestPrice
-  - capacityOptimized
-  - diversified
-  - priceCapacityOptimized
-  - instance pools
-  - target capacity
-  - capacity rebalance
-  - spot placement score
-  - capacity reservations
-  - launch template
-  - fleet type
-  - maintain
-tags:
-  - aws
-  - ec2
-  - spot-fleet
-  - cloudops
-  - deploy
-  - compute
-  - provisioning
-  - allocation-strategy
-  - capacity-rebalance
-  - launch-template
-  - spot-instances
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with ec2, iam, and service-roles access. Works with Terraform aws_spot_fleet_request resources and CloudFormation AWS::EC2::SpotFleet templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - ec2
-    - spot-fleet
-    - cloudops
-    - deploy
-    - compute
-    - provisioning
-    - allocation-strategy
-    - capacity-rebalance
-    - launch-template
-    - spot-instances
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create spot fleet
-    - ec2 spot fleet request
-    - spot allocation strategy
-    - capacity rebalance spot
-    - spot placement score
-    - priceCapacityOptimized
-    - lowestPrice spot
-    - capacityOptimized spot
-    - diversified spot fleet
-    - maintain spot fleet
-  when_to_use: >-
-    Invoke when the user wants to create an EC2 Spot Fleet request
-    (maintain or one-time request), select an allocation strategy
-    (lowestPrice, capacityOptimized, diversified,
-    priceCapacityOptimized), configure instance pool
-    diversification, enable capacity rebalance and replacement,
-    use Spot placement score for capacity awareness, or integrate
-    Spot Fleets with capacity reservations. Do NOT invoke for
-    single Spot Instance requests (use RunInstances with
-    InstanceMarketOptions), for On-Demand Capacity Reservations
-    standalone (use capacity-reservation operators), for EC2
-    Auto Scaling Groups with mixed instances (use
-    autoscaling-policy-deployer), or for auditing existing Spot
-    Fleet configurations (use autoscaling-group-auditor).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, ec2, spot-fleet, cloudops, deploy, compute, provisioning, allocation-strategy, capacity-rebalance, launch-template, spot-instances
+  dependencies: aws-orchestrator
+  keywords: aws, ec2, spot fleet, spot instances, cloudops, deploy, provisioning, allocation strategy, lowestPrice, capacityOptimized, diversified, priceCapacityOptimized, instance pools, target capacity, capacity rebalance, spot placement score, capacity reservations, launch template, fleet type, maintain
+  when_to_use: Invoke when the user wants to create an EC2 Spot Fleet request (maintain or one-time request), select an allocation strategy (lowestPrice, capacityOptimized, diversified, priceCapacityOptimized), configure instance pool diversification, enable capacity rebalance and replacement, use Spot placement score for capacity awareness, or integrate Spot Fleets with capacity reservations. Do NOT invoke for single Spot Instance requests (use RunInstances with InstanceMarketOptions), for On-Demand Capacity Reservations standalone (use capacity-reservation operators), for EC2 Auto Scaling Groups with mixed instances (use autoscaling-policy-deployer), or for auditing existing Spot Fleet configurations (use autoscaling-group-auditor).
 ---
 
 # EC2 Spot Fleet Deployer

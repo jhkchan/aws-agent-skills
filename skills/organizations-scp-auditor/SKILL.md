@@ -1,70 +1,24 @@
 ---
 name: organizations-scp-auditor
-description: >-
-  Audits AWS Organizations Service Control Policies (SCPs) for effective
-  permission boundaries across the OU hierarchy — FullAWSAccess inheritance,
-  deny-list guardrails (LeaveOrganization, security-service disruption, region
-  restriction), account-level overrides, and silently ineffective conditions
-  from unsupported SCP condition keys. Emits a deterministic verdict
-  (PERMISSIVE_SCP | MISSING_GUARDRAIL | CONFIG_GAP | OK) per target account
-  with enumerated findings and specific remediation. Use when reviewing SCPs,
-  checking OU hierarchy guardrails, auditing effective permissions, validating
-  deny-list strategy, or hardening organization-level security posture.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Organizations Service Control Policies (SCPs) for effective permission boundaries across the OU hierarchy — FullAWSAccess inheritance, deny-list guardrails (LeaveOrganization, security-service disruption, region restriction), account-level overrides, and silently ineffective conditions from unsupported SCP condition keys. Emits a deterministic verdict (PERMISSIVE_SCP | MISSING_GUARDRAIL | CONFIG_GAP | OK) per target account with enumerated findings and specific remediation. Use when reviewing SCPs, checking OU hierarchy guardrails, auditing effective permissions, validating deny-list strategy, or hardening organization-level security posture.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline SCP-document classification.
-  Live-account audits use aws organizations list-policies-for-target,
-  describe-policy, list-roots, and list-accounts-for-parent (AWS CLI v2, SSO
-  or key-based credentials, management account or delegated administrator).
-keywords:
-  - Organizations
-  - SCP
-  - Service Control Policy
-  - OU hierarchy
-  - FullAWSAccess
-  - deny-list
-  - allow-list
-  - LeaveOrganization
-  - aws:RequestedRegion
-  - guardrail
-  - management account
-  - account-level override
-  - effective permissions
-  - policy inheritance
-  - organizational unit
-tags: [organizations, scp, governance, guardrail, ou-hierarchy, policy-inheritance, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline SCP-document classification. Live-account audits use aws organizations list-policies-for-target, describe-policy, list-roots, and list-accounts-for-parent (AWS CLI v2, SSO or key-based credentials, management account or delegated administrator).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
-  verdict_shape: "PERMISSIVE_SCP | MISSING_GUARDRAIL | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing SCPs before attaching to production OUs, checking effective
-    permissions across the OU hierarchy, auditing deny-list guardrails,
-    validating FullAWSAccess strategy, inspecting account-level SCP overrides,
-    or hardening organization-level security posture.
-  activation_triggers:
-    - "audit these SCPs"
-    - "check SCP guardrails"
-    - "effective permissions for this OU"
-    - "is LeaveOrganization denied"
-    - "FullAWSAccess strategy"
-    - "SCP deny-list review"
-    - "OU hierarchy security"
-    - "organization guardrail audit"
-  invocation_schema: >-
-    Input: either (a) an SCP policy document JSON plus OU hierarchy context
-    (root -> OU -> account chain with attached SCPs at each level), OR (b) a
-    target ID (root/OU/account) for live-account effective-SCP audit. Output:
-    deterministic TARGET/VERDICT/REASON/FINDINGS/REMEDIATION block per target,
-    where VERDICT in {PERMISSIVE_SCP, MISSING_GUARDRAIL, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: PERMISSIVE_SCP | MISSING_GUARDRAIL | CONFIG_GAP | OK
+  when_to_use: Reviewing SCPs before attaching to production OUs, checking effective permissions across the OU hierarchy, auditing deny-list guardrails, validating FullAWSAccess strategy, inspecting account-level SCP overrides, or hardening organization-level security posture.
+  activation_triggers: audit these SCPs, check SCP guardrails, effective permissions for this OU, is LeaveOrganization denied, FullAWSAccess strategy, SCP deny-list review, OU hierarchy security, organization guardrail audit
+  invocation_schema: 'Input: either (a) an SCP policy document JSON plus OU hierarchy context (root -> OU -> account chain with attached SCPs at each level), OR (b) a target ID (root/OU/account) for live-account effective-SCP audit. Output: deterministic TARGET/VERDICT/REASON/FINDINGS/REMEDIATION block per target, where VERDICT in {PERMISSIVE_SCP, MISSING_GUARDRAIL, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Organizations, SCP, Service Control Policy, OU hierarchy, FullAWSAccess, deny-list, allow-list, LeaveOrganization, aws:RequestedRegion, guardrail, management account, account-level override, effective permissions, policy inheritance, organizational unit
+  tags: organizations, scp, governance, guardrail, ou-hierarchy, policy-inheritance, audit
 ---
 
 # Organizations SCP Auditor

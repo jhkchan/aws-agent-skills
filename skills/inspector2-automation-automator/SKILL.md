@@ -1,95 +1,27 @@
 ---
 name: inspector2-automation-automator
-description: >-
-  Designs and deploys Amazon Inspector v2 automation workflows —
-  enabling Inspector across EC2, ECR, and Lambda resources;
-  EventBridge routing for finding events; severity-based auto-
-  remediation (Critical = patch via SSM Automation, High = notify
-  with Slack/email); ECR image scan on push integration; Lambda
-  code scan finding handling; finding suppression for accepted
-  risks; Inspector to Security Hub finding forwarding; multi-account
-  via Organizations delegated admin; patch baseline association
-  for OS-level remediation; SSM Automation runbook design for
-  OS patching; container image rebuild trigger via CodeBuild;
-  finding lifecycle (open/suppressed/closed) and SLA enforcement.
-  Emits AUTOMATION_DEPLOYED with a workflow template (CLI or
-  CloudFormation) or REVIEW_REQUIRED with the specific gap. Use
-  when building Inspector-driven remediation, wiring SSM patch
-  baselines to Inspector findings, configuring ECR rescan, or
-  forwarding Inspector findings to Security Hub.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Designs and deploys Amazon Inspector v2 automation workflows — enabling Inspector across EC2, ECR, and Lambda resources; EventBridge routing for finding events; severity-based auto- remediation (Critical = patch via SSM Automation, High = notify with Slack/email); ECR image scan on push integration; Lambda code scan finding handling; finding suppression for accepted risks; Inspector to Security Hub finding forwarding; multi-account via Organizations delegated admin; patch baseline association for OS-level remediation; SSM Automation runbook design for OS patching; container image rebuild trigger via CodeBuild; finding lifecycle (open/suppressed/closed) and SLA enforcement. Emits AUTOMATION_DEPLOYED with a workflow template (CLI or CloudFormation) or REVIEW_REQUIRED with the specific gap. Use when building Inspector-driven remediation, wiring SSM patch baselines to Inspector findings, configuring ECR rescan, or forwarding Inspector findings to Security Hub.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline workflow design.
-  Live deployment uses aws inspector2 enable, list-findings,
-  list-coverage, aws ssm create-document, start-automation-execution,
-  create-patch-baseline, aws events put-rule, put-targets, aws
-  securityhub batch-import-findings, aws ecr
-  put-image-scanning-configuration, start-image-scan, and aws
-  codebuild start-build — AWS CLI v2, SSO or key-based credentials.
-keywords:
-  - Amazon Inspector
-  - Inspector v2
-  - Inspector2
-  - vulnerability scanning
-  - ECR image scan
-  - Lambda code scan
-  - EventBridge finding
-  - SSM patch baseline
-  - SSM Automation runbook
-  - Security Hub
-  - delegated admin
-  - finding suppression
-  - finding lifecycle
-  - severity-based remediation
-  - container rebuild
-  - patch remediation
-tags: [amazon-inspector, security-automation, ssm-patch, security-hub, eventbridge, automate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline workflow design. Live deployment uses aws inspector2 enable, list-findings, list-coverage, aws ssm create-document, start-automation-execution, create-patch-baseline, aws events put-rule, put-targets, aws securityhub batch-import-findings, aws ecr put-image-scanning-configuration, start-image-scan, and aws codebuild start-build — AWS CLI v2, SSO or key-based credentials.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATION_DEPLOYED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Designing Inspector v2 automation, wiring SSM Automation
-    runbooks to Inspector findings, building severity-based
-    remediation (Critical=patch, High=notify), configuring ECR
-    image scan on push, handling Lambda code scan findings,
-    forwarding Inspector findings to Security Hub, building
-    multi-account Inspector via Organizations delegated admin,
-    configuring patch baseline associations, or suppressing
-    accepted-risk findings.
-  activation_triggers:
-    - "automate Inspector finding"
-    - "Inspector v2 remediation"
-    - "ECR image scan on push"
-    - "Lambda code scan finding"
-    - "Inspector to Security Hub"
-    - "severity-based remediation"
-    - "SSM patch baseline for Inspector"
-    - "Inspector delegated admin"
-    - "Inspector finding suppression"
-    - "container image rebuild"
-    - "Inspector EventBridge"
-    - "Critical finding auto-patch"
-  invocation_schema: >-
-    Input: either (a) an Inspector finding or finding type (e.g.,
-    CVE-2026-1234 on i-0abc123, or "all Critical findings in
-    prod-OU"), OR (b) an automation requirement ("auto-patch
-    Critical Inspector findings, notify on High"). Output:
-    deterministic REMEDIATION block per finding class —
-    FINDING/SEVERITY/DETECTION/RESPONSE/SSM_RUNBOOK/VERIFICATION/
-    VERDICT — where VERDICT is AUTOMATION_DEPLOYED (workflow
-    template ready) or REVIEW_REQUIRED (specific gap cited).
+  verdict_shape: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
+  when_to_use: Designing Inspector v2 automation, wiring SSM Automation runbooks to Inspector findings, building severity-based remediation (Critical=patch, High=notify), configuring ECR image scan on push, handling Lambda code scan findings, forwarding Inspector findings to Security Hub, building multi-account Inspector via Organizations delegated admin, configuring patch baseline associations, or suppressing accepted-risk findings.
+  activation_triggers: automate Inspector finding, Inspector v2 remediation, ECR image scan on push, Lambda code scan finding, Inspector to Security Hub, severity-based remediation, SSM patch baseline for Inspector, Inspector delegated admin, Inspector finding suppression, container image rebuild, Inspector EventBridge, Critical finding auto-patch
+  invocation_schema: 'Input: either (a) an Inspector finding or finding type (e.g., CVE-2026-1234 on i-0abc123, or "all Critical findings in prod-OU"), OR (b) an automation requirement ("auto-patch Critical Inspector findings, notify on High"). Output: deterministic REMEDIATION block per finding class — FINDING/SEVERITY/DETECTION/RESPONSE/SSM_RUNBOOK/VERIFICATION/ VERDICT — where VERDICT is AUTOMATION_DEPLOYED (workflow template ready) or REVIEW_REQUIRED (specific gap cited).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Amazon Inspector, Inspector v2, Inspector2, vulnerability scanning, ECR image scan, Lambda code scan, EventBridge finding, SSM patch baseline, SSM Automation runbook, Security Hub, delegated admin, finding suppression, finding lifecycle, severity-based remediation, container rebuild, patch remediation
+  tags: amazon-inspector, security-automation, ssm-patch, security-hub, eventbridge, automate
 ---
 
 # Inspector2 Automation Automator

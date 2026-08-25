@@ -1,102 +1,26 @@
 ---
 name: managed-blockchain-deployer
-description: >-
-  Provisions AWS Managed Blockchain with production defaults: Hyperledger
-  Fabric network creation (edition Starter vs Standard, framework version,
-  voting policy), member creation (admin certificate, CA), peer node
-  creation (instance type, Availability Zone, CloudWatch log config), CA
-  enrollment, channel creation, chaincode lifecycle (install/instantiate
-  1.4, approve/commit 2.x). Covers the separate Managed Blockchain
-  Ethereum nodes (public mainnet/testnet) and the serverless Managed
-  Blockchain Query API for on-chain reads (Ethereum, Bitcoin balances,
-  transactions, contracts). Emits a READY_TO_DEPLOY checklist. Use when
-  creating a Fabric network, adding consortium members, deploying peer
-  nodes, installing chaincode, provisioning Ethereum nodes, or querying
-  blockchain data. Triggers: create Managed Blockchain network,
-  Hyperledger Fabric AWS, blockchain member, peer node, chaincode,
-  certificate authority, Managed Blockchain Query, Ethereum node AWS.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Managed Blockchain with production defaults: Hyperledger Fabric network creation (edition Starter vs Standard, framework version, voting policy), member creation (admin certificate, CA), peer node creation (instance type, Availability Zone, CloudWatch log config), CA enrollment, channel creation, chaincode lifecycle (install/instantiate 1.4, approve/commit 2.x). Covers the separate Managed Blockchain Ethereum nodes (public mainnet/testnet) and the serverless Managed Blockchain Query API for on-chain reads (Ethereum, Bitcoin balances, transactions, contracts). Emits a READY_TO_DEPLOY checklist. Use when creating a Fabric network, adding consortium members, deploying peer nodes, installing chaincode, provisioning Ethereum nodes, or querying blockchain data. Triggers: create Managed Blockchain network, Hyperledger Fabric AWS, blockchain member, peer node, chaincode, certificate authority, Managed Blockchain Query, Ethereum node AWS.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with
-  managedblockchain, managedblockchain-query, ec2, logs, and iam
-  access. Works with Terraform aws_managedblockchain_* resources and
-  CloudFormation AWS::ManagedBlockchain::* templates.
-keywords:
-  - aws
-  - managed blockchain
-  - cloudops
-  - deploy
-  - provisioning
-  - hyperledger fabric
-  - blockchain network
-  - consortium
-  - peer node
-  - chaincode
-  - certificate authority
-  - ethereum
-  - blockchain query
-  - token balances
-  - bitcoin
-  - distributed ledger
-tags:
-  - aws
-  - managed-blockchain
-  - cloudops
-  - deploy
-  - analytics
-  - provisioning
-  - hyperledger-fabric
-  - blockchain
-  - ethereum
-  - chaincode
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with managedblockchain, managedblockchain-query, ec2, logs, and iam access. Works with Terraform aws_managedblockchain_* resources and CloudFormation AWS::ManagedBlockchain::* templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - managed-blockchain
-    - cloudops
-    - deploy
-    - analytics
-    - provisioning
-    - hyperledger-fabric
-    - blockchain
-    - ethereum
-    - chaincode
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create managed blockchain network
-    - hyperledger fabric aws
-    - blockchain member creation
-    - peer node provisioning
-    - chaincode deployment
-    - managed blockchain query
-    - ethereum node aws
-  when_to_use: >-
-    Invoke when the user wants to create an AWS Managed Blockchain
-    network (Hyperledger Fabric or Ethereum), add consortium members,
-    deploy peer nodes, configure a certificate authority, install
-    chaincode, create channels, provision Ethereum nodes, or query
-    public blockchain data via the Managed Blockchain Query API. Do
-    NOT invoke for Amazon QLDB, AWS KMS blockchain signing, or for
-    auditing existing blockchain posture (use an auditor skill).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, managed-blockchain, cloudops, deploy, analytics, provisioning, hyperledger-fabric, blockchain, ethereum, chaincode
+  dependencies: aws-orchestrator
+  keywords: aws, managed blockchain, cloudops, deploy, provisioning, hyperledger fabric, blockchain network, consortium, peer node, chaincode, certificate authority, ethereum, blockchain query, token balances, bitcoin, distributed ledger
+  when_to_use: Invoke when the user wants to create an AWS Managed Blockchain network (Hyperledger Fabric or Ethereum), add consortium members, deploy peer nodes, configure a certificate authority, install chaincode, create channels, provision Ethereum nodes, or query public blockchain data via the Managed Blockchain Query API. Do NOT invoke for Amazon QLDB, AWS KMS blockchain signing, or for auditing existing blockchain posture (use an auditor skill).
 ---
 
 # Managed Blockchain Deployer

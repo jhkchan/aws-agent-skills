@@ -1,107 +1,29 @@
 ---
 name: lambda-invocation-troubleshooter
-description: >-
-  Diagnoses AWS Lambda invocation failures through an eight-category
-  diagnostic tree: TaskTimeoutException (timeout config vs slow
-  downstream), Runtime.ExitError out-of-memory (MaxMemoryUsed vs
-  MemorySize; CPU scales with memory), cold-start init latency
-  (SnapStart, provisioned concurrency), AccessDenied from execution
-  role (CloudTrail, simulate-principal-policy), VPC connectivity (NAT
-  Gateway, VPC endpoint, SG), environment variable KMS decrypt errors
-  and unset variables, invocation-type mismatch (sync caller timeout
-  vs async retry / DLQ / destination), and ECR container image pull
-  errors (image URI, repo policy, size). Walks symptoms to a verified
-  root cause with evidence-backed probes; emits ROOT_CAUSE_FOUND,
-  NEED_MORE_INFO, or ESCALATE.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses AWS Lambda invocation failures through an eight-category diagnostic tree: TaskTimeoutException (timeout config vs slow downstream), Runtime.ExitError out-of-memory (MaxMemoryUsed vs MemorySize; CPU scales with memory), cold-start init latency (SnapStart, provisioned concurrency), AccessDenied from execution role (CloudTrail, simulate-principal-policy), VPC connectivity (NAT Gateway, VPC endpoint, SG), environment variable KMS decrypt errors and unset variables, invocation-type mismatch (sync caller timeout vs async retry / DLQ / destination), and ECR container image pull errors (image URI, repo policy, size). Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_FOUND, NEED_MORE_INFO, or ESCALATE.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and function configuration. Live-account
-  diagnosis uses aws lambda get-function-configuration, aws logs get-log-events / filter- log-events, aws lambda get-policy, aws ec2 describe-security-groups, aws lambda get-event-source-mapping, aws lambda
-  get-function-url, aws kms describe-key, aws ecr describe-repositories / get-repository-policy, aws cloudtrail lookup-events, and aws lambda list-provisioned-concurrency-configs (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-- Lambda
-- TaskTimeoutException
-- Runtime.ExitError
-- out of memory
-- cold start
-- init duration
-- SnapStart
-- provisioned concurrency
-- AccessDenied
-- execution role
-- simulate-principal-policy
-- VPC
-- NAT Gateway
-- VPC endpoint
-- environment variable
-- KMS decrypt
-- invocation type
-- EventSourceMapping
-- DLQ
-- destination
-- container image
-- ECR
-- image pull
-- troubleshooting
-tags:
-- lambda
-- compute
-- troubleshooting
-- invocation
-- timeout
-- oom
-- cold-start
-- iam-role
-- vpc
-- kms
-- ecr
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and function configuration. Live-account diagnosis uses aws lambda get-function-configuration, aws logs get-log-events / filter- log-events, aws lambda get-policy, aws ec2 describe-security-groups, aws lambda get-event-source-mapping, aws lambda get-function-url, aws kms describe-key, aws ecr describe-repositories / get-repository-policy, aws...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
   verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
-  when_to_use: Diagnosing a Lambda function invocation failure (timeout, OOM, AccessDenied, cold-start latency, network error, env var decrypt error, async retry storm, container image pull failure), walking
-    a symptom to the failed layer with verify and fix commands, validating why an application's invocation returns an error, or triaging a "the Lambda is broken" page where the root cause may be config,
-    execution role, network, runtime, or container registry — not necessarily the function code itself.
-  when_not_to_use: Code-level debugging of the function handler (use the application logs and a debugger), CloudFront/Lambda@Edge origin issues (use the CloudFront distribution logs), Step Functions orchestration
-    debugging (use the Step Functions execution history), IAM policy authoring for the execution role (use iam-least-privilege-advisor), or VPC route table / NACL posture audits (use ec2-security-group-auditor).
-    This skill diagnoses invocation-time failures; it does not tune handler code or audit steady-state configuration posture.
-  activation_triggers:
-  - Lambda TaskTimeoutException
-  - Task timed out
-  - Lambda out of memory
-  - Runtime.ExitError
-  - Lambda cold start
-  - init duration
-  - Lambda AccessDenied
-  - execution role denied
-  - Lambda cannot reach internet
-  - Lambda cannot reach S3
-  - Lambda VPC timeout
-  - Lambda environment variable KMS
-  - Lambda decrypt error
-  - Lambda async retry storm
-  - EventSourceMapping retry
-  - Lambda container image pull
-  - ECR image pull error
-  - Lambda Provisioned concurrency
-  - troubleshoot Lambda invocation
-  invocation_schema: 'Input: either (a) a symptom description (error message, observed behaviour, "function returns 502", "async invocations are retried forever"), optionally paired with the function configuration
-    (get-function-configuration output) and recent CloudWatch logs, OR (b) a FunctionName plus caller context (invocation type, source ARN, observed error) for live-account diagnosis. Output: a deterministic
-    TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and LAYER ∈ {TIMEOUT_CONFIG, TIMEOUT_DOWNSTREAM, MEMORY_CONFIG, COLD_START, PERMISSION_EXECUTION_ROLE,
-    PERMISSION_RESOURCE_POLICY, VPC_CONNECTIVITY, VPC_ENDPOINT, ENV_VAR_KMS, ENV_VAR_MISSING, INVOCATION_ASYNC, INVOCATION_SYNC, ECR_IMAGE, ECR_POLICY, RUNTIME_UNSUPPORTED, UNKNOWN}.'
-  invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"Lambda function fn-prod-processor was invoked 200 times\nin the last hour; 30 returned TaskTimeoutException after\
-    \ 30s; the\nrest succeeded.\"\nFunctionName: fn-prod-processor\nRuntime: nodejs20.x\nTimeout: 30\nMemorySize: 256\nHandler: index.handler\nLastLogEvents: 1 timeout at \"await dynamodb.put(...).promise()\"\
-    \n  followed by \"Task timed out after 30.00 seconds\"\nInvocation type: RequestResponse (sync), called from API Gateway"
+  when_to_use: Diagnosing a Lambda function invocation failure (timeout, OOM, AccessDenied, cold-start latency, network error, env var decrypt error, async retry storm, container image pull failure), walking a symptom to the failed layer with verify and fix commands, validating why an application's invocation returns an error, or triaging a "the Lambda is broken" page where the root cause may be config, execution role, network, runtime, or container registry — not necessarily the function code itself.
+  when_not_to_use: Code-level debugging of the function handler (use the application logs and a debugger), CloudFront/Lambda@Edge origin issues (use the CloudFront distribution logs), Step Functions orchestration debugging (use the Step Functions execution history), IAM policy authoring for the execution role (use iam-least-privilege-advisor), or VPC route table / NACL posture audits (use ec2-security-group-auditor). This skill diagnoses invocation-time failures; it does not tune handler code or audit steady-state configuration posture.
+  activation_triggers: Lambda TaskTimeoutException, Task timed out, Lambda out of memory, Runtime.ExitError, Lambda cold start, init duration, Lambda AccessDenied, execution role denied, Lambda cannot reach internet, Lambda cannot reach S3, Lambda VPC timeout, Lambda environment variable KMS, Lambda decrypt error, Lambda async retry storm, EventSourceMapping retry, Lambda container image pull, ECR image pull error, Lambda Provisioned concurrency, troubleshoot Lambda invocation
+  invocation_schema: 'Input: either (a) a symptom description (error message, observed behaviour, "function returns 502", "async invocations are retried forever"), optionally paired with the function configuration (get-function-configuration output) and recent CloudWatch logs, OR (b) a FunctionName plus caller context (invocation type, source ARN, observed error) for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and LAYER ∈ {TIMEOUT_CONFIG, TIMEOUT_DOWNSTREAM, MEMORY_CONFIG, COLD_START, PERMISSION_EXECUTION_ROLE, PERMISSION_RESOURCE_POLICY, VPC_CONNECTIVITY, VPC_ENDPOINT, ENV_VAR_KMS, ENV_VAR_MISSING, INVOCATION_ASYNC, INVOCATION_SYNC, ECR_IMAGE, ECR_POLICY, RUNTIME_UNSUPPORTED, UNKNOWN}.'
+  invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"Lambda function fn-prod-processor was invoked 200 times\nin the last hour; 30 returned TaskTimeoutException after 30s; the\nrest succeeded.\"\nFunctionName: fn-prod-processor\nRuntime: nodejs20.x\nTimeout: 30\nMemorySize: 256\nHandler: index.handler\nLastLogEvents: 1 timeout at \"await dynamodb.put(...).promise()\"\n  followed by \"Task timed out after 30.00 seconds\"\nInvocation type: RequestResponse (sync), called from API Gateway"
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Lambda, TaskTimeoutException, Runtime.ExitError, out of memory, cold start, init duration, SnapStart, provisioned concurrency, AccessDenied, execution role, simulate-principal-policy, VPC, NAT Gateway, VPC endpoint, environment variable, KMS decrypt, invocation type, EventSourceMapping, DLQ, destination, container image, ECR, image pull, troubleshooting
+  tags: lambda, compute, troubleshooting, invocation, timeout, oom, cold-start, iam-role, vpc, kms, ecr
 ---
 
 # Lambda Invocation Troubleshooter

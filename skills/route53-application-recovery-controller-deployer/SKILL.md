@@ -1,113 +1,26 @@
 ---
 name: route53-application-recovery-controller-deployer
-description: >-
-  Provisions Route 53 Application Recovery Controller (ARC) with
-  production defaults: recovery cluster (five Route 53 regional
-  clusters across AWS regions for quorum), routing controls (boolean
-  on/off toggles for traffic to a cell), control panels (groupings of
-  routing controls), safety rules (prevent unsafe failover —
-  disallow all routing controls OFF simultaneously), resource sets
-  (by resource type: NLB, ASG, DynamoDB table, Aurora cluster, EC2,
-  etc.), readiness checks (validate each cell has required resources
-  before failover), cells (groupings of resources representing an
-  application instance for failover), readiness scopes, cross-region
-  readiness assessment, and CloudWatch routing control state
-  monitoring. Emits a READY_TO_DEPLOY checklist with verification
-  commands. Use when creating ARC readiness checks, configuring
-  routing controls for failover, setting up safety rules, creating
-  cells for active-active or active-standby, or building a recovery
-  cluster. Triggers: route 53 arc, application recovery controller,
-  routing control, safety rule, readiness check, recovery cluster,
-  control panel, cell failover, resource set, readiness scope.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Route 53 Application Recovery Controller (ARC) with production defaults: recovery cluster (five Route 53 regional clusters across AWS regions for quorum), routing controls (boolean on/off toggles for traffic to a cell), control panels (groupings of routing controls), safety rules (prevent unsafe failover — disallow all routing controls OFF simultaneously), resource sets (by resource type: NLB, ASG, DynamoDB table, Aurora cluster, EC2, etc.), readiness checks (validate each cell has required resources before failover), cells (groupings of resources representing an application instance for failover), readiness scopes, cross-region readiness assessment, and CloudWatch routing control state monitoring. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating ARC readiness checks, configuring routing. Triggers: route 53 arc, application recovery controller, routing control, safety rule, readiness check, recovery cluster, control panel, cell failover, resource set, readiness...'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with
-  route53-recovery-control-config, route53-recovery-readiness, and
-  route53-recovery-cluster access. Works with Terraform
-  aws_route53recoverycontrolconfig_* and
-  aws_route53recoveryreadiness_* resources and CloudFormation
-  AWS::Route53RecoveryControl::* templates.
-keywords:
-  - aws
-  - route 53 arc
-  - application recovery controller
-  - routing control
-  - safety rule
-  - readiness check
-  - recovery cluster
-  - control panel
-  - cell failover
-  - resource set
-  - cloudops
-  - deploy
-  - provisioning
-  - disaster recovery
-  - failover
-tags:
-  - aws
-  - route-53-arc
-  - application-recovery-controller
-  - cloudops
-  - deploy
-  - networking
-  - disaster-recovery
-  - failover
-  - routing-control
-  - readiness-check
-  - safety-rule
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with route53-recovery-control-config, route53-recovery-readiness, and route53-recovery-cluster access. Works with Terraform aws_route53recoverycontrolconfig_* and aws_route53recoveryreadiness_* resources and CloudFormation AWS::Route53RecoveryControl::* templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - route-53-arc
-    - application-recovery-controller
-    - cloudops
-    - deploy
-    - networking
-    - disaster-recovery
-    - failover
-    - routing-control
-    - readiness-check
-    - safety-rule
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - route 53 arc
-    - application recovery controller
-    - routing control
-    - safety rule
-    - readiness check
-    - recovery cluster
-    - control panel
-    - cell failover
-    - resource set
-    - readiness scope
-  when_to_use: >-
-    Invoke when the user wants to set up Route 53 Application Recovery
-    Controller for application failover orchestration — creating routing
-    controls (traffic on/off switches), safety rules (prevent unsafe
-    failover), readiness checks (validate cells before failover),
-    resource sets, cells, control panels, or recovery clusters. Do NOT
-    invoke for Route 53 health checks (use health-check skills), Route
-    53 DNS failover (use dns-failover skills), or Elastic Disaster
-    Recovery (use drs skills).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, route-53-arc, application-recovery-controller, cloudops, deploy, networking, disaster-recovery, failover, routing-control, readiness-check, safety-rule
+  dependencies: aws-orchestrator
+  keywords: aws, route 53 arc, application recovery controller, routing control, safety rule, readiness check, recovery cluster, control panel, cell failover, resource set, cloudops, deploy, provisioning, disaster recovery, failover
+  when_to_use: Invoke when the user wants to set up Route 53 Application Recovery Controller for application failover orchestration — creating routing controls (traffic on/off switches), safety rules (prevent unsafe failover), readiness checks (validate cells before failover), resource sets, cells, control panels, or recovery clusters. Do NOT invoke for Route 53 health checks (use health-check skills), Route 53 DNS failover (use dns-failover skills), or Elastic Disaster Recovery (use drs skills).
 ---
 
 # Route 53 Application Recovery Controller Deployer

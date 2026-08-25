@@ -1,124 +1,26 @@
 ---
 name: amplify-app-deployer
-description: >-
-  Provisions AWS Amplify applications with production defaults: Git-based
-  deployments (CodeCommit, GitHub, GitLab, Bitbucket) with OAuth or
-  service-role connection, build settings (amplify.yml buildspec with
-  frontend and backend phases), custom headers, redirects (SPA rewrite
-  for React Router / Next.js), environment variables (plaintext and
-  AWS Secrets Manager references), custom domain via Route 53 CNAME or
-  CloudFront, rendering mode (SSR vs SSG vs SPA), Amplify Backend
-  (auth with Cognito, API with AppSync GraphQL or REST, storage with
-  S3, functions with Lambda), CI/CD pipeline on every git push,
-  branch-based environments, and the latest Amplify Gen 2
-  (TypeScript CDK-based defineBackend). Emits a READY_TO_DEPLOY
-  checklist with prerequisites, build config, and verification
-  commands. Use when creating an Amplify app, wiring a Git provider,
-  configuring a custom domain, designing SSR/SSG, deploying Amplify
-  Gen 2, or generating provisioning CLI / IaC templates.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Amplify applications with production defaults: Git-based deployments (CodeCommit, GitHub, GitLab, Bitbucket) with OAuth or service-role connection, build settings (amplify.yml buildspec with frontend and backend phases), custom headers, redirects (SPA rewrite for React Router / Next.js), environment variables (plaintext and AWS Secrets Manager references), custom domain via Route 53 CNAME or CloudFront, rendering mode (SSR vs SSG vs SPA), Amplify Backend (auth with Cognito, API with AppSync GraphQL or REST, storage with S3, functions with Lambda), CI/CD pipeline on every git push, branch-based environments, and the latest Amplify Gen 2 (TypeScript CDK-based defineBackend). Emits a READY_TO_DEPLOY checklist with prerequisites, build config, and verification commands. Use when creating an Amplify app, wiring a Git provider, configuring a custom domain, designing SSR/SSG, deploying Amplify Gen 2, or generating provisioning CLI / IaC templates.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with amplify,
-  cloudfront, route53, iam, secretsmanager, cognito-idp, appsync,
-  lambda, s3, and codeconnections access. Works with Terraform
-  aws_amplify_app / aws_amplify_branch / aws_amplify_domain_association
-  resources, CloudFormation AWS::Amplify::App templates, and the
-  Amplify Gen 2 TypeScript CDK backend (amplify defineBackend).
-keywords:
-  - aws
-  - amplify
-  - amplify gen 2
-  - git-based deploy
-  - codecommit
-  - github
-  - gitlab
-  - bitbucket
-  - buildspec
-  - amplify.yml
-  - custom headers
-  - redirects
-  - SPA rewrite
-  - environment variables
-  - custom domain
-  - route 53
-  - cloudfront
-  - SSR
-  - SSG
-  - SPA
-  - amplify backend
-  - cognito auth
-  - appsync api
-  - lambda functions
-  - s3 storage
-  - cicd pipeline
-  - branch environments
-  - cloudops
-  - deploy
-  - devtools
-tags: [aws, amplify, devtools, deploy, cicd, git, codecommit, github, frontend, serverless]
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with amplify, cloudfront, route53, iam, secretsmanager, cognito-idp, appsync, lambda, s3, and codeconnections access. Works with Terraform aws_amplify_app / aws_amplify_branch / aws_amplify_domain_association resources, CloudFormation AWS::Amplify::App templates, and the Amplify Gen 2 TypeScript CDK backend (amplify defineBackend).'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - amplify
-    - devtools
-    - deploy
-    - cicd
-    - git
-    - codecommit
-    - github
-    - frontend
-    - serverless
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create amplify app
-    - provision amplify
-    - amplify git deploy
-    - amplify github
-    - amplify codecommit
-    - amplify custom domain
-    - amplify gen 2
-    - amplify ssr
-    - amplify ssg
-    - amplify spa
-    - amplify backend
-    - amplify cognito auth
-    - amplify appsync
-    - amplify buildspec
-    - amplify.yml
-    - amplify environment variables
-    - amplify redirects
-    - amplify cicd
-  when_to_use: >-
-    Invoke when the user wants to create a new Amplify application,
-    wire a Git provider (CodeCommit, GitHub, GitLab, Bitbucket) for
-    CI/CD, configure a custom domain via Route 53 / CloudFront, design
-    SSR vs SSG vs SPA rendering, deploy an Amplify Gen 2 (TypeScript
-    CDK-based) backend, wire Cognito auth / AppSync API / S3 storage /
-    Lambda functions, configure buildspec.yml (amplify.yml), set custom
-    headers / redirects (SPA rewrite), manage environment variables,
-    or generate provisioning CLI commands / IaC templates. Do NOT
-    invoke for self-managed Next.js on EC2 / ECS / Fargate, CloudFront
-    static site without Amplify, or AppSync-only deployments without
-    the Amplify build pipeline.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, amplify, devtools, deploy, cicd, git, codecommit, github, frontend, serverless
+  dependencies: aws-orchestrator
+  keywords: aws, amplify, amplify gen 2, git-based deploy, codecommit, github, gitlab, bitbucket, buildspec, amplify.yml, custom headers, redirects, SPA rewrite, environment variables, custom domain, route 53, cloudfront, SSR, SSG, SPA, amplify backend, cognito auth, appsync api, lambda functions, s3 storage, cicd pipeline, branch environments, cloudops, deploy, devtools
+  when_to_use: Invoke when the user wants to create a new Amplify application, wire a Git provider (CodeCommit, GitHub, GitLab, Bitbucket) for CI/CD, configure a custom domain via Route 53 / CloudFront, design SSR vs SSG vs SPA rendering, deploy an Amplify Gen 2 (TypeScript CDK-based) backend, wire Cognito auth / AppSync API / S3 storage / Lambda functions, configure buildspec.yml (amplify.yml), set custom headers / redirects (SPA rewrite), manage environment variables, or generate provisioning CLI commands / IaC templates. Do NOT invoke for self-managed Next.js on EC2 / ECS / Fargate, CloudFront static site without Amplify, or AppSync-only deployments without the Amplify build pipeline.
 ---
 
 # Amplify App Deployer

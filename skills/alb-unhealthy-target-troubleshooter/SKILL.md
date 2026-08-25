@@ -1,99 +1,53 @@
 ---
 name: alb-unhealthy-target-troubleshooter
-description: >-
-  Diagnoses ALB target health check failures through a ten-category
-  diagnostic tree: health check path misconfiguration (wrong path,
-  non-200 response), port mismatch (target port vs health check port),
-  protocol mismatch (HTTP vs HTTPS, HTTP/1.0 vs HTTP/1.1 expectations),
-  deregistration delay stranding targets, security group rules blocking
-  ALB health checker IPs, Lambda target group async failures,
-  weighted target group routing, deregistration timeout, health check
-  threshold/interval tuning, slow start mode, and target group
-  attributes (stickiness, proxy protocol, preserve client IP). Walks
-  symptoms to a verified root cause with evidence-backed probes; emits
-  ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses ALB target health check failures through a ten-category diagnostic tree: health check path misconfiguration (wrong path, non-200 response), port mismatch (target port vs health check port), protocol mismatch (HTTP vs HTTPS, HTTP/1.0 vs HTTP/1.1 expectations), deregistration delay stranding targets, security group rules blocking ALB health checker IPs, Lambda target group async failures, weighted target group routing, deregistration timeout, health check threshold/interval tuning, slow start mode, and target group attributes (stickiness, proxy protocol, preserve client IP). Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and target group configuration. Live-account
-  diagnosis uses aws elbv2 describe-target-health, aws elbv2 describe-target-groups, aws elbv2 describe-target-group-attributes, aws ec2 describe-security-groups, aws ec2 describe-network-interfaces, aws logs filter-log-events,
-  aws cloudwatch get-metric-statistics, aws lambda get-function-configuration, and aws elbv2 describe-listeners (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- ALB
-- Application Load Balancer
-- target health
-- unhealthy target
-- health check
-- target group
-- deregistration delay
-- deregistration timeout
-- security group
-- health checker IP
-- Lambda target group
-- weighted target group
-- stickiness
-- proxy protocol
-- preserve client IP
-- slow start
-- cross-zone
-- draining
-- troubleshooting
-tags:
-- alb
-- networking
-- troubleshooting
-- target-health
-- elbv2
-- load-balancer
-- health-check
-- security-group
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and target group configuration. Live-account diagnosis uses aws elbv2 describe-target-health, aws elbv2 describe-target-groups, aws elbv2 describe-target-group-attributes, aws ec2 describe-security-groups, aws ec2 describe-network-interfaces, aws logs filter-log-events, aws cloudwatch get-metric-statistics, aws lambda get-function-configuration...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
-  when_to_use: Diagnosing an ALB target health check failure (targets showing unhealthy or unused, health check path errors, port or protocol mismatch, deregistration delay stranding targets, security group blocking health
-    checker IPs, Lambda target group invocation failures, weighted target group routing issues, or slow-start mode causing apparent unhealthy targets), walking a symptom to the failed config layer with verify and fix commands.
-  when_not_to_use: NLB (Network Load Balancer) target health issues (use NLB-specific tooling), Route 53 health check failures (use Route 53 monitoring), Classic ELB health checks (use classic-elb tools), application code
-    debugging of the target itself (use the application logs and a debugger), or global accelerator endpoint health (use Global Accelerator diagnostics). This skill diagnoses ALB target-health failures; it does not tune application
-    performance or audit steady-state load balancer posture.
-  activation_triggers:
-  - ALB target unhealthy
-  - target health check failed
-  - target health Unused
-  - target health Draining
-  - ALB 502 Bad Gateway
-  - ALB 503 Service Unavailable
-  - health check path misconfiguration
-  - target port mismatch
-  - health check port mismatch
-  - protocol mismatch HTTP HTTPS
-  - deregistration delay
-  - deregistration timeout
-  - security group blocking health check
-  - ALB health checker IP
-  - Lambda target group unhealthy
-  - weighted target group
-  - slow start mode
-  - target group stickiness
-  - proxy protocol v2
-  - preserve client IP
-  - connection draining
-  - troubleshoot ALB health check
-  invocation_schema: 'Input: either (a) a symptom description (error message, observed behaviour, "targets are unhealthy", "502s from the ALB"), optionally paired with the target group configuration (describe-target-groups
-    output) and target health output, OR (b) a Target Group ARN plus ALB context for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED,
-    INSUFFICIENT_DATA} and LAYER ∈ {HEALTH_CHECK_PATH, PORT_MISMATCH, PROTOCOL_MISMATCH, SG_BLOCKING_HEALTH_CHECK, DEREGISTRATION_DELAY, HEALTH_CHECK_THRESHOLD, LAMBDA_TARGET_INTEGRATION, WEIGHTED_ROUTING, SLOW_START,
-    CROSS_ZONE, TARGET_GROUP_ATTRIBUTE, UNKNOWN}.'
-  invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"ALB target group tg-prod-app shows 4 of 6 targets as\nunhealthy. Health check is configured on /health with port 80,\nbut\
-    \ the application listens on 8080. The health check response is a\nconnection refused.\"\nTargetGroupArn: arn:aws:elasticloadbalancing:us-east-1:111111111111:targetgroup/tg-prod-app/abc123\nTargetType: instance\nHealthCheckPath:\
-    \ /health\nHealthCheckPort: 80\nTarget Port: 8080\nProtocol: HTTP\nHealthCheckProtocol: HTTP\nTargets: 6 registered, 4 unhealthy (Reason: Target.FailedHealthChecks)"
+  when_to_use: Diagnosing an ALB target health check failure (targets showing unhealthy or unused, health check path errors, port or protocol mismatch, deregistration delay stranding targets, security group blocking health checker IPs, Lambda target group invocation failures, weighted target group routing issues, or slow-start mode causing apparent unhealthy targets), walking a symptom to the failed config layer with verify and fix commands.
+  when_not_to_use: NLB (Network Load Balancer) target health issues (use NLB-specific tooling), Route 53 health check failures (use Route 53 monitoring), Classic ELB health checks (use classic-elb tools), application code debugging of the target itself (use the application logs and a debugger), or global accelerator endpoint health (use Global Accelerator diagnostics). This skill diagnoses ALB target-health failures; it does not tune application performance or audit steady-state load balancer posture.
+  activation_triggers: ALB target unhealthy, target health check failed, target health Unused, target health Draining, ALB 502 Bad Gateway, ALB 503 Service Unavailable, health check path misconfiguration, target port mismatch, health check port mismatch, protocol mismatch HTTP HTTPS, deregistration delay, deregistration timeout, security group blocking health check, ALB health checker IP, Lambda target group unhealthy, weighted target group, slow start mode, target group stickiness, proxy protocol v2, preserve client IP, connection draining, troubleshoot ALB health check
+  invocation_schema: 'Input: either (a) a symptom description (error message, observed behaviour, "targets are unhealthy", "502s from the ALB"), optionally paired with the target group configuration (describe-target-groups output) and target health output, OR (b) a Target Group ARN plus ALB context for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {HEALTH_CHECK_PATH, PORT_MISMATCH, PROTOCOL_MISMATCH, SG_BLOCKING_HEALTH_CHECK, DEREGISTRATION_DELAY, HEALTH_CHECK_THRESHOLD, LAMBDA_TARGET_INTEGRATION, WEIGHTED_ROUTING, SLOW_START, CROSS_ZONE, TARGET_GROUP_ATTRIBUTE, UNKNOWN}.'
+  invocation_example: '# Minimal valid input (offline symptom classification):
+
+    Symptom: "ALB target group tg-prod-app shows 4 of 6 targets as
+
+    unhealthy. Health check is configured on /health with port 80,
+
+    but the application listens on 8080. The health check response is a
+
+    connection refused."
+
+    TargetGroupArn: arn:aws:elasticloadbalancing:us-east-1:111111111111:targetgroup/tg-prod-app/abc123
+
+    TargetType: instance
+
+    HealthCheckPath: /health
+
+    HealthCheckPort: 80
+
+    Target Port: 8080
+
+    Protocol: HTTP
+
+    HealthCheckProtocol: HTTP
+
+    Targets: 6 registered, 4 unhealthy (Reason: Target.FailedHealthChecks)'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: ALB, Application Load Balancer, target health, unhealthy target, health check, target group, deregistration delay, deregistration timeout, security group, health checker IP, Lambda target group, weighted target group, stickiness, proxy protocol, preserve client IP, slow start, cross-zone, draining, troubleshooting
+  tags: alb, networking, troubleshooting, target-health, elbv2, load-balancer, health-check, security-group
 ---
 
 # ALB Unhealthy Target Troubleshooter

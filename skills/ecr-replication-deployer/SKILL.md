@@ -1,106 +1,26 @@
 ---
 name: ecr-replication-deployer
-description: >-
-  Provisions Amazon ECR cross-region and cross-account replication
-  with production defaults: registry-level replication configuration
-  (put-registry-replication-configuration), replication rules
-  (source → destination region and registry), cross-account
-  replication (destination registry ID), pull-through cache rules
-  (upstream registry URL — ecr-public, quay.io, docker.io, k8s.io),
-  cache pull permissions (Lambda/ECS pulls from cached image),
-  replication lag awareness, cost per replicated image (storage in
-  both regions), CloudWatch metrics for replication
-  (ImageReplicationStatus), batch delete protection for replicated
-  images, and deletion policy for source vs replica. Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when
-  configuring ECR cross-region replication, cross-account ECR
-  replication, ECR pull-through cache, or multi-region container
-  image availability. Triggers: configure ecr replication, ecr
-  cross-region replication, ecr cross-account replication, ecr
-  pull-through cache, ecr replication rule, ecr registry replication.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon ECR cross-region and cross-account replication with production defaults: registry-level replication configuration (put-registry-replication-configuration), replication rules (source → destination region and registry), cross-account replication (destination registry ID), pull-through cache rules (upstream registry URL — ecr-public, quay.io, docker.io, k8s.io), cache pull permissions (Lambda/ECS pulls from cached image), replication lag awareness, cost per replicated image (storage in both regions), CloudWatch metrics for replication (ImageReplicationStatus), batch delete protection for replicated images, and deletion policy for source vs replica. Emits a READY_TO_DEPLOY checklist with verification commands. Use when configuring ECR cross-region replication, cross-account ECR replication, ECR pull-through cache, or. Triggers: configure ecr replication, ecr cross-region replication, ecr cross-account replication, ecr pull-through cache, ecr replication rule, ecr registry replication.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with ecr access
-  (and cross-account IAM if cross-account replication). Works with
-  Terraform aws_ecr_replication_configuration /
-  aws_ecr_pull_through_cache_rule resources and CloudFormation
-  AWS::ECR::ReplicationConfiguration templates.
-keywords:
-  - aws
-  - ecr
-  - elastic container registry
-  - replication
-  - cross-region
-  - cross-account
-  - pull-through cache
-  - cloudops
-  - deploy
-  - provisioning
-  - container registry
-  - docker
-  - devtools
-tags:
-  - aws
-  - ecr
-  - replication
-  - cloudops
-  - deploy
-  - devtools
-  - provisioning
-  - cross-region
-  - cross-account
-  - pull-through-cache
-  - container-registry
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with ecr access (and cross-account IAM if cross-account replication). Works with Terraform aws_ecr_replication_configuration / aws_ecr_pull_through_cache_rule resources and CloudFormation AWS::ECR::ReplicationConfiguration templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - ecr
-    - replication
-    - cloudops
-    - deploy
-    - devtools
-    - provisioning
-    - cross-region
-    - cross-account
-    - pull-through-cache
-    - container-registry
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - configure ecr replication
-    - ecr cross-region replication
-    - ecr cross-account replication
-    - ecr pull-through cache
-    - ecr replication rule
-    - ecr registry replication
-    - ecr pull-through cache rule
-    - ecr replication configuration
-  when_to_use: >-
-    Invoke when the user wants to configure ECR cross-region
-    replication, cross-account ECR replication, ECR pull-through
-    cache rules (for docker.io, quay.io, k8s.io, ecr-public upstream
-    registries), multi-region container image availability for DR,
-    or understand replication lag and cost implications. Do NOT
-    invoke for ECR repository lifecycle policies (separate skill),
-    ECR image scanning, or ECS/EKS task deployment.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, ecr, replication, cloudops, deploy, devtools, provisioning, cross-region, cross-account, pull-through-cache, container-registry
+  dependencies: aws-orchestrator
+  keywords: aws, ecr, elastic container registry, replication, cross-region, cross-account, pull-through cache, cloudops, deploy, provisioning, container registry, docker, devtools
+  when_to_use: Invoke when the user wants to configure ECR cross-region replication, cross-account ECR replication, ECR pull-through cache rules (for docker.io, quay.io, k8s.io, ecr-public upstream registries), multi-region container image availability for DR, or understand replication lag and cost implications. Do NOT invoke for ECR repository lifecycle policies (separate skill), ECR image scanning, or ECS/EKS task deployment.
 ---
 
 # ECR Replication Deployer

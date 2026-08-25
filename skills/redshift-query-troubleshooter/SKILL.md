@@ -1,105 +1,47 @@
 ---
 name: redshift-query-troubleshooter
-description: >-
-  Diagnoses Amazon Redshift query failures through a twelve-category
-  diagnostic tree: WLM queue timeout (queue wait vs execution time),
-  table lock detection (STV_LOCKS, lock contention), COPY command
-  failures (IAM role, data format, delimiter, S3 manifest mismatch),
-  distribution key skew causing data skew, sort key misalignment
-  causing full table scans, nested loop joins (DS_DIST_NONE vs
-  DS_DIST_ALL_INNER), insufficient sort/dist keys, STL_ERROR messages,
-  connection limits, SSL/TLS certificate issues, query plan analysis
-  (EXPLAIN), vacuum blocked by concurrent writes, and encoding
-  conversion errors. Walks symptoms to a verified root cause with
-  evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED or
-  INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses Amazon Redshift query failures through a twelve-category diagnostic tree: WLM queue timeout (queue wait vs execution time), table lock detection (STV_LOCKS, lock contention), COPY command failures (IAM role, data format, delimiter, S3 manifest mismatch), distribution key skew causing data skew, sort key misalignment causing full table scans, nested loop joins (DS_DIST_NONE vs DS_DIST_ALL_INNER), insufficient sort/dist keys, STL_ERROR messages, connection limits, SSL/TLS certificate issues, query plan analysis (EXPLAIN), vacuum blocked by concurrent writes, and encoding conversion errors. Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and query context. Live-account
-  diagnosis uses aws redshift describe-clusters, aws redshift describe-cluster-subnet-groups, aws redshift-data execute-statement / describe-statement, and SQL queries against system tables
-  (STV_LOCKS, STL_ERROR, SVV_QUERY_SUMMARY, STL_QUERY, STL_LOAD_ERRORS, SVV_TABLE_INFO, PG_TABLE_DEF, STV_WLM_QUERY_STATE) via the Data API or a direct JDBC/ODBC connection (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-- Redshift
-- WLM
-- WLM queue timeout
-- table lock
-- STV_LOCKS
-- COPY command
-- distribution key
-- distribution style
-- sort key
-- data skew
-- nested loop join
-- DS_DIST_ALL_INNER
-- full table scan
-- STL_ERROR
-- SVV_QUERY_SUMMARY
-- EXPLAIN
-- vacuum
-- connection limit
-- SSL certificate
-- encoding conversion
-- load error
-- S3 manifest
-- troubleshooting
-tags:
-- redshift
-- analytics
-- troubleshooting
-- wlm
-- distribution-key
-- sort-key
-- query-performance
-- data-warehouse
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and query context. Live-account diagnosis uses aws redshift describe-clusters, aws redshift describe-cluster-subnet-groups, aws redshift-data execute-statement / describe-statement, and SQL queries against system tables (STV_LOCKS, STL_ERROR, SVV_QUERY_SUMMARY, STL_QUERY, STL_LOAD_ERRORS, SVV_TABLE_INFO, PG_TABLE_DEF, STV_WLM_QUERY_STATE) via the...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
-  when_to_use: Diagnosing an Amazon Redshift query failure (WLM queue timeout, table lock contention, COPY command failure, distribution key skew, sort key misalignment, nested loop join, connection limit, SSL/TLS error, vacuum
-    blocked, or encoding conversion error), walking a symptom to the failed config or data-modeling layer with verify and fix commands.
-  when_not_to_use: Amazon RDS/Aurora query performance tuning (use RDS-specific tooling), Athena query failures (use athena-query-optimizer), EMR Spark job debugging (use emr-cluster-auditor), application-side ORM query
-    construction (use the application logs and ORM docs), or Redshift Serverless workgroup provisioning (use redshift-specific infrastructure tooling). This skill diagnoses query-time failures; it does not tune cluster
-    sizing or manage resize operations.
-  activation_triggers:
-  - Redshift query timeout
-  - WLM queue timeout
-  - Redshift table lock
-  - STV_LOCKS
-  - Redshift COPY command failure
-  - STL_LOAD_ERRORS
-  - distribution key skew
-  - sort key misalignment
-  - full table scan
-  - nested loop join
-  - DS_DIST_ALL_INNER
-  - DS_DIST_NONE
-  - Redshift connection limit
-  - Redshift SSL certificate
-  - Redshift encoding conversion
-  - Redshift vacuum blocked
-  - SVV_QUERY_SUMMARY
-  - STL_ERROR
-  - Redshift query plan
-  - EXPLAIN
-  - S3 COPY manifest mismatch
-  - troubleshoot Redshift query
-  invocation_schema: 'Input: either (a) a symptom description (error message, observed behaviour, "query times out", "COPY fails", "query is slow"), optionally paired with the query text and cluster context, OR (b) a cluster
-    identifier plus query ID or error message for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈
-    {WLM_QUEUE_TIMEOUT, TABLE_LOCK, COPY_IAM_ROLE, COPY_DATA_FORMAT, DIST_KEY_SKEW, SORT_KEY_MISALIGNMENT, NESTED_LOOP_JOIN, CONNECTION_LIMIT, SSL_TLS_ERROR, VACUUM_BLOCKED, ENCODING_CONVERSION, QUERY_PLAN, UNKNOWN}.'
-  invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"Redshift query on sales table takes 45 seconds; EXPLAIN\nshows ds_dist_all_inner and a seq scan. The table uses DISTSTYLE EVEN\nbut\
-    \ joins on store_id which is the dist key of the store table.\"\nCluster: prod-analytics-cluster\nDatabase: analytics_db\nQuery: SELECT s.store_name, sum(sa.amount) FROM store s JOIN sales sa ON s.store_id\
-    \ = sa.store_id GROUP BY s.store_name\nTable sales: DISTSTYLE EVEN, sort key (sale_date)\nTable store: DISTSTYLE KEY (distkey: store_id), sort key (store_id)\nEXPLAIN excerpt: XN Hash Join DS_DIST_ALL_INNER\
-    \ -> XN Seq Scan on sales"
+  when_to_use: Diagnosing an Amazon Redshift query failure (WLM queue timeout, table lock contention, COPY command failure, distribution key skew, sort key misalignment, nested loop join, connection limit, SSL/TLS error, vacuum blocked, or encoding conversion error), walking a symptom to the failed config or data-modeling layer with verify and fix commands.
+  when_not_to_use: Amazon RDS/Aurora query performance tuning (use RDS-specific tooling), Athena query failures (use athena-query-optimizer), EMR Spark job debugging (use emr-cluster-auditor), application-side ORM query construction (use the application logs and ORM docs), or Redshift Serverless workgroup provisioning (use redshift-specific infrastructure tooling). This skill diagnoses query-time failures; it does not tune cluster sizing or manage resize operations.
+  activation_triggers: Redshift query timeout, WLM queue timeout, Redshift table lock, STV_LOCKS, Redshift COPY command failure, STL_LOAD_ERRORS, distribution key skew, sort key misalignment, full table scan, nested loop join, DS_DIST_ALL_INNER, DS_DIST_NONE, Redshift connection limit, Redshift SSL certificate, Redshift encoding conversion, Redshift vacuum blocked, SVV_QUERY_SUMMARY, STL_ERROR, Redshift query plan, EXPLAIN, S3 COPY manifest mismatch, troubleshoot Redshift query
+  invocation_schema: 'Input: either (a) a symptom description (error message, observed behaviour, "query times out", "COPY fails", "query is slow"), optionally paired with the query text and cluster context, OR (b) a cluster identifier plus query ID or error message for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {WLM_QUEUE_TIMEOUT, TABLE_LOCK, COPY_IAM_ROLE, COPY_DATA_FORMAT, DIST_KEY_SKEW, SORT_KEY_MISALIGNMENT, NESTED_LOOP_JOIN, CONNECTION_LIMIT, SSL_TLS_ERROR, VACUUM_BLOCKED, ENCODING_CONVERSION, QUERY_PLAN, UNKNOWN}.'
+  invocation_example: '# Minimal valid input (offline symptom classification):
+
+    Symptom: "Redshift query on sales table takes 45 seconds; EXPLAIN
+
+    shows ds_dist_all_inner and a seq scan. The table uses DISTSTYLE EVEN
+
+    but joins on store_id which is the dist key of the store table."
+
+    Cluster: prod-analytics-cluster
+
+    Database: analytics_db
+
+    Query: SELECT s.store_name, sum(sa.amount) FROM store s JOIN sales sa ON s.store_id = sa.store_id GROUP BY s.store_name
+
+    Table sales: DISTSTYLE EVEN, sort key (sale_date)
+
+    Table store: DISTSTYLE KEY (distkey: store_id), sort key (store_id)
+
+    EXPLAIN excerpt: XN Hash Join DS_DIST_ALL_INNER -> XN Seq Scan on sales'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Redshift, WLM, WLM queue timeout, table lock, STV_LOCKS, COPY command, distribution key, distribution style, sort key, data skew, nested loop join, DS_DIST_ALL_INNER, full table scan, STL_ERROR, SVV_QUERY_SUMMARY, EXPLAIN, vacuum, connection limit, SSL certificate, encoding conversion, load error, S3 manifest, troubleshooting
+  tags: redshift, analytics, troubleshooting, wlm, distribution-key, sort-key, query-performance, data-warehouse
 ---
 
 # Redshift Query Troubleshooter

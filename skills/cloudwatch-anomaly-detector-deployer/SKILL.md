@@ -1,101 +1,26 @@
 ---
 name: cloudwatch-anomaly-detector-deployer
-description: >-
-  Deploys Amazon CloudWatch Anomaly Detection models on AWS metrics with
-  production defaults: anomaly detector creation
-  (put-metric-anomaly-detector), metric math band visualization
-  (ANOMALY_DETECTION_BAND), configuration (stat, period, assessment
-  period), std dev multiplier tuning (default 3, lower = more
-  sensitive), alert on band breach (upper or lower), recovery to normal
-  state, cross-account anomaly detection, composite alarm integration,
-  custom metrics vs built-in (CPU, network) support, and limitation
-  detection (not all metrics support anomaly detection). Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when creating
-  a CloudWatch anomaly detection model, configuring anomaly bands,
-  tuning anomaly sensitivity, setting anomaly alarms, or visualizing
-  anomaly detection bands. Triggers create anomaly detection model,
-  cloudwatch anomaly detection, anomaly band breach alarm, tune anomaly
-  sensitivity, anomaly detector std dev, anomaly detection custom
-  metric, cross-account anomaly detection.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Deploys Amazon CloudWatch Anomaly Detection models on AWS metrics with production defaults: anomaly detector creation (put-metric-anomaly-detector), metric math band visualization (ANOMALY_DETECTION_BAND), configuration (stat, period, assessment period), std dev multiplier tuning (default 3, lower = more sensitive), alert on band breach (upper or lower), recovery to normal state, cross-account anomaly detection, composite alarm integration, custom metrics vs built-in (CPU, network) support, and limitation detection (not all metrics support anomaly detection). Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a CloudWatch anomaly detection model, configuring anomaly bands, tuning anomaly sensitivity, setting anomaly alarms, or visualizing anomaly detection bands. Triggers create anomaly detection model, cloudwatch anomaly detection, anomaly band breach alarm, tune anomaly sensitivity, anomaly detector std dev, anomaly detection custom metric, cross-account anomaly detection.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with cloudwatch and
-  cloudwatch:PutMetricAnomalyDetector permissions. Works with
-  Terraform aws_cloudwatch_anomaly_detector and aws_cloudwatch_metric_alarm
-  resources and CloudFormation AWS::CloudWatch::AnomalyDetector templates.
-keywords:
-  - aws
-  - cloudwatch
-  - anomaly detection
-  - anomaly detector
-  - metric math
-  - anomaly band
-  - cloudops
-  - deploy
-  - std dev
-  - sensitivity
-  - composite alarm
-  - custom metrics
-  - cross-account
-tags:
-  - aws
-  - cloudwatch
-  - anomaly-detection
-  - cloudops
-  - deploy
-  - monitoring
-  - metric-math
-  - alarms
-  - sensitivity
-  - cross-account
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with cloudwatch and cloudwatch:PutMetricAnomalyDetector permissions. Works with Terraform aws_cloudwatch_anomaly_detector and aws_cloudwatch_metric_alarm resources and CloudFormation AWS::CloudWatch::AnomalyDetector templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - cloudwatch
-    - anomaly-detection
-    - cloudops
-    - deploy
-    - monitoring
-    - metric-math
-    - alarms
-    - sensitivity
-    - cross-account
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create anomaly detection model
-    - cloudwatch anomaly detection
-    - anomaly band breach alarm
-    - tune anomaly sensitivity
-    - anomaly detector std dev
-    - anomaly detection custom metric
-    - cross-account anomaly detection
-  when_to_use: >-
-    Invoke when the user wants to create a CloudWatch Anomaly Detection
-    model on a metric, visualize the anomaly detection band, configure an
-    alarm on band breach, tune the anomaly sensitivity via standard
-    deviation multiplier, deploy cross-account anomaly detection, or
-    integrate anomaly detectors with composite alarms. Do NOT invoke for
-    static-threshold CloudWatch alarms without anomaly detection, metric
-    streaming (Kinesis), or Logs Insights anomaly detection.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, cloudwatch, anomaly-detection, cloudops, deploy, monitoring, metric-math, alarms, sensitivity, cross-account
+  dependencies: aws-orchestrator
+  keywords: aws, cloudwatch, anomaly detection, anomaly detector, metric math, anomaly band, cloudops, deploy, std dev, sensitivity, composite alarm, custom metrics, cross-account
+  when_to_use: Invoke when the user wants to create a CloudWatch Anomaly Detection model on a metric, visualize the anomaly detection band, configure an alarm on band breach, tune the anomaly sensitivity via standard deviation multiplier, deploy cross-account anomaly detection, or integrate anomaly detectors with composite alarms. Do NOT invoke for static-threshold CloudWatch alarms without anomaly detection, metric streaming (Kinesis), or Logs Insights anomaly detection.
 ---
 
 # CloudWatch Anomaly Detection Deployer

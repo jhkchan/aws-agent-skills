@@ -1,124 +1,26 @@
 ---
 name: backup-vault-deployer
-description: >-
-  Provisions AWS Backup vaults with production defaults: vault
-  creation (KMS encryption, tags), backup plans (rule-based with
-  lifecycle, schedule, cross-region copy), vault lock (governance vs
-  compliance mode WORM with MinRetentionDays, MaxRetentionDays,
-  ChangeableForDays), vault access policy for cross-account backup,
-  backup report plans, continuous vs periodic backups (PITR for
-  EC2/RDS/DynamoDB), resource-type coverage
-  (EC2/RDS/EFS/DynamoDB/S3/FSx), and Audit Manager integration.
-  Emits a READY_TO_DEPLOY checklist with verification commands. Use
-  when creating a backup vault, locking a vault for compliance,
-  deploying a backup plan with cross-region copy, or setting up
-  continuous backups for PITR. Triggers: create backup vault, vault
-  lock compliance mode, backup plan deploy, backup policy,
-  cross-region backup copy, continuous backup pitr, backup vault
-  access policy, backup report plan, aws backup org policy.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Backup vaults with production defaults: vault creation (KMS encryption, tags), backup plans (rule-based with lifecycle, schedule, cross-region copy), vault lock (governance vs compliance mode WORM with MinRetentionDays, MaxRetentionDays, ChangeableForDays), vault access policy for cross-account backup, backup report plans, continuous vs periodic backups (PITR for EC2/RDS/DynamoDB), resource-type coverage (EC2/RDS/EFS/DynamoDB/S3/FSx), and Audit Manager integration. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a backup vault, locking a vault for compliance, deploying a backup plan with cross-region copy, or setting up continuous backups for PITR. Triggers: create backup vault, vault lock compliance mode, backup plan deploy, backup policy, cross-region backup copy, continuous backup pitr, backup vault access policy, backup report plan, aws backup org policy.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with backup, kms,
-  iam, s3, and organizations access (and cross-account STS assume-role
-  if cross-account backup). Works with Terraform
-  aws_backup_vault / aws_backup_vault_lock_configuration /
-  aws_backup_plan / aws_backup_selection / aws_backup_framework
-  resources and CloudFormation AWS::Backup::Vault / BackupPlan
-  templates.
-keywords:
-  - aws
-  - backup
-  - backup vault
-  - cloudops
-  - deploy
-  - provisioning
-  - vault lock
-  - compliance mode
-  - governance mode
-  - worm
-  - backup plan
-  - backup policy
-  - backup selection
-  - cross-region copy
-  - cross-account backup
-  - continuous backup
-  - pitr
-  - recovery point
-  - kms encryption
-  - cold storage
-  - lifecycle
-  - backup reports
-  - audit manager
-tags:
-  - aws
-  - backup
-  - storage
-  - cloudops
-  - deploy
-  - backup-vault
-  - vault-lock
-  - compliance-mode
-  - backup-plan
-  - cross-region
-  - pitr
-  - kms
-  - worm
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with backup, kms, iam, s3, and organizations access (and cross-account STS assume-role if cross-account backup). Works with Terraform aws_backup_vault / aws_backup_vault_lock_configuration / aws_backup_plan / aws_backup_selection / aws_backup_framework resources and CloudFormation AWS::Backup::Vault / BackupPlan templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - backup
-    - storage
-    - cloudops
-    - deploy
-    - backup-vault
-    - vault-lock
-    - compliance-mode
-    - backup-plan
-    - cross-region
-    - pitr
-    - kms
-    - worm
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create backup vault
-    - vault lock compliance mode
-    - backup plan deploy
-    - backup policy
-    - cross-region backup copy
-    - continuous backup pitr
-    - backup vault access policy
-    - backup report plan
-    - aws backup org policy
-    - backup vault kms
-  when_to_use: >-
-    Invoke when the user wants to create an AWS Backup vault, apply a
-    vault lock (governance or compliance mode for WORM), deploy a
-    backup plan with lifecycle rules and cross-region copy, configure
-    continuous backups for PITR, set up backup report plans, configure
-    a vault access policy for cross-account backup, or deploy an org-
-    level backup policy. Do NOT invoke for operating existing backup
-    vault lifecycles (use backup-vault-operator), restoring from
-    backups (use backup restore skills), or auditing existing backup
-    plans (use backup-plan-auditor).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, backup, storage, cloudops, deploy, backup-vault, vault-lock, compliance-mode, backup-plan, cross-region, pitr, kms, worm
+  dependencies: aws-orchestrator
+  keywords: aws, backup, backup vault, cloudops, deploy, provisioning, vault lock, compliance mode, governance mode, worm, backup plan, backup policy, backup selection, cross-region copy, cross-account backup, continuous backup, pitr, recovery point, kms encryption, cold storage, lifecycle, backup reports, audit manager
+  when_to_use: Invoke when the user wants to create an AWS Backup vault, apply a vault lock (governance or compliance mode for WORM), deploy a backup plan with lifecycle rules and cross-region copy, configure continuous backups for PITR, set up backup report plans, configure a vault access policy for cross-account backup, or deploy an org- level backup policy. Do NOT invoke for operating existing backup vault lifecycles (use backup-vault-operator), restoring from backups (use backup restore skills), or auditing existing backup plans (use backup-plan-auditor).
 ---
 
 # Backup Vault Deployer

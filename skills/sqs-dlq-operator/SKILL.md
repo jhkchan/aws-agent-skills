@@ -1,90 +1,27 @@
 ---
 name: sqs-dlq-operator
-description: >-
-  Operates SQS dead-letter queue lifecycles safely: creates DLQs with correct type (Standard vs FIFO matching source), tunes redrive policy maxReceiveCount against consumer semantics, analyzes DLQ messages to diagnose why redriven (poison-pill payload, visibility-timeout race, IAM denial, partial-batch gap), replays messages back to source via StartMessageMoveTask (2022+ replacement for deprecated Redrive), monitors DLQ depth via ApproximateNumberOfMessagesVisible + ApproximateAgeOfOldestMessage, and wires the latest surfaces — Lambda partial-batch responses (ReportBatchItemFailures) to prevent false positives, redrive allowlists via RedriveAllowPolicy.
-  Enforces safety: type-match check, retention=14 days, CONFIRM gate, snapshot before replay, maxReceiveCount >= 3, idempotent-consumer verification.
-  Emits READY with exact CLI + CONFIRM gate, BLOCKED when pre-checks fail, or COMPLETED when replay confirmed and DLQ depth returned to zero.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Operates SQS dead-letter queue lifecycles safely: creates DLQs with correct type (Standard vs FIFO matching source), tunes redrive policy maxReceiveCount against consumer semantics, analyzes DLQ messages to diagnose why redriven (poison-pill payload, visibility-timeout race, IAM denial, partial-batch gap), replays messages back to source via StartMessageMoveTask (2022+ replacement for deprecated Redrive), monitors DLQ depth via ApproximateNumberOfMessagesVisible + ApproximateAgeOfOldestMessage, and wires the latest surfaces — Lambda partial-batch responses (ReportBatchItemFailures) to prevent false positives, redrive allowlists via RedriveAllowPolicy. Enforces safety: type-match check, retention=14 days, CONFIRM gate, snapshot before replay, maxReceiveCount >= 3, idempotent-consumer verification. Emits READY with exact CLI + CONFIRM gate, BLOCKED when pre-checks fail, or COMPLETED when replay confirmed and DLQ depth returned to zero.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline plan classification.
-  Live-account operations use aws sqs create-queue, set-queue-attributes,
-  get-queue-attributes, list-queues, list-dead-letter-source-queues,
-  start-message-move-task, list-message-move-tasks, receive-message,
-  delete-message, purge-queue, aws lambda list-event-source-mappings /
-  update-event-source-mapping, aws cloudwatch get-metric-statistics,
-  aws logs filter-log-events. Requires AWS CLI v2 with sqs, lambda,
-  cloudwatch, and logs access (SSO or key-based).
-keywords:
-  - SQS
-  - dead-letter queue
-  - DLQ
-  - redrive policy
-  - maxReceiveCount
-  - StartMessageMoveTask
-  - message replay
-  - poison pill
-  - visibility timeout
-  - partial batch response
-  - ReportBatchItemFailures
-  - ApproximateNumberOfMessagesVisible
-  - ApproximateAgeOfOldestMessage
-  - RedriveAllowPolicy
-  - FIFO DLQ
-  - Standard DLQ
-  - Lambda event source mapping
-  - DLQ analysis
-tags: [sqs, messaging, app-integration, dead-letter-queue, dlq, operate, redrive, replay]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws sqs create-queue, set-queue-attributes, get-queue-attributes, list-queues, list-dead-letter-source-queues, start-message-move-task, list-message-move-tasks, receive-message, delete-message, purge-queue, aws lambda list-event-source-mappings / update-event-source-mapping, aws cloudwatch get-metric-statistics, aws logs...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Creating or tuning an SQS dead-letter queue (Standard or FIFO),
-    wiring a redrive policy with the right maxReceiveCount, diagnosing
-    why messages landed in the DLQ (poison pill, visibility-timeout
-    race, IAM denial, partial-batch gap), replaying messages from DLQ
-    back to source via StartMessageMoveTask, monitoring DLQ depth via
-    ApproximateNumberOfMessagesVisible, configuring Lambda partial
-    batch responses (ReportBatchItemFailures) to prevent false-positive
-    DLQ entries, or scoping cross-account redrive via RedriveAllowPolicy.
-    Do NOT invoke for greenfield queue provisioning (use
-    sqs-queue-deployer) or for DLQ policy security audits (use
-    sqs-dlq-policy-auditor).
-  activation_triggers:
-    - "create SQS DLQ"
-    - "dead-letter queue"
-    - "tune maxReceiveCount"
-    - "redrive policy"
-    - "messages stuck in DLQ"
-    - "replay DLQ messages"
-    - "StartMessageMoveTask"
-    - "poison pill message"
-    - "DLQ analysis"
-    - "why messages went to DLQ"
-    - "DLQ depth alarm"
-    - "ApproximateNumberOfMessagesVisible"
-    - "partial batch response"
-    - "ReportBatchItemFailures"
-    - "RedriveAllowPolicy"
-    - "DLQ redrive"
-  invocation_schema: >-
-    Input: either (a) a DLQ operation intent (create, tune-redrive,
-    analyze, replay) with target queue name(s), OR (b) a DLQ URL for
-    live-account diagnosis or replay. Output: deterministic
-    OPERATION / VERDICT / TARGET / PRE_CHECKS / STEPS / POST_VERIFY /
-    STATE / NOTES block where VERDICT is one of READY, BLOCKED,
-    COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Creating or tuning an SQS dead-letter queue (Standard or FIFO), wiring a redrive policy with the right maxReceiveCount, diagnosing why messages landed in the DLQ (poison pill, visibility-timeout race, IAM denial, partial-batch gap), replaying messages from DLQ back to source via StartMessageMoveTask, monitoring DLQ depth via ApproximateNumberOfMessagesVisible, configuring Lambda partial batch responses (ReportBatchItemFailures) to prevent false-positive DLQ entries, or scoping cross-account redrive via RedriveAllowPolicy. Do NOT invoke for greenfield queue provisioning (use sqs-queue-deployer) or for DLQ policy security audits (use sqs-dlq-policy-auditor).
+  activation_triggers: create SQS DLQ, dead-letter queue, tune maxReceiveCount, redrive policy, messages stuck in DLQ, replay DLQ messages, StartMessageMoveTask, poison pill message, DLQ analysis, why messages went to DLQ, DLQ depth alarm, ApproximateNumberOfMessagesVisible, partial batch response, ReportBatchItemFailures, RedriveAllowPolicy, DLQ redrive
+  invocation_schema: 'Input: either (a) a DLQ operation intent (create, tune-redrive, analyze, replay) with target queue name(s), OR (b) a DLQ URL for live-account diagnosis or replay. Output: deterministic OPERATION / VERDICT / TARGET / PRE_CHECKS / STEPS / POST_VERIFY / STATE / NOTES block where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: SQS, dead-letter queue, DLQ, redrive policy, maxReceiveCount, StartMessageMoveTask, message replay, poison pill, visibility timeout, partial batch response, ReportBatchItemFailures, ApproximateNumberOfMessagesVisible, ApproximateAgeOfOldestMessage, RedriveAllowPolicy, FIFO DLQ, Standard DLQ, Lambda event source mapping, DLQ analysis
+  tags: sqs, messaging, app-integration, dead-letter-queue, dlq, operate, redrive, replay
 ---
 
 # SQS DLQ Operator

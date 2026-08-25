@@ -1,107 +1,27 @@
 ---
 name: cloudfront-distribution-deployer
-description: >-
-  Provisions production-grade CloudFront distributions with secure defaults:
-  Origin Access Control (OAC) for S3 origins (replaces legacy OAI), custom
-  origin HTTPS with origin protocol policy, TLS 1.2 minimum with ACM
-  certificates (must be in us-east-1), WAFv2 Web ACL association, managed cache
-  and origin-request policies, origin group failover (active-active or
-  active-passive), geo restriction allowlist/blocklist, Lambda@Edge vs
-  CloudFront Functions selection, price class, S3 access logging, response
-  headers policy for security headers, and latest features (KeyValueStore,
-  continuous deployment staging). Emits a deployment plan with a
-  READY_TO_DEPLOY checklist. Use when provisioning a new distribution,
-  configuring OAC on S3 origins, attaching WAF at the edge, planning
-  multi-origin failover, or hardening a CDN before production.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions production-grade CloudFront distributions with secure defaults: Origin Access Control (OAC) for S3 origins (replaces legacy OAI), custom origin HTTPS with origin protocol policy, TLS 1.2 minimum with ACM certificates (must be in us-east-1), WAFv2 Web ACL association, managed cache and origin-request policies, origin group failover (active-active or active-passive), geo restriction allowlist/blocklist, Lambda@Edge vs CloudFront Functions selection, price class, S3 access logging, response headers policy for security headers, and latest features (KeyValueStore, continuous deployment staging). Emits a deployment plan with a READY_TO_DEPLOY checklist. Use when provisioning a new distribution, configuring OAC on S3 origins, attaching WAF at the edge, planning multi-origin failover, or hardening a CDN before production.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline architecture planning. Live
-  deployment uses aws cloudfront create-distribution,
-  create-origin-access-control, create-cache-policy, create-origin-request-policy,
-  create-response-headers-policy, create-distribution-with-staging-config,
-  aws wafv2 create-web-acl associate-web-acl, and aws acm list-certificates
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - CloudFront
-  - distribution deploy
-  - Origin Access Control
-  - OAC
-  - OAI migration
-  - S3 origin
-  - custom origin
-  - ALB origin
-  - OriginProtocolPolicy
-  - ViewerProtocolPolicy
-  - TLS 1.2
-  - TLSv1.2_2021
-  - ACM certificate
-  - us-east-1
-  - WAFv2
-  - Web ACL
-  - cache policy
-  - origin request policy
-  - managed policy
-  - origin group
-  - failover
-  - geo restriction
-  - Lambda@Edge
-  - CloudFront Functions
-  - KeyValueStore
-  - price class
-  - access logging
-  - response headers policy
-  - security headers
-  - HSTS
-  - continuous deployment
-  - staging distribution
-  - CDN provisioning
-tags: [cloudfront, networking, deploy, cdn, oac, waf, tls, cache-policy, lambda-edge, cloudfront-functions, security-headers, geo-restriction]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline architecture planning. Live deployment uses aws cloudfront create-distribution, create-origin-access-control, create-cache-policy, create-origin-request-policy, create-response-headers-policy, create-distribution-with-staging-config, aws wafv2 create-web-acl associate-web-acl, and aws acm list-certificates (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: deploy
   skill_class: capability
   lifecycle_status: experimental
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Provisioning a new CloudFront distribution for production, configuring
-    Origin Access Control on S3 origins, attaching a WAFv2 Web ACL at the
-    edge, planning multi-origin failover with origin groups, designing cache
-    and origin request policies, setting up geo restriction, choosing between
-    Lambda@Edge and CloudFront Functions, configuring security response
-    headers, or planning a continuous-deployment (staging) distribution
-    workflow.
-  activation_triggers:
-    - "create a CloudFront distribution"
-    - "provision a CDN distribution"
-    - "configure OAC on my S3 origin"
-    - "CloudFront with WAF"
-    - "multi-origin failover distribution"
-    - "Lambda@Edge vs CloudFront Functions"
-    - "CloudFront cache policy"
-    - "CloudFront security headers"
-    - "CloudFront geo restriction"
-    - "CloudFront continuous deployment"
-    - "ACM certificate for CloudFront"
-    - "price class CloudFront"
-  invocation_schema: >-
-    Input shape (one of): (a) a deployment specification including origin
-    type (S3/custom/ALB), domain names, TLS requirements, WAF requirements,
-    cache behavior requirements, geo restriction, edge compute requirements,
-    logging destination, and price class; (b) a partial spec for interactive
-    refinement (e.g., "CloudFront in front of an S3 bucket with OAC and
-    WAF"); (c) an existing distribution ID for architecture review against
-    the well-architected checklist. Output shape: { DISTRIBUTION_SPEC,
-    VERDICT, ARCHITECTURE, CHECKLIST[], FINDINGS[], DEPLOY_COMMANDS } where
-    VERDICT ∈ { READY_TO_DEPLOY, PREREQUISITES_MISSING, ERROR }.
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Provisioning a new CloudFront distribution for production, configuring Origin Access Control on S3 origins, attaching a WAFv2 Web ACL at the edge, planning multi-origin failover with origin groups, designing cache and origin request policies, setting up geo restriction, choosing between Lambda@Edge and CloudFront Functions, configuring security response headers, or planning a continuous-deployment (staging) distribution workflow.
+  activation_triggers: create a CloudFront distribution, provision a CDN distribution, configure OAC on my S3 origin, CloudFront with WAF, multi-origin failover distribution, Lambda@Edge vs CloudFront Functions, CloudFront cache policy, CloudFront security headers, CloudFront geo restriction, CloudFront continuous deployment, ACM certificate for CloudFront, price class CloudFront
+  invocation_schema: 'Input shape (one of): (a) a deployment specification including origin type (S3/custom/ALB), domain names, TLS requirements, WAF requirements, cache behavior requirements, geo restriction, edge compute requirements, logging destination, and price class; (b) a partial spec for interactive refinement (e.g., "CloudFront in front of an S3 bucket with OAC and WAF"); (c) an existing distribution ID for architecture review against the well-architected checklist. Output shape: { DISTRIBUTION_SPEC, VERDICT, ARCHITECTURE, CHECKLIST[], FINDINGS[], DEPLOY_COMMANDS } where VERDICT ∈ { READY_TO_DEPLOY, PREREQUISITES_MISSING, ERROR }.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudFront, distribution deploy, Origin Access Control, OAC, OAI migration, S3 origin, custom origin, ALB origin, OriginProtocolPolicy, ViewerProtocolPolicy, TLS 1.2, TLSv1.2_2021, ACM certificate, us-east-1, WAFv2, Web ACL, cache policy, origin request policy, managed policy, origin group, failover, geo restriction, Lambda@Edge, CloudFront Functions, KeyValueStore, price class, access logging, response headers policy, security headers, HSTS, continuous deployment, staging distribution, CDN provisioning
+  tags: cloudfront, networking, deploy, cdn, oac, waf, tls, cache-policy, lambda-edge, cloudfront-functions, security-headers, geo-restriction
 ---
 
 # CloudFront Distribution Deployer

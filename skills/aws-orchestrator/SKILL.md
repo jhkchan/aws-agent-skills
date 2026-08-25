@@ -1,31 +1,20 @@
 ---
 name: aws-orchestrator
-description: "Start here for any AWS CloudOps audit, security review, compliance check, or infrastructure assessment. Diagnoses the task and routes to the right specialist skill(s) across the 4-phase CloudOps pipeline (Assess, Audit, Prioritize, Remediate). Use whenever the user mentions S3, IAM, EC2, security groups, bucket policy, public access, least privilege, compliance, CIS, PCI-DSS, audit, exposure, remediation, hardening, or asks 'is this resource secure/public/compliant'. A bare AWS resource name plus any audit verb is a sufficient trigger. Use even if the user does not explicitly say 'pipeline' — 'check my S3 buckets', 'audit this IAM role', 'are my security groups open' are all triggers."
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Start here for any AWS CloudOps audit, security review, compliance check, or infrastructure assessment. Diagnoses the task and routes to the right specialist skill(s) across the 4-phase CloudOps pipeline (Assess, Audit, Prioritize, Remediate). Use whenever the user mentions S3, IAM, EC2, security groups, bucket policy, public access, least privilege, compliance, CIS, PCI-DSS, audit, exposure, remediation, hardening, or asks 'is this resource secure/public/compliant'. A bare AWS resource name plus any audit verb is a sufficient trigger. Use even if the user does not explicitly say 'pipeline' — 'check my S3 buckets', 'audit this IAM role', 'are my security groups open' are all triggers.
 license: Apache-2.0
-keywords:
-  - aws
-  - cloudops
-  - orchestration
-  - pipeline
-  - routing
-  - audit
-  - security
-  - compliance
-tags: [aws, cloudops, orchestration, pipeline, routing, audit, security]
-dependencies:
-  - s3-public-access-auditor
-  - iam-least-privilege-advisor
-  - ec2-security-group-auditor
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: false
-  phase: 0
-  supports_pipeline: true
-  entry_point: true
+  requires_llm: 'false'
+  phase: '0'
+  supports_pipeline: 'true'
+  entry_point: 'true'
   family: Management
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: aws, cloudops, orchestration, pipeline, routing, audit, security, compliance
+  tags: aws, cloudops, orchestration, pipeline, routing, audit, security
+  dependencies: s3-public-access-auditor, iam-least-privilege-advisor, ec2-security-group-auditor
 ---
 
 ## Natural Language Triggers

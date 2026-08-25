@@ -1,52 +1,15 @@
 ---
 name: cloudwatch-alarm-troubleshooter
-description: >-
-  Diagnoses CloudWatch alarm issues through a nine-category diagnostic
-  tree: alarm stuck in INSUFFICIENT_DATA (missing metric, missing
-  dimension, period misaligned), alarm not firing (static threshold
-  vs anomaly detection band, statistic mismatch Sum/Average/Maximum),
-  high-resolution vs standard-resolution period mismatch, metric
-  namespace typo or wrong source, composite alarm rule evaluation
-  failure, math expression errors, dimension case-sensitivity and
-  exact-string matching, alarm actions not triggering (SNS topic
-  policy, Lambda invoke permission, missing action), alarm history
-  analysis for state transitions, and treat-missing-data
-  configuration. Walks symptoms to a verified root cause with
-  evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED or
-  INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses CloudWatch alarm issues through a nine-category diagnostic tree: alarm stuck in INSUFFICIENT_DATA (missing metric, missing dimension, period misaligned), alarm not firing (static threshold vs anomaly detection band, statistic mismatch Sum/Average/Maximum), high-resolution vs standard-resolution period mismatch, metric namespace typo or wrong source, composite alarm rule evaluation failure, math expression errors, dimension case-sensitivity and exact-string matching, alarm actions not triggering (SNS topic policy, Lambda invoke permission, missing action), alarm history analysis for state transitions, and treat-missing-data configuration. Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted alarm state and metric configuration. Live-account diagnosis uses aws cloudwatch describe-alarms, get-metric-data, get-metric-statistics, describe-alarm-history, aws logs describe-metric-filters, aws sns get-topic-attributes, aws lambda get-policy, and aws cloudwatch put-metric-data for a test point (AWS CLI v2,
-  SSO or key-based credentials).
-keywords:
-- CloudWatch
-- alarm
-- INSUFFICIENT_DATA
-- alarm not firing
-- metric dimension
-- period alignment
-- anomaly detection
-- composite alarm
-- math expression
-- alarm actions
-- treat-missing-data
-- troubleshooting
-tags:
-- cloudwatch
-- management
-- troubleshooting
-- alarm
-- INSUFFICIENT_DATA
-- anomaly-detection
-- composite-alarm
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted alarm state and metric configuration. Live-account diagnosis uses aws cloudwatch describe-alarms, get-metric-data, get-metric-statistics, describe-alarm-history, aws logs describe-metric-filters, aws sns get-topic-attributes, aws lambda get-policy, and aws cloudwatch put-metric-data for a test point (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: troubleshoot
   skill_class: capability
@@ -54,24 +17,13 @@ metadata:
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
   when_to_use: Diagnosing a CloudWatch alarm that does not behave as expected — stuck in INSUFFICIENT_DATA, never transitions to ALARM, fires inconsistently with the metric, alarm actions (SNS, Lambda, Auto Scaling, SSM) do not invoke, composite alarm rule evaluates incorrectly, math-expression alarm errors out, or a metric-filter alarm never matches log lines. Use whenever the operator says "the alarm is broken" and the root cause may be metric config, namespace, dimension, period, statistic, threshold model, action target policy, or treat-missing-data setting — not necessarily the metric pipeline itself.
   when_not_to_use: Designing a new alarm policy from scratch (use cloudwatch-alarm-auditor for posture review), debugging the underlying application metric emission path (use cloudwatch-metrics-troubleshooter), building dashboards (use cloudwatch-dashboard-deployer), investigating Logs Insights performance (use cloudwatch-logs-insights-troubshooter), or auto-remediating a firing alarm for a known issue (use auto-remediation-automator). This skill diagnoses alarm-behaviour failures; it does not redesign alarm coverage or fix the upstream metric.
-  activation_triggers:
-  - CloudWatch alarm INSUFFICIENT_DATA
-  - alarm stuck in INSUFFICIENT_DATA
-  - CloudWatch alarm not firing
-  - alarm never goes to ALARM
-  - CloudWatch dimension mismatch
-  - alarm dimension case-sensitive
-  - CloudWatch alarm period misaligned
-  - high-resolution alarm
-  - CloudWatch composite alarm
-  - alarm math expression error
-  - CloudWatch alarm action not triggering
-  - SNS topic alarm action
-  - Lambda alarm action permission
-  - treat-missing-data
-  - troubleshoot CloudWatch alarm
+  activation_triggers: CloudWatch alarm INSUFFICIENT_DATA, alarm stuck in INSUFFICIENT_DATA, CloudWatch alarm not firing, alarm never goes to ALARM, CloudWatch dimension mismatch, alarm dimension case-sensitive, CloudWatch alarm period misaligned, high-resolution alarm, CloudWatch composite alarm, alarm math expression error, CloudWatch alarm action not triggering, SNS topic alarm action, Lambda alarm action permission, treat-missing-data, troubleshoot CloudWatch alarm
   invocation_schema: 'Input: either (a) a symptom description (alarm name, observed state — INSUFFICIENT_DATA / OK-but-expected-ALARM / ALARM-with-no-action, time window), optionally paired with the alarm configuration (describe-alarms output) and the raw metric points (get-metric-data output) for offline classification, OR (b) an AlarmName plus the metric namespace, metric name, dimensions, period, statistic, and threshold for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {METRIC_DIMENSION_MISMATCH, NAMESPACE_TYPO, PERIOD_MISALIGNMENT, RESOLUTION_MISMATCH, STATISTIC_MISMATCH, THRESHOLD_STATIC, THRESHOLD_ANOMALY, MATH_EXPRESSION, COMPOSITE_RULE, TREAT_MISSING_DATA, INSUFFICIENT_DATA_CONFIG, ACTION_SNS_POLICY, ACTION_LAMBDA_POLICY, ACTION_AUTOSCALING_POLICY, ACTION_SSM_POLICY, ACTION_MISSING, UNKNOWN}.'
   invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"Alarm HighErrorRateAlarm has been in INSUFFICIENT_DATA\nfor 3 days. The Lambda function fn-orders-api is clearly emitting\nErrors, we can see them on the dashboard.\"\nAlarmName: HighErrorRateAlarm\nNamespace: AWS/Lambda\nMetricName: Errors\nDimensions: [{Name: FunctionName, Value: fn-orders-api}]\nPeriod: 300\nStatistic: Sum\nThreshold: 5 (GreaterThanThreshold)\nTreatMissingData: missing\nStateValue: INSUFFICIENT_DATA\nMetric evidence: dashboard shows non-zero Errors for fn-orders-api\n  every 5 minutes for the last 24 hours"
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudWatch, alarm, INSUFFICIENT_DATA, alarm not firing, metric dimension, period alignment, anomaly detection, composite alarm, math expression, alarm actions, treat-missing-data, troubleshooting
+  tags: cloudwatch, management, troubleshooting, alarm, INSUFFICIENT_DATA, anomaly-detection, composite-alarm
 ---
 
 # CloudWatch Alarm Troubleshooter

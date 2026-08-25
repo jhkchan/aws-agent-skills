@@ -1,139 +1,26 @@
 ---
 name: waf-rule-deployer
-description: >-
-  Provisions AWS WAFv2 rule sets with production defaults: Web ACL
-  creation (CloudFront scope in us-east-1 vs Regional scope), rule
-  groups (managed vs custom) with capacity planning in WCU (Web ACL
-  Capacity Units, 1500 default per ACL), managed rule groups
-  (AWSManagedRulesCommonRuleSet, AWSManagedRulesSQLiRuleSet,
-  AWSManagedRulesAmazonIpReputationList, AWSManagedRulesLinuxRuleSet,
-  AWSManagedRulesWindowsRuleSet, AWSManagedRulesUnixRuleSet),
-  custom rules (byte-match, regex pattern set, geo-match,
-  rate-based), IP set and regex pattern set resources, rule priority
-  ordering (lowest number evaluated first), action types (allow,
-  block, count, CAPTCHA, Challenge), bot control managed rule group,
-  account takeover prevention (ATP), label matching for rule
-  chaining, logging configuration via Kinesis Firehose to S3, and
-  CloudFront distribution association. Emits a READY_TO_DEPLOY
-  checklist with verification commands. Use when creating a WAF rule
-  set, attaching managed rule groups to a Web ACL, writing custom
-  byte-match or geo-match rules, configuring rate-based rules,
-  planning WCU budget, configuring WAF logging to S3 via Firehose,
-  associating a Web ACL with a CloudFront distribution, or chaining
-  rules with labels. Triggers: create WAF rule, WAF managed rule
-  group, WAF custom rule, WAF byte match, WAF geo match, WAF rate
-  based rule, WAF IP set, WAF regex pattern set, WAF WCU budget,
-  WAF CloudFront ACL, WAF logging Kinesis Firehose, WAF bot control,
-  WAF ATP, WAF label matching, WAF Challenge action, WAF CAPTCHA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS WAFv2 rule sets with production defaults: Web ACL creation (CloudFront scope in us-east-1 vs Regional scope), rule groups (managed vs custom) with capacity planning in WCU (Web ACL Capacity Units, 1500 default per ACL), managed rule groups (AWSManagedRulesCommonRuleSet, AWSManagedRulesSQLiRuleSet, AWSManagedRulesAmazonIpReputationList, AWSManagedRulesLinuxRuleSet, AWSManagedRulesWindowsRuleSet, AWSManagedRulesUnixRuleSet), custom rules (byte-match, regex pattern set, geo-match, rate-based), IP set and regex pattern set resources, rule priority ordering (lowest number evaluated first), action types (allow, block, count, CAPTCHA, Challenge), bot control managed rule group, account takeover. Triggers: create WAF rule, WAF managed rule group, WAF custom rule, WAF byte match, WAF geo match, WAF rate based rule, WAF IP set, WAF regex pattern set, WAF WCU budget, WAF CloudFront ACL, WAF logging Kinesis Firehose, WAF bot control, WAF ATP, WAF label matching, WAF Challenge action, WAF CAPTCHA.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with wafv2,
-  cloudfront, firehose, s3, iam, and logs access. CloudFront-scoped
-  Web ACLs must be created in us-east-1. Works with Terraform
-  aws_wafv2_web_acl / aws_wafv2_rule_group / aws_wafv2_ip_set /
-  aws_wafv2_regex_pattern_set resources and CloudFormation
-  AWS::WAFv2::WebACL / AWS::WAFv2::RuleGroup templates.
-keywords:
-  - aws
-  - waf
-  - wafv2
-  - web acl
-  - rule group
-  - managed rules
-  - custom rules
-  - cloudops
-  - deploy
-  - provisioning
-  - security
-  - byte match
-  - geo match
-  - rate based
-  - ip set
-  - regex pattern set
-  - wcu
-  - bot control
-  - atp
-  - captcha
-  - challenge
-  - cloudfront
-  - label matching
-  - kinesis firehose
-tags:
-  - aws
-  - waf
-  - wafv2
-  - security
-  - cloudops
-  - deploy
-  - rule-group
-  - managed-rules
-  - custom-rules
-  - cloudfront
-  - rate-based
-  - bot-control
-  - atp
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with wafv2, cloudfront, firehose, s3, iam, and logs access. CloudFront-scoped Web ACLs must be created in us-east-1. Works with Terraform aws_wafv2_web_acl / aws_wafv2_rule_group / aws_wafv2_ip_set / aws_wafv2_regex_pattern_set resources and CloudFormation AWS::WAFv2::WebACL / AWS::WAFv2::RuleGroup templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - waf
-    - wafv2
-    - security
-    - cloudops
-    - deploy
-    - rule-group
-    - managed-rules
-    - custom-rules
-    - cloudfront
-    - rate-based
-    - bot-control
-    - atp
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create waf rule
-    - waf managed rule group
-    - waf custom rule
-    - waf byte match
-    - waf geo match
-    - waf rate based rule
-    - waf ip set
-    - waf regex pattern set
-    - waf wcu budget
-    - waf cloudfront acl
-    - waf logging kinesis firehose
-    - waf bot control
-    - waf atp
-    - waf label matching
-    - waf challenge action
-    - waf captcha
-  when_to_use: >-
-    Invoke when the user wants to create a WAFv2 Web ACL with managed
-    and custom rules, attach managed rule groups (CommonRuleSet,
-    SQLiRuleSet, AmazonIpReputationList), write custom byte-match or
-    geo-match or rate-based rules, plan WCU capacity budget, configure
-    WAF logging to S3 via Kinesis Firehose, associate a Web ACL with a
-    CloudFront distribution (must be in us-east-1), or chain rules
-    using labels. Do NOT invoke for AWS Shield Advanced (use shield
-    skills), AWS Firewall Manager (use firewall-manager skills), or
-    for auditing an existing Web ACL (use wafv2-web-acl-auditor).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, waf, wafv2, security, cloudops, deploy, rule-group, managed-rules, custom-rules, cloudfront, rate-based, bot-control, atp
+  dependencies: aws-orchestrator
+  keywords: aws, waf, wafv2, web acl, rule group, managed rules, custom rules, cloudops, deploy, provisioning, security, byte match, geo match, rate based, ip set, regex pattern set, wcu, bot control, atp, captcha, challenge, cloudfront, label matching, kinesis firehose
+  when_to_use: Invoke when the user wants to create a WAFv2 Web ACL with managed and custom rules, attach managed rule groups (CommonRuleSet, SQLiRuleSet, AmazonIpReputationList), write custom byte-match or geo-match or rate-based rules, plan WCU capacity budget, configure WAF logging to S3 via Kinesis Firehose, associate a Web ACL with a CloudFront distribution (must be in us-east-1), or chain rules using labels. Do NOT invoke for AWS Shield Advanced (use shield skills), AWS Firewall Manager (use firewall-manager skills), or for auditing an existing Web ACL (use wafv2-web-acl-auditor).
 ---
 
 # WAF Rule Deployer

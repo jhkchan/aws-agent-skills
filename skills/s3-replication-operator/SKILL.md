@@ -1,104 +1,27 @@
 ---
 name: s3-replication-operator
-description: >-
-  Operates S3 cross-region replication (CRR) and same-region replication
-  (SRR) end-to-end — rule configuration (priority, filter prefix/tags,
-  status), source/destination requirements (versioning on BOTH buckets,
-  same or different region/account), IAM replication role
-  (s3:ReplicateObject, s3:ReplicateDelete,
-  s3:ObjectOwnerOverrideToBucketOwner, KMS decrypt/encrypt), Replication
-  Time Control (RTC, 15 min SLA, CloudWatch PendingReplication metrics),
-  batch replication of existing objects via S3 Batch Operations,
-  delete-marker replication (optional, separate config), replica
-  modification sync, cross-account destination bucket policy
-  (s3:x-amz-source-account condition), and S3 Replication to multiple
-  destinations. Runs deterministic pre-checks behind a CONFIRM gate and
-  emits a READY, BLOCKED, or COMPLETED verdict. Use when configuring
-  CRR/SRR rules, diagnosing replication not happening, batching existing
-  objects, or wiring cross-account replication.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates S3 cross-region replication (CRR) and same-region replication (SRR) end-to-end — rule configuration (priority, filter prefix/tags, status), source/destination requirements (versioning on BOTH buckets, same or different region/account), IAM replication role (s3:ReplicateObject, s3:ReplicateDelete, s3:ObjectOwnerOverrideToBucketOwner, KMS decrypt/encrypt), Replication Time Control (RTC, 15 min SLA, CloudWatch PendingReplication metrics), batch replication of existing objects via S3 Batch Operations, delete-marker replication (optional, separate config), replica modification sync, cross-account destination bucket policy (s3:x-amz-source-account condition), and S3 Replication to multiple destinations. Runs deterministic pre-checks behind a CONFIRM gate and emits a READY, BLOCKED, or COMPLETED verdict. Use when configuring CRR/SRR rules, diagnosing replication not happening, batching existing objects, or wiring cross-account replication.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws s3api get-bucket-replication, put-bucket-replication,
-  get-bucket-versioning, get-bucket-encryption, get-bucket-location, aws
-  s3control create-job (Batch Operations), aws cloudwatch
-  get-metric-statistics (RTC metrics), and aws kms describe-key /
-  get-key-policy (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - S3 replication
-  - cross-region replication
-  - CRR
-  - same-region replication
-  - SRR
-  - ReplicationTimeControl
-  - RTC
-  - replication rule
-  - filter prefix
-  - delete marker replication
-  - replica modification sync
-  - batch replication
-  - S3 Batch Operations
-  - cross-account replication
-  - destination bucket policy
-  - s3:ReplicateObject
-  - s3:ReplicateDelete
-  - KMS decrypt
-  - PendingReplication
-  - multiple destinations
-  - versioning enabled
-  - OwnershipControls
-tags: [aws, s3, storage, replication, crr, srr, kms, cross-account, backup, dr, operate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws s3api get-bucket-replication, put-bucket-replication, get-bucket-versioning, get-bucket-encryption, get-bucket-location, aws s3control create-job (Batch Operations), aws cloudwatch get-metric-statistics (RTC metrics), and aws kms describe-key / get-key-policy (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Configuring or modifying a replication rule (CRR or SRR), diagnosing
-    objects not replicating, setting up batch replication for existing
-    objects, wiring cross-account destination bucket policy, enabling
-    Replication Time Control and reading its CloudWatch metrics, deciding
-    whether delete-marker replication should be on, configuring replica
-    modification sync, or designing S3 Replication to multiple
-    destination buckets.
-  activation_triggers:
-    - "configure S3 replication"
-    - "cross-region replication"
-    - "CRR setup"
-    - "same-region replication"
-    - "SRR setup"
-    - "objects not replicating"
-    - "replication is broken"
-    - "batch replicate existing objects"
-    - "S3 Batch Operations replication"
-    - "cross-account replication"
-    - "destination bucket policy replication"
-    - "Replication Time Control"
-    - "RTC metrics"
-    - "delete marker replication"
-    - "replica modification sync"
-    - "S3 multiple destinations"
-    - "PendingReplication metric"
-    - "versioning required for replication"
-  invocation_schema: >-
-    Input: either (a) a source bucket configuration (get-bucket-replication,
-    get-bucket-versioning, get-bucket-encryption, get-bucket-location) plus
-    the intended operation (add-rule, update-rule, enable-rtc,
-    batch-replicate, diagnose-not-replicating, configure-cross-account,
-    enable-delete-marker-replication), OR (b) a source + destination bucket
-    pair for live-account execution. Output: deterministic OPERATION /
-    VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per
-    operation, where VERDICT is one of READY, BLOCKED, COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Configuring or modifying a replication rule (CRR or SRR), diagnosing objects not replicating, setting up batch replication for existing objects, wiring cross-account destination bucket policy, enabling Replication Time Control and reading its CloudWatch metrics, deciding whether delete-marker replication should be on, configuring replica modification sync, or designing S3 Replication to multiple destination buckets.
+  activation_triggers: configure S3 replication, cross-region replication, CRR setup, same-region replication, SRR setup, objects not replicating, replication is broken, batch replicate existing objects, S3 Batch Operations replication, cross-account replication, destination bucket policy replication, Replication Time Control, RTC metrics, delete marker replication, replica modification sync, S3 multiple destinations, PendingReplication metric, versioning required for replication
+  invocation_schema: 'Input: either (a) a source bucket configuration (get-bucket-replication, get-bucket-versioning, get-bucket-encryption, get-bucket-location) plus the intended operation (add-rule, update-rule, enable-rtc, batch-replicate, diagnose-not-replicating, configure-cross-account, enable-delete-marker-replication), OR (b) a source + destination bucket pair for live-account execution. Output: deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: S3 replication, cross-region replication, CRR, same-region replication, SRR, ReplicationTimeControl, RTC, replication rule, filter prefix, delete marker replication, replica modification sync, batch replication, S3 Batch Operations, cross-account replication, destination bucket policy, s3:ReplicateObject, s3:ReplicateDelete, KMS decrypt, PendingReplication, multiple destinations, versioning enabled, OwnershipControls
+  tags: aws, s3, storage, replication, crr, srr, kms, cross-account, backup, dr, operate
 ---
 
 # S3 Replication Operator

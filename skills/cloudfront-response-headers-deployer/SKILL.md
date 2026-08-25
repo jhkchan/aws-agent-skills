@@ -1,113 +1,27 @@
 ---
 name: cloudfront-response-headers-deployer
-description: >-
-  Provisions CloudFront response headers policies with secure defaults: security
-  headers (Content-Security-Policy, Strict-Transport-Security, X-Frame-Options,
-  X-Content-Type-Options, Referrer-Policy, Permissions-Policy), CORS
-  configuration (access-control-allow-origin, methods, headers, credentials,
-  expose-headers, max-age, preflight), custom headers (Cache-Control, X-Custom),
-  removal headers (Server, X-Powered-By), managed policies
-  (CORS-with-preflight-and-SecurityHeadersPolicy, SimpleCORS,
-  CORSAndHTTPSecurityHeadersPolicy, SecurityHeadersPolicy), and the latest
-  CloudFront response headers policy managed updates. Emits a deployment plan
-  with a verdict (READY_TO_DEPLOY with full CloudFormation / Terraform template
-  | PREREQUISITES_MISSING with specific gap and remediation). Use when
-  provisioning security headers on a CloudFront distribution, configuring CORS
-  for cross-origin access, attaching managed SecurityHeadersPolicy, removing
-  server fingerprint headers, or hardening a CDN's HTTP response posture.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions CloudFront response headers policies with secure defaults: security headers (Content-Security-Policy, Strict-Transport-Security, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy), CORS configuration (access-control-allow-origin, methods, headers, credentials, expose-headers, max-age, preflight), custom headers (Cache-Control, X-Custom), removal headers (Server, X-Powered-By), managed policies (CORS-with-preflight-and-SecurityHeadersPolicy, SimpleCORS, CORSAndHTTPSecurityHeadersPolicy, SecurityHeadersPolicy), and the latest CloudFront response headers policy managed updates. Emits a deployment plan with a verdict (READY_TO_DEPLOY with full CloudFormation / Terraform template | PREREQUISITES_MISSING with specific gap and remediation). Use when provisioning security headers on a CloudFront distribution, configuring CORS for cross-origin access, attaching managed SecurityHeadersPolicy, removing server fingerprint headers, or hardening a CDN''s HTTP response posture.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws cloudfront create-response-headers-policy,
-  get-response-headers-policy, update-response-headers-policy,
-  delete-response-headers-policy, list-response-headers-policies,
-  create-response-headers-policy-config, get-distribution-config,
-  update-distribution, create-distribution, list-conflicting-aliases, and
-  aws cloudfront get-cache-policy-config (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-  - CloudFront
-  - response headers policy
-  - security headers
-  - Content-Security-Policy
-  - CSP
-  - Strict-Transport-Security
-  - HSTS
-  - X-Frame-Options
-  - X-Content-Type-Options
-  - Referrer-Policy
-  - Permissions-Policy
-  - CORS
-  - access-control-allow-origin
-  - preflight
-  - managed policy
-  - SecurityHeadersPolicy
-  - SimpleCORS
-  - Cache-Control
-  - custom headers
-  - removal headers
-  - Server header
-  - X-Powered-By
-tags:
-  - cloudfront
-  - networking
-  - deploy
-  - security-headers
-  - cors
-  - response-headers-policy
-  - cdn
-  - hardening
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws cloudfront create-response-headers-policy, get-response-headers-policy, update-response-headers-policy, delete-response-headers-policy, list-response-headers-policies, create-response-headers-policy-config, get-distribution-config, update-distribution, create-distribution, list-conflicting-aliases, and aws cloudfront...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Provisioning a CloudFront response headers policy for security headers
-    (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy,
-    Permissions-Policy); configuring CORS for cross-origin access (simple CORS,
-    preflight, credentials); attaching a managed policy
-    (SecurityHeadersPolicy, CORSAndHTTPSecurityHeadersPolicy,
-    SimpleCORS, CORS-with-preflight-and-SecurityHeadersPolicy); removing
-    server fingerprint headers (Server, X-Powered-By); setting custom headers
-    (Cache-Control, X-Custom); or hardening a distribution's HTTP response
-    posture before production.
-  activation_triggers:
-    - "create CloudFront response headers policy"
-    - "CloudFront security headers"
-    - "CloudFront CSP"
-    - "CloudFront HSTS"
-    - "CloudFront X-Frame-Options"
-    - "CloudFront CORS"
-    - "CloudFront access-control-allow-origin"
-    - "CloudFront preflight"
-    - "CloudFront managed SecurityHeadersPolicy"
-    - "CloudFront SimpleCORS"
-    - "CloudFront remove Server header"
-    - "CloudFront remove X-Powered-By"
-    - "CloudFront Cache-Control header"
-    - "CloudFront Permissions-Policy"
-    - "CloudFront Referrer-Policy"
-    - "attach response headers policy to distribution"
-  invocation_schema: >-
-    Input shape (one of): (a) a deployment spec describing header requirements
-    (security headers + values, CORS origin/methods/headers, custom headers,
-    removal headers, managed vs custom policy); (b) a partial spec for
-    interactive refinement ("security headers on my distribution"); (c) an
-    existing distribution ID for policy review against the secure-defaults
-    checklist. Output shape: { POLICY_SPEC, VERDICT, ARCHITECTURE, CHECKLIST[],
-    FINDINGS[], DEPLOY_COMMANDS } where VERDICT ∈ { READY_TO_DEPLOY,
-    PREREQUISITES_MISSING }.
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Provisioning a CloudFront response headers policy for security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy); configuring CORS for cross-origin access (simple CORS, preflight, credentials); attaching a managed policy (SecurityHeadersPolicy, CORSAndHTTPSecurityHeadersPolicy, SimpleCORS, CORS-with-preflight-and-SecurityHeadersPolicy); removing server fingerprint headers (Server, X-Powered-By); setting custom headers (Cache-Control, X-Custom); or hardening a distribution's HTTP response posture before production.
+  activation_triggers: create CloudFront response headers policy, CloudFront security headers, CloudFront CSP, CloudFront HSTS, CloudFront X-Frame-Options, CloudFront CORS, CloudFront access-control-allow-origin, CloudFront preflight, CloudFront managed SecurityHeadersPolicy, CloudFront SimpleCORS, CloudFront remove Server header, CloudFront remove X-Powered-By, CloudFront Cache-Control header, CloudFront Permissions-Policy, CloudFront Referrer-Policy, attach response headers policy to distribution
+  invocation_schema: 'Input shape (one of): (a) a deployment spec describing header requirements (security headers + values, CORS origin/methods/headers, custom headers, removal headers, managed vs custom policy); (b) a partial spec for interactive refinement ("security headers on my distribution"); (c) an existing distribution ID for policy review against the secure-defaults checklist. Output shape: { POLICY_SPEC, VERDICT, ARCHITECTURE, CHECKLIST[], FINDINGS[], DEPLOY_COMMANDS } where VERDICT ∈ { READY_TO_DEPLOY, PREREQUISITES_MISSING }.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudFront, response headers policy, security headers, Content-Security-Policy, CSP, Strict-Transport-Security, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, CORS, access-control-allow-origin, preflight, managed policy, SecurityHeadersPolicy, SimpleCORS, Cache-Control, custom headers, removal headers, Server header, X-Powered-By
+  tags: cloudfront, networking, deploy, security-headers, cors, response-headers-policy, cdn, hardening
 ---
 
 # CloudFront Response Headers Deployer

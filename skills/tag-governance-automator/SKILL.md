@@ -1,96 +1,27 @@
 ---
 name: tag-governance-automator
-description: >-
-  Designs and implements AWS tag governance automation across Organizations
-  TagPolicy JSON (allowed_values, case_sensitive, enforced_for cascade),
-  EventBridge + Lambda auto-tagging on EC2/S3/Lambda creation (derive Owner
-  from IAM identity, Environment from account map), Resource Groups Tagging
-  API bulk operations (tag-resources, untag-resources, get-resources
-  multi-region), Config required-tags managed rule + Security Hub finding
-  aggregation, cost-allocation-tag activation via Billing API (user-defined
-  vs AWS-generated), and ABAC IAM policy design with aws:ResourceTag and
-  aws:PrincipalTag condition keys. Covers automated remediation: Config
-  detects missing tag, SSM Automation adds tag, Config re-evaluates.
-  Emits AUTOMATED with tag policy template or MANUAL_STEP_REQUIRED with the
-  specific gap. Use when building tag governance, auto-tagging pipelines,
-  ABAC, or tag-compliance automation.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Designs and implements AWS tag governance automation across Organizations TagPolicy JSON (allowed_values, case_sensitive, enforced_for cascade), EventBridge + Lambda auto-tagging on EC2/S3/Lambda creation (derive Owner from IAM identity, Environment from account map), Resource Groups Tagging API bulk operations (tag-resources, untag-resources, get-resources multi-region), Config required-tags managed rule + Security Hub finding aggregation, cost-allocation-tag activation via Billing API (user-defined vs AWS-generated), and ABAC IAM policy design with aws:ResourceTag and aws:PrincipalTag condition keys. Covers automated remediation: Config detects missing tag, SSM Automation adds tag, Config re-evaluates. Emits AUTOMATED with tag policy template or MANUAL_STEP_REQUIRED with the specific gap. Use when building tag governance, auto-tagging pipelines, ABAC, or tag-compliance automation.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline policy design. Live deployment
-  uses aws organizations enable-policy-type, create-policy, update-policy,
-  aws resourcegroupstaggingapi tag-resources, untag-resources, get-resources,
-  aws configservice put-config-rule, describe-config-rules,
-  aws ce update-cost-allocation-tags-status, aws ssm create-document,
-  start-automation-execution, and aws lambda create-function with an
-  EventBridge rule — AWS CLI v2, SSO or key-based credentials,
-  Organizations management or member-account permissions.
-keywords:
-  - AWS Organizations
-  - Tag Policy
-  - TagPolicy
-  - allowed_values
-  - enforced_for
-  - Resource Groups Tagging API
-  - tag-resources
-  - untag-resources
-  - AWS Config
-  - required-tags
-  - Security Hub
-  - EventBridge
-  - Lambda auto-tagging
-  - cost allocation tags
-  - ABAC
-  - aws:ResourceTag
-  - aws:PrincipalTag
-  - aws:RequestTag
-  - SSM Automation
-  - tag compliance
-  - tag governance
-tags: [aws-organizations, tag-policy, resource-groups-tagging-api, aws-config, security-hub, abac, eventbridge, lambda, automate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline policy design. Live deployment uses aws organizations enable-policy-type, create-policy, update-policy, aws resourcegroupstaggingapi tag-resources, untag-resources, get-resources, aws configservice put-config-rule, describe-config-rules, aws ce update-cost-allocation-tags-status, aws ssm create-document, start-automation-execution, and aws lambda create-function with an...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATED | MANUAL_STEP_REQUIRED"
-  when_to_use: >-
-    Designing Organizations tag policies (allowed_values, case sensitivity,
-    enforced_for), building EventBridge + Lambda auto-tagging pipelines,
-    running Resource Groups Tagging API bulk operations across regions,
-    wiring Config required-tags rules with Security Hub findings,
-    activating cost allocation tags, designing ABAC IAM policies with
-    aws:ResourceTag / aws:PrincipalTag conditions, or remediating untagged
-    resources via Config + SSM Automation.
-  activation_triggers:
-    - "design Organizations TagPolicy"
-    - "allowed_values enforced_for"
-    - "auto-tag on creation EventBridge Lambda"
-    - "Resource Groups Tagging API bulk"
-    - "tag-resources untag-resources"
-    - "required-tags Config rule"
-    - "cost allocation tag activation"
-    - "ABAC IAM policy ResourceTag"
-    - "tag compliance remediation"
-    - "Security Hub tag finding"
-    - "tag governance baseline"
-  invocation_schema: >-
-    Input: either (a) a tag governance requirement ("enforce Environment and
-    CostCenter tags on all EC2 and S3 resources", "auto-tag Owner on EC2
-    creation", "design ABAC policy for team-scoped access"), OR (b) an
-    existing tag policy / Config rule / EventBridge rule to audit and
-    harden. Output: deterministic GOVERNANCE block per requirement —
-    STRATEGY/POLICY/AUTOMATION/COMPLIANCE/VERDICT — where VERDICT is
-    AUTOMATED (tag policy template ready) or MANUAL_STEP_REQUIRED (specific
-    gap cited, e.g., Billing console activation that cannot be API-driven).
+  verdict_shape: AUTOMATED | MANUAL_STEP_REQUIRED
+  when_to_use: Designing Organizations tag policies (allowed_values, case sensitivity, enforced_for), building EventBridge + Lambda auto-tagging pipelines, running Resource Groups Tagging API bulk operations across regions, wiring Config required-tags rules with Security Hub findings, activating cost allocation tags, designing ABAC IAM policies with aws:ResourceTag / aws:PrincipalTag conditions, or remediating untagged resources via Config + SSM Automation.
+  activation_triggers: design Organizations TagPolicy, allowed_values enforced_for, auto-tag on creation EventBridge Lambda, Resource Groups Tagging API bulk, tag-resources untag-resources, required-tags Config rule, cost allocation tag activation, ABAC IAM policy ResourceTag, tag compliance remediation, Security Hub tag finding, tag governance baseline
+  invocation_schema: 'Input: either (a) a tag governance requirement ("enforce Environment and CostCenter tags on all EC2 and S3 resources", "auto-tag Owner on EC2 creation", "design ABAC policy for team-scoped access"), OR (b) an existing tag policy / Config rule / EventBridge rule to audit and harden. Output: deterministic GOVERNANCE block per requirement — STRATEGY/POLICY/AUTOMATION/COMPLIANCE/VERDICT — where VERDICT is AUTOMATED (tag policy template ready) or MANUAL_STEP_REQUIRED (specific gap cited, e.g., Billing console activation that cannot be API-driven).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Organizations, Tag Policy, TagPolicy, allowed_values, enforced_for, Resource Groups Tagging API, tag-resources, untag-resources, AWS Config, required-tags, Security Hub, EventBridge, Lambda auto-tagging, cost allocation tags, ABAC, aws:ResourceTag, aws:PrincipalTag, aws:RequestTag, SSM Automation, tag compliance, tag governance
+  tags: aws-organizations, tag-policy, resource-groups-tagging-api, aws-config, security-hub, abac, eventbridge, lambda, automate
 ---
 
 # Tag Governance Automator

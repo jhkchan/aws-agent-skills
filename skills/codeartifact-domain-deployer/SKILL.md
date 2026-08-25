@@ -1,123 +1,26 @@
 ---
 name: codeartifact-domain-deployer
-description: >-
-  Provisions AWS CodeArtifact domains with production defaults: domain
-  creation (create-domain), repository creation within a domain
-  (create-repository), upstream repository configuration (npm, pip,
-  maven, nuget), external connection cascade (npmjs.com, pypi.org,
-  mavencentral, nuget.org), package ingest via publish/copy-package,
-  package consumption via authorization token (aws codeartifact login,
-  12-hour expiry), repository policy (cross-account read/write),
-  domain owner vs repository admin separation, asset retention and
-  lifecycle policy, package version immutability, VPC interface
-  endpoint for private access, KMS encryption (customer managed key),
-  CloudWatch metrics (DownloadPackageVersion, PublishPackageVersion).
-  Emits a READY_TO_DEPLOY checklist with verification commands. Use
-  when creating a CodeArtifact domain, configuring upstream/external
-  connection cascade for dependency resolution, setting up package
-  consumption auth tokens, sharing repositories cross-account, or
-  enabling private VPC access. Triggers: codeartifact domain, codeartifact
-  external connection, codeartifact upstream cascade, codeartifact login,
-  codeartifact authorization token, codeartifact VPC endpoint, codeartifact
-  KMS encryption, codeartifact repository policy, codeartifact lifecycle
-  policy, codeartifact package immutability, codeartifact cross-account.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS CodeArtifact domains with production defaults: domain creation (create-domain), repository creation within a domain (create-repository), upstream repository configuration (npm, pip, maven, nuget), external connection cascade (npmjs.com, pypi.org, mavencentral, nuget.org), package ingest via publish/copy-package, package consumption via authorization token (aws codeartifact login, 12-hour expiry), repository policy (cross-account read/write), domain owner vs repository admin separation, asset retention and lifecycle policy, package version immutability, VPC interface endpoint for private access, KMS encryption (customer managed key), CloudWatch metrics. Triggers: codeartifact domain, codeartifact external connection, codeartifact upstream cascade, codeartifact login, codeartifact authorization token, codeartifact VPC endpoint, codeartifact KMS encryption, codeartifact repository policy, codeartifact lifecycle policy, codeartifact package immutability, codeartifact cross-account.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with codeartifact,
-  iam, kms, ec2 (VPC endpoint), and sts access. Works with Terraform
-  aws_codeartifact_domain / aws_codeartifact_repository /
-  aws_codeartifact_domain_permissions_policy resources, CloudFormation
-  AWS::CodeArtifact::Domain / AWS::CodeArtifact::Repository templates,
-  and the CodeArtifact login CLI for npm / pip / maven / nuget.
-keywords:
-  - aws
-  - codeartifact
-  - domain
-  - devtools
-  - cloudops
-  - deploy
-  - provisioning
-  - upstream
-  - external-connection
-  - authorization-token
-  - kms
-  - vpc-endpoint
-  - lifecycle
-  - immutability
-  - cross-account
-  - repository-policy
-  - package-registry
-tags:
-  - aws
-  - codeartifact
-  - domain
-  - devtools
-  - cloudops
-  - deploy
-  - provisioning
-  - upstream
-  - external-connection
-  - kms
-  - vpc-endpoint
-  - lifecycle
-  - cross-account
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with codeartifact, iam, kms, ec2 (VPC endpoint), and sts access. Works with Terraform aws_codeartifact_domain / aws_codeartifact_repository / aws_codeartifact_domain_permissions_policy resources, CloudFormation AWS::CodeArtifact::Domain / AWS::CodeArtifact::Repository templates, and the CodeArtifact login CLI for npm / pip / maven / nuget.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - codeartifact
-    - domain
-    - devtools
-    - cloudops
-    - deploy
-    - provisioning
-    - upstream
-    - external-connection
-    - kms
-    - vpc-endpoint
-    - lifecycle
-    - cross-account
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - codeartifact domain
-    - codeartifact external connection
-    - codeartifact upstream cascade
-    - codeartifact login
-    - codeartifact authorization token
-    - codeartifact vpc endpoint
-    - codeartifact kms encryption
-    - codeartifact repository policy
-    - codeartifact lifecycle policy
-    - codeartifact package immutability
-    - codeartifact cross-account
-  when_to_use: >-
-    Invoke when the user wants to create a CodeArtifact domain, configure
-    the upstream and external-connection cascade for dependency resolution,
-    set up package consumption authorization tokens (aws codeartifact login),
-    share repositories cross-account via repository policy, enable private
-    access via VPC interface endpoint, configure KMS encryption, set
-    lifecycle/retention policies, or enforce package version immutability.
-    Do NOT invoke for CodeArtifact repository-only operations without domain
-    context (use codeartifact-repository-deployer), plain S3-backed package
-    storage, or GitHub Packages (separate service).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, codeartifact, domain, devtools, cloudops, deploy, provisioning, upstream, external-connection, kms, vpc-endpoint, lifecycle, cross-account
+  dependencies: aws-orchestrator
+  keywords: aws, codeartifact, domain, devtools, cloudops, deploy, provisioning, upstream, external-connection, authorization-token, kms, vpc-endpoint, lifecycle, immutability, cross-account, repository-policy, package-registry
+  when_to_use: Invoke when the user wants to create a CodeArtifact domain, configure the upstream and external-connection cascade for dependency resolution, set up package consumption authorization tokens (aws codeartifact login), share repositories cross-account via repository policy, enable private access via VPC interface endpoint, configure KMS encryption, set lifecycle/retention policies, or enforce package version immutability. Do NOT invoke for CodeArtifact repository-only operations without domain context (use codeartifact-repository-deployer), plain S3-backed package storage, or GitHub Packages (separate service).
 ---
 
 # CodeArtifact Domain Deployer

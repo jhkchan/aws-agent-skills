@@ -1,87 +1,27 @@
 ---
 name: auto-remediation-automator
-description: >-
-  Designs and implements automated remediation workflows linking AWS Config
-  rules to SSM Automation runbooks. Detects non-compliant resources via
-  managed or custom Config rules, maps each finding to the correct SSM
-  document (AWS-DisableS3BucketPublicAccess, AWS-EnableS3BucketEncryption,
-  AWS-IAMRevokeUnusedAccessKey, custom runbooks for security-group or
-  tagging fixes), wires the remediation configuration
-  (put-remediation-configurations) with automatic vs manual trigger
-  semantics, and adds safety gates (snapshot, dry-run, CloudTrail audit,
-  SSM Change Manager approval). Covers EventBridge-on-Config alternatives,
-  conformance packs for bulk remediation, and Config timeline verification.
-  Emits AUTOMATED with a workflow template or MANUAL_STEP_REQUIRED with the
-  specific gap. Use when building auto-remediation for Config findings,
-  wiring SSM Automation to Config rules, designing conformance-pack
-  remediation, or hardening an existing remediation flow.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Designs and implements automated remediation workflows linking AWS Config rules to SSM Automation runbooks. Detects non-compliant resources via managed or custom Config rules, maps each finding to the correct SSM document (AWS-DisableS3BucketPublicAccess, AWS-EnableS3BucketEncryption, AWS-IAMRevokeUnusedAccessKey, custom runbooks for security-group or tagging fixes), wires the remediation configuration (put-remediation-configurations) with automatic vs manual trigger semantics, and adds safety gates (snapshot, dry-run, CloudTrail audit, SSM Change Manager approval). Covers EventBridge-on-Config alternatives, conformance packs for bulk remediation, and Config timeline verification. Emits AUTOMATED with a workflow template or MANUAL_STEP_REQUIRED with the specific gap. Use when building auto-remediation for Config findings, wiring SSM Automation to Config rules, designing conformance-pack remediation, or hardening an existing remediation flow.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline workflow design. Live deployment
-  uses aws configservice put-config-rule, put-remediation-configurations,
-  describe-remediation-configurations, describe-remediation-execution-status,
-  aws ssm create-document, describe-document, start-automation-execution,
-  get-automation-execution, and aws cloudformation deploy (for conformance
-  packs) — AWS CLI v2, SSO or key-based credentials.
-keywords:
-  - AWS Config
-  - SSM Automation
-  - auto-remediation
-  - remediation configuration
-  - put-remediation-configurations
-  - conformance packs
-  - AWS-DisableS3BucketPublicAccess
-  - AWS-EnableS3BucketEncryption
-  - AWS-IAMRevokeUnusedAccessKey
-  - AWS-AttachIAMManagedPolicy
-  - Config Rule
-  - NON_COMPLIANT
-  - EventBridge
-  - SSM Change Manager
-  - CloudTrail audit
-  - Config timeline
-  - governance automation
-tags: [aws-config, ssm-automation, auto-remediation, governance, conformance-packs, eventbridge, automate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline workflow design. Live deployment uses aws configservice put-config-rule, put-remediation-configurations, describe-remediation-configurations, describe-remediation-execution-status, aws ssm create-document, describe-document, start-automation-execution, get-automation-execution, and aws cloudformation deploy (for conformance packs) — AWS CLI v2, SSO or key-based credentials.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATED | MANUAL_STEP_REQUIRED"
-  when_to_use: >-
-    Designing auto-remediation for AWS Config findings, wiring SSM
-    Automation runbooks to Config rules, deciding between automatic and
-    manual remediation triggers, building conformance-pack bulk remediation,
-    adding EventBridge-driven custom remediation, or hardening an existing
-    remediation workflow with safety gates and audit.
-  activation_triggers:
-    - "automate Config remediation"
-    - "wire SSM to Config rule"
-    - "put-remediation-configurations"
-    - "automatic remediation setup"
-    - "conformance pack remediation"
-    - "EventBridge Lambda remediation"
-    - "SSM Automation runbook for Config"
-    - "NON_COMPLIANT auto-fix"
-    - "remediation safety gate"
-    - "Config timeline verification"
-  invocation_schema: >-
-    Input: either (a) a Config rule definition (managed identifier or custom
-    Lambda rule) plus target non-compliant resource examples, OR (b) a
-    remediation requirement ("auto-disable public S3 buckets", "revoke
-    exposed IAM keys on detection"). Output: deterministic REMEDIATION
-    block per rule — WORKFLOW/TRIGGER/SAFETY/AUDIT/VERDICT — where VERDICT
-    is AUTOMATED (workflow template ready) or MANUAL_STEP_REQUIRED (specific
-    gap cited).
+  verdict_shape: AUTOMATED | MANUAL_STEP_REQUIRED
+  when_to_use: Designing auto-remediation for AWS Config findings, wiring SSM Automation runbooks to Config rules, deciding between automatic and manual remediation triggers, building conformance-pack bulk remediation, adding EventBridge-driven custom remediation, or hardening an existing remediation workflow with safety gates and audit.
+  activation_triggers: automate Config remediation, wire SSM to Config rule, put-remediation-configurations, automatic remediation setup, conformance pack remediation, EventBridge Lambda remediation, SSM Automation runbook for Config, NON_COMPLIANT auto-fix, remediation safety gate, Config timeline verification
+  invocation_schema: 'Input: either (a) a Config rule definition (managed identifier or custom Lambda rule) plus target non-compliant resource examples, OR (b) a remediation requirement ("auto-disable public S3 buckets", "revoke exposed IAM keys on detection"). Output: deterministic REMEDIATION block per rule — WORKFLOW/TRIGGER/SAFETY/AUDIT/VERDICT — where VERDICT is AUTOMATED (workflow template ready) or MANUAL_STEP_REQUIRED (specific gap cited).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Config, SSM Automation, auto-remediation, remediation configuration, put-remediation-configurations, conformance packs, AWS-DisableS3BucketPublicAccess, AWS-EnableS3BucketEncryption, AWS-IAMRevokeUnusedAccessKey, AWS-AttachIAMManagedPolicy, Config Rule, NON_COMPLIANT, EventBridge, SSM Change Manager, CloudTrail audit, Config timeline, governance automation
+  tags: aws-config, ssm-automation, auto-remediation, governance, conformance-packs, eventbridge, automate
 ---
 
 # Auto-Remediation Automator

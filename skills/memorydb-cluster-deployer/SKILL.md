@@ -1,123 +1,26 @@
 ---
 name: memorydb-cluster-deployer
-description: >-
-  Provisions Amazon MemoryDB for Redis clusters with production
-  defaults: cluster creation (node type, shard count, replica count),
-  subnets (subnet group across AZs), security groups, encryption
-  (TLS at-rest + in-transit — both on by default), ACLs (user-based
-  access control via access lists), snapshots (automated + manual),
-  multi-AZ (cluster mode with shard-level failover), data tiering
-  (low-cost SSD tier for infrequently-accessed data), and multi-
-  Region. Emits a READY_TO_DEPLOY checklist with verification
-  commands. Use when creating a MemoryDB cluster, sizing nodes and
-  shards, designing a Multi-AZ Redis topology, hardening TLS/ACLs,
-  or enabling data tiering / multi-Region. Triggers: create
-  MemoryDB, provision MemoryDB, MemoryDB cluster, MemoryDB Redis,
-  MemoryDB ACL, MemoryDB multi-AZ, MemoryDB data tiering, MemoryDB
-  multi-Region, MemoryDB snapshots, MemoryDB TLS.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon MemoryDB for Redis clusters with production defaults: cluster creation (node type, shard count, replica count), subnets (subnet group across AZs), security groups, encryption (TLS at-rest + in-transit — both on by default), ACLs (user-based access control via access lists), snapshots (automated + manual), multi-AZ (cluster mode with shard-level failover), data tiering (low-cost SSD tier for infrequently-accessed data), and multi- Region. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a MemoryDB cluster, sizing nodes and shards, designing a Multi-AZ Redis topology, hardening TLS/ACLs, or enabling data tiering / multi-Region. Triggers: create MemoryDB, provision MemoryDB, MemoryDB cluster, MemoryDB Redis, MemoryDB ACL, MemoryDB multi-AZ, MemoryDB data tiering, MemoryDB multi-Region, MemoryDB snapshots, MemoryDB TLS.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with memorydb,
-  ec2, kms, and iam access. Works with Terraform aws_memorydb_cluster
-  / aws_memorydb_subnet_group resources and CloudFormation
-  AWS::MemoryDB::Cluster / AWS::MemoryDB::SubnetGroup templates.
-keywords:
-  - aws
-  - memorydb
-  - redis
-  - cloudops
-  - deploy
-  - provisioning
-  - in-memory database
-  - cluster mode
-  - multi-az
-  - failover
-  - encryption at rest
-  - encryption in transit
-  - tls
-  - acl
-  - access list
-  - subnet group
-  - parameter group
-  - snapshot
-  - data tiering
-  - multi-region
-  - shard count
-  - replica count
-tags:
-  - aws
-  - memorydb
-  - redis
-  - cloudops
-  - deploy
-  - databases
-  - in-memory
-  - provisioning
-  - cluster-mode
-  - multi-az
-  - encryption
-  - acl
-  - data-tiering
-  - multi-region
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with memorydb, ec2, kms, and iam access. Works with Terraform aws_memorydb_cluster / aws_memorydb_subnet_group resources and CloudFormation AWS::MemoryDB::Cluster / AWS::MemoryDB::SubnetGroup templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - memorydb
-    - redis
-    - cloudops
-    - deploy
-    - databases
-    - in-memory
-    - provisioning
-    - cluster-mode
-    - multi-az
-    - encryption
-    - acl
-    - data-tiering
-    - multi-region
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create memorydb cluster
-    - provision memorydb
-    - memorydb acl
-    - memorydb multi-az
-    - memorydb data tiering
-    - memorydb multi-region
-    - memorydb snapshots
-    - memorydb tls
-    - memorydb subnet group
-    - memorydb shard count
-    - memorydb replica count
-    - memorydb encryption
-  when_to_use: >-
-    Invoke when the user wants to create a new Amazon MemoryDB for
-    Redis cluster (durable in-memory database), size nodes / shards /
-    replicas, design a Multi-AZ Redis cluster-mode topology with
-    shard-level failover, harden TLS + ACLs, enable data tiering
-    (SSD-backed cost optimization), enable multi-Region replication,
-    configure snapshots, or generate provisioning CLI commands / IaC
-    templates. Do NOT invoke for ElastiCache (cache, not durable
-    database — use elasticache-cache-deployer), for self-managed Redis
-    on EC2, or for non-Redis databases.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, memorydb, redis, cloudops, deploy, databases, in-memory, provisioning, cluster-mode, multi-az, encryption, acl, data-tiering, multi-region
+  dependencies: aws-orchestrator
+  keywords: aws, memorydb, redis, cloudops, deploy, provisioning, in-memory database, cluster mode, multi-az, failover, encryption at rest, encryption in transit, tls, acl, access list, subnet group, parameter group, snapshot, data tiering, multi-region, shard count, replica count
+  when_to_use: Invoke when the user wants to create a new Amazon MemoryDB for Redis cluster (durable in-memory database), size nodes / shards / replicas, design a Multi-AZ Redis cluster-mode topology with shard-level failover, harden TLS + ACLs, enable data tiering (SSD-backed cost optimization), enable multi-Region replication, configure snapshots, or generate provisioning CLI commands / IaC templates. Do NOT invoke for ElastiCache (cache, not durable database — use elasticache-cache-deployer), for self-managed Redis on EC2, or for non-Redis databases.
 ---
 
 # MemoryDB Cluster Deployer

@@ -1,126 +1,26 @@
 ---
 name: connect-instance-deployer
-description: >-
-  Provisions Amazon Connect instances, contact flows, queues, routing
-  profiles, phone numbers, and integrations with production defaults.
-  Instance creation with three identity modes (SAML federation,
-  Connect directory, existing AWS Directory Service directory). Contact
-  flows authored as JSON specs with Lambda invoke blocks (InvokeLambda),
-  branching, queue transfers, and Lex bot integration (InvokeAmazonLex).
-  Routing profiles with skill requirements (skill name + proficiency),
-  queue associations, agent hierarchy. Phone number claim (toll-free,
-  DID). Voice ID (speaker enrollment, fraud risk). Contact Lens
-  (sentiment, transcription, redaction). Chat, voice, task channels.
-  S3 recording storage with KMS encryption. Lex V2 for IVR.
-  Real-time/historical metrics. Emits READY_TO_DEPLOY with verification
-  commands. Use when creating a Connect instance, authoring a contact
-  flow, configuring routing skills, claiming a phone number, integrating
-  Lex for IVR, enabling Voice ID or Contact Lens, or setting up
-  recording storage.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Provisions Amazon Connect instances, contact flows, queues, routing profiles, phone numbers, and integrations with production defaults. Instance creation with three identity modes (SAML federation, Connect directory, existing AWS Directory Service directory). Contact flows authored as JSON specs with Lambda invoke blocks (InvokeLambda), branching, queue transfers, and Lex bot integration (InvokeAmazonLex). Routing profiles with skill requirements (skill name + proficiency), queue associations, agent hierarchy. Phone number claim (toll-free, DID). Voice ID (speaker enrollment, fraud risk). Contact Lens (sentiment, transcription, redaction). Chat, voice, task channels. S3 recording storage with KMS encryption. Lex V2 for IVR. Real-time/historical metrics. Emits READY_TO_DEPLOY with verification commands. Use when creating a Connect instance, authoring a contact flow, configuring routing skills, claiming a phone number, integrating Lex for IVR, enabling Voice ID or Contact Lens, or setting up recording storage.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with connect access
-  (and connect-contact-lens for Contact Lens, lexv2-runtime for Lex,
-  s3 for recording storage, kms for key policy). Works with Terraform
-  aws_connect_instance, aws_connect_contact_flow, aws_connect_queue,
-  aws_connect_routing_profile, aws_connect_phone_number,
-  aws_connect_user, aws_connect_user_hierarchy_group resources and
-  CloudFormation AWS::Connect::* templates.
-keywords:
-  - aws
-  - connect
-  - amazon connect
-  - contact center
-  - contact flow
-  - lambda invoke
-  - queue
-  - routing profile
-  - skill requirement
-  - phone number
-  - toll-free
-  - did
-  - saml
-  - directory
-  - voice id
-  - contact lens
-  - sentiment
-  - transcription
-  - chat
-  - voice
-  - task
-  - lex bot
-  - ivr
-  - recording
-  - s3
-  - kms
-  - real-time metrics
-  - historical metrics
-tags:
-  - aws
-  - connect
-  - appintegration
-  - deploy
-  - contact-center
-  - contact-flow
-  - routing
-  - voice
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with connect access (and connect-contact-lens for Contact Lens, lexv2-runtime for Lex, s3 for recording storage, kms for key policy). Works with Terraform aws_connect_instance, aws_connect_contact_flow, aws_connect_queue, aws_connect_routing_profile, aws_connect_phone_number, aws_connect_user, aws_connect_user_hierarchy_group resources and CloudFormation AWS::Connect::* templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - connect
-    - appintegration
-    - deploy
-    - contact-center
-    - contact-flow
-    - routing
-    - voice
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create connect instance
-    - saml identity
-    - contact flow json
-    - lambda invoke block
-    - queue and routing profile
-    - routing profile skill
-    - claim phone number toll-free
-    - did porting
-    - lex bot ivr
-    - voice id enrollment
-    - contact lens sentiment
-    - connect task
-    - s3 recording kms
-  when_to_use: >-
-    Invoke when the user wants to create an Amazon Connect instance
-    (SAML, Connect directory, or existing AWS Directory Service
-    directory), author a contact flow with Lambda invoke blocks or Lex
-    integration, configure a routing profile with skill requirements,
-    claim a phone number (toll-free, DID), set up queues with quick-
-    connect lists, integrate Amazon Lex V2 for IVR, enable Voice ID
-    speaker enrollment, enable Contact Lens for sentiment /
-    transcription / redaction, configure chat and voice channels,
-    manage tasks, set up S3 recording storage with KMS encryption, or
-    wire real-time and historical metrics. Do NOT invoke for Amazon
-    Chime SDK, Amazon WorkSpaces, or standalone Amazon Lex bot
-    deployment.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, connect, appintegration, deploy, contact-center, contact-flow, routing, voice
+  dependencies: aws-orchestrator
+  keywords: aws, connect, amazon connect, contact center, contact flow, lambda invoke, queue, routing profile, skill requirement, phone number, toll-free, did, saml, directory, voice id, contact lens, sentiment, transcription, chat, voice, task, lex bot, ivr, recording, s3, kms, real-time metrics, historical metrics
+  when_to_use: Invoke when the user wants to create an Amazon Connect instance (SAML, Connect directory, or existing AWS Directory Service directory), author a contact flow with Lambda invoke blocks or Lex integration, configure a routing profile with skill requirements, claim a phone number (toll-free, DID), set up queues with quick- connect lists, integrate Amazon Lex V2 for IVR, enable Voice ID speaker enrollment, enable Contact Lens for sentiment / transcription / redaction, configure chat and voice channels, manage tasks, set up S3 recording storage with KMS encryption, or wire real-time and historical metrics. Do NOT invoke for Amazon Chime SDK, Amazon WorkSpaces, or standalone Amazon Lex bot deployment.
 ---
 
 # Connect Instance Deployer

@@ -1,108 +1,29 @@
 ---
 name: bedrock-model-cost-optimizer
-description: 'Optimises Amazon Bedrock inference cost across seven dimensions: model selection (Claude Haiku is ~60x cheaper
-  per token than Opus; Nova Micro cheaper still; route simple queries to cheapest capable model), token usage analysis (output
-  tokens cost 3-5x more than input), prompt caching (cache repeated system prompts to reduce input cost by up to 90%; TTL
-  5 min default, 1 hr max), batch inference (50% discount vs on-demand for non-latency-sensitive workloads), response length
-  control (max_tokens, stop sequences, structured output), fine-tuning vs few-shot trade-off (fine-tune once then serve on
-  cheaper base vs per-call in-context examples), and Guardrails / Knowledge Base overhead (Guardrails charges per processed
-  token; KB adds vector store cost). Reads CloudWatch Bedrock metrics (InputTokenCount, OutputTokenCount, InvocationCount)
-  and Cost Explorer. Emits OPTIMIZED or FURTHER_OPTIMIZATION_AVAILABLE. Use when reviewing Bedrock spend, planning model downgrades,
-  evaluating prompt caching, or running a GenAI ...'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Optimises Amazon Bedrock inference cost across seven dimensions: model selection (Claude Haiku is ~60x cheaper per token than Opus; Nova Micro cheaper still; route simple queries to cheapest capable model), token usage analysis (output tokens cost 3-5x more than input), prompt caching (cache repeated system prompts to reduce input cost by up to 90%; TTL 5 min default, 1 hr max), batch inference (50% discount vs on-demand for non-latency-sensitive workloads), response length control (max_tokens, stop sequences, structured output), fine-tuning vs few-shot trade-off (fine-tune once then serve on cheaper base vs per-call in-context examples), and Guardrails / Knowledge Base overhead (Guardrails charges per processed token; KB adds vector store cost). Reads CloudWatch Bedrock metrics (InputTokenCount, OutputTokenCount, InvocationCount) and Cost Explorer. Emits OPTIMIZED or FURTHER_OPTIMIZATION_AVAILABLE. Use when reviewing Bedrock spend, planning model downgrades, evaluating prompt caching, or running a GenAI ...'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline classification works
-  from pasted CloudWatch Bedrock metrics and Cost Explorer data. Live-account optimization uses aws bedrock list-foundation-models,
-  aws bedrock get-foundation-model, aws cloudwatch get-metric-statistics (AWS/Bedrock namespace), aws ce get-cost-and-usage
-  (Service=Bedrock), aws bedrock create-prompt, aws bedrock create-guardrail, aws bedrock create-model-invocation-job (batch),
-  and aws bedrock get-use-case-with-responses (KB; AWS CLI v2, SSO or key-based credentials). Pricing references us-east-1
-  published rates as of 2026.
-keywords:
-- Bedrock
-- model selection
-- cost optimization
-- prompt caching
-- batch inference
-- token usage
-- Claude Haiku
-- Claude Sonnet
-- Claude Opus
-- Nova Micro
-- Nova Lite
-- Nova Pro
-- input tokens
-- output tokens
-- max_tokens
-- stop sequences
-- fine-tuning
-- few-shot
-- Guardrails
-- Knowledge Base
-- provisioned throughput
-- on-demand
-- model routing
-- embedding
-- Titan embeddings
-- Cohere embeddings
-- CloudWatch Bedrock metrics
-- GenAI FinOps
-tags:
-- bedrock
-- ai-ml
-- cost-optimization
-- genai-finops
-- prompt-caching
-- batch-inference
-- model-selection
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline classification works from pasted CloudWatch Bedrock metrics and Cost Explorer data. Live-account optimization uses aws bedrock list-foundation-models, aws bedrock get-foundation-model, aws cloudwatch get-metric-statistics (AWS/Bedrock namespace), aws ce get-cost-and-usage (Service=Bedrock), aws bedrock create-prompt, aws bedrock create-guardrail, aws bedrock create-model-invocation-job (batch), and aws...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AI/ML
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-  when_to_use: Optimising Bedrock inference spend, triaging model selection (downgrading Opus to Haiku for simple queries),
-    evaluating prompt caching eligibility for repeated system prompts, planning batch inference for non-real-time workloads,
-    controlling response length via max_tokens and stop sequences, deciding fine-tune vs few-shot for a high-volume use case,
-    estimating Guardrails or Knowledge Base cost overhead, or running a GenAI FinOps review on Bedrock spend.
-  when_not_to_use: EC2 instance rightsizing for self-hosted models (use ec2-rightsizing-optimizer), Lambda function cost (use
-    lambda-cost-optimizer), SageMaker endpoint cost (use sagemaker-cost-optimizer if available), or Bedrock model troubleshooting
-    (invocation errors, throttling, content policy blocks — use the Bedrock troubleshooter). This skill focuses on cost-driven
-    optimization decisions, not functional debugging of broken invocations.
-  activation_triggers:
-  - optimise Bedrock cost
-  - Bedrock model selection
-  - Bedrock prompt caching
-  - Bedrock batch inference
-  - Bedrock token usage
-  - Bedrock max_tokens optimization
-  - Bedrock fine-tuning cost
-  - Bedrock Guardrails overhead
-  - Bedrock Knowledge Base cost
-  - Bedrock provisioned throughput
-  - Bedrock model routing
-  - Bedrock embedding model
-  - Bedrock CloudWatch metrics
-  - Bedrock GenAI FinOps
-  - Claude Haiku vs Sonnet vs Opus cost
-  - Nova model pricing
-  - reduce Bedrock bill
-  - Bedrock monthly savings estimate
-  invocation_schema: 'Input: either (a) a model identifier + live-account context with CloudWatch Bedrock metrics, (b) a Cost
-    Explorer Bedrock spend breakdown, OR (c) a prompt/workflow description with token usage data (InputTokenCount, OutputTokenCount,
-    InvocationCount over 14-30 days). Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ ESTIMATED_SAVINGS/MIGRATION_STEPS
-    block per model or workflow, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
-  invocation_example: "ModelId: anthropic.claude-3-opus-20240229-v1:0\nRegion: us-east-1\nPricing: on-demand\nMetrics (last\
-    \ 30 days):\n  - InputTokenCount total: 500,000,000 (avg 2,500/invocation)\n  - OutputTokenCount total: 100,000,000 (avg\
-    \ 500/invocation)\n  - InvocationCount: 200,000\n  - InvocationLatency avg: 3,200 ms, p95: 5,800 ms\nWorkload: customer\
-    \ support chatbot. System prompt is 2,000 tokens\nof company policy + FAQ, repeated on every invocation.\nCost Explorer:\
-    \ $4,800/month on Bedrock.\nEmit the standard optimization block."
+  when_to_use: Optimising Bedrock inference spend, triaging model selection (downgrading Opus to Haiku for simple queries), evaluating prompt caching eligibility for repeated system prompts, planning batch inference for non-real-time workloads, controlling response length via max_tokens and stop sequences, deciding fine-tune vs few-shot for a high-volume use case, estimating Guardrails or Knowledge Base cost overhead, or running a GenAI FinOps review on Bedrock spend.
+  when_not_to_use: EC2 instance rightsizing for self-hosted models (use ec2-rightsizing-optimizer), Lambda function cost (use lambda-cost-optimizer), SageMaker endpoint cost (use sagemaker-cost-optimizer if available), or Bedrock model troubleshooting (invocation errors, throttling, content policy blocks — use the Bedrock troubleshooter). This skill focuses on cost-driven optimization decisions, not functional debugging of broken invocations.
+  activation_triggers: optimise Bedrock cost, Bedrock model selection, Bedrock prompt caching, Bedrock batch inference, Bedrock token usage, Bedrock max_tokens optimization, Bedrock fine-tuning cost, Bedrock Guardrails overhead, Bedrock Knowledge Base cost, Bedrock provisioned throughput, Bedrock model routing, Bedrock embedding model, Bedrock CloudWatch metrics, Bedrock GenAI FinOps, Claude Haiku vs Sonnet vs Opus cost, Nova model pricing, reduce Bedrock bill, Bedrock monthly savings estimate
+  invocation_schema: 'Input: either (a) a model identifier + live-account context with CloudWatch Bedrock metrics, (b) a Cost Explorer Bedrock spend breakdown, OR (c) a prompt/workflow description with token usage data (InputTokenCount, OutputTokenCount, InvocationCount over 14-30 days). Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ ESTIMATED_SAVINGS/MIGRATION_STEPS block per model or workflow, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
+  invocation_example: "ModelId: anthropic.claude-3-opus-20240229-v1:0\nRegion: us-east-1\nPricing: on-demand\nMetrics (last 30 days):\n  - InputTokenCount total: 500,000,000 (avg 2,500/invocation)\n  - OutputTokenCount total: 100,000,000 (avg 500/invocation)\n  - InvocationCount: 200,000\n  - InvocationLatency avg: 3,200 ms, p95: 5,800 ms\nWorkload: customer support chatbot. System prompt is 2,000 tokens\nof company policy + FAQ, repeated on every invocation.\nCost Explorer: $4,800/month on Bedrock.\nEmit the standard optimization block."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Bedrock, model selection, cost optimization, prompt caching, batch inference, token usage, Claude Haiku, Claude Sonnet, Claude Opus, Nova Micro, Nova Lite, Nova Pro, input tokens, output tokens, max_tokens, stop sequences, fine-tuning, few-shot, Guardrails, Knowledge Base, provisioned throughput, on-demand, model routing, embedding, Titan embeddings, Cohere embeddings, CloudWatch Bedrock metrics, GenAI FinOps
+  tags: bedrock, ai-ml, cost-optimization, genai-finops, prompt-caching, batch-inference, model-selection
 ---
 
 # Bedrock Model Cost Optimizer

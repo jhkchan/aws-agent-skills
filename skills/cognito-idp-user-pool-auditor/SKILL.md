@@ -1,72 +1,23 @@
 ---
 name: cognito-idp-user-pool-auditor
-description: >-
-  Audits Amazon Cognito user pools for security posture — MFA enforcement,
-  password policy strength, app-client auth-flow safety (SRP vs password vs
-  admin), OAuth flow exposure (implicit vs code+PKCE), token validity,
-  PreventUserExistenceErrors, Advanced Security Features mode, account
-  recovery, and deletion protection — then provides specific remediation.
-  Use when reviewing a Cognito user pool configuration, auditing app-client
-  auth flows, checking MFA enforcement, validating OAuth settings, or
-  hardening an identity provider before production. Triggers: Cognito, user
-  pool, identity provider, IdP, MFA, MfaConfiguration, password policy,
-  app client, ExplicitAuthFlows, USER_SRP_AUTH, USER_PASSWORD_AUTH,
-  ADMIN_NO_SRP_AUTH, ALLOW_ADMIN_USER_PASSWORD_AUTH, OAuth, implicit flow,
-  code flow, PKCE, PreventUserExistenceErrors, AdvancedSecurityMode, token
-  revocation, RefreshTokenValidity, account takeover, user enumeration,
-  hosted UI, Cognito domain, cognito-idp.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Audits Amazon Cognito user pools for security posture — MFA enforcement, password policy strength, app-client auth-flow safety (SRP vs password vs admin), OAuth flow exposure (implicit vs code+PKCE), token validity, PreventUserExistenceErrors, Advanced Security Features mode, account recovery, and deletion protection — then provides specific remediation. Use when reviewing a Cognito user pool configuration, auditing app-client auth flows, checking MFA enforcement, validating OAuth settings, or hardening an identity provider before production. Triggers: Cognito, user pool, identity provider, IdP, MFA, MfaConfiguration, password policy, app client, ExplicitAuthFlows, USER_SRP_AUTH, USER_PASSWORD_AUTH, ADMIN_NO_SRP_AUTH, ALLOW_ADMIN_USER_PASSWORD_AUTH, OAuth, implicit flow, code flow, PKCE, PreventUserExistenceErrors, AdvancedSecurityMode, token revocation, RefreshTokenValidity, account takeover, user enumeration, hosted UI, Cognito domain, cognito-idp.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline configuration classification.
-  Live-account audits use aws cognito-idp describe-user-pool,
-  describe-user-pool-client, and list-user-pools (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - Cognito
-  - user pool
-  - identity provider
-  - IdP
-  - MFA
-  - MfaConfiguration
-  - password policy
-  - app client
-  - ExplicitAuthFlows
-  - USER_SRP_AUTH
-  - USER_PASSWORD_AUTH
-  - ADMIN_NO_SRP_AUTH
-  - ALLOW_ADMIN_USER_PASSWORD_AUTH
-  - OAuth
-  - implicit flow
-  - PKCE
-  - PreventUserExistenceErrors
-  - AdvancedSecurityMode
-  - token revocation
-  - RefreshTokenValidity
-  - account takeover
-  - user enumeration
-  - hosted UI
-  - cognito-idp
-tags: [cognito, security, identity, mfa, oauth, auth-flows, user-pool, audit, compliance]
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline configuration classification. Live-account audits use aws cognito-idp describe-user-pool, describe-user-pool-client, and list-user-pools (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
-  verdict_shape: "INSECURE | WEAK | ADEQUATE | OK"
-  when_to_use: >-
-    Reviewing a Cognito user pool configuration before production, auditing
-    app-client auth flows for credential exposure, checking MFA enforcement,
-    validating OAuth settings (implicit vs code flow), hardening an identity
-    provider against account takeover, or checking PreventUserExistenceErrors
-    for user-enumeration risk.
+  verdict_shape: INSECURE | WEAK | ADEQUATE | OK
+  when_to_use: Reviewing a Cognito user pool configuration before production, auditing app-client auth flows for credential exposure, checking MFA enforcement, validating OAuth settings (implicit vs code flow), hardening an identity provider against account takeover, or checking PreventUserExistenceErrors for user-enumeration risk.
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Cognito, user pool, identity provider, IdP, MFA, MfaConfiguration, password policy, app client, ExplicitAuthFlows, USER_SRP_AUTH, USER_PASSWORD_AUTH, ADMIN_NO_SRP_AUTH, ALLOW_ADMIN_USER_PASSWORD_AUTH, OAuth, implicit flow, PKCE, PreventUserExistenceErrors, AdvancedSecurityMode, token revocation, RefreshTokenValidity, account takeover, user enumeration, hosted UI, cognito-idp
+  tags: cognito, security, identity, mfa, oauth, auth-flows, user-pool, audit, compliance
+  dependencies: aws-orchestrator
 ---
 
 # Cognito User Pool Auditor

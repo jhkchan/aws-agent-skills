@@ -1,73 +1,24 @@
 ---
 name: codepipeline-pipeline-auditor
-description: >-
-  Audits AWS CodePipeline pipelines for artifact-store encryption (KMS CMK
-  presence), cross-account or over-permissive action roles, disabled stage
-  transitions, source-action credential posture (GitHub v1 OAuth vs CodeStar
-  Connection), and manual-approval gate coverage. Emits a deterministic
-  verdict (NO_ENCRYPTION | OVERPERMISSIVE_ROLE | DISABLED_STAGE | CONFIG_GAP
-  | OK) per pipeline with enumerated findings and CLI remediation. Use when
-  reviewing pipeline definitions, checking for unencrypted artifact buckets,
-  validating cross-account deployment roles, detecting disabled stages,
-  auditing source credential strength, or verifying production approval gates.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS CodePipeline pipelines for artifact-store encryption (KMS CMK presence), cross-account or over-permissive action roles, disabled stage transitions, source-action credential posture (GitHub v1 OAuth vs CodeStar Connection), and manual-approval gate coverage. Emits a deterministic verdict (NO_ENCRYPTION | OVERPERMISSIVE_ROLE | DISABLED_STAGE | CONFIG_GAP | OK) per pipeline with enumerated findings and CLI remediation. Use when reviewing pipeline definitions, checking for unencrypted artifact buckets, validating cross-account deployment roles, detecting disabled stages, auditing source credential strength, or verifying production approval gates.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline pipeline-definition classification.
-  Live-account audits use aws codepipeline get-pipeline, get-pipeline-state,
-  list-pipelines, and disable/enable-stage-transition (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - CodePipeline
-  - pipeline audit
-  - artifact store
-  - KMS encryption
-  - cross-account role
-  - over-permissive role
-  - disabled stage
-  - stage transition
-  - GitHub v1 source
-  - CodeStar Connection
-  - manual approval
-  - approval gate
-  - artifact bucket
-  - deployment pipeline
-  - CI/CD security
-tags: [codepipeline, security, devtools, ci-cd, encryption, cross-account, pipeline, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline pipeline-definition classification. Live-account audits use aws codepipeline get-pipeline, get-pipeline-state, list-pipelines, and disable/enable-stage-transition (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
-  verdict_shape: "NO_ENCRYPTION | OVERPERMISSIVE_ROLE | DISABLED_STAGE | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a CodePipeline pipeline definition before production deployment,
-    checking for unencrypted artifact stores, auditing cross-account deploy
-    roles, detecting disabled stage transitions, validating source-action
-    credential strength (GitHub v1 vs CodeStar Connection), or verifying
-    manual-approval gate coverage.
-  activation_triggers:
-    - "audit this codepipeline"
-    - "is my pipeline artifact store encrypted"
-    - "check for disabled stage transitions"
-    - "cross-account deploy role in pipeline"
-    - "github v1 source deprecated"
-    - "missing manual approval gate"
-    - "pipeline security audit"
-    - "over-permissive pipeline role"
-    - "codestar connection check"
-  invocation_schema: >-
-    Input: either (a) a CodePipeline pipeline definition JSON (from
-    get-pipeline), optionally paired with get-pipeline-state output for
-    transition status, OR (b) a pipeline name/ARN for live-account audit.
-    Output: deterministic PIPELINE/VERDICT/REASON/FINDINGS/REMEDIATION block
-    per pipeline, where VERDICT is one of {NO_ENCRYPTION, OVERPERMISSIVE_ROLE,
-    DISABLED_STAGE, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: NO_ENCRYPTION | OVERPERMISSIVE_ROLE | DISABLED_STAGE | CONFIG_GAP | OK
+  when_to_use: Reviewing a CodePipeline pipeline definition before production deployment, checking for unencrypted artifact stores, auditing cross-account deploy roles, detecting disabled stage transitions, validating source-action credential strength (GitHub v1 vs CodeStar Connection), or verifying manual-approval gate coverage.
+  activation_triggers: audit this codepipeline, is my pipeline artifact store encrypted, check for disabled stage transitions, cross-account deploy role in pipeline, github v1 source deprecated, missing manual approval gate, pipeline security audit, over-permissive pipeline role, codestar connection check
+  invocation_schema: 'Input: either (a) a CodePipeline pipeline definition JSON (from get-pipeline), optionally paired with get-pipeline-state output for transition status, OR (b) a pipeline name/ARN for live-account audit. Output: deterministic PIPELINE/VERDICT/REASON/FINDINGS/REMEDIATION block per pipeline, where VERDICT is one of {NO_ENCRYPTION, OVERPERMISSIVE_ROLE, DISABLED_STAGE, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CodePipeline, pipeline audit, artifact store, KMS encryption, cross-account role, over-permissive role, disabled stage, stage transition, GitHub v1 source, CodeStar Connection, manual approval, approval gate, artifact bucket, deployment pipeline, CI/CD security
+  tags: codepipeline, security, devtools, ci-cd, encryption, cross-account, pipeline, audit
 ---
 
 # CodePipeline Pipeline Auditor

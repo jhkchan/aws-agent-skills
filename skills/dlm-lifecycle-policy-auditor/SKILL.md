@@ -1,79 +1,24 @@
 ---
 name: dlm-lifecycle-policy-auditor
-description: >-
-  Audits AWS Data Lifecycle Manager (DLM) EBS snapshot lifecycle policies for
-  coverage gaps and silent-failure modes: disabled policies, empty tag/resource
-  targets, invalid Cron schedules, weak or missing retention rules, absent
-  cross-region copy (DR gap), CopyTags metadata loss, per-volume snapshot
-  quota risk, and the DLM service-role breakage that silently halts backups.
-  Emits a deterministic verdict (NO_POLICY | MISCONFIGURED | CONFIG_GAP | OK)
-  per policy or workload with enumerated findings and specific CLI remediation.
-  Use when reviewing DLM EBS snapshot policies, checking backup coverage,
-  validating retention/DR posture, or diagnosing why snapshots stopped
-  appearing.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Audits AWS Data Lifecycle Manager (DLM) EBS snapshot lifecycle policies for coverage gaps and silent-failure modes: disabled policies, empty tag/resource targets, invalid Cron schedules, weak or missing retention rules, absent cross-region copy (DR gap), CopyTags metadata loss, per-volume snapshot quota risk, and the DLM service-role breakage that silently halts backups. Emits a deterministic verdict (NO_POLICY | MISCONFIGURED | CONFIG_GAP | OK) per policy or workload with enumerated findings and specific CLI remediation. Use when reviewing DLM EBS snapshot policies, checking backup coverage, validating retention/DR posture, or diagnosing why snapshots stopped appearing.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline policy-document classification.
-  Live-account audits use aws dlm get-lifecycle-policies,
-  aws dlm get-lifecycle-policy, aws ec2 describe-snapshots, and
-  aws ec2 describe-volumes (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - DLM
-  - Data Lifecycle Manager
-  - EBS snapshot
-  - lifecycle policy
-  - backup
-  - retention
-  - cross-region copy
-  - disaster recovery
-  - snapshot policy
-  - CronExpression
-  - RetainRule
-  - CreateRule
-  - TargetTags
-  - CopyTags
-  - FastRestoreRule
-  - CrossRegionCopyTargets
-  - AWSDataLifecycleManagerServiceRole
-  - snapshot quota
-  - backup audit
-  - DR gap
-tags: [dlm, storage, ebs, snapshots, backup, retention, disaster-recovery, lifecycle, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline policy-document classification. Live-account audits use aws dlm get-lifecycle-policies, aws dlm get-lifecycle-policy, aws ec2 describe-snapshots, and aws ec2 describe-volumes (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
-  verdict_shape: "NO_POLICY | MISCONFIGURED | CONFIG_GAP | OK"
-  when_to_use: >-
-    Auditing DLM EBS snapshot lifecycle policies for coverage and correctness,
-    diagnosing why snapshots stopped appearing, validating retention/DR posture,
-    checking cross-region copy configuration, or confirming a workload has
-    automated EBS backup coverage before production deployment.
-  activation_triggers:
-    - "audit this DLM lifecycle policy"
-    - "why did my EBS snapshots stop"
-    - "is my backup policy enabled"
-    - "check DLM retention"
-    - "DLM cross-region copy gap"
-    - "is DLM working"
-    - "EBS snapshot coverage"
-    - "lifecycle policy disabled"
-    - "DLM silent failure"
-    - "audit EBS backup posture"
-  invocation_schema: >-
-    Input: either (a) a DLM lifecycle policy JSON document (from
-    get-lifecycle-policy), optionally paired with account-level context
-    (list of volumes, list of all policies), OR (b) a workload/account
-    identifier for live-account coverage audit. Output: deterministic
-    POLICY/VERDICT/REASON/FINDINGS/REMEDIATION block per policy or workload,
-    where VERDICT ∈ {NO_POLICY, MISCONFIGURED, CONFIG_GAP, OK}.
+  verdict_shape: NO_POLICY | MISCONFIGURED | CONFIG_GAP | OK
+  when_to_use: Auditing DLM EBS snapshot lifecycle policies for coverage and correctness, diagnosing why snapshots stopped appearing, validating retention/DR posture, checking cross-region copy configuration, or confirming a workload has automated EBS backup coverage before production deployment.
+  activation_triggers: audit this DLM lifecycle policy, why did my EBS snapshots stop, is my backup policy enabled, check DLM retention, DLM cross-region copy gap, is DLM working, EBS snapshot coverage, lifecycle policy disabled, DLM silent failure, audit EBS backup posture
+  invocation_schema: 'Input: either (a) a DLM lifecycle policy JSON document (from get-lifecycle-policy), optionally paired with account-level context (list of volumes, list of all policies), OR (b) a workload/account identifier for live-account coverage audit. Output: deterministic POLICY/VERDICT/REASON/FINDINGS/REMEDIATION block per policy or workload, where VERDICT ∈ {NO_POLICY, MISCONFIGURED, CONFIG_GAP, OK}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: DLM, Data Lifecycle Manager, EBS snapshot, lifecycle policy, backup, retention, cross-region copy, disaster recovery, snapshot policy, CronExpression, RetainRule, CreateRule, TargetTags, CopyTags, FastRestoreRule, CrossRegionCopyTargets, AWSDataLifecycleManagerServiceRole, snapshot quota, backup audit, DR gap
+  tags: dlm, storage, ebs, snapshots, backup, retention, disaster-recovery, lifecycle, audit
 ---
 
 # DLM Lifecycle Policy Auditor

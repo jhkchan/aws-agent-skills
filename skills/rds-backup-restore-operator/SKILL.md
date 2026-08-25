@@ -1,94 +1,26 @@
 ---
 name: rds-backup-restore-operator
-description: >-
-  Operates RDS and Aurora backup and restore workflows safely — automated
-  backup window configuration, manual snapshots for pre-maintenance safety,
-  cross-region and cross-account snapshot copy, point-in-time restore (PITR),
-  Aurora Backtrack for in-place rewind, S3 export/import, and full post-
-  restore verification. Runs deterministic pre-checks (subnet group, security
-  group, option group, KMS key, instance status), executes the operation
-  behind a CONFIRM gate, and emits a verdict (READY | BLOCKED | COMPLETED)
-  per operation with the exact CLI sequence, expected side-effects (new
-  instance endpoint, connection-string updates), and verification commands.
-  Use when configuring RDS backup retention, creating pre-migration snapshots,
-  restoring to a point in time, backtracking an Aurora cluster, exporting a
-  snapshot to S3, or recovering from a bad change.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates RDS and Aurora backup and restore workflows safely — automated backup window configuration, manual snapshots for pre-maintenance safety, cross-region and cross-account snapshot copy, point-in-time restore (PITR), Aurora Backtrack for in-place rewind, S3 export/import, and full post- restore verification. Runs deterministic pre-checks (subnet group, security group, option group, KMS key, instance status), executes the operation behind a CONFIRM gate, and emits a verdict (READY | BLOCKED | COMPLETED) per operation with the exact CLI sequence, expected side-effects (new instance endpoint, connection-string updates), and verification commands. Use when configuring RDS backup retention, creating pre-migration snapshots, restoring to a point in time, backtracking an Aurora cluster, exporting a snapshot to S3, or recovering from a bad change.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws rds describe-db-instances, aws rds describe-db-snapshots,
-  aws rds describe-db-cluster-backtracks, aws rds create-db-snapshot, aws rds
-  restore-db-instance-to-point-in-time, aws rds restore-db-instance-from-db-
-  snapshot, aws rds backtrack-db-cluster, aws rds start-export-task, and aws
-  rds start-import-from-s3 (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - RDS
-  - Amazon Aurora
-  - Aurora MySQL
-  - Aurora PostgreSQL
-  - automated backup
-  - manual snapshot
-  - point-in-time recovery
-  - PITR
-  - backtrack
-  - fast database clone
-  - cross-region snapshot copy
-  - cross-account snapshot share
-  - S3 export
-  - S3 import
-  - backup retention
-  - backup window
-  - maintenance window
-  - Multi-AZ
-  - restore-db-instance-to-point-in-time
-  - restore-db-instance-from-db-snapshot
-  - backtrack-db-cluster
-  - create-db-snapshot
-  - start-export-task
-tags: [rds, aurora, databases, backup, restore, pitr, backtrack, snapshot, recovery, disaster-recovery]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws rds describe-db-instances, aws rds describe-db-snapshots, aws rds describe-db-cluster-backtracks, aws rds create-db-snapshot, aws rds restore-db-instance-to-point-in-time, aws rds restore-db-instance-from-db- snapshot, aws rds backtrack-db-cluster, aws rds start-export-task, and aws rds start-import-from-s3 (AWS CLI v2, SSO or...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: operate
   skill_class: capability
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Configuring RDS backup retention or backup window, creating a manual
-    snapshot before maintenance or a risky change, copying snapshots cross-
-    region or cross-account, restoring an RDS instance to a point in time,
-    restoring from a snapshot, backtracking an Aurora MySQL cluster, exporting
-    a snapshot to S3, importing from S3 into Aurora MySQL, or recovering
-    from a bad schema change.
-  activation_triggers:
-    - "configure RDS backup retention"
-    - "create RDS manual snapshot"
-    - "restore RDS to point in time"
-    - "PITR restore RDS"
-    - "restore RDS from snapshot"
-    - "backtrack Aurora cluster"
-    - "Aurora fast clone"
-    - "copy RDS snapshot cross-region"
-    - "share RDS snapshot cross-account"
-    - "export RDS snapshot to S3"
-    - "import S3 into Aurora MySQL"
-    - "RDS pre-migration snapshot"
-    - "recover from bad RDS change"
-    - "verify RDS restore"
-  invocation_schema: >-
-    Input: either (a) an RDS instance/cluster configuration with the intended
-    operation (create-snapshot, pitr-restore, snapshot-restore, backtrack,
-    export, import), OR (b) an instance-id / cluster-id + operation for
-    live-account execution. Output: deterministic OPERATION/VERDICT/PRE_CHECKS/
-    STEPS/POST_VERIFY block per operation, where VERDICT is one of READY,
-    BLOCKED, COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Configuring RDS backup retention or backup window, creating a manual snapshot before maintenance or a risky change, copying snapshots cross- region or cross-account, restoring an RDS instance to a point in time, restoring from a snapshot, backtracking an Aurora MySQL cluster, exporting a snapshot to S3, importing from S3 into Aurora MySQL, or recovering from a bad schema change.
+  activation_triggers: configure RDS backup retention, create RDS manual snapshot, restore RDS to point in time, PITR restore RDS, restore RDS from snapshot, backtrack Aurora cluster, Aurora fast clone, copy RDS snapshot cross-region, share RDS snapshot cross-account, export RDS snapshot to S3, import S3 into Aurora MySQL, RDS pre-migration snapshot, recover from bad RDS change, verify RDS restore
+  invocation_schema: 'Input: either (a) an RDS instance/cluster configuration with the intended operation (create-snapshot, pitr-restore, snapshot-restore, backtrack, export, import), OR (b) an instance-id / cluster-id + operation for live-account execution. Output: deterministic OPERATION/VERDICT/PRE_CHECKS/ STEPS/POST_VERIFY block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: RDS, Amazon Aurora, Aurora MySQL, Aurora PostgreSQL, automated backup, manual snapshot, point-in-time recovery, PITR, backtrack, fast database clone, cross-region snapshot copy, cross-account snapshot share, S3 export, S3 import, backup retention, backup window, maintenance window, Multi-AZ, restore-db-instance-to-point-in-time, restore-db-instance-from-db-snapshot, backtrack-db-cluster, create-db-snapshot, start-export-task
+  tags: rds, aurora, databases, backup, restore, pitr, backtrack, snapshot, recovery, disaster-recovery
 ---
 
 # RDS Backup Restore Operator

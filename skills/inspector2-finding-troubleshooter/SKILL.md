@@ -1,120 +1,27 @@
 ---
 name: inspector2-finding-troubleshooter
-description: >-
-  Diagnoses Amazon Inspector v2 vulnerability findings through a finding-type-driven
-  diagnostic tree covering network reachability (unreachable ports, unintended IGW
-  exposure, SG/NAU cascade), package vulnerability (CVE in OS packages, language
-  ecosystems npm/pip/gem/go, Lambda layers, ECR container images), and code
-  vulnerability (Lambda code scanning for injection, hardcoded secrets, path
-  traversal). Walks severity (Critical/High/Medium/Low) to remediation per type
-  (patch packages via SSM Patch Manager, fix code, restrict security groups,
-  rebuild ECR images, update Lambda layers), integrates SBOM export, Lambda layer
-  scanning, ECR image scanning, and the latest Inspector code scanning for Lambda
-  and SBOM export features. Emits ROOT_CAUSE_FOUND with the specific finding type,
-  vulnerable artifact, and remediation path. Use when an Inspector finding fires,
-  a CVE is reported on EC2/ECR/Lambda, network reachability is flagged, SBOM
-  export shows vulnerable packages, or Lambda code scanning reports a code vuln.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Diagnoses Amazon Inspector v2 vulnerability findings through a finding-type-driven diagnostic tree covering network reachability (unreachable ports, unintended IGW exposure, SG/NAU cascade), package vulnerability (CVE in OS packages, language ecosystems npm/pip/gem/go, Lambda layers, ECR container images), and code vulnerability (Lambda code scanning for injection, hardcoded secrets, path traversal). Walks severity (Critical/High/Medium/Low) to remediation per type (patch packages via SSM Patch Manager, fix code, restrict security groups, rebuild ECR images, update Lambda layers), integrates SBOM export, Lambda layer scanning, ECR image scanning, and the latest Inspector code scanning for Lambda and SBOM export features. Emits ROOT_CAUSE_FOUND with the specific finding type, vulnerable artifact, and remediation path. Use when an Inspector finding fires, a CVE is reported on EC2/ECR/Lambda, network reachability is flagged, SBOM export shows vulnerable packages, or Lambda code scanning reports a code vuln.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Offline finding classification works from pasted finding JSON and
-  CVE metadata. Live-account diagnosis uses aws inspector2 list-findings,
-  describe-findings, batch-get-finding-details, list-coverage,
-  list-sbom-export, batch-get-code-snippets, aws ecr describe-images and
-  describe-image-scan-findings, aws lambda get-function-configuration,
-  aws ssm list-inventory-entries, aws ec2 describe-security-groups, and
-  aws ec2 describe-network-interfaces (AWS CLI v2, SSO or key-based
-  credentials). Optional Bedrock or OpenAI invocation for CVE-to-patch mapping.
-keywords:
-  - aws
-  - inspector
-  - inspector v2
-  - inspector2
-  - vulnerability
-  - CVE
-  - network reachability
-  - package vulnerability
-  - code vulnerability
-  - SBOM
-  - software bill of materials
-  - Lambda layer scanning
-  - ECR image scanning
-  - Lambda code scanning
-  - patch management
-  - SSM Patch Manager
-  - security groups
-  - SCA
-  - SAST
-  - cloudops
-  - troubleshoot
-  - security
-tags: [aws, inspector, inspector2, vulnerability, cve, sbom, ecr-scan, lambda-scan, security, troubleshoot]
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline finding classification works from pasted finding JSON and CVE metadata. Live-account diagnosis uses aws inspector2 list-findings, describe-findings, batch-get-finding-details, list-coverage, list-sbom-export, batch-get-code-snippets, aws ecr describe-images and describe-image-scan-findings, aws lambda get-function-configuration, aws ssm list-inventory-entries, aws ec2 describe-security-groups, and aws...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - inspector
-    - inspector2
-    - vulnerability
-    - cve
-    - sbom
-    - ecr-scan
-    - lambda-scan
-    - security
-    - troubleshoot
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - inspector finding
-    - inspector v2 vulnerability
-    - inspector network reachability
-    - inspector package vulnerability
-    - inspector code vulnerability
-    - inspector lambda code scanning
-    - inspector sbom export
-    - inspector ecr image scan
-    - inspector lambda layer scan
-    - CVE remediation
-    - inspector patch package
-    - inspector finding severity
-    - inspector finding suppressed
-    - inspector finding updated
-  when_to_use: >-
-    Diagnosing an Amazon Inspector v2 finding — a CVE on an EC2 instance,
-    ECR image, or Lambda function; a network reachability finding flagging
-    an unintended internet-exposed port; a package vulnerability in an OS
-    package, language ecosystem (npm, pip, gem, go, maven), or Lambda layer;
-    a code vulnerability from Inspector code scanning for Lambda (injection,
-    hardcoded secrets, path traversal); an SBOM export showing vulnerable
-    packages; triaging a Critical or High finding; deciding whether to patch,
-    suppress, or restrict; or running a "what does this Inspector finding
-    mean and how do I fix it" page where the root cause may be a stale
-    package, an unintended SG rule, a Lambda layer rebuild, or a code fix
-    — not necessarily the resource itself.
-  when_not_to_use: >-
-    Configuration posture audits (use securityhub-finding-auditor for
-    control findings, AWS Config rule violations), Amazon Macie data
-    classification alerts, Amazon GuardDuty threat detections (runtime
-    threats — use guardduty-finding-troubleshooter), or AWS WAF blocks
-    (use alb-5xx-troubleshooter step 5). This skill diagnoses Inspector
-    scan findings (vulnerability + reachability + code), not detection
-    services.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, inspector, inspector2, vulnerability, cve, sbom, ecr-scan, lambda-scan, security, troubleshoot
+  dependencies: aws-orchestrator
+  keywords: aws, inspector, inspector v2, inspector2, vulnerability, CVE, network reachability, package vulnerability, code vulnerability, SBOM, software bill of materials, Lambda layer scanning, ECR image scanning, Lambda code scanning, patch management, SSM Patch Manager, security groups, SCA, SAST, cloudops, troubleshoot, security
+  when_to_use: Diagnosing an Amazon Inspector v2 finding — a CVE on an EC2 instance, ECR image, or Lambda function; a network reachability finding flagging an unintended internet-exposed port; a package vulnerability in an OS package, language ecosystem (npm, pip, gem, go, maven), or Lambda layer; a code vulnerability from Inspector code scanning for Lambda (injection, hardcoded secrets, path traversal); an SBOM export showing vulnerable packages; triaging a Critical or High finding; deciding whether to patch, suppress, or restrict; or running a "what does this Inspector finding mean and how do I fix it" page where the root cause may be a stale package, an unintended SG rule, a Lambda layer rebuild, or a code fix — not necessarily the resource itself.
+  when_not_to_use: Configuration posture audits (use securityhub-finding-auditor for control findings, AWS Config rule violations), Amazon Macie data classification alerts, Amazon GuardDuty threat detections (runtime threats — use guardduty-finding-troubleshooter), or AWS WAF blocks (use alb-5xx-troubleshooter step 5). This skill diagnoses Inspector scan findings (vulnerability + reachability + code), not detection services.
 ---
 
 # Inspector v2 Finding Troubleshooter

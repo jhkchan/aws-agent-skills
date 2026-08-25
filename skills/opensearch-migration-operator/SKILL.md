@@ -1,117 +1,29 @@
 ---
 name: opensearch-migration-operator
-description: >-
-  Operates Elasticsearch to OpenSearch migration workflows safely — version
-  compatibility assessment (ES 5.x/6.x/7.x to OpenSearch 1.x/2.x), index
-  migration via snapshot/restore to S3 repository and reindex-from-remote,
-  plugin compatibility (remove ES-only plugins before migration), client
-  compatibility (OpenSearch client vs ES client, compatibility mode),
-  _search API compatibility mode, cluster migration path (in-place upgrade
-  vs new cluster + reindex), snapshot repository setup (S3 repository
-  plugin), downtime planning (blue/green strategy), and OpenSearch 2.x
-  features (neural search, vector DB, flow frameworks). Runs deterministic
-  pre-checks (version compatibility, plugin inventory, snapshot repository
-  health, index mapping compatibility), executes behind a CONFIRM gate, and
-  emits READY, BLOCKED, or COMPLETED per operation with the exact CLI and
-  API sequence. Use for ES-to-OpenSearch migration planning, snapshot
-  repository setup, index reindex, or post-migration verification.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates Elasticsearch to OpenSearch migration workflows safely — version compatibility assessment (ES 5.x/6.x/7.x to OpenSearch 1.x/2.x), index migration via snapshot/restore to S3 repository and reindex-from-remote, plugin compatibility (remove ES-only plugins before migration), client compatibility (OpenSearch client vs ES client, compatibility mode), _search API compatibility mode, cluster migration path (in-place upgrade vs new cluster + reindex), snapshot repository setup (S3 repository plugin), downtime planning (blue/green strategy), and OpenSearch 2.x features (neural search, vector DB, flow frameworks). Runs deterministic pre-checks (version compatibility, plugin inventory, snapshot repository health, index mapping compatibility), executes behind a CONFIRM gate, and emits READY, BLOCKED, or COMPLETED per operation with the exact CLI and API sequence. Use for ES-to-OpenSearch migration planning, snapshot repository setup, index reindex, or post-migration verification.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws opensearch describe-domain, aws opensearch
-  describe-domain-config, aws opensearch update-domain-config, aws es
-  describe-elasticsearch-domain (for legacy ES domains), aws es
-  update-elasticsearch-domain-config, aws s3 ls/head for snapshot
-  repository buckets, and curl against the OpenSearch/Elasticsearch _cluster/
-  health, _cat/indices, _nodes, _plugins, and _snapshot endpoints (AWS CLI
-  v2, SSO or key-based credentials).
-keywords:
-  - OpenSearch
-  - Elasticsearch
-  - migration
-  - version compatibility
-  - snapshot
-  - reindex
-  - S3 repository
-  - plugin compatibility
-  - client compatibility
-  - compatibility mode
-  - blue/green
-  - in-place upgrade
-  - neural search
-  - vector DB
-  - flow frameworks
-tags: [opensearch, elasticsearch, analytics, migration, snapshot, reindex, blue-green]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws opensearch describe-domain, aws opensearch describe-domain-config, aws opensearch update-domain-config, aws es describe-elasticsearch-domain (for legacy ES domains), aws es update-elasticsearch-domain-config, aws s3 ls/head for snapshot repository buckets, and curl against the OpenSearch/Elasticsearch _cluster/ health...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Planning or executing an Elasticsearch to OpenSearch migration,
-    assessing version compatibility, setting up S3 snapshot repositories,
-    migrating indices via snapshot/restore or reindex-from-remote, removing
-    ES-only plugins, evaluating in-place upgrade vs new cluster, planning
-    blue/green downtime strategy, configuring OpenSearch client compatibility
-    mode, or verifying post-migration cluster health.
-  when_not_to_use: >-
-    OpenSearch security audits or IAM policy reviews (use opensearch-domain-
-    auditor), OpenSearch performance tuning beyond migration scope (use query
-    and shard analysis directly), building new OpenSearch clusters from
-    scratch (use opensearch-domain-deployer), or OpenSearch index mapping
-    design (application-level work). This skill focuses on the migration
-    operation — not security posture or greenfield deployment.
-  activation_triggers:
-    - "migrate Elasticsearch to OpenSearch"
-    - "ES to OpenSearch migration"
-    - "OpenSearch version compatibility"
-    - "OpenSearch snapshot repository S3"
-    - "reindex from remote OpenSearch"
-    - "OpenSearch plugin compatibility"
-    - "OpenSearch client compatibility mode"
-    - "in-place upgrade OpenSearch"
-    - "blue/green migration OpenSearch"
-    - "OpenSearch 2.x migration"
-    - "OpenSearch neural search"
-    - "OpenSearch vector DB"
-    - "OpenSearch flow frameworks"
-    - "post-migration verification OpenSearch"
-    - "Elasticsearch deprecation migration"
-  invocation_schema: >-
-    Input: either (a) an Elasticsearch/OpenSearch domain configuration with
-    the intended migration operation (assess, snapshot-setup, in-place-upgrade,
-    new-cluster-reindex, blue-green, verify), OR (b) a domain endpoint + API
-    health output for live-account execution. Output: a deterministic
-    OPERATION/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation, where
-    VERDICT is one of READY, BLOCKED, COMPLETED.
-  invocation_example: |-
-    # Minimal valid input (offline plan classification):
-    Domain: prod-search-cluster
-    Region: us-east-1
-    Current: Elasticsearch 7.10 (AWS managed)
-    Target: OpenSearch 2.x (AWS managed)
-    Operation: assess-migration-readiness
-
-    Cluster configuration:
-      - ES version: 7.10
-      - Node count: 6 (3 master, 3 data)
-      - Instance type: r6g.large.search
-      - Plugins: analysis-icu, analysis-phonetic, ingest-attachment
-      - Indices: 45 (12 TB total)
-      - Snapshot repository: not configured
-      - Custom plugins: none
-
-    Emit the standard VERDICT block.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Planning or executing an Elasticsearch to OpenSearch migration, assessing version compatibility, setting up S3 snapshot repositories, migrating indices via snapshot/restore or reindex-from-remote, removing ES-only plugins, evaluating in-place upgrade vs new cluster, planning blue/green downtime strategy, configuring OpenSearch client compatibility mode, or verifying post-migration cluster health.
+  when_not_to_use: OpenSearch security audits or IAM policy reviews (use opensearch-domain- auditor), OpenSearch performance tuning beyond migration scope (use query and shard analysis directly), building new OpenSearch clusters from scratch (use opensearch-domain-deployer), or OpenSearch index mapping design (application-level work). This skill focuses on the migration operation — not security posture or greenfield deployment.
+  activation_triggers: migrate Elasticsearch to OpenSearch, ES to OpenSearch migration, OpenSearch version compatibility, OpenSearch snapshot repository S3, reindex from remote OpenSearch, OpenSearch plugin compatibility, OpenSearch client compatibility mode, in-place upgrade OpenSearch, blue/green migration OpenSearch, OpenSearch 2.x migration, OpenSearch neural search, OpenSearch vector DB, OpenSearch flow frameworks, post-migration verification OpenSearch, Elasticsearch deprecation migration
+  invocation_schema: 'Input: either (a) an Elasticsearch/OpenSearch domain configuration with the intended migration operation (assess, snapshot-setup, in-place-upgrade, new-cluster-reindex, blue-green, verify), OR (b) a domain endpoint + API health output for live-account execution. Output: a deterministic OPERATION/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  invocation_example: "# Minimal valid input (offline plan classification):\nDomain: prod-search-cluster\nRegion: us-east-1\nCurrent: Elasticsearch 7.10 (AWS managed)\nTarget: OpenSearch 2.x (AWS managed)\nOperation: assess-migration-readiness\n\nCluster configuration:\n  - ES version: 7.10\n  - Node count: 6 (3 master, 3 data)\n  - Instance type: r6g.large.search\n  - Plugins: analysis-icu, analysis-phonetic, ingest-attachment\n  - Indices: 45 (12 TB total)\n  - Snapshot repository: not configured\n  - Custom plugins: none\n\nEmit the standard VERDICT block."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: OpenSearch, Elasticsearch, migration, version compatibility, snapshot, reindex, S3 repository, plugin compatibility, client compatibility, compatibility mode, blue/green, in-place upgrade, neural search, vector DB, flow frameworks
+  tags: opensearch, elasticsearch, analytics, migration, snapshot, reindex, blue-green
 ---
 
 # OpenSearch Migration Operator

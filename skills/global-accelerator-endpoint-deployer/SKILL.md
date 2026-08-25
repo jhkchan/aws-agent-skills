@@ -1,110 +1,26 @@
 ---
 name: global-accelerator-endpoint-deployer
-description: >-
-  Provisions AWS Global Accelerator with production defaults: accelerator
-  creation with two static anycast IP addresses, listeners (TCP/UDP port
-  ranges), endpoint groups (region, traffic dial percentage, health check
-  interval/threshold), endpoint types (ALB, NLB, EC2 IP, EIP), endpoint
-  weights for within-region distribution, client IP address preservation,
-  BYOIP integration, flow logs, CloudWatch metrics, cross-region routing,
-  DNS naming, and endpoint group failover. Emits a READY_TO_DEPLOY
-  checklist with verification commands. Use when creating a Global
-  Accelerator, configuring anycast IPs, setting up multi-region endpoints,
-  adjusting traffic dial for regional canary, configuring endpoint weights,
-  enabling client IP preservation, or managing endpoint group failover.
-  Triggers: create global accelerator, anycast ip addresses, traffic dial,
-  endpoint group, endpoint weight, listener ports, client ip preservation,
-  global accelerator failover, byoip accelerator, accelerator flow logs.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Global Accelerator with production defaults: accelerator creation with two static anycast IP addresses, listeners (TCP/UDP port ranges), endpoint groups (region, traffic dial percentage, health check interval/threshold), endpoint types (ALB, NLB, EC2 IP, EIP), endpoint weights for within-region distribution, client IP address preservation, BYOIP integration, flow logs, CloudWatch metrics, cross-region routing, DNS naming, and endpoint group failover. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Global Accelerator, configuring anycast IPs, setting up multi-region endpoints, adjusting traffic dial for regional canary, configuring endpoint weights, enabling client IP preservation, or managing endpoint group failover. Triggers: create global accelerator, anycast ip addresses, traffic dial, endpoint group, endpoint weight, listener ports, client ip preservation, global accelerator failover, byoip accelerator, accelerator flow logs.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with globalaccelerator
-  access. Works with Terraform aws_globalaccelerator_accelerator /
-  aws_globalaccelerator_listener / aws_globalaccelerator_endpoint_group
-  resources and CloudFormation AWS::GlobalAccelerator::Accelerator /
-  Listener / EndpointGroup templates.
-keywords:
-  - aws
-  - global accelerator
-  - anycast
-  - cloudops
-  - deploy
-  - provisioning
-  - traffic dial
-  - endpoint group
-  - endpoint weight
-  - listener
-  - cross-region
-  - failover
-  - byoip
-  - flow logs
-  - client ip preservation
-tags:
-  - aws
-  - global-accelerator
-  - anycast
-  - cloudops
-  - deploy
-  - networking
-  - provisioning
-  - traffic-dial
-  - endpoint-group
-  - cross-region
-  - failover
-  - byoip
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with globalaccelerator access. Works with Terraform aws_globalaccelerator_accelerator / aws_globalaccelerator_listener / aws_globalaccelerator_endpoint_group resources and CloudFormation AWS::GlobalAccelerator::Accelerator / Listener / EndpointGroup templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - global-accelerator
-    - anycast
-    - cloudops
-    - deploy
-    - networking
-    - provisioning
-    - traffic-dial
-    - endpoint-group
-    - cross-region
-    - failover
-    - byoip
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create global accelerator
-    - anycast ip addresses
-    - traffic dial
-    - endpoint group
-    - endpoint weight
-    - listener ports
-    - client ip preservation
-    - global accelerator failover
-    - byoip accelerator
-    - accelerator flow logs
-  when_to_use: >-
-    Invoke when the user wants to create an AWS Global Accelerator with
-    static anycast IP addresses, configure listeners with TCP/UDP ports,
-    set up endpoint groups across regions with traffic dial percentages,
-    add endpoints (ALB, NLB, EC2, EIP) with weights, enable client IP
-    preservation, integrate BYOIP, configure flow logs, or manage
-    endpoint group failover. Do NOT invoke for CloudFront (CDN/edge),
-    Route 53 (DNS routing), Elastic Load Balancing v2 directly, or
-    Transit Gateway.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, global-accelerator, anycast, cloudops, deploy, networking, provisioning, traffic-dial, endpoint-group, cross-region, failover, byoip
+  dependencies: aws-orchestrator
+  keywords: aws, global accelerator, anycast, cloudops, deploy, provisioning, traffic dial, endpoint group, endpoint weight, listener, cross-region, failover, byoip, flow logs, client ip preservation
+  when_to_use: Invoke when the user wants to create an AWS Global Accelerator with static anycast IP addresses, configure listeners with TCP/UDP ports, set up endpoint groups across regions with traffic dial percentages, add endpoints (ALB, NLB, EC2, EIP) with weights, enable client IP preservation, integrate BYOIP, configure flow logs, or manage endpoint group failover. Do NOT invoke for CloudFront (CDN/edge), Route 53 (DNS routing), Elastic Load Balancing v2 directly, or Transit Gateway.
 ---
 
 # Global Accelerator Endpoint Deployer

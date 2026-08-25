@@ -1,77 +1,24 @@
 ---
 name: cloudwatch-alarm-auditor
-description: >-
-  Audits CloudWatch alarm configurations for blind spots across six dimensions:
-  detection strategy (anomaly detection vs static threshold), action wiring
-  (SNS/Lambda/AutoScaling), missing-metric handling (TreatMissingData),
-  composite-alarm integrity, alarm state history, and structural config errors.
-  Emits a deterministic verdict (NO_ANOMALY | NO_ACTION | INSUFFICIENT_DATA |
-  CONFIG_GAP | OK) per alarm with enumerated findings and CLI remediation. Use
-  when reviewing CloudWatch alarms, checking for missing alarm actions, auditing
-  insufficient-data handling, validating anomaly-detection coverage, or
-  hardening alarm posture before production deployment.
-version: 0.2.0
-author: Jacky Chan — AWS Community Builder
+description: 'Audits CloudWatch alarm configurations for blind spots across six dimensions: detection strategy (anomaly detection vs static threshold), action wiring (SNS/Lambda/AutoScaling), missing-metric handling (TreatMissingData), composite-alarm integrity, alarm state history, and structural config errors. Emits a deterministic verdict (NO_ANOMALY | NO_ACTION | INSUFFICIENT_DATA | CONFIG_GAP | OK) per alarm with enumerated findings and CLI remediation. Use when reviewing CloudWatch alarms, checking for missing alarm actions, auditing insufficient-data handling, validating anomaly-detection coverage, or hardening alarm posture before production deployment.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline alarm-config classification.
-  Live-account audits use aws cloudwatch describe-alarms,
-  describe-alarm-history, and describe-anomaly-detectors (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - CloudWatch
-  - alarms
-  - alarm actions
-  - SNS
-  - anomaly detection
-  - composite alarms
-  - insufficient data
-  - TreatMissingData
-  - missing metric
-  - alarm state history
-  - threshold
-  - DatapointsToAlarm
-  - EvaluationPeriods
-  - alarm audit
-  - blind spot
-  - ActionsEnabled
-  - MetricMath
-  - PutMetricAlarm
-tags: [cloudwatch, monitoring, alarms, anomaly-detection, observability, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline alarm-config classification. Live-account audits use aws cloudwatch describe-alarms, describe-alarm-history, and describe-anomaly-detectors (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
-  verdict_shape: "NO_ANOMALY | NO_ACTION | INSUFFICIENT_DATA | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a CloudWatch alarm configuration before production deployment,
-    checking whether alarm actions are wired (SNS/Lambda/AutoScaling), auditing
-    insufficient-data handling, validating anomaly-detection coverage vs static
-    thresholds, inspecting composite alarm integrity, or hardening alarm
-    posture across an account.
-  activation_triggers:
-    - "audit this CloudWatch alarm"
-    - "check my alarm actions"
-    - "is this alarm configured correctly"
-    - "alarm has no SNS topic"
-    - "insufficient data handling"
-    - "should I use anomaly detection"
-    - "composite alarm audit"
-    - "missing metric alarm"
-    - "alarm blind spot"
-    - "TreatMissingData"
-  invocation_schema: >-
-    Input: either (a) a CloudWatch alarm configuration (MetricAlarm or
-    CompositeAlarm JSON or text representation), optionally paired with alarm
-    state history, OR (b) an alarm name for live-account audit.
-    Output: deterministic ALARM/VERDICT/REASON/FINDINGS/REMEDIATION block per
-    alarm, where VERDICT is one of NO_ANOMALY, NO_ACTION, INSUFFICIENT_DATA,
-    CONFIG_GAP, OK.
+  verdict_shape: NO_ANOMALY | NO_ACTION | INSUFFICIENT_DATA | CONFIG_GAP | OK
+  when_to_use: Reviewing a CloudWatch alarm configuration before production deployment, checking whether alarm actions are wired (SNS/Lambda/AutoScaling), auditing insufficient-data handling, validating anomaly-detection coverage vs static thresholds, inspecting composite alarm integrity, or hardening alarm posture across an account.
+  activation_triggers: audit this CloudWatch alarm, check my alarm actions, is this alarm configured correctly, alarm has no SNS topic, insufficient data handling, should I use anomaly detection, composite alarm audit, missing metric alarm, alarm blind spot, TreatMissingData
+  invocation_schema: 'Input: either (a) a CloudWatch alarm configuration (MetricAlarm or CompositeAlarm JSON or text representation), optionally paired with alarm state history, OR (b) an alarm name for live-account audit. Output: deterministic ALARM/VERDICT/REASON/FINDINGS/REMEDIATION block per alarm, where VERDICT is one of NO_ANOMALY, NO_ACTION, INSUFFICIENT_DATA, CONFIG_GAP, OK.'
+  version: 0.2.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudWatch, alarms, alarm actions, SNS, anomaly detection, composite alarms, insufficient data, TreatMissingData, missing metric, alarm state history, threshold, DatapointsToAlarm, EvaluationPeriods, alarm audit, blind spot, ActionsEnabled, MetricMath, PutMetricAlarm
+  tags: cloudwatch, monitoring, alarms, anomaly-detection, observability, audit
 ---
 
 # CloudWatch Alarm Auditor

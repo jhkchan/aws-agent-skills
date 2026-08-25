@@ -1,99 +1,27 @@
 ---
 name: event-driven-automator
-description: >-
-  Designs and implements event-driven architectures on Amazon
-  EventBridge. Covers event bus selection (default, custom, partner),
-  event pattern matching with content-based filtering, rule-to-target
-  wiring (Lambda, Step Functions, SQS, SNS, API Gateway, API
-  destinations, ECS, Systems Manager), EventBridge Pipes (DynamoDB
-  Streams / Kinesis / SQS / MQ source with enrichment), and
-  EventBridge Scheduler for time-based triggers. Adds the
-  non-negotiables: per-target DLQ, idempotent consumers, retry policy,
-  ordering semantics, circular-dependency detection, and dead-letter
-  alarms. Covers common AWS event patterns (EC2 state change,
-  GuardDuty finding, Security Hub finding, CodeBuild failure, Auto
-  Scaling launch, S3 object created, CloudWatch alarm). Emits
-  AUTOMATED with an architecture template or MANUAL_STEP_REQUIRED
-  with the specific gap. Use when building EventBridge event-driven
-  automation, designing Pipes pipelines, configuring Scheduler, or
-  hardening event delivery with DLQ and idempotency.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Designs and implements event-driven architectures on Amazon EventBridge. Covers event bus selection (default, custom, partner), event pattern matching with content-based filtering, rule-to-target wiring (Lambda, Step Functions, SQS, SNS, API Gateway, API destinations, ECS, Systems Manager), EventBridge Pipes (DynamoDB Streams / Kinesis / SQS / MQ source with enrichment), and EventBridge Scheduler for time-based triggers. Adds the non-negotiables: per-target DLQ, idempotent consumers, retry policy, ordering semantics, circular-dependency detection, and dead-letter alarms. Covers common AWS event patterns (EC2 state change, GuardDuty finding, Security Hub finding, CodeBuild failure, Auto Scaling launch, S3 object created, CloudWatch alarm). Emits AUTOMATED with an architecture template or MANUAL_STEP_REQUIRED with the specific gap. Use when building EventBridge event-driven automation, designing Pipes pipelines, configuring Scheduler, or hardening event delivery with DLQ and idempotency.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline architecture
-  design. Live deployment uses aws events create-event-bus,
-  put-rule, put-targets, create-archive, update-event-bus, put-event
-  (TestEventPattern), aws pipes create-pipe, start-pipe, aws
-  scheduler create-schedule, get-schedule, and aws schemas
-  create-registry (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - EventBridge
-  - event bus
-  - event pattern
-  - rule targets
-  - EventBridge Pipes
-  - EventBridge Scheduler
-  - DLQ
-  - idempotency
-  - retry policy
-  - circular dependency
-  - GuardDuty finding
-  - Security Hub finding
-  - CodeBuild failure
-  - EC2 state change
-  - Auto Scaling launch
-  - S3 object created
-  - CloudWatch alarm
-  - API destination
-  - Schema Registry
-  - global endpoints
-  - event-driven architecture
-tags: [eventbridge, app-integration, event-driven, pipes, scheduler, automate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline architecture design. Live deployment uses aws events create-event-bus, put-rule, put-targets, create-archive, update-event-bus, put-event (TestEventPattern), aws pipes create-pipe, start-pipe, aws scheduler create-schedule, get-schedule, and aws schemas create-registry (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATED | MANUAL_STEP_REQUIRED"
-  when_to_use: >-
-    Designing an event-driven architecture on EventBridge, wiring
-    rules to targets (Lambda, Step Functions, SQS, ECS, API
-    destinations), building a Pipes pipeline from a stream/queue,
-    configuring Scheduler for time-based triggers, hardening event
-    delivery with DLQ and idempotency, or diagnosing event-matching
-    and delivery failures.
-  activation_triggers:
-    - "EventBridge rule target"
-    - "event-driven architecture"
-    - "EventBridge Pipes"
-    - "EventBridge Scheduler"
-    - "event pattern matching"
-    - "DLQ for events"
-    - "idempotent consumer"
-    - "GuardDuty finding automation"
-    - "Security Hub finding workflow"
-    - "CodeBuild failure notification"
-    - "EC2 state change trigger"
-    - "S3 object created trigger"
-    - "circular dependency EventBridge"
-    - "API destination"
-    - "global endpoints EventBridge"
-  invocation_schema: >-
-    Input: either (a) an event source and desired action ("when a
-    GuardDuty finding arrives, run a Lambda to isolate the EC2
-    instance"), OR (b) an existing EventBridge rule/target
-    configuration for review. Output: deterministic ARCHITECTURE
-    block per workflow — BUS/PATTERN/TARGETS/RETRY/SAFETY/AUDIT/
-    VERDICT — where VERDICT is AUTOMATED (template ready) or
-    MANUAL_STEP_REQUIRED (specific gap cited).
+  verdict_shape: AUTOMATED | MANUAL_STEP_REQUIRED
+  when_to_use: Designing an event-driven architecture on EventBridge, wiring rules to targets (Lambda, Step Functions, SQS, ECS, API destinations), building a Pipes pipeline from a stream/queue, configuring Scheduler for time-based triggers, hardening event delivery with DLQ and idempotency, or diagnosing event-matching and delivery failures.
+  activation_triggers: EventBridge rule target, event-driven architecture, EventBridge Pipes, EventBridge Scheduler, event pattern matching, DLQ for events, idempotent consumer, GuardDuty finding automation, Security Hub finding workflow, CodeBuild failure notification, EC2 state change trigger, S3 object created trigger, circular dependency EventBridge, API destination, global endpoints EventBridge
+  invocation_schema: 'Input: either (a) an event source and desired action ("when a GuardDuty finding arrives, run a Lambda to isolate the EC2 instance"), OR (b) an existing EventBridge rule/target configuration for review. Output: deterministic ARCHITECTURE block per workflow — BUS/PATTERN/TARGETS/RETRY/SAFETY/AUDIT/ VERDICT — where VERDICT is AUTOMATED (template ready) or MANUAL_STEP_REQUIRED (specific gap cited).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: EventBridge, event bus, event pattern, rule targets, EventBridge Pipes, EventBridge Scheduler, DLQ, idempotency, retry policy, circular dependency, GuardDuty finding, Security Hub finding, CodeBuild failure, EC2 state change, Auto Scaling launch, S3 object created, CloudWatch alarm, API destination, Schema Registry, global endpoints, event-driven architecture
+  tags: eventbridge, app-integration, event-driven, pipes, scheduler, automate
 ---
 
 # Event-Driven Automator

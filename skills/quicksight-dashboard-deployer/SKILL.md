@@ -1,116 +1,26 @@
 ---
 name: quicksight-dashboard-deployer
-description: >-
-  Provisions Amazon QuickSight dashboards with production defaults:
-  account creation (Standard/Enterprise), data source (Athena, RDS,
-  Redshift, S3, Aurora), dataset (SQL, join, calculated field),
-  analysis (visual types, sheet layout), dashboard creation and sharing,
-  template-based deployment, row-level security (RLS via dataset
-  permissions), SPICE vs Direct Query, VPC connection for private data
-  stores, IAM service role, email-based user provisioning, namespace
-  and groups, refresh schedules, parameterized dashboards. Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when
-  creating a QuickSight dashboard, connecting QuickSight to a data
-  source, setting up SPICE ingestion, configuring row-level security,
-  deploying multi-tenant dashboards, or provisioning QuickSight users.
-  Triggers: create quicksight dashboard, quicksight data source,
-  quicksight SPICE, quicksight template, quicksight row-level security,
-  quicksight VPC connection, quicksight enterprise.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon QuickSight dashboards with production defaults: account creation (Standard/Enterprise), data source (Athena, RDS, Redshift, S3, Aurora), dataset (SQL, join, calculated field), analysis (visual types, sheet layout), dashboard creation and sharing, template-based deployment, row-level security (RLS via dataset permissions), SPICE vs Direct Query, VPC connection for private data stores, IAM service role, email-based user provisioning, namespace and groups, refresh schedules, parameterized dashboards. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a QuickSight dashboard, connecting QuickSight to a data source, setting up SPICE ingestion, configuring row-level security, deploying multi-tenant dashboards, or provisioning QuickSight users. Triggers: create quicksight dashboard, quicksight data source, quicksight SPICE, quicksight template, quicksight row-level security, quicksight VPC connection, quicksight enterprise.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with quicksight access
-  (and sts:AssumeRole if cross-account data sources). Works with
-  Terraform aws_quicksight_* resources and CloudFormation
-  AWS::QuickSight::* templates.
-keywords:
-  - aws
-  - quicksight
-  - dashboard
-  - analytics
-  - bi
-  - cloudops
-  - deploy
-  - provisioning
-  - spice
-  - data source
-  - dataset
-  - analysis
-  - template
-  - row-level security
-  - rls
-  - vpc connection
-  - enterprise
-tags:
-  - aws
-  - quicksight
-  - dashboard
-  - analytics
-  - cloudops
-  - deploy
-  - provisioning
-  - spice
-  - data-source
-  - dataset
-  - analysis
-  - template
-  - row-level-security
-  - vpc-connection
-  - enterprise
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with quicksight access (and sts:AssumeRole if cross-account data sources). Works with Terraform aws_quicksight_* resources and CloudFormation AWS::QuickSight::* templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - quicksight
-    - dashboard
-    - analytics
-    - cloudops
-    - deploy
-    - provisioning
-    - spice
-    - data-source
-    - dataset
-    - analysis
-    - template
-    - row-level-security
-    - vpc-connection
-    - enterprise
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create quicksight dashboard
-    - quicksight data source
-    - quicksight SPICE
-    - quicksight template
-    - quicksight row-level security
-    - quicksight VPC connection
-    - quicksight user provisioning
-    - quicksight enterprise
-  when_to_use: >-
-    Invoke when the user wants to create a QuickSight dashboard, connect
-    QuickSight to a data source (Athena, RDS, Redshift, S3, Aurora),
-    configure SPICE ingestion vs Direct Query, set up row-level security,
-    deploy template-based multi-tenant dashboards, provision QuickSight
-    users and groups, or configure VPC connections for private data
-    stores. Do NOT invoke for Amazon Athena workgroup management (use
-    Athena skills), Redshift cluster provisioning (use Redshift skills),
-    or general BI tool comparisons.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, quicksight, dashboard, analytics, cloudops, deploy, provisioning, spice, data-source, dataset, analysis, template, row-level-security, vpc-connection, enterprise
+  dependencies: aws-orchestrator
+  keywords: aws, quicksight, dashboard, analytics, bi, cloudops, deploy, provisioning, spice, data source, dataset, analysis, template, row-level security, rls, vpc connection, enterprise
+  when_to_use: Invoke when the user wants to create a QuickSight dashboard, connect QuickSight to a data source (Athena, RDS, Redshift, S3, Aurora), configure SPICE ingestion vs Direct Query, set up row-level security, deploy template-based multi-tenant dashboards, provision QuickSight users and groups, or configure VPC connections for private data stores. Do NOT invoke for Amazon Athena workgroup management (use Athena skills), Redshift cluster provisioning (use Redshift skills), or general BI tool comparisons.
 ---
 
 # QuickSight Dashboard Deployer

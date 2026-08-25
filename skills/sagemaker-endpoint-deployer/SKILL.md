@@ -1,94 +1,27 @@
 ---
 name: sagemaker-endpoint-deployer
-description: >-
-  Provisions SageMaker real-time, serverless, and asynchronous inference
-  endpoints with production defaults: model creation (S3 artifact, container
-  image), endpoint config (instance type, count, variant, weights), endpoint
-  creation, auto-scaling on InvocationsPerInstance, data capture, model
-  monitor (data quality, model quality, bias drift), A/B testing (weighted
-  variants), shadow testing, Serverless Inference, Asynchronous Inference,
-  and JumpStart foundation model deployment. Emits a READY_TO_DEPLOY
-  checklist with verification commands. Use when deploying a SageMaker
-  endpoint, configuring auto-scaling, enabling data capture and model
-  monitoring, setting up A/B or shadow variants, or deploying JumpStart
-  foundation models. Triggers: create SageMaker endpoint, deploy model,
-  real-time inference, serverless inference, async inference, A/B test,
-  shadow deployment, data capture, model monitor, JumpStart.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions SageMaker real-time, serverless, and asynchronous inference endpoints with production defaults: model creation (S3 artifact, container image), endpoint config (instance type, count, variant, weights), endpoint creation, auto-scaling on InvocationsPerInstance, data capture, model monitor (data quality, model quality, bias drift), A/B testing (weighted variants), shadow testing, Serverless Inference, Asynchronous Inference, and JumpStart foundation model deployment. Emits a READY_TO_DEPLOY checklist with verification commands. Use when deploying a SageMaker endpoint, configuring auto-scaling, enabling data capture and model monitoring, setting up A/B or shadow variants, or deploying JumpStart foundation models. Triggers: create SageMaker endpoint, deploy model, real-time inference, serverless inference, async inference, A/B test, shadow deployment, data capture, model monitor, JumpStart.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). For live deployment: AWS CLI v2 with sagemaker, s3, iam, ec2,
-  cloudwatch, and application-autoscaling access. Works with Terraform
-  aws_sagemaker_model / aws_sagemaker_endpoint_configuration /
-  aws_sagemaker_endpoint resources and CloudFormation
-  AWS::SageMaker::Model / EndpointConfig / Endpoint templates.
-keywords:
-  - aws
-  - sagemaker
-  - endpoint
-  - inference
-  - deploy
-  - real-time
-  - serverless inference
-  - asynchronous inference
-  - model deployment
-  - auto-scaling
-  - data capture
-  - model monitor
-  - a/b testing
-  - shadow testing
-  - jumpstart
-  - foundation models
-  - variant
-  - invocations
-  - container image
-  - model artifact
-tags:
-  - aws
-  - sagemaker
-  - inference
-  - deploy
-  - ai-ml
-  - endpoint
-  - auto-scaling
-  - model-monitor
-  - jumpstart
-  - serverless-inference
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with sagemaker, s3, iam, ec2, cloudwatch, and application-autoscaling access. Works with Terraform aws_sagemaker_model / aws_sagemaker_endpoint_configuration / aws_sagemaker_endpoint resources and CloudFormation AWS::SageMaker::Model / EndpointConfig / Endpoint templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AI/ML
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Invoke when the user wants to deploy a SageMaker inference endpoint
-    (real-time, serverless, or asynchronous), configure auto-scaling on
-    InvocationsPerInstance, enable data capture and model monitoring, set
-    up A/B testing or shadow variants, or deploy a JumpStart foundation
-    model. Do NOT invoke for SageMaker training jobs, processing jobs,
-    feature store, or model registry auditing.
-  activation_triggers:
-    - "create sagemaker endpoint"
-    - "deploy sagemaker model"
-    - "real-time inference"
-    - "serverless inference"
-    - "asynchronous inference"
-    - "sagemaker auto-scaling"
-    - "data capture"
-    - "model monitor"
-    - "a/b testing variants"
-    - "shadow deployment"
-    - "jumpstart foundation model"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Invoke when the user wants to deploy a SageMaker inference endpoint (real-time, serverless, or asynchronous), configure auto-scaling on InvocationsPerInstance, enable data capture and model monitoring, set up A/B testing or shadow variants, or deploy a JumpStart foundation model. Do NOT invoke for SageMaker training jobs, processing jobs, feature store, or model registry auditing.
+  activation_triggers: create sagemaker endpoint, deploy sagemaker model, real-time inference, serverless inference, asynchronous inference, sagemaker auto-scaling, data capture, model monitor, a/b testing variants, shadow deployment, jumpstart foundation model
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: aws, sagemaker, endpoint, inference, deploy, real-time, serverless inference, asynchronous inference, model deployment, auto-scaling, data capture, model monitor, a/b testing, shadow testing, jumpstart, foundation models, variant, invocations, container image, model artifact
+  tags: aws, sagemaker, inference, deploy, ai-ml, endpoint, auto-scaling, model-monitor, jumpstart, serverless-inference
+  dependencies: aws-orchestrator
 ---
 
 # SageMaker Endpoint Deployer

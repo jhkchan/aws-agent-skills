@@ -1,69 +1,24 @@
 ---
 name: service-quotas-usage-auditor
-description: >-
-  Audits AWS Service Quotas — quota utilization per service, approaching
-  limits (>=80%), CloudWatch alarm coverage on AWS/Usage metrics, applied
-  vs default quota drift, adjustable quotas stuck at default with rising
-  usage, denied or stale quota increase requests, and non-trackable quotas
-  lacking a UsageMetric. Emits a deterministic verdict
-  (APPROACHING_LIMIT | NO_ALARM | CONFIG_GAP | OK) per quota with
-  enumerated findings and CLI remediation. Use when reviewing quota
-  utilization, checking for approaching service limits, auditing quota
-  increase request history, or validating CloudWatch alarm coverage.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Service Quotas — quota utilization per service, approaching limits (>=80%), CloudWatch alarm coverage on AWS/Usage metrics, applied vs default quota drift, adjustable quotas stuck at default with rising usage, denied or stale quota increase requests, and non-trackable quotas lacking a UsageMetric. Emits a deterministic verdict (APPROACHING_LIMIT | NO_ALARM | CONFIG_GAP | OK) per quota with enumerated findings and CLI remediation. Use when reviewing quota utilization, checking for approaching service limits, auditing quota increase request history, or validating CloudWatch alarm coverage.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline quota-snapshot classification.
-  Live-account audits use aws service-quotas list-service-quotas,
-  get-service-quota, get-aws-default-service-quota,
-  list-requested-service-quota-change-history, and aws cloudwatch
-  describe-alarbs-for-metric (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Service Quotas
-  - quota utilization
-  - approaching limit
-  - AWS/Usage
-  - CloudWatch alarm
-  - quota increase
-  - applied quota
-  - default quota
-  - Adjustable
-  - UsageMetric
-  - quota code
-  - service limits
-  - Trusted Advisor
-  - quota monitoring
-  - quota remediation
-tags: [service-quotas, management, quota, limits, cloudwatch, monitoring, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline quota-snapshot classification. Live-account audits use aws service-quotas list-service-quotas, get-service-quota, get-aws-default-service-quota, list-requested-service-quota-change-history, and aws cloudwatch describe-alarbs-for-metric (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
-  verdict_shape: "APPROACHING_LIMIT | NO_ALARM | CONFIG_GAP | OK"
-  when_to_use: >-
-    Auditing AWS Service Quotas utilization, CloudWatch alarm coverage on
-    AWS/Usage metrics, and quota increase request history.
-  activation_triggers:
-    - "audit service quotas"
-    - "check quota utilization"
-    - "approaching service limit"
-    - "quota increase request"
-    - "cloudwatch alarm on quota"
-    - "service limits audit"
-  invocation_schema: >-
-    Input: either (a) a Service Quotas snapshot (quota code, service code,
-    applied value, default value, UsageMetric, utilization, increase
-    request history, CloudWatch alarm state), OR (b) a service-code for
-    live-account audit via aws service-quotas list-service-quotas.
-    Output: deterministic QUOTA/VERDICT/REASON/UTILIZATION/FINDINGS/
-    REMEDIATION block per quota, where VERDICT is one of APPROACHING_LIMIT,
-    NO_ALARM, CONFIG_GAP, OK (or ERROR for malformed input).
+  verdict_shape: APPROACHING_LIMIT | NO_ALARM | CONFIG_GAP | OK
+  when_to_use: Auditing AWS Service Quotas utilization, CloudWatch alarm coverage on AWS/Usage metrics, and quota increase request history.
+  activation_triggers: audit service quotas, check quota utilization, approaching service limit, quota increase request, cloudwatch alarm on quota, service limits audit
+  invocation_schema: 'Input: either (a) a Service Quotas snapshot (quota code, service code, applied value, default value, UsageMetric, utilization, increase request history, CloudWatch alarm state), OR (b) a service-code for live-account audit via aws service-quotas list-service-quotas. Output: deterministic QUOTA/VERDICT/REASON/UTILIZATION/FINDINGS/ REMEDIATION block per quota, where VERDICT is one of APPROACHING_LIMIT, NO_ALARM, CONFIG_GAP, OK (or ERROR for malformed input).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Service Quotas, quota utilization, approaching limit, AWS/Usage, CloudWatch alarm, quota increase, applied quota, default quota, Adjustable, UsageMetric, quota code, service limits, Trusted Advisor, quota monitoring, quota remediation
+  tags: service-quotas, management, quota, limits, cloudwatch, monitoring, audit
 ---
 
 # Service Quotas Usage Auditor

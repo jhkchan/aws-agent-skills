@@ -1,114 +1,27 @@
 ---
 name: cur-automation-automator
-description: >-
-  Designs end-to-end AWS Cost and Usage Report (CUR) automation: CUR creation
-  (hourly granularity, resource-level, ReportVersioning, Athena integration),
-  Athena setup (database, table, partition projection), CUR query automation
-  (top spenders, unused resources, Savings Plan opportunities, tag compliance),
-  QuickSight integration (datasets, SPICE dashboards), Cost Category automation,
-  cost allocation tag activation, and latest CUR 2.0 split cost allocation,
-  AWS BCM Data Exports, Amazon Q cost analysis. Emits a verdict
-  (AUTOMATED with full IaC template | MANUAL_STEP_REQUIRED with specific gap).
-  Use when setting up CUR, migrating from Cost Explorer to Athena-backed
-  analytics, automating FinOps queries, building QuickSight cost dashboards,
-  activating tags at scale, or adopting CUR 2.0 split cost allocation.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Designs end-to-end AWS Cost and Usage Report (CUR) automation: CUR creation (hourly granularity, resource-level, ReportVersioning, Athena integration), Athena setup (database, table, partition projection), CUR query automation (top spenders, unused resources, Savings Plan opportunities, tag compliance), QuickSight integration (datasets, SPICE dashboards), Cost Category automation, cost allocation tag activation, and latest CUR 2.0 split cost allocation, AWS BCM Data Exports, Amazon Q cost analysis. Emits a verdict (AUTOMATED with full IaC template | MANUAL_STEP_REQUIRED with specific gap). Use when setting up CUR, migrating from Cost Explorer to Athena-backed analytics, automating FinOps queries, building QuickSight cost dashboards, activating tags at scale, or adopting CUR 2.0 split cost allocation.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws cur describe-report-definitions, put-report-definition,
-  delete-report-definition, modify-report-definition, aws athena
-  start-query-execution, get-query-execution, create-named-query, aws glue
-  get-database, create-database, aws quicksight create-data-source,
-  create-dataset, create-dashboard, aws ce list-cost-category-definitions,
-  create-cost-category-definition, aws ce update-cost-allocation-tags-status,
-  list-cost-allocation-tags, aws bcm-data-exports create-export, list-exports
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - CUR
-  - Cost and Usage Report
-  - FinOps
-  - Athena
-  - partition projection
-  - QuickSight
-  - SPICE
-  - cost allocation tags
-  - Cost Category
-  - Savings Plans
-  - Reserved Instances
-  - top spenders
-  - unused resources
-  - tag compliance
-  - CUR 2.0
-  - split cost allocation
-  - EKS cost attribution
-  - BCM Data Exports
-  - Amazon Q cost analysis
-  - cost dashboard
-tags:
-  - cur
-  - finops
-  - athena
-  - quicksight
-  - cost-optimization
-  - automate
-  - cost-allocation
-  - bcm-data-exports
-  - cur2
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws cur describe-report-definitions, put-report-definition, delete-report-definition, modify-report-definition, aws athena start-query-execution, get-query-execution, create-named-query, aws glue get-database, create-database, aws quicksight create-data-source, create-dataset, create-dashboard, aws ce...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: FinOps
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATED | MANUAL_STEP_REQUIRED"
-  when_to_use: >-
-    Setting up CUR for the first time (creating the report, Athena database,
-    partitioned table); migrating from Cost Explorer API to Athena-backed CUR
-    analytics for higher resolution and longer history; automating recurring
-    FinOps queries (top spenders, unused resources, Savings Plan / Reserved
-    Instance opportunities, tag compliance); building QuickSight cost
-    dashboards backed by CUR; activating cost allocation tags at scale via
-    CE API; defining Cost Categories for chargeback / showback; adopting
-    CUR 2.0 split cost allocation for EKS / ECS / Lambda container cost
-    attribution; migrating from legacy CUR to BCM Data Exports; or wiring
-    Amazon Q (Business Pro) for natural-language cost analysis.
-  activation_triggers:
-    - "set up CUR"
-    - "create Cost and Usage Report"
-    - "CUR Athena integration"
-    - "Athena CUR partition projection"
-    - "top spenders query"
-    - "unused resources FinOps"
-    - "Savings Plan opportunities"
-    - "Reserved Instance recommendations"
-    - "tag compliance audit"
-    - "QuickSight cost dashboard"
-    - "SPICE dataset CUR"
-    - "Cost Category automation"
-    - "cost allocation tag activation"
-    - "CUR 2.0 split cost allocation"
-    - "EKS cost attribution"
-    - "BCM Data Exports"
-    - "Amazon Q cost analysis"
-  invocation_schema: >-
-    Input: either (a) a scenario describing the target CUR setup (greenfield
-    vs. migration, scope: single account vs. organization/payer, granularity:
-    hourly vs. daily, target: Athena-only vs. Athena+QuickSight vs. BCM Data
-    Exports), OR (b) an existing CUR + Athena configuration and an operation
-    (audit, migrate-cur2, add-quicksight, automate-queries, activate-tags,
-    define-cost-categories). Output: deterministic OPERATION / VERDICT /
-    REQUIREMENTS / IAC_TEMPLATE / MANUAL_GAPS / NOTES block where VERDICT is
-    AUTOMATED (full CloudFormation / Terraform template generated) or
-    MANUAL_STEP_REQUIRED (specific gap blocks automation, with exact CLI
-    snippet to close it).
+  verdict_shape: AUTOMATED | MANUAL_STEP_REQUIRED
+  when_to_use: Setting up CUR for the first time (creating the report, Athena database, partitioned table); migrating from Cost Explorer API to Athena-backed CUR analytics for higher resolution and longer history; automating recurring FinOps queries (top spenders, unused resources, Savings Plan / Reserved Instance opportunities, tag compliance); building QuickSight cost dashboards backed by CUR; activating cost allocation tags at scale via CE API; defining Cost Categories for chargeback / showback; adopting CUR 2.0 split cost allocation for EKS / ECS / Lambda container cost attribution; migrating from legacy CUR to BCM Data Exports; or wiring Amazon Q (Business Pro) for natural-language cost analysis.
+  activation_triggers: set up CUR, create Cost and Usage Report, CUR Athena integration, Athena CUR partition projection, top spenders query, unused resources FinOps, Savings Plan opportunities, Reserved Instance recommendations, tag compliance audit, QuickSight cost dashboard, SPICE dataset CUR, Cost Category automation, cost allocation tag activation, CUR 2.0 split cost allocation, EKS cost attribution, BCM Data Exports, Amazon Q cost analysis
+  invocation_schema: 'Input: either (a) a scenario describing the target CUR setup (greenfield vs. migration, scope: single account vs. organization/payer, granularity: hourly vs. daily, target: Athena-only vs. Athena+QuickSight vs. BCM Data Exports), OR (b) an existing CUR + Athena configuration and an operation (audit, migrate-cur2, add-quicksight, automate-queries, activate-tags, define-cost-categories). Output: deterministic OPERATION / VERDICT / REQUIREMENTS / IAC_TEMPLATE / MANUAL_GAPS / NOTES block where VERDICT is AUTOMATED (full CloudFormation / Terraform template generated) or MANUAL_STEP_REQUIRED (specific gap blocks automation, with exact CLI snippet to close it).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CUR, Cost and Usage Report, FinOps, Athena, partition projection, QuickSight, SPICE, cost allocation tags, Cost Category, Savings Plans, Reserved Instances, top spenders, unused resources, tag compliance, CUR 2.0, split cost allocation, EKS cost attribution, BCM Data Exports, Amazon Q cost analysis, cost dashboard
+  tags: cur, finops, athena, quicksight, cost-optimization, automate, cost-allocation, bcm-data-exports, cur2
 ---
 
 # CUR Automation Automator

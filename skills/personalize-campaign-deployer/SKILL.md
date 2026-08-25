@@ -1,130 +1,26 @@
 ---
 name: personalize-campaign-deployer
-description: >-
-  Deploys Amazon Personalize recommendation pipelines with production
-  defaults: dataset group creation (CUSTOM or DOMAIN), dataset types
-  (Interactions, Users, Items), Avro-like JSON schema, bulk import
-  from S3 and incremental events via PutEvents, solution creation
-  with recipe selection (User-Personalization, SIMS, Popularity-
-  Counting), solution version training (HPO vs manual), campaign
-  creation with minProvisionedTPS, event tracker for real-time
-  updates, batch inference jobs, recommender creation for DOMAIN
-  groups, filter creation, campaign offline metrics, and AutoTraining.
-  Emits a READY_TO_DEPLOY checklist with verification commands. Use
-  when building a recommendation system, training a Personalize
-  solution, creating a campaign, deploying real-time recommendations,
-  configuring event tracker, running batch inference, or selecting a
-  recipe. Triggers: create personalize dataset group, personalize
-  schema, personalize solution, personalize recipe, personalize
-  campaign, personalize minProvisionedTPS, personalize event tracker,
-  personalize put events, personalize batch inference, personalize
-  recommender, personalize filter, personalize HPO.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Deploys Amazon Personalize recommendation pipelines with production defaults: dataset group creation (CUSTOM or DOMAIN), dataset types (Interactions, Users, Items), Avro-like JSON schema, bulk import from S3 and incremental events via PutEvents, solution creation with recipe selection (User-Personalization, SIMS, Popularity- Counting), solution version training (HPO vs manual), campaign creation with minProvisionedTPS, event tracker for real-time updates, batch inference jobs, recommender creation for DOMAIN groups, filter creation, campaign offline metrics, and AutoTraining. Emits a READY_TO_DEPLOY checklist with verification commands. Use when building a recommendation system, training a Personalize solution. Triggers: create personalize dataset group, personalize schema, personalize solution, personalize recipe, personalize campaign, personalize minProvisionedTPS, personalize event tracker, personalize put events, personalize batch inference, personalize recommender, personalize filter, personalize HPO.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with personalize
-  access and an IAM role granting s3:GetObject on the training-data
-  bucket, iam:PassRole for the Personalize service role, and
-  personalize:* actions. Works with Lambda runtimes (boto3
-  personalize-runtime client for GetRecommendations and PutEvents),
-  Terraform aws_personalize_* resources, and CloudFormation
-  AWS::Personalize::* templates.
-keywords:
-  - aws
-  - personalize
-  - recommendations
-  - recommendation system
-  - dataset group
-  - interactions
-  - users
-  - items
-  - schema
-  - recipe
-  - user-personalization
-  - sims
-  - popularity-counting
-  - solution
-  - campaign
-  - minprovisionedtps
-  - event tracker
-  - put events
-  - batch inference
-  - recommender
-  - filter
-  - hpo
-  - ml
-  - deploy
-  - provisioning
-tags:
-  - aws
-  - personalize
-  - recommendations
-  - ml
-  - deploy
-  - provisioning
-  - dataset-group
-  - recipe
-  - campaign
-  - event-tracker
-  - batch-inference
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with personalize access and an IAM role granting s3:GetObject on the training-data bucket, iam:PassRole for the Personalize service role, and personalize:* actions. Works with Lambda runtimes (boto3 personalize-runtime client for GetRecommendations and PutEvents), Terraform aws_personalize_* resources, and CloudFormation AWS::Personalize::* templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AI/ML
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - personalize
-    - recommendations
-    - ml
-    - deploy
-    - provisioning
-    - dataset-group
-    - recipe
-    - campaign
-    - event-tracker
-    - batch-inference
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create personalize dataset group
-    - personalize schema
-    - personalize data import
-    - personalize solution
-    - personalize recipe
-    - personalize campaign
-    - personalize minprovisionedtps
-    - personalize event tracker
-    - personalize put events
-    - personalize batch inference
-    - personalize recommender
-    - personalize filter
-    - personalize hpo
-  when_to_use: >-
-    Invoke when the user wants to build a recommendation system using
-    Amazon Personalize. Covers dataset group creation (CUSTOM or DOMAIN),
-    dataset schema definition (Avro-like JSON for Interactions, Users,
-    Items), bulk data import from S3, incremental events via PutEvents,
-    solution creation with recipe selection (User-Personalization, SIMS,
-    Popularity-Counting), solution version training with HPO, campaign
-    creation with minProvisionedTPS, event tracker for real-time
-    recommendations, batch inference jobs, recommender creation for
-    DOMAIN dataset groups, filter creation, and campaign metrics. Do NOT
-    invoke for Amazon SageMaker custom models, Amazon Bedrock, or Amazon
-    OpenSearch recommendations.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, personalize, recommendations, ml, deploy, provisioning, dataset-group, recipe, campaign, event-tracker, batch-inference
+  dependencies: aws-orchestrator
+  keywords: aws, personalize, recommendations, recommendation system, dataset group, interactions, users, items, schema, recipe, user-personalization, sims, popularity-counting, solution, campaign, minprovisionedtps, event tracker, put events, batch inference, recommender, filter, hpo, ml, deploy, provisioning
+  when_to_use: Invoke when the user wants to build a recommendation system using Amazon Personalize. Covers dataset group creation (CUSTOM or DOMAIN), dataset schema definition (Avro-like JSON for Interactions, Users, Items), bulk data import from S3, incremental events via PutEvents, solution creation with recipe selection (User-Personalization, SIMS, Popularity-Counting), solution version training with HPO, campaign creation with minProvisionedTPS, event tracker for real-time recommendations, batch inference jobs, recommender creation for DOMAIN dataset groups, filter creation, and campaign metrics. Do NOT invoke for Amazon SageMaker custom models, Amazon Bedrock, or Amazon OpenSearch recommendations.
 ---
 
 # Personalize Campaign Deployer

@@ -1,106 +1,26 @@
 ---
 name: cloudfront-origin-access-control-deployer
-description: >-
-  Provisions Amazon CloudFront Origin Access Control (OAC) with
-  production defaults: OAC creation (create-origin-access-control),
-  S3 origin configuration (s3:GetObject via OAC), bucket policy
-  update (cloudfront.amazonaws.com principal with StringEquals
-  AWS:SourceArn condition), signing behavior (sigv4 vs always),
-  Origin Access Identity (OAI) vs OAC migration with no downtime,
-  multi-distribution to single bucket, SSE-KMS with OAC (sigv4
-  signing required, KMS key policy), origin type (S3 vs S3 bucket
-  with Website Endpoint), CloudFront distribution configuration
-  with OriginAccessControlId, and region restrictions. Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when
-  creating a CloudFront OAC, securing an S3 origin behind
-  CloudFront, migrating from OAI to OAC, configuring SSE-KMS with
-  CloudFront, or serving an S3 bucket from multiple distributions.
-  Triggers: create cloudfront oac, origin access control, cloudfront
-  s3 origin, oai to oac migration, cloudfront sse-kms, cloudfront
-  bucket policy, s3 origin oac.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon CloudFront Origin Access Control (OAC) with production defaults: OAC creation (create-origin-access-control), S3 origin configuration (s3:GetObject via OAC), bucket policy update (cloudfront.amazonaws.com principal with StringEquals AWS:SourceArn condition), signing behavior (sigv4 vs always), Origin Access Identity (OAI) vs OAC migration with no downtime, multi-distribution to single bucket, SSE-KMS with OAC (sigv4 signing required, KMS key policy), origin type (S3 vs S3 bucket with Website Endpoint), CloudFront distribution configuration with OriginAccessControlId, and region restrictions. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a CloudFront OAC, securing an S3 origin behind CloudFront, migrating from OAI to OAC, configuring SSE-KMS with CloudFront, or serving an S3 bucket from multiple. Triggers: create cloudfront oac, origin access control, cloudfront s3 origin, oai to oac migration, cloudfront sse-kms, cloudfront bucket policy, s3 origin oac.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with cloudfront and
-  s3 access. Works with Terraform aws_cloudfront_origin_access_control
-  / aws_cloudfront_distribution / aws_s3_bucket_policy resources and
-  CloudFormation AWS::CloudFront::OriginAccessControl templates.
-keywords:
-  - aws
-  - cloudfront
-  - origin access control
-  - oac
-  - s3 origin
-  - cloudops
-  - deploy
-  - provisioning
-  - oai
-  - origin access identity
-  - sse-kms
-  - bucket policy
-  - sigv4
-  - multi-distribution
-  - cdn
-tags:
-  - aws
-  - cloudfront
-  - oac
-  - cloudops
-  - deploy
-  - networking
-  - provisioning
-  - s3
-  - sse-kms
-  - cdn
-  - origin-access-control
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with cloudfront and s3 access. Works with Terraform aws_cloudfront_origin_access_control / aws_cloudfront_distribution / aws_s3_bucket_policy resources and CloudFormation AWS::CloudFront::OriginAccessControl templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - cloudfront
-    - oac
-    - cloudops
-    - deploy
-    - networking
-    - s3
-    - sse-kms
-    - cdn
-    - origin-access-control
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create cloudfront oac
-    - origin access control
-    - cloudfront s3 origin
-    - oai to oac migration
-    - cloudfront sse-kms
-    - cloudfront bucket policy
-    - s3 origin oac
-    - cloudfront multi-distribution
-  when_to_use: >-
-    Invoke when the user wants to create a CloudFront Origin Access
-    Control (OAC) for an S3 origin, secure an S3 bucket behind
-    CloudFront, migrate from OAI to OAC, configure SSE-KMS with a
-    CloudFront distribution, serve an S3 bucket from multiple
-    distributions, or understand OAC signing behavior. Do NOT invoke
-    for CloudFront custom origins (ALB, EC2, on-premises — OAC is
-    S3-only), Lambda@Edge, or CloudFront Functions.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, cloudfront, oac, cloudops, deploy, networking, provisioning, s3, sse-kms, cdn, origin-access-control
+  dependencies: aws-orchestrator
+  keywords: aws, cloudfront, origin access control, oac, s3 origin, cloudops, deploy, provisioning, oai, origin access identity, sse-kms, bucket policy, sigv4, multi-distribution, cdn
+  when_to_use: Invoke when the user wants to create a CloudFront Origin Access Control (OAC) for an S3 origin, secure an S3 bucket behind CloudFront, migrate from OAI to OAC, configure SSE-KMS with a CloudFront distribution, serve an S3 bucket from multiple distributions, or understand OAC signing behavior. Do NOT invoke for CloudFront custom origins (ALB, EC2, on-premises — OAC is S3-only), Lambda@Edge, or CloudFront Functions.
 ---
 
 # CloudFront Origin Access Control Deployer

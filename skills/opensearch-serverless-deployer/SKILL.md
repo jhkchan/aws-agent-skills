@@ -1,116 +1,28 @@
 ---
 name: opensearch-serverless-deployer
-description: >-
-  Provisions Amazon OpenSearch Serverless collections with secure defaults —
-  collection type selection (SEARCH, TIMESERIES, VECTORSEARCH), encryption
-  policy with customer-managed KMS (must exist before collection), network
-  policy (public or VPC-only), data lifecycle policy (retention), capacity
-  (OCU, min 4 for HA, auto-scaling), standby replicas, SAML / IAM Identity
-  Center authentication, data access policies (IAM principals), VPC
-  endpoints, vector search (k-NN, faiss, nmslib), semantic search with
-  Bedrock embeddings, and flow frameworks. Runs deterministic pre-checks
-  (encryption-policy-first ordering, KMS symmetric key, network policy
-  precedes collection, OCU minimum, SAML metadata URL), emits create-
-  collection CLIs behind a CONFIRM gate, verifies via list-collections.
-  Emits READY_TO_DEPLOY | PREREQUISITES_MISSING. Use when provisioning
-  OpenSearch Serverless, configuring vector search, or setting up semantic
-  search collections.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Provisions Amazon OpenSearch Serverless collections with secure defaults — collection type selection (SEARCH, TIMESERIES, VECTORSEARCH), encryption policy with customer-managed KMS (must exist before collection), network policy (public or VPC-only), data lifecycle policy (retention), capacity (OCU, min 4 for HA, auto-scaling), standby replicas, SAML / IAM Identity Center authentication, data access policies (IAM principals), VPC endpoints, vector search (k-NN, faiss, nmslib), semantic search with Bedrock embeddings, and flow frameworks. Runs deterministic pre-checks (encryption-policy-first ordering, KMS symmetric key, network policy precedes collection, OCU minimum, SAML metadata URL), emits create- collection CLIs behind a CONFIRM gate, verifies via list-collections. Emits READY_TO_DEPLOY | PREREQUISITES_MISSING. Use when provisioning OpenSearch Serverless, configuring vector search, or setting up semantic search collections.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws opensearchserverless create-security-policy (encryption,
-  network), create-collection, create-vpc-endpoint, create-access-policy,
-  update-collection, list-collections, batch-get-collection (AWS CLI v2, SSO
-  or key-based credentials).
-keywords:
-  - OpenSearch Serverless
-  - collection
-  - VECTORSEARCH
-  - SEARCH
-  - TIMESERIES
-  - OCU
-  - OpenSearch Compute Units
-  - encryption policy
-  - network policy
-  - data lifecycle policy
-  - access policy
-  - KMS
-  - VPC endpoint
-  - SAML
-  - IAM Identity Center
-  - k-NN
-  - faiss
-  - vector search
-  - semantic search
-  - flow frameworks
-  - standby replicas
-tags: [opensearch, analytics, deploy, serverless, vector-search, kms, vpc, saml, semantic-search, collection]
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws opensearchserverless create-security-policy (encryption, network), create-collection, create-vpc-endpoint, create-access-policy, update-collection, list-collections, batch-get-collection (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - opensearch
-    - analytics
-    - deploy
-    - serverless
-    - vector-search
-    - kms
-    - vpc
-    - saml
-    - collection
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - OpenSearch Serverless
-    - VECTORSEARCH
-    - OCU
-    - encryption policy
-    - network policy
-    - KMS
-    - VPC endpoint
-    - vector search
-    - semantic search
-  when_to_use: >-
-    Provisioning a new OpenSearch Serverless collection (SEARCH, TIMESERIES,
-    or VECTORSEARCH), configuring encryption with customer-managed KMS,
-    setting up VPC-only network access, enabling SAML or IAM Identity Center
-    authentication, defining data lifecycle policies, sizing OCU capacity,
-    deploying vector or semantic search, or wiring flow frameworks.
-  activation_triggers:
-    - "create OpenSearch Serverless collection"
-    - "provision vector search collection"
-    - "OpenSearch Serverless with KMS"
-    - "OpenSearch Serverless VPC endpoint"
-    - "semantic search collection"
-    - "k-NN vector index"
-    - "OpenSearch Serverless SAML auth"
-    - "OCU capacity planning"
-    - "flow frameworks OpenSearch"
-    - "opensearchserverless create-collection"
-  invocation_schema: >-
-    Input: either (a) a collection deployment intent (create, update) with
-    target collection name, type (SEARCH / TIMESERIES / VECTORSEARCH),
-    encryption, network, capacity, access, lifecycle, and optional vector
-    config; OR (b) a collection id for live-account update or validation.
-    Output: deterministic COLLECTION/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY
-    block per operation, where VERDICT is one of READY_TO_DEPLOY,
-    PREREQUISITES_MISSING.
+  author: Jacky Chan — AWS Community Builder
+  tags: opensearch, analytics, deploy, serverless, vector-search, kms, vpc, saml, semantic-search, collection
+  dependencies: aws-orchestrator
+  keywords: OpenSearch Serverless, collection, VECTORSEARCH, SEARCH, TIMESERIES, OCU, OpenSearch Compute Units, encryption policy, network policy, data lifecycle policy, access policy, KMS, VPC endpoint, SAML, IAM Identity Center, k-NN, faiss, vector search, semantic search, flow frameworks, standby replicas
+  when_to_use: Provisioning a new OpenSearch Serverless collection (SEARCH, TIMESERIES, or VECTORSEARCH), configuring encryption with customer-managed KMS, setting up VPC-only network access, enabling SAML or IAM Identity Center authentication, defining data lifecycle policies, sizing OCU capacity, deploying vector or semantic search, or wiring flow frameworks.
+  activation_triggers: create OpenSearch Serverless collection, provision vector search collection, OpenSearch Serverless with KMS, OpenSearch Serverless VPC endpoint, semantic search collection, k-NN vector index, OpenSearch Serverless SAML auth, OCU capacity planning, flow frameworks OpenSearch, opensearchserverless create-collection
+  invocation_schema: 'Input: either (a) a collection deployment intent (create, update) with target collection name, type (SEARCH / TIMESERIES / VECTORSEARCH), encryption, network, capacity, access, lifecycle, and optional vector config; OR (b) a collection id for live-account update or validation. Output: deterministic COLLECTION/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation, where VERDICT is one of READY_TO_DEPLOY, PREREQUISITES_MISSING.'
 ---
 
 # OpenSearch Serverless Deployer

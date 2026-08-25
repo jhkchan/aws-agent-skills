@@ -1,64 +1,15 @@
 ---
 name: transit-gateway-routing-troubleshooter
-description: >-
-  Diagnoses AWS Transit Gateway routing failures through a fourteen-layer
-  diagnostic tree: TGW route table association vs propagation (separate
-  controls), static route priority (static beats propagated), overlapping
-  CIDR blocks across attachments, peering attachment non-transitivity
-  (VPC-A→TGW-A←peering→TGW-B→VPC-C requires direct peering, no
-  transitive hop), VPN/Direct Connect gateway routing, multicast domain
-  membership, TGW flow logs gaps, VPC route table default route 0.0/0
-  pointing at TGW, TGW attachment placed in the wrong subnet/AZ,
-  cross-VPC security group references (not supported through TGW), DNS
-  resolution across TGW attachments, appliance mode forcing traffic
-  through an inspection VPC, and blackhole route detection. Walks
-  symptoms to a verified root cause with evidence-backed read-only
-  probes; emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses AWS Transit Gateway routing failures through a fourteen-layer diagnostic tree: TGW route table association vs propagation (separate controls), static route priority (static beats propagated), overlapping CIDR blocks across attachments, peering attachment non-transitivity (VPC-A→TGW-A←peering→TGW-B→VPC-C requires direct peering, no transitive hop), VPN/Direct Connect gateway routing, multicast domain membership, TGW flow logs gaps, VPC route table default route 0.0/0 pointing at TGW, TGW attachment placed in the wrong subnet/AZ, cross-VPC security group references (not supported through TGW), DNS resolution across TGW attachments, appliance mode forcing traffic through an inspection VPC, and blackhole route detection. Walks symptoms to a verified root cause with evidence-backed read-only probes; emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted topology and error messages. Live-account diagnosis uses aws ec2 describe-transit-gateways, describe-transit-gateway-attachments, describe-transit-gateway-route-tables, get-transit-gateway-route-table-associations, get-transit-gateway-route-table-propagations, search-transit-gateway-routes, describe-route-tables, describe-vpn-connections, describe-direct-connect-gateways, logs filter-log-events (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- Transit Gateway
-- TGW
-- route table
-- association
-- propagation
-- static route
-- propagated route
-- overlapping CIDR
-- peering attachment
-- non-transitive
-- VPN
-- Direct Connect
-- multicast domain
-- flow logs
-- default route
-- appliance mode
-- inspection VPC
-- blackhole
-- security group
-- cross-VPC
-- DNS resolution
-- troubleshooting
-tags:
-- transit-gateway
-- networking
-- troubleshooting
-- routing
-- tgw
-- peering
-- vpn
-- direct-connect
-- appliance-mode
-- multicast
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted topology and error messages. Live-account diagnosis uses aws ec2 describe-transit-gateways, describe-transit-gateway-attachments, describe-transit-gateway-route-tables, get-transit-gateway-route-table-associations, get-transit-gateway-route-table-propagations, search-transit-gateway-routes, describe-route-tables, describe-vpn-connections...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: troubleshoot
   skill_class: capability
@@ -66,25 +17,31 @@ metadata:
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
   when_to_use: Diagnosing a Transit Gateway routing failure (traffic from one attached VPC never reaches another attached VPC, traffic takes the wrong path, traffic is asymmetrically dropped, peering between two TGWs does not forward, VPN/DX routing through TGW is broken, multicast traffic does not reach all members, appliance-mode inspection VPC drops cross-AZ return traffic, or a default route 0.0/0 pointing at the TGW produces a blackhole). Use when the symptom is "VPC-A cannot reach VPC-B through the transit gateway" and the cause may be route table association/propagation, static-route priority, overlapping CIDR, non-transitive peering, wrong-subnet attachment, missing appliance mode, or a missing TGW route table entry.
   when_not_to_use: Provisioning a new TGW or attachment (use transit-gateway-deployer), VPC peering (non-TGW) connectivity (use vpc-peering-deployer), VPC endpoint / PrivateLink connectivity inside a single VPC (use vpc-connectivity-troubleshooter), or TGW cost / capacity posture audits (use networkmanager-core-network-auditor). This skill diagnoses routing failures at runtime; it does not provision or audit steady-state posture.
-  activation_triggers:
-  - VPC cannot reach VPC through transit gateway
-  - TGW traffic blackhole
-  - TGW route table missing entry
-  - TGW static route overrides propagated
-  - transit gateway peering non-transitive
-  - TGW appliance mode cross-AZ return
-  - TGW overlapping CIDR
-  - TGW default route 0.0.0.0/0
-  - TGW attachment wrong subnet
-  - TGW VPN routing
-  - TGW Direct Connect routing
-  - TGW multicast not received
-  - TGW DNS resolution across attachments
-  - TGW flow logs missing
-  - security group cross-VPC TGW
-  - troubleshoot transit gateway routing
+  activation_triggers: VPC cannot reach VPC through transit gateway, TGW traffic blackhole, TGW route table missing entry, TGW static route overrides propagated, transit gateway peering non-transitive, TGW appliance mode cross-AZ return, TGW overlapping CIDR, TGW default route 0.0.0.0/0, TGW attachment wrong subnet, TGW VPN routing, TGW Direct Connect routing, TGW multicast not received, TGW DNS resolution across attachments, TGW flow logs missing, security group cross-VPC TGW, troubleshoot transit gateway routing
   invocation_schema: 'Input: either (a) a symptom description ("VPC-A cannot reach VPC-B through TGW", "traffic exits VPC-A but never arrives at VPC-B", "TGW peering between two regions does not forward"), optionally paired with the TGW topology (attachment IDs, VPC CIDRs, route table IDs), OR (b) a TGW ID plus the source/destination VPC IDs and observed packet-flow symptom for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {TGW_ROUTE_TABLE_ASSOCIATION, TGW_ROUTE_TABLE_PROPAGATION, TGW_STATIC_ROUTE_PRIORITY, TGW_OVERLAPPING_CIDR, TGW_PEERING_NON_TRANSITIVE, TGW_VPN_DX_ROUTING, TGW_MULTICAST_DOMAIN, TGW_FLOW_LOGS, VPC_DEFAULT_ROUTE_TGW, TGW_ATTACHMENT_WRONG_SUBNET, TGW_SG_CROSS_VPC, TGW_DNS_RESOLUTION, TGW_APPLIANCE_MODE, TGW_BLACKHOLE_ROUTE, UNKNOWN}.'
-  invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"EC2 instance i-aaa in VPC vpc-a (10.10.0.0/16, us-east-1)\ncannot reach EC2 instance i-bbb in VPC vpc-b (10.20.0.0/16, us-east-1)\nthrough transit gateway tgw-aaa. The ping times out. Both VPCs are\nattached to the TGW; the VPC-A route table has 10.20.0.0/16 → tgw-aaa.\"\nTGW: tgw-aaa\nAttachment A: tgw-attach-aaa (VPC vpc-a, subnet subnet-a-aaa, AZ us-east-1a)\nAttachment B: tgw-attach-bbb (VPC vpc-b, subnet subnet-b-aaa, AZ us-east-1a)\nVPC-A route table: 10.20.0.0/16 → tgw-aaa\nVPC-B route table: (default route 0.0.0.0/0 → igw-bbb; no entry for 10.10.0.0/16)"
+  invocation_example: '# Minimal valid input (offline symptom classification):
+
+    Symptom: "EC2 instance i-aaa in VPC vpc-a (10.10.0.0/16, us-east-1)
+
+    cannot reach EC2 instance i-bbb in VPC vpc-b (10.20.0.0/16, us-east-1)
+
+    through transit gateway tgw-aaa. The ping times out. Both VPCs are
+
+    attached to the TGW; the VPC-A route table has 10.20.0.0/16 → tgw-aaa."
+
+    TGW: tgw-aaa
+
+    Attachment A: tgw-attach-aaa (VPC vpc-a, subnet subnet-a-aaa, AZ us-east-1a)
+
+    Attachment B: tgw-attach-bbb (VPC vpc-b, subnet subnet-b-aaa, AZ us-east-1a)
+
+    VPC-A route table: 10.20.0.0/16 → tgw-aaa
+
+    VPC-B route table: (default route 0.0.0.0/0 → igw-bbb; no entry for 10.10.0.0/16)'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Transit Gateway, TGW, route table, association, propagation, static route, propagated route, overlapping CIDR, peering attachment, non-transitive, VPN, Direct Connect, multicast domain, flow logs, default route, appliance mode, inspection VPC, blackhole, security group, cross-VPC, DNS resolution, troubleshooting
+  tags: transit-gateway, networking, troubleshooting, routing, tgw, peering, vpn, direct-connect, appliance-mode, multicast
 ---
 
 # Transit Gateway Routing Troubleshooter

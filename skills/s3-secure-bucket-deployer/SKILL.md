@@ -1,95 +1,25 @@
 ---
 name: s3-secure-bucket-deployer
-description: 'Provisions S3 buckets with production-grade security defaults: Block Public Access (account + bucket, all 4 settings), default encryption (SSE-S3 or SSE-KMS with customer key), versioning
-  with optional MFA delete, Object Ownership = BucketOwnerEnforced (ACLs disabled), access logging + CloudTrail data events, HTTPS-only bucket policy, SSE-KMS upload enforcement, lifecycle rules for cost
-  optimization, and cross-region / same-region replication. Emits a READY_TO_DEPLOY checklist with every configuration item verified against the bucket''s actual state, plus copy-pasteable provisioning
-  and verification commands. Use when creating a new S3 bucket, hardening an existing bucket before production, validating that a bucket meets security baseline, or generating a Terraform / CloudFormation
-  skeleton with correct defaults. Triggers: create S3 bucket, provision S3, secure bucket, S3 deployment, bucket encryption, SSE-KMS, BPA, lifecycle, replication, production bucket setup.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions S3 buckets with production-grade security defaults: Block Public Access (account + bucket, all 4 settings), default encryption (SSE-S3 or SSE-KMS with customer key), versioning with optional MFA delete, Object Ownership = BucketOwnerEnforced (ACLs disabled), access logging + CloudTrail data events, HTTPS-only bucket policy, SSE-KMS upload enforcement, lifecycle rules for cost optimization, and cross-region / same-region replication. Emits a READY_TO_DEPLOY checklist with every configuration item verified against the bucket''s actual state, plus copy-pasteable provisioning and verification commands. Use when creating a new S3 bucket, hardening an existing bucket before production, validating that a bucket meets security baseline, or generating a Terraform / CloudFormation skeleton with correct defaults. Triggers: create S3 bucket, provision S3, secure bucket, S3 deployment, bucket encryption, SSE-KMS, BPA, lifecycle, replication, production bucket setup.'
 license: Apache-2.0
-compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with s3api, s3control, kms, cloudtrail, and iam access. Works with Terraform
-  aws_s3_bucket resources and CloudFormation AWS::S3::Bucket templates.'
-keywords:
-- aws
-- s3
-- cloudops
-- deploy
-- provisioning
-- security
-- block-public-access
-- bpa
-- encryption
-- sse-kms
-- sse-s3
-- bucket-owner-enforced
-- versioning
-- mfa-delete
-- lifecycle
-- replication
-- crr
-- bucket-policy
-- secure-transport
-- access-logging
-tags:
-- aws
-- s3
-- cloudops
-- deploy
-- security
-- bpa
-- encryption
-- sse-kms
-- versioning
-- lifecycle
-- replication
-- bucket-policy
-dependencies:
-- aws-orchestrator
+compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with s3api, s3control, kms, cloudtrail, and iam access. Works with Terraform aws_s3_bucket resources and CloudFormation AWS::S3::Bucket templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: deploy
   skill_class: capability
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-  - aws
-  - s3
-  - cloudops
-  - deploy
-  - security
-  - bpa
-  - encryption
-  - sse-kms
-  - versioning
-  - lifecycle
-  - replication
-  - bucket-policy
-  dependencies:
-  - aws-orchestrator
-  keywords:
-  - create s3 bucket
-  - provision s3
-  - secure bucket
-  - block public access
-  - sse-kms
-  - bucket owner enforced
-  - s3 versioning
-  - mfa delete
-  - s3 lifecycle
-  - s3 replication
-  - https-only policy
-  - s3 access logging
-  when_to_use: Invoke when the user wants to create a new S3 bucket with security defaults, harden an existing bucket to production baseline, validate a bucket configuration before go-live, generate provisioning
-    CLI commands or IaC templates for a secure bucket, or verify that a bucket's current configuration matches the security baseline. Do NOT invoke for auditing public-access exposure (use s3-public-access-auditor),
-    or for non-S3 storage (EBS, EFS, FSx).
+  tags: aws, s3, cloudops, deploy, security, bpa, encryption, sse-kms, versioning, lifecycle, replication, bucket-policy
+  dependencies: aws-orchestrator
+  keywords: aws, s3, cloudops, deploy, provisioning, security, block-public-access, bpa, encryption, sse-kms, sse-s3, bucket-owner-enforced, versioning, mfa-delete, lifecycle, replication, crr, bucket-policy, secure-transport, access-logging
+  when_to_use: Invoke when the user wants to create a new S3 bucket with security defaults, harden an existing bucket to production baseline, validate a bucket configuration before go-live, generate provisioning CLI commands or IaC templates for a secure bucket, or verify that a bucket's current configuration matches the security baseline. Do NOT invoke for auditing public-access exposure (use s3-public-access-auditor), or for non-S3 storage (EBS, EFS, FSx).
 ---
 
 # S3 Secure Bucket Deployer

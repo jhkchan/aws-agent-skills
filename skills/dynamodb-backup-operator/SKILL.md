@@ -1,106 +1,28 @@
 ---
 name: dynamodb-backup-operator
-description: >-
-  Operates DynamoDB backup and restore workflows safely — on-demand
-  backups via create-backup, point-in-time recovery (PITR) enable/verify
-  via update-continuous-backups, AWS Backup cross-region/cross-account
-  vault plans, restore-table-from-backup, restore-table-to-point-in-time
-  (with selective attribute projection), and cross-region restore via
-  export-to-S3/import-from-S3. Runs deterministic pre-checks (PITR
-  enabled, backup AVAILABLE, target table name free, IAM permissions
-  present, billing-mode/capacity drift), executes the operation behind
-  a CONFIRM gate, and emits a verdict (READY | BLOCKED | COMPLETED) per
-  operation with the exact CLI sequence, expected side-effects (new
-  table name — must update application connection strings, no
-  auto-scaling/streams/TTL/alarms/IAM copied), and verification
-  commands. Use when creating on-demand backups, enabling PITR,
-  restoring a DynamoDB table to a point in time, restoring from a
-  backup, copying a table cross-region, or recovering from accidental
-  data loss.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates DynamoDB backup and restore workflows safely — on-demand backups via create-backup, point-in-time recovery (PITR) enable/verify via update-continuous-backups, AWS Backup cross-region/cross-account vault plans, restore-table-from-backup, restore-table-to-point-in-time (with selective attribute projection), and cross-region restore via export-to-S3/import-from-S3. Runs deterministic pre-checks (PITR enabled, backup AVAILABLE, target table name free, IAM permissions present, billing-mode/capacity drift), executes the operation behind a CONFIRM gate, and emits a verdict (READY | BLOCKED | COMPLETED) per operation with the exact CLI sequence, expected side-effects (new table name — must update application connection strings, no auto-scaling/streams/TTL/alarms/IAM copied), and verification commands. Use when creating on-demand backups, enabling PITR, restoring a DynamoDB table to a point in time, restoring from a backup, copying a table cross-region, or recovering from accidental data loss.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline plan classification.
-  Live-account operations use aws dynamodb describe-table,
-  describe-continuous-backups, describe-backup, list-backups,
-  create-backup, update-continuous-backups, restore-table-from-backup,
-  restore-table-to-point-in-time, export-table-to-point-in-time,
-  import-table, and aws backup start-restore-job (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - DynamoDB
-  - on-demand backup
-  - create-backup
-  - point-in-time recovery
-  - PITR
-  - continuous backups
-  - update-continuous-backups
-  - restore-table-from-backup
-  - restore-table-to-point-in-time
-  - AWS Backup
-  - cross-region backup
-  - cross-account backup
-  - backup vault
-  - export-to-S3
-  - import-table
-  - table recovery
-  - disaster recovery
-  - selective restore
-  - partial restore
-tags: [dynamodb, databases, backup, restore, pitr, recovery, aws-backup, disaster-recovery]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws dynamodb describe-table, describe-continuous-backups, describe-backup, list-backups, create-backup, update-continuous-backups, restore-table-from-backup, restore-table-to-point-in-time, export-table-to-point-in-time, import-table, and aws backup start-restore-job (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
+  verdict_shape: READY | BLOCKED | COMPLETED
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags: [dynamodb, databases, backup, restore, pitr, recovery, aws-backup]
-  dependencies: [aws-orchestrator]
-  keywords:
-    - DynamoDB
-    - on-demand backup
-    - PITR
-    - restore
-    - AWS Backup
-    - cross-region
-    - disaster recovery
-  when_to_use: >-
-    Creating an on-demand DynamoDB backup, enabling or verifying PITR,
-    restoring a DynamoDB table to a point in time, restoring from a
-    backup, copying a table cross-region or cross-account, exporting a
-    table to S3 for import elsewhere, recovering from accidental writes
-    or deletes, or planning a backup/restore drill.
-  activation_triggers:
-    - "create DynamoDB backup"
-    - "enable DynamoDB PITR"
-    - "restore DynamoDB table"
-    - "restore DynamoDB to point in time"
-    - "PITR restore DynamoDB"
-    - "restore DynamoDB from backup"
-    - "copy DynamoDB table cross-region"
-    - "export DynamoDB to S3"
-    - "import DynamoDB from S3"
-    - "DynamoDB pre-migration backup"
-    - "recover DynamoDB data"
-    - "DynamoDB AWS Backup plan"
-    - "verify DynamoDB restore"
-  invocation_schema: >-
-    Input: either (a) a DynamoDB table configuration with the intended
-    operation (create-backup, enable-pitr, pitr-restore, snapshot-
-    restore, export, import, aws-backup-restore), OR (b) a table-name
-    / backup-ARN + operation for live-account execution. Output:
-    deterministic OPERATION/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block
-    per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.
+  author: Jacky Chan — AWS Community Builder
+  tags: dynamodb, databases, backup, restore, pitr, recovery, aws-backup, disaster-recovery
+  dependencies: aws-orchestrator
+  keywords: DynamoDB, on-demand backup, create-backup, point-in-time recovery, PITR, continuous backups, update-continuous-backups, restore-table-from-backup, restore-table-to-point-in-time, AWS Backup, cross-region backup, cross-account backup, backup vault, export-to-S3, import-table, table recovery, disaster recovery, selective restore, partial restore
+  when_to_use: Creating an on-demand DynamoDB backup, enabling or verifying PITR, restoring a DynamoDB table to a point in time, restoring from a backup, copying a table cross-region or cross-account, exporting a table to S3 for import elsewhere, recovering from accidental writes or deletes, or planning a backup/restore drill.
+  activation_triggers: create DynamoDB backup, enable DynamoDB PITR, restore DynamoDB table, restore DynamoDB to point in time, PITR restore DynamoDB, restore DynamoDB from backup, copy DynamoDB table cross-region, export DynamoDB to S3, import DynamoDB from S3, DynamoDB pre-migration backup, recover DynamoDB data, DynamoDB AWS Backup plan, verify DynamoDB restore
+  invocation_schema: 'Input: either (a) a DynamoDB table configuration with the intended operation (create-backup, enable-pitr, pitr-restore, snapshot- restore, export, import, aws-backup-restore), OR (b) a table-name / backup-ARN + operation for live-account execution. Output: deterministic OPERATION/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
 ---
 
 # DynamoDB Backup Restore Operator

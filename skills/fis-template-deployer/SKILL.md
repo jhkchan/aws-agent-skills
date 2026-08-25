@@ -1,117 +1,26 @@
 ---
 name: fis-template-deployer
-description: >-
-  Provisions AWS Fault Injection Simulator (FIS) experiment templates with
-  production defaults: experiment template creation (JSON), action
-  specification (aws:ec2:stop-instances, aws:ec2:terminate-instances,
-  aws:ecs:drain-container-instances, aws:lambda:invoke,
-  aws:network:disrupt-connectivity, aws:rds:failover-db-cluster,
-  aws:s3:pause-bucket-access, aws:cloudwatch:put-metric-data), target
-  selection via resource tags and filters, stop conditions (CloudWatch
-  alarm auto-abort), IAM role configuration (trust policy +
-  permissions scoped to fault actions on target resources), log group
-  configuration, experiment start and rollback, and report generation.
-  Emits a READY_TO_DEPLOY checklist with verification commands. Use when
-  creating a FIS experiment template, running a chaos experiment,
-  configuring fault injection on EC2/ECS/RDS/Lambda/S3, setting stop
-  conditions for auto-abort, or scoping targets via resource tags.
-  Triggers: create fis experiment template, fault injection simulator,
-  chaos experiment aws, aws:ec2:stop-instances, aws:network:disrupt-
-  connectivity, aws:rds:failover-db-cluster, aws:ecs:drain-container-
-  instances, fis stop condition, fis iam role, fis target tags.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Fault Injection Simulator (FIS) experiment templates with production defaults: experiment template creation (JSON), action specification (aws:ec2:stop-instances, aws:ec2:terminate-instances, aws:ecs:drain-container-instances, aws:lambda:invoke, aws:network:disrupt-connectivity, aws:rds:failover-db-cluster, aws:s3:pause-bucket-access, aws:cloudwatch:put-metric-data), target selection via resource tags and filters, stop conditions (CloudWatch alarm auto-abort), IAM role configuration (trust policy + permissions scoped to fault actions on target resources), log group configuration, experiment start and rollback, and report generation. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a FIS experiment. Triggers: create fis experiment template, fault injection simulator, chaos experiment aws, aws:ec2:stop-instances, aws:network:disrupt- connectivity, aws:rds:failover-db-cluster, aws:ecs:drain-container- instances, fis stop condition, fis iam role, fis target tags.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with fis, ec2, ecs,
-  rds, lambda, iam, and cloudwatch access. Works with Terraform
-  aws_fis_experiment_template resources and CloudFormation
-  AWS::FIS::ExperimentTemplate templates.
-keywords:
-  - aws
-  - fis
-  - fault injection simulator
-  - chaos engineering
-  - experiment template
-  - cloudops
-  - deploy
-  - stop conditions
-  - cloudwatch alarm
-  - iam role
-  - resource tags
-  - target
-  - auto-abort
-  - ec2 stop instances
-  - network disrupt connectivity
-  - rds failover
-  - ecs drain
-  - lambda invoke
-  - s3 pause bucket
-tags:
-  - aws
-  - fis
-  - fault-injection-simulator
-  - cloudops
-  - deploy
-  - chaos-engineering
-  - experiment-template
-  - stop-conditions
-  - cloudwatch-alarm
-  - iam-role
-  - resource-tags
-  - auto-abort
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with fis, ec2, ecs, rds, lambda, iam, and cloudwatch access. Works with Terraform aws_fis_experiment_template resources and CloudFormation AWS::FIS::ExperimentTemplate templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - fis
-    - fault-injection-simulator
-    - cloudops
-    - deploy
-    - chaos-engineering
-    - experiment-template
-    - stop-conditions
-    - cloudwatch-alarm
-    - iam-role
-    - resource-tags
-    - auto-abort
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create fis experiment template
-    - fault injection simulator
-    - chaos experiment aws
-    - aws:ec2:stop-instances
-    - aws:network:disrupt-connectivity
-    - aws:rds:failover-db-cluster
-    - aws:ecs:drain-container-instances
-    - fis stop condition
-    - fis iam role
-    - fis target tags
-  when_to_use: >-
-    Invoke when the user wants to create an AWS Fault Injection Simulator
-    experiment template, configure a chaos/fault injection experiment on
-    EC2/ECS/RDS/Lambda/S3/network resources, scope experiment targets via
-    resource tags and filters, set stop conditions (CloudWatch alarms)
-    for auto-abort, configure the FIS IAM role with appropriate trust
-    and permissions, or start/rollback an experiment. Do NOT invoke for
-    AWS Resilience Hub (readiness assessment), Chaos Mesh (EKS-native),
-    or Gremlin (third-party chaos tool).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, fis, fault-injection-simulator, cloudops, deploy, chaos-engineering, experiment-template, stop-conditions, cloudwatch-alarm, iam-role, resource-tags, auto-abort
+  dependencies: aws-orchestrator
+  keywords: aws, fis, fault injection simulator, chaos engineering, experiment template, cloudops, deploy, stop conditions, cloudwatch alarm, iam role, resource tags, target, auto-abort, ec2 stop instances, network disrupt connectivity, rds failover, ecs drain, lambda invoke, s3 pause bucket
+  when_to_use: Invoke when the user wants to create an AWS Fault Injection Simulator experiment template, configure a chaos/fault injection experiment on EC2/ECS/RDS/Lambda/S3/network resources, scope experiment targets via resource tags and filters, set stop conditions (CloudWatch alarms) for auto-abort, configure the FIS IAM role with appropriate trust and permissions, or start/rollback an experiment. Do NOT invoke for AWS Resilience Hub (readiness assessment), Chaos Mesh (EKS-native), or Gremlin (third-party chaos tool).
 ---
 
 # FIS Template Deployer

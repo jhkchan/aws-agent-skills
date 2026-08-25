@@ -1,74 +1,26 @@
 ---
 name: iam-key-rotation-automator
-description: >-
-  Designs and implements IAM access key rotation automation pipelines.
-  Detects aged access keys via get-access-key-last-used and credential
-  reports, wires EventBridge scheduled rules for 90-day rotation,
-  deploys Lambda rotation flows (create, verify, deactivate, delete),
-  manages graceful overlap windows, sends Slack/SNS pre-rotation
-  notifications, handles break-glass exception lists, syncs keys
-  cross-account, integrates programmatic access advisor, automates
-  credential reports, and migrates permanent keys to STS temporary
-  credentials. Emits AUTOMATION_DEPLOYED with IaC template or
-  REVIEW_REQUIRED with the specific gap.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Designs and implements IAM access key rotation automation pipelines. Detects aged access keys via get-access-key-last-used and credential reports, wires EventBridge scheduled rules for 90-day rotation, deploys Lambda rotation flows (create, verify, deactivate, delete), manages graceful overlap windows, sends Slack/SNS pre-rotation notifications, handles break-glass exception lists, syncs keys cross-account, integrates programmatic access advisor, automates credential reports, and migrates permanent keys to STS temporary credentials. Emits AUTOMATION_DEPLOYED with IaC template or REVIEW_REQUIRED with the specific gap.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline workflow design.
-  Live deployment uses aws iam list-access-keys, create-access-key,
-  update-access-key, delete-access-key, get-access-key-last-used,
-  generate-credential-report, aws events put-rule/put-targets, aws
-  lambda create-function, aws sns publish, aws sts get-caller-identity.
-keywords:
-  - IAM access key
-  - key rotation
-  - credential report
-  - get-access-key-last-used
-  - EventBridge scheduled rule
-  - Lambda rotation
-  - access advisor
-  - break-glass exception
-  - overlap window
-  - STS temporary credentials
-  - assume role
-  - cross-account key sync
-tags: [aws-iam, key-rotation, security, access-keys, eventbridge, lambda, automate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline workflow design. Live deployment uses aws iam list-access-keys, create-access-key, update-access-key, delete-access-key, get-access-key-last-used, generate-credential-report, aws events put-rule/put-targets, aws lambda create-function, aws sns publish, aws sts get-caller-identity.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
   family: Security
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATION_DEPLOYED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Building IAM access key rotation automation, wiring EventBridge
-    schedules for key rotation, deploying Lambda rotation flows with
-    overlap windows, managing break-glass exceptions, integrating
-    access advisor, automating credential reports, or migrating
-    permanent keys to STS temporary credentials.
-  activation_triggers:
-    - "automate IAM key rotation"
-    - "access key age detection"
-    - "credential report automation"
-    - "90-day key rotation"
-    - "Lambda rotation flow"
-    - "overlap window rotation"
-    - "break-glass exception list"
-    - "access advisor integration"
-    - "STS temporary credentials migration"
-    - "cross-account key sync"
-  invocation_schema: >-
-    Input: either (a) a list of IAM users with access key metadata
-    (key ID, creation date, last-used date, status), OR (b) a key
-    rotation automation requirement. Output: deterministic ROTATION
-    block per key — DETECTION/ROTATION_FLOW/OVERLAP/NOTIFICATION/
-    EXCEPTIONS/AUDIT/VERDICT.
+  verdict_shape: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
+  when_to_use: Building IAM access key rotation automation, wiring EventBridge schedules for key rotation, deploying Lambda rotation flows with overlap windows, managing break-glass exceptions, integrating access advisor, automating credential reports, or migrating permanent keys to STS temporary credentials.
+  activation_triggers: automate IAM key rotation, access key age detection, credential report automation, 90-day key rotation, Lambda rotation flow, overlap window rotation, break-glass exception list, access advisor integration, STS temporary credentials migration, cross-account key sync
+  invocation_schema: 'Input: either (a) a list of IAM users with access key metadata (key ID, creation date, last-used date, status), OR (b) a key rotation automation requirement. Output: deterministic ROTATION block per key — DETECTION/ROTATION_FLOW/OVERLAP/NOTIFICATION/ EXCEPTIONS/AUDIT/VERDICT.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: IAM access key, key rotation, credential report, get-access-key-last-used, EventBridge scheduled rule, Lambda rotation, access advisor, break-glass exception, overlap window, STS temporary credentials, assume role, cross-account key sync
+  tags: aws-iam, key-rotation, security, access-keys, eventbridge, lambda, automate
 ---
 
 # IAM Key Rotation Automator

@@ -32,51 +32,95 @@ function parseFrontmatter(text) {
   if (parts.length < 3) return {};
   const yamlBlock = parts[1];
   const fm = {};
+  // One level of nesting (agentskills.io metadata map): `metadata:` with
+  // indented `  key: value` children. Lists and block scalars supported at
+  // both levels.
   let currentKey = null;
-  let inList = false;
+  let currentMap = fm; // fm itself, or fm.metadata while inside the nested map
+  let inMetadata = false;
+
+  const setKey = (map, key, value) => {
+    map[key] = value;
+  };
 
   for (const line of yamlBlock.split("\n")) {
     const trimmed = line.trimEnd();
     if (!trimmed.trim()) continue;
 
-    // List item under a key (  - value)
+    // List item under a key (any indent)
     const listMatch = trimmed.match(/^\s+-\s+(.+)$/);
     if (listMatch && currentKey) {
-      if (!Array.isArray(fm[currentKey])) fm[currentKey] = [];
-      fm[currentKey].push(listMatch[1].replace(/^["']|["']$/g, ""));
-      inList = true;
+      if (!Array.isArray(currentMap[currentKey])) currentMap[currentKey] = [];
+      currentMap[currentKey].push(listMatch[1].replace(/^["']|["']$/g, ""));
       continue;
     }
 
-    // Key: value
+    // Indented key: value — nested map member (metadata)
+    const nestedMatch = trimmed.match(/^[ ]{2,}([\w][\w_-]*)\s*:\s*(.*)$/);
+    if (nestedMatch && inMetadata && currentMap !== fm) {
+      const [, key, value] = nestedMatch;
+      currentKey = key;
+      if (value.trim()) {
+        let v = value.trim();
+        if (v === ">-" || v === ">" || v === "|-" || v === "|") {
+          setKey(currentMap, key, "__BLOCK__");
+        } else if (v.startsWith("[") && v.endsWith("]")) {
+          setKey(
+            currentMap,
+            key,
+            v
+              .slice(1, -1)
+              .split(",")
+              .map((s) => s.trim().replace(/^["']|["']$/g, ""))
+              .filter((s) => s.length > 0)
+          );
+        } else {
+          setKey(currentMap, key, v.replace(/^["']|["']$/g, ""));
+        }
+      } else {
+        setKey(currentMap, key, null);
+      }
+      continue;
+    }
+
+    // Top-level key: value
     const kvMatch = trimmed.match(/^(\w[\w_]*)\s*:\s*(.*)$/);
     if (kvMatch) {
       const [, key, value] = kvMatch;
       currentKey = key;
-      inList = false;
+      inMetadata = false;
+      currentMap = fm;
       if (value.trim()) {
-        // Inline value — strip quotes, handle YAML block scalars
         let v = value.trim();
         if (v === ">-" || v === ">" || v === "|-" || v === "|") {
-          // Block scalar — collect subsequent indented lines
-          fm[key] = "__BLOCK__";
+          setKey(fm, key, "__BLOCK__");
         } else if (v.startsWith("[") && v.endsWith("]")) {
-          // Inline YAML array: [a, b, c] -> ["a", "b", "c"]
-          fm[key] = v
-            .slice(1, -1)
-            .split(",")
-            .map((s) => s.trim().replace(/^["']|["']$/g, ""))
-            .filter((s) => s.length > 0);
+          setKey(
+            fm,
+            key,
+            v
+              .slice(1, -1)
+              .split(",")
+              .map((s) => s.trim().replace(/^["']|["']$/g, ""))
+              .filter((s) => s.length > 0)
+          );
         } else {
-          v = v.replace(/^["']|["']$/g, "");
-          fm[key] = v;
+          setKey(fm, key, v.replace(/^["']|["']$/g, ""));
         }
       } else {
-        fm[key] = null;
+        if (key === "metadata") {
+          // Enter nested map
+          setKey(fm, "metadata", {});
+          inMetadata = true;
+          currentMap = fm.metadata;
+        } else {
+          setKey(fm, key, null);
+        }
       }
-    } else if (currentKey && fm[currentKey] === "__BLOCK__" && trimmed.startsWith(" ")) {
+    } else if (currentKey && currentMap[currentKey] === "__BLOCK__" && trimmed.startsWith(" ")) {
       // Continuation of block scalar
-      fm[currentKey] = (fm[currentKey] === "__BLOCK__" ? "" : fm[currentKey] + " ") + trimmed.trim();
+      currentMap[currentKey] =
+        (currentMap[currentKey] === "__BLOCK__" ? "" : currentMap[currentKey] + " ") + trimmed.trim();
     }
   }
   return fm;
@@ -116,13 +160,18 @@ function discoverSkills() {
     const meta = frontmatter.metadata || {};
     const taskType = meta.task_type || inferTaskTypeFromName(entry.name);
 
+    // Spec (agentskills.io) frontmatter: version/keywords/tags/dependencies live
+    // in metadata as comma-joined strings. Legacy top-level arrays also accepted.
+    const splitCsv = (v) =>
+      typeof v === "string" ? v.split(",").map((s) => s.trim()).filter(Boolean) : Array.isArray(v) ? v : [];
+
     skills.push({
       name: frontmatter.name || entry.name,
       description: frontmatter.description || "",
-      version: frontmatter.version || "unknown",
-      keywords: [...(frontmatter.keywords || []), ...keywords],
-      tags: frontmatter.tags || [],
-      dependencies: frontmatter.dependencies || [],
+      version: meta.version || frontmatter.version || "unknown",
+      keywords: [...splitCsv(meta.keywords ?? frontmatter.keywords), ...keywords],
+      tags: splitCsv(meta.tags ?? frontmatter.tags),
+      dependencies: splitCsv(meta.dependencies ?? frontmatter.dependencies),
       metadata: meta,
       taskType,
       skillClass: meta.skill_class || (taskType === "audit" ? "capability" : "capability"),

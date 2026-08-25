@@ -1,101 +1,28 @@
 ---
 name: s3-object-lambda-deployer
-description: >-
-  Provisions S3 Object Lambda Access Points and the supporting transform
-  Lambda function with production defaults: standard Access Point
-  creation, Lambda function for GetObject response transformation (redact
-  PII, enrich data, convert formats), Object Lambda AP creation, routing
-  (Object Lambda AP → standard AP → S3), supported operations (GetObject,
-  HeadObject, ListObjects, ListObjectVersions), multi-region Object
-  Lambda, GetObjectACL, and range downloads. Emits READY_TO_DEPLOY /
-  PREREQUISITES_MISSING with every item verified and copy-pasteable
-  s3control / lambda / s3api commands. Use when transforming S3 objects
-  on retrieval without maintaining a second copy. Triggers: S3 Object
-  Lambda, transform GetObject, redact PII on retrieval, enrich S3 data,
-  convert CSV to Parquet on read, Object Lambda access point, multi-
-  region Object Lambda.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions S3 Object Lambda Access Points and the supporting transform Lambda function with production defaults: standard Access Point creation, Lambda function for GetObject response transformation (redact PII, enrich data, convert formats), Object Lambda AP creation, routing (Object Lambda AP → standard AP → S3), supported operations (GetObject, HeadObject, ListObjects, ListObjectVersions), multi-region Object Lambda, GetObjectACL, and range downloads. Emits READY_TO_DEPLOY / PREREQUISITES_MISSING with every item verified and copy-pasteable s3control / lambda / s3api commands. Use when transforming S3 objects on retrieval without maintaining a second copy. Triggers: S3 Object Lambda, transform GetObject, redact PII on retrieval, enrich S3 data, convert CSV to Parquet on read, Object Lambda access point, multi- region Object Lambda.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Live provisioning uses AWS CLI v2 with s3control
-  (create-access-point, create-access-point-for-object-lambda,
-  get-access-point-for-object-lambda, get-access-point-configuration-
-  for-object-lambda), lambda (create-function, put-function-
-  concurrency, put-function-event-invoke-config), iam (create-role,
-  attach-role-policy), s3api (put-bucket-policy, get-bucket-policy),
-  and cloudformation / terraform aws_s3_object_lambda equivalents.
-keywords:
-  - aws
-  - s3
-  - s3-object-lambda
-  - object-lambda
-  - access-point
-  - transform-on-read
-  - pii-redaction
-  - data-enrichment
-  - format-conversion
-  - lambda
-  - multi-region
-  - getobjectacl
-  - range-download
-  - cloudops
-  - deploy
-tags:
-  - aws
-  - s3
-  - object-lambda
-  - access-point
-  - lambda
-  - transform
-  - deploy
-  - storage
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Live provisioning uses AWS CLI v2 with s3control (create-access-point, create-access-point-for-object-lambda, get-access-point-for-object-lambda, get-access-point-configuration- for-object-lambda), lambda (create-function, put-function- concurrency, put-function-event-invoke-config), iam (create-role, attach-role-policy), s3api (put-bucket-policy, get-bucket-policy), and cloudformation / terraform...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Creating an S3 Object Lambda Access Point to transform objects on
-    retrieval (redact PII, enrich data, convert formats), authoring the
-    supporting transform Lambda function, configuring routing between
-    the Object Lambda AP and a standard Access Point, enabling
-    GetObject/HeadObject/ListObjects/ListObjectVersions operations on
-    an Object Lambda AP, deploying multi-region Object Lambda for DR or
-    latency, enabling GetObjectACL or range downloads, or generating
-    IaC (CloudFormation / Terraform) for any of the above. Do NOT
-    invoke for plain Access Points without Object Lambda (use
-    s3-access-points-deployer), or for S3 on Outposts Object Lambda
-    (not supported).
-  activation_triggers:
-    - "S3 Object Lambda"
-    - "Object Lambda access point"
-    - "transform GetObject"
-    - "redact PII on retrieval"
-    - "enrich S3 data on read"
-    - "convert CSV to Parquet on read"
-    - "Object Lambda with GetObjectACL"
-    - "Object Lambda range download"
-    - "multi-region Object Lambda"
-    - "transformation configuration"
-  invocation_schema: >-
-    Input: either (a) a bucket ARN/name + Object Lambda AP name +
-    transform Lambda spec (function ARN or build-from-template), or
-    (b) a multi-region Object Lambda spec (regions + per-region
-    transform functions). Output: deterministic OBJECT_LAMBDA_SPEC /
-    VERDICT / CHECKLIST / VERIFICATION_COMMANDS block per the STRICT
-    output contract, where VERDICT is READY_TO_DEPLOY or
-    PREREQUISITES_MISSING.
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Creating an S3 Object Lambda Access Point to transform objects on retrieval (redact PII, enrich data, convert formats), authoring the supporting transform Lambda function, configuring routing between the Object Lambda AP and a standard Access Point, enabling GetObject/HeadObject/ListObjects/ListObjectVersions operations on an Object Lambda AP, deploying multi-region Object Lambda for DR or latency, enabling GetObjectACL or range downloads, or generating IaC (CloudFormation / Terraform) for any of the above. Do NOT invoke for plain Access Points without Object Lambda (use s3-access-points-deployer), or for S3 on Outposts Object Lambda (not supported).
+  activation_triggers: S3 Object Lambda, Object Lambda access point, transform GetObject, redact PII on retrieval, enrich S3 data on read, convert CSV to Parquet on read, Object Lambda with GetObjectACL, Object Lambda range download, multi-region Object Lambda, transformation configuration
+  invocation_schema: 'Input: either (a) a bucket ARN/name + Object Lambda AP name + transform Lambda spec (function ARN or build-from-template), or (b) a multi-region Object Lambda spec (regions + per-region transform functions). Output: deterministic OBJECT_LAMBDA_SPEC / VERDICT / CHECKLIST / VERIFICATION_COMMANDS block per the STRICT output contract, where VERDICT is READY_TO_DEPLOY or PREREQUISITES_MISSING.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: aws, s3, s3-object-lambda, object-lambda, access-point, transform-on-read, pii-redaction, data-enrichment, format-conversion, lambda, multi-region, getobjectacl, range-download, cloudops, deploy
+  tags: aws, s3, object-lambda, access-point, lambda, transform, deploy, storage
+  dependencies: aws-orchestrator
 ---
 
 # S3 Object Lambda Deployer

@@ -1,51 +1,15 @@
 ---
 name: ecs-fargate-deployer
-description: 'Deploys AWS ECS Fargate services with production-grade configuration: right-sized task definition (CPU/memory combos, Fargate sizing), container definitions (image, port mappings, env vars,
-  health checks), service definition (desired count, deployment circuit breaker, minimum healthy percent), awsvpc networking (security groups, subnets), ALB integration (target group, listener rules), target-tracking
-  auto-scaling (CPU/memory/ALB request count), separate task execution role and task role, secrets via Secrets Manager / SSM Parameter Store, FireLens and CloudWatch logging, and latest features (Fargate
-  Spot, EFA, container health check improvements). Emits a READY_TO_DEPLOY checklist with every configuration item verified. Use when creating a new ECS Fargate service, deploying a container to production,
-  validating an ECS service configuration, or generating deployment CLI and IaC templates. Triggers: ECS Fargate, task definition, service, ALB, auto-scaling, container, deployment, ECS deploy.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Deploys AWS ECS Fargate services with production-grade configuration: right-sized task definition (CPU/memory combos, Fargate sizing), container definitions (image, port mappings, env vars, health checks), service definition (desired count, deployment circuit breaker, minimum healthy percent), awsvpc networking (security groups, subnets), ALB integration (target group, listener rules), target-tracking auto-scaling (CPU/memory/ALB request count), separate task execution role and task role, secrets via Secrets Manager / SSM Parameter Store, FireLens and CloudWatch logging, and latest features (Fargate Spot, EFA, container health check improvements). Emits a READY_TO_DEPLOY checklist with every configuration item verified. Use when creating a new ECS Fargate service, deploying a container to production, validating an ECS service configuration, or generating deployment CLI and IaC templates. Triggers: ECS Fargate, task definition, service, ALB, auto-scaling, container, deployment, ECS deploy.'
 license: Apache-2.0
-compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with ecs, ec2, iam, elasticloadbalancingv2, servicediscovery, logs, secretsmanager,
-  and ssm access. Works with Terraform aws_ecs_service / aws_ecs_task_definition resources, CloudFormation AWS::ECS::* resources, and AWS Copilot.'
-keywords:
-- aws
-- ecs
-- fargate
-- cloudops
-- deploy
-- provisioning
-- containers
-- task-definition
-- awsvpc
-- alb
-- target-group
-- auto-scaling
-- circuit-breaker
-- firelens
-- fargate-spot
-tags:
-- aws
-- ecs
-- fargate
-- cloudops
-- deploy
-- containers
-- task-definition
-- awsvpc
-- alb
-- auto-scaling
-dependencies:
-- aws-orchestrator
+compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with ecs, ec2, iam, elasticloadbalancingv2, servicediscovery, logs, secretsmanager, and ssm access. Works with Terraform aws_ecs_service / aws_ecs_task_definition resources, CloudFormation AWS::ECS::* resources, and AWS Copilot.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: deploy
   skill_class: capability
@@ -53,35 +17,10 @@ metadata:
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-  - aws
-  - ecs
-  - fargate
-  - cloudops
-  - deploy
-  - containers
-  - task-definition
-  - awsvpc
-  - alb
-  - auto-scaling
-  dependencies:
-  - aws-orchestrator
-  keywords:
-  - create ecs fargate service
-  - deploy ecs fargate
-  - ecs task definition
-  - ecs service
-  - fargate cpu memory
-  - ecs awsvpc networking
-  - alb target group ecs
-  - ecs auto scaling
-  - ecs circuit breaker
-  - ecs secrets
-  - fargate spot
-  - ecs firelens
-  when_to_use: Invoke when the user wants to create a new ECS Fargate service, deploy a container workload to Fargate, validate an existing ECS service configuration against best practices, generate deployment
-    CLI commands or IaC templates, or troubleshoot a Fargate deployment failure caused by missing prerequisites (task definition, subnets, ALB, execution role, secrets). Do NOT invoke for ECS on EC2 deployments
-    (use an EC2-launch-type-specific skill) or for EKS deployments (use an EKS skill).
+  tags: aws, ecs, fargate, cloudops, deploy, containers, task-definition, awsvpc, alb, auto-scaling
+  dependencies: aws-orchestrator
+  keywords: aws, ecs, fargate, cloudops, deploy, provisioning, containers, task-definition, awsvpc, alb, target-group, auto-scaling, circuit-breaker, firelens, fargate-spot
+  when_to_use: Invoke when the user wants to create a new ECS Fargate service, deploy a container workload to Fargate, validate an existing ECS service configuration against best practices, generate deployment CLI commands or IaC templates, or troubleshoot a Fargate deployment failure caused by missing prerequisites (task definition, subnets, ALB, execution role, secrets). Do NOT invoke for ECS on EC2 deployments (use an EC2-launch-type-specific skill) or for EKS deployments (use an EKS skill).
 ---
 
 # ECS Fargate Deployer

@@ -1,107 +1,26 @@
 ---
 name: lambda-alias-deployer
-description: >-
-  Provisions Lambda aliases with production defaults: alias creation
-  pointing to a specific published version, traffic shifting
-  (weighted aliases for canary/linear deployments), API Gateway
-  stage integration (alias as stage trigger), CloudWatch alarm per
-  alias, provisioned concurrency on alias, Lambda SnapStart
-  integration. Emits a READY_TO_DEPLOY checklist with verification
-  commands. Use when creating a Lambda alias, shifting traffic
-  between versions, configuring canary deployment, setting up API
-  Gateway stage with alias, adding provisioned concurrency to an
-  alias, or enabling SnapStart. Triggers: create lambda alias,
-  weighted alias, traffic shift lambda, canary deployment lambda,
-  provisioned concurrency alias, lambda snapstart alias, API
-  gateway stage alias, lambda version alias.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Lambda aliases with production defaults: alias creation pointing to a specific published version, traffic shifting (weighted aliases for canary/linear deployments), API Gateway stage integration (alias as stage trigger), CloudWatch alarm per alias, provisioned concurrency on alias, Lambda SnapStart integration. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Lambda alias, shifting traffic between versions, configuring canary deployment, setting up API Gateway stage with alias, adding provisioned concurrency to an alias, or enabling SnapStart. Triggers: create lambda alias, weighted alias, traffic shift lambda, canary deployment lambda, provisioned concurrency alias, lambda snapstart alias, API gateway stage alias, lambda version alias.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with lambda,
-  apigateway, cloudwatch, and iam access. Works with Terraform
-  aws_lambda_alias / aws_lambda_provisioned_concurrency_config
-  resources and CloudFormation AWS::Lambda::Alias templates.
-keywords:
-  - aws
-  - lambda
-  - alias
-  - cloudops
-  - deploy
-  - provisioning
-  - traffic shifting
-  - weighted alias
-  - canary deployment
-  - provisioned concurrency
-  - snapstart
-  - api gateway
-  - cloudwatch alarm
-  - lambda version
-  - stage integration
-tags:
-  - aws
-  - lambda
-  - alias
-  - cloudops
-  - deploy
-  - compute
-  - provisioning
-  - traffic-shifting
-  - canary
-  - provisioned-concurrency
-  - snapstart
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with lambda, apigateway, cloudwatch, and iam access. Works with Terraform aws_lambda_alias / aws_lambda_provisioned_concurrency_config resources and CloudFormation AWS::Lambda::Alias templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - lambda
-    - alias
-    - cloudops
-    - deploy
-    - compute
-    - provisioning
-    - traffic-shifting
-    - canary
-    - provisioned-concurrency
-    - snapstart
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create lambda alias
-    - weighted alias traffic
-    - canary deployment lambda
-    - provisioned concurrency alias
-    - lambda snapstart alias
-    - api gateway stage alias
-    - lambda version alias
-    - cloudwatch alarm per alias
-    - traffic shift lambda
-  when_to_use: >-
-    Invoke when the user wants to create a Lambda alias pointing to
-    a specific published version, configure traffic shifting between
-    versions (weighted aliases for canary or linear deployment), set
-    up API Gateway stage integration with a Lambda alias, create
-    CloudWatch alarms scoped to a specific alias, configure
-    provisioned concurrency on an alias, or enable Lambda SnapStart
-    with alias-based routing. Do NOT invoke for Lambda function
-    creation (use lambda function deployers), for Lambda layer
-    management, for EventBridge rule configuration, or for auditing
-    existing Lambda alias configurations.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, lambda, alias, cloudops, deploy, compute, provisioning, traffic-shifting, canary, provisioned-concurrency, snapstart
+  dependencies: aws-orchestrator
+  keywords: aws, lambda, alias, cloudops, deploy, provisioning, traffic shifting, weighted alias, canary deployment, provisioned concurrency, snapstart, api gateway, cloudwatch alarm, lambda version, stage integration
+  when_to_use: Invoke when the user wants to create a Lambda alias pointing to a specific published version, configure traffic shifting between versions (weighted aliases for canary or linear deployment), set up API Gateway stage integration with a Lambda alias, create CloudWatch alarms scoped to a specific alias, configure provisioned concurrency on an alias, or enable Lambda SnapStart with alias-based routing. Do NOT invoke for Lambda function creation (use lambda function deployers), for Lambda layer management, for EventBridge rule configuration, or for auditing existing Lambda alias configurations.
 ---
 
 # Lambda Alias Deployer

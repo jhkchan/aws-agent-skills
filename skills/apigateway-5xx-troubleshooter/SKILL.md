@@ -1,106 +1,28 @@
 ---
 name: apigateway-5xx-troubleshooter
-description: >-
-  Diagnoses Amazon API Gateway 5xx errors (500 InternalServerError, 502
-  BadGateway, 503 ServiceUnavailable, 504 Timeout) through a systematic
-  diagnostic tree covering Lambda proxy response format errors, Lambda
-  runtime crashes, HTTP backend invalid responses, VPC Link target health,
-  throttling at stage/concurrency/usage-plan layers, integration timeout
-  mismatches, and rare internal failures. Walks symptoms to root cause with
-  CloudWatch metrics (5xxError, Latency), access logs (integrationErrorMessage,
-  responseLatency), CloudTrail Invoke API calls, and Lambda LogError scans.
-  Emits ROOT_CAUSE_FOUND with the specific failure layer or ESCALATE for
-  AWS-side incidents. Use when API Gateway returns 5xx errors, Lambda proxy
-  format errors, integration timeouts, or throttled requests.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Diagnoses Amazon API Gateway 5xx errors (500 InternalServerError, 502 BadGateway, 503 ServiceUnavailable, 504 Timeout) through a systematic diagnostic tree covering Lambda proxy response format errors, Lambda runtime crashes, HTTP backend invalid responses, VPC Link target health, throttling at stage/concurrency/usage-plan layers, integration timeout mismatches, and rare internal failures. Walks symptoms to root cause with CloudWatch metrics (5xxError, Latency), access logs (integrationErrorMessage, responseLatency), CloudTrail Invoke API calls, and Lambda LogError scans. Emits ROOT_CAUSE_FOUND with the specific failure layer or ESCALATE for AWS-side incidents. Use when API Gateway returns 5xx errors, Lambda proxy format errors, integration timeouts, or throttled requests.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Offline symptom classification works from pasted error strings
-  and stage/integration metadata. Live-account diagnosis uses aws apigateway
-  get-stage, get-resources, get-method, get-integration, aws apigatewayv2
-  get-stage, aws lambda get-function-configuration, aws logs filter-log-events
-  (Lambda LogError scan), aws cloudwatch get-metric-statistics, and aws
-  cloudtrail lookup-events (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - API Gateway
-  - 5xx
-  - 500
-  - 502
-  - 503
-  - 504
-  - BadGateway
-  - ServiceUnavailable
-  - GatewayTimeout
-  - InternalServerError
-  - Lambda proxy
-  - integration timeout
-  - throttling
-  - rate limit
-  - burst limit
-  - concurrency
-  - usage plan
-  - VPC Link
-  - mapping template
-  - CloudWatch metrics
-  - access logs
-  - CloudTrail
-  - troubleshooting
-tags: [apigateway, app-integration, troubleshooting, 5xx, lambda, throttle, timeout, cloudwatch]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error strings and stage/integration metadata. Live-account diagnosis uses aws apigateway get-stage, get-resources, get-method, get-integration, aws apigatewayv2 get-stage, aws lambda get-function-configuration, aws logs filter-log-events (Lambda LogError scan), aws cloudwatch get-metric-statistics, and aws cloudtrail lookup-events (AWS CLI v2, SSO or key-based...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
-  when_to_use: >-
-    Diagnosing an API Gateway 5xx error (500, 502, 503, 504), walking a
-    symptom to the failed integration layer with verify and fix commands,
-    validating a Lambda proxy response format, diagnosing integration
-    timeouts, identifying stage/usage-plan/concurrency throttling, or
-    triaging a "the API is returning 5xx" page where the root cause may be
-    Lambda, the HTTP backend, VPC Link health, throttling, or timeout
-    configuration — not necessarily API Gateway itself.
-  when_not_to_use: >-
-    Configuration posture audits (use apigateway-resource-policy-auditor),
-    authoring resource policies, deploying new APIs (use the deploy task
-    type), Lambda function code debugging beyond the integration contract,
-    or 4xx error diagnosis (4xx is a client/auth problem, not a 5xx backend
-    problem).
-  activation_triggers:
-    - "API Gateway 5xx error"
-    - "API Gateway 502 BadGateway"
-    - "API Gateway 504 timeout"
-    - "API Gateway 503 throttled"
-    - "API Gateway 500 InternalServerError"
-    - "Lambda proxy malformed response"
-    - "integration timed out"
-    - "Execution failed due to a timeout error"
-    - "Type Error in Lambda"
-    - "Runtime.LogError"
-    - "stage throttling exceeded"
-    - "Lambda concurrent executions exceeded"
-    - "API Gateway access logs 5xx"
-    - "troubleshoot API Gateway"
-  invocation_schema: >-
-    Input: either (a) a symptom description (error code 500/502/503/504,
-    observed latency pattern, recent deployment), optionally paired with
-    the API/stage metadata (get-rest-apis/get-stage output, integration
-    type, Lambda function configuration), OR (b) a REST API id + stage
-    name for live-account diagnosis. Output: a deterministic
-    TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT
-    ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and LAYER ∈
-    {BACKEND_LAMBDA_ERROR, BACKEND_RESPONSE_FORMAT, BACKEND_HTTP_INVALID,
-    BACKEND_VPC_LINK, BACKEND_MAPPING_TEMPLATE, TIMEOUT_LAMBDA,
-    TIMEOUT_HTTP, TIMEOUT_MISMATCH, THROTTLE_STAGE, THROTTLE_CONCURRENCY,
-    THROTTLE_USAGE_PLAN, PAYLOAD_TOO_LARGE, INTERNAL_ERROR, UNKNOWN}.
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+  when_to_use: Diagnosing an API Gateway 5xx error (500, 502, 503, 504), walking a symptom to the failed integration layer with verify and fix commands, validating a Lambda proxy response format, diagnosing integration timeouts, identifying stage/usage-plan/concurrency throttling, or triaging a "the API is returning 5xx" page where the root cause may be Lambda, the HTTP backend, VPC Link health, throttling, or timeout configuration — not necessarily API Gateway itself.
+  when_not_to_use: Configuration posture audits (use apigateway-resource-policy-auditor), authoring resource policies, deploying new APIs (use the deploy task type), Lambda function code debugging beyond the integration contract, or 4xx error diagnosis (4xx is a client/auth problem, not a 5xx backend problem).
+  activation_triggers: API Gateway 5xx error, API Gateway 502 BadGateway, API Gateway 504 timeout, API Gateway 503 throttled, API Gateway 500 InternalServerError, Lambda proxy malformed response, integration timed out, Execution failed due to a timeout error, Type Error in Lambda, Runtime.LogError, stage throttling exceeded, Lambda concurrent executions exceeded, API Gateway access logs 5xx, troubleshoot API Gateway
+  invocation_schema: 'Input: either (a) a symptom description (error code 500/502/503/504, observed latency pattern, recent deployment), optionally paired with the API/stage metadata (get-rest-apis/get-stage output, integration type, Lambda function configuration), OR (b) a REST API id + stage name for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and LAYER ∈ {BACKEND_LAMBDA_ERROR, BACKEND_RESPONSE_FORMAT, BACKEND_HTTP_INVALID, BACKEND_VPC_LINK, BACKEND_MAPPING_TEMPLATE, TIMEOUT_LAMBDA, TIMEOUT_HTTP, TIMEOUT_MISMATCH, THROTTLE_STAGE, THROTTLE_CONCURRENCY, THROTTLE_USAGE_PLAN, PAYLOAD_TOO_LARGE, INTERNAL_ERROR, UNKNOWN}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: API Gateway, 5xx, 500, 502, 503, 504, BadGateway, ServiceUnavailable, GatewayTimeout, InternalServerError, Lambda proxy, integration timeout, throttling, rate limit, burst limit, concurrency, usage plan, VPC Link, mapping template, CloudWatch metrics, access logs, CloudTrail, troubleshooting
+  tags: apigateway, app-integration, troubleshooting, 5xx, lambda, throttle, timeout, cloudwatch
 ---
 
 # API Gateway 5xx Troubleshooter

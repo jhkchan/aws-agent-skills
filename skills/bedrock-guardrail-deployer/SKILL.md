@@ -1,95 +1,28 @@
 ---
 name: bedrock-guardrail-deployer
-description: >-
-  Provisions Amazon Bedrock Guardrails with production defaults: guardrail
-  creation (name, description, KMS key), content filters (hate, insults,
-  sexual, violence with NONE/LOW/MEDIUM/HIGH severity), denied topics
-  (custom topics with definition and examples), word filters (managed
-  profanity list + custom word list), sensitive information filters (PII
-  entities with ALLOW/AUDIT/BLOCK actions + regex patterns), cross-region
-  deployment, guardrail application (associate with model invocations and
-  Agents), and guardrail evaluation. Emits READY_TO_DEPLOY /
-  PREREQUISITES_MISSING with every filter verified and copy-pasteable
-  bedrock commands. Use when deploying content moderation and safety
-  guardrails for Bedrock model invocations. Triggers: Bedrock Guardrail,
-  content filter, denied topic, PII filter, word filter, guardrail
-  evaluation, Guardrails with Agents, contextual grounding check.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon Bedrock Guardrails with production defaults: guardrail creation (name, description, KMS key), content filters (hate, insults, sexual, violence with NONE/LOW/MEDIUM/HIGH severity), denied topics (custom topics with definition and examples), word filters (managed profanity list + custom word list), sensitive information filters (PII entities with ALLOW/AUDIT/BLOCK actions + regex patterns), cross-region deployment, guardrail application (associate with model invocations and Agents), and guardrail evaluation. Emits READY_TO_DEPLOY / PREREQUISITES_MISSING with every filter verified and copy-pasteable bedrock commands. Use when deploying content moderation and safety guardrails for Bedrock model invocations. Triggers: Bedrock Guardrail, content filter, denied topic, PII filter, word filter, guardrail evaluation, Guardrails with Agents, contextual grounding check.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Live provisioning uses AWS CLI v2 with bedrock
-  (create-guardrail, get-guardrail, update-guardrail, list-guards,
-  create-guardrail-version), iam (create-role, attach-role-policy),
-  and cloudformation / terraform aws_bedrock_guardrail equivalents.
-keywords:
-  - aws
-  - bedrock
-  - guardrail
-  - content-filter
-  - denied-topics
-  - word-filter
-  - pii-filter
-  - sensitive-information
-  - safety
-  - content-moderation
-  - contextual-grounding
-  - cloudops
-  - deploy
-  - ai-ml
-tags:
-  - aws
-  - bedrock
-  - guardrail
-  - content-moderation
-  - safety
-  - deploy
-  - ai-ml
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Live provisioning uses AWS CLI v2 with bedrock (create-guardrail, get-guardrail, update-guardrail, list-guards, create-guardrail-version), iam (create-role, attach-role-policy), and cloudformation / terraform aws_bedrock_guardrail equivalents.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AI/ML
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Creating an Amazon Bedrock Guardrail to filter harmful content
-    (hate, insults, sexual, violence), defining custom denied topics
-    with definitions and examples, configuring word filters (managed
-    profanity + custom words), setting up sensitive information (PII)
-    filters with ALLOW/AUDIT/BLOCK actions or regex patterns, deploying
-    cross-region guardrails, applying guardrails to model invocations
-    or Bedrock Agents, configuring contextual grounding checks, running
-    guardrail evaluation, or generating IaC (CloudFormation / Terraform)
-    for any of the above. Do NOT invoke for model access provisioning
-    (use bedrock-model-access-inventory), or for Knowledge Base creation.
-  activation_triggers:
-    - "Bedrock Guardrail"
-    - "Bedrock content filter"
-    - "denied topics"
-    - "PII guardrail"
-    - "word filter Bedrock"
-    - "sensitive information filter"
-    - "Guardrail evaluation"
-    - "Guardrails with Agents"
-    - "contextual grounding check"
-    - "guardrail severity levels"
-  invocation_schema: >-
-    Input: either (a) a guardrail spec with content filter severities,
-    denied topics, word filters, PII filters, and optional regex
-    patterns, or (b) a cross-region guardrail spec (regions + per-region
-    filter configuration). Output: deterministic GUARDRAIL_SPEC /
-    VERDICT / CHECKLIST / VERIFICATION_COMMANDS block per the STRICT
-    output contract, where VERDICT is READY_TO_DEPLOY or
-    PREREQUISITES_MISSING.
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Creating an Amazon Bedrock Guardrail to filter harmful content (hate, insults, sexual, violence), defining custom denied topics with definitions and examples, configuring word filters (managed profanity + custom words), setting up sensitive information (PII) filters with ALLOW/AUDIT/BLOCK actions or regex patterns, deploying cross-region guardrails, applying guardrails to model invocations or Bedrock Agents, configuring contextual grounding checks, running guardrail evaluation, or generating IaC (CloudFormation / Terraform) for any of the above. Do NOT invoke for model access provisioning (use bedrock-model-access-inventory), or for Knowledge Base creation.
+  activation_triggers: Bedrock Guardrail, Bedrock content filter, denied topics, PII guardrail, word filter Bedrock, sensitive information filter, Guardrail evaluation, Guardrails with Agents, contextual grounding check, guardrail severity levels
+  invocation_schema: 'Input: either (a) a guardrail spec with content filter severities, denied topics, word filters, PII filters, and optional regex patterns, or (b) a cross-region guardrail spec (regions + per-region filter configuration). Output: deterministic GUARDRAIL_SPEC / VERDICT / CHECKLIST / VERIFICATION_COMMANDS block per the STRICT output contract, where VERDICT is READY_TO_DEPLOY or PREREQUISITES_MISSING.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: aws, bedrock, guardrail, content-filter, denied-topics, word-filter, pii-filter, sensitive-information, safety, content-moderation, contextual-grounding, cloudops, deploy, ai-ml
+  tags: aws, bedrock, guardrail, content-moderation, safety, deploy, ai-ml
+  dependencies: aws-orchestrator
 ---
 
 # Bedrock Guardrail Deployer

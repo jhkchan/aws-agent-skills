@@ -1,106 +1,26 @@
 ---
 name: rds-bluegreen-deployer
-description: >-
-  Deploys Amazon RDS Blue/Green Deployments with production defaults:
-  blue/green creation (create-blue-green-deployment — source to staging
-  clone), switchover (1-minute downtime via DNS update), traffic
-  rerouting, switchover timeout configuration, green environment
-  validation, database changes in green (major version upgrade,
-  parameter group changes, schema changes), replication from blue to
-  green (logical replication), delete green after successful switch,
-  Aurora MySQL/PostgreSQL support, Blue/Green limitations (engine
-  version constraints, storage type, read replica topology),
-  monitoring during green validation (CloudWatch Enhanced Monitoring),
-  application connection string update. Emits a READY_TO_DEPLOY
-  checklist with verification commands. Use when creating an RDS
-  blue/green deployment, performing zero-downtime database upgrade,
-  switching over a blue/green deployment, validating the green
-  environment, or performing major version upgrade in green before
-  switch. Triggers: create blue green deployment, rds blue green
-  switchover, zero downtime database upgrade, aurora blue green, rds
-  major version upgrade green, green environment validation, switch
-  over blue green.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Deploys Amazon RDS Blue/Green Deployments with production defaults: blue/green creation (create-blue-green-deployment — source to staging clone), switchover (1-minute downtime via DNS update), traffic rerouting, switchover timeout configuration, green environment validation, database changes in green (major version upgrade, parameter group changes, schema changes), replication from blue to green (logical replication), delete green after successful switch, Aurora MySQL/PostgreSQL support, Blue/Green limitations (engine version constraints, storage type, read replica topology), monitoring during green validation (CloudWatch Enhanced Monitoring), application connection string update. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating an RDS blue/green deployment, performing. Triggers: create blue green deployment, rds blue green switchover, zero downtime database upgrade, aurora blue green, rds major version upgrade green, green environment validation, switch over blue green.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with RDS access.
-  Works with Terraform aws_rds_blue_green_deployment resource and
-  CloudFormation AWS::RDS::BlueGreenDeployment templates.
-keywords:
-  - aws
-  - rds
-  - blue green
-  - blue/green deployment
-  - cloudops
-  - deploy
-  - zero downtime
-  - switchover
-  - aurora
-  - major version upgrade
-  - parameter group
-  - schema change
-  - green environment
-  - staging clone
-  - dns switch
-tags:
-  - aws
-  - rds
-  - blue-green
-  - cloudops
-  - deploy
-  - databases
-  - aurora
-  - switchover
-  - zero-downtime
-  - upgrades
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with RDS access. Works with Terraform aws_rds_blue_green_deployment resource and CloudFormation AWS::RDS::BlueGreenDeployment templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - rds
-    - blue-green
-    - cloudops
-    - deploy
-    - databases
-    - aurora
-    - switchover
-    - zero-downtime
-    - upgrades
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create blue green deployment
-    - rds blue green switchover
-    - zero downtime database upgrade
-    - aurora blue green
-    - rds major version upgrade green
-    - green environment validation
-    - switch over blue green
-  when_to_use: >-
-    Invoke when the user wants to create an RDS Blue/Green Deployment,
-    perform a zero-downtime database upgrade (major version, parameter
-    group, or schema changes), switch over a blue/green deployment,
-    validate the green environment before switchover, delete a green
-    environment after successful switchover, or understand Blue/Green
-    limitations. Do NOT invoke for standard RDS modifications without
-    Blue/Green (use modify-db-instance directly), Aurora Global
-    Database failover, or Multi-AZ failover.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, rds, blue-green, cloudops, deploy, databases, aurora, switchover, zero-downtime, upgrades
+  dependencies: aws-orchestrator
+  keywords: aws, rds, blue green, blue/green deployment, cloudops, deploy, zero downtime, switchover, aurora, major version upgrade, parameter group, schema change, green environment, staging clone, dns switch
+  when_to_use: Invoke when the user wants to create an RDS Blue/Green Deployment, perform a zero-downtime database upgrade (major version, parameter group, or schema changes), switch over a blue/green deployment, validate the green environment before switchover, delete a green environment after successful switchover, or understand Blue/Green limitations. Do NOT invoke for standard RDS modifications without Blue/Green (use modify-db-instance directly), Aurora Global Database failover, or Multi-AZ failover.
 ---
 
 # RDS Blue/Green Deployer

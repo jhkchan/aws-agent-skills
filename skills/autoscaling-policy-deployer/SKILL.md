@@ -1,100 +1,28 @@
 ---
 name: autoscaling-policy-deployer
-description: >-
-  Provisions Amazon EC2 Auto Scaling policies and surrounding primitives with
-  production defaults: target tracking (CPUUtilization, ALBRequestCountPerTarget,
-  custom metrics), step scaling (CloudWatch alarm → step adjustments), scheduled
-  scaling, warm pools, instance refresh, capacity rebalance, predictive scaling
-  (ML-based forecast), and Mixed Instances Policy (On-Demand + Spot blend).
-  Emits READY_TO_DEPLOY / PREREQUISITES_MISSING with every item verified and
-  copy-pasteable autoscaling / cloudwatch commands. Use when attaching a
-  scaling policy, configuring scheduled actions, enabling warm pool or
-  capacity rebalance, triggering an instance refresh, or blending On-Demand
-  with Spot. Triggers: Auto Scaling policy, target tracking, step scaling,
-  scheduled action, warm pool, instance refresh, capacity rebalance,
-  predictive scaling, Mixed Instances Policy.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon EC2 Auto Scaling policies and surrounding primitives with production defaults: target tracking (CPUUtilization, ALBRequestCountPerTarget, custom metrics), step scaling (CloudWatch alarm → step adjustments), scheduled scaling, warm pools, instance refresh, capacity rebalance, predictive scaling (ML-based forecast), and Mixed Instances Policy (On-Demand + Spot blend). Emits READY_TO_DEPLOY / PREREQUISITES_MISSING with every item verified and copy-pasteable autoscaling / cloudwatch commands. Use when attaching a scaling policy, configuring scheduled actions, enabling warm pool or capacity rebalance, triggering an instance refresh, or blending On-Demand with Spot. Triggers: Auto Scaling policy, target tracking, step scaling, scheduled action, warm pool, instance refresh, capacity rebalance, predictive scaling, Mixed Instances Policy.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Live provisioning uses AWS CLI v2 with autoscaling
-  (put-scaling-policy, put-scheduled-update-group-action, put-warm-pool,
-  start-instance-refresh, update-auto-scaling-group, create-auto-scaling-group),
-  cloudwatch (put-metric-alarm), ec2 (describe-launch-templates,
-  describe-instance-types), and cloudformation / terraform
-  aws_autoscaling_* equivalents.
-keywords:
-  - aws
-  - ec2
-  - autoscaling
-  - auto-scaling-group
-  - target-tracking
-  - step-scaling
-  - scheduled-scaling
-  - warm-pool
-  - instance-refresh
-  - capacity-rebalance
-  - predictive-scaling
-  - mixed-instances-policy
-  - spot-instances
-  - cloudops
-  - deploy
-tags:
-  - aws
-  - autoscaling
-  - ec2
-  - scaling-policy
-  - spot-instances
-  - warm-pool
-  - instance-refresh
-  - deploy
-  - compute
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Live provisioning uses AWS CLI v2 with autoscaling (put-scaling-policy, put-scheduled-update-group-action, put-warm-pool, start-instance-refresh, update-auto-scaling-group, create-auto-scaling-group), cloudwatch (put-metric-alarm), ec2 (describe-launch-templates, describe-instance-types), and cloudformation / terraform aws_autoscaling_* equivalents.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Attaching a scaling policy (target tracking, step, predictive) to an
-    existing Auto Scaling Group, configuring recurring scheduled scaling
-    actions, enabling a warm pool for fast scale-out, triggering or
-    scheduling an instance refresh for rolling template updates, enabling
-    capacity rebalance for Spot-backed ASGs, defining a Mixed Instances
-    Policy with On-Demand + Spot blend and allocation strategy, or
-    generating IaC (CloudFormation / Terraform) for any of the above. Do
-    NOT invoke for ECS Service Auto Scaling (use ecs-fargate-deployer),
-    for DynamoDB capacity (use dynamodb-table-deployer), or for ASG audit
-    posture (use autoscaling-group-auditor).
-  activation_triggers:
-    - "Auto Scaling policy"
-    - "target tracking scaling"
-    - "step scaling policy"
-    - "scheduled scaling action"
-    - "warm pool"
-    - "instance refresh"
-    - "capacity rebalance"
-    - "predictive scaling"
-    - "Mixed Instances Policy"
-    - "Spot Instance diversification"
-    - "ASG scaling plan"
-  invocation_schema: >-
-    Input: an Auto Scaling Group name + one or more scaling configurations
-    (target tracking metric+target, step scaling alarm+adjustments,
-    scheduled action recurrence, warm pool spec, instance refresh trigger,
-    capacity rebalance enablement, predictive scaling forecast, Mixed
-    Instances Policy spec). Output: deterministic POLICY_SPEC / VERDICT /
-    CHECKLIST / VERIFICATION_COMMANDS block per the STRICT output contract,
-    where VERDICT is READY_TO_DEPLOY or PREREQUISITES_MISSING.
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Attaching a scaling policy (target tracking, step, predictive) to an existing Auto Scaling Group, configuring recurring scheduled scaling actions, enabling a warm pool for fast scale-out, triggering or scheduling an instance refresh for rolling template updates, enabling capacity rebalance for Spot-backed ASGs, defining a Mixed Instances Policy with On-Demand + Spot blend and allocation strategy, or generating IaC (CloudFormation / Terraform) for any of the above. Do NOT invoke for ECS Service Auto Scaling (use ecs-fargate-deployer), for DynamoDB capacity (use dynamodb-table-deployer), or for ASG audit posture (use autoscaling-group-auditor).
+  activation_triggers: Auto Scaling policy, target tracking scaling, step scaling policy, scheduled scaling action, warm pool, instance refresh, capacity rebalance, predictive scaling, Mixed Instances Policy, Spot Instance diversification, ASG scaling plan
+  invocation_schema: 'Input: an Auto Scaling Group name + one or more scaling configurations (target tracking metric+target, step scaling alarm+adjustments, scheduled action recurrence, warm pool spec, instance refresh trigger, capacity rebalance enablement, predictive scaling forecast, Mixed Instances Policy spec). Output: deterministic POLICY_SPEC / VERDICT / CHECKLIST / VERIFICATION_COMMANDS block per the STRICT output contract, where VERDICT is READY_TO_DEPLOY or PREREQUISITES_MISSING.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: aws, ec2, autoscaling, auto-scaling-group, target-tracking, step-scaling, scheduled-scaling, warm-pool, instance-refresh, capacity-rebalance, predictive-scaling, mixed-instances-policy, spot-instances, cloudops, deploy
+  tags: aws, autoscaling, ec2, scaling-policy, spot-instances, warm-pool, instance-refresh, deploy, compute
+  dependencies: aws-orchestrator
 ---
 
 # Auto Scaling Policy Deployer

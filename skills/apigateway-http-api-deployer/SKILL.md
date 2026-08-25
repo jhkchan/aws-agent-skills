@@ -1,109 +1,27 @@
 ---
 name: apigateway-http-api-deployer
-description: >-
-  Provisions production-grade API Gateway HTTP APIs (v2) with routes
-  (ANY, GET, POST, {proxy+} greedy), integration targets (Lambda proxy
-  AWS_PROXY, HTTP proxy, VPC link private integration, Step Functions
-  START_EXECUTION, SQS SendMessage, Kinesis PutRecord), JWT authorizer
-  backed by OpenID Connect / Cognito issuer, CORS configuration with
-  preflight handling, JSON access logging to CloudWatch with $context
-  variables, stage auto-deploy for continuous deployment, custom domain
-  via ACM with API mapping, and WAFv2 REGIONAL Web ACL association.
-  Emits a READY_TO_DEPLOY checklist and ordered aws apigatewayv2
-  commands. Use when provisioning an HTTP API, configuring JWT/OIDC
-  authorizers, setting up CORS, integrating Step Functions / SQS /
-  Kinesis from HTTP API, deploying VPC link private integrations, or
-  enabling auto-deploy stages.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Provisions production-grade API Gateway HTTP APIs (v2) with routes (ANY, GET, POST, {proxy+} greedy), integration targets (Lambda proxy AWS_PROXY, HTTP proxy, VPC link private integration, Step Functions START_EXECUTION, SQS SendMessage, Kinesis PutRecord), JWT authorizer backed by OpenID Connect / Cognito issuer, CORS configuration with preflight handling, JSON access logging to CloudWatch with $context variables, stage auto-deploy for continuous deployment, custom domain via ACM with API mapping, and WAFv2 REGIONAL Web ACL association. Emits a READY_TO_DEPLOY checklist and ordered aws apigatewayv2 commands. Use when provisioning an HTTP API, configuring JWT/OIDC authorizers, setting up CORS, integrating Step Functions / SQS / Kinesis from HTTP API, deploying VPC link private integrations, or enabling auto-deploy stages.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline architecture
-  planning. Live deployment uses aws apigatewayv2 create-api,
-  create-route, create-integration, create-authorizer, create-stage,
-  update-stage, create-domain-name, create-api-mapping, update-route,
-  and aws wafv2 associate-web-acl (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-  - API Gateway
-  - HTTP API
-  - API Gateway v2
-  - apigatewayv2
-  - route
-  - ANY method
-  - proxy path
-  - Lambda proxy
-  - AWS_PROXY
-  - HTTP proxy
-  - HTTP_PROXY
-  - VPC link
-  - private integration
-  - Step Functions
-  - START_EXECUTION
-  - SQS integration
-  - Kinesis integration
-  - JWT authorizer
-  - OpenID Connect
-  - OIDC
-  - Cognito
-  - CORS
-  - preflight
-  - access logging
-  - auto-deploy
-  - stage
-  - custom domain
-  - ACM
-  - API mapping
-  - WAFv2
-  - Web ACL
-tags: [apigateway, app-integration, deploy, http-api, apigatewayv2, lambda-proxy, jwt-authorizer, oidc, cors, vpc-link, step-functions, auto-deploy, access-logging, custom-domain, waf]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline architecture planning. Live deployment uses aws apigatewayv2 create-api, create-route, create-integration, create-authorizer, create-stage, update-stage, create-domain-name, create-api-mapping, update-route, and aws wafv2 associate-web-acl (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Provisioning a new API Gateway HTTP API (v2) for production,
-    configuring Lambda proxy (AWS_PROXY) or HTTP_PROXY integrations,
-    setting up a JWT authorizer backed by OpenID Connect or Cognito,
-    enabling CORS with preflight, integrating Step Functions / SQS /
-    Kinesis directly from HTTP API, deploying private integrations via
-    VPC link to an NLB, enabling stage auto-deploy for continuous
-    deployment, configuring JSON access logging, mapping a custom domain
-    name via ACM, or associating a WAFv2 REGIONAL Web ACL.
-  activation_triggers:
-    - "create an HTTP API"
-    - "provision API Gateway v2"
-    - "API Gateway HTTP API"
-    - "Lambda proxy HTTP API"
-    - "JWT authorizer HTTP API"
-    - "OIDC authorizer API Gateway"
-    - "CORS configuration API Gateway"
-    - "Step Functions HTTP API"
-    - "SQS API Gateway integration"
-    - "Kinesis API Gateway integration"
-    - "VPC link private integration"
-    - "auto-deploy stage"
-    - "API Gateway custom domain"
-    - "REST to HTTP migration"
-  invocation_schema: >-
-    Input shape (one of): (a) a deployment specification including
-    routes (method + path, including ANY and {proxy+}), integration
-    targets (Lambda, HTTP_PROXY, VPC_LINK, STEP_FUNCTION, SQS, KINESIS),
-    JWT authorizer issuer/audience, CORS requirements, logging,
-    auto-deploy, custom domain, WAF; (b) a partial spec for interactive
-    refinement; (c) an existing HTTP API ID for architecture review.
-    Output shape: { API_SPEC, VERDICT, ARCHITECTURE, CHECKLIST[],
-    FINDINGS[], DEPLOY_COMMANDS } where VERDICT ∈ {
-    READY_TO_DEPLOY, PREREQUISITES_MISSING, ERROR }.
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Provisioning a new API Gateway HTTP API (v2) for production, configuring Lambda proxy (AWS_PROXY) or HTTP_PROXY integrations, setting up a JWT authorizer backed by OpenID Connect or Cognito, enabling CORS with preflight, integrating Step Functions / SQS / Kinesis directly from HTTP API, deploying private integrations via VPC link to an NLB, enabling stage auto-deploy for continuous deployment, configuring JSON access logging, mapping a custom domain name via ACM, or associating a WAFv2 REGIONAL Web ACL.
+  activation_triggers: create an HTTP API, provision API Gateway v2, API Gateway HTTP API, Lambda proxy HTTP API, JWT authorizer HTTP API, OIDC authorizer API Gateway, CORS configuration API Gateway, Step Functions HTTP API, SQS API Gateway integration, Kinesis API Gateway integration, VPC link private integration, auto-deploy stage, API Gateway custom domain, REST to HTTP migration
+  invocation_schema: 'Input shape (one of): (a) a deployment specification including routes (method + path, including ANY and {proxy+}), integration targets (Lambda, HTTP_PROXY, VPC_LINK, STEP_FUNCTION, SQS, KINESIS), JWT authorizer issuer/audience, CORS requirements, logging, auto-deploy, custom domain, WAF; (b) a partial spec for interactive refinement; (c) an existing HTTP API ID for architecture review. Output shape: { API_SPEC, VERDICT, ARCHITECTURE, CHECKLIST[], FINDINGS[], DEPLOY_COMMANDS } where VERDICT ∈ { READY_TO_DEPLOY, PREREQUISITES_MISSING, ERROR }.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: API Gateway, HTTP API, API Gateway v2, apigatewayv2, route, ANY method, proxy path, Lambda proxy, AWS_PROXY, HTTP proxy, HTTP_PROXY, VPC link, private integration, Step Functions, START_EXECUTION, SQS integration, Kinesis integration, JWT authorizer, OpenID Connect, OIDC, Cognito, CORS, preflight, access logging, auto-deploy, stage, custom domain, ACM, API mapping, WAFv2, Web ACL
+  tags: apigateway, app-integration, deploy, http-api, apigatewayv2, lambda-proxy, jwt-authorizer, oidc, cors, vpc-link, step-functions, auto-deploy, access-logging, custom-domain, waf
 ---
 
 # API Gateway HTTP API Deployer

@@ -1,77 +1,24 @@
 ---
 name: verified-permissions-policy-auditor
-description: >-
-  Audits Amazon Verified Permissions policy stores for Cedar policy validation,
-  schema-to-policy consistency, principal/resource authorization scope, policy
-  template usage, and validation-mode configuration gaps. Emits a deterministic
-  verdict (INVALID_POLICY | SCHEMA_MISMATCH | OVERPERMISSIVE | CONFIG_GAP | OK)
-  per policy with enumerated findings and CLI remediation. Use when reviewing
-  Cedar policies, checking for bare-permit overexposure, validating schema
-  consistency, auditing template-linked policies, or hardening AVP policy
-  stores before production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits Amazon Verified Permissions policy stores for Cedar policy validation, schema-to-policy consistency, principal/resource authorization scope, policy template usage, and validation-mode configuration gaps. Emits a deterministic verdict (INVALID_POLICY | SCHEMA_MISMATCH | OVERPERMISSIVE | CONFIG_GAP | OK) per policy with enumerated findings and CLI remediation. Use when reviewing Cedar policies, checking for bare-permit overexposure, validating schema consistency, auditing template-linked policies, or hardening AVP policy stores before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline policy-document classification.
-  Live-account audits use aws verifiedpermissions get-policy-store,
-  get-policy, get-schema, and list-policies (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-  - Verified Permissions
-  - Cedar
-  - policy store
-  - authorization
-  - permit
-  - forbid
-  - bare permit
-  - schema validation
-  - policy template
-  - principal scope
-  - IsAuthorized
-  - entity hierarchy
-  - Cedar syntax
-  - authorization model
-  - AVP audit
-  - overpermissive policy
-  - template-linked
-  - validation mode
-  - Cedar type checking
-  - action scope
-tags: [verified-permissions, cedar, security, authorization, policy-store, schema-validation, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline policy-document classification. Live-account audits use aws verifiedpermissions get-policy-store, get-policy, get-schema, and list-policies (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
-  verdict_shape: "INVALID_POLICY | SCHEMA_MISMATCH | OVERPERMISSIVE | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a Cedar policy before production deployment, checking for bare
-    or over-permissive permit clauses, validating schema-to-policy
-    consistency, auditing template-linked policies, inspecting validation-mode
-    configuration, or hardening Amazon Verified Permissions policy-store
-    posture.
-  activation_triggers:
-    - "audit this Cedar policy"
-    - "check Verified Permissions policy store"
-    - "is my Cedar policy overpermissive"
-    - "bare permit Cedar"
-    - "schema mismatch Cedar"
-    - "policy template audit"
-    - "validation mode off AVP"
-    - "Cedar forbid clause"
-    - "AVP authorization scope"
-    - "IsAuthorized policy review"
-  invocation_schema: >-
-    Input: either (a) a Cedar policy document (optionally paired with the
-    policy-store schema and validation settings), OR (b) a policy-store-id for
-    live-account audit. Output: deterministic POLICY/VERDICT/REASON/FINDINGS/
-    REMEDIATION block per policy, where VERDICT belongs to
-    {INVALID_POLICY, SCHEMA_MISMATCH, OVERPERMISSIVE, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: INVALID_POLICY | SCHEMA_MISMATCH | OVERPERMISSIVE | CONFIG_GAP | OK
+  when_to_use: Reviewing a Cedar policy before production deployment, checking for bare or over-permissive permit clauses, validating schema-to-policy consistency, auditing template-linked policies, inspecting validation-mode configuration, or hardening Amazon Verified Permissions policy-store posture.
+  activation_triggers: audit this Cedar policy, check Verified Permissions policy store, is my Cedar policy overpermissive, bare permit Cedar, schema mismatch Cedar, policy template audit, validation mode off AVP, Cedar forbid clause, AVP authorization scope, IsAuthorized policy review
+  invocation_schema: 'Input: either (a) a Cedar policy document (optionally paired with the policy-store schema and validation settings), OR (b) a policy-store-id for live-account audit. Output: deterministic POLICY/VERDICT/REASON/FINDINGS/ REMEDIATION block per policy, where VERDICT belongs to {INVALID_POLICY, SCHEMA_MISMATCH, OVERPERMISSIVE, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Verified Permissions, Cedar, policy store, authorization, permit, forbid, bare permit, schema validation, policy template, principal scope, IsAuthorized, entity hierarchy, Cedar syntax, authorization model, AVP audit, overpermissive policy, template-linked, validation mode, Cedar type checking, action scope
+  tags: verified-permissions, cedar, security, authorization, policy-store, schema-validation, audit
 ---
 
 # Verified Permissions Policy Auditor

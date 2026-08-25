@@ -1,92 +1,27 @@
 ---
 name: stepfunctions-statemachine-deployer
-description: Provisions production-grade AWS Step Functions state machines with correct type selection (Standard exactly-once up to 1 year vs Express at-least-once up to 5 min), Amazon States Language definitions
-  (Task, Choice, Parallel, Map, Wait, Pass, Fail, Succeed), service integrations via Resource ARN patterns (Lambda, DynamoDB, SQS, SNS, ECS, SageMaker, Glue, Athena, Bedrock), sync (.sync) vs callback (.waitForTaskToken)
-  invocation patterns, error handling (Retry with exponential backoff, Catch routing), Inline Map (40 concurrent) vs Distributed Map (10000+ concurrent with S3/DynamoDB ItemReader, ItemBatcher, toleratedFailurePercentage),
-  IAM least-privilege execution role, input/output processing (InputPath, ResultPath, OutputPath, Parameters), Express sync (RequestResponse) vs async (Firehose logging) workflows, and AWS SDK service integrations
-  for direct API calls without Lambda. Emits a READY_TO_DEPLOY checklist. Use when provisioning state machines, designing ASL workflows, configuring service.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Provisions production-grade AWS Step Functions state machines with correct type selection (Standard exactly-once up to 1 year vs Express at-least-once up to 5 min), Amazon States Language definitions (Task, Choice, Parallel, Map, Wait, Pass, Fail, Succeed), service integrations via Resource ARN patterns (Lambda, DynamoDB, SQS, SNS, ECS, SageMaker, Glue, Athena, Bedrock), sync (.sync) vs callback (.waitForTaskToken) invocation patterns, error handling (Retry with exponential backoff, Catch routing), Inline Map (40 concurrent) vs Distributed Map (10000+ concurrent with S3/DynamoDB ItemReader, ItemBatcher, toleratedFailurePercentage), IAM least-privilege execution role, input/output processing (InputPath, ResultPath, OutputPath, Parameters), Express sync (RequestResponse) vs async (Firehose logging) workflows, and AWS SDK service integrations for direct API calls without Lambda. Emits a READY_TO_DEPLOY checklist. Use when provisioning state machines, designing ASL workflows, configuring service.
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline architecture planning. Live deployment uses aws stepfunctions create-state-machine,
-  update-state-machine, describe-state-machine, validate-state-machine-definition, start-execution, and aws iam create-role / attach-role-policy (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- Step Functions
-- state machine
-- ASL
-- Amazon States Language
-- Standard workflow
-- Express workflow
-- Task state
-- Choice state
-- Parallel state
-- Map state
-- Distributed Map
-- Inline Map
-- Retry
-- Catch
-- error handling
-- service integration
-- Resource ARN
-- waitForTaskToken
-- sync integration
-- callback pattern
-- Task Token
-- IAM execution role
-- states:StartExecution
-- InputPath
-- ResultPath
-- OutputPath
-- Parameters
-- ItemReader
-- ItemBatcher
-- Bedrock invocation
-- AWS SDK integration
-- Step Functions Playground
-tags:
-- stepfunctions
-- app-integration
-- deploy
-- state-machine
-- asl
-- express
-- standard
-- distributed-map
-- service-integration
-- iam
-- error-handling
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline architecture planning. Live deployment uses aws stepfunctions create-state-machine, update-state-machine, describe-state-machine, validate-state-machine-definition, start-execution, and aws iam create-role / attach-role-policy (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
-  when_to_use: Provisioning a new Step Functions state machine, choosing between Standard and Express workflow types, designing an ASL definition with service integrations (Lambda, DynamoDB, SQS, ECS, Glue,
-    Bedrock), configuring Retry/Catch error handling, building a Distributed Map for large-scale fan-out, scoping the IAM execution role to specific resource ARNs, choosing between sync (.sync) and callback
-    (.waitForTaskToken) integration patterns, or hardening an Express workflow for production.
-  activation_triggers:
-  - create a state machine
-  - deploy Step Functions workflow
-  - Standard vs Express workflow
-  - write ASL definition
-  - service integration Resource ARN
-  - Retry and Catch blocks
-  - Distributed Map state
-  - waitForTaskToken callback
-  - Step Functions execution role
-  - Step Functions + Lambda orchestration
-  - Step Functions + Bedrock
-  - Express workflow synchronous
-  invocation_schema: 'Input shape (one of): (a) a deployment specification including workflow name, type (STANDARD | EXPRESS), ASL definition (or requirements to derive one), service integrations, error-handling
-    requirements, and execution role scope; (b) a partial spec for interactive refinement (e.g., "Express workflow invoking Lambda + DynamoDB, sync, 60s budget"); (c) an existing state machine ARN for architecture
-    review against the well-architected checklist. Output shape: { STATE_MACHINE_SPEC, VERDICT, ARCHITECTURE, CHECKLIST[], FINDINGS[], DEPLOY_COMMANDS } where VERDICT ∈ { READY_TO_DEPLOY, PREREQUISITES_MISSING,
-    ERROR }.'
+  when_to_use: Provisioning a new Step Functions state machine, choosing between Standard and Express workflow types, designing an ASL definition with service integrations (Lambda, DynamoDB, SQS, ECS, Glue, Bedrock), configuring Retry/Catch error handling, building a Distributed Map for large-scale fan-out, scoping the IAM execution role to specific resource ARNs, choosing between sync (.sync) and callback (.waitForTaskToken) integration patterns, or hardening an Express workflow for production.
+  activation_triggers: create a state machine, deploy Step Functions workflow, Standard vs Express workflow, write ASL definition, service integration Resource ARN, Retry and Catch blocks, Distributed Map state, waitForTaskToken callback, Step Functions execution role, Step Functions + Lambda orchestration, Step Functions + Bedrock, Express workflow synchronous
+  invocation_schema: 'Input shape (one of): (a) a deployment specification including workflow name, type (STANDARD | EXPRESS), ASL definition (or requirements to derive one), service integrations, error-handling requirements, and execution role scope; (b) a partial spec for interactive refinement (e.g., "Express workflow invoking Lambda + DynamoDB, sync, 60s budget"); (c) an existing state machine ARN for architecture review against the well-architected checklist. Output shape: { STATE_MACHINE_SPEC, VERDICT, ARCHITECTURE, CHECKLIST[], FINDINGS[], DEPLOY_COMMANDS } where VERDICT ∈ { READY_TO_DEPLOY, PREREQUISITES_MISSING, ERROR }.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Step Functions, state machine, ASL, Amazon States Language, Standard workflow, Express workflow, Task state, Choice state, Parallel state, Map state, Distributed Map, Inline Map, Retry, Catch, error handling, service integration, Resource ARN, waitForTaskToken, sync integration, callback pattern, Task Token, IAM execution role, states:StartExecution, InputPath, ResultPath, OutputPath, Parameters, ItemReader, ItemBatcher, Bedrock invocation, AWS SDK integration, Step Functions Playground
+  tags: stepfunctions, app-integration, deploy, state-machine, asl, express, standard, distributed-map, service-integration, iam, error-handling
 ---
 
 # Step Functions State Machine Deployer

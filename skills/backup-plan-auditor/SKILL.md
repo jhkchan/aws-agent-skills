@@ -1,76 +1,24 @@
 ---
 name: backup-plan-auditor
-description: >-
-  Audits AWS Backup plans for coverage gaps (empty or missing resource
-  selections), vault risks (missing vault lock, governance-mode lock,
-  AWS-managed encryption key), impossible lifecycle configurations (cold
-  storage transition at or after deletion, retention below vault-lock floor),
-  and compliance violations (backup frequency below daily, retention below
-  30 days). Emits a deterministic verdict (COVERAGE_GAP | VAULT_RISK |
-  NONCOMPLIANT | CONFIG_GAP | OK) per plan with enumerated findings and
-  specific CLI remediation. Use when reviewing backup plans, checking backup
-  coverage, auditing vault lock posture, validating lifecycle rules, or
-  verifying backup compliance before an audit.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Backup plans for coverage gaps (empty or missing resource selections), vault risks (missing vault lock, governance-mode lock, AWS-managed encryption key), impossible lifecycle configurations (cold storage transition at or after deletion, retention below vault-lock floor), and compliance violations (backup frequency below daily, retention below 30 days). Emits a deterministic verdict (COVERAGE_GAP | VAULT_RISK | NONCOMPLIANT | CONFIG_GAP | OK) per plan with enumerated findings and specific CLI remediation. Use when reviewing backup plans, checking backup coverage, auditing vault lock posture, validating lifecycle rules, or verifying backup compliance before an audit.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan-document classification.
-  Live-account audits use aws backup get-backup-plan, aws backup
-  list-backup-plans, aws backup describe-backup-vault, and aws backup
-  get-backup-vault-access-policy (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - AWS Backup
-  - backup plan
-  - backup vault
-  - vault lock
-  - coverage gap
-  - lifecycle
-  - cold storage
-  - retention
-  - backup frequency
-  - compliance
-  - ransomware
-  - WORM
-  - backup audit
-  - MoveToColdStorageAfterDays
-  - DeleteAfterDays
-  - cross-region copy
-  - backup selection
-  - ScheduleExpression
-  - ChangeableForDays
-tags: [backup, storage, recovery, vault-lock, lifecycle, compliance, audit, ransomware]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan-document classification. Live-account audits use aws backup get-backup-plan, aws backup list-backup-plans, aws backup describe-backup-vault, and aws backup get-backup-vault-access-policy (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
-  verdict_shape: "COVERAGE_GAP | VAULT_RISK | NONCOMPLIANT | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing an AWS Backup plan before production deployment, checking for
-    coverage gaps, auditing vault lock posture, validating lifecycle rules,
-    verifying backup frequency and retention compliance, or hardening backup
-    posture against ransomware.
-  activation_triggers:
-    - "audit this backup plan"
-    - "check backup coverage"
-    - "is my backup vault locked"
-    - "backup lifecycle invalid"
-    - "backup compliance check"
-    - "cold storage transition"
-    - "vault lock governance vs compliance"
-    - "backup retention too short"
-    - "ransomware protection backup"
-  invocation_schema: >-
-    Input: either (a) a backup plan configuration (rules, selections, vault
-    metadata), OR (b) a plan-id/ARN for live-account audit. Output:
-    deterministic PLAN/VERDICT/REASON/FINDINGS/REMEDIATION block per plan,
-    where VERDICT is one of COVERAGE_GAP, VAULT_RISK, NONCOMPLIANT,
-    CONFIG_GAP, OK.
+  verdict_shape: COVERAGE_GAP | VAULT_RISK | NONCOMPLIANT | CONFIG_GAP | OK
+  when_to_use: Reviewing an AWS Backup plan before production deployment, checking for coverage gaps, auditing vault lock posture, validating lifecycle rules, verifying backup frequency and retention compliance, or hardening backup posture against ransomware.
+  activation_triggers: audit this backup plan, check backup coverage, is my backup vault locked, backup lifecycle invalid, backup compliance check, cold storage transition, vault lock governance vs compliance, backup retention too short, ransomware protection backup
+  invocation_schema: 'Input: either (a) a backup plan configuration (rules, selections, vault metadata), OR (b) a plan-id/ARN for live-account audit. Output: deterministic PLAN/VERDICT/REASON/FINDINGS/REMEDIATION block per plan, where VERDICT is one of COVERAGE_GAP, VAULT_RISK, NONCOMPLIANT, CONFIG_GAP, OK.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Backup, backup plan, backup vault, vault lock, coverage gap, lifecycle, cold storage, retention, backup frequency, compliance, ransomware, WORM, backup audit, MoveToColdStorageAfterDays, DeleteAfterDays, cross-region copy, backup selection, ScheduleExpression, ChangeableForDays
+  tags: backup, storage, recovery, vault-lock, lifecycle, compliance, audit, ransomware
 ---
 
 # Backup Plan Auditor

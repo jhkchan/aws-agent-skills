@@ -1,114 +1,28 @@
 ---
 name: multi-account-governance-automator
-description: >-
-  Designs AWS multi-account governance automation spanning Organizations
-  (OU hierarchy, account creation, SCP guardrail/throttle/deny strategies),
-  Control Tower (landing zone, preventive + detective guardrails, Account
-  Factory Factory), delegated administration (audit + log-archive accounts,
-  GuardDuty/Security Hub/Config delegated admin), AWS Config multi-account
-  aggregator, CloudTrail organization trail, Security Hub aggregator, IAM
-  Identity Center (permission sets, SSO across accounts), account vending
-  machine (Control Tower Account Factory or Service Catalog + Lambda
-  baseline-stack), AWS Resource Explorer (cross-account search index), and
-  RAM cross-account resource sharing. Emits AUTOMATED with deployment plan
-  or MANUAL_STEP_REQUIRED with the specific gap (e.g., root email + billing
-  alarm + SCP inheritance order). Use when standing up or hardening a
-  multi-account AWS organization.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Designs AWS multi-account governance automation spanning Organizations (OU hierarchy, account creation, SCP guardrail/throttle/deny strategies), Control Tower (landing zone, preventive + detective guardrails, Account Factory Factory), delegated administration (audit + log-archive accounts, GuardDuty/Security Hub/Config delegated admin), AWS Config multi-account aggregator, CloudTrail organization trail, Security Hub aggregator, IAM Identity Center (permission sets, SSO across accounts), account vending machine (Control Tower Account Factory or Service Catalog + Lambda baseline-stack), AWS Resource Explorer (cross-account search index), and RAM cross-account resource sharing. Emits AUTOMATED with deployment plan or MANUAL_STEP_REQUIRED with the specific gap (e.g., root email + billing alarm + SCP inheritance order). Use when standing up or hardening a multi-account AWS organization.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan authoring. Live deployment
-  uses aws organizations create-organization, create-organizational-unit,
-  create-account, create-policy, attach-policy, move-account, enable-policy-type,
-  aws controltower create-landing-zone, create-account, aws configservice
-  put-configuration-aggregator, put-aggregation-authorization, aws cloudtrail
-  create-organization-trail (or update), aws securityhub enable-organization-admin-account,
-  create-finding-aggregator, aws sso-admin create-permission-set,
-  aws resource-explorer-2 create-index, create-view, update-index-type,
-  aws ram create-resource-share — AWS CLI v2, SSO or key-based, management
-  account or delegated-admin credentials.
-keywords:
-  - AWS Organizations
-  - OU hierarchy
-  - SCP
-  - service control policy
-  - Control Tower
-  - landing zone
-  - guardrails
-  - Account Factory
-  - delegated administration
-  - audit account
-  - log archive
-  - Config aggregator
-  - CloudTrail organization trail
-  - Security Hub aggregator
-  - GuardDuty delegated admin
-  - IAM Identity Center
-  - permission set
-  - account vending machine
-  - SCP strategy
-  - Resource Explorer
-  - RAM resource share
-tags:
-  - aws-organizations
-  - control-tower
-  - scp
-  - governance
-  - iam-identity-center
-  - config-aggregator
-  - security-hub
-  - cloudtrail
-  - automate
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan authoring. Live deployment uses aws organizations create-organization, create-organizational-unit, create-account, create-policy, attach-policy, move-account, enable-policy-type, aws controltower create-landing-zone, create-account, aws configservice put-configuration-aggregator, put-aggregation-authorization, aws cloudtrail create-organization-trail (or update), aws...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: automate
   skill_class: capability
   lifecycle_status: active
   verdict_shape: AUTOMATED | MANUAL_STEP_REQUIRED
-  when_to_use: >-
-    Standing up a new multi-account AWS organization, designing an OU
-    hierarchy and SCP baseline, deploying or hardening a Control Tower
-    landing zone, wiring GuardDuty/Security Hub/Config as delegated
-    administrators in an audit account, centralizing CloudTrail and Config
-    aggregation, rolling out IAM Identity Center permission sets across
-    member accounts, building an account vending machine, scoping SCP
-    guardrails vs throttle vs deny, or hardening RAM cross-account shares.
-  when_not_to_use:
-    - Single-account hardening with no cross-account component (use iam-hardening skill).
-    - Tag governance in isolation (use tag-governance-automator — SCP TagPolicy is its surface).
-    - Incident response automation (use incident-response-automator — containment, not governance).
-    - Cost optimization across an org (use FinOps skills — this skill is structure + posture, not spend).
-  activation_triggers:
-    - "multi-account governance"
-    - "OU hierarchy design"
-    - "SCP baseline guardrail"
-    - "Control Tower landing zone"
-    - "Account Factory vending"
-    - "Config aggregator cross-account"
-    - "Security Hub delegated admin"
-    - "CloudTrail organization trail"
-    - "IAM Identity Center permission set"
-    - "Resource Explorer cross-account index"
-    - "RAM resource share cross-account"
-  invocation_schema: >-
-    Input: either (a) a governance requirement ("set up a 50-account org
-    with audit + log-archive", "design SCP guardrails that block root
-    account actions", "deploy a Control Tower landing zone with GuardDuty
-    delegated to audit"), OR (b) an existing Organizations / Control Tower
-    / Config aggregator / Identity Center configuration to audit and
-    harden. Output: deterministic GOVERNANCE block per requirement —
-    STRUCTURE/CONTROLS/DELEGATION/SHARING/VERDICT — where VERDICT is
-    AUTOMATED (deployment plan complete with all gates passing) or
-    MANUAL_STEP_REQUIRED (specific gap cited, e.g., missing SCP inheritance
-    review, stale service control policy, unaggregated member account).
+  when_to_use: Standing up a new multi-account AWS organization, designing an OU hierarchy and SCP baseline, deploying or hardening a Control Tower landing zone, wiring GuardDuty/Security Hub/Config as delegated administrators in an audit account, centralizing CloudTrail and Config aggregation, rolling out IAM Identity Center permission sets across member accounts, building an account vending machine, scoping SCP guardrails vs throttle vs deny, or hardening RAM cross-account shares.
+  when_not_to_use: Single-account hardening with no cross-account component (use iam-hardening skill)., Tag governance in isolation (use tag-governance-automator — SCP TagPolicy is its surface)., Incident response automation (use incident-response-automator — containment, not governance)., Cost optimization across an org (use FinOps skills — this skill is structure + posture, not spend).
+  activation_triggers: multi-account governance, OU hierarchy design, SCP baseline guardrail, Control Tower landing zone, Account Factory vending, Config aggregator cross-account, Security Hub delegated admin, CloudTrail organization trail, IAM Identity Center permission set, Resource Explorer cross-account index, RAM resource share cross-account
+  invocation_schema: 'Input: either (a) a governance requirement ("set up a 50-account org with audit + log-archive", "design SCP guardrails that block root account actions", "deploy a Control Tower landing zone with GuardDuty delegated to audit"), OR (b) an existing Organizations / Control Tower / Config aggregator / Identity Center configuration to audit and harden. Output: deterministic GOVERNANCE block per requirement — STRUCTURE/CONTROLS/DELEGATION/SHARING/VERDICT — where VERDICT is AUTOMATED (deployment plan complete with all gates passing) or MANUAL_STEP_REQUIRED (specific gap cited, e.g., missing SCP inheritance review, stale service control policy, unaggregated member account).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Organizations, OU hierarchy, SCP, service control policy, Control Tower, landing zone, guardrails, Account Factory, delegated administration, audit account, log archive, Config aggregator, CloudTrail organization trail, Security Hub aggregator, GuardDuty delegated admin, IAM Identity Center, permission set, account vending machine, SCP strategy, Resource Explorer, RAM resource share
+  tags: aws-organizations, control-tower, scp, governance, iam-identity-center, config-aggregator, security-hub, cloudtrail, automate
 ---
 
 # Multi-Account Governance Automator

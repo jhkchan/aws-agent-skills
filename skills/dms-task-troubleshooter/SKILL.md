@@ -1,133 +1,28 @@
 ---
 name: dms-task-troubleshooter
-description: >-
-  Diagnoses AWS Database Migration Service (DMS) replication task
-  failures through a systematic diagnostic tree covering task status
-  (stopped, failed, running with errors), source connection failures
-  (security group ingress, IAM trust policy, missing pglogical/MySQL
-  binlog/MS-Replication/Oracle LogMiner), target connection failures
-  (IAM, PK/FK constraint violations), CDC latency (memory pressure,
-  disk swap, Logging disabled), full load errors (table mapping,
-  data type mismatches, LOB limits), and task settings (Logging,
-  validation, ParallelLoadThreads). Walks symptoms to root cause with
-  describe-replication-tasks, task logs, table-statistics, and CDC
-  metrics (CDCLatencySource, CDCLatencyTarget). Emits
-  ROOT_CAUSE_FOUND with the specific failure layer or ESCALATE.
-  Latest coverage: DMS Serverless, DMS with Babelfish, DMS Fleet
-  Advisor. Use when a DMS task is stopped, failed, or showing high
-  CDC latency.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses AWS Database Migration Service (DMS) replication task failures through a systematic diagnostic tree covering task status (stopped, failed, running with errors), source connection failures (security group ingress, IAM trust policy, missing pglogical/MySQL binlog/MS-Replication/Oracle LogMiner), target connection failures (IAM, PK/FK constraint violations), CDC latency (memory pressure, disk swap, Logging disabled), full load errors (table mapping, data type mismatches, LOB limits), and task settings (Logging, validation, ParallelLoadThreads). Walks symptoms to root cause with describe-replication-tasks, task logs, table-statistics, and CDC metrics (CDCLatencySource, CDCLatencyTarget). Emits ROOT_CAUSE_FOUND with the specific failure layer or ESCALATE. Latest coverage: DMS Serverless, DMS with Babelfish, DMS Fleet Advisor. Use when a DMS task is stopped, failed, or showing high CDC latency.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline symptom classification works from pasted
-  task status and error messages. Live-account diagnosis uses aws dms
-  describe-replication-tasks, describe-replication-instances, describe-
-  endpoints, describe-table-statistics, aws logs filter-log-events
-  (CloudWatch Logs for dms-task-<id>), aws cloudwatch get-metric-
-  statistics (DMS namespace: CDCLatencySource, CDCLatencyTarget,
-  CDCChangesDiskSource, CPUUtilization, FreeableMemory), aws ec2
-  describe-security-groups, aws iam get-role (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - AWS DMS
-  - Database Migration Service
-  - replication task
-  - CDC
-  - change data capture
-  - full load
-  - source endpoint
-  - target endpoint
-  - binary logging
-  - binlog
-  - pglogical
-  - MS-Replication
-  - LogMiner
-  - task status failed
-  - task stopped
-  - CDC latency
-  - memory pressure
-  - disk swap
-  - table mapping
-  - data type mismatch
-  - LOB
-  - primary key
-  - foreign key
-  - constraint violation
-  - DMS Serverless
-  - Babelfish
-  - DMS Fleet Advisor
-  - CloudWatch Logs
-  - troubleshooting
-tags: [aws, dms, database-migration, rds, aurora, cdc, replication, troubleshooting]
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted task status and error messages. Live-account diagnosis uses aws dms describe-replication-tasks, describe-replication-instances, describe- endpoints, describe-table-statistics, aws logs filter-log-events (CloudWatch Logs for dms-task-<id>), aws cloudwatch get-metric- statistics (DMS namespace: CDCLatencySource, CDCLatencyTarget, CDCChangesDiskSource...'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Migration
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
-  when_to_use: >-
-    Diagnosing a DMS replication task that is stopped, failed, or
-    running with errors; walking a symptom (task failed, source
-    connection test failed, CDC latency climbing, full load table-
-    statistics stuck at 0 rows, target constraint violation) to the
-    failed layer (source endpoint, network, IAM, target endpoint,
-    schema, task settings, replication instance capacity) with verify
-    and fix commands; triaging a "DMS task is failing" or "CDC lag is
-    growing" page where the root cause may be source binary logging
-    disabled, source SG ingress blocked, IAM role trust policy wrong,
-    target PK/FK constraints, memory pressure on CDC, disk swap on
-    the replication instance, table-mapping wildcards excluding
-    tables, data type mismatches, or LOB size limits — not necessarily
-    the DMS service itself.
-  when_not_to_use: >-
-    Pre-migration assessment and database inventory (use Amazon DMS
-    Fleet Advisor directly, not the troubleshooter), choosing source
-    and target engines (use the deploy task type for endpoint
-    creation), or cost optimization of DMS resources (use the
-    optimize task type). This skill diagnoses runtime task failures
-    and CDC latency, not greenfield planning.
-  activation_triggers:
-    - "DMS task failed"
-    - "DMS task stopped"
-    - "DMS replication task error"
-    - "DMS source connection failed"
-    - "DMS target connection failed"
-    - "DMS CDC latency"
-    - "DMS CDC lag growing"
-    - "DMS full load stuck"
-    - "DMS table statistics zero rows"
-    - "DMS binary logging disabled"
-    - "DMS pglogical not installed"
-    - "DMS constraint violation"
-    - "DMS data type mismatch"
-    - "DMS LOB size limit"
-    - "DMS memory pressure"
-    - "DMS disk swap"
-    - "DMS Serverless"
-    - "DMS Babelfish"
-    - "DMS Fleet Advisor"
-  invocation_schema: >-
-    Input: either (a) a symptom description (task status failed,
-    observed error message, failing table, CDC latency value), paired
-    with the DMS task metadata (describe-replication-tasks, describe-
-    endpoints, describe-replication-instances, table-statistics
-    output), OR (b) a task ARN or name for live-account diagnosis.
-    Output: a deterministic TARGET / VERDICT / REASON / LAYER /
-    EVIDENCE / REMEDIATION block where VERDICT is in
-    {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and LAYER is in
-    {SOURCE_CONNECTION, SOURCE_BINARY_LOGGING, SOURCE_PERMISSIONS,
-    TARGET_CONNECTION, TARGET_CONSTRAINTS, TARGET_PERMISSIONS,
-    TASK_SETTINGS, TABLE_MAPPING, DATA_TYPE_MISMATCH, LOB_LIMIT,
-    INSTANCE_CAPACITY, MEMORY_PRESSURE, DISK_SWAP, NETWORK_SG,
-    IAM_ROLE, DMS_SERVICE, UNKNOWN}.
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+  when_to_use: Diagnosing a DMS replication task that is stopped, failed, or running with errors; walking a symptom (task failed, source connection test failed, CDC latency climbing, full load table- statistics stuck at 0 rows, target constraint violation) to the failed layer (source endpoint, network, IAM, target endpoint, schema, task settings, replication instance capacity) with verify and fix commands; triaging a "DMS task is failing" or "CDC lag is growing" page where the root cause may be source binary logging disabled, source SG ingress blocked, IAM role trust policy wrong, target PK/FK constraints, memory pressure on CDC, disk swap on the replication instance, table-mapping wildcards excluding tables, data type mismatches, or LOB size limits — not necessarily the DMS service itself.
+  when_not_to_use: Pre-migration assessment and database inventory (use Amazon DMS Fleet Advisor directly, not the troubleshooter), choosing source and target engines (use the deploy task type for endpoint creation), or cost optimization of DMS resources (use the optimize task type). This skill diagnoses runtime task failures and CDC latency, not greenfield planning.
+  activation_triggers: DMS task failed, DMS task stopped, DMS replication task error, DMS source connection failed, DMS target connection failed, DMS CDC latency, DMS CDC lag growing, DMS full load stuck, DMS table statistics zero rows, DMS binary logging disabled, DMS pglogical not installed, DMS constraint violation, DMS data type mismatch, DMS LOB size limit, DMS memory pressure, DMS disk swap, DMS Serverless, DMS Babelfish, DMS Fleet Advisor
+  invocation_schema: 'Input: either (a) a symptom description (task status failed, observed error message, failing table, CDC latency value), paired with the DMS task metadata (describe-replication-tasks, describe- endpoints, describe-replication-instances, table-statistics output), OR (b) a task ARN or name for live-account diagnosis. Output: a deterministic TARGET / VERDICT / REASON / LAYER / EVIDENCE / REMEDIATION block where VERDICT is in {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and LAYER is in {SOURCE_CONNECTION, SOURCE_BINARY_LOGGING, SOURCE_PERMISSIONS, TARGET_CONNECTION, TARGET_CONSTRAINTS, TARGET_PERMISSIONS, TASK_SETTINGS, TABLE_MAPPING, DATA_TYPE_MISMATCH, LOB_LIMIT, INSTANCE_CAPACITY, MEMORY_PRESSURE, DISK_SWAP, NETWORK_SG, IAM_ROLE, DMS_SERVICE, UNKNOWN}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS DMS, Database Migration Service, replication task, CDC, change data capture, full load, source endpoint, target endpoint, binary logging, binlog, pglogical, MS-Replication, LogMiner, task status failed, task stopped, CDC latency, memory pressure, disk swap, table mapping, data type mismatch, LOB, primary key, foreign key, constraint violation, DMS Serverless, Babelfish, DMS Fleet Advisor, CloudWatch Logs, troubleshooting
+  tags: aws, dms, database-migration, rds, aurora, cdc, replication, troubleshooting
 ---
 
 # DMS Task Troubleshooter

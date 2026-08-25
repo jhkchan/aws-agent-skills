@@ -1,83 +1,24 @@
 ---
 name: cloudwatch-logs-retention-auditor
-description: >-
-  Audits CloudWatch Logs log groups for Never-expire retention (silent
-  infinite-cost accumulation), missing SSE-KMS customer-managed-key (CMK)
-  encryption, excessive-retention × volume cost exposure, subscription
-  filter fan-out (Lambda/Kinesis/Cross-account destination), missing
-  metric filters, and absent CloudWatch Logs Anomaly Detectors. Emits a
-  deterministic first-fail-wins verdict
-  (NO_RETENTION | NO_ENCRYPTION | COST_RISK | CONFIG_GAP | OK) per log
-  group with enumerated findings and CLI remediation. Use when reviewing
-  CloudWatch Logs posture, auditing log group retention, validating KMS
-  CMK encryption, hunting for runaway cost on Never-expire groups,
-  checking metric-filter / anomaly-detector observability coverage, or
-  hardening log-group posture before compliance review.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits CloudWatch Logs log groups for Never-expire retention (silent infinite-cost accumulation), missing SSE-KMS customer-managed-key (CMK) encryption, excessive-retention × volume cost exposure, subscription filter fan-out (Lambda/Kinesis/Cross-account destination), missing metric filters, and absent CloudWatch Logs Anomaly Detectors. Emits a deterministic first-fail-wins verdict (NO_RETENTION | NO_ENCRYPTION | COST_RISK | CONFIG_GAP | OK) per log group with enumerated findings and CLI remediation. Use when reviewing CloudWatch Logs posture, auditing log group retention, validating KMS CMK encryption, hunting for runaway cost on Never-expire groups, checking metric-filter / anomaly-detector observability coverage, or hardening log-group posture before compliance review.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline config classification.
-  Live-account audits use aws logs describe-log-groups,
-  describe-metric-filters, describe-subscription-filters,
-  describe-anomaly-detectors, and aws kms describe-key (AWS CLI v2, SSO
-  or key-based credentials).
-keywords:
-  - CloudWatch Logs
-  - log group retention
-  - Never expire
-  - retentionInDays
-  - SSE-KMS
-  - customer-managed key
-  - kmsKeyId
-  - metric filter
-  - subscription filter
-  - anomaly detector
-  - CloudWatch Logs Insights
-  - storedBytes
-  - PutRetentionPolicy
-  - AssociateKmsKey
-  - PutMetricFilter
-  - PutSubscriptionFilter
-  - log cost audit
-  - infinite retention
-  - compliance retention
-  - observability gap
-tags: [cloudwatch-logs, management, retention, cost, kms-encryption, metric-filters, anomaly-detection, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline config classification. Live-account audits use aws logs describe-log-groups, describe-metric-filters, describe-subscription-filters, describe-anomaly-detectors, and aws kms describe-key (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
-  verdict_shape: "NO_RETENTION | NO_ENCRYPTION | COST_RISK | CONFIG_GAP | OK"
-  when_to_use: >-
-    Pre-compliance review of CloudWatch Logs log groups, Never-expire
-    retention audits, KMS CMK encryption verification, runaway log cost
-    investigations, metric-filter / anomaly-detector coverage audits, or
-    hardening log-group posture before production cutover.
-  activation_triggers:
-    - "audit this CloudWatch Logs group"
-    - "is my log group retention set"
-    - "Never expire log group"
-    - "check CloudWatch Logs cost"
-    - "is CloudWatch Logs encrypted with KMS"
-    - "are metric filters configured"
-    - "is anomaly detection enabled"
-    - "subscription filter audit"
-    - "CloudWatch Logs compliance check"
-    - "log group cost risk"
-  invocation_schema: >-
-    Input: either (a) describe-log-groups output (JSON or key-value
-    summary) for one log group, optionally paired with
-    describe-metric-filters, describe-subscription-filters, and
-    describe-anomaly-detectors output, OR (b) a log-group name/ARN for
-    live-account audit. Output: deterministic LOG_GROUP/VERDICT/REASON/
-    FINDINGS/REMEDIATION block per log group, where VERDICT ∈
-    {NO_RETENTION, NO_ENCRYPTION, COST_RISK, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: NO_RETENTION | NO_ENCRYPTION | COST_RISK | CONFIG_GAP | OK
+  when_to_use: Pre-compliance review of CloudWatch Logs log groups, Never-expire retention audits, KMS CMK encryption verification, runaway log cost investigations, metric-filter / anomaly-detector coverage audits, or hardening log-group posture before production cutover.
+  activation_triggers: audit this CloudWatch Logs group, is my log group retention set, Never expire log group, check CloudWatch Logs cost, is CloudWatch Logs encrypted with KMS, are metric filters configured, is anomaly detection enabled, subscription filter audit, CloudWatch Logs compliance check, log group cost risk
+  invocation_schema: 'Input: either (a) describe-log-groups output (JSON or key-value summary) for one log group, optionally paired with describe-metric-filters, describe-subscription-filters, and describe-anomaly-detectors output, OR (b) a log-group name/ARN for live-account audit. Output: deterministic LOG_GROUP/VERDICT/REASON/ FINDINGS/REMEDIATION block per log group, where VERDICT ∈ {NO_RETENTION, NO_ENCRYPTION, COST_RISK, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudWatch Logs, log group retention, Never expire, retentionInDays, SSE-KMS, customer-managed key, kmsKeyId, metric filter, subscription filter, anomaly detector, CloudWatch Logs Insights, storedBytes, PutRetentionPolicy, AssociateKmsKey, PutMetricFilter, PutSubscriptionFilter, log cost audit, infinite retention, compliance retention, observability gap
+  tags: cloudwatch-logs, management, retention, cost, kms-encryption, metric-filters, anomaly-detection, audit
 ---
 
 # CloudWatch Logs Retention & Cost Auditor

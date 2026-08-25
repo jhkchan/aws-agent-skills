@@ -1,124 +1,28 @@
 ---
 name: sagemaker-training-job-operator
-description: >-
-  Operates Amazon SageMaker training jobs end-to-end — job creation
-  (algorithm spec, input data S3 channels, output S3, instance
-  type, volume size, hyperparameters), spot training
-  (SpotInstanceConfig with checkpointing S3), distributed training
-  (multi-GPU, multi-instance, SageMaker Distributed Data Parallel
-  and Model Parallel), warm pools (reuse provisioned instances),
-  automatic model tuning (HPO with warm starts), and model
-  artifacts (register-model, model registry versioning). Covers
-  SageMaker Training Compiler, P5 instances (H100), and training
-  plan management. Runs deterministic pre-checks (instance quota,
-  image existence, S3 input access, KMS, IAM role, VPC, warm pool
-  availability), executes behind a CONFIRM gate, and emits
-  READY | BLOCKED | COMPLETED with the exact CLI sequence and
-  post-verification. Use when launching a training job, configuring
-  spot/distributed training, setting up HPO, registering a model,
-  or resolving a BLOCKED training job.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates Amazon SageMaker training jobs end-to-end — job creation (algorithm spec, input data S3 channels, output S3, instance type, volume size, hyperparameters), spot training (SpotInstanceConfig with checkpointing S3), distributed training (multi-GPU, multi-instance, SageMaker Distributed Data Parallel and Model Parallel), warm pools (reuse provisioned instances), automatic model tuning (HPO with warm starts), and model artifacts (register-model, model registry versioning). Covers SageMaker Training Compiler, P5 instances (H100), and training plan management. Runs deterministic pre-checks (instance quota, image existence, S3 input access, KMS, IAM role, VPC, warm pool availability), executes behind a CONFIRM gate, and emits READY | BLOCKED | COMPLETED with the exact CLI sequence and post-verification. Use when launching a training job, configuring spot/distributed training, setting up HPO, registering a model, or resolving a BLOCKED training job.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline plan classification works on a supplied
-  job configuration. Live-account operations use aws sagemaker
-  create-training-job, describe-training-job, stop-training-job,
-  create-hyper-parameter-tuning-job, describe-hyper-parameter-tuning-job,
-  create-model, create-model-package, describe-model-package-group,
-  update-training-job (warm pools), aws service-quotas
-  get-service-quota, and aws ec2 describe-instances (for VPC and
-  security group verification) (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-  - SageMaker
-  - training job
-  - spot training
-  - SpotInstanceConfig
-  - checkpointing
-  - distributed training
-  - SageMaker Distributed Data Parallel
-  - SageMaker Distributed Model Parallel
-  - warm pools
-  - hyperparameter optimization
-  - HPO
-  - automatic model tuning
-  - model registry
-  - register-model
-  - Training Compiler
-  - P5 instances
-  - H100
-  - training plan
-  - capacity reservation
-  - algorithm spec
-tags:
-  - sagemaker
-  - ai-ml
-  - operate
-  - training
-  - distributed-training
-  - hpo
-  - model-registry
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline plan classification works on a supplied job configuration. Live-account operations use aws sagemaker create-training-job, describe-training-job, stop-training-job, create-hyper-parameter-tuning-job, describe-hyper-parameter-tuning-job, create-model, create-model-package, describe-model-package-group, update-training-job (warm pools), aws service-quotas get-service-quota, and aws ec2 describe-instances...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AI/ML
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Launching or operating a SageMaker training job (single-instance,
-    spot, distributed, or warm-pool), configuring SageMaker
-    Distributed Data Parallel or Model Parallel for multi-GPU /
-    multi-instance training, setting up checkpoint S3 for spot
-    recovery, launching an automatic model tuning (HPO) job with
-    warm starts, registering a trained model in the model registry
-    (register-model, create-model-package), resolving a BLOCKED
-    training job (instance quota, image access, S3 permissions, VPC
-    misconfiguration, warm pool capacity), or selecting the correct
-    instance type (P5 / P5e H100, P4de A100, G5, Trn1) and Training
-    Compiler configuration.
-  when_not_to_use: >-
-    SageMaker endpoint deployment or real-time inference (use the
-    sagemaker-endpoint-deployer skill), SageMaker Studio or domain
-    setup (use the sagemaker-studio operator), SageMaker audit and
-    security posture (use the sagemaker-endpoint-auditor), or
-    non-SageMaker training (EC2-based training, ECS, EKS).
-  activation_triggers:
-    - "SageMaker training job"
-    - "create-training-job"
-    - "spot training"
-    - "SpotInstanceConfig"
-    - "checkpoint S3"
-    - "distributed training"
-    - "SageMaker Distributed Data Parallel"
-    - "SageMaker Distributed Model Parallel"
-    - "warm pool"
-    - "hyperparameter tuning"
-    - "automatic model tuning"
-    - "HPO"
-    - "register-model"
-    - "model registry"
-    - "Training Compiler"
-    - "P5 instance"
-    - "H100 training"
-    - "training plan"
-    - "SageMaker training BLOCKED"
-    - "training job Failed"
-  invocation_schema: >-
-    Input: either (a) a training job configuration with the
-    algorithm spec, input/output S3, instance type, hyperparameters,
-    and optional spot/distributed/warm-pool/HPO settings, OR (b) a
-    job-name + operation for live-account execution (launch,
-    describe, stop, register-model). Output: a deterministic
-    OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY block
-    per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Launching or operating a SageMaker training job (single-instance, spot, distributed, or warm-pool), configuring SageMaker Distributed Data Parallel or Model Parallel for multi-GPU / multi-instance training, setting up checkpoint S3 for spot recovery, launching an automatic model tuning (HPO) job with warm starts, registering a trained model in the model registry (register-model, create-model-package), resolving a BLOCKED training job (instance quota, image access, S3 permissions, VPC misconfiguration, warm pool capacity), or selecting the correct instance type (P5 / P5e H100, P4de A100, G5, Trn1) and Training Compiler configuration.
+  when_not_to_use: SageMaker endpoint deployment or real-time inference (use the sagemaker-endpoint-deployer skill), SageMaker Studio or domain setup (use the sagemaker-studio operator), SageMaker audit and security posture (use the sagemaker-endpoint-auditor), or non-SageMaker training (EC2-based training, ECS, EKS).
+  activation_triggers: SageMaker training job, create-training-job, spot training, SpotInstanceConfig, checkpoint S3, distributed training, SageMaker Distributed Data Parallel, SageMaker Distributed Model Parallel, warm pool, hyperparameter tuning, automatic model tuning, HPO, register-model, model registry, Training Compiler, P5 instance, H100 training, training plan, SageMaker training BLOCKED, training job Failed
+  invocation_schema: 'Input: either (a) a training job configuration with the algorithm spec, input/output S3, instance type, hyperparameters, and optional spot/distributed/warm-pool/HPO settings, OR (b) a job-name + operation for live-account execution (launch, describe, stop, register-model). Output: a deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: SageMaker, training job, spot training, SpotInstanceConfig, checkpointing, distributed training, SageMaker Distributed Data Parallel, SageMaker Distributed Model Parallel, warm pools, hyperparameter optimization, HPO, automatic model tuning, model registry, register-model, Training Compiler, P5 instances, H100, training plan, capacity reservation, algorithm spec
+  tags: sagemaker, ai-ml, operate, training, distributed-training, hpo, model-registry
 ---
 
 # SageMaker Training Job Operator

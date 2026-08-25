@@ -1,106 +1,26 @@
 ---
 name: batch-compute-environment-deployer
-description: >-
-  Provisions AWS Batch compute environments, job queues, and job
-  definitions with production defaults: EC2 vs Fargate vs EKS compute
-  environment types, launch template integration, allocation strategy
-  (BEST_FIT, BEST_FIT_PROGRESSIVE, SPOT_CAPACITY_OPTIMIZED), instance
-  types and role, min/max/desired vCPUs, subnets and security groups,
-  job queue with priority levels, job definition (container image,
-  vCPU/memory, resources, env vars, mount points), job dependencies
-  (sequential, N-ary), array jobs, CloudWatch metrics (CPUPct,
-  MemoryPct, RUNNABLE), spot instance integration, Fargate platform
-  version. Emits a READY_TO_DEPLOY checklist with verification
-  commands. Use when creating a Batch compute environment, setting up
-  a job queue, registering a job definition, configuring spot instances
-  for Batch, or running array jobs with dependencies. Triggers: batch
-  compute environment, job queue, job definition, allocation strategy,
-  spot capacity, batch fargate, array jobs, job dependencies.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Batch compute environments, job queues, and job definitions with production defaults: EC2 vs Fargate vs EKS compute environment types, launch template integration, allocation strategy (BEST_FIT, BEST_FIT_PROGRESSIVE, SPOT_CAPACITY_OPTIMIZED), instance types and role, min/max/desired vCPUs, subnets and security groups, job queue with priority levels, job definition (container image, vCPU/memory, resources, env vars, mount points), job dependencies (sequential, N-ary), array jobs, CloudWatch metrics (CPUPct, MemoryPct, RUNNABLE), spot instance integration, Fargate platform version. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Batch compute environment, setting up a job queue, registering a job definition, configuring spot instances for Batch, or running array jobs with dependencies. Triggers: batch compute environment, job queue, job definition, allocation strategy, spot capacity, batch fargate, array jobs, job dependencies.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with batch, ec2, iam,
-  and ecs access. Works with Terraform aws_batch_compute_environment /
-  aws_batch_job_queue / aws_batch_job_definition resources and
-  CloudFormation AWS::Batch::ComputeEnvironment /
-  AWS::Batch::JobQueue / AWS::Batch::JobDefinition templates.
-keywords:
-  - aws
-  - batch
-  - compute environment
-  - job queue
-  - job definition
-  - cloudops
-  - deploy
-  - provisioning
-  - allocation strategy
-  - spot
-  - fargate
-  - eks
-  - array jobs
-  - job dependencies
-tags:
-  - aws
-  - batch
-  - compute-environment
-  - cloudops
-  - deploy
-  - compute
-  - provisioning
-  - job-queue
-  - job-definition
-  - spot
-  - fargate
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with batch, ec2, iam, and ecs access. Works with Terraform aws_batch_compute_environment / aws_batch_job_queue / aws_batch_job_definition resources and CloudFormation AWS::Batch::ComputeEnvironment / AWS::Batch::JobQueue / AWS::Batch::JobDefinition templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - batch
-    - compute-environment
-    - cloudops
-    - deploy
-    - compute
-    - provisioning
-    - job-queue
-    - job-definition
-    - spot
-    - fargate
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create batch compute environment
-    - batch job queue
-    - register job definition
-    - batch allocation strategy
-    - batch spot capacity
-    - batch fargate
-    - batch array jobs
-    - batch job dependencies
-  when_to_use: >-
-    Invoke when the user wants to create an AWS Batch compute
-    environment (EC2, Fargate, or EKS), set up a job queue with priority
-    levels, register a job definition with container and resource
-    specifications, configure spot instance integration, use allocation
-    strategies (BEST_FIT, BEST_FIT_PROGRESSIVE, SPOT_CAPACITY_OPTIMIZED),
-    or configure array jobs with dependencies. Do NOT invoke for ECS
-    task definitions (use ecs-fargate-deployer), EKS cluster creation
-    (use eks skills), or Lambda functions (use lambda skills).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, batch, compute-environment, cloudops, deploy, compute, provisioning, job-queue, job-definition, spot, fargate
+  dependencies: aws-orchestrator
+  keywords: aws, batch, compute environment, job queue, job definition, cloudops, deploy, provisioning, allocation strategy, spot, fargate, eks, array jobs, job dependencies
+  when_to_use: Invoke when the user wants to create an AWS Batch compute environment (EC2, Fargate, or EKS), set up a job queue with priority levels, register a job definition with container and resource specifications, configure spot instance integration, use allocation strategies (BEST_FIT, BEST_FIT_PROGRESSIVE, SPOT_CAPACITY_OPTIMIZED), or configure array jobs with dependencies. Do NOT invoke for ECS task definitions (use ecs-fargate-deployer), EKS cluster creation (use eks skills), or Lambda functions (use lambda skills).
 ---
 
 # Batch Compute Environment Deployer

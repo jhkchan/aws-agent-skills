@@ -1,114 +1,26 @@
 ---
 name: vpclattice-service-deployer
-description: >-
-  Provisions Amazon VPC Lattice services with production defaults:
-  service network creation (top-level routing plane), service (HTTP/gRPC),
-  target group (instance/IP/Lambda/ALB), listener rules (path-based,
-  header-based, method-based routing), IAM auth policy (service-level not
-  rule-level), resource-based service policy, target group health checks
-  (determines routing eligibility), cross-account service access, custom
-  domain name mapping, service network VPC association, traffic splitting
-  for canary deployments, access log delivery to CloudWatch/S3, and
-  pricing per GB processed. Emits a READY_TO_DEPLOY checklist with
-  verification commands. Use when creating a VPC Lattice service network,
-  configuring Lattice services, setting up target groups, defining
-  listener rules, applying IAM auth policies, enabling access logs, or
-  configuring canary traffic splitting. Triggers: create vpc lattice
-  service network, vpc lattice target group, vpc lattice listener rule,
-  vpc lattice auth policy, vpc lattice traffic splitting, vpc lattice
-  custom domain, vpc lattice service network vpc association, vpc lattice
-  cross-account access, vpc lattice access logs, vpc lattice health check.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon VPC Lattice services with production defaults: service network creation (top-level routing plane), service (HTTP/gRPC), target group (instance/IP/Lambda/ALB), listener rules (path-based, header-based, method-based routing), IAM auth policy (service-level not rule-level), resource-based service policy, target group health checks (determines routing eligibility), cross-account service access, custom domain name mapping, service network VPC association, traffic splitting for canary deployments, access log delivery to CloudWatch/S3, and pricing per GB processed. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a VPC Lattice service network, configuring. Triggers: create vpc lattice service network, vpc lattice target group, vpc lattice listener rule, vpc lattice auth policy, vpc lattice traffic splitting, vpc lattice custom domain, vpc lattice service network vpc association, vpc lattice cross-account access, vpc lattice access logs, vpc lattice health check.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with vpc-lattice
-  access. Works with Terraform aws_vpclattice_service_network /
-  aws_vpclattice_service / aws_vpclattice_target_group /
-  aws_vpclattice_listener resources and CloudFormation
-  AWS::VpcLattice::ServiceNetwork / Service / TargetGroup templates.
-keywords:
-  - aws
-  - vpc lattice
-  - service network
-  - lattice service
-  - target group
-  - listener rule
-  - cloudops
-  - deploy
-  - provisioning
-  - auth policy
-  - traffic splitting
-  - canary
-  - custom domain
-  - health check
-  - access logs
-  - cross-account
-tags:
-  - aws
-  - vpc-lattice
-  - service-network
-  - cloudops
-  - deploy
-  - networking
-  - provisioning
-  - auth-policy
-  - traffic-splitting
-  - canary
-  - health-check
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with vpc-lattice access. Works with Terraform aws_vpclattice_service_network / aws_vpclattice_service / aws_vpclattice_target_group / aws_vpclattice_listener resources and CloudFormation AWS::VpcLattice::ServiceNetwork / Service / TargetGroup templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - vpc-lattice
-    - service-network
-    - cloudops
-    - deploy
-    - networking
-    - provisioning
-    - auth-policy
-    - traffic-splitting
-    - canary
-    - health-check
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create vpc lattice service network
-    - vpc lattice target group
-    - vpc lattice listener rule
-    - vpc lattice auth policy
-    - vpc lattice traffic splitting
-    - vpc lattice custom domain
-    - vpc lattice service network vpc association
-    - vpc lattice cross-account access
-    - vpc lattice access logs
-    - vpc lattice health check
-  when_to_use: >-
-    Invoke when the user wants to create an Amazon VPC Lattice service
-    network, provision Lattice services (HTTP or gRPC), configure target
-    groups (instance/IP/Lambda/ALB), define listener rules (path-based,
-    header-based, method-based routing), apply IAM auth policies at the
-    service level, set up resource-based service policies, configure
-    target group health checks, enable cross-account service access, map
-    custom domain names, associate VPCs with a service network, configure
-    traffic splitting for canary deployments, or deliver access logs to
-    CloudWatch/S3. Do NOT invoke for AWS Transit Gateway, VPC peering,
-    ALB/NLB provisioning, or API Gateway (HTTP API).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, vpc-lattice, service-network, cloudops, deploy, networking, provisioning, auth-policy, traffic-splitting, canary, health-check
+  dependencies: aws-orchestrator
+  keywords: aws, vpc lattice, service network, lattice service, target group, listener rule, cloudops, deploy, provisioning, auth policy, traffic splitting, canary, custom domain, health check, access logs, cross-account
+  when_to_use: Invoke when the user wants to create an Amazon VPC Lattice service network, provision Lattice services (HTTP or gRPC), configure target groups (instance/IP/Lambda/ALB), define listener rules (path-based, header-based, method-based routing), apply IAM auth policies at the service level, set up resource-based service policies, configure target group health checks, enable cross-account service access, map custom domain names, associate VPCs with a service network, configure traffic splitting for canary deployments, or deliver access logs to CloudWatch/S3. Do NOT invoke for AWS Transit Gateway, VPC peering, ALB/NLB provisioning, or API Gateway (HTTP API).
 ---
 
 # VPC Lattice Service Deployer

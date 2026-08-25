@@ -1,114 +1,27 @@
 ---
 name: eventbridge-pipe-deployer
-description: >-
-  Provisions production-grade Amazon EventBridge Pipes connecting sources
-  (DynamoDB Streams, Kinesis, SQS, MSK, Amazon MQ, self-managed Kafka)
-  to targets (Lambda, Step Functions, EventBridge bus, SQS, SNS, ECS,
-  API Gateway, API Destination, Redshift, SageMaker, AWS Batch) with
-  optional filter patterns, optional enrichment (Lambda, Step Functions,
-  API Gateway, API Destination), batch windowing, dead-letter queue,
-  and correct IAM roles. Emits READY_TO_DEPLOY with an ordered CLI plan
-  or PREREQUISITES_MISSING with the specific gap. Use when wiring a
-  streaming source to a downstream target via Pipes, configuring batch
-  windows and DLQs, adding enrichment transformations, or routing
-  Kafka/MSK topics to Step Functions.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Provisions production-grade Amazon EventBridge Pipes connecting sources (DynamoDB Streams, Kinesis, SQS, MSK, Amazon MQ, self-managed Kafka) to targets (Lambda, Step Functions, EventBridge bus, SQS, SNS, ECS, API Gateway, API Destination, Redshift, SageMaker, AWS Batch) with optional filter patterns, optional enrichment (Lambda, Step Functions, API Gateway, API Destination), batch windowing, dead-letter queue, and correct IAM roles. Emits READY_TO_DEPLOY with an ordered CLI plan or PREREQUISITES_MISSING with the specific gap. Use when wiring a streaming source to a downstream target via Pipes, configuring batch windows and DLQs, adding enrichment transformations, or routing Kafka/MSK topics to Step Functions.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline plan generation.
-  Live deployment uses aws pipes create-pipe, update-pipe,
-  start-pipe, describe-pipe, tag-resource, aws iam create-role,
-  attach-role-policy, aws sqs create-queue, get-queue-attributes,
-  aws dynamodbstreams describe-stream, aws kinesis describe-stream,
-  aws kafka describe-cluster, aws mq describe-broker, and
-  aws lambda add-permission (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - EventBridge Pipes
-  - pipe deploy
-  - DynamoDB Streams source
-  - Kinesis source
-  - SQS source
-  - MSK source
-  - Amazon MQ source
-  - self-managed Kafka
-  - Lambda target
-  - Step Functions target
-  - EventBridge bus target
-  - SQS target
-  - SNS target
-  - ECS task target
-  - API Gateway target
-  - API Destination target
-  - Redshift target
-  - SageMaker target
-  - AWS Batch target
-  - enrichment Lambda
-  - enrichment Step Functions
-  - filter pattern
-  - batch window
-  - MaximumBatchingWindowInSeconds
-  - MaximumBatchSize
-  - dead-letter queue
-  - DLQ
-  - pipe IAM role
-  - enrichment transformation
-tags: [eventbridge, pipes, app-integration, event-driven, deploy, streaming, dlq, batch-window, enrichment]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan generation. Live deployment uses aws pipes create-pipe, update-pipe, start-pipe, describe-pipe, tag-resource, aws iam create-role, attach-role-policy, aws sqs create-queue, get-queue-attributes, aws dynamodbstreams describe-stream, aws kinesis describe-stream, aws kafka describe-cluster, aws mq describe-broker, and aws lambda add-permission (AWS CLI v2, SSO or key-based...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Provisioning a new EventBridge Pipe from a streaming or polling
-    source to a downstream target, configuring batch windowing and
-    concurrency, attaching a dead-letter queue for failed events,
-    inserting an enrichment step (Lambda, Step Functions, API Gateway,
-    API Destination), wiring an AWS Batch or Redshift or SageMaker
-    target, configuring a filter pattern to pre-filter source records,
-    or sourcing from MSK / Amazon MQ / self-managed Kafka.
-  activation_triggers:
-    - "create EventBridge Pipe"
-    - "deploy EventBridge Pipe"
-    - "DynamoDB Streams to Lambda pipe"
-    - "Kinesis to Step Functions pipe"
-    - "SQS to Lambda pipe"
-    - "MSK source pipe"
-    - "Amazon MQ source pipe"
-    - "self-managed Kafka pipe"
-    - "pipe enrichment Lambda"
-    - "pipe enrichment Step Functions"
-    - "pipe filter pattern"
-    - "pipe batch window"
-    - "MaximumBatchingWindowInSeconds"
-    - "pipe DLQ"
-    - "EventBridge Pipe IAM role"
-    - "pipe to EventBridge bus"
-    - "pipe to ECS task"
-    - "pipe to API Destination"
-    - "pipe to Redshift"
-    - "pipe to SageMaker"
-    - "pipe to AWS Batch"
-  invocation_schema: >-
-    Input (one of): (a) a deployment spec — source (DynamoDB Streams /
-    Kinesis / SQS / MSK / Amazon MQ / self-managed Kafka), optional
-    filter pattern, optional enrichment (Lambda / Step Functions / API
-    Gateway / API Destination), target (Lambda / Step Functions /
-    EventBridge bus / SQS / SNS / ECS / API Gateway / API Destination /
-    Redshift / SageMaker / Batch), batch window and batch size, DLQ
-    ARN, IAM role configuration; (b) a partial spec for interactive
-    refinement; (c) an existing pipe ARN for review against the
-    well-architected checklist. Output: PIPE_SPEC, VERDICT,
-    ARCHITECTURE, CHECKLIST[], FINDINGS[], DEPLOY_COMMANDS — where
-    VERDICT is READY_TO_DEPLOY or PREREQUISITES_MISSING.
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Provisioning a new EventBridge Pipe from a streaming or polling source to a downstream target, configuring batch windowing and concurrency, attaching a dead-letter queue for failed events, inserting an enrichment step (Lambda, Step Functions, API Gateway, API Destination), wiring an AWS Batch or Redshift or SageMaker target, configuring a filter pattern to pre-filter source records, or sourcing from MSK / Amazon MQ / self-managed Kafka.
+  activation_triggers: create EventBridge Pipe, deploy EventBridge Pipe, DynamoDB Streams to Lambda pipe, Kinesis to Step Functions pipe, SQS to Lambda pipe, MSK source pipe, Amazon MQ source pipe, self-managed Kafka pipe, pipe enrichment Lambda, pipe enrichment Step Functions, pipe filter pattern, pipe batch window, MaximumBatchingWindowInSeconds, pipe DLQ, EventBridge Pipe IAM role, pipe to EventBridge bus, pipe to ECS task, pipe to API Destination, pipe to Redshift, pipe to SageMaker, pipe to AWS Batch
+  invocation_schema: 'Input (one of): (a) a deployment spec — source (DynamoDB Streams / Kinesis / SQS / MSK / Amazon MQ / self-managed Kafka), optional filter pattern, optional enrichment (Lambda / Step Functions / API Gateway / API Destination), target (Lambda / Step Functions / EventBridge bus / SQS / SNS / ECS / API Gateway / API Destination / Redshift / SageMaker / Batch), batch window and batch size, DLQ ARN, IAM role configuration; (b) a partial spec for interactive refinement; (c) an existing pipe ARN for review against the well-architected checklist. Output: PIPE_SPEC, VERDICT, ARCHITECTURE, CHECKLIST[], FINDINGS[], DEPLOY_COMMANDS — where VERDICT is READY_TO_DEPLOY or PREREQUISITES_MISSING.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: EventBridge Pipes, pipe deploy, DynamoDB Streams source, Kinesis source, SQS source, MSK source, Amazon MQ source, self-managed Kafka, Lambda target, Step Functions target, EventBridge bus target, SQS target, SNS target, ECS task target, API Gateway target, API Destination target, Redshift target, SageMaker target, AWS Batch target, enrichment Lambda, enrichment Step Functions, filter pattern, batch window, MaximumBatchingWindowInSeconds, MaximumBatchSize, dead-letter queue, DLQ, pipe IAM role, enrichment transformation
+  tags: eventbridge, pipes, app-integration, event-driven, deploy, streaming, dlq, batch-window, enrichment
 ---
 
 # EventBridge Pipe Deployer

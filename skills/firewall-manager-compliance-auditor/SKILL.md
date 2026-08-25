@@ -1,74 +1,23 @@
 ---
 name: firewall-manager-compliance-auditor
-description: >-
-  Audits AWS Firewall Manager (FMS) policies across WAF, Shield Advanced,
-  VPC Security Groups, Network Firewall, DNS Firewall, and third-party
-  firewalls — evaluates policy state (READY vs NOT_READY), resource-tag
-  scope coverage gaps, RemediationEnabled posture (enforce vs detect-only),
-  PolicyType currency (WAFV2 vs legacy WAF), IncludeMap/ExcludeMap
-  account/OU coverage, ResourceTypeLists completeness, and live
-  NonCompliantResourceCount. Emits a deterministic verdict
-  (NONCOMPLIANT | INCOMPLETE_COVERAGE | CONFIG_GAP | OK) per policy with
-  enumerated findings and specific CLI remediation. Use when reviewing
-  FMS policy coverage, checking WAF/SG/Shield policy scope, auditing
-  resource-tag enforcement, validating remediation posture, or hardening
-  FMS posture across an AWS Organization. Triggers: Firewall Manager,
-  FMS, policy compliance, WAF policy, Shield Advanced policy, Security
-  Group policy, Network Firewall policy, DNS Firewall policy,
-  RemediationEnabled, PolicyState, NOT_READY, ResourceTags scope,
-  IncludeMap, ExcludeMap, NonCompliantResourceCount.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Audits AWS Firewall Manager (FMS) policies across WAF, Shield Advanced, VPC Security Groups, Network Firewall, DNS Firewall, and third-party firewalls — evaluates policy state (READY vs NOT_READY), resource-tag scope coverage gaps, RemediationEnabled posture (enforce vs detect-only), PolicyType currency (WAFV2 vs legacy WAF), IncludeMap/ExcludeMap account/OU coverage, ResourceTypeLists completeness, and live NonCompliantResourceCount. Emits a deterministic verdict (NONCOMPLIANT | INCOMPLETE_COVERAGE | CONFIG_GAP | OK) per policy with enumerated findings and specific CLI remediation. Use when reviewing FMS policy coverage, checking WAF/SG/Shield policy scope, auditing resource-tag enforcement, validating remediation posture, or hardening FMS. Triggers: Firewall Manager, FMS, policy compliance, WAF policy, Shield Advanced policy, Security Group policy, Network Firewall policy, DNS Firewall policy, RemediationEnabled, PolicyState, NOT_READY, ResourceTags scope, IncludeMap, ExcludeMap, NonCompliantResourceCount.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex).
-  No AWS CLI required for offline policy classification. Live-account
-  audits use aws fms list-policies, aws fms get-policy, aws fms
-  list-compliance-status, aws fms get-compliance-detail, aws fms
-  get-protection-status, aws fms get-admin-scope (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - Firewall Manager
-  - FMS
-  - policy compliance
-  - WAF policy
-  - Shield Advanced
-  - Security Groups policy
-  - Network Firewall policy
-  - DNS Firewall
-  - PolicyState
-  - NOT_READY
-  - RemediationEnabled
-  - ResourceTags
-  - ResourceTypeLists
-  - IncludeMap
-  - ExcludeMap
-  - NonCompliantResourceCount
-  - NONCOMPLIANT
-  - WAFV2
-  - SECURITY_GROUPS_COMMON
-  - SECURITY_GROUPS_CONTENT_AUDIT
-  - SECURITY_GROUPS_USAGE_AUDIT
-  - THIRD_PARTY_FIREWALL
-  - IMPORTED_FIREWALL
-tags: [aws, fms, firewall-manager, security, compliance, waf, shield, policy, audit, organizations]
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex). No AWS CLI required for offline policy classification. Live-account audits use aws fms list-policies, aws fms get-policy, aws fms list-compliance-status, aws fms get-compliance-detail, aws fms get-protection-status, aws fms get-admin-scope (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
-  verdict_shape: "NONCOMPLIANT | INCOMPLETE_COVERAGE | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing an FMS policy configuration, auditing policy scope coverage
-    across an AWS Organization, validating PolicyState (READY vs NOT_READY),
-    checking RemediationEnabled posture, investigating non-compliant
-    resource counts, or hardening FMS posture across WAF, Shield Advanced,
-    VPC Security Groups, Network Firewall, or DNS Firewall policies.
+  verdict_shape: NONCOMPLIANT | INCOMPLETE_COVERAGE | CONFIG_GAP | OK
+  when_to_use: Reviewing an FMS policy configuration, auditing policy scope coverage across an AWS Organization, validating PolicyState (READY vs NOT_READY), checking RemediationEnabled posture, investigating non-compliant resource counts, or hardening FMS posture across WAF, Shield Advanced, VPC Security Groups, Network Firewall, or DNS Firewall policies.
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Firewall Manager, FMS, policy compliance, WAF policy, Shield Advanced, Security Groups policy, Network Firewall policy, DNS Firewall, PolicyState, NOT_READY, RemediationEnabled, ResourceTags, ResourceTypeLists, IncludeMap, ExcludeMap, NonCompliantResourceCount, NONCOMPLIANT, WAFV2, SECURITY_GROUPS_COMMON, SECURITY_GROUPS_CONTENT_AUDIT, SECURITY_GROUPS_USAGE_AUDIT, THIRD_PARTY_FIREWALL, IMPORTED_FIREWALL
+  tags: aws, fms, firewall-manager, security, compliance, waf, shield, policy, audit, organizations
+  dependencies: aws-orchestrator
 ---
 
 # Firewall Manager Compliance Auditor

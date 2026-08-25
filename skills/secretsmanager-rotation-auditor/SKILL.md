@@ -1,60 +1,23 @@
 ---
 name: secretsmanager-rotation-auditor
-description: >-
-  Audits AWS Secrets Manager secrets for rotation posture — rotation
-  enablement, rotation-Lambda health (existence, execution-role permissions,
-  VPC connectivity, invocation errors), staleness against the configured
-  rotation interval, stuck AWSPENDING versions, and recovery-window state.
-  Classifies each secret as UNROTATED, ROTATION_BROKEN, STALE, or OK with
-  risk-severity and concrete remediation. Use when reviewing secret rotation
-  health, validating rotation-Lambda wiring, investigating failed rotations,
-  or auditing credential hygiene before compliance gates. Triggers: Secrets
-  Manager, secret rotation, rotation Lambda, LastRotatedDate, AutomaticallyAfterDays,
-  AWSPENDING, rotation broken, stale secret, unrotated secret, recovery window,
-  credential hygiene, compliance check, RDS credentials, API token rotation.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Audits AWS Secrets Manager secrets for rotation posture — rotation enablement, rotation-Lambda health (existence, execution-role permissions, VPC connectivity, invocation errors), staleness against the configured rotation interval, stuck AWSPENDING versions, and recovery-window state. Classifies each secret as UNROTATED, ROTATION_BROKEN, STALE, or OK with risk-severity and concrete remediation. Use when reviewing secret rotation health, validating rotation-Lambda wiring, investigating failed rotations, or auditing credential hygiene before compliance gates. Triggers: Secrets Manager, secret rotation, rotation Lambda, LastRotatedDate, AutomaticallyAfterDays, AWSPENDING, rotation broken, stale secret, unrotated secret, recovery window, credential hygiene, compliance check, RDS credentials, API token rotation.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf). No AWS
-  CLI required for offline config-text classification. Live-account audits
-  use aws secretsmanager describe-secret, list-secret-version-ids, and
-  aws lambda get-function / get-policy (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-  - Secrets Manager
-  - secret rotation
-  - rotation Lambda
-  - LastRotatedDate
-  - AutomaticallyAfterDays
-  - AWSPENDING
-  - unrotated secret
-  - stale secret
-  - rotation broken
-  - recovery window
-  - credential hygiene
-  - compliance
-  - RDS credentials
-  - API token rotation
-  - KMS key
-  - SecretsManagerRotation
-tags: [aws, secretsmanager, cloudops, security, rotation, compliance, credential-hygiene]
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf). No AWS CLI required for offline config-text classification. Live-account audits use aws secretsmanager describe-secret, list-secret-version-ids, and aws lambda get-function / get-policy (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
-  verdict_shape: "UNROTATED | ROTATION_BROKEN | STALE | OK"
-  when_to_use: >-
-    Reviewing a Secrets Manager secret's rotation posture, validating
-    rotation-Lambda wiring, investigating a failed or stuck rotation,
-    checking whether a credential is overdue, auditing credential hygiene
-    before a compliance gate, or reviewing secrets in a recovery window.
+  verdict_shape: UNROTATED | ROTATION_BROKEN | STALE | OK
+  when_to_use: Reviewing a Secrets Manager secret's rotation posture, validating rotation-Lambda wiring, investigating a failed or stuck rotation, checking whether a credential is overdue, auditing credential hygiene before a compliance gate, or reviewing secrets in a recovery window.
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Secrets Manager, secret rotation, rotation Lambda, LastRotatedDate, AutomaticallyAfterDays, AWSPENDING, unrotated secret, stale secret, rotation broken, recovery window, credential hygiene, compliance, RDS credentials, API token rotation, KMS key, SecretsManagerRotation
+  tags: aws, secretsmanager, cloudops, security, rotation, compliance, credential-hygiene
+  dependencies: aws-orchestrator
 ---
 
 # Secrets Manager Rotation Auditor

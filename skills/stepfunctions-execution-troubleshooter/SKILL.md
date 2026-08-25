@@ -1,109 +1,27 @@
 ---
 name: stepfunctions-execution-troubleshooter
-description: >-
-  Diagnoses AWS Step Functions execution failures across Standard and
-  Express workflows. Covers States.Runtime (invalid JSONPath),
-  States.Timeout (Task timed out, heartbeat mismatch), States.TaskFailed
-  (integration returned error), States.Permission / States.Permissions
-  (IAM role missing action or cross-account trust), States.
-  ParameterPathFailure (input processing error), States.BranchFailed
-  (Parallel branch), States.ALL vs specific error catching, retry
-  exhaustion (MaxAttempts reached), execution limits (Express 5 min vs
-  Standard 1 year), and redrive behavior (Standard only, re-executes
-  from failed state). Emits ROOT_CAUSE_FOUND | NEED_MORE_INFO |
-  ESCALATE with evidence from describe-execution, get-execution-history,
-  and CloudWatch Metrics (ExecutionsFailed, ExecutionThrottled,
-  ThrottledStateTransition). Use when a Step Functions execution fails,
-  silently retries, throttles, or redrive is required.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Diagnoses AWS Step Functions execution failures across Standard and Express workflows. Covers States.Runtime (invalid JSONPath), States.Timeout (Task timed out, heartbeat mismatch), States.TaskFailed (integration returned error), States.Permission / States.Permissions (IAM role missing action or cross-account trust), States. ParameterPathFailure (input processing error), States.BranchFailed (Parallel branch), States.ALL vs specific error catching, retry exhaustion (MaxAttempts reached), execution limits (Express 5 min vs Standard 1 year), and redrive behavior (Standard only, re-executes from failed state). Emits ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE with evidence from describe-execution, get-execution-history, and CloudWatch Metrics (ExecutionsFailed, ExecutionThrottled, ThrottledStateTransition). Use when a Step Functions execution fails, silently retries, throttles, or redrive is required.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline diagnosis works on supplied describe-execution
-  / get-execution-history JSON. Live-account diagnosis uses aws stepfunctions
-  describe-execution, get-execution-history, describe-state-machine,
-  aws logs get-log-events / filter-log-events (for Express), aws cloudwatch
-  get-metric-statistics, and aws iam simulate-principal-policy (AWS CLI v2,
-  SSO or key-based credentials).
-keywords:
-  - Step Functions
-  - State Machine
-  - States.Runtime
-  - States.Timeout
-  - States.TaskFailed
-  - States.Permission
-  - States.ParameterPathFailure
-  - States.BranchFailed
-  - States.ALL
-  - retry exhausted
-  - MaxAttempts
-  - redrive
-  - Express workflow
-  - Standard workflow
-  - execution throttle
-  - IAM role
-  - service integration
-  - JSONPath
-  - CloudWatch Metrics
-tags:
-  - stepfunctions
-  - app-integration
-  - troubleshoot
-  - execution-failure
-  - states-error
-  - retry
-  - redrive
-  - express
-  - standard
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works on supplied describe-execution / get-execution-history JSON. Live-account diagnosis uses aws stepfunctions describe-execution, get-execution-history, describe-state-machine, aws logs get-log-events / filter-log-events (for Express), aws cloudwatch get-metric-statistics, and aws iam simulate-principal-policy (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
-  when_to_use: >-
-    Diagnosing why a Step Functions execution FAILED, why a Task state
-    returned States.Runtime / States.Timeout / States.TaskFailed /
-    States.Permission / States.ParameterPathFailure / States.BranchFailed,
-    why a Catcher is not catching, why retries silently exhaust, why an
-    Express workflow hit the 5-minute limit, or when to use redrive on
-    a Standard execution.
-  activation_triggers:
-    - "Step Functions execution failed"
-    - "States.Runtime"
-    - "States.Timeout"
-    - "States.TaskFailed"
-    - "States.Permission"
-    - "States.Permissions"
-    - "States.ParameterPathFailure"
-    - "States.BranchFailed"
-    - "States.ALL not catching"
-    - "Step Functions retry exhausted"
-    - "Step Functions MaxAttempts"
-    - "Step Functions execution throttled"
-    - "Express workflow 5 minute limit"
-    - "Step Functions redrive"
-    - "Step Functions Catcher not catching"
-  invocation_schema: >-
-    Input: either (a) a symptom description (state machine ARN, failing
-    execution ARN or name, observed error string, executed state name),
-    OR (b) a live-account scenario where the agent runs aws stepfunctions
-    describe-execution / get-execution-history / describe-state-machine
-    and aws cloudwatch get-metric-statistics to gather evidence. Output:
-    a deterministic INCIDENT / VERDICT / ROOT_CAUSE / EVIDENCE /
-    ROOT_CAUSE_CATALOG / REMEDIATION block where VERDICT ∈
-    {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and ROOT_CAUSE names
-    the specific failure category (RUNTIME_ERROR / TASK_TIMEOUT /
-    TASK_FAILED / PERMISSION_DENIED / PARAMETER_PATH_FAILURE /
-    BRANCH_FAILED / RETRY_EXHAUSTED / CATCH_MISCONFIGURED /
-    EXECUTION_LIMIT_HIT) and the offending config element.
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+  when_to_use: Diagnosing why a Step Functions execution FAILED, why a Task state returned States.Runtime / States.Timeout / States.TaskFailed / States.Permission / States.ParameterPathFailure / States.BranchFailed, why a Catcher is not catching, why retries silently exhaust, why an Express workflow hit the 5-minute limit, or when to use redrive on a Standard execution.
+  activation_triggers: Step Functions execution failed, States.Runtime, States.Timeout, States.TaskFailed, States.Permission, States.Permissions, States.ParameterPathFailure, States.BranchFailed, States.ALL not catching, Step Functions retry exhausted, Step Functions MaxAttempts, Step Functions execution throttled, Express workflow 5 minute limit, Step Functions redrive, Step Functions Catcher not catching
+  invocation_schema: 'Input: either (a) a symptom description (state machine ARN, failing execution ARN or name, observed error string, executed state name), OR (b) a live-account scenario where the agent runs aws stepfunctions describe-execution / get-execution-history / describe-state-machine and aws cloudwatch get-metric-statistics to gather evidence. Output: a deterministic INCIDENT / VERDICT / ROOT_CAUSE / EVIDENCE / ROOT_CAUSE_CATALOG / REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and ROOT_CAUSE names the specific failure category (RUNTIME_ERROR / TASK_TIMEOUT / TASK_FAILED / PERMISSION_DENIED / PARAMETER_PATH_FAILURE / BRANCH_FAILED / RETRY_EXHAUSTED / CATCH_MISCONFIGURED / EXECUTION_LIMIT_HIT) and the offending config element.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Step Functions, State Machine, States.Runtime, States.Timeout, States.TaskFailed, States.Permission, States.ParameterPathFailure, States.BranchFailed, States.ALL, retry exhausted, MaxAttempts, redrive, Express workflow, Standard workflow, execution throttle, IAM role, service integration, JSONPath, CloudWatch Metrics
+  tags: stepfunctions, app-integration, troubleshoot, execution-failure, states-error, retry, redrive, express, standard
 ---
 
 # Step Functions Execution Troubleshooter

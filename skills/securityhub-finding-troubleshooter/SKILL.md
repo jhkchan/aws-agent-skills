@@ -1,118 +1,28 @@
 ---
 name: securityhub-finding-troubleshooter
-description: >-
-  Diagnoses and resolves AWS Security Hub findings through a
-  standard-driven decision tree covering CIS AWS Foundations Benchmark,
-  PCI DSS 3.2.1, AWS Foundational Security Best Practices (FSBP), and
-  NIST 800-53. Walks each finding through its lifecycle (New, Notified,
-  Suppressed, Resolved) and severity (Critical, High, Medium, Low) to
-  the failed control, then to the per-service remediation (S3 BPA, IAM
-  password policy, EC2 IMDSv2, KMS rotation, CloudTrail data events,
-  Config conformance). Identifies findings stuck in
-  Resolved-but-still-failing, NOT_AVAILABLE with StatusReasons,
-  multi-account aggregation gaps, and standards disabled mid-audit.
-  Configures custom actions (EventBridge rule to Lambda) for
-  auto-remediation, manages enabled-standards, and applies Automation
-  Rules and custom controls. Emits ROOT_CAUSE_FOUND with the specific
-  control failure, NEED_MORE_INFO, or ESCALATE. Use when triaging a
-  Security Hub finding, diagnosing a control that will not resolve, or
-  designing a remediation runbook.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Diagnoses and resolves AWS Security Hub findings through a standard-driven decision tree covering CIS AWS Foundations Benchmark, PCI DSS 3.2.1, AWS Foundational Security Best Practices (FSBP), and NIST 800-53. Walks each finding through its lifecycle (New, Notified, Suppressed, Resolved) and severity (Critical, High, Medium, Low) to the failed control, then to the per-service remediation (S3 BPA, IAM password policy, EC2 IMDSv2, KMS rotation, CloudTrail data events, Config conformance). Identifies findings stuck in Resolved-but-still-failing, NOT_AVAILABLE with StatusReasons, multi-account aggregation gaps, and standards disabled mid-audit. Configures custom actions (EventBridge rule to Lambda) for auto-remediation, manages enabled-standards, and applies Automation Rules and custom controls. Emits ROOT_CAUSE_FOUND with the specific control failure, NEED_MORE_INFO, or ESCALATE. Use when triaging a Security Hub finding, diagnosing a control that will not resolve, or designing a remediation runbook.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline triage works from pasted ASFF finding JSON.
-  Live-account diagnosis uses aws securityhub get-findings,
-  get-findings-statistics, describe-standards, describe-hub,
-  list-enabled-products, get-insights, update-findings,
-  get-finding-aggregator, get-administrator-account, aws configservice
-  describe-config-rules / describe-configuration-recorders, aws s3api
-  get-public-access-block, aws iam get-account-password-policy, aws
-  ec2 describe-instances, aws kms describe-keys, aws cloudtrail
-  describe-trails, and aws events put-rule / put-targets (AWS CLI v2,
-  SSO or key-based credentials).
-keywords:
-  - Security Hub
-  - ASFF
-  - finding
-  - control
-  - CIS
-  - PCI DSS
-  - FSBP
-  - NIST 800-53
-  - compliance
-  - remediation
-  - custom action
-  - EventBridge
-  - Lambda
-  - finding aggregator
-  - Automation Rules
-  - custom controls
-  - enabled standards
-  - suppression
-  - troubleshooting
-tags: [securityhub, security, compliance, cis, pci-dss, fsbp, nist, remediation, troubleshooting, eventbridge]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline triage works from pasted ASFF finding JSON. Live-account diagnosis uses aws securityhub get-findings, get-findings-statistics, describe-standards, describe-hub, list-enabled-products, get-insights, update-findings, get-finding-aggregator, get-administrator-account, aws configservice describe-config-rules / describe-configuration-recorders, aws s3api get-public-access-block, aws iam...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
-  when_to_use: >-
-    Diagnosing a Security Hub finding (single ASFF JSON, finding ID, or
-    a list of findings from get-findings) for the failed control, walking
-    the standard (CIS, PCI DSS, FSBP, NIST) to the per-service
-    remediation (S3, IAM, EC2, KMS, CloudTrail, Config), diagnosing a
-    finding stuck in Resolved-but-still-failing or NOT_AVAILABLE with
-    StatusReasons, configuring custom actions (EventBridge rule to
-    Lambda), managing enabled-standards mid-audit, applying Automation
-    Rules or custom controls, or resolving multi-account aggregation
-    gaps. Diagnoses runtime control failures — not posture reporting.
-  when_not_to_use: >-
-    Posture reporting and aggregate compliance scoring (use
-    securityhub-control-compliance-auditor for FAILED/WARNING/PASSED
-    control scoring across the account, or the auditor family for
-    per-service config posture). Non-Security-Hub detections
-    (GuardDuty, Inspector, Macie, Detective) use their own skills.
-    Forensic chain of custody belongs to incident-response-automator.
-  activation_triggers:
-    - "Security Hub finding"
-    - "Security Hub alert"
-    - "troubleshoot Security Hub"
-    - "Security Hub control failing"
-    - "CIS control"
-    - "PCI DSS control"
-    - "FSBP control"
-    - "Foundational Security Best Practices"
-    - "NIST 800-53 control"
-    - "Security Hub NOT_AVAILABLE"
-    - "Security Hub StatusReason"
-    - "finding stuck Resolved"
-    - "Security Hub custom action"
-    - "Security Hub Automation Rules"
-    - "Security Hub custom control"
-    - "Security Hub finding aggregator"
-    - "enabled standards Security Hub"
-    - "ASFF finding"
-  invocation_schema: >-
-    Input: either (a) a Security Hub finding JSON (ASFF) or finding ID
-    + product ARN for live lookup, optionally paired with the related
-    Config rule evaluation; OR (b) a control ID (e.g.,
-    S3.1, CIS.1.3, PCI.S3.1) and resource ARN for live-account
-    diagnosis. Output: a deterministic FINDING/VERDICT/REASON/LAYER/
-    EVIDENCE/SUPPRESSION/REMEDIATION block where VERDICT in
-    {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and LAYER in
-    {S3_BPA, IAM_PASSWORD_POLICY, IAM_MFA, EC2_IMDSV2, EC2_SG,
-    KMS_ROTATION, CLOUDTRAIL_DATA_EVENTS, CONFIG_RECORDER,
-    CUSTOM_ACTION_GAPPED, STANDARD_DISABLED, AGGREGATOR_GAP,
-    AUTOMATION_RULE_MISCONFIGURED, FALSE_POSITIVE, AWS_SIDE, UNKNOWN}.
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+  when_to_use: Diagnosing a Security Hub finding (single ASFF JSON, finding ID, or a list of findings from get-findings) for the failed control, walking the standard (CIS, PCI DSS, FSBP, NIST) to the per-service remediation (S3, IAM, EC2, KMS, CloudTrail, Config), diagnosing a finding stuck in Resolved-but-still-failing or NOT_AVAILABLE with StatusReasons, configuring custom actions (EventBridge rule to Lambda), managing enabled-standards mid-audit, applying Automation Rules or custom controls, or resolving multi-account aggregation gaps. Diagnoses runtime control failures — not posture reporting.
+  when_not_to_use: Posture reporting and aggregate compliance scoring (use securityhub-control-compliance-auditor for FAILED/WARNING/PASSED control scoring across the account, or the auditor family for per-service config posture). Non-Security-Hub detections (GuardDuty, Inspector, Macie, Detective) use their own skills. Forensic chain of custody belongs to incident-response-automator.
+  activation_triggers: Security Hub finding, Security Hub alert, troubleshoot Security Hub, Security Hub control failing, CIS control, PCI DSS control, FSBP control, Foundational Security Best Practices, NIST 800-53 control, Security Hub NOT_AVAILABLE, Security Hub StatusReason, finding stuck Resolved, Security Hub custom action, Security Hub Automation Rules, Security Hub custom control, Security Hub finding aggregator, enabled standards Security Hub, ASFF finding
+  invocation_schema: 'Input: either (a) a Security Hub finding JSON (ASFF) or finding ID + product ARN for live lookup, optionally paired with the related Config rule evaluation; OR (b) a control ID (e.g., S3.1, CIS.1.3, PCI.S3.1) and resource ARN for live-account diagnosis. Output: a deterministic FINDING/VERDICT/REASON/LAYER/ EVIDENCE/SUPPRESSION/REMEDIATION block where VERDICT in {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and LAYER in {S3_BPA, IAM_PASSWORD_POLICY, IAM_MFA, EC2_IMDSV2, EC2_SG, KMS_ROTATION, CLOUDTRAIL_DATA_EVENTS, CONFIG_RECORDER, CUSTOM_ACTION_GAPPED, STANDARD_DISABLED, AGGREGATOR_GAP, AUTOMATION_RULE_MISCONFIGURED, FALSE_POSITIVE, AWS_SIDE, UNKNOWN}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Security Hub, ASFF, finding, control, CIS, PCI DSS, FSBP, NIST 800-53, compliance, remediation, custom action, EventBridge, Lambda, finding aggregator, Automation Rules, custom controls, enabled standards, suppression, troubleshooting
+  tags: securityhub, security, compliance, cis, pci-dss, fsbp, nist, remediation, troubleshooting, eventbridge
 ---
 
 # Security Hub Finding Troubleshooter

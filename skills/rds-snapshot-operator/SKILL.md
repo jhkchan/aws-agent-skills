@@ -1,103 +1,27 @@
 ---
 name: rds-snapshot-operator
-description: >-
-  Operates Amazon RDS and Aurora snapshot workflows end-to-end — automated
-  backup retention (1-35 days) and the PITR window, manual snapshot creation
-  (pre-upgrade, compliance, audit), snapshot copy to DR regions
-  (cross-region KMS re-encryption), point-in-time recovery at 5-minute
-  granularity, cross-account snapshot sharing via DBSnapshotAttribute,
-  snapshot restore (new instance vs Aurora clone), snapshot lifecycle
-  automation (delete old via Lambda/EventBridge), Aurora backtrack vs
-  snapshot restore, Aurora clone from snapshot (instant copy-on-write),
-  Blue/Green deploy with snapshot pre-flight, snapshot export to S3
-  (Parquet via ExportTask), snapshot size monitoring, and multi-AZ snapshot
-  behavior. Runs deterministic pre-checks (instance state, storage type,
-  option group compatibility, KMS key, IAM export role) behind a CONFIRM
-  gate and emits OPERATION_COMPLETED or REVIEW_REQUIRED per operation. Use
-  when creating pre-upgrade snapshots, configuring DR snapshot copies,
-  restoring to a point in time, sharing snapshots cross-account, exporting
-  snapshot data to S3, or automating snapshot lifecycle cleanup.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates Amazon RDS and Aurora snapshot workflows end-to-end — automated backup retention (1-35 days) and the PITR window, manual snapshot creation (pre-upgrade, compliance, audit), snapshot copy to DR regions (cross-region KMS re-encryption), point-in-time recovery at 5-minute granularity, cross-account snapshot sharing via DBSnapshotAttribute, snapshot restore (new instance vs Aurora clone), snapshot lifecycle automation (delete old via Lambda/EventBridge), Aurora backtrack vs snapshot restore, Aurora clone from snapshot (instant copy-on-write), Blue/Green deploy with snapshot pre-flight, snapshot export to S3 (Parquet via ExportTask), snapshot size monitoring, and multi-AZ snapshot behavior. Runs deterministic pre-checks (instance state, storage type, option group compatibility, KMS key, IAM export role) behind a CONFIRM gate and emits OPERATION_COMPLETED or REVIEW_REQUIRED per operation. Use when creating pre-upgrade snapshots, configuring DR snapshot copies, restoring to a point in time, sharing...
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws rds create-db-snapshot, copy-db-snapshot,
-  delete-db-snapshot, describe-db-snapshots, modify-db-instance
-  --backup-retention-period, restore-db-instance-to-point-in-time,
-  restore-db-cluster-to-point-in-time, create-db-cluster-from-snapshot,
-  share-db-snapshot, start-export-task, aws lambda, aws events (AWS CLI v2,
-  SSO or key-based credentials).
-keywords:
-  - RDS snapshot
-  - manual snapshot
-  - automated backup
-  - backup retention
-  - PITR
-  - point-in-time recovery
-  - snapshot copy
-  - cross-region snapshot
-  - DR snapshot
-  - snapshot sharing
-  - cross-account snapshot
-  - snapshot restore
-  - Aurora clone
-  - Aurora backtrack
-  - Blue/Green deploy
-  - snapshot export
-  - S3 export Parquet
-  - snapshot lifecycle
-  - EventBridge snapshot
-  - KMS re-encryption
-  - DBSnapshotAttribute
-tags: [aws, rds, aurora, database, snapshot, backup, recovery, dr, compliance, operate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws rds create-db-snapshot, copy-db-snapshot, delete-db-snapshot, describe-db-snapshots, modify-db-instance --backup-retention-period, restore-db-instance-to-point-in-time, restore-db-cluster-to-point-in-time, create-db-cluster-from-snapshot, share-db-snapshot, start-export-task, aws lambda, aws events (AWS CLI v2, SSO or key-based...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "OPERATION_COMPLETED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Creating a manual snapshot before an upgrade or maintenance window,
-    changing automated backup retention (1-35 days), copying snapshots to
-    a DR region, restoring to a point in time (5-minute granularity),
-    sharing a snapshot cross-account, cloning an Aurora cluster from a
-    snapshot, exporting snapshot data to S3 in Parquet format, automating
-    snapshot lifecycle cleanup, or running a Blue/Green deploy with a
-    snapshot pre-flight.
-  activation_triggers:
-    - "create RDS snapshot"
-    - "manual snapshot before upgrade"
-    - "change backup retention"
-    - "PITR restore"
-    - "point-in-time recovery"
-    - "copy snapshot to DR region"
-    - "cross-region snapshot copy"
-    - "share snapshot cross-account"
-    - "restore from snapshot"
-    - "Aurora clone from snapshot"
-    - "Aurora backtrack"
-    - "export snapshot to S3"
-    - "snapshot lifecycle cleanup"
-    - "delete old snapshots"
-    - "Blue/Green deploy snapshot"
-    - "snapshot size monitoring"
-  invocation_schema: >-
-    Input: either (a) an RDS instance/cluster configuration (describe-db-
-    instance output) plus the intended operation (create-snapshot,
-    copy-snapshot, restore-pitr, share-snapshot, clone-from-snapshot,
-    export-snapshot, delete-snapshot, update-retention), OR (b) an
-    instance/cluster identifier + operation for live-account execution.
-    Output: deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS /
-    POST_VERIFY / NOTES block per snapshot operation, where VERDICT is
-    OPERATION_COMPLETED or REVIEW_REQUIRED.
+  verdict_shape: OPERATION_COMPLETED | REVIEW_REQUIRED
+  when_to_use: Creating a manual snapshot before an upgrade or maintenance window, changing automated backup retention (1-35 days), copying snapshots to a DR region, restoring to a point in time (5-minute granularity), sharing a snapshot cross-account, cloning an Aurora cluster from a snapshot, exporting snapshot data to S3 in Parquet format, automating snapshot lifecycle cleanup, or running a Blue/Green deploy with a snapshot pre-flight.
+  activation_triggers: create RDS snapshot, manual snapshot before upgrade, change backup retention, PITR restore, point-in-time recovery, copy snapshot to DR region, cross-region snapshot copy, share snapshot cross-account, restore from snapshot, Aurora clone from snapshot, Aurora backtrack, export snapshot to S3, snapshot lifecycle cleanup, delete old snapshots, Blue/Green deploy snapshot, snapshot size monitoring
+  invocation_schema: 'Input: either (a) an RDS instance/cluster configuration (describe-db- instance output) plus the intended operation (create-snapshot, copy-snapshot, restore-pitr, share-snapshot, clone-from-snapshot, export-snapshot, delete-snapshot, update-retention), OR (b) an instance/cluster identifier + operation for live-account execution. Output: deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per snapshot operation, where VERDICT is OPERATION_COMPLETED or REVIEW_REQUIRED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: RDS snapshot, manual snapshot, automated backup, backup retention, PITR, point-in-time recovery, snapshot copy, cross-region snapshot, DR snapshot, snapshot sharing, cross-account snapshot, snapshot restore, Aurora clone, Aurora backtrack, Blue/Green deploy, snapshot export, S3 export Parquet, snapshot lifecycle, EventBridge snapshot, KMS re-encryption, DBSnapshotAttribute
+  tags: aws, rds, aurora, database, snapshot, backup, recovery, dr, compliance, operate
 ---
 
 # RDS Snapshot Operator

@@ -1,82 +1,28 @@
 ---
 name: route53-routing-policy-deployer
-description: 'Provisions Route 53 routing policies and dependent primitives with production defaults: simple, weighted (canary), latency, failover (primary/secondary with health checks), geolocation (continent/
-  country/subdivision), geoproximity (bias), multivalue answer (round-robin with HCs), IP-based (CIDR), alias records (ALB, CloudFront, API Gateway, S3 website, VPC interface endpoint) with EvaluateTargetHealth,
-  health checks (endpoint, string match, inverted, calculated), traffic policies (versioned), and Route 53 Application Recovery Controller (routing control + readiness check + safety rule). Emits READY_TO_DEPLOY
-  / PREREQUISITES_MISSING with every record and HC verified and copy-pasteable route53 / route53-recovery-cluster commands. Use when provisioning DNS routing for multi-region, canary, geolocation, DR failover,
-  or aliasing to an AWS service. Triggers: Route 53, routing policy, weighted, latency, failover, geolocation, health check, alias, traffic policy.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Route 53 routing policies and dependent primitives with production defaults: simple, weighted (canary), latency, failover (primary/secondary with health checks), geolocation (continent/ country/subdivision), geoproximity (bias), multivalue answer (round-robin with HCs), IP-based (CIDR), alias records (ALB, CloudFront, API Gateway, S3 website, VPC interface endpoint) with EvaluateTargetHealth, health checks (endpoint, string match, inverted, calculated), traffic policies (versioned), and Route 53 Application Recovery Controller (routing control + readiness check + safety rule). Emits READY_TO_DEPLOY / PREREQUISITES_MISSING with every record and HC verified and copy-pasteable route53 / route53-recovery-cluster commands. Use when provisioning DNS routing for multi-region, canary, geolocation, DR failover, or aliasing to an AWS service. Triggers: Route 53, routing policy, weighted, latency, failover, geolocation, health check, alias, traffic policy.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Live provisioning uses AWS CLI v2 with route53 (change-resource-record-sets, create-health-check, create-traffic-
-  policy, test-dns-answer), route53domains, and route53-recovery-cluster config (create-routing-control, create-readiness-check) for Application Recovery Controller. Works with Terraform aws_route53_record
-  / aws_route53_health_check and CloudFormation AWS::Route53::* resources.
-keywords:
-- aws
-- route53
-- dns
-- routing-policy
-- weighted
-- latency
-- failover
-- geolocation
-- geoproximity
-- multivalue-answer
-- ip-based-routing
-- alias-record
-- health-check
-- traffic-policy
-- application-recovery-controller
-- routing-control
-- readiness-check
-- cloudops
-- deploy
-tags:
-- aws
-- route53
-- dns
-- routing-policy
-- health-check
-- failover
-- deploy
-- networking
-dependencies:
-- aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Live provisioning uses AWS CLI v2 with route53 (change-resource-record-sets, create-health-check, create-traffic- policy, test-dns-answer), route53domains, and route53-recovery-cluster config (create-routing-control, create-readiness-check) for Application Recovery Controller. Works with Terraform aws_route53_record / aws_route53_health_check and CloudFormation AWS::Route53::* resources.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
-  when_to_use: Provisioning a Route 53 routing policy (simple, weighted, latency, failover, geolocation, geoproximity, multivalue answer, IP-based), creating an alias record to an AWS service (ALB, CloudFront,
-    API Gateway, S3 website, VPC interface endpoint), configuring a health check (endpoint, string matching, inverted, calculated), versioning a traffic policy, or setting up Route 53 Application Recovery
-    Controller (routing control + readiness check). Do NOT invoke for emergency failover execution (use route53-failover-operator), or for non-Route-53 DNS providers.
-  activation_triggers:
-  - Route 53 routing policy
-  - weighted routing
-  - latency routing
-  - failover routing
-  - geolocation routing
-  - geoproximity routing
-  - multivalue answer routing
-  - IP-based routing
-  - CIDR routing
-  - alias record to ALB
-  - alias record to CloudFront
-  - Route 53 health check
-  - Route 53 traffic policy
-  - Application Recovery Controller
-  - routing control
-  - readiness check
-  invocation_schema: 'Input: either (a) a hosted zone ID + record name + routing policy type + target value(s), or (b) an alias-record spec (AWS resource + record name), or (c) an Application Recovery Controller
-    spec (control tower + routing controls + readiness checks). Output: deterministic RECORD_SET / VERDICT / CHECKLIST / VERIFICATION_COMMANDS block per the STRICT output contract, where VERDICT is READY_TO_DEPLOY
-    or PREREQUISITES_MISSING.'
+  when_to_use: Provisioning a Route 53 routing policy (simple, weighted, latency, failover, geolocation, geoproximity, multivalue answer, IP-based), creating an alias record to an AWS service (ALB, CloudFront, API Gateway, S3 website, VPC interface endpoint), configuring a health check (endpoint, string matching, inverted, calculated), versioning a traffic policy, or setting up Route 53 Application Recovery Controller (routing control + readiness check). Do NOT invoke for emergency failover execution (use route53-failover-operator), or for non-Route-53 DNS providers.
+  activation_triggers: Route 53 routing policy, weighted routing, latency routing, failover routing, geolocation routing, geoproximity routing, multivalue answer routing, IP-based routing, CIDR routing, alias record to ALB, alias record to CloudFront, Route 53 health check, Route 53 traffic policy, Application Recovery Controller, routing control, readiness check
+  invocation_schema: 'Input: either (a) a hosted zone ID + record name + routing policy type + target value(s), or (b) an alias-record spec (AWS resource + record name), or (c) an Application Recovery Controller spec (control tower + routing controls + readiness checks). Output: deterministic RECORD_SET / VERDICT / CHECKLIST / VERIFICATION_COMMANDS block per the STRICT output contract, where VERDICT is READY_TO_DEPLOY or PREREQUISITES_MISSING.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: aws, route53, dns, routing-policy, weighted, latency, failover, geolocation, geoproximity, multivalue-answer, ip-based-routing, alias-record, health-check, traffic-policy, application-recovery-controller, routing-control, readiness-check, cloudops, deploy
+  tags: aws, route53, dns, routing-policy, health-check, failover, deploy, networking
+  dependencies: aws-orchestrator
 ---
 
 # Route 53 Routing Policy Deployer

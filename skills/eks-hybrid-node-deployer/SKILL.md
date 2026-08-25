@@ -1,112 +1,26 @@
 ---
 name: eks-hybrid-node-deployer
-description: >-
-  Provisions Amazon EKS Hybrid Nodes with production defaults:
-  hybrid node IAM role creation, activation code/ID for on-prem
-  registration (NOT IAM access keys), connector agent (nodeadm or
-  eksctl anywhere), pod identity for hybrid workloads, networking
-  (direct VPN/Direct Connect or via Cloud Network), security group
-  mapping, node group (remote vs managed), upgrade strategy for hybrid
-  nodes, health monitoring via CloudWatch agent, SSM Session Manager
-  for hybrid node access, capacity planning for on-prem k8s nodes, and
-  node draining during on-prem maintenance. Emits a READY_TO_DEPLOY
-  checklist with verification commands. Use when registering on-prem
-  nodes to EKS, configuring hybrid node networking, setting up pod
-  identity for hybrid workloads, or planning hybrid node upgrades.
-  Triggers: create eks hybrid nodes, register on-prem node to eks,
-  eks hybrid node activation code, eks hybrid pod identity, eks hybrid
-  networking direct connect, eks hybrid nodeadm, eks hybrid ssm session
-  manager, eks hybrid node drain, eks hybrid cloudwatch monitoring,
-  eks hybrid node upgrade.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon EKS Hybrid Nodes with production defaults: hybrid node IAM role creation, activation code/ID for on-prem registration (NOT IAM access keys), connector agent (nodeadm or eksctl anywhere), pod identity for hybrid workloads, networking (direct VPN/Direct Connect or via Cloud Network), security group mapping, node group (remote vs managed), upgrade strategy for hybrid nodes, health monitoring via CloudWatch agent, SSM Session Manager for hybrid node access, capacity planning for on-prem k8s nodes, and node draining during on-prem maintenance. Emits a READY_TO_DEPLOY checklist with verification commands. Use when registering on-prem nodes to EKS, configuring hybrid node networking, setting up pod identity. Triggers: create eks hybrid nodes, register on-prem node to eks, eks hybrid node activation code, eks hybrid pod identity, eks hybrid networking direct connect, eks hybrid nodeadm, eks hybrid ssm session manager, eks hybrid node drain, eks hybrid cloudwatch monitoring, eks hybrid node upgrade.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with eks access,
-  SSM, and IAM. Works with Terraform aws_eks_node_group /
-  aws_eks_access_entry resources and eksctl anywhere / nodeadm for
-  on-prem registration.
-keywords:
-  - aws
-  - eks
-  - hybrid nodes
-  - on-prem
-  - activation code
-  - pod identity
-  - nodeadm
-  - cloudops
-  - deploy
-  - provisioning
-  - direct connect
-  - ssm session manager
-  - node drain
-  - cloudwatch agent
-  - upgrade strategy
-tags:
-  - aws
-  - eks
-  - hybrid-nodes
-  - cloudops
-  - deploy
-  - compute
-  - provisioning
-  - on-prem
-  - pod-identity
-  - direct-connect
-  - ssm
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with eks access, SSM, and IAM. Works with Terraform aws_eks_node_group / aws_eks_access_entry resources and eksctl anywhere / nodeadm for on-prem registration.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - eks
-    - hybrid-nodes
-    - cloudops
-    - deploy
-    - compute
-    - provisioning
-    - on-prem
-    - pod-identity
-    - direct-connect
-    - ssm
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create eks hybrid nodes
-    - register on-prem node to eks
-    - eks hybrid node activation code
-    - eks hybrid pod identity
-    - eks hybrid networking direct connect
-    - eks hybrid nodeadm
-    - eks hybrid ssm session manager
-    - eks hybrid node drain
-    - eks hybrid cloudwatch monitoring
-    - eks hybrid node upgrade
-  when_to_use: >-
-    Invoke when the user wants to register on-premises servers as
-    Amazon EKS hybrid nodes, configure hybrid node IAM roles, generate
-    activation codes/IDs for on-prem registration, set up pod identity
-    for hybrid workloads, configure networking (Direct Connect/VPN) for
-    on-prem nodes to reach the EKS control plane, configure security
-    group mapping, plan hybrid node upgrades, set up CloudWatch health
-    monitoring, enable SSM Session Manager for hybrid node access, or
-    plan node draining for on-prem maintenance. Do NOT invoke for
-    standard EKS managed node groups (EC2-based), EKS Fargate, EKS
-    Anywhere (self-managed control plane), or ECS.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, eks, hybrid-nodes, cloudops, deploy, compute, provisioning, on-prem, pod-identity, direct-connect, ssm
+  dependencies: aws-orchestrator
+  keywords: aws, eks, hybrid nodes, on-prem, activation code, pod identity, nodeadm, cloudops, deploy, provisioning, direct connect, ssm session manager, node drain, cloudwatch agent, upgrade strategy
+  when_to_use: Invoke when the user wants to register on-premises servers as Amazon EKS hybrid nodes, configure hybrid node IAM roles, generate activation codes/IDs for on-prem registration, set up pod identity for hybrid workloads, configure networking (Direct Connect/VPN) for on-prem nodes to reach the EKS control plane, configure security group mapping, plan hybrid node upgrades, set up CloudWatch health monitoring, enable SSM Session Manager for hybrid node access, or plan node draining for on-prem maintenance. Do NOT invoke for standard EKS managed node groups (EC2-based), EKS Fargate, EKS Anywhere (self-managed control plane), or ECS.
 ---
 
 # EKS Hybrid Node Deployer

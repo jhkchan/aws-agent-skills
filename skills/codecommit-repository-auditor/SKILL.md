@@ -1,79 +1,24 @@
 ---
 name: codecommit-repository-auditor
-description: >-
-  Audits AWS CodeCommit repositories for approval-rule-template coverage,
-  customer-managed KMS encryption, default-branch deletion protection (IAM
-  enforced, not native), notification-rule alerting, and the CodeCommit
-  service-wide deprecation/maintenance mode risk. Emits a deterministic
-  verdict (NO_APPROVAL_RULE | NO_ENCRYPTION | CONFIG_GAP | DEPRECATION_RISK
-  | OK) per repository with enumerated findings and specific CLI
-  remediation. Use when reviewing CodeCommit repositories, checking pull
-  request review enforcement, validating encryption-key control, auditing
-  branch protection, or assessing migration urgency due to service
-  deprecation.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS CodeCommit repositories for approval-rule-template coverage, customer-managed KMS encryption, default-branch deletion protection (IAM enforced, not native), notification-rule alerting, and the CodeCommit service-wide deprecation/maintenance mode risk. Emits a deterministic verdict (NO_APPROVAL_RULE | NO_ENCRYPTION | CONFIG_GAP | DEPRECATION_RISK | OK) per repository with enumerated findings and specific CLI remediation. Use when reviewing CodeCommit repositories, checking pull request review enforcement, validating encryption-key control, auditing branch protection, or assessing migration urgency due to service deprecation.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline config classification. Live-account
-  audits use aws codecommit get-repository, aws codecommit
-  list-approval-rule-templates, aws codecommit list-tags-for-resource, and
-  aws codestar-notifications list-notification-rules (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - CodeCommit
-  - repository audit
-  - approval rule template
-  - KMS encryption
-  - branch deletion protection
-  - notification rules
-  - CodeStar Notifications
-  - default branch
-  - deprecation
-  - maintenance mode
-  - migration
-  - pull request approval
-  - code review enforcement
-  - supply chain security
-  - repository policy
-  - codecommit:DeleteBranch
-  - codecommit:References
-  - aws/codecommit
-  - customer managed key
-tags: [codecommit, devtools, security, repository, approval-rule, encryption, branch-protection, deprecation, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline config classification. Live-account audits use aws codecommit get-repository, aws codecommit list-approval-rule-templates, aws codecommit list-tags-for-resource, and aws codestar-notifications list-notification-rules (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
-  verdict_shape: "NO_APPROVAL_RULE | NO_ENCRYPTION | CONFIG_GAP | DEPRECATION_RISK | OK"
-  when_to_use: >-
-    Reviewing a CodeCommit repository before production deployment, checking
-    pull-request approval enforcement, validating customer-managed KMS
-    encryption, auditing branch deletion protection, verifying notification
-    alerting, or assessing CodeCommit migration urgency due to service
-    deprecation/maintenance mode.
-  activation_triggers:
-    - "audit CodeCommit repository approval rules and encryption"
-    - "check CodeCommit pull request approval enforcement"
-    - "is my CodeCommit repo using a customer managed KMS key"
-    - "CodeCommit branch deletion protection IAM audit"
-    - "CodeCommit notification rules CodeStar audit"
-    - "CodeCommit deprecation migration assessment"
-    - "migrate off CodeCommit repository audit checklist"
-    - "CodeCommit repository security and config gap audit"
-  invocation_schema: >-
-    Input: either (a) a CodeCommit repository configuration bundle
-    (repository metadata + approval rule templates + KMS key ARN +
-    notification rules + branch protection IAM policies + tags), OR (b) a
-    repository name/ARN for live-account audit. Output: deterministic
-    REPO/VERDICT/REASON/FINDINGS/REMEDIATION block per repository, where
-    VERDICT is one of {NO_APPROVAL_RULE, NO_ENCRYPTION, CONFIG_GAP,
-    DEPRECATION_RISK, OK}.
+  verdict_shape: NO_APPROVAL_RULE | NO_ENCRYPTION | CONFIG_GAP | DEPRECATION_RISK | OK
+  when_to_use: Reviewing a CodeCommit repository before production deployment, checking pull-request approval enforcement, validating customer-managed KMS encryption, auditing branch deletion protection, verifying notification alerting, or assessing CodeCommit migration urgency due to service deprecation/maintenance mode.
+  activation_triggers: audit CodeCommit repository approval rules and encryption, check CodeCommit pull request approval enforcement, is my CodeCommit repo using a customer managed KMS key, CodeCommit branch deletion protection IAM audit, CodeCommit notification rules CodeStar audit, CodeCommit deprecation migration assessment, migrate off CodeCommit repository audit checklist, CodeCommit repository security and config gap audit
+  invocation_schema: 'Input: either (a) a CodeCommit repository configuration bundle (repository metadata + approval rule templates + KMS key ARN + notification rules + branch protection IAM policies + tags), OR (b) a repository name/ARN for live-account audit. Output: deterministic REPO/VERDICT/REASON/FINDINGS/REMEDIATION block per repository, where VERDICT is one of {NO_APPROVAL_RULE, NO_ENCRYPTION, CONFIG_GAP, DEPRECATION_RISK, OK}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CodeCommit, repository audit, approval rule template, KMS encryption, branch deletion protection, notification rules, CodeStar Notifications, default branch, deprecation, maintenance mode, migration, pull request approval, code review enforcement, supply chain security, repository policy, codecommit:DeleteBranch, codecommit:References, aws/codecommit, customer managed key
+  tags: codecommit, devtools, security, repository, approval-rule, encryption, branch-protection, deprecation, audit
 ---
 
 # CodeCommit Repository Auditor

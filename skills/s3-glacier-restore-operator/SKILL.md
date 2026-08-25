@@ -1,108 +1,27 @@
 ---
 name: s3-glacier-restore-operator
-description: >-
-  Operates S3 Glacier restore workflows — initiates object restores
-  from Flexible Retrieval tiers (Expedited 1-5 min, Standard 3-5 hr,
-  Bulk 5-12 hr) and from Deep Archive (12-48 hr; Bulk 12 hr),
-  provisions Expedited capacity to guarantee throughput, manages
-  in-place restore vs copy-to-other-tier strategies, performs bulk
-  restores via S3 Batch Operations (manifest + role + report),
-  checks restore status via head-object Restore field and
-  restore-object waiters, integrates with lifecycle policies
-  (Transition + NoncurrentVersionTransition), and operates latest
-  features (S3 Glacier Instant Retrieval for ms-latency access on
-  cold data, Deep Archive bulk restore cost-tier). Emits a
-  deterministic execution plan with pre-checks, CONFIRM gate, and
-  post-verification. Use when restoring a single object, a prefix,
-  or a manifest of thousands of objects from Glacier; provisioning
-  Expedited capacity; running a DR restore drill; or diagnosing a
-  stalled restore job.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates S3 Glacier restore workflows — initiates object restores from Flexible Retrieval tiers (Expedited 1-5 min, Standard 3-5 hr, Bulk 5-12 hr) and from Deep Archive (12-48 hr; Bulk 12 hr), provisions Expedited capacity to guarantee throughput, manages in-place restore vs copy-to-other-tier strategies, performs bulk restores via S3 Batch Operations (manifest + role + report), checks restore status via head-object Restore field and restore-object waiters, integrates with lifecycle policies (Transition + NoncurrentVersionTransition), and operates latest features (S3 Glacier Instant Retrieval for ms-latency access on cold data, Deep Archive bulk restore cost-tier). Emits a deterministic execution plan with pre-checks, CONFIRM gate, and post-verification. Use when restoring a single object, a prefix, or a manifest of thousands of objects from Glacier; provisioning Expedited capacity; running a DR restore drill; or diagnosing a stalled restore job.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline plan authoring.
-  Live-account operations use aws s3api restore-object, head-object,
-  get-object, list-objects-v2, aws s3api wait object-restored,
-  aws s3control create-job (Batch Operations), describe-job,
-  get-job-tagging, and aws s3api put-bucket-lifecycle-configuration
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - S3 Glacier
-  - S3 Glacier Flexible Retrieval
-  - S3 Glacier Deep Archive
-  - S3 Glacier Instant Retrieval
-  - restore-object
-  - Expedited retrieval
-  - Standard retrieval
-  - Bulk retrieval
-  - provisioned capacity
-  - S3 Batch Operations
-  - bulk restore
-  - restore in place
-  - copy to different tier
-  - head-object Restore field
-  - RestoreObject
-  - lifecycle policy
-  - Transition
-  - NoncurrentVersionTransition
-  - DR restore drill
-  - manifest restore
-  - Glacier Instant Retrieval
-  - Deep Archive bulk restore
-tags: [s3, storage, operate, glacier, restore, deep-archive, instant-retrieval, batch-operations, lifecycle, expedited, provisioned-capacity]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan authoring. Live-account operations use aws s3api restore-object, head-object, get-object, list-objects-v2, aws s3api wait object-restored, aws s3control create-job (Batch Operations), describe-job, get-job-tagging, and aws s3api put-bucket-lifecycle-configuration (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Restoring a single object, prefix, or manifest of objects from
-    S3 Glacier Flexible Retrieval, Glacier Deep Archive, or Glacier
-    Instant Retrieval; choosing between Expedited / Standard / Bulk
-    tiers; provisioning Expedited capacity for guaranteed throughput;
-    running a DR restore drill with an RTO target; orchestrating a
-    bulk restore via S3 Batch Operations; checking restore status
-    via head-object Restore field; reconciling restore in place vs
-    copy-to-different-tier; integrating restores with lifecycle
-    policies; or diagnosing a stalled restore job.
-  activation_triggers:
-    - "restore object from Glacier"
-    - "S3 Glacier restore"
-    - "expedited retrieval"
-    - "standard retrieval"
-    - "bulk retrieval"
-    - "Deep Archive restore"
-    - "Glacier Instant Retrieval"
-    - "provisioned capacity"
-    - "bulk restore via Batch Operations"
-    - "manifest restore"
-    - "restore drill"
-    - "DR restore from Glacier"
-    - "head-object Restore field"
-    - "stalled restore job"
-    - "lifecycle policy integration"
-    - "copy to different storage class"
-  invocation_schema: >-
-    Input shape (one of): (a) a restore specification including the
-    bucket, key (or prefix, or manifest), source storage class
-    (Glacier Flexible Retrieval | Glacier Deep Archive | Glacier
-    Instant Retrieval), retrieval tier (Expedited | Standard | Bulk),
-    target destination (in-place | copy-to-bucket | copy-to-tier),
-    and RTO budget; (b) a partial spec for interactive refinement
-    (e.g., "restore this prefix from Glacier, urgent"); (c) an
-    existing job ID for status check or diagnosis. Output shape:
-    { OPERATION, VERDICT, TARGET, PRE_CHECKS, STEPS, POST_VERIFY,
-    STATE, NOTES } where VERDICT ∈ { READY, BLOCKED, COMPLETED,
-    ERROR }.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Restoring a single object, prefix, or manifest of objects from S3 Glacier Flexible Retrieval, Glacier Deep Archive, or Glacier Instant Retrieval; choosing between Expedited / Standard / Bulk tiers; provisioning Expedited capacity for guaranteed throughput; running a DR restore drill with an RTO target; orchestrating a bulk restore via S3 Batch Operations; checking restore status via head-object Restore field; reconciling restore in place vs copy-to-different-tier; integrating restores with lifecycle policies; or diagnosing a stalled restore job.
+  activation_triggers: restore object from Glacier, S3 Glacier restore, expedited retrieval, standard retrieval, bulk retrieval, Deep Archive restore, Glacier Instant Retrieval, provisioned capacity, bulk restore via Batch Operations, manifest restore, restore drill, DR restore from Glacier, head-object Restore field, stalled restore job, lifecycle policy integration, copy to different storage class
+  invocation_schema: 'Input shape (one of): (a) a restore specification including the bucket, key (or prefix, or manifest), source storage class (Glacier Flexible Retrieval | Glacier Deep Archive | Glacier Instant Retrieval), retrieval tier (Expedited | Standard | Bulk), target destination (in-place | copy-to-bucket | copy-to-tier), and RTO budget; (b) a partial spec for interactive refinement (e.g., "restore this prefix from Glacier, urgent"); (c) an existing job ID for status check or diagnosis. Output shape: { OPERATION, VERDICT, TARGET, PRE_CHECKS, STEPS, POST_VERIFY, STATE, NOTES } where VERDICT ∈ { READY, BLOCKED, COMPLETED, ERROR }.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: S3 Glacier, S3 Glacier Flexible Retrieval, S3 Glacier Deep Archive, S3 Glacier Instant Retrieval, restore-object, Expedited retrieval, Standard retrieval, Bulk retrieval, provisioned capacity, S3 Batch Operations, bulk restore, restore in place, copy to different tier, head-object Restore field, RestoreObject, lifecycle policy, Transition, NoncurrentVersionTransition, DR restore drill, manifest restore, Glacier Instant Retrieval, Deep Archive bulk restore
+  tags: s3, storage, operate, glacier, restore, deep-archive, instant-retrieval, batch-operations, lifecycle, expedited, provisioned-capacity
 ---
 
 # S3 Glacier Restore Operator

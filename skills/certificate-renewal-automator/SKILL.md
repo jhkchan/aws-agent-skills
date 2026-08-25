@@ -1,79 +1,26 @@
 ---
 name: certificate-renewal-automator
-description: >-
-  Designs and implements ACM certificate renewal automation pipelines.
-  Detects expiring certificates via CloudWatch alarms on DaysToExpiry,
-  wires EventBridge scheduled rules for daily cert scans, deploys Lambda
-  functions that request new certificates, validate DNS via Route 53
-  CNAME records, update ALB/NLB listeners, rotate API Gateway custom
-  domain certificates, and update CloudFront distributions. Covers
-  private CA (ACM PCA) lifecycle, cross-account cert sharing via IAM,
-  SNI verification, wildcard vs SAN renewal, exported-private-key manual
-  renewal, and CloudTrail audit. Emits AUTOMATION_DEPLOYED with a full
-  IaC template or REVIEW_REQUIRED with the specific gap.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Designs and implements ACM certificate renewal automation pipelines. Detects expiring certificates via CloudWatch alarms on DaysToExpiry, wires EventBridge scheduled rules for daily cert scans, deploys Lambda functions that request new certificates, validate DNS via Route 53 CNAME records, update ALB/NLB listeners, rotate API Gateway custom domain certificates, and update CloudFront distributions. Covers private CA (ACM PCA) lifecycle, cross-account cert sharing via IAM, SNI verification, wildcard vs SAN renewal, exported-private-key manual renewal, and CloudTrail audit. Emits AUTOMATION_DEPLOYED with a full IaC template or REVIEW_REQUIRED with the specific gap.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline workflow design. Live
-  deployment uses aws acm describe-certificates, request-certificate,
-  get-certificate, aws acm-pca issue-certificate, aws elbv2
-  modify-listener, aws apigateway update-domain-name, aws cloudfront
-  update-distribution, aws route53 change-resource-record-sets, aws
-  events put-rule/put-targets, aws lambda create-function — AWS CLI v2.
-keywords:
-  - ACM
-  - certificate renewal
-  - DaysToExpiry
-  - CloudWatch alarm
-  - EventBridge scheduled rule
-  - Lambda renewal
-  - DNS validation
-  - Route 53 CNAME
-  - ACM PCA
-  - ALB listener certificate
-  - CloudFront distribution
-  - API Gateway custom domain
-  - SNI verification
-  - wildcard certificate
-  - SAN certificate
-  - CloudTrail audit
-tags: [aws-acm, certificate-renewal, tls, security, cloudwatch, eventbridge, lambda, automate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline workflow design. Live deployment uses aws acm describe-certificates, request-certificate, get-certificate, aws acm-pca issue-certificate, aws elbv2 modify-listener, aws apigateway update-domain-name, aws cloudfront update-distribution, aws route53 change-resource-record-sets, aws events put-rule/put-targets, aws lambda create-function — AWS CLI v2.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
   family: Security
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATION_DEPLOYED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Building ACM certificate renewal automation, wiring CloudWatch
-    alarms for cert expiry, deploying EventBridge + Lambda renewal
-    pipelines, managing PCA certificate lifecycles, rotating certs on
-    ALB/NLB/CloudFront/API Gateway, or auditing cert API calls.
-  activation_triggers:
-    - "automate certificate renewal"
-    - "ACM expiry alarm"
-    - "DaysToExpiry CloudWatch"
-    - "certificate rotation Lambda"
-    - "DNS validation Route 53"
-    - "ACM PCA lifecycle"
-    - "ALB listener certificate update"
-    - "CloudFront certificate renewal"
-    - "API Gateway custom domain cert"
-    - "SNI verification"
-    - "cross-account certificate sharing"
-  invocation_schema: >-
-    Input: either (a) a list of ACM certificate ARNs with associated
-    services and renewal status, OR (b) a cert renewal automation
-    requirement. Output: deterministic RENEWAL block per certificate —
-    DETECTION/RENEWAL_FLOW/VALIDATION/NOTIFICATION/AUDIT/VERDICT —
-    where VERDICT is AUTOMATION_DEPLOYED or REVIEW_REQUIRED.
+  verdict_shape: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
+  when_to_use: Building ACM certificate renewal automation, wiring CloudWatch alarms for cert expiry, deploying EventBridge + Lambda renewal pipelines, managing PCA certificate lifecycles, rotating certs on ALB/NLB/CloudFront/API Gateway, or auditing cert API calls.
+  activation_triggers: automate certificate renewal, ACM expiry alarm, DaysToExpiry CloudWatch, certificate rotation Lambda, DNS validation Route 53, ACM PCA lifecycle, ALB listener certificate update, CloudFront certificate renewal, API Gateway custom domain cert, SNI verification, cross-account certificate sharing
+  invocation_schema: 'Input: either (a) a list of ACM certificate ARNs with associated services and renewal status, OR (b) a cert renewal automation requirement. Output: deterministic RENEWAL block per certificate — DETECTION/RENEWAL_FLOW/VALIDATION/NOTIFICATION/AUDIT/VERDICT — where VERDICT is AUTOMATION_DEPLOYED or REVIEW_REQUIRED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: ACM, certificate renewal, DaysToExpiry, CloudWatch alarm, EventBridge scheduled rule, Lambda renewal, DNS validation, Route 53 CNAME, ACM PCA, ALB listener certificate, CloudFront distribution, API Gateway custom domain, SNI verification, wildcard certificate, SAN certificate, CloudTrail audit
+  tags: aws-acm, certificate-renewal, tls, security, cloudwatch, eventbridge, lambda, automate
 ---
 
 # Certificate Renewal Automator

@@ -1,48 +1,15 @@
 ---
 name: dynamodb-throttling-optimizer
 description: 'Optimises DynamoDB throttling prevention across eight dimensions: partition key design (hot partition detection via CloudWatch ThrottledRequests), burst capacity utilization (300-second burst bucket understanding), adaptive capacity (automatic redistribution, not a design substitute), GSI partition key distribution (hot GSI backpressure), write capacity mode (provisioned vs on-demand for bursty writes), batch write API (BatchWriteItem for 16x throughput), exponential backoff with jitter (ProvisionedThroughputExceededException handling), and write sharding (random suffix for high-cardinality hot keys). Covers conditional writes for idempotency, TTL for data lifecycle, partition splitting, and throttling root cause analysis via CloudTrail.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted CloudWatch metrics and table configuration. Live-account optimization uses aws dynamodb describe-table, aws dynamodb describe-limits, aws cloudwatch get-metric-statistics (ThrottledRequests, ConsumedReadCapacityUnits, ConsumedWriteCapacityUnits, ReturnedItemCount), aws cloudtrail lookup-events, and aws application-autoscaling describe-scaling-policies (AWS CLI v2, SSO or key-based credentials). Pricing references us-east-1 published rates as of 2026; re-state regional rates from the reference matrix for other regions.
-keywords:
-- DynamoDB
-- throttling
-- hot partition
-- partition key
-- write sharding
-- burst capacity
-- adaptive capacity
-- GSI
-- batch write
-- BatchWriteItem
-- exponential backoff
-- jitter
-- provisioned vs on-demand
-- ProvisionedThroughputExceededException
-- ThrottledRequests
-- ConsumedWriteCapacityUnits
-- conditional writes
-- idempotency
-- TTL
-- partition splitting
-- CloudTrail
-- root cause analysis
-tags:
-- dynamodb
-- databases
-- performance
-- throttling
-- partition-design
-- capacity
-- write-sharding
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted CloudWatch metrics and table configuration. Live-account optimization uses aws dynamodb describe-table, aws dynamodb describe-limits, aws cloudwatch get-metric-statistics (ThrottledRequests, ConsumedReadCapacityUnits, ConsumedWriteCapacityUnits, ReturnedItemCount), aws cloudtrail lookup-events, and aws application-autoscaling describe-scaling-policies (AWS...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: optimize
   skill_class: capability
@@ -50,27 +17,13 @@ metadata:
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
   when_to_use: Preventing DynamoDB throttling, diagnosing hot partitions via CloudWatch ThrottledRequests, designing write-sharding strategies for high-cardinality keys, evaluating burst capacity utilization, understanding adaptive capacity limits, distributing GSI partition keys, choosing provisioned vs on-demand for bursty writes, implementing BatchWriteItem for throughput, configuring exponential backoff with jitter, or running throttling root cause analysis via CloudTrail.
   when_not_to_use: DynamoDB cost optimization without a throttling focus (use dynamodb-capacity-optimizer), DynamoDB table security or IAM auditing (use dynamodb-table-auditor), or DynamoDB schema design from scratch (use a data modeling specialist). This skill targets throttling prevention and partition-key distribution, not dollar cost or greenfield schema design.
-  activation_triggers:
-  - prevent DynamoDB throttling
-  - DynamoDB hot partition
-  - DynamoDB ThrottledRequests
-  - DynamoDB write sharding
-  - DynamoDB burst capacity
-  - DynamoDB adaptive capacity
-  - DynamoDB GSI throttling
-  - DynamoDB BatchWriteItem
-  - DynamoDB exponential backoff
-  - DynamoDB ProvisionedThroughputExceededException
-  - DynamoDB partition key design
-  - DynamoDB partition splitting
-  - DynamoDB on-demand vs provisioned
-  - DynamoDB throttling root cause
-  - DynamoDB CloudTrail analysis
-  - DynamoDB conditional writes
-  - DynamoDB idempotency
-  - DynamoDB TTL throttling
+  activation_triggers: prevent DynamoDB throttling, DynamoDB hot partition, DynamoDB ThrottledRequests, DynamoDB write sharding, DynamoDB burst capacity, DynamoDB adaptive capacity, DynamoDB GSI throttling, DynamoDB BatchWriteItem, DynamoDB exponential backoff, DynamoDB ProvisionedThroughputExceededException, DynamoDB partition key design, DynamoDB partition splitting, DynamoDB on-demand vs provisioned, DynamoDB throttling root cause, DynamoDB CloudTrail analysis, DynamoDB conditional writes, DynamoDB idempotency, DynamoDB TTL throttling
   invocation_schema: 'Input: either (a) a table identifier + live-account context, (b) a CloudWatch metrics export (ThrottledRequests, ConsumedWriteCapacityUnits, ConsumedReadCapacityUnits), OR (c) table metadata (TableName, BillingMode, ProvisionedThroughput, GSIs, partition key attribute, TTL status) with observed throttling events. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ ESTIMATED_THROUGHPUT_IMPACT/MIGRATION_STEPS block per table, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
   invocation_example: "# Minimal valid input (offline classification):\nTableName: user-events-prod\nRegion: us-east-1\nBillingMode: PROVISIONED\nProvisionedThroughput:\n  ReadCapacityUnits: 5000\n  WriteCapacityUnits: 3000\nPartitionKey: user_id (String)\nGSI: event-type-index (partition key: event_type)\nTTL: not enabled\nMetrics (last 30 days):\n  - ThrottledRequests: 45,000 (on Write)\n  - ConsumedWriteCapacityUnits: avg 2800/s, max 3500/s\n  - ConsumedReadCapacityUnits: avg 1200/s, max 1800/s\n  - ReturnedItemCount: avg 50/scan\nThrottling pattern: spikes at top-of-hour batch writes (same user_id\n  values concentrated in few partitions)\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_THROUGHPUT_IMPACT, MIGRATION_STEPS)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: DynamoDB, throttling, hot partition, partition key, write sharding, burst capacity, adaptive capacity, GSI, batch write, BatchWriteItem, exponential backoff, jitter, provisioned vs on-demand, ProvisionedThroughputExceededException, ThrottledRequests, ConsumedWriteCapacityUnits, conditional writes, idempotency, TTL, partition splitting, CloudTrail, root cause analysis
+  tags: dynamodb, databases, performance, throttling, partition-design, capacity, write-sharding
 ---
 
 # DynamoDB Throttling Optimizer

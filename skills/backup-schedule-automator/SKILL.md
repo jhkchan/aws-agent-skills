@@ -1,93 +1,27 @@
 ---
 name: backup-schedule-automator
-description: >-
-  Designs and implements automated AWS Backup scheduling workflows using backup
-  plans, tag-based resource assignment, cross-account backup via Organizations
-  backup policies, on-demand backup triggering via EventBridge and Lambda, backup
-  vault notifications (SNS), restore testing automation, lifecycle policy
-  automation (warm storage tiering to cold storage), curated backup reports,
-  audit trail via CloudTrail, compliance reporting, and multi-region backup
-  orchestration. Wires backup vault lock for WORM compliance, backup plan
-  templates for common patterns (daily-7d, weekly-30d, monthly-1yr), and
-  EventBridge-driven on-demand backups triggered by application deployment
-  events. Emits AUTOMATION_DEPLOYED with a deployment-ready backup plan and
-  policy template or REVIEW_REQUIRED with the specific gap. Use when building
-  AWS Backup automation, designing tag-based backup schedules, configuring
-  cross-account or cross-region backup, implementing lifecycle tiering, or
-  setting up restore testing for RTO/RPO validation.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Designs and implements automated AWS Backup scheduling workflows using backup plans, tag-based resource assignment, cross-account backup via Organizations backup policies, on-demand backup triggering via EventBridge and Lambda, backup vault notifications (SNS), restore testing automation, lifecycle policy automation (warm storage tiering to cold storage), curated backup reports, audit trail via CloudTrail, compliance reporting, and multi-region backup orchestration. Wires backup vault lock for WORM compliance, backup plan templates for common patterns (daily-7d, weekly-30d, monthly-1yr), and EventBridge-driven on-demand backups triggered by application deployment events. Emits AUTOMATION_DEPLOYED with a deployment-ready backup plan and policy template or REVIEW_REQUIRED with the specific gap. Use when building AWS Backup automation, designing tag-based backup schedules, configuring cross-account or cross-region backup, implementing lifecycle tiering, or setting up restore testing for RTO/RPO validation.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline workflow design. Live deployment
-  uses aws backup create-backup-plan, start-backup-job, create-backup-vault,
-  put-backup-vault-access-policy, create-framework, start-restore-job,
-  describe-backup-job, describe-restore-job, aws events put-rule, put-targets,
-  aws lambda create-function, aws organizations put-backup-policy, and
-  aws cloudformation deploy — AWS CLI v2, SSO or key-based credentials.
-keywords:
-  - AWS Backup
-  - backup plan
-  - backup vault
-  - tag-based assignment
-  - cross-account backup
-  - backup policy
-  - Organizations backup
-  - vault lock
-  - WORM compliance
-  - lifecycle policy
-  - cold storage tiering
-  - restore testing
-  - RTO RPO validation
-  - backup report
-  - EventBridge on-demand backup
-  - backup vault notification
-  - SNS backup alert
-  - multi-region backup
-  - CloudTrail audit
-  - backup framework
-tags: [aws-backup, backup-plan, backup-vault, lifecycle-policy, cross-account, restore-testing, automate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline workflow design. Live deployment uses aws backup create-backup-plan, start-backup-job, create-backup-vault, put-backup-vault-access-policy, create-framework, start-restore-job, describe-backup-job, describe-restore-job, aws events put-rule, put-targets, aws lambda create-function, aws organizations put-backup-policy, and aws cloudformation deploy — AWS CLI v2, SSO or key-based...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATION_DEPLOYED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Designing automated AWS Backup schedules, building tag-based resource
-    assignment at scale, configuring cross-account backup via Organizations
-    policies, implementing lifecycle tiering (warm to cold storage), setting
-    up restore testing automation for RTO/RPO validation, wiring EventBridge
-    on-demand backup triggers, enabling backup vault lock for WORM compliance,
-    deploying curated backup reports, or orchestrating multi-region backup.
-  activation_triggers:
-    - "automate AWS Backup schedule"
-    - "backup plan from template"
-    - "tag-based backup assignment"
-    - "cross-account backup Organizations"
-    - "backup vault lock WORM"
-    - "lifecycle cold storage tiering"
-    - "restore testing automation"
-    - "RTO RPO validation"
-    - "on-demand backup EventBridge"
-    - "backup report automation"
-    - "backup policy inheritance"
-    - "multi-region backup orchestration"
-  invocation_schema: >-
-    Input: either (a) a resource scope (tag-based selection, resource type
-    list) plus backup requirements (frequency, retention, lifecycle), OR (b)
-    a compliance requirement ("daily backups with 1-year retention and WORM
-    lock", "cross-account backup to DR account"). Output: deterministic
-    BACKUP block — PLAN/VAULT/LIFECYCLE/TRIGGER/RESTORE_TEST/VERDICT — where
-    VERDICT is AUTOMATION_DEPLOYED (deployment-ready template) or
-    REVIEW_REQUIRED (specific gap cited).
+  verdict_shape: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
+  when_to_use: Designing automated AWS Backup schedules, building tag-based resource assignment at scale, configuring cross-account backup via Organizations policies, implementing lifecycle tiering (warm to cold storage), setting up restore testing automation for RTO/RPO validation, wiring EventBridge on-demand backup triggers, enabling backup vault lock for WORM compliance, deploying curated backup reports, or orchestrating multi-region backup.
+  activation_triggers: automate AWS Backup schedule, backup plan from template, tag-based backup assignment, cross-account backup Organizations, backup vault lock WORM, lifecycle cold storage tiering, restore testing automation, RTO RPO validation, on-demand backup EventBridge, backup report automation, backup policy inheritance, multi-region backup orchestration
+  invocation_schema: 'Input: either (a) a resource scope (tag-based selection, resource type list) plus backup requirements (frequency, retention, lifecycle), OR (b) a compliance requirement ("daily backups with 1-year retention and WORM lock", "cross-account backup to DR account"). Output: deterministic BACKUP block — PLAN/VAULT/LIFECYCLE/TRIGGER/RESTORE_TEST/VERDICT — where VERDICT is AUTOMATION_DEPLOYED (deployment-ready template) or REVIEW_REQUIRED (specific gap cited).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Backup, backup plan, backup vault, tag-based assignment, cross-account backup, backup policy, Organizations backup, vault lock, WORM compliance, lifecycle policy, cold storage tiering, restore testing, RTO RPO validation, backup report, EventBridge on-demand backup, backup vault notification, SNS backup alert, multi-region backup, CloudTrail audit, backup framework
+  tags: aws-backup, backup-plan, backup-vault, lifecycle-policy, cross-account, restore-testing, automate
 ---
 
 # Backup Schedule Automator

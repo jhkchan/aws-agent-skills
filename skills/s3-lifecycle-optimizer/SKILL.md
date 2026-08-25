@@ -1,88 +1,26 @@
 ---
 name: s3-lifecycle-optimizer
-description: >-
-  Optimises S3 storage cost through lifecycle-policy design, storage-class
-  selection, and access-pattern analysis. Invents the right transition and
-  expiration rules per workload archetype (logs, compliance archive,
-  application data, versioned buckets, multipart-upload leaks), projects
-  monthly savings net of minimum-duration and retrieval charges, and emits
-  a deterministic verdict (OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL)
-  per bucket with the exact put-bucket-lifecycle-configuration payload and
-  estimated dollar impact. Use when reviewing S3 spend, designing lifecycle
-  policies, choosing between Standard-IA / One-Zone-IA / Intelligent-Tiering
-  / Glacier tiers, pruning noncurrent versions, aborting stale multipart
-  uploads, or projecting savings from a storage-class migration.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Optimises S3 storage cost through lifecycle-policy design, storage-class selection, and access-pattern analysis. Invents the right transition and expiration rules per workload archetype (logs, compliance archive, application data, versioned buckets, multipart-upload leaks), projects monthly savings net of minimum-duration and retrieval charges, and emits a deterministic verdict (OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL) per bucket with the exact put-bucket-lifecycle-configuration payload and estimated dollar impact. Use when reviewing S3 spend, designing lifecycle policies, choosing between Standard-IA / One-Zone-IA / Intelligent-Tiering / Glacier tiers, pruning noncurrent versions, aborting stale multipart uploads, or projecting savings from a storage-class migration.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline configuration classification.
-  Live-account audits use aws s3api list-buckets, aws s3api
-  get-bucket-lifecycle-configuration, aws s3api list-objects-v2 (with
-  --page-size for inventory), aws s3api list-multipart-uploads, aws s3api
-  get-bucket-versioning, and aws s3control get-storage-lens-configuration
-  (AWS CLI v2, SSO or key-based credentials). Pricing is us-east-1 published
-  rates as of 2026; re-state the regional rates from the reference matrix
-  before producing dollar estimates for other regions.
-keywords:
-  - S3
-  - lifecycle policy
-  - storage class
-  - Standard-IA
-  - One-Zone-IA
-  - Intelligent-Tiering
-  - Glacier Instant Retrieval
-  - Glacier Flexible Retrieval
-  - Glacier Deep Archive
-  - S3 Express One Zone
-  - directory bucket
-  - noncurrent version
-  - multipart upload
-  - S3 Storage Lens
-  - S3 Object Lock
-  - S3 Batch Operations
-  - S3 Tables
-  - put-bucket-lifecycle-configuration
-  - storage cost optimization
-tags: [s3, storage, cost-optimization, lifecycle, storage-class, glacier, intelligent-tiering, object-lock, finops]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline configuration classification. Live-account audits use aws s3api list-buckets, aws s3api get-bucket-lifecycle-configuration, aws s3api list-objects-v2 (with --page-size for inventory), aws s3api list-multipart-uploads, aws s3api get-bucket-versioning, and aws s3control get-storage-lens-configuration (AWS CLI v2, SSO or key-based credentials). Pricing is us-east-1 published rates...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: optimize
   skill_class: capability
-  verdict_shape: "OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL"
-  when_to_use: >-
-    Reviewing S3 spend, designing or auditing lifecycle policies, selecting
-    storage classes for infrequently accessed data, projecting savings from
-    Standard -> Standard-IA / Intelligent-Tiering / Glacier transitions,
-    pruning noncurrent versions on versioned buckets, aborting stale
-    multipart uploads, or hardening compliance archives with Object Lock.
-  activation_triggers:
-    - "optimise S3 storage cost"
-    - "design S3 lifecycle policy"
-    - "S3 storage class analysis"
-    - "move S3 data to Glacier"
-    - "S3 Intelligent-Tiering vs Standard-IA"
-    - "prune noncurrent S3 versions"
-    - "abort stale S3 multipart uploads"
-    - "S3 Object Lock retention"
-    - "S3 lifecycle transition rules"
-    - "S3 cost optimization review"
-    - "Glacier Deep Archive lifecycle"
-    - "S3 Batch Operations storage class"
-  invocation_schema: >-
-    Input: either (a) a bucket configuration (lifecycle configuration JSON,
-    versioning status, Storage Lens metrics summary, optional object-age
-    histogram), OR (b) a bucket name for live-account optimisation. Output:
-    deterministic BUCKET/VERDICT/REASON/RECOMMENDATION/SAVINGS/IMPLEMENTATION
-    block per bucket, where VERDICT is one of OPTIMIZED, OPPORTUNITY_FOUND,
-    ALREADY_OPTIMAL.
+  verdict_shape: OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL
+  when_to_use: Reviewing S3 spend, designing or auditing lifecycle policies, selecting storage classes for infrequently accessed data, projecting savings from Standard -> Standard-IA / Intelligent-Tiering / Glacier transitions, pruning noncurrent versions on versioned buckets, aborting stale multipart uploads, or hardening compliance archives with Object Lock.
+  activation_triggers: optimise S3 storage cost, design S3 lifecycle policy, S3 storage class analysis, move S3 data to Glacier, S3 Intelligent-Tiering vs Standard-IA, prune noncurrent S3 versions, abort stale S3 multipart uploads, S3 Object Lock retention, S3 lifecycle transition rules, S3 cost optimization review, Glacier Deep Archive lifecycle, S3 Batch Operations storage class
+  invocation_schema: 'Input: either (a) a bucket configuration (lifecycle configuration JSON, versioning status, Storage Lens metrics summary, optional object-age histogram), OR (b) a bucket name for live-account optimisation. Output: deterministic BUCKET/VERDICT/REASON/RECOMMENDATION/SAVINGS/IMPLEMENTATION block per bucket, where VERDICT is one of OPTIMIZED, OPPORTUNITY_FOUND, ALREADY_OPTIMAL.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: S3, lifecycle policy, storage class, Standard-IA, One-Zone-IA, Intelligent-Tiering, Glacier Instant Retrieval, Glacier Flexible Retrieval, Glacier Deep Archive, S3 Express One Zone, directory bucket, noncurrent version, multipart upload, S3 Storage Lens, S3 Object Lock, S3 Batch Operations, S3 Tables, put-bucket-lifecycle-configuration, storage cost optimization
+  tags: s3, storage, cost-optimization, lifecycle, storage-class, glacier, intelligent-tiering, object-lock, finops
 ---
 
 # S3 Lifecycle Optimizer

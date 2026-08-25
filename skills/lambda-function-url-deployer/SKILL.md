@@ -1,107 +1,26 @@
 ---
 name: lambda-function-url-deployer
-description: >-
-  Provisions AWS Lambda Function URLs with production defaults: auth
-  mode (AWS_IAM vs NONE), CORS configuration (allowOrigins,
-  allowMethods, allowHeaders, exposeHeaders, maxAgeSeconds), invoke
-  mode (BUFFERED vs RESPONSE_STREAM), 15-second timeout limit for
-  function URL invocations, dual-stack IPv4/IPv6 endpoints, $LATEST
-  alias constraint (cannot attach to a custom alias without
-  UpdateFunctionUrl), CloudWatch metrics (UrlRequests, Url4xx,
-  Url5xx, UrlLatency), cold start impact on first-byte latency,
-  custom domain via CloudFront + Lambda URL, and pricing parity with
-  standard Lambda invocations. Emits a READY_TO_DEPLOY checklist
-  with verification commands. Use when creating a Lambda function
-  URL, configuring CORS on a function URL, enabling response
-  streaming, setting up IAM-authenticated function URLs, placing a
-  custom domain in front of a function URL via CloudFront, or
-  monitoring function URL metrics. Triggers: create lambda function
-  url, configure cors on function url, enable response streaming
-  lambda, lambda function url iam auth, lambda url cloudfront
-  custom domain, lambda function url buffered vs response_stream.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Lambda Function URLs with production defaults: auth mode (AWS_IAM vs NONE), CORS configuration (allowOrigins, allowMethods, allowHeaders, exposeHeaders, maxAgeSeconds), invoke mode (BUFFERED vs RESPONSE_STREAM), 15-second timeout limit for function URL invocations, dual-stack IPv4/IPv6 endpoints, $LATEST alias constraint (cannot attach to a custom alias without UpdateFunctionUrl), CloudWatch metrics (UrlRequests, Url4xx, Url5xx, UrlLatency), cold start impact on first-byte latency, custom domain via CloudFront + Lambda URL, and pricing parity with standard Lambda invocations. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Lambda function URL, configuring CORS on a function URL, enabling response streaming, setting up IAM-authenticated function. Triggers: create lambda function url, configure cors on function url, enable response streaming lambda, lambda function url iam auth, lambda url cloudfront custom domain, lambda function url buffered vs...'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with lambda
-  access. Works with Terraform aws_lambda_function_url resource and
-  CloudFormation AWS::Lambda::Url templates.
-keywords:
-  - aws
-  - lambda
-  - function url
-  - cloudops
-  - deploy
-  - provisioning
-  - cors
-  - response streaming
-  - iam auth
-  - dual-stack
-  - cloudfront
-  - invoke mode
-  - buffered
-  - response_stream
-tags:
-  - aws
-  - lambda
-  - lambda-function-url
-  - cloudops
-  - deploy
-  - compute
-  - provisioning
-  - cors
-  - streaming
-  - iam
-  - cloudfront
-  - dual-stack
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with lambda access. Works with Terraform aws_lambda_function_url resource and CloudFormation AWS::Lambda::Url templates.'
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - lambda
-    - lambda-function-url
-    - cloudops
-    - deploy
-    - compute
-    - provisioning
-    - cors
-    - streaming
-    - iam
-    - cloudfront
-    - dual-stack
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create lambda function url
-    - configure cors on function url
-    - enable response streaming lambda
-    - lambda function url iam auth
-    - lambda url cloudfront custom domain
-    - lambda function url buffered vs response_stream
-  when_to_use: >-
-    Invoke when the user wants to create a Lambda Function URL,
-    configure CORS on an existing function URL, switch invoke mode
-    between BUFFERED and RESPONSE_STREAM, set up IAM-authenticated
-    vs public (NONE auth) function URLs, place a custom domain
-    (CloudFront) in front of a function URL, or monitor function URL
-    CloudWatch metrics. Do NOT invoke for API Gateway HTTP/REST APIs
-    (use apigateway skills), Lambda@Edge (use lambda-at-edge skills),
-    or Application Load Balancer targets (use alb skills).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, lambda, lambda-function-url, cloudops, deploy, compute, provisioning, cors, streaming, iam, cloudfront, dual-stack
+  dependencies: aws-orchestrator
+  keywords: aws, lambda, function url, cloudops, deploy, provisioning, cors, response streaming, iam auth, dual-stack, cloudfront, invoke mode, buffered, response_stream
+  when_to_use: Invoke when the user wants to create a Lambda Function URL, configure CORS on an existing function URL, switch invoke mode between BUFFERED and RESPONSE_STREAM, set up IAM-authenticated vs public (NONE auth) function URLs, place a custom domain (CloudFront) in front of a function URL, or monitor function URL CloudWatch metrics. Do NOT invoke for API Gateway HTTP/REST APIs (use apigateway skills), Lambda@Edge (use lambda-at-edge skills), or Application Load Balancer targets (use alb skills).
 ---
 
 # Lambda Function URL Deployer

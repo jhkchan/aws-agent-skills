@@ -1,114 +1,26 @@
 ---
 name: s3-table-bucket-deployer
-description: >-
-  Provisions Amazon S3 Tables (table buckets) with production defaults:
-  table bucket creation (create-table-bucket), namespace management
-  (create-namespace), table creation in Apache Iceberg format
-  (create-table with schema, partition spec), table maintenance
-  configuration (compaction, snapshot management, unreferenced file
-  cleanup), table bucket policy (separate from regular S3 object bucket
-  policy), Apache Iceberg REST catalog endpoint for Athena integration,
-  Lake Formation integration for fine-grained access control, table
-  format version (Iceberg v2 for row-level deletes), partitioning
-  strategy alignment with query patterns, S3 table bucket vs regular S3
-  bucket distinction (purpose-built for tabular data), and Apache
-  Iceberg features (time travel, schema evolution, ACID transactions).
-  Emits a READY_TO_DEPLOY checklist with verification commands. Use when
-  creating an S3 table bucket, managing namespaces, creating an Iceberg
-  table in S3 Tables, configuring table maintenance, applying a table
-  bucket policy, integrating Athena with S3 Tables, or setting up Lake
-  Formation permissions on table bucket resources. Triggers: create s3
-  table bucket, s3 tables namespace, iceberg table s3, s3 table
-  maintenance compaction, s3 table bucket policy, iceberg rest catalog
-  athena, lake formation s3 tables, s3 table partition spec.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon S3 Tables (table buckets) with production defaults: table bucket creation (create-table-bucket), namespace management (create-namespace), table creation in Apache Iceberg format (create-table with schema, partition spec), table maintenance configuration (compaction, snapshot management, unreferenced file cleanup), table bucket policy (separate from regular S3 object bucket policy), Apache Iceberg REST catalog endpoint for Athena integration, Lake Formation integration for fine-grained access control, table format version (Iceberg v2 for row-level deletes), partitioning strategy alignment with query patterns, S3 table bucket vs regular S3 bucket distinction (purpose-built for tabular data), and Apache Iceberg features (time travel, schema evolution, ACID transactions). Emits a. Triggers: create s3 table bucket, s3 tables namespace, iceberg table s3, s3 table maintenance compaction, s3 table bucket policy, iceberg rest catalog athena, lake formation s3 tables, s3 table partition spec.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with s3tables access
-  (and Lake Formation / Athena workgroup permissions for integration
-  steps). Works with Terraform aws_s3tables_table_bucket /
-  aws_s3tables_namespace / aws_s3tables_table resources and
-  CloudFormation AWS::S3Tables::TableBucket /
-  AWS::S3Tables::Table templates.
-keywords:
-  - aws
-  - s3 tables
-  - table bucket
-  - apache iceberg
-  - cloudops
-  - deploy
-  - provisioning
-  - namespace
-  - compaction
-  - snapshot management
-  - table bucket policy
-  - iceberg rest catalog
-  - athena
-  - lake formation
-  - schema evolution
-  - time travel
-  - acid transactions
-tags:
-  - aws
-  - s3-tables
-  - table-bucket
-  - apache-iceberg
-  - cloudops
-  - deploy
-  - storage
-  - provisioning
-  - compaction
-  - lake-formation
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with s3tables access (and Lake Formation / Athena workgroup permissions for integration steps). Works with Terraform aws_s3tables_table_bucket / aws_s3tables_namespace / aws_s3tables_table resources and CloudFormation AWS::S3Tables::TableBucket / AWS::S3Tables::Table templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - s3-tables
-    - table-bucket
-    - apache-iceberg
-    - cloudops
-    - deploy
-    - storage
-    - provisioning
-    - compaction
-    - lake-formation
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create s3 table bucket
-    - s3 tables namespace
-    - iceberg table s3
-    - s3 table maintenance compaction
-    - s3 table bucket policy
-    - iceberg rest catalog athena
-    - lake formation s3 tables
-    - s3 table partition spec
-  when_to_use: >-
-    Invoke when the user wants to create an Amazon S3 table bucket,
-    manage namespaces within a table bucket, create an Apache Iceberg
-    table in S3 Tables, configure table maintenance (compaction, snapshot
-    management, unreferenced file cleanup), apply a table bucket policy,
-    integrate Athena with S3 Tables via the Iceberg REST catalog, or set
-    up Lake Formation permissions on table bucket resources. Do NOT
-    invoke for regular S3 bucket operations (standard object storage),
-    S3 Glacier, or DynamoDB. For general-purpose object storage use the
-    standard S3 bucket skills.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, s3-tables, table-bucket, apache-iceberg, cloudops, deploy, storage, provisioning, compaction, lake-formation
+  dependencies: aws-orchestrator
+  keywords: aws, s3 tables, table bucket, apache iceberg, cloudops, deploy, provisioning, namespace, compaction, snapshot management, table bucket policy, iceberg rest catalog, athena, lake formation, schema evolution, time travel, acid transactions
+  when_to_use: Invoke when the user wants to create an Amazon S3 table bucket, manage namespaces within a table bucket, create an Apache Iceberg table in S3 Tables, configure table maintenance (compaction, snapshot management, unreferenced file cleanup), apply a table bucket policy, integrate Athena with S3 Tables via the Iceberg REST catalog, or set up Lake Formation permissions on table bucket resources. Do NOT invoke for regular S3 bucket operations (standard object storage), S3 Glacier, or DynamoDB. For general-purpose object storage use the standard S3 bucket skills.
 ---
 
 # S3 Table Bucket Deployer

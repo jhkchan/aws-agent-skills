@@ -1,77 +1,24 @@
 ---
 name: kinesis-stream-auditor
-description: >-
-  Audits Amazon Kinesis Data Streams for encryption-at-rest gaps (EncryptionType
-  NONE), extended-retention cost exposure, shard-count quota-exhaustion risk,
-  enhanced-monitoring blind spots (missing per-shard IteratorAge and
-  WriteProvisionedThroughputExceeded), consumer checkpointing posture, and
-  on-demand vs provisioned mode fit. Emits a deterministic verdict
-  (NO_ENCRYPTION | COST_RISK | CONFIG_GAP | OK) per stream with enumerated
-  findings and CLI remediation. Use when reviewing Kinesis stream
-  configurations, checking encryption posture, validating monitoring coverage,
-  auditing retention cost, or assessing consumer health before production
-  deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits Amazon Kinesis Data Streams for encryption-at-rest gaps (EncryptionType NONE), extended-retention cost exposure, shard-count quota-exhaustion risk, enhanced-monitoring blind spots (missing per-shard IteratorAge and WriteProvisionedThroughputExceeded), consumer checkpointing posture, and on-demand vs provisioned mode fit. Emits a deterministic verdict (NO_ENCRYPTION | COST_RISK | CONFIG_GAP | OK) per stream with enumerated findings and CLI remediation. Use when reviewing Kinesis stream configurations, checking encryption posture, validating monitoring coverage, auditing retention cost, or assessing consumer health before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline stream-config classification. Live
-  account audits use aws kinesis describe-stream-summary, describe-stream,
-  list-stream-consumers, and list-shards (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-  - Kinesis
-  - Kinesis Data Streams
-  - stream encryption
-  - SSE-KMS
-  - EncryptionType
-  - enhanced monitoring
-  - shard-level metrics
-  - retention period
-  - extended retention
-  - shard count
-  - quota exhaustion
-  - enhanced fan-out
-  - consumer checkpointing
-  - on-demand mode
-  - provisioned mode
-  - UpdateShardCount
-  - IteratorAgeMilliseconds
-  - WriteProvisionedThroughputExceeded
-  - stream cost audit
-  - StartStreamEncryption
-tags: [kinesis, analytics, encryption, cost, monitoring, consumer, stream-audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline stream-config classification. Live account audits use aws kinesis describe-stream-summary, describe-stream, list-stream-consumers, and list-shards (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
-  verdict_shape: "NO_ENCRYPTION | COST_RISK | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a Kinesis Data Streams configuration before production deployment,
-    checking encryption-at-rest posture, auditing extended-retention cost,
-    validating enhanced-monitoring coverage, assessing consumer checkpointing,
-    or evaluating on-demand vs provisioned mode fit.
-  activation_triggers:
-    - "audit this kinesis stream"
-    - "is my kinesis stream encrypted"
-    - "check kinesis retention cost"
-    - "kinesis enhanced monitoring"
-    - "kinesis shard quota"
-    - "kinesis consumer health"
-    - "on-demand vs provisioned kinesis"
-    - "kinesis stream cost"
-  invocation_schema: >-
-    Input: either (a) a Kinesis stream configuration summary (StreamStatus,
-    StreamMode, OpenShardCount, RetentionPeriodHours, EncryptionType, KeyId,
-    EnhancedMonitoring, ConsumerCount), optionally paired with utilization
-    metadata, OR (b) a stream name/ARN for live-account audit. Output:
-    deterministic STREAM/VERDICT/REASON/FINDINGS/REMEDIATION block per stream,
-    where VERDICT belongs to {NO_ENCRYPTION, COST_RISK, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: NO_ENCRYPTION | COST_RISK | CONFIG_GAP | OK
+  when_to_use: Reviewing a Kinesis Data Streams configuration before production deployment, checking encryption-at-rest posture, auditing extended-retention cost, validating enhanced-monitoring coverage, assessing consumer checkpointing, or evaluating on-demand vs provisioned mode fit.
+  activation_triggers: audit this kinesis stream, is my kinesis stream encrypted, check kinesis retention cost, kinesis enhanced monitoring, kinesis shard quota, kinesis consumer health, on-demand vs provisioned kinesis, kinesis stream cost
+  invocation_schema: 'Input: either (a) a Kinesis stream configuration summary (StreamStatus, StreamMode, OpenShardCount, RetentionPeriodHours, EncryptionType, KeyId, EnhancedMonitoring, ConsumerCount), optionally paired with utilization metadata, OR (b) a stream name/ARN for live-account audit. Output: deterministic STREAM/VERDICT/REASON/FINDINGS/REMEDIATION block per stream, where VERDICT belongs to {NO_ENCRYPTION, COST_RISK, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Kinesis, Kinesis Data Streams, stream encryption, SSE-KMS, EncryptionType, enhanced monitoring, shard-level metrics, retention period, extended retention, shard count, quota exhaustion, enhanced fan-out, consumer checkpointing, on-demand mode, provisioned mode, UpdateShardCount, IteratorAgeMilliseconds, WriteProvisionedThroughputExceeded, stream cost audit, StartStreamEncryption
+  tags: kinesis, analytics, encryption, cost, monitoring, consumer, stream-audit
 ---
 
 # Kinesis Stream Auditor

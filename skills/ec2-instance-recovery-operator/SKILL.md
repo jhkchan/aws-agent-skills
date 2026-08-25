@@ -1,108 +1,27 @@
 ---
 name: ec2-instance-recovery-operator
-description: >-
-  Operates EC2 instance recovery — system status check failure
-  (hardware degradation, stop/start, EC2 recover action), CloudWatch
-  alarm recovery (reboots on same host), instance replacement via Auto
-  Scaling group health check, EBS volume detach/attach for data
-  salvage, console output for OS-level diagnosis, SSM Session Manager
-  for SSH-less live troubleshooting, AMI creation from a failing
-  instance for forensic snapshot, instance stop/start to clear
-  ephemeral issues, placement group recovery, EC2 automatic recovery,
-  and Capacity Reservation preservation during recovery. Runs
-  deterministic pre-checks (instance state, system status check,
-  EBS attachment status, ASG membership, SSM agent reachability,
-  CloudWatch alarm config, Capacity Reservation binding) behind a
-  CONFIRM gate and emits a READY, BLOCKED, or COMPLETED verdict per
-  recovery action. Use when an instance is impaired, hardware has
-  degraded, an ASG is churning, or a forensic snapshot is needed
-  before termination.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates EC2 instance recovery — system status check failure (hardware degradation, stop/start, EC2 recover action), CloudWatch alarm recovery (reboots on same host), instance replacement via Auto Scaling group health check, EBS volume detach/attach for data salvage, console output for OS-level diagnosis, SSM Session Manager for SSH-less live troubleshooting, AMI creation from a failing instance for forensic snapshot, instance stop/start to clear ephemeral issues, placement group recovery, EC2 automatic recovery, and Capacity Reservation preservation during recovery. Runs deterministic pre-checks (instance state, system status check, EBS attachment status, ASG membership, SSM agent reachability, CloudWatch alarm config, Capacity Reservation binding) behind a CONFIRM gate and emits a READY, BLOCKED, or COMPLETED verdict per recovery action. Use when an instance is impaired, hardware has degraded, an ASG is churning, or a forensic snapshot is needed before termination.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline plan classification.
-  Live-account operations use aws ec2 describe-instance-status,
-  describe-instances, stop-instances, start-instances, reboot-instances,
-  describe-volumes, detach-volume, attach-volume, get-console-output,
-  create-image, describe-instance-attribute, aws ssm start-session,
-  describe-instance-information, aws cloudwatch describe-alarms,
-  put-metric-alarm, and autoscaling describe-auto-scaling-instances
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - EC2 instance recovery
-  - system status check
-  - instance status check
-  - hardware degradation
-  - stop/start instance
-  - EC2 recover action
-  - CloudWatch alarm recovery
-  - Auto Scaling group replacement
-  - ASG health check
-  - EBS detach attach
-  - console output
-  - get-console-output
-  - SSM Session Manager
-  - AMI forensic snapshot
-  - placement group recovery
-  - Capacity Reservation
-  - instance store
-  - ephemeral storage
-  - impaired instance
-  - EC2 automatic recovery
-tags: [aws, ec2, compute, recovery, ebs, ssm, cloudwatch, autoscaling, forensics, operate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws ec2 describe-instance-status, describe-instances, stop-instances, start-instances, reboot-instances, describe-volumes, detach-volume, attach-volume, get-console-output, create-image, describe-instance-attribute, aws ssm start-session, describe-instance-information, aws cloudwatch describe-alarms, put-metric-alarm, and...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Recovering from an EC2 system status check failure (hardware
-    degradation), configuring CloudWatch alarm recovery, replacing an
-    instance via Auto Scaling group health check, detaching and
-    reattaching EBS volumes to salvage data from an unhealthy instance,
-    diagnosing OS-level issues via console output, accessing an
-    impaired instance via SSM Session Manager, creating an AMI for
-    forensic snapshot before termination, stop/starting an instance to
-    clear ephemeral issues, recovering an instance in a placement
-    group, or preserving a Capacity Reservation binding during
-    recovery.
-  activation_triggers:
-    - "instance status check failed"
-    - "system status check failed"
-    - "instance impaired"
-    - "hardware degradation"
-    - "EC2 recover"
-    - "CloudWatch recovery alarm"
-    - "instance stop start"
-    - "reboot instance"
-    - "ASG instance replacement"
-    - "Auto Scaling health check"
-    - "EBS detach attach"
-    - "console output"
-    - "Session Manager access"
-    - "AMI forensic snapshot"
-    - "placement group recovery"
-    - "Capacity Reservation"
-    - "instance unreachable"
-    - "EC2 automatic recovery"
-  invocation_schema: >-
-    Input: either (a) an instance configuration (describe-instance-status,
-    describe-instances) plus the intended operation (recover-instance,
-    stop-start, reboot, replace-via-asg, detach-attach-ebs,
-    forensic-ami, enable-recovery-alarm, diagnose-impaired), OR (b) an
-    instance-id + operation for live-account execution. Output:
-    deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS /
-    POST_VERIFY / NOTES block per recovery, where VERDICT is one of
-    READY, BLOCKED, COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Recovering from an EC2 system status check failure (hardware degradation), configuring CloudWatch alarm recovery, replacing an instance via Auto Scaling group health check, detaching and reattaching EBS volumes to salvage data from an unhealthy instance, diagnosing OS-level issues via console output, accessing an impaired instance via SSM Session Manager, creating an AMI for forensic snapshot before termination, stop/starting an instance to clear ephemeral issues, recovering an instance in a placement group, or preserving a Capacity Reservation binding during recovery.
+  activation_triggers: instance status check failed, system status check failed, instance impaired, hardware degradation, EC2 recover, CloudWatch recovery alarm, instance stop start, reboot instance, ASG instance replacement, Auto Scaling health check, EBS detach attach, console output, Session Manager access, AMI forensic snapshot, placement group recovery, Capacity Reservation, instance unreachable, EC2 automatic recovery
+  invocation_schema: 'Input: either (a) an instance configuration (describe-instance-status, describe-instances) plus the intended operation (recover-instance, stop-start, reboot, replace-via-asg, detach-attach-ebs, forensic-ami, enable-recovery-alarm, diagnose-impaired), OR (b) an instance-id + operation for live-account execution. Output: deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per recovery, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: EC2 instance recovery, system status check, instance status check, hardware degradation, stop/start instance, EC2 recover action, CloudWatch alarm recovery, Auto Scaling group replacement, ASG health check, EBS detach attach, console output, get-console-output, SSM Session Manager, AMI forensic snapshot, placement group recovery, Capacity Reservation, instance store, ephemeral storage, impaired instance, EC2 automatic recovery
+  tags: aws, ec2, compute, recovery, ebs, ssm, cloudwatch, autoscaling, forensics, operate
 ---
 
 # EC2 Instance Recovery Operator

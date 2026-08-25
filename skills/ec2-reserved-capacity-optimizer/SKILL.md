@@ -1,105 +1,28 @@
 ---
 name: ec2-reserved-capacity-optimizer
-description: >-
-  Optimizes EC2 Reserved Instance and Savings Plans commitments across
-  seven dimensions: RI utilization analysis (underused Standard or
-  Convertible RIs), coverage gap detection (on-demand spend exposed to
-  full price), Standard vs Convertible RI selection, 1-year vs 3-year
-  term trade-offs, upfront vs no-upfront payment options, Savings Plans
-  type choice (Compute SP vs EC2 Instance SP vs SageMaker SP), and
-  Cost Explorer recommendation harvesting. Reads Cost Explorer RI/SP
-  utilization, coverage reports, and EC2 fleet inventory. Emits
-  FURTHER_OPTIMIZATION_AVAILABLE or OPTIMIZED with commitment
-  adjustments, estimated savings, and utilization alerts. Use when
-  reviewing RI portfolios, evaluating Savings Plans, planning a
-  commitment strategy, or conducting a FinOps commitment review.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Optimizes EC2 Reserved Instance and Savings Plans commitments across seven dimensions: RI utilization analysis (underused Standard or Convertible RIs), coverage gap detection (on-demand spend exposed to full price), Standard vs Convertible RI selection, 1-year vs 3-year term trade-offs, upfront vs no-upfront payment options, Savings Plans type choice (Compute SP vs EC2 Instance SP vs SageMaker SP), and Cost Explorer recommendation harvesting. Reads Cost Explorer RI/SP utilization, coverage reports, and EC2 fleet inventory. Emits FURTHER_OPTIMIZATION_AVAILABLE or OPTIMIZED with commitment adjustments, estimated savings, and utilization alerts. Use when reviewing RI portfolios, evaluating Savings Plans, planning a commitment strategy, or conducting a FinOps commitment review.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline recommendation classification works from
-  pasted Cost Explorer RI/SP utilization reports, coverage data, and
-  EC2 fleet summaries. Live-account optimization uses aws ce
-  get-reservation-utilization, aws ce get-reservation-coverage, aws ce
-  get-savings-plans-utilization, aws ce get-savings-plans-coverage, aws
-  ce get-cost-and-usage, aws ce get-reservation-purchase-recommendation,
-  aws ec2 describe-reserved-instances, aws ec2 describe-instances, and
-  aws savingsplans describe-savings-plans (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-  - EC2
-  - Reserved Instances
-  - Savings Plans
-  - RI utilization
-  - RI coverage
-  - Standard RI
-  - Convertible RI
-  - commitment management
-  - Cost Explorer
-  - Compute Savings Plans
-  - EC2 Instance Savings Plans
-  - upfront payment
-  - 1-year term
-  - 3-year term
-  - RI marketplace
-  - FinOps
-  - CloudWatch utilization alerts
-  - Budgets
-tags: [ec2, reserved-instances, savings-plans, compute, cost-optimization, finops, commitment-management, cost-explorer]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted Cost Explorer RI/SP utilization reports, coverage data, and EC2 fleet summaries. Live-account optimization uses aws ce get-reservation-utilization, aws ce get-reservation-coverage, aws ce get-savings-plans-utilization, aws ce get-savings-plans-coverage, aws ce get-cost-and-usage, aws ce get-reservation-purchase-recommendation, aws ec2...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-  when_to_use: >-
-    Optimizing EC2 Reserved Instance portfolios, evaluating Savings Plans
-    (Compute vs EC2 Instance vs SageMaker), analyzing RI utilization or
-    coverage gaps, deciding Standard vs Convertible RIs, choosing
-    1-year vs 3-year commitment terms, evaluating upfront vs no-upfront
-    payment options, selling unused RIs on the RI Marketplace, setting
-    up RI/SP utilization alerts via CloudWatch or Budgets, normalizing
-    an EC2 fleet for Savings Plans coverage, or conducting a FinOps
-    commitment strategy review.
-  when_not_to_use: >-
-    EC2 instance right-sizing (use ec2-rightsizing-optimizer), Lambda
-    cost optimization (use lambda-cost-optimizer), Fargate cost
-    optimization (use fargate-cost-optimizer), EKS cost optimization
-    (use eks-cost-optimizer), or Spot Instance strategy (use
-    ec2-spot-strategy-optimizer). This skill focuses on commitment
-    optimization (RIs and SPs), not workload architecture changes.
-  activation_triggers:
-    - "optimise Reserved Instances"
-    - "RI utilization"
-    - "RI coverage"
-    - "Savings Plans optimization"
-    - "Standard vs Convertible RI"
-    - "1-year vs 3-year commitment"
-    - "upfront vs no upfront"
-    - "Compute Savings Plans"
-    - "EC2 Instance Savings Plans"
-    - "RI marketplace sell"
-    - "commitment management"
-    - "FinOps commitment review"
-    - "reduce EC2 commitment waste"
-    - "RI underutilized"
-    - "on-demand coverage gap"
-  invocation_schema: >-
-    Input: either (a) a linked account or payer account with live
-    Cost Explorer access, (b) pasted RI/SP utilization and coverage
-    reports with EC2 fleet instance-type distribution, OR (c) a
-    commitment decision question (e.g. "should I buy 3-year Standard
-    RIs for m5.large?"). Output: a deterministic TARGET / VERDICT /
-    REASON / RECOMMENDATION / ESTIMATED_SAVINGS / ACTION_STEPS block
-    per commitment dimension, where VERDICT is one of {OPTIMIZED,
-    FURTHER_OPTIMIZATION_AVAILABLE}.
+  when_to_use: Optimizing EC2 Reserved Instance portfolios, evaluating Savings Plans (Compute vs EC2 Instance vs SageMaker), analyzing RI utilization or coverage gaps, deciding Standard vs Convertible RIs, choosing 1-year vs 3-year commitment terms, evaluating upfront vs no-upfront payment options, selling unused RIs on the RI Marketplace, setting up RI/SP utilization alerts via CloudWatch or Budgets, normalizing an EC2 fleet for Savings Plans coverage, or conducting a FinOps commitment strategy review.
+  when_not_to_use: EC2 instance right-sizing (use ec2-rightsizing-optimizer), Lambda cost optimization (use lambda-cost-optimizer), Fargate cost optimization (use fargate-cost-optimizer), EKS cost optimization (use eks-cost-optimizer), or Spot Instance strategy (use ec2-spot-strategy-optimizer). This skill focuses on commitment optimization (RIs and SPs), not workload architecture changes.
+  activation_triggers: optimise Reserved Instances, RI utilization, RI coverage, Savings Plans optimization, Standard vs Convertible RI, 1-year vs 3-year commitment, upfront vs no upfront, Compute Savings Plans, EC2 Instance Savings Plans, RI marketplace sell, commitment management, FinOps commitment review, reduce EC2 commitment waste, RI underutilized, on-demand coverage gap
+  invocation_schema: 'Input: either (a) a linked account or payer account with live Cost Explorer access, (b) pasted RI/SP utilization and coverage reports with EC2 fleet instance-type distribution, OR (c) a commitment decision question (e.g. "should I buy 3-year Standard RIs for m5.large?"). Output: a deterministic TARGET / VERDICT / REASON / RECOMMENDATION / ESTIMATED_SAVINGS / ACTION_STEPS block per commitment dimension, where VERDICT is one of {OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: EC2, Reserved Instances, Savings Plans, RI utilization, RI coverage, Standard RI, Convertible RI, commitment management, Cost Explorer, Compute Savings Plans, EC2 Instance Savings Plans, upfront payment, 1-year term, 3-year term, RI marketplace, FinOps, CloudWatch utilization alerts, Budgets
+  tags: ec2, reserved-instances, savings-plans, compute, cost-optimization, finops, commitment-management, cost-explorer
 ---
 
 # EC2 Reserved Capacity Optimizer

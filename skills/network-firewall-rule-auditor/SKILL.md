@@ -1,79 +1,24 @@
 ---
 name: network-firewall-rule-auditor
-description: >-
-  Audits AWS Network Firewall configurations for permissive stateful and
-  stateless rules, missing TLS inspection, firewall-subnet routing gaps that
-  bypass inspection, rule-group evaluation-order shadowing, and logging
-  blind spots. Emits a deterministic verdict (PERMISSIVE_RULE |
-  NO_TLS_INSPECTION | ROUTING_GAP | CONFIG_GAP | OK) per firewall with
-  enumerated findings and specific CLI remediation. Use when reviewing
-  Network Firewall policies, checking for wildcard pass rules, validating
-  TLS inspection coverage, auditing firewall route tables, or verifying
-  rule-group evaluation order before production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Network Firewall configurations for permissive stateful and stateless rules, missing TLS inspection, firewall-subnet routing gaps that bypass inspection, rule-group evaluation-order shadowing, and logging blind spots. Emits a deterministic verdict (PERMISSIVE_RULE | NO_TLS_INSPECTION | ROUTING_GAP | CONFIG_GAP | OK) per firewall with enumerated findings and specific CLI remediation. Use when reviewing Network Firewall policies, checking for wildcard pass rules, validating TLS inspection coverage, auditing firewall route tables, or verifying rule-group evaluation order before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline policy-document classification.
-  Live-account audits use aws network-firewall describe-firewall,
-  describe-firewall-policy, describe-rule-group, describe-logging-configuration,
-  describe-tls-inspection-config, and aws ec2 describe-route-tables (AWS CLI v2,
-  SSO or key-based credentials).
-keywords:
-  - Network Firewall
-  - stateful rules
-  - stateless rules
-  - Suricata
-  - TLS inspection
-  - firewall routing
-  - rule group
-  - StatelessDefaultActions
-  - StatelessFragmentDefaultActions
-  - StatefulDefaultActions
-  - drop_strict
-  - forward_to_sfe
-  - HOME_NET
-  - fragment bypass
-  - shadowed rule
-  - STRICT_ORDER
-  - SNI
-  - network firewall audit
-  - intrusion prevention
-tags: [network-firewall, security, stateful-rules, stateless-rules, tls-inspection, routing, suricata, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline policy-document classification. Live-account audits use aws network-firewall describe-firewall, describe-firewall-policy, describe-rule-group, describe-logging-configuration, describe-tls-inspection-config, and aws ec2 describe-route-tables (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
-  verdict_shape: "PERMISSIVE_RULE | NO_TLS_INSPECTION | ROUTING_GAP | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a Network Firewall policy before production deployment, checking
-    for permissive stateful or stateless rules, validating TLS inspection
-    coverage, auditing firewall subnet route tables for traffic-bypass gaps,
-    verifying rule-group evaluation order, or hardening intrusion-prevention
-    posture across a VPC.
-  activation_triggers:
-    - "audit this network firewall"
-    - "check firewall rules"
-    - "permissive firewall policy"
-    - "is TLS inspection enabled"
-    - "firewall routing gap"
-    - "rule group evaluation order"
-    - "stateless default actions"
-    - "fragment bypass firewall"
-    - "shadowed Suricata rules"
-    - "HOME_NET misconfiguration"
-  invocation_schema: >-
-    Input: either (a) a Network Firewall policy JSON (stateful + stateless rule
-    groups, default actions), optionally paired with route-table data and TLS
-    config, OR (b) a firewall-arn/name for live-account audit.
-    Output: deterministic FIREWALL/VERDICT/REASON/FINDINGS/REMEDIATION block per
-    firewall, where VERDICT ∈ {PERMISSIVE_RULE, NO_TLS_INSPECTION, ROUTING_GAP,
-    CONFIG_GAP, OK, ERROR}.
+  verdict_shape: PERMISSIVE_RULE | NO_TLS_INSPECTION | ROUTING_GAP | CONFIG_GAP | OK
+  when_to_use: Reviewing a Network Firewall policy before production deployment, checking for permissive stateful or stateless rules, validating TLS inspection coverage, auditing firewall subnet route tables for traffic-bypass gaps, verifying rule-group evaluation order, or hardening intrusion-prevention posture across a VPC.
+  activation_triggers: audit this network firewall, check firewall rules, permissive firewall policy, is TLS inspection enabled, firewall routing gap, rule group evaluation order, stateless default actions, fragment bypass firewall, shadowed Suricata rules, HOME_NET misconfiguration
+  invocation_schema: 'Input: either (a) a Network Firewall policy JSON (stateful + stateless rule groups, default actions), optionally paired with route-table data and TLS config, OR (b) a firewall-arn/name for live-account audit. Output: deterministic FIREWALL/VERDICT/REASON/FINDINGS/REMEDIATION block per firewall, where VERDICT ∈ {PERMISSIVE_RULE, NO_TLS_INSPECTION, ROUTING_GAP, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Network Firewall, stateful rules, stateless rules, Suricata, TLS inspection, firewall routing, rule group, StatelessDefaultActions, StatelessFragmentDefaultActions, StatefulDefaultActions, drop_strict, forward_to_sfe, HOME_NET, fragment bypass, shadowed rule, STRICT_ORDER, SNI, network firewall audit, intrusion prevention
+  tags: network-firewall, security, stateful-rules, stateless-rules, tls-inspection, routing, suricata, audit
 ---
 
 # Network Firewall Rule Auditor

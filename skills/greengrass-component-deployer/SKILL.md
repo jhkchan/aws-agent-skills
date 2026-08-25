@@ -1,128 +1,26 @@
 ---
 name: greengrass-component-deployer
-description: >-
-  Deploys AWS IoT Greengrass v2 components with production defaults:
-  component recipe YAML (lifecycle hooks: install, startup, shutdown),
-  component versioning (semantic versioning, bump on recipe change),
-  artifact storage (S3 bucket + presigned URLs), component dependencies
-  (HARD vs SOFT dependency types), deployment to thing group (not
-  individual devices), configuration merge (runtime parameters for
-  per-device customization), IoT role alias for Secrets Manager access,
-  Lambda functions as components (aws.lambda component dependency),
-  Docker containers as components (aws.greengrass.DockerApplicationManager
-  + aws.docker.Login), local volume mounts (docker volume / bind mount),
-  cloud-based deployment vs local deployment (default deployment vs
-  deployment job), and core device setup (Greengrass CLI, token exchange
-  role). Emits a READY_TO_DEPLOY checklist with verification commands.
-  Use when creating a Greengrass component, deploying to a thing group,
-  packaging an artifact, writing a recipe, configuring a Lambda as a
-  component, running a Docker container on the edge, or setting up
-  secret manager integration. Triggers: create greengrass component,
-  deploy greengrass component, greengrass recipe yaml, greengrass
-  deployment thing group, greengrass configuration merge, greengrass
-  lambda component, greengrass docker component, greengrass secret
-  manager, greengrass core device setup, greengrass component version.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Deploys AWS IoT Greengrass v2 components with production defaults: component recipe YAML (lifecycle hooks: install, startup, shutdown), component versioning (semantic versioning, bump on recipe change), artifact storage (S3 bucket + presigned URLs), component dependencies (HARD vs SOFT dependency types), deployment to thing group (not individual devices), configuration merge (runtime parameters for per-device customization), IoT role alias for Secrets Manager access, Lambda functions as components (aws.lambda component dependency), Docker containers as components (aws.greengrass.DockerApplicationManager + aws.docker.Login), local volume mounts (docker volume / bind mount), cloud-based deployment vs local. Triggers: create greengrass component, deploy greengrass component, greengrass recipe yaml, greengrass deployment thing group, greengrass configuration merge, greengrass lambda component, greengrass docker component, greengrass secret manager, greengrass core device setup, greengrass component version.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with greengrassv2
-  and s3 access, plus IoT things/thing groups provisioned. Works with
-  Terraform aws_greengrass_component_definition /
-  aws_greengrass_deployment resources and CloudFormation
-  AWS::GreengrassV2::Component / AWS::GreengrassV2::Deployment templates.
-keywords:
-  - aws
-  - greengrass
-  - greengrass v2
-  - iot
-  - edge
-  - component
-  - recipe
-  - cloudops
-  - deploy
-  - provisioning
-  - thing group
-  - lifecycle
-  - artifact
-  - lambda
-  - docker
-  - secret manager
-  - configuration merge
-  - core device
-tags:
-  - aws
-  - greengrass
-  - greengrass-v2
-  - iot
-  - edge
-  - cloudops
-  - deploy
-  - provisioning
-  - component
-  - recipe
-  - lifecycle
-  - lambda
-  - docker
-  - thing-group
-  - configuration-merge
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with greengrassv2 and s3 access, plus IoT things/thing groups provisioned. Works with Terraform aws_greengrass_component_definition / aws_greengrass_deployment resources and CloudFormation AWS::GreengrassV2::Component / AWS::GreengrassV2::Deployment templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - greengrass
-    - greengrass-v2
-    - iot
-    - edge
-    - cloudops
-    - deploy
-    - provisioning
-    - component
-    - recipe
-    - lifecycle
-    - lambda
-    - docker
-    - thing-group
-    - configuration-merge
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create greengrass component
-    - deploy greengrass component
-    - greengrass recipe yaml
-    - greengrass deployment thing group
-    - greengrass configuration merge
-    - greengrass lambda component
-    - greengrass docker component
-    - greengrass secret manager
-    - greengrass core device setup
-    - greengrass component version
-  when_to_use: >-
-    Invoke when the user wants to create or deploy an AWS IoT Greengrass
-    v2 component, write a component recipe with lifecycle hooks, store
-    component artifacts in S3, manage component dependencies (hard vs
-    soft), deploy a component to a thing group, use configuration merge
-    for per-device runtime parameters, integrate Secrets Manager via IoT
-    role alias, run a Lambda function as a component, run a Docker
-    container as a component, configure local volume mounts, or set up
-    a Greengrass core device. Do NOT invoke for Greengrass v1 (use v1
-    skills), AWS IoT Core device management (no Greengrass), or AWS
-    Panorama (different edge runtime).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, greengrass, greengrass-v2, iot, edge, cloudops, deploy, provisioning, component, recipe, lifecycle, lambda, docker, thing-group, configuration-merge
+  dependencies: aws-orchestrator
+  keywords: aws, greengrass, greengrass v2, iot, edge, component, recipe, cloudops, deploy, provisioning, thing group, lifecycle, artifact, lambda, docker, secret manager, configuration merge, core device
+  when_to_use: Invoke when the user wants to create or deploy an AWS IoT Greengrass v2 component, write a component recipe with lifecycle hooks, store component artifacts in S3, manage component dependencies (hard vs soft), deploy a component to a thing group, use configuration merge for per-device runtime parameters, integrate Secrets Manager via IoT role alias, run a Lambda function as a component, run a Docker container as a component, configure local volume mounts, or set up a Greengrass core device. Do NOT invoke for Greengrass v1 (use v1 skills), AWS IoT Core device management (no Greengrass), or AWS Panorama (different edge runtime).
 ---
 
 # Greengrass Component Deployer

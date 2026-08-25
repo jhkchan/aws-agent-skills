@@ -1,115 +1,27 @@
 ---
 name: ssm-session-manager-troubleshooter
-description: >-
-  Diagnoses AWS Systems Manager (SSM) Session Manager failures via a
-  systematic 7-symptom decision tree: target instance not reachable
-  (SSM agent not running, not managed, wrong region), session fails
-  to start (IAM role missing ssm:StartSession, session-manager
-  console permission not attached), port forwarding fails (local port
-  in use, SSH config conflict), shell access fails (SSM agent version
-  too old, shell not configured), VPC connectivity issues (SSM
-  endpoints not configured for private instances), session
-  disconnects (network timeout, idle disconnect), and latest features
-  (Session Manager with key pairs, cross-account sessions). Maps each
-  symptom to root cause via diagnostic commands and specific fixes.
-  Emits ROOT_CAUSE_FOUND with a fix plan, NEED_MORE_INFO with the
-  next diagnostic, or ESCALATE with the escalation path. Use when a
-  Session Manager session fails to start, drops mid-session, cannot
-  port-forward, or shell access errors out.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses AWS Systems Manager (SSM) Session Manager failures via a systematic 7-symptom decision tree: target instance not reachable (SSM agent not running, not managed, wrong region), session fails to start (IAM role missing ssm:StartSession, session-manager console permission not attached), port forwarding fails (local port in use, SSH config conflict), shell access fails (SSM agent version too old, shell not configured), VPC connectivity issues (SSM endpoints not configured for private instances), session disconnects (network timeout, idle disconnect), and latest features (Session Manager with key pairs, cross-account sessions). Maps each symptom to root cause via diagnostic commands and specific fixes. Emits ROOT_CAUSE_FOUND with a fix plan, NEED_MORE_INFO with the next diagnostic, or ESCALATE with the escalation path. Use when a Session Manager session fails to start, drops mid-session, cannot port-forward, or shell access errors out.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline diagnosis. Live-
-  account troubleshooting uses aws ssm describe-sessions,
-  describe-instance-information, get-connection-status,
-  start-session, terminate-session, describe-instance-properties,
-  aws ec2 describe-instances, describe-vpc-endpoints,
-  describe-instance-profile, aws iam list-attached-role-policies,
-  simulate-principal-policy, and CloudTrail queries (AWS CLI v2, SSO
-  or key-based credentials). SSM agent logs at
-  /var/log/amazon/ssm/amazon-ssm-agent.log on the host; session-
-  manager plugin logs at ~/.ssm/logs/ on the client.
-keywords:
-  - Systems Manager
-  - SSM
-  - Session Manager
-  - session fails to start
-  - target not reachable
-  - port forwarding
-  - shell access
-  - session disconnects
-  - IdleTimeout
-  - ssmmessages
-  - ec2messages
-  - ssm:StartSession
-  - ssm-sessionmanager-console-perm
-  - AmazonSSMManagedInstanceCore
-  - session-manager-plugin
-  - cross-account session
-  - SSH proxy
-  - KMS session encryption
-  - VPC endpoints
-  - SSM agent version
-tags: [ssm, systems-manager, session-manager, management, troubleshoot, port-forwarding, diagnostic]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline diagnosis. Live- account troubleshooting uses aws ssm describe-sessions, describe-instance-information, get-connection-status, start-session, terminate-session, describe-instance-properties, aws ec2 describe-instances, describe-vpc-endpoints, describe-instance-profile, aws iam list-attached-role-policies, simulate-principal-policy, and CloudTrail queries (AWS CLI v2, SSO or...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
-  when_to_use: >-
-    Diagnosing a Systems Manager Session Manager session that fails
-    to start, drops mid-session, cannot establish port forwarding,
-    returns a shell-access error, or cannot reach a target instance.
-    Covers the seven primary symptom categories: target not
-    reachable, session fails to start, port forwarding fails, shell
-    access fails, VPC/endpoint connectivity, session disconnects,
-    and latest-feature integration (key pairs, cross-account). Use
-    when `aws ssm start-session` errors out, the console "Start
-    session" button greys out or returns "TargetNotConnected", a
-    port-forwarding tunnel won't bind, or a session drops after a
-    few minutes of use.
-  activation_triggers:
-    - "Session Manager fails"
-    - "session fails to start"
-    - "TargetNotConnected"
-    - "target instance not reachable"
-    - "session-manager-plugin"
-    - "port forwarding fails"
-    - "shell access fails"
-    - "SSM session disconnects"
-    - "session drops"
-    - "IdleTimeout"
-    - "ssm:StartSession denied"
-    - "ssm-sessionmanager-console-perm"
-    - "ssmmessages endpoint missing"
-    - "SSM agent version too old"
-    - "Session Manager key pair"
-    - "cross-account session"
-    - "start-session error"
-    - "session-manager plugin not installed"
-    - "Port 2222 in use"
-  invocation_schema: >-
-    Input: either (a) an instance-id or target-id with observed
-    symptom (target-not-reachable / session-fails-to-start / port-
-    forwarding-fails / shell-access-fails / vpc-connectivity /
-    session-disconnects / latest-feature), optionally with
-    session-id, OR (b) live-account diagnostic output from
-    describe-sessions, describe-instance-information, get-
-    connection-status, etc. Output: deterministic DIAGNOSIS block
-    per session — SYMPTOM/ROOT_CAUSE/EVIDENCE/LAYER_CHECK/FIX/
-    VERDICT — where VERDICT is ROOT_CAUSE_FOUND (cause identified
-    + fix actionable), NEED_MORE_INFO (specific next diagnostic
-    cited), or ESCALATE (requires AWS Support or out-of-band
-    action).
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+  when_to_use: 'Diagnosing a Systems Manager Session Manager session that fails to start, drops mid-session, cannot establish port forwarding, returns a shell-access error, or cannot reach a target instance. Covers the seven primary symptom categories: target not reachable, session fails to start, port forwarding fails, shell access fails, VPC/endpoint connectivity, session disconnects, and latest-feature integration (key pairs, cross-account). Use when `aws ssm start-session` errors out, the console "Start session" button greys out or returns "TargetNotConnected", a port-forwarding tunnel won''t bind, or a session drops after a few minutes of use.'
+  activation_triggers: Session Manager fails, session fails to start, TargetNotConnected, target instance not reachable, session-manager-plugin, port forwarding fails, shell access fails, SSM session disconnects, session drops, IdleTimeout, ssm:StartSession denied, ssm-sessionmanager-console-perm, ssmmessages endpoint missing, SSM agent version too old, Session Manager key pair, cross-account session, start-session error, session-manager plugin not installed, Port 2222 in use
+  invocation_schema: 'Input: either (a) an instance-id or target-id with observed symptom (target-not-reachable / session-fails-to-start / port- forwarding-fails / shell-access-fails / vpc-connectivity / session-disconnects / latest-feature), optionally with session-id, OR (b) live-account diagnostic output from describe-sessions, describe-instance-information, get- connection-status, etc. Output: deterministic DIAGNOSIS block per session — SYMPTOM/ROOT_CAUSE/EVIDENCE/LAYER_CHECK/FIX/ VERDICT — where VERDICT is ROOT_CAUSE_FOUND (cause identified + fix actionable), NEED_MORE_INFO (specific next diagnostic cited), or ESCALATE (requires AWS Support or out-of-band action).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Systems Manager, SSM, Session Manager, session fails to start, target not reachable, port forwarding, shell access, session disconnects, IdleTimeout, ssmmessages, ec2messages, ssm:StartSession, ssm-sessionmanager-console-perm, AmazonSSMManagedInstanceCore, session-manager-plugin, cross-account session, SSH proxy, KMS session encryption, VPC endpoints, SSM agent version
+  tags: ssm, systems-manager, session-manager, management, troubleshoot, port-forwarding, diagnostic
 ---
 
 # SSM Session Manager Troubleshooter

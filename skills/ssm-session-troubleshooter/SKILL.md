@@ -1,68 +1,15 @@
 ---
 name: ssm-session-troubleshooter
-description: >-
-  Diagnoses AWS Systems Manager Session Manager failures through a
-  thirteen-category diagnostic tree: managed instance not showing
-  up (SSM Agent not running, activation code expired, hybrid
-  enrollment), session connection timeout (ssmmessages endpoint,
-  Security group egress), SSM Agent version outdated (session
-  features require minimum agent version), IAM role missing
-  ssm:StartSession / ssm:TerminateSession / ssm:ResumeSession
-  (AmazonSSMManagedInstanceCore), VPC endpoint for SSM missing one
-  of the three required endpoints (ssm, ec2messages, ssmmessages),
-  session document errors (SSM_Session document schema or sharing),
-  port forwarding failures (local-port-forwarding document and
-  target-host reachability), shell profile errors
-  (SSM-SessionManagerRunShell profile misconfig), audit log
-  delivery to S3 missing (S3 bucket policy for session-output),
-  session recording to S3 (encryption and bucket Region),
-  CloudWatch Logs delivery missing (log group permission on the
-  instance role), macOS vs Linux agent differences (session
-  support matrix), patch baseline association blocking session
-  (ScanOnly / InstallOverrideList maintenance window in flight),
-  and Systems Manager document (SSM Document) errors. Walks
-  symptoms to a verified root cause with evidence-backed probes;
-  emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses AWS Systems Manager Session Manager failures through a thirteen-category diagnostic tree: managed instance not showing up (SSM Agent not running, activation code expired, hybrid enrollment), session connection timeout (ssmmessages endpoint, Security group egress), SSM Agent version outdated (session features require minimum agent version), IAM role missing ssm:StartSession / ssm:TerminateSession / ssm:ResumeSession (AmazonSSMManagedInstanceCore), VPC endpoint for SSM missing one of the three required endpoints (ssm, ec2messages, ssmmessages), session document errors (SSM_Session document schema or sharing), port forwarding failures (local-port-forwarding document and target-host reachability), shell profile errors (SSM-SessionManagerRunShell profile misconfig), audit log delivery to S3 missing (S3 bucket policy for session-output), session recording to S3 (encryption and bucket Region), CloudWatch Logs delivery missing (log group permission on the instance role), macOS vs Linux agent...'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and instance configuration. Live-account diagnosis uses aws ssm describe-instance-information, describe-sessions, get-document, describe-instance-properties, aws ec2 describe-instances / describe-vpc-endpoints / describe-security-groups, aws iam simulate-principal-policy on the instance role, aws logs describe-log-groups / filter-log-events, aws s3api get-bucket-policy on the session-output bucket, and aws ssm describe-association / describe-instance-associations-status (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- SSM
-- Session Manager
-- ssm:StartSession
-- SSM Agent
-- AmazonSSMManagedInstanceCore
-- VPC endpoint
-- ssmmessages
-- ec2messages
-- port forwarding
-- shell profile
-- session recording
-- S3 audit logs
-- CloudWatch Logs
-- hybrid enrollment
-- activation code
-- patch baseline
-- SSM Document
-- troubleshooting
-tags:
-- ssm
-- management
-- troubleshooting
-- session-manager
-- vpc-endpoint
-- iam-role
-- port-forwarding
-- session-recording
-- audit-logs
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and instance configuration. Live-account diagnosis uses aws ssm describe-instance-information, describe-sessions, get-document, describe-instance-properties, aws ec2 describe-instances / describe-vpc-endpoints / describe-security-groups, aws iam simulate-principal-policy on the instance role, aws logs describe-log-groups / filter-log-events, aws...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: troubleshoot
   skill_class: capability
@@ -70,27 +17,35 @@ metadata:
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
   when_to_use: Diagnosing an SSM Session Manager failure (managed instance not showing in the console, session connection timeout, port forwarding failure, "is not registered to the account or role" error, missing audit logs in S3, missing CloudWatch Logs, session recording failure, shell profile error, patch-baseline-blocked session, SSM Document error, agent version too old for session features), walking a symptom to the failed layer with verify and fix commands, validating why a session cannot start or connect, or triaging a "Session Manager is broken" page where the root cause may be agent, IAM role, VPC endpoint, document, shell profile, or audit-log config — not necessarily the SSM service itself.
   when_not_to_use: SSM Run Command / Automation execution debugging (use ssm-automation-deployer or a run-command skill), EC2 instance reachability at the OS level (use ec2-instance-reachability checks), patch compliance posture audits (use ssm-patch-compliance-automator), or IAM policy authoring for the instance role (use iam-least-privilege-advisor). This skill diagnoses Session Manager connectivity and session-output failures; it does not audit patch baseline posture or debug Run Command document execution.
-  activation_triggers:
-  - SSM Session Manager connection failed
-  - SSM session timeout
-  - managed instance not showing up
-  - instance not registered SSM
-  - SSM Agent not running
-  - ssm:StartSession denied
-  - SSM port forwarding failed
-  - channel closed Session Manager
-  - ssmmessages endpoint
-  - VPC endpoint SSM missing
-  - SSM session recording S3
-  - SSM audit logs missing
-  - SessionManagerRunShell
-  - SSM Document error
-  - SSM agent version outdated
-  - hybrid activation expired
-  - patch baseline blocking session
-  - troubleshoot SSM Session Manager
+  activation_triggers: SSM Session Manager connection failed, SSM session timeout, managed instance not showing up, instance not registered SSM, SSM Agent not running, ssm:StartSession denied, SSM port forwarding failed, channel closed Session Manager, ssmmessages endpoint, VPC endpoint SSM missing, SSM session recording S3, SSM audit logs missing, SessionManagerRunShell, SSM Document error, SSM agent version outdated, hybrid activation expired, patch baseline blocking session, troubleshoot SSM Session Manager
   invocation_schema: 'Input: either (a) a symptom description (error message, observed behaviour, "session times out after 10s", "instance not in the console"), optionally paired with the instance configuration (describe-instance-information output) and recent SSM / CloudWatch logs, OR (b) an InstanceId plus session context (document name, session id, target host for port forwarding, VPC endpoint config) for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {INSTANCE_NOT_REGISTERED, SESSION_CONNECTION_TIMEOUT, AGENT_OUTDATED, IAM_PERMISSION_MISSING, VPC_ENDPOINT_MISSING, SESSION_DOCUMENT_ERROR, PORT_FORWARDING_FAILURE, SHELL_PROFILE_ERROR, AUDIT_LOG_S3_MISSING, SESSION_RECORDING_S3, CLOUDWATCH_LOGS_MISSING, PATCH_BASELINE_BLOCKING, SSM_DOCUMENT_ERROR, UNKNOWN}.'
-  invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"EC2 instance i-0abcdef1234567890 in a private subnet does\nnot appear in the SSM Fleet Manager console. The instance\nhas the AmazonSSMManagedInstanceCore role attached but is\nin a VPC with no ssmmessages VPC endpoint. Sessions started\nfrom other instances in a public subnet work fine.\"\nInstanceId: i-0abcdef1234567890\nVPC: vpc-priv (no internet gateway, no NAT gateway)\nInstanceRole: EC2-SSM-Role (AmazonSSMManagedInstanceCore attached)\nVPC endpoints configured: ssm (interface), ec2messages (interface)\nVPC endpoints MISSING: ssmmessages\nLast log line: \"Session Manager connection timed out\""
+  invocation_example: '# Minimal valid input (offline symptom classification):
+
+    Symptom: "EC2 instance i-0abcdef1234567890 in a private subnet does
+
+    not appear in the SSM Fleet Manager console. The instance
+
+    has the AmazonSSMManagedInstanceCore role attached but is
+
+    in a VPC with no ssmmessages VPC endpoint. Sessions started
+
+    from other instances in a public subnet work fine."
+
+    InstanceId: i-0abcdef1234567890
+
+    VPC: vpc-priv (no internet gateway, no NAT gateway)
+
+    InstanceRole: EC2-SSM-Role (AmazonSSMManagedInstanceCore attached)
+
+    VPC endpoints configured: ssm (interface), ec2messages (interface)
+
+    VPC endpoints MISSING: ssmmessages
+
+    Last log line: "Session Manager connection timed out"'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: SSM, Session Manager, ssm:StartSession, SSM Agent, AmazonSSMManagedInstanceCore, VPC endpoint, ssmmessages, ec2messages, port forwarding, shell profile, session recording, S3 audit logs, CloudWatch Logs, hybrid enrollment, activation code, patch baseline, SSM Document, troubleshooting
+  tags: ssm, management, troubleshooting, session-manager, vpc-endpoint, iam-role, port-forwarding, session-recording, audit-logs
 ---
 
 # SSM Session Troubleshooter

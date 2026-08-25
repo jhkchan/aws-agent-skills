@@ -1,70 +1,15 @@
 ---
 name: lambda-timeout-troubleshooter
-description: >-
-  Diagnoses AWS Lambda TaskTimeoutException through a focused timeout
-  decision tree: configured timeout vs observed Duration, init-phase
-  (cold-start) timeout vs invoke-phase timeout, SDK retry storms with
-  exponential backoff multiplier, HTTP client missing connect timeouts,
-  database connection overhead without RDS Proxy, VPC ENI attachment
-  delay (hyperplane-eliminated cold start), EFS mount latency, Step
-  Functions task timeout vs Lambda Timeout mismatch, API Gateway 504
-  vs async Lambda 202, provisioned concurrency init-phase timeout,
-  OOM-before-timeout masking, child-process fork overhead, and p99/p99.9
-  Duration analysis with X-Ray trace bottleneck identification. Walks
-  symptoms to a verified root cause with evidence-backed probes; emits
-  ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses AWS Lambda TaskTimeoutException through a focused timeout decision tree: configured timeout vs observed Duration, init-phase (cold-start) timeout vs invoke-phase timeout, SDK retry storms with exponential backoff multiplier, HTTP client missing connect timeouts, database connection overhead without RDS Proxy, VPC ENI attachment delay (hyperplane-eliminated cold start), EFS mount latency, Step Functions task timeout vs Lambda Timeout mismatch, API Gateway 504 vs async Lambda 202, provisioned concurrency init-phase timeout, OOM-before-timeout masking, child-process fork overhead, and p99/p99.9 Duration analysis with X-Ray trace bottleneck identification. Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages, REPORT log lines, and function configuration. Live-account diagnosis uses aws lambda get-function-configuration, aws logs get-log-events / filter-log-events, aws cloudwatch get-metric-statistics (Duration p99/p99.9, InitDuration, Throttles), aws xray get-trace-summaries
-  / batch-get-traces, aws stepfunctions describe-execution, aws ec2 describe-route-tables, and aws lambda list-provisioned-concurrency-configs (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- Lambda
-- TaskTimeoutException
-- Task timed out
-- timeout
-- init phase
-- cold start
-- SnapStart
-- provisioned concurrency
-- SDK retry
-- exponential backoff
-- retry storm
-- HTTP client
-- connect timeout
-- RDS Proxy
-- database connection
-- VPC ENI
-- hyperplane ENI
-- EFS mount
-- Step Functions
-- API Gateway 504
-- async 202
-- OOM before timeout
-- child process
-- X-Ray trace
-- p99 Duration
-- troubleshooting
-tags:
-- lambda
-- compute
-- troubleshooting
-- timeout
-- init-phase
-- cold-start
-- sdk-retry
-- http-client
-- vpc
-- efs
-- step-functions
-- xray
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages, REPORT log lines, and function configuration. Live-account diagnosis uses aws lambda get-function-configuration, aws logs get-log-events / filter-log-events, aws cloudwatch get-metric-statistics (Duration p99/p99.9, InitDuration, Throttles), aws xray get-trace-summaries / batch-get-traces, aws stepfunctions describe-execution, aws ec2...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: troubleshoot
   skill_class: capability
@@ -72,31 +17,13 @@ metadata:
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
   when_to_use: Diagnosing a Lambda TaskTimeoutException where the root cause may be init-phase timeout (cold start), invoke-phase downstream latency, SDK retry multiplier exhausting the budget, HTTP client missing connect/read timeouts, DB connection overhead without RDS Proxy, Step Functions vs Lambda timeout mismatch, API Gateway 504 on sync invokes, provisioned concurrency init-phase timeout, OOM masking as timeout, or child-process fork overhead — walking the symptom to the failed layer with verify commands, validating why a function returns TaskTimeoutException, or triaging a "Lambda times out" page where the actual bottleneck is init, retry, downstream, or memory — not the configured timeout alone.
   when_not_to_use: Invocation AccessDenied or KMS decrypt errors (use lambda-invocation-troubleshooter), code-level debugging of the function handler (use the application logs and a debugger), CloudFront/Lambda@Edge origin timeouts (use the CloudFront distribution logs), or steady-state p99 latency tuning without TaskTimeoutException (use lambda-cold-start-optimizer). This skill diagnoses TaskTimeoutException root causes; it does not author handler code or audit steady-state config posture.
-  activation_triggers:
-  - Lambda TaskTimeoutException
-  - Task timed out Lambda
-  - Lambda timeout init phase
-  - Lambda cold start timeout
-  - Lambda SnapStart timeout
-  - Lambda SDK retry storm
-  - Lambda exponential backoff timeout
-  - Lambda HTTP client hang
-  - axios no connect timeout Lambda
-  - Lambda RDS Proxy timeout
-  - database connection Lambda timeout
-  - Lambda VPC ENI timeout
-  - Lambda EFS mount timeout
-  - Step Functions Lambda timeout mismatch
-  - API Gateway 504 Lambda
-  - Lambda async 202 caller timeout
-  - provisioned concurrency init timeout
-  - Lambda OOM before timeout
-  - Lambda child process timeout
-  - Lambda X-Ray bottleneck
-  - Lambda Duration p99
-  - diagnose Lambda timeout
+  activation_triggers: Lambda TaskTimeoutException, Task timed out Lambda, Lambda timeout init phase, Lambda cold start timeout, Lambda SnapStart timeout, Lambda SDK retry storm, Lambda exponential backoff timeout, Lambda HTTP client hang, axios no connect timeout Lambda, Lambda RDS Proxy timeout, database connection Lambda timeout, Lambda VPC ENI timeout, Lambda EFS mount timeout, Step Functions Lambda timeout mismatch, API Gateway 504 Lambda, Lambda async 202 caller timeout, provisioned concurrency init timeout, Lambda OOM before timeout, Lambda child process timeout, Lambda X-Ray bottleneck, Lambda Duration p99, diagnose Lambda timeout
   invocation_schema: 'Input: either (a) a TaskTimeoutException symptom description (error message, REPORT log line with Duration ≈ Timeout, observed pattern — every invocation vs bursty), optionally paired with the function configuration (get-function-configuration output, Runtime, Timeout, MemorySize, SnapStart, VpcConfig, FileSystemConfigs) and recent CloudWatch logs / X-Ray trace, OR (b) a FunctionName plus caller context (Step Functions / API Gateway / EventBridge / direct Invoke) for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {TIMEOUT_CONFIG, TIMEOUT_DOWNSTREAM, TIMEOUT_INIT_PHASE, TIMEOUT_VPC_ENI, TIMEOUT_DB_CONNECTION, TIMEOUT_HTTP_CLIENT, TIMEOUT_SDK_RETRY_STORM, TIMEOUT_EFS_MOUNT, TIMEOUT_STEP_FUNCTIONS_MISMATCH, TIMEOUT_ASYNC_APIGW, TIMEOUT_PROV_CONCURRENCY_INIT, TIMEOUT_OOM_BEFORE_TIMEOUT, TIMEOUT_CHILD_PROCESS, UNKNOWN}.'
   invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"Lambda function fn-prod-order-handler started\nreturning TaskTimeoutException after the 09:00 traffic peak; 60%\nof invocations now time out at 30s; the rest succeed in 2-4s.\"\nFunctionName: fn-prod-order-handler\nRuntime: nodejs20.x\nTimeout: 30\nMemorySize: 512\nHandler: index.handler\nSnapStart: (not applicable — Node.js)\nVpcConfig: (none)\nFileSystemConfigs: (none)\nLastLogEvents: 1 timeout at \"await dynamodb.put(...).promise()\"\n  retrying (attempt 2 of 3) ... then \"Task timed out after 30.00 seconds\"\nCaller: Step Functions task with TimeoutSeconds: 30"
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Lambda, TaskTimeoutException, Task timed out, timeout, init phase, cold start, SnapStart, provisioned concurrency, SDK retry, exponential backoff, retry storm, HTTP client, connect timeout, RDS Proxy, database connection, VPC ENI, hyperplane ENI, EFS mount, Step Functions, API Gateway 504, async 202, OOM before timeout, child process, X-Ray trace, p99 Duration, troubleshooting
+  tags: lambda, compute, troubleshooting, timeout, init-phase, cold-start, sdk-retry, http-client, vpc, efs, step-functions, xray
 ---
 
 # Lambda Timeout Troubleshooter

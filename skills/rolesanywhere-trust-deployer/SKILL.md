@@ -1,120 +1,26 @@
 ---
 name: rolesanywhere-trust-deployer
-description: >-
-  Provisions IAM Roles Anywhere trust infrastructure with production
-  defaults: trust anchor creation (binding an external certificate
-  authority to AWS IAM), profile creation (mapping external
-  certificates to IAM roles via role ARNs and role-passthrough),
-  session policy attachment, credential helper configuration (AWS
-  signing helper for certificate-based authentication), external CA
-  (PKI) integration, role assumption workflow (exchange X.509
-  certificate for STS temporary credentials), session duration,
-  managed-policy vs inline-policy selection, temporary credentials
-  (access key / secret / session token), CloudTrail audit
-  (AssumeRoot events), and revocation configuration (CRL/OCSP).
-  Emits a READY_TO_DEPLOY checklist with verification commands. Use
-  when creating a Roles Anywhere trust anchor, mapping external
-  certificates to IAM roles, configuring the credential helper,
-  setting up cert-based authentication to AWS APIs, or integrating
-  an external PKI with AWS. Triggers: create roles anywhere trust
-  anchor, iam roles anywhere profile, credential helper, certificate
-  based authentication aws, external ca aws, exchange cert for sts,
-  roles anywhere session policy, roles anywhere revocation.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions IAM Roles Anywhere trust infrastructure with production defaults: trust anchor creation (binding an external certificate authority to AWS IAM), profile creation (mapping external certificates to IAM roles via role ARNs and role-passthrough), session policy attachment, credential helper configuration (AWS signing helper for certificate-based authentication), external CA (PKI) integration, role assumption workflow (exchange X.509 certificate for STS temporary credentials), session duration, managed-policy vs inline-policy selection, temporary credentials (access key / secret / session token), CloudTrail audit (AssumeRoot events), and revocation configuration (CRL/OCSP). Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Roles Anywhere trust. Triggers: create roles anywhere trust anchor, iam roles anywhere profile, credential helper, certificate based authentication aws, external ca aws, exchange cert for sts, roles anywhere session policy, roles anywhere revocation.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with iam,
-  rolesanywhere, sts, cloudwatch, and cloudtrail access, plus the
-  aws_signing_helper binary (downloaded from AWS) on the client
-  machine. Works with Terraform aws_rolesanywhere_trust_anchor,
-  aws_rolesanywhere_profile, and aws_rolesanywhere_crl resources
-  and CloudFormation AWS::RolesAnywhere::TrustAnchor /
-  AWS::RolesAnywhere::Profile templates.
-keywords:
-  - aws
-  - iam
-  - roles anywhere
-  - trust anchor
-  - certificate authority
-  - pki
-  - x.509
-  - credential helper
-  - signing helper
-  - sts
-  - temporary credentials
-  - session policy
-  - cloudops
-  - deploy
-  - security
-  - revocation
-  - crl
-  - assume root
-tags:
-  - aws
-  - iam
-  - roles-anywhere
-  - trust-anchor
-  - certificate-authority
-  - pki
-  - credential-helper
-  - cloudops
-  - deploy
-  - security
-  - session-policy
-  - revocation
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with iam, rolesanywhere, sts, cloudwatch, and cloudtrail access, plus the aws_signing_helper binary (downloaded from AWS) on the client machine. Works with Terraform aws_rolesanywhere_trust_anchor, aws_rolesanywhere_profile, and aws_rolesanywhere_crl resources and CloudFormation AWS::RolesAnywhere::TrustAnchor / AWS::RolesAnywhere::Profile templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - iam
-    - roles-anywhere
-    - trust-anchor
-    - certificate-authority
-    - pki
-    - credential-helper
-    - cloudops
-    - deploy
-    - security
-    - session-policy
-    - revocation
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create roles anywhere trust anchor
-    - iam roles anywhere profile
-    - credential helper
-    - certificate based authentication aws
-    - external ca aws
-    - exchange cert for sts
-    - roles anywhere session policy
-    - roles anywhere revocation
-  when_to_use: >-
-    Invoke when the user wants to create an IAM Roles Anywhere trust
-    anchor (binding an external certificate authority to AWS IAM),
-    create a profile (mapping external certificates to IAM roles),
-    configure the credential helper (AWS signing helper), set up
-    certificate-based authentication to AWS APIs, integrate an
-    external PKI with AWS, configure revocation (CRL/OCSP), or
-    understand the role assumption workflow (exchange X.509 cert
-    for STS credentials). Do NOT invoke for standard IAM role
-    assumption via STS (no certificate), AWS IAM Identity Center
-    (SSO), or AWS Organizations SCC (service control policies).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, iam, roles-anywhere, trust-anchor, certificate-authority, pki, credential-helper, cloudops, deploy, security, session-policy, revocation
+  dependencies: aws-orchestrator
+  keywords: aws, iam, roles anywhere, trust anchor, certificate authority, pki, x.509, credential helper, signing helper, sts, temporary credentials, session policy, cloudops, deploy, security, revocation, crl, assume root
+  when_to_use: Invoke when the user wants to create an IAM Roles Anywhere trust anchor (binding an external certificate authority to AWS IAM), create a profile (mapping external certificates to IAM roles), configure the credential helper (AWS signing helper), set up certificate-based authentication to AWS APIs, integrate an external PKI with AWS, configure revocation (CRL/OCSP), or understand the role assumption workflow (exchange X.509 cert for STS credentials). Do NOT invoke for standard IAM role assumption via STS (no certificate), AWS IAM Identity Center (SSO), or AWS Organizations SCC (service control policies).
 ---
 
 # Roles Anywhere Trust Deployer

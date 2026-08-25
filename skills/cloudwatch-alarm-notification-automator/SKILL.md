@@ -1,98 +1,27 @@
 ---
 name: cloudwatch-alarm-notification-automator
-description: >-
-  Designs CloudWatch alarm notification and escalation automation across six surfaces: SNS-to-Lambda forwarders for Slack / Teams / PagerDuty / Opsgenie; EventBridge rules on CloudWatch Alarm State Change; alarm-to-Jira / ServiceNow ticket auto-create with idempotency; composite alarm correlation to deduplicate noisy children into one escalation; tiered escalation (primary -> secondary -> manager) via SNS + Step Functions; and 2024-2026 surfaces — AWS User Notifications chat delivery (Slack / Chime / Teams without Lambda), SNS SMS / phone, and Amazon Q for natural-language triage.
-  Enforces safety: subscription-confirmation, kill-switch, dry-run test publish, IAM least-privilege, secrets in Parameter Store / Secrets Manager, ticket idempotency.
-  Emits AUTOMATED with the workflow OR MANUAL_STEP_REQUIRED with the gap.
-  Use when wiring alarm-to-Slack, alarm-to-ticket, escalation tiers, composite-correlation fatigue reduction, or adopting User Notifications / Amazon Q.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Designs CloudWatch alarm notification and escalation automation across six surfaces: SNS-to-Lambda forwarders for Slack / Teams / PagerDuty / Opsgenie; EventBridge rules on CloudWatch Alarm State Change; alarm-to-Jira / ServiceNow ticket auto-create with idempotency; composite alarm correlation to deduplicate noisy children into one escalation; tiered escalation (primary -> secondary -> manager) via SNS + Step Functions; and 2024-2026 surfaces — AWS User Notifications chat delivery (Slack / Chime / Teams without Lambda), SNS SMS / phone, and Amazon Q for natural-language triage. Enforces safety: subscription-confirmation, kill-switch, dry-run test publish, IAM least-privilege, secrets in Parameter Store / Secrets Manager, ticket idempotency. Emits AUTOMATED with the workflow OR MANUAL_STEP_REQUIRED with the gap. Use when wiring alarm-to-Slack, alarm-to-ticket, escalation tiers, composite-correlation fatigue reduction, or adopting User Notifications / Amazon Q.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan authoring. Live deployment
-  uses aws sns create-topic / subscribe / publish, aws lambda create-function
-  / update-function-code, aws events put-rule / put-targets, aws sqs
-  create-queue, aws stepfunctions create-state-machine, aws ssm put-parameter,
-  aws secretsmanager create-secret, aws cloudwatch put-metric-alarm /
-  put-composite-alarm, aws notifications / notifications-contacts APIs,
-  aws chatbot create-slack-channel-configuration. Requires AWS CLI v2 with
-  sns, lambda, events, sqs, stepfunctions, ssm, secretsmanager, cloudwatch,
-  iam, and notifications access (SSO or key-based).
-keywords:
-  - CloudWatch alarm
-  - alarm notification
-  - SNS
-  - Lambda forwarder
-  - Slack
-  - Microsoft Teams
-  - PagerDuty
-  - Opsgenie
-  - EventBridge
-  - alarm state change
-  - Jira
-  - ServiceNow
-  - ticket automation
-  - composite alarm
-  - alarm correlation
-  - escalation policy
-  - tiered escalation
-  - Step Functions
-  - AWS User Notifications
-  - SNS SMS
-  - Amazon Q
-  - alarm triage
-  - alarm fatigue
-  - kill-switch
-tags: [cloudwatch, monitoring, alarms, notifications, automation, sns, eventbridge, slack, pagerduty, escalate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan authoring. Live deployment uses aws sns create-topic / subscribe / publish, aws lambda create-function / update-function-code, aws events put-rule / put-targets, aws sqs create-queue, aws stepfunctions create-state-machine, aws ssm put-parameter, aws secretsmanager create-secret, aws cloudwatch put-metric-alarm / put-composite-alarm, aws notifications /...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATED | MANUAL_STEP_REQUIRED"
-  when_to_use: >-
-    Designing CloudWatch alarm notification or escalation automation —
-    wiring alarms to Slack/Teams/PagerDuty via SNS+Lambda, building
-    EventBridge-driven alarm-to-ticket (Jira/ServiceNow) workflows,
-    creating composite alarm correlation to deduplicate child alarms,
-    designing tiered escalation policies, adopting AWS User Notifications
-    for native chat-based delivery, configuring SNS SMS/phone for
-    page-the-human alerts, or using Amazon Q for natural-language alarm
-    triage. Do NOT invoke for creating/tuning the underlying alarm threshold
-    itself (use cloudwatch-alarm-operator) or for security-incident
-    containment automation (use incident-response-automator).
-  activation_triggers:
-    - "alarm to Slack"
-    - "alarm to Teams"
-    - "alarm to PagerDuty"
-    - "alarm notification Lambda"
-    - "alarm SNS fan-out"
-    - "CloudWatch alarm EventBridge"
-    - "alarm state change"
-    - "alarm to Jira ticket"
-    - "alarm to ServiceNow"
-    - "composite alarm correlation"
-    - "alarm escalation policy"
-    - "tiered escalation"
-    - "AWS User Notifications"
-    - "SNS phone number"
-    - "SNS SMS alarm"
-    - "Amazon Q alarm analysis"
-    - "reduce alarm fatigue"
-  invocation_schema: >-
-    Input: either (a) a notification design intent with target channel(s)
-    and source alarms, OR (b) an existing workflow (EventBridge rule +
-    SNS topic ARN + Lambda forwarder ARN) for validation against the
-    safety baseline. Output: deterministic NOTIFICATION_SOURCE / SCOPE /
-    VERDICT / WORKFLOW / SAFETY / FINDINGS / REMEDIATION block where
-    VERDICT is one of AUTOMATED | MANUAL_STEP_REQUIRED.
+  verdict_shape: AUTOMATED | MANUAL_STEP_REQUIRED
+  when_to_use: Designing CloudWatch alarm notification or escalation automation — wiring alarms to Slack/Teams/PagerDuty via SNS+Lambda, building EventBridge-driven alarm-to-ticket (Jira/ServiceNow) workflows, creating composite alarm correlation to deduplicate child alarms, designing tiered escalation policies, adopting AWS User Notifications for native chat-based delivery, configuring SNS SMS/phone for page-the-human alerts, or using Amazon Q for natural-language alarm triage. Do NOT invoke for creating/tuning the underlying alarm threshold itself (use cloudwatch-alarm-operator) or for security-incident containment automation (use incident-response-automator).
+  activation_triggers: alarm to Slack, alarm to Teams, alarm to PagerDuty, alarm notification Lambda, alarm SNS fan-out, CloudWatch alarm EventBridge, alarm state change, alarm to Jira ticket, alarm to ServiceNow, composite alarm correlation, alarm escalation policy, tiered escalation, AWS User Notifications, SNS phone number, SNS SMS alarm, Amazon Q alarm analysis, reduce alarm fatigue
+  invocation_schema: 'Input: either (a) a notification design intent with target channel(s) and source alarms, OR (b) an existing workflow (EventBridge rule + SNS topic ARN + Lambda forwarder ARN) for validation against the safety baseline. Output: deterministic NOTIFICATION_SOURCE / SCOPE / VERDICT / WORKFLOW / SAFETY / FINDINGS / REMEDIATION block where VERDICT is one of AUTOMATED | MANUAL_STEP_REQUIRED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudWatch alarm, alarm notification, SNS, Lambda forwarder, Slack, Microsoft Teams, PagerDuty, Opsgenie, EventBridge, alarm state change, Jira, ServiceNow, ticket automation, composite alarm, alarm correlation, escalation policy, tiered escalation, Step Functions, AWS User Notifications, SNS SMS, Amazon Q, alarm triage, alarm fatigue, kill-switch
+  tags: cloudwatch, monitoring, alarms, notifications, automation, sns, eventbridge, slack, pagerduty, escalate
 ---
 
 # CloudWatch Alarm Notification Automator

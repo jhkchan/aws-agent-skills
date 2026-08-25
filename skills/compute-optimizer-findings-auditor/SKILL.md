@@ -1,78 +1,24 @@
 ---
 name: compute-optimizer-findings-auditor
-description: >-
-  Audits AWS Compute Optimizer findings for EC2, EBS, Lambda, Auto Scaling
-  Group, and ECS resources — classifies overprovisioned (underutilized) waste,
-  underprovisioned (performance-risk) findings, and low-confidence
-  recommendations (inferred memory, high performanceRisk, stale data) into a
-  deterministic verdict with per-finding risk and CLI remediation. Emits
-  UNDERUTILIZED | NOT_OPTIMIZED | OK per resource. Use when reviewing Compute
-  Optimizer recommendations, triaging right-sizing findings, validating
-  finding confidence before acting, or auditing cost-optimization posture.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Compute Optimizer findings for EC2, EBS, Lambda, Auto Scaling Group, and ECS resources — classifies overprovisioned (underutilized) waste, underprovisioned (performance-risk) findings, and low-confidence recommendations (inferred memory, high performanceRisk, stale data) into a deterministic verdict with per-finding risk and CLI remediation. Emits UNDERUTILIZED | NOT_OPTIMIZED | OK per resource. Use when reviewing Compute Optimizer recommendations, triaging right-sizing findings, validating finding confidence before acting, or auditing cost-optimization posture.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline finding-document classification.
-  Live-account audits use aws compute-optimizer
-  get-ec2-instance-recommendations, get-ebs-volume-recommendations,
-  get-lambda-function-recommendations, and get-enrollment-status (AWS CLI v2,
-  SSO or key-based credentials).
-keywords:
-  - Compute Optimizer
-  - right-sizing
-  - overprovisioned
-  - underprovisioned
-  - underutilized
-  - EC2 recommendations
-  - EBS recommendations
-  - Lambda recommendations
-  - Auto Scaling Group
-  - ECS Fargate
-  - performanceRisk
-  - savingsOpportunity
-  - finding confidence
-  - inferred memory
-  - CloudWatch Agent
-  - cost optimization
-  - resource utilization
-  - gp3 migration
-  - Lambda memory
-  - finding reasons
-tags: [compute, cost-optimization, right-sizing, compute-optimizer, ec2, ebs, lambda, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline finding-document classification. Live-account audits use aws compute-optimizer get-ec2-instance-recommendations, get-ebs-volume-recommendations, get-lambda-function-recommendations, and get-enrollment-status (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
-  verdict_shape: "UNDERUTILIZED | NOT_OPTIMIZED | OK"
-  when_to_use: >-
-    Reviewing Compute Optimizer findings for EC2, EBS, Lambda, or ASG
-    resources, triaging right-sizing recommendations, validating finding
-    confidence before approving a right-size action, auditing cost-
-    optimization posture, or checking whether a finding is actionable or
-    low-confidence noise.
-  activation_triggers:
-    - "audit compute optimizer findings"
-    - "check EC2 right-sizing recommendations"
-    - "is this compute optimizer finding reliable"
-    - "review overprovisioned resources"
-    - "compute optimizer low confidence"
-    - "Lambda memory recommendations"
-    - "EBS volume recommendations"
-    - "performanceRisk too high"
-    - "compute optimizer stale findings"
-    - "right-size EC2 instances"
-  invocation_schema: >-
-    Input: either (a) a Compute Optimizer finding/recommendation document
-    (EC2, EBS, Lambda, ASG) with finding, findingReasons, utilizationMetrics,
-    recommendationOptions, and metadata, OR (b) a resource ARN for live-account
-    audit. Output: deterministic RESOURCE/VERDICT/REASON/FINDINGS/REMEDIATION
-    block per resource, where VERDICT ∈ {UNDERUTILIZED, NOT_OPTIMIZED, OK}.
+  verdict_shape: UNDERUTILIZED | NOT_OPTIMIZED | OK
+  when_to_use: Reviewing Compute Optimizer findings for EC2, EBS, Lambda, or ASG resources, triaging right-sizing recommendations, validating finding confidence before approving a right-size action, auditing cost- optimization posture, or checking whether a finding is actionable or low-confidence noise.
+  activation_triggers: audit compute optimizer findings, check EC2 right-sizing recommendations, is this compute optimizer finding reliable, review overprovisioned resources, compute optimizer low confidence, Lambda memory recommendations, EBS volume recommendations, performanceRisk too high, compute optimizer stale findings, right-size EC2 instances
+  invocation_schema: 'Input: either (a) a Compute Optimizer finding/recommendation document (EC2, EBS, Lambda, ASG) with finding, findingReasons, utilizationMetrics, recommendationOptions, and metadata, OR (b) a resource ARN for live-account audit. Output: deterministic RESOURCE/VERDICT/REASON/FINDINGS/REMEDIATION block per resource, where VERDICT ∈ {UNDERUTILIZED, NOT_OPTIMIZED, OK}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Compute Optimizer, right-sizing, overprovisioned, underprovisioned, underutilized, EC2 recommendations, EBS recommendations, Lambda recommendations, Auto Scaling Group, ECS Fargate, performanceRisk, savingsOpportunity, finding confidence, inferred memory, CloudWatch Agent, cost optimization, resource utilization, gp3 migration, Lambda memory, finding reasons
+  tags: compute, cost-optimization, right-sizing, compute-optimizer, ec2, ebs, lambda, audit
 ---
 
 # Compute Optimizer Findings Auditor

@@ -1,105 +1,28 @@
 ---
 name: guardduty-finding-automator
-description: >-
-  Designs and implements automated response workflows for Amazon GuardDuty
-  findings. Wires EventBridge rules to severity-based routing (Critical/High
-  auto-isolate, Medium notify, Low log), Lambda remediation functions
-  (isolate EC2 via security group swap, revoke IAM access keys, block
-  source IPs in WAF, update security groups), SNS notifications with full
-  finding context, Security Hub integration via BatchImportFindings, and
-  multi-account coverage through Organizations delegated administrator.
-  Covers suppression rules (create-filter) for known false positives,
-  finding archive workflows, CloudTrail correlation for TTP chaining,
-  auto-enable GuardDuty in new accounts via Lambda on CreateAccount, and
-  custom threat intel upload (ThreatIntelSet / IPSet). Emits
-  AUTOMATION_DEPLOYED with the full EventBridge+Lambda+SNS pipeline or
-  REVIEW_REQUIRED with the specific gap. Use when building automated
-  GuardDuty response, severity-based auto-remediation, multi-account
-  GuardDuty automation, or integrating GuardDuty with Security Hub.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Designs and implements automated response workflows for Amazon GuardDuty findings. Wires EventBridge rules to severity-based routing (Critical/High auto-isolate, Medium notify, Low log), Lambda remediation functions (isolate EC2 via security group swap, revoke IAM access keys, block source IPs in WAF, update security groups), SNS notifications with full finding context, Security Hub integration via BatchImportFindings, and multi-account coverage through Organizations delegated administrator. Covers suppression rules (create-filter) for known false positives, finding archive workflows, CloudTrail correlation for TTP chaining, auto-enable GuardDuty in new accounts via Lambda on CreateAccount, and custom threat intel upload (ThreatIntelSet / IPSet). Emits AUTOMATION_DEPLOYED with the full EventBridge+Lambda+SNS pipeline or REVIEW_REQUIRED with the specific gap. Use when building automated GuardDuty response, severity-based auto-remediation, multi-account GuardDuty automation, or integrating GuardDuty with...
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline workflow design. Live deployment
-  uses aws guardduty create-filter, list-findings, get-findings,
-  archive-findings, create-threat-intel-set, create-ip-set,
-  aws events put-rule, put-targets, aws lambda create-function,
-  aws sns create-topic, subscribe, aws securityhub batch-import-findings,
-  aws organizations enable-aws-service-access, and
-  aws cloudformation deploy (for multi-account StackSets) — AWS CLI v2,
-  SSO or key-based credentials.
-keywords:
-  - Amazon GuardDuty
-  - EventBridge
-  - Lambda remediation
-  - severity-based routing
-  - EC2 isolation
-  - IAM credential revocation
-  - WAF IP blocking
-  - SNS notification
-  - AWS Security Hub
-  - BatchImportFindings
-  - Organizations delegated admin
-  - suppression filter
-  - finding archive
-  - CloudTrail correlation
-  - TTP chaining
-  - ThreatIntelSet
-  - IPSet
-  - auto-enable GuardDuty
-  - incident response automation
-tags: [guardduty, security, eventbridge, lambda, security-hub, incident-response, automate, threat-detection]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline workflow design. Live deployment uses aws guardduty create-filter, list-findings, get-findings, archive-findings, create-threat-intel-set, create-ip-set, aws events put-rule, put-targets, aws lambda create-function, aws sns create-topic, subscribe, aws securityhub batch-import-findings, aws organizations enable-aws-service-access, and aws cloudformation deploy (for multi-account...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATION_DEPLOYED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Building automated response workflows for GuardDuty findings, wiring
-    EventBridge to Lambda remediation functions, designing severity-based
-    auto-response (Critical/High auto-isolate, Medium notify, Low log),
-    configuring GuardDuty with Security Hub integration, setting up
-    multi-account GuardDuty via Organizations delegated administrator,
-    creating suppression filters for known false positives, uploading
-    custom threat intel, or auto-enabling GuardDuty in new accounts.
-  when_not_to_use: >-
-    Investigating a single GuardDuty finding for root cause (use
-    guardduty-finding-investigator). Triaging finding severity numerically
-    without automation (use guardduty-finding-severity-triage). Config
-    posture audits of GuardDuty detector enablement (use the auditor
-    family). Forensic chain of custody and disk imaging belong to
-    incident-response-automator. Non-GuardDuty detections (Inspector,
-    Macie, Detective) use their own skills.
-  activation_triggers:
-    - "automate GuardDuty response"
-    - "GuardDuty EventBridge Lambda"
-    - "severity-based auto-remediation"
-    - "isolate EC2 on GuardDuty finding"
-    - "revoke IAM keys on detection"
-    - "block IP in WAF from GuardDuty"
-    - "GuardDuty Security Hub integration"
-    - "GuardDuty suppression filter"
-    - "GuardDuty multi-account automation"
-    - "auto-enable GuardDuty new account"
-    - "GuardDuty custom threat intel"
-    - "archive GuardDuty findings"
-  invocation_schema: >-
-    Input: either (a) a GuardDuty finding type or family (e.g.,
-    UnauthorizedAccess:EC2/SSHBruteForce) plus desired remediation actions,
-    OR (b) an automation requirement ("auto-isolate EC2 on Critical
-    findings", "revoke IAM keys on credential-abuse detection"). Output:
-    deterministic AUTOMATION block per finding family — ROUTING/REMEDIATION/
-    NOTIFICATION/INTEGRATION/SAFETY/VERDICT — where VERDICT is
-    AUTOMATION_DEPLOYED (pipeline template ready) or REVIEW_REQUIRED
-    (specific gap cited).
+  verdict_shape: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
+  when_to_use: Building automated response workflows for GuardDuty findings, wiring EventBridge to Lambda remediation functions, designing severity-based auto-response (Critical/High auto-isolate, Medium notify, Low log), configuring GuardDuty with Security Hub integration, setting up multi-account GuardDuty via Organizations delegated administrator, creating suppression filters for known false positives, uploading custom threat intel, or auto-enabling GuardDuty in new accounts.
+  when_not_to_use: Investigating a single GuardDuty finding for root cause (use guardduty-finding-investigator). Triaging finding severity numerically without automation (use guardduty-finding-severity-triage). Config posture audits of GuardDuty detector enablement (use the auditor family). Forensic chain of custody and disk imaging belong to incident-response-automator. Non-GuardDuty detections (Inspector, Macie, Detective) use their own skills.
+  activation_triggers: automate GuardDuty response, GuardDuty EventBridge Lambda, severity-based auto-remediation, isolate EC2 on GuardDuty finding, revoke IAM keys on detection, block IP in WAF from GuardDuty, GuardDuty Security Hub integration, GuardDuty suppression filter, GuardDuty multi-account automation, auto-enable GuardDuty new account, GuardDuty custom threat intel, archive GuardDuty findings
+  invocation_schema: 'Input: either (a) a GuardDuty finding type or family (e.g., UnauthorizedAccess:EC2/SSHBruteForce) plus desired remediation actions, OR (b) an automation requirement ("auto-isolate EC2 on Critical findings", "revoke IAM keys on credential-abuse detection"). Output: deterministic AUTOMATION block per finding family — ROUTING/REMEDIATION/ NOTIFICATION/INTEGRATION/SAFETY/VERDICT — where VERDICT is AUTOMATION_DEPLOYED (pipeline template ready) or REVIEW_REQUIRED (specific gap cited).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Amazon GuardDuty, EventBridge, Lambda remediation, severity-based routing, EC2 isolation, IAM credential revocation, WAF IP blocking, SNS notification, AWS Security Hub, BatchImportFindings, Organizations delegated admin, suppression filter, finding archive, CloudTrail correlation, TTP chaining, ThreatIntelSet, IPSet, auto-enable GuardDuty, incident response automation
+  tags: guardduty, security, eventbridge, lambda, security-hub, incident-response, automate, threat-detection
 ---
 
 # GuardDuty Finding Automator

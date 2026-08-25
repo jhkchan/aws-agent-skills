@@ -1,117 +1,28 @@
 ---
 name: dr-failover-automator
-description: >-
-  Designs AWS disaster recovery failover automation across the four DR
-  strategies (backup & restore, pilot light, warm standby, multi-site
-  active/active), Route 53 health-checked failover records, Aurora
-  Global Database planned + unplanned failover, S3 cross-region
-  replication failover, RDS cross-region read replica promotion,
-  Elastic Disaster Recovery (DRS) launch, AWS Backup cross-region
-  restore, cross-zone + cross-region load balancing (Global
-  Accelerator), Lambda multi-region, and Step Functions orchestration
-  of the canonical failover sequence (health check, promote, DNS,
-  verify, notify). Includes AWS Resilience Hub readiness assessment
-  and Elastic DRS non-blocking agent. Emits AUTOMATED with failover
-  runbook or MANUAL_STEP_REQUIRED with the gap. Use when designing DR
-  failover, RTO/RPO analysis, or resilience assessment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Designs AWS disaster recovery failover automation across the four DR strategies (backup & restore, pilot light, warm standby, multi-site active/active), Route 53 health-checked failover records, Aurora Global Database planned + unplanned failover, S3 cross-region replication failover, RDS cross-region read replica promotion, Elastic Disaster Recovery (DRS) launch, AWS Backup cross-region restore, cross-zone + cross-region load balancing (Global Accelerator), Lambda multi-region, and Step Functions orchestration of the canonical failover sequence (health check, promote, DNS, verify, notify). Includes AWS Resilience Hub readiness assessment and Elastic DRS non-blocking agent. Emits AUTOMATED with failover runbook or MANUAL_STEP_REQUIRED with the gap. Use when designing DR failover, RTO/RPO analysis, or resilience assessment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan authoring. Live deployment
-  uses aws route53 change-resource-record-sets (failover record, health check),
-  aws rds failover-global-cluster (Aurora Global), promote-read-replica
-  (RDS cross-region), aws drs start-recovery (Elastic DRS),
-  aws backup start-restore-job (cross-region restore),
-  aws elasticloadbalancing modify-load-balancer-attributes (cross-zone),
-  aws lambda create-function / update-function-code (multi-region deploy),
-  aws stepfunctions start-execution (orchestration),
-  aws resiliencehub create-app + start-app-assessment — AWS CLI v2,
-  SSO or key-based, primary + secondary region credentials.
-keywords:
-  - disaster recovery
-  - DR failover
-  - backup and restore
-  - pilot light
-  - warm standby
-  - multi-site active-active
-  - Route 53 health check
-  - Route 53 failover record
-  - Aurora Global Database
-  - cross-region read replica
-  - Elastic Disaster Recovery
-  - DRS launch
-  - CloudEndure migration
-  - AWS Backup cross-region restore
-  - cross-zone load balancing
-  - Global Accelerator
-  - Lambda multi-region
-  - Step Functions failover orchestration
-  - AWS Resilience Hub
-  - RTO RPO
-  - S3 cross-region replication
-tags:
-  - disaster-recovery
-  - route53
-  - aurora-global
-  - elastic-drs
-  - aws-backup
-  - resilience-hub
-  - stepfunctions
-  - automate
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan authoring. Live deployment uses aws route53 change-resource-record-sets (failover record, health check), aws rds failover-global-cluster (Aurora Global), promote-read-replica (RDS cross-region), aws drs start-recovery (Elastic DRS), aws backup start-restore-job (cross-region restore), aws elasticloadbalancing modify-load-balancer-attributes (cross-zone), aws lambda...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: automate
   skill_class: capability
   lifecycle_status: active
   verdict_shape: AUTOMATED | MANUAL_STEP_REQUIRED
-  when_to_use: >-
-    Designing a DR failover plan, picking among backup-restore / pilot
-    light / warm standby / multi-site strategies, wiring Route 53
-    health-checked DNS failover, automating Aurora Global Database or
-    RDS cross-region replica promotion, orchestrating Elastic Disaster
-    Recovery (DRS) launch, centralizing AWS Backup cross-region restore,
-    deploying Lambda multi-region with Route 53 failover, building a
-    Step Functions failover orchestrator (health check -> promote ->
-    DNS -> verify -> notify), or running an AWS Resilience Hub readiness
-    assessment.
-  when_not_to_use:
-    - Single-region high availability (use autoscaling / multi-AZ skills — DR is cross-region by definition).
-    - Backup-only design with no failover component (use backup / data-protection skills).
-    - Application-level health check design (use app-monitoring skills — this skill automates failover, not monitoring).
-    - Migration planning (use migration skills — DR is about failover, not lift-and-shift).
-  activation_triggers:
-    - "DR failover automation"
-    - "Route 53 health-checked failover"
-    - "Aurora Global Database failover"
-    - "RDS cross-region read replica promotion"
-    - "Elastic Disaster Recovery launch"
-    - "pilot light DR strategy"
-    - "warm standby DR"
-    - "multi-site active active"
-    - "AWS Backup cross-region restore"
-    - "Lambda multi-region deploy"
-    - "Step Functions failover orchestrator"
-    - "Resilience Hub readiness assessment"
-    - "RTO RPO analysis"
-    - "S3 cross-region replication failover"
-  invocation_schema: >-
-    Input: either (a) a DR requirement ("design pilot-light DR for a
-    three-tier app, RTO 30min, RPO 5min, us-east-1 -> us-west-2"),
-    OR (b) an existing failover workflow / Route 53 configuration /
-    Aurora Global cluster to audit and harden. Output: deterministic
-    DR block per requirement — STRATEGY/FAILOVER/ORCHESTRATION/VERIFICATION/
-    VERDICT — where VERDICT is AUTOMATED (failover runbook complete with
-    all gates passing) or MANUAL_STEP_REQUIRED (specific gap cited,
-    e.g., health check missing, untested RDS promotion, no break-glass
-    notification path).
+  when_to_use: Designing a DR failover plan, picking among backup-restore / pilot light / warm standby / multi-site strategies, wiring Route 53 health-checked DNS failover, automating Aurora Global Database or RDS cross-region replica promotion, orchestrating Elastic Disaster Recovery (DRS) launch, centralizing AWS Backup cross-region restore, deploying Lambda multi-region with Route 53 failover, building a Step Functions failover orchestrator (health check -> promote -> DNS -> verify -> notify), or running an AWS Resilience Hub readiness assessment.
+  when_not_to_use: Single-region high availability (use autoscaling / multi-AZ skills — DR is cross-region by definition)., Backup-only design with no failover component (use backup / data-protection skills)., Application-level health check design (use app-monitoring skills — this skill automates failover, not monitoring)., Migration planning (use migration skills — DR is about failover, not lift-and-shift).
+  activation_triggers: DR failover automation, Route 53 health-checked failover, Aurora Global Database failover, RDS cross-region read replica promotion, Elastic Disaster Recovery launch, pilot light DR strategy, warm standby DR, multi-site active active, AWS Backup cross-region restore, Lambda multi-region deploy, Step Functions failover orchestrator, Resilience Hub readiness assessment, RTO RPO analysis, S3 cross-region replication failover
+  invocation_schema: 'Input: either (a) a DR requirement ("design pilot-light DR for a three-tier app, RTO 30min, RPO 5min, us-east-1 -> us-west-2"), OR (b) an existing failover workflow / Route 53 configuration / Aurora Global cluster to audit and harden. Output: deterministic DR block per requirement — STRATEGY/FAILOVER/ORCHESTRATION/VERIFICATION/ VERDICT — where VERDICT is AUTOMATED (failover runbook complete with all gates passing) or MANUAL_STEP_REQUIRED (specific gap cited, e.g., health check missing, untested RDS promotion, no break-glass notification path).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: disaster recovery, DR failover, backup and restore, pilot light, warm standby, multi-site active-active, Route 53 health check, Route 53 failover record, Aurora Global Database, cross-region read replica, Elastic Disaster Recovery, DRS launch, CloudEndure migration, AWS Backup cross-region restore, cross-zone load balancing, Global Accelerator, Lambda multi-region, Step Functions failover orchestration, AWS Resilience Hub, RTO RPO, S3 cross-region replication
+  tags: disaster-recovery, route53, aurora-global, elastic-drs, aws-backup, resilience-hub, stepfunctions, automate
 ---
 
 # DR Failover Automator

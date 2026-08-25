@@ -1,122 +1,28 @@
 ---
 name: stepfunctions-express-deployer
-description: >-
-  Provisions Step Functions Express Workflows with production
-  defaults: Express-vs-Standard decision (5-min cap, at-least-once
-  vs exactly-once, per-invocation vs per-transition pricing), sync
-  (RequestResponse) vs async invocation, CloudWatch Logs
-  configuration (ALL / ERROR / FATAL / OFF levels and INCLUDE_DATA
-  / EXCLUDE_DATA), IAM least-privilege execution role, EventBridge
-  scheduling, Distributed Map and Inline Map fan-out,
-  Express-compatible service integrations (.sync, AWS SDK direct
-  calls), idempotency for at-least-once delivery, observability
-  (metrics, X-Ray, CloudWatch alarms). Emits READY_TO_DEPLOY /
-  PREREQUISITES_MISSING with copy-pasteable stepfunctions / logs /
-  events / iam CLI. Use when provisioning an Express workflow,
-  migrating high-volume Standard workloads to Express, configuring
-  sync invocation from API Gateway, or hardening logging. Triggers:
-  Express workflow, create state machine EXPRESS, sync express,
-  async express, EventBridge Step Functions, Step Functions
-  logging, Distributed Map Express.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Step Functions Express Workflows with production defaults: Express-vs-Standard decision (5-min cap, at-least-once vs exactly-once, per-invocation vs per-transition pricing), sync (RequestResponse) vs async invocation, CloudWatch Logs configuration (ALL / ERROR / FATAL / OFF levels and INCLUDE_DATA / EXCLUDE_DATA), IAM least-privilege execution role, EventBridge scheduling, Distributed Map and Inline Map fan-out, Express-compatible service integrations (.sync, AWS SDK direct calls), idempotency for at-least-once delivery, observability (metrics, X-Ray, CloudWatch alarms). Emits READY_TO_DEPLOY / PREREQUISITES_MISSING with copy-pasteable stepfunctions / logs / events / iam CLI. Use when provisioning an Express workflow, migrating high-volume Standard workloads to Express, configuring sync invocation from API Gateway, or hardening logging. Triggers: Express workflow, create state machine EXPRESS, sync express, async express, EventBridge Step Functions, Step Functions logging, Distributed Map Express.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Live provisioning uses AWS CLI v2 with
-  stepfunctions (create-state-machine, update-state-machine,
-  describe-state-machine, start-sync-execution, start-execution,
-  validate-state-machine-definition), logs (create-log-group,
-  put-retention-policy), events (put-rule, put-targets), iam
-  (create-role, attach-role-policy, put-role-policy), and
-  cloudformation / terraform aws_sfn_state_machine equivalents.
-keywords:
-  - aws
-  - step-functions
-  - stepfunctions
-  - express-workflow
-  - state-machine
-  - asl
-  - amazon-states-language
-  - sync-execution
-  - requestresponse
-  - async-execution
-  - cloudwatch-logs
-  - include-data
-  - exclude-data
-  - eventbridge
-  - distributed-map
-  - inline-map
-  - sync-integration
-  - waitfortasktoken
-  - idempotency
-  - at-least-once
-  - iam-execution-role
-  - x-ray
-  - cloudops
-  - deploy
-tags:
-  - aws
-  - step-functions
-  - express-workflow
-  - state-machine
-  - sync-execution
-  - logging
-  - eventbridge
-  - deploy
-  - app-integration
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Live provisioning uses AWS CLI v2 with stepfunctions (create-state-machine, update-state-machine, describe-state-machine, start-sync-execution, start-execution, validate-state-machine-definition), logs (create-log-group, put-retention-policy), events (put-rule, put-targets), iam (create-role, attach-role-policy, put-role-policy), and cloudformation / terraform aws_sfn_state_machine equivalents.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Provisioning a new Step Functions Express Workflow, deciding
-    between Express and Standard (5-min cap, at-least-once semantics,
-    per-invocation pricing), configuring sync (RequestResponse) vs
-    async invocation, attaching a CloudWatch Logs log group with the
-    correct level (ALL / ERROR / FATAL / OFF) and INCLUDE_DATA /
-    EXCLUDE_DATA exposure, scheduling recurring Express executions
-    via EventBridge, using Distributed Map or Inline Map with
-    Express, using .sync service integrations (Glue, Batch, ECS,
-    SageMaker), or hardening idempotency for at-least-once delivery.
-    Do NOT invoke for Standard workflows that run >5 minutes or use
-    .waitForTaskToken (use stepfunctions-statemachine-deployer), or
-    for troubleshooting execution failures (use
-    stepfunctions-execution-troubleshooter).
-  activation_triggers:
-    - "Express workflow"
-    - "create Express state machine"
-    - "Step Functions EXPRESS"
-    - "sync express execution"
-    - "start-sync-execution"
-    - "async express"
-    - "Express workflow logging"
-    - "Step Functions CloudWatch Logs"
-    - "INCLUDE_DATA"
-    - "EXCLUDE_DATA"
-    - "EventBridge Step Functions"
-    - "Distributed Map Express"
-    - "Standard-to-Express migration"
-    - "Express idempotency"
-  invocation_schema: >-
-    Input: either (a) a workflow name + ASL definition (or
-    requirements to derive one) + sync/async invocation mode, or
-    (b) a Standard-to-Express migration spec (existing state machine
-    ARN + compatibility check), or (c) an EventBridge-scheduled
-    Express spec (schedule expression + execution role). Output:
-    deterministic EXPRESS_WORKFLOW / VERDICT / CHECKLIST /
-    VERIFICATION_COMMANDS block per the STRICT output contract,
-    where VERDICT is READY_TO_DEPLOY or PREREQUISITES_MISSING.
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Provisioning a new Step Functions Express Workflow, deciding between Express and Standard (5-min cap, at-least-once semantics, per-invocation pricing), configuring sync (RequestResponse) vs async invocation, attaching a CloudWatch Logs log group with the correct level (ALL / ERROR / FATAL / OFF) and INCLUDE_DATA / EXCLUDE_DATA exposure, scheduling recurring Express executions via EventBridge, using Distributed Map or Inline Map with Express, using .sync service integrations (Glue, Batch, ECS, SageMaker), or hardening idempotency for at-least-once delivery. Do NOT invoke for Standard workflows that run >5 minutes or use .waitForTaskToken (use stepfunctions-statemachine-deployer), or for troubleshooting execution failures (use stepfunctions-execution-troubleshooter).
+  activation_triggers: Express workflow, create Express state machine, Step Functions EXPRESS, sync express execution, start-sync-execution, async express, Express workflow logging, Step Functions CloudWatch Logs, INCLUDE_DATA, EXCLUDE_DATA, EventBridge Step Functions, Distributed Map Express, Standard-to-Express migration, Express idempotency
+  invocation_schema: 'Input: either (a) a workflow name + ASL definition (or requirements to derive one) + sync/async invocation mode, or (b) a Standard-to-Express migration spec (existing state machine ARN + compatibility check), or (c) an EventBridge-scheduled Express spec (schedule expression + execution role). Output: deterministic EXPRESS_WORKFLOW / VERDICT / CHECKLIST / VERIFICATION_COMMANDS block per the STRICT output contract, where VERDICT is READY_TO_DEPLOY or PREREQUISITES_MISSING.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: aws, step-functions, stepfunctions, express-workflow, state-machine, asl, amazon-states-language, sync-execution, requestresponse, async-execution, cloudwatch-logs, include-data, exclude-data, eventbridge, distributed-map, inline-map, sync-integration, waitfortasktoken, idempotency, at-least-once, iam-execution-role, x-ray, cloudops, deploy
+  tags: aws, step-functions, express-workflow, state-machine, sync-execution, logging, eventbridge, deploy, app-integration
+  dependencies: aws-orchestrator
 ---
 
 # Step Functions Express Workflows Deployer

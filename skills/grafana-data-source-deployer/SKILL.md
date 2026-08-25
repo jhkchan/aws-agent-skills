@@ -1,104 +1,26 @@
 ---
 name: grafana-data-source-deployer
-description: >-
-  Provisions Amazon Managed Grafana workspaces with production defaults:
-  workspace creation, SAML/SSO authentication, data source configuration
-  (CloudWatch, Prometheus/AMP, Athena, Timestream, OpenSearch, X-Ray),
-  IAM role for data source access (workspace role with per-service read
-  permissions), workspace API key, dashboard provisioning (import/export
-  JSON), user/group management, workspace endpoint, plugin management,
-  organization units, notification channels, version control integration,
-  and Grafana Enterprise features. Emits a READY_TO_DEPLOY checklist
-  with verification commands. Use when creating a Grafana workspace,
-  configuring data sources, setting up SAML SSO, provisioning dashboards,
-  or managing workspace permissions. Triggers: create grafana workspace,
-  grafana data source cloudwatch, grafana prometheus data source,
-  grafana athena data source, grafana saml sso, grafana workspace api key,
-  grafana dashboard provisioning, grafana iam role.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon Managed Grafana workspaces with production defaults: workspace creation, SAML/SSO authentication, data source configuration (CloudWatch, Prometheus/AMP, Athena, Timestream, OpenSearch, X-Ray), IAM role for data source access (workspace role with per-service read permissions), workspace API key, dashboard provisioning (import/export JSON), user/group management, workspace endpoint, plugin management, organization units, notification channels, version control integration, and Grafana Enterprise features. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Grafana workspace, configuring data sources, setting up SAML SSO, provisioning dashboards, or managing workspace permissions. Triggers: create grafana workspace, grafana data source cloudwatch, grafana prometheus data source, grafana athena data source, grafana saml sso, grafana workspace api key, grafana dashboard provisioning, grafana iam role.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with grafana and iam
-  access. Works with Terraform aws_grafana_workspace /
-  aws_grafana_workspace_api_key / aws_grafana_role_association resources
-  and CloudFormation AWS::Grafana::Workspace templates.
-keywords:
-  - aws
-  - grafana
-  - managed grafana
-  - data source
-  - cloudops
-  - deploy
-  - provisioning
-  - workspace
-  - saml
-  - sso
-  - cloudwatch
-  - prometheus
-  - dashboard
-  - visualization
-tags:
-  - aws
-  - grafana
-  - managed-grafana
-  - cloudops
-  - deploy
-  - management
-  - provisioning
-  - observability
-  - dashboards
-  - data-source
-  - saml-sso
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with grafana and iam access. Works with Terraform aws_grafana_workspace / aws_grafana_workspace_api_key / aws_grafana_role_association resources and CloudFormation AWS::Grafana::Workspace templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - grafana
-    - managed-grafana
-    - cloudops
-    - deploy
-    - management
-    - provisioning
-    - observability
-    - dashboards
-    - data-source
-    - saml-sso
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create grafana workspace
-    - grafana data source cloudwatch
-    - grafana prometheus data source
-    - grafana athena data source
-    - grafana saml sso
-    - grafana workspace api key
-    - grafana dashboard provisioning
-    - grafana iam role
-  when_to_use: >-
-    Invoke when the user wants to create an Amazon Managed Grafana
-    workspace, configure data sources (CloudWatch, Prometheus/AMP,
-    Athena, Timestream, OpenSearch, X-Ray), set up SAML SSO
-    authentication, provision dashboards, create workspace API keys,
-    manage workspace users/groups, or configure notification channels.
-    Do NOT invoke for self-hosted Grafana (EC2/ECS), Amazon
-    CloudWatch dashboards (use cloudwatch-dashboard skills), or
-    QuickSight.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, grafana, managed-grafana, cloudops, deploy, management, provisioning, observability, dashboards, data-source, saml-sso
+  dependencies: aws-orchestrator
+  keywords: aws, grafana, managed grafana, data source, cloudops, deploy, provisioning, workspace, saml, sso, cloudwatch, prometheus, dashboard, visualization
+  when_to_use: Invoke when the user wants to create an Amazon Managed Grafana workspace, configure data sources (CloudWatch, Prometheus/AMP, Athena, Timestream, OpenSearch, X-Ray), set up SAML SSO authentication, provision dashboards, create workspace API keys, manage workspace users/groups, or configure notification channels. Do NOT invoke for self-hosted Grafana (EC2/ECS), Amazon CloudWatch dashboards (use cloudwatch-dashboard skills), or QuickSight.
 ---
 
 # Grafana Data Source Deployer

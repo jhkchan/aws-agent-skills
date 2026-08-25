@@ -1,112 +1,27 @@
 ---
 name: cloudtrail-lake-operator
-description: >-
-  Operates AWS CloudTrail Lake end-to-end — Event Data Store (EDS)
-  creation with the full ingestion surface (CloudTrail management
-  events, CloudTrail data events for S3/Lambda, AWS Config
-  snapshots, Audit Manager evidence, non-AWS events via Partner
-  integrations, CloudTrail Insights), organization scope and
-  SSE-KMS encryption, PartiQL queries (WHERE on eventTime/
-  eventSource/eventName/userIdentity, JOIN across same-Region EDS,
-  aggregation via GROUP BY/COUNT/SUM/AVG), query optimization via
-  partitioning and columnar tuning, Athena federation via the
-  CloudTrailLake connector for cross-account/cross-Region queries,
-  QuickSight dashboards on top of Athena, and non-AWS ingestion
-  via PutAuditEvents with registered Partner sources. Runs
-  deterministic pre-checks behind a CONFIRM gate and emits a READY,
-  BLOCKED, or COMPLETED verdict.
-  Use when creating or modifying an EDS, configuring organization
-  ingestion, writing PartiQL queries, diagnosing slow or empty
-  queries, federating via Athena, or ingesting non-AWS events.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates AWS CloudTrail Lake end-to-end — Event Data Store (EDS) creation with the full ingestion surface (CloudTrail management events, CloudTrail data events for S3/Lambda, AWS Config snapshots, Audit Manager evidence, non-AWS events via Partner integrations, CloudTrail Insights), organization scope and SSE-KMS encryption, PartiQL queries (WHERE on eventTime/ eventSource/eventName/userIdentity, JOIN across same-Region EDS, aggregation via GROUP BY/COUNT/SUM/AVG), query optimization via partitioning and columnar tuning, Athena federation via the CloudTrailLake connector for cross-account/cross-Region queries, QuickSight dashboards on top of Athena, and non-AWS ingestion via PutAuditEvents with registered Partner sources. Runs deterministic pre-checks behind a CONFIRM gate and emits a READY, BLOCKED, or COMPLETED verdict. Use when creating or modifying an EDS, configuring organization ingestion, writing PartiQL queries, diagnosing slow or empty queries, federating via Athena, or ingesting non-AWS events.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline plan
-  classification. Live-account operations use aws cloudtrail
-  create-event-data-store, update-event-data-store,
-  delete-event-data-store, list-event-data-stores,
-  get-query, start-query, describe-query, get-query-results,
-  get-event-data-store, list-queries, put-audit-events (with
-  partner-type), aws lakeformation grant permissions (for Athena
-  federation), aws athena start-query-execution, get-query-results,
-  and aws kms describe-key / get-key-policy (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - AWS CloudTrail Lake
-  - CloudTrail Lake
-  - Event Data Store
-  - EDS
-  - PartiQL
-  - CloudTrail query
-  - federated query Athena
-  - Athena CloudTrail Lake connector
-  - non-AWS events CloudTrail
-  - PutAuditEvents
-  - CloudTrail data events
-  - CloudTrail management events
-  - AWS Config configuration snapshots
-  - AWS Audit Manager evidence
-  - CloudTrail Insights
-  - organization trail Lake
-  - multi-account CloudTrail Lake
-  - Lake query optimization
-  - CloudTrail Lake partitioning
-  - QuickSight CloudTrail Lake
-tags: [aws, cloudtrail, lake, governance, audit, security, partiql, athena, quicksight, operate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws cloudtrail create-event-data-store, update-event-data-store, delete-event-data-store, list-event-data-stores, get-query, start-query, describe-query, get-query-results, get-event-data-store, list-queries, put-audit-events (with partner-type), aws lakeformation grant permissions (for Athena federation), aws athena...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Creating or modifying an Event Data Store (EDS), configuring
-    multi-account or organization-level ingestion into CloudTrail
-    Lake, ingesting non-AWS events (SaaS apps, on-prem) via
-    PutAuditEvents, writing PartiQL queries (SELECT, WHERE, JOIN,
-    aggregation, time-window analytics), diagnosing a slow or empty-
-    result query, federating Lake queries via Athena for cross-
-    account or cross-Region analysis, building QuickSight dashboards
-    on top of Athena-federated CloudTrail Lake, or configuring
-    CloudTrail Insights events ingestion.
-  activation_triggers:
-    - "create Event Data Store"
-    - "CloudTrail Lake EDS"
-    - "PartiQL query CloudTrail"
-    - "federated query Athena"
-    - "Athena CloudTrail Lake connector"
-    - "non-AWS events CloudTrail"
-    - "PutAuditEvents"
-    - "ingest SaaS audit logs to AWS"
-    - "CloudTrail data events to Lake"
-    - "CloudTrail management events to Lake"
-    - "AWS Config snapshots to Lake"
-    - "Audit Manager evidence to Lake"
-    - "CloudTrail Insights to Lake"
-    - "organization CloudTrail Lake"
-    - "multi-account CloudTrail Lake"
-    - "CloudTrail Lake query slow"
-    - "CloudTrail Lake empty results"
-    - "QuickSight CloudTrail Lake"
-  invocation_schema: >-
-    Input: either (a) a CloudTrail Lake Event Data Store
-    configuration (get-event-data-store, list-event-data-stores,
-    get-query, get-query-results) plus the intended operation
-    (create-eds, update-eds, run-query, diagnose-empty-query,
-    diagnose-slow-query, federate-via-athena, configure-non-aws-
-    ingestion, configure-quicksight), OR (b) a specific EDS + PartiQL
-    SQL pair for live-account execution. Output: deterministic
-    OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / NOTES
-    block per operation, where VERDICT is one of READY, BLOCKED,
-    COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Creating or modifying an Event Data Store (EDS), configuring multi-account or organization-level ingestion into CloudTrail Lake, ingesting non-AWS events (SaaS apps, on-prem) via PutAuditEvents, writing PartiQL queries (SELECT, WHERE, JOIN, aggregation, time-window analytics), diagnosing a slow or empty- result query, federating Lake queries via Athena for cross- account or cross-Region analysis, building QuickSight dashboards on top of Athena-federated CloudTrail Lake, or configuring CloudTrail Insights events ingestion.
+  activation_triggers: create Event Data Store, CloudTrail Lake EDS, PartiQL query CloudTrail, federated query Athena, Athena CloudTrail Lake connector, non-AWS events CloudTrail, PutAuditEvents, ingest SaaS audit logs to AWS, CloudTrail data events to Lake, CloudTrail management events to Lake, AWS Config snapshots to Lake, Audit Manager evidence to Lake, CloudTrail Insights to Lake, organization CloudTrail Lake, multi-account CloudTrail Lake, CloudTrail Lake query slow, CloudTrail Lake empty results, QuickSight CloudTrail Lake
+  invocation_schema: 'Input: either (a) a CloudTrail Lake Event Data Store configuration (get-event-data-store, list-event-data-stores, get-query, get-query-results) plus the intended operation (create-eds, update-eds, run-query, diagnose-empty-query, diagnose-slow-query, federate-via-athena, configure-non-aws- ingestion, configure-quicksight), OR (b) a specific EDS + PartiQL SQL pair for live-account execution. Output: deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS CloudTrail Lake, CloudTrail Lake, Event Data Store, EDS, PartiQL, CloudTrail query, federated query Athena, Athena CloudTrail Lake connector, non-AWS events CloudTrail, PutAuditEvents, CloudTrail data events, CloudTrail management events, AWS Config configuration snapshots, AWS Audit Manager evidence, CloudTrail Insights, organization trail Lake, multi-account CloudTrail Lake, Lake query optimization, CloudTrail Lake partitioning, QuickSight CloudTrail Lake
+  tags: aws, cloudtrail, lake, governance, audit, security, partiql, athena, quicksight, operate
 ---
 
 # AWS CloudTrail Lake Operator

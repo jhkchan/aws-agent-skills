@@ -1,96 +1,27 @@
 ---
 name: backup-vault-compliance-automator
-description: >-
-  Designs and implements AWS Backup vault compliance automation
-  workflows. Enforces vault policies (deny non-encrypted backups),
-  validates vault lock compliance (governance vs compliance mode),
-  automates backup report generation (daily compliance summary),
-  verifies recovery point encryption, audits backup plan coverage
-  (identifies resources without backup plans), validates cross-region
-  backup replication, checks backup frequency compliance (daily for
-  production), enforces retention policy, manages Vault Lock cool-off
-  periods, deploys multi-account compliance via AWS Organizations, and
-  wires Config rules for continuous backup compliance detection.
-  Emits AUTOMATION_DEPLOYED with deployment templates or
-  REVIEW_REQUIRED with the specific gap. Use when enforcing backup
-  vault security, auditing backup coverage, deploying Vault Lock,
-  verifying cross-region replication, or building Config-based
-  backup compliance monitoring.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Designs and implements AWS Backup vault compliance automation workflows. Enforces vault policies (deny non-encrypted backups), validates vault lock compliance (governance vs compliance mode), automates backup report generation (daily compliance summary), verifies recovery point encryption, audits backup plan coverage (identifies resources without backup plans), validates cross-region backup replication, checks backup frequency compliance (daily for production), enforces retention policy, manages Vault Lock cool-off periods, deploys multi-account compliance via AWS Organizations, and wires Config rules for continuous backup compliance detection. Emits AUTOMATION_DEPLOYED with deployment templates or REVIEW_REQUIRED with the specific gap. Use when enforcing backup vault security, auditing backup coverage, deploying Vault Lock, verifying cross-region replication, or building Config-based backup compliance monitoring.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline workflow design.
-  Live deployment uses aws backup create-backup-vault, put-backup-vault-policy,
-  put-backup-vault-lock-configuration, describe-backup-vault,
-  list-recovery-points-by-backup-vault, start-backup-job,
-  describe-backup-job, create-backup-plan, create-backup-selection,
-  create-framework, describe-framework, aws configservice put-config-rule,
-  put-remediation-configurations, and aws organizations
-  enable-aws-service-access — AWS CLI v2, SSO or key-based credentials.
-keywords:
-  - AWS Backup
-  - backup vault
-  - vault lock
-  - vault policy
-  - backup compliance
-  - recovery point encryption
-  - backup plan coverage
-  - cross-region backup
-  - backup frequency
-  - retention policy
-  - governance mode
-  - compliance mode
-  - AWS Config rules
-  - backup reports
-  - multi-account backup
-  - AWS Organizations
-  - backup framework
-  - cool-off period
-tags: [aws-backup, vault-lock, backup-compliance, vault-policy, cross-region, config-rules, automate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline workflow design. Live deployment uses aws backup create-backup-vault, put-backup-vault-policy, put-backup-vault-lock-configuration, describe-backup-vault, list-recovery-points-by-backup-vault, start-backup-job, describe-backup-job, create-backup-plan, create-backup-selection, create-framework, describe-framework, aws configservice put-config-rule, put-remediation-configurations...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATION_DEPLOYED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Enforcing backup vault security policies, deploying Vault Lock
-    (governance or compliance mode), auditing backup plan coverage
-    across resources, verifying recovery point encryption, validating
-    cross-region replication, checking backup frequency compliance,
-    deploying Config rules for backup governance, automating backup
-    compliance reports, or rolling out multi-account backup compliance
-    via AWS Organizations.
-  activation_triggers:
-    - "enforce backup vault policy"
-    - "deploy vault lock"
-    - "backup coverage audit"
-    - "recovery point encryption verification"
-    - "cross-region backup compliance"
-    - "backup frequency check"
-    - "Config rule for backup compliance"
-    - "backup compliance report"
-    - "multi-account backup governance"
-    - "governance mode vault lock"
-    - "compliance mode vault lock"
-    - "backup plan coverage audit"
-  invocation_schema: >-
-    Input: either (a) a backup vault configuration (vault name, policy
-    requirements, lock mode) plus target resources, OR (b) a backup
-    compliance requirement ("all production resources must have daily
-    backups with 30-day retention", "verify all recovery points are
-    encrypted"). Output: deterministic COMPLIANCE block per vault —
-    POLICY/LOCK/COVERAGE/REPLICATION/VERDICT — where VERDICT is
-    AUTOMATION_DEPLOYED (templates ready) or REVIEW_REQUIRED (specific
-    gap cited).
+  verdict_shape: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
+  when_to_use: Enforcing backup vault security policies, deploying Vault Lock (governance or compliance mode), auditing backup plan coverage across resources, verifying recovery point encryption, validating cross-region replication, checking backup frequency compliance, deploying Config rules for backup governance, automating backup compliance reports, or rolling out multi-account backup compliance via AWS Organizations.
+  activation_triggers: enforce backup vault policy, deploy vault lock, backup coverage audit, recovery point encryption verification, cross-region backup compliance, backup frequency check, Config rule for backup compliance, backup compliance report, multi-account backup governance, governance mode vault lock, compliance mode vault lock, backup plan coverage audit
+  invocation_schema: 'Input: either (a) a backup vault configuration (vault name, policy requirements, lock mode) plus target resources, OR (b) a backup compliance requirement ("all production resources must have daily backups with 30-day retention", "verify all recovery points are encrypted"). Output: deterministic COMPLIANCE block per vault — POLICY/LOCK/COVERAGE/REPLICATION/VERDICT — where VERDICT is AUTOMATION_DEPLOYED (templates ready) or REVIEW_REQUIRED (specific gap cited).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Backup, backup vault, vault lock, vault policy, backup compliance, recovery point encryption, backup plan coverage, cross-region backup, backup frequency, retention policy, governance mode, compliance mode, AWS Config rules, backup reports, multi-account backup, AWS Organizations, backup framework, cool-off period
+  tags: aws-backup, vault-lock, backup-compliance, vault-policy, cross-region, config-rules, automate
 ---
 
 # Backup Vault Compliance Automator

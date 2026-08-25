@@ -1,78 +1,24 @@
 ---
 name: eks-cluster-auditor
-description: >-
-  Audits AWS EKS cluster configurations for public API endpoint exposure,
-  disabled control-plane logging, IAM auth mapRoles misconfiguration
-  (system:masters to broad principals), security group ingress exposure
-  on critical ports, and outdated Kubernetes version drift. Emits a
-  deterministic categorical verdict per cluster. Use when reviewing EKS
-  cluster security posture, checking API endpoint exposure, validating
-  control-plane logging, auditing aws-auth ConfigMap, inspecting node
-  security groups, or assessing version lifecycle status before production
-  deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS EKS cluster configurations for public API endpoint exposure, disabled control-plane logging, IAM auth mapRoles misconfiguration (system:masters to broad principals), security group ingress exposure on critical ports, and outdated Kubernetes version drift. Emits a deterministic categorical verdict per cluster. Use when reviewing EKS cluster security posture, checking API endpoint exposure, validating control-plane logging, auditing aws-auth ConfigMap, inspecting node security groups, or assessing version lifecycle status before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline config classification. Live-account
-  audits use aws eks describe-cluster, aws eks list-access-entries, kubectl
-  describe configmap aws-auth -n kube-system, and aws ec2 describe-security-groups
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - EKS
-  - Kubernetes
-  - cluster audit
-  - public endpoint
-  - API server
-  - control plane logging
-  - aws-auth
-  - ConfigMap
-  - mapRoles
-  - system:masters
-  - security group
-  - kubelet
-  - outdated version
-  - Kubernetes version
-  - endpointPublicAccess
-  - endpointPrivateAccess
-  - publicAccessCidrs
-  - IRSA
-  - node IAM role
-  - cluster hardening
-  - access entries
-tags: [eks, kubernetes, security, cluster-audit, public-endpoint, logging, iam-auth, security-group, version-drift, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline config classification. Live-account audits use aws eks describe-cluster, aws eks list-access-entries, kubectl describe configmap aws-auth -n kube-system, and aws ec2 describe-security-groups (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
-  verdict_shape: "PUBLIC_ENDPOINT | LOGGING_DISABLED | CONFIG_GAP | OUTDATED | OK"
-  when_to_use: >-
-    Reviewing an EKS cluster before production deployment, checking API
-    endpoint public exposure, validating control-plane logging enablement,
-    auditing the aws-auth ConfigMap for over-permissive IAM-to-RBAC mappings,
-    inspecting node/cluster security group ingress rules, or assessing
-    Kubernetes version lifecycle status.
-  activation_triggers:
-    - "audit this EKS cluster"
-    - "is my EKS API server public"
-    - "check control plane logging"
-    - "audit aws-auth ConfigMap"
-    - "system:masters mapping"
-    - "check EKS security groups"
-    - "is my Kubernetes version outdated"
-    - "harden EKS cluster"
-  invocation_schema: >-
-    Input: either (a) an EKS cluster configuration (describe-cluster output or
-    equivalent JSON), optionally paired with aws-auth ConfigMap data and
-    security group rules, OR (b) a cluster name/ARN for live-account audit.
-    Output: deterministic CLUSTER/VERDICT/REASON/FINDINGS/REMEDIATION block
-    per cluster, where VERDICT is one of PUBLIC_ENDPOINT, LOGGING_DISABLED,
-    CONFIG_GAP, OUTDATED, OK.
+  verdict_shape: PUBLIC_ENDPOINT | LOGGING_DISABLED | CONFIG_GAP | OUTDATED | OK
+  when_to_use: Reviewing an EKS cluster before production deployment, checking API endpoint public exposure, validating control-plane logging enablement, auditing the aws-auth ConfigMap for over-permissive IAM-to-RBAC mappings, inspecting node/cluster security group ingress rules, or assessing Kubernetes version lifecycle status.
+  activation_triggers: audit this EKS cluster, is my EKS API server public, check control plane logging, audit aws-auth ConfigMap, system:masters mapping, check EKS security groups, is my Kubernetes version outdated, harden EKS cluster
+  invocation_schema: 'Input: either (a) an EKS cluster configuration (describe-cluster output or equivalent JSON), optionally paired with aws-auth ConfigMap data and security group rules, OR (b) a cluster name/ARN for live-account audit. Output: deterministic CLUSTER/VERDICT/REASON/FINDINGS/REMEDIATION block per cluster, where VERDICT is one of PUBLIC_ENDPOINT, LOGGING_DISABLED, CONFIG_GAP, OUTDATED, OK.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: EKS, Kubernetes, cluster audit, public endpoint, API server, control plane logging, aws-auth, ConfigMap, mapRoles, system:masters, security group, kubelet, outdated version, Kubernetes version, endpointPublicAccess, endpointPrivateAccess, publicAccessCidrs, IRSA, node IAM role, cluster hardening, access entries
+  tags: eks, kubernetes, security, cluster-audit, public-endpoint, logging, iam-auth, security-group, version-drift, audit
 ---
 
 # EKS Cluster Auditor

@@ -1,49 +1,22 @@
 ---
 name: iam-least-privilege-advisor
-description: >-
-  Analyzes AWS IAM policies to identify over-permissive grants — wildcard
-  actions, wildcard resources, privilege-escalation actions (PassRole,
-  AssumeRole), inverse wildcards (NotAction/NotResource), and condition-key
-  bypasses — then provides least-privilege remediation. Use when reviewing
-  IAM policies, checking for wildcard or escalation permissions, auditing
-  role or user privileges, or tightening access control scope.
-version: 0.3.0
-author: Jacky Chan — AWS Community Builder
+description: Analyzes AWS IAM policies to identify over-permissive grants — wildcard actions, wildcard resources, privilege-escalation actions (PassRole, AssumeRole), inverse wildcards (NotAction/NotResource), and condition-key bypasses — then provides least-privilege remediation. Use when reviewing IAM policies, checking for wildcard or escalation permissions, auditing role or user privileges, or tightening access control scope.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf). No AWS
-  CLI required for offline policy-document classification. Live-account
-  audits use aws iam simulate-principal-policy and aws cloudtrail
-  lookup-events (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - IAM
-  - least privilege
-  - policy analysis
-  - wildcard permissions
-  - privilege escalation
-  - over-permissive
-  - IAM audit
-  - PassRole
-  - AssumeRole
-  - NotAction
-  - NotResource
-  - condition bypass
-  - policy remediation
-tags: [iam, security, least-privilege, policy-analysis, privilege-escalation]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf). No AWS CLI required for offline policy-document classification. Live-account audits use aws iam simulate-principal-policy and aws cloudtrail lookup-events (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
-  verdict_shape: "OVERPERMISSIVE | LEAST_PRIVILEGE | AMBIGUOUS"
-  when_to_use: >-
-    Reviewing an IAM policy document (inline or managed), auditing a role or
-    user before production deployment, checking for wildcard or escalation
-    permissions, tightening access-control scope, or scoping down a policy
-    derived from CloudTrail activity.
+  verdict_shape: OVERPERMISSIVE | LEAST_PRIVILEGE | AMBIGUOUS
+  when_to_use: Reviewing an IAM policy document (inline or managed), auditing a role or user before production deployment, checking for wildcard or escalation permissions, tightening access-control scope, or scoping down a policy derived from CloudTrail activity.
+  version: 0.3.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: IAM, least privilege, policy analysis, wildcard permissions, privilege escalation, over-permissive, IAM audit, PassRole, AssumeRole, NotAction, NotResource, condition bypass, policy remediation
+  tags: iam, security, least-privilege, policy-analysis, privilege-escalation
 ---
 
 # IAM Least-Privilege Advisor

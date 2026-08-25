@@ -1,116 +1,27 @@
 ---
 name: codepipeline-failure-troubleshooter
-description: >-
-  Diagnoses AWS CodePipeline execution failures across source, build,
-  deploy, and approval stages. Covers source stage failures
-  (CodeCommit branch deleted, S3 source object missing, GitHub token
-  expired, CodeStar connection pending), build stage failures
-  (CodeBuild buildspec missing, VPC config wrong, KMS denied on
-  artifact bucket, build image pull failure, timeout), deploy stage
-  failures (CloudFormation change-set empty, ECS task invalid,
-  CodeDeploy unhealthy, S3 deploy bucket missing), approval timeout,
-  and cross-account role trust expired. Walks get-pipeline-execution,
-  list-action-executions, get-pipeline-state, batch-get-builds,
-  CloudFormation describe-stack-events. Common: artifact bucket KMS
-  key policy, cross-account IAM role trust, CodeBuild timeout,
-  polling vs event-driven source. Emits ROOT_CAUSE_FOUND |
-  NEED_MORE_INFO | ESCALATE. Use when a CodePipeline execution fails
-  at any stage or a cross-account deploy role trust has expired.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses AWS CodePipeline execution failures across source, build, deploy, and approval stages. Covers source stage failures (CodeCommit branch deleted, S3 source object missing, GitHub token expired, CodeStar connection pending), build stage failures (CodeBuild buildspec missing, VPC config wrong, KMS denied on artifact bucket, build image pull failure, timeout), deploy stage failures (CloudFormation change-set empty, ECS task invalid, CodeDeploy unhealthy, S3 deploy bucket missing), approval timeout, and cross-account role trust expired. Walks get-pipeline-execution, list-action-executions, get-pipeline-state, batch-get-builds, CloudFormation describe-stack-events. Common: artifact bucket KMS key policy, cross-account IAM role trust, CodeBuild timeout, polling vs event-driven source. Emits ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE. Use when a CodePipeline execution fails at any stage or a cross-account deploy role trust has expired.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline diagnosis works on supplied
-  get-pipeline-execution / list-action-executions /
-  get-pipeline-state JSON. Live-account diagnosis uses
-  aws codepipeline get-pipeline-execution, list-action-executions,
-  get-pipeline-state, get-pipeline, list-pipelines,
-  aws codebuild batch-get-builds,
-  aws cloudformation describe-stack-events (for CFN deploy stages),
-  aws iam simulate-principal-policy, and
-  aws logs get-log-events / filter-log-events for CodeBuild logs
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - CodePipeline
-  - pipeline
-  - execution failed
-  - Source stage
-  - Build stage
-  - Deploy stage
-  - Approval
-  - CodeBuild
-  - buildspec
-  - CodeCommit
-  - GitHub connection
-  - CodeStar connection
-  - cross-account
-  - artifact bucket
-  - KMS key policy
-  - CloudFormation deploy
-  - CodeDeploy
-  - ECS deploy
-  - CloudWatch Events
-  - IAM role trust
-tags:
-  - codepipeline
-  - devtools
-  - troubleshoot
-  - pipeline-failure
-  - codebuild
-  - cross-account
-  - deployment
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works on supplied get-pipeline-execution / list-action-executions / get-pipeline-state JSON. Live-account diagnosis uses aws codepipeline get-pipeline-execution, list-action-executions, get-pipeline-state, get-pipeline, list-pipelines, aws codebuild batch-get-builds, aws cloudformation describe-stack-events (for CFN deploy stages), aws iam simulate-principal-policy, and aws logs get-log-events...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
-  when_to_use: >-
-    Diagnosing why a CodePipeline execution FAILED, why a Source
-    action failed (CodeCommit branch deleted, S3 source empty, GitHub
-    token expired, CodeStar connection pending), why a Build action
-    failed (CodeBuild environment error, buildspec missing, VPC config
-    wrong, KMS denied, timeout), why a Deploy action failed
-    (CloudFormation change-set empty, ECS task invalid, CodeDeploy
-    unhealthy), why an Approval timed out, or why a cross-account
-    deploy role's trust expired.
-  activation_triggers:
-    - "CodePipeline execution failed"
-    - "CodePipeline action FAILED"
-    - "Source stage failed"
-    - "Build stage failed"
-    - "Deploy stage failed"
-    - "CodeBuild failed"
-    - "buildspec missing"
-    - "GitHub token expired"
-    - "CodeStar connection pending"
-    - "CodePipeline cross-account"
-    - "artifact bucket KMS denied"
-    - "CodePipeline approval timeout"
-    - "CloudFormation change-set empty"
-    - "CodeDeploy unhealthy"
-    - "CodePipeline throttled"
-  invocation_schema: >-
-    Input: either (a) a symptom description (pipeline name, region,
-    failed stage / action name, observed error from the console or
-    CLI), OR (b) a live-account scenario where the agent runs
-    aws codepipeline get-pipeline-execution / list-action-executions
-    / get-pipeline-state / get-pipeline and aws codebuild
-    batch-get-builds to gather evidence. Output: a deterministic
-    INCIDENT / VERDICT / ROOT_CAUSE / EVIDENCE /
-    ROOT_CAUSE_CATALOG / REMEDIATION block where VERDICT ∈
-    {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and ROOT_CAUSE
-    names the specific failure category (SOURCE_STAGE_FAILED /
-    BUILD_STAGE_FAILED / DEPLOY_STAGE_FAILED / APPROVAL_TIMEOUT /
-    CROSS_ACCOUNT_ROLE_FAILED) and the offending configuration
-    element.
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+  when_to_use: Diagnosing why a CodePipeline execution FAILED, why a Source action failed (CodeCommit branch deleted, S3 source empty, GitHub token expired, CodeStar connection pending), why a Build action failed (CodeBuild environment error, buildspec missing, VPC config wrong, KMS denied, timeout), why a Deploy action failed (CloudFormation change-set empty, ECS task invalid, CodeDeploy unhealthy), why an Approval timed out, or why a cross-account deploy role's trust expired.
+  activation_triggers: CodePipeline execution failed, CodePipeline action FAILED, Source stage failed, Build stage failed, Deploy stage failed, CodeBuild failed, buildspec missing, GitHub token expired, CodeStar connection pending, CodePipeline cross-account, artifact bucket KMS denied, CodePipeline approval timeout, CloudFormation change-set empty, CodeDeploy unhealthy, CodePipeline throttled
+  invocation_schema: 'Input: either (a) a symptom description (pipeline name, region, failed stage / action name, observed error from the console or CLI), OR (b) a live-account scenario where the agent runs aws codepipeline get-pipeline-execution / list-action-executions / get-pipeline-state / get-pipeline and aws codebuild batch-get-builds to gather evidence. Output: a deterministic INCIDENT / VERDICT / ROOT_CAUSE / EVIDENCE / ROOT_CAUSE_CATALOG / REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and ROOT_CAUSE names the specific failure category (SOURCE_STAGE_FAILED / BUILD_STAGE_FAILED / DEPLOY_STAGE_FAILED / APPROVAL_TIMEOUT / CROSS_ACCOUNT_ROLE_FAILED) and the offending configuration element.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CodePipeline, pipeline, execution failed, Source stage, Build stage, Deploy stage, Approval, CodeBuild, buildspec, CodeCommit, GitHub connection, CodeStar connection, cross-account, artifact bucket, KMS key policy, CloudFormation deploy, CodeDeploy, ECS deploy, CloudWatch Events, IAM role trust
+  tags: codepipeline, devtools, troubleshoot, pipeline-failure, codebuild, cross-account, deployment
 ---
 
 # CodePipeline Failure Troubleshooter

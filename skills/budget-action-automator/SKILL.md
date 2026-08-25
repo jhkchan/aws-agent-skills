@@ -1,88 +1,27 @@
 ---
 name: budget-action-automator
-description: >-
-  Designs and deploys AWS Budgets automated actions — cost, usage, RI
-  coverage, and RI utilization budgets with threshold-driven responses.
-  Covers budget creation (actual vs forecasted alerts), SNS notification
-  wiring, IAM action attachment (apply SCP deny on breach, apply IAM
-  policy to constrain usage), EventBridge routing to Lambda for
-  custom remediation (stop non-prod EC2, tag untagged resources, post
-  to Slack), multi-account rollout via Organizations Payer, cost
-  allocation tag enforcement as a budget prerequisite, Budgets API
-  automation patterns, forecast-based proactive action before actual
-  breach, and budget rollover/reset semantics. Emits AUTOMATION_DEPLOYED
-  with a workflow template (CloudFormation / CLI) or REVIEW_REQUIRED
-  with the specific gap. Use when building budget actions, wiring IAM
-  or SCP responses to budget breaches, or complementing Cost
-  Anomaly Detection with threshold-based controls.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Designs and deploys AWS Budgets automated actions — cost, usage, RI coverage, and RI utilization budgets with threshold-driven responses. Covers budget creation (actual vs forecasted alerts), SNS notification wiring, IAM action attachment (apply SCP deny on breach, apply IAM policy to constrain usage), EventBridge routing to Lambda for custom remediation (stop non-prod EC2, tag untagged resources, post to Slack), multi-account rollout via Organizations Payer, cost allocation tag enforcement as a budget prerequisite, Budgets API automation patterns, forecast-based proactive action before actual breach, and budget rollover/reset semantics. Emits AUTOMATION_DEPLOYED with a workflow template (CloudFormation / CLI) or REVIEW_REQUIRED with the specific gap. Use when building budget actions, wiring IAM or SCP responses to budget breaches, or complementing Cost Anomaly Detection with threshold-based controls.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline workflow design.
-  Live deployment uses aws budgets create-budget, create-notification,
-  subscribe, put-budget-action, describe-budget-action, aws ce
-  get-cost-and-usage, get-cost-forecast, aws organizations
-  attach-policy, create-policy, aws sns create-topic — AWS CLI v2,
-  SSO or key-based credentials.
-keywords:
-  - AWS Budgets
-  - budget action
-  - put-budget-action
-  - SCP deny
-  - SNS notification
-  - cost budget
-  - usage budget
-  - RI coverage
-  - RI utilization
-  - forecast threshold
-  - Cost Anomaly Detection
-  - cost allocation tags
-  - Organizations Payer
-  - budget rollover
-  - EventBridge budget
-  - FinOps automation
-tags: [aws-budgets, finops, cost-optimization, scp, iam-action, eventbridge, automate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline workflow design. Live deployment uses aws budgets create-budget, create-notification, subscribe, put-budget-action, describe-budget-action, aws ce get-cost-and-usage, get-cost-forecast, aws organizations attach-policy, create-policy, aws sns create-topic — AWS CLI v2, SSO or key-based credentials.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: FinOps
   task_type: automate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "AUTOMATION_DEPLOYED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Designing AWS Budgets automated actions, wiring IAM/SCP responses
-    to budget breaches, building multi-account budget rollouts via
-    Organizations Payer, enforcing cost allocation tags before budget
-    creation, complementing Cost Anomaly Detection with threshold
-    controls, configuring forecast-based proactive action, or
-    automating RI coverage / RI utilization budgets.
-  activation_triggers:
-    - "automate budget action"
-    - "put-budget-action"
-    - "budget breach SCP"
-    - "budget SNS notification"
-    - "forecast budget action"
-    - "RI coverage budget"
-    - "RI utilization budget"
-    - "budget multi-account payer"
-    - "cost allocation tag budget"
-    - "Budgets API automation"
-    - "budget EventBridge Lambda"
-    - "budget Slack notification"
-  invocation_schema: >-
-    Input: either (a) a budget requirement ("alert at 80% of $10K
-    monthly cost budget and deny new EC2 launches at 100%"), OR (b) a
-    budget configuration under review. Output: deterministic BUDGET
-    ACTION block per budget — BUDGET/THRESHOLD/NOTIFICATION/RESPONSE/
-    MULTI_ACCOUNT/VERDICT — where VERDICT is AUTOMATION_DEPLOYED
-    (workflow template ready) or REVIEW_REQUIRED (specific gap cited).
+  verdict_shape: AUTOMATION_DEPLOYED | REVIEW_REQUIRED
+  when_to_use: Designing AWS Budgets automated actions, wiring IAM/SCP responses to budget breaches, building multi-account budget rollouts via Organizations Payer, enforcing cost allocation tags before budget creation, complementing Cost Anomaly Detection with threshold controls, configuring forecast-based proactive action, or automating RI coverage / RI utilization budgets.
+  activation_triggers: automate budget action, put-budget-action, budget breach SCP, budget SNS notification, forecast budget action, RI coverage budget, RI utilization budget, budget multi-account payer, cost allocation tag budget, Budgets API automation, budget EventBridge Lambda, budget Slack notification
+  invocation_schema: 'Input: either (a) a budget requirement ("alert at 80% of $10K monthly cost budget and deny new EC2 launches at 100%"), OR (b) a budget configuration under review. Output: deterministic BUDGET ACTION block per budget — BUDGET/THRESHOLD/NOTIFICATION/RESPONSE/ MULTI_ACCOUNT/VERDICT — where VERDICT is AUTOMATION_DEPLOYED (workflow template ready) or REVIEW_REQUIRED (specific gap cited).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Budgets, budget action, put-budget-action, SCP deny, SNS notification, cost budget, usage budget, RI coverage, RI utilization, forecast threshold, Cost Anomaly Detection, cost allocation tags, Organizations Payer, budget rollover, EventBridge budget, FinOps automation
+  tags: aws-budgets, finops, cost-optimization, scp, iam-action, eventbridge, automate
 ---
 
 # Budget Action Automator

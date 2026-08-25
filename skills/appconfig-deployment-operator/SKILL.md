@@ -1,120 +1,28 @@
 ---
 name: appconfig-deployment-operator
-description: >-
-  Operates AWS AppConfig deployment lifecycles safely — creates
-  applications, environments, and configuration profiles
-  (freeform and feature-flag); defines deployment strategies
-  (linear or all-at-once, growth factor, deployment duration,
-  bake time); starts, monitors, and completes deployments;
-  rolls back on CloudWatch alarm; and integrates AppConfig
-  Lambda extensions for runtime feature flags and dynamic
-  configuration. Runs deterministic pre-checks (application /
-  environment existence, profile schema validity, strategy
-  sanity, alarm health, IAM), emits the exact start-deployment
-  / stop-deployment / rollback CLI behind a CONFIRM gate, and
-  verifies state transitions. Emits READY | BLOCKED | COMPLETED.
-  Use when launching a staged AppConfig deployment, wiring
-  rollback alarms, switching strategies, adopting AppConfig
-  Lambda extensions for live feature flags, integrating
-  AppConfig with CodeDeploy, or diagnosing a deployment stuck
-  in DEPLOYING / ROLLING_BACK / TERMINATED.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates AWS AppConfig deployment lifecycles safely — creates applications, environments, and configuration profiles (freeform and feature-flag); defines deployment strategies (linear or all-at-once, growth factor, deployment duration, bake time); starts, monitors, and completes deployments; rolls back on CloudWatch alarm; and integrates AppConfig Lambda extensions for runtime feature flags and dynamic configuration. Runs deterministic pre-checks (application / environment existence, profile schema validity, strategy sanity, alarm health, IAM), emits the exact start-deployment / stop-deployment / rollback CLI behind a CONFIRM gate, and verifies state transitions. Emits READY | BLOCKED | COMPLETED. Use when launching a staged AppConfig deployment, wiring rollback alarms, switching strategies, adopting AppConfig Lambda extensions for live feature flags, integrating AppConfig with CodeDeploy, or diagnosing a deployment stuck in DEPLOYING / ROLLING_BACK / TERMINATED.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline plan
-  classification. Live-account operations use aws appconfig
-  create-application, create-environment, create-configuration-profile,
-  create-deployment-strategy, start-deployment, get-deployment,
-  stop-deployment, list-deployments, get-configuration,
-  aws codedeploy stop-deployment, and aws cloudwatch
-  describe-alarms (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - AppConfig
-  - feature flags
-  - dynamic configuration
-  - deployment strategy
-  - linear deployment
-  - all-at-once
-  - growth factor
-  - bake time
-  - rollback
-  - CloudWatch alarm
-  - Lambda extension
-  - CodeDeploy
-  - configuration profile
-  - environment
-  - staged rollout
-  - canary
-  - AppConfig agent
-  - StartDeployment
-  - configuration data
-tags:
-  - appconfig
-  - configuration
-  - feature-flags
-  - operate
-  - staged-rollout
-  - rollback
-  - codedeploy
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws appconfig create-application, create-environment, create-configuration-profile, create-deployment-strategy, start-deployment, get-deployment, stop-deployment, list-deployments, get-configuration, aws codedeploy stop-deployment, and aws cloudwatch describe-alarms (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Launching or operating an AppConfig deployment (start, monitor,
-    stop, rollback), defining a deployment strategy (linear,
-    all-at-once, growth factor, deployment duration, bake time),
-    wiring CloudWatch alarms for automatic rollback, integrating
-    AppConfig Lambda extensions for runtime feature flags / dynamic
-    configuration, integrating AppConfig with CodeDeploy for
-    orchestrated deployments, creating configuration profiles
-    (freeform JSON, feature-flag schema), creating applications and
-    environments, diagnosing a deployment stuck in DEPLOYING,
-    ROLLING_BACK, or TERMINATED, or choosing between
-    AppConfig.AllAtOnce / Linear / AppConfig deployments via
-    CodeDeploy.
-  when_not_to_use: >-
-    General secrets management (use Parameter Store or Secrets
-    Manager), SSM document execution (use ssm-documents-operator),
-    CloudFormation stack updates (use cloudformation-stack operators),
-    or service mesh traffic shifting (use appmesh-deployer).
-  activation_triggers:
-    - "AppConfig deployment"
-    - "start-deployment"
-    - "stop-deployment"
-    - "rollback AppConfig"
-    - "deployment strategy"
-    - "growth factor"
-    - "bake time"
-    - "linear deployment"
-    - "all-at-once"
-    - "feature flag"
-    - "AppConfig Lambda extension"
-    - "AppConfig agent"
-    - "configuration profile"
-    - "AppConfig CodeDeploy"
-    - "deployment stuck DEPLOYING"
-    - "ROLLING_BACK"
-    - "AppConfig TERMINATED"
-    - "dynamic configuration"
-  invocation_schema: >-
-    Input: either (a) an AppConfig deployment intent (start, stop,
-    rollback, define-strategy, create-profile, create-environment,
-    create-application) with target application / environment /
-    profile / strategy identifiers, OR (b) a deployment-id +
-    operation for live-account execution. Output: a deterministic
-    OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY block
-    per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Launching or operating an AppConfig deployment (start, monitor, stop, rollback), defining a deployment strategy (linear, all-at-once, growth factor, deployment duration, bake time), wiring CloudWatch alarms for automatic rollback, integrating AppConfig Lambda extensions for runtime feature flags / dynamic configuration, integrating AppConfig with CodeDeploy for orchestrated deployments, creating configuration profiles (freeform JSON, feature-flag schema), creating applications and environments, diagnosing a deployment stuck in DEPLOYING, ROLLING_BACK, or TERMINATED, or choosing between AppConfig.AllAtOnce / Linear / AppConfig deployments via CodeDeploy.
+  when_not_to_use: General secrets management (use Parameter Store or Secrets Manager), SSM document execution (use ssm-documents-operator), CloudFormation stack updates (use cloudformation-stack operators), or service mesh traffic shifting (use appmesh-deployer).
+  activation_triggers: AppConfig deployment, start-deployment, stop-deployment, rollback AppConfig, deployment strategy, growth factor, bake time, linear deployment, all-at-once, feature flag, AppConfig Lambda extension, AppConfig agent, configuration profile, AppConfig CodeDeploy, deployment stuck DEPLOYING, ROLLING_BACK, AppConfig TERMINATED, dynamic configuration
+  invocation_schema: 'Input: either (a) an AppConfig deployment intent (start, stop, rollback, define-strategy, create-profile, create-environment, create-application) with target application / environment / profile / strategy identifiers, OR (b) a deployment-id + operation for live-account execution. Output: a deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AppConfig, feature flags, dynamic configuration, deployment strategy, linear deployment, all-at-once, growth factor, bake time, rollback, CloudWatch alarm, Lambda extension, CodeDeploy, configuration profile, environment, staged rollout, canary, AppConfig agent, StartDeployment, configuration data
+  tags: appconfig, configuration, feature-flags, operate, staged-rollout, rollback, codedeploy
 ---
 
 # AppConfig Deployment Operator

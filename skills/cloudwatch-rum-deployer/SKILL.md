@@ -1,66 +1,15 @@
 ---
 name: cloudwatch-rum-deployer
-description: >-
-  Provisions CloudWatch RUM (Real User Monitoring) app monitors
-  with production-grade defaults — domain allow-list, sample
-  rate, cookie domain, telemetries (errors, performance, HTTP),
-  X-Ray trace correlation, custom events, custom metrics, and
-  the CloudWatch RUM JavaScript SDK integrated via CDN or npm.
-  Wires Application Signals client-side correlation and emits a
-  READY_TO_DEPLOY checklist verifying every prerequisite. Use
-  when creating a RUM app monitor, injecting the RUM SDK (CDN
-  script tag or npm import), wiring cookie domain, recording
-  custom events / custom metrics, enabling X-Ray trace
-  integration, or correlating client-side RUM sessions with
-  server-side Application Signals. Triggers: cloudwatch rum,
-  real user monitoring, rum app monitor, rum javascript sdk,
-  rum web client, rum cdn, rum npm, cookie domain, custom
-  events rum, rum custom metrics, x-ray rum correlation,
-  application signals client correlation, web vitals
-  cloudwatch, client-side observability.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions CloudWatch RUM (Real User Monitoring) app monitors with production-grade defaults — domain allow-list, sample rate, cookie domain, telemetries (errors, performance, HTTP), X-Ray trace correlation, custom events, custom metrics, and the CloudWatch RUM JavaScript SDK integrated via CDN or npm. Wires Application Signals client-side correlation and emits a READY_TO_DEPLOY checklist verifying every prerequisite. Use when creating a RUM app monitor, injecting the RUM SDK (CDN script tag or npm import), wiring cookie domain, recording custom events / custom metrics, enabling X-Ray trace integration, or correlating client-side RUM sessions with server-side Application Signals. Triggers: cloudwatch rum, real user monitoring, rum app monitor, rum javascript sdk, rum web client, rum cdn, rum npm, cookie domain, custom events rum, rum custom metrics, x-ray rum correlation, application signals client correlation, web vitals cloudwatch, client-side observability.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with
-  rum, cloudwatch, xray, iam, application-signals, and ssm access.
-  Works with Terraform aws_cloudwatch_rum_app_monitor, CloudFormation
-  AWS::RUM::AppMonitor, and the CloudWatch RUM JavaScript SDK
-  (@/aws-cdk/aws-rum or aws-rum-web on npm).
-keywords:
-  - aws
-  - cloudwatch
-  - rum
-  - real-user-monitoring
-  - client-side-observability
-  - cloudops
-  - deploy
-  - provisioning
-  - javascript-sdk
-  - web-vitals
-  - cookie-domain
-  - custom-events
-  - custom-metrics
-  - xray-correlation
-  - application-signals
-tags:
-  - aws
-  - cloudwatch
-  - rum
-  - observability
-  - deploy
-  - javascript-sdk
-  - web-vitals
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with rum, cloudwatch, xray, iam, application-signals, and ssm access. Works with Terraform aws_cloudwatch_rum_app_monitor, CloudFormation AWS::RUM::AppMonitor, and the CloudWatch RUM JavaScript SDK (@/aws-cdk/aws-rum or aws-rum-web on npm).'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: deploy
   skill_class: capability
@@ -68,42 +17,10 @@ metadata:
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-    - aws
-    - cloudwatch
-    - rum
-    - observability
-    - deploy
-    - javascript-sdk
-    - web-vitals
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - cloudwatch rum
-    - real user monitoring
-    - rum app monitor
-    - rum javascript sdk
-    - rum web client
-    - cookie domain rum
-    - rum custom events
-    - rum custom metrics
-    - x-ray rum correlation
-    - application signals client correlation
-    - web vitals cloudwatch
-    - client-side observability
-    - session sampling
-  when_to_use: >-
-    Invoke when the user wants to create a CloudWatch RUM app monitor
-    (domain, sample rate, cookie domain, telemetries), inject the
-    CloudWatch RUM JavaScript SDK via CDN or npm, wire cookie
-    domain, record custom events or custom metrics, enable X-Ray
-    tracing integration for client-to-server trace correlation, or
-    correlate client-side RUM sessions with server-side Application
-    Signals service map. Do NOT invoke for plain CloudWatch dashboards
-    or alarms (use cloudwatch-dashboard-deployer / cloudwatch-alarm-operator),
-    for X-Ray-only tracing without RUM (use xray-tracing-deployer), or
-    for Application Signals enablement on server workloads
-    (use cloudwatch-application-signals-deployer).
+  tags: aws, cloudwatch, rum, observability, deploy, javascript-sdk, web-vitals
+  dependencies: aws-orchestrator
+  keywords: aws, cloudwatch, rum, real-user-monitoring, client-side-observability, cloudops, deploy, provisioning, javascript-sdk, web-vitals, cookie-domain, custom-events, custom-metrics, xray-correlation, application-signals
+  when_to_use: Invoke when the user wants to create a CloudWatch RUM app monitor (domain, sample rate, cookie domain, telemetries), inject the CloudWatch RUM JavaScript SDK via CDN or npm, wire cookie domain, record custom events or custom metrics, enable X-Ray tracing integration for client-to-server trace correlation, or correlate client-side RUM sessions with server-side Application Signals service map. Do NOT invoke for plain CloudWatch dashboards or alarms (use cloudwatch-dashboard-deployer / cloudwatch-alarm-operator), for X-Ray-only tracing without RUM (use xray-tracing-deployer), or for Application Signals enablement on server workloads (use cloudwatch-application-signals-deployer).
 ---
 
 # CloudWatch RUM Deployer

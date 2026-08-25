@@ -1,44 +1,15 @@
 ---
 name: kms-key-deployer
 description: 'Provisions AWS KMS keys correctly: key type selection (symmetric AES-256, asymmetric RSA/ECDSA, HMAC), key spec, key policy with separated key administrators vs key users, grants vs key policy, aliases, automatic rotation (symmetric only, annually), multi-Region keys (primary + replicas), custom key store (CloudHSM), deletion window (7-30 days, irreversible), tagging, cross-account access (key policy + caller IAM), and envelope encryption pattern. Emits a READY_TO_DEPLOY checklist with every configuration item verified. Use when creating a new KMS key, deploying a customer-managed CMK, validating a key policy, enabling rotation, or configuring multi-Region keys. Triggers: create KMS key, customer managed key, CMK, key policy, key administrators, key users, KMS grants, automatic rotation, multi-Region keys, CloudHSM custom key store, envelope encryption, cross-account KMS.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
 compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with kms, iam, cloudhsm, ram, and sts access. Works with Terraform aws_kms_key / aws_kms_alias / aws_kms_grant resources, CloudFormation AWS::KMS::Key / AWS::KMS::Alias, and SAM templates.'
-keywords:
-- aws
-- kms
-- security
-- cloudops
-- deploy
-- provisioning
-- encryption
-- key-policy
-- cmk
-- envelope-encryption
-- multi-region
-- cloudhsm
-- key-rotation
-- asymmetric
-- grants
-tags:
-- aws
-- kms
-- security
-- cloudops
-- deploy
-- encryption
-- key-policy
-- multi-region
-dependencies:
-- aws-orchestrator
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: deploy
   skill_class: capability
@@ -46,31 +17,9 @@ metadata:
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-  - aws
-  - kms
-  - security
-  - cloudops
-  - deploy
-  - encryption
-  - key-policy
-  - multi-region
-  dependencies:
-  - aws-orchestrator
-  keywords:
-  - create kms key
-  - customer managed key
-  - kms key policy
-  - kms key administrators
-  - kms key users
-  - kms grants
-  - automatic key rotation
-  - multi-region kms key
-  - cloudhsm custom key store
-  - envelope encryption
-  - cross-account kms
-  - kms asymmetric
-  - kms hmac
+  tags: aws, kms, security, cloudops, deploy, encryption, key-policy, multi-region
+  dependencies: aws-orchestrator
+  keywords: aws, kms, security, cloudops, deploy, provisioning, encryption, key-policy, cmk, envelope-encryption, multi-region, cloudhsm, key-rotation, asymmetric, grants
   when_to_use: Invoke when the user wants to create a new KMS customer-managed key (CMK), provision a multi-Region key, configure a CloudHSM custom key store key, validate a key policy for least-privilege, enable automatic rotation, set up cross-account access, or generate deployment CLI / IaC templates. Do NOT invoke for AWS-managed default keys (S3, EBS, DynamoDB defaults — these are not customer-controllable), or for TLS certificate key material (use ACM).
 ---
 

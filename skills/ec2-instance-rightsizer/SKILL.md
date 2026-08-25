@@ -1,94 +1,29 @@
 ---
 name: ec2-instance-rightsizer
-description: 'Right-sizes EC2 instances for cost optimization using a utilization-driven decision matrix across CPU, memory, network, and disk. Analyses 14-30 day CloudWatch utilization (CPUUtilization, NetworkIn/Out,
-  DiskReadOps) plus CloudWatch agent memory metrics (MemoryUtilization, mem_used_percent), interprets Compute Optimizer EC2 recommendations, detects idle instances (<5% CPU for 14 consecutive days), evaluates instance-family migration paths (m5 to m6i/m7i, c5 to c7g, r5 to r7g), assesses Graviton (arm64) AMI and application compatibility, tunes burstable instances (t3/t4g Unlimited vs default credit mode), applies workload-specific sizing rules (web server vs database vs batch), accounts for Savings Plans impact on right-sizing decisions, and checks termination protection before any resize action. Emits OPTIMIZED when all dimensions pass, or FURTHER_OPTIMIZATION_AVAILABLE when a concrete downsize, upsize, family migration, or Graviton opportunity exists with a dollar savings estimate.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Right-sizes EC2 instances for cost optimization using a utilization-driven decision matrix across CPU, memory, network, and disk. Analyses 14-30 day CloudWatch utilization (CPUUtilization, NetworkIn/Out, DiskReadOps) plus CloudWatch agent memory metrics (MemoryUtilization, mem_used_percent), interprets Compute Optimizer EC2 recommendations, detects idle instances (<5% CPU for 14 consecutive days), evaluates instance-family migration paths (m5 to m6i/m7i, c5 to c7g, r5 to r7g), assesses Graviton (arm64) AMI and application compatibility, tunes burstable instances (t3/t4g Unlimited vs default credit mode), applies workload-specific sizing rules (web server vs database vs batch), accounts for Savings Plans impact on right-sizing decisions, and checks termination protection before any resize action. Emits OPTIMIZED when all dimensions pass, or FURTHER_OPTIMIZATION_AVAILABLE when a concrete downsize, upsize, family migration, or Graviton opportunity exists with a dollar savings estimate.
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted CloudWatch metrics and Compute Optimizer findings.
-  Live-account optimization uses aws ec2 describe-instances, aws ec2 describe-instance-attribute, aws cloudwatch get-metric-statistics (CPUUtilization, NetworkIn, NetworkOut, DiskReadOps, DiskWriteOps),
-  aws cloudwatch list-metrics (CWAgent memory namespace), aws compute-optimizer get-ec2-instance-recommendations, aws ec2 describe-images, and aws ce get-cost-and-usage (AWS CLI v2, SSO or key-based credentials).
-  Pricing references us-east-1 published on-demand rates as of 2026; re-state regional rates from the pricing matrix for other regions.
-keywords:
-- EC2
-- right-sizing
-- cost optimization
-- Compute Optimizer
-- CloudWatch utilization
-- CPUUtilization
-- MemoryUtilization
-- CWAgent
-- idle instance
-- instance family migration
-- m5 to m6i
-- c5 to c7g
-- Graviton
-- arm64
-- Graviton2
-- burstable
-- t3 Unlimited
-- t4g
-- CPU credits
-- CPUCreditBalance
-- workload sizing
-- web server
-- database
-- batch
-- Savings Plans
-- Spot
-- termination protection
-- FinOps
-tags:
-- ec2
-- compute
-- cost-optimization
-- finops
-- rightsizing
-- graviton
-- compute-optimizer
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted CloudWatch metrics and Compute Optimizer findings. Live-account optimization uses aws ec2 describe-instances, aws ec2 describe-instance-attribute, aws cloudwatch get-metric-statistics (CPUUtilization, NetworkIn, NetworkOut, DiskReadOps, DiskWriteOps), aws cloudwatch list-metrics (CWAgent memory namespace), aws compute-optimizer...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-  when_to_use: Right-sizing EC2 instances for cost, triaging Compute Optimizer EC2 findings, evaluating Graviton (arm64) migration, tuning burstable t3/t4g instances (Unlimited vs default),
-    detecting idle EC2 instances (<5% CPU sustained), planning instance-family migrations (m5 to m6i/m7i, c5 to c7g), or running a FinOps EC2 right-sizing sweep.
-  when_not_to_use: EC2 Reserved Instance or Savings Plan purchasing decisions (use ec2-reserved-capacity-optimizer), EBS volume cost optimization (use ebs-volume-optimizer), EC2 security group auditing
-    (use ec2-security-group-auditor), or EC2 launch troubleshooting (use the EC2 troubleshooter). This skill focuses on instance-type right-sizing, not pricing-model procurement or functional debugging.
-  activation_triggers:
-  - right-size EC2 instance
-  - EC2 cost optimization
-  - EC2 Compute Optimizer recommendation
-  - EC2 underutilized
-  - EC2 overprovisioned
-  - EC2 idle detection
-  - EC2 Graviton migration
-  - EC2 arm64 compatibility
-  - EC2 instance family migration
-  - m5 to m6i migration
-  - c5 to c7g migration
-  - t3 Unlimited vs default
-  - t4g CPU credits
-  - EC2 CPU utilization low
-  - EC2 memory utilization
-  - EC2 FinOps right-sizing
-  - EC2 workload sizing
-  - EC2 downsize recommendation
-  - EC2 upsize recommendation
-  - Savings Plans right-sizing impact
-  invocation_schema: 'Input: either (a) an instance ID or fleet description + live-account context, (b) a Compute Optimizer EC2 finding document, OR (c) CloudWatch utilization metrics (CPUUtilization,
-    NetworkIn/Out, DiskReadOps, MemoryUtilization from CWAgent) with at least 14 days of observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/MIGRATION_STEPS
-    block per instance, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
-  invocation_example: "# Minimal valid input (offline finding classification):\nInstanceId: i-0abc123def456\nInstanceType: m5.2xlarge\nArchitecture: x86_64\nRegion: us-east-1\nPricing: On-Demand (no\n\
-    \ Savings Plan coverage)\nMetrics (last 14 days):\n  - CPUUtilization avg: 3.2%, p95: 7.1%\n  - MemoryUtilization avg: 28% (CWAgent mem_used_percent)\n  - NetworkIn avg: 12 MB/h\n  - DiskReadOps\
-    \ avg: 450/s\nCompute Optimizer finding: Overprovisioned\nEmit the standard right-sizing block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  when_to_use: Right-sizing EC2 instances for cost, triaging Compute Optimizer EC2 findings, evaluating Graviton (arm64) migration, tuning burstable t3/t4g instances (Unlimited vs default), detecting idle EC2 instances (<5% CPU sustained), planning instance-family migrations (m5 to m6i/m7i, c5 to c7g), or running a FinOps EC2 right-sizing sweep.
+  when_not_to_use: EC2 Reserved Instance or Savings Plan purchasing decisions (use ec2-reserved-capacity-optimizer), EBS volume cost optimization (use ebs-volume-optimizer), EC2 security group auditing (use ec2-security-group-auditor), or EC2 launch troubleshooting (use the EC2 troubleshooter). This skill focuses on instance-type right-sizing, not pricing-model procurement or functional debugging.
+  activation_triggers: right-size EC2 instance, EC2 cost optimization, EC2 Compute Optimizer recommendation, EC2 underutilized, EC2 overprovisioned, EC2 idle detection, EC2 Graviton migration, EC2 arm64 compatibility, EC2 instance family migration, m5 to m6i migration, c5 to c7g migration, t3 Unlimited vs default, t4g CPU credits, EC2 CPU utilization low, EC2 memory utilization, EC2 FinOps right-sizing, EC2 workload sizing, EC2 downsize recommendation, EC2 upsize recommendation, Savings Plans right-sizing impact
+  invocation_schema: 'Input: either (a) an instance ID or fleet description + live-account context, (b) a Compute Optimizer EC2 finding document, OR (c) CloudWatch utilization metrics (CPUUtilization, NetworkIn/Out, DiskReadOps, MemoryUtilization from CWAgent) with at least 14 days of observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/MIGRATION_STEPS block per instance, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
+  invocation_example: "# Minimal valid input (offline finding classification):\nInstanceId: i-0abc123def456\nInstanceType: m5.2xlarge\nArchitecture: x86_64\nRegion: us-east-1\nPricing: On-Demand (no\n Savings Plan coverage)\nMetrics (last 14 days):\n  - CPUUtilization avg: 3.2%, p95: 7.1%\n  - MemoryUtilization avg: 28% (CWAgent mem_used_percent)\n  - NetworkIn avg: 12 MB/h\n  - DiskReadOps avg: 450/s\nCompute Optimizer finding: Overprovisioned\nEmit the standard right-sizing block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: EC2, right-sizing, cost optimization, Compute Optimizer, CloudWatch utilization, CPUUtilization, MemoryUtilization, CWAgent, idle instance, instance family migration, m5 to m6i, c5 to c7g, Graviton, arm64, Graviton2, burstable, t3 Unlimited, t4g, CPU credits, CPUCreditBalance, workload sizing, web server, database, batch, Savings Plans, Spot, termination protection, FinOps
+  tags: ec2, compute, cost-optimization, finops, rightsizing, graviton, compute-optimizer
 ---
 
 # EC2 Instance Rightsizer

@@ -1,64 +1,15 @@
 ---
 name: ses-email-deployer
-description: >-
-  Provisions Amazon SES email infrastructure — domain identity
-  with DNS verification (DKIM CNAME, MX for bounce / complaint),
-  configuration set with event publishing (sends, deliveries,
-  bounces, complaints, opens, clicks), dedicated IP pools with
-  warmup, email templates (HTML / text), suppression list
-  management, and VPC endpoint integration. Wires SES v2 API,
-  Mail Manager ingress / egress, and emits a READY_TO_DEPLOY
-  checklist verifying domain verification, DKIM signing, SPF /
-  DMARC alignment, bounce / complaint notifications, and
-  production-access state. Use when creating an SES domain
-  identity, verifying DKIM, configuring a configuration set with
-  event publishing, setting up dedicated IP pools, creating
-  email templates, managing the suppression list, or wiring SES
-  VPC endpoints. Triggers: amazon ses, sesv2, domain identity,
-  dkim, spf, dmarc, mail-from domain, configuration set, event
-  publishing, bounce complaint, dedicated ip pool, ip warmup,
-  email template, suppression list, ses vpc endpoint, mail
-  manager.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon SES email infrastructure — domain identity with DNS verification (DKIM CNAME, MX for bounce / complaint), configuration set with event publishing (sends, deliveries, bounces, complaints, opens, clicks), dedicated IP pools with warmup, email templates (HTML / text), suppression list management, and VPC endpoint integration. Wires SES v2 API, Mail Manager ingress / egress, and emits a READY_TO_DEPLOY checklist verifying domain verification, DKIM signing, SPF / DMARC alignment, bounce / complaint notifications, and production-access state. Use when creating an SES domain identity, verifying DKIM, configuring a configuration set with event publishing, setting up dedicated IP pools, creating email templates, managing the suppression list, or wiring SES VPC endpoints. Triggers: amazon ses, sesv2, domain identity, dkim, spf, dmarc, mail-from domain, configuration set, event publishing, bounce complaint, dedicated ip pool, ip warmup, email template, suppression list, ses vpc endpoint, mail manager.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with
-  sesv2, ses, route53, iam, and ec2 access. Works with Terraform
-  aws_sesv2_* resources, CloudFormation AWS::SESV2::* types, and
-  the AWS SDK sesv2 client.
-keywords:
-  - aws
-  - ses
-  - sesv2
-  - email
-  - dkim
-  - spf
-  - dmarc
-  - configuration-set
-  - dedicated-ip
-  - ip-warmup
-  - email-template
-  - suppression-list
-  - mail-manager
-  - cloudops
-  - deploy
-tags:
-  - aws
-  - ses
-  - email
-  - dkim
-  - deploy
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with sesv2, ses, route53, iam, and ec2 access. Works with Terraform aws_sesv2_* resources, CloudFormation AWS::SESV2::* types, and the AWS SDK sesv2 client.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: deploy
   skill_class: capability
@@ -66,46 +17,10 @@ metadata:
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-    - aws
-    - ses
-    - email
-    - dkim
-    - deploy
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - amazon ses
-    - ses v2
-    - domain identity
-    - dkim
-    - spf
-    - dmarc
-    - mail-from domain
-    - configuration set
-    - event publishing
-    - bounce complaint
-    - dedicated ip pool
-    - ip warmup
-    - email template
-    - suppression list
-    - ses vpc endpoint
-    - mail manager
-  when_to_use: >-
-    Invoke when the user wants to provision Amazon SES email
-    infrastructure — domain identity with DNS verification (DKIM
-    CNAME, MX for bounce / complaint feedback), email address
-    identity, configuration set with event publishing (sends,
-    deliveries, bounces, complaints, opens, clicks), dedicated IP
-    pools with warmup, email templates (HTML / text), suppression
-    list management, or SES VPC endpoints. Use for SES v2 API
-    provisioning, Mail Manager ingress / egress, SPF / DMARC
-    alignment, and production-access request workflow. Do NOT
-    invoke for SNS topic provisioning (sns-topic-deployer), for
-    Lambda-based email processing (lambda-function-deployer), for
-    Route 53 record management outside SES verification
-    (route53-routing-policy-deployer), or for Pinpoint campaign
-    management (pinpoint-campaign-deployer).
+  tags: aws, ses, email, dkim, deploy
+  dependencies: aws-orchestrator
+  keywords: aws, ses, sesv2, email, dkim, spf, dmarc, configuration-set, dedicated-ip, ip-warmup, email-template, suppression-list, mail-manager, cloudops, deploy
+  when_to_use: Invoke when the user wants to provision Amazon SES email infrastructure — domain identity with DNS verification (DKIM CNAME, MX for bounce / complaint feedback), email address identity, configuration set with event publishing (sends, deliveries, bounces, complaints, opens, clicks), dedicated IP pools with warmup, email templates (HTML / text), suppression list management, or SES VPC endpoints. Use for SES v2 API provisioning, Mail Manager ingress / egress, SPF / DMARC alignment, and production-access request workflow. Do NOT invoke for SNS topic provisioning (sns-topic-deployer), for Lambda-based email processing (lambda-function-deployer), for Route 53 record management outside SES verification (route53-routing-policy-deployer), or for Pinpoint campaign management (pinpoint-campaign-deployer).
 ---
 
 # SES Email Deployer

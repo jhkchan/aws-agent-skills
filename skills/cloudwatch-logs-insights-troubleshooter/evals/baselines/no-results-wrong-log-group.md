@@ -1,7 +1,7 @@
 # Baseline (no-skill) response: no-results-wrong-log-group
 
 This file captures what a generic assistant produces WITHOUT the
-cloudwatch-logs-insights-troubshooter skill loaded — the contrast that
+cloudwatch-logs-insights-troubleshooter skill loaded — the contrast that
 proves the skill adds structure (deterministic VERDICT, category-aware
 walk, specific remediation).
 

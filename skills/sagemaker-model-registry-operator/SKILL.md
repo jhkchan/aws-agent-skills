@@ -1,122 +1,28 @@
 ---
 name: sagemaker-model-registry-operator
-description: >-
-  Operates SageMaker Model Registry lifecycles safely — creates
-  model package groups; registers versioned model packages
-  (model artifacts, inference images, metrics, approval
-  status); drives the manual approval workflow
-  (PendingManualApproval to Approved or Rejected); manages
-  model package versions within a group; and distinguishes
-  group-registered from standalone packages. Covers SageMaker
-  Model Cards (auto-populated from packages), the Model
-  Dashboard, and Model Registry with SageMaker Projects for
-  CI/CD model deployment. Runs deterministic pre-checks
-  (artifact accessibility, image availability, metrics S3
-  reachability, IAM, approval-state legality), emits the exact
-  create-model-package / update-model-package CLI behind a
-  CONFIRM gate, and verifies registry state. Emits READY |
-  BLOCKED | COMPLETED. Use when registering a model, approving
-  for production, listing versions, adopting Model Cards, or
-  wiring Model Registry with SageMaker Projects.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates SageMaker Model Registry lifecycles safely — creates model package groups; registers versioned model packages (model artifacts, inference images, metrics, approval status); drives the manual approval workflow (PendingManualApproval to Approved or Rejected); manages model package versions within a group; and distinguishes group-registered from standalone packages. Covers SageMaker Model Cards (auto-populated from packages), the Model Dashboard, and Model Registry with SageMaker Projects for CI/CD model deployment. Runs deterministic pre-checks (artifact accessibility, image availability, metrics S3 reachability, IAM, approval-state legality), emits the exact create-model-package / update-model-package CLI behind a CONFIRM gate, and verifies registry state. Emits READY | BLOCKED | COMPLETED. Use when registering a model, approving for production, listing versions, adopting Model Cards, or wiring Model Registry with SageMaker Projects.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor,
-  Windsurf, Codex, Gemini). No AWS CLI required for offline
-  plan classification. Live-account operations use aws
-  sagemaker create-model-package-group, create-model-package,
-  update-model-package, describe-model-package,
-  list-model-packages, delete-model-package,
-  create-model-card, describe-model-card,
-  list-mlflow-models, and aws sagemaker list-projects
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - SageMaker
-  - Model Registry
-  - model package group
-  - model package
-  - model approval
-  - PendingManualApproval
-  - Approved
-  - Rejected
-  - model versioning
-  - Model Card
-  - Model Dashboard
-  - SageMaker Projects
-  - CI/CD model deployment
-  - inference specification
-  - model metrics
-  - model artifacts
-  - InferenceSpecification
-  - model package ARN
-tags:
-  - sagemaker
-  - ai-ml
-  - model-registry
-  - mlops
-  - operate
-  - model-approval
-  - model-cards
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws sagemaker create-model-package-group, create-model-package, update-model-package, describe-model-package, list-model-packages, delete-model-package, create-model-card, describe-model-card, list-mlflow-models, and aws sagemaker list-projects (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AI/ML
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Registering a trained model in SageMaker Model Registry
-    (create-model-package-group, create-model-package),
-    driving the model approval workflow (PendingManualApproval
-    to Approved or Rejected), managing model package versions
-    within a group, distinguishing group-registered packages
-    from standalone packages, listing or describing packages,
-    adopting SageMaker Model Cards (auto-populated from a
-    registered package), using the SageMaker Model Dashboard
-    for a cross-registry view, wiring Model Registry with
-    SageMaker Projects for CI/CD model deployment pipelines,
-    or diagnosing a model package stuck in
-    PendingManualApproval or a Failed registration.
-  when_not_to_use: >-
-    SageMaker endpoint deployment or real-time inference (use
-    sagemaker-endpoint-deployer), SageMaker training job
-    operations (use sagemaker-training-job-operator),
-    SageMaker Studio or domain setup, or non-SageMaker model
-    registries (MLflow open-source on EC2/EKS, HuggingFace Hub).
-  activation_triggers:
-    - "SageMaker Model Registry"
-    - "model package group"
-    - "create-model-package"
-    - "update-model-package"
-    - "model approval"
-    - "PendingManualApproval"
-    - "approve model"
-    - "reject model"
-    - "ModelApprovalStatus"
-    - "Model Card"
-    - "create-model-card"
-    - "Model Dashboard"
-    - "SageMaker Projects"
-    - "model CI/CD"
-    - "model versioning"
-    - "InferenceSpecification"
-    - "model package ARN"
-    - "describe-model-package"
-  invocation_schema: >-
-    Input: either (a) a model registry operation intent
-    (create-group, register-package, approve, reject, list,
-    describe, model-card, projects-integration) with target
-    model package group / package / approval status, OR (b) a
-    model-package-arn + operation for live-account execution.
-    Output: a deterministic OPERATION / VERDICT / PRE_CHECKS /
-    STEPS / POST_VERIFY block per operation, where VERDICT is
-    one of READY, BLOCKED, COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Registering a trained model in SageMaker Model Registry (create-model-package-group, create-model-package), driving the model approval workflow (PendingManualApproval to Approved or Rejected), managing model package versions within a group, distinguishing group-registered packages from standalone packages, listing or describing packages, adopting SageMaker Model Cards (auto-populated from a registered package), using the SageMaker Model Dashboard for a cross-registry view, wiring Model Registry with SageMaker Projects for CI/CD model deployment pipelines, or diagnosing a model package stuck in PendingManualApproval or a Failed registration.
+  when_not_to_use: SageMaker endpoint deployment or real-time inference (use sagemaker-endpoint-deployer), SageMaker training job operations (use sagemaker-training-job-operator), SageMaker Studio or domain setup, or non-SageMaker model registries (MLflow open-source on EC2/EKS, HuggingFace Hub).
+  activation_triggers: SageMaker Model Registry, model package group, create-model-package, update-model-package, model approval, PendingManualApproval, approve model, reject model, ModelApprovalStatus, Model Card, create-model-card, Model Dashboard, SageMaker Projects, model CI/CD, model versioning, InferenceSpecification, model package ARN, describe-model-package
+  invocation_schema: 'Input: either (a) a model registry operation intent (create-group, register-package, approve, reject, list, describe, model-card, projects-integration) with target model package group / package / approval status, OR (b) a model-package-arn + operation for live-account execution. Output: a deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: SageMaker, Model Registry, model package group, model package, model approval, PendingManualApproval, Approved, Rejected, model versioning, Model Card, Model Dashboard, SageMaker Projects, CI/CD model deployment, inference specification, model metrics, model artifacts, InferenceSpecification, model package ARN
+  tags: sagemaker, ai-ml, model-registry, mlops, operate, model-approval, model-cards
 ---
 
 # SageMaker Model Registry Operator

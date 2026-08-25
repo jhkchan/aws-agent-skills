@@ -1,112 +1,26 @@
 ---
 name: vpc-peering-deployer
-description: >-
-  Provisions Amazon VPC peering connections with production defaults:
-  requester/accepter model (create-vpc-peering-connection,
-  accept-vpc-peering-connection), same-account vs cross-account peering,
-  same-region vs inter-region peering, DNS resolution
-  (allowDnsResolutionFromPeeredVpc), route table updates on BOTH sides
-  (required for traffic to flow), security group cross-VPC references
-  (same account+region only), limitations (no transitive routing, no
-  edge-to-edge routing), and IPv6 support. Emits a READY_TO_DEPLOY
-  checklist with verification commands. Use when creating a VPC peering
-  connection, connecting two VPCs, setting up cross-account VPC peering,
-  enabling inter-region VPC peering, or configuring DNS resolution across
-  peered VPCs. Triggers: create vpc peering connection, cross-account vpc
-  peering, inter-region vpc peering, vpc peering route table, vpc peering
-  DNS resolution, vpc peering security group reference, accept vpc peering,
-  vpc peering IPv6.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon VPC peering connections with production defaults: requester/accepter model (create-vpc-peering-connection, accept-vpc-peering-connection), same-account vs cross-account peering, same-region vs inter-region peering, DNS resolution (allowDnsResolutionFromPeeredVpc), route table updates on BOTH sides (required for traffic to flow), security group cross-VPC references (same account+region only), limitations (no transitive routing, no edge-to-edge routing), and IPv6 support. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a VPC peering connection, connecting two VPCs, setting up cross-account VPC peering, enabling inter-region VPC peering, or configuring DNS resolution across peered VPCs. Triggers: create vpc peering connection, cross-account vpc peering, inter-region vpc peering, vpc peering route table, vpc peering DNS resolution, vpc peering security group reference, accept vpc peering, vpc peering IPv6.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with ec2 access (and
-  cross-account STS assume-role if cross-account peering). Works with
-  Terraform aws_vpc_peering_connection /
-  aws_vpc_peering_connection_accepter / aws_route resources and
-  CloudFormation AWS::EC2::VPCPeeringConnection templates.
-keywords:
-  - aws
-  - vpc
-  - vpc peering
-  - peering connection
-  - cloudops
-  - deploy
-  - provisioning
-  - cross-account
-  - inter-region
-  - requester
-  - accepter
-  - route table
-  - dns resolution
-  - security group reference
-  - ipv6
-  - transitive routing
-  - edge-to-edge
-tags:
-  - aws
-  - vpc
-  - vpc-peering
-  - cloudops
-  - deploy
-  - networking
-  - provisioning
-  - cross-account
-  - inter-region
-  - route-table
-  - dns-resolution
-  - security-group
-  - ipv6
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with ec2 access (and cross-account STS assume-role if cross-account peering). Works with Terraform aws_vpc_peering_connection / aws_vpc_peering_connection_accepter / aws_route resources and CloudFormation AWS::EC2::VPCPeeringConnection templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - vpc
-    - vpc-peering
-    - cloudops
-    - deploy
-    - networking
-    - provisioning
-    - cross-account
-    - inter-region
-    - route-table
-    - dns-resolution
-    - security-group
-    - ipv6
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create vpc peering connection
-    - cross-account vpc peering
-    - inter-region vpc peering
-    - vpc peering route table
-    - vpc peering dns resolution
-    - vpc peering security group reference
-    - accept vpc peering
-    - vpc peering ipv6
-  when_to_use: >-
-    Invoke when the user wants to create a VPC peering connection between
-    two VPCs (same-account or cross-account, same-region or inter-region),
-    configure DNS resolution across peered VPCs, update route tables on
-    both sides for traffic flow, reference security groups across peered
-    VPCs, or understand VPC peering limitations (no transitive routing).
-    Do NOT invoke for AWS Transit Gateway (use transit-gateway skills), VPC
-    endpoints (PrivateLink), or VPN/Direct Connect connectivity.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, vpc, vpc-peering, cloudops, deploy, networking, provisioning, cross-account, inter-region, route-table, dns-resolution, security-group, ipv6
+  dependencies: aws-orchestrator
+  keywords: aws, vpc, vpc peering, peering connection, cloudops, deploy, provisioning, cross-account, inter-region, requester, accepter, route table, dns resolution, security group reference, ipv6, transitive routing, edge-to-edge
+  when_to_use: Invoke when the user wants to create a VPC peering connection between two VPCs (same-account or cross-account, same-region or inter-region), configure DNS resolution across peered VPCs, update route tables on both sides for traffic flow, reference security groups across peered VPCs, or understand VPC peering limitations (no transitive routing). Do NOT invoke for AWS Transit Gateway (use transit-gateway skills), VPC endpoints (PrivateLink), or VPN/Direct Connect connectivity.
 ---
 
 # VPC Peering Deployer

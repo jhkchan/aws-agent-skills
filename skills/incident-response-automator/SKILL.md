@@ -1,115 +1,28 @@
 ---
 name: incident-response-automator
-description: 'Designs automated AWS incident response workflows across detection (GuardDuty, Security Hub, CloudWatch alarms, EventBridge, AWS Health) and response patterns (EC2 quarantine SG, IAM credential
-  revocation, EBS forensic snapshot, memory capture via SSM, WAF/NACL IP block, secret rotation, session revoke), notification (SNS/Slack/Teams via Lambda, on-call paging), and recovery (restore from backup,
-  clean AMI redeploy). Orchestrates via EventBridge rule (GuardDuty severity >= 7) to Step Functions state machine (isolate, snapshot, notify, human approval, recover), SSM Automation documents
-  (AWS-IsolateEC2Instance, AWS-DisableIAMUserAccessKey, AWS-RevokeSession), and Systems Manager Incident Manager. Enforces safety: kill-switch required, isolated-account testing, manual override, full
-  CloudTrail + Step Functions audit. Emits verdict AUTOMATED with response plan or MANUAL_STEP_REQUIRED with gap. Use when designing IR playbooks or wiring GuardDuty/Security Hub to remediation.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Designs automated AWS incident response workflows across detection (GuardDuty, Security Hub, CloudWatch alarms, EventBridge, AWS Health) and response patterns (EC2 quarantine SG, IAM credential revocation, EBS forensic snapshot, memory capture via SSM, WAF/NACL IP block, secret rotation, session revoke), notification (SNS/Slack/Teams via Lambda, on-call paging), and recovery (restore from backup, clean AMI redeploy). Orchestrates via EventBridge rule (GuardDuty severity >= 7) to Step Functions state machine (isolate, snapshot, notify, human approval, recover), SSM Automation documents (AWS-IsolateEC2Instance, AWS-DisableIAMUserAccessKey, AWS-RevokeSession), and Systems Manager Incident Manager. Enforces safety: kill-switch required, isolated-account testing, manual override, full CloudTrail + Step Functions audit. Emits verdict AUTOMATED with response plan or MANUAL_STEP_REQUIRED with gap. Use when designing IR playbooks or wiring GuardDuty/Security Hub to remediation.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan authoring. Live deployment uses aws guardduty list-detectors/create-filter,
-  aws events put-rule, aws stepfunctions create-state-machine, aws ssm create-document, aws ssm-incidents create-response-plan, aws iam update-access-key / delete-role-policy, aws ec2 modify-instance-attribute,
-  aws ssm start-automation-execution. Requires AWS CLI v2 with guardduty, ssm, ssm-incidents, stepfunctions, events, iam, ec2, and secretsmanager access (SSO or key-based).
-keywords:
-- incident response
-- GuardDuty
-- Security Hub
-- CloudWatch alarm
-- EventBridge
-- AWS Health
-- Step Functions
-- SSM Automation
-- Systems Manager
-- Incident Manager
-- response plan
-- EC2 quarantine
-- IAM credential revocation
-- EBS snapshot
-- forensic preservation
-- WAF block
-- secret rotation
-- revoke session
-- SNS notification
-- Lambda
-- kill-switch
-- automated remediation
-tags:
-- security
-- incident-response
-- automation
-- guardduty
-- securityhub
-- ssm
-- stepfunctions
-- eventbridge
-- incident-manager
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan authoring. Live deployment uses aws guardduty list-detectors/create-filter, aws events put-rule, aws stepfunctions create-state-machine, aws ssm create-document, aws ssm-incidents create-response-plan, aws iam update-access-key / delete-role-policy, aws ec2 modify-instance-attribute, aws ssm start-automation-execution. Requires AWS CLI v2 with guardduty, ssm, ssm-incidents...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: automate
   skill_class: capability
   lifecycle_status: active
   verdict_shape: AUTOMATED | MANUAL_STEP_REQUIRED
-  when_to_use: Designing an automated incident response workflow for AWS, wiring GuardDuty or Security Hub findings to automated containment actions, building a Step Functions state machine that orchestrates
-    isolate- snapshot-notify-recover, creating SSM Automation documents for containment (quarantine SG, IAM key revoke, session revoke), standing up an Incident Manager response plan with chat channel and
-    on-call engagement, or hardening an existing IR automation with kill-switch and manual override.
-  when_not_to_use:
-  - Manual incident triage — this skill designs automation; use a triage skill for human-driven investigation.
-  - AWS Config rule remediation (different mechanism — uses SSM Automation but triggered by Config non-compliance, not a finding).
-  - Disaster recovery (DR) orchestration — DR is about service continuity, not threat containment; use a DR/backup-restore skill.
-  - Patch management at scale — use SSM Patch Manager, not IR automation.
-  activation_triggers:
-  - automate incident response
-  - GuardDuty to Lambda remediation
-  - Step Functions for incident response
-  - EC2 quarantine security group
-  - revoke IAM access key automatically
-  - forensic EBS snapshot
-  - SSM Automation document for containment
-  - Incident Manager response plan
-  - EventBridge rule for GuardDuty finding
-  - kill-switch for IR automation
-  - automated WAF block on attacker IP
-  invocation_schema:
-    type: object
-    required:
-    - finding_source
-    - response_scope
-    properties:
-      finding_source:
-        type: enum
-        enum:
-        - guardduty
-        - securityhub
-        - cloudwatch-alarm
-        - eventbridge
-        - health
-        description: The detection source that triggers the workflow.
-      response_scope:
-        type: enum
-        enum:
-        - isolate
-        - snapshot
-        - contain
-        - notify
-        - recover
-        - full-playbook
-        description: Which response phases to automate.
-      severity_threshold:
-        type: number
-        description: Minimum finding severity (GuardDuty scale 0-10, Security Hub normalized to 0-100). Default 7.0 (GuardDuty) / 70 (SH).
-      existing_workflow:
-        type: object
-        description: An existing EventBridge rule + Step Functions state machine definition (Amazon States Language JSON). When provided, the skill runs the safety + audit gate and emits AUTOMATED or MANUAL_STEP_REQUIRED.
-    output: 'Deterministic block: FINDING_SOURCE / RESPONSE_SCOPE / VERDICT / WORKFLOW / SAFETY / AUDIT / FINDINGS / REMEDIATION. VERDICT is one of AUTOMATED | MANUAL_STEP_REQUIRED. AUTOMATED means the
-      workflow is complete, includes a kill-switch, has been validated in an isolated test account, and covers audit logging. MANUAL_STEP_REQUIRED means one or more safety/coverage gates failed — the output
-      enumerates the specific gap and the required manual fix.'
+  when_to_use: Designing an automated incident response workflow for AWS, wiring GuardDuty or Security Hub findings to automated containment actions, building a Step Functions state machine that orchestrates isolate- snapshot-notify-recover, creating SSM Automation documents for containment (quarantine SG, IAM key revoke, session revoke), standing up an Incident Manager response plan with chat channel and on-call engagement, or hardening an existing IR automation with kill-switch and manual override.
+  when_not_to_use: Manual incident triage — this skill designs automation; use a triage skill for human-driven investigation., AWS Config rule remediation (different mechanism — uses SSM Automation but triggered by Config non-compliance, not a finding)., Disaster recovery (DR) orchestration — DR is about service continuity, not threat containment; use a DR/backup-restore skill., Patch management at scale — use SSM Patch Manager, not IR automation.
+  activation_triggers: automate incident response, GuardDuty to Lambda remediation, Step Functions for incident response, EC2 quarantine security group, revoke IAM access key automatically, forensic EBS snapshot, SSM Automation document for containment, Incident Manager response plan, EventBridge rule for GuardDuty finding, kill-switch for IR automation, automated WAF block on attacker IP
+  invocation_schema: "{output: \"Deterministic block: FINDING_SOURCE / RESPONSE_SCOPE / VERDICT / WORKFLOW\\\n    \\ / SAFETY / AUDIT / FINDINGS / REMEDIATION. VERDICT is one of AUTOMATED | MANUAL_STEP_REQUIRED.\\\n    \\ AUTOMATED means the workflow is complete, includes a kill-switch, has been validated\\\n    \\ in an isolated test account, and covers audit logging. MANUAL_STEP_REQUIRED\\\n    \\ means one or more safety/coverage gates failed \\u2014 the output enumerates\\\n    \\ the specific gap and the required manual fix.\", properties: {existing_workflow: {\n      description: 'An existing EventBridge rule + Step Functions state machine definition\n        (Amazon States Language JSON). When provided, the skill runs the safety +\n        audit gate and emits AUTOMATED or MANUAL_STEP_REQUIRED.', type: object}, finding_source: {\n      description: The detection source that triggers the workflow., enum: [guardduty,\n        securityhub, cloudwatch-alarm, eventbridge, health], type: enum}, response_scope: {\n      description: Which response phases to automate., enum: [isolate, snapshot, contain,\n        notify, recover, full-playbook], type: enum}, severity_threshold: {description: 'Minimum\n        finding severity (GuardDuty scale 0-10, Security Hub normalized to 0-100).\n        Default 7.0 (GuardDuty) / 70 (SH).', type: number}}, required: [finding_source,\n    response_scope], type: object}"
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: incident response, GuardDuty, Security Hub, CloudWatch alarm, EventBridge, AWS Health, Step Functions, SSM Automation, Systems Manager, Incident Manager, response plan, EC2 quarantine, IAM credential revocation, EBS snapshot, forensic preservation, WAF block, secret rotation, revoke session, SNS notification, Lambda, kill-switch, automated remediation
+  tags: security, incident-response, automation, guardduty, securityhub, ssm, stepfunctions, eventbridge, incident-manager
 ---
 
 # Incident Response Automator

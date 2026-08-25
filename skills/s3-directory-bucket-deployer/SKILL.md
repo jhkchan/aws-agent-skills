@@ -1,96 +1,28 @@
 ---
 name: s3-directory-bucket-deployer
-description: >-
-  Provisions S3 Express One Zone directory buckets and S3 Tables table
-  buckets with production defaults: directory bucket name format
-  (base-name--az-id--x-s3), Availability Zone ID targeting, zone affinity
-  for co-located compute (EC2/ECS/EKS in the same AZ for single-digit-
-  millisecond latency), S3 Express One Zone pricing characteristics
-  (lowest latency, highest requests/sec), table buckets for Apache
-  Iceberg via S3 Tables, and the hard limitations (no cross-region
-  replication, no versioning, no Object Lock, no Transfer Acceleration).
-  Emits READY_TO_DEPLOY / PREREQUISITES_MISSING with every item verified
-  and copy-pasteable s3api / s3tables / ec2 commands. Use when deploying
-  S3 Express One Zone for latency-sensitive or high-throughput
-  workloads. Triggers: S3 directory bucket, S3 Express One Zone, AZ ID
-  bucket, table bucket, S3 Tables, zone-affinity compute, Iceberg on S3,
-  directory bucket name format.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions S3 Express One Zone directory buckets and S3 Tables table buckets with production defaults: directory bucket name format (base-name--az-id--x-s3), Availability Zone ID targeting, zone affinity for co-located compute (EC2/ECS/EKS in the same AZ for single-digit- millisecond latency), S3 Express One Zone pricing characteristics (lowest latency, highest requests/sec), table buckets for Apache Iceberg via S3 Tables, and the hard limitations (no cross-region replication, no versioning, no Object Lock, no Transfer Acceleration). Emits READY_TO_DEPLOY / PREREQUISITES_MISSING with every item verified and copy-pasteable s3api / s3tables / ec2 commands. Use when deploying S3 Express One Zone for latency-sensitive or high-throughput workloads. Triggers: S3 directory bucket, S3 Express One Zone, AZ ID bucket, table bucket, S3 Tables, zone-affinity compute, Iceberg on S3, directory bucket name format.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Live provisioning uses AWS CLI v2 with s3api
-  (create-directory-bucket, get-bucket-location, list-buckets,
-  get-bucket-encryption), s3tables (create-table-bucket,
-  get-table-bucket), ec2 (describe-availability-zones,
-  describe-subnets, run-instances), iam (create-role,
-  attach-role-policy), and cloudformation / terraform
-  aws_s3_directory_bucket equivalents.
-keywords:
-  - aws
-  - s3
-  - s3-express-one-zone
-  - directory-bucket
-  - az-id
-  - zone-affinity
-  - table-bucket
-  - s3-tables
-  - apache-iceberg
-  - single-digit-latency
-  - cloudops
-  - deploy
-  - storage
-tags:
-  - aws
-  - s3
-  - express-one-zone
-  - directory-bucket
-  - table-bucket
-  - deploy
-  - storage
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Live provisioning uses AWS CLI v2 with s3api (create-directory-bucket, get-bucket-location, list-buckets, get-bucket-encryption), s3tables (create-table-bucket, get-table-bucket), ec2 (describe-availability-zones, describe-subnets, run-instances), iam (create-role, attach-role-policy), and cloudformation / terraform aws_s3_directory_bucket equivalents.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Creating an S3 Express One Zone directory bucket for latency-
-    sensitive or high-throughput workloads, targeting a specific
-    Availability Zone ID for zone affinity with co-located compute
-    (EC2, ECS, EKS), deploying a table bucket for Apache Iceberg tables
-    via S3 Tables, mapping AZ names to AZ IDs for directory bucket
-    naming, or generating IaC (CloudFormation / Terraform) for any of
-    the above. Do NOT invoke for general-purpose S3 buckets (use
-    s3-secure-bucket-deployer), S3 on Outposts, or for cross-region
-    replication requirements (directory buckets do not support CRR).
-  activation_triggers:
-    - "S3 directory bucket"
-    - "S3 Express One Zone"
-    - "directory bucket name format"
-    - "AZ ID bucket"
-    - "zone affinity compute"
-    - "table bucket"
-    - "S3 Tables"
-    - "Apache Iceberg on S3"
-    - "single-digit millisecond latency S3"
-    - "directory bucket limitations"
-  invocation_schema: >-
-    Input: either (a) a base bucket name + AZ ID (or AZ name to resolve)
-    + optional encryption / compute placement spec, or (b) a table
-    bucket spec for S3 Tables (Iceberg). Output: deterministic
-    DIRECTORY_BUCKET_SPEC / VERDICT / CHECKLIST /
-    VERIFICATION_COMMANDS block per the STRICT output contract, where
-    VERDICT is READY_TO_DEPLOY or PREREQUISITES_MISSING.
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Creating an S3 Express One Zone directory bucket for latency- sensitive or high-throughput workloads, targeting a specific Availability Zone ID for zone affinity with co-located compute (EC2, ECS, EKS), deploying a table bucket for Apache Iceberg tables via S3 Tables, mapping AZ names to AZ IDs for directory bucket naming, or generating IaC (CloudFormation / Terraform) for any of the above. Do NOT invoke for general-purpose S3 buckets (use s3-secure-bucket-deployer), S3 on Outposts, or for cross-region replication requirements (directory buckets do not support CRR).
+  activation_triggers: S3 directory bucket, S3 Express One Zone, directory bucket name format, AZ ID bucket, zone affinity compute, table bucket, S3 Tables, Apache Iceberg on S3, single-digit millisecond latency S3, directory bucket limitations
+  invocation_schema: 'Input: either (a) a base bucket name + AZ ID (or AZ name to resolve) + optional encryption / compute placement spec, or (b) a table bucket spec for S3 Tables (Iceberg). Output: deterministic DIRECTORY_BUCKET_SPEC / VERDICT / CHECKLIST / VERIFICATION_COMMANDS block per the STRICT output contract, where VERDICT is READY_TO_DEPLOY or PREREQUISITES_MISSING.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: aws, s3, s3-express-one-zone, directory-bucket, az-id, zone-affinity, table-bucket, s3-tables, apache-iceberg, single-digit-latency, cloudops, deploy, storage
+  tags: aws, s3, express-one-zone, directory-bucket, table-bucket, deploy, storage
+  dependencies: aws-orchestrator
 ---
 
 # S3 Directory Bucket Deployer

@@ -1,43 +1,15 @@
 ---
 name: elasticache-cost-optimizer
 description: Optimises Amazon ElastiCache cost across seven dimensions — node-type right-sizing (CloudWatch EngineCPUUtilization, CPUUtilization, CurrConnections), Graviton node migration (cache.r6g/r7g ~20% cheaper than cache.m5/r5), Reserved Node vs On-Demand (1yr/3yr, modify-reserved-cache-nodes-offering exchange), replication group topology (fewer larger nodes vs many small, replica count, cluster mode sharding cost), ElastiCache Serverless (auto-scaling, per-GB-hour pricing), persistence cost (AOF vs RDB snapshots), and data tiering (r6gd/r7gd SSD-backed). Distinguishes Redis vs Memcached for cost. Covers latest Serverless, Graviton r7g, and data tiering. Emits OPTIMIZED, OPPORTUNITY_FOUND, or ALREADY_OPTIMAL per cluster with estimated monthly savings.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline classification works from pasted cluster configuration, CloudWatch summaries, and billing line items. Live-account optimisation uses aws elasticache describe-replication-groups, describe-cache-clusters --show-cache-node-info, describe-reserved-cache-nodes, describe-reserved-cache-nodes-offerings, aws cloudwatch get-metric-statistics for AWS/ElastiCache CPUUtilization, EngineCPUUtilization, CurrConnections, NetworkBandwidthIn/Out, FreeableMemory, aws ce get-cost-and-usage filtered to Amazon ElastiCache USAGE_TYPEs (ElastiCache:NodeUsage), and modify-reserved-cache-nodes-offering for RN exchange (AWS CLI v2, SSO or key-based credentials). Pricing is us-east-1 published rates as of 2026; re-state regional rates before producing dollar estimates for other regions.
-keywords:
-- Amazon ElastiCache
-- ElastiCache for Redis
-- ElastiCache for Memcached
-- ElastiCache Serverless
-- Graviton
-- cache.r6g
-- cache.r7g
-- cache.r6gd
-- data tiering
-- Reserved Node
-- replication group
-- cluster mode
-- sharding
-- right-sizing
-- AOF persistence
-- RDB snapshots
-- FinOps
-- cache cost
-tags:
-- elasticache
-- databases
-- cost-optimization
-- finops
-- right-sizing
-- serverless
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline classification works from pasted cluster configuration, CloudWatch summaries, and billing line items. Live-account optimisation uses aws elasticache describe-replication-groups, describe-cache-clusters --show-cache-node-info, describe-reserved-cache-nodes, describe-reserved-cache-nodes-offerings, aws cloudwatch get-metric-statistics for AWS/ElastiCache CPUUtilization, EngineCPUUtilization...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: optimize
   skill_class: capability
@@ -45,23 +17,13 @@ metadata:
   verdict_shape: OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL
   when_to_use: Reviewing Amazon ElastiCache cluster spend, right-sizing cache node types, evaluating Graviton-based nodes (cache.r6g/r7g vs cache.m5/r5), deciding between On-Demand and Reserved Nodes for steady-state cache clusters, tuning replication group topology (fewer larger nodes vs many small), evaluating ElastiCache Serverless for variable workloads, auditing AOF persistence cost, or evaluating data tiering (r6gd/r7gd) for large datasets.
   when_not_to_use: RDS or Aurora cost optimisation (use rds-cost-optimizer or aurora-cost-optimizer), DynamoDB capacity-mode optimisation (use a DynamoDB specialist), Redis self-managed on EC2 cost optimisation (this skill covers the managed ElastiCache service only), cache performance tuning or eviction policy tuning as the primary goal (use a cache operations workflow; this skill uses metrics only to identify cost waste), or ElastiCache failover operations (use elasticache-failover-operator).
-  activation_triggers:
-  - optimise ElastiCache cost
-  - right-size ElastiCache node
-  - ElastiCache Graviton migration
-  - cache.r6g vs cache.m5
-  - ElastiCache Reserved Node
-  - ElastiCache Serverless
-  - replication group topology cost
-  - ElastiCache cluster mode cost
-  - AOF persistence cost
-  - ElastiCache data tiering
-  - cache node right-sizing
-  - ElastiCache FinOps review
-  - reduce ElastiCache bill
-  - Memcached vs Redis cost
+  activation_triggers: optimise ElastiCache cost, right-size ElastiCache node, ElastiCache Graviton migration, cache.r6g vs cache.m5, ElastiCache Reserved Node, ElastiCache Serverless, replication group topology cost, ElastiCache cluster mode cost, AOF persistence cost, ElastiCache data tiering, cache node right-sizing, ElastiCache FinOps review, reduce ElastiCache bill, Memcached vs Redis cost
   invocation_schema: 'Input: either (a) an ElastiCache replication group or cache cluster identifier + live-account context, (b) a cluster configuration document (engine, node type, shard count, replicas per shard, persistence mode, pricing model, CloudWatch metrics), OR (c) a fleet description for batch optimisation. Output: a deterministic TARGET / VERDICT / REASON / RECOMMENDATION / ESTIMATED_SAVINGS / MIGRATION_STEPS block per cluster, where VERDICT ∈ {OPTIMIZED, OPPORTUNITY_FOUND, ALREADY_OPTIMAL}.'
   invocation_example: "# Minimal valid input (offline classification):\nReplication Group: orders-cache-rg\nEngine: redis (7.0)\nRegion: us-east-1\nNodeType: cache.m5.2xlarge (8 vCPU, 26.36 GB)\nShards: 3 (cluster mode enabled)\nReplicasPerShard: 1 (total 6 nodes)\nPersistence: RDB snapshots (daily)\nPricing: On-Demand (no RN)\nCloudWatch metrics (last 30 days):\n  - CPUUtilization: avg=8%, max=15%\n  - EngineCPUUtilization: avg=5%, max=12%\n  - CurrConnections: avg=120, max=200\nEmit the standard optimisation block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Amazon ElastiCache, ElastiCache for Redis, ElastiCache for Memcached, ElastiCache Serverless, Graviton, cache.r6g, cache.r7g, cache.r6gd, data tiering, Reserved Node, replication group, cluster mode, sharding, right-sizing, AOF persistence, RDB snapshots, FinOps, cache cost
+  tags: elasticache, databases, cost-optimization, finops, right-sizing, serverless
 ---
 
 # ElastiCache Cost Optimizer

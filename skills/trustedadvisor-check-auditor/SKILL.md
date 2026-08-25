@@ -1,81 +1,24 @@
 ---
 name: trustedadvisor-check-auditor
-description: >-
-  Audits AWS Trusted Advisor check results across cost optimization,
-  performance, security, fault tolerance, and service-limits pillars for
-  actionable findings, recommended actions, support-tier gating (Basic vs
-  Business/Enterprise), check-result staleness, and excluded-resource blind
-  spots. Emits a deterministic verdict (CRITICAL_CHECK | WARNING_CHECK |
-  CONFIG_GAP | OK) per check with enumerated findings and specific CLI
-  remediation. Use when reviewing Trusted Advisor check results, validating
-  TA coverage, checking support-tier access to checks, diagnosing
-  not_available statuses, or assessing overall TA posture before a
-  compliance or operational review.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Trusted Advisor check results across cost optimization, performance, security, fault tolerance, and service-limits pillars for actionable findings, recommended actions, support-tier gating (Basic vs Business/Enterprise), check-result staleness, and excluded-resource blind spots. Emits a deterministic verdict (CRITICAL_CHECK | WARNING_CHECK | CONFIG_GAP | OK) per check with enumerated findings and specific CLI remediation. Use when reviewing Trusted Advisor check results, validating TA coverage, checking support-tier access to checks, diagnosing not_available statuses, or assessing overall TA posture before a compliance or operational review.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline check-result classification.
-  Live-account audits use aws support describe-trusted-advisor-checks,
-  aws support describe-trusted-advisor-check-result, and
-  aws support refresh-trusted-advisor-check (AWS CLI v2, SSO or key-based
-  credentials, Business or Enterprise support plan required for full
-  coverage).
-keywords:
-  - Trusted Advisor
-  - TA checks
-  - cost optimization
-  - fault tolerance
-  - service limits
-  - support tier
-  - Business Support
-  - Enterprise Support
-  - Basic Support
-  - check staleness
-  - excluded resources
-  - not_available
-  - check refresh
-  - Organizations delegated admin
-  - S3 bucket permissions check
-  - security groups check
-  - idle EC2
-  - compliance audit
-  - operational review
-tags: [trusted-advisor, governance, cost-optimization, security, fault-tolerance, service-limits, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline check-result classification. Live-account audits use aws support describe-trusted-advisor-checks, aws support describe-trusted-advisor-check-result, and aws support refresh-trusted-advisor-check (AWS CLI v2, SSO or key-based credentials, Business or Enterprise support plan required for full coverage).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
-  verdict_shape: "CRITICAL_CHECK | WARNING_CHECK | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing Trusted Advisor check results before a compliance or operational
-    review, validating support-tier access to the full check catalog,
-    diagnosing not_available or stale check statuses, auditing excluded
-    resources that hide findings, or assessing overall TA posture across an
-    account or organization.
-  activation_triggers:
-    - "audit Trusted Advisor checks"
-    - "review TA findings"
-    - "is TA configured correctly"
-    - "check support tier coverage"
-    - "stale Trusted Advisor results"
-    - "excluded TA resources"
-    - "not_available TA check"
-    - "service limit exceeded"
-    - "cost optimization findings"
-    - "fault tolerance findings"
-  invocation_schema: >-
-    Input: either (a) a Trusted Advisor check result (JSON or text, including
-    check name, category, status, timestamp, flagged resources), optionally
-    paired with account metadata (support tier, total checks available,
-    exclusions), OR (b) a check-id for live-account audit.
-    Output: deterministic CHECK/VERDICT/REASON/FINDINGS/REMEDIATION block per
-    check, where VERDICT is in {CRITICAL_CHECK, WARNING_CHECK, CONFIG_GAP, OK}.
+  verdict_shape: CRITICAL_CHECK | WARNING_CHECK | CONFIG_GAP | OK
+  when_to_use: Reviewing Trusted Advisor check results before a compliance or operational review, validating support-tier access to the full check catalog, diagnosing not_available or stale check statuses, auditing excluded resources that hide findings, or assessing overall TA posture across an account or organization.
+  activation_triggers: audit Trusted Advisor checks, review TA findings, is TA configured correctly, check support tier coverage, stale Trusted Advisor results, excluded TA resources, not_available TA check, service limit exceeded, cost optimization findings, fault tolerance findings
+  invocation_schema: 'Input: either (a) a Trusted Advisor check result (JSON or text, including check name, category, status, timestamp, flagged resources), optionally paired with account metadata (support tier, total checks available, exclusions), OR (b) a check-id for live-account audit. Output: deterministic CHECK/VERDICT/REASON/FINDINGS/REMEDIATION block per check, where VERDICT is in {CRITICAL_CHECK, WARNING_CHECK, CONFIG_GAP, OK}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Trusted Advisor, TA checks, cost optimization, fault tolerance, service limits, support tier, Business Support, Enterprise Support, Basic Support, check staleness, excluded resources, not_available, check refresh, Organizations delegated admin, S3 bucket permissions check, security groups check, idle EC2, compliance audit, operational review
+  tags: trusted-advisor, governance, cost-optimization, security, fault-tolerance, service-limits, audit
 ---
 
 # Trusted Advisor Check Auditor

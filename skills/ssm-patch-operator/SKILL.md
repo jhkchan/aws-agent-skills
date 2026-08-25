@@ -1,112 +1,28 @@
 ---
 name: ssm-patch-operator
-description: >-
-  Operates SSM Patch Manager workflows safely — patch baseline authoring
-  (AWS-managed and custom), patch group tag targeting, AWS-RunPatchBaseline
-  Scan and Install operations, maintenance window task scheduling, and
-  patch compliance reporting. Runs deterministic pre-checks (instance
-  managed-status, SSM Agent health, baseline association, free disk
-  space, reboot tolerance, maintenance-window target membership,
-  rate-control budget), executes the patching operation behind a
-  CONFIRM gate, and emits a verdict (READY | BLOCKED | COMPLETED) per
-  operation with the exact send-command sequence, expected side-effects
-  (reboot, compliance delta), and post-verification. Use when running a
-  security patch sweep, scheduling a maintenance-window patch task,
-  diagnosing a NON_COMPLIANT instance, planning a fleet-wide Install
-  with rate-control, or building a custom baseline with approval rules.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates SSM Patch Manager workflows safely — patch baseline authoring (AWS-managed and custom), patch group tag targeting, AWS-RunPatchBaseline Scan and Install operations, maintenance window task scheduling, and patch compliance reporting. Runs deterministic pre-checks (instance managed-status, SSM Agent health, baseline association, free disk space, reboot tolerance, maintenance-window target membership, rate-control budget), executes the patching operation behind a CONFIRM gate, and emits a verdict (READY | BLOCKED | COMPLETED) per operation with the exact send-command sequence, expected side-effects (reboot, compliance delta), and post-verification. Use when running a security patch sweep, scheduling a maintenance-window patch task, diagnosing a NON_COMPLIANT instance, planning a fleet-wide Install with rate-control, or building a custom baseline with approval rules.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws ssm describe-instance-information, describe-patch-baseline,
-  describe-patch-baselines, describe-patch-states, list-compliance-items,
-  send-command (AWS-RunPatchBaseline), get-command-invocation,
-  create-association, update-association, create-maintenance-window,
-  register-task-with-maintenance-window, and aws ec2 describe-instances
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Systems Manager
-  - SSM
-  - Patch Manager
-  - patch baseline
-  - AWS-RunPatchBaseline
-  - AWS-ApplyPatchBaseline
-  - patch group
-  - Scan
-  - Install
-  - compliance
-  - NON_COMPLIANT
-  - maintenance window
-  - rate-control
-  - ApprovalRules
-  - ApproveAfterDays
-  - AmazonSSMManagedInstanceCore
-  - AmazonLinux2
-  - Ubuntu
-  - Windows
-  - macOS
-  - kernel panic
-  - reboot
-  - NoReboot
-  - SSM Quick Setup
-tags: [ssm, systems-manager, patch-manager, management, patching, compliance, maintenance-window, operate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws ssm describe-instance-information, describe-patch-baseline, describe-patch-baselines, describe-patch-states, list-compliance-items, send-command (AWS-RunPatchBaseline), get-command-invocation, create-association, update-association, create-maintenance-window, register-task-with-maintenance-window, and aws ec2 describe-instances...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
+  verdict_shape: READY | BLOCKED | COMPLETED
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags: [ssm, systems-manager, patch-manager, management, patching, compliance, maintenance-window, operate]
-  dependencies: [aws-orchestrator]
-  keywords:
-    - Systems Manager
-    - SSM
-    - Patch Manager
-    - patch baseline
-    - AWS-RunPatchBaseline
-    - patch group
-    - maintenance window
-  when_to_use: >-
-    Running a security patch sweep against an EC2 or hybrid fleet, creating
-    or modifying a custom patch baseline with approval rules, scheduling a
-    maintenance-window task that runs AWS-RunPatchBaseline with
-    Operation=Install, diagnosing a NON_COMPLIANT instance, planning a
-    fleet-wide Install with rate-control and max-errors, switching an
-    association from Scan to Install, or pre-checking a host before the
-    next patch window.
-  activation_triggers:
-    - "patch this instance"
-    - "run AWS-RunPatchBaseline"
-    - "scan for missing patches"
-    - "install missing patches"
-    - "create patch baseline"
-    - "custom patch baseline rules"
-    - "patch group tag"
-    - "schedule patching maintenance window"
-    - "diagnose NON_COMPLIANT patch"
-    - "Operation=Install"
-    - "Operation=Scan"
-    - "rate-control patching"
-    - "approve after days"
-    - "NoReboot patch install"
-  invocation_schema: >-
-    Input: either (a) a patch operation request (operation=scan|install|
-    create-baseline|update-baseline|create-mw|register-task) paired with
-    instance(s), patch baseline, and optional maintenance-window context,
-    OR (b) an instance-id / baseline-id / maintenance-window-id for live-
-    account execution. Output: deterministic OPERATION/VERDICT/PRE_CHECKS/
-    STEPS/POST_VERIFY block per operation, where VERDICT is one of READY,
-    BLOCKED, COMPLETED.
+  author: Jacky Chan — AWS Community Builder
+  tags: ssm, systems-manager, patch-manager, management, patching, compliance, maintenance-window, operate
+  dependencies: aws-orchestrator
+  keywords: Systems Manager, SSM, Patch Manager, patch baseline, AWS-RunPatchBaseline, AWS-ApplyPatchBaseline, patch group, Scan, Install, compliance, NON_COMPLIANT, maintenance window, rate-control, ApprovalRules, ApproveAfterDays, AmazonSSMManagedInstanceCore, AmazonLinux2, Ubuntu, Windows, macOS, kernel panic, reboot, NoReboot, SSM Quick Setup
+  when_to_use: Running a security patch sweep against an EC2 or hybrid fleet, creating or modifying a custom patch baseline with approval rules, scheduling a maintenance-window task that runs AWS-RunPatchBaseline with Operation=Install, diagnosing a NON_COMPLIANT instance, planning a fleet-wide Install with rate-control and max-errors, switching an association from Scan to Install, or pre-checking a host before the next patch window.
+  activation_triggers: patch this instance, run AWS-RunPatchBaseline, scan for missing patches, install missing patches, create patch baseline, custom patch baseline rules, patch group tag, schedule patching maintenance window, diagnose NON_COMPLIANT patch, Operation=Install, Operation=Scan, rate-control patching, approve after days, NoReboot patch install
+  invocation_schema: 'Input: either (a) a patch operation request (operation=scan|install| create-baseline|update-baseline|create-mw|register-task) paired with instance(s), patch baseline, and optional maintenance-window context, OR (b) an instance-id / baseline-id / maintenance-window-id for live- account execution. Output: deterministic OPERATION/VERDICT/PRE_CHECKS/ STEPS/POST_VERIFY block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
 ---
 
 # SSM Patch Operator

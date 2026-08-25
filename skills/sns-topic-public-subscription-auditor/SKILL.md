@@ -1,73 +1,24 @@
 ---
 name: sns-topic-public-subscription-auditor
-description: >-
-  Audits AWS SNS topics for public subscription exposure (Principal:"*" with
-  sns:Subscribe or sns:Publish in topic policy), missing KMS encryption
-  (plaintext messages at rest), delivery-status logging gaps (silent message
-  loss with no CloudWatch signal), cross-account subscription vectors, and
-  FIFO deduplication misconfiguration. Emits a deterministic verdict
-  (PUBLIC_SUBSCRIPTION | NO_ENCRYPTION | CONFIG_GAP | OK) per topic with
-  enumerated findings and specific CLI remediation. Use when reviewing SNS
-  topic policies, checking for public subscription access, validating
-  encryption-at-rest, auditing delivery observability, or hardening message
-  bus posture before production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS SNS topics for public subscription exposure (Principal:"*" with sns:Subscribe or sns:Publish in topic policy), missing KMS encryption (plaintext messages at rest), delivery-status logging gaps (silent message loss with no CloudWatch signal), cross-account subscription vectors, and FIFO deduplication misconfiguration. Emits a deterministic verdict (PUBLIC_SUBSCRIPTION | NO_ENCRYPTION | CONFIG_GAP | OK) per topic with enumerated findings and specific CLI remediation. Use when reviewing SNS topic policies, checking for public subscription access, validating encryption-at-rest, auditing delivery observability, or hardening message bus posture before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline policy-document classification.
-  Live-account audits use aws sns get-topic-attributes, aws sns
-  list-subscriptions-by-topic, and aws sns list-topics (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - SNS
-  - topic policy
-  - public subscription
-  - Principal:"*"
-  - sns:Subscribe
-  - sns:Publish
-  - cross-account subscription
-  - KMS encryption
-  - delivery status logging
-  - FIFO deduplication
-  - ContentBasedDeduplication
-  - MessageDeduplicationId
-  - aws:SourceOwner
-  - data exfiltration
-  - message fanout
-  - topic policy remediation
-tags: [sns, app-integration, messaging, security, public-access, encryption, delivery-logging, fifo, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline policy-document classification. Live-account audits use aws sns get-topic-attributes, aws sns list-subscriptions-by-topic, and aws sns list-topics (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
-  verdict_shape: "PUBLIC_SUBSCRIPTION | NO_ENCRYPTION | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing an SNS topic policy before production deployment, checking for
-    public subscription or publish access, validating KMS encryption-at-rest,
-    auditing delivery-status logging coverage, verifying FIFO deduplication
-    configuration, or hardening message-bus posture across an account.
-  activation_triggers:
-    - "audit this SNS topic"
-    - "is my SNS topic public"
-    - "check SNS topic policy"
-    - "SNS public subscription"
-    - "SNS cross-account access"
-    - "SNS delivery logging"
-    - "SNS FIFO deduplication"
-    - "harden SNS topic policy"
-  invocation_schema: >-
-    Input: either (a) an SNS topic policy JSON document, optionally paired with
-    topic attributes (KmsMasterKeyId, FifoTopic, ContentBasedDeduplication,
-    delivery logging config, subscription list), OR (b) a topic ARN for
-    live-account audit. Output: deterministic TOPIC / VERDICT / REASON /
-    FINDINGS / REMEDIATION block per topic, where VERDICT is in
-    {PUBLIC_SUBSCRIPTION, NO_ENCRYPTION, CONFIG_GAP, OK}.
+  verdict_shape: PUBLIC_SUBSCRIPTION | NO_ENCRYPTION | CONFIG_GAP | OK
+  when_to_use: Reviewing an SNS topic policy before production deployment, checking for public subscription or publish access, validating KMS encryption-at-rest, auditing delivery-status logging coverage, verifying FIFO deduplication configuration, or hardening message-bus posture across an account.
+  activation_triggers: audit this SNS topic, is my SNS topic public, check SNS topic policy, SNS public subscription, SNS cross-account access, SNS delivery logging, SNS FIFO deduplication, harden SNS topic policy
+  invocation_schema: 'Input: either (a) an SNS topic policy JSON document, optionally paired with topic attributes (KmsMasterKeyId, FifoTopic, ContentBasedDeduplication, delivery logging config, subscription list), OR (b) a topic ARN for live-account audit. Output: deterministic TOPIC / VERDICT / REASON / FINDINGS / REMEDIATION block per topic, where VERDICT is in {PUBLIC_SUBSCRIPTION, NO_ENCRYPTION, CONFIG_GAP, OK}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: SNS, topic policy, public subscription, Principal:"*", sns:Subscribe, sns:Publish, cross-account subscription, KMS encryption, delivery status logging, FIFO deduplication, ContentBasedDeduplication, MessageDeduplicationId, aws:SourceOwner, data exfiltration, message fanout, topic policy remediation
+  tags: sns, app-integration, messaging, security, public-access, encryption, delivery-logging, fifo, audit
 ---
 
 # SNS Topic Public Subscription Auditor

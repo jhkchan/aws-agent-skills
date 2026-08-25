@@ -1,124 +1,28 @@
 ---
 name: ssm-patch-baseline-deployer
-description: >-
-  Provisions SSM Patch Baselines with secure patch-management defaults —
-  baseline creation (OS, product, classification, severity), approval
-  rules (auto-approve after N days, compliance level), patch groups
-  (tag-based targeting), default vs custom baseline selection,
-  maintenance window integration, and custom repositories for Amazon
-  Linux 2023, RHEL, Ubuntu, Windows, macOS. Runs pre-checks (OS
-  validity, product-OS matching, Patch Group tag key, instance role
-  AmazonSSMManagedInstanceCore, IAM permissions, maintenance window
-  task document), emits create-patch-baseline, register-patch-baseline
-  -for-patch-group, register-task-with-maintenance-window CLIs behind a
-  CONFIRM gate, verifies via describe-patch-baseline. Emits
-  READY_TO_DEPLOY | PREREQUISITES_MISSING. Use when creating patch
-  baselines, configuring approval rules, targeting patch groups, or
-  integrating with maintenance windows.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Provisions SSM Patch Baselines with secure patch-management defaults — baseline creation (OS, product, classification, severity), approval rules (auto-approve after N days, compliance level), patch groups (tag-based targeting), default vs custom baseline selection, maintenance window integration, and custom repositories for Amazon Linux 2023, RHEL, Ubuntu, Windows, macOS. Runs pre-checks (OS validity, product-OS matching, Patch Group tag key, instance role AmazonSSMManagedInstanceCore, IAM permissions, maintenance window task document), emits create-patch-baseline, register-patch-baseline -for-patch-group, register-task-with-maintenance-window CLIs behind a CONFIRM gate, verifies via describe-patch-baseline. Emits READY_TO_DEPLOY | PREREQUISITES_MISSING. Use when creating patch baselines, configuring approval rules, targeting patch groups, or integrating with maintenance windows.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws ssm create-patch-baseline, update-patch-baseline,
-  register-patch-baseline-for-patch-group, describe-patch-baseline,
-  describe-instance-patch-states, register-target-with-maintenance-window,
-  register-task-with-maintenance-window (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-  - SSM Patch Manager
-  - Patch Baseline
-  - patch baseline
-  - approval rule
-  - auto-approve
-  - compliance level
-  - patch group
-  - tag-based targeting
-  - maintenance window
-  - operating system
-  - Amazon Linux 2023
-  - macOS patching
-  - Windows Server
-  - Ubuntu
-  - RHEL
-  - custom repository
-  - SSM
-  - Systems Manager
-  - patch compliance
-  - AmazonSSMManagedInstanceCore
-tags: [ssm, patch-baseline, management, patch-manager, maintenance-window, deploy, compliance, os-patching]
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws ssm create-patch-baseline, update-patch-baseline, register-patch-baseline-for-patch-group, describe-patch-baseline, describe-instance-patch-states, register-target-with-maintenance-window, register-task-with-maintenance-window (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - ssm
-    - patch-baseline
-    - management
-    - patch-manager
-    - maintenance-window
-    - deploy
-    - compliance
-    - os-patching
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - SSM Patch Manager
-    - Patch Baseline
-    - approval rule
-    - patch group
-    - maintenance window
-    - Amazon Linux 2023
-    - macOS patching
-    - custom repository
-    - patch compliance
-  when_to_use: >-
-    Creating or updating an SSM Patch Baseline (approval rules, operating
-    system, classification, severity), registering a patch group for
-    tag-based targeting, setting default vs custom baseline selection,
-    integrating a patch baseline with a maintenance window (register
-    targets and tasks), or configuring custom repositories for Amazon
-    Linux 2023, RHEL, Ubuntu, Windows, or macOS patching.
-  activation_triggers:
-    - "create patch baseline"
-    - "provision SSM patch baseline"
-    - "deploy patch baseline"
-    - "approval rule patching"
-    - "auto-approve patches"
-    - "patch group"
-    - "register patch baseline"
-    - "maintenance window patching"
-    - "Amazon Linux 2023 patches"
-    - "macOS patching SSM"
-    - "Windows Server patch baseline"
-    - "Ubuntu patch baseline"
-    - "RHEL patch baseline"
-    - "custom repository patching"
-    - "patch compliance severity"
-    - "ssm create-patch-baseline"
-    - "register-patch-baseline-for-patch-group"
-    - "default patch baseline"
-  invocation_schema: >-
-    Input: either (a) a patch baseline deployment intent (create or
-    update) with target operating system, approval rules (classification,
-    severity, auto-approve days, compliance level), patch group, and
-    optional maintenance window integration; OR (b) a baseline ID for
-    live-account update or validation. Output: deterministic
-    BASELINE/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation,
-    where VERDICT is one of READY_TO_DEPLOY, PREREQUISITES_MISSING.
+  author: Jacky Chan — AWS Community Builder
+  tags: ssm, patch-baseline, management, patch-manager, maintenance-window, deploy, compliance, os-patching
+  dependencies: aws-orchestrator
+  keywords: SSM Patch Manager, Patch Baseline, patch baseline, approval rule, auto-approve, compliance level, patch group, tag-based targeting, maintenance window, operating system, Amazon Linux 2023, macOS patching, Windows Server, Ubuntu, RHEL, custom repository, SSM, Systems Manager, patch compliance, AmazonSSMManagedInstanceCore
+  when_to_use: Creating or updating an SSM Patch Baseline (approval rules, operating system, classification, severity), registering a patch group for tag-based targeting, setting default vs custom baseline selection, integrating a patch baseline with a maintenance window (register targets and tasks), or configuring custom repositories for Amazon Linux 2023, RHEL, Ubuntu, Windows, or macOS patching.
+  activation_triggers: create patch baseline, provision SSM patch baseline, deploy patch baseline, approval rule patching, auto-approve patches, patch group, register patch baseline, maintenance window patching, Amazon Linux 2023 patches, macOS patching SSM, Windows Server patch baseline, Ubuntu patch baseline, RHEL patch baseline, custom repository patching, patch compliance severity, ssm create-patch-baseline, register-patch-baseline-for-patch-group, default patch baseline
+  invocation_schema: 'Input: either (a) a patch baseline deployment intent (create or update) with target operating system, approval rules (classification, severity, auto-approve days, compliance level), patch group, and optional maintenance window integration; OR (b) a baseline ID for live-account update or validation. Output: deterministic BASELINE/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation, where VERDICT is one of READY_TO_DEPLOY, PREREQUISITES_MISSING.'
 ---
 
 # SSM Patch Baseline Deployer

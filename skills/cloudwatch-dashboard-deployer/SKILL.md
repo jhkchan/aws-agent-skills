@@ -1,117 +1,28 @@
 ---
 name: cloudwatch-dashboard-deployer
-description: >-
-  Provisions CloudWatch dashboards with widget layouts, metric
-  selections, and sharing models. Covers dashboard JSON (widgets,
-  layout), metric widgets (namespace/metric/dimensions/statistics),
-  log insights widgets (query syntax), alarm widgets, text widgets,
-  metric math expressions, custom metrics (CloudWatch agent,
-  PutMetricData, EMF), cross-account shared dashboards, snapshot
-  sharing, dashboard variables ($INSTANCE_ID), SLO/operational/
-  executive dashboards, Metric Explorer, and Application Signals
-  auto-discovery. Runs pre-checks (namespace availability, metric
-  publishing, IAM, cross-account role), emits put-dashboard CLI
-  behind a CONFIRM gate, and verifies widget rendering. Emits
-  READY_TO_DEPLOY | PREREQUISITES_MISSING. Use when creating
-  operational, SLO, executive, cross-account, log insights, or
-  metric math dashboards.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Provisions CloudWatch dashboards with widget layouts, metric selections, and sharing models. Covers dashboard JSON (widgets, layout), metric widgets (namespace/metric/dimensions/statistics), log insights widgets (query syntax), alarm widgets, text widgets, metric math expressions, custom metrics (CloudWatch agent, PutMetricData, EMF), cross-account shared dashboards, snapshot sharing, dashboard variables ($INSTANCE_ID), SLO/operational/ executive dashboards, Metric Explorer, and Application Signals auto-discovery. Runs pre-checks (namespace availability, metric publishing, IAM, cross-account role), emits put-dashboard CLI behind a CONFIRM gate, and verifies widget rendering. Emits READY_TO_DEPLOY | PREREQUISITES_MISSING. Use when creating operational, SLO, executive, cross-account, log insights, or metric math dashboards.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws cloudwatch put-dashboard, get-dashboard,
-  list-dashboards, delete-dashboards, get-metric-statistics (AWS CLI v2,
-  SSO or key-based credentials).
-keywords:
-  - CloudWatch
-  - dashboards
-  - put-dashboard
-  - metric widgets
-  - log insights widgets
-  - alarm widgets
-  - text widgets
-  - metric math
-  - custom metrics
-  - CloudWatch agent
-  - PutMetricData
-  - embedded metrics format
-  - cross-account dashboards
-  - snapshot sharing
-  - dashboard variables
-  - SLO dashboards
-  - operational dashboards
-  - executive dashboards
-  - metric explorer
-  - Application Signals
-  - auto-discovery
-tags: [cloudwatch, monitoring, dashboards, observability, deploy, metric-widgets, cross-account]
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws cloudwatch put-dashboard, get-dashboard, list-dashboards, delete-dashboards, get-metric-statistics (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - cloudwatch
-    - monitoring
-    - dashboards
-    - observability
-    - deploy
-    - metric-widgets
-    - cross-account
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - CloudWatch
-    - dashboards
-    - metric widgets
-    - log insights
-    - metric math
-    - cross-account
-  when_to_use: >-
-    Creating CloudWatch dashboards (operational, SLO, executive, cross-
-    account), building metric widgets with correct namespace/dimensions/
-    statistics, adding log insights widgets with query syntax, using metric
-    math to combine multiple metrics, configuring dashboard variables for
-    dynamic filtering, deploying shared cross-account dashboards, setting
-    up snapshot sharing, leveraging Application Signals auto-discovery, or
-    auditing dashboard widget correctness.
-  activation_triggers:
-    - "create CloudWatch dashboard"
-    - "provision dashboard"
-    - "metric widget"
-    - "log insights widget"
-    - "alarm widget"
-    - "text widget"
-    - "metric math dashboard"
-    - "custom metrics dashboard"
-    - "cross-account dashboard"
-    - "snapshot sharing dashboard"
-    - "dashboard variables"
-    - "SLO dashboard"
-    - "operational dashboard"
-    - "executive dashboard"
-    - "metric explorer"
-    - "Application Signals dashboard"
-  invocation_schema: >-
-    Input: either (a) a dashboard deployment intent (create, update, share)
-    with target dashboard name, widget specifications, metric namespace/
-    dimensions, and sharing model, OR (b) a dashboard name for live-account
-    update or validation. Output: deterministic DASHBOARD/VERDICT/PRE_CHECKS/
-    STEPS/POST_VERIFY block per operation, where VERDICT is one of
-    READY_TO_DEPLOY, PREREQUISITES_MISSING.
+  author: Jacky Chan — AWS Community Builder
+  tags: cloudwatch, monitoring, dashboards, observability, deploy, metric-widgets, cross-account
+  dependencies: aws-orchestrator
+  keywords: CloudWatch, dashboards, put-dashboard, metric widgets, log insights widgets, alarm widgets, text widgets, metric math, custom metrics, CloudWatch agent, PutMetricData, embedded metrics format, cross-account dashboards, snapshot sharing, dashboard variables, SLO dashboards, operational dashboards, executive dashboards, metric explorer, Application Signals, auto-discovery
+  when_to_use: Creating CloudWatch dashboards (operational, SLO, executive, cross- account), building metric widgets with correct namespace/dimensions/ statistics, adding log insights widgets with query syntax, using metric math to combine multiple metrics, configuring dashboard variables for dynamic filtering, deploying shared cross-account dashboards, setting up snapshot sharing, leveraging Application Signals auto-discovery, or auditing dashboard widget correctness.
+  activation_triggers: create CloudWatch dashboard, provision dashboard, metric widget, log insights widget, alarm widget, text widget, metric math dashboard, custom metrics dashboard, cross-account dashboard, snapshot sharing dashboard, dashboard variables, SLO dashboard, operational dashboard, executive dashboard, metric explorer, Application Signals dashboard
+  invocation_schema: 'Input: either (a) a dashboard deployment intent (create, update, share) with target dashboard name, widget specifications, metric namespace/ dimensions, and sharing model, OR (b) a dashboard name for live-account update or validation. Output: deterministic DASHBOARD/VERDICT/PRE_CHECKS/ STEPS/POST_VERIFY block per operation, where VERDICT is one of READY_TO_DEPLOY, PREREQUISITES_MISSING.'
 ---
 
 # CloudWatch Dashboard Deployer

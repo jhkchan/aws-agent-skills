@@ -1,106 +1,27 @@
 ---
 name: inspector2-coverage-operator
-description: >-
-  Operates Amazon Inspector v2 coverage across an AWS Organization
-  or single account — enables / disables Inspector per account and
-  region, manages EC2 coverage (SSM agent, deep inspection), ECR
-  coverage (image scanning, rescan on push), Lambda coverage (code
-  scanning, dependencies), surfaces coverage gaps (uncovered
-  resources, SSM-missing instances, disabled regions), configures
-  delegated admin for org-wide coverage, and operates the latest
-  capabilities (Lambda code vulnerability scanning, SBOM export,
-  EC2 deep inspection, ECR enhanced scan). Runs deterministic
-  pre-checks (delegated admin, members, region activation, SSM
-  online, ECR config, Lambda eligibility), emits the exact
-  inspector2:Enable / Disable / UpdateOrganizationConfiguration
-  CLI behind a CONFIRM gate, and verifies coverage post-apply.
-  Emits a verdict (READY | BLOCKED | COMPLETED). Use when enabling
-  Inspector, diagnosing coverage gaps, configuring delegated admin,
-  exporting SBOMs, or rolling out Lambda code scanning.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates Amazon Inspector v2 coverage across an AWS Organization or single account — enables / disables Inspector per account and region, manages EC2 coverage (SSM agent, deep inspection), ECR coverage (image scanning, rescan on push), Lambda coverage (code scanning, dependencies), surfaces coverage gaps (uncovered resources, SSM-missing instances, disabled regions), configures delegated admin for org-wide coverage, and operates the latest capabilities (Lambda code vulnerability scanning, SBOM export, EC2 deep inspection, ECR enhanced scan). Runs deterministic pre-checks (delegated admin, members, region activation, SSM online, ECR config, Lambda eligibility), emits the exact inspector2:Enable / Disable / UpdateOrganizationConfiguration CLI behind a CONFIRM gate, and verifies coverage post-apply. Emits a verdict (READY | BLOCKED | COMPLETED). Use when enabling Inspector, diagnosing coverage gaps, configuring delegated admin, exporting SBOMs, or rolling out Lambda code scanning.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws inspector2 enable, disable,
-  update-organization-configuration, describe-organization-configuration,
-  list-coverage, list-members, batch-get-member-ec2-deep-inspection-state,
-  update-ec2-deep-inspection-configuration, list-usage-totals,
-  batch-update-ec2-deep-inspection-state, list-filters,
-  enable-delegated-admin-account, list-delegated-admin-accounts,
-  cancel-sbom-export, list-sbom-export (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-  - Amazon Inspector v2
-  - Inspector
-  - vulnerability scanning
-  - EC2 scanning
-  - ECR scanning
-  - Lambda scanning
-  - code vulnerability
-  - SBOM export
-  - software bill of materials
-  - deep inspection
-  - SSM agent
-  - coverage gap
-  - delegated admin
-  - AWS Organizations
-  - member account
-  - network reachability
-  - package vulnerability
-  - container image scanning
-  - Inspector delegated admin
-  - Inspector coverage
-tags: [aws-inspector2, security, operate, vulnerability-scanning, ec2-coverage, ecr-coverage, lambda-coverage, delegated-admin, sbom-export, code-vulnerability, organizations, ssm-agent]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws inspector2 enable, disable, update-organization-configuration, describe-organization-configuration, list-coverage, list-members, batch-get-member-ec2-deep-inspection-state, update-ec2-deep-inspection-configuration, list-usage-totals, batch-update-ec2-deep-inspection-state, list-filters, enable-delegated-admin-account...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Enabling Inspector v2 per account or region, configuring delegated
-    admin for Organizations-wide coverage, diagnosing EC2 coverage gaps
-    (SSM agent missing, deep inspection not enabled), ECR scanning
-    coverage (rescan-on-push, enhanced scan), Lambda function code
-    vulnerability scanning enablement, exporting SBOMs for audit, or
-    verifying that 100% of in-scope resources are covered.
-  activation_triggers:
-    - "enable Inspector"
-    - "disable Inspector"
-    - "Inspector v2 coverage"
-    - "EC2 scanning coverage"
-    - "ECR scanning coverage"
-    - "Lambda scanning coverage"
-    - "Lambda code vulnerability"
-    - "Inspector delegated admin"
-    - "Inspector member accounts"
-    - "Inspector organization scan"
-    - "Inspector coverage gap"
-    - "SSM agent missing Inspector"
-    - "deep inspection EC2"
-    - "EC2 deep inspection"
-    - "SBOM export"
-    - "software bill of materials"
-    - "Inspector enable region"
-    - "batch update EC2 deep inspection"
-  invocation_schema: >-
-    Input: either (a) an Inspector operation intent (enable, disable,
-    enable-delegated-admin, update-org-config, associate-member,
-    update-ec2-deep-inspection, enable-lambda-code-scan,
-    configure-ecr-rescan, export-sbom, diagnose-coverage) with target
-    account/region, resource scope, and scan types (EC2 / ECR / Lambda
-    / Member); OR (b) a live coverage report from `aws inspector2
-    list-coverage` for diagnosis. Output: deterministic
-    OPERATION/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per
-    operation, where VERDICT is one of READY, BLOCKED, COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Enabling Inspector v2 per account or region, configuring delegated admin for Organizations-wide coverage, diagnosing EC2 coverage gaps (SSM agent missing, deep inspection not enabled), ECR scanning coverage (rescan-on-push, enhanced scan), Lambda function code vulnerability scanning enablement, exporting SBOMs for audit, or verifying that 100% of in-scope resources are covered.
+  activation_triggers: enable Inspector, disable Inspector, Inspector v2 coverage, EC2 scanning coverage, ECR scanning coverage, Lambda scanning coverage, Lambda code vulnerability, Inspector delegated admin, Inspector member accounts, Inspector organization scan, Inspector coverage gap, SSM agent missing Inspector, deep inspection EC2, EC2 deep inspection, SBOM export, software bill of materials, Inspector enable region, batch update EC2 deep inspection
+  invocation_schema: 'Input: either (a) an Inspector operation intent (enable, disable, enable-delegated-admin, update-org-config, associate-member, update-ec2-deep-inspection, enable-lambda-code-scan, configure-ecr-rescan, export-sbom, diagnose-coverage) with target account/region, resource scope, and scan types (EC2 / ECR / Lambda / Member); OR (b) a live coverage report from `aws inspector2 list-coverage` for diagnosis. Output: deterministic OPERATION/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Amazon Inspector v2, Inspector, vulnerability scanning, EC2 scanning, ECR scanning, Lambda scanning, code vulnerability, SBOM export, software bill of materials, deep inspection, SSM agent, coverage gap, delegated admin, AWS Organizations, member account, network reachability, package vulnerability, container image scanning, Inspector delegated admin, Inspector coverage
+  tags: aws-inspector2, security, operate, vulnerability-scanning, ec2-coverage, ecr-coverage, lambda-coverage, delegated-admin, sbom-export, code-vulnerability, organizations, ssm-agent
 ---
 
 # Inspector v2 Coverage Operator

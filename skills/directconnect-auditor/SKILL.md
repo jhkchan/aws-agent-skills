@@ -1,84 +1,24 @@
 ---
 name: directconnect-auditor
-description: >-
-  Audits AWS Direct Connect (DX) topology for resilience and security posture —
-  physical-layer redundancy (2+ connections at diverse DX locations, not the
-  same POP), MACSec link encryption on capable hardware, BGP peer
-  authentication (especially on public VIFs where route hijack is trivial),
-  virtual-interface redundancy across diverse connections via a Direct Connect
-  Gateway, and LOA-CFA provisioning state. Emits a deterministic verdict
-  (SINGLE_CONNECTION | NO_ENCRYPTION | CONFIG_GAP | OK) per topology with
-  enumerated findings and specific CLI remediation. Use when reviewing Direct
-  Connect connections, checking for single-path failure risk, validating MACSec
-  enforcement, auditing BGP auth on public VIFs, or hardening hybrid-network
-  posture before production cutover.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Direct Connect (DX) topology for resilience and security posture — physical-layer redundancy (2+ connections at diverse DX locations, not the same POP), MACSec link encryption on capable hardware, BGP peer authentication (especially on public VIFs where route hijack is trivial), virtual-interface redundancy across diverse connections via a Direct Connect Gateway, and LOA-CFA provisioning state. Emits a deterministic verdict (SINGLE_CONNECTION | NO_ENCRYPTION | CONFIG_GAP | OK) per topology with enumerated findings and specific CLI remediation. Use when reviewing Direct Connect connections, checking for single-path failure risk, validating MACSec enforcement, auditing BGP auth on public VIFs, or hardening hybrid-network posture before production cutover.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline topology classification from
-  describe-connections / describe-virtual-interfaces JSON output. Live-account
-  audits use aws directconnect describe-connections,
-  describe-virtual-interfaces, describe-lags, describe-connection-loa, and
-  describe-bgp-peers (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Direct Connect
-  - DX
-  - MACSec
-  - BGP
-  - virtual interface
-  - private VIF
-  - public VIF
-  - transit VIF
-  - LOA-CFA
-  - redundancy
-  - diverse location
-  - Link Aggregation Group
-  - LAG
-  - Direct Connect Gateway
-  - DXGW
-  - route hijack
-  - BGP MD5
-  - hybrid networking
-  - link encryption
-  - 802.1AE
-  - transit gateway
-  - hybrid DC
-tags: [directconnect, networking, macsec, bgp, redundancy, encryption, loa, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline topology classification from describe-connections / describe-virtual-interfaces JSON output. Live-account audits use aws directconnect describe-connections, describe-virtual-interfaces, describe-lags, describe-connection-loa, and describe-bgp-peers (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
-  verdict_shape: "SINGLE_CONNECTION | NO_ENCRYPTION | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing Direct Connect topology before production cutover, checking for
-    single-path or single-facility failure risk, validating MACSec enforcement
-    on capable hardware, auditing BGP peer auth on public VIFs (route-hijack
-    defence), confirming LOA-CFA issuance for connections stuck in requested,
-    or hardening hybrid-network resilience across regions.
-  activation_triggers:
-    - "audit this Direct Connect connection"
-    - "is my DX redundant"
-    - "MACSec check Direct Connect"
-    - "BGP auth public VIF"
-    - "LOA stuck pending"
-    - "diverse location Direct Connect"
-    - "single path failure risk DX"
-    - "route hijack public VIF"
-    - "LAG redundancy audit"
-    - "Direct Connect Gateway failover"
-  invocation_schema: >-
-    Input: either (a) describe-connections + describe-virtual-interfaces JSON
-    (optionally paired with describe-lags and describe-connection-loa output),
-    OR (b) a connection-id or LAG-id for live-account audit. Output:
-    deterministic CONNECTION/VERDICT/REASON/FINDINGS/REMEDIATION block per
-    topology, where VERDICT ∈ {SINGLE_CONNECTION, NO_ENCRYPTION, CONFIG_GAP,
-    OK, ERROR}.
+  verdict_shape: SINGLE_CONNECTION | NO_ENCRYPTION | CONFIG_GAP | OK
+  when_to_use: Reviewing Direct Connect topology before production cutover, checking for single-path or single-facility failure risk, validating MACSec enforcement on capable hardware, auditing BGP peer auth on public VIFs (route-hijack defence), confirming LOA-CFA issuance for connections stuck in requested, or hardening hybrid-network resilience across regions.
+  activation_triggers: audit this Direct Connect connection, is my DX redundant, MACSec check Direct Connect, BGP auth public VIF, LOA stuck pending, diverse location Direct Connect, single path failure risk DX, route hijack public VIF, LAG redundancy audit, Direct Connect Gateway failover
+  invocation_schema: 'Input: either (a) describe-connections + describe-virtual-interfaces JSON (optionally paired with describe-lags and describe-connection-loa output), OR (b) a connection-id or LAG-id for live-account audit. Output: deterministic CONNECTION/VERDICT/REASON/FINDINGS/REMEDIATION block per topology, where VERDICT ∈ {SINGLE_CONNECTION, NO_ENCRYPTION, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Direct Connect, DX, MACSec, BGP, virtual interface, private VIF, public VIF, transit VIF, LOA-CFA, redundancy, diverse location, Link Aggregation Group, LAG, Direct Connect Gateway, DXGW, route hijack, BGP MD5, hybrid networking, link encryption, 802.1AE, transit gateway, hybrid DC
+  tags: directconnect, networking, macsec, bgp, redundancy, encryption, loa, audit
 ---
 
 # Direct Connect Auditor

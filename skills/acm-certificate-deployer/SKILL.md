@@ -1,118 +1,26 @@
 ---
 name: acm-certificate-deployer
-description: >-
-  Provisions AWS ACM certificates with production defaults: certificate
-  request (domain names, wildcard), DNS validation (Route53 CNAME,
-  cross-account), email validation (deprecated), certificate renewal
-  (automatic, managed by ACM), import third-party certificates (PEM
-  format, private key, chain), CloudFront integration (must be in
-  us-east-1), cross-account sharing (resource-based policy with
-  service principals), ACM private CA integration, ACM for private
-  certificates. Emits a READY_TO_DEPLOY checklist with verification
-  commands. Use when requesting an ACM certificate, setting up DNS
-  validation, importing a third-party cert, configuring CloudFront
-  TLS, or deploying private certificates via AWS Private CA.
-  Triggers: request ACM certificate, DNS validation, Route53 CNAME
-  ACM, ACM wildcard certificate, ACM CloudFront certificate, ACM
-  renewal, import certificate ACM, AWS Private CA, ACM private
-  certificate.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS ACM certificates with production defaults: certificate request (domain names, wildcard), DNS validation (Route53 CNAME, cross-account), email validation (deprecated), certificate renewal (automatic, managed by ACM), import third-party certificates (PEM format, private key, chain), CloudFront integration (must be in us-east-1), cross-account sharing (resource-based policy with service principals), ACM private CA integration, ACM for private certificates. Emits a READY_TO_DEPLOY checklist with verification commands. Use when requesting an ACM certificate, setting up DNS validation, importing a third-party cert, configuring CloudFront TLS, or deploying private certificates via AWS Private CA. Triggers: request ACM certificate, DNS validation, Route53 CNAME ACM, ACM wildcard certificate, ACM CloudFront certificate, ACM renewal, import certificate ACM, AWS Private CA, ACM private certificate.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with acm, route53,
-  iam, and cloudfront access. Works with Terraform
-  aws_acm_certificate / aws_acm_certificate_validation resources and
-  CloudFormation AWS::CertificateManager::Certificate templates.
-keywords:
-  - aws
-  - acm
-  - certificate manager
-  - cloudops
-  - deploy
-  - provisioning
-  - tls certificate
-  - ssl certificate
-  - dns validation
-  - route53
-  - wildcard certificate
-  - certificate renewal
-  - import certificate
-  - cloudfront integration
-  - us-east-1
-  - private ca
-  - aws private ca
-  - private certificate
-  - cross-account sharing
-  - resource-based policy
-  - pem
-  - email validation
-tags:
-  - aws
-  - acm
-  - certificate-manager
-  - cloudops
-  - deploy
-  - security
-  - provisioning
-  - tls
-  - dns-validation
-  - cloudfront
-  - private-ca
-  - wildcard
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with acm, route53, iam, and cloudfront access. Works with Terraform aws_acm_certificate / aws_acm_certificate_validation resources and CloudFormation AWS::CertificateManager::Certificate templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - acm
-    - certificate-manager
-    - cloudops
-    - deploy
-    - security
-    - provisioning
-    - tls
-    - dns-validation
-    - cloudfront
-    - private-ca
-    - wildcard
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - request acm certificate
-    - dns validation acm
-    - route53 cname acm
-    - acm wildcard certificate
-    - acm cloudfront certificate
-    - acm renewal
-    - import certificate acm
-    - aws private ca
-    - acm private certificate
-    - acm cross-account
-  when_to_use: >-
-    Invoke when the user wants to request an AWS Certificate Manager
-    (ACM) certificate (public or private), set up DNS validation via
-    Route53, configure a wildcard certificate, import a third-party
-    certificate, deploy a certificate for CloudFront (us-east-1
-    requirement), integrate with AWS Private CA, or share a private
-    certificate cross-account. Do NOT invoke for IAM server
-    certificates (deprecated), for self-signed certificates outside
-    ACM, or for auditing existing certificate expiry (use
-    acm-certificate-expiry-auditor).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, acm, certificate-manager, cloudops, deploy, security, provisioning, tls, dns-validation, cloudfront, private-ca, wildcard
+  dependencies: aws-orchestrator
+  keywords: aws, acm, certificate manager, cloudops, deploy, provisioning, tls certificate, ssl certificate, dns validation, route53, wildcard certificate, certificate renewal, import certificate, cloudfront integration, us-east-1, private ca, aws private ca, private certificate, cross-account sharing, resource-based policy, pem, email validation
+  when_to_use: Invoke when the user wants to request an AWS Certificate Manager (ACM) certificate (public or private), set up DNS validation via Route53, configure a wildcard certificate, import a third-party certificate, deploy a certificate for CloudFront (us-east-1 requirement), integrate with AWS Private CA, or share a private certificate cross-account. Do NOT invoke for IAM server certificates (deprecated), for self-signed certificates outside ACM, or for auditing existing certificate expiry (use acm-certificate-expiry-auditor).
 ---
 
 # ACM Certificate Deployer

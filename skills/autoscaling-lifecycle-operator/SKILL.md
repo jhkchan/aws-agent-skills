@@ -1,147 +1,28 @@
 ---
 name: autoscaling-lifecycle-operator
-description: >-
-  Operates EC2 Auto Scaling lifecycle hook workflows end-to-end — launch
-  lifecycle hook management (pending:wait transition, bootstrap
-  registration, ELB target registration, custom action execution),
-  terminate lifecycle hook management (terminating:wait transition, ELB
-  deregistration, session drain, graceful shutdown), HeartbeatTimeout
-  management (default 3600s, heartbeat extension via record-lifecycle-
-  action-heartbeat), Lambda/EventBridge integration for lifecycle actions
-  (complete-lifecycle-action invocation contract), warm pool configuration
-  (MinSize, MaxGroupPreparedCapacity, pool state transitions), standby
-  state and instance protection, CloudWatch alarm-based scaling policies,
-  scheduled actions, capacity rebalance integration for Spot
-  interruptions, and lifecycle hook notification targets (SNS/SQS/Lambda
-  /EventBridge). Runs deterministic pre-checks (hook existence, IAM
-  passrole, notification target ARN validity, HeartbeatTimeout bounds,
-  Lambda complete-lifecycle-action IAM grant, warm pool capacity headroom)
-  behind a CONFIRM gate and emits an OPERATION_COMPLETED or REVIEW_REQUIRED
-  verdict per lifecycle operation. Use when adding launch/terminate hooks,
-  debugging stuck lifecycle instances, configuring warm pools, wiring
-  graceful-drain Lambdas, or integrating capacity rebalance.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates EC2 Auto Scaling lifecycle hook workflows end-to-end — launch lifecycle hook management (pending:wait transition, bootstrap registration, ELB target registration, custom action execution), terminate lifecycle hook management (terminating:wait transition, ELB deregistration, session drain, graceful shutdown), HeartbeatTimeout management (default 3600s, heartbeat extension via record-lifecycle- action-heartbeat), Lambda/EventBridge integration for lifecycle actions (complete-lifecycle-action invocation contract), warm pool configuration (MinSize, MaxGroupPreparedCapacity, pool state transitions), standby state and instance protection, CloudWatch alarm-based scaling policies, scheduled actions, capacity rebalance integration for Spot interruptions, and lifecycle hook notification targets (SNS/SQS/Lambda /EventBridge). Runs deterministic pre-checks (hook existence, IAM passrole, notification target ARN validity, HeartbeatTimeout bounds, Lambda complete-lifecycle-action IAM grant, warm pool capacity...
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws autoscaling describe-lifecycle-hooks, put-lifecycle-
-  hook, delete-lifecycle-hook, complete-lifecycle-action, record-lifecycle-
-  action-heartbeat, describe-warm-pool, put-warm-pool, describe-auto-
-  scaling-groups, update-auto-scaling-group, set-instance-protection,
-  enter-standby, exit-standby, put-scheduled-action, put-scaling-policy,
-  aws lambda get-function-configuration, get-policy, aws sns get-topic-
-  attributes, aws sqs get-queue-attributes, aws logs filter-log-events,
-  and aws ec2 describe-instance-status (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-  - Auto Scaling
-  - lifecycle hook
-  - launch lifecycle hook
-  - terminate lifecycle hook
-  - HeartbeatTimeout
-  - DefaultResult
-  - CONTINUE
-  - ABANDON
-  - complete-lifecycle-action
-  - record-lifecycle-action-heartbeat
-  - pending:wait
-  - Pending:Wait
-  - Terminating:Wait
-  - InService
-  - warm pool
-  - warm pool MinSize
-  - MaxGroupPreparedCapacity
-  - warm pool state
-  - capacity rebalance
-  - instance protection
-  - standby
-  - EnterStandby
-  - ExitStandby
-  - graceful drain
-  - ELB deregistration
-  - target group deregistration
-  - connection drain
-  - session drain
-  - scheduled action
-  - scaling policy
-  - CloudWatch alarm
-  - step scaling
-  - target tracking
-  - Spot Instance Interruption
-  - SNS notification
-  - SQS notification
-  - EventBridge
-  - lifecycle Lambda
-  - bootstrap registration
-tags: [aws, autoscaling, compute, lifecycle, ec2, warm-pool, spot, elb, lambda, eventbridge, operate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws autoscaling describe-lifecycle-hooks, put-lifecycle- hook, delete-lifecycle-hook, complete-lifecycle-action, record-lifecycle- action-heartbeat, describe-warm-pool, put-warm-pool, describe-auto- scaling-groups, update-auto-scaling-group, set-instance-protection, enter-standby, exit-standby, put-scheduled-action...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "OPERATION_COMPLETED | REVIEW_REQUIRED"
-  when_to_use: >-
-    Adding or modifying launch/terminate lifecycle hooks, debugging stuck
-    lifecycle instances (pending:wait or terminating:wait), configuring warm
-    pools for faster scale-out, wiring graceful-drain Lambdas for ELB
-    deregistration and session drain, setting instance protection or standby
-    state, integrating capacity rebalance with Spot interruptions, creating
-    scheduled actions or CloudWatch alarm-based scaling policies, or routing
-    lifecycle notifications to SNS/SQS/Lambda.
-  when_not_to_use: >-
-    EC2 instance-level OS patching or application deployment (use an SSM or
-    CodeDeploy skill), ECS/Fargate service autoscaling (use an ECS
-    autoscaling skill), Auto Scaling group creation from scratch (use a
-    provisioning skill), or cost optimization of EC2 fleets (use an EC2
-    rightsizing skill). This skill focuses on lifecycle hook operations and
-    warm pool management, not fleet provisioning or cost optimization.
-  activation_triggers:
-    - "add lifecycle hook"
-    - "launch lifecycle hook"
-    - "terminate lifecycle hook"
-    - "lifecycle hook timeout"
-    - "HeartbeatTimeout"
-    - "complete-lifecycle-action"
-    - "stuck lifecycle instance"
-    - "pending wait stuck"
-    - "terminating wait stuck"
-    - "warm pool configuration"
-    - "warm pool MinSize"
-    - "capacity rebalance"
-    - "graceful drain"
-    - "ELB deregistration lifecycle"
-    - "session drain"
-    - "instance protection"
-    - "standby state"
-    - "enter standby"
-    - "exit standby"
-    - "scheduled action autoscaling"
-    - "scaling policy"
-    - "CloudWatch alarm scaling"
-    - "Spot interruption lifecycle"
-    - "SNS lifecycle notification"
-    - "SQS lifecycle notification"
-    - "EventBridge lifecycle"
-    - "lifecycle Lambda"
-    - "bootstrap on launch"
-  invocation_schema: >-
-    Input: either (a) an Auto Scaling group configuration (describe-auto-
-    scaling-groups output) plus the intended operation (add-launch-hook,
-    add-terminate-hook, modify-hook, delete-hook, configure-warm-pool,
-    set-protection, enter-standby, exit-standby, add-scheduled-action,
-    add-scaling-policy, enable-capacity-rebalance, diagnose-stuck), OR (b)
-    an ASG name + operation for live-account execution. Output: a
-    deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY /
-    NOTES block per lifecycle operation, where VERDICT is one of
-    OPERATION_COMPLETED, REVIEW_REQUIRED.
+  verdict_shape: OPERATION_COMPLETED | REVIEW_REQUIRED
+  when_to_use: Adding or modifying launch/terminate lifecycle hooks, debugging stuck lifecycle instances (pending:wait or terminating:wait), configuring warm pools for faster scale-out, wiring graceful-drain Lambdas for ELB deregistration and session drain, setting instance protection or standby state, integrating capacity rebalance with Spot interruptions, creating scheduled actions or CloudWatch alarm-based scaling policies, or routing lifecycle notifications to SNS/SQS/Lambda.
+  when_not_to_use: EC2 instance-level OS patching or application deployment (use an SSM or CodeDeploy skill), ECS/Fargate service autoscaling (use an ECS autoscaling skill), Auto Scaling group creation from scratch (use a provisioning skill), or cost optimization of EC2 fleets (use an EC2 rightsizing skill). This skill focuses on lifecycle hook operations and warm pool management, not fleet provisioning or cost optimization.
+  activation_triggers: add lifecycle hook, launch lifecycle hook, terminate lifecycle hook, lifecycle hook timeout, HeartbeatTimeout, complete-lifecycle-action, stuck lifecycle instance, pending wait stuck, terminating wait stuck, warm pool configuration, warm pool MinSize, capacity rebalance, graceful drain, ELB deregistration lifecycle, session drain, instance protection, standby state, enter standby, exit standby, scheduled action autoscaling, scaling policy, CloudWatch alarm scaling, Spot interruption lifecycle, SNS lifecycle notification, SQS lifecycle notification, EventBridge lifecycle, lifecycle Lambda, bootstrap on launch
+  invocation_schema: 'Input: either (a) an Auto Scaling group configuration (describe-auto- scaling-groups output) plus the intended operation (add-launch-hook, add-terminate-hook, modify-hook, delete-hook, configure-warm-pool, set-protection, enter-standby, exit-standby, add-scheduled-action, add-scaling-policy, enable-capacity-rebalance, diagnose-stuck), OR (b) an ASG name + operation for live-account execution. Output: a deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per lifecycle operation, where VERDICT is one of OPERATION_COMPLETED, REVIEW_REQUIRED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Auto Scaling, lifecycle hook, launch lifecycle hook, terminate lifecycle hook, HeartbeatTimeout, DefaultResult, CONTINUE, ABANDON, complete-lifecycle-action, record-lifecycle-action-heartbeat, pending:wait, Pending:Wait, Terminating:Wait, InService, warm pool, warm pool MinSize, MaxGroupPreparedCapacity, warm pool state, capacity rebalance, instance protection, standby, EnterStandby, ExitStandby, graceful drain, ELB deregistration, target group deregistration, connection drain, session drain, scheduled action, scaling policy, CloudWatch alarm, step scaling, target tracking, Spot Instance Interruption, SNS notification, SQS notification, EventBridge, lifecycle Lambda, bootstrap registration
+  tags: aws, autoscaling, compute, lifecycle, ec2, warm-pool, spot, elb, lambda, eventbridge, operate
 ---
 
 # Auto Scaling Lifecycle Hook Operator

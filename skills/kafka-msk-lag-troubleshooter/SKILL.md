@@ -1,72 +1,15 @@
 ---
 name: kafka-msk-lag-troubleshooter
-description: >-
-  Diagnoses Amazon MSK consumer lag through a ten-category diagnostic
-  tree: consumer-group lag (RecordsLagMax) vs consumer processing rate,
-  partition skew / hot-key imbalance, broker CPU/disk/network
-  saturation, under-replicated partitions and ISR shrink/expansion,
-  ZooKeeper session expiry, consumer fetch.min.bytes / fetch.max.wait.ms
-  micro-batch tuning, producer acks / batch.size / compression.type
-  throughput, topic partition count vs consumer parallelism, MSK Connect
-  source/sink connector lag, MSK Serverless vs Provisioned partition
-  throughput throttling (ConsumedReadThroughput, BytesPerSec), and
-  rebalance storms from missing static membership. Walks symptoms to a
-  verified root cause with evidence-backed probes; emits
-  ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses Amazon MSK consumer lag through a ten-category diagnostic tree: consumer-group lag (RecordsLagMax) vs consumer processing rate, partition skew / hot-key imbalance, broker CPU/disk/network saturation, under-replicated partitions and ISR shrink/expansion, ZooKeeper session expiry, consumer fetch.min.bytes / fetch.max.wait.ms micro-batch tuning, producer acks / batch.size / compression.type throughput, topic partition count vs consumer parallelism, MSK Connect source/sink connector lag, MSK Serverless vs Provisioned partition throughput throttling (ConsumedReadThroughput, BytesPerSec), and rebalance storms from missing static membership. Walks symptoms to a verified root cause with evidence-backed probes; emits ROOT_CAUSE_IDENTIFIED or INSUFFICIENT_DATA.'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted consumer-group metrics and CloudWatch dashboards. Live-account diagnosis uses aws kafka describe-cluster, aws kafka describe-cluster-operation, aws cloudwatch get-metric-statistics on AWS/Kafka and AWS/MSKConnect namespaces, aws kafka list-consumer-groups, aws kafka describe-consumer-group, aws kafka get-client-metrics, and aws logs get-query-results (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- MSK
-- Kafka
-- consumer lag
-- RecordsLagMax
-- partition skew
-- hot key
-- under-replicated partitions
-- ISR
-- ISR shrink
-- broker saturation
-- broker disk
-- ZooKeeper
-- fetch.min.bytes
-- fetch.max.wait
-- micro-batch
-- producer acks
-- batch.size
-- compression.type
-- partition count
-- consumer parallelism
-- MSK Connect
-- source connector
-- sink connector
-- MSK Serverless
-- ConsumedReadThroughput
-- BytesPerSec
-- rebalance storm
-- static membership
-- group.session.timeout
-- troubleshooting
-tags:
-- kafka
-- msk
-- analytics
-- troubleshooting
-- consumer-lag
-- partition-skew
-- isr
-- broker
-- producer
-- consumer
-- serverless
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted consumer-group metrics and CloudWatch dashboards. Live-account diagnosis uses aws kafka describe-cluster, aws kafka describe-cluster-operation, aws cloudwatch get-metric-statistics on AWS/Kafka and AWS/MSKConnect namespaces, aws kafka list-consumer-groups, aws kafka describe-consumer-group, aws kafka get-client-metrics, and aws logs get-query-results (AWS CLI v2...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: troubleshoot
   skill_class: capability
@@ -74,36 +17,13 @@ metadata:
   verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
   when_to_use: Diagnosing Amazon MSK consumer-group lag (RecordsLagMax climbing, consumer processing rate below producer rate, partition skew where one partition holds the majority of messages, under-replicated partitions with ISR shrink, broker CPU/disk/network saturation, ZooKeeper session instability, consumer fetch.min.bytes or fetch.max.wait.ms set too high for low-volume topics, producer acks/batch.size/compression misconfigured for throughput, topic partition count lower than consumer-group member count, MSK Connect source/sink connector lag, MSK Serverless ConsumedReadThroughput throttling, or rebalance storms from missing static membership), walking a symptom to the failed layer with verify commands, validating why a consumer group shows growing lag, or triaging a "the pipeline is behind" page where the root cause may be producer rate, consumer rate, partition distribution, broker health, or cluster throttling — not necessarily the consumer application code itself.
   when_not_to_use: Application-code-level debugging of the consumer's process() handler (use the consumer logs and a profiler), Kafka client library upgrade or compatibility testing (use the client library docs), cross-cluster MirrorMaker2 topology design (use the MSK documentation), KRaft mode migration planning (use the MSK Multi-AZ KRaft guide), or MSK cluster capacity sizing for a greenfield workload (use the msk-cluster-auditor skill). This skill diagnoses lag incidents; it does not size clusters or tune for steady-state throughput optimization.
-  activation_triggers:
-  - MSK consumer lag
-  - Kafka RecordsLagMax
-  - consumer group lag climbing
-  - Kafka partition skew
-  - hot key Kafka
-  - under-replicated partitions MSK
-  - ISR shrink Kafka
-  - broker disk full MSK
-  - broker CPU high Kafka
-  - ZooKeeper session expired
-  - Kafka fetch.min.bytes
-  - fetch.max.wait.ms
-  - Kafka micro-batch
-  - producer acks Kafka
-  - batch.size producer
-  - compression.type Kafka
-  - partition count too low
-  - consumer parallelism
-  - MSK Connect lag
-  - source connector lag
-  - sink connector lag
-  - MSK Serverless throttled
-  - ConsumedReadThroughput
-  - Kafka rebalance storm
-  - static membership Kafka
-  - group.session.timeout.ms
-  - troubleshoot Kafka lag
+  activation_triggers: MSK consumer lag, Kafka RecordsLagMax, consumer group lag climbing, Kafka partition skew, hot key Kafka, under-replicated partitions MSK, ISR shrink Kafka, broker disk full MSK, broker CPU high Kafka, ZooKeeper session expired, Kafka fetch.min.bytes, fetch.max.wait.ms, Kafka micro-batch, producer acks Kafka, batch.size producer, compression.type Kafka, partition count too low, consumer parallelism, MSK Connect lag, source connector lag, sink connector lag, MSK Serverless throttled, ConsumedReadThroughput, Kafka rebalance storm, static membership Kafka, group.session.timeout.ms, troubleshoot Kafka lag
   invocation_schema: 'Input: either (a) a symptom description (RecordsLagMax climbing, consumer group behind, "pipeline is lagging", throughput drop), optionally paired with the MSK cluster ARN, topic name, consumer group name, and CloudWatch/Kafka metrics snapshots, OR (b) a cluster ARN plus consumer group name and topic for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA} and LAYER ∈ {CONSUMER_RATE, CONSUMER_FETCH_TUNING, PARTITION_SKEW, ISR_SHRINK, BROKER_SATURATION, ZOOKEEPER_ISSUE, PRODUCER_CONFIG, PARTITION_PARALLELISM, MSK_CONNECT_LAG, MSK_SERVERLESS_THROTTLE, MSK_PROVISIONED_THROTTLE, REBALANCE_STORM, UNKNOWN}.'
   invocation_example: "# Minimal valid input (offline symptom classification):\nSymptom: \"consumer group cg-payments-processor on topic tx-events shows\nRecordsLagMax climbing from 10K to 8M over 4 hours; the pipeline is\nfalling behind.\"\nClusterArn: arn:aws:kafka:us-east-1:111111111111:cluster/prod-msk/abc-123\nTopic: tx-events\nConsumerGroup: cg-payments-processor\nPartitions: 12\nConsumerGroupMembers: 12\nCloudWatch (last 4h):\n  - RecordsLagMax: 10000 → 8000000\n  - ConsumptionRate (BytesPerSec): flat at 5 MB/s\n  - BytesInPerSec: 12 MB/s\n  - UnderReplicatedPartitions: 0\n  - CpuUser / CpuSystem: 35% / 5%\nInvocation type: poll-based consumer (kafka-clients), commit manual"
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: MSK, Kafka, consumer lag, RecordsLagMax, partition skew, hot key, under-replicated partitions, ISR, ISR shrink, broker saturation, broker disk, ZooKeeper, fetch.min.bytes, fetch.max.wait, micro-batch, producer acks, batch.size, compression.type, partition count, consumer parallelism, MSK Connect, source connector, sink connector, MSK Serverless, ConsumedReadThroughput, BytesPerSec, rebalance storm, static membership, group.session.timeout, troubleshooting
+  tags: kafka, msk, analytics, troubleshooting, consumer-lag, partition-skew, isr, broker, producer, consumer, serverless
 ---
 
 # Kafka MSK Lag Troubleshooter

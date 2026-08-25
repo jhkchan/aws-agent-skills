@@ -1,74 +1,24 @@
 ---
 name: efs-filesystem-auditor
-description: >-
-  Audits AWS EFS filesystems for encryption-at-rest, filesystem policy public
-  principal exposure, encryption-in-transit enforcement, lifecycle management
-  policies, and access point governance. Emits a deterministic verdict
-  (UNENCRYPTED | PUBLIC_POLICY | CONFIG_GAP | OK) per filesystem with
-  enumerated findings and specific remediation. Use when reviewing EFS
-  filesystem configurations, checking for public filesystem policies,
-  validating encryption posture, auditing lifecycle policies, or hardening
-  EFS access before production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS EFS filesystems for encryption-at-rest, filesystem policy public principal exposure, encryption-in-transit enforcement, lifecycle management policies, and access point governance. Emits a deterministic verdict (UNENCRYPTED | PUBLIC_POLICY | CONFIG_GAP | OK) per filesystem with enumerated findings and specific remediation. Use when reviewing EFS filesystem configurations, checking for public filesystem policies, validating encryption posture, auditing lifecycle policies, or hardening EFS access before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline configuration classification.
-  Live-account audits use aws efs describe-file-systems, aws efs
-  describe-file-system-policy, aws efs describe-access-points, and aws efs
-  describe-lifecycle-policies (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - EFS
-  - Elastic File System
-  - filesystem policy
-  - encryption-at-rest
-  - encryption-in-transit
-  - aws:SecureTransport
-  - elasticfilesystem:ClientMount
-  - elasticfilesystem:ClientRootAccess
-  - elasticfilesystem:ClientWrite
-  - elasticfilesystem:AccessPointArn
-  - Principal:"*"
-  - lifecycle policy
-  - TransitionToIA
-  - Infrequent Access
-  - access points
-  - EFS audit
-  - KmsKeyId
-  - public filesystem
-  - NFS encryption
-  - storage security
-tags: [efs, storage, security, filesystem-policy, encryption, lifecycle, access-points, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline configuration classification. Live-account audits use aws efs describe-file-systems, aws efs describe-file-system-policy, aws efs describe-access-points, and aws efs describe-lifecycle-policies (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
-  verdict_shape: "UNENCRYPTED | PUBLIC_POLICY | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing an EFS filesystem configuration before production deployment,
-    checking for public filesystem policy exposure, validating encryption-at-rest
-    and encryption-in-transit enforcement, auditing lifecycle management
-    policies, or hardening EFS access governance across an account.
-  activation_triggers:
-    - "audit this EFS filesystem"
-    - "is my EFS filesystem public"
-    - "check EFS encryption"
-    - "EFS filesystem policy too permissive"
-    - "review EFS lifecycle policy"
-    - "EFS access points configured"
-    - "harden EFS filesystem"
-    - "Principal star EFS"
-  invocation_schema: >-
-    Input: either (a) an EFS filesystem configuration (metadata + optional
-    filesystem policy JSON + optional access point summary), OR (b) a
-    filesystem-id/ARN for live-account audit. Output: deterministic
-    FILESYSTEM/VERDICT/REASON/FINDINGS/REMEDIATION block per filesystem,
-    where VERDICT ∈ {UNENCRYPTED, PUBLIC_POLICY, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: UNENCRYPTED | PUBLIC_POLICY | CONFIG_GAP | OK
+  when_to_use: Reviewing an EFS filesystem configuration before production deployment, checking for public filesystem policy exposure, validating encryption-at-rest and encryption-in-transit enforcement, auditing lifecycle management policies, or hardening EFS access governance across an account.
+  activation_triggers: audit this EFS filesystem, is my EFS filesystem public, check EFS encryption, EFS filesystem policy too permissive, review EFS lifecycle policy, EFS access points configured, harden EFS filesystem, Principal star EFS
+  invocation_schema: 'Input: either (a) an EFS filesystem configuration (metadata + optional filesystem policy JSON + optional access point summary), OR (b) a filesystem-id/ARN for live-account audit. Output: deterministic FILESYSTEM/VERDICT/REASON/FINDINGS/REMEDIATION block per filesystem, where VERDICT ∈ {UNENCRYPTED, PUBLIC_POLICY, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: EFS, Elastic File System, filesystem policy, encryption-at-rest, encryption-in-transit, aws:SecureTransport, elasticfilesystem:ClientMount, elasticfilesystem:ClientRootAccess, elasticfilesystem:ClientWrite, elasticfilesystem:AccessPointArn, Principal:"*", lifecycle policy, TransitionToIA, Infrequent Access, access points, EFS audit, KmsKeyId, public filesystem, NFS encryption, storage security
+  tags: efs, storage, security, filesystem-policy, encryption, lifecycle, access-points, audit
 ---
 
 # EFS Filesystem Auditor

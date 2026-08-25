@@ -1,127 +1,26 @@
 ---
 name: serverlessrepo-application-deployer
-description: >-
-  Provisions AWS Serverless Application Repository (SAR) applications
-  with production defaults: SAM template (template.yaml) with
-  Transform: AWS::Serverless-2016-10-31, README.md (required for
-  publish), LICENSE (required for public), application packaging
-  (zip upload or S3 bucket with code URI), semantic versioning
-  (SemVer — required for every publish), application sharing model
-  (private vs account-grant vs public), application policy (who
-  can deploy cross-account), nested applications (AWS::Serverless::
-  Application), application parameters (cloudformation parameters
-  surfaced at deploy time), deployment role (CAPABILITY_IAM /
-  CAPABILITY_NAMED_IAM / CAPABILITY_AUTO_EXPAND), SAM transform
-  during deploy (transform happens BEFORE CloudFormation sees the
-  template), published author profile (author name, URL, labels),
-  application deletion and cleanup (delete stack → unpublish),
-  and SAR vs AppRegistry distinction (SAR = deploy serverless
-  apps; AppRegistry = metadata grouping). Emits a READY_TO_DEPLOY
-  checklist with verification commands. Use when publishing a SAR
-  application, sharing an application cross-account, deploying
-  someone else's SAR application, versioning an application update,
-  or composing nested applications. Triggers: publish serverless
-  application, sar publish, serverless application repository,
-  sam package, sam deploy, sar application policy, cross-account
-  sar deploy, nested sar application, semantic version sar.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Serverless Application Repository (SAR) applications with production defaults: SAM template (template.yaml) with Transform: AWS::Serverless-2016-10-31, README.md (required for publish), LICENSE (required for public), application packaging (zip upload or S3 bucket with code URI), semantic versioning (SemVer — required for every publish), application sharing model (private vs account-grant vs public), application policy (who can deploy cross-account), nested applications (AWS::Serverless:: Application), application parameters (cloudformation parameters surfaced at deploy time), deployment role (CAPABILITY_IAM / CAPABILITY_NAMED_IAM / CAPABILITY_AUTO_EXPAND), SAM transform during deploy (transform happens BEFORE CloudFormation sees the template), published author profile (author name, URL. Triggers: publish serverless application, sar publish, serverless application repository, sam package, sam deploy, sar application policy, cross-account sar deploy, nested sar application, semantic version sar.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS SAM CLI (sam package,
-  sam deploy) or AWS CLI v2 with serverlessrepo create-application /
-  put-application-policy / create-cloud-formation-change-set.
-  Requires an S3 bucket for artifact storage and IAM permissions for
-  cloudformation:CreateChangeSet, serverlessrepo:CreateApplication,
-  and the transforms the SAM template declares.
-keywords:
-  - aws
-  - serverless application repository
-  - sar
-  - sam
-  - sam template
-  - sam deploy
-  - sam package
-  - cloudformation
-  - semantic versioning
-  - application policy
-  - nested application
-  - cross-account deploy
-  - application sharing
-  - public application
-  - private application
-  - appregistry
-  - deployment role
-  - lambda
-  - cloudops
-  - deploy
-  - devtools
-tags:
-  - aws
-  - serverless
-  - sar
-  - sam
-  - cloudformation
-  - cloudops
-  - deploy
-  - devtools
-  - semantic-versioning
-  - application-policy
-  - nested-application
-  - cross-account
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS SAM CLI (sam package, sam deploy) or AWS CLI v2 with serverlessrepo create-application / put-application-policy / create-cloud-formation-change-set. Requires an S3 bucket for artifact storage and IAM permissions for cloudformation:CreateChangeSet, serverlessrepo:CreateApplication, and the transforms the SAM template declares.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - serverless
-    - sar
-    - sam
-    - cloudformation
-    - cloudops
-    - deploy
-    - devtools
-    - semantic-versioning
-    - application-policy
-    - nested-application
-    - cross-account
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - publish serverless application
-    - sar publish
-    - serverless application repository
-    - sam package
-    - sam deploy
-    - sar application policy
-    - cross-account sar deploy
-    - nested sar application
-    - semantic version sar
-  when_to_use: >-
-    Invoke when the user wants to publish a serverless application
-    to the Serverless Application Repository, share an application
-    privately or publicly, deploy an application from SAR via
-    CloudFormation, version an application update using semantic
-    versioning, compose nested SAR applications, configure an
-    application policy for cross-account deployment, or understand
-    the SAM transform pipeline. Do NOT invoke for AWS Service Catalog
-    product registration (different catalog), CDK app publishing
-    (CDK has its own publishing path), or AppRegistry metadata
-    grouping (AppRegistry is metadata-only, not a deploy surface).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, serverless, sar, sam, cloudformation, cloudops, deploy, devtools, semantic-versioning, application-policy, nested-application, cross-account
+  dependencies: aws-orchestrator
+  keywords: aws, serverless application repository, sar, sam, sam template, sam deploy, sam package, cloudformation, semantic versioning, application policy, nested application, cross-account deploy, application sharing, public application, private application, appregistry, deployment role, lambda, cloudops, deploy, devtools
+  when_to_use: Invoke when the user wants to publish a serverless application to the Serverless Application Repository, share an application privately or publicly, deploy an application from SAR via CloudFormation, version an application update using semantic versioning, compose nested SAR applications, configure an application policy for cross-account deployment, or understand the SAM transform pipeline. Do NOT invoke for AWS Service Catalog product registration (different catalog), CDK app publishing (CDK has its own publishing path), or AppRegistry metadata grouping (AppRegistry is metadata-only, not a deploy surface).
 ---
 
 # Serverless Application Repository Deployer

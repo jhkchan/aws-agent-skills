@@ -1,110 +1,27 @@
 ---
 name: transit-gateway-deployer
-description: >-
-  Provisions production-grade AWS Transit Gateway topologies with
-  secure defaults: TGW creation (Amazon ASN, DNS support, multicast),
-  VPC attachments with subnet selections, TGW route tables
-  (association + propagation), inter-region peering connections,
-  Connect attachments (GRE tunnels for SD-WAN), TGW Network Manager
-  (global network visualization), cross-account sharing via RAM, and
-  AWS Cloud WAN integration. Emits READY_TO_DEPLOY with an ordered
-  CLI plan or PREREQUISITES_MISSING with the specific gap. Use when
-  building hub-and-spoke or mesh topologies, configuring inter-region
-  TGW peering, deploying Connect attachments for SD-WAN appliances,
-  sharing a TGW across accounts via RAM, or migrating to Cloud WAN.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions production-grade AWS Transit Gateway topologies with secure defaults: TGW creation (Amazon ASN, DNS support, multicast), VPC attachments with subnet selections, TGW route tables (association + propagation), inter-region peering connections, Connect attachments (GRE tunnels for SD-WAN), TGW Network Manager (global network visualization), cross-account sharing via RAM, and AWS Cloud WAN integration. Emits READY_TO_DEPLOY with an ordered CLI plan or PREREQUISITES_MISSING with the specific gap. Use when building hub-and-spoke or mesh topologies, configuring inter-region TGW peering, deploying Connect attachments for SD-WAN appliances, sharing a TGW across accounts via RAM, or migrating to Cloud WAN.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline plan generation.
-  Live deployment uses aws ec2 create-transit-gateway,
-  create-transit-gateway-vpc-attachment, create-transit-gateway-route-table,
-  associate-transit-gateway-route-table, enable-transit-gateway-route-table-propagation,
-  create-transit-gateway-peering-attachment,
-  create-transit-gateway-connect, create-transit-gateway-connect-peer,
-  create-transit-gateway-multicast-domain, aws ram create-resource-share,
-  aws networkmanager create-global-network, create-core-network
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Transit Gateway
-  - TGW deploy
-  - TGW creation
-  - Amazon ASN
-  - VPC attachment
-  - subnet selection
-  - TGW route table
-  - route association
-  - route propagation
-  - peering connection
-  - inter-region peering
-  - TGW Connect
-  - GRE tunnel
-  - SD-WAN
-  - Connect attachment
-  - Connect peer
-  - Network Manager
-  - global network
-  - RAM share
-  - cross-account TGW
-  - TGW multicast
-  - multicast domain
-  - AWS Cloud WAN
-  - core network
-tags: [transit-gateway, tgw, networking, deploy, hub-and-spoke, peering, connect-attachment, ram-share, cloud-wan, multicast]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan generation. Live deployment uses aws ec2 create-transit-gateway, create-transit-gateway-vpc-attachment, create-transit-gateway-route-table, associate-transit-gateway-route-table, enable-transit-gateway-route-table-propagation, create-transit-gateway-peering-attachment, create-transit-gateway-connect, create-transit-gateway-connect-peer...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Provisioning a new Transit Gateway for hub-and-spoke or mesh
-    topology, configuring VPC attachments with subnet selections,
-    building TGW route tables with association and propagation,
-    deploying inter-region peering connections between regional TGWs,
-    deploying Connect attachments with GRE tunnels for SD-WAN
-    appliances, sharing a TGW across AWS accounts via RAM, configuring
-    multicast domains, integrating with AWS Cloud WAN, or migrating
-    from VPC peering to TGW.
-  activation_triggers:
-    - "create Transit Gateway"
-    - "deploy Transit Gateway"
-    - "TGW hub and spoke"
-    - "TGW VPC attachment"
-    - "TGW route table"
-    - "TGW route propagation"
-    - "TGW peering connection"
-    - "inter-region TGW peering"
-    - "TGW Connect attachment"
-    - "TGW Connect GRE"
-    - "SD-WAN Connect attachment"
-    - "TGW Network Manager"
-    - "global network TGW"
-    - "RAM share TGW"
-    - "cross-account Transit Gateway"
-    - "TGW multicast domain"
-    - "AWS Cloud WAN"
-    - "core network TGW"
-    - "TGW ASN"
-    - "TGW DNS support"
-  invocation_schema: >-
-    Input (one of): (a) a deployment spec — TGW options (ASN, DNS,
-    multicast, AutoAcceptSharedAttachments), VPC attachments with
-    subnet IDs, route table topology with associations and
-    propagations, optional peering connections, optional Connect
-    attachments with BGP/GRE peer config, optional RAM share
-    principals, optional Cloud WAN integration; (b) a partial spec
-    for interactive refinement; (c) an existing TGW ID for review
-    against the well-architected checklist. Output: TGW_SPEC,
-    VERDICT, ARCHITECTURE, CHECKLIST[], FINDINGS[], DEPLOY_COMMANDS
-    — where VERDICT is READY_TO_DEPLOY or PREREQUISITES_MISSING.
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Provisioning a new Transit Gateway for hub-and-spoke or mesh topology, configuring VPC attachments with subnet selections, building TGW route tables with association and propagation, deploying inter-region peering connections between regional TGWs, deploying Connect attachments with GRE tunnels for SD-WAN appliances, sharing a TGW across AWS accounts via RAM, configuring multicast domains, integrating with AWS Cloud WAN, or migrating from VPC peering to TGW.
+  activation_triggers: create Transit Gateway, deploy Transit Gateway, TGW hub and spoke, TGW VPC attachment, TGW route table, TGW route propagation, TGW peering connection, inter-region TGW peering, TGW Connect attachment, TGW Connect GRE, SD-WAN Connect attachment, TGW Network Manager, global network TGW, RAM share TGW, cross-account Transit Gateway, TGW multicast domain, AWS Cloud WAN, core network TGW, TGW ASN, TGW DNS support
+  invocation_schema: 'Input (one of): (a) a deployment spec — TGW options (ASN, DNS, multicast, AutoAcceptSharedAttachments), VPC attachments with subnet IDs, route table topology with associations and propagations, optional peering connections, optional Connect attachments with BGP/GRE peer config, optional RAM share principals, optional Cloud WAN integration; (b) a partial spec for interactive refinement; (c) an existing TGW ID for review against the well-architected checklist. Output: TGW_SPEC, VERDICT, ARCHITECTURE, CHECKLIST[], FINDINGS[], DEPLOY_COMMANDS — where VERDICT is READY_TO_DEPLOY or PREREQUISITES_MISSING.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Transit Gateway, TGW deploy, TGW creation, Amazon ASN, VPC attachment, subnet selection, TGW route table, route association, route propagation, peering connection, inter-region peering, TGW Connect, GRE tunnel, SD-WAN, Connect attachment, Connect peer, Network Manager, global network, RAM share, cross-account TGW, TGW multicast, multicast domain, AWS Cloud WAN, core network
+  tags: transit-gateway, tgw, networking, deploy, hub-and-spoke, peering, connect-attachment, ram-share, cloud-wan, multicast
 ---
 
 # Transit Gateway Deployer

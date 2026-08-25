@@ -1,98 +1,25 @@
 ---
 name: codedeploy-deployment-group-auditor
-description: >-
-  Audits AWS CodeDeploy deployment groups for auto-rollback enablement,
-  CloudWatch alarm monitoring, deployment-config risk (AllAtATime, custom
-  minimum-healthy-hosts of zero), and blue/green termination posture
-  (immediate termination, no traffic control). Emits a deterministic
-  verdict (NO_ROLLBACK | NO_ALARMS | CONFIG_GAP | OK) per deployment group
-  with enumerated findings and CLI remediation. Use when reviewing
-  CodeDeploy deployment groups, validating rollback configuration, checking
-  alarm coverage, auditing deployment strategy, or hardening blue/green
-  termination before production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS CodeDeploy deployment groups for auto-rollback enablement, CloudWatch alarm monitoring, deployment-config risk (AllAtATime, custom minimum-healthy-hosts of zero), and blue/green termination posture (immediate termination, no traffic control). Emits a deterministic verdict (NO_ROLLBACK | NO_ALARMS | CONFIG_GAP | OK) per deployment group with enumerated findings and CLI remediation. Use when reviewing CodeDeploy deployment groups, validating rollback configuration, checking alarm coverage, auditing deployment strategy, or hardening blue/green termination before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline config classification. Live-account
-  audits use aws deploy get-deployment-group and aws deploy
-  batch-get-deployment-groups (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - CodeDeploy
-  - deployment group
-  - auto-rollback
-  - CloudWatch alarms
-  - alarm configuration
-  - deployment config
-  - AllAtATime
-  - OneAtATime
-  - blue/green
-  - blue green
-  - termination wait
-  - MinimumHealthyHosts
-  - deployment strategy
-  - rollback configuration
-  - ignorePollAlarmFailure
-  - Lambda canary
-  - deployment safety
-  - EC2 in-place
-  - ECS blue green
-  - DEPLOYMENT_FAILURE
-tags: [codedeploy, devtools, deployment, rollback, alarms, blue-green, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline config classification. Live-account audits use aws deploy get-deployment-group and aws deploy batch-get-deployment-groups (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
-  verdict_shape: "NO_ROLLBACK | NO_ALARMS | CONFIG_GAP | OK"
-  when_to_use: >-
-    Audit a CodeDeploy deployment group before production deployment.
-    Trigger example: "audit this CodeDeploy deployment group",
-    "is auto-rollback enabled on <dg>?", "check CodeDeploy alarms",
-    "AllAtATime deployment risk", "blue/green termination too fast".
-    Validates auto-rollback, alarm coverage, deployment-config risk, and
-    blue/green termination posture; emits a deterministic verdict per group.
-  activation_triggers:
-    - "audit this CodeDeploy deployment group"
-    - "is auto-rollback enabled"
-    - "check CodeDeploy alarm configuration"
-    - "AllAtATime deployment risk"
-    - "blue/green termination too fast"
-    - "deployment config too aggressive"
-    - "CodeDeploy rollback configuration"
-    - "deployment strategy audit"
-  invocation_schema: >-
-    Input: either (a) a CodeDeploy deployment group JSON document (from
-    aws deploy get-deployment-group), optionally paired with deployment
-    config metadata, OR (b) a deployment group name + application name
-    for live-account audit. Output: deterministic
-    DEPLOYMENT_GROUP/VERDICT/REASON/FINDINGS/REMEDIATION block per
-    deployment group, where VERDICT is in {NO_ROLLBACK, NO_ALARMS,
-    CONFIG_GAP, OK, ERROR}.
-  invocation_example: |-
-    # Minimal valid input shape (offline audit)
-    {
-      "deploymentGroupName": "my-dg",
-      "applicationName": "my-app",
-      "computePlatform": "Server",
-      "deploymentConfigName": "CodeDeployDefault.OneAtATime",
-      "deploymentStyle": {"deploymentType": "IN_PLACE", "deploymentOption": "WITH_TRAFFIC_CONTROL"},
-      "autoRollbackConfiguration": {"enabled": true, "triggers": ["DEPLOYMENT_FAILURE"]},
-      "alarmConfiguration": {"enabled": true, "ignorePollAlarmFailure": false,
-        "alarms": [{"name": "HighErrorRate"}]}
-    }
-    # Expected output (single line per field, fixed order):
-    # DEPLOYMENT_GROUP: my-dg
-    # VERDICT: OK
-    # REASON: All four gates passed (Steps 1-4).
-    # FINDINGS:
-    #   - [OK] autoRollbackConfiguration enabled with DEPLOYMENT_FAILURE (Step 1)
-    #   - [OK] alarmConfiguration enabled with 1 alarm (Step 2)
-    # REMEDIATION: None required.
+  verdict_shape: NO_ROLLBACK | NO_ALARMS | CONFIG_GAP | OK
+  when_to_use: 'Audit a CodeDeploy deployment group before production deployment. Trigger example: "audit this CodeDeploy deployment group", "is auto-rollback enabled on <dg>?", "check CodeDeploy alarms", "AllAtATime deployment risk", "blue/green termination too fast". Validates auto-rollback, alarm coverage, deployment-config risk, and blue/green termination posture; emits a deterministic verdict per group.'
+  activation_triggers: audit this CodeDeploy deployment group, is auto-rollback enabled, check CodeDeploy alarm configuration, AllAtATime deployment risk, blue/green termination too fast, deployment config too aggressive, CodeDeploy rollback configuration, deployment strategy audit
+  invocation_schema: 'Input: either (a) a CodeDeploy deployment group JSON document (from aws deploy get-deployment-group), optionally paired with deployment config metadata, OR (b) a deployment group name + application name for live-account audit. Output: deterministic DEPLOYMENT_GROUP/VERDICT/REASON/FINDINGS/REMEDIATION block per deployment group, where VERDICT is in {NO_ROLLBACK, NO_ALARMS, CONFIG_GAP, OK, ERROR}.'
+  invocation_example: "# Minimal valid input shape (offline audit)\n{\n  \"deploymentGroupName\": \"my-dg\",\n  \"applicationName\": \"my-app\",\n  \"computePlatform\": \"Server\",\n  \"deploymentConfigName\": \"CodeDeployDefault.OneAtATime\",\n  \"deploymentStyle\": {\"deploymentType\": \"IN_PLACE\", \"deploymentOption\": \"WITH_TRAFFIC_CONTROL\"},\n  \"autoRollbackConfiguration\": {\"enabled\": true, \"triggers\": [\"DEPLOYMENT_FAILURE\"]},\n  \"alarmConfiguration\": {\"enabled\": true, \"ignorePollAlarmFailure\": false,\n    \"alarms\": [{\"name\": \"HighErrorRate\"}]}\n}\n# Expected output (single line per field, fixed order):\n# DEPLOYMENT_GROUP: my-dg\n# VERDICT: OK\n# REASON: All four gates passed (Steps 1-4).\n# FINDINGS:\n#   - [OK] autoRollbackConfiguration enabled with DEPLOYMENT_FAILURE (Step 1)\n#   - [OK] alarmConfiguration enabled with 1 alarm (Step 2)\n# REMEDIATION: None required."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CodeDeploy, deployment group, auto-rollback, CloudWatch alarms, alarm configuration, deployment config, AllAtATime, OneAtATime, blue/green, blue green, termination wait, MinimumHealthyHosts, deployment strategy, rollback configuration, ignorePollAlarmFailure, Lambda canary, deployment safety, EC2 in-place, ECS blue green, DEPLOYMENT_FAILURE
+  tags: codedeploy, devtools, deployment, rollback, alarms, blue-green, audit
 ---
 
 # CodeDeploy Deployment Group Auditor

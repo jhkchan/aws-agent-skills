@@ -1,106 +1,26 @@
 ---
 name: cloudwatch-application-signals-operator
-description: >-
-  Operates AWS CloudWatch Application Signals with production defaults:
-  enablement via OpenTelemetry (OTel) SDK instrumentation or
-  auto-instrumentation, service level objectives (SLO) creation (target
-  percentage, interval), SLI metrics (availability, latency) derived
-  automatically from traces, burn rate alerts (fast burn = page, slow
-  burn = ticket) using multi-window multi-burn-rate (MWMBR) algorithm,
-  service map visualization, CloudWatch RUM integration for client-side
-  telemetry, correlation with X-Ray traces, service hierarchy
-  (service → operation), canary alarms, anomaly detection on SLI
-  metrics, and multi-service SLO tracking. Emits an OPERATION_COMPLETED
-  checklist with verification commands. Use when enabling Application
-  Signals, creating SLOs, setting up burn rate alerts, visualizing
-  service maps, or integrating RUM with server-side observability.
-  Triggers: application signals, slo creation, sli metrics, burn rate
-  alert, service map, cloudwatch rum, otel instrumentation, multi-burn-
-  rate, x-ray correlation, canary alarm, anomaly detection slo.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Operates AWS CloudWatch Application Signals with production defaults: enablement via OpenTelemetry (OTel) SDK instrumentation or auto-instrumentation, service level objectives (SLO) creation (target percentage, interval), SLI metrics (availability, latency) derived automatically from traces, burn rate alerts (fast burn = page, slow burn = ticket) using multi-window multi-burn-rate (MWMBR) algorithm, service map visualization, CloudWatch RUM integration for client-side telemetry, correlation with X-Ray traces, service hierarchy (service → operation), canary alarms, anomaly detection on SLI metrics, and multi-service SLO tracking. Emits an OPERATION_COMPLETED checklist with verification commands. Use when enabling Application Signals, creating SLOs, setting up burn rate alerts, visualizing service maps, or. Triggers: application signals, slo creation, sli metrics, burn rate alert, service map, cloudwatch rum, otel instrumentation, multi-burn- rate, x-ray correlation, canary alarm, anomaly detection slo.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live operation: AWS CLI v2 with cloudwatch and
-  application-signals access. Works with Terraform
-  aws_cloudwatchobservability_access_policy and CloudFormation
-  AWS::ApplicationSignals::ServiceLevelObjective resources.
-keywords:
-  - aws
-  - cloudwatch
-  - application signals
-  - slo
-  - sli
-  - burn rate
-  - otel
-  - opentelemetry
-  - service map
-  - cloudops
-  - operate
-  - x-ray
-  - rum
-  - observability
-tags:
-  - aws
-  - cloudwatch
-  - application-signals
-  - slo
-  - sli
-  - burn-rate
-  - cloudops
-  - operate
-  - observability
-  - opentelemetry
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live operation: AWS CLI v2 with cloudwatch and application-signals access. Works with Terraform aws_cloudwatchobservability_access_policy and CloudFormation AWS::ApplicationSignals::ServiceLevelObjective resources.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "OPERATION_COMPLETED | REVIEW_REQUIRED"
+  verdict_shape: OPERATION_COMPLETED | REVIEW_REQUIRED
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - cloudwatch
-    - application-signals
-    - slo
-    - sli
-    - burn-rate
-    - cloudops
-    - operate
-    - observability
-    - opentelemetry
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - application signals enable
-    - slo creation
-    - sli metrics
-    - burn rate alert
-    - multi-window multi-burn-rate
-    - service map visualization
-    - cloudwatch rum integration
-    - x-ray trace correlation
-    - otel instrumentation
-    - anomaly detection slo
-  when_to_use: >-
-    Invoke when the user wants to enable Application Signals, create
-    service level objectives (SLOs), set up burn rate alerts (fast/slow
-    burn), visualize service maps, integrate CloudWatch RUM, correlate
-    traces with X-Ray, configure anomaly detection on SLI metrics, or
-    track SLOs across multiple services. Do NOT invoke for basic
-    CloudWatch alarm creation (use cloudwatch-alarm-operator), CloudWatch
-    Logs analysis (use cloudwatch-logs-insights-troubleshooter), or
-    general X-Ray tracing setup (use xray-tracing-deployer).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, cloudwatch, application-signals, slo, sli, burn-rate, cloudops, operate, observability, opentelemetry
+  dependencies: aws-orchestrator
+  keywords: aws, cloudwatch, application signals, slo, sli, burn rate, otel, opentelemetry, service map, cloudops, operate, x-ray, rum, observability
+  when_to_use: Invoke when the user wants to enable Application Signals, create service level objectives (SLOs), set up burn rate alerts (fast/slow burn), visualize service maps, integrate CloudWatch RUM, correlate traces with X-Ray, configure anomaly detection on SLI metrics, or track SLOs across multiple services. Do NOT invoke for basic CloudWatch alarm creation (use cloudwatch-alarm-operator), CloudWatch Logs analysis (use cloudwatch-logs-insights-troubleshooter), or general X-Ray tracing setup (use xray-tracing-deployer).
 ---
 
 # CloudWatch Application Signals Operator

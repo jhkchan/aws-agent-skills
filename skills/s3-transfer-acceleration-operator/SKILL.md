@@ -1,99 +1,27 @@
 ---
 name: s3-transfer-acceleration-operator
-description: >-
-  Operates S3 Transfer Acceleration workflows — enable/disable
-  acceleration per bucket (put-bucket-accelerate-configuration),
-  cost analysis by source region ($0.004-0.025/GB depending on
-  edge location), speed comparison tool (CloudFront edge vs
-  direct S3 endpoint), multipart upload with acceleration endpoints
-  (<bucket>.s3-accelerate.amazonaws.com), checksum verification
-  (CRC32C, SHA-256) on accelerated uploads, S3 multipart copy
-  between accelerated buckets, Direct Connect comparison, and
-  diagnostic loops (get-bucket-accelerate-configuration,
-  CloudWatch BytesUploaded). Runs deterministic pre-checks (bucket
-  exists, not a directory bucket, caller has
-  s3:PutAccelerateConfiguration, region supports acceleration,
-  cost acknowledgment) behind a CONFIRM gate and emits a READY,
-  BLOCKED, or COMPLETED verdict. Use when enabling/disabling
-  acceleration, comparing transfer speeds, planning multipart
-  uploads over acceleration, or diagnosing slow transfers.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates S3 Transfer Acceleration workflows — enable/disable acceleration per bucket (put-bucket-accelerate-configuration), cost analysis by source region ($0.004-0.025/GB depending on edge location), speed comparison tool (CloudFront edge vs direct S3 endpoint), multipart upload with acceleration endpoints (<bucket>.s3-accelerate.amazonaws.com), checksum verification (CRC32C, SHA-256) on accelerated uploads, S3 multipart copy between accelerated buckets, Direct Connect comparison, and diagnostic loops (get-bucket-accelerate-configuration, CloudWatch BytesUploaded). Runs deterministic pre-checks (bucket exists, not a directory bucket, caller has s3:PutAccelerateConfiguration, region supports acceleration, cost acknowledgment) behind a CONFIRM gate and emits a READY, BLOCKED, or COMPLETED verdict. Use when enabling/disabling acceleration, comparing transfer speeds, planning multipart uploads over acceleration, or diagnosing slow transfers.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline plan
-  classification. Live-account operations use aws s3api
-  put-bucket-accelerate-configuration,
-  get-bucket-accelerate-configuration, s3api create-multipart-upload
-  / upload-part / complete-multipart-upload (with accelerate
-  endpoint), aws s3 ls --endpoint-url, CloudWatch GetMetricStatistics
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - S3 Transfer Acceleration
-  - accelerate endpoint
-  - s3-accelerate.amazonaws.com
-  - multipart upload
-  - checksum verification
-  - CRC32
-  - CRC32C
-  - SHA-256
-  - Direct Connect
-  - edge network
-  - put-bucket-accelerate-configuration
-  - get-bucket-accelerate-configuration
-  - BytesUploaded
-  - speed comparison
-  - cost per GB
-  - multipart copy
-  - bucket configuration
-tags: [aws, s3, storage, transfer-acceleration, upload, networking, operate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws s3api put-bucket-accelerate-configuration, get-bucket-accelerate-configuration, s3api create-multipart-upload / upload-part / complete-multipart-upload (with accelerate endpoint), aws s3 ls --endpoint-url, CloudWatch GetMetricStatistics (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Enabling or disabling S3 Transfer Acceleration on a bucket,
-    comparing transfer speed between accelerated and direct S3
-    endpoints, planning a multipart upload over the accelerate
-    endpoint, verifying checksums on accelerated uploads, performing
-    a multipart copy between accelerated buckets, comparing Transfer
-    Acceleration vs Direct Connect for large data transfers, or
-    diagnosing why accelerated transfers are slower than expected.
-  activation_triggers:
-    - "enable S3 Transfer Acceleration"
-    - "disable S3 Transfer Acceleration"
-    - "accelerate endpoint"
-    - "s3-accelerate.amazonaws.com"
-    - "put-bucket-accelerate-configuration"
-    - "get-bucket-accelerate-configuration"
-    - "S3 speed comparison"
-    - "accelerated multipart upload"
-    - "S3 checksum verification"
-    - "CRC32C upload"
-    - "S3 multipart copy accelerated"
-    - "Transfer Acceleration cost"
-    - "Direct Connect vs Transfer Acceleration"
-    - "slow S3 transfer"
-    - "S3 edge network upload"
-  invocation_schema: >-
-    Input: either (a) a bucket configuration
-    (get-bucket-accelerate-configuration, get-bucket-location,
-    head-bucket output) plus the intended operation
-    (enable-acceleration, disable-acceleration, speed-comparison,
-    plan-multipart-upload, compare-direct-connect,
-    diagnose-transfer), OR (b) a bucket-name + operation for live-
-    account execution. Output: deterministic OPERATION / VERDICT /
-    PRE_CHECKS / STEPS / POST_VERIFY / COST / NOTES block per
-    operation, where VERDICT is one of READY, BLOCKED, COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Enabling or disabling S3 Transfer Acceleration on a bucket, comparing transfer speed between accelerated and direct S3 endpoints, planning a multipart upload over the accelerate endpoint, verifying checksums on accelerated uploads, performing a multipart copy between accelerated buckets, comparing Transfer Acceleration vs Direct Connect for large data transfers, or diagnosing why accelerated transfers are slower than expected.
+  activation_triggers: enable S3 Transfer Acceleration, disable S3 Transfer Acceleration, accelerate endpoint, s3-accelerate.amazonaws.com, put-bucket-accelerate-configuration, get-bucket-accelerate-configuration, S3 speed comparison, accelerated multipart upload, S3 checksum verification, CRC32C upload, S3 multipart copy accelerated, Transfer Acceleration cost, Direct Connect vs Transfer Acceleration, slow S3 transfer, S3 edge network upload
+  invocation_schema: 'Input: either (a) a bucket configuration (get-bucket-accelerate-configuration, get-bucket-location, head-bucket output) plus the intended operation (enable-acceleration, disable-acceleration, speed-comparison, plan-multipart-upload, compare-direct-connect, diagnose-transfer), OR (b) a bucket-name + operation for live- account execution. Output: deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / COST / NOTES block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: S3 Transfer Acceleration, accelerate endpoint, s3-accelerate.amazonaws.com, multipart upload, checksum verification, CRC32, CRC32C, SHA-256, Direct Connect, edge network, put-bucket-accelerate-configuration, get-bucket-accelerate-configuration, BytesUploaded, speed comparison, cost per GB, multipart copy, bucket configuration
+  tags: aws, s3, storage, transfer-acceleration, upload, networking, operate
 ---
 
 # S3 Transfer Acceleration Operator

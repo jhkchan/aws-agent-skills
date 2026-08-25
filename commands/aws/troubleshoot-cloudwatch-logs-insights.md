@@ -15,12 +15,12 @@ nl_triggers:
   - "metric filter vs Logs Insights"
   - "CloudWatch Logs query returns nothing"
   - "diagnose Logs Insights"
-routes_to: cloudwatch-logs-insights-troubshooter
+routes_to: cloudwatch-logs-insights-troubleshooter
 ---
 
 # /aws:troubleshoot-cloudwatch-logs-insights
 
-Activate the `cloudwatch-logs-insights-troubshooter` skill and diagnose
+Activate the `cloudwatch-logs-insights-troubleshooter` skill and diagnose
 a CloudWatch Logs Insights problem.
 
 ## What it does

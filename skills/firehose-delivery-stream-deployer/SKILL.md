@@ -1,108 +1,26 @@
 ---
 name: firehose-delivery-stream-deployer
-description: >-
-  Provisions Kinesis Data Firehose delivery streams with production
-  defaults: source selection (Direct PUT, Kinesis Data Stream, Amazon
-  MSK, CloudWatch Logs), Lambda transformation for ETL, format
-  conversion (Parquet/ORC/JSON via dynamic schema), S3 destination
-  (prefix patterns, error prefix, buffering hints), OpenSearch
-  destination, HTTP endpoint destination (Splunk/custom), Redshift
-  destination (COPY via S3 staging), backup configuration, retry and
-  duration settings, CloudWatch logging, and server-side encryption
-  (KMS). Emits a READY_TO_DEPLOY checklist with verification
-  commands. Use when creating a Firehose delivery stream, configuring
-  S3/OpenSearch/Redshift/HTTP destinations, setting up Lambda
-  transformation, or enabling Parquet format conversion. Triggers:
-  create firehose delivery stream, firehose s3 destination, firehose
-  lambda transformation, firehose parquet conversion, firehose
-  opensearch destination, firehose redshift destination, firehose
-  splunk http endpoint, firehose buffering hints.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Kinesis Data Firehose delivery streams with production defaults: source selection (Direct PUT, Kinesis Data Stream, Amazon MSK, CloudWatch Logs), Lambda transformation for ETL, format conversion (Parquet/ORC/JSON via dynamic schema), S3 destination (prefix patterns, error prefix, buffering hints), OpenSearch destination, HTTP endpoint destination (Splunk/custom), Redshift destination (COPY via S3 staging), backup configuration, retry and duration settings, CloudWatch logging, and server-side encryption (KMS). Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Firehose delivery stream, configuring S3/OpenSearch/Redshift/HTTP destinations, setting up Lambda transformation, or enabling Parquet format conversion. Triggers: create firehose delivery stream, firehose s3 destination, firehose lambda transformation, firehose parquet conversion, firehose opensearch destination, firehose redshift destination, firehose splunk http endpoint, firehose buffering hints.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with firehose, s3,
-  lambda, iam, and kms access. Works with Terraform
-  aws_kinesis_firehose_delivery_stream resources and CloudFormation
-  AWS::KinesisFirehose::DeliveryStream templates.
-keywords:
-  - aws
-  - kinesis
-  - firehose
-  - delivery stream
-  - cloudops
-  - deploy
-  - provisioning
-  - s3 destination
-  - opensearch
-  - redshift
-  - lambda transformation
-  - parquet
-  - format conversion
-  - buffering hints
-  - kms encryption
-tags:
-  - aws
-  - kinesis
-  - firehose
-  - delivery-stream
-  - cloudops
-  - deploy
-  - analytics
-  - provisioning
-  - s3-destination
-  - lambda-transformation
-  - parquet
-  - kms-encryption
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with firehose, s3, lambda, iam, and kms access. Works with Terraform aws_kinesis_firehose_delivery_stream resources and CloudFormation AWS::KinesisFirehose::DeliveryStream templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - kinesis
-    - firehose
-    - delivery-stream
-    - cloudops
-    - deploy
-    - analytics
-    - provisioning
-    - s3-destination
-    - lambda-transformation
-    - parquet
-    - kms-encryption
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create firehose delivery stream
-    - firehose s3 destination
-    - firehose lambda transformation
-    - firehose parquet conversion
-    - firehose opensearch destination
-    - firehose redshift destination
-    - firehose splunk http endpoint
-    - firehose buffering hints
-  when_to_use: >-
-    Invoke when the user wants to create a Kinesis Data Firehose
-    delivery stream, configure S3/OpenSearch/Redshift/HTTP endpoint
-    destinations, set up Lambda transformation for ETL, enable Parquet
-    or ORC format conversion, configure buffering hints, or set up KMS
-    encryption. Do NOT invoke for Kinesis Data Streams (use
-    kinesis-stream-deployer), Kinesis Data Analytics (use
-    kinesis-analytics-deployer), or Firehose auditing/troubleshooting.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, kinesis, firehose, delivery-stream, cloudops, deploy, analytics, provisioning, s3-destination, lambda-transformation, parquet, kms-encryption
+  dependencies: aws-orchestrator
+  keywords: aws, kinesis, firehose, delivery stream, cloudops, deploy, provisioning, s3 destination, opensearch, redshift, lambda transformation, parquet, format conversion, buffering hints, kms encryption
+  when_to_use: Invoke when the user wants to create a Kinesis Data Firehose delivery stream, configure S3/OpenSearch/Redshift/HTTP endpoint destinations, set up Lambda transformation for ETL, enable Parquet or ORC format conversion, configure buffering hints, or set up KMS encryption. Do NOT invoke for Kinesis Data Streams (use kinesis-stream-deployer), Kinesis Data Analytics (use kinesis-analytics-deployer), or Firehose auditing/troubleshooting.
 ---
 
 # Firehose Delivery Stream Deployer

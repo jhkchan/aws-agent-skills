@@ -1,78 +1,24 @@
 ---
 name: cloudfront-distribution-auditor
-description: >-
-  Audits AWS CloudFront distributions for insecure TLS viewer minimum protocol
-  versions and viewer protocol policies, missing Origin Access Control (OAC) on
-  S3 origins, missing WAF Web ACL association, disabled access logging, absent
-  geographic restrictions, and default-cache-behavior misconfigurations. Emits a
-  deterministic verdict (INSECURE_TLS | NO_OAC | CONFIG_GAP | OK) per
-  distribution with enumerated findings and CLI remediation. Use when reviewing
-  a CloudFront distribution before production deployment, checking TLS posture,
-  validating OAC on S3 origins, verifying WAF coverage, auditing logging status,
-  or hardening edge security.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS CloudFront distributions for insecure TLS viewer minimum protocol versions and viewer protocol policies, missing Origin Access Control (OAC) on S3 origins, missing WAF Web ACL association, disabled access logging, absent geographic restrictions, and default-cache-behavior misconfigurations. Emits a deterministic verdict (INSECURE_TLS | NO_OAC | CONFIG_GAP | OK) per distribution with enumerated findings and CLI remediation. Use when reviewing a CloudFront distribution before production deployment, checking TLS posture, validating OAC on S3 origins, verifying WAF coverage, auditing logging status, or hardening edge security.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline distribution-config classification.
-  Live-account audits use aws cloudfront get-distribution-config,
-  aws cloudfront get-origin-access-control, and aws cloudfront list-distributions
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - CloudFront
-  - distribution audit
-  - TLS minimum protocol
-  - TLSv1.2_2021
-  - Origin Access Control
-  - OAC
-  - OAI
-  - ViewerProtocolPolicy
-  - OriginProtocolPolicy
-  - WAF association
-  - Web ACL
-  - access logging
-  - geographic restrictions
-  - geo restriction
-  - default cache behavior
-  - default root object
-  - S3 website endpoint
-  - edge security
-  - HTTPS enforcement
-  - distribution hardening
-tags: [cloudfront, security, tls, oac, waf, logging, geo-restriction, networking, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline distribution-config classification. Live-account audits use aws cloudfront get-distribution-config, aws cloudfront get-origin-access-control, and aws cloudfront list-distributions (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
-  verdict_shape: "INSECURE_TLS | NO_OAC | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a CloudFront distribution before production deployment, checking
-    TLS minimum protocol version, validating Origin Access Control on S3
-    origins, verifying WAF Web ACL association, auditing access logging,
-    inspecting geographic restrictions, or hardening edge security posture
-    across distributions.
-  activation_triggers:
-    - "audit this CloudFront distribution"
-    - "is my CloudFront TLS secure"
-    - "check CloudFront OAC"
-    - "is OAC configured on my S3 origin"
-    - "does my distribution have a WAF"
-    - "CloudFront logging disabled"
-    - "geo restriction CloudFront"
-    - "ViewerProtocolPolicy allow-all"
-    - "hardening CloudFront before production"
-    - "OriginProtocolPolicy http-only"
-  invocation_schema: >-
-    Input: either (a) a CloudFront distribution config JSON, optionally paired
-    with origin-access-control metadata, OR (b) a distribution id for
-    live-account audit. Output: deterministic DISTRIBUTION/VERDICT/REASON/
-    FINDINGS/REMEDIATION block per distribution, where VERDICT belongs to
-    {INSECURE_TLS, NO_OAC, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: INSECURE_TLS | NO_OAC | CONFIG_GAP | OK
+  when_to_use: Reviewing a CloudFront distribution before production deployment, checking TLS minimum protocol version, validating Origin Access Control on S3 origins, verifying WAF Web ACL association, auditing access logging, inspecting geographic restrictions, or hardening edge security posture across distributions.
+  activation_triggers: audit this CloudFront distribution, is my CloudFront TLS secure, check CloudFront OAC, is OAC configured on my S3 origin, does my distribution have a WAF, CloudFront logging disabled, geo restriction CloudFront, ViewerProtocolPolicy allow-all, hardening CloudFront before production, OriginProtocolPolicy http-only
+  invocation_schema: 'Input: either (a) a CloudFront distribution config JSON, optionally paired with origin-access-control metadata, OR (b) a distribution id for live-account audit. Output: deterministic DISTRIBUTION/VERDICT/REASON/ FINDINGS/REMEDIATION block per distribution, where VERDICT belongs to {INSECURE_TLS, NO_OAC, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudFront, distribution audit, TLS minimum protocol, TLSv1.2_2021, Origin Access Control, OAC, OAI, ViewerProtocolPolicy, OriginProtocolPolicy, WAF association, Web ACL, access logging, geographic restrictions, geo restriction, default cache behavior, default root object, S3 website endpoint, edge security, HTTPS enforcement, distribution hardening
+  tags: cloudfront, security, tls, oac, waf, logging, geo-restriction, networking, audit
 ---
 
 # CloudFront Distribution Auditor

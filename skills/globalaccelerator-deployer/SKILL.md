@@ -1,96 +1,27 @@
 ---
 name: globalaccelerator-deployer
-description: >-
-  Provisions production-grade AWS Global Accelerator deployments with secure
-  defaults: anycast static IP allocation (Amazon pool or BYOIP), TCP/UDP
-  listeners with port ranges and client affinity, regional endpoint groups
-  with traffic dials and health checks, ALB/NLB/EC2/EIP endpoint types,
-  client IP preservation for NLB/EC2 origins, flow logs to CloudWatch or
-  S3, cross-account endpoints via RAM resource share, and custom routing
-  accelerators for deterministic port-to-endpoint mapping. Emits a
-  deployment plan with a READY_TO_DEPLOY checklist. Use when provisioning
-  a new accelerator, planning multi-region active-active traffic steering,
-  configuring client IP preservation for NLB origins, advertising BYOIP
-  ranges, sharing endpoints across AWS accounts, or building a custom
-  routing accelerator for gaming/VoIP workloads.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions production-grade AWS Global Accelerator deployments with secure defaults: anycast static IP allocation (Amazon pool or BYOIP), TCP/UDP listeners with port ranges and client affinity, regional endpoint groups with traffic dials and health checks, ALB/NLB/EC2/EIP endpoint types, client IP preservation for NLB/EC2 origins, flow logs to CloudWatch or S3, cross-account endpoints via RAM resource share, and custom routing accelerators for deterministic port-to-endpoint mapping. Emits a deployment plan with a READY_TO_DEPLOY checklist. Use when provisioning a new accelerator, planning multi-region active-active traffic steering, configuring client IP preservation for NLB origins, advertising BYOIP ranges, sharing endpoints across AWS accounts, or building a custom routing accelerator for gaming/VoIP workloads.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline architecture planning. Live
-  deployment uses aws globalaccelerator create-accelerator,
-  create-listener, create-endpoint-group, add-endpoints,
-  update-endpoint-group, advertise-byoip-cidr, aws ram create-resource-share,
-  aws ec2 describe-addresses, and aws logs create-log-group
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Global Accelerator
-  - accelerator deploy
-  - anycast IP
-  - static IP
-  - BYOIP
-  - listener
-  - endpoint group
-  - traffic dial
-  - health check
-  - ALB endpoint
-  - NLB endpoint
-  - EC2 endpoint
-  - Elastic IP endpoint
-  - client IP preservation
-  - PreserveClientIpEnabled
-  - flow logs
-  - cross-account endpoints
-  - RAM resource share
-  - custom routing accelerator
-  - dual-stack
-  - IPv6
-  - client affinity
-  - multi-region active-active
-tags: [globalaccelerator, networking, deploy, anycast, byoip, endpoint-group, traffic-dial, client-ip-preservation, cross-account, custom-routing]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline architecture planning. Live deployment uses aws globalaccelerator create-accelerator, create-listener, create-endpoint-group, add-endpoints, update-endpoint-group, advertise-byoip-cidr, aws ram create-resource-share, aws ec2 describe-addresses, and aws logs create-log-group (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Provisioning a new Global Accelerator for production, planning
-    multi-region active-active traffic steering, configuring client IP
-    preservation for NLB or EC2 endpoints, advertising BYOIP CIDR blocks,
-    sharing endpoint groups across AWS accounts via RAM, deploying a
-    custom routing accelerator for gaming or VoIP workloads, or
-    configuring flow logs to CloudWatch or S3.
-  activation_triggers:
-    - "create a Global Accelerator"
-    - "provision an accelerator with static IPs"
-    - "multi-region active-active accelerator"
-    - "BYOIP advertise through Global Accelerator"
-    - "client IP preservation for NLB"
-    - "cross-account endpoint share"
-    - "custom routing accelerator"
-    - "Global Accelerator endpoint group"
-    - "traffic dial multi-region"
-    - "Global Accelerator flow logs"
-    - "dual-stack IPv6 accelerator"
-  invocation_schema: >-
-    Input shape (one of): (a) a deployment specification including
-    endpoint type (ALB/NLB/EC2/EIP), regions, listener protocol and port
-    range, traffic steering model, BYOIP requirement, client IP
-    preservation requirement, flow log destination, and cross-account
-    requirement; (b) a partial spec for interactive refinement (e.g.,
-    "Global Accelerator in front of two regional ALBs with active-active");
-    (c) an existing accelerator ARN for architecture review against the
-    well-architected checklist. Output shape: { ACCELERATOR_SPEC, VERDICT,
-    ARCHITECTURE, CHECKLIST[], FINDINGS[], DEPLOY_COMMANDS } where VERDICT
-    ∈ { READY_TO_DEPLOY, PREREQUISITES_MISSING }.
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Provisioning a new Global Accelerator for production, planning multi-region active-active traffic steering, configuring client IP preservation for NLB or EC2 endpoints, advertising BYOIP CIDR blocks, sharing endpoint groups across AWS accounts via RAM, deploying a custom routing accelerator for gaming or VoIP workloads, or configuring flow logs to CloudWatch or S3.
+  activation_triggers: create a Global Accelerator, provision an accelerator with static IPs, multi-region active-active accelerator, BYOIP advertise through Global Accelerator, client IP preservation for NLB, cross-account endpoint share, custom routing accelerator, Global Accelerator endpoint group, traffic dial multi-region, Global Accelerator flow logs, dual-stack IPv6 accelerator
+  invocation_schema: 'Input shape (one of): (a) a deployment specification including endpoint type (ALB/NLB/EC2/EIP), regions, listener protocol and port range, traffic steering model, BYOIP requirement, client IP preservation requirement, flow log destination, and cross-account requirement; (b) a partial spec for interactive refinement (e.g., "Global Accelerator in front of two regional ALBs with active-active"); (c) an existing accelerator ARN for architecture review against the well-architected checklist. Output shape: { ACCELERATOR_SPEC, VERDICT, ARCHITECTURE, CHECKLIST[], FINDINGS[], DEPLOY_COMMANDS } where VERDICT ∈ { READY_TO_DEPLOY, PREREQUISITES_MISSING }.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Global Accelerator, accelerator deploy, anycast IP, static IP, BYOIP, listener, endpoint group, traffic dial, health check, ALB endpoint, NLB endpoint, EC2 endpoint, Elastic IP endpoint, client IP preservation, PreserveClientIpEnabled, flow logs, cross-account endpoints, RAM resource share, custom routing accelerator, dual-stack, IPv6, client affinity, multi-region active-active
+  tags: globalaccelerator, networking, deploy, anycast, byoip, endpoint-group, traffic-dial, client-ip-preservation, cross-account, custom-routing
 ---
 
 # Global Accelerator Deployer

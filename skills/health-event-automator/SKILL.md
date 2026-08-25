@@ -1,109 +1,28 @@
 ---
 name: health-event-automator
-description: >-
-  Designs AWS Health event response automation across the three event type
-  categories (issue, accountNotification, scheduledChange), EventBridge
-  rules routing Health events to SNS, Lambda responders (Slack/Teams
-  notify, Jira ticket create, DR failover trigger, Auto Scaling scale-out),
-  AWS Health API affected-entity mapping, organizational view for
-  org-level Health events across all member accounts, AWS User
-  Notifications chat delivery, AWS Health Omics workflow alerts, and
-  EventBridge Scheduler for scheduled-change lead-time actions. Emits
-  AUTOMATED with the responder playbook or MANUAL_STEP_REQUIRED with the
-  gap. Use when designing Health event automation, org-level health
-  visibility, or scheduled-change remediation workflows.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Designs AWS Health event response automation across the three event type categories (issue, accountNotification, scheduledChange), EventBridge rules routing Health events to SNS, Lambda responders (Slack/Teams notify, Jira ticket create, DR failover trigger, Auto Scaling scale-out), AWS Health API affected-entity mapping, organizational view for org-level Health events across all member accounts, AWS User Notifications chat delivery, AWS Health Omics workflow alerts, and EventBridge Scheduler for scheduled-change lead-time actions. Emits AUTOMATED with the responder playbook or MANUAL_STEP_REQUIRED with the gap. Use when designing Health event automation, org-level health visibility, or scheduled-change remediation workflows.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan authoring. Live deployment
-  uses aws health describe-events / describe-affected-entities,
-  aws health describe-aggregate-offers (org), aws events put-rule
-  (Health event pattern), aws events put-targets (SNS/Lambda),
-  aws scheduler create-schedule (scheduled-change lead-time),
-  aws notifications contacts / channels (User Notifications),
-  aws backup start-restore-job (DR trigger),
-  aws autoscaling update-auto-scaling-group (scale-out responder),
-  aws sns publish / lambda invoke (custom responder) — AWS CLI v2,
-  SSO or key-based, Business/Enterprise support tier for Health API.
-keywords:
-  - AWS Health
-  - Health event
-  - EventBridge rule
-  - event type category
-  - issue
-  - accountNotification
-  - scheduledChange
-  - affected entity
-  - organizational view
-  - Health API
-  - Health Omics
-  - User Notifications
-  - scheduled change
-  - lead-time action
-  - EventBridge Scheduler
-  - SNS Lambda responder
-  - Slack notification
-  - Jira ticket
-  - DR failover trigger
-  - Auto Scaling scale-out
-tags:
-  - aws-health
-  - eventbridge
-  - sns
-  - lambda
-  - user-notifications
-  - automate
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan authoring. Live deployment uses aws health describe-events / describe-affected-entities, aws health describe-aggregate-offers (org), aws events put-rule (Health event pattern), aws events put-targets (SNS/Lambda), aws scheduler create-schedule (scheduled-change lead-time), aws notifications contacts / channels (User Notifications), aws backup start-restore-job (DR trigger)...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: automate
   skill_class: capability
   lifecycle_status: active
   verdict_shape: AUTOMATED | MANUAL_STEP_REQUIRED
-  when_to_use: >-
-    Designing Health event response automation, wiring EventBridge rules
-    for AWS Health events (issue, accountNotification, scheduledChange),
-    mapping affected entities, building organizational-view Health
-    dashboards, automating Slack/Teams/Jira notifications, triggering DR
-    failover or scale-out from Health events, scheduling lead-time actions
-    for scheduled changes, or routing Health Omics workflow alerts.
-  when_not_to_use:
-    - General incident response without an AWS Health signal (use incident-response-automator — Health is one trigger source).
-    - DR failover design itself (use dr-failover-automator — this skill triggers failover, it does not design the strategy).
-    - Security finding triage (use guardduty / security-hub skills — Health events are operational, not security findings).
-    - Cost anomaly response (use cost-anomaly-response-automator — Health events are not billing signals).
-  activation_triggers:
-    - "AWS Health event automation"
-    - "EventBridge rule for Health"
-    - "Health affected entity"
-    - "Health organizational view"
-    - "scheduled change lead-time"
-    - "Health event SNS Lambda"
-    - "Slack notification for Health"
-    - "Jira ticket from Health event"
-    - "DR failover from Health"
-    - "Auto Scaling scale-out on Health"
-    - "AWS User Notifications"
-    - "Health Omics alert"
-    - "accountNotification automation"
-    - "scheduledChange automation"
-  invocation_schema: >-
-    Input: either (a) a Health automation requirement ("route issue events
-    for EC2 in org to Slack + create Jira, with DR failover on region
-    outage"), OR (b) an existing EventBridge Health rule / responder
-    workflow to audit and harden. Output: deterministic Health block per
-    requirement — EVENT_TYPES/AFFECTED_ENTITIES/RESPONDERS/ORG_VIEW/
-    SCHEDULED_CHANGES/VERIFICATION/VERDICT — where VERDICT is AUTOMATED
-    (responder playbook complete with all gates passing) or
-    MANUAL_STEP_REQUIRED (specific gap cited, e.g., no affected-entity
-    enrichment, no org-level rule, lead-time action missing).
+  when_to_use: Designing Health event response automation, wiring EventBridge rules for AWS Health events (issue, accountNotification, scheduledChange), mapping affected entities, building organizational-view Health dashboards, automating Slack/Teams/Jira notifications, triggering DR failover or scale-out from Health events, scheduling lead-time actions for scheduled changes, or routing Health Omics workflow alerts.
+  when_not_to_use: General incident response without an AWS Health signal (use incident-response-automator — Health is one trigger source)., DR failover design itself (use dr-failover-automator — this skill triggers failover, it does not design the strategy)., Security finding triage (use guardduty / security-hub skills — Health events are operational, not security findings)., Cost anomaly response (use cost-anomaly-response-automator — Health events are not billing signals).
+  activation_triggers: AWS Health event automation, EventBridge rule for Health, Health affected entity, Health organizational view, scheduled change lead-time, Health event SNS Lambda, Slack notification for Health, Jira ticket from Health event, DR failover from Health, Auto Scaling scale-out on Health, AWS User Notifications, Health Omics alert, accountNotification automation, scheduledChange automation
+  invocation_schema: 'Input: either (a) a Health automation requirement ("route issue events for EC2 in org to Slack + create Jira, with DR failover on region outage"), OR (b) an existing EventBridge Health rule / responder workflow to audit and harden. Output: deterministic Health block per requirement — EVENT_TYPES/AFFECTED_ENTITIES/RESPONDERS/ORG_VIEW/ SCHEDULED_CHANGES/VERIFICATION/VERDICT — where VERDICT is AUTOMATED (responder playbook complete with all gates passing) or MANUAL_STEP_REQUIRED (specific gap cited, e.g., no affected-entity enrichment, no org-level rule, lead-time action missing).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Health, Health event, EventBridge rule, event type category, issue, accountNotification, scheduledChange, affected entity, organizational view, Health API, Health Omics, User Notifications, scheduled change, lead-time action, EventBridge Scheduler, SNS Lambda responder, Slack notification, Jira ticket, DR failover trigger, Auto Scaling scale-out
+  tags: aws-health, eventbridge, sns, lambda, user-notifications, automate
 ---
 
 # Health Event Automator

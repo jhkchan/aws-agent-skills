@@ -1,115 +1,26 @@
 ---
 name: signer-signing-profile-deployer
-description: >-
-  Provisions AWS Signer signing profiles with production defaults:
-  platform selection (AWSLambda-SHA384-ECDSA, AmazonFreeRTOS,
-  AWSIoT) where the platform fixes the cryptographic algorithm,
-  Lambda code signing config (code-signing-config ARN, allowed
-  publishing profiles, untrusted-artifact-on-violation=Enforce),
-  signing job creation (source S3, destination S3, profile ARN),
-  certificate validation, signature verification at Lambda deploy
-  time, revocation tracking, profile versioning, IAM permissions,
-  IoT device management integration, CloudTrail audit, and
-  trusted profile management. Emits a READY_TO_DEPLOY checklist
-  with verification commands. Use when creating a signing
-  profile, configuring Lambda code signing, starting a signing
-  job, or managing trusted profile versions. Triggers: create
-  signer signing profile, Lambda code signing config, signer
-  signing job, allowed publishing profiles, profile versioning.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Signer signing profiles with production defaults: platform selection (AWSLambda-SHA384-ECDSA, AmazonFreeRTOS, AWSIoT) where the platform fixes the cryptographic algorithm, Lambda code signing config (code-signing-config ARN, allowed publishing profiles, untrusted-artifact-on-violation=Enforce), signing job creation (source S3, destination S3, profile ARN), certificate validation, signature verification at Lambda deploy time, revocation tracking, profile versioning, IAM permissions, IoT device management integration, CloudTrail audit, and trusted profile management. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a signing profile, configuring Lambda code signing, starting a signing job, or managing trusted profile versions. Triggers: create signer signing profile, Lambda code signing config, signer signing job, allowed publishing profiles, profile versioning.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with signer,
-  lambda, iam, s3, iot, and sts access. Works with Terraform
-  aws_signer_signing_profile / aws_lambda_code_signing_config /
-  aws_signer_signing_job resources and CloudFormation
-  AWS::Signer::SigningProfile / AWS::Lambda::CodeSigningConfig
-  templates.
-keywords:
-  - aws
-  - signer
-  - code signing
-  - signing profile
-  - cloudops
-  - deploy
-  - provisioning
-  - lambda code signing
-  - aws-lambda-sha384-ecdsa
-  - amazonfreertos
-  - awsiot
-  - signing job
-  - code signing config
-  - allowed publishing profiles
-  - untrusted artifact on violation
-  - certificate validation
-  - signature verification
-  - profile versioning
-  - trusted profile
-tags:
-  - aws
-  - signer
-  - code-signing
-  - signing-profile
-  - cloudops
-  - deploy
-  - security
-  - provisioning
-  - lambda-code-signing
-  - signing-job
-  - profile-versioning
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with signer, lambda, iam, s3, iot, and sts access. Works with Terraform aws_signer_signing_profile / aws_lambda_code_signing_config / aws_signer_signing_job resources and CloudFormation AWS::Signer::SigningProfile / AWS::Lambda::CodeSigningConfig templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - signer
-    - code-signing
-    - signing-profile
-    - cloudops
-    - deploy
-    - security
-    - provisioning
-    - lambda-code-signing
-    - signing-job
-    - profile-versioning
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create signer signing profile
-    - aws-lambda-sha384-ecdsa
-    - amazonfreertos signing
-    - awsiot signing
-    - lambda code signing config
-    - signer signing job
-    - allowed publishing profiles
-    - untrusted artifact on violation
-    - signer certificate validation
-    - signature verification lambda
-    - profile versioning
-    - trusted profile management
-  when_to_use: >-
-    Invoke when the user wants to create an AWS Signer signing
-    profile, configure Lambda code signing, start a signing job,
-    validate a Signer certificate chain, manage trusted profile
-    versions, or audit signing operations via CloudTrail. Do NOT
-    invoke for AWS KMS asymmetric signing (use kms-key-deployer),
-    ACM certificate management (use acm-certificate-deployer), or
-    CloudHSM key lifecycle (use cloudhsm-cluster-deployer).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, signer, code-signing, signing-profile, cloudops, deploy, security, provisioning, lambda-code-signing, signing-job, profile-versioning
+  dependencies: aws-orchestrator
+  keywords: aws, signer, code signing, signing profile, cloudops, deploy, provisioning, lambda code signing, aws-lambda-sha384-ecdsa, amazonfreertos, awsiot, signing job, code signing config, allowed publishing profiles, untrusted artifact on violation, certificate validation, signature verification, profile versioning, trusted profile
+  when_to_use: Invoke when the user wants to create an AWS Signer signing profile, configure Lambda code signing, start a signing job, validate a Signer certificate chain, manage trusted profile versions, or audit signing operations via CloudTrail. Do NOT invoke for AWS KMS asymmetric signing (use kms-key-deployer), ACM certificate management (use acm-certificate-deployer), or CloudHSM key lifecycle (use cloudhsm-cluster-deployer).
 ---
 
 # Signer Signing Profile Deployer

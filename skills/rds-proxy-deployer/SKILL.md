@@ -1,112 +1,26 @@
 ---
 name: rds-proxy-deployer
-description: >-
-  Provisions Amazon RDS Proxy connections with production defaults:
-  connection pooling (create-db-proxy), target Aurora cluster or
-  serverless v2, Secrets Manager integration for database credentials,
-  IAM authentication, TLS/SSL enforcement (require TLS), connection
-  target config, security group associations, DB subnet group (multi-AZ),
-  max connections percent, max idle connections percent, role alias,
-  CloudWatch metrics (DatabaseConnections, CPUUtilization), failover
-  handling, Aurora Serverless v2 compatibility, and multi-AZ proxy
-  deployment. Emits a READY_TO_DEPLOY checklist with verification
-  commands. Use when creating an RDS Proxy, configuring connection
-  pooling, setting up Secrets Manager integration, enabling IAM auth,
-  or sizing max connections for Aurora. Triggers: create rds proxy,
-  rds proxy connection pooling, rds proxy secrets manager, rds proxy
-  iam authentication, rds proxy tls, aurora serverless v2 proxy, rds
-  proxy multi-az, rds proxy max connections, rds proxy failover.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon RDS Proxy connections with production defaults: connection pooling (create-db-proxy), target Aurora cluster or serverless v2, Secrets Manager integration for database credentials, IAM authentication, TLS/SSL enforcement (require TLS), connection target config, security group associations, DB subnet group (multi-AZ), max connections percent, max idle connections percent, role alias, CloudWatch metrics (DatabaseConnections, CPUUtilization), failover handling, Aurora Serverless v2 compatibility, and multi-AZ proxy deployment. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating an RDS Proxy, configuring connection pooling, setting up Secrets Manager integration, enabling IAM auth, or sizing max connections for Aurora. Triggers: create rds proxy, rds proxy connection pooling, rds proxy secrets manager, rds proxy iam authentication, rds proxy tls, aurora serverless v2 proxy, rds proxy multi-az, rds proxy max connections, rds proxy failover.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with rds, secretsmanager,
-  iam, ec2, and cloudwatch access. Works with Terraform
-  aws_db_proxy / aws_db_proxy_default_target_group /
-  aws_db_proxy_target resources and CloudFormation
-  AWS::RDS::DBProxy templates.
-keywords:
-  - aws
-  - rds
-  - rds proxy
-  - aurora
-  - connection pooling
-  - cloudops
-  - deploy
-  - provisioning
-  - secrets manager
-  - iam authentication
-  - tls
-  - aurora serverless v2
-  - multi-az
-  - failover
-tags:
-  - aws
-  - rds
-  - rds-proxy
-  - aurora
-  - cloudops
-  - deploy
-  - databases
-  - provisioning
-  - connection-pooling
-  - secrets-manager
-  - iam-auth
-  - tls
-  - multi-az
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with rds, secretsmanager, iam, ec2, and cloudwatch access. Works with Terraform aws_db_proxy / aws_db_proxy_default_target_group / aws_db_proxy_target resources and CloudFormation AWS::RDS::DBProxy templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - rds
-    - rds-proxy
-    - aurora
-    - cloudops
-    - deploy
-    - databases
-    - provisioning
-    - connection-pooling
-    - secrets-manager
-    - iam-auth
-    - tls
-    - multi-az
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create rds proxy
-    - rds proxy connection pooling
-    - rds proxy secrets manager
-    - rds proxy iam authentication
-    - rds proxy tls
-    - aurora serverless v2 proxy
-    - rds proxy multi-az
-    - rds proxy max connections
-    - rds proxy failover
-  when_to_use: >-
-    Invoke when the user wants to create an RDS Proxy for connection
-    pooling, configure Secrets Manager integration for database
-    credentials, enable IAM authentication, enforce TLS/SSL, size max
-    connections based on Aurora ACU, configure a DB subnet group for
-    multi-AZ proxy deployment, set up security group associations, wire
-    CloudWatch metrics monitoring, handle failover for Aurora clusters,
-    or connect the proxy to Aurora Serverless v2. Do NOT invoke for
-    auditing existing proxies, RDS instance creation itself, or Aurora
-    Global Database configuration.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, rds, rds-proxy, aurora, cloudops, deploy, databases, provisioning, connection-pooling, secrets-manager, iam-auth, tls, multi-az
+  dependencies: aws-orchestrator
+  keywords: aws, rds, rds proxy, aurora, connection pooling, cloudops, deploy, provisioning, secrets manager, iam authentication, tls, aurora serverless v2, multi-az, failover
+  when_to_use: Invoke when the user wants to create an RDS Proxy for connection pooling, configure Secrets Manager integration for database credentials, enable IAM authentication, enforce TLS/SSL, size max connections based on Aurora ACU, configure a DB subnet group for multi-AZ proxy deployment, set up security group associations, wire CloudWatch metrics monitoring, handle failover for Aurora clusters, or connect the proxy to Aurora Serverless v2. Do NOT invoke for auditing existing proxies, RDS instance creation itself, or Aurora Global Database configuration.
 ---
 
 # RDS Proxy Deployer

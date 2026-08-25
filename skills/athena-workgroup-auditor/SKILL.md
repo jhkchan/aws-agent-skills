@@ -1,81 +1,24 @@
 ---
 name: athena-workgroup-auditor
-description: >-
-  Audits Amazon Athena workgroups for query-result encryption gaps (S3 + KMS),
-  missing data-scan limits (BytesScannedCutoffPerQuery), workgroup enforcement
-  posture (EnforceWorkGroupConfiguration — the keystone control that makes
-  every other setting binding vs advisory), query-history retention beyond
-  Athena's fixed 45-day API window, and named-query IAM exposure. Emits a
-  deterministic category verdict (NO_ENCRYPTION | NO_LIMITS | CONFIG_GAP | OK)
-  per workgroup with enumerated findings and CLI remediation. Use when
-  reviewing Athena workgroups, checking result-encryption posture, validating
-  per-query cost bounds, confirming client-override enforcement, auditing
-  Athena query-history retention, or scoping named-query IAM before granting
-  cross-team access.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits Amazon Athena workgroups for query-result encryption gaps (S3 + KMS), missing data-scan limits (BytesScannedCutoffPerQuery), workgroup enforcement posture (EnforceWorkGroupConfiguration — the keystone control that makes every other setting binding vs advisory), query-history retention beyond Athena's fixed 45-day API window, and named-query IAM exposure. Emits a deterministic category verdict (NO_ENCRYPTION | NO_LIMITS | CONFIG_GAP | OK) per workgroup with enumerated findings and CLI remediation. Use when reviewing Athena workgroups, checking result-encryption posture, validating per-query cost bounds, confirming client-override enforcement, auditing Athena query-history retention, or scoping named-query IAM before granting cross-team access.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline workgroup-config classification.
-  Live-account audits use aws athena get-work-group, list-work-groups,
-  get-named-query, and list-named-queries (AWS CLI v2, SSO or key-based
-  credentials), plus aws cloudtrail describe-trail and get-event-selectors
-  for the data-event coverage dimension.
-keywords:
-  - Athena
-  - workgroup
-  - EnforceWorkGroupConfiguration
-  - BytesScannedCutoffPerQuery
-  - data scan limit
-  - query result encryption
-  - SSE-KMS
-  - SSE-S3
-  - OutputLocation
-  - named query IAM
-  - query history retention
-  - CloudTrail data events
-  - primary workgroup
-  - AthenaSpark
-  - cost blast radius
-  - data exfiltration
-  - Athena audit
-  - workgroup remediation
-tags: [athena, analytics, security, cost-control, workgroup, encryption, dsl, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline workgroup-config classification. Live-account audits use aws athena get-work-group, list-work-groups, get-named-query, and list-named-queries (AWS CLI v2, SSO or key-based credentials), plus aws cloudtrail describe-trail and get-event-selectors for the data-event coverage dimension.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
-  verdict_shape: "NO_ENCRYPTION | NO_LIMITS | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing an Athena workgroup before production rollout, checking that
-    query-result encryption (SSE-KMS with a CMK) is configured and enforced,
-    validating that BytesScannedCutoffPerQuery caps runaway cost, confirming
-    EnforceWorkGroupConfiguration is true (the keystone control), auditing
-    long-term query history beyond Athena's fixed 45-day API window, or
-    scoping named-query IAM to prevent SQL exfiltration via GetNamedQuery.
-  activation_triggers:
-    - "audit this Athena workgroup"
-    - "is my Athena workgroup enforced"
-    - "check Athena query result encryption"
-    - "is BytesScannedCutoffPerQuery set"
-    - "Athena data scan limit"
-    - "primary workgroup defaults"
-    - "Athena query history retention"
-    - "named query IAM exposure"
-    - "EnforceWorkGroupConfiguration false"
-    - "Athena cost blast radius"
-  invocation_schema: >-
-    Input: either (a) an Athena workgroup Configuration block (the JSON
-    returned by aws athena get-work-group), optionally paired with the
-    workgroup Name/State/Description and any named-query + IAM context,
-    OR (b) a workgroup name for live-account audit. Output: deterministic
-    WORKGROUP/VERDICT/REASON/FINDINGS/REMEDIATION block per workgroup,
-    where VERDICT ∈ {NO_ENCRYPTION, NO_LIMITS, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: NO_ENCRYPTION | NO_LIMITS | CONFIG_GAP | OK
+  when_to_use: Reviewing an Athena workgroup before production rollout, checking that query-result encryption (SSE-KMS with a CMK) is configured and enforced, validating that BytesScannedCutoffPerQuery caps runaway cost, confirming EnforceWorkGroupConfiguration is true (the keystone control), auditing long-term query history beyond Athena's fixed 45-day API window, or scoping named-query IAM to prevent SQL exfiltration via GetNamedQuery.
+  activation_triggers: audit this Athena workgroup, is my Athena workgroup enforced, check Athena query result encryption, is BytesScannedCutoffPerQuery set, Athena data scan limit, primary workgroup defaults, Athena query history retention, named query IAM exposure, EnforceWorkGroupConfiguration false, Athena cost blast radius
+  invocation_schema: 'Input: either (a) an Athena workgroup Configuration block (the JSON returned by aws athena get-work-group), optionally paired with the workgroup Name/State/Description and any named-query + IAM context, OR (b) a workgroup name for live-account audit. Output: deterministic WORKGROUP/VERDICT/REASON/FINDINGS/REMEDIATION block per workgroup, where VERDICT ∈ {NO_ENCRYPTION, NO_LIMITS, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Athena, workgroup, EnforceWorkGroupConfiguration, BytesScannedCutoffPerQuery, data scan limit, query result encryption, SSE-KMS, SSE-S3, OutputLocation, named query IAM, query history retention, CloudTrail data events, primary workgroup, AthenaSpark, cost blast radius, data exfiltration, Athena audit, workgroup remediation
+  tags: athena, analytics, security, cost-control, workgroup, encryption, dsl, audit
 ---
 
 # Athena Workgroup Auditor

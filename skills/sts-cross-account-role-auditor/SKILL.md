@@ -1,80 +1,23 @@
 ---
 name: sts-cross-account-role-auditor
-description: >-
-  Audits IAM role trust policies (AssumeRolePolicyDocument) for cross-account
-  exposure, wildcard Principal grants, confused-deputy service-principal
-  vectors, and condition-strength weaknesses. Emits a deterministic
-  EXTERNAL_TRUST | WILDCARD_TRUST | CONDITIONAL | OK verdict per role with
-  severity and remediation. Use when reviewing IAM role trust policies,
-  checking who can assume a role, auditing cross-account access, validating
-  ExternalId or SourceArn guards, or hardening role trust before production.
-  Triggers: STS, AssumeRole, trust policy, AssumeRolePolicyDocument,
-  cross-account, ExternalId, confused deputy, Principal AWS root, Principal
-  Service, Principal star, SAML federated, SourceArn, SourceAccount,
-  NotPrincipal, role trust audit, role assumption exposure.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Audits IAM role trust policies (AssumeRolePolicyDocument) for cross-account exposure, wildcard Principal grants, confused-deputy service-principal vectors, and condition-strength weaknesses. Emits a deterministic EXTERNAL_TRUST | WILDCARD_TRUST | CONDITIONAL | OK verdict per role with severity and remediation. Use when reviewing IAM role trust policies, checking who can assume a role, auditing cross-account access, validating ExternalId or SourceArn guards, or hardening role trust before production. Triggers: STS, AssumeRole, trust policy, AssumeRolePolicyDocument, cross-account, ExternalId, confused deputy, Principal AWS root, Principal Service, Principal star, SAML federated, SourceArn, SourceAccount, NotPrincipal, role trust audit, role assumption exposure.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline trust-policy classification. Live
-  account audits use aws iam get-role --query Role.AssumeRolePolicyDocument
-  and aws iam list-roles (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - STS
-  - trust policy
-  - AssumeRole
-  - AssumeRolePolicyDocument
-  - cross-account
-  - ExternalId
-  - confused deputy
-  - Principal
-  - wildcard principal
-  - role trust
-  - SAML
-  - OIDC
-  - federated
-  - SourceArn
-  - SourceAccount
-  - NotPrincipal
-  - role assumption
-  - IAM audit
-  - security
-tags: [sts, iam, security, trust-policy, cross-account, external-id, confused-deputy, role-audit]
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline trust-policy classification. Live account audits use aws iam get-role --query Role.AssumeRolePolicyDocument and aws iam list-roles (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
-  verdict_shape: "EXTERNAL_TRUST | WILDCARD_TRUST | CONDITIONAL | OK"
+  verdict_shape: EXTERNAL_TRUST | WILDCARD_TRUST | CONDITIONAL | OK
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags: [sts, iam, security, trust-policy, cross-account, external-id, confused-deputy, role-audit]
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - STS
-    - trust policy
-    - AssumeRole
-    - cross-account
-    - ExternalId
-    - confused deputy
-    - Principal
-    - wildcard principal
-    - SourceArn
-    - SourceAccount
-    - role trust
-  when_to_use: >-
-    Reviewing an IAM role trust policy (AssumeRolePolicyDocument), auditing who
-    can assume a role, checking cross-account or external access exposure,
-    validating ExternalId / SourceArn / SourceAccount guards, hardening a
-    service-role trust before production, or investigating confused-deputy
-    attack surface.
+  author: Jacky Chan — AWS Community Builder
+  tags: sts, iam, security, trust-policy, cross-account, external-id, confused-deputy, role-audit
+  dependencies: aws-orchestrator
+  keywords: STS, trust policy, AssumeRole, AssumeRolePolicyDocument, cross-account, ExternalId, confused deputy, Principal, wildcard principal, role trust, SAML, OIDC, federated, SourceArn, SourceAccount, NotPrincipal, role assumption, IAM audit, security
+  when_to_use: Reviewing an IAM role trust policy (AssumeRolePolicyDocument), auditing who can assume a role, checking cross-account or external access exposure, validating ExternalId / SourceArn / SourceAccount guards, hardening a service-role trust before production, or investigating confused-deputy attack surface.
 ---
 
 # STS Cross-Account Role Auditor

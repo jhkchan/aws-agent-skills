@@ -1,111 +1,26 @@
 ---
 name: license-manager-deployer
-description: >-
-  Provisions AWS License Manager configurations with production defaults:
-  license configurations (license type, count, rules), resource
-  associations (EC2 instances, Systems Manager managed instances, on-
-  premises resources), license rules enforcement (vCPU-based, instance-
-  based, cores-based counting), cross-account sharing via AWS
-  Organizations, automated discovery via Systems Manager inventory,
-  license violation detection and alerting, self-service portal grants,
-  Oracle license tracking, SQL Server licensing, subscription management,
-  CloudWatch integration for violations. Emits a READY_TO_DEPLOY
-  checklist with verification commands. Use when creating a License
-  Manager configuration, tracking Oracle or SQL Server licenses, setting
-  up vCPU-based license enforcement, distributing licenses across
-  Organization accounts, detecting license violations, or configuring
-  self-service license grants. Triggers: create license configuration,
-  license manager vcpu counting, oracle license tracking, sql server
-  licensing, cross-account license sharing, license manager organizations,
-  license violation alerting, license manager grants, ssm license
-  discovery.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS License Manager configurations with production defaults: license configurations (license type, count, rules), resource associations (EC2 instances, Systems Manager managed instances, on- premises resources), license rules enforcement (vCPU-based, instance- based, cores-based counting), cross-account sharing via AWS Organizations, automated discovery via Systems Manager inventory, license violation detection and alerting, self-service portal grants, Oracle license tracking, SQL Server licensing, subscription management, CloudWatch integration for violations. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a License Manager configuration, tracking Oracle or SQL Server licenses, setting up vCPU-based license. Triggers: create license configuration, license manager vcpu counting, oracle license tracking, sql server licensing, cross-account license sharing, license manager organizations, license violation alerting, license manager grants, ssm license discovery.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with license-manager
-  access (and organizations:EnableAWSServiceAccess for cross-account
-  sharing, ssm managed-instance activation for on-premises discovery).
-  Works with Terraform aws_licensemanager_license_configuration resource
-  and CloudFormation AWS::LicenseManager::LicenseConfiguration templates.
-keywords:
-  - aws
-  - license manager
-  - license configuration
-  - cloudops
-  - deploy
-  - provisioning
-  - vcpu counting
-  - oracle licensing
-  - sql server licensing
-  - cross-account
-  - organizations
-  - ssm discovery
-  - license violation
-  - grants
-  - self-service portal
-tags:
-  - aws
-  - license-manager
-  - cloudops
-  - deploy
-  - governance
-  - licensing
-  - provisioning
-  - oracle
-  - sql-server
-  - organizations
-  - ssm
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with license-manager access (and organizations:EnableAWSServiceAccess for cross-account sharing, ssm managed-instance activation for on-premises discovery). Works with Terraform aws_licensemanager_license_configuration resource and CloudFormation AWS::LicenseManager::LicenseConfiguration templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - license-manager
-    - cloudops
-    - deploy
-    - governance
-    - licensing
-    - oracle
-    - sql-server
-    - organizations
-    - ssm
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create license configuration
-    - license manager vcpu counting
-    - oracle license tracking
-    - sql server licensing
-    - cross-account license sharing
-    - license manager organizations
-    - license violation alerting
-    - license manager grants
-    - ssm license discovery
-  when_to_use: >-
-    Invoke when the user wants to create an AWS License Manager license
-    configuration, track Oracle or SQL Server licenses, enforce vCPU/
-    instance/cores-based license counting, distribute license
-    configurations across AWS Organizations member accounts, enable SSM-
-    based automated discovery of licensed resources, set up license
-    violation detection and alerting, or configure self-service license
-    grants. Do NOT invoke for AWS Marketplace subscription purchase (use
-    Marketplace skills), IAM policy management, or AWS Cost Explorer
-    analysis.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, license-manager, cloudops, deploy, governance, licensing, provisioning, oracle, sql-server, organizations, ssm
+  dependencies: aws-orchestrator
+  keywords: aws, license manager, license configuration, cloudops, deploy, provisioning, vcpu counting, oracle licensing, sql server licensing, cross-account, organizations, ssm discovery, license violation, grants, self-service portal
+  when_to_use: Invoke when the user wants to create an AWS License Manager license configuration, track Oracle or SQL Server licenses, enforce vCPU/ instance/cores-based license counting, distribute license configurations across AWS Organizations member accounts, enable SSM- based automated discovery of licensed resources, set up license violation detection and alerting, or configure self-service license grants. Do NOT invoke for AWS Marketplace subscription purchase (use Marketplace skills), IAM policy management, or AWS Cost Explorer analysis.
 ---
 
 # License Manager Deployer

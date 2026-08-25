@@ -1,111 +1,27 @@
 ---
 name: cloudwatch-metrics-troubleshooter
-description: >-
-  Diagnoses missing or unexpected AWS CloudWatch metrics. Covers metric
-  not appearing (wrong namespace, wrong dimensions, resource not
-  emitting), metric value unexpected (wrong statistic, wrong period,
-  metric math error), INSUFFICIENT_DATA alarms (metric exists but
-  sparse data points), custom metrics not arriving (CloudWatch agent
-  config, PutMetricData errors, EMF parsing failures), Container
-  Insights not working (EKS/ECS agent not installed), and CloudWatch
-  RUM not collecting (app config wrong). Emits ROOT_CAUSE_FOUND |
-  NEED_MORE_INFO | ESCALATE with evidence from get-metric-statistics,
-  list-metrics, CloudWatch agent logs, and EMF validation. Use when a
-  metric is absent, an alarm is stuck in INSUFFICIENT_DATA, custom
-  metrics are not arriving, or Container Insights shows no data.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Diagnoses missing or unexpected AWS CloudWatch metrics. Covers metric not appearing (wrong namespace, wrong dimensions, resource not emitting), metric value unexpected (wrong statistic, wrong period, metric math error), INSUFFICIENT_DATA alarms (metric exists but sparse data points), custom metrics not arriving (CloudWatch agent config, PutMetricData errors, EMF parsing failures), Container Insights not working (EKS/ECS agent not installed), and CloudWatch RUM not collecting (app config wrong). Emits ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE with evidence from get-metric-statistics, list-metrics, CloudWatch agent logs, and EMF validation. Use when a metric is absent, an alarm is stuck in INSUFFICIENT_DATA, custom metrics are not arriving, or Container Insights shows no data.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline diagnosis works on supplied get-metric-
-  statistics / list-metrics JSON output. Live-account diagnosis uses
-  aws cloudwatch get-metric-statistics, list-metrics, put-metric-data
-  (dry validation), aws logs filter-log-events (for EMF and agent
-  logs), aws ecs describe-services / aws eks describe-cluster (for
-  Container Insights), and aws iam simulate-principal-policy (for
-  PutMetricData denied) — AWS CLI v2, SSO or key-based credentials.
-keywords:
-  - CloudWatch Metrics
-  - metric missing
-  - wrong namespace
-  - wrong dimensions
-  - wrong statistic
-  - metric math
-  - INSUFFICIENT_DATA
-  - custom metric
-  - PutMetricData
-  - Embedded Metric Format
-  - EMF
-  - CloudWatch Agent
-  - Container Insights
-  - EKS insights
-  - ECS insights
-  - CloudWatch RUM
-  - alarm
-  - get-metric-statistics
-  - list-metrics
-tags:
-  - cloudwatch
-  - metrics
-  - management
-  - troubleshoot
-  - missing-metric
-  - insufficient-data
-  - emf
-  - container-insights
-  - rum
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works on supplied get-metric- statistics / list-metrics JSON output. Live-account diagnosis uses aws cloudwatch get-metric-statistics, list-metrics, put-metric-data (dry validation), aws logs filter-log-events (for EMF and agent logs), aws ecs describe-services / aws eks describe-cluster (for Container Insights), and aws iam simulate-principal-policy (for PutMetricData denied) — AWS CLI v2...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
-  when_to_use: >-
-    Diagnosing why a CloudWatch metric is absent (wrong namespace,
-    wrong dimensions, resource not emitting); why a metric value is
-    unexpected (wrong statistic, wrong period, metric math error);
-    why an alarm is stuck in INSUFFICIENT_DATA; why custom metrics
-    are not arriving (CloudWatch agent misconfigured, PutMetricData
-    denied, EMF blob malformed); why Container Insights shows no data
-    for EKS / ECS; or why CloudWatch RUM is not collecting data.
-  activation_triggers:
-    - "CloudWatch metric missing"
-    - "CloudWatch metric not appearing"
-    - "CloudWatch wrong namespace"
-    - "CloudWatch wrong dimensions"
-    - "CloudWatch wrong statistic"
-    - "CloudWatch metric math error"
-    - "CloudWatch alarm INSUFFICIENT_DATA"
-    - "custom metric not arriving"
-    - "PutMetricData error"
-    - "Embedded Metric Format parsing"
-    - "EMF blob invalid"
-    - "CloudWatch agent not emitting"
-    - "Container Insights missing"
-    - "EKS Container Insights not working"
-    - "ECS Container Insights not working"
-    - "CloudWatch RUM not collecting"
-  invocation_schema: >-
-    Input: either (a) a symptom description (namespace, metric name,
-    dimensions, expected vs observed value or alarm state), OR (b) a
-    live-account scenario where the agent runs aws cloudwatch
-    get-metric-statistics / list-metrics / aws logs filter-log-events
-    (for EMF and agent logs) / aws ecs describe-services (Container
-    Insights) to gather evidence. Output: a deterministic INCIDENT /
-    VERDICT / ROOT_CAUSE / EVIDENCE / ROOT_CAUSE_CATALOG / REMEDIATION
-    block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE}
-    and ROOT_CAUSE names the specific failure category
-    (METRIC_NOT_APPEARING / METRIC_VALUE_UNEXPECTED /
-    INSUFFICIENT_DATA_ALRM / CUSTOM_METRIC_NOT_ARRIVING /
-    CONTAINER_INSIGHTS_MISSING / RUM_NOT_COLLECTING) and the offending
-    config element.
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+  when_to_use: Diagnosing why a CloudWatch metric is absent (wrong namespace, wrong dimensions, resource not emitting); why a metric value is unexpected (wrong statistic, wrong period, metric math error); why an alarm is stuck in INSUFFICIENT_DATA; why custom metrics are not arriving (CloudWatch agent misconfigured, PutMetricData denied, EMF blob malformed); why Container Insights shows no data for EKS / ECS; or why CloudWatch RUM is not collecting data.
+  activation_triggers: CloudWatch metric missing, CloudWatch metric not appearing, CloudWatch wrong namespace, CloudWatch wrong dimensions, CloudWatch wrong statistic, CloudWatch metric math error, CloudWatch alarm INSUFFICIENT_DATA, custom metric not arriving, PutMetricData error, Embedded Metric Format parsing, EMF blob invalid, CloudWatch agent not emitting, Container Insights missing, EKS Container Insights not working, ECS Container Insights not working, CloudWatch RUM not collecting
+  invocation_schema: 'Input: either (a) a symptom description (namespace, metric name, dimensions, expected vs observed value or alarm state), OR (b) a live-account scenario where the agent runs aws cloudwatch get-metric-statistics / list-metrics / aws logs filter-log-events (for EMF and agent logs) / aws ecs describe-services (Container Insights) to gather evidence. Output: a deterministic INCIDENT / VERDICT / ROOT_CAUSE / EVIDENCE / ROOT_CAUSE_CATALOG / REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and ROOT_CAUSE names the specific failure category (METRIC_NOT_APPEARING / METRIC_VALUE_UNEXPECTED / INSUFFICIENT_DATA_ALRM / CUSTOM_METRIC_NOT_ARRIVING / CONTAINER_INSIGHTS_MISSING / RUM_NOT_COLLECTING) and the offending config element.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudWatch Metrics, metric missing, wrong namespace, wrong dimensions, wrong statistic, metric math, INSUFFICIENT_DATA, custom metric, PutMetricData, Embedded Metric Format, EMF, CloudWatch Agent, Container Insights, EKS insights, ECS insights, CloudWatch RUM, alarm, get-metric-statistics, list-metrics
+  tags: cloudwatch, metrics, management, troubleshoot, missing-metric, insufficient-data, emf, container-insights, rum
 ---
 
 # CloudWatch Metrics Troubleshooter

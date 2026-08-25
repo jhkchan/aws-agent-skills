@@ -1,121 +1,29 @@
 ---
 name: apigateway-throttle-optimizer
-description: >-
-  Optimises AWS API Gateway throttle and cost across seven dimensions: API
-  type selection (REST $3.50/M vs HTTP $1.00/M requests), stage and method-
-  level rate/burst throttle tuning, usage plans with API keys for per-
-  client throttling, response caching (TTL tuning to eliminate 50-80% of
-  integration calls), payload compression (gzip) and field filtering,
-  WAF integration cost analysis, and private API VPC endpoint cost.
-  Reads CloudWatch metrics (Count, 4xx, 5xx, Latency,
-  IntegrationLatency) and projects monthly savings. Emits OPTIMIZED or
-  FURTHER_OPTIMIZATION_AVAILABLE with an API-specific recommendation.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Optimises AWS API Gateway throttle and cost across seven dimensions: API type selection (REST $3.50/M vs HTTP $1.00/M requests), stage and method- level rate/burst throttle tuning, usage plans with API keys for per- client throttling, response caching (TTL tuning to eliminate 50-80% of integration calls), payload compression (gzip) and field filtering, WAF integration cost analysis, and private API VPC endpoint cost. Reads CloudWatch metrics (Count, 4xx, 5xx, Latency, IntegrationLatency) and projects monthly savings. Emits OPTIMIZED or FURTHER_OPTIMIZATION_AVAILABLE with an API-specific recommendation.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Offline recommendation classification works from pasted
-  CloudWatch metrics. Live-account optimization uses aws apigateway
-  get-rest-apis, get-stages, get-usage-plans, get-resources, aws
-  cloudwatch get-metric-statistics (Count, 4xx, 5xx, Latency,
-  IntegrationLatency), aws ce get-cost-and-usage (AWS CLI v2, SSO or
-  key-based credentials). Pricing references us-east-1 published rates as
-  of 2026; re-state regional rates from the reference matrix for other
-  regions.
-keywords:
-  - API Gateway
-  - throttle optimization
-  - cost optimization
-  - REST API
-  - HTTP API
-  - rate limit
-  - burst limit
-  - usage plan
-  - API key
-  - caching
-  - stage throttle
-  - method throttle
-  - WAF
-  - VPC endpoint
-  - payload compression
-  - gzip
-  - data transfer
-  - reserved concurrency
-  - FinOps
-  - AppIntegration
-tags:
-  - apigateway
-  - api
-  - app-integration
-  - cost-optimization
-  - finops
-  - throttle
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted CloudWatch metrics. Live-account optimization uses aws apigateway get-rest-apis, get-stages, get-usage-plans, get-resources, aws cloudwatch get-metric-statistics (Count, 4xx, 5xx, Latency, IntegrationLatency), aws ce get-cost-and-usage (AWS CLI v2, SSO or key-based credentials). Pricing references us-east-1 published rates as of 2026; re-state regional...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-  when_to_use: >-
-    Optimising API Gateway throttle settings, reducing per-request cost
-    via REST-to-HTTP API migration, enabling response caching for repeated
-    calls, setting up per-client throttling via usage plans, reducing
-    payload size via compression, or reviewing WAF/VPC endpoint overhead.
-  when_not_to_use: >-
-    Lambda function cost behind the API (use lambda-cost-optimizer), Cloud-
-    Front distribution cost (use cloudfront-optimizer), or functional API
-    Gateway troubleshooting (5xx errors, deployment failures, CORS — use
-    the API Gateway troubleshooter). This skill focuses on throttle and
-    cost-driven optimization decisions, not functional debugging.
-  activation_triggers:
-    - optimise API Gateway throttle
-    - API Gateway cost optimization
-    - REST to HTTP API migration
-    - API Gateway caching
-    - API Gateway usage plan
-    - API Gateway rate limit
-    - API Gateway burst limit
-    - API Gateway per-client throttle
-    - API Gateway payload compression
-    - API Gateway WAF cost
-    - API Gateway VPC endpoint cost
-    - API Gateway FinOps savings
-    - reduce API Gateway bill
-    - API throttle review
-  invocation_schema: >-
-    Input: either (a) a REST/HTTP API identifier + live-account context,
-    (b) a pasted set of CloudWatch API Gateway metrics with at least 14
-    days of observation, OR (c) an API configuration document (API type,
-    stage throttle, usage plans, caching, method-level settings).
-    Output: a deterministic
-    TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/MIGRATION_STEPS
-    block per API, where VERDICT is one of OPTIMIZED,
-    FURTHER_OPTIMIZATION_AVAILABLE.
-  invocation_example: >-
-    # Minimal valid input (offline metric classification):
-    ApiName: product-catalog-api
-    ApiType: REST (REGIONAL)
-    Region: us-east-1
-    Stage: prod
-    Stage throttle: rate=10000 rps, burst=5000
-    Caching: disabled
-    Usage plans: none (account-level throttle only)
-    Metrics (last 30 days):
-      - Count: 200,000,000/month
-      - 4xx: 5,000,000/month (2.5%)
-      - 5xx: 100,000/month (0.05%)
-      - Latency avg: 120 ms, p95: 250 ms
-      - IntegrationLatency avg: 95 ms
-    Workload: product catalog lookup (read-only, idempotent).
-    Emit the standard optimization block (TARGET, VERDICT, REASON,
-    RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+  when_to_use: Optimising API Gateway throttle settings, reducing per-request cost via REST-to-HTTP API migration, enabling response caching for repeated calls, setting up per-client throttling via usage plans, reducing payload size via compression, or reviewing WAF/VPC endpoint overhead.
+  when_not_to_use: Lambda function cost behind the API (use lambda-cost-optimizer), Cloud- Front distribution cost (use cloudfront-optimizer), or functional API Gateway troubleshooting (5xx errors, deployment failures, CORS — use the API Gateway troubleshooter). This skill focuses on throttle and cost-driven optimization decisions, not functional debugging.
+  activation_triggers: optimise API Gateway throttle, API Gateway cost optimization, REST to HTTP API migration, API Gateway caching, API Gateway usage plan, API Gateway rate limit, API Gateway burst limit, API Gateway per-client throttle, API Gateway payload compression, API Gateway WAF cost, API Gateway VPC endpoint cost, API Gateway FinOps savings, reduce API Gateway bill, API throttle review
+  invocation_schema: 'Input: either (a) a REST/HTTP API identifier + live-account context, (b) a pasted set of CloudWatch API Gateway metrics with at least 14 days of observation, OR (c) an API configuration document (API type, stage throttle, usage plans, caching, method-level settings). Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/MIGRATION_STEPS block per API, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
+  invocation_example: "# Minimal valid input (offline metric classification): ApiName: product-catalog-api ApiType: REST (REGIONAL) Region: us-east-1 Stage: prod Stage throttle: rate=10000 rps, burst=5000 Caching: disabled Usage plans: none (account-level throttle only) Metrics (last 30 days):\n  - Count: 200,000,000/month\n  - 4xx: 5,000,000/month (2.5%)\n  - 5xx: 100,000/month (0.05%)\n  - Latency avg: 120 ms, p95: 250 ms\n  - IntegrationLatency avg: 95 ms\nWorkload: product catalog lookup (read-only, idempotent). Emit the standard optimization block (TARGET, VERDICT, REASON, RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: API Gateway, throttle optimization, cost optimization, REST API, HTTP API, rate limit, burst limit, usage plan, API key, caching, stage throttle, method throttle, WAF, VPC endpoint, payload compression, gzip, data transfer, reserved concurrency, FinOps, AppIntegration
+  tags: apigateway, api, app-integration, cost-optimization, finops, throttle
 ---
 
 # API Gateway Throttle Optimizer

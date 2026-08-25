@@ -1,112 +1,26 @@
 ---
 name: vpc-endpoint-policy-troubleshooter
-description: >-
-  Diagnoses Amazon VPC endpoint policy and connectivity failures
-  across interface endpoints (PrivateLink), Gateway endpoints
-  (S3/DynamoDB), and endpoint services (NLB-backed). Covers endpoint
-  policy evaluation (default vs custom), security group on interface
-  endpoint ENIs (inbound from client subnet on service port), DNS
-  resolution (private DNS, private hosted zone), cross-account
-  access (resource policy plus IAM), Gateway endpoint routing (must
-  be in route table), endpoint service timeouts, and policy JSON
-  syntax errors. Emits ROOT_CAUSE_IDENTIFIED with remediation
-  commands, or INSUFFICIENT_DATA when more diagnostics are needed.
-  Use when troubleshooting endpoint connection failures, PrivateLink
-  timeouts, endpoint policy access denied, S3 or DynamoDB Gateway
-  routing, endpoint DNS resolution, or cross-account PrivateLink.
-  Triggers - vpc endpoint failure, privatelink timeout, endpoint
-  policy denied, gateway endpoint route, endpoint dns, cross-account
-  endpoint, nlb endpoint service.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Diagnoses Amazon VPC endpoint policy and connectivity failures across interface endpoints (PrivateLink), Gateway endpoints (S3/DynamoDB), and endpoint services (NLB-backed). Covers endpoint policy evaluation (default vs custom), security group on interface endpoint ENIs (inbound from client subnet on service port), DNS resolution (private DNS, private hosted zone), cross-account access (resource policy plus IAM), Gateway endpoint routing (must be in route table), endpoint service timeouts, and policy JSON syntax errors. Emits ROOT_CAUSE_IDENTIFIED with remediation commands, or INSUFFICIENT_DATA when more diagnostics are needed. Use when troubleshooting endpoint connection failures, PrivateLink timeouts, endpoint policy access denied, S3 or DynamoDB Gateway routing, endpoint DNS resolution, or cross-account PrivateLink. Triggers - vpc endpoint failure, privatelink timeout, endpoint policy denied, gateway endpoint route, endpoint dns, cross-account endpoint, nlb endpoint service.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live diagnosis - AWS CLI v2 with ec2, sts, and
-  route53 access. Works with Terraform aws_vpc_endpoint /
-  aws_vpc_endpoint_policy / aws_security_group resources and
-  CloudFormation AWS::EC2::VPCEndpoint templates.
-keywords:
-  - aws
-  - vpc endpoint
-  - vpc endpoint policy
-  - privatelink
-  - gateway endpoint
-  - cloudops
-  - troubleshoot
-  - diagnose
-  - interface endpoint
-  - endpoint service
-  - nlb
-  - security group
-  - route table
-  - dns resolution
-  - cross-account
-  - s3 endpoint
-  - dynamodb endpoint
-tags:
-  - aws
-  - vpc-endpoint
-  - privatelink
-  - gateway-endpoint
-  - cloudops
-  - troubleshoot
-  - networking
-  - diagnose
-  - endpoint-policy
-  - security-group
-  - route-table
-  - dns-resolution
-  - cross-account
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live diagnosis - AWS CLI v2 with ec2, sts, and route53 access. Works with Terraform aws_vpc_endpoint / aws_vpc_endpoint_policy / aws_security_group resources and CloudFormation AWS::EC2::VPCEndpoint templates.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA"
+  verdict_shape: ROOT_CAUSE_IDENTIFIED | INSUFFICIENT_DATA
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - vpc-endpoint
-    - privatelink
-    - gateway-endpoint
-    - cloudops
-    - troubleshoot
-    - networking
-    - diagnose
-    - endpoint-policy
-    - security-group
-    - route-table
-    - dns-resolution
-    - cross-account
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - vpc endpoint connection failure
-    - privatelink timeout
-    - endpoint policy denied
-    - gateway endpoint route table
-    - endpoint dns resolution
-    - cross-account endpoint
-    - nlb endpoint service
-    - endpoint security group
-  when_to_use: >-
-    Invoke when the user wants to troubleshoot VPC endpoint connectivity
-    failures, endpoint policy access denied errors, interface endpoint
-    (PrivateLink) connection timeouts, Gateway endpoint (S3/DynamoDB)
-    routing issues, endpoint DNS name resolution failures, cross-account
-    endpoint access, or endpoint service (NLB-backed) availability. Do
-    NOT invoke for VPC peering connectivity, Transit Gateway routing, or
-    VPN/Direct Connect troubleshooting.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, vpc-endpoint, privatelink, gateway-endpoint, cloudops, troubleshoot, networking, diagnose, endpoint-policy, security-group, route-table, dns-resolution, cross-account
+  dependencies: aws-orchestrator
+  keywords: aws, vpc endpoint, vpc endpoint policy, privatelink, gateway endpoint, cloudops, troubleshoot, diagnose, interface endpoint, endpoint service, nlb, security group, route table, dns resolution, cross-account, s3 endpoint, dynamodb endpoint
+  when_to_use: Invoke when the user wants to troubleshoot VPC endpoint connectivity failures, endpoint policy access denied errors, interface endpoint (PrivateLink) connection timeouts, Gateway endpoint (S3/DynamoDB) routing issues, endpoint DNS name resolution failures, cross-account endpoint access, or endpoint service (NLB-backed) availability. Do NOT invoke for VPC peering connectivity, Transit Gateway routing, or VPN/Direct Connect troubleshooting.
 ---
 
 # VPC Endpoint Policy Troubleshooter

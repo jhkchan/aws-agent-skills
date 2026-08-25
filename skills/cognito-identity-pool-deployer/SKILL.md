@@ -1,103 +1,26 @@
 ---
 name: cognito-identity-pool-deployer
-description: >-
-  Provisions Amazon Cognito Identity Pools (federated identities) with
-  production defaults: identity pool creation, identity providers
-  (Cognito User Pool, Amazon, Google, Facebook, Apple, SAML, OIDC),
-  authenticated vs unauthenticated roles, role mapping (rules-based
-  vs token-based), custom IAM role assumption per provider, principal
-  tag attribute mapping, SAML provider trust policy, identity pool
-  authflow (GetId + GetCredentialsForIdentity), access control via
-  groups, JWT claim extraction, and cross-account role assumption.
-  Emits a READY_TO_DEPLOY checklist with verification commands. Use
-  when creating a Cognito Identity Pool, configuring federated
-  identity providers, setting up role mapping for per-provider IAM
-  roles, enabling guest (unauthenticated) access, or mapping JWT
-  claims to IAM roles. Triggers: create cognito identity pool,
-  federated identity, cognito role mapping, identity pool provider,
-  unauthenticated role, get credentials for identity, principal tags,
-  SAML federation cognito.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon Cognito Identity Pools (federated identities) with production defaults: identity pool creation, identity providers (Cognito User Pool, Amazon, Google, Facebook, Apple, SAML, OIDC), authenticated vs unauthenticated roles, role mapping (rules-based vs token-based), custom IAM role assumption per provider, principal tag attribute mapping, SAML provider trust policy, identity pool authflow (GetId + GetCredentialsForIdentity), access control via groups, JWT claim extraction, and cross-account role assumption. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Cognito Identity Pool, configuring federated identity providers, setting up role mapping for per-provider IAM roles, enabling guest (unauthenticated) access, or mapping JWT claims to IAM roles. Triggers: create cognito identity pool, federated identity, cognito role mapping, identity pool provider, unauthenticated role, get credentials for identity, principal tags, SAML federation cognito.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with cognito-identity
-  and iam access. Works with Terraform aws_cognito_identity_pool,
-  aws_cognito_identity_pool_provider_config, and aws_iam_role resources
-  and CloudFormation AWS::Cognito::IdentityPool templates.
-keywords:
-  - aws
-  - cognito
-  - identity pool
-  - federated identity
-  - role mapping
-  - unauthenticated role
-  - authenticated role
-  - jwt claims
-  - principal tags
-  - saml federation
-  - cloudops
-  - deploy
-  - provisioning
-  - security
-tags:
-  - aws
-  - cognito
-  - identity-pool
-  - cloudops
-  - deploy
-  - security
-  - federated-identity
-  - role-mapping
-  - iam
-  - authentication
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with cognito-identity and iam access. Works with Terraform aws_cognito_identity_pool, aws_cognito_identity_pool_provider_config, and aws_iam_role resources and CloudFormation AWS::Cognito::IdentityPool templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - cognito
-    - identity-pool
-    - cloudops
-    - deploy
-    - security
-    - federated-identity
-    - role-mapping
-    - iam
-    - authentication
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create cognito identity pool
-    - federated identity
-    - cognito role mapping
-    - identity pool provider
-    - unauthenticated role
-    - get credentials for identity
-    - principal tags
-    - saml federation cognito
-  when_to_use: >-
-    Invoke when the user wants to create a Cognito Identity Pool for
-    federated identity — configuring identity providers (Cognito User
-    Pool, social providers, SAML, OIDC), authenticated/unauthenticated
-    IAM roles, rules-based or token-based role mapping, principal tag
-    attribute mapping, or cross-account role assumption. Do NOT invoke
-    for Cognito User Pools (use user-pool skills), IAM Identity Center
-    (use identity-center skills), or STS federation directly.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, cognito, identity-pool, cloudops, deploy, security, federated-identity, role-mapping, iam, authentication
+  dependencies: aws-orchestrator
+  keywords: aws, cognito, identity pool, federated identity, role mapping, unauthenticated role, authenticated role, jwt claims, principal tags, saml federation, cloudops, deploy, provisioning, security
+  when_to_use: Invoke when the user wants to create a Cognito Identity Pool for federated identity — configuring identity providers (Cognito User Pool, social providers, SAML, OIDC), authenticated/unauthenticated IAM roles, rules-based or token-based role mapping, principal tag attribute mapping, or cross-account role assumption. Do NOT invoke for Cognito User Pools (use user-pool skills), IAM Identity Center (use identity-center skills), or STS federation directly.
 ---
 
 # Cognito Identity Pool Deployer

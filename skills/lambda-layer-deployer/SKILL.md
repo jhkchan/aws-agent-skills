@@ -1,116 +1,26 @@
 ---
 name: lambda-layer-deployer
-description: >-
-  Provisions AWS Lambda Layers with production defaults: layer creation
-  (zip with dependencies), compatible runtimes (nodejs, python, java,
-  ruby, provided.al2, provided.al2023), compatible architectures
-  (x86_64, arm64), layer versioning (immutable versions), cross-account
-  sharing (resource-based policy), layer usage (function + version
-  ARN), AWS SDK layers (always latest runtime SDK), Powertools layers.
-  Emits a READY_TO_DEPLOY checklist with verification commands. Use
-  when creating a Lambda Layer, packaging dependencies for Lambda,
-  sharing a layer across accounts, pinning a layer version, or
-  deploying Powertools / AWS SDK layers. Triggers: create Lambda
-  layer, publish Lambda layer, Lambda layer version, Lambda layer
-  zip, Lambda Powertools layer, Lambda SDK layer, Lambda layer
-  compatible runtimes, Lambda layer arm64, Lambda layer cross-account.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS Lambda Layers with production defaults: layer creation (zip with dependencies), compatible runtimes (nodejs, python, java, ruby, provided.al2, provided.al2023), compatible architectures (x86_64, arm64), layer versioning (immutable versions), cross-account sharing (resource-based policy), layer usage (function + version ARN), AWS SDK layers (always latest runtime SDK), Powertools layers. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Lambda Layer, packaging dependencies for Lambda, sharing a layer across accounts, pinning a layer version, or deploying Powertools / AWS SDK layers. Triggers: create Lambda layer, publish Lambda layer, Lambda layer version, Lambda layer zip, Lambda Powertools layer, Lambda SDK layer, Lambda layer compatible runtimes, Lambda layer arm64, Lambda layer cross-account.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with lambda, iam,
-  and sts access. Works with Terraform aws_lambda_layer_version
-  resource and CloudFormation AWS::Lambda::LayerVersion templates.
-keywords:
-  - aws
-  - lambda
-  - lambda layer
-  - cloudops
-  - deploy
-  - provisioning
-  - layer version
-  - compatible runtimes
-  - compatible architectures
-  - arm64
-  - x86_64
-  - cross-account sharing
-  - resource-based policy
-  - powertools
-  - aws sdk
-  - dependencies
-  - zip
-  - nodejs
-  - python
-  - java
-  - ruby
-  - provided.al2
-  - provided.al2023
-tags:
-  - aws
-  - lambda
-  - lambda-layer
-  - cloudops
-  - deploy
-  - compute
-  - provisioning
-  - layer-version
-  - arm64
-  - cross-account
-  - powertools
-  - sdk
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with lambda, iam, and sts access. Works with Terraform aws_lambda_layer_version resource and CloudFormation AWS::Lambda::LayerVersion templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - lambda
-    - lambda-layer
-    - cloudops
-    - deploy
-    - compute
-    - provisioning
-    - layer-version
-    - arm64
-    - cross-account
-    - powertools
-    - sdk
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create lambda layer
-    - publish lambda layer
-    - lambda layer version
-    - lambda layer zip
-    - lambda powertools layer
-    - lambda sdk layer
-    - lambda layer compatible runtimes
-    - lambda layer arm64
-    - lambda layer cross-account
-    - lambda layer sharing
-  when_to_use: >-
-    Invoke when the user wants to create or publish an AWS Lambda
-    Layer (zip with dependencies), specify compatible runtimes and
-    architectures, share a layer across accounts via resource-based
-    policy, pin a layer version to a function, or deploy AWS-provided
-    layers (Powertools, AWS SDK). Do NOT invoke for Lambda function
-    deployment (use lambda-function-deployer), for container-based
-    Lambda images (use container image workflows), or for Lambda
-    runtime deprecation auditing (use lambda-runtime-deprecation-
-    auditor).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, lambda, lambda-layer, cloudops, deploy, compute, provisioning, layer-version, arm64, cross-account, powertools, sdk
+  dependencies: aws-orchestrator
+  keywords: aws, lambda, lambda layer, cloudops, deploy, provisioning, layer version, compatible runtimes, compatible architectures, arm64, x86_64, cross-account sharing, resource-based policy, powertools, aws sdk, dependencies, zip, nodejs, python, java, ruby, provided.al2, provided.al2023
+  when_to_use: Invoke when the user wants to create or publish an AWS Lambda Layer (zip with dependencies), specify compatible runtimes and architectures, share a layer across accounts via resource-based policy, pin a layer version to a function, or deploy AWS-provided layers (Powertools, AWS SDK). Do NOT invoke for Lambda function deployment (use lambda-function-deployer), for container-based Lambda images (use container image workflows), or for Lambda runtime deprecation auditing (use lambda-runtime-deprecation- auditor).
 ---
 
 # Lambda Layer Deployer

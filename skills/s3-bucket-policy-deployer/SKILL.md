@@ -1,108 +1,26 @@
 ---
 name: s3-bucket-policy-deployer
-description: >-
-  Provisions S3 bucket policies with production defaults: policy
-  structure (Principal, Action, Resource, Condition), common
-  patterns (HTTPS-only via aws:SecureTransport Deny, cross-account
-  with external ID, VPC-endpoint-only via aws:SourceVpce, CloudFront
-  Origin Access Control, AWS service access), policy vs ACL
-  (policy preferred — ACLs are legacy), 20 KB policy size limit,
-  condition keys (aws:SourceIp, aws:SourceVpc, aws:SourceVpce,
-  s3:x-amz-acl, aws:SecureTransport), S3 Access Points policy
-  delegation, S3 Multi-Region Access Point (MRAP) policy. Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when
-  attaching a bucket policy, enforcing HTTPS-only, restricting to
-  a VPC endpoint, granting CloudFront OAC, or delegating via
-  Access Points. Triggers: S3 bucket policy, put-bucket-policy,
-  aws:SecureTransport, cross-account S3, VPC endpoint only, S3
-  CloudFront OAC, S3 Access Points delegation, MRAP policy.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions S3 bucket policies with production defaults: policy structure (Principal, Action, Resource, Condition), common patterns (HTTPS-only via aws:SecureTransport Deny, cross-account with external ID, VPC-endpoint-only via aws:SourceVpce, CloudFront Origin Access Control, AWS service access), policy vs ACL (policy preferred — ACLs are legacy), 20 KB policy size limit, condition keys (aws:SourceIp, aws:SourceVpc, aws:SourceVpce, s3:x-amz-acl, aws:SecureTransport), S3 Access Points policy delegation, S3 Multi-Region Access Point (MRAP) policy. Emits a READY_TO_DEPLOY checklist with verification commands. Use when attaching a bucket policy, enforcing HTTPS-only, restricting to a VPC endpoint, granting CloudFront OAC, or delegating via Access Points. Triggers: S3 bucket policy, put-bucket-policy, aws:SecureTransport, cross-account S3, VPC endpoint only, S3 CloudFront OAC, S3 Access Points delegation, MRAP policy.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Live provisioning uses AWS CLI v2 with s3api
-  (put-bucket-policy, get-bucket-policy, delete-bucket-policy),
-  s3control (put-access-point-policy,
-  put-multi-region-access-point-policy), cloudfront
-  (get-origin-access-control). Works with Terraform
-  aws_s3_bucket_policy and CloudFormation
-  AWS::S3::BucketPolicy.
-keywords:
-  - aws
-  - s3
-  - bucket policy
-  - aws:SecureTransport
-  - cross-account
-  - vpc endpoint
-  - aws:SourceVpce
-  - aws:SourceVpc
-  - aws:SourceIp
-  - cloudfront oac
-  - origin access control
-  - s3:x-amz-acl
-  - access points delegation
-  - mrap policy
-  - policy size limit
-  - cloudops
-  - deploy
-tags:
-  - aws
-  - s3
-  - bucket-policy
-  - cloudfront-oac
-  - vpc-endpoint
-  - cloudops
-  - deploy
-  - storage
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Live provisioning uses AWS CLI v2 with s3api (put-bucket-policy, get-bucket-policy, delete-bucket-policy), s3control (put-access-point-policy, put-multi-region-access-point-policy), cloudfront (get-origin-access-control). Works with Terraform aws_s3_bucket_policy and CloudFormation AWS::S3::BucketPolicy.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - s3
-    - bucket-policy
-    - cloudfront-oac
-    - vpc-endpoint
-    - cloudops
-    - deploy
-    - storage
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - S3 bucket policy
-    - put-bucket-policy
-    - aws:SecureTransport
-    - cross-account S3 access
-    - VPC endpoint only S3
-    - S3 CloudFront OAC
-    - S3 Access Points delegation
-    - MRAP policy
-  when_to_use: >-
-    Invoke when the user wants to attach or replace an S3 bucket
-    policy: enforcing HTTPS-only access (aws:SecureTransport Deny),
-    granting cross-account access with conditions, restricting to a
-    VPC endpoint (aws:SourceVpce), configuring CloudFront Origin
-    Access Control (OAC), granting AWS service access, delegating
-    via S3 Access Points, or configuring a Multi-Region Access
-    Point policy. Do NOT invoke for bucket-level hardening without
-    a policy (use s3-secure-bucket-deployer), for access point
-    creation (use s3-access-points-deployer), for S3 ACLs (legacy —
-    policies are preferred), or for auditing existing policies (use
-    s3-public-access-auditor).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, s3, bucket-policy, cloudfront-oac, vpc-endpoint, cloudops, deploy, storage
+  dependencies: aws-orchestrator
+  keywords: aws, s3, bucket policy, aws:SecureTransport, cross-account, vpc endpoint, aws:SourceVpce, aws:SourceVpc, aws:SourceIp, cloudfront oac, origin access control, s3:x-amz-acl, access points delegation, mrap policy, policy size limit, cloudops, deploy
+  when_to_use: 'Invoke when the user wants to attach or replace an S3 bucket policy: enforcing HTTPS-only access (aws:SecureTransport Deny), granting cross-account access with conditions, restricting to a VPC endpoint (aws:SourceVpce), configuring CloudFront Origin Access Control (OAC), granting AWS service access, delegating via S3 Access Points, or configuring a Multi-Region Access Point policy. Do NOT invoke for bucket-level hardening without a policy (use s3-secure-bucket-deployer), for access point creation (use s3-access-points-deployer), for S3 ACLs (legacy — policies are preferred), or for auditing existing policies (use s3-public-access-auditor).'
 ---
 
 # S3 Bucket Policy Deployer

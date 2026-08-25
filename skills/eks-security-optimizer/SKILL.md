@@ -1,100 +1,24 @@
 ---
 name: eks-security-optimizer
-description: 'Optimises Amazon EKS cluster security posture across eight dimensions: pod security standards (Pod Security
-  Admission — privileged/baseline/restricted PSS profiles enforced via admission controller replacing deprecated PodSecurityPolicy),
-  IAM identity (IRSA — IAM Roles for Service Accounts over node IAM role for least privilege; EKS Pod Identity as the newer
-  alternative), network policies (Calico/Cilium network policies for east-west traffic segmentation; default deny recommended),
-  secrets encryption (KMS envelope encryption for Kubernetes secrets via --encryption-config), image scanning (ECR scan-on-push
-  with enhanced scanning via Inspector for vulnerability detection), runtime security (GuardDuty EKS runtime monitoring for
-  lateral movement and credential theft detection; Falco for syscall-level detection), admission webhook policies (OPA Gatekeeper
-  / Kyverno for policy-as-code enforcement), and service mesh mTLS (App Mesh or Istio with ACM PCA for mutual TLS between
-  pods). Reads cluster configuration vi...'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Optimises Amazon EKS cluster security posture across eight dimensions: pod security standards (Pod Security Admission — privileged/baseline/restricted PSS profiles enforced via admission controller replacing deprecated PodSecurityPolicy), IAM identity (IRSA — IAM Roles for Service Accounts over node IAM role for least privilege; EKS Pod Identity as the newer alternative), network policies (Calico/Cilium network policies for east-west traffic segmentation; default deny recommended), secrets encryption (KMS envelope encryption for Kubernetes secrets via --encryption-config), image scanning (ECR scan-on-push with enhanced scanning via Inspector for vulnerability detection), runtime security (GuardDuty EKS runtime monitoring for lateral movement and credential theft detection; Falco for syscall-level detection), admission webhook policies (OPA Gatekeeper / Kyverno for policy-as-code enforcement), and service mesh mTLS (App Mesh or Istio with ACM PCA for mutual TLS between pods). Reads cluster configuration vi...'
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline classification works
-  from pasted cluster configuration and kubectl output. Live-account optimization uses aws eks describe-cluster, aws eks list-addons,
-  aws eks describe-addon, aws kms describe-key, aws ecr describe-images, aws ecr describe-image-scan-findings, aws guardduty
-  list-findings, aws guardduty get-findings, kubectl get/describe/apply (kubectl v1.28+, AWS CLI v2, SSO or key-based credentials).
-keywords:
-- EKS
-- Kubernetes
-- pod security
-- Pod Security Admission
-- IRSA
-- IAM Roles for Service Accounts
-- EKS Pod Identity
-- network policies
-- Calico
-- Cilium
-- secrets encryption
-- KMS
-- image scanning
-- ECR scan-on-push
-- runtime security
-- GuardDuty EKS
-- Falco
-- admission webhook
-- OPA Gatekeeper
-- Kyverno
-- service mesh
-- mTLS
-- App Mesh
-- ACM PCA
-- audit logging
-- IMDSv2
-- privilege escalation
-- container security
-- cluster hardening
-tags:
-- eks
-- compute
-- security
-- kubernetes
-- container-security
-- cluster-hardening
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline classification works from pasted cluster configuration and kubectl output. Live-account optimization uses aws eks describe-cluster, aws eks list-addons, aws eks describe-addon, aws kms describe-key, aws ecr describe-images, aws ecr describe-image-scan-findings, aws guardduty list-findings, aws guardduty get-findings, kubectl get/describe/apply (kubectl v1.28+, AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-  when_to_use: Optimising EKS security posture, triaging pod security standards, evaluating IRSA vs node IAM role, implementing
-    network policies for east-west segmentation, enabling KMS secrets encryption, configuring ECR scan-on-push, enabling GuardDuty
-    EKS runtime monitoring, deploying OPA Gatekeeper or Kyverno admission policies, implementing service mesh mTLS, preparing
-    for compliance audit, or hardening a cluster before production.
-  when_not_to_use: EKS cluster troubleshooting (pod crashes, scheduling failures, control plane errors — use the EKS troubleshooter),
-    EC2 security group auditing (use ec2-security-audit), IAM policy analysis for non-EKS resources (use iam-policy-analyzer),
-    or general Kubernetes application debugging. This skill focuses on security posture optimization, not functional debugging.
-  activation_triggers:
-  - optimise EKS security
-  - EKS pod security standards
-  - EKS IRSA configuration
-  - EKS Pod Identity
-  - EKS network policies
-  - EKS secrets encryption KMS
-  - ECR scan-on-push
-  - GuardDuty EKS runtime
-  - OPA Gatekeeper EKS
-  - Kyverno EKS policies
-  - EKS service mesh mTLS
-  - EKS audit logging
-  - EKS IMDSv2 enforcement
-  - EKS privilege escalation
-  - EKS kubelet anonymous auth
-  - EKS API server endpoint
-  - EKS cluster hardening
-  - container security review
-  - EKS compliance audit
-  invocation_schema: 'Input: either (a) a cluster identifier + live-account context, (b) a kubectl configuration dump, OR
-    (c) a security finding document (GuardDuty/Inspector/Config) with cluster details. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/
-    SEVERITY/REMEDIATION_STEPS block per cluster, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
+  when_to_use: Optimising EKS security posture, triaging pod security standards, evaluating IRSA vs node IAM role, implementing network policies for east-west segmentation, enabling KMS secrets encryption, configuring ECR scan-on-push, enabling GuardDuty EKS runtime monitoring, deploying OPA Gatekeeper or Kyverno admission policies, implementing service mesh mTLS, preparing for compliance audit, or hardening a cluster before production.
+  when_not_to_use: EKS cluster troubleshooting (pod crashes, scheduling failures, control plane errors — use the EKS troubleshooter), EC2 security group auditing (use ec2-security-audit), IAM policy analysis for non-EKS resources (use iam-policy-analyzer), or general Kubernetes application debugging. This skill focuses on security posture optimization, not functional debugging.
+  activation_triggers: optimise EKS security, EKS pod security standards, EKS IRSA configuration, EKS Pod Identity, EKS network policies, EKS secrets encryption KMS, ECR scan-on-push, GuardDuty EKS runtime, OPA Gatekeeper EKS, Kyverno EKS policies, EKS service mesh mTLS, EKS audit logging, EKS IMDSv2 enforcement, EKS privilege escalation, EKS kubelet anonymous auth, EKS API server endpoint, EKS cluster hardening, container security review, EKS compliance audit
+  invocation_schema: 'Input: either (a) a cluster identifier + live-account context, (b) a kubectl configuration dump, OR (c) a security finding document (GuardDuty/Inspector/Config) with cluster details. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ SEVERITY/REMEDIATION_STEPS block per cluster, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
   invocation_example: 'ClusterName: prod-cluster-1
 
     Region: us-east-1
@@ -122,6 +46,10 @@ metadata:
 
 
     Emit the standard security optimization block.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: EKS, Kubernetes, pod security, Pod Security Admission, IRSA, IAM Roles for Service Accounts, EKS Pod Identity, network policies, Calico, Cilium, secrets encryption, KMS, image scanning, ECR scan-on-push, runtime security, GuardDuty EKS, Falco, admission webhook, OPA Gatekeeper, Kyverno, service mesh, mTLS, App Mesh, ACM PCA, audit logging, IMDSv2, privilege escalation, container security, cluster hardening
+  tags: eks, compute, security, kubernetes, container-security, cluster-hardening
 ---
 
 # EKS Security Optimizer

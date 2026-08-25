@@ -1,115 +1,26 @@
 ---
 name: sitewise-asset-deployer
-description: >-
-  Deploys AWS IoT SiteWise industrial data infrastructure with production
-  defaults: asset model creation (measurement, metric, transform,
-  attribute property types), asset hierarchy (parent-child composition),
-  SiteWise Edge gateway on IoT Greengrass, data ingestion via
-  BatchPutAssetPropertyValue, OPC-UA source configuration, asset property
-  aliases, dashboards, threshold alarms, warm-tier storage, and Identity
-  Center portal access. Emits a READY_TO_DEPLOY checklist with
-  verification commands. Use when modeling industrial assets, ingesting
-  OPC-UA telemetry, creating dashboards, configuring alarms, deploying
-  Edge gateways, or setting up aliases. Triggers: create iot sitewise
-  asset model, sitewise asset hierarchy, sitewise edge gateway, opc-ua
-  source sitewise, batchputassetpropertyvalue, sitewise dashboard
-  portal, sitewise alarm, asset property alias, sitewise identity center.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Deploys AWS IoT SiteWise industrial data infrastructure with production defaults: asset model creation (measurement, metric, transform, attribute property types), asset hierarchy (parent-child composition), SiteWise Edge gateway on IoT Greengrass, data ingestion via BatchPutAssetPropertyValue, OPC-UA source configuration, asset property aliases, dashboards, threshold alarms, warm-tier storage, and Identity Center portal access. Emits a READY_TO_DEPLOY checklist with verification commands. Use when modeling industrial assets, ingesting OPC-UA telemetry, creating dashboards, configuring alarms, deploying Edge gateways, or setting up aliases. Triggers: create iot sitewise asset model, sitewise asset hierarchy, sitewise edge gateway, opc-ua source sitewise, batchputassetpropertyvalue, sitewise dashboard portal, sitewise alarm, asset property alias, sitewise identity center.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with iot-sitewise
-  access (and greengrassv2 access if deploying Edge gateway). Works
-  with Terraform aws_iotsitewise_asset_model / aws_iotsitewise_asset /
-  aws_iotsitewise_gateway resources and CloudFormation
-  AWS::IoTSiteWise::AssetModel / Asset / Gateway templates.
-keywords:
-  - aws
-  - iot sitewise
-  - asset model
-  - asset hierarchy
-  - cloudops
-  - deploy
-  - provisioning
-  - opc-ua
-  - measurement
-  - transform
-  - metric
-  - attribute
-  - gateway
-  - greengrass
-  - batchputassetpropertyvalue
-  - alias
-  - dashboard
-  - portal
-  - alarm
-  - identity center
-tags:
-  - aws
-  - iot-sitewise
-  - cloudops
-  - deploy
-  - industrial
-  - provisioning
-  - asset-model
-  - opc-ua
-  - edge-gateway
-  - dashboard
-  - alarm
-  - identity-center
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with iot-sitewise access (and greengrassv2 access if deploying Edge gateway). Works with Terraform aws_iotsitewise_asset_model / aws_iotsitewise_asset / aws_iotsitewise_gateway resources and CloudFormation AWS::IoTSiteWise::AssetModel / Asset / Gateway templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - iot-sitewise
-    - cloudops
-    - deploy
-    - industrial
-    - provisioning
-    - asset-model
-    - opc-ua
-    - edge-gateway
-    - dashboard
-    - alarm
-    - identity-center
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create iot sitewise asset model
-    - sitewise asset hierarchy
-    - sitewise edge gateway
-    - opc-ua source sitewise
-    - batchputassetpropertyvalue
-    - sitewise dashboard portal
-    - sitewise alarm
-    - asset property alias
-    - sitewise identity center
-  when_to_use: >-
-    Invoke when the user wants to model industrial assets in AWS IoT
-    SiteWise, create asset models with measurement/metric/transform/
-    attribute properties, build parent-child asset hierarchies, deploy
-    SiteWise Edge gateways on IoT Greengrass, configure OPC-UA source
-    data ingestion, set up asset property aliases for external data
-    feeds, create dashboards and portals, configure threshold-based
-    alarms, or integrate SiteWise with CloudWatch and Identity Center.
-    Do NOT invoke for AWS IoT Core (device connectivity), AWS IoT
-    TwinMaker (digital twins), or AWS IoT Events (event detection)
-    unless the task specifically involves SiteWise asset modeling.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, iot-sitewise, cloudops, deploy, industrial, provisioning, asset-model, opc-ua, edge-gateway, dashboard, alarm, identity-center
+  dependencies: aws-orchestrator
+  keywords: aws, iot sitewise, asset model, asset hierarchy, cloudops, deploy, provisioning, opc-ua, measurement, transform, metric, attribute, gateway, greengrass, batchputassetpropertyvalue, alias, dashboard, portal, alarm, identity center
+  when_to_use: Invoke when the user wants to model industrial assets in AWS IoT SiteWise, create asset models with measurement/metric/transform/ attribute properties, build parent-child asset hierarchies, deploy SiteWise Edge gateways on IoT Greengrass, configure OPC-UA source data ingestion, set up asset property aliases for external data feeds, create dashboards and portals, configure threshold-based alarms, or integrate SiteWise with CloudWatch and Identity Center. Do NOT invoke for AWS IoT Core (device connectivity), AWS IoT TwinMaker (digital twins), or AWS IoT Events (event detection) unless the task specifically involves SiteWise asset modeling.
 ---
 
 # AWS IoT SiteWise Asset Deployer

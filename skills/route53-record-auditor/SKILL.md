@@ -1,77 +1,24 @@
 ---
 name: route53-record-auditor
-description: >-
-  Audits AWS Route 53 record sets for missing health checks on weighted,
-  failover, latency, geolocation, and multivalue routing policies; dangling
-  ALIAS records pointing to deleted AWS resources (ELB, CloudFront, S3
-  website, API Gateway); DNSSEC signing gaps on public hosted zones; public
-  hosted-zone exposure of private/internal IP addresses; and TTL
-  inconsistency within routing-policy record groups. Emits a deterministic
-  verdict (NO_HEALTH_CHECK | DNSSEC_GAP | DANGLING | CONFIG_GAP | OK) per
-  record with enumerated findings and specific CLI remediation. Use when
-  reviewing Route 53 records, checking for dangling DNS records, validating
-  failover or weighted health checks, auditing DNSSEC posture, or hardening
-  DNS configuration before production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Route 53 record sets for missing health checks on weighted, failover, latency, geolocation, and multivalue routing policies; dangling ALIAS records pointing to deleted AWS resources (ELB, CloudFront, S3 website, API Gateway); DNSSEC signing gaps on public hosted zones; public hosted-zone exposure of private/internal IP addresses; and TTL inconsistency within routing-policy record groups. Emits a deterministic verdict (NO_HEALTH_CHECK | DNSSEC_GAP | DANGLING | CONFIG_GAP | OK) per record with enumerated findings and specific CLI remediation. Use when reviewing Route 53 records, checking for dangling DNS records, validating failover or weighted health checks, auditing DNSSEC posture, or hardening DNS configuration before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline record-set classification.
-  Live-account audits use aws route53 list-hosted-zones, list-resource-record-sets,
-  get-hosted-zone, get-dnssec, list-health-checks, and aws ec2
-  describe-network-interfaces (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Route 53
-  - DNS
-  - health check
-  - failover routing
-  - weighted routing
-  - latency routing
-  - geolocation routing
-  - multivalue answer
-  - DNSSEC
-  - dangling record
-  - subdomain takeover
-  - ALIAS record
-  - public hosted zone
-  - TTL consistency
-  - record set audit
-  - DNS hardening
-  - Route 53 misconfiguration
-tags: [route53, dns, networking, health-check, dnssec, dangling-record, ttl, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline record-set classification. Live-account audits use aws route53 list-hosted-zones, list-resource-record-sets, get-hosted-zone, get-dnssec, list-health-checks, and aws ec2 describe-network-interfaces (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
-  verdict_shape: "NO_HEALTH_CHECK | DNSSEC_GAP | DANGLING | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing Route 53 record sets before production deployment, auditing
-    DNS failover health-check coverage, detecting dangling ALIAS records
-    pointing to deleted AWS resources, validating DNSSEC signing on public
-    hosted zones, checking public-zone exposure of private IPs, or
-    hardening DNS configuration across an account.
-  activation_triggers:
-    - "audit these Route 53 records"
-    - "is my DNS failover healthy"
-    - "dangling Route 53 record"
-    - "missing health check weighted"
-    - "DNSSEC not enabled"
-    - "public hosted zone exposure"
-    - "Route 53 TTL inconsistency"
-    - "subdomain takeover risk"
-    - "failover PRIMARY no health check"
-  invocation_schema: >-
-    Input: either (a) one or more Route 53 record sets (list-resource-record-sets
-    JSON), optionally paired with hosted-zone metadata (get-dnssec,
-    get-hosted-zone), OR (b) a hosted-zone-id for live-account audit.
-    Output: deterministic RECORD/VERDICT/REASON/RISK/FINDINGS/REMEDIATION
-    block per record, where VERDICT is in {NO_HEALTH_CHECK, DNSSEC_GAP,
-    DANGLING, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: NO_HEALTH_CHECK | DNSSEC_GAP | DANGLING | CONFIG_GAP | OK
+  when_to_use: Reviewing Route 53 record sets before production deployment, auditing DNS failover health-check coverage, detecting dangling ALIAS records pointing to deleted AWS resources, validating DNSSEC signing on public hosted zones, checking public-zone exposure of private IPs, or hardening DNS configuration across an account.
+  activation_triggers: audit these Route 53 records, is my DNS failover healthy, dangling Route 53 record, missing health check weighted, DNSSEC not enabled, public hosted zone exposure, Route 53 TTL inconsistency, subdomain takeover risk, failover PRIMARY no health check
+  invocation_schema: 'Input: either (a) one or more Route 53 record sets (list-resource-record-sets JSON), optionally paired with hosted-zone metadata (get-dnssec, get-hosted-zone), OR (b) a hosted-zone-id for live-account audit. Output: deterministic RECORD/VERDICT/REASON/RISK/FINDINGS/REMEDIATION block per record, where VERDICT is in {NO_HEALTH_CHECK, DNSSEC_GAP, DANGLING, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Route 53, DNS, health check, failover routing, weighted routing, latency routing, geolocation routing, multivalue answer, DNSSEC, dangling record, subdomain takeover, ALIAS record, public hosted zone, TTL consistency, record set audit, DNS hardening, Route 53 misconfiguration
+  tags: route53, dns, networking, health-check, dnssec, dangling-record, ttl, audit
 ---
 
 # Route 53 Record Auditor

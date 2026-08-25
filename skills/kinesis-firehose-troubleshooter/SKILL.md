@@ -1,119 +1,27 @@
 ---
 name: kinesis-firehose-troubleshooter
-description: >-
-  Diagnoses Amazon Kinesis Data Firehose delivery stream failures
-  via a systematic 8-symptom decision tree: delivery to S3 fails
-  (bucket deleted, KMS key policy, bucket region mismatch), data
-  transformation Lambda fails (Lambda timeout, exception, resource
-  policy), delivery lag (buffering hints too large, Lambda slow,
-  throttling), data format conversion fails (incorrect JSON, Hive
-  SerDe mismatch for Parquet/ORC), delivery to OpenSearch fails
-  (cluster unreachable, auth failure, circuit breaker), delivery to
-  Redshift fails (COPY command failure, staging bucket issue), and
-  latest destinations (Firehose to Snowflake, HTTP endpoint, Splunk
-  delivery). Maps each symptom to root cause via diagnostic commands
-  and specific fixes. Emits ROOT_CAUSE_FOUND with a fix plan,
-  NEED_MORE_INFO with the next diagnostic, or ESCALATE with the
-  escalation path. Use when Firehose is failing to deliver, lagging,
-  transforming incorrectly, or a downstream destination returns
-  errors.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses Amazon Kinesis Data Firehose delivery stream failures via a systematic 8-symptom decision tree: delivery to S3 fails (bucket deleted, KMS key policy, bucket region mismatch), data transformation Lambda fails (Lambda timeout, exception, resource policy), delivery lag (buffering hints too large, Lambda slow, throttling), data format conversion fails (incorrect JSON, Hive SerDe mismatch for Parquet/ORC), delivery to OpenSearch fails (cluster unreachable, auth failure, circuit breaker), delivery to Redshift fails (COPY command failure, staging bucket issue), and latest destinations (Firehose to Snowflake, HTTP endpoint, Splunk delivery). Maps each symptom to root cause via diagnostic commands and specific fixes. Emits ROOT_CAUSE_FOUND with a fix plan, NEED_MORE_INFO with the next diagnostic, or ESCALATE with the escalation path. Use when Firehose is failing to deliver, lagging, transforming incorrectly, or a downstream destination returns errors.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline diagnosis. Live-
-  account troubleshooting uses aws firehose describe-delivery-
-  stream, list-tags-for-stream, list-delivery-streams, start-
-  delivery-stream-encryption, stop-delivery-stream-encryption,
-  aws logs filter-log-events, aws lambda get-function,
-  get-policy, invoke, aws s3api head-bucket, get-bucket-location,
-  aws opensearch describe-domain, describe-domain-health, aws
-  redshift describe-clusters, aws kms describe-key, get-key-policy,
-  aws cloudwatch get-metric-statistics, and CloudTrail queries
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Kinesis
-  - Kinesis Data Firehose
-  - delivery stream
-  - delivery to S3 fails
-  - delivery lag
-  - data transformation Lambda
-  - Lambda processing
-  - data format conversion
-  - Parquet
-  - ORC
-  - Hive SerDe
-  - OpenSearch delivery
-  - Redshift COPY
-  - Snowflake delivery
-  - HTTP endpoint delivery
-  - Splunk HEC
-  - circuit breaker
-  - buffering hints
-  - KMS key policy
-  - staging bucket
-tags: [kinesis, firehose, analytics, troubleshoot, delivery-stream, lambda, opensearch, redshift, diagnostic]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline diagnosis. Live- account troubleshooting uses aws firehose describe-delivery- stream, list-tags-for-stream, list-delivery-streams, start- delivery-stream-encryption, stop-delivery-stream-encryption, aws logs filter-log-events, aws lambda get-function, get-policy, invoke, aws s3api head-bucket, get-bucket-location, aws opensearch describe-domain, describe-domain-health, aws...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
-  when_to_use: >-
-    Diagnosing a Kinesis Data Firehose delivery stream that is
-    failing to deliver, lagging, transforming incorrectly, or
-    one of the downstream destinations returns errors. Covers
-    the eight primary symptom categories: delivery to S3 fails,
-    data transformation Lambda fails, delivery lag, data format
-    conversion fails (Parquet/ORC), delivery to OpenSearch fails,
-    delivery to Redshift fails, and latest destinations (Firehose
-    to Snowflake, HTTP endpoint, Splunk). Use when CloudWatch
-    shows DeliveryToS3.Success dropping, Firehose logs show
-    Lambda transformation errors, ORC/Parquet conversion
-    produces 0-byte objects, the OpenSearch destination returns
-    429s, or the Redshift COPY command fails.
-  activation_triggers:
-    - "Firehose delivery fails"
-    - "Firehose delivery lag"
-    - "Firehose to S3 fails"
-    - "Firehose to OpenSearch fails"
-    - "Firehose to Redshift fails"
-    - "Firehose to Snowflake fails"
-    - "Firehose HTTP endpoint fails"
-    - "Firehose Splunk delivery fails"
-    - "Firehose Lambda transformation fails"
-    - "DeliveryToS3.Success drops"
-    - "DeliveryToS3.DataFreshnessSec high"
-    - "data format conversion fails"
-    - "Parquet conversion 0 bytes"
-    - "ORC SerDe mismatch"
-    - "Firehose circuit breaker"
-    - "OpenSearch 429"
-    - "Redshift COPY fails"
-    - "Splunk HEC token invalid"
-    - "Firehose KMS denied"
-    - "bucket region mismatch"
-  invocation_schema: >-
-    Input: either (a) a delivery-stream-name with observed
-    symptom (delivery-to-s3-fails / lambda-fails / delivery-lag
-    / format-conversion-fails / opensearch-fails / redshift-fails
-    / latest-destination-fails), optionally with a destination
-    type (s3 / opensearch / redshift / snowflake / http-endpoint
-    / splunk), OR (b) live-account diagnostic output from
-    describe-delivery-stream, get-metric-statistics, filter-log-
-    events, etc. Output: deterministic DIAGNOSIS block per
-    stream - SYMPTOM/ROOT_CAUSE/EVIDENCE/LAYER_CHECK/FIX/
-    VERDICT - where VERDICT is ROOT_CAUSE_FOUND (cause identified
-    + fix actionable), NEED_MORE_INFO (specific next diagnostic
-    cited), or ESCALATE (requires AWS Support or out-of-band
-    action).
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+  when_to_use: 'Diagnosing a Kinesis Data Firehose delivery stream that is failing to deliver, lagging, transforming incorrectly, or one of the downstream destinations returns errors. Covers the eight primary symptom categories: delivery to S3 fails, data transformation Lambda fails, delivery lag, data format conversion fails (Parquet/ORC), delivery to OpenSearch fails, delivery to Redshift fails, and latest destinations (Firehose to Snowflake, HTTP endpoint, Splunk). Use when CloudWatch shows DeliveryToS3.Success dropping, Firehose logs show Lambda transformation errors, ORC/Parquet conversion produces 0-byte objects, the OpenSearch destination returns 429s, or the Redshift COPY command fails.'
+  activation_triggers: Firehose delivery fails, Firehose delivery lag, Firehose to S3 fails, Firehose to OpenSearch fails, Firehose to Redshift fails, Firehose to Snowflake fails, Firehose HTTP endpoint fails, Firehose Splunk delivery fails, Firehose Lambda transformation fails, DeliveryToS3.Success drops, DeliveryToS3.DataFreshnessSec high, data format conversion fails, Parquet conversion 0 bytes, ORC SerDe mismatch, Firehose circuit breaker, OpenSearch 429, Redshift COPY fails, Splunk HEC token invalid, Firehose KMS denied, bucket region mismatch
+  invocation_schema: 'Input: either (a) a delivery-stream-name with observed symptom (delivery-to-s3-fails / lambda-fails / delivery-lag / format-conversion-fails / opensearch-fails / redshift-fails / latest-destination-fails), optionally with a destination type (s3 / opensearch / redshift / snowflake / http-endpoint / splunk), OR (b) live-account diagnostic output from describe-delivery-stream, get-metric-statistics, filter-log- events, etc. Output: deterministic DIAGNOSIS block per stream - SYMPTOM/ROOT_CAUSE/EVIDENCE/LAYER_CHECK/FIX/ VERDICT - where VERDICT is ROOT_CAUSE_FOUND (cause identified + fix actionable), NEED_MORE_INFO (specific next diagnostic cited), or ESCALATE (requires AWS Support or out-of-band action).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Kinesis, Kinesis Data Firehose, delivery stream, delivery to S3 fails, delivery lag, data transformation Lambda, Lambda processing, data format conversion, Parquet, ORC, Hive SerDe, OpenSearch delivery, Redshift COPY, Snowflake delivery, HTTP endpoint delivery, Splunk HEC, circuit breaker, buffering hints, KMS key policy, staging bucket
+  tags: kinesis, firehose, analytics, troubleshoot, delivery-stream, lambda, opensearch, redshift, diagnostic
 ---
 
 # Kinesis Data Firehose Troubleshooter

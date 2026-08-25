@@ -1,96 +1,25 @@
 ---
 name: cloudtrail-org-trail-auditor
-description: >-
-  Audits AWS CloudTrail organization trails for full-org coverage, multi-region
-  logging, KMS encryption (SSE-KMS) of log delivery, log-file validation (digest
-  integrity), CloudWatch Logs delivery, CloudTrail Insights enablement, and log
-  retention posture. Emits a deterministic verdict
-  (NO_ORG_TRAIL | NO_ENCRYPTION | NO_VALIDATION | NO_INSIGHTS | CONFIG_GAP | OK)
-  per trail with enumerated findings and CLI remediation. Use when reviewing
-  CloudTrail trail configurations, checking org-wide audit coverage, validating
-  log integrity, confirming KMS encryption, verifying CloudTrail Insights, or
-  hardening forensic-readiness posture before compliance assessment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS CloudTrail organization trails for full-org coverage, multi-region logging, KMS encryption (SSE-KMS) of log delivery, log-file validation (digest integrity), CloudWatch Logs delivery, CloudTrail Insights enablement, and log retention posture. Emits a deterministic verdict (NO_ORG_TRAIL | NO_ENCRYPTION | NO_VALIDATION | NO_INSIGHTS | CONFIG_GAP | OK) per trail with enumerated findings and CLI remediation. Use when reviewing CloudTrail trail configurations, checking org-wide audit coverage, validating log integrity, confirming KMS encryption, verifying CloudTrail Insights, or hardening forensic-readiness posture before compliance assessment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline trail-config classification.
-  Live-account audits use aws cloudtrail describe-trails, get-trail-status,
-  get-insight-selectors, and aws logs describe-log-groups (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - CloudTrail
-  - organization trail
-  - multi-region trail
-  - KMS encryption
-  - log file validation
-  - digest files
-  - CloudWatch Logs
-  - CloudTrail Insights
-  - log retention
-  - audit logging
-  - compliance
-  - forensic readiness
-  - IsOrganizationTrail
-  - IsMultiRegionTrail
-  - LogFileValidationEnabled
-  - trail auditor
-  - API activity logging
-tags: [cloudtrail, governance, audit-logging, compliance, security, insights, kms-encryption]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline trail-config classification. Live-account audits use aws cloudtrail describe-trails, get-trail-status, get-insight-selectors, and aws logs describe-log-groups (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
-  verdict_shape: "NO_ORG_TRAIL | NO_ENCRYPTION | NO_VALIDATION | NO_INSIGHTS | CONFIG_GAP | OK"
-  when_to_use: >-
-    Pre-compliance review of an AWS Organizations CloudTrail trail's
-    configuration: org-wide coverage, multi-region logging, KMS-encryption,
-    log-file integrity validation, Insights enablement, and log retention
-    posture.
-  when_not_to_use:
-    - "Single-account trail that is NOT part of an AWS Organization (different audit scope)."
-    - "CloudTrail Lake event-data-store queries (different API surface: list-event-data-stores / start-query)."
-    - "Configuring data-event selectors for S3/Lambda/DynamoDB resources (separate skill)."
-    - "Macie, GuardDuty, or Security Hub finding triage (use the dedicated triage skills)."
-    - "Cost-optimization of CloudTrail ingest volume (use a cost-audit skill)."
-  activation_triggers:
-    - "audit this CloudTrail org trail"
-    - "is my org trail configured correctly"
-    - "check CloudTrail org trail log file validation"
-    - "is the CloudTrail org trail encrypted with KMS"
-    - "are CloudTrail Insights enabled on the org trail"
-    - "CloudTrail multi-region check on the org trail"
-    - "CloudTrail org trail coverage audit"
-    - "verify CloudTrail forensic readiness for the org"
-  invocation_schema:
-    type: object
-    required: [trail_config]
-    properties:
-      trail_config:
-        type: object
-        description: >-
-          describe-trails output (JSON or key-value summary) for one trail.
-      trail_status:
-        type: object
-        description: get-trail-status output (optional but recommended).
-      insight_selectors:
-        type: array
-        description: get-insight-selectors output (optional).
-      cw_retention_days:
-        type: integer
-        description: CloudWatch Logs retentionInDays for the trail's log group.
-      trail_name_or_arn:
-        type: string
-        description: Trail name/ARN for live-account audit (alternative to trail_config).
-    output: >-
-      Deterministic per-trail block: TRAIL / VERDICT / REASON / FINDINGS /
-      REMEDIATION. VERDICT is one of NO_ORG_TRAIL | NO_ENCRYPTION |
-      NO_VALIDATION | NO_INSIGHTS | CONFIG_GAP | OK (first-fail-wins order).
+  verdict_shape: NO_ORG_TRAIL | NO_ENCRYPTION | NO_VALIDATION | NO_INSIGHTS | CONFIG_GAP | OK
+  when_to_use: 'Pre-compliance review of an AWS Organizations CloudTrail trail''s configuration: org-wide coverage, multi-region logging, KMS-encryption, log-file integrity validation, Insights enablement, and log retention posture.'
+  when_not_to_use: 'Single-account trail that is NOT part of an AWS Organization (different audit scope)., CloudTrail Lake event-data-store queries (different API surface: list-event-data-stores / start-query)., Configuring data-event selectors for S3/Lambda/DynamoDB resources (separate skill)., Macie, GuardDuty, or Security Hub finding triage (use the dedicated triage skills)., Cost-optimization of CloudTrail ingest volume (use a cost-audit skill).'
+  activation_triggers: audit this CloudTrail org trail, is my org trail configured correctly, check CloudTrail org trail log file validation, is the CloudTrail org trail encrypted with KMS, are CloudTrail Insights enabled on the org trail, CloudTrail multi-region check on the org trail, CloudTrail org trail coverage audit, verify CloudTrail forensic readiness for the org
+  invocation_schema: "{output: 'Deterministic per-trail block: TRAIL / VERDICT / REASON / FINDINGS / REMEDIATION.\n    VERDICT is one of NO_ORG_TRAIL | NO_ENCRYPTION | NO_VALIDATION | NO_INSIGHTS |\n    CONFIG_GAP | OK (first-fail-wins order).', properties: {cw_retention_days: {description: CloudWatch\n        Logs retentionInDays for the trail's log group., type: integer}, insight_selectors: {\n      description: get-insight-selectors output (optional)., type: array}, trail_config: {\n      description: describe-trails output (JSON or key-value summary) for one trail.,\n      type: object}, trail_name_or_arn: {description: Trail name/ARN for live-account\n        audit (alternative to trail_config)., type: string}, trail_status: {description: get-trail-status\n        output (optional but recommended)., type: object}}, required: [trail_config],\n  type: object}"
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudTrail, organization trail, multi-region trail, KMS encryption, log file validation, digest files, CloudWatch Logs, CloudTrail Insights, log retention, audit logging, compliance, forensic readiness, IsOrganizationTrail, IsMultiRegionTrail, LogFileValidationEnabled, trail auditor, API activity logging
+  tags: cloudtrail, governance, audit-logging, compliance, security, insights, kms-encryption
 ---
 
 # CloudTrail Organization Trail Auditor

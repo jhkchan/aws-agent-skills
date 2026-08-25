@@ -1,130 +1,26 @@
 ---
 name: elasticache-cache-deployer
-description: >-
-  Provisions ElastiCache (Redis OSS / Memcached) clusters with production
-  defaults: engine selection (Redis for persistence, clustering, pub/sub,
-  TLS vs Memcached for simple key-value, multi-threaded, no persistence),
-  cluster mode enabled vs disabled, node type sizing, Multi-AZ failover
-  (Redis only), VPC-only networking, encryption at-rest + in-transit +
-  AUTH (Redis only), subnet group, parameter group maxmemory-policy,
-  snapshot retention, ElastiCache Serverless, Global Datastore. Emits a
-  READY_TO_DEPLOY checklist with verification commands. Use when creating
-  an ElastiCache cluster, choosing between Redis and Memcached, designing
-  a Multi-AZ Redis failover topology, sizing cache nodes, or generating
-  provisioning CLI commands / IaC templates. Triggers: create
-  ElastiCache, provision Redis, provision Memcached, ElastiCache cluster
-  mode, Redis replication group, Global Datastore, ElastiCache
-  Serverless, cache node type sizing.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions ElastiCache (Redis OSS / Memcached) clusters with production defaults: engine selection (Redis for persistence, clustering, pub/sub, TLS vs Memcached for simple key-value, multi-threaded, no persistence), cluster mode enabled vs disabled, node type sizing, Multi-AZ failover (Redis only), VPC-only networking, encryption at-rest + in-transit + AUTH (Redis only), subnet group, parameter group maxmemory-policy, snapshot retention, ElastiCache Serverless, Global Datastore. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating an ElastiCache cluster, choosing between Redis and Memcached, designing a Multi-AZ Redis failover topology, sizing cache nodes, or generating provisioning CLI commands / IaC templates. Triggers: create ElastiCache, provision Redis, provision Memcached, ElastiCache cluster mode, Redis replication group, Global Datastore, ElastiCache Serverless, cache node type sizing.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). For live deployment: AWS CLI v2 with elasticache, ec2, kms, and
-  iam access. Works with Terraform aws_elasticache_cluster /
-  aws_elasticache_replication_group resources and CloudFormation
-  AWS::ElastiCache::* templates.
-keywords:
-  - aws
-  - elasticache
-  - redis
-  - memcached
-  - cloudops
-  - deploy
-  - provisioning
-  - cache
-  - replication group
-  - cluster mode
-  - multi-az
-  - failover
-  - encryption at rest
-  - encryption in transit
-  - auth token
-  - tls
-  - subnet group
-  - parameter group
-  - maxmemory-policy
-  - allkeys-lru
-  - noeviction
-  - snapshot
-  - backup
-  - global datastore
-  - elasticache serverless
-  - outposts
-tags:
-  - aws
-  - elasticache
-  - redis
-  - memcached
-  - cloudops
-  - deploy
-  - databases
-  - cache
-  - provisioning
-  - replication-group
-  - multi-az
-  - encryption
-  - global-datastore
-  - serverless
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with elasticache, ec2, kms, and iam access. Works with Terraform aws_elasticache_cluster / aws_elasticache_replication_group resources and CloudFormation AWS::ElastiCache::* templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - elasticache
-    - redis
-    - memcached
-    - cloudops
-    - deploy
-    - databases
-    - cache
-    - provisioning
-    - replication-group
-    - multi-az
-    - encryption
-    - global-datastore
-    - serverless
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create elasticache
-    - provision redis cluster
-    - provision memcached cluster
-    - elasticache replication group
-    - elasticache cluster mode
-    - multi-az redis
-    - redis failover
-    - elasticache encryption
-    - elasticache auth token
-    - elasticache subnet group
-    - elasticache parameter group
-    - elasticache snapshot
-    - global datastore
-    - elasticache serverless
-    - cache node type
-  when_to_use: >-
-    Invoke when the user wants to create a new ElastiCache cluster (Redis or
-    Memcached), design a Multi-AZ Redis failover topology, choose between
-    Redis and Memcached, size cache nodes for a workload, harden an existing
-    cluster before production (TLS, AUTH, encryption at rest), set up a
-    Global Datastore for cross-region replication, provision an ElastiCache
-    Serverless cache, or generate provisioning CLI commands / IaC templates.
-    Do NOT invoke for auditing existing cluster posture (use
-    elasticache-cluster-auditor), or for non-ElastiCache caches (DynamoDB
-    DAX, MemoryDB for Redis, self-managed Redis on EC2).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, elasticache, redis, memcached, cloudops, deploy, databases, cache, provisioning, replication-group, multi-az, encryption, global-datastore, serverless
+  dependencies: aws-orchestrator
+  keywords: aws, elasticache, redis, memcached, cloudops, deploy, provisioning, cache, replication group, cluster mode, multi-az, failover, encryption at rest, encryption in transit, auth token, tls, subnet group, parameter group, maxmemory-policy, allkeys-lru, noeviction, snapshot, backup, global datastore, elasticache serverless, outposts
+  when_to_use: Invoke when the user wants to create a new ElastiCache cluster (Redis or Memcached), design a Multi-AZ Redis failover topology, choose between Redis and Memcached, size cache nodes for a workload, harden an existing cluster before production (TLS, AUTH, encryption at rest), set up a Global Datastore for cross-region replication, provision an ElastiCache Serverless cache, or generate provisioning CLI commands / IaC templates. Do NOT invoke for auditing existing cluster posture (use elasticache-cluster-auditor), or for non-ElastiCache caches (DynamoDB DAX, MemoryDB for Redis, self-managed Redis on EC2).
 ---
 
 # ElastiCache Cache Deployer

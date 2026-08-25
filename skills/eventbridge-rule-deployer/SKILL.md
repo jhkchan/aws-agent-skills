@@ -1,105 +1,27 @@
 ---
 name: eventbridge-rule-deployer
-description: >-
-  Provisions Amazon EventBridge rules and targets correctly the first
-  time. Covers event-pattern rules (matching events from AWS services
-  or custom sources) and schedule rules (cron/rate), content-based
-  filtering (source, detail-type, detail JSON paths, exists, prefix,
-  suffix, numeric, CIDR, anything-but), target wiring for Lambda,
-  Step Functions, SQS, SNS, ECS, API Gateway, Kinesis, Redshift,
-  SageMaker, and API Destinations, per-target DLQ and retry policy
-  (MaximumRetryAttempts, MaximumEventAgeInSeconds), input
-  transformation (InputPath, InputTemplate), cross-account bus
-  policies, custom event-bus creation, archive and replay,
-  EventBridge Scheduler vs scheduled rules, Pipes vs Rules, global
-  endpoints, and Schema Registry. Emits READY_TO_DEPLOY with a
-  working CLI plan or PREREQUISITES_MISSING with the specific gap.
-  Use when provisioning rules, wiring targets with DLQ and retry,
-  configuring input transformers, deploying cross-account routing,
-  or setting up event archives.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Provisions Amazon EventBridge rules and targets correctly the first time. Covers event-pattern rules (matching events from AWS services or custom sources) and schedule rules (cron/rate), content-based filtering (source, detail-type, detail JSON paths, exists, prefix, suffix, numeric, CIDR, anything-but), target wiring for Lambda, Step Functions, SQS, SNS, ECS, API Gateway, Kinesis, Redshift, SageMaker, and API Destinations, per-target DLQ and retry policy (MaximumRetryAttempts, MaximumEventAgeInSeconds), input transformation (InputPath, InputTemplate), cross-account bus policies, custom event-bus creation, archive and replay, EventBridge Scheduler vs scheduled rules, Pipes vs Rules, global endpoints, and Schema Registry. Emits READY_TO_DEPLOY with a working CLI plan or PREREQUISITES_MISSING with the specific gap. Use when provisioning rules, wiring targets with DLQ and retry, configuring input transformers, deploying cross-account routing, or setting up event archives.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline plan generation.
-  Live deployment uses aws events put-rule, put-targets, put-events,
-  test-event-pattern, create-event-bus, put-permission,
-  create-archive, start-replay, describe-rule, list-targets-by-rule,
-  aws lambda add-permission, aws scheduler create-schedule, and aws
-  pipes create-pipe (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - EventBridge
-  - event bus
-  - event pattern
-  - scheduled rule
-  - cron rule
-  - rate rule
-  - rule targets
-  - dead-letter queue
-  - DLQ
-  - retry policy
-  - input transformer
-  - InputTemplate
-  - cross-account events
-  - event bus policy
-  - custom event bus
-  - archive and replay
-  - EventBridge Scheduler
-  - EventBridge Pipes
-  - global endpoints
-  - Schema Registry
-  - API destination
-  - provision rules
-tags: [eventbridge, app-integration, event-driven, deploy, rules, targets, dlq]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan generation. Live deployment uses aws events put-rule, put-targets, put-events, test-event-pattern, create-event-bus, put-permission, create-archive, start-replay, describe-rule, list-targets-by-rule, aws lambda add-permission, aws scheduler create-schedule, and aws pipes create-pipe (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Provisioning new EventBridge rules (event-pattern or schedule),
-    wiring targets (Lambda, Step Functions, SQS, SNS, ECS, API
-    Destination, API Gateway, Kinesis, Redshift, SageMaker),
-    configuring per-target DLQ and retry policy, setting up input
-    transformation, deploying cross-account event bus permissions,
-    creating custom event buses, configuring archives for replay, or
-    deciding between Scheduler, Pipes, and Rules for a workload.
-  activation_triggers:
-    - "create EventBridge rule"
-    - "deploy EventBridge rule"
-    - "EventBridge target Lambda"
-    - "EventBridge scheduled rule"
-    - "EventBridge cron"
-    - "EventBridge rate expression"
-    - "event pattern matching"
-    - "EventBridge input transformer"
-    - "EventBridge DLQ"
-    - "retry policy EventBridge"
-    - "cross-account event bus"
-    - "custom event bus"
-    - "EventBridge archive replay"
-    - "EventBridge API destination"
-    - "EventBridge Scheduler vs rules"
-    - "EventBridge Pipes vs rules"
-    - "global endpoints EventBridge"
-    - "Schema Registry"
-  invocation_schema: >-
-    Input: either (a) an event source and desired target ("trigger
-    Lambda X when GuardDuty fires severity >= 7"), or (b) a schedule
-    requirement ("run this Step Functions every night at 2am UTC"),
-    or (c) a deployment plan request for an existing rule config.
-    Output: deterministic PLAN block per rule — RULE/TARGETS/RETRY/
-    DLQ/INPUT_TRANSFORM/PREREQUISITES/VERDICT — where VERDICT is
-    READY_TO_DEPLOY (CLI plan complete and pre-flight green) or
-    PREREQUISITES_MISSING (specific gap cited).
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Provisioning new EventBridge rules (event-pattern or schedule), wiring targets (Lambda, Step Functions, SQS, SNS, ECS, API Destination, API Gateway, Kinesis, Redshift, SageMaker), configuring per-target DLQ and retry policy, setting up input transformation, deploying cross-account event bus permissions, creating custom event buses, configuring archives for replay, or deciding between Scheduler, Pipes, and Rules for a workload.
+  activation_triggers: create EventBridge rule, deploy EventBridge rule, EventBridge target Lambda, EventBridge scheduled rule, EventBridge cron, EventBridge rate expression, event pattern matching, EventBridge input transformer, EventBridge DLQ, retry policy EventBridge, cross-account event bus, custom event bus, EventBridge archive replay, EventBridge API destination, EventBridge Scheduler vs rules, EventBridge Pipes vs rules, global endpoints EventBridge, Schema Registry
+  invocation_schema: 'Input: either (a) an event source and desired target ("trigger Lambda X when GuardDuty fires severity >= 7"), or (b) a schedule requirement ("run this Step Functions every night at 2am UTC"), or (c) a deployment plan request for an existing rule config. Output: deterministic PLAN block per rule — RULE/TARGETS/RETRY/ DLQ/INPUT_TRANSFORM/PREREQUISITES/VERDICT — where VERDICT is READY_TO_DEPLOY (CLI plan complete and pre-flight green) or PREREQUISITES_MISSING (specific gap cited).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: EventBridge, event bus, event pattern, scheduled rule, cron rule, rate rule, rule targets, dead-letter queue, DLQ, retry policy, input transformer, InputTemplate, cross-account events, event bus policy, custom event bus, archive and replay, EventBridge Scheduler, EventBridge Pipes, global endpoints, Schema Registry, API destination, provision rules
+  tags: eventbridge, app-integration, event-driven, deploy, rules, targets, dlq
 ---
 
 # EventBridge Rule Deployer

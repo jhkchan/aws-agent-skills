@@ -1,116 +1,26 @@
 ---
 name: codecommit-repository-deployer
-description: >-
-  Provisions AWS CodeCommit repositories with production defaults:
-  repository creation (create-repository), default branch, KMS
-  encryption with customer-managed key, approval rule templates and
-  branch protection, notification rules, pull request templates,
-  cross-account resource policy, repository triggers (Lambda/SNS),
-  migration from external Git, IAM git credentials vs SSH keys vs
-  git-remote-codecommit, and CodeBuild/CodePipeline connection. Emits
-  a READY_TO_DEPLOY checklist with verification commands. Use when
-  creating a CodeCommit repository, configuring approval rules, KMS
-  encryption, cross-account access, or migrating from external Git.
-  Triggers: create codecommit repository, codecommit approval rule,
-  codecommit kms encryption, codecommit cross-account, codecommit
-  trigger, git-remote-codecommit.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS CodeCommit repositories with production defaults: repository creation (create-repository), default branch, KMS encryption with customer-managed key, approval rule templates and branch protection, notification rules, pull request templates, cross-account resource policy, repository triggers (Lambda/SNS), migration from external Git, IAM git credentials vs SSH keys vs git-remote-codecommit, and CodeBuild/CodePipeline connection. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a CodeCommit repository, configuring approval rules, KMS encryption, cross-account access, or migrating from external Git. Triggers: create codecommit repository, codecommit approval rule, codecommit kms encryption, codecommit cross-account, codecommit trigger, git-remote-codecommit.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with codecommit,
-  kms, iam, sns, and lambda access (and cross-account STS assume-role
-  if cross-account repository access). Works with Terraform
-  aws_codecommit_repository / aws_codecommit_approval_rule_template /
-  aws_codecommit_trigger resources and CloudFormation
-  AWS::CodeCommit::Repository templates.
-keywords:
-  - aws
-  - codecommit
-  - repository
-  - git
-  - cloudops
-  - deploy
-  - provisioning
-  - approval rule template
-  - branch protection
-  - kms encryption
-  - notification rule
-  - pull request template
-  - cross-account
-  - git-remote-codecommit
-  - codebuild
-  - codepipeline
-tags:
-  - aws
-  - codecommit
-  - git
-  - cloudops
-  - deploy
-  - dev-tools
-  - provisioning
-  - approval-rule
-  - branch-protection
-  - kms
-  - notification
-  - cross-account
-  - codebuild
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with codecommit, kms, iam, sns, and lambda access (and cross-account STS assume-role if cross-account repository access). Works with Terraform aws_codecommit_repository / aws_codecommit_approval_rule_template / aws_codecommit_trigger resources and CloudFormation AWS::CodeCommit::Repository templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - codecommit
-    - git
-    - cloudops
-    - deploy
-    - dev-tools
-    - provisioning
-    - approval-rule
-    - branch-protection
-    - kms
-    - notification
-    - cross-account
-    - codebuild
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create codecommit repository
-    - codecommit default branch
-    - codecommit approval rule template
-    - codecommit branch protection
-    - codecommit kms encryption
-    - codecommit notification rule
-    - codecommit pull request template
-    - codecommit cross-account
-    - codecommit trigger
-    - git-remote-codecommit
-  when_to_use: >-
-    Invoke when the user wants to create a CodeCommit repository,
-    configure a default branch, set up an approval rule template for
-    branch protection, enable KMS encryption with a customer-managed key,
-    create notification rules for repository events, add a pull request
-    template, configure cross-account access via resource policy, set up
-    repository triggers (Lambda/SNS), migrate from an external Git
-    provider, connect the repository to CodeBuild or CodePipeline, or
-    choose between IAM git credentials, SSH keys, and git-remote-codecommit
-    (GRC) for authentication. Do NOT invoke for auditing existing
-    repositories (use codecommit-repository-auditor), GitHub repository
-    management, or CodeBuild/CodePipeline pipeline configuration itself.
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, codecommit, git, cloudops, deploy, dev-tools, provisioning, approval-rule, branch-protection, kms, notification, cross-account, codebuild
+  dependencies: aws-orchestrator
+  keywords: aws, codecommit, repository, git, cloudops, deploy, provisioning, approval rule template, branch protection, kms encryption, notification rule, pull request template, cross-account, git-remote-codecommit, codebuild, codepipeline
+  when_to_use: Invoke when the user wants to create a CodeCommit repository, configure a default branch, set up an approval rule template for branch protection, enable KMS encryption with a customer-managed key, create notification rules for repository events, add a pull request template, configure cross-account access via resource policy, set up repository triggers (Lambda/SNS), migrate from an external Git provider, connect the repository to CodeBuild or CodePipeline, or choose between IAM git credentials, SSH keys, and git-remote-codecommit (GRC) for authentication. Do NOT invoke for auditing existing repositories (use codecommit-repository-auditor), GitHub repository management, or CodeBuild/CodePipeline pipeline configuration itself.
 ---
 
 # CodeCommit Repository Deployer

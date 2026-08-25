@@ -1,44 +1,15 @@
 ---
 name: rds-parameter-group-deployer
 description: 'Provisions RDS DB parameter groups with correct production defaults: family selection (postgres15, mysql8.0, aurora-postgresql15), static vs dynamic parameters (static requires DB instance reboot), ApplyMethod (immediate vs pending-reboot), PostgreSQL tuning (max_connections, shared_buffers, work_mem, wal_buffers, checkpoint_completion_target), MySQL tuning (innodb_buffer_pool_size, max_connections, slow_query_log), Aurora-specific parameters, Aurora Serverless v2 capacity parameters, and parameter group association with DB instances and clusters. Emits a READY_TO_DEPLOY checklist. Use when creating a DB parameter group, tuning PostgreSQL/MySQL parameters, configuring Aurora Serverless v2, or associating a parameter group with a DB instance. Triggers: create RDS parameter group, DB parameter group family, postgres parameter group, mysql parameter group, Aurora parameter group, static vs dynamic parameters, shared_buffers, innodb_buffer_pool_size, max_connections, ApplyMethod, pending-reboot.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
 compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with rds access. Works with Terraform aws_db_parameter_group / aws_rds_cluster_parameter_group resources, CloudFormation AWS::RDS::DBParameterGroup / AWS::RDS::DBClusterParameterGroup, and SAM templates.'
-keywords:
-- aws
-- rds
-- aurora
-- databases
-- cloudops
-- deploy
-- provisioning
-- parameter-group
-- postgres
-- mysql
-- tuning
-- static-dynamic
-- apply-method
-- aurora-serverless-v2
-tags:
-- aws
-- rds
-- aurora
-- databases
-- cloudops
-- deploy
-- parameter-group
-- postgres
-- mysql
-dependencies:
-- aws-orchestrator
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
   task_type: deploy
   skill_class: capability
@@ -46,35 +17,9 @@ metadata:
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-  - aws
-  - rds
-  - aurora
-  - databases
-  - cloudops
-  - deploy
-  - parameter-group
-  - postgres
-  - mysql
-  dependencies:
-  - aws-orchestrator
-  keywords:
-  - create rds parameter group
-  - db parameter group
-  - db parameter group family
-  - postgres parameter group
-  - mysql parameter group
-  - aurora parameter group
-  - static vs dynamic parameters
-  - apply method immediate
-  - pending reboot
-  - shared_buffers
-  - work_mem
-  - max_connections
-  - innodb_buffer_pool_size
-  - slow_query_log
-  - aurora serverless v2
-  - rds parameter tuning
+  tags: aws, rds, aurora, databases, cloudops, deploy, parameter-group, postgres, mysql
+  dependencies: aws-orchestrator
+  keywords: aws, rds, aurora, databases, cloudops, deploy, provisioning, parameter-group, postgres, mysql, tuning, static-dynamic, apply-method, aurora-serverless-v2
   when_to_use: Invoke when the user wants to create a new RDS DB parameter group or DB cluster parameter group, tune PostgreSQL or MySQL parameters, configure Aurora-specific parameters, set up Aurora Serverless v2 capacity settings, or associate a parameter group with a DB instance or Aurora cluster. Do NOT invoke for option groups (use the option-group skill), for DB instance class changes (use the instance-deployer skill), or for RDS Proxy configuration.
 ---
 

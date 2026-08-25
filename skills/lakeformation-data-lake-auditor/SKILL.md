@@ -1,79 +1,24 @@
 ---
 name: lakeformation-data-lake-auditor
-description: >-
-  Audits AWS Lake Formation data-lake posture for catalog-level super-grants,
-  cross-account principals, ColumnWildcard SELECT without DataCellsFilter,
-  WithGrantablePermissions delegation chains, grants on unregistered S3
-  locations, data-lake admin composition, IAMAllowedPrincipals mixed-mode
-  databases, and sensitive-table cell-filter wiring. Emits a deterministic
-  verdict (OVERPERMISSIVE_GRANT | EXTERNAL_ACCOUNT | CONFIG_GAP | OK) per
-  data lake with enumerated findings and CLI remediation. Use when reviewing
-  Lake Formation permissions, auditing LF-tag policies, checking cross-account
-  data shares, validating cell-level filtering, or hardening data-lake
-  posture before production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Lake Formation data-lake posture for catalog-level super-grants, cross-account principals, ColumnWildcard SELECT without DataCellsFilter, WithGrantablePermissions delegation chains, grants on unregistered S3 locations, data-lake admin composition, IAMAllowedPrincipals mixed-mode databases, and sensitive-table cell-filter wiring. Emits a deterministic verdict (OVERPERMISSIVE_GRANT | EXTERNAL_ACCOUNT | CONFIG_GAP | OK) per data lake with enumerated findings and CLI remediation. Use when reviewing Lake Formation permissions, auditing LF-tag policies, checking cross-account data shares, validating cell-level filtering, or hardening data-lake posture before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline grant-document classification.
-  Live-account audits use aws lakeformation list-permissions, list-resources,
-  get-data-lake-settings, list-data-cells-filter, and describe-organization
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - Lake Formation
-  - data lake
-  - LF-tag
-  - LF permissions
-  - ColumnWildcard
-  - DataCellsFilter
-  - IAMAllowedPrincipals
-  - DataLakeAdmins
-  - WithGrantablePermissions
-  - cross-account data share
-  - Resource Link
-  - registered location
-  - cell-level filter
-  - Glue Data Catalog
-  - ABAC
-  - row-level security
-  - data lake audit
-  - Lake Formation quota
-tags: [lakeformation, analytics, security, data-lake, lf-tag, abac, cross-account, cell-filter, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline grant-document classification. Live-account audits use aws lakeformation list-permissions, list-resources, get-data-lake-settings, list-data-cells-filter, and describe-organization (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
-  verdict_shape: "OVERPERMISSIVE_GRANT | EXTERNAL_ACCOUNT | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing Lake Formation permissions before production deployment, auditing
-    a data lake for cross-account sharing, checking whether ColumnWildcard
-    SELECT grants are backed by a DataCellsFilter, validating that grants
-    target registered S3 locations, reviewing the DataLakeAdmins break-glass
-    list, or diagnosing IAMAllowedPrincipals mixed-mode leakage.
-  activation_triggers:
-    - "audit this Lake Formation data lake"
-    - "check LF permissions"
-    - "is my data lake shared cross-account"
-    - "audit Lake Formation grants"
-    - "column wildcard SELECT exposure"
-    - "is my DataCellsFilter wired"
-    - "IAMAllowedPrincipals mixed mode"
-    - "data lake admin list review"
-    - "WithGrantablePermissions delegation"
-    - "registered location gap"
-    - "hardening Lake Formation"
-  invocation_schema: >-
-    Input: either (a) a Lake Formation grant/permission JSON document
-    (list-permissions output) paired with list-resources and
-    get-data-lake-settings metadata, OR (b) a catalog/account id for
-    live-account audit. Output: deterministic LAKE/VERDICT/REASON/FINDINGS/
-    REMEDIATION block per data lake, where VERDICT is in
-    {OVERPERMISSIVE_GRANT, EXTERNAL_ACCOUNT, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: OVERPERMISSIVE_GRANT | EXTERNAL_ACCOUNT | CONFIG_GAP | OK
+  when_to_use: Reviewing Lake Formation permissions before production deployment, auditing a data lake for cross-account sharing, checking whether ColumnWildcard SELECT grants are backed by a DataCellsFilter, validating that grants target registered S3 locations, reviewing the DataLakeAdmins break-glass list, or diagnosing IAMAllowedPrincipals mixed-mode leakage.
+  activation_triggers: audit this Lake Formation data lake, check LF permissions, is my data lake shared cross-account, audit Lake Formation grants, column wildcard SELECT exposure, is my DataCellsFilter wired, IAMAllowedPrincipals mixed mode, data lake admin list review, WithGrantablePermissions delegation, registered location gap, hardening Lake Formation
+  invocation_schema: 'Input: either (a) a Lake Formation grant/permission JSON document (list-permissions output) paired with list-resources and get-data-lake-settings metadata, OR (b) a catalog/account id for live-account audit. Output: deterministic LAKE/VERDICT/REASON/FINDINGS/ REMEDIATION block per data lake, where VERDICT is in {OVERPERMISSIVE_GRANT, EXTERNAL_ACCOUNT, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Lake Formation, data lake, LF-tag, LF permissions, ColumnWildcard, DataCellsFilter, IAMAllowedPrincipals, DataLakeAdmins, WithGrantablePermissions, cross-account data share, Resource Link, registered location, cell-level filter, Glue Data Catalog, ABAC, row-level security, data lake audit, Lake Formation quota
+  tags: lakeformation, analytics, security, data-lake, lf-tag, abac, cross-account, cell-filter, audit
 ---
 
 # Lake Formation Data Lake Auditor

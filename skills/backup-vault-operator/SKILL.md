@@ -1,111 +1,27 @@
 ---
 name: backup-vault-operator
-description: >-
-  Operates AWS Backup vault lifecycles — creates vaults with KMS
-  encryption and tags, applies vault locks (compliance WORM vs
-  governance soft lock with MinRetentionDays / MaxRetentionDays /
-  ChangeableForDays), authors backup plans (schedule, cold-storage
-  lifecycle, cross-region copy), manages selections (tag-based,
-  resource-ARN, Conditions), starts restore jobs (PITR,
-  cross-region, restore-to-new), and operates latest features
-  (continuous backups for EC2 PITR, Backup Search, AWS Backup for
-  FSx). Runs pre-checks (KMS key enabled, vault lock state, IAM
-  permissions, recovery point COMPLETED), emits the exact
-  backup:create-backup-vault / put-backup-vault-lock-configuration
-  / create-backup-plan / start-restore-job CLI behind a CONFIRM
-  gate, and verifies state post-apply. Emits a verdict (READY |
-  BLOCKED | COMPLETED). Use when creating a vault, locking for
-  compliance (CIS 3.6, NIST CP-9), scheduling cross-region DR,
-  running a PITR restore drill, diagnosing a failed job, or
-  enabling continuous backups.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates AWS Backup vault lifecycles — creates vaults with KMS encryption and tags, applies vault locks (compliance WORM vs governance soft lock with MinRetentionDays / MaxRetentionDays / ChangeableForDays), authors backup plans (schedule, cold-storage lifecycle, cross-region copy), manages selections (tag-based, resource-ARN, Conditions), starts restore jobs (PITR, cross-region, restore-to-new), and operates latest features (continuous backups for EC2 PITR, Backup Search, AWS Backup for FSx). Runs pre-checks (KMS key enabled, vault lock state, IAM permissions, recovery point COMPLETED), emits the exact backup:create-backup-vault / put-backup-vault-lock-configuration / create-backup-plan / start-restore-job CLI behind a CONFIRM gate, and verifies state post-apply. Emits a verdict (READY | BLOCKED | COMPLETED). Use when creating a vault, locking for compliance (CIS 3.6, NIST CP-9), scheduling cross-region DR, running a PITR restore drill, diagnosing a failed job, or enabling continuous backups.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws backup create-backup-vault, put-backup-vault-lock-configuration,
-  create-backup-plan, create-backup-selection, start-backup-job, start-restore-job,
-  describe-backup-job, describe-restore-job, list-recovery-points-by-backup-vault,
-  list-backup-plans, list-backup-selections, get-backup-plan-from-json,
-  describe-backup-vault, describe-copy-job (AWS CLI v2, SSO or key-based
-  credentials).
-keywords:
-  - AWS Backup
-  - backup vault
-  - vault lock
-  - compliance mode
-  - governance mode
-  - WORM
-  - retention lock
-  - backup plan
-  - backup policy
-  - backup selection
-  - tag-based backup
-  - cross-region copy
-  - lifecycle
-  - cold storage
-  - point-in-time recovery
-  - PITR
-  - continuous backup
-  - EC2 PITR
-  - Backup Search
-  - Amazon FSx backup
-  - recovery point
-  - restore job
-  - cross-region restore
-  - backup reports
-  - backup compliance
-  - KMS encryption
-  - backup vault KMS
-tags: [aws-backup, storage, operate, vault-lock, backup-plan, backup-selection, restore, pitr, compliance-mode, kms, cross-region-copy, fsx, backup-search]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws backup create-backup-vault, put-backup-vault-lock-configuration, create-backup-plan, create-backup-selection, start-backup-job, start-restore-job, describe-backup-job, describe-restore-job, list-recovery-points-by-backup-vault, list-backup-plans, list-backup-selections, get-backup-plan-from-json, describe-backup-vault...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Creating or locking a backup vault (compliance vs governance mode),
-    authoring backup plans (schedule, lifecycle, cross-region copy),
-    building backup selections (by tag, resource ID, conditions),
-    starting point-in-time or cross-region restores, running restore
-    drills, diagnosing failed backup jobs or stuck restore jobs, enabling
-    continuous backups for EC2 PITR, deploying AWS Backup for FSx, or
-    using Backup Search across recovery points.
-  activation_triggers:
-    - "create AWS Backup vault"
-    - "lock backup vault"
-    - "compliance mode backup vault"
-    - "governance mode backup vault"
-    - "WORM backup vault"
-    - "retention lock"
-    - "create backup plan"
-    - "backup policy"
-    - "backup selection by tag"
-    - "cross-region copy backup"
-    - "point-in-time recovery"
-    - "continuous backup EC2"
-    - "restore from backup"
-    - "cross-region restore"
-    - "start restore job"
-    - "diagnose failed backup job"
-    - "Backup Search"
-    - "AWS Backup for FSx"
-  invocation_schema: >-
-    Input: either (a) a backup operation intent (create-vault, lock-vault,
-    create-plan, create-selection, start-backup, start-restore, enable-pitr,
-    diagnose) with target vault name, KMS key ARN, schedule, retention
-    window, and resource scope; OR (b) an existing vault name + recovery
-    point ID for live-account restore or diagnosis. Output: deterministic
-    OPERATION/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation,
-    where VERDICT is one of READY, BLOCKED, COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Creating or locking a backup vault (compliance vs governance mode), authoring backup plans (schedule, lifecycle, cross-region copy), building backup selections (by tag, resource ID, conditions), starting point-in-time or cross-region restores, running restore drills, diagnosing failed backup jobs or stuck restore jobs, enabling continuous backups for EC2 PITR, deploying AWS Backup for FSx, or using Backup Search across recovery points.
+  activation_triggers: create AWS Backup vault, lock backup vault, compliance mode backup vault, governance mode backup vault, WORM backup vault, retention lock, create backup plan, backup policy, backup selection by tag, cross-region copy backup, point-in-time recovery, continuous backup EC2, restore from backup, cross-region restore, start restore job, diagnose failed backup job, Backup Search, AWS Backup for FSx
+  invocation_schema: 'Input: either (a) a backup operation intent (create-vault, lock-vault, create-plan, create-selection, start-backup, start-restore, enable-pitr, diagnose) with target vault name, KMS key ARN, schedule, retention window, and resource scope; OR (b) an existing vault name + recovery point ID for live-account restore or diagnosis. Output: deterministic OPERATION/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Backup, backup vault, vault lock, compliance mode, governance mode, WORM, retention lock, backup plan, backup policy, backup selection, tag-based backup, cross-region copy, lifecycle, cold storage, point-in-time recovery, PITR, continuous backup, EC2 PITR, Backup Search, Amazon FSx backup, recovery point, restore job, cross-region restore, backup reports, backup compliance, KMS encryption, backup vault KMS
+  tags: aws-backup, storage, operate, vault-lock, backup-plan, backup-selection, restore, pitr, compliance-mode, kms, cross-region-copy, fsx, backup-search
 ---
 
 # Backup Vault Operator

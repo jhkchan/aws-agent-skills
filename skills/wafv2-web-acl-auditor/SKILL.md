@@ -1,65 +1,23 @@
 ---
 name: wafv2-web-acl-auditor
-description: >-
-  Audits AWS WAFv2 Web ACL configurations to determine whether the ACL
-  provides effective protection: default-action posture (Allow vs Block),
-  managed-rule-group coverage gaps, rule effectiveness (BLOCK vs COUNT,
-  shadow/bypass rules, stale exclusions), rate-based rule correctness,
-  logging and visibility configuration, and text-transformation bypass
-  vectors. Emits a deterministic verdict per Web ACL. Use when reviewing
-  a WAFv2 Web ACL for security posture, checking managed-rule coverage,
-  validating rate-limit configuration, auditing WAF logging, or hardening
-  a WAF before production deployment. Triggers: WAF, WAFv2, Web ACL,
-  managed rule group, AWSManagedRules, rate-based rule, CAPTCHA, Challenge,
-  OverrideAction, Count mode, forwarded IP, Bot Control, ATP, text
-  transformation, WAF logging, WAF visibility, OWASP, SQLi, XSS, RFI.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Audits AWS WAFv2 Web ACL configurations to determine whether the ACL provides effective protection: default-action posture (Allow vs Block), managed-rule-group coverage gaps, rule effectiveness (BLOCK vs COUNT, shadow/bypass rules, stale exclusions), rate-based rule correctness, logging and visibility configuration, and text-transformation bypass vectors. Emits a deterministic verdict per Web ACL. Use when reviewing a WAFv2 Web ACL for security posture, checking managed-rule coverage, validating rate-limit configuration, auditing WAF logging, or hardening a WAF before production deployment. Triggers: WAF, WAFv2, Web ACL, managed rule group, AWSManagedRules, rate-based rule, CAPTCHA, Challenge, OverrideAction, Count mode, forwarded IP, Bot Control, ATP, text transformation, WAF logging, WAF visibility, OWASP, SQLi, XSS, RFI.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex).
-  No AWS CLI required for offline Web ACL classification — the skill reasons
-  over provided config text. Live-account audits use aws wafv2
-  describe-web-acl / list-web-acls / get-logging-configuration (AWS CLI v2,
-  SSO or key-based credentials).
-keywords:
-  - WAF
-  - WAFv2
-  - Web ACL
-  - managed rule group
-  - AWSManagedRulesCommonRuleSet
-  - rate-based rule
-  - OverrideAction
-  - Count mode
-  - forwarded IP
-  - Bot Control
-  - ATP
-  - text transformation
-  - WAF logging
-  - WAF visibility
-  - OWASP
-  - SQLi
-  - XSS
-  - CAPTCHA
-  - Challenge
-tags: [aws, wafv2, cloudops, security, web-acl, managed-rules, rate-limiting, owasp, audit, compliance]
-dependencies:
-  - aws-orchestrator
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex). No AWS CLI required for offline Web ACL classification — the skill reasons over provided config text. Live-account audits use aws wafv2 describe-web-acl / list-web-acls / get-logging-configuration (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
-  verdict_shape: "MISCONFIGURED | WEAK | ADEQUATE | OK"
-  when_to_use: >-
-    Reviewing a WAFv2 Web ACL configuration (JSON from describe-web-acl),
-    auditing managed-rule-group coverage, validating rate-based-rule
-    correctness, checking WAF logging and visibility configuration,
-    investigating rule-bypass or shadow-rule patterns, or hardening a WAF
-    before production deployment.
+  verdict_shape: MISCONFIGURED | WEAK | ADEQUATE | OK
+  when_to_use: Reviewing a WAFv2 Web ACL configuration (JSON from describe-web-acl), auditing managed-rule-group coverage, validating rate-based-rule correctness, checking WAF logging and visibility configuration, investigating rule-bypass or shadow-rule patterns, or hardening a WAF before production deployment.
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: WAF, WAFv2, Web ACL, managed rule group, AWSManagedRulesCommonRuleSet, rate-based rule, OverrideAction, Count mode, forwarded IP, Bot Control, ATP, text transformation, WAF logging, WAF visibility, OWASP, SQLi, XSS, CAPTCHA, Challenge
+  tags: aws, wafv2, cloudops, security, web-acl, managed-rules, rate-limiting, owasp, audit, compliance
+  dependencies: aws-orchestrator
 ---
 
 # WAFv2 Web ACL Auditor

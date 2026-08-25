@@ -1,111 +1,28 @@
 ---
 name: clb-to-alb-migration-operator
-description: >-
-  Operates Classic Load Balancer (CLB) to Application Load Balancer
-  (ALB) migrations end-to-end — pre-migration feature assessment
-  (proxy protocol vs X-Forwarded-For, sticky sessions, SSL termination,
-  connection draining vs deregistration delay), ALB target group
-  creation mapping each CLB backend port/protocol, listener migration
-  with path/host-based routing, deregistration delay tuning, SSL/TLS
-  certificate migration (ACM or IAM), DNS cutover (Route 53 weighted
-  canary vs direct swap), rollback strategy, and latest-feature
-  coverage (ALB with Lambda targets, ALB with OIDC via Cognito, ALB
-  WAF). Runs deterministic pre-checks (CLB scheme matches ALB, subnet
-  count >= 2, no TCP passthrough listener, SSL cert resolvable, health
-  check path reachable) behind a CONFIRM gate and emits READY, BLOCKED,
-  or COMPLETED per migration. Use when planning a CLB-to-ALB migration,
-  validating feature parity, cutting over traffic, or rolling back.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates Classic Load Balancer (CLB) to Application Load Balancer (ALB) migrations end-to-end — pre-migration feature assessment (proxy protocol vs X-Forwarded-For, sticky sessions, SSL termination, connection draining vs deregistration delay), ALB target group creation mapping each CLB backend port/protocol, listener migration with path/host-based routing, deregistration delay tuning, SSL/TLS certificate migration (ACM or IAM), DNS cutover (Route 53 weighted canary vs direct swap), rollback strategy, and latest-feature coverage (ALB with Lambda targets, ALB with OIDC via Cognito, ALB WAF). Runs deterministic pre-checks (CLB scheme matches ALB, subnet count >= 2, no TCP passthrough listener, SSL cert resolvable, health check path reachable) behind a CONFIRM gate and emits READY, BLOCKED, or COMPLETED per migration. Use when planning a CLB-to-ALB migration, validating feature parity, cutting over traffic, or rolling back.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline plan classification.
-  Live-account operations use aws elbv2 describe-load-balancers,
-  create-load-balancer, create-target-group, create-listener,
-  create-rule, modify-target-group-attributes, describe-attributes (for
-  CLB draining), aws elb describe-load-balancers (Classic), describe-
-  tags, aws acm list-certificates, describe-certificates, aws route53
-  list-resource-record-sets, change-resource-record-sets, aws ec2
-  describe-subnets, describe-security-groups (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - Classic Load Balancer
-  - CLB
-  - ELB
-  - Application Load Balancer
-  - ALB
-  - ELBv2
-  - migration
-  - cutover
-  - target group
-  - listener rule
-  - SSL certificate
-  - ACM
-  - deregistration delay
-  - connection draining
-  - proxy protocol
-  - X-Forwarded-For
-  - X-Forwarded-Proto
-  - sticky session
-  - L7 load balancing
-  - Route 53 weighted routing
-  - Lambda target
-  - OIDC
-  - WAF on ALB
-  - rollback
-tags: [aws, elbv2, elb, alb, clb, load-balancer, networking, migration, operate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws elbv2 describe-load-balancers, create-load-balancer, create-target-group, create-listener, create-rule, modify-target-group-attributes, describe-attributes (for CLB draining), aws elb describe-load-balancers (Classic), describe- tags, aws acm list-certificates, describe-certificates, aws route53 list-resource-record-sets...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Migrating a Classic Load Balancer to an Application Load Balancer,
-    planning feature parity (sticky sessions, SSL termination, connection
-    draining), creating ALB target groups that map CLB backends, migrating
-    listeners and adding path/host-based listener rules, tuning
-    deregistration delay to match the CLB's connection draining timeout,
-    migrating SSL certificates from IAM/ACM to ALB listeners, performing
-    a DNS cutover via Route 53 weighted routing (canary) or direct swap,
-    rolling back a failed migration, or diagnosing why ALB targets are
-    unhealthy post-cutover.
-  when_not_to_use: >-
-    ALB-to-NLB conversions (different feature parity; use a separate
-    planning effort), pure 5xx triage on the existing CLB (use
-    alb-5xx-troubleshooter-style diagnosis on CLB access logs), or cost
-    optimization of an existing ALB (use the optimize task type). This
-    skill drives the migration plan and cutover, not runtime triage.
-  activation_triggers:
-    - "migrate CLB to ALB"
-    - "Classic Load Balancer migration"
-    - "CLB to ALB cutover"
-    - "connection draining to deregistration delay"
-    - "proxy protocol to X-Forwarded-For"
-    - "ALB target group from CLB"
-    - "ALB listener rule migration"
-    - "Route 53 weighted routing cutover"
-    - "ALB Lambda target"
-    - "ALB OIDC authentication"
-    - "WAF on ALB"
-    - "ALB rollback"
-    - "ALB SSL certificate migration"
-    - "ELBv2 create-listener from CLB"
-  invocation_schema: >-
-    Input: either (a) a Classic Load Balancer configuration (elb describe-
-    load-balancers output) plus the intended operation (plan-migration,
-    create-target-groups, migrate-listeners, cutover-dns, rollback,
-    verify-cutover), OR (b) a CLB DNS name + operation for live-account
-    execution. Output: a deterministic OPERATION / VERDICT / TARGET /
-    PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per migration, where
-    VERDICT is one of READY, BLOCKED, COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Migrating a Classic Load Balancer to an Application Load Balancer, planning feature parity (sticky sessions, SSL termination, connection draining), creating ALB target groups that map CLB backends, migrating listeners and adding path/host-based listener rules, tuning deregistration delay to match the CLB's connection draining timeout, migrating SSL certificates from IAM/ACM to ALB listeners, performing a DNS cutover via Route 53 weighted routing (canary) or direct swap, rolling back a failed migration, or diagnosing why ALB targets are unhealthy post-cutover.
+  when_not_to_use: ALB-to-NLB conversions (different feature parity; use a separate planning effort), pure 5xx triage on the existing CLB (use alb-5xx-troubleshooter-style diagnosis on CLB access logs), or cost optimization of an existing ALB (use the optimize task type). This skill drives the migration plan and cutover, not runtime triage.
+  activation_triggers: migrate CLB to ALB, Classic Load Balancer migration, CLB to ALB cutover, connection draining to deregistration delay, proxy protocol to X-Forwarded-For, ALB target group from CLB, ALB listener rule migration, Route 53 weighted routing cutover, ALB Lambda target, ALB OIDC authentication, WAF on ALB, ALB rollback, ALB SSL certificate migration, ELBv2 create-listener from CLB
+  invocation_schema: 'Input: either (a) a Classic Load Balancer configuration (elb describe- load-balancers output) plus the intended operation (plan-migration, create-target-groups, migrate-listeners, cutover-dns, rollback, verify-cutover), OR (b) a CLB DNS name + operation for live-account execution. Output: a deterministic OPERATION / VERDICT / TARGET / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per migration, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Classic Load Balancer, CLB, ELB, Application Load Balancer, ALB, ELBv2, migration, cutover, target group, listener rule, SSL certificate, ACM, deregistration delay, connection draining, proxy protocol, X-Forwarded-For, X-Forwarded-Proto, sticky session, L7 load balancing, Route 53 weighted routing, Lambda target, OIDC, WAF on ALB, rollback
+  tags: aws, elbv2, elb, alb, clb, load-balancer, networking, migration, operate
 ---
 
 # CLB-to-ALB Migration Operator

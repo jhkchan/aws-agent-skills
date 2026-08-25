@@ -1,77 +1,24 @@
 ---
 name: msk-cluster-auditor
-description: >-
-  Audits Amazon MSK (Managed Streaming for Kafka) clusters for encryption
-  in-transit (TLS between clients and brokers, inter-broker), encryption
-  at-rest (customer-managed KMS key), client authentication (TLS/IAM/SCRAM/
-  unauthenticated), broker logging (CloudWatch/S3/Firehose), and public
-  access exposure (private vs public subnets, SERVICE_PROVIDED_EIPS). Emits
-  a deterministic categorical verdict per cluster. Use when reviewing MSK
-  cluster security, checking Kafka encryption settings, validating client
-  authentication modes, auditing broker logging coverage, or assessing
-  public access exposure before production deployment.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits Amazon MSK (Managed Streaming for Kafka) clusters for encryption in-transit (TLS between clients and brokers, inter-broker), encryption at-rest (customer-managed KMS key), client authentication (TLS/IAM/SCRAM/ unauthenticated), broker logging (CloudWatch/S3/Firehose), and public access exposure (private vs public subnets, SERVICE_PROVIDED_EIPS). Emits a deterministic categorical verdict per cluster. Use when reviewing MSK cluster security, checking Kafka encryption settings, validating client authentication modes, auditing broker logging coverage, or assessing public access exposure before production deployment.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline config classification. Live-account
-  audits use aws kafka describe-cluster, aws kafka describe-configuration, and
-  aws kafka list-clusters (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - MSK
-  - Managed Kafka
-  - Kafka
-  - cluster audit
-  - encryption in-transit
-  - TLS
-  - encryption at-rest
-  - KMS
-  - client authentication
-  - SASL
-  - SCRAM
-  - IAM auth
-  - mTLS
-  - unauthenticated
-  - broker logging
-  - CloudWatch
-  - public access
-  - plaintext
-  - broker security
-  - MSK Serverless
-  - cluster hardening
-  - TLS_PLAINTEXT
-tags: [msk, kafka, security, cluster-audit, encryption, authentication, logging, public-access, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline config classification. Live-account audits use aws kafka describe-cluster, aws kafka describe-configuration, and aws kafka list-clusters (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
-  verdict_shape: "NO_ENCRYPTION | UNAUTHENTICATED | PUBLIC_ACCESS | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing an MSK cluster before production deployment, checking Kafka
-    encryption in-transit settings, validating client authentication modes,
-    auditing broker logging coverage, assessing public access exposure, or
-    hardening MSK cluster security posture.
-  activation_triggers:
-    - "audit this MSK cluster"
-    - "is my Kafka cluster encrypted"
-    - "check MSK authentication"
-    - "MSK unauthenticated access"
-    - "is my MSK cluster public"
-    - "check MSK broker logging"
-    - "harden MSK cluster"
-    - "Kafka plaintext broker"
-  invocation_schema: >-
-    Input: either (a) an MSK cluster configuration (describe-cluster output or
-    equivalent JSON), optionally paired with MSK configuration (Kafka broker
-    settings), OR (b) a cluster ARN/name for live-account audit.
-    Output: deterministic CLUSTER/VERDICT/REASON/FINDINGS/REMEDIATION block
-    per cluster, where VERDICT is one of NO_ENCRYPTION, UNAUTHENTICATED,
-    PUBLIC_ACCESS, CONFIG_GAP, OK.
+  verdict_shape: NO_ENCRYPTION | UNAUTHENTICATED | PUBLIC_ACCESS | CONFIG_GAP | OK
+  when_to_use: Reviewing an MSK cluster before production deployment, checking Kafka encryption in-transit settings, validating client authentication modes, auditing broker logging coverage, assessing public access exposure, or hardening MSK cluster security posture.
+  activation_triggers: audit this MSK cluster, is my Kafka cluster encrypted, check MSK authentication, MSK unauthenticated access, is my MSK cluster public, check MSK broker logging, harden MSK cluster, Kafka plaintext broker
+  invocation_schema: 'Input: either (a) an MSK cluster configuration (describe-cluster output or equivalent JSON), optionally paired with MSK configuration (Kafka broker settings), OR (b) a cluster ARN/name for live-account audit. Output: deterministic CLUSTER/VERDICT/REASON/FINDINGS/REMEDIATION block per cluster, where VERDICT is one of NO_ENCRYPTION, UNAUTHENTICATED, PUBLIC_ACCESS, CONFIG_GAP, OK.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: MSK, Managed Kafka, Kafka, cluster audit, encryption in-transit, TLS, encryption at-rest, KMS, client authentication, SASL, SCRAM, IAM auth, mTLS, unauthenticated, broker logging, CloudWatch, public access, plaintext, broker security, MSK Serverless, cluster hardening, TLS_PLAINTEXT
+  tags: msk, kafka, security, cluster-audit, encryption, authentication, logging, public-access, audit
 ---
 
 # MSK Cluster Auditor

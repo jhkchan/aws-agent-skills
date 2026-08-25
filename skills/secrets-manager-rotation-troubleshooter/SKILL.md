@@ -1,32 +1,8 @@
 ---
 name: secrets-manager-rotation-troubleshooter
-description: 'Diagnoses AWS Secrets Manager rotation failures through a ten-category diagnostic tree: rotation Lambda errors at the database (wrong host, port, database name, credential creation), rotation schedule not triggering (EventBridge rule deleted, disabled, or wrong schedule expression), cross-account secret access denied (rotation role lacks kms:Decrypt or secretsmanager:GetSecretValue on the secret), Master Secret ARN misconfigured in the rotation template, rotation Lambda timeout (default 3s too low, or 15s insufficient for slow DB), VPC connectivity (rotation Lambda not attached to DB subnets, missing NAT/endpoint for Secrets Manager API), rotation strategy conflict (Alternating Users on a engine without CREATE USER, Single User on a twin-secret setup), twin secrets not synced across regions/accounts, rotation token missing (a caller invoked the Lambda directly without a ClientRequestToken), and superuser permissions insufficient for the rotation Lambda''s DB user. Walks symptoms
-  to a verified root cause wi...'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses AWS Secrets Manager rotation failures through a ten-category diagnostic tree: rotation Lambda errors at the database (wrong host, port, database name, credential creation), rotation schedule not triggering (EventBridge rule deleted, disabled, or wrong schedule expression), cross-account secret access denied (rotation role lacks kms:Decrypt or secretsmanager:GetSecretValue on the secret), Master Secret ARN misconfigured in the rotation template, rotation Lambda timeout (default 3s too low, or 15s insufficient for slow DB), VPC connectivity (rotation Lambda not attached to DB subnets, missing NAT/endpoint for Secrets Manager API), rotation strategy conflict (Alternating Users on a engine without CREATE USER, Single User on a twin-secret setup), twin secrets not synced across regions/accounts, rotation token missing (a caller invoked the Lambda directly without a ClientRequestToken), and superuser permissions insufficient for the rotation Lambda''s DB user. Walks symptoms to a verified root cause wi...'
 license: Apache-2.0
 compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline symptom classification works from pasted error messages and rotation configuration. Live-account diagnosis uses aws secretsmanager describe-secret, aws secretsmanager
-keywords:
-- Secrets Manager
-- rotation
-- rotation Lambda
-- Master Secret
-- Alternating Users
-- Single User
-- rotation strategy
-- EventBridge schedule
-- rotation token
-- ClientRequestToken
-- cross-account secret
-- twin secrets
-- RotateSecret
-- rotation template
-- Superuser
-- database credential
-- rotation disabled
-- rate(1d)
-- VPC connectivity
-- KMS decrypt
 metadata:
   domain: aws-cloudops
   complexity: high
@@ -44,6 +20,9 @@ metadata:
   activation_triggers: ''
   invocation_schema: '''Input: either (a) a symptom description (error message from the rotation Lambda CloudWatch logs, observed behaviour such as "LastRotatedDate is 30 days ago", "rotation succeeds but applications cannot connect"), optionally paired with the secret''s describe-secret output and recent rotation Lambda logs, OR (b) a SecretId plus caller context for live-account diagnosis. Output: a deterministic TARGET/VERDICT/REASON/LAYER/EVIDENCE/REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_IDENTIFIED, INSUFFICIENT_DATA, ESCALATE} and LAYER ∈ {ROTATION_LAMBDA_TIMEOUT, ROTATION_LAMBDA_VPC, ROTATION_LAMBDA_DB_CREDENTIAL, ROTATION_LAMBDA_DB_ENDPOINT, SCHEDULE_MISSING, SCHEDULE_DISABLED, MASTER_SECRET_MISCONFIGURED, PERMISSION_ROTATION_ROLE, PERMISSION_CROSS_ACCOUNT, KMS_DECRYPT_ROLE, ROTATION_TOKEN_MISSING, SUPERUSER_INSUFFICIENT, STRATEGY_CONFLICT, TWIN_SECRETS_NOT_SYNCED, PREVIOUS_CREDENTIAL_NOT_STORED, REDSHIFT_ROTATION_FUNCTION, UNKNOWN}.'''
   invocation_example: '"# Minimal valid input (offline symptom classification):\nSymptom: \"Secret prod/db/payments-primary has not rotated in 7 days;\nLastRotatedDate is 2026-07-30. The rotation Lambda''s last execution\nlogged ''Task timed out after 3.00 seconds''.\"\nSecretId: prod/db/payments-primary\nRotationEnabled: true\nRotationLambdaARN: arn:aws:lambda:us-east-1:111111111111:function:SecretsManagerRotation-prod-db-payments\nRotationRules: {ScheduleExpression: ''rate(1d)''}\nLastRotatedDate: 2026-07-30T03:17:22Z\nOwningService: (none — customer-managed)\nKmsKeyId: alias/aws/secretsmanager\nRotationLambda LastLog: ''Task timed out after 3.00 seconds''"'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Secrets Manager, rotation, rotation Lambda, Master Secret, Alternating Users, Single User, rotation strategy, EventBridge schedule, rotation token, ClientRequestToken, cross-account secret, twin secrets, RotateSecret, rotation template, Superuser, database credential, rotation disabled, rate(1d), VPC connectivity, KMS decrypt
 ---
 
 # Secrets Manager Rotation Troubleshooter

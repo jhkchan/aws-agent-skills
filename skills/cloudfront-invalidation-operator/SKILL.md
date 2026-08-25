@@ -1,96 +1,27 @@
 ---
 name: cloudfront-invalidation-operator
-description: >-
-  Operates CloudFront cache invalidation workflows — invalidation
-  creation with path patterns (/* all, /images/* directory,
-  /images/*.css wildcard, single-path), invalidation cost tiering
-  (first 1,000 paths/month free then $0.005 per path), cache-busting
-  strategy (invalidation vs versioned filenames), invalidation
-  status polling (InvalidationStatus: InProgress→Completed), bulk
-  invalidation patterns, continuous deployment staging invalidation,
-  and diagnostic loops (get-invalidation, list-invalidations).
-  Runs deterministic pre-checks (distribution Deployed, caller has
-  cloudfront:CreateInvalidation, path count under free tier,
-  path syntax valid) behind a CONFIRM gate and emits a READY,
-  BLOCKED, or COMPLETED verdict. Use when creating invalidations,
-  waiting for completion, choosing invalidation vs cache-busting,
-  or diagnosing invalidation cost.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Operates CloudFront cache invalidation workflows — invalidation creation with path patterns (/* all, /images/* directory, /images/*.css wildcard, single-path), invalidation cost tiering (first 1,000 paths/month free then $0.005 per path), cache-busting strategy (invalidation vs versioned filenames), invalidation status polling (InvalidationStatus: InProgress→Completed), bulk invalidation patterns, continuous deployment staging invalidation, and diagnostic loops (get-invalidation, list-invalidations). Runs deterministic pre-checks (distribution Deployed, caller has cloudfront:CreateInvalidation, path count under free tier, path syntax valid) behind a CONFIRM gate and emits a READY, BLOCKED, or COMPLETED verdict. Use when creating invalidations, waiting for completion, choosing invalidation vs cache-busting, or diagnosing invalidation cost.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline plan classification.
-  Live-account operations use aws cloudfront create-invalidation,
-  get-invalidation, list-invalidations, get-distribution,
-  list-distributions, get-distribution-config (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - CloudFront
-  - invalidation
-  - cache busting
-  - edge cache
-  - CDN
-  - path pattern
-  - wildcard invalidation
-  - CreateInvalidation
-  - GetInvalidation
-  - InvalidationStatus
-  - continuous deployment
-  - staging distribution
-  - cache policy
-  - versioned filenames
-  - origin
-  - distribution
-  - InProgress
-  - Completed
-tags: [aws, cloudfront, networking, cdn, cache, invalidation, operate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws cloudfront create-invalidation, get-invalidation, list-invalidations, get-distribution, list-distributions, get-distribution-config (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Creating a CloudFront cache invalidation (/* all, /images/*
-    directory, /images/*.css wildcard, or single-object path), waiting
-    for an invalidation to reach Completed status, deciding whether to
-    invalidate or use versioned filenames for cache-busting, planning
-    a bulk invalidation that exceeds the 1,000-path free tier,
-    invalidating a staging distribution in a continuous deployment
-    workflow, or diagnosing why an invalidation is stuck InProgress or
-    costs more than expected.
-  activation_triggers:
-    - "invalidate CloudFront cache"
-    - "CloudFront invalidation"
-    - "create-invalidation"
-    - "get-invalidation"
-    - "InvalidationStatus"
-    - "InProgress invalidation"
-    - "cache busting"
-    - "versioned filenames"
-    - "CloudFront continuous deployment"
-    - "staging distribution invalidation"
-    - "invalidate /*"
-    - "bulk invalidation"
-    - "CloudFront edge cache"
-    - "clear CDN cache"
-    - "invalidation cost"
-  invocation_schema: >-
-    Input: either (a) a CloudFront distribution configuration
-    (get-distribution output) plus the intended operation
-    (create-invalidation, wait-invalidation, cost-analysis,
-    compare-strategy, diagnose-invalidation), OR (b) a distribution-id
-    + operation for live-account execution. Output: deterministic
-    OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / NOTES
-    block per invalidation, where VERDICT is one of READY, BLOCKED,
-    COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Creating a CloudFront cache invalidation (/* all, /images/* directory, /images/*.css wildcard, or single-object path), waiting for an invalidation to reach Completed status, deciding whether to invalidate or use versioned filenames for cache-busting, planning a bulk invalidation that exceeds the 1,000-path free tier, invalidating a staging distribution in a continuous deployment workflow, or diagnosing why an invalidation is stuck InProgress or costs more than expected.
+  activation_triggers: invalidate CloudFront cache, CloudFront invalidation, create-invalidation, get-invalidation, InvalidationStatus, InProgress invalidation, cache busting, versioned filenames, CloudFront continuous deployment, staging distribution invalidation, invalidate /*, bulk invalidation, CloudFront edge cache, clear CDN cache, invalidation cost
+  invocation_schema: 'Input: either (a) a CloudFront distribution configuration (get-distribution output) plus the intended operation (create-invalidation, wait-invalidation, cost-analysis, compare-strategy, diagnose-invalidation), OR (b) a distribution-id + operation for live-account execution. Output: deterministic OPERATION / VERDICT / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per invalidation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudFront, invalidation, cache busting, edge cache, CDN, path pattern, wildcard invalidation, CreateInvalidation, GetInvalidation, InvalidationStatus, continuous deployment, staging distribution, cache policy, versioned filenames, origin, distribution, InProgress, Completed
+  tags: aws, cloudfront, networking, cdn, cache, invalidation, operate
 ---
 
 # CloudFront Invalidation Operator

@@ -1,142 +1,29 @@
 ---
 name: apprunner-autoscaling-optimizer
-description: >-
-  Optimises AWS App Runner autoscaling configuration for cost and
-  performance — auto-scaling configuration (MinSize/MaxSize
-  provisioning), concurrency setting (requests per instance, the
-  primary cost lever), CPU/memory utilization target tuning, instance
-  type sizing (1 vCPU / 2 GB vs 2 vCPU / 4 GB vs 4 vCPU / 8 GB),
-  health check interval tuning, scale-in cooldown, static vs dynamic
-  traffic pattern analysis, cost-per-request modeling, VPC ingress/
-  egress cost analysis (NAT gateway, VPC endpoints), observability
-  cost, and pause/resume for non-prod cost savings. Reads App Runner
-  service configuration, CloudWatch metrics, and Cost Explorer data
-  to project monthly savings. Emits OPTIMIZED with specific
-  recommendation and estimated savings, or
-  FURTHER_OPTIMIZATION_AVAILABLE. Use when reviewing App Runner
-  spend, tuning concurrency, right-sizing MinSize, or evaluating
-  pause/resume for non-prod environments.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Optimises AWS App Runner autoscaling configuration for cost and performance — auto-scaling configuration (MinSize/MaxSize provisioning), concurrency setting (requests per instance, the primary cost lever), CPU/memory utilization target tuning, instance type sizing (1 vCPU / 2 GB vs 2 vCPU / 4 GB vs 4 vCPU / 8 GB), health check interval tuning, scale-in cooldown, static vs dynamic traffic pattern analysis, cost-per-request modeling, VPC ingress/ egress cost analysis (NAT gateway, VPC endpoints), observability cost, and pause/resume for non-prod cost savings. Reads App Runner service configuration, CloudWatch metrics, and Cost Explorer data to project monthly savings. Emits OPTIMIZED with specific recommendation and estimated savings, or FURTHER_OPTIMIZATION_AVAILABLE. Use when reviewing App Runner spend, tuning concurrency, right-sizing MinSize, or evaluating pause/resume for non-prod environments.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). Offline recommendation classification works from pasted App
-  Runner service configuration and CloudWatch metrics. Live-account
-  optimization uses aws apprunner describe-service, describe-auto-scaling-
-  configuration, list-services, list-auto-scaling-configurations, aws
-  cloudwatch get-metric-statistics (RequestCount, InstanceCount,
-  CPUUtilization, MemoryUtilization, 4xx, 5xx, Latency), aws ce get-cost-
-  and-usage, and aws ce get-usage-forecast (AWS CLI v2, SSO or key-based
-  credentials). Pricing references us-east-1 published rates as of 2026;
-  re-state regional rates from the reference matrix for other regions.
-keywords:
-  - App Runner
-  - auto-scaling configuration
-  - concurrency
-  - MinSize
-  - MaxSize
-  - provisioned instances
-  - instance type
-  - 1 vCPU 2 GB
-  - 2 vCPU 4 GB
-  - 4 vCPU 8 GB
-  - CPU utilization
-  - memory utilization
-  - health check
-  - health check interval
-  - scale-in cooldown
-  - scale-out speed
-  - static traffic
-  - dynamic traffic
-  - cost per request
-  - custom domain
-  - SSL certificate
-  - deployment
-  - VPC ingress
-  - VPC egress
-  - NAT gateway
-  - observability cost
-  - CloudWatch Logs
-  - pause service
-  - resume service
-  - non-prod savings
-  - FinOps
-tags: [aws, apprunner, compute, cost-optimization, autoscaling, finops, concurrency, serverless-container, optimize]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted App Runner service configuration and CloudWatch metrics. Live-account optimization uses aws apprunner describe-service, describe-auto-scaling- configuration, list-services, list-auto-scaling-configurations, aws cloudwatch get-metric-statistics (RequestCount, InstanceCount, CPUUtilization, MemoryUtilization, 4xx, 5xx, Latency), aws ce get-cost- and-usage...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE"
-  when_to_use: >-
-    Optimising App Runner autoscaling configuration, tuning concurrency
-    settings, right-sizing MinSize/MaxSize, evaluating instance type
-    upgrades (1/2/4 vCPU), analyzing cost-per-request, deciding whether to
-    pause non-prod services, reviewing VPC egress cost, tuning health
-    check intervals, or conducting a FinOps review of App Runner services.
-  when_not_to_use: >-
-    ECS/Fargate service autoscaling (use an ECS autoscaling skill), Lambda
-    cost optimization (use lambda-cost-optimizer), EC2 instance rightsizing
-    (use ec2-rightsizing-optimizer), or App Runner troubleshooting
-    (deployment failures, configuration errors — use the App Runner
-    troubleshooter). This skill focuses on cost-driven autoscaling
-    optimization, not functional debugging.
-  activation_triggers:
-    - "optimise App Runner"
-    - "App Runner autoscaling"
-    - "App Runner concurrency"
-    - "App Runner MinSize"
-    - "App Runner MaxSize"
-    - "App Runner instance type"
-    - "App Runner cost"
-    - "App Runner FinOps"
-    - "App Runner pause"
-    - "App Runner resume"
-    - "App Runner VPC egress"
-    - "App Runner health check"
-    - "App Runner scale-in cooldown"
-    - "App Runner cost per request"
-    - "App Runner right-size"
-    - "App Runner provisioned"
-    - "reduce App Runner bill"
-    - "App Runner non-prod savings"
-  invocation_schema: >-
-    Input: either (a) an App Runner service ARN + live-account context,
-    (b) a service configuration document (describe-service +
-    describe-auto-scaling-configuration output), OR (c) CloudWatch metrics
-    (RequestCount, InstanceCount, CPUUtilization, MemoryUtilization, 4xx,
-    5xx) with at least 14 days of observation. Output: a deterministic
-    TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/MIGRATION_STEPS
-    block per service, where VERDICT is one of OPTIMIZED,
-    FURTHER_OPTIMIZATION_AVAILABLE.
-  invocation_example: >-
-    # Minimal valid input (offline finding classification):
-    ServiceName: prod-api-service
-    AutoScalingConfiguration:
-      MinSize: 1
-      MaxSize: 25
-      Concurrency: 100
-    InstanceConfiguration:
-      Cpu: 1 vCPU
-      Memory: 2 GB
-    Region: us-east-1
-    Metrics (last 30 days):
-      - RequestCount: 8,000,000/month
-      - Avg InstanceCount: 2.3 (MinSize 1 is sufficient)
-      - Avg CPUUtilization: 15%
-      - Avg MemoryUtilization: 22%
-      - 5xx rate: 0.01%
-    Traffic pattern: dynamic (peak 3x baseline during business hours)
-    Cost (last 30 days): $1,200/month
-    Emit the standard optimization block (TARGET, VERDICT, REASON,
-    RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS).
+  verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
+  when_to_use: Optimising App Runner autoscaling configuration, tuning concurrency settings, right-sizing MinSize/MaxSize, evaluating instance type upgrades (1/2/4 vCPU), analyzing cost-per-request, deciding whether to pause non-prod services, reviewing VPC egress cost, tuning health check intervals, or conducting a FinOps review of App Runner services.
+  when_not_to_use: ECS/Fargate service autoscaling (use an ECS autoscaling skill), Lambda cost optimization (use lambda-cost-optimizer), EC2 instance rightsizing (use ec2-rightsizing-optimizer), or App Runner troubleshooting (deployment failures, configuration errors — use the App Runner troubleshooter). This skill focuses on cost-driven autoscaling optimization, not functional debugging.
+  activation_triggers: optimise App Runner, App Runner autoscaling, App Runner concurrency, App Runner MinSize, App Runner MaxSize, App Runner instance type, App Runner cost, App Runner FinOps, App Runner pause, App Runner resume, App Runner VPC egress, App Runner health check, App Runner scale-in cooldown, App Runner cost per request, App Runner right-size, App Runner provisioned, reduce App Runner bill, App Runner non-prod savings
+  invocation_schema: 'Input: either (a) an App Runner service ARN + live-account context, (b) a service configuration document (describe-service + describe-auto-scaling-configuration output), OR (c) CloudWatch metrics (RequestCount, InstanceCount, CPUUtilization, MemoryUtilization, 4xx, 5xx) with at least 14 days of observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/MIGRATION_STEPS block per service, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
+  invocation_example: "# Minimal valid input (offline finding classification): ServiceName: prod-api-service AutoScalingConfiguration:\n  MinSize: 1\n  MaxSize: 25\n  Concurrency: 100\nInstanceConfiguration:\n  Cpu: 1 vCPU\n  Memory: 2 GB\nRegion: us-east-1 Metrics (last 30 days):\n  - RequestCount: 8,000,000/month\n  - Avg InstanceCount: 2.3 (MinSize 1 is sufficient)\n  - Avg CPUUtilization: 15%\n  - Avg MemoryUtilization: 22%\n  - 5xx rate: 0.01%\nTraffic pattern: dynamic (peak 3x baseline during business hours) Cost (last 30 days): $1,200/month Emit the standard optimization block (TARGET, VERDICT, REASON, RECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: App Runner, auto-scaling configuration, concurrency, MinSize, MaxSize, provisioned instances, instance type, 1 vCPU 2 GB, 2 vCPU 4 GB, 4 vCPU 8 GB, CPU utilization, memory utilization, health check, health check interval, scale-in cooldown, scale-out speed, static traffic, dynamic traffic, cost per request, custom domain, SSL certificate, deployment, VPC ingress, VPC egress, NAT gateway, observability cost, CloudWatch Logs, pause service, resume service, non-prod savings, FinOps
+  tags: aws, apprunner, compute, cost-optimization, autoscaling, finops, concurrency, serverless-container, optimize
 ---
 
 # App Runner Autoscaling Optimizer

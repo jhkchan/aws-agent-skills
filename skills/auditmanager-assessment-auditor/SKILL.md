@@ -1,107 +1,25 @@
 ---
 name: auditmanager-assessment-auditor
-description: >-
-  Audits AWS Audit Manager assessments for evidence-collection integrity,
-  control compliance rate, delegation wiring, and account-level settings
-  posture. Evaluates assessment lifecycle state (ACTIVE vs stopped/INACTIVE),
-  the data-source dependency chain (AWS Config recording + CloudTrail
-  management-event logging), NOT_ASSESSED burden, FAIL burden, framework
-  scope coverage, KMS-key/SNS-topic/reports-destination/process-owner
-  configuration, and outstanding delegations. Emits a deterministic verdict
-  (INCOMPLETE_EVIDENCE | LOW_COMPLIANCE | CONFIG_GAP | OK) per assessment
-  with enumerated findings and CLI remediation. Use when reviewing an Audit
-  Manager assessment, validating evidence completeness before a compliance
-  report, checking whether a stopped assessment has stale compliance data,
-  or auditing Audit Manager account settings.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Audit Manager assessments for evidence-collection integrity, control compliance rate, delegation wiring, and account-level settings posture. Evaluates assessment lifecycle state (ACTIVE vs stopped/INACTIVE), the data-source dependency chain (AWS Config recording + CloudTrail management-event logging), NOT_ASSESSED burden, FAIL burden, framework scope coverage, KMS-key/SNS-topic/reports-destination/process-owner configuration, and outstanding delegations. Emits a deterministic verdict (INCOMPLETE_EVIDENCE | LOW_COMPLIANCE | CONFIG_GAP | OK) per assessment with enumerated findings and CLI remediation. Use when reviewing an Audit Manager assessment, validating evidence completeness before a compliance report, checking whether a stopped assessment has stale compliance data, or auditing Audit Manager account settings.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline config-snapshot classification.
-  Live-account audits use aws auditmanager get-assessment, get-settings,
-  get-account-status, list-assessments, list-delegations, and
-  list-assessment-control-insights-by-control-domain (AWS CLI v2, SSO or
-  key-based credentials). AWS Config and CloudTrail status are read via
-  aws configservice describe-configuration-recorder-status and aws
-  cloudtrail describe-trails.
-keywords:
-  - Audit Manager
-  - assessment
-  - compliance
-  - evidence collection
-  - framework
-  - control compliance
-  - NOT_ASSESSED
-  - delegation
-  - AWS Config
-  - CloudTrail
-  - INACTIVE assessment
-  - stopped assessment
-  - defaultProcessOwners
-  - kmsKey
-  - assessment reports destination
-  - SNS topic
-  - scope
-  - SOC 2
-  - PCI DSS
-  - HIPAA
-  - control response
-  - governance audit
-tags: [auditmanager, governance, compliance, evidence-collection, delegation, config, cloudtrail, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline config-snapshot classification. Live-account audits use aws auditmanager get-assessment, get-settings, get-account-status, list-assessments, list-delegations, and list-assessment-control-insights-by-control-domain (AWS CLI v2, SSO or key-based credentials). AWS Config and CloudTrail status are read via aws configservice describe-configuration-recorder-status and aws cloudtrail...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
-  verdict_shape: "INCOMPLETE_EVIDENCE | LOW_COMPLIANCE | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing an Audit Manager assessment before generating a compliance
-    report, validating that evidence collection is trustworthy (not stale or
-    data-source-broken), checking whether a stopped/INACTIVE assessment is
-    producing a false compliance picture, auditing Audit Manager account
-    settings (KMS key, SNS topic, reports destination, process owners), or
-    scoping an assessment against the full organisation estate.
-  when_not_to_use: >-
-    Do NOT invoke for AWS Config conformance-pack evaluation, Security Hub
-    finding triage, or generic IAM-policy review — these have their own
-    auditors. Do NOT invoke if the caller only wants a compliance-score
-    dashboard (use the Audit Manager console); this skill emits findings and
-    remediation, not a score widget.
-  activation_triggers:
-    - "audit this Audit Manager assessment"
-    - "is my assessment evidence complete"
-    - "check assessment compliance"
-    - "stopped assessment stale evidence"
-    - "Audit Manager settings"
-    - "assessment delegation pending"
-    - "NOT_ASSESSED controls"
-    - "assessment scope gap"
-    - "compliance report readiness"
-    - "Audit Manager config gap"
-  invocation_schema: >-
-    Input: either (a) an assessment snapshot with required fields —
-    assessment.id (str, ARN), assessment.name (str), assessment.status
-    ("ACTIVE"|"INACTIVE"), assessment.creationTime (ISO-8601),
-    assessment.lastUpdated (ISO-8601), scope.awsAccounts (list[accountId]),
-    scope.awsServices (list[serviceName]),
-    controlSets[].controls[].response ("PASS"|"FAIL"|"NOT_ASSESSED"|
-    "MANUAL"|"UNDER_REVIEW"), settings.kmsKey (str|""), settings.snsTopic
-    (str|""), settings.defaultAssessmentReportsDestination (s3Uri|""),
-    settings.defaultProcessOwners (list[roleArn]) — plus optional
-    dataSources.configRecorders (per account × region, recording bool),
-    dataSources.cloudTrails (per region, IncludeManagementEvents bool),
-    delegations[].status ("IN_PROGRESS"|"COMPLETE"|"FAILED") and
-    delegations[].creationTime; OR (b) assessmentId (str) for live-account
-    audit. Output: deterministic block per assessment — ASSESSMENT (id),
-    FRAMEWORK (str), VERDICT ("INCOMPLETE_EVIDENCE"|"LOW_COMPLIANCE"|
-    "CONFIG_GAP"|"OK"), REASON (1-2 sentences citing worst finding + step
-    number), CONTROL BREAKDOWN (total, PASS, FAIL, NOT_ASSESSED, MANUAL,
-    UNDER_REVIEW, compliance%), FINDINGS (list[finding]), REMEDIATION
-    (list[action]).
+  verdict_shape: INCOMPLETE_EVIDENCE | LOW_COMPLIANCE | CONFIG_GAP | OK
+  when_to_use: Reviewing an Audit Manager assessment before generating a compliance report, validating that evidence collection is trustworthy (not stale or data-source-broken), checking whether a stopped/INACTIVE assessment is producing a false compliance picture, auditing Audit Manager account settings (KMS key, SNS topic, reports destination, process owners), or scoping an assessment against the full organisation estate.
+  when_not_to_use: Do NOT invoke for AWS Config conformance-pack evaluation, Security Hub finding triage, or generic IAM-policy review — these have their own auditors. Do NOT invoke if the caller only wants a compliance-score dashboard (use the Audit Manager console); this skill emits findings and remediation, not a score widget.
+  activation_triggers: audit this Audit Manager assessment, is my assessment evidence complete, check assessment compliance, stopped assessment stale evidence, Audit Manager settings, assessment delegation pending, NOT_ASSESSED controls, assessment scope gap, compliance report readiness, Audit Manager config gap
+  invocation_schema: 'Input: either (a) an assessment snapshot with required fields — assessment.id (str, ARN), assessment.name (str), assessment.status ("ACTIVE"|"INACTIVE"), assessment.creationTime (ISO-8601), assessment.lastUpdated (ISO-8601), scope.awsAccounts (list[accountId]), scope.awsServices (list[serviceName]), controlSets[].controls[].response ("PASS"|"FAIL"|"NOT_ASSESSED"| "MANUAL"|"UNDER_REVIEW"), settings.kmsKey (str|""), settings.snsTopic (str|""), settings.defaultAssessmentReportsDestination (s3Uri|""), settings.defaultProcessOwners (list[roleArn]) — plus optional dataSources.configRecorders (per account × region, recording bool), dataSources.cloudTrails (per region, IncludeManagementEvents bool), delegations[].status ("IN_PROGRESS"|"COMPLETE"|"FAILED") and delegations[].creationTime; OR (b) assessmentId (str) for live-account audit. Output: deterministic block per assessment — ASSESSMENT (id), FRAMEWORK (str), VERDICT ("INCOMPLETE_EVIDENCE"|"LOW_COMPLIANCE"| "CONFIG_GAP"|"OK"), REASON (1-2 sentences citing worst finding + step number), CONTROL BREAKDOWN (total, PASS, FAIL, NOT_ASSESSED, MANUAL, UNDER_REVIEW, compliance%), FINDINGS (list[finding]), REMEDIATION (list[action]).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Audit Manager, assessment, compliance, evidence collection, framework, control compliance, NOT_ASSESSED, delegation, AWS Config, CloudTrail, INACTIVE assessment, stopped assessment, defaultProcessOwners, kmsKey, assessment reports destination, SNS topic, scope, SOC 2, PCI DSS, HIPAA, control response, governance audit
+  tags: auditmanager, governance, compliance, evidence-collection, delegation, config, cloudtrail, audit
 ---
 
 # Audit Manager Assessment Auditor

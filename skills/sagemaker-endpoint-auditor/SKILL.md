@@ -1,76 +1,24 @@
 ---
 name: sagemaker-endpoint-auditor
-description: >-
-  Audits SageMaker real-time and async endpoints for security posture and
-  production readiness — KMS encryption-at-rest and inter-container traffic
-  encryption, execution-role blast radius (wildcard actions, sagemaker:*,
-  iam:PassRole), VPC configuration (internet-facing vs private), data capture
-  and model monitoring schedule coverage, and instance count for high
-  availability. Emits a deterministic verdict
-  (NO_ENCRYPTION | OVERPERMISSIVE_ROLE | NO_MONITORING | PUBLIC_ENDPOINT |
-  CONFIG_GAP | OK) per endpoint with enumerated findings and CLI remediation.
-  Use when reviewing SageMaker endpoints before production deployment,
-  checking endpoint encryption posture, auditing execution-role scope,
-  validating VPC configuration, verifying model monitoring coverage, or
-  checking instance count for high availability.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits SageMaker real-time and async endpoints for security posture and production readiness — KMS encryption-at-rest and inter-container traffic encryption, execution-role blast radius (wildcard actions, sagemaker:*, iam:PassRole), VPC configuration (internet-facing vs private), data capture and model monitoring schedule coverage, and instance count for high availability. Emits a deterministic verdict (NO_ENCRYPTION | OVERPERMISSIVE_ROLE | NO_MONITORING | PUBLIC_ENDPOINT | CONFIG_GAP | OK) per endpoint with enumerated findings and CLI remediation. Use when reviewing SageMaker endpoints before production deployment, checking endpoint encryption posture, auditing execution-role scope, validating VPC configuration, verifying model monitoring coverage, or checking instance count for high availability.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline config-document classification.
-  Live-account audits use aws sagemaker describe-endpoint,
-  describe-endpoint-config, describe-model, and list-monitoring-schedules
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - SageMaker
-  - endpoint
-  - KMS encryption
-  - inter-container encryption
-  - execution role
-  - VPC config
-  - data capture
-  - model monitor
-  - instance count
-  - high availability
-  - production readiness
-  - endpoint audit
-  - inference pipeline
-  - network isolation
-  - sagemaker:InvokeEndpoint
-  - blast radius
-tags: [sagemaker, ai-ml, security, endpoint, encryption, vpc, monitoring, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline config-document classification. Live-account audits use aws sagemaker describe-endpoint, describe-endpoint-config, describe-model, and list-monitoring-schedules (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AI/ML
-  verdict_shape: "NO_ENCRYPTION | OVERPERMISSIVE_ROLE | NO_MONITORING | PUBLIC_ENDPOINT | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a SageMaker endpoint before production deployment, checking
-    endpoint encryption (KMS + inter-container), auditing the execution role
-    for wildcard permissions, validating VPC configuration (private vs
-    internet-facing), verifying model monitoring coverage (data capture +
-    monitoring schedule), or checking instance count for high availability.
-  activation_triggers:
-    - "audit this SageMaker endpoint"
-    - "is my endpoint encrypted"
-    - "check endpoint VPC config"
-    - "execution role too broad"
-    - "is model monitoring enabled"
-    - "endpoint production ready"
-    - "SageMaker endpoint public"
-    - "inter-container encryption"
-  invocation_schema: >-
-    Input: either (a) a SageMaker endpoint configuration bundle (Model +
-    EndpointConfig + Endpoint metadata + optional MonitoringSchedule +
-    optional execution-role policy document), OR (b) an endpoint name/ARN for
-    live-account audit. Output: deterministic ENDPOINT/VERDICT/REASON/FINDINGS/
-    REMEDIATION block per endpoint, where VERDICT is one of NO_ENCRYPTION,
-    OVERPERMISSIVE_ROLE, NO_MONITORING, PUBLIC_ENDPOINT, CONFIG_GAP, OK.
+  verdict_shape: NO_ENCRYPTION | OVERPERMISSIVE_ROLE | NO_MONITORING | PUBLIC_ENDPOINT | CONFIG_GAP | OK
+  when_to_use: Reviewing a SageMaker endpoint before production deployment, checking endpoint encryption (KMS + inter-container), auditing the execution role for wildcard permissions, validating VPC configuration (private vs internet-facing), verifying model monitoring coverage (data capture + monitoring schedule), or checking instance count for high availability.
+  activation_triggers: audit this SageMaker endpoint, is my endpoint encrypted, check endpoint VPC config, execution role too broad, is model monitoring enabled, endpoint production ready, SageMaker endpoint public, inter-container encryption
+  invocation_schema: 'Input: either (a) a SageMaker endpoint configuration bundle (Model + EndpointConfig + Endpoint metadata + optional MonitoringSchedule + optional execution-role policy document), OR (b) an endpoint name/ARN for live-account audit. Output: deterministic ENDPOINT/VERDICT/REASON/FINDINGS/ REMEDIATION block per endpoint, where VERDICT is one of NO_ENCRYPTION, OVERPERMISSIVE_ROLE, NO_MONITORING, PUBLIC_ENDPOINT, CONFIG_GAP, OK.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: SageMaker, endpoint, KMS encryption, inter-container encryption, execution role, VPC config, data capture, model monitor, instance count, high availability, production readiness, endpoint audit, inference pipeline, network isolation, sagemaker:InvokeEndpoint, blast radius
+  tags: sagemaker, ai-ml, security, endpoint, encryption, vpc, monitoring, audit
 ---
 
 # SageMaker Endpoint Auditor

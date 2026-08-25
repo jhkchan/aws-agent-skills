@@ -1,45 +1,15 @@
 ---
 name: kinesis-analytics-deployer
 description: 'Deploys Amazon Kinesis Data Analytics applications (Managed Service for Apache Flink and Studio SQL) with production-grade config: application creation (runtime FLINK-1_19 or SQL-1_0, service execution role), source (Kinesis Data Stream or Firehose with stream ARN, starting position), destination (Kinesis Data Stream, Firehose, S3 with parallelism), SQL vs Flink selection, checkpointing (interval, min pause), parallelism and parallelismPerKPU tuning, CloudWatch logging, application snapshots for stateful recovery, Studio notebooks with Apache Zeppelin, session window SQL patterns, latest features (Studio notebooks, Zeppelin, session windows, snapshots, custom app code via S3). Emits a READY_TO_DEPLOY checklist. Use when creating a KDA application, deploying a Flink or SQL streaming job, validating config, or generating CLI/IaC templates. Triggers: Kinesis Data Analytics, Managed Flink, KDA Studio, Zeppelin, streaming SQL, Flink application, checkpointing, parallelism, session windows.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
 compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with kinesisanalytics, kinesisanalyticsv2, kinesis, firehose, iam, logs, and s3 access. Works with Terraform aws_kinesisanalyticsv2_application / aws_kinesis_analytics_application resources, CloudFormation AWS::KinesisAnalyticsV2::Application resources, and the AWS Console Kinesis Data Analytics wizard.'
-keywords:
-- aws
-- kinesis
-- kinesis-analytics
-- kinesis-data-analytics
-- managed-flink
-- apache-flink
-- cloudops
-- deploy
-- analytics
-- streaming
-- flink
-- studio-notebook
-- zeppelin
-- checkpointing
-- parallelism
-- session-windows
-tags:
-- aws
-- kinesis
-- kinesis-analytics
-- cloudops
-- deploy
-- analytics
-- streaming
-- flink
-dependencies:
-- aws-orchestrator
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: deploy
   skill_class: capability
@@ -47,28 +17,9 @@ metadata:
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-  - aws
-  - kinesis
-  - kinesis-analytics
-  - cloudops
-  - deploy
-  - analytics
-  - streaming
-  - flink
-  dependencies:
-  - aws-orchestrator
-  keywords:
-  - create kinesis data analytics
-  - deploy kinesis analytics
-  - managed service for apache flink
-  - kinesis analytics flink application
-  - kinesis analytics sql application
-  - kinesis analytics studio notebook
-  - kinesis analytics checkpointing
-  - kinesis analytics parallelism
-  - kinesis analytics session windows
-  - kinesis analytics zeppelin notebook
+  tags: aws, kinesis, kinesis-analytics, cloudops, deploy, analytics, streaming, flink
+  dependencies: aws-orchestrator
+  keywords: aws, kinesis, kinesis-analytics, kinesis-data-analytics, managed-flink, apache-flink, cloudops, deploy, analytics, streaming, flink, studio-notebook, zeppelin, checkpointing, parallelism, session-windows
   when_to_use: Invoke when the user wants to create a new Kinesis Data Analytics application (Managed Service for Apache Flink or Studio SQL), deploy a Flink streaming job, deploy a streaming SQL pipeline with session/hopping/tumbling windows, configure an interactive Studio notebook with Zeppelin, validate an existing KDA configuration against best practices, generate deployment CLI commands or IaC templates, or troubleshoot a KDA deployment failure caused by missing prerequisites (execution role, source stream, checkpoint configuration). Do NOT invoke for Kinesis Data Streams provisioning (use kinesis-stream-auditor), Kinesis Firehose delivery (use kinesis-firehose-troubshooter), or MSK (use kafka-msk-troubleshooter).
 ---
 

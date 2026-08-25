@@ -1,83 +1,24 @@
 ---
 name: resiliencehub-app-assessment-auditor
-description: >-
-  Audits AWS Resilience Hub application assessments for assessment staleness
-  (older than 90 days), resiliency policy binding and tier-to-RTO/RPO
-  calibration, per-tier compliance breaches (MissionCritical or Critical
-  NonCompliant triggers HIGH_RISK), aggregate compliance score below 80
-  (LOW_COMPLIANCE), app-version drift since the last assessment, failed or
-  pending assessment status (no compliance data), and unimplemented
-  alarm / SDD / test recommendations. Emits a deterministic verdict
-  (STALE_ASSESSMENT | HIGH_RISK | LOW_COMPLIANCE | CONFIG_GAP | OK) per app
-  with enumerated findings and CLI remediation. Use when reviewing Resilience
-  Hub app assessments, checking RTO/RPO compliance, validating resiliency
-  policy coverage, or auditing assessment freshness before a production
-  launch.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS Resilience Hub application assessments for assessment staleness (older than 90 days), resiliency policy binding and tier-to-RTO/RPO calibration, per-tier compliance breaches (MissionCritical or Critical NonCompliant triggers HIGH_RISK), aggregate compliance score below 80 (LOW_COMPLIANCE), app-version drift since the last assessment, failed or pending assessment status (no compliance data), and unimplemented alarm / SDD / test recommendations. Emits a deterministic verdict (STALE_ASSESSMENT | HIGH_RISK | LOW_COMPLIANCE | CONFIG_GAP | OK) per app with enumerated findings and CLI remediation. Use when reviewing Resilience Hub app assessments, checking RTO/RPO compliance, validating resiliency policy coverage, or auditing assessment freshness before a production launch.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline assessment-document
-  classification. Live-account audits use aws resiliencehub
-  list-app-assessments, describe-app-assessment, describe-app,
-  list-resiliency-policies, and describe-resiliency-policy (AWS CLI v2,
-  SSO or key-based credentials).
-keywords:
-  - Resilience Hub
-  - app assessment
-  - RTO
-  - RPO
-  - resiliency policy
-  - compliance score
-  - MissionCritical
-  - Critical tier
-  - NonCompliant
-  - assessment staleness
-  - app version drift
-  - alarm recommendations
-  - SDD recommendations
-  - resiliency audit
-  - compliance breach
-  - assessment freshness
-  - publish-app-version
-  - start-app-assessment
-  - policy binding
-  - resiliency tier
-tags: [resiliencehub, management, resiliency, rto, rpo, compliance, assessment, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline assessment-document classification. Live-account audits use aws resiliencehub list-app-assessments, describe-app-assessment, describe-app, list-resiliency-policies, and describe-resiliency-policy (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
-  verdict_shape: "STALE_ASSESSMENT | HIGH_RISK | LOW_COMPLIANCE | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing a Resilience Hub app assessment before production launch,
-    checking RTO/RPO compliance against a resiliency policy, auditing
-    assessment freshness, validating that the app version has not drifted
-    since the last assessment, or confirming alarm/SDD/test recommendation
-    coverage.
-  activation_triggers:
-    - "audit this resilience hub assessment"
-    - "is my app assessment stale"
-    - "check RTO RPO compliance"
-    - "resiliency policy coverage"
-    - "assessment freshness check"
-    - "app version drift resilience hub"
-    - "compliance score too low"
-    - "MissionCritical tier non compliant"
-    - "resilience hub recommendations"
-    - "resiliency policy not attached"
-  invocation_schema: >-
-    Input: either (a) a Resilience Hub app-assessment snapshot (assessment
-    metadata + compliance map + policy + recommendations), optionally paired
-    with describe-app metadata, OR (b) an app-ARN for live-account audit.
-    Output: deterministic APP/VERDICT/REASON/FINDINGS/REMEDIATION block per
-    app, where VERDICT is one of STALE_ASSESSMENT, HIGH_RISK, LOW_COMPLIANCE,
-    CONFIG_GAP, OK, or ERROR.
+  verdict_shape: STALE_ASSESSMENT | HIGH_RISK | LOW_COMPLIANCE | CONFIG_GAP | OK
+  when_to_use: Reviewing a Resilience Hub app assessment before production launch, checking RTO/RPO compliance against a resiliency policy, auditing assessment freshness, validating that the app version has not drifted since the last assessment, or confirming alarm/SDD/test recommendation coverage.
+  activation_triggers: audit this resilience hub assessment, is my app assessment stale, check RTO RPO compliance, resiliency policy coverage, assessment freshness check, app version drift resilience hub, compliance score too low, MissionCritical tier non compliant, resilience hub recommendations, resiliency policy not attached
+  invocation_schema: 'Input: either (a) a Resilience Hub app-assessment snapshot (assessment metadata + compliance map + policy + recommendations), optionally paired with describe-app metadata, OR (b) an app-ARN for live-account audit. Output: deterministic APP/VERDICT/REASON/FINDINGS/REMEDIATION block per app, where VERDICT is one of STALE_ASSESSMENT, HIGH_RISK, LOW_COMPLIANCE, CONFIG_GAP, OK, or ERROR.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Resilience Hub, app assessment, RTO, RPO, resiliency policy, compliance score, MissionCritical, Critical tier, NonCompliant, assessment staleness, app version drift, alarm recommendations, SDD recommendations, resiliency audit, compliance breach, assessment freshness, publish-app-version, start-app-assessment, policy binding, resiliency tier
+  tags: resiliencehub, management, resiliency, rto, rpo, compliance, assessment, audit
 ---
 
 # Resilience Hub App Assessment Auditor

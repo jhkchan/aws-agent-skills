@@ -1,101 +1,54 @@
 ---
 name: rds-instance-auditor
-description: >-
-  Audits AWS RDS DB instances for the seven high-impact configuration risks that
-  drive data-loss and outage incidents — public accessibility (internet-exposed
-  database), encryption-at-rest (immutable post-creation), deletion protection,
-  Multi-AZ availability, automated-backup / PITR retention, auto minor-version
-  upgrade, and Enhanced Monitoring. Emits a deterministic verdict
-  (PUBLIC | UNENCRYPTED | NO_DELETION_PROTECTION | SINGLE_AZ | CONFIG_GAP | OK)
-  per instance with enumerated findings and specific remediation CLI. Use when
-  reviewing RDS posture, checking for internet-reachable databases, validating
-  encryption enablement, auditing deletion-protection / backup coverage before
-  production deployment, or hardening database instance configuration.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS RDS DB instances for the seven high-impact configuration risks that drive data-loss and outage incidents — public accessibility (internet-exposed database), encryption-at-rest (immutable post-creation), deletion protection, Multi-AZ availability, automated-backup / PITR retention, auto minor-version upgrade, and Enhanced Monitoring. Emits a deterministic verdict (PUBLIC | UNENCRYPTED | NO_DELETION_PROTECTION | SINGLE_AZ | CONFIG_GAP | OK) per instance with enumerated findings and specific remediation CLI. Use when reviewing RDS posture, checking for internet-reachable databases, validating encryption enablement, auditing deletion-protection / backup coverage before production deployment, or hardening database instance configuration.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline metadata classification. Live-account
-  audits use aws rds describe-db-instances and aws rds describe-db-clusters
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - RDS
-  - DB instance
-  - public accessibility
-  - encryption-at-rest
-  - StorageEncrypted
-  - Multi-AZ
-  - deletion protection
-  - automated backups
-  - BackupRetentionPeriod
-  - minor version upgrade
-  - Enhanced Monitoring
-  - PITR
-  - Aurora cluster scope
-  - database audit
-  - data loss prevention
-  - PubliclyAccessible
-  - DB instance hardening
-tags: [rds, databases, security, availability, encryption, backups, multi-az, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline metadata classification. Live-account audits use aws rds describe-db-instances and aws rds describe-db-clusters (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Databases
-  verdict_shape: "PUBLIC | UNENCRYPTED | NO_DELETION_PROTECTION | SINGLE_AZ | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing an RDS DB instance configuration before production deployment,
-    checking whether a database is internet-reachable, validating
-    encryption-at-rest, auditing deletion-protection or backup coverage,
-    verifying Multi-AZ posture, or hardening database instance configuration
-    across an account.
-  when_not_to_use: >-
-    Aurora cluster-level posture audits (use the DBCluster block directly),
-    performance-tuning or query optimization, IAM/auth analysis (password
-    policies, IAM database authentication), certificate/TLS expiry checks
-    (acm-certificate-expiry-auditor), KMS key-policy or rotation audits
-    (kms-key-policy-auditor), or subnet/route-table reachability analysis.
-    This skill classifies configuration posture from instance metadata — it
-    does not perform live connectivity or penetration testing.
-  activation_triggers:
-    - "audit this RDS instance"
-    - "is my database public"
-    - "check RDS encryption"
-    - "is deletion protection enabled"
-    - "are automated backups on"
-    - "Multi-AZ check"
-    - "minor version upgrade"
-    - "Enhanced Monitoring off"
-    - "harden RDS instance"
-    - "PubliclyAccessible true"
-    - "BackupRetentionPeriod zero"
-  invocation_schema: >-
-    Input: either (a) an RDS DB instance configuration (describe-db-instances
-    metadata), optionally paired with the DBCluster block for Aurora engines,
-    OR (b) a db-instance-identifier for live-account audit. Output:
-    deterministic INSTANCE/VERDICT/REASON/FINDINGS/REMEDIATION block per
-    instance, where VERDICT ∈ {PUBLIC, UNENCRYPTED, NO_DELETION_PROTECTION,
-    SINGLE_AZ, CONFIG_GAP, OK, ERROR}.
-  invocation_example: |-
-    # Minimal valid input (offline metadata classification):
+  verdict_shape: PUBLIC | UNENCRYPTED | NO_DELETION_PROTECTION | SINGLE_AZ | CONFIG_GAP | OK
+  when_to_use: Reviewing an RDS DB instance configuration before production deployment, checking whether a database is internet-reachable, validating encryption-at-rest, auditing deletion-protection or backup coverage, verifying Multi-AZ posture, or hardening database instance configuration across an account.
+  when_not_to_use: Aurora cluster-level posture audits (use the DBCluster block directly), performance-tuning or query optimization, IAM/auth analysis (password policies, IAM database authentication), certificate/TLS expiry checks (acm-certificate-expiry-auditor), KMS key-policy or rotation audits (kms-key-policy-auditor), or subnet/route-table reachability analysis. This skill classifies configuration posture from instance metadata — it does not perform live connectivity or penetration testing.
+  activation_triggers: audit this RDS instance, is my database public, check RDS encryption, is deletion protection enabled, are automated backups on, Multi-AZ check, minor version upgrade, Enhanced Monitoring off, harden RDS instance, PubliclyAccessible true, BackupRetentionPeriod zero
+  invocation_schema: 'Input: either (a) an RDS DB instance configuration (describe-db-instances metadata), optionally paired with the DBCluster block for Aurora engines, OR (b) a db-instance-identifier for live-account audit. Output: deterministic INSTANCE/VERDICT/REASON/FINDINGS/REMEDIATION block per instance, where VERDICT ∈ {PUBLIC, UNENCRYPTED, NO_DELETION_PROTECTION, SINGLE_AZ, CONFIG_GAP, OK, ERROR}.'
+  invocation_example: '# Minimal valid input (offline metadata classification):
+
     DBInstanceIdentifier: db-prod-mysql-01
+
     Engine: mysql
+
     DBInstanceStatus: available
+
     PubliclyAccessible: false
+
     StorageEncrypted: true
+
     KmsKeyId: arn:aws:kms:us-east-1:111111111111:key/abc
+
     MultiAZ: true
+
     DeletionProtection: false
+
     BackupRetentionPeriod: 7
+
     AutoMinorVersionUpgrade: true
+
     MonitoringInterval: 60
+
     # For Aurora, also supply the DBCluster block:
+
     # DBClusterIdentifier, StorageEncrypted, DeletionProtection,
-    # BackupRetentionPeriod (cluster is authoritative for these).
+
+    # BackupRetentionPeriod (cluster is authoritative for these).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: RDS, DB instance, public accessibility, encryption-at-rest, StorageEncrypted, Multi-AZ, deletion protection, automated backups, BackupRetentionPeriod, minor version upgrade, Enhanced Monitoring, PITR, Aurora cluster scope, database audit, data loss prevention, PubliclyAccessible, DB instance hardening
+  tags: rds, databases, security, availability, encryption, backups, multi-az, audit
 ---
 
 # RDS Instance Auditor

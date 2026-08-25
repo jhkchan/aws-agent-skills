@@ -1,85 +1,27 @@
 ---
 name: cicd-pipeline-automator
-description: Designs and implements AWS-native CI/CD pipelines end-to-end using CodePipeline, CodeBuild, CodeDeploy, CloudFormation, CDK, and Terraform. Generates working pipeline-as-code templates (CloudFormation
-  AWS::CodePipeline::Pipeline, CDK Pipeline module, Terraform aws_codepipeline) wired with source (CodeCommit / GitHub / CodeStar Connection), build (buildspec.yml, VPC-aware CodeBuild), test (unit, integration,
-  CodeGuru Reviewer security scans), and deploy (CloudFormation change-set, CodeDeploy in-place / blue-green, ECS rolling, S3, Service Catalog) stages. Handles cross-account deployment (IAM roles, KMS artifact
-  key, resource-based policy), blue/green (Lambda traffic shifting 10/90, ECS circuit breaker, Route53 weighted), pipeline monitoring (CloudWatch Events on state changes, SNS failure notifications, manual
-  approval), and CodePipeline V2 event-driven triggers. Emits a verdict (AUTOMATED with pipeline template | MANUAL_STEP_REQUIRED with specific gap). Use when building a CI/CD pipeline, designing.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Designs and implements AWS-native CI/CD pipelines end-to-end using CodePipeline, CodeBuild, CodeDeploy, CloudFormation, CDK, and Terraform. Generates working pipeline-as-code templates (CloudFormation AWS::CodePipeline::Pipeline, CDK Pipeline module, Terraform aws_codepipeline) wired with source (CodeCommit / GitHub / CodeStar Connection), build (buildspec.yml, VPC-aware CodeBuild), test (unit, integration, CodeGuru Reviewer security scans), and deploy (CloudFormation change-set, CodeDeploy in-place / blue-green, ECS rolling, S3, Service Catalog) stages. Handles cross-account deployment (IAM roles, KMS artifact key, resource-based policy), blue/green (Lambda traffic shifting 10/90, ECS circuit breaker, Route53 weighted), pipeline monitoring (CloudWatch Events on state changes, SNS failure notifications, manual approval), and CodePipeline V2 event-driven triggers. Emits a verdict (AUTOMATED with pipeline template | MANUAL_STEP_REQUIRED with specific gap). Use when building a CI/CD pipeline, designing.
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws codepipeline create-pipeline,
-  update-pipeline, get-pipeline, get-pipeline-state, start-pipeline- execution, list-pipelines, aws codebuild create-project, batch-get- projects, aws codedeploy create-application, aws cloudformation create-change-set,
-  execute-change-set, aws codestar-connections create-connection (AWS CLI v2, SSO or key-based credentials).
-keywords:
-- CodePipeline
-- CodeBuild
-- CodeDeploy
-- CI/CD
-- pipeline as code
-- CloudFormation
-- CDK
-- Terraform
-- blue/green
-- canary
-- cross-account deployment
-- CodeStar Connection
-- CodeCommit
-- GitHub
-- buildspec
-- change-set
-- manual approval
-- pipeline monitoring
-- CodePipeline V2
-- CodeCatalyst
-tags:
-- codepipeline
-- codebuild
-- codedeploy
-- ci-cd
-- devtools
-- automate
-- cloudformation
-- cdk
-- terraform
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws codepipeline create-pipeline, update-pipeline, get-pipeline, get-pipeline-state, start-pipeline- execution, list-pipelines, aws codebuild create-project, batch-get- projects, aws codedeploy create-application, aws cloudformation create-change-set, execute-change-set, aws codestar-connections create-connection (AWS CLI v2, SSO...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
   task_type: automate
   skill_class: capability
   lifecycle_status: active
   verdict_shape: AUTOMATED | MANUAL_STEP_REQUIRED
-  when_to_use: Designing or implementing a CI/CD pipeline using CodePipeline, CodeBuild, CodeDeploy, CloudFormation, CDK, or Terraform. Setting up source (CodeCommit, GitHub, CodeStar Connection), build
-    (buildspec.yml, VPC-aware CodeBuild), test (unit, integration, CodeGuru), or deploy (CloudFormation change-set, CodeDeploy in-place or blue/green, ECS rolling, S3, Service Catalog) stages. Wiring cross-account
-    deployment (IAM roles, KMS key, bucket policy). Implementing blue/green (Lambda traffic shifting, ECS circuit breaker, Route53 weighted). Adding pipeline monitoring (CloudWatch Events, SNS, manual approval).
-    Migrating to CodePipeline V2 or troubleshooting pipeline failures.
-  activation_triggers:
-  - build CI/CD pipeline
-  - create CodePipeline
-  - design deployment pipeline
-  - blue/green deployment
-  - Lambda canary deploy
-  - ECS rolling deploy
-  - cross-account deployment
-  - CodeStar Connection
-  - buildspec.yml
-  - pipeline as code
-  - CloudFormation deploy pipeline
-  - CDK pipelines
-  - Terraform aws_codepipeline
-  - CodePipeline V2 migration
-  - pipeline not triggering
-  - CodeBuild timeout
-  - manual approval gate
-  - SNS pipeline failure notification
-  invocation_schema: 'Input: either (a) a deployment scenario describing app, source, build, test, deploy targets, and constraints (language, environment, cross-account, blue/green), OR (b) an existing
-    pipeline definition + the operation (create, update, troubleshoot, migrate V2). Output: deterministic OPERATION/VERDICT/REQUIREMENTS/PIPELINE_TEMPLATE/ MANUAL_GAPS block per operation, where VERDICT
-    is AUTOMATED (full template generated) or MANUAL_STEP_REQUIRED (specific gap blocks automation).'
+  when_to_use: Designing or implementing a CI/CD pipeline using CodePipeline, CodeBuild, CodeDeploy, CloudFormation, CDK, or Terraform. Setting up source (CodeCommit, GitHub, CodeStar Connection), build (buildspec.yml, VPC-aware CodeBuild), test (unit, integration, CodeGuru), or deploy (CloudFormation change-set, CodeDeploy in-place or blue/green, ECS rolling, S3, Service Catalog) stages. Wiring cross-account deployment (IAM roles, KMS key, bucket policy). Implementing blue/green (Lambda traffic shifting, ECS circuit breaker, Route53 weighted). Adding pipeline monitoring (CloudWatch Events, SNS, manual approval). Migrating to CodePipeline V2 or troubleshooting pipeline failures.
+  activation_triggers: build CI/CD pipeline, create CodePipeline, design deployment pipeline, blue/green deployment, Lambda canary deploy, ECS rolling deploy, cross-account deployment, CodeStar Connection, buildspec.yml, pipeline as code, CloudFormation deploy pipeline, CDK pipelines, Terraform aws_codepipeline, CodePipeline V2 migration, pipeline not triggering, CodeBuild timeout, manual approval gate, SNS pipeline failure notification
+  invocation_schema: 'Input: either (a) a deployment scenario describing app, source, build, test, deploy targets, and constraints (language, environment, cross-account, blue/green), OR (b) an existing pipeline definition + the operation (create, update, troubleshoot, migrate V2). Output: deterministic OPERATION/VERDICT/REQUIREMENTS/PIPELINE_TEMPLATE/ MANUAL_GAPS block per operation, where VERDICT is AUTOMATED (full template generated) or MANUAL_STEP_REQUIRED (specific gap blocks automation).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CodePipeline, CodeBuild, CodeDeploy, CI/CD, pipeline as code, CloudFormation, CDK, Terraform, blue/green, canary, cross-account deployment, CodeStar Connection, CodeCommit, GitHub, buildspec, change-set, manual approval, pipeline monitoring, CodePipeline V2, CodeCatalyst
+  tags: codepipeline, codebuild, codedeploy, ci-cd, devtools, automate, cloudformation, cdk, terraform
 ---
 
 # CI/CD Pipeline Automator

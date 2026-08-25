@@ -1,116 +1,26 @@
 ---
 name: opensearch-index-deployer
-description: >-
-  Provisions Amazon OpenSearch Service indices with production
-  defaults: index creation with explicit mappings (dynamic vs
-  strict), shard count (primary + replica) sizing targeting 10-50 GB
-  per shard, ILM policies with hot/warm/cold tiering, force merge for
-  read-only indices, snapshot management (automated + manual to S3),
-  alias management for zero-downtime reindexing, index templates and
-  component templates, rollover aliases, data streams for time-series,
-  search pipeline configuration, k-NN vector search index
-  configuration, and field type mapping (keyword vs text, nested vs
-  object). Emits a READY_TO_DEPLOY checklist with verification
-  commands. Use when creating an OpenSearch index, configuring shard
-  count, setting up ILM, managing aliases, creating index templates,
-  or configuring data streams. Triggers: create opensearch index,
-  opensearch shard sizing, opensearch ilm policy, opensearch alias
-  reindex, opensearch index template, opensearch knn vector,
-  opensearch data stream.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon OpenSearch Service indices with production defaults: index creation with explicit mappings (dynamic vs strict), shard count (primary + replica) sizing targeting 10-50 GB per shard, ILM policies with hot/warm/cold tiering, force merge for read-only indices, snapshot management (automated + manual to S3), alias management for zero-downtime reindexing, index templates and component templates, rollover aliases, data streams for time-series, search pipeline configuration, k-NN vector search index configuration, and field type mapping (keyword vs text, nested vs object). Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating an OpenSearch index, configuring shard count, setting up ILM, managing aliases, creating index templates, or configuring data streams. Triggers: create opensearch index, opensearch shard sizing, opensearch ilm policy, opensearch alias reindex, opensearch index template, opensearch knn vector, opensearch data stream.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with opensearch
-  access (sigv4 or basic auth), or the OpenSearch Dev Tools console.
-  Works with Terraform opensearch_index / opensearch_domain resources
-  and CloudFormation AWS::OpenSearchService::Domain templates.
-keywords:
-  - aws
-  - opensearch
-  - elasticsearch
-  - index management
-  - cloudops
-  - deploy
-  - provisioning
-  - shard sizing
-  - ilm
-  - index lifecycle
-  - hot warm cold
-  - force merge
-  - snapshot
-  - alias reindex
-  - index template
-  - component template
-  - rollover
-  - data stream
-  - knn vector
-  - search pipeline
-tags:
-  - aws
-  - opensearch
-  - index-management
-  - cloudops
-  - deploy
-  - analytics
-  - provisioning
-  - ilm
-  - shard-sizing
-  - alias-reindex
-  - knn-vector
-  - data-stream
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with opensearch access (sigv4 or basic auth), or the OpenSearch Dev Tools console. Works with Terraform opensearch_index / opensearch_domain resources and CloudFormation AWS::OpenSearchService::Domain templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - opensearch
-    - index-management
-    - cloudops
-    - deploy
-    - analytics
-    - provisioning
-    - ilm
-    - shard-sizing
-    - alias-reindex
-    - knn-vector
-    - data-stream
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create opensearch index
-    - opensearch shard sizing
-    - opensearch ilm policy
-    - opensearch alias reindex
-    - opensearch index template
-    - opensearch knn vector
-    - opensearch data stream
-    - opensearch snapshot repository
-  when_to_use: >-
-    Invoke when the user wants to create an OpenSearch Service index
-    with mappings and shard sizing, configure ILM policies for
-    hot/warm/cold storage tiering, set up aliases for zero-downtime
-    reindexing, deploy index templates or component templates,
-    configure data streams for time-series data, deploy k-NN vector
-    search indices, configure search pipelines, or manage snapshots
-    to S3. Do NOT invoke for OpenSearch domain-level provisioning
-    (use opensearch-domain-deployer), OpenSearch Serverless (use
-    opensearch-serverless-deployer), or OpenSearch domain auditing
-    (use opensearch-domain-auditor).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, opensearch, index-management, cloudops, deploy, analytics, provisioning, ilm, shard-sizing, alias-reindex, knn-vector, data-stream
+  dependencies: aws-orchestrator
+  keywords: aws, opensearch, elasticsearch, index management, cloudops, deploy, provisioning, shard sizing, ilm, index lifecycle, hot warm cold, force merge, snapshot, alias reindex, index template, component template, rollover, data stream, knn vector, search pipeline
+  when_to_use: Invoke when the user wants to create an OpenSearch Service index with mappings and shard sizing, configure ILM policies for hot/warm/cold storage tiering, set up aliases for zero-downtime reindexing, deploy index templates or component templates, configure data streams for time-series data, deploy k-NN vector search indices, configure search pipelines, or manage snapshots to S3. Do NOT invoke for OpenSearch domain-level provisioning (use opensearch-domain-deployer), OpenSearch Serverless (use opensearch-serverless-deployer), or OpenSearch domain auditing (use opensearch-domain-auditor).
 ---
 
 # OpenSearch Index Deployer

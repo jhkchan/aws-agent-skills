@@ -1,114 +1,26 @@
 ---
 name: storage-gateway-deployer
-description: >-
-  Deploys AWS Storage Gateway with production defaults: gateway types
-  (S3 File Gateway, FSx File Gateway, Volume Gateway cached/stored, Tape
-  Gateway), gateway activation via activation key, local disk allocation
-  (cache vs upload buffer), S3 File Gateway NFS/SMB file share exports,
-  file share configuration (S3 bucket mapping, default storage class),
-  SMB Active Directory integration, Volume Gateway iSCSI targets, Tape
-  Gateway VTL with backup software, CloudWatch monitoring, bandwidth
-  rate limit scheduling, automatic file share refresh, SMB guest
-  password, and audit logging. Emits a READY_TO_DEPLOY checklist with
-  verification commands. Use when deploying Storage Gateway, setting up
-  S3 File Gateway, configuring Volume Gateway iSCSI, deploying Tape
-  Gateway VTL, or configuring SMB Active Directory. Triggers: deploy
-  storage gateway, s3 file gateway, volume gateway, tape gateway,
-  fsx file gateway, storage gateway activation, cache upload buffer,
-  nfs smb file share, iscsi target, vtl tape, bandwidth rate limit.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Deploys AWS Storage Gateway with production defaults: gateway types (S3 File Gateway, FSx File Gateway, Volume Gateway cached/stored, Tape Gateway), gateway activation via activation key, local disk allocation (cache vs upload buffer), S3 File Gateway NFS/SMB file share exports, file share configuration (S3 bucket mapping, default storage class), SMB Active Directory integration, Volume Gateway iSCSI targets, Tape Gateway VTL with backup software, CloudWatch monitoring, bandwidth rate limit scheduling, automatic file share refresh, SMB guest password, and audit logging. Emits a READY_TO_DEPLOY checklist with verification commands. Use when deploying Storage Gateway, setting up S3 File Gateway, configuring Volume Gateway iSCSI, deploying Tape Gateway VTL, or configuring SMB Active Directory. Triggers: deploy storage gateway, s3 file gateway, volume gateway, tape gateway, fsx file gateway, storage gateway activation, cache upload buffer, nfs smb file share, iscsi target, vtl tape, bandwidth rate limit.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with storagegateway
-  and ec2 access. Works with Terraform aws_storagegateway_gateway,
-  aws_storagegateway_nfs_file_share, aws_storagegateway_smb_file_share,
-  aws_storagegateway_cached_iscsi_volume,
-  aws_storagegateway_stored_iscsi_volume, and aws_storagegateway_tape_pool
-  resources, and CloudFormation AWS::StorageGateway templates.
-keywords:
-  - aws
-  - storage gateway
-  - s3 file gateway
-  - volume gateway
-  - tape gateway
-  - fsx file gateway
-  - cloudops
-  - deploy
-  - provisioning
-  - cache
-  - upload buffer
-  - nfs
-  - smb
-  - iscsi
-  - vtl
-  - active directory
-  - bandwidth rate limit
-  - file share
-tags:
-  - aws
-  - storage-gateway
-  - s3-file-gateway
-  - volume-gateway
-  - tape-gateway
-  - cloudops
-  - deploy
-  - storage
-  - provisioning
-  - nfs
-  - smb
-  - iscsi
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with storagegateway and ec2 access. Works with Terraform aws_storagegateway_gateway, aws_storagegateway_nfs_file_share, aws_storagegateway_smb_file_share, aws_storagegateway_cached_iscsi_volume, aws_storagegateway_stored_iscsi_volume, and aws_storagegateway_tape_pool resources, and CloudFormation AWS::StorageGateway templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - storage-gateway
-    - s3-file-gateway
-    - volume-gateway
-    - tape-gateway
-    - cloudops
-    - deploy
-    - storage
-    - provisioning
-    - nfs
-    - smb
-    - iscsi
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - deploy storage gateway
-    - s3 file gateway nfs smb
-    - volume gateway iscsi
-    - tape gateway vtl
-    - cache upload buffer
-    - storage gateway activation
-    - bandwidth rate limit
-    - smb active directory
-  when_to_use: >-
-    Invoke when the user wants to deploy an AWS Storage Gateway (S3 File
-    Gateway, FSx File Gateway, Volume Gateway cached or stored, or Tape
-    Gateway), activate a gateway, allocate local disks (cache vs upload
-    buffer), configure NFS or SMB file shares, join an SMB file share to
-    Active Directory, set up iSCSI volumes, configure a VTL for backup
-    software, apply bandwidth rate limits, or configure CloudWatch
-    monitoring and audit logging. Do NOT invoke for AWS DataSync (use
-    datasync skills), AWS Transfer Family (SFTP), or S3 File Gateway
-    troubleshooting (use a troubleshooter skill).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, storage-gateway, s3-file-gateway, volume-gateway, tape-gateway, cloudops, deploy, storage, provisioning, nfs, smb, iscsi
+  dependencies: aws-orchestrator
+  keywords: aws, storage gateway, s3 file gateway, volume gateway, tape gateway, fsx file gateway, cloudops, deploy, provisioning, cache, upload buffer, nfs, smb, iscsi, vtl, active directory, bandwidth rate limit, file share
+  when_to_use: Invoke when the user wants to deploy an AWS Storage Gateway (S3 File Gateway, FSx File Gateway, Volume Gateway cached or stored, or Tape Gateway), activate a gateway, allocate local disks (cache vs upload buffer), configure NFS or SMB file shares, join an SMB file share to Active Directory, set up iSCSI volumes, configure a VTL for backup software, apply bandwidth rate limits, or configure CloudWatch monitoring and audit logging. Do NOT invoke for AWS DataSync (use datasync skills), AWS Transfer Family (SFTP), or S3 File Gateway troubleshooting (use a troubleshooter skill).
 ---
 
 # Storage Gateway Deployer

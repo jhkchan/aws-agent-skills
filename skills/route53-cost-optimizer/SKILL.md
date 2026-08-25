@@ -1,42 +1,15 @@
 ---
 name: route53-cost-optimizer
 description: 'Optimises Amazon Route 53 DNS cost across seven dimensions: hosted zone cost reduction (consolidating low-traffic domains, detecting unused zones that still bill $0.50/month), health check cost analysis (endpoint checks at $0.50/month vs calculated checks which are free), DNS query volume analysis per zone (standard queries $0.40/B, latency-based routing +$0.20/B, geolocation +$0.30/B), traffic policy vs simple routing cost (traffic policies are $50/month flat), routing policy surcharge evaluation, private hosted zone VPC association audit, DNSSEC cost impact (KMS signing key at $1/key/month), and query logging volume reduction (CloudWatch ingestion $0.50/GB). Emits FURTHER_OPTIMIZATION_AVAILABLE, OPTIMIZED, or ALREADY_OPTIMAL. Use when reviewing Route 53 spend, auditing hosted zones, or a FinOps DNS review.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted Route 53 configuration and CloudWatch metrics. Live-account optimization uses aws route53 list-hosted-zones, aws route53 list-health-checks, aws route53 get-hosted-zone, aws route53 list-traffic-policies, aws route53 list-query-logging-configs, aws cloudwatch get-metric-statistics (DNSQueries, HealthCheckPercentHealthy), aws ce get-cost-and-usage, and aws kms describe-key for DNSSEC key cost attribution (AWS CLI v2, SSO or key-based credentials). Pricing references us-east-1 published rates as of 2026; re-state regional rates where applicable.
-keywords:
-- Route 53
-- DNS
-- cost optimization
-- hosted zones
-- health checks
-- traffic policies
-- latency-based routing
-- geolocation routing
-- weighted routing
-- DNSSEC
-- query logging
-- private hosted zones
-- domain transfer
-- calculated health checks
-- FinOps
-- CloudOps
-tags:
-- route53
-- networking
-- dns
-- cost-optimization
-- finops
-- health-checks
-- dnssec
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted Route 53 configuration and CloudWatch metrics. Live-account optimization uses aws route53 list-hosted-zones, aws route53 list-health-checks, aws route53 get-hosted-zone, aws route53 list-traffic-policies, aws route53 list-query-logging-configs, aws cloudwatch get-metric-statistics (DNSQueries, HealthCheckPercentHealthy), aws ce get-cost-and-usage, and aws...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: optimize
   skill_class: capability
@@ -44,24 +17,35 @@ metadata:
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
   when_to_use: Optimising Route 53 cost, auditing hosted zone inventory, detecting unused hosted zones, analysing health check spend, evaluating traffic policy necessity, reviewing DNS query volume and routing policy surcharges, assessing DNSSEC cost impact, or reducing DNS query logging volume.
   when_not_to_use: Route 53 record-level troubleshooting (use route53-record-auditor), Route 53 health check functional debugging (use route53-health-check-troubleshooter), Route 53 failover operations (use route53-failover-operator), or Route 53 resolver configuration (use route53-resolver-deployer). This skill focuses on cost-driven optimization decisions, not functional DNS debugging.
-  activation_triggers:
-  - optimise Route 53 cost
-  - Route 53 hosted zone audit
-  - Route 53 unused zones
-  - Route 53 health check cost
-  - Route 53 traffic policy cost
-  - Route 53 DNSSEC cost
-  - Route 53 query logging cost
-  - Route 53 routing policy cost
-  - Route 53 FinOps savings
-  - reduce DNS bill
-  - hosted zone consolidation
-  - calculated health checks
-  - DNS query volume analysis
-  - Route 53 monthly savings estimate
-  - private hosted zone cost
+  activation_triggers: optimise Route 53 cost, Route 53 hosted zone audit, Route 53 unused zones, Route 53 health check cost, Route 53 traffic policy cost, Route 53 DNSSEC cost, Route 53 query logging cost, Route 53 routing policy cost, Route 53 FinOps savings, reduce DNS bill, hosted zone consolidation, calculated health checks, DNS query volume analysis, Route 53 monthly savings estimate, private hosted zone cost
   invocation_schema: 'Input: either (a) a hosted zone identifier + live-account context, (b) a Cost Explorer Route 53 cost breakdown, OR (c) CloudWatch Route 53 metrics (DNSQueries, HealthCheckPercentHealthy, HealthCheckStatus) with at least 14 days of observation. Output: a deterministic TARGET/VERDICT/REASON/RECOMMENDATION/ESTIMATED_SAVINGS/REMEDIATION_STEPS block per zone or health check, where VERDICT is one of OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE.'
-  invocation_example: "# Minimal valid input (offline finding classification):\nHostedZoneId: Z1A2B3C4D5E6F7\nDomainName: legacy-staging.example.com\nZoneType: Public\nRecordCount: 4 (SOA, NS, 1 A record, 1 TXT)\nHealthChecks: 2 (endpoint-based, 30s interval)\nQueryVolume: ~1,000/month (last 30 days)\nDNSSEC: Enabled (KMS key in use)\nQueryLogging: Enabled (CloudWatch Logs)\nRegion: us-east-1\nEmit the standard optimization block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, REMEDIATION_STEPS)."
+  invocation_example: '# Minimal valid input (offline finding classification):
+
+    HostedZoneId: Z1A2B3C4D5E6F7
+
+    DomainName: legacy-staging.example.com
+
+    ZoneType: Public
+
+    RecordCount: 4 (SOA, NS, 1 A record, 1 TXT)
+
+    HealthChecks: 2 (endpoint-based, 30s interval)
+
+    QueryVolume: ~1,000/month (last 30 days)
+
+    DNSSEC: Enabled (KMS key in use)
+
+    QueryLogging: Enabled (CloudWatch Logs)
+
+    Region: us-east-1
+
+    Emit the standard optimization block (TARGET, VERDICT, REASON,
+
+    RECOMMENDATION, ESTIMATED_SAVINGS, REMEDIATION_STEPS).'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Route 53, DNS, cost optimization, hosted zones, health checks, traffic policies, latency-based routing, geolocation routing, weighted routing, DNSSEC, query logging, private hosted zones, domain transfer, calculated health checks, FinOps, CloudOps
+  tags: route53, networking, dns, cost-optimization, finops, health-checks, dnssec
 ---
 
 # Route 53 Cost Optimizer

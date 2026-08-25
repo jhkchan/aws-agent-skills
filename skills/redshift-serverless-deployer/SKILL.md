@@ -1,45 +1,15 @@
 ---
 name: redshift-serverless-deployer
 description: 'Deploys Amazon Redshift Serverless with production-grade configuration: namespace creation (DB name, admin credentials, KMS encryption, IAM roles, VPC security groups), workgroup creation (base capacity RPU, subnet group, public access, enhanced VPC routing), usage limits (daily/monthly RPU caps, cost controls), Data API for query execution without persistent connections, query editor v2, scheduled and cross-Region snapshots for DR, and latest features (cross-Region snapshot copy, cost controls with usage thresholds, Secrets Manager integration, zero-ETL). Emits a READY_TO_DEPLOY checklist with every configuration item verified. Use when creating a Redshift Serverless namespace or workgroup, validating a configuration, or generating deployment CLI and IaC templates. Triggers: Redshift Serverless, serverless data warehouse, RPU capacity, namespace, workgroup, Data API, cross-Region snapshots, usage limits, cost controls, query editor v2.'
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
 compatibility: 'Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with redshift-serverless, ec2, kms, iam, secretsmanager, and logs access. Works with Terraform aws_redshiftserverless_* resources, CloudFormation AWS::RedshiftServerless::* resources, and the AWS Console Redshift Serverless wizard.'
-keywords:
-- aws
-- redshift
-- redshift-serverless
-- cloudops
-- deploy
-- provisioning
-- analytics
-- data-warehouse
-- namespace
-- workgroup
-- rpu
-- data-api
-- cross-region-snapshots
-- usage-limits
-- cost-controls
-- kms-encryption
-tags:
-- aws
-- redshift
-- redshift-serverless
-- cloudops
-- deploy
-- analytics
-- namespace
-- workgroup
-dependencies:
-- aws-orchestrator
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: deploy
   skill_class: capability
@@ -47,28 +17,9 @@ metadata:
   verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
   author: Jacky Chan — AWS Community Builder
-  tags:
-  - aws
-  - redshift
-  - redshift-serverless
-  - cloudops
-  - deploy
-  - analytics
-  - namespace
-  - workgroup
-  dependencies:
-  - aws-orchestrator
-  keywords:
-  - create redshift serverless
-  - deploy redshift serverless
-  - redshift serverless namespace
-  - redshift serverless workgroup
-  - redshift serverless rpu
-  - redshift serverless data api
-  - redshift serverless usage limits
-  - redshift serverless cross-region snapshots
-  - redshift serverless cost controls
-  - redshift serverless query editor
+  tags: aws, redshift, redshift-serverless, cloudops, deploy, analytics, namespace, workgroup
+  dependencies: aws-orchestrator
+  keywords: aws, redshift, redshift-serverless, cloudops, deploy, provisioning, analytics, data-warehouse, namespace, workgroup, rpu, data-api, cross-region-snapshots, usage-limits, cost-controls, kms-encryption
   when_to_use: Invoke when the user wants to create a new Redshift Serverless namespace or workgroup, deploy a serverless data warehouse, validate an existing Redshift Serverless configuration against best practices, generate deployment CLI commands or IaC templates, or troubleshoot a Redshift Serverless deployment failure caused by missing prerequisites (KMS key, security groups, subnet group, IAM roles). Do NOT invoke for provisioned Redshift clusters (use redshift-cluster-deployer), Athena (use athena-query-optimizer), or Aurora (use rds-instance-deployer).
 ---
 

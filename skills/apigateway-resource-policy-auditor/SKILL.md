@@ -1,74 +1,24 @@
 ---
 name: apigateway-resource-policy-auditor
-description: >-
-  Audits AWS API Gateway REST/HTTP APIs for unauthenticated public methods
-  (authorizationType NONE), API-key-as-auth misconceptions, cross-account
-  resource policy grants, missing usage plans and rate limiting, and absent
-  WAF Web ACL associations. Emits a deterministic verdict (PUBLIC_NO_AUTH |
-  NO_RATE_LIMIT | CONFIG_GAP | OK) per API with enumerated findings and CLI
-  remediation. Use when reviewing API Gateway security posture, checking for
-  open methods, validating rate-limiting coverage, auditing resource policies
-  for cross-account exposure, or verifying WAF protection before production.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS API Gateway REST/HTTP APIs for unauthenticated public methods (authorizationType NONE), API-key-as-auth misconceptions, cross-account resource policy grants, missing usage plans and rate limiting, and absent WAF Web ACL associations. Emits a deterministic verdict (PUBLIC_NO_AUTH | NO_RATE_LIMIT | CONFIG_GAP | OK) per API with enumerated findings and CLI remediation. Use when reviewing API Gateway security posture, checking for open methods, validating rate-limiting coverage, auditing resource policies for cross-account exposure, or verifying WAF protection before production.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline config classification. Live-account
-  audits use aws apigateway get-rest-apis, get-resources, get-method,
-  get-stage, get-usage-plans, and aws wafv2 get-web-acl-for-resource
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - API Gateway
-  - resource policy
-  - authorizationType NONE
-  - PUBLIC_NO_AUTH
-  - usage plan
-  - rate limiting
-  - throttle
-  - WAF Web ACL
-  - cross-account
-  - API key
-  - execute-api:Invoke
-  - REST API
-  - HTTP API
-  - EDGE endpoint
-  - REGIONAL endpoint
-  - PRIVATE endpoint
-  - COGNITO_USER_POOLS
-  - method authorization
-  - API security audit
-tags: [apigateway, security, resource-policy, authorization, rate-limiting, waf, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline config classification. Live-account audits use aws apigateway get-rest-apis, get-resources, get-method, get-stage, get-usage-plans, and aws wafv2 get-web-acl-for-resource (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
-  verdict_shape: "PUBLIC_NO_AUTH | NO_RATE_LIMIT | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing an API Gateway REST/HTTP API before production deployment,
-    checking for methods with no authentication, validating usage-plan
-    coverage and rate limiting, auditing a resource policy for cross-account
-    exposure, or verifying WAF Web ACL association.
-  activation_triggers:
-    - "audit this API Gateway"
-    - "is my API publicly accessible"
-    - "check API Gateway authorization"
-    - "API Gateway no auth methods"
-    - "is there a usage plan for my API"
-    - "does my API have WAF"
-    - "cross-account API Gateway resource policy"
-    - "API key required but no auth"
-    - "API Gateway rate limiting"
-  invocation_schema: >-
-    Input: either (a) API Gateway configuration (API metadata + methods +
-    stage + resource policy + usage plan + WAF status), OR (b) a REST API
-    id for live-account audit. Output: deterministic API/VERDICT/REASON/
-    FINDINGS/REMEDIATION block per API, where VERDICT in {PUBLIC_NO_AUTH,
-    NO_RATE_LIMIT, CONFIG_GAP, OK, ERROR}.
+  verdict_shape: PUBLIC_NO_AUTH | NO_RATE_LIMIT | CONFIG_GAP | OK
+  when_to_use: Reviewing an API Gateway REST/HTTP API before production deployment, checking for methods with no authentication, validating usage-plan coverage and rate limiting, auditing a resource policy for cross-account exposure, or verifying WAF Web ACL association.
+  activation_triggers: audit this API Gateway, is my API publicly accessible, check API Gateway authorization, API Gateway no auth methods, is there a usage plan for my API, does my API have WAF, cross-account API Gateway resource policy, API key required but no auth, API Gateway rate limiting
+  invocation_schema: 'Input: either (a) API Gateway configuration (API metadata + methods + stage + resource policy + usage plan + WAF status), OR (b) a REST API id for live-account audit. Output: deterministic API/VERDICT/REASON/ FINDINGS/REMEDIATION block per API, where VERDICT in {PUBLIC_NO_AUTH, NO_RATE_LIMIT, CONFIG_GAP, OK, ERROR}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: API Gateway, resource policy, authorizationType NONE, PUBLIC_NO_AUTH, usage plan, rate limiting, throttle, WAF Web ACL, cross-account, API key, execute-api:Invoke, REST API, HTTP API, EDGE endpoint, REGIONAL endpoint, PRIVATE endpoint, COGNITO_USER_POOLS, method authorization, API security audit
+  tags: apigateway, security, resource-policy, authorization, rate-limiting, waf, audit
 ---
 
 # API Gateway Resource Policy Auditor

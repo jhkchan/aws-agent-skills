@@ -1,122 +1,28 @@
 ---
 name: cloudformation-drift-troubleshooter
-description: >-
-  Diagnoses AWS CloudFormation stack drift — resources whose actual
-  configuration diverged from the template because they were
-  changed, deleted, or added outside CloudFormation. Walks
-  detect-stack-drift, describe-stack-drift-detection-status, and
-  describe-stack-resource-drifts to classify each drift as MODIFIED
-  (property changed outside CFN), DELETED (resource deleted outside
-  CFN), or ADDITION (new resource not in stack). Maps drift impact
-  on stack updates and recommends a resolution strategy: import
-  existing resources (import-resources), drift reset (update to
-  match drift), or revert the resource to match template. Covers
-  drift prevention via IAM policy with aws:CalledViaFirst,
-  CloudFormation Hooks, and Conformance Packs. Handles nested
-  stack drift and CDK drift. Emits ROOT_CAUSE_FOUND |
-  NEED_MORE_INFO | ESCALATE. Use when a stack reports DRIFTED, an
-  UPDATE_FAILED cites drift as the cause, an operator needs to
-  import out-of-band resources, or a compliance pack flags stack
-  drift.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Diagnoses AWS CloudFormation stack drift — resources whose actual configuration diverged from the template because they were changed, deleted, or added outside CloudFormation. Walks detect-stack-drift, describe-stack-drift-detection-status, and describe-stack-resource-drifts to classify each drift as MODIFIED (property changed outside CFN), DELETED (resource deleted outside CFN), or ADDITION (new resource not in stack). Maps drift impact on stack updates and recommends a resolution strategy: import existing resources (import-resources), drift reset (update to match drift), or revert the resource to match template. Covers drift prevention via IAM policy with aws:CalledViaFirst, CloudFormation Hooks, and Conformance Packs. Handles nested stack drift and CDK drift. Emits ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE. Use when a stack reports DRIFTED, an UPDATE_FAILED cites drift as the cause, an operator needs to import out-of-band resources, or a compliance pack flags stack drift.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline diagnosis works on supplied
-  describe-stack-resource-drifts JSON. Live-account diagnosis uses
-  aws cloudformation detect-stack-drift,
-  describe-stack-drift-detection-status,
-  describe-stack-resource-drifts, describe-stack-resources,
-  describe-change-set, aws iam simulate-principal-policy, and
-  aws configservice get-resource-config-history for forensic
-  property-level timeline (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - CloudFormation
-  - drift
-  - detect-stack-drift
-  - describe-stack-resource-drifts
-  - StackDriftStatus
-  - DRIFTED
-  - MODIFIED
-  - DELETED
-  - ADDITION
-  - resource import
-  - import-resources
-  - drift reset
-  - out-of-band change
-  - CloudFormation Hooks
-  - Conformance Pack
-  - nested stack drift
-  - CDK drift
-  - UPDATE_FAILED
-tags:
-  - cloudformation
-  - devtools
-  - troubleshoot
-  - drift
-  - resource-import
-  - guardrails
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline diagnosis works on supplied describe-stack-resource-drifts JSON. Live-account diagnosis uses aws cloudformation detect-stack-drift, describe-stack-drift-detection-status, describe-stack-resource-drifts, describe-stack-resources, describe-change-set, aws iam simulate-principal-policy, and aws configservice get-resource-config-history for forensic property-level timeline (AWS CLI v2, SSO or key-based...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: DevTools
   task_type: troubleshoot
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE"
-  when_to_use: >-
-    Diagnosing why a stack reports StackDriftStatus DRIFTED, why an
-    UPDATE_FAILED cites drift as the cause, why a resource was
-    modified or deleted outside CloudFormation, how to classify
-    per-resource drift (MODIFIED / DELETED / ADDITION), how to
-    resolve drift via import / reset / revert, how to prevent
-    recurrence via IAM policy or CloudFormation Hooks, or how to
-    walk nested-stack drift and CDK drift.
-  when_not_to_use: >-
-    Stack lifecycle failures unrelated to drift (use
-    cloudformation-stack-troubleshooter for CREATE_FAILED,
-    UPDATE_FAILED with Replacement, DELETE_FAILED, ROLLBACK_COMPLETE,
-    UPDATE_ROLLBACK_FAILED). IaC generation from existing resources
-    (use the IaC Generator skill). Pure CloudFormation Hooks
-    authoring (use the Hooks authoring reference). CDK errors that
-    are not drift-related (use the CDK troubleshooter).
-  activation_triggers:
-    - "CloudFormation drift"
-    - "stack drift"
-    - "StackDriftStatus DRIFTED"
-    - "ResourceDriftStatus MODIFIED"
-    - "ResourceDriftStatus DELETED"
-    - "ResourceDriftStatus ADDITION"
-    - "describe-stack-resource-drifts"
-    - "detect-stack-drift"
-    - "resource modified outside CloudFormation"
-    - "resource deleted outside CloudFormation"
-    - "import existing resources into stack"
-    - "drift reset"
-    - "CloudFormation Hooks"
-    - "CDK drift"
-    - "nested stack drift"
-    - "Conformance Pack drift"
-  invocation_schema: >-
-    Input: either (a) a symptom description (stack name or ARN,
-    region, observed StackDriftStatus, the list of
-    StackResourceDrifts with their ResourceDriftStatus and
-    PropertyDifferences), OR (b) a live-account scenario where the
-    agent runs aws cloudformation detect-stack-drift /
-    describe-stack-drift-detection-status /
-    describe-stack-resource-drifts and aws configservice
-    get-resource-config-history to gather evidence. Output: a
-    deterministic INCIDENT / VERDICT / ROOT_CAUSE / EVIDENCE /
-    ROOT_CAUSE_CATALOG / REMEDIATION block where VERDICT ∈
-    {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and ROOT_CAUSE names
-    the drift type (MODIFIED / DELETED / ADDITION) and the offending
-    resource(s), with a resolution strategy chosen from
-    {IMPORT, RESET_TO_DRIFT, REVERT_TO_TEMPLATE, ESCALATE_TO_OWNER}.
+  verdict_shape: ROOT_CAUSE_FOUND | NEED_MORE_INFO | ESCALATE
+  when_to_use: Diagnosing why a stack reports StackDriftStatus DRIFTED, why an UPDATE_FAILED cites drift as the cause, why a resource was modified or deleted outside CloudFormation, how to classify per-resource drift (MODIFIED / DELETED / ADDITION), how to resolve drift via import / reset / revert, how to prevent recurrence via IAM policy or CloudFormation Hooks, or how to walk nested-stack drift and CDK drift.
+  when_not_to_use: Stack lifecycle failures unrelated to drift (use cloudformation-stack-troubleshooter for CREATE_FAILED, UPDATE_FAILED with Replacement, DELETE_FAILED, ROLLBACK_COMPLETE, UPDATE_ROLLBACK_FAILED). IaC generation from existing resources (use the IaC Generator skill). Pure CloudFormation Hooks authoring (use the Hooks authoring reference). CDK errors that are not drift-related (use the CDK troubleshooter).
+  activation_triggers: CloudFormation drift, stack drift, StackDriftStatus DRIFTED, ResourceDriftStatus MODIFIED, ResourceDriftStatus DELETED, ResourceDriftStatus ADDITION, describe-stack-resource-drifts, detect-stack-drift, resource modified outside CloudFormation, resource deleted outside CloudFormation, import existing resources into stack, drift reset, CloudFormation Hooks, CDK drift, nested stack drift, Conformance Pack drift
+  invocation_schema: 'Input: either (a) a symptom description (stack name or ARN, region, observed StackDriftStatus, the list of StackResourceDrifts with their ResourceDriftStatus and PropertyDifferences), OR (b) a live-account scenario where the agent runs aws cloudformation detect-stack-drift / describe-stack-drift-detection-status / describe-stack-resource-drifts and aws configservice get-resource-config-history to gather evidence. Output: a deterministic INCIDENT / VERDICT / ROOT_CAUSE / EVIDENCE / ROOT_CAUSE_CATALOG / REMEDIATION block where VERDICT ∈ {ROOT_CAUSE_FOUND, NEED_MORE_INFO, ESCALATE} and ROOT_CAUSE names the drift type (MODIFIED / DELETED / ADDITION) and the offending resource(s), with a resolution strategy chosen from {IMPORT, RESET_TO_DRIFT, REVERT_TO_TEMPLATE, ESCALATE_TO_OWNER}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudFormation, drift, detect-stack-drift, describe-stack-resource-drifts, StackDriftStatus, DRIFTED, MODIFIED, DELETED, ADDITION, resource import, import-resources, drift reset, out-of-band change, CloudFormation Hooks, Conformance Pack, nested stack drift, CDK drift, UPDATE_FAILED
+  tags: cloudformation, devtools, troubleshoot, drift, resource-import, guardrails
 ---
 
 # CloudFormation Drift Troubleshooter

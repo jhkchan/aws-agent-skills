@@ -1,120 +1,26 @@
 ---
 name: ssm-association-operator
-description: >-
-  Operates AWS Systems Manager (SSM) State Manager associations with
-  production defaults: association creation (document name, targets,
-  schedule), association status (Success/Failed/Pending), compliance
-  reporting, association versioning, output location (S3 bucket with
-  KMS-encrypted SSE), rate control (max-concurrency and max-errors as
-  integer counts, NOT percentages), target via resource tags (dynamic —
-  new instances auto-included) vs instance IDs (static), association
-  automation (apply on cron/rate schedule), association remediation on
-  non-compliance, multi-document association, document-specific
-  parameters, SSM document lifecycle (create/update/default version),
-  and CloudWatch metrics for association execution. Emits an
-  OPERATION_COMPLETED checklist with verification commands or
-  REVIEW_REQUIRED with a specific gap citation. Use when creating or
-  operating SSM associations, scheduling configuration/patch/inventory
-  runs, targeting instances by tag, configuring rate control, routing
-  output to S3, remediating non-compliance, or versioning associations.
-  Triggers: create ssm association, ssm state manager, ssm association
-  schedule, ssm association rate control, ssm association targets,
-  ssm association output s3, ssm association compliance, ssm association
-  version, ssm document parameters, ssm association remediation.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Operates AWS Systems Manager (SSM) State Manager associations with production defaults: association creation (document name, targets, schedule), association status (Success/Failed/Pending), compliance reporting, association versioning, output location (S3 bucket with KMS-encrypted SSE), rate control (max-concurrency and max-errors as integer counts, NOT percentages), target via resource tags (dynamic — new instances auto-included) vs instance IDs (static), association automation (apply on cron/rate schedule), association remediation on non-compliance, multi-document association, document-specific parameters, SSM document lifecycle (create/update/default version), and CloudWatch metrics for association execution. Emits an OPERATION_COMPLETED. Triggers: create ssm association, ssm state manager, ssm association schedule, ssm association rate control, ssm association targets, ssm association output s3, ssm association compliance, ssm association version, ssm document parameters, ssm association remediation.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with ssm access (and
-  iam access for role/policy creation, s3 access for output bucket
-  validation). Works with Terraform aws_ssm_association /
-  aws_ssm_document resources and CloudFormation
-  AWS::SSM::Association / AWS::SSM::Document templates.
-keywords:
-  - aws
-  - systems manager
-  - ssm
-  - state manager
-  - association
-  - create association
-  - association schedule
-  - association targets
-  - rate control
-  - max-concurrency
-  - max-errors
-  - compliance
-  - association version
-  - output location
-  - ssm document
-  - document lifecycle
-  - remediation
-  - tag targets
-  - cloudops
-  - operate
-tags:
-  - aws
-  - systems-manager
-  - ssm
-  - state-manager
-  - association
-  - cloudops
-  - operate
-  - compliance
-  - rate-control
-  - ssm-document
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with ssm access (and iam access for role/policy creation, s3 access for output bucket validation). Works with Terraform aws_ssm_association / aws_ssm_document resources and CloudFormation AWS::SSM::Association / AWS::SSM::Document templates.'
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "OPERATION_COMPLETED | REVIEW_REQUIRED"
+  verdict_shape: OPERATION_COMPLETED | REVIEW_REQUIRED
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - systems-manager
-    - ssm
-    - state-manager
-    - association
-    - cloudops
-    - operate
-    - compliance
-    - rate-control
-    - ssm-document
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create ssm association
-    - ssm state manager
-    - ssm association schedule
-    - ssm association rate control
-    - ssm association targets
-    - ssm association output s3
-    - ssm association compliance
-    - ssm association version
-    - ssm document parameters
-    - ssm association remediation
-  when_to_use: >-
-    Invoke when the user wants to create or operate an SSM State Manager
-    association — apply a document (AWS-managed or custom) to targets on
-    a schedule, target instances by tag (dynamic) or instance IDs
-    (static), configure rate control (max-concurrency and max-errors as
-    integer counts), route execution output to an S3 bucket, view
-    association status and compliance, version an association, set up
-    remediation when an association drifts to non-compliant, or run
-    multi-document associations. Do NOT invoke for ad-hoc one-off
-    command runs (use ssm-run-command skills), patch baseline creation
-    (use ssm-patch-baseline-deployer), or session manager
-    troubleshooting (use ssm-session-troubleshooter).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, systems-manager, ssm, state-manager, association, cloudops, operate, compliance, rate-control, ssm-document
+  dependencies: aws-orchestrator
+  keywords: aws, systems manager, ssm, state manager, association, create association, association schedule, association targets, rate control, max-concurrency, max-errors, compliance, association version, output location, ssm document, document lifecycle, remediation, tag targets, cloudops, operate
+  when_to_use: Invoke when the user wants to create or operate an SSM State Manager association — apply a document (AWS-managed or custom) to targets on a schedule, target instances by tag (dynamic) or instance IDs (static), configure rate control (max-concurrency and max-errors as integer counts), route execution output to an S3 bucket, view association status and compliance, version an association, set up remediation when an association drifts to non-compliant, or run multi-document associations. Do NOT invoke for ad-hoc one-off command runs (use ssm-run-command skills), patch baseline creation (use ssm-patch-baseline-deployer), or session manager troubleshooting (use ssm-session-troubleshooter).
 ---
 
 # SSM Association Operator

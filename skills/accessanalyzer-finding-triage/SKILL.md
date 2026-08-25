@@ -1,65 +1,23 @@
 ---
 name: accessanalyzer-finding-triage
-description: >-
-  Triages IAM Access Analyzer findings (external access + unused access) into
-  risk verdicts with remediation. Classifies each finding as real external
-  exposure (EXTERNAL_ACCESS), stale credential or permission (UNUSED_ACCESS),
-  expected cross-account or service integration (EXPECTED), or condition-bounded
-  non-risk (SAFE). Evaluates the zone-of-trust model, principal type (public vs
-  specific vs service), condition-key cryptographic strength, resource-type
-  blast radius, and finding freshness. INVOKE DETERMINISTICALLY when the input
-  contains an Access Analyzer finding JSON or finding reference — detection
-  signal: findingType is ExternalAccess or starts with Unused, OR the input
-  references isPublic, zone of trust, resource-based policy exposure, archive
-  rule, or UnusedIAMRole/UnusedIAMUserAccessKey. Use when reviewing Access
-  Analyzer findings, triaging external-access or unused-access findings,
-  prioritizing remediation, or validating archive-rule suppression decisions.
-version: 0.2.0
-author: Jacky Chan — AWS Community Builder
+description: 'Triages IAM Access Analyzer findings (external access + unused access) into risk verdicts with remediation. Classifies each finding as real external exposure (EXTERNAL_ACCESS), stale credential or permission (UNUSED_ACCESS), expected cross-account or service integration (EXPECTED), or condition-bounded non-risk (SAFE). Evaluates the zone-of-trust model, principal type (public vs specific vs service), condition-key cryptographic strength, resource-type blast radius, and finding freshness. INVOKE DETERMINISTICALLY when the input contains an Access Analyzer finding JSON or finding reference — detection signal: findingType is ExternalAccess or starts with Unused, OR the input references isPublic, zone of trust, resource-based policy exposure, archive rule, or UnusedIAMRole/UnusedIAMUserAccessKey. Use when reviewing Access Analyzer findings, triaging external-access or unused-access findings, prioritizing remediation, or validating archive-rule suppression decisions.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf). No AWS
-  CLI required for offline finding classification. Live-account triage uses
-  aws accessanalyzer list-findings and aws accessanalyzer archive-rule
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - IAM Access Analyzer
-  - external access
-  - unused access
-  - finding triage
-  - zone of trust
-  - isPublic
-  - cross-account
-  - resource-based policy
-  - archive rule
-  - UnusedIAMRole
-  - unused access key
-  - KMS key policy
-  - S3 bucket policy
-  - SQS queue policy
-  - Secrets Manager
-  - IAM role trust
-  - condition strength
-  - aws:SourceArn
-  - aws:SourceAccount
-  - service principal
-tags: [iam, security, access-analyzer, finding-triage, external-access, unused-access, zone-of-trust]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf). No AWS CLI required for offline finding classification. Live-account triage uses aws accessanalyzer list-findings and aws accessanalyzer archive-rule (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Security
-  verdict_shape: "EXTERNAL_ACCESS | UNUSED_ACCESS | EXPECTED | SAFE"
-  pattern: "Mindset → Quick Triage → Expert Deltas → Process → Matrices → Anti-Patterns → Pre-flight Gate → Remediation"
-  when_to_use: >-
-    Reviewing IAM Access Analyzer findings, triaging external-access or
-    unused-access findings, prioritizing which findings to remediate first,
-    validating whether a finding can be archived, or deciding if a
-    cross-account resource-policy grant is an expected integration or a
-    security risk.
+  verdict_shape: EXTERNAL_ACCESS | UNUSED_ACCESS | EXPECTED | SAFE
+  pattern: Mindset → Quick Triage → Expert Deltas → Process → Matrices → Anti-Patterns → Pre-flight Gate → Remediation
+  when_to_use: Reviewing IAM Access Analyzer findings, triaging external-access or unused-access findings, prioritizing which findings to remediate first, validating whether a finding can be archived, or deciding if a cross-account resource-policy grant is an expected integration or a security risk.
+  version: 0.2.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: IAM Access Analyzer, external access, unused access, finding triage, zone of trust, isPublic, cross-account, resource-based policy, archive rule, UnusedIAMRole, unused access key, KMS key policy, S3 bucket policy, SQS queue policy, Secrets Manager, IAM role trust, condition strength, aws:SourceArn, aws:SourceAccount, service principal
+  tags: iam, security, access-analyzer, finding-triage, external-access, unused-access, zone-of-trust
 ---
 
 # IAM Access Analyzer Finding Triage

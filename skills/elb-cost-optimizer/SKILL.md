@@ -1,106 +1,28 @@
 ---
 name: elb-cost-optimizer
-description: >-
-  Optimizes Elastic Load Balancer cost across seven dimensions: ALB
-  vs NLB vs CLB cost comparison and migration, LCU (Load Balancer
-  Capacity Unit) analysis across the four billing dimensions (new
-  connections, active connections, processed bytes, rule evaluations),
-  target group consolidation via multi-path routing, cross-zone load
-  balancing cost impact, idle load balancer detection, connection
-  draining timeout tuning, CLB-to-ALB/NLB migration savings, data
-  transfer cost reduction via PrivateLink, ALB access log volume
-  reduction, and SSL certificate overhead. Reads CloudWatch LCU
-  metrics, ELB configurations, and Cost Explorer data. Emits
-  FURTHER_OPTIMIZATION_AVAILABLE or OPTIMIZED with estimated savings
-  and consolidation steps. Use when reviewing ELB spend, analyzing
-  LCU costs, consolidating ALBs, migrating CLBs, or a FinOps review
-  of load balancer spend.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Optimizes Elastic Load Balancer cost across seven dimensions: ALB vs NLB vs CLB cost comparison and migration, LCU (Load Balancer Capacity Unit) analysis across the four billing dimensions (new connections, active connections, processed bytes, rule evaluations), target group consolidation via multi-path routing, cross-zone load balancing cost impact, idle load balancer detection, connection draining timeout tuning, CLB-to-ALB/NLB migration savings, data transfer cost reduction via PrivateLink, ALB access log volume reduction, and SSL certificate overhead. Reads CloudWatch LCU metrics, ELB configurations, and Cost Explorer data. Emits FURTHER_OPTIMIZATION_AVAILABLE or OPTIMIZED with estimated savings and consolidation steps. Use when reviewing ELB spend, analyzing LCU costs, consolidating ALBs, migrating CLBs, or a FinOps review of load balancer spend.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). Offline recommendation classification works from
-  pasted CloudWatch LCU metrics, ELB configurations, and Cost
-  Explorer data. Live-account optimization uses aws elbv2
-  describe-load-balancers, describe-target-groups, describe-listeners,
-  describe-rules, aws cloudwatch get-metric-statistics
-  (ConsumedLCUs, NewConnectionCount, ActiveConnectionCount,
-  ProcessedBytes, RuleEvaluations), aws ce get-cost-and-usage, and
-  aws elb describe-load-balancers (for CLB inventory, AWS CLI v2,
-  SSO or key-based credentials).
-keywords:
-  - Elastic Load Balancer
-  - ALB
-  - NLB
-  - CLB
-  - LCU
-  - Load Balancer Capacity Unit
-  - multi-path routing
-  - target group consolidation
-  - cross-zone
-  - idle load balancer
-  - CLB migration
-  - PrivateLink
-  - access logs
-  - SSL certificate
-  - connection draining
-  - FinOps
-  - cost optimization
-tags: [elb, alb, nlb, clb, networking, cost-optimization, finops, lcu, load-balancer]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline recommendation classification works from pasted CloudWatch LCU metrics, ELB configurations, and Cost Explorer data. Live-account optimization uses aws elbv2 describe-load-balancers, describe-target-groups, describe-listeners, describe-rules, aws cloudwatch get-metric-statistics (ConsumedLCUs, NewConnectionCount, ActiveConnectionCount, ProcessedBytes, RuleEvaluations), aws ce get-cost-and-usage, and aws...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: optimize
   skill_class: capability
   lifecycle_status: active
   verdict_shape: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-  when_to_use: >-
-    Optimizing ELB cost, analyzing LCU (Load Balancer Capacity Unit)
-    utilization across the four billing dimensions, consolidating ALBs
-    via multi-path routing and target group merging, evaluating CLB
-    to ALB/NLB migration, detecting idle load balancers, tuning
-    connection draining timeouts, reducing cross-zone data transfer
-    costs, evaluating PrivateLink for inter-AZ traffic reduction,
-    reducing ALB access log volume, or conducting a FinOps review of
-    load balancer spend.
-  when_not_to_use: >-
-    ALB 5xx error troubleshooting (use alb-5xx-troubleshooter),
-    CLB-to-ALB migration execution (use clb-to-alb-migration-operator),
-    Route 53 cost optimization (use route53-cost-optimizer), or VPC
-    data transfer optimization (use data-transfer-optimizer). This
-    skill focuses on cost-driven optimization, not functional
-    debugging or migration execution.
-  activation_triggers:
-    - "optimise ELB cost"
-    - "ALB LCU analysis"
-    - "load balancer cost"
-    - "idle load balancer"
-    - "CLB to ALB migration cost"
-    - "target group consolidation"
-    - "multi-path routing"
-    - "reduce ALB count"
-    - "cross-zone load balancing cost"
-    - "LCU dimensions"
-    - "ELB FinOps"
-    - "reduce load balancer bill"
-    - "NLB vs ALB cost"
-    - "PrivateLink data transfer"
-    - "ALB access log cost"
-  invocation_schema: >-
-    Input: either (a) a load balancer ARN with live-account context,
-    (b) CloudWatch LCU metrics (ConsumedLCUs, NewConnectionCount,
-    ActiveConnectionCount, ProcessedBytes, RuleEvaluations) with at
-    least 14 days of observation, OR (c) an ELB configuration with
-    listener and target group details. Output: a deterministic TARGET
-    / VERDICT / REASON / RECOMMENDATION / ESTIMATED_SAVINGS /
-    ACTION_STEPS block per load balancer or fleet, where VERDICT is
-    one of {OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE}.
+  when_to_use: Optimizing ELB cost, analyzing LCU (Load Balancer Capacity Unit) utilization across the four billing dimensions, consolidating ALBs via multi-path routing and target group merging, evaluating CLB to ALB/NLB migration, detecting idle load balancers, tuning connection draining timeouts, reducing cross-zone data transfer costs, evaluating PrivateLink for inter-AZ traffic reduction, reducing ALB access log volume, or conducting a FinOps review of load balancer spend.
+  when_not_to_use: ALB 5xx error troubleshooting (use alb-5xx-troubleshooter), CLB-to-ALB migration execution (use clb-to-alb-migration-operator), Route 53 cost optimization (use route53-cost-optimizer), or VPC data transfer optimization (use data-transfer-optimizer). This skill focuses on cost-driven optimization, not functional debugging or migration execution.
+  activation_triggers: optimise ELB cost, ALB LCU analysis, load balancer cost, idle load balancer, CLB to ALB migration cost, target group consolidation, multi-path routing, reduce ALB count, cross-zone load balancing cost, LCU dimensions, ELB FinOps, reduce load balancer bill, NLB vs ALB cost, PrivateLink data transfer, ALB access log cost
+  invocation_schema: 'Input: either (a) a load balancer ARN with live-account context, (b) CloudWatch LCU metrics (ConsumedLCUs, NewConnectionCount, ActiveConnectionCount, ProcessedBytes, RuleEvaluations) with at least 14 days of observation, OR (c) an ELB configuration with listener and target group details. Output: a deterministic TARGET / VERDICT / REASON / RECOMMENDATION / ESTIMATED_SAVINGS / ACTION_STEPS block per load balancer or fleet, where VERDICT is one of {OPTIMIZED, FURTHER_OPTIMIZATION_AVAILABLE}.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Elastic Load Balancer, ALB, NLB, CLB, LCU, Load Balancer Capacity Unit, multi-path routing, target group consolidation, cross-zone, idle load balancer, CLB migration, PrivateLink, access logs, SSL certificate, connection draining, FinOps, cost optimization
+  tags: elb, alb, nlb, clb, networking, cost-optimization, finops, lcu, load-balancer
 ---
 
 # ELB Cost Optimizer

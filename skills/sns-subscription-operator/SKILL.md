@@ -1,112 +1,28 @@
 ---
 name: sns-subscription-operator
-description: >-
-  Operates AWS SNS subscription workflows end-to-end — subscription
-  creation (HTTP/HTTPS/SQS/Lambda/email/sms/firehose), subscription
-  confirmation (PendingConfirmation to Confirmed via token or
-  auto-confirm for SQS/Lambda), filter-policy design (message
-  attributes, FilterPolicyScope), delivery policies (retry backoff,
-  dead-letter queue via redrive), subscription attributes
-  (RawMessageDelivery), and diagnostic loops
-  (list-subscriptions-by-topic, get-subscription-attributes,
-  CloudTrail events). Runs deterministic pre-checks (topic exists,
-  endpoint reachable, topic policy permits subscription, protocol
-  valid, filter-policy JSON valid, DLQ target exists for redrive)
-  behind a CONFIRM gate and emits a READY, BLOCKED, or COMPLETED
-  verdict per operation. Use when creating subscriptions, confirming
-  pending subscriptions, debugging filter-policy matches, configuring
-  delivery retry and DLQ, or diagnosing why messages are not
-  delivered.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates AWS SNS subscription workflows end-to-end — subscription creation (HTTP/HTTPS/SQS/Lambda/email/sms/firehose), subscription confirmation (PendingConfirmation to Confirmed via token or auto-confirm for SQS/Lambda), filter-policy design (message attributes, FilterPolicyScope), delivery policies (retry backoff, dead-letter queue via redrive), subscription attributes (RawMessageDelivery), and diagnostic loops (list-subscriptions-by-topic, get-subscription-attributes, CloudTrail events). Runs deterministic pre-checks (topic exists, endpoint reachable, topic policy permits subscription, protocol valid, filter-policy JSON valid, DLQ target exists for redrive) behind a CONFIRM gate and emits a READY, BLOCKED, or COMPLETED verdict per operation. Use when creating subscriptions, confirming pending subscriptions, debugging filter-policy matches, configuring delivery retry and DLQ, or diagnosing why messages are not delivered.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline plan classification.
-  Live-account operations use aws sns subscribe, confirm-subscription,
-  list-subscriptions-by-topic, get-subscription-attributes,
-  set-subscription-attributes, unsubscribe, aws sqs
-  get-queue-attributes / set-queue-attributes (for SQS-backed
-  subscriptions and DLQ), aws lambda get-policy (for Lambda-backed
-  subscriptions), aws firehose describe-delivery-stream (for firehose
-  targets), and aws cloudtrail lookup-events (AWS CLI v2, SSO or
-  key-based credentials).
-keywords:
-  - SNS
-  - subscription
-  - PendingConfirmation
-  - ConfirmSubscription
-  - filter policy
-  - FilterPolicyScope
-  - message attributes
-  - delivery policy
-  - retry backoff
-  - dead-letter queue
-  - DLQ
-  - redrive policy
-  - RawMessageDelivery
-  - HTTP subscription
-  - HTTPS subscription
-  - SQS subscription
-  - Lambda subscription
-  - email subscription
-  - firehose subscription
-  - subscription attributes
-  - SNS message data protection
-  - cross-account subscription
-keywords_tags:
-  - aws
-  - sns
-  - app-integration
-  - subscription
-  - messaging
-  - operate
-tags: [aws, sns, app-integration, subscription, messaging, filter-policy, delivery-policy, operate]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws sns subscribe, confirm-subscription, list-subscriptions-by-topic, get-subscription-attributes, set-subscription-attributes, unsubscribe, aws sqs get-queue-attributes / set-queue-attributes (for SQS-backed subscriptions and DLQ), aws lambda get-policy (for Lambda-backed subscriptions), aws firehose describe-delivery-stream (for...
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: AppIntegration
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Creating an SNS subscription to a topic (HTTP/HTTPS/SQS/Lambda/
-    email/sms/firehose/application), confirming a subscription stuck
-    in PendingConfirmation, designing or debugging a subscription
-    filter policy, configuring delivery retry policy and dead-letter
-    queue (DLQ), setting subscription attributes (RawMessageDelivery),
-    diagnosing why messages are not delivered to a subscription, or
-    validating SNS message data protection posture for a subscription.
-  activation_triggers:
-    - "create SNS subscription"
-    - "confirm SNS subscription"
-    - "PendingConfirmation"
-    - "SNS filter policy"
-    - "SNS delivery policy"
-    - "SNS dead-letter queue"
-    - "SNS subscription redrive"
-    - "SNS retry backoff"
-    - "RawMessageDelivery"
-    - "subscribe to SNS topic"
-    - "SNS subscription not receiving messages"
-    - "SNS message data protection"
-    - "cross-account SNS subscription"
-    - "SNS firehose subscription"
-    - "get-subscription-attributes"
-  invocation_schema: >-
-    Input: either (a) an SNS subscription configuration (topic ARN,
-    protocol, endpoint, filter policy, delivery policy, subscription
-    attributes) plus the intended operation (create, confirm,
-    set-filter-policy, set-delivery-policy, set-attributes, delete,
-    diagnose), OR (b) a subscription ARN + operation for live-account
-    execution. Output: deterministic OPERATION / VERDICT / TARGET /
-    PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per operation,
-    where VERDICT is one of READY, BLOCKED, COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Creating an SNS subscription to a topic (HTTP/HTTPS/SQS/Lambda/ email/sms/firehose/application), confirming a subscription stuck in PendingConfirmation, designing or debugging a subscription filter policy, configuring delivery retry policy and dead-letter queue (DLQ), setting subscription attributes (RawMessageDelivery), diagnosing why messages are not delivered to a subscription, or validating SNS message data protection posture for a subscription.
+  activation_triggers: create SNS subscription, confirm SNS subscription, PendingConfirmation, SNS filter policy, SNS delivery policy, SNS dead-letter queue, SNS subscription redrive, SNS retry backoff, RawMessageDelivery, subscribe to SNS topic, SNS subscription not receiving messages, SNS message data protection, cross-account SNS subscription, SNS firehose subscription, get-subscription-attributes
+  invocation_schema: 'Input: either (a) an SNS subscription configuration (topic ARN, protocol, endpoint, filter policy, delivery policy, subscription attributes) plus the intended operation (create, confirm, set-filter-policy, set-delivery-policy, set-attributes, delete, diagnose), OR (b) a subscription ARN + operation for live-account execution. Output: deterministic OPERATION / VERDICT / TARGET / PRE_CHECKS / STEPS / POST_VERIFY / NOTES block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: SNS, subscription, PendingConfirmation, ConfirmSubscription, filter policy, FilterPolicyScope, message attributes, delivery policy, retry backoff, dead-letter queue, DLQ, redrive policy, RawMessageDelivery, HTTP subscription, HTTPS subscription, SQS subscription, Lambda subscription, email subscription, firehose subscription, subscription attributes, SNS message data protection, cross-account subscription
+  tags: aws, sns, app-integration, subscription, messaging, filter-policy, delivery-policy, operate
+  keywords_tags: aws, sns, app-integration, subscription, messaging, operate
 ---
 
 # SNS Subscription Operator

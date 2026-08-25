@@ -1,95 +1,27 @@
 ---
 name: cloudwatch-alarm-operator
-description: >-
-  Operates CloudWatch alarm lifecycles safely — creates static-threshold,
-  metric-math, anomaly-detection, and composite alarms; tunes threshold /
-  period / DatapointsToAlarm / TreatMissingData; wires alarm actions
-  (SNS, Auto Scaling, EC2 recover/stop/reboot, Lambda via SNS, Systems
-  Manager via SNS); reduces alarm fatigue via composite rollups and
-  anomaly bands; and diagnoses alarms stuck in INSUFFICIENT_DATA or
-  failing to fire. Runs deterministic pre-checks (metric namespace,
-  dimensions, statistic, SNS topic existence, actions-enabled flag),
-  emits the exact put-metric-alarm / put-composite-alarm CLI behind a
-  CONFIRM gate, and verifies state transitions post-apply. Emits a
-  verdict (READY | BLOCKED | COMPLETED) per operation. Use when creating
-  CPU/memory/disk/error-rate/latency/SQS-depth/Lambda-throttle alarms,
-  building composite alarms to reduce alarm fatigue, converting static
-  thresholds to anomaly detection, diagnosing alarms stuck in
-  INSUFFICIENT_DATA, or tuning alarm sensitivity.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Operates CloudWatch alarm lifecycles safely — creates static-threshold, metric-math, anomaly-detection, and composite alarms; tunes threshold / period / DatapointsToAlarm / TreatMissingData; wires alarm actions (SNS, Auto Scaling, EC2 recover/stop/reboot, Lambda via SNS, Systems Manager via SNS); reduces alarm fatigue via composite rollups and anomaly bands; and diagnoses alarms stuck in INSUFFICIENT_DATA or failing to fire. Runs deterministic pre-checks (metric namespace, dimensions, statistic, SNS topic existence, actions-enabled flag), emits the exact put-metric-alarm / put-composite-alarm CLI behind a CONFIRM gate, and verifies state transitions post-apply. Emits a verdict (READY | BLOCKED | COMPLETED) per operation. Use when creating CPU/memory/disk/error-rate/latency/SQS-depth/Lambda-throttle alarms, building composite alarms to reduce alarm fatigue, converting static thresholds to anomaly detection, diagnosing alarms stuck in INSUFFICIENT_DATA, or tuning alarm sensitivity.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline plan classification. Live-account
-  operations use aws cloudwatch put-metric-alarm, put-composite-alarm,
-  describe-alarms, describe-alarm-history, get-metric-statistics,
-  put-anomaly-detector, enable-alarm-actions, disable-alarm-actions
-  (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - CloudWatch
-  - alarms
-  - put-metric-alarm
-  - put-composite-alarm
-  - anomaly detection
-  - metric math
-  - alarm actions
-  - SNS
-  - Auto Scaling
-  - EC2 recover
-  - alarm fatigue
-  - composite alarms
-  - INSUFFICIENT_DATA
-  - TreatMissingData
-  - threshold tuning
-  - DatapointsToAlarm
-  - EvaluationPeriods
-  - request-error-rate
-  - CPUUtilization
-  - Lambda throttles
-  - SQS queue depth
-tags: [cloudwatch, monitoring, alarms, observability, operate, anomaly-detection, composite-alarms]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline plan classification. Live-account operations use aws cloudwatch put-metric-alarm, put-composite-alarm, describe-alarms, describe-alarm-history, get-metric-statistics, put-anomaly-detector, enable-alarm-actions, disable-alarm-actions (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 4
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '4'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Management
   task_type: operate
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY | BLOCKED | COMPLETED"
-  when_to_use: >-
-    Creating or tuning CloudWatch alarms (CPU, memory, disk, error rate,
-    latency, SQS depth, Lambda errors/throttles), wiring alarm actions
-    (SNS, Auto Scaling, EC2 recover, Lambda, SSM), building composite
-    alarms to reduce alarm fatigue, converting static thresholds to
-    anomaly detection, diagnosing alarms stuck in INSUFFICIENT_DATA or
-    not firing, or auditing alarm state transitions.
-  activation_triggers:
-    - "create CloudWatch alarm"
-    - "tune CloudWatch alarm"
-    - "alarm stuck in INSUFFICIENT_DATA"
-    - "alarm not triggering"
-    - "composite alarm"
-    - "reduce alarm fatigue"
-    - "anomaly detection alarm"
-    - "metric math alarm"
-    - "request error rate alarm"
-    - "CPU threshold alarm"
-    - "memory alarm CloudWatch agent"
-    - "Lambda throttle alarm"
-    - "SQS queue depth alarm"
-    - "EC2 recover alarm action"
-    - "alarm actions SNS"
-  invocation_schema: >-
-    Input: either (a) an alarm operation intent (create, tune, diagnose,
-    composite-rollup) with target namespace/metric/dimensions/threshold,
-    OR (b) an alarm name for live-account tuning or diagnosis. Output:
-    deterministic OPERATION/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block
-    per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.
+  verdict_shape: READY | BLOCKED | COMPLETED
+  when_to_use: Creating or tuning CloudWatch alarms (CPU, memory, disk, error rate, latency, SQS depth, Lambda errors/throttles), wiring alarm actions (SNS, Auto Scaling, EC2 recover, Lambda, SSM), building composite alarms to reduce alarm fatigue, converting static thresholds to anomaly detection, diagnosing alarms stuck in INSUFFICIENT_DATA or not firing, or auditing alarm state transitions.
+  activation_triggers: create CloudWatch alarm, tune CloudWatch alarm, alarm stuck in INSUFFICIENT_DATA, alarm not triggering, composite alarm, reduce alarm fatigue, anomaly detection alarm, metric math alarm, request error rate alarm, CPU threshold alarm, memory alarm CloudWatch agent, Lambda throttle alarm, SQS queue depth alarm, EC2 recover alarm action, alarm actions SNS
+  invocation_schema: 'Input: either (a) an alarm operation intent (create, tune, diagnose, composite-rollup) with target namespace/metric/dimensions/threshold, OR (b) an alarm name for live-account tuning or diagnosis. Output: deterministic OPERATION/VERDICT/PRE_CHECKS/STEPS/POST_VERIFY block per operation, where VERDICT is one of READY, BLOCKED, COMPLETED.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: CloudWatch, alarms, put-metric-alarm, put-composite-alarm, anomaly detection, metric math, alarm actions, SNS, Auto Scaling, EC2 recover, alarm fatigue, composite alarms, INSUFFICIENT_DATA, TreatMissingData, threshold tuning, DatapointsToAlarm, EvaluationPeriods, request-error-rate, CPUUtilization, Lambda throttles, SQS queue depth
+  tags: cloudwatch, monitoring, alarms, observability, operate, anomaly-detection, composite-alarms
 ---
 
 # CloudWatch Alarm Operator

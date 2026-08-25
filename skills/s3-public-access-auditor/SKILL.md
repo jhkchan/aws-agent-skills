@@ -1,53 +1,23 @@
 ---
 name: s3-public-access-auditor
-description: "Audits S3 bucket configurations (Block Public Access settings, ACLs, bucket policies, Access Points, and Object Ownership) to determine which buckets are publicly accessible and provides specific remediation guidance. Use when reviewing S3 bucket security, checking for public access exposure, validating BPA settings, auditing bucket ACLs/policies for compliance, or inventorying exposure across hundreds of buckets in an account. Triggers: S3, bucket, public access, BPA, Block Public Access, bucket policy, ACL, AllUsers, AuthenticatedUsers, Principal:*, s3:GetObject, s3:PutObject, Access Point, Multi-Region Access Point, MRAP, Object Ownership, BucketOwnerEnforced, Object Writer, sourceIp, aws:sourceVpce, public read, public write, s3 exposure, data leak, bucket security, compliance check, bulk bucket audit."
-version: 0.4.0
-author: Jacky Chan — AWS Community Builder
+description: 'Audits S3 bucket configurations (Block Public Access settings, ACLs, bucket policies, Access Points, and Object Ownership) to determine which buckets are publicly accessible and provides specific remediation guidance. Use when reviewing S3 bucket security, checking for public access exposure, validating BPA settings, auditing bucket ACLs/policies for compliance, or inventorying exposure across hundreds of buckets in an account. Triggers: S3, bucket, public access, BPA, Block Public Access, bucket policy, ACL, AllUsers, AuthenticatedUsers, Principal:*, s3:GetObject, s3:PutObject, Access Point, Multi-Region Access Point, MRAP, Object Ownership, BucketOwnerEnforced, Object Writer, sourceIp, aws:sourceVpce, public read, public write, s3 exposure, data leak, bucket security, compliance check, bulk bucket audit.'
 license: Apache-2.0
-compatibility: "Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI calls needed for analysis — the skill reasons over provided config text. For live remediation, AWS CLI v2 with s3api/s3control/accesspoints access."
-keywords:
-  - aws
-  - s3
-  - cloudops
-  - security
-  - public-access
-  - bpa
-  - block-public-access
-  - bucket-policy
-  - acl
-  - audit
-  - compliance
-  - data-leak
-tags: [aws, s3, cloudops, security, public-access, bpa, bucket-policy, acl, audit, compliance]
-dependencies:
-  - aws-orchestrator
+compatibility: Requires an LLM agent runtime (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI calls needed for analysis — the skill reasons over provided config text. For live remediation, AWS CLI v2 with s3api/s3control/accesspoints access.
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Storage
-  verdict_shape: "PUBLIC | SAFE | AMBIGUOUS"
+  verdict_shape: PUBLIC | SAFE | AMBIGUOUS
   version: 0.4.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags: [aws, s3, cloudops, security, public-access, bpa, bucket-policy, acl, access-points, object-ownership, audit, compliance]
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - s3
-    - public access
-    - bpa
-    - block public access
-    - bucket policy
-    - acl
-    - access point
-    - multi-region access point
-    - object ownership
-    - audit
-    - compliance
-  when_to_use: "Invoke when the user supplies S3 bucket config (BPA settings, ACL JSON, bucket-policy JSON, Access Point ARN/policy, Object Ownership value) and asks to classify public exposure for one or many buckets; when triaging a potential S3 data-leak alert (GuardDuty finding, MACIE finding, security-hub rule); when hardening an account by inventorying all buckets for BPA/ACL/policy posture; or when validating that intended-public buckets (static website / CloudFront origin) are not over-exposed. Do NOT invoke for non-S3 storage (EBS/EFS/FSx) or for object-level encryption/KMS questions unless they affect the public-access verdict."
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, s3, cloudops, security, public-access, bpa, bucket-policy, acl, audit, compliance
+  dependencies: aws-orchestrator
+  keywords: aws, s3, cloudops, security, public-access, bpa, block-public-access, bucket-policy, acl, audit, compliance, data-leak
+  when_to_use: Invoke when the user supplies S3 bucket config (BPA settings, ACL JSON, bucket-policy JSON, Access Point ARN/policy, Object Ownership value) and asks to classify public exposure for one or many buckets; when triaging a potential S3 data-leak alert (GuardDuty finding, MACIE finding, security-hub rule); when hardening an account by inventorying all buckets for BPA/ACL/policy posture; or when validating that intended-public buckets (static website / CloudFront origin) are not over-exposed. Do NOT invoke for non-S3 storage (EBS/EFS/FSx) or for object-level encryption/KMS questions unless they affect the public-access verdict.
 ---
 
 # S3 Public-Access Auditor

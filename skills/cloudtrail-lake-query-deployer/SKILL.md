@@ -1,102 +1,26 @@
 ---
 name: cloudtrail-lake-query-deployer
-description: >-
-  Provisions AWS CloudTrail Lake with production defaults: event data
-  store (EDS) creation, ingestion (management events, data events,
-  Insights), SQL query via StartQuery/GetQueryResults, time-based
-  filtering, advanced event selectors, federation to Athena/Athena
-  workgroup, multi-account EDS (via Organizations), retention (7-3653
-  days), billing model (per GB ingested + per GB scanned), CloudWatch
-  integration for query alerts, saved queries, common forensic query
-  patterns (who deleted X, what did user Y do), and data protection
-  policy (mask PII in events). Emits a READY_TO_DEPLOY checklist with
-  verification commands. Use when creating a CloudTrail Lake event
-  data store, configuring multi-account event ingestion, running
-  forensic SQL queries on CloudTrail events, setting up Athena
-  federation, or masking PII in event data. Triggers: cloudtrail lake,
-  event data store, cloudtrail lake query, start query cloudtrail,
-  athena federation cloudtrail, cloudtrail forensic query, EDS
-  retention, cloudtrail data protection, multi-account cloudtrail lake.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions AWS CloudTrail Lake with production defaults: event data store (EDS) creation, ingestion (management events, data events, Insights), SQL query via StartQuery/GetQueryResults, time-based filtering, advanced event selectors, federation to Athena/Athena workgroup, multi-account EDS (via Organizations), retention (7-3653 days), billing model (per GB ingested + per GB scanned), CloudWatch integration for query alerts, saved queries, common forensic query patterns (who deleted X, what did user Y do), and data protection policy (mask PII in events). Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a CloudTrail Lake event data store, configuring multi-account event ingestion, running forensic SQL queries on CloudTrail events, setting up Athena federation. Triggers: cloudtrail lake, event data store, cloudtrail lake query, start query cloudtrail, athena federation cloudtrail, cloudtrail forensic query, EDS retention, cloudtrail data protection, multi-account cloudtrail lake.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with cloudtrail-lake
-  and athena access. Works with Terraform
-  aws_cloudtrail_event_data_store resources and CloudFormation
-  AWS::CloudTrail::EventDataStore templates.
-keywords:
-  - aws
-  - cloudtrail lake
-  - event data store
-  - EDS
-  - cloudtrail query
-  - forensic query
-  - athena federation
-  - data protection
-  - multi-account cloudtrail
-  - cloudops
-  - deploy
-  - governance
-tags:
-  - aws
-  - cloudtrail-lake
-  - cloudops
-  - deploy
-  - governance
-  - event-data-store
-  - auditing
-  - forensics
-  - sql-query
-  - data-protection
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with cloudtrail-lake and athena access. Works with Terraform aws_cloudtrail_event_data_store resources and CloudFormation AWS::CloudTrail::EventDataStore templates.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Governance
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - cloudtrail-lake
-    - cloudops
-    - deploy
-    - governance
-    - event-data-store
-    - auditing
-    - forensics
-    - sql-query
-    - data-protection
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - cloudtrail lake
-    - event data store
-    - cloudtrail lake query
-    - start query cloudtrail
-    - athena federation cloudtrail
-    - cloudtrail forensic query
-    - EDS retention
-    - cloudtrail data protection
-    - multi-account cloudtrail lake
-  when_to_use: >-
-    Invoke when the user wants to create CloudTrail Lake event data
-    stores, configure multi-account event ingestion, run SQL forensic
-    queries on CloudTrail events, set up Athena federation, configure
-    data protection (PII masking), or manage EDS retention. Do NOT
-    invoke for standard CloudTrail trails (use cloudtrail skills),
-    CloudWatch Logs (use cloudwatch skills), or AWS Config (use config
-    skills).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, cloudtrail-lake, cloudops, deploy, governance, event-data-store, auditing, forensics, sql-query, data-protection
+  dependencies: aws-orchestrator
+  keywords: aws, cloudtrail lake, event data store, EDS, cloudtrail query, forensic query, athena federation, data protection, multi-account cloudtrail, cloudops, deploy, governance
+  when_to_use: Invoke when the user wants to create CloudTrail Lake event data stores, configure multi-account event ingestion, run SQL forensic queries on CloudTrail events, set up Athena federation, configure data protection (PII masking), or manage EDS retention. Do NOT invoke for standard CloudTrail trails (use cloudtrail skills), CloudWatch Logs (use cloudwatch skills), or AWS Config (use config skills).
 ---
 
 # CloudTrail Lake Query Deployer

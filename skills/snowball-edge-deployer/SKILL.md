@@ -1,105 +1,26 @@
 ---
 name: snowball-edge-deployer
-description: >-
-  Deploys AWS Snowball Edge with production defaults: job creation
-  (import vs export), device type selection (Storage Optimized, Compute
-  Optimized, Snowcone), S3 bucket configuration for import/export,
-  Lambda functions for compute, NFS interface for data transfer, IoT
-  certificate for device pairing, shipping and tracking, data transfer
-  reporting, cluster mode (5-10 nodes for compute), device unlock,
-  return shipping, data validation report, EKS Anywhere on Snowball,
-  and long-term rental. Emits a READY_TO_DEPLOY checklist with
-  verification commands. Use when creating a Snowball Edge job, setting
-  up a data migration device, configuring cluster mode, deploying EKS
-  Anywhere, or transferring bulk data. Triggers: create snowball job,
-  snowball edge import, snowball edge export, snowball device unlock,
-  snowball cluster mode, snowball nfs transfer, eks anywhere snowball,
-  snowcone deploy, snowball data migration.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Deploys AWS Snowball Edge with production defaults: job creation (import vs export), device type selection (Storage Optimized, Compute Optimized, Snowcone), S3 bucket configuration for import/export, Lambda functions for compute, NFS interface for data transfer, IoT certificate for device pairing, shipping and tracking, data transfer reporting, cluster mode (5-10 nodes for compute), device unlock, return shipping, data validation report, EKS Anywhere on Snowball, and long-term rental. Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Snowball Edge job, setting up a data migration device, configuring cluster mode, deploying EKS Anywhere, or transferring bulk data. Triggers: create snowball job, snowball edge import, snowball edge export, snowball device unlock, snowball cluster mode, snowball nfs transfer, eks anywhere snowball, snowcone deploy, snowball data migration.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with snowball and
-  s3 access. Works with Terraform aws_snowball_job resources and
-  CloudFormation AWS::Snowball::Job templates. Requires the snowballEdge
-  client (opnix) on the receiving device for unlock and data transfer.
-keywords:
-  - aws
-  - snowball edge
-  - snowball
-  - snowcone
-  - data migration
-  - bulk transfer
-  - cloudops
-  - deploy
-  - provisioning
-  - import job
-  - export job
-  - cluster mode
-  - eks anywhere
-  - nfs
-  - lambda
-  - device unlock
-  - iot certificate
-tags:
-  - aws
-  - snowball-edge
-  - snowball
-  - snowcone
-  - cloudops
-  - deploy
-  - migration
-  - provisioning
-  - data-transfer
-  - cluster-mode
-  - eks-anywhere
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with snowball and s3 access. Works with Terraform aws_snowball_job resources and CloudFormation AWS::Snowball::Job templates. Requires the snowballEdge client (opnix) on the receiving device for unlock and data transfer.'
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Migration
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - snowball-edge
-    - snowball
-    - cloudops
-    - deploy
-    - migration
-    - data-transfer
-    - cluster-mode
-    - eks-anywhere
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create snowball job
-    - snowball edge import
-    - snowball edge export
-    - snowball device unlock
-    - snowball cluster mode
-    - snowball nfs transfer
-    - eks anywhere snowball
-    - snowball data migration
-  when_to_use: >-
-    Invoke when the user wants to create an AWS Snowball Edge job (import
-    or export), select a device type (Storage Optimized, Compute
-    Optimized, Snowcone), configure S3 buckets for data transfer, set up
-    NFS for data transfer, unlock a Snowball device, configure cluster
-    mode for compute resiliency, deploy Lambda functions on Snowball,
-    set up EKS Anywhere on Snowball, or manage long-term rental. Do NOT
-    invoke for AWS DataSync (use datasync skills), AWS Transfer Family
-    (SFTP), or online S3 replication (use S3 Cross-Region Replication).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, snowball-edge, snowball, snowcone, cloudops, deploy, migration, provisioning, data-transfer, cluster-mode, eks-anywhere
+  dependencies: aws-orchestrator
+  keywords: aws, snowball edge, snowball, snowcone, data migration, bulk transfer, cloudops, deploy, provisioning, import job, export job, cluster mode, eks anywhere, nfs, lambda, device unlock, iot certificate
+  when_to_use: Invoke when the user wants to create an AWS Snowball Edge job (import or export), select a device type (Storage Optimized, Compute Optimized, Snowcone), configure S3 buckets for data transfer, set up NFS for data transfer, unlock a Snowball device, configure cluster mode for compute resiliency, deploy Lambda functions on Snowball, set up EKS Anywhere on Snowball, or manage long-term rental. Do NOT invoke for AWS DataSync (use datasync skills), AWS Transfer Family (SFTP), or online S3 replication (use S3 Cross-Region Replication).
 ---
 
 # Snowball Edge Deployer

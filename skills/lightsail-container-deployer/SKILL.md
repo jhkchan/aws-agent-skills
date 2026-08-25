@@ -1,103 +1,26 @@
 ---
 name: lightsail-container-deployer
-description: >-
-  Provisions Amazon Lightsail Container Services with production
-  defaults: container service creation (power scale nano/micro/small/
-  medium/large/xlarge), deployment (container image from ECR or public
-  registry), public endpoint (HTTPS domain, health check path), ECR
-  private registry auth (access key and secret), environment variables,
-  secrets via Lightsail container parameters, scale (number of nodes),
-  container port mapping, managed TLS certificate, custom domain via
-  DNS CNAME, CloudWatch Logs integration, and cost predictability
-  (all-inclusive pricing). Emits a READY_TO_DEPLOY checklist with
-  verification commands. Use when creating a Lightsail container
-  service, deploying a container, configuring ECR private auth, setting
-  up a public endpoint, or managing scale. Triggers: create lightsail
-  container, deploy container service, lightsail power scale, lightsail
-  ECR auth, container public endpoint, lightsail environment variables,
-  lightsail secrets, lightsail custom domain, lightsail managed TLS.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: 'Provisions Amazon Lightsail Container Services with production defaults: container service creation (power scale nano/micro/small/ medium/large/xlarge), deployment (container image from ECR or public registry), public endpoint (HTTPS domain, health check path), ECR private registry auth (access key and secret), environment variables, secrets via Lightsail container parameters, scale (number of nodes), container port mapping, managed TLS certificate, custom domain via DNS CNAME, CloudWatch Logs integration, and cost predictability (all-inclusive pricing). Emits a READY_TO_DEPLOY checklist with verification commands. Use when creating a Lightsail container service, deploying a container, configuring ECR private auth, setting up a public endpoint, or managing scale. Triggers: create lightsail container, deploy container service, lightsail power scale, lightsail ECR auth, container public endpoint, lightsail environment variables, lightsail secrets, lightsail custom domain, lightsail managed TLS.'
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). For live deployment: AWS CLI v2 with lightsail access
-  (and ECR access if pulling from a private registry). Works with
-  Terraform aws_lightsail_container_service /
-  aws_lightsail_container_deployment_version resources and CloudFormation
-  via AWS::Lightsail::Container templates (where supported).
-keywords:
-  - aws
-  - lightsail
-  - container service
-  - cloudops
-  - deploy
-  - provisioning
-  - power scale
-  - ecr auth
-  - managed tls
-  - public endpoint
-  - container deployment
-  - cost predictable
-tags:
-  - aws
-  - lightsail
-  - container
-  - cloudops
-  - deploy
-  - compute
-  - provisioning
-  - ecr
-  - managed-tls
-  - public-endpoint
-dependencies:
-  - aws-orchestrator
+compatibility: 'Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). For live deployment: AWS CLI v2 with lightsail access (and ECR access if pulling from a private registry). Works with Terraform aws_lightsail_container_service / aws_lightsail_container_deployment_version resources and CloudFormation via AWS::Lightsail::Container templates (where supported).'
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Compute
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
   version: 0.1.0
-  author: "Jacky Chan — AWS Community Builder"
-  tags:
-    - aws
-    - lightsail
-    - container
-    - cloudops
-    - deploy
-    - compute
-    - provisioning
-    - ecr
-    - managed-tls
-    - public-endpoint
-  dependencies:
-    - aws-orchestrator
-  keywords:
-    - create lightsail container
-    - deploy container service
-    - lightsail power scale
-    - lightsail ecr auth
-    - container public endpoint
-    - lightsail environment variables
-    - lightsail secrets
-    - lightsail custom domain
-    - lightsail managed tls
-  when_to_use: >-
-    Invoke when the user wants to create an Amazon Lightsail Container
-    Service, deploy a container image (from ECR or public registry),
-    configure ECR private registry auth, set up a public endpoint with
-    managed TLS, configure environment variables and secrets, manage
-    scale (node count), map container ports, or set up a custom domain.
-    Do NOT invoke for ECS/EKS (use ECS/EKS skills), App Runner (use
-    App Runner skills), Lambda (use Lambda skills), or Elastic Beanstalk
-    (use Beanstalk skills).
+  author: Jacky Chan — AWS Community Builder
+  tags: aws, lightsail, container, cloudops, deploy, compute, provisioning, ecr, managed-tls, public-endpoint
+  dependencies: aws-orchestrator
+  keywords: aws, lightsail, container service, cloudops, deploy, provisioning, power scale, ecr auth, managed tls, public endpoint, container deployment, cost predictable
+  when_to_use: Invoke when the user wants to create an Amazon Lightsail Container Service, deploy a container image (from ECR or public registry), configure ECR private registry auth, set up a public endpoint with managed TLS, configure environment variables and secrets, manage scale (node count), map container ports, or set up a custom domain. Do NOT invoke for ECS/EKS (use ECS/EKS skills), App Runner (use App Runner skills), Lambda (use Lambda skills), or Elastic Beanstalk (use Beanstalk skills).
 ---
 
 # Lightsail Container Deployer

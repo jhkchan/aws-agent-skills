@@ -1,71 +1,24 @@
 ---
 name: billing-account-auditor
-description: >-
-  Audits AWS account billing posture across five dimensions — root account
-  security (MFA + access keys), IAM user/group billing access delegation vs
-  root-only, AWS Cost Anomaly Detection enablement, billing budgets/alerts
-  coverage, and free-tier usage alerts. Emits a deterministic verdict
-  (ROOT_BILLING | NO_ANOMALY_DETECTION | CONFIG_GAP | OK) per account with
-  enumerated findings and specific CLI remediation. Use when reviewing
-  billing access, checking cost anomaly detection, auditing budget coverage,
-  validating root MFA, or hardening billing posture for FinOps compliance.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Audits AWS account billing posture across five dimensions — root account security (MFA + access keys), IAM user/group billing access delegation vs root-only, AWS Cost Anomaly Detection enablement, billing budgets/alerts coverage, and free-tier usage alerts. Emits a deterministic verdict (ROOT_BILLING | NO_ANOMALY_DETECTION | CONFIG_GAP | OK) per account with enumerated findings and specific CLI remediation. Use when reviewing billing access, checking cost anomaly detection, auditing budget coverage, validating root MFA, or hardening billing posture for FinOps compliance.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex,
-  Gemini). No AWS CLI required for offline configuration classification.
-  Live-account audits use aws iam get-account-summary, aws ce
-  list-cost-anomaly-monitors, aws budgets describe-budgets, and aws ce
-  get-anomaly-subscriptions (AWS CLI v2, SSO or key-based credentials).
-keywords:
-  - AWS Billing
-  - billing access
-  - root MFA
-  - Cost Anomaly Detection
-  - billing budgets
-  - free-tier alerts
-  - aws-portal
-  - Cost Explorer
-  - FinOps
-  - billing audit
-  - cost governance
-  - IAM billing delegation
-  - account security
-  - budget alerts
-  - billing preferences
-tags: [billing, finops, cost-management, security, root-mfa, anomaly-detection, audit]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline configuration classification. Live-account audits use aws iam get-account-summary, aws ce list-cost-anomaly-monitors, aws budgets describe-budgets, and aws ce get-anomaly-subscriptions (AWS CLI v2, SSO or key-based credentials).
 metadata:
   domain: aws-cloudops
   complexity: medium
-  requires_llm: true
-  phase: 2
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '2'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: FinOps
-  verdict_shape: "ROOT_BILLING | NO_ANOMALY_DETECTION | CONFIG_GAP | OK"
-  when_to_use: >-
-    Reviewing billing access delegation, checking if Cost Anomaly Detection is
-    enabled, auditing budget/alert coverage, validating root MFA, or hardening
-    billing posture before a FinOps compliance review.
-  activation_triggers:
-    - "audit my billing configuration"
-    - "check billing access"
-    - "is Cost Anomaly Detection enabled"
-    - "do I have billing budgets"
-    - "is root MFA enabled"
-    - "billing alerts configured"
-    - "free tier usage alerts"
-    - "who can access billing"
-    - "root account billing access"
-    - "billing posture audit"
-  invocation_schema: >-
-    Input: either (a) an account billing configuration snapshot (root MFA
-    status, IAM billing access setting, IAM billing policies, CAD monitors,
-    budgets, free-tier alert preference), OR (b) an account-id for
-    live-account audit. Output: deterministic ACCOUNT/VERDICT/RISK/REASON/
-    FINDINGS/REMEDIATION block, where VERDICT is ROOT_BILLING,
-    NO_ANOMALY_DETECTION, CONFIG_GAP, or OK.
+  verdict_shape: ROOT_BILLING | NO_ANOMALY_DETECTION | CONFIG_GAP | OK
+  when_to_use: Reviewing billing access delegation, checking if Cost Anomaly Detection is enabled, auditing budget/alert coverage, validating root MFA, or hardening billing posture before a FinOps compliance review.
+  activation_triggers: audit my billing configuration, check billing access, is Cost Anomaly Detection enabled, do I have billing budgets, is root MFA enabled, billing alerts configured, free tier usage alerts, who can access billing, root account billing access, billing posture audit
+  invocation_schema: 'Input: either (a) an account billing configuration snapshot (root MFA status, IAM billing access setting, IAM billing policies, CAD monitors, budgets, free-tier alert preference), OR (b) an account-id for live-account audit. Output: deterministic ACCOUNT/VERDICT/RISK/REASON/ FINDINGS/REMEDIATION block, where VERDICT is ROOT_BILLING, NO_ANOMALY_DETECTION, CONFIG_GAP, or OK.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS Billing, billing access, root MFA, Cost Anomaly Detection, billing budgets, free-tier alerts, aws-portal, Cost Explorer, FinOps, billing audit, cost governance, IAM billing delegation, account security, budget alerts, billing preferences
+  tags: billing, finops, cost-management, security, root-mfa, anomaly-detection, audit
 ---
 
 # Billing Account Auditor

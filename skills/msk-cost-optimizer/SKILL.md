@@ -1,44 +1,15 @@
 ---
 name: msk-cost-optimizer
 description: Optimises Amazon MSK cost across seven dimensions — broker type right-sizing (CloudWatch BytesInPerSec, KafkaDataLogsDiskUsed, consumer lag MaxOffsetLag), broker count optimisation (minimum 3 for HA, reduce excess on low-throughput clusters), EBS storage optimisation (storage-auto-scaling vs fixed gp3, right-size to retention needs), MSK Serverless vs provisioned (break-even ~50 MB/s ingress), partition count impact (excessive partitions add broker overhead), data retention optimisation (log retention hours, compacted topics for changelog workloads), and Graviton broker migration (Kafka 3.x, kafka.m7g ~20% cheaper). Covers MSK Cluster Tier (Express) and MSK with KRaft. Emits OPTIMIZED, OPPORTUNITY_FOUND, or ALREADY_OPTIMAL per cluster with estimated monthly savings.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
 license: Apache-2.0
-compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline classification works from pasted cluster configuration, CloudWatch summaries, and billing line items. Live-account optimisation uses aws kafka describe-cluster, describe-cluster-v2, list-clusters-v2, aws kafka describe-configuration, aws cloudwatch get-metric-statistics for AWS/Kafka BytesInPerSec, BytesOutPerSec, KafkaDataLogsDiskUsed, ConsumerLagMetrics MaxOffsetLag, CpuUser, CpuSystem, aws ce get-cost-and-usage filtered to Amazon MSK USAGE_TYPEs (MSK:BrokerUsage, MSK:ServerlessUsage), and aws kafka update-broker-storage / update-cluster-configuration for remediation (AWS CLI v2, SSO or key-based credentials). Pricing is us-east-1 published rates as of 2026; re-state regional rates before producing dollar estimates for other regions.
-keywords:
-- Amazon MSK
-- Amazon Managed Streaming for Apache Kafka
-- MSK Serverless
-- MSK Express
-- MSK Cluster Tier
-- MSK KRaft
-- Graviton brokers
-- kafka.m7g
-- broker right-sizing
-- EBS storage optimisation
-- log retention
-- compacted topics
-- partition count
-- consumer lag
-- KafkaDataLogsDiskUsed
-- data retention
-- FinOps
-- streaming cost
-tags:
-- msk
-- kafka
-- analytics
-- cost-optimization
-- finops
-- right-sizing
-- serverless
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). Offline classification works from pasted cluster configuration, CloudWatch summaries, and billing line items. Live-account optimisation uses aws kafka describe-cluster, describe-cluster-v2, list-clusters-v2, aws kafka describe-configuration, aws cloudwatch get-metric-statistics for AWS/Kafka BytesInPerSec, BytesOutPerSec, KafkaDataLogsDiskUsed, ConsumerLagMetrics MaxOffsetLag, CpuUser, CpuSystem, aws ce...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 3
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '3'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Analytics
   task_type: optimize
   skill_class: capability
@@ -46,24 +17,13 @@ metadata:
   verdict_shape: OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL
   when_to_use: Reviewing Amazon MSK cluster spend, right-sizing Kafka broker types, evaluating Graviton brokers (kafka.m7g vs kafka.m5), deciding between MSK Serverless and provisioned (break-even ~50 MB/s), optimising broker count (minimum 3 for HA, reduce excess), auditing EBS storage allocation vs actual disk usage, tuning log retention hours or compacted topics for storage savings, or evaluating MSK Cluster Tier (Express) and MSK with KRaft for cost.
   when_not_to_use: Self-managed Kafka on EC2 cost optimisation (this skill covers the managed MSK service only), Kafka Connect or MSK Connect cost optimisation (use kafka-connect-troubleshooter or a Connect specialist), Kinesis Data Streams cost optimisation (different service), Kafka performance tuning or partition rebalancing as the primary goal (use a Kafka operations workflow; this skill uses metrics only to identify cost waste), or MSK security or TLS configuration (use a security audit workflow).
-  activation_triggers:
-  - optimise MSK cost
-  - right-size MSK broker
-  - MSK Graviton migration
-  - kafka.m7g vs kafka.m5
-  - MSK Serverless vs provisioned
-  - MSK broker count
-  - MSK EBS storage optimisation
-  - MSK log retention
-  - MSK compacted topics
-  - MSK partition count
-  - MSK Cluster Tier Express
-  - MSK KRaft
-  - MSK consumer lag cost
-  - KafkaDataLogsDiskUsed
-  - reduce MSK bill
+  activation_triggers: optimise MSK cost, right-size MSK broker, MSK Graviton migration, kafka.m7g vs kafka.m5, MSK Serverless vs provisioned, MSK broker count, MSK EBS storage optimisation, MSK log retention, MSK compacted topics, MSK partition count, MSK Cluster Tier Express, MSK KRaft, MSK consumer lag cost, KafkaDataLogsDiskUsed, reduce MSK bill
   invocation_schema: 'Input: either (a) an MSK cluster ARN or identifier + live-account context, (b) a cluster configuration document (broker type, broker count, EBS volume size, partition count, retention hours, Kafka version, pricing model, CloudWatch metrics), OR (c) a fleet description for batch optimisation. Output: a deterministic TARGET / VERDICT / REASON / RECOMMENDATION / ESTIMATED_SAVINGS / MIGRATION_STEPS block per cluster, where VERDICT ∈ {OPTIMIZED, OPPORTUNITY_FOUND, ALREADY_OPTIMAL}.'
   invocation_example: "# Minimal valid input (offline classification):\nCluster: events-prod-msk\nKafka Version: 3.5.1\nRegion: us-east-1\nBroker Type: kafka.m5.large (2 vCPU, 8 GB)\nBroker Count: 6\nEBS Volume: 1 TB gp3 per broker\nPartitions: 120 across 15 topics\nLog Retention: 168 hours (7 days)\nCompacted Topics: none\nPricing: On-Demand (no commit)\nCloudWatch metrics (last 30 days):\n  - BytesInPerSec per broker: avg=5, max=12\n  - KafkaDataLogsDiskUsed: avg=25%, max=35%\n  - MaxOffsetLag: avg=1,000 (low consumer lag)\nEmit the standard optimisation block (TARGET, VERDICT, REASON,\nRECOMMENDATION, ESTIMATED_SAVINGS, MIGRATION_STEPS)."
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: Amazon MSK, Amazon Managed Streaming for Apache Kafka, MSK Serverless, MSK Express, MSK Cluster Tier, MSK KRaft, Graviton brokers, kafka.m7g, broker right-sizing, EBS storage optimisation, log retention, compacted topics, partition count, consumer lag, KafkaDataLogsDiskUsed, data retention, FinOps, streaming cost
+  tags: msk, kafka, analytics, cost-optimization, finops, right-sizing, serverless
 ---
 
 # MSK Cost Optimizer

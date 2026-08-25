@@ -1,121 +1,27 @@
 ---
 name: appmesh-deployer
-description: >-
-  Provisions production-grade AWS App Mesh service meshes — mesh
-  with egress filter (DROP_ALL vs ALLOW_ALL), virtual nodes with
-  Cloud Map or DNS service discovery, virtual routers with weighted
-  routes (HTTP / TCP / gRPC), retry and timeout policies, virtual
-  gateways for ingress (ALB/NLB → gateway → mesh), mutual TLS via
-  ACM Private CA and SDS, circuit breaking (connection pool +
-  outlier detection), Envoy sidecar injection (EKS App Mesh
-  Controller, ECS task, EC2 binary), and latest features (App Mesh
-  Gateway Controller for EKS via CRDs). Runs pre-checks (Cloud Map
-  namespace exists, ACM Private CA ACTIVE, IAM appmesh:Create*
-  granted, EKS namespace labeled) and emits the exact appmesh
-  create-mesh / create-virtual-node / create-route /
-  create-virtual-gateway CLI behind a CONFIRM gate. Emits a
-  verdict (READY_TO_DEPLOY | PREREQUISITES_MISSING). Use when
-  provisioning a mesh, configuring canary routing,
-  exposing services via a virtual gateway, hardening east-west
-  with mTLS, or adopting the Gateway Controller.
-version: 0.1.0
-author: Jacky Chan — AWS Community Builder
+description: Provisions production-grade AWS App Mesh service meshes — mesh with egress filter (DROP_ALL vs ALLOW_ALL), virtual nodes with Cloud Map or DNS service discovery, virtual routers with weighted routes (HTTP / TCP / gRPC), retry and timeout policies, virtual gateways for ingress (ALB/NLB → gateway → mesh), mutual TLS via ACM Private CA and SDS, circuit breaking (connection pool + outlier detection), Envoy sidecar injection (EKS App Mesh Controller, ECS task, EC2 binary), and latest features (App Mesh Gateway Controller for EKS via CRDs). Runs pre-checks (Cloud Map namespace exists, ACM Private CA ACTIVE, IAM appmesh:Create* granted, EKS namespace labeled) and emits the exact appmesh create-mesh / create-virtual-node / create-route / create-virtual-gateway CLI behind a CONFIRM gate. Emits a verdict (READY_TO_DEPLOY | PREREQUISITES_MISSING). Use when provisioning a mesh, configuring canary routing, exposing services via a virtual gateway, hardening east-west with mTLS, or adopting the Gateway Controller.
 license: Apache-2.0
-compatibility: >-
-  Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf,
-  Codex, Gemini). No AWS CLI required for offline architecture
-  planning. Live deployment uses aws appmesh create-mesh,
-  create-virtual-node, create-virtual-router, create-route,
-  create-virtual-gateway, create-gateway-route,
-  create-virtual-service, describe-mesh, list-meshes,
-  list-virtual-nodes, list-virtual-routers, list-routes,
-  servicediscovery create-service, create-http-namespace,
-  acm-pca create-certificate-authority (AWS CLI v2, SSO or key-based
-  credentials). For EKS, also requires kubectl and the App Mesh
-  Controller custom resource definitions.
-keywords:
-  - AWS App Mesh
-  - service mesh
-  - Envoy
-  - virtual node
-  - virtual router
-  - virtual service
-  - virtual gateway
-  - gateway route
-  - weighted routing
-  - blue/green
-  - canary
-  - http route
-  - tcp route
-  - grpc route
-  - retry policy
-  - timeout policy
-  - circuit breaking
-  - outlier detection
-  - connection pool
-  - mutual TLS
-  - mTLS
-  - ACM Private CA
-  - Cloud Map
-  - service discovery
-  - sidecar injection
-  - egress filter
-  - App Mesh Controller
-  - EKS
-  - App Mesh Gateway Controller
-  - ingress
-tags: [appmesh, networking, deploy, service-mesh, envoy, weighted-routing, virtual-gateway, mtls, cloud-map, circuit-breaking, eks, grpc]
+compatibility: Agent runtime that reads SKILL.md (Claude Code, Cursor, Windsurf, Codex, Gemini). No AWS CLI required for offline architecture planning. Live deployment uses aws appmesh create-mesh, create-virtual-node, create-virtual-router, create-route, create-virtual-gateway, create-gateway-route, create-virtual-service, describe-mesh, list-meshes, list-virtual-nodes, list-virtual-routers, list-routes, servicediscovery create-service, create-http-namespace, acm-pca create-certificate-authority (AWS CLI...
 metadata:
   domain: aws-cloudops
   complexity: high
-  requires_llm: true
-  phase: 1
-  supports_pipeline: true
-  entry_point: false
+  requires_llm: 'true'
+  phase: '1'
+  supports_pipeline: 'true'
+  entry_point: 'false'
   family: Networking
   task_type: deploy
   skill_class: capability
   lifecycle_status: active
-  verdict_shape: "READY_TO_DEPLOY | PREREQUISITES_MISSING"
-  when_to_use: >-
-    Provisioning a new App Mesh service mesh, configuring virtual
-    nodes with service discovery, authoring virtual routers with
-    weighted/canary/blue-green routes, exposing services outside the
-    mesh via a virtual gateway, hardening east-west traffic with
-    mutual TLS, designing retry/timeout/circuit-breaker policies, or
-    adopting the App Mesh Gateway Controller for EKS.
-  activation_triggers:
-    - "create App Mesh"
-    - "deploy service mesh"
-    - "App Mesh virtual node"
-    - "App Mesh virtual router"
-    - "App Mesh weighted routing"
-    - "App Mesh canary deployment"
-    - "App Mesh blue/green"
-    - "App Mesh virtual gateway"
-    - "App Mesh ingress"
-    - "App Mesh mutual TLS"
-    - "App Mesh mTLS"
-    - "App Mesh retry policy"
-    - "App Mesh timeout policy"
-    - "App Mesh circuit breaker"
-    - "Envoy sidecar injection"
-    - "App Mesh Cloud Map"
-    - "App Mesh Controller EKS"
-    - "App Mesh Gateway Controller"
-  invocation_schema: >-
-    Input shape (one of): (a) a deployment specification including
-    mesh name, egress filter, virtual nodes (with service discovery
-    backend), virtual routers with routes (HTTP/TCP/gRPC match,
-    weighted targets, retry/timeout), optional virtual gateway (with
-    ingress listeners), optional mTLS configuration, and optional
-    EKS namespace mapping; (b) a partial spec for interactive
-    refinement (e.g., "App Mesh with weighted routing between two
-    versions of the checkout service"); (c) an existing mesh name
-    for architecture review against the well-architected checklist.
-    Output shape: { MESH_SPEC, VERDICT, ARCHITECTURE, CHECKLIST[],
-    FINDINGS[], DEPLOY_COMMANDS } where VERDICT ∈ {
-    READY_TO_DEPLOY, PREREQUISITES_MISSING, ERROR }.
+  verdict_shape: READY_TO_DEPLOY | PREREQUISITES_MISSING
+  when_to_use: Provisioning a new App Mesh service mesh, configuring virtual nodes with service discovery, authoring virtual routers with weighted/canary/blue-green routes, exposing services outside the mesh via a virtual gateway, hardening east-west traffic with mutual TLS, designing retry/timeout/circuit-breaker policies, or adopting the App Mesh Gateway Controller for EKS.
+  activation_triggers: create App Mesh, deploy service mesh, App Mesh virtual node, App Mesh virtual router, App Mesh weighted routing, App Mesh canary deployment, App Mesh blue/green, App Mesh virtual gateway, App Mesh ingress, App Mesh mutual TLS, App Mesh mTLS, App Mesh retry policy, App Mesh timeout policy, App Mesh circuit breaker, Envoy sidecar injection, App Mesh Cloud Map, App Mesh Controller EKS, App Mesh Gateway Controller
+  invocation_schema: 'Input shape (one of): (a) a deployment specification including mesh name, egress filter, virtual nodes (with service discovery backend), virtual routers with routes (HTTP/TCP/gRPC match, weighted targets, retry/timeout), optional virtual gateway (with ingress listeners), optional mTLS configuration, and optional EKS namespace mapping; (b) a partial spec for interactive refinement (e.g., "App Mesh with weighted routing between two versions of the checkout service"); (c) an existing mesh name for architecture review against the well-architected checklist. Output shape: { MESH_SPEC, VERDICT, ARCHITECTURE, CHECKLIST[], FINDINGS[], DEPLOY_COMMANDS } where VERDICT ∈ { READY_TO_DEPLOY, PREREQUISITES_MISSING, ERROR }.'
+  version: 0.1.0
+  author: Jacky Chan — AWS Community Builder
+  keywords: AWS App Mesh, service mesh, Envoy, virtual node, virtual router, virtual service, virtual gateway, gateway route, weighted routing, blue/green, canary, http route, tcp route, grpc route, retry policy, timeout policy, circuit breaking, outlier detection, connection pool, mutual TLS, mTLS, ACM Private CA, Cloud Map, service discovery, sidecar injection, egress filter, App Mesh Controller, EKS, App Mesh Gateway Controller, ingress
+  tags: appmesh, networking, deploy, service-mesh, envoy, weighted-routing, virtual-gateway, mtls, cloud-map, circuit-breaking, eks, grpc
 ---
 
 # App Mesh Deployer
