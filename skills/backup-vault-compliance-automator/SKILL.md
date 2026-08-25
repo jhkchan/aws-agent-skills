@@ -132,66 +132,11 @@ GAP: Run list-backup-vaults and describe-backup-vault, then supply the complianc
 
 ### Step 0: Expert knowledge — non-obvious AWS Backup behaviors
 
-These behaviors change the compliance design if ignored:
-
-- **Vault Lock cool-off period is mandatory.** When creating a
-  compliance-mode lock, AWS enforces a minimum 3-day cool-off
-  (`ChangeableForDays`). During cool-off the lock is removable; after
-  expiry it is permanent and irreversible. Compliance mode is NOT
-  immediately immutable.
-
-- **A backup vault policy is NOT a vault lock.** The policy controls
-  IAM access (who can write/read/delete). The lock controls
-  immutability (whether deletion is possible at all). Both are needed
-  for full compliance.
-
-- **Backup Framework (2024) provides native compliance reporting.**
-  Declarative controls (encryption, frequency, retention) with
-  automated evaluation. Reduces need for custom Config rules for
-  common checks.
-
-- **Cross-account backup requires destination vault policy to allow
-  the source account.** A missing `aws:PrincipalAccount` condition
-  is the most common cause of cross-account backup failures.
-
-- **`StartBackupJob` does NOT validate the target vault's encryption
-  policy at submission.** The job may be accepted but fail at
-  completion. Always poll `describe-backup-job` for final status.
-
-- **Recovery point deletion respects Vault Lock retention.** Calling
-  `delete-recovery-point` on a locked recovery point fails with
-  `InvalidParameterValueException`. The lock overrides IAM.
-
-- **Tag-based backup selections are dynamic; explicit-ID selections
-  are static.** A selection targeting `BackupPlan=prod` auto-includes
-  new tagged resources. Explicit resource IDs do NOT auto-include
-  new resources.
-
-- **AWS Backup audit evaluates compliance daily, not real-time.** For
-  immediate alerting, use EventBridge on `Backup Job State Change`.
+Full catalog: [Advanced patterns](references/advanced-patterns.md) — cool-off semantics, policy-vs-lock, Backup Framework, cross-account prerequisites, job validation, lock-vs-IAM.
 
 ### Step 1: Inventory the current backup state
 
-```bash
-# Vault inventory (name, encryption, lock state, recovery point count)
-aws backup list-backup-vaults --query 'BackupVaultList[*].[BackupVaultName,EncryptionKeyArn,LockState,NumberOfRecoveryPoints]'
-
-# Vault policy and lock state
-aws backup get-backup-vault-policy --backup-vault-name <vault>
-aws backup describe-backup-vault --backup-vault-name <vault> --query '[LockState,MinRetentionDays,VaultLockDate]'
-
-# Recovery point encryption status
-aws backup list-recovery-points-by-backup-vault --backup-vault-name <vault> \
-  --query 'RecoveryPoints[*].[RecoveryPointArn,ResourceType,Status,EncryptionKeyArn]'
-
-# Backup plans, selections, and copy jobs
-aws backup list-backup-plans --query 'BackupPlansList[*].[BackupPlanId,BackupPlanName]'
-aws backup list-backup-selections --backup-plan-id <plan-id>
-aws backup list-copy-jobs --by-state COMPLETED
-```
-
-Surface in the output: vaults without policies, vaults without locks,
-recovery points without encryption, resources without backup selections.
+Full inventory commands: [Diagnostic commands](references/diagnostic-commands.md).
 
 ### Step 2: Enforce vault policy (deny non-encrypted backups)
 
@@ -246,27 +191,7 @@ aws backup put-backup-vault-policy \
   --region us-east-1
 ```
 
-For cross-account backup vaults, add a statement allowing the source
-account:
-
-```json
-{
-  "Sid": "AllowCrossAccountBackup",
-  "Effect": "Allow",
-  "Principal": {"AWS": "arn:aws:iam::222222222222:root"},
-  "Action": ["backup:CopyIntoBackupVault", "backup:DescribeRecoveryPoint"],
-  "Resource": "*"
-}
-```
-
-Common policy errors:
-
-| Error | Cause | Fix |
-|---|---|---|
-| Deny is too broad | `Resource: "*"` blocks all operations | Scope to the specific vault ARN |
-| Missing KMS condition | Unencrypted backups still accepted | Add `Null` check on `aws:ResourceTag/x-calculated-integrity` |
-| Cross-account block | Destination vault missing source account allow | Add `AllowCrossAccountBackup` statement |
-| Root lock conflict | Policy allows delete but Vault Lock prevents it | Policy is moot — lock overrides IAM |
+Cross-account vault policy statement: [Advanced patterns](references/advanced-patterns.md).
 
 ### Step 3: Deploy Vault Lock (governance vs compliance mode)
 
@@ -316,29 +241,7 @@ aws backup list-recovery-points-by-backup-vault \
   --region us-east-1
 ```
 
-Check each recovery point:
-
-```python
-import boto3
-
-backup = boto3.client('backup')
-
-def verify_encryption(vault_name, approved_kms_key_arn):
-    paginator = backup.get_paginator('list_recovery_points_by_backup_vault')
-    violations = []
-
-    for page in paginator.paginate(BackupVaultName=vault_name):
-        for rp in page['RecoveryPoints']:
-            arn = rp['RecoveryPointArn']
-            kms_key = rp.get('EncryptionKeyArn')
-
-            if kms_key is None:
-                violations.append(f"UNENCRYPTED: {arn} ({rp['ResourceType']})")
-            elif kms_key != approved_kms_key_arn:
-                violations.append(f"WRONG_KEY: {arn} uses {kms_key}, expected {approved_kms_key_arn}")
-
-    return violations
-```
+Per-recovery-point KMS verification script: [Diagnostic commands](references/diagnostic-commands.md).
 
 If violations are found, the vault policy (Step 2) should prevent
 future unencrypted backups. Existing unencrypted recovery points
@@ -352,29 +255,7 @@ must be either:
 
 Identify resources that lack backup plans:
 
-```bash
-# List all EC2 instances
-aws ec2 describe-instances \
-  --query 'Reservations[*].Instances[*].InstanceId' \
-  --output text \
-  --region us-east-1
-
-# List all RDS instances
-aws rds describe-db-instances \
-  --query 'DBInstances[*].DBInstanceIdentifier' \
-  --output text \
-  --region us-east-1
-
-# List all DynamoDB tables
-aws dynamodb list-tables \
-  --output text \
-  --region us-east-1
-
-# List backup selections
-aws backup list-backup-plans \
-  --output json \
-  --region us-east-1
-```
+Resource enumeration commands (EC2, RDS, DynamoDB, plans): [Diagnostic commands](references/diagnostic-commands.md).
 
 Coverage audit logic: enumerate all EC2/RDS/DynamoDB/EFS resources,
 cross-reference against backup plan selections (tag-based and
@@ -402,20 +283,11 @@ rule is required. See **references/backup-config-rules.md**.
 
 ### Step 6: Validate cross-region backup replication
 
-```bash
-aws backup list-copy-jobs --by-state COMPLETED --output json --region us-east-1
-aws backup list-recovery-points-by-backup-vault \
-  --backup-vault-name prod-backup-vault-dr --region us-west-2
-```
+Copy-job and destination-vault verification commands: [Diagnostic commands](references/diagnostic-commands.md).
 
 Replication checklist: copy job `COMPLETED`, destination vault has
 recovery points, destination KMS key is region-specific (not source
 key ARN), recovery point ARN differs from source.
-
-Common failures: `ACCESS_DENIED` (destination vault policy missing
-source account), `KMS_NOT_FOUND` (source key is region-specific —
-create destination-region key), copy job `FAILED` silently (poll
-status; set up CloudWatch alarm).
 
 ### Step 7: Check backup frequency compliance
 
@@ -451,25 +323,7 @@ aws configservice put-config-rule \
   --region us-east-1
 ```
 
-Custom Config rule for backup coverage (detect resources without backup
-plans):
-
-```bash
-aws configservice put-config-rule \
-  --config-rule '{
-    "ConfigRuleName": "custom-ec2-must-have-backup-plan",
-    "Source": {
-      "Owner": "CUSTOM_LAMBDA",
-      "SourceDetails": [{
-        "EventSource": "aws.config",
-        "MessageType": "ConfigurationItemChangeNotification"
-      }],
-      "SourceIdentifier": "arn:aws:lambda:us-east-1:111111111111:function:check-ec2-backup-coverage"
-    },
-    "Scope": {"ComplianceResourceTypes": ["AWS::EC2::Instance"]}
-  }' \
-  --region us-east-1
-```
+Custom coverage-rule deploy CLI: [Backup Config rules](references/backup-config-rules.md).
 
 For the full custom Config rule Lambda implementation including tag
 extraction, backup plan lookup, and compliance evaluation, see
@@ -477,26 +331,11 @@ extraction, backup plan lookup, and compliance evaluation, see
 
 ### Step 9: Automate backup compliance reports
 
-```bash
-aws backup create-report-plan \
-  --report-plan-name daily-compliance-summary \
-  --report-setting '{"ReportTemplates":["BACKUP_JOB_REPORT","BACKUP_POLICY_REPORT"]}' \
-  --report-delivery-config '{"S3BucketName":"com-company-backup-reports","Formats":["CSV","JSON"]}' \
-  --region us-east-1
-```
-
-Reports are generated daily and delivered to S3. Set up Athena tables
-on the S3 output for queryable compliance dashboards.
+Report-plan setup (daily compliance summary to S3): [Advanced patterns](references/advanced-patterns.md).
 
 ### Step 10: Multi-account backup compliance via Organizations
 
-1. **Delegated administrator:**
-   `aws backup register-delegated-administrator --account-id 111111111111`
-2. **Org-level backup policy:** Use AWS Organizations backup policies
-   (tag-based) to enforce plans across member accounts.
-   `aws organizations create-policy --type BACKUP_POLICY --content file://policy.json`
-3. **Config aggregation:** Management account aggregates compliance:
-   `aws configservice put-configuration-aggregator --organization-aggregator-source '{"RoleArn":"...","AllAwsRegions":true}'`
+Delegated administrator, org-level backup policy, Config aggregation: [Advanced patterns](references/advanced-patterns.md).
 
 ### Step 11: Manage Vault Lock cool-off period
 
@@ -562,30 +401,6 @@ TEMPLATE:
   aws backup put-backup-vault-policy --backup-vault-name prod-backup-vault --policy file://vault-policy.json
   aws backup put-backup-vault-lock-configuration --backup-vault-name prod-backup-vault --changeable-for-days 3 --min-retention-days 90 --max-retention-days 2557 --mode COMPLIANCE
   aws configservice put-config-rule --config-rule '{"ConfigRuleName":"backup-recovery-point-encrypted","Source":{"Owner":"AWS","SourceIdentifier":"backup-recovery-point-encrypted"}}'
-```
-
-### Worked example — REVIEW_REQUIRED, governance mode on compliance vault
-
-```text
-COMPLIANCE: compliance-vault-review
-VAULT: compliance-vault
-POLICY:
-  - Vault policy: deny-non-encrypted (correct)
-  - KMS enforcement: correct approved key
-LOCK:
-  - Mode: GOVERNANCE (WRONG — regulatory requirement is COMPLIANCE)
-  - MinRetention: 30 days (WRONG — minimum should be 90 days)
-  - MaxRetention: 365 days (WRONG — should be 2557 days for 7-year compliance)
-  - CoolOff: lock removable by privileged principal
-COVERAGE:
-  - Total resources: 50
-  - Covered: 50
-  - Gap: 0
-REPLICATION:
-  - Cross-region: NOT CONFIGURED (required for DR)
-VERDICT: REVIEW_REQUIRED
-GAP: Vault is in GOVERNANCE mode but regulatory requirement (SEC 17a-4) demands COMPLIANCE mode. MinRetention is 30d but policy requires 90d minimum. Cross-region replication is not configured. These three issues must be resolved before the vault can be certified as compliant. Note: switching from GOVERNANCE to COMPLIANCE mode requires removing the current lock (possible in governance mode) and re-deploying in compliance mode with the correct retention parameters.
-TEMPLATE: (deploy after mode and retention parameters are confirmed)
 ```
 
 ## Anti-Patterns — NEVER do these things
@@ -676,75 +491,14 @@ Is the vault subject to regulatory immutability requirements?
             - Use when the organization wants immutability even without regulatory mandate
 ```
 
-## Appendix B — Config rules and cost reference
+## References (load on demand)
 
-Managed rules: `backup-plan-frequency`, `backup-recovery-point-encrypted`,
-`backup-recovery-point-manual-deletion-disabled`, `backup-vaults-are-encrypted`.
-Custom rules: coverage audit, min-retention, cross-region copy. See
-**references/backup-config-rules.md** for implementations.
-
-Cost summary: warm storage $0.05/GB-mo, cold $0.0125/GB-mo, cross-region
-$0.02/GB, backup job $0.025/GB, restore $0.025/GB. See
-**references/vault-lock-modes.md** for the full cost model.
-
-## Recent AWS features (2024-2026)
-
-- **AWS Backup Framework (2024):** Declarative compliance controls
-  with automated evaluation. Reduces need for custom Config rules for
-  common checks (encryption, frequency, retention). Framework reports
-  integrate with AWS Audit Manager.
-
-- **Cross-account backup (2024-2025):** Native support for backing
-  up resources from one account to a vault in another account without
-  custom IAM roles. Simplifies centralized backup architectures.
-
-- **Backup Vault Lock compliance mode enhancements (2024):** Added
-  `MaxRetentionDays` parameter to lock configuration. Previously only
-  minimum retention was enforceable — now both bounds are locked.
-
-- **CloudWatch Events for backup state changes (2024-2025):**
-  EventBridge events for `Backup Job State Change` and `Copy Job
-  State Change`. Enables real-time compliance alerting without waiting
-  for daily audit evaluation.
-
-- **AWS Backup for Amazon EBS multi-volume consistent snapshots
-  (2025):** Application-consistent backups across multiple EBS volumes
-  attached to a single EC2 instance. Improves recovery integrity for
-  multi-volume databases.
-
-- **Organizations backup policies (2025-2026):** Tag-based backup
-  policy enforcement at the organization level. Member accounts inherit
-  backup plans based on resource tags without individual account
-  configuration.
-
-- **Backup continuous verification (2025-2026):** Automated restore
-  testing — periodically restores recovery points and validates data
-  integrity. Catches silent backup corruption that standard job-status
-  monitoring misses.
-
-## Expert heuristic: the silent coverage gap
-
-The most dangerous backup compliance failure is a resource that has
-NEVER been backed up because no one tagged it for a backup plan.
-
-**The rule (non-negotiable):**
-
-> EVERY production resource MUST be covered by a backup plan. The ONLY
-> guarantee against coverage gaps is a Config rule that flags
-> resources without backup as NON_COMPLIANT.
-
-**Why:** AWS Backup does not natively alert when a new resource is
-created without coverage. An engineer creates a new RDS instance,
-forgets to tag it, and it runs without backups for months — typically
-discovered during an incident when recovery is needed and impossible.
-
-**Detection:** Custom Config rule on EC2/RDS/DynamoDB evaluating tag
-presence; AWS Backup Framework coverage control; EventBridge on
-`RunInstances`/`CreateDBInstance` for real-time tag check.
-
-**Surface in output:** include `COVERAGE_GAP: <count>` and
-`UNENCRYPTED_RECOVERY_POINTS: <count>`. If either is > 0, do NOT
-mark the deployment as complete.
+- [Worked examples](references/worked-examples.md) — full walkthroughs (REVIEW_REQUIRED governance-mode review)
+- [Error handling](references/error-handling.md) — vault-policy and cross-region replication error tables and remedies
+- [Diagnostic commands](references/diagnostic-commands.md) — inventory, encryption verification, coverage enumeration, copy-job checks
+- [Advanced patterns](references/advanced-patterns.md) — non-obvious Backup behaviors, cross-account policy, reports, multi-account rollout, cost reference, recent features
+- [Backup Config rules](references/backup-config-rules.md) — managed and custom Config rule implementations
+- [Vault Lock modes](references/vault-lock-modes.md) — full governance vs compliance mode reference and cost model
 
 ## Domain
 

@@ -168,3 +168,104 @@ objective (RPO) observed during the drill.
 
 5. **Expanding the subnet-AZ list after creation.** The subnet list
    is fixed at `create-cluster` time. Plan the AZ topology up front.
+
+---
+
+## Step 5 — HSM backups (daily + on-demand)
+
+AWS CloudHSM takes automatic backups every 5 minutes (delta) plus a
+daily snapshot. On-demand backups create a manual snapshot before
+risky changes via the management utility.
+
+```bash
+# List recent backups
+aws cloudhsmv2 describe-backups \
+  --filters clusterIds=$CLUSTER_ID \
+  --query 'Backups[*].{Id:BackupId, Created:CreateTimestamp, Type:BackupType, State:BackupState}' \
+  --output table --region us-east-1
+```
+
+For an on-demand backup, use the management util (`mu`) `createBackup`
+command; the backup ID is returned in the mu output. Backups are
+cluster-scoped. Retention is configurable per cluster.
+
+---
+
+## Step 6 — Cross-region backup copy
+
+For DR, copy backups to a second region. The destination region
+must be enabled for CloudHSM.
+
+```bash
+# Copy a backup to a destination region (DR)
+aws cloudhsmv2 copy-backup-to-region \
+  --backup-id <backup-id> \
+  --destination-region us-west-2 \
+  --region us-east-1
+
+# In the destination region, restore the backup into a new cluster
+aws cloudhsmv2 restore-backup --backup-id <dest-backup-id> --region us-west-2
+# (Creates a NEW cluster-id in us-west-2)
+```
+
+**Constraint:** cross-region copy is one-way. The destination
+backup creates a new cluster-id on restore; it is NOT a hot
+replica.
+
+---
+
+## Step 7 — HA across AZs
+
+HA is achieved by adding HSM instances in different AZs to the SAME
+cluster. Key material auto-syncs.
+
+```text
+Recommended HA topologies:
+  2 AZs: tolerates 1 AZ failure (minimum production posture)
+  3 AZs: tolerates 1 AZ failure during a replace (recommended)
+```
+
+```bash
+# Add a third HSM for stricter HA
+aws cloudhsmv2 create-hsm --cluster-id "$CLUSTER_ID" \
+  --availability-zone us-east-1c --ip-address 10.0.3.10 --region us-east-1
+
+# Verify all HSMs ACTIVE and in sync
+aws cloudhsmv2 describe-clusters --filters clusterIds=$CLUSTER_ID \
+  --query 'Clusters[0].Hsms[*].{AZ:AvailabilityZone, State:State, ENI:EniIp}' \
+  --output table --region us-east-1
+```
+
+Two separate clusters in two AZs do NOT sync. HA is intra-cluster.
+
+---
+
+## Step 13 — Degradation recovery (create replacement, sync)
+
+When an HSM degrades (hardware fault, AZ outage), recover by
+creating a replacement HSM in the same cluster; key material
+auto-syncs from the surviving HSM(s).
+
+```text
+Recovery procedure:
+  1. Identify the degraded HSM (describe-clusters, state != ACTIVE)
+  2. If AZ is healthy: create a replacement HSM in the same AZ
+     (aws cloudhsmv2 create-hsm --cluster-id <id> --availability-zone <az>)
+  3. If AZ is down: create a replacement in a different AZ already
+     in the cluster's subnet list
+  4. Wait for new HSM ACTIVE — it auto-syncs key material
+  5. Delete the degraded HSM:
+     aws cloudhsmv2 delete-hsm --cluster-id <id> --hsm-id <degraded-hsm-id>
+  6. Verify ≥2 ACTIVE HSMs in different AZs
+```
+
+```bash
+# Delete a degraded HSM after the replacement is ACTIVE
+aws cloudhsmv2 delete-hsm \
+  --cluster-id "$CLUSTER_ID" \
+  --hsm-id hsm-degraded111 --region us-east-1
+```
+
+**Constraint:** never drop below 1 ACTIVE HSM in production; you
+lose HA. Always create the replacement BEFORE deleting the degraded
+HSM.

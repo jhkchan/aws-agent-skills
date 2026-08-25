@@ -173,33 +173,10 @@ Run before classification. Misclassifying these produces wrong plans.
 instances per call; drain `--next-token` for fleet-wide audits. For a
 single instance, `--instance-ids <id>` returns one result.
 
-**Live-account pre-flight (skip if offline plan audit):**
-1. `aws ec2 describe-instance-status --instance-ids <id> --include-all-
-   instances` — capture `InstanceState`, `SystemStatus.Status`,
-   `InstanceStatus.Status`, `Events` (scheduled maintenance).
-2. `aws ec2 describe-instances --instance-ids <id>` — capture
-   `InstanceType`, `Placement` (Affinity, GroupName, Tenancy),
-   `RootDeviceType`, `BlockDeviceMappings`, `StateTransitionReason`,
-   `CapacityReservationId`, `CapacityReservationSpecification`.
-3. `aws autoscaling describe-auto-scaling-instances --instance-ids
-   <id>` — capture ASG membership, `LifecycleState`, `HealthStatus`.
-4. `aws ec2 describe-volumes --filters Name=attachment.instance-id,
-   Values=<id>` — capture all EBS volume IDs and attachment state for
-   rollback.
-5. `aws ssm describe-instance-information --filters Key=InstanceIds,
-   Values=<id>` — capture `PingStatus`, `AgentVersion`,
-   `PlatformName`.
-6. `aws cloudwatch describe-alarms-for-metric --namespace
-   AWS/EC2 --metric-name StatusCheckFailed_System --dimensions
-   Name=InstanceId,Value=<id>` — capture any existing recovery alarm.
-7. `aws ec2 get-console-output --instance-id <id> --latest` — capture
-   the last boot's console log for OS-level diagnosis.
+**Live-account pre-flight (skip if offline plan audit):** the 7 read-only commands
+(describe-instance-status ... get-console-output) are listed in [Diagnostic commands](references/diagnostic-commands.md).
 
-**Malformed input:** if the input JSON is invalid or missing required
-fields, emit `VERDICT: ERROR` with `REASON: Instance/operation
-configuration is not valid JSON or is missing required fields — cannot
-plan.` and `REMEDIATION: Re-fetch with aws ec2 describe-instance-status
---instance-ids <id> --include-all-instances --output json and re-plan.`
+Malformed-input protocol (VERDICT: ERROR + REMEDIATION): see [Error handling](references/error-handling.md).
 
 | Instance attribute | Effect on operation |
 |---|---|
@@ -218,81 +195,14 @@ plan.` and `REMEDIATION: Re-fetch with aws ec2 describe-instance-status
 
 ## Process — operation planning (apply in order)
 
-### Step 0: Expert knowledge — non-obvious EC2 recovery behaviors
+### Step 0: Expert knowledge - non-obvious EC2 recovery behaviors (condensed)
 
-- **Stop/start vs. reboot is the most important decision.** Stop/start
-  RELOCATES the instance to a new physical host (clears hardware
-  issues, loses instance-store data, releases dedicated host and
-  Capacity Reservation binding). Reboot STAYS on the same host
-  (preserves everything, but does not clear host-level hardware
-  issues). For `SystemStatus: impaired`, stop/start is the fix; for
-  `InstanceStatus: impaired`, reboot or SSM access is the fix.
-
-- **The CloudWatch EC2 recover action is an API-driven same-host
-  reboot.** Triggered by `StatusCheckFailed_System > 0 for N
-  datapoints`. It only helps for recoverable transient hardware
-  issues. For persistent issues, AWS schedules a `system-reboot` or
-  `instance-stop` event — recover masks the symptom.
-
-- **ASG health check replacement is usually preferred over manual
-  recovery.** The ASG's built-in recovery (launch replacement, drain
-  old, terminate) is more reliable than manual stop/start. Manually
-  recovering an ASG instance risks termination during recovery.
-  Suspend `HealthCheck` if manual recovery is required.
-
-- **EBS detach/attach is the safest data-salvage path.** If an
-  instance is unreachable but EBS volumes are healthy, detach the
-  root volume, attach to a rescue instance in the same AZ, fix the
-  issue, detach, re-attach to the original. Preserves all data.
-
-- **AMI creation is non-blocking.** `create-image --no-reboot`
-  captures WITHOUT a clean shutdown (best-effort consistency).
-  `create-image` (default) does a clean shutdown first. For forensic
-  snapshots of a hung instance, use `--no-reboot`.
-
-- **EC2 Serial Console (2024+) provides OS-level access without
-  network.** If SSH, SSM, and the network are all down, the EC2
-  Serial Console provides a tty to the instance's serial port. This
-  requires explicit enablement per instance (`--enable-api-serial-
-  console` at the account level + per-instance).
-
-- **Capacity Reservation binding is volatile on stop.** When an
-  instance with `CapacityReservationSpecification.TargetCapacity=
-  ReservationId` stops, the binding is released. On start, the
-  instance launches only if the reservation still has capacity. To
-  preserve: re-specify the reservation at start, or use an open
-  reservation in the same AZ.
-
-- **Instance-store (ephemeral) volumes are NEVER recoverable after
-  stop.** The data lives on the physical host. Stop releases the
-  host. Start lands elsewhere. EBS-backed volumes (including EBS
-  snapshots) are independent of the host.
-
-- **Placement group recovery is constrained.** A `cluster` placement
-  group instance stopped may not be able to restart if the group
-  lacks free capacity (the cluster relies on low-latency interconnect
-  between specific hosts). Prefer reboot (same host) for placement-
-  group members.
-
-- **`StatusCheckFailed_System` and `StatusCheckFailed_Instance` are
-  separate CloudWatch metrics.** A recovery alarm on
-  `StatusCheckFailed_System` triggers the EC2 recover action (same-
-  host reboot). A recovery alarm on `StatusCheckFailed_Instance` does
-  nothing useful — recover only addresses hardware. For instance-
-  status issues, use a Lambda-backed custom alarm that triggers SSM
-  or reboot.
-
-- **EC2 automatic recovery (2024-2025 GA) is AWS-managed.** AWS can
-  now automatically recover an instance on detected hardware failure
-  WITHOUT a customer-configured CloudWatch alarm. This is enabled by
-  default for most instance types. The instance reboots on the same
-  host; EBS and instance-store data are preserved. If automatic
-  recovery does not fire, the manual CloudWatch alarm + recover
-  action is the fallback.
-
-- **`get-console-output` returns the LAST boot only.** Each
-  `stop/start` or `reboot` clears the prior console log. For
-  historical diagnosis, capture the output BEFORE rebooting.
+- Stop/start RELOCATES to a new host (loses instance-store data, releases Capacity Reservation/dedicated host). Reboot STAYS on the same host.
+- CloudWatch EC2 recover action = API-driven same-host reboot; only helps `StatusCheckFailed_System`.
+- ASG-managed replacement usually beats manual recovery; suspend `HealthCheck` if manual recovery is required.
+- EBS detach/attach to a rescue instance in the same AZ is the safest data-salvage path.
+- `create-image --no-reboot` for forensic snapshots of hung instances; `get-console-output` shows the LAST boot only.
+- Full deep dives (Serial Console, automatic recovery, placement groups, metric separation): [Advanced patterns](references/advanced-patterns.md).
 
 ### Step 1: Pre-check gate — BLOCKED if any check fails
 
@@ -474,60 +384,6 @@ NOTES:
       --alarm-actions arn:aws:automate:us-east-1:ec2:recover
 ```
 
-### Worked example — detach-attach-ebs (data salvage, COMPLETED)
-
-```text
-OPERATION: detach-attach-ebs
-VERDICT: COMPLETED
-TARGET: i-0abcdef1234567890 (volume vol-0abc to rescue i-0rescue9999)
-PRE_CHECKS:
-  - [PASS] Source instance unreachable but not terminated
-  - [PASS] EBS volume vol-0abc attached, DeleteOnTermination: false
-  - [PASS] Rescue instance i-0rescue9999 in same AZ (us-east-1a)
-  - [PASS] Device name /dev/sdf free on rescue instance
-STEPS:
-  1. (executed) aws ec2 detach-volume --volume-id vol-0abc
-     --instance-id i-0abcdef1234567890 --force
-  2. (executed) aws ec2 attach-volume --volume-id vol-0abc
-     --instance-id i-0rescue9999 --device /dev/sdf
-  3. (executed) Operator reverted bad config, unmounted, detached
-  4. (executed) aws ec2 attach-volume --volume-id vol-0abc
-     --instance-id i-0abcdef1234567890 --device /dev/xvda
-POST_VERIFY:
-  - [PASS] Volume vol-0abc in-use on i-0abcdef1234567890 at /dev/xvda
-  - [PASS] Instance boots; nginx config valid; application responds
-NOTES:
-  - EBS detach/attach preserved all data on the root volume without
-    a stop/start. Safest path when OS is reachable from a rescue
-    instance but not from the original.
-```
-
-### Worked example — diagnose-impaired (BLOCKED with remediation)
-
-```text
-OPERATION: diagnose-impaired
-VERDICT: BLOCKED
-TARGET: i-0abcdef1234567890 (state: running, system-status: ok,
-        instance-status: impaired)
-PRE_CHECKS:
-  - [PASS] Instance exists, not terminated
-  - [PASS] InstanceStatus impaired (OS-level, not hardware)
-  - [PASS] SSM PingStatus: ConnectionLost (agent hung)
-  - [FAIL] Console output: kernel panic in module xyz-driver
-    (OS unresponsive; SSH/SSM unavailable)
-STEPS: (none — root cause is kernel panic)
-POST_VERIFY: (none)
-NOTES:
-  - Root cause: kernel panic from xyz-driver. The instance is running
-    but the OS is hung — SSH and SSM are both down.
-  - Fix options:
-    A) EBS detach/attach to rescue, remove the driver, reattach.
-    B) stop/start if instance-store data is expendable.
-  - Capture console output BEFORE any recovery action:
-    aws ec2 get-console-output --instance-id i-0abcdef1234567890
-      --latest > /tmp/i-0abcdef-console-$(date +%s).txt
-```
-
 ## Anti-Patterns — NEVER
 
 - NEVER stop an instance with `RootDeviceType: instance-store`
@@ -589,36 +445,7 @@ NOTES:
   operation, emit the CONFIRM prompt. Do NOT execute until the
   operator confirms.
 
-- **Capture pre-state for rollback.** Before any recovery:
-  `aws ec2 describe-instances --instance-ids <id> --output json >
-  /tmp/<id>-pre-$(date +%s).json` AND `aws ec2 describe-volumes
-  --filters Name=attachment.instance-id,Values=<id> --output json >
-  /tmp/<id>-volumes-$(date +%s).json` AND `aws ec2 get-console-output
-  --instance-id <id> --latest > /tmp/<id>-console-$(date +%s).txt`.
-
-- **Forensic AMI first.** If there is ANY chance the recovery could
-  fail or the instance could be terminated, create an AMI first.
-  The AMI is the point-in-time rollback.
-
-- **EBS volume inventory.** Capture all volume IDs and attachment
-  state. For detach/attach, verify the device name is free on the
-  target instance.
-
-- **ASG process suspension.** For manual recovery of ASG instances:
-  `aws autoscaling suspend-processes --auto-scaling-group-name <asg>
-  --scaling-processes HealthCheck AlarmNotification`. Resume after
-  recovery completes.
-
-- **Capacity Reservation re-targeting.** Capture
-  `CapacityReservationId` before stop. On start:
-  `aws ec2 modify-instance-capacity-reservation-attributes
-  --instance-id <id> --capacity-reservation-specification
-  'CapacityReservationTarget={CapacityReservationId=<id>}'`.
-
-- **Placement group capacity check.** For cluster placement group
-  instances, verify free capacity before stop/start. Prefer reboot
-  if capacity is uncertain.
-
+- Full defense-in-depth checklist (pre-state capture commands, AMI-first, ASG suspension, Capacity Reservation re-targeting, placement-group capacity): [Advanced patterns](references/advanced-patterns.md).
 ## Expert heuristic: stop/start vs. reboot
 
 The single highest-leverage decision in EC2 recovery is:
@@ -662,42 +489,14 @@ downtime without fixing anything.
 4. **Capacity Reservation:** confirm the binding (if applicable).
 5. **Console output:** capture post-recovery console log.
 
-## Recent AWS features (2024-2026)
+## References (load on demand)
 
-- **EC2 automatic recovery (2024-2025 GA):** AWS automatically
-  recovers instances on detected hardware failure without a customer-
-  configured alarm. Same-host reboot, preserves EBS and instance-
-  store. Manual CloudWatch recover is the fallback.
-
-- **EC2 Serial Console (2024 GA):** OS-level tty access via the
-  serial port, independent of SSH/SSM/network. Requires account-
-  level enablement and per-instance opt-in. Use when SSH and SSM
-  are both down.
-
-- **Capacity Reservation preservation on stop/start (2024-2025):**
-  New APIs allow preserving the binding through stop/start when the
-  reservation has capacity. Use
-  `modify-instance-capacity-reservation-attributes` to re-bind.
-
-- **ASG Capacity Rebalance (2024-2025):** Proactively replaces
-  instances at risk of interruption (Spot) or hardware degradation
-  (on-demand). Configure via `--capacity-rebalance`.
-
-- **Application Recovery Controller (2024-2026):** Zonal shift
-  (evacuate an AZ) and routing control (kill switch) for coordinated
-  regional failover beyond single-instance recovery.
-
-- **SSM Session Manager port forwarding (2024):** SSH-less access to
-  databases and internal services via the impaired instance's SSM
-  agent. Useful for live troubleshooting without SSH keys.
-
-- **EBS Fast Snapshot Restore (2024-2025):** Eliminates first-read
-  I/O latency for recovery launches from a snapshot. Enable on the
-  snapshot before launching the recovery instance.
-
-- **EC2 Operating System Log (2025):** The console captures pre-
-  reboot OS-level diagnostic logs, reducing reliance on
-  `get-console-output` for post-recovery forensics.
+- [Worked examples](references/worked-examples.md) - detach-attach-ebs (COMPLETED) and diagnose-impaired (BLOCKED) walkthroughs
+- [Error handling](references/error-handling.md) - malformed-input VERDICT: ERROR protocol
+- [Diagnostic commands](references/diagnostic-commands.md) - live-account pre-flight command listing
+- [Advanced patterns](references/advanced-patterns.md) - expert behaviors, defense-in-depth safety checklist, 2024-2026 features
+- [Status check deep dive](references/status-check-deep-dive.md) - System vs Instance status, stop/start vs reboot attribute tables
+- [Recovery procedures](references/recovery-procedures.md) - per-archetype diagnostic and recovery procedures
 
 ## Domain
 

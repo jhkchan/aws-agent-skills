@@ -339,3 +339,145 @@ resource "aws_cloudwatch_composite_alarm" "cpu_critical" {
 5. **Not handling missing data.** Decide on `--treat-missing-data`
    explicitly. The default (`missing`) may cause INSUFFICIENT_DATA
    during expected gaps.
+
+---
+
+## Step 5 — Band visualization (metric math)
+
+The anomaly detection band is visualized in the CloudWatch console
+using metric math with the `ANOMALY_DETECTION_BAND` function. This
+function returns the upper and lower band values for a given anomaly
+detector.
+
+**Metric math expression for band visualization:**
+
+```text
+ANOMALY_DETECTION_BAND(m1)
+```
+
+Where `m1` is the metric being monitored.
+
+**CLI — create a metric math dashboard via put-dashboard:**
+
+```bash
+# The ANOMALY_DETECTION_BAND function produces upper/lower band values.
+# In the console, this renders as a shaded band around the metric line.
+aws cloudwatch put-dashboard \
+  --dashboard-name "AnomalyDetection-CPU" \
+  --dashboard-body '{"widgets":[{"type":"metric","x":0,"y":0,"width":12,"height":6,"properties":{"metrics":[["AWS/EC2","CPUUtilization","InstanceId","i-abc1234567890"],[{"expression":"ANOMALY_DETECTION_BAND(m1)","label":"Anomaly Band","id":"e1"}]],"view":"timeSeries","period":300,"stat":"Average"}}]}'
+```
+
+The `ANOMALY_DETECTION_BAND` function references the metric `m1`
+(the first metric in the array) and produces the expected band.
+
+---
+
+## Step 8 — Recovery to normal state
+
+When the metric value returns inside the anomaly band, the alarm
+transitions back to `OK` automatically. This is the recovery-to-normal
+behavior.
+
+```text
+Alarm state transitions:
+  OK → ANOMALY (metric outside band for evaluation_periods)
+  ANOMALY → OK (metric back inside band for evaluation_periods)
+  OK → INSUFFICIENT_DATA (not enough data to evaluate, e.g., during LEARNING)
+```
+
+**Recovery behavior configuration:**
+
+- `--evaluation-periods` controls how many consecutive in-band points
+  are needed to recover to OK (same parameter as breach detection).
+- The alarm evaluates BOTH breach and recovery using the same
+  evaluation periods count. There is no separate recovery-period
+  parameter.
+- For asymmetric behavior (quick to alert, slow to recover), use
+  different alarms or a composite alarm with state logic.
+
+**OK action (notification on recovery):**
+
+```bash
+aws cloudwatch put-metric-alarm \
+  --alarm-name "cpu-anomaly-breach-i-abc123" \
+  --ok-actions "arn:aws:sns:us-east-1:123456789012:anomaly-alerts" \
+  --alarm-actions "arn:aws:sns:us-east-1:123456789012:anomaly-alerts" \
+  ... # other parameters same as Step 6
+```
+
+Setting `--ok-actions` sends an SNS notification when the alarm
+recovers to OK, providing closure on the anomaly event.
+
+---
+
+## Step 9 — Cross-account anomaly detection
+
+CloudWatch supports cross-account anomaly detection, where a monitoring
+(central) account creates anomaly detectors on metrics from member
+accounts. This requires CloudWatch cross-account observability sharing.
+
+**Prerequisites for cross-account:**
+1. The member account must enable sharing (cloudwatch:PutResourcePolicy).
+2. The monitoring account must have a data source link to the member
+   account.
+3. The anomaly detector is created in the monitoring account,
+   referencing the member account's metric.
+
+**Member account — enable sharing:**
+
+```bash
+aws cloudwatch put-resource-policy \
+  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::111111111111:root"},"Action":["cloudwatch:GetMetricData","cloudwatch:GetMetricStatistics"],"Resource":"*"}]}'
+```
+
+**Monitoring account — create detector and link:**
+
+```bash
+# Create data source link to member account
+aws logs create-link --link-name "member-account-link" \
+  --resource-arn "arn:aws:logs:us-east-1:222222222222:log-group:*" \
+  --filter 'logGroupNamePrefix("aws/cloudwatch/")'
+
+# Create detector (metric resolved from linked member account)
+aws cloudwatch put-metric-anomaly-detector \
+  --namespace "AWS/EC2" --metric-name "CPUUtilization" \
+  --dimensions Name=InstanceId,Value=i-abc1234567890 \
+  --stat "Average" --period 300 \
+  --configuration '{"StandardDeviation": 3}'
+```
+
+**Note:** cross-account observability uses the "source account" and
+"monitoring account" model. The detector and alarm live in the
+monitoring account. The metric data is read from the source account via
+the sharing policy.
+
+---
+
+## Step 10 — Composite alarm integration
+
+Composite alarms combine multiple alarms (anomaly + static threshold)
+using AND/OR logic. This is useful for reducing false positives by
+requiring multiple conditions to be true simultaneously.
+
+**Example: anomaly breach AND high absolute threshold:**
+
+```bash
+aws cloudwatch put-composite-alarm \
+  --alarm-name "cpu-composite-anomaly-and-threshold" \
+  --alarm-rule "(ALARM(cpu-anomaly-breach-i-abc123) AND ALARM(cpu-high-threshold-i-abc123))" \
+  --alarm-actions "arn:aws:sns:us-east-1:123456789012:critical-alerts"
+```
+
+**Composite alarm logic patterns:**
+
+| Pattern | Rule expression | Use case |
+|---|---|---|
+| Anomaly AND threshold | `ALARM(anomaly) AND ALARM(threshold)` | Reduce false positives; require both anomaly and high value |
+| Anomaly OR threshold | `ALARM(anomaly) OR ALARM(threshold)` | Broad coverage; alert on either condition |
+| Anomaly AND NOT maintenance | `ALARM(anomaly) AND NOT ALARM(maintenance-mode)` | Suppress anomalies during planned maintenance |
+| Either of two metrics anomalous | `ALARM(cpu-anomaly) OR ALARM(memory-anomaly)` | Alert if either resource is anomalous |
+
+**Key implication:** composite alarms let you combine anomaly detection
+with static thresholds for a layered alerting strategy. This is the
+recommended approach for production — use anomaly detection as the
+primary signal and static thresholds as backstop coverage.

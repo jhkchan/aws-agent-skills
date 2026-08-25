@@ -181,3 +181,110 @@ aws cloudwatch get-metric-data \
 If the band is consistently too tight (many points outside) or too
 loose (band never breached even during known incidents), adjust the
 std dev multiplier accordingly.
+
+---
+
+## Expert heuristic: std dev multiplier tuning
+
+The standard deviation multiplier controls the band width and thus the
+sensitivity of anomaly detection.
+
+```text
+Std dev multiplier guide:
+  ├── 1.0  → Very sensitive (catches small deviations, many false positives)
+  │        Use for: critical metrics where any deviation matters
+  ├── 2.0  → Sensitive (good starting point for volatile metrics)
+  │        Use for: error rates, latency percentiles with high variance
+  ├── 3.0  → DEFAULT (balanced, the AWS-recommended starting point)
+  │        Use for: CPU utilization, request count, network traffic
+  ├── 4.0  → Less sensitive (fewer false positives, may miss small anomalies)
+  │        Use for: metrics with known periodic spikes (batch jobs)
+  └── 5.0  → Very insensitive (only catches major anomalies)
+             Use for: metrics where only severe deviations matter
+
+Rule of thumb: start at 3, observe for 1 week, tune down if missing
+real anomalies, tune up if too many false positives.
+```
+
+**Key implication:** the std dev multiplier is the primary tuning knob
+after deployment. It is not set-and-forget; plan for a tuning cycle
+after initial deployment.
+
+---
+
+## Step 4 — Sensitivity tuning (std dev multiplier)
+
+The standard deviation multiplier (`StandardDeviation` in the
+configuration JSON) is the primary tuning knob for anomaly detection
+sensitivity. It controls how wide the expected-value band is.
+
+| Std dev multiplier | Sensitivity | Band width | False positive rate | Use case |
+|---|---|---|---|---|
+| 1 | Very high | Narrow (1 sigma) | High | Critical metrics, any deviation matters |
+| 2 | High | Medium (2 sigma) | Moderate | Error rates, volatile latency |
+| 3 (DEFAULT) | Balanced | Standard (3 sigma) | Low | CPU, network, request count |
+| 4 | Low | Wide (4 sigma) | Very low | Metrics with periodic spikes |
+| 5 | Very low | Very wide (5 sigma) | Minimal | Only severe anomalies matter |
+
+**Tuning procedure:**
+
+1. Deploy with default (3).
+2. Observe for at least 1 week.
+3. If too many false positives: increase to 4.
+4. If missing real anomalies: decrease to 2.
+5. Re-observe for another week. Iterate.
+
+**Update std dev multiplier (post-deployment tuning):**
+
+```bash
+aws cloudwatch put-metric-anomaly-detector \
+  --namespace "AWS/EC2" \
+  --metric-name "CPUUtilization" \
+  --dimensions Name=InstanceId,Value=i-abc1234567890 \
+  --stat "Average" \
+  --period 300 \
+  --configuration '{"StandardDeviation": 2}'
+```
+
+**Note:** Changing the std dev triggers a model re-train. The new band
+appears within 15 minutes. The alarm continues to use the old band
+until the model re-trains.
+
+---
+
+## Step 7 — Assessment period and training data
+
+The assessment period (controlled by `evaluation-periods` on the alarm)
+determines how many consecutive anomalous data points must occur before
+the alarm fires.
+
+| Assessment periods | Behavior | Trade-off |
+|---|---|---|
+| 1 | Fires on a single anomalous point | Very fast detection; high false positive rate |
+| 2-3 (DEFAULT) | Requires 2-3 consecutive anomalous points | Balanced; good starting point |
+| 5+ | Requires sustained anomaly over many periods | Low false positives; slower detection |
+
+**Training data depth check (PREREQUISITE):**
+
+```bash
+# Count data points in the last 15 days at 5-min period
+DATAPOINTS=$(aws cloudwatch get-metric-statistics \
+  --namespace "AWS/EC2" \
+  --metric-name "CPUUtilization" \
+  --dimensions Name=InstanceId,Value=i-abc1234567890 \
+  --statistics Average \
+  --period 300 \
+  --start-time $(date -u -v-15d +%Y-%m-%dT%H:%M:%SZ) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  --query 'Datapoints | length(@)' --output text)
+
+echo "Historical data points: $DATAPOINTS"
+# If < 15 → PREREQUISITES_MISSING (insufficient training data)
+# If >= 15 → proceed with detector creation
+```
+
+**The 2-week rule:** the ML model needs approximately 2 weeks of data
+to learn the metric's pattern (especially diurnal/weekly cycles). With
+less data, the model may not capture weekend vs weekday differences,
+time-of-day patterns, etc. If the metric is new, wait 2 weeks before
+deploying anomaly detection.

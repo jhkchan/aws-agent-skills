@@ -201,3 +201,49 @@ resource "aws_cloudhsm_v2_hsm" "b" {
 
 5. **Forgetting the quorum token drill.** Quorum is useless if no
    one knows how to meet it under pressure. Run an annual drill.
+
+---
+
+## Step 4 — Crypto officer/user management
+
+Once the cluster is ACTIVE, log in via the CloudHSM management util
+(`cloudhsm_mgmt_util`, aliased `mu`) over the ENI to create the
+first Crypto Officer (CO) and Crypto Users (CU).
+
+```bash
+# Configure the CloudHSM client with the cluster's ENI
+sudo /opt/cloudhsm/bin/configure -a 10.0.1.10
+
+# Start the management utility (mu)
+/opt/cloudhsm/bin/cloudhsm_mgmt_util /opt/cloudhsm/etc/cloudhsm_mgmt_util.cfg
+
+# Inside mu:
+#   loginHSM CO admin <password-from-secrets-manager>
+#   createUser CO officer2 <password>
+#   createUser CU app-user <password>
+#   quit
+```
+
+**Critical practices:**
+- The CO `admin` password is the cluster's crown-jewel secret. Store
+  in AWS Secrets Manager (encrypted with a customer-managed KMS key).
+- Create ≥2 CO users so you have quorum if one is lost.
+- CUs own and use keys; created by COs; scoped to the cluster.
+- Password policies (length, complexity) propagate via cluster sync.
+
+---
+
+## Step 12 — CN-to-cluster-ID mapping
+
+The CloudHSM client uses the cluster's Common Name (CN) to verify
+the cluster during TLS handshake. The mapping is registered in the
+client config (`configure -a <eni-ip>` or DNS CNAME).
+
+```bash
+# Point the client at the cluster's primary ENI
+sudo /opt/cloudhsm/bin/configure -a 10.0.1.10
+# Or DNS CNAME: cloudhsm.internal.example.com → 10.0.1.10
+```
+
+If the mapping is wrong, the client fails the TLS handshake. Verify
+the customer CA bundle is current on the client host.

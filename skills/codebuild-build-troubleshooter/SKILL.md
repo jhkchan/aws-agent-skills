@@ -165,136 +165,9 @@ Read batch-get-builds phases[] — find the FIRST FAILED phase.
         → BUILDSPEC_SYNTAX
 ```
 
-- **NEVER** declare `ROOT_CAUSE_IDENTIFIED` without a failing probe that
-  matches the symptom. The phase status (`FAILED`) is a symptom, not a
-  root cause; read the phase `contexts[].message` and the build logs
-  before naming the category.
-
-- **NEVER** confuse the service role with the source credential. The
-  **service role** is assumed by CodeBuild at build time (permissions for
-  the build to call AWS APIs — S3, ECR, Secrets Manager, SSM). The
-  **source credential** is the OAuth token / SSH key used to clone the
-  source repo (CodeCommit uses IAM; GitHub uses a stored personal access
-  token or connection ARN). A `DOWNLOAD_SOURCE` failure is the source
-  credential; a `CannotPullContainerError` from ECR is the service role.
-
-- **NEVER** recommend adding a NAT Gateway to fix a VPC-attached CodeBuild
-  build without first checking for VPC endpoints. ECR interface endpoints
-  (`com.amazonaws.<region>.ecr.api`, `com.amazonaws.<region>.ecr.dkr`)
-  and the S3 gateway endpoint are cheaper and more secure. The NAT is
-  required for external package registries (npm, PyPI), not for AWS
-  services.
-
-- **NEVER** assume `privilegedMode: false` is a buildspec field. It is a
-  project-level environment config (`environment.privilegedMode`). Docker-
-  in-Docker builds (running `docker build` inside buildspec commands)
-  REQUIRE `privilegedMode: true`. Without it, the Docker daemon is
-  unavailable and every `docker` command fails in any phase.
-
-- **NEVER** conflate `LOCAL_DOCKER_LAYER` cache with `S3` cache.
-  `LOCAL_DOCKER_LAYER` caches Docker layers on the build host (ephemeral,
-  requires privileged mode). `S3` cache stores compiled artifacts /
-  dependency caches in an S3 bucket (persistent, requires bucket + IAM).
-  Using the wrong mode produces "cache not helping" patterns.
-
-- **NEVER** change the runtime version in a buildspec without checking
-  the CodeBuild managed image support matrix. Runtime versions are removed
-  when the underlying OS or language is deprecated (e.g., `nodejs: 12`,
-  `python: 3.7`). A removed runtime produces `YAML_FILE_ERROR` which looks
-  like a syntax error but is actually a runtime availability issue.
-
-## Expert heuristic
-
-> **Buildspec phase ordering is strictly sequential:** `INSTALL` →
-> `PRE_BUILD` → `BUILD` → `POST_BUILD` → `UPLOAD_ARTIFACTS`. A failure
-> in an earlier phase prevents later phases from running. Always read
-> the first `FAILED` phase — it is the root cause, not a downstream
-> symptom.
->
-> **Docker builds inside CodeBuild require `environment.privileged-mode:
-> true` on the project.** This is a project-level config, NOT a buildspec
-> field. Without it, the Docker daemon is not started and every `docker`
-> command returns "Cannot connect to the Docker daemon."
->
-> **Cache mode determines the storage backend and permissions:**
-> - `LOCAL_DOCKER_LAYER` — on-host Docker layer cache; requires
->   `privilegedMode: true`; helps only if the same build host is reused.
-> - `LOCAL_SOURCE_CACHE` — on-host Git source cache.
-> - `LOCAL_CUSTOM_CACHE` — on-host custom paths from buildspec `cache.paths`.
-> - `S3` — persistent cache in `cache.bucket`; service role needs
->   `s3:GetObject` / `s3:PutObject` on `cache.bucket/*`.
-
-## Configuration dependency graph
-
-```
-                      CodeBuild project
-                            │
-         ┌─────────────────┼──────────────────────┐
-         ▼                 ▼                      ▼
-    environment       source               service role
-    (image,           (type:               (permissions for S3,
-     privileged-      CodeCommit /          ECR, Secrets Manager,
-     mode, runtime,   GitHub / S3)          SSM, CloudWatch Logs,
-     computeType,                            KMS)
-     envVariables,          │
-     vpcConfig)             ▼                     │
-         │            source credential           ▼
-         │            (CodeCommit = IAM;     IAM policy
-         │             GitHub = OAuth        (ecr:*, s3:*,
-         │             token stored as       secretsmanager:*,
-         │             CodeBuild cred)       ssm:GetParameter,
-         ▼                                   logs:*, kms:Decrypt)
-    buildspec.yml                               │
-    (phases, artifacts,                         ▼
-     cache)                                S3 bucket
-         │                                 (artifacts +
-         ▼                                  cache bucket)
-    cache config
-    (type: LOCAL_* or S3;
-     if S3: bucket + path)
-         │
-         ▼
-    vpcConfig (if set)
-    (subnets, securityGroups;
-     private subnet → NAT
-     for external egress or
-     VPC endpoints for AWS)
-```
-
-## Mindset
-
-A failing CodeBuild build is usually a configuration or environment
-issue, not a code bug. The buildspec commands are almost always correct;
-the broken thing is the project environment (privileged mode, runtime,
-VPC), the service role permissions (ECR, S3, Secrets Manager), the
-source credential (CodeCommit IAM, GitHub token), or the cache config
-(wrong mode, missing bucket permissions). Treat the buildspec commands
-as innocent until the project config, service role, and environment
-are proven correct.
-
 ## Pre-flight: gather-info gate
 
-```bash
-# 1. Build details (phases, logs, source, environment, artifacts)
-aws codebuild batch-get-builds --ids <build-id> --output json
-
-# 2. Project details (environment, serviceRole, source, vpcConfig, cache)
-aws codebuild batch-get-projects --names <project-name> --output json
-
-# 3. Build log events
-aws logs get-log-events \
-  --log-group-name /aws/codebuild/<project-name> \
-  --log-stream-name <stream> --output json
-
-# 4. Service role policy check
-ROLE_NAME=$(echo <role-arn> | cut -d/ -f2)
-aws iam list-attached-role-policies --role-name <role-name> --output json
-aws iam list-role-policies --role-name <role-name> --output json
-
-# 5. AWS Health (regional CodeBuild events)
-aws health describe-events \
-  --filter eventStatusCodes=OPEN,UPCOMING --output json
-```
+Gather-info probes (build details, project config, build logs, service-role policies, AWS Health): [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ### Build-state short-circuit
 
@@ -599,123 +472,7 @@ CONFIRM: Before updating the project, emit and await:
   (yes/no)"
 ```
 
-### Worked example — ECR image pull auth (BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE)
-
-```text
-TARGET: cb-deploy-runner (arn:aws:codebuild:us-east-1:123456789012:project/cb-deploy-runner)
-  Build ID: cb-deploy-runner:9f8e7d6c-5b4a-3210-fedc-ba9876543210
-VERDICT: ROOT_CAUSE_IDENTIFIED
-REASON: The INSTALL phase fails with BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE
-  when pulling 111111111111.dkr.ecr.us-east-1.amazonaws.com/ci-base-images:python3.12
-  (cross-account ECR). The CodeBuild service role
-  (arn:aws:iam::123456789012:role/codebuild-cb-deploy-runner-role) lacks
-  ecr:BatchGetImage and ecr:GetDownloadUrlForLayer on the source ECR repo.
-  The image exists (950 MB, under 15 GB cap) and the project is not
-  VPC-attached, ruling out IMAGE_PULL_SIZE and VPC_NO_EGRESS.
-ROOT_CAUSE: IMAGE_PULL_AUTH
-EVIDENCE:
-  - Symptom: INSTALL phase FAILED. Log excerpt from CloudWatch:
-    "BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE: Unable to pull
-     111111111111.dkr.ecr.us-east-1.amazonaws.com/ci-base-images:python3.12:
-     insufficient privileges"
-  - Failing probe:
-    aws iam simulate-principal-policy \
-      --policy-source-arn arn:aws:iam::123456789012:role/codebuild-cb-deploy-runner-role \
-      --action-names ecr:BatchGetImage ecr:GetDownloadUrlForLayer ecr:BatchCheckLayerAvailability \
-      --resource-arns arn:aws:ecr:us-east-1:111111111111:repository/ci-base-images \
-      --output json
-    Result: "EvalDecision": "implicitDeny" for all three actions.
-  - Passing probes:
-    - Image exists: aws ecr describe-images --repository-name ci-base-images \
-      --image-ids imageTag=python3.12 --registry-id 111111111111
-      → imageSizeInBytes: ~950 MB (under 15 GB cap)
-    - Not VPC-attached: batch-get-projects shows vpcConfig = null
-    - ECR repo policy exists but only grants account 111111111111 roles,
-      not the CodeBuild service role in account 123456789012
-REMEDIATION:
-  1. Add ECR read permissions to the CodeBuild service role (account
-     123456789012):
-     aws iam put-role-policy \
-       --role-name codebuild-cb-deploy-runner-role \
-       --policy-name ecr-pull-ci-base-images \
-       --policy-document '{
-         "Version": "2012-10-17",
-         "Statement": [
-           {
-             "Effect": "Allow",
-             "Action": [
-               "ecr:BatchGetImage",
-               "ecr:GetDownloadUrlForLayer",
-               "ecr:BatchCheckLayerAvailability"
-             ],
-             "Resource": "arn:aws:ecr:us-east-1:111111111111:repository/ci-base-images"
-           },
-           {
-             "Effect": "Allow",
-             "Action": "ecr:GetAuthorizationToken",
-             "Resource": "*"
-           }
-         ]
-       }'
-  2. Grant cross-account access in the ECR repo policy (account
-     111111111111):
-     aws ecr put-repository-policy \
-       --registry-id 111111111111 \
-       --repository-name ci-base-images \
-       --policy-text '{
-         "Version": "2012-10-17",
-         "Statement": [{
-           "Sid": "AllowCodeBuildCrossAccountPull",
-           "Effect": "Allow",
-           "Principal": {
-             "AWS": "arn:aws:iam::123456789012:role/codebuild-cb-deploy-runner-role"
-           },
-           "Action": [
-             "ecr:BatchGetImage",
-             "ecr:GetDownloadUrlForLayer",
-             "ecr:BatchCheckLayerAvailability"
-           ]
-         }]
-       }'
-  3. Verify the IAM simulation now returns allowed:
-     aws iam simulate-principal-policy \
-       --policy-source-arn arn:aws:iam::123456789012:role/codebuild-cb-deploy-runner-role \
-       --action-names ecr:BatchGetImage \
-       --resource-arns arn:aws:ecr:us-east-1:111111111111:repository/ci-base-images \
-       --output json
-     Expected: "EvalDecision": "allowed"
-  4. Re-run the build to confirm the fix:
-     aws codebuild start-build --project-name cb-deploy-runner --region us-east-1
-  5. Verify the INSTALL phase succeeds:
-     aws codebuild batch-get-builds --ids <new-build-id> \
-       --query 'builds[0].phases[?phaseType==`INSTALL`].phaseStatus' --output text
-     Expected: SUCCEEDED
-CONFIRM: Before updating the service role IAM and ECR repo policy, emit
-  and await: "CONFIRM: About to add ECR read permissions to role
-  codebuild-cb-deploy-runner-role (account 123456789012) and update the
-  cross-account repo policy on ci-base-images (account 111111111111).
-  Proceed? (yes/no)"
-```
-
-### Worked example — INSUFFICIENT_DATA
-
-```text
-TARGET: unknown
-VERDICT: INSUFFICIENT_DATA
-REASON: Input is "CodeBuild build failing in prod" with no project name,
-  build ID, failed phase, or error string.
-ROOT_CAUSE: UNKNOWN
-EVIDENCE:
-  - Missing: project name or build ID
-  - Missing: observed error string or failed phase
-  - Missing: region
-REMEDIATION:
-  1. Run aws codebuild list-projects and share the project name.
-  2. Run aws codebuild list-builds-for-project --project-name <name>
-     and share the most recent build ID.
-  3. Run aws codebuild batch-get-builds --ids <build-id> and share
-     phases[] output.
-```
+Further worked examples (cross-account ECR image-pull auth; INSUFFICIENT_DATA re-prompt): [references/worked-examples.md](references/worked-examples.md).
 
 ## Pre-flight safety checks
 
@@ -733,29 +490,15 @@ REMEDIATION:
 - **VPC config changes** trigger new ENI creation; plan outside peaks.
 - **Bulk remediation:** batch groups of at most 5 projects.
 
-## Remediation guidance
 
-| ROOT_CAUSE | Specific fix |
-|---|---|
-| `IMAGE_PULL_AUTH` | Add `ecr:BatchGetImage`, `ecr:GetDownloadUrlForLayer` to service role; for cross-account, also update ECR repo policy. |
-| `IMAGE_PULL_SIZE` | Reduce image below 10 GB compressed; use multi-stage builds. |
-| `PHASE_COMMAND_FAIL` | Fix the buildspec command; check logs for exit code and message. |
-| `BUILDSPEC_SYNTAX` | Run `validate-buildspec`; fix YAML indentation; verify runtime versions. |
-| `ARTIFACT_S3_PERMISSION` | Add `s3:PutObject`, `s3:GetObject`, `s3:ListBucket` on artifacts bucket. |
-| `ARTIFACT_KMS` | Add `kms:Decrypt`, `kms:GenerateDataKey` on the artifacts bucket key. |
-| `VPC_NO_EGRESS` | Add NAT Gateway for external egress or VPC endpoints for AWS services. |
-| `VPC_SG_BLOCKING` | Add egress rule allowing HTTPS (443) to package registry. |
-| `RUNTIME_VERSION` | Update `runtime-versions` to a supported version. |
-| `BUILD_TIMEOUT_CONFIG` | Raise `timeoutInMinutes` (1-480 min). |
-| `BUILD_TIMEOUT_DOWNSTREAM` | Investigate slow command; add retries or cache downloads. |
-| `SOURCE_CHECKOUT_AUTH` | CodeCommit: verify `codecommit:GitPull`; GitHub: rotate token or use CodeStar connection. |
-| `CACHE_S3_MISCONFIG` | Verify `cache.bucket`; add `s3:GetObject`/`s3:PutObject` on cache bucket. |
-| `CACHE_LOCAL_MISCONFIG` | Enable `privilegedMode: true` for `LOCAL_DOCKER_LAYER`. |
-| `DOCKER_PRIVILEGED_MODE` | `update-project --environment privilegedMode=true,...`. |
-| `SECRET_ACCESS` | Add `secretsmanager:GetSecretValue` or `ssm:GetParameter` to service role. |
-| `BADGE_GENERATION` | `update-project --name <n> --badge-enabled badgeEnabled=true`. |
-| `QUEUED_CONCURRENCY` | Raise `concurrentBuildLimit` or request Service Quota increase. |
-| `BATCH_CONFIG` | Fix buildspec `batch` block; verify `build-graph` deps; ensure role permissions. |
+## References (load on demand)
+
+- [Worked examples](references/worked-examples.md) - full walkthroughs: cross-account ECR image-pull auth (BUILD_CONTAINER_UNABLE_TO_PULL_IMAGE), INSUFFICIENT_DATA re-prompt
+- [Error handling](references/error-handling.md) - ROOT_CAUSE-to-fix remediation table
+- [Diagnostic commands](references/diagnostic-commands.md) - pre-flight gather-info gate: the five read-only probes
+- [Advanced patterns](references/advanced-patterns.md) - NEVER rules (expanded rationale), expert heuristic, configuration dependency graph, diagnostic mindset
+- [Build environment reference](references/build-environment-reference.md) - images, runtimes, compute types
+
 
 ## Domain
 

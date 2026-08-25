@@ -48,7 +48,7 @@ leverage action across nine dimensions applied in priority order.
 | **Mindset** | RA3 vs DC2 mental model, Serverless cost curve, WLM behaviour | Understanding the optimisation model |
 | **Pre-flight** | Cluster metadata gate — status, node type, Serverless vs provisioned | Before executing any CLI |
 | **Process** | Per-dimension optimisation: right-sizing, node type, WLM, storage, pricing | When choosing recommendations |
-| **Expert heuristic** | Non-obvious Redshift cost and performance behaviours | Review before complex decisions |
+| **Expert heuristic** | Non-obvious Redshift cost and performance behaviours → `references/advanced-patterns.md` | Review before complex decisions |
 | **NEVER** | Anti-patterns that cause query starvation, data loss, or overspend | Review before risky changes |
 
 ## Quick reference — verdict thresholds
@@ -121,27 +121,6 @@ across nine dimensions — driven by four Redshift cost realities:
   are bursty and have significant idle periods. Steady-state 24/7 workloads
   are typically cheaper on provisioned clusters with Reserved Nodes.
 
-## Philosophy
-
-Four behaviours separate a senior Redshift FinOps engineer from a
-generalist:
-
-- **CPUUtilization + QueryQueueLength together determine right-sizing.**
-  15% CPU with 0 queue length = overprovisioned. 60% CPU with a 200-query
-  queue = under-provisioned or WLM-misconfigured. 15% CPU with a 500-query
-  queue = WLM problem, not a capacity problem.
-- **RA3 managed storage is cheaper for data that grows.** DC2 local
-  storage forces you to buy compute to hold data. RA3 lets you right-size
-  compute independently.
-- **VACUUM and ANALYZE are cost levers, not just maintenance.** Unvacuumed
-  tables hold deleted rows (bloat) that consume storage and slow scans.
-  Unanalyzed tables produce bad query plans that burn CPU. Both inflate
-  cost indirectly.
-- **Data sharing eliminates redundant clusters.** If three clusters each
-  query the same production data, data sharing lets one producer cluster
-  serve multiple consumer clusters without copying data — cutting compute
-  by 60-70%.
-
 ## Pre-flight: cluster metadata gate
 
 Run before classification. Misclassifying these produces false positives.
@@ -164,38 +143,15 @@ Nodes, Serverless workgroups, storage utilisation).
 
 ## Process — optimisation logic (apply in order, aggregate all applicable)
 
+Per-step detail notes (migration cost, downsize magnitude, WLM best practices, compression/VACUUM strategy, cost models, MV/data-sharing strategy): `references/advanced-patterns.md` § Per-step detail notes.
+
 ### Step 0: Expert knowledge — non-obvious Redshift cost behaviours
 
 These behaviours are easy to misjudge without Redshift operational
 experience. See `references/redshift-optimization-deep-dive.md` for full
 detail. Key bullets:
 
-- **RA3 managed storage bills on actual usage, not provisioned.** Unlike
-  DC2 where you pay for the full local disk, RA3 charges $0.024/GB-month
-  for data actually stored in managed storage. Deleting stale data directly
-  reduces the bill.
-- **DC2 to RA3 migration is not always cheaper.** DC2 includes local
-  storage in the node price. If a cluster uses < 60% of DC2 local storage
-  AND has low CPU, RA3 is cheaper. If the cluster uses > 80% of DC2 local
-  storage, DC2 may be more cost-effective (storage is "free" with compute).
-- **Concurrency Scaling charges accrue per active second.** If a cluster
-  scales 8 hours/day, that is ~$314/month in scaling charges. Compare with
-  Reserved Nodes for the equivalent capacity.
-- **Redshift Serverless RPU billing is per-second with 1-minute minimum.**
-  Base capacity RPU sets the floor. A Serverless workgroup with base RPU
-  8 and max RPU 32 bills at least 8 x $0.36 = $2.88/hour even when idle.
-- **Reserved Nodes do NOT apply to Concurrency Scaling charges.** RIs
-  discount the provisioned cluster nodes only. Scaling clusters always
-  bill at On-Demand rates.
-- **VACUUM DELETE reclaims disk space from deleted rows.** Without
-  VACUUM, deleted rows are soft-deleted (marked for deletion) and still
-  consume storage. On RA3, this directly increases managed-storage cost.
-- **ANALYZE updates table statistics for the query planner.** Without
-  recent statistics, the planner may choose a broadcast join instead of a
-  redistribute join, causing unnecessary network traffic and CPU burn.
-- **Data sharing producer clusters bear the compute cost.** Consumer
-  clusters query the data without storing or computing it. The producer
-  cluster's compute is shared across all consumers.
+Key bullets: `references/advanced-patterns.md` § Step 0 (verbatim).
 
 ### Step 1: Node-type selection — RA3 vs DC2
 
@@ -206,10 +162,6 @@ detail. Key bullets:
 | DC2 with > 80% local storage used | High | DC2 may be cost-effective (storage bundled) |
 | RA3 | N/A | Already on managed storage; proceed to right-sizing |
 | RA3 with local SSD consistently full | Hot data overflow | Consider larger RA3 node or data tiering |
-
-**Migration cost:** DC2 to RA3 requires a snapshot/restore or elastic
-resize. Brief downtime (minutes for elastic resize, longer for
-snapshot/restore depending on data volume).
 
 ### Step 2: Right-sizing — node count and node size
 
@@ -223,15 +175,6 @@ If the cluster is on the correct node type, evaluate node count and size.
 | CPU 30-70%, QueueLength < 10 | Correctly sized | Proceed to Step 3 |
 | WLM misconfigured (one queue, no SQA) | **OPPORTUNITY_FOUND** (WLM) | Fix WLM BEFORE right-sizing |
 
-**Downsize magnitude:** Conservative = 1 node. Aggressive (CPU < 20% +
-0 queue) = 2 nodes or smaller node type. Always verify query performance
-after downsizing. Redshift requires a minimum of 2 nodes (leader + compute)
-for multi-node clusters; single-node clusters have no redundancy.
-
-**Node family selection:** RA3 (ra3.xl4xlarge, ra3.16xlarge) for most
-production workloads. DC2 (dc2.large, dc2.8xlarge) for small dense-
-storage workloads. Serverless for variable/bursty workloads.
-
 ### Step 3: Pricing model optimisation
 
 | Workload pattern | Recommended model | Savings vs On-Demand |
@@ -241,14 +184,6 @@ storage workloads. Serverless for variable/bursty workloads.
 | Dev/test, business-hours only | 1-yr Reserved Node | ~40% |
 | Variable/spiky workload | Redshift Serverless (RPU-based) | Pay-per-use; cheaper for idle periods |
 | Bursty workload needing peak capacity | Concurrency Scaling + Reserved Nodes | RI for base + CS for peaks |
-
-**IMPORTANT:** Reserved Nodes apply to provisioned cluster nodes only.
-They do NOT discount Concurrency Scaling charges or Serverless RPU
-consumption. Do NOT recommend RIs for Serverless workgroups.
-
-**Commitment laddering:** Purchase 1-yr RIs for baseline -> extend to 3-yr
-for stable clusters -> keep On-Demand for variable workloads and
-Serverless.
 
 ### Step 4: Workload management (WLM) optimisation
 
@@ -261,15 +196,6 @@ Serverless.
 | Concurrency Scaling off with bursty queue spikes | **OPPORTUNITY_FOUND** | Enable Concurrency Scaling for peak queues |
 | Concurrency Scaling on but never triggers | Finding | Unused scaling — no cost impact (billed per use) |
 
-**WLM best practices:**
-- Create at least 2 queues: one for short interactive BI queries (high
-  priority, low concurrency) and one for long ETL queries (lower priority,
-  higher concurrency).
-- Enable SQA to auto-route queries estimated < 15 seconds to a dedicated
-  short-query path, bypassing the main queue.
-- Set Concurrency Scaling to AUTO for queues with unpredictable spikes.
-  Scaling clusters are added automatically when the queue is full.
-
 ### Step 5: Storage optimisation
 
 | Current storage state | Verdict | Recommendation |
@@ -281,15 +207,6 @@ Serverless.
 | DC2 local storage > 80% full | Warning | Evaluate RA3 migration or add nodes |
 | RA3 managed storage growing unbounded | **OPPORTUNITY_FOUND** | Implement data lifecycle (archive old partitions to S3) |
 
-**Compression types:** AZ64 (default, best for numeric/date), Zstandard
-(best compression ratio, general purpose), LZO (legacy, fast). Always
-test compression on a sample before applying cluster-wide — some query
-patterns perform worse with high compression.
-
-**VACUUM strategy:** VACUUM DELETE reclaims space from soft-deleted rows.
-VACUUM SORT re-sorts data. Run during low-traffic windows — VACUUM is
-resource-intensive and can impact query performance.
-
 ### Step 6: Concurrency Scaling evaluation
 
 | Concurrency Scaling state | Workload pattern | Recommendation |
@@ -298,12 +215,6 @@ resource-intensive and can impact query performance.
 | Off, sustained queue depth | Peak hours > 8h/day | **OPPORTUNITY_FOUND** — add Reserved Nodes instead of CS |
 | On, scales < 2h/day | Cost justified | Keep — small cost for burst headroom |
 | On, scales > 8h/day | Expensive | **OPPORTUNITY_FOUND** — right-size cluster or buy RIs |
-
-**Cost comparison:** Concurrency Scaling at ~$1.08/hour. If the cluster
-scales 8h/day x 30 days = $2,592/month. Compare with adding a Reserved
-Node: ra3.4xlarge at 3-yr RI ~$1,113/month (40% of $2,475). Reserved Nodes
-are cheaper for sustained load; Concurrency Scaling is cheaper for short
-bursts.
 
 ### Step 7: Redshift Serverless evaluation
 
@@ -314,14 +225,6 @@ bursts.
 | Serverless with base RPU 32, actual usage avg 8 RPU | Over-provisioned base | **OPPORTUNITY_FOUND** — lower base RPU |
 | Serverless with base RPU 8, frequently hits max RPU | Under-provisioned max | **OPPORTUNITY_FOUND** — raise max RPU |
 
-**Serverless cost model:** `hourly_cost = actual_RPU x $0.36`; monthly
-floor = `base_RPU x $0.36 x 730`. Example: base RPU 8 = $2,102/month
-floor. Lowering base RPU from 32 to 8 drops floor from $8,410 to $2,102.
-
-**Serverless vs provisioned decision rule:** If the workload runs < 12
-hours/day at moderate RPU, Serverless is typically cheaper. If the
-workload runs 24/7 at steady RPU, provisioned with RIs is cheaper.
-
 ### Step 8: Advanced features optimisation
 
 | Feature | Use case | Cost impact |
@@ -331,17 +234,6 @@ workload runs 24/7 at steady RPU, provisioned with RIs is cheaper.
 | Data sharing | Cross-cluster queries without data copy | Eliminates redundant ETL and storage; producer bears compute |
 | Data lake export (UNLOAD to S3) | Archive cold data to S3 + query via Spectrum | Reduces managed storage; Spectrum scans at $5/TB |
 | Late materialized views | Incremental refresh for large views | Reduces refresh compute cost |
-
-**Materialized view strategy:** Create materialized views for frequently
-queried aggregations (daily sales, active users). Auto-refresh on a
-schedule. This reduces CPU on the main cluster by pre-computing results.
-The trade-off: refresh compute cost. Use incremental refresh (late
-materialized views) for large datasets.
-
-**Data sharing strategy:** If multiple clusters query the same production
-data, configure one producer cluster with data sharing. Consumer clusters
-query the data directly without copying. This eliminates redundant storage
-and ETL pipelines.
 
 ### Step 9: Idle cluster detection
 
@@ -387,33 +279,7 @@ Stack applicable dimensions for the total saving.
 - If all dimensions pass for current node type but pricing could improve ->
   **OPPORTUNITY_FOUND** (pricing dimension).
 
-## Output format (per cluster)
-
-```text
-TARGET: <cluster-identifier or workgroup-name>
-VERDICT: OPTIMIZED | OPPORTUNITY_FOUND | ALREADY_OPTIMAL
-REASON: <1-2 sentences naming the recommendation and supporting data>
-RECOMMENDATION:
-  Current: <node-type> x <node-count> at <pricing-model> in <region>
-    Distribution: <EVEN | KEY(<col>) | ALL>  Sort key: <none | <col> | compound(<cols>)>
-  Proposed: <node-type> x <node-count> at <pricing-model> in <region>
-    Distribution: <EVEN | KEY(<col>) | ALL>  Sort key: <none | <col> | compound(<cols>)>
-  Dimensions: <list of applicable dimensions>
-  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
-ESTIMATED_SAVINGS:
-  Monthly (node-type): $<amount>
-  Monthly (right-size): $<amount>
-  Monthly (pricing model): $<amount>
-  Monthly (other): $<amount>
-  Annual total: $<amount>
-  Assumptions: <list (730h/month, us-east-1 pricing, etc.)>
-MIGRATION_STEPS:
-  1. <specific action with CLI command>
-  2. <verification step>
-CONFIRM: Before executing any state-changing CLI, emit and await operator
-  approval: "CONFIRM: About to <action> on <cluster> in <region>. Proceed?
-  (yes/no)"
-```
+Verbose field-by-field variant: `references/advanced-patterns.md` § Output format.
 
 ## STRICT output contract
 
@@ -496,75 +362,8 @@ MIGRATION_STEPS:
 CONFIRM: Before resizing the cluster, emit and await: "CONFIRM: About to resize analytics-prod-cluster from 4 to 2 ra3.4xlarge nodes in us-east-1. Elastic resize causes brief downtime (~10-20 min). Proceed? (yes/no)"
 ```
 
-### Worked example — DC2.Large to RA3.xlplus node-type migration
-
-```text
-TARGET: billing-events-cluster (arn:aws:redshift:us-east-1:123456789012:cluster:billing-events-cluster)
-VERDICT: OPPORTUNITY_FOUND
-REASON: dc2.large x 12 nodes at 12% CPU / 0 QueryQueueLength over 30 days is
-  massively oversized — 12 nodes exist solely because data grew to 1.5 TB
-  and each dc2.large holds only 160 GB local (Step 1). Migrating to
-  ra3.xlplus x 2 with managed storage eliminates 10 excess compute nodes.
-  No Reserved Node in place on steady-state production (Step 3). Largest
-  table (events_log, 1.2 TB) has no sort key — every query scans the full
-  table (Step 5).
-RECOMMENDATION:
-  Current: dc2.large x 12 at On-Demand in us-east-1
-    Distribution: KEY(user_id) on 6 tables, EVEN on 4 tables  Sort key: none on events_log
-  Proposed: ra3.xlplus x 2 at 3-yr Reserved Node in us-east-1
-    Distribution: KEY(tenant_id) on all tables  Sort key: compound(event_time, tenant_id) on events_log
-  Dimensions: node-type (dc2.large → ra3.xlplus), right-size (12 → 2),
-    pricing (On-Demand → 3-yr RI), distribution (KEY user_id → KEY tenant_id),
-    sort-key (none → compound), storage (VACUUM + compress)
-  Confidence: HIGH — 30 days of CloudWatch data; 12% CPU / 0 queue confirms
-    overprovisioning; storage at 73% of local capacity confirms node-count
-    driven by storage growth not compute need.
-ESTIMATED_SAVINGS:
-  Monthly (node-type + right-size): $1,680.46
-    — dc2.large: 12 × $0.25 × 730 = $2,190.00
-    — ra3.xlplus OD: 2 × $0.775 × 730 = $1,131.50
-    — node saving: $2,190.00 − $1,131.50 = $1,058.50
-  Monthly (pricing model): $452.60
-    — ra3.xlplus 3-yr RI (~60% discount): 2 × $0.31 × 730 = $452.60
-    — vs On-Demand for remaining 2 nodes: $1,131.50 − $452.60 = $678.90 saved
-      (pricing discount applied to proposed nodes only)
-  Monthly (managed storage): -$36.00
-    — 1,500 GB × $0.024/GB = $36.00 (new cost; DC2 storage was bundled)
-  Monthly (storage compression): $14.40
-    — VACUUM reclaims est. 600 GB soft-deleted rows × $0.024 = $14.40
-  Monthly total: $2,107.46  ($1,058.50 + $678.90 + $36.00 offset + $14.40)
-  Annual total: ~$25,289.52
-  Assumptions: 730h/month, us-east-1 pricing as of 2026, 3-yr RI No Upfront
-    at ~60% discount, managed storage at $0.024/GB-month, workload steady-state.
-MIGRATION_STEPS:
-  1. Snapshot the cluster before migration:
-     aws redshift create-snapshot --cluster-identifier billing-events-cluster \
-       --snapshot-identifier pre-dc2-ra3-migration-$(date +%s) --region us-east-1
-  2. Elastic resize to ra3.xlplus x 2 (brief downtime ~10-20 min):
-     aws redshift resize-cluster --cluster-identifier billing-events-cluster \
-       --cluster-type multi-node --number-of-nodes 2 --node-type ra3.xlplus \
-       --region us-east-1
-  3. Wait for resize to complete, then verify query performance:
-     aws redshift describe-clusters --cluster-identifier billing-events-cluster \
-       --query 'Clusters[0].ClusterStatus' --output text --region us-east-1
-  4. Update distribution style on key tables:
-     ALTER TABLE events_log ALTER DISTSTYLE KEY DISTKEY (tenant_id);
-     ALTER TABLE user_sessions ALTER DISTSTYLE KEY DISTKEY (tenant_id);
-  5. Add compound sort key to events_log:
-     ALTER TABLE events_log ALTER SORTKEY (event_time, tenant_id);
-     VACUUM SORT ONLY events_log;
-  6. VACUUM and ANALYZE all tables:
-     VACUUM DELETE; ANALYZE;
-  7. After 7 days of stable operation, purchase 3-yr Reserved Nodes:
-     aws redshift describe-reserved-node-offerings --node-type ra3.xlplus \
-       --duration 94608000 --offering-type "No Upfront" --region us-east-1
-     aws redshift purchase-reserved-node-offering \
-       --reserved-node-offering-id <offering-id> --node-count 2 --region us-east-1
-CONFIRM: Before migrating billing-events-cluster from dc2.large x 12 to
-  ra3.xlplus x 2 in us-east-1, emit and await: "CONFIRM: Elastic resize
-  causes ~10-20 min downtime. Monthly saving $2,107.46 (96% compute
-  reduction). Proceed? (yes/no)"
-```
+Secondary worked example — DC2.Large x 12 → RA3.xlplus x 2 node-type
+migration with full savings arithmetic: `references/worked-examples.md`.
 
 ### Node-type migration decision tree
 
@@ -601,18 +400,7 @@ Is the current cluster DC2?
 7. **DC2-to-RA3 must check storage utilisation** — DC2 with > 80% local
    storage used may be cheaper than RA3 + managed storage.
 
-## Error handling — CLI and data-source failures
-
-| Failure mode | Detection | Handling |
-|---|---|---|
-| `describe-clusters` returns empty | `len(Clusters) == 0` | No clusters to optimise. ALREADY_OPTIMAL for fleet. |
-| CloudWatch CPUUtilization returns empty | `len(Datapoints) == 0` | Cluster may be paused/stopped. Check ClusterStatus. |
-| `resize-cluster` returns InvalidClusterState | Resize in progress or incompatible | Wait for current operation to complete. |
-| `purchase-reserved-node-offering` fails | Offering ID stale | Re-query for a fresh offering-id. |
-| Serverless workgroup not found | `ResourceNotFoundException` | Check workgroup name and region. |
-| Concurrency Scaling metrics absent | CS never triggered | CS is enabled but unused — no cost impact. |
-| Cluster in `modifying` state | ClusterStatus | Wait for completion before recommending changes. |
-| VACUUM running | `STV_TBL_PERM` shows active vacuum | Do not recommend concurrent VACUUMs. |
+CLI and data-source failure modes: `references/error-handling.md`.
 
 ## Anti-Patterns — NEVER (top 5)
 
@@ -666,23 +454,7 @@ Post-tree overrides: Serverless workgroup -> evaluate base/max RPU
 deletion). DC2 cluster -> evaluate RA3 migration first (Step 1). Status
 = `modifying` -> wait for completion.
 
-## Expert heuristic — non-obvious Redshift behaviours
-
-| Heuristic | Impact on optimisation |
-|---|---|
-| RA3 managed storage bills on actual usage, not provisioned | Deleting stale data and VACUUM directly reduces monthly cost |
-| DC2 local storage is bundled with compute | DC2 with > 80% storage usage may be cheaper than RA3 + managed storage |
-| Concurrency Scaling charges per active second | Sustained CS (8h+/day) costs more than a Reserved Node |
-| Reserved Nodes do NOT discount Concurrency Scaling | CS always bills at On-Demand; budget CS separately |
-| Serverless base RPU sets the floor cost | Min RPU 8 = $2,102/month floor even when idle |
-| VACUUM reclaims soft-deleted rows | Without VACUUM, deleted rows still consume storage and slow scans |
-| ANALYZE updates planner statistics | Stale stats cause bad joins — broadcast instead of redistribute burns CPU |
-| Data sharing producer bears compute | One producer can serve many consumers, eliminating redundant clusters |
-| SQA bypasses the main WLM queue | Enable SQA for sub-15s queries to prevent short queries being stuck behind long ETL |
-| Materialized views reduce main-cluster CPU | Pre-computed aggregations trade refresh cost for query savings |
-| Redshift ML AUTO ON delegates to SageMaker | Training costs accrue in SageMaker; inference is free in Redshift |
-| Spectrum scans S3 at $5/TB | Cheaper than storing cold data in Redshift managed storage |
-| Elastic resize has brief downtime (~10-20 min) | Plan during maintenance window; snapshot before resize |
+Non-obvious Redshift behaviours table: `references/advanced-patterns.md` § Expert heuristic.
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
@@ -702,36 +474,14 @@ deletion). DC2 cluster -> evaluate RA3 migration first (Step 1). Status
 - **Check for data sharing dependencies.** If the cluster is a data
   sharing producer, downsizing it impacts all consumer clusters.
 
-## Recent AWS features (2024-2026)
+Recent AWS features (2024-2026): `references/advanced-patterns.md`.
 
-- **Redshift RA3 node types expanded (2024-2025):** ra3.4xlarge and
-  ra3.16xlarge remain the standard. Managed storage now supports up to
-  10 PB per cluster. Evaluate DC2 clusters for RA3 migration.
-- **Redshift Serverless general availability + enhancements (2024-2025):**
-  Base capacity RPU 8-512, auto-scaling, cross-account data sharing.
-  Evaluate for variable workloads with significant idle periods.
-- **Concurrency Scaling improvements (2024):** Faster scaling cluster
-  spin-up (30 seconds vs 2 minutes previously). More cost-effective for
-  short bursts.
-- **Redshift ML AUTO ON (2024-2025):** Automatically trains and deploys
-  SageMaker Autopilot models from Redshift SQL. Inference runs in
-  Redshift without separate SageMaker endpoint costs.
-- **Materialized views with incremental refresh (2024-2025):** Late
-  materialized views support incremental refresh, reducing the compute
-  cost of keeping views current.
-- **Data sharing general availability (2024):** Cross-account and cross-
-  region data sharing. One producer cluster serves multiple consumers
-  without data duplication.
-- **AZ64 compression (2024):** Default encoding for new tables. 30-40%
-  better compression than LZO for numeric and date columns with faster
-  decompression.
-- **Data lake export (UNLOAD to S3, 2024-2025):** Native export of query
-  results to S3 in Parquet format for cold data archival and Spectrum
-  querying.
-
-## References
+## References (load on demand)
 
 - `references/redshift-optimization-deep-dive.md` — CLI scripts, WLM
+- [Worked examples](references/worked-examples.md) — full walkthroughs
+- [Error handling](references/error-handling.md) — API error codes and remedies
+- [Advanced patterns](references/advanced-patterns.md) — philosophy, per-step detail notes, expert heuristics, 2024-2026 features
   configuration details, storage analysis, and migration procedures
 
 ## Domain

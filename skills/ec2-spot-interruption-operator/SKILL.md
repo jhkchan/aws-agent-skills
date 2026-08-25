@@ -164,34 +164,10 @@ Run before classification. Misclassifying these produces wrong plans.
 **Pagination:** `describe-spot-instance-requests` paginates at 1,000/page
 — drain `--next-token` to completion. Filter by `--state active`.
 
-**Live-account pre-flight (skip if offline plan audit):**
-1. `aws ec2 describe-spot-instance-requests --spot-instance-request-id
-   <id>` — confirm `State: active`; capture `InstanceId`,
-   `InstanceInterruptionBehavior`, `InstanceType`, `AvailabilityZone`.
-2. `aws ec2 describe-spot-fleet-requests --spot-fleet-request-ids <id>`
-   — capture `AllocationStrategy`, `TargetCapacity`,
-   `FulfilledCapacity`, `LaunchTemplateConfigs.Overrides`
-   (diversification list).
-3. `aws events describe-rule --name <rule-name>` — confirm `ENABLED`.
-   `aws events list-targets-by-rule` — confirm target (SQS or Lambda).
-4. `aws sqs get-queue-attributes --queue-url <url>
-   --attribute-names All` — capture queue depth,
-   `ApproximateAgeOfOldestMessage`, `RedrivePolicy`.
-5. `aws lambda get-function-configuration --function-name <fn>` —
-   confirm `State: Active`, `Timeout >= 60`. `aws lambda
-   get-function-concurrency` — confirm reserved concurrency not 0.
-6. `aws elbv2 describe-target-group-attributes --target-group-arn <arn>`
-   — capture `deregistration_delay.timeout_seconds`.
-   `aws elbv2 describe-target-health` — confirm instance is registered.
-7. `aws autoscaling describe-auto-scaling-groups
-   --auto-scaling-group-names <name>` — capture `CapacityRebalance`,
-   `MixedInstancesPolicy`, lifecycle hooks.
+**Live-account pre-flight (skip if offline plan audit):** the 7 read-only commands
+(describe-spot-instance-requests ... autoscaling describe-auto-scaling-groups) are listed in [Diagnostic commands](references/diagnostic-commands.md).
 
-**Malformed input:** if the input JSON is invalid or missing required
-fields, emit `VERDICT: ERROR` with `REASON: Spot/Fleet/ASG configuration
-is not valid JSON or is missing required fields — cannot plan.` and
-`REMEDIATION: Re-fetch with aws ec2 describe-spot-instance-requests
---spot-instance-request-id <id> --output json and re-plan.`
+Malformed-input protocol (VERDICT: ERROR + REMEDIATION): see [Error handling](references/error-handling.md).
 
 | Spot/Fleet/ASG attribute | Effect on operation |
 |---|---|
@@ -210,68 +186,14 @@ is not valid JSON or is missing required fields — cannot plan.` and
 
 ## Process — operation planning (apply in order)
 
-### Step 0: Expert knowledge — non-obvious EC2 Spot interruption behaviors
+### Step 0: Expert knowledge - non-obvious EC2 Spot interruption behaviors (condensed)
 
-These behaviors are easy to misjudge without operational Spot
-experience. Each changes a plan if ignored:
-
-- **The 2-minute warning is a maximum, not a guarantee.** Design the
-  graceful-shutdown pipeline to complete within 90 seconds. Some
-  interruption scenarios (capacity-reclaim) may provide less notice.
-  EventBridge is the ONLY notification channel — there is no SNS,
-  email, or CloudWatch Alarm for Spot interruptions.
-
-- **`InstanceInterruptionBehavior` is set at launch and immutable.**
-  Options: `terminate` (default), `stop` (EBS-backed), `hibernate`
-  (requires `--hibernate-options Configured=true`). If the Spot
-  request is cancelled, stopped/hibernated instances cannot restart
-  as Spot — they become On-Demand or remain stopped.
-
-- **Capacity rebalance is proactive, not reactive.** ASG
-  `CapacityRebalance` monitors Spot placement risk and launches
-  replacements BEFORE the 2-minute warning. Enable for production
-  ASGs to reduce actual interruptions experienced.
-
-- **`capacity-optimized` over `lowest-price` for production.**
-  `lowest-price` selects the cheapest pool (highest interruption rate).
-  `capacity-optimized` selects pools with the lowest interruption rate
-  at a 5-10% cost premium for 10-100x better availability.
-
-- **Diversification math: 3 families x 3 AZs = 9 pools.** Interruption
-  rates are roughly independent across pools. With 9 pools, the
-  probability of all being interrupted simultaneously is negligible —
-  the basis for the 99.9% availability claim. Mix Intel, AMD, and
-  Graviton (`c5`, `m5`, `c6g`) across 3+ AZs.
-
-- **Spot placement score is a forecast, not a guarantee.**
-  `get-spot-placement-scores` estimates fulfillment likelihood (10 =
-  highly recommended; 1 = unlikely). Run BEFORE launching large fleets.
-  The score is a snapshot — it does not guarantee future availability.
-
-- **Spot Block is deprecated (2024+).** No new requests accepted. Use
-  On-Demand Capacity Reservations for predictable capacity.
-
-- **ELB deregistration delay must fit within 2 minutes.** The ALB
-  default of 300 seconds means the instance is terminated before
-  draining finishes. Set to 30-60 seconds for Spot targets.
-
-- **ASG lifecycle hooks fire on termination, not on the warning.**
-  The `InstanceTerminating` hook places the instance in
-  `Terminating:Wait` — but the Spot interruption terminates after 2
-  minutes regardless. The lifecycle hook does NOT extend the window.
-
-- **Spot Fleet auto-replaces interrupted instances.** No manual
-  intervention needed for capacity restoration — but replacements
-  start from scratch (no state migration). Stateful workloads must
-  checkpoint independently.
-
-- **Graviton (arm64) Spot often has lower interruption rates.** Newer
-  pools with more spare capacity. Include in diversification for both
-  cost and resilience. Verify application supports arm64.
-
-- **`describe-spot-instance-requests` `StatusCode` for early warning.**
-  `marked-for-stop` or `marked-for-termination` indicates imminent
-  interruption. `fulfilled` means healthy.
+- The 2-minute warning is a maximum, not a guarantee - design the pipeline to finish within 90 seconds. EventBridge is the ONLY notification channel.
+- `InstanceInterruptionBehavior` is set at launch and immutable (terminate / stop / hibernate).
+- Capacity rebalance is proactive (launches replacements BEFORE the warning). Prefer `capacity-optimized` over `lowest-price` for production.
+- Diversification math: 3 families x 3 AZs = 9 pools for 99.9% availability. Spot placement score is a forecast, not a guarantee.
+- Spot Block is deprecated (2024+). ELB deregistration delay must fit within 2 minutes; lifecycle hooks fire on termination, not the warning.
+- Full deep dives (Graviton rates, StatusCode early warning, Fleet auto-replacement): [Advanced patterns](references/advanced-patterns.md).
 
 ### Step 1: Pre-check gate — REVIEW_REQUIRED if any check needs human attention
 
@@ -324,18 +246,7 @@ items listed. Do NOT execute until the operator reviews.
    DLQ empty. Lambda `Active`, reserved concurrency >= 1. ELB delay
    30-60s.
 
-**Interruption-handling failure-mode table:**
-
-| Symptom | Root cause | Fix |
-|---|---|---|
-| EventBridge rule fired but Lambda never invoked | Lambda reserved concurrency = 0, OR resource-based policy missing `events.amazonaws.com` | `put-function-concurrency --reserved-concurrent-executions 5`; add `lambda:InvokeFunction` permission for `events.amazonaws.com` |
-| Lambda invoked but timed out | Lambda timeout too short (< 60s), OR S3/DynamoDB write is slow | `update-function-configuration --timeout 90`; check checkpoint target latency |
-| Lambda completed but instance not deregistered from ELB | Lambda lacks `elasticloadbalancing:DeregisterTargets`, OR wrong target group ARN | Add the permission; verify the target group ARN in the Lambda env |
-| Instance deregistered but ELB still sending traffic | `deregistration_delay.timeout_seconds` > 120 (longer than the 2-minute window) | Modify the target group: `modify-target-group-attributes --attributes Key=deregistration_delay.timeout_seconds,Value=30` |
-| Spot Fleet did not auto-replace | `TargetCapacity` dropped, OR `ExcessCapacityTerminationPolicy` misconfigured, OR all pools exhausted | Verify `TargetCapacity`; check `describe-spot-fleet-request-history` for launch failures |
-| ASG did not launch replacement | `DesiredCapacity` already met by On-Demand, OR `MixedInstancesPolicy` spot percentage = 0 | Verify `SpotAllocationStrategy` and `SpotPercentage`; check ASG activity |
-| Repeated interruptions on the same instance type | Single pool, high interruption rate in that AZ | Diversify: add more instance types and AZs; switch to `capacity-optimized` |
-| Stateful work lost despite pipeline | Checkpoint not written before termination (pipeline too slow) | Reduce checkpoint latency; use async writes; consider `InstanceInterruptionBehavior: stop` |
+Interruption-handling failure-mode table (Lambda never invoked, ELB still sending traffic, Fleet did not auto-replace, etc.): see [Error handling](references/error-handling.md).
 
 ### Step 2: OPERATION_COMPLETED or REVIEW_REQUIRED — emit operation plan
 
@@ -491,129 +402,6 @@ NOTES:
     reducing the effective gap to zero.
 ```
 
-### Worked example — tune-replacement-strategy (REVIEW_REQUIRED)
-
-```text
-OPERATION: tune-replacement-strategy
-VERDICT: REVIEW_REQUIRED
-TARGET: prod-batch-fleet (Spot Fleet: sfr-batch-prod, current strategy: lowestPrice, target: capacity-optimized)
-PRE_CHECKS:
-  - [PASS] Spot Fleet sfr-batch-prod State: active
-  - [PASS] TargetCapacity: 50, FulfilledCapacity: 47 (3 instances
-    recently interrupted)
-  - [REVIEW] Current AllocationStrategy: lowestPrice with
-    InstancePoolsToUseCount: 1 (single pool — highest interruption
-    risk). Proposed: capacity-optimized with the existing 5-instance-
-    type diversification. This changes the pool selection logic —
-    new launches will prefer lower-interruption pools over cheaper
-    ones. Estimated cost impact: +5-8% on Spot spend. Confirm the
-    cost increase is acceptable for the availability improvement.
-  - [REVIEW] Current diversification: 2 instance families (c5, m5)
-    across 2 AZs (us-east-1a, us-east-1b). Below the 3x3 minimum
-    for 99.9% availability. Proposed: add c6g (Graviton) and
-    us-east-1c. Confirm the batch workload supports arm64.
-STEPS:
-  1. CONFIRM: About to modify Spot Fleet sfr-batch-prod: change
-     AllocationStrategy from lowestPrice to capacity-optimized, add
-     c6g.large and c6g.xlarge to the LaunchTemplate Overrides, add
-     us-east-1c to the AZ list. This takes effect immediately for
-     new launches. Existing instances are not restarted. Proceed?
-     (yes/no)
-  2. aws ec2 modify-spot-fleet-request \
-       --spot-fleet-request-id sfr-batch-prod \
-       --target-capacity 50 \
-       --excess-capacity-termination-policy true \
-       --launch-template-configs '[{
-         "LaunchTemplateSpecification": {
-           "LaunchTemplateId": "lt-batch-prod",
-           "Version": "2"
-         },
-         "Overrides": [
-           {"InstanceType": "c5.large", "AvailabilityZone": "us-east-1a"},
-           {"InstanceType": "c5.large", "AvailabilityZone": "us-east-1b"},
-           {"InstanceType": "c5.large", "AvailabilityZone": "us-east-1c"},
-           {"InstanceType": "m5.large", "AvailabilityZone": "us-east-1a"},
-           {"InstanceType": "m5.large", "AvailabilityZone": "us-east-1b"},
-           {"InstanceType": "m5.large", "AvailabilityZone": "us-east-1c"},
-           {"InstanceType": "c6g.large", "AvailabilityZone": "us-east-1a"},
-           {"InstanceType": "c6g.large", "AvailabilityZone": "us-east-1b"},
-           {"InstanceType": "c6g.large", "AvailabilityZone": "us-east-1c"}
-         ]
-       }]'
-  3. Monitor interruption rate over 24-48 hours:
-     aws cloudwatch get-metric-statistics \
-       --namespace AWS/Usage \
-       --metric-name CallCount \
-       --dimensions Name=Service,Value=EC2 Name=Resource,Value=Spot \
-       --start-time $(date -u -v-2d +%Y-%m-%dT%H:%M:%SZ) \
-       --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-       --period 3600 --statistics Sum
-POST_VERIFY:
-  - (pending execution)
-  - [PASS] AllocationStrategy: capacity-optimized (confirmed via
-    describe-spot-fleet-requests)
-  - [PASS] Diversification: 3 families (c5, m5, c6g) x 3 AZs (1a, 1b, 1c)
-  - [PASS] Spot Fleet FulfilledCapacity: 50 (full capacity within 10 min)
-  - [PASS] 48-hour interruption count: 2 (down from 12 in the prior
-    48-hour window with lowestPrice + single pool)
-NOTES:
-  - The switch from lowestPrice to capacity-optimized typically reduces
-    interruption frequency by 5-10x. The cost increase is 5-8% because
-    capacity-optimized does not always select the cheapest pool.
-  - Graviton (c6g) instances often have lower interruption rates than
-    x86 (c5/m5) due to newer capacity. Confirm the batch application
-    runs on arm64 (recompile or use multi-arch container images).
-  - The 3x3 diversification (9 pools) provides a 99.9% Spot availability
-    profile — the probability of all 9 pools being interrupted
-    simultaneously is negligible.
-```
-
-### Worked example — configure-pipeline (condensed)
-
-```text
-OPERATION: configure-pipeline
-VERDICT: REVIEW_REQUIRED
-TARGET: prod-api-asg (graceful-shutdown pipeline: EventBridge + SQS + Lambda)
-PRE_CHECKS:
-  - [PASS] ASG exists, uses Spot via MixedInstancesPolicy
-  - [PASS] ALB target group exists (deregistration_delay: 300 — needs
-    change to 45 for Spot)
-  - [REVIEW] Pipeline: EventBridge -> SQS (with DLQ) -> Lambda
-    (timeout 90, reserved concurrency 10). Lambda deregisters from ELB,
-    sends SIGTERM via SSM, writes checkpoint to S3. Confirm bucket +
-    Lambda role permissions.
-  - [REVIEW] ALB deregistration_delay change 300 -> 45: affects ALL
-    Spot targets. Confirm app drains in-flight requests within 45s.
-STEPS:
-  1. CONFIRM: configure Spot interruption pipeline for prod-api-asg
-     (EventBridge rule, SQS+DLQ, Lambda, modify ELB delay to 45s).
-     Proceed? (yes/no)
-  2. aws sqs create-queue --queue-name spot-interruption-queue
-  3. aws sqs set-queue-attributes --queue-url <url> \
-       --attributes RedrivePolicy='{"deadLetterTargetArn":"...:dlq","maxReceiveCount":"3"}'
-  4. aws events put-rule --name spot-interruption-warning \
-       --event-pattern '{"detail-type":["EC2 Spot Instance Interruption Warning"],"source":["aws.ec2"]}'
-  5. aws events put-targets --rule spot-interruption-warning \
-       --targets '[{"Id":"1","Arn":"arn:aws:sqs:us-east-1:...:spot-interruption-queue"}]'
-  6. aws lambda create-function --function-name prod-spot-graceful-shutdown \
-       --runtime python3.12 --handler index.lambda_handler \
-       --role arn:aws:iam::...:role/spot-shutdown-role \
-       --timeout 90 --code S3Bucket=prod-lambda-artifacts,S3Key=spot-shutdown/latest.zip
-  7. aws lambda put-function-concurrency --function-name prod-spot-graceful-shutdown \
-       --reserved-concurrent-executions 10
-  8. aws elbv2 modify-target-group-attributes --target-group-arn <arn> \
-       --attributes Key=deregistration_delay.timeout_seconds,Value=45
-  9. aws autoscaling put-lifecycle-hook --auto-scaling-group-name prod-api-asg \
-       --lifecycle-hook-name spot-termination-hook \
-       --lifecycle-transition autoscaling:EC2_INSTANCE_TERMINATING \
-       --heartbeat-timeout 120 --default-result CONTINUE
-POST_VERIFY: (pending) — rule ENABLED, SQS DLQ configured, Lambda Active,
-  ELB delay 45, lifecycle hook 120s. Synthetic test passes.
-NOTES: Test with synthetic event BEFORE relying on it. 45s delay leaves
-  75s for checkpointing. Monitor SQS depth — stale messages mean Lambda
-  is lagging.
-```
-
 ## Anti-Patterns — NEVER
 
 - NEVER rely on Spot without a graceful-shutdown pipeline. Without
@@ -691,30 +479,14 @@ NOTES: Test with synthetic event BEFORE relying on it. 45s delay leaves
   AZs. Use `capacity-optimized` allocation strategy. Enable
   `CapacityRebalance` on ASGs for proactive replacement.
 
-## Recent AWS features (2024-2026)
+## References (load on demand)
 
-- **Capacity Rebalance GA:** ASG `CapacityRebalance` proactively
-  monitors Spot risk and launches replacements BEFORE the 2-minute
-  warning. Enable for production ASGs.
-
-- **Spot Placement Score API:** `get-spot-placement-scores` forecasts
-  fulfillment likelihood. Score 10 = "highly recommended"; 1 = "very
-  unlikely." Run before launching large fleets.
-
-- **`capacity-optimized-prioritized`:** Honors `Priority` in Overrides
-  when pools have equal capacity. Use when you have preferred types.
-
-- **Spot Block deprecation (2024+):** No new requests accepted. Use
-  On-Demand Capacity Reservations for predictable capacity.
-
-- **Graviton4 Spot (c7g, m7g, r7g):** Newer pools with lower
-  interruption rates. Include in diversification for cost + resilience.
-
-- **MixedInstancesPolicy SpotPercentage:** Control the Spot vs On-Demand
-  ratio. 50-70% Spot balances savings with On-Demand baseline.
-
-- **IMDSv2 required (2024):** All new EC2 launches (including Spot)
-  must enforce `HttpTokens: required`. Verify launch templates.
+- [Worked examples](references/worked-examples.md) - tune-replacement-strategy (REVIEW_REQUIRED) and configure-pipeline walkthroughs
+- [Error handling](references/error-handling.md) - failure-mode table and malformed-input VERDICT: ERROR protocol
+- [Diagnostic commands](references/diagnostic-commands.md) - live-account pre-flight command listing
+- [Advanced patterns](references/advanced-patterns.md) - expert behaviors and 2024-2026 feature notes
+- [Diversification and strategy](references/diversification-and-strategy.md) - allocation strategies, diversification math, placement score
+- [Graceful shutdown pipeline](references/graceful-shutdown-pipeline.md) - EventBridge + SQS + Lambda architecture and checkpointing
 
 ## Domain
 

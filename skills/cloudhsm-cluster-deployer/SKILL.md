@@ -82,6 +82,8 @@ markers, then `VERIFICATION_COMMANDS:` with indented
 | Output format | The literal checklist template |
 | references/cluster-activation-and-users.md | Activation + CO detail |
 | references/backups-and-ha.md | Backups + HA + recovery detail |
+| references/advanced-patterns.md | Heuristics + integration detail |
+| references/error-handling.md | API errors + remedies |
 
 ## Mindset
 
@@ -161,74 +163,6 @@ exist.
   subnets on HSM service ports (TCP 22 for SSH-less mu, TCP 17578
   for management, TCP 2223 for client). Use narrowest possible
   CIDR.
-
-## Expert heuristic: cluster activation is one-time (CSR → self-signed cert)
-
-A baseline model says "create a cluster, create an HSM, done." The
-correct heuristic recognizes that the first HSM in a cluster emits
-a Certificate Signing Request (CSR); you sign it with your in-house
-CA (or self-sign for the bootstrap), then upload the signed
-certificate PLUS the issuing CA certificate to AWS. AWS uses these
-to activate the cluster. After activation:
-
-```text
-Cluster state lifecycle:
-  CreateCluster → Uninitialized
-  CreateHsm (first) → ACTIVATING (HSM emits CSR)
-  Download CSR → sign with your CA → upload signed cert + CA cert
-  AWS verifies → cluster becomes ACTIVE
-  Once ACTIVE: activation is ONE-TIME. The customer certificate is
-  the trust root for every subsequent HSM in the cluster.
-```
-
-**Key implication:** you CANNOT re-activate under a different CA
-without a new cluster. Plan the CA choice up front. If you must
-rotate the trust root, restore from backup into a new cluster.
-
-## Expert heuristic: minimum 2 AZs for HA
-
-A single HSM is a single point of failure. CloudHSM achieves HA by
-adding HSM instances in different AZs to the SAME cluster; key
-material auto-syncs.
-
-```text
-Production topology:
-  Cluster: cloudhsm-prod (cluster-xxx)
-    ├── HSM in us-east-1a (subnet-aaa)
-    ├── HSM in us-east-1b (subnet-bbb)
-    └── HSM in us-east-1c (subnet-ccc) [N+2 for stricter HA]
-
-  Key material auto-syncs. Client lib load-balances across the ENIs.
-  Loss of 1 AZ = no outage (other HSMs serve).
-```
-
-**Key implication:** 2 AZs tolerates 1 AZ failure. 3 AZs tolerates
-1 AZ failure during a replace (recommended production posture). Two
-separate clusters in two AZs do NOT sync and do NOT count as HA.
-
-## Expert heuristic: crypto officer password is NOT recoverable (quorum required)
-
-CloudHSM has no "forgot password" flow. The Crypto Officer (CO) user
-is the root-of-trust account inside the HSM. Lose the CO password
-AND you've lost access to the cluster's key material. Lose quorum
-(if you set quorum policies) and you've lost the ability to perform
-privileged operations.
-
-```text
-Recoverability posture:
-  CO password lost → key material is UNRECOVERABLE
-  Quorum not met → privileged operations blocked (no override)
-  Mitigations:
-    ├── ≥2 CO users, each with the password in a secure offline
-    │   store (Secrets Manager, KMS-encrypted vault)
-    ├── Documented quorum policy (M-of-N) for destructive ops
-    └── Frequent backups + cross-region copy so the worst case is
-        "restore from backup into a new cluster"
-```
-
-**Key implication:** treat the CO password as a crown-jewel secret.
-Maintain ≥2 COs, document rotation, and test the backup-restore
-drill annually.
 
 ## Prerequisites (verify before provisioning)
 
@@ -333,221 +267,43 @@ into a new cluster.
 
 ## Step 4 — Crypto officer/user management
 
-Once the cluster is ACTIVE, log in via the CloudHSM management util
-(`cloudhsm_mgmt_util`, aliased `mu`) over the ENI to create the
-first Crypto Officer (CO) and Crypto Users (CU).
-
-```bash
-# Configure the CloudHSM client with the cluster's ENI
-sudo /opt/cloudhsm/bin/configure -a 10.0.1.10
-
-# Start the management utility (mu)
-/opt/cloudhsm/bin/cloudhsm_mgmt_util /opt/cloudhsm/etc/cloudhsm_mgmt_util.cfg
-
-# Inside mu:
-#   loginHSM CO admin <password-from-secrets-manager>
-#   createUser CO officer2 <password>
-#   createUser CU app-user <password>
-#   quit
-```
-
-**Critical practices:**
-- The CO `admin` password is the cluster's crown-jewel secret. Store
-  in AWS Secrets Manager (encrypted with a customer-managed KMS key).
-- Create ≥2 CO users so you have quorum if one is lost.
-- CUs own and use keys; created by COs; scoped to the cluster.
-- Password policies (length, complexity) propagate via cluster sync.
+Full procedure: [cluster-activation-and-users.md](references/cluster-activation-and-users.md). Log in via `cloudhsm_mgmt_util` (mu) over the ENI; create the first CO (`admin`) and CUs. The CO password is the crown-jewel secret — store in Secrets Manager (customer-managed KMS key) and keep >=2 COs for quorum.
 
 ## Step 5 — HSM backups (daily + on-demand)
 
-AWS CloudHSM takes automatic backups every 5 minutes (delta) plus a
-daily snapshot. On-demand backups create a manual snapshot before
-risky changes via the management utility.
-
-```bash
-# List recent backups
-aws cloudhsmv2 describe-backups \
-  --filters clusterIds=$CLUSTER_ID \
-  --query 'Backups[*].{Id:BackupId, Created:CreateTimestamp, Type:BackupType, State:BackupState}' \
-  --output table --region us-east-1
-```
-
-For an on-demand backup, use the management util (`mu`) `createBackup`
-command; the backup ID is returned in the mu output. Backups are
-cluster-scoped. Retention is configurable per cluster.
+Full procedure: [backups-and-ha.md](references/backups-and-ha.md). Automatic backups every ~5 minutes (delta) plus a daily snapshot; on-demand backups via the mu `createBackup` command. Backups are cluster-scoped; retention is configurable per cluster.
 
 ## Step 6 — Cross-region backup copy
 
-For DR, copy backups to a second region. The destination region
-must be enabled for CloudHSM.
-
-```bash
-# Copy a backup to a destination region (DR)
-aws cloudhsmv2 copy-backup-to-region \
-  --backup-id <backup-id> \
-  --destination-region us-west-2 \
-  --region us-east-1
-
-# In the destination region, restore the backup into a new cluster
-aws cloudhsmv2 restore-backup --backup-id <dest-backup-id> --region us-west-2
-# (Creates a NEW cluster-id in us-west-2)
-```
-
-**Constraint:** cross-region copy is one-way. The destination
-backup creates a new cluster-id on restore; it is NOT a hot
-replica.
+Full procedure: [backups-and-ha.md](references/backups-and-ha.md). `copy-backup-to-region` for DR — the copy is one-way and restore in the destination creates a NEW cluster-id (cold DR, not a hot replica).
 
 ## Step 7 — HA across AZs
 
-HA is achieved by adding HSM instances in different AZs to the SAME
-cluster. Key material auto-syncs.
-
-```text
-Recommended HA topologies:
-  2 AZs: tolerates 1 AZ failure (minimum production posture)
-  3 AZs: tolerates 1 AZ failure during a replace (recommended)
-```
-
-```bash
-# Add a third HSM for stricter HA
-aws cloudhsmv2 create-hsm --cluster-id "$CLUSTER_ID" \
-  --availability-zone us-east-1c --ip-address 10.0.3.10 --region us-east-1
-
-# Verify all HSMs ACTIVE and in sync
-aws cloudhsmv2 describe-clusters --filters clusterIds=$CLUSTER_ID \
-  --query 'Clusters[0].Hsms[*].{AZ:AvailabilityZone, State:State, ENI:EniIp}' \
-  --output table --region us-east-1
-```
-
-Two separate clusters in two AZs do NOT sync. HA is intra-cluster.
+Full procedure: [backups-and-ha.md](references/backups-and-ha.md). 2 AZs tolerates 1 AZ failure (minimum production posture); 3 AZs tolerates 1 failure during a replace (recommended). Two separate clusters do NOT sync key material.
 
 ## Step 8 — PKCS#11/JCE/PCSC library integration
 
-Workloads integrate with CloudHSM via the PKCS#11 library (C/C++),
-the JCE provider (Java), or PCSC (smart-card HSM). The client
-config maps the cluster CN to the cluster-ID.
-
-```bash
-# Install + configure the PKCS#11 library
-sudo yum install -y cloudhsm-client-pkcs11
-sudo /opt/cloudhsm/bin/configure-pkcs11 -i <cluster-id> \
-  -e /opt/cloudhsm/etc/customerCA.crt
-
-# For Java JCE: install and configure
-sudo yum install -y cloudhsm-client-java
-# Edit /opt/cloudhsm/java/libcloudhsm.conf to point at the cluster
-```
-
-**Constraint:** the client uses the customer CA certificate (the
-one you uploaded during activation) to trust the cluster. Keep the
-bundle current on every client host.
+Full procedure: [advanced-patterns.md](references/advanced-patterns.md). The client uses the customer CA certificate (uploaded at activation) to trust the cluster — keep the bundle current on every client host.
 
 ## Step 9 — SSL/TLS offload
 
-CloudHSM can hold the private key for an SSL/TLS offload workload
-(Nginx, Apache, HAProxy). The private key never leaves the HSM; the
-workload references it by handle.
-
-```text
-1. Generate the keypair inside the HSM (via PKCS#11 or key_mgmt_util).
-2. Create a CSR from the HSM-held private key.
-3. Issue the certificate (ACM or external CA).
-4. Configure the web server to use the CloudHSM PKCS#11 provider
-   for the private key.
-5. The web server holds only the certificate; the private key
-   remains in the HSM.
-```
-
-This offloads TLS termination private-key operations to the HSM,
-satisfying FIPS 140-2 Level 3 for key material.
+Full procedure: [advanced-patterns.md](references/advanced-patterns.md). Generate the keypair inside the HSM; the web server holds only the certificate — the private key never leaves the HSM.
 
 ## Step 10 — FIPS 140-2 Level 3 compliance
 
-AWS CloudHSM is validated to FIPS 140-2 Level 3. To maintain the
-compliance posture:
-
-- Use only Amazon-provided client libraries (PKCS#11, JCE, PCSC).
-- Do NOT export key material to the workload's memory (use in-HSM
-  operations).
-- Maintain the audit trail: CloudTrail logs control-plane events
-  (`CreateCluster`, `CreateHsm`, `InitializeCluster`,
-  `CopyBackupToRegion`); the HSM logs data-plane operations (key
-  use, user logins) to HSM logs.
-- Restrict ENI security group inbound to workload subnets only.
-- Use CO quorum for destructive operations.
-
-```bash
-# Audit CloudHSM control-plane events
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventSource,AttributeValue=cloudhsm.amazonaws.com \
-  --max-results 50 --region us-east-1
-```
+Full procedure: [advanced-patterns.md](references/advanced-patterns.md). In-HSM operations only; CloudTrail control-plane + HSM data-plane audit trail; narrow SG inbound; CO quorum for destructive operations.
 
 ## Step 11 — Network security group (sg-xxx)
 
-The CloudHSM ENI security group is the network-isolation boundary.
-Inbound rules should be the narrowest possible.
-
-| Port | Protocol | Source | Purpose |
-|---|---|---|---|
-| 22 | TCP | CO bastion subnet | SSH-less management (mu) — restrict further |
-| 17578 | TCP | CO bastion subnet | Management utility |
-| 2223 | TCP | workload subnet | Client (PKCS#11/JCE/PCSC) |
-
-```bash
-# Tighten the SG to workload subnet CIDR only
-aws ec2 authorize-security-group-ingress \
-  --group-id sg-cloudhsm-prod \
-  --ip-permissions IpProtocol=tcp,FromPort=2223,ToPort=2223,IpRanges=[{CidrIp=10.0.10.0/24}] \
-  --region us-east-1
-```
-
-Never open `0.0.0.0/0` to CloudHSM ENIs.
+Full procedure: [advanced-patterns.md](references/advanced-patterns.md). Inbound TCP 2223 (client) from workload subnets only; TCP 17578 (management utility); TCP 22 (mu). Use the narrowest CIDR — never `0.0.0.0/0`.
 
 ## Step 12 — CN-to-cluster-ID mapping
 
-The CloudHSM client uses the cluster's Common Name (CN) to verify
-the cluster during TLS handshake. The mapping is registered in the
-client config (`configure -a <eni-ip>` or DNS CNAME).
-
-```bash
-# Point the client at the cluster's primary ENI
-sudo /opt/cloudhsm/bin/configure -a 10.0.1.10
-# Or DNS CNAME: cloudhsm.internal.example.com → 10.0.1.10
-```
-
-If the mapping is wrong, the client fails the TLS handshake. Verify
-the customer CA bundle is current on the client host.
+Full procedure: [cluster-activation-and-users.md](references/cluster-activation-and-users.md). Register the mapping via `configure -a <eni-ip>` or a DNS CNAME; a wrong mapping fails the client TLS handshake.
 
 ## Step 13 — Degradation recovery (create replacement, sync)
 
-When an HSM degrades (hardware fault, AZ outage), recover by
-creating a replacement HSM in the same cluster; key material
-auto-syncs from the surviving HSM(s).
-
-```text
-Recovery procedure:
-  1. Identify the degraded HSM (describe-clusters, state != ACTIVE)
-  2. If AZ is healthy: create a replacement HSM in the same AZ
-     (aws cloudhsmv2 create-hsm --cluster-id <id> --availability-zone <az>)
-  3. If AZ is down: create a replacement in a different AZ already
-     in the cluster's subnet list
-  4. Wait for new HSM ACTIVE — it auto-syncs key material
-  5. Delete the degraded HSM:
-     aws cloudhsmv2 delete-hsm --cluster-id <id> --hsm-id <degraded-hsm-id>
-  6. Verify ≥2 ACTIVE HSMs in different AZs
-```
-
-```bash
-# Delete a degraded HSM after the replacement is ACTIVE
-aws cloudhsmv2 delete-hsm \
-  --cluster-id "$CLUSTER_ID" \
-  --hsm-id hsm-degraded111 --region us-east-1
-```
-
-**Constraint:** never drop below 1 ACTIVE HSM in production; you
-lose HA. Always create the replacement BEFORE deleting the degraded
-HSM.
+Full procedure: [backups-and-ha.md](references/backups-and-ha.md). Create the replacement HSM FIRST, wait for ACTIVE + sync, then delete the degraded HSM — never drop below 1 ACTIVE HSM.
 
 ## NEVER do these things
 
@@ -663,37 +419,13 @@ VERIFICATION_COMMANDS:
   aws cloudtrail lookup-events --lookup-attributes AttributeKey=EventSource,AttributeValue=cloudhsm.amazonaws.com --region us-east-1
 ```
 
-## Error handling
+## References (load on demand)
 
-### create-cluster fails with CloudHsmAccessDeniedException
-- Caller missing `cloudhsm:CreateCluster` or the
-  AWSServiceRoleForCloudHSM service-linked role. Recreate via IAM.
-
-### HSM stuck in CREATE_IN_PROGRESS
-- Poll `describe-clusters`. If >30 min, the AZ may lack capacity.
-  Try a different AZ in the cluster's subnet list.
-
-### initialize-cluster fails with CloudHsmInvalidStateException
-- The CSR hasn't been emitted yet (first HSM not ACTIVE). Wait for
-  first HSM to reach ACTIVE before fetching the CSR.
-
-### CO login fails with HSM error
-- Wrong CO password, or the cluster's customer CA bundle isn't on
-  the client host. Verify the CA bundle path
-  (`/opt/cloudhsm/etc/customerCA.crt`) and password.
-
-### Cross-region copy fails with ValidationException
-- Destination region not enabled for CloudHSM. Enable via
-  `cloudhsmv2 put-allow-destination-region` (or console).
-
-### HSM in degraded state
-- Create a replacement HSM in the same cluster (different AZ if the
-  AZ is down), wait for ACTIVE + sync, then delete the degraded
-  HSM.
-
-### Want to change the customer CA
-- Activation is one-time. To change CAs, restore from backup into a
-  new cluster under the new CA.
+- [Cluster activation and users](references/cluster-activation-and-users.md) — one-time CSR activation flow, CO/CU management via mu, password policies, quorum, CN-to-cluster-ID mapping (Steps 4 and 12 in detail)
+- [Backups and HA](references/backups-and-ha.md) — backup model, cross-region copy, HA topology, degradation recovery, DR drill (Steps 5, 6, 7, and 13 in detail)
+- [Advanced patterns](references/advanced-patterns.md) — expert heuristics (one-time activation, >=2 AZs, CO password non-recoverability), PKCS#11/JCE/PCSC integration, SSL/TLS offload, FIPS 140-2 Level 3 posture, security groups (Steps 8-11 in detail)
+- [Error handling](references/error-handling.md) — API error codes and remedies
+- [End-to-end walkthrough](examples/README.md) — full worked example from invocation to verification
 
 ## Domain
 

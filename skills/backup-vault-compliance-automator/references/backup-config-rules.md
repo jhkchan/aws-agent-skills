@@ -398,3 +398,25 @@ aws configservice put-remediation-configurations \
     }
   ]'
 ```
+
+## Deploy the custom EC2 backup-coverage Config rule (from SKILL.md Step 8)
+
+Custom Config rule for backup coverage (detect resources without backup
+plans):
+
+```bash
+aws configservice put-config-rule \
+  --config-rule '{
+    "ConfigRuleName": "custom-ec2-must-have-backup-plan",
+    "Source": {
+      "Owner": "CUSTOM_LAMBDA",
+      "SourceDetails": [{
+        "EventSource": "aws.config",
+        "MessageType": "ConfigurationItemChangeNotification"
+      }],
+      "SourceIdentifier": "arn:aws:lambda:us-east-1:111111111111:function:check-ec2-backup-coverage"
+    },
+    "Scope": {"ComplianceResourceTypes": ["AWS::EC2::Instance"]}
+  }' \
+  --region us-east-1
+```

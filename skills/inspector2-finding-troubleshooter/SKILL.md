@@ -129,27 +129,7 @@ causes and wrong remediation.
 
 ### Account-wide pre-flight commands
 
-```bash
-# 1. Get the finding JSON (the single highest-signal command)
-aws inspector2 batch-get-finding-details --finding-arns <arn> --output json
-# Fields: Type, Severity, Title, Resources, PackageVulnerability{cve,
-#   package, vulnerableVersionRange, fixedInVersion},
-#   NetworkReachability{protocol, port, cidr}, CodeVulnerability{filePath,
-#   lineNumber, snippet}
-
-# 2. Coverage + staleness (is the resource scanned? is the finding current?)
-aws inspector2 list-coverage \
-  --filter-criteria "ResourceArn=[{Comparison=EQUALS,Value=<arn>}]" --output json
-aws inspector2 list-findings \
-  --filter-criteria "FindingArn=[{Comparison=EQUALS,Value=<arn>}]" \
-  --query 'findings[0].{State:State,LastObservedAt:lastObservedAt}' --output json
-
-# 3. Code snippet for code-vulnerability findings (highest-signal for Step 4)
-aws inspector2 batch-get-code-snippets --finding-arns <arn> --output json
-
-# 4. SBOM export status (if SBOM integration is configured)
-aws inspector2 list-sbom-export --output json
-```
+All pre-flight commands (read-only): see `references/diagnostic-commands.md` § Pre-flight.
 
 ### Finding-type short-circuit
 
@@ -188,54 +168,9 @@ emit ROOT_CAUSE_FOUND without a failing probe that matches the finding.**
 
 ### Step 0: Non-obvious behaviours that change diagnosis
 
-These are operational gotchas a senior Inspector operator knows from
-triage experience. Each routes a diagnosis away from the obvious layer:
-
-- **A finding may be stale.** Inspector scans on a schedule (every 24h
-  EC2, on push ECR, on update Lambda). A `lastObservedAt` > 24h may
-  already be fixed. Check current state (SSM inventory, ECR scan,
-  Lambda config) before recommending remediation.
-
-- **A CVE may not be exploitable even if the package is present.** CVEs
-  have conditions: only vulnerable with a specific config, OS, or code
-  path. Check the upstream advisory before page-triggering on Critical.
-  Suppress with `update-filter` if not applicable.
-
-- **ECR image scans reflect the base image at build time.** A new image
-  with a patched base closes the finding, but the running task is NOT
-  patched until redeployed. Verify the task definition references the
-  new image digest.
-
-- **Lambda package CVEs live in layers.** A CVE in a shared layer
-  affects every function using it. The fix is to publish a new layer
-  version and update each function — not patch the function source.
-  Use `get-function-configuration` → `Layers` to trace the CVE.
-
-- **Lambda code scanning finds source defects, not package CVEs.**
-  Inspector code scanning for Lambda (2024-2025) flags injection,
-  hardcoded secrets, path traversal. The `CodeSnippet` from
-  `batch-get-code-snippets` is the highest-signal artifact — it shows
-  the exact line.
-
-- **Reachability findings reflect SG + route + IGW state at scan time.**
-  A port flagged internet-reachable may have been restricted since the
-  scan. Verify with live `describe-security-groups` /
-  `describe-route-tables`. If the SG is already scoped, the finding
-  closes on the next scan — do NOT recommend redundant changes.
-
-- **`batch-get-finding-details` is the single highest-signal command.**
-  `list-findings` returns a summary; `batch-get-finding-details`
-  returns the full JSON with the type-specific block. Always pull
-  detail before classifying.
-
-- **Findings auto-close on rescan if the issue is gone.** Inspector
-  sets `State: CLOSED` automatically. Operators who "manually close"
-  findings create noise — let Inspector close them. Manual suppression
-  (`update-configuration` → filter) is for confirmed false positives.
-
-- **Code snippets may be redacted.** `batch-get-code-snippets` redacts
-  secrets (ironic for a hardcoded-secret finding). The `text` field may
-  show `REDACTED` — use `filePath` + `lineNumber` to locate manually.
+Stale findings, exploitability conditions, layer-trace gotchas,
+auto-close behaviour, redacted snippets — see
+`references/advanced-patterns.md` § Step 0.
 
 ### Step 1: Finding entry — pick the diagnostic branch
 
@@ -250,9 +185,7 @@ Map the finding `Type` to a branch and jump to that branch's section.
 
 ### Step 1b: Gather the full finding JSON (when the type is ambiguous)
 
-```bash
-aws inspector2 batch-get-finding-details --finding-arns <arn> --output json
-```
+Command: see `references/diagnostic-commands.md` § Step 1b.
 
 The response includes the full finding JSON. Read `Type`, `Title`,
 `Description`, and the type-specific block before classifying.
@@ -261,19 +194,7 @@ The response includes the full finding JSON. Read `Type`, `Title`,
 
 #### 2a: Package CVE on EC2 instance
 
-```bash
-# SSM-managed instance inventory (the highest-signal probe)
-aws ssm list-inventory-entries --instance-id <i-id> \
-  --type "AWS:Application" \
-  --filters "Key=Name,Values=<package-name>" --output json
-# Verify the patched version is available in the baseline
-aws ssm describe-patches --filters Key=PRODUCT,Values=AmazonLinux2023 \
-  --output json | jq '.[] | select(.CVEIds | contains("<cve>"))'
-# Check compliance state (is the instance already patched?)
-aws ssm describe-instance-patches --instance-id <i-id> \
-  --filters Key=STATE,Values=Installed --output json | \
-  jq '.[] | select(.Title | contains("<package>"))'
-```
+Probes: see `references/diagnostic-commands.md` § Step 2a.
 
 **Verdict signals:**
 - `list-inventory-entries` shows the package in the CVE's vulnerable
@@ -288,15 +209,7 @@ aws ssm describe-instance-patches --instance-id <i-id> \
 
 #### 2b: Package CVE on ECR image
 
-```bash
-aws ecr describe-image-scan-findings --repository-name <repo> \
-  --image-id imageDigest=<digest> --output json
-aws ecr describe-images --repository-name <repo> \
-  --image-ids imageDigest=<digest> --output json
-# List all repo images (find other vulnerable tags)
-aws ecr describe-images --repository-name <repo> --output json | \
-  jq '.imageDetails[] | select(.imageTags != null)'
-```
+Probes: see `references/diagnostic-commands.md` § Step 2b.
 
 **Verdict signals:**
 - CVE present and image is referenced by a running task →
@@ -310,15 +223,7 @@ aws ecr describe-images --repository-name <repo> --output json | \
 
 #### 2c: Package CVE on Lambda function
 
-```bash
-aws lambda get-function-configuration --function-name <name> --output json
-# Look for: Runtime, Layers (ARNs), Handler, LastModified
-aws lambda get-layer-version --layer-name <layer-name> \
-  --version-number <n> --output json
-# Download the function code package to inspect dependencies
-aws lambda get-function --function-name <name> \
-  --query 'Code.Location' --output text
-```
+Probes: see `references/diagnostic-commands.md` § Step 2c.
 
 **Verdict signals:**
 - Layer version older than the patched version →
@@ -345,15 +250,7 @@ maintainer.
 
 #### 3a: SG rule exposes the flagged port
 
-```bash
-aws ec2 describe-instances --instance-ids <i-id> --output json | \
-  jq '.Reservations[0].Instances[0].SecurityGroups[].GroupId'
-aws ec2 describe-security-groups --group-ids <sg-id> --output json | \
-  jq '.SecurityGroups[].IpPermissions[]'
-# The finding's NetworkReachability block names the flagged port + CIDR
-aws inspector2 batch-get-finding-details --finding-arns <arn> --output json | \
-  jq '.findingDetails[0].finding.networkReachability'
-```
+Probes: see `references/diagnostic-commands.md` § Step 3a.
 
 **Verdict signals:**
 - SG allows `0.0.0.0/0` on the flagged port →
@@ -365,14 +262,7 @@ aws inspector2 batch-get-finding-details --finding-arns <arn> --output json | \
 
 #### 3b: IGW route exposes the resource publicly
 
-```bash
-aws ec2 describe-network-interfaces \
-  --filters Name=attachment.instance-id,Values=<i-id> \
-  --output json | jq '.NetworkInterfaces[].Association'
-aws ec2 describe-route-tables \
-  --filters Name=association.subnet-id,Values=<subnet-id> \
-  --output json | jq '.RouteTables[].Routes[]'
-```
+Probes: see `references/diagnostic-commands.md` § Step 3b.
 
 **Verdict signals:**
 - Instance has a public IP and the subnet route table has a `0.0.0.0/0`
@@ -383,20 +273,7 @@ aws ec2 describe-route-tables \
 
 ### Step 4: Lambda code vulnerability — diagnose the source defect
 
-```bash
-# Code snippet (the single highest-signal probe for code findings)
-aws inspector2 batch-get-code-snippets --finding-arns <arn> --output json
-# Look for: filePath, lineNumber, text (may be REDACTED)
-
-# Lambda function configuration (handler, runtime, last modified)
-aws lambda get-function-configuration \
-  --function-name <name> --output json
-
-# If the snippet is redacted, use the filePath + lineNumber from the finding
-# to locate the issue in the source
-aws inspector2 batch-get-finding-details --finding-arns <arn> --output json | \
-  jq '.findingDetails[0].finding.codeVulnerability'
-```
+Probes: see `references/diagnostic-commands.md` § Step 4.
 
 **Verdict signals:**
 - `batch-get-code-snippets` returns a snippet matching the rule (e.g.,
@@ -412,18 +289,7 @@ aws inspector2 batch-get-finding-details --finding-arns <arn> --output json | \
 
 ### Step 5: SBOM export integration
 
-```bash
-# List SBOM export reports
-aws inspector2 list-sbom-export --output json
-
-# Get a specific SBOM export (includes S3 location, format, status)
-aws inspector2 get-sbom-export --report-id <id> --output json
-
-# Download the SBOM from S3 (CycloneDX or SPDX format)
-aws s3 cp s3://<bucket>/<key> /tmp/sbom.json
-# Parse for the vulnerable package across all resources
-jq '.components[] | select(.name == "<package>")' /tmp/sbom.json
-```
+Probes: see `references/diagnostic-commands.md` § Step 5.
 
 **Verdict signals:**
 - SBOM export maps the CVE'd package to multiple resources →
@@ -433,18 +299,7 @@ jq '.components[] | select(.name == "<package>")' /tmp/sbom.json
 
 ### Step 6: Staleness check — finding already fixed
 
-```bash
-# Finding state and last-observed time
-aws inspector2 list-findings \
-  --filter-criteria "FindingArn=[{Comparison=EQUALS,Value=<arn>}]" \
-  --query 'findings[0].{State:State,LastObservedAt:lastObservedAt}' \
-  --output json
-
-# For EC2: current package version via SSM
-aws ssm list-inventory-entries --instance-id <i-id> \
-  --type "AWS:Application" \
-  --filters "Key=Name,Values=<package>" --output json
-```
+Probes: see `references/diagnostic-commands.md` § Step 6.
 
 **Verdict signals:**
 - Finding `State: OPEN` but current package version >= `fixedInVersion`
@@ -531,85 +386,10 @@ CONFIRM: Before running AWS-RunPatchBaseline, emit and await:
    Proceed? (yes/no)"
 ```
 
-### Worked example — Lambda code vulnerability (hardcoded secret)
+Additional worked examples — Lambda hardcoded secret, SG overly
+permissive: see `references/worked-examples.md`.
 
-```text
-TARGET: arn:aws:lambda:us-east-1:111:function:checkout-handler
-VERDICT: ROOT_CAUSE_FOUND
-REASON: Function checkout-handler has a hardcoded AWS access key in
-  handler.js line 42 (rule JS-HARDCODED-SECRET); CodeSnippet pinpointed
-  the line (text REDACTED).
-FINDING_TYPE: CODE_VULNERABILITY
-SEVERITY: HIGH
-LAYER: LAMBDA_SOURCE_DEFECT
-EVIDENCE:
-  - Finding: CODE_VULNERABILITY, rule JS-HARDCODED-SECRET, severity HIGH.
-  - Probe: batch-get-code-snippets returns filePath: handler.js,
-    lineNumber: 42, text: REDACTED (secret redacted; location is signal).
-  - Passing: runtime nodejs20.x current; no package CVE on layers.
-REMEDIATION:
-  1. Remove the hardcoded key from handler.js line 42. Load the
-     credential from Secrets Manager or an environment variable.
-  2. Rotate the exposed key — revoke in IAM and issue a new one.
-  3. Redeploy: update-function-code --function-name checkout-handler
-     --zip-file fileb://deploy.zip
-  4. Verify: re-scan after redeploy; the finding closes when the
-     secret is no longer in the source.
-CONFIRM: Before redeploying, emit and await:
-  "CONFIRM: About to update-function-code on checkout-handler
-   (remove hardcoded secret). Proceed? (yes/no)"
-```
-
-### Worked example — Network reachability (SG overly permissive)
-
-```text
-TARGET: arn:aws:ec2:us-east-1:111:instance/i-db99
-VERDICT: ROOT_CAUSE_FOUND
-REASON: Instance i-db99 has SG sg-db1 with inbound rule 0.0.0.0/0 on
-  tcp/3306 (MySQL); Inspector flagged port 3306 reachable from INTERNET.
-FINDING_TYPE: NETWORK_REACHABILITY
-SEVERITY: CRITICAL
-LAYER: SG_OVERLY_PERMISSIVE
-EVIDENCE:
-  - Finding: port 3306, CIDR 0.0.0.0/0, scope INTERNET, lastObservedAt
-    2026-08-09T22:00Z.
-  - Probe: describe-security-groups --group-ids sg-db1 returns
-    IpPermissions: [{FromPort: 3306, IpRanges: [{CidrIp: 0.0.0.0/0}]}].
-  - Passing: no package CVEs; no recent config change.
-REMEDIATION:
-  1. Revoke the 0.0.0.0/0 inbound rule on tcp/3306 (see references).
-  2. Add a scoped rule: authorize-security-group-ingress --group-id
-     sg-db1 --protocol tcp --port 3306 --source-security-group-id sg-app
-  3. Remove the public IP if the instance does not need it.
-  4. Verify: the finding closes on the next Inspector rescan.
-CONFIRM: Before revoking SG ingress, emit and await:
-  "CONFIRM: About to revoke-security-group-ingress on sg-db1
-   (tcp/3306 from 0.0.0.0/0). Proceed? (yes/no)"
-```
-
-## Expert heuristic: finding triage priority
-
-Inspector emits findings by severity, but the *exploitability* and
-*exposure* of the vulnerable resource determines the actual priority.
-Triage by exposure first, severity second, exploitability third.
-
-| Exposure + severity | Priority | Action |
-|---|---|---|
-| Public IP + Critical CVE | P0 | Patch within hours; isolate if no fix |
-| Public IP + High CVE | P1 | Patch same day |
-| Internal + Critical CVE | P1 | Patch same day; isolate if no fix |
-| Internal + High CVE | P2 | Patch within the week |
-| Reachability Critical (any port) | P0 | Restrict SG within hours |
-| Reachability Medium (internal port) | P3 | Backlog; scope when possible |
-| Code vuln (hardcoded secret) | P0 | Rotate + fix immediately |
-| Code vuln (path traversal) | P1 | Fix same day |
-| Stale finding (already patched) | — | Verify and let auto-close |
-
-**Common mistake:** triaging by severity alone. A Critical CVE on a
-fully-isolated instance with no public IP and no exploitable code path
-is a P2. A High CVE on an internet-facing instance with a known exploit
-in the wild is a P0. The skill surfaces the exposure (public IP, SG
-scope) alongside the severity.
+Finding triage priority matrix (exposure × severity): see `references/advanced-patterns.md` § Triage priority.
 
 ## Anti-Patterns — NEVER (top 5)
 
@@ -665,35 +445,20 @@ separate from findings (use SBOM for scope, findings for action).
 For per-layer copy-pasteable remediation commands, see
 `references/finding-types-reference.md`.
 
+## References (load on demand)
+
+- [Diagnostic commands](references/diagnostic-commands.md) — read-only probes per diagnostic step
+- [Worked examples](references/worked-examples.md) — full walkthroughs
+- [Advanced patterns](references/advanced-patterns.md) — non-obvious behaviours, triage matrix, 2024-2026 features
+- [Finding types reference](references/finding-types-reference.md) — finding JSON format and per-layer remediation
+- [Remediation CLI commands](references/remediation-cli-commands.md) — copy-pasteable state-changing commands per LAYER verdict
+
 ## Domain
 
 AWS CloudOps / Inspector v2 Vulnerability Diagnostics, SBOM Integration,
 Lambda Code Scanning, ECR Image Scanning, and SSM Patch Coordination.
 
-## Recent AWS features (2024-2026)
-
-- **Inspector SBOM export (2024-2025):** Software Bill of Materials
-  (CycloneDX or SPDX) for an account or resource. Exported to S3 with
-  full package inventory across EC2, ECR, Lambda. Use SBOM to map a
-  CVE to all affected resources, not just the flagged one.
-- **Inspector code scanning for Lambda (2024-2025):** SAST-style code
-  vulnerability detection for Lambda functions (injection, hardcoded
-  secrets, path traversal, weak crypto). Uses `batch-get-code-snippets`
-  to return the exact source line. Findings: `Type: CODE_VULNERABILITY`
-  or `LAMBDA_CODE_VULNERABILITY`. Requires enabling on the account.
-- **Lambda layer scanning (2024-2025):** Inspector scans attached Lambda
-  layers for package CVEs, not just the deployment package. A CVE in a
-  shared layer produces findings on every function using it. The layer
-  ARN is in `get-function-configuration`.
-- **ECR enhanced scanning (2024):** Deeper container CVE coverage beyond
-  the native ECR scan. Toggle per-repo via
-  `put-image-scanning-configuration` with `scanType=ENHANCED`.
-  Findings flow to both ECR and Inspector.
-- **Inspector v2 EC2 deep inspection (2024-2025):** Extended package
-  coverage for EC2 (application-level packages, not just OS). Requires
-  SSM agent. `list-coverage` shows the deep inspection status.
-- **Inspector finding aggregation to Security Hub (2024-2025):**
-  Findings forward to Security Hub for cross-service triage.
+Recent AWS features (SBOM export, Lambda code scanning, ECR enhanced scanning, deep inspection): see `references/advanced-patterns.md`.
 
 ## AWS documentation
 

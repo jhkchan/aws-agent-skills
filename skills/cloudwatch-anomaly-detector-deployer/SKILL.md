@@ -81,6 +81,8 @@ with a specific gap citation in the checklist (marked `[✗]`), and
 | Output format | The literal checklist template |
 | references/sensitivity-and-tuning.md | Std dev multiplier detail |
 | references/alarms-and-composite.md | Alarm + composite detail |
+| references/advanced-patterns.md | Compatibility + features detail |
+| references/error-handling.md | Failure modes + remedies |
 
 ## Mindset
 
@@ -152,60 +154,6 @@ procedure below forces an explicit check on historical data depth.
 - Composite alarms evaluate AND/OR of children; a child in
   `INSUFFICIENT_DATA` may propagate to the composite.
 
-## Expert heuristic: the two-week baseline requirement
-
-A baseline model says "create the detector and attach an alarm." The
-correct heuristic recognizes that the ML model needs historical data to
-learn the expected pattern, and without it, the band does not exist.
-
-```text
-Metric data timeline:
-  Past ──────────────────────────────────── Present ──── Future
-  │←──── historical data (>= 15 points) ────→│
-  │                                          │
-  │  Detector created here ─────────────────→│  LEARNING → TRAINED
-  │                                          │
-  │  Band available here ───────────────────→│  Alarm can fire
-  │                                          │
-
-If < 15 historical data points exist:
-  Detector stays in LEARNING indefinitely
-  Band never produced
-  Alarm never fires (INSUFFICIENT_DATA)
-```
-
-**Key implication:** always verify the metric has at least 2 weeks of
-historical data at the target period (5 min, 1 min, etc.) before
-creating the detector. If the metric is new, wait 2 weeks before
-deploying anomaly detection, or use a shorter-period metric that
-accumulates 15 points faster.
-
-## Expert heuristic: std dev multiplier tuning
-
-The standard deviation multiplier controls the band width and thus the
-sensitivity of anomaly detection.
-
-```text
-Std dev multiplier guide:
-  ├── 1.0  → Very sensitive (catches small deviations, many false positives)
-  │        Use for: critical metrics where any deviation matters
-  ├── 2.0  → Sensitive (good starting point for volatile metrics)
-  │        Use for: error rates, latency percentiles with high variance
-  ├── 3.0  → DEFAULT (balanced, the AWS-recommended starting point)
-  │        Use for: CPU utilization, request count, network traffic
-  ├── 4.0  → Less sensitive (fewer false positives, may miss small anomalies)
-  │        Use for: metrics with known periodic spikes (batch jobs)
-  └── 5.0  → Very insensitive (only catches major anomalies)
-             Use for: metrics where only severe deviations matter
-
-Rule of thumb: start at 3, observe for 1 week, tune down if missing
-real anomalies, tune up if too many false positives.
-```
-
-**Key implication:** the std dev multiplier is the primary tuning knob
-after deployment. It is not set-and-forget; plan for a tuning cycle
-after initial deployment.
-
 ## Prerequisites (verify before provisioning)
 
 Before emitting provisioning commands, verify these prerequisites. If
@@ -261,47 +209,7 @@ producing the anomaly band.
 
 ## Step 2 — Metric compatibility check
 
-**This is the most commonly skipped step and the #1 cause of "my
-anomaly detector doesn't work" tickets.**
-
-Not all CloudWatch metrics support anomaly detection. The model needs
-metrics that produce regular, frequent data points with enough history.
-The following metric characteristics indicate POOR compatibility:
-
-| Metric characteristic | Why it fails | Recommendation |
-|---|---|---|
-| Sparse data (mostly zero, occasional spikes) | Model cannot learn a baseline from mostly-zero data | Use static threshold > 0 |
-| Irregular intervals (data only when events occur) | No pattern to learn | Use static threshold or Logs Insights |
-| Less than 15 data points at target period | Insufficient training data | Wait for more data; use shorter period |
-| Constant value (no variability) | Model trains but band is trivially narrow; every change is anomalous | Use static threshold for delta detection |
-| Counter metrics (monotonically increasing) | Model learns the rate of increase, not the absolute value | Use a rate/derivative metric instead |
-
-**Compatible metrics (good candidates):**
-- `AWS/EC2 CPUUtilization` — regular, frequent, diurnal patterns
-- `AWS/ApplicationELB RequestCount` — traffic patterns
-- `AWS/RDS DatabaseConnections` — usage patterns
-- Custom metrics that report regularly (e.g., request latency, queue
-  depth, active sessions)
-- `AWS/NetworkELB ProcessedBytes` — network throughput patterns
-
-**Verify metric compatibility:**
-
-```bash
-# Check if the metric has sufficient data points
-aws cloudwatch get-metric-statistics \
-  --namespace "AWS/EC2" \
-  --metric-name "CPUUtilization" \
-  --dimensions Name=InstanceId,Value=i-abc1234567890 \
-  --statistics Average \
-  --period 300 \
-  --start-time $(date -u -v-15d +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --query 'Datapoints | length(@)' --output text
-# Expected: >= 15 (ideally thousands for 2 weeks at 5-min period)
-```
-
-If the result is less than 15, the metric does not have enough data for
-a reliable baseline. Output `VERDICT: PREREQUISITES_MISSING`.
+**This is the most commonly skipped step and the #1 cause of tickets.** Full compatibility table and verification command: [advanced-patterns.md](references/advanced-patterns.md). Sparse, irregular, constant-value, and counter metrics are poor candidates; if fewer than 15 data points exist at the target period, output `VERDICT: PREREQUISITES_MISSING`.
 
 ## Step 3 — Configuration (stat, period, dimensions)
 
@@ -359,69 +267,11 @@ aws cloudwatch put-metric-anomaly-detector \
 
 ## Step 4 — Sensitivity tuning (std dev multiplier)
 
-The standard deviation multiplier (`StandardDeviation` in the
-configuration JSON) is the primary tuning knob for anomaly detection
-sensitivity. It controls how wide the expected-value band is.
-
-| Std dev multiplier | Sensitivity | Band width | False positive rate | Use case |
-|---|---|---|---|---|
-| 1 | Very high | Narrow (1 sigma) | High | Critical metrics, any deviation matters |
-| 2 | High | Medium (2 sigma) | Moderate | Error rates, volatile latency |
-| 3 (DEFAULT) | Balanced | Standard (3 sigma) | Low | CPU, network, request count |
-| 4 | Low | Wide (4 sigma) | Very low | Metrics with periodic spikes |
-| 5 | Very low | Very wide (5 sigma) | Minimal | Only severe anomalies matter |
-
-**Tuning procedure:**
-
-1. Deploy with default (3).
-2. Observe for at least 1 week.
-3. If too many false positives: increase to 4.
-4. If missing real anomalies: decrease to 2.
-5. Re-observe for another week. Iterate.
-
-**Update std dev multiplier (post-deployment tuning):**
-
-```bash
-aws cloudwatch put-metric-anomaly-detector \
-  --namespace "AWS/EC2" \
-  --metric-name "CPUUtilization" \
-  --dimensions Name=InstanceId,Value=i-abc1234567890 \
-  --stat "Average" \
-  --period 300 \
-  --configuration '{"StandardDeviation": 2}'
-```
-
-**Note:** Changing the std dev triggers a model re-train. The new band
-appears within 15 minutes. The alarm continues to use the old band
-until the model re-trains.
+Full tuning guide: [sensitivity-and-tuning.md](references/sensitivity-and-tuning.md). Default `StandardDeviation` 3 (balanced); lower = more sensitive but more false positives, higher = less sensitive. Changes take up to 15 minutes (model re-trains).
 
 ## Step 5 — Band visualization (metric math)
 
-The anomaly detection band is visualized in the CloudWatch console
-using metric math with the `ANOMALY_DETECTION_BAND` function. This
-function returns the upper and lower band values for a given anomaly
-detector.
-
-**Metric math expression for band visualization:**
-
-```text
-ANOMALY_DETECTION_BAND(m1)
-```
-
-Where `m1` is the metric being monitored.
-
-**CLI — create a metric math dashboard via put-dashboard:**
-
-```bash
-# The ANOMALY_DETECTION_BAND function produces upper/lower band values.
-# In the console, this renders as a shaded band around the metric line.
-aws cloudwatch put-dashboard \
-  --dashboard-name "AnomalyDetection-CPU" \
-  --dashboard-body '{"widgets":[{"type":"metric","x":0,"y":0,"width":12,"height":6,"properties":{"metrics":[["AWS/EC2","CPUUtilization","InstanceId","i-abc1234567890"],[{"expression":"ANOMALY_DETECTION_BAND(m1)","label":"Anomaly Band","id":"e1"}]],"view":"timeSeries","period":300,"stat":"Average"}}]}'
-```
-
-The `ANOMALY_DETECTION_BAND` function references the metric `m1`
-(the first metric in the array) and produces the expected band.
+Full procedure: [alarms-and-composite.md](references/alarms-and-composite.md). The `ANOMALY_DETECTION_BAND(m1)` metric-math expression renders the expected band in dashboards.
 
 ## Step 6 — Alarm on band breach
 
@@ -478,173 +328,27 @@ momentary spikes.
 
 ## Step 7 — Assessment period and training data
 
-The assessment period (controlled by `evaluation-periods` on the alarm)
-determines how many consecutive anomalous data points must occur before
-the alarm fires.
-
-| Assessment periods | Behavior | Trade-off |
-|---|---|---|
-| 1 | Fires on a single anomalous point | Very fast detection; high false positive rate |
-| 2-3 (DEFAULT) | Requires 2-3 consecutive anomalous points | Balanced; good starting point |
-| 5+ | Requires sustained anomaly over many periods | Low false positives; slower detection |
-
-**Training data depth check (PREREQUISITE):**
-
-```bash
-# Count data points in the last 15 days at 5-min period
-DATAPOINTS=$(aws cloudwatch get-metric-statistics \
-  --namespace "AWS/EC2" \
-  --metric-name "CPUUtilization" \
-  --dimensions Name=InstanceId,Value=i-abc1234567890 \
-  --statistics Average \
-  --period 300 \
-  --start-time $(date -u -v-15d +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --query 'Datapoints | length(@)' --output text)
-
-echo "Historical data points: $DATAPOINTS"
-# If < 15 → PREREQUISITES_MISSING (insufficient training data)
-# If >= 15 → proceed with detector creation
-```
-
-**The 2-week rule:** the ML model needs approximately 2 weeks of data
-to learn the metric's pattern (especially diurnal/weekly cycles). With
-less data, the model may not capture weekend vs weekday differences,
-time-of-day patterns, etc. If the metric is new, wait 2 weeks before
-deploying anomaly detection.
+Full guide: [sensitivity-and-tuning.md](references/sensitivity-and-tuning.md). `evaluation-periods` 2-3 (default) balances detection speed vs false positives; verify ~2 weeks of historical data before creating the detector.
 
 ## Step 8 — Recovery to normal state
 
-When the metric value returns inside the anomaly band, the alarm
-transitions back to `OK` automatically. This is the recovery-to-normal
-behavior.
-
-```text
-Alarm state transitions:
-  OK → ANOMALY (metric outside band for evaluation_periods)
-  ANOMALY → OK (metric back inside band for evaluation_periods)
-  OK → INSUFFICIENT_DATA (not enough data to evaluate, e.g., during LEARNING)
-```
-
-**Recovery behavior configuration:**
-
-- `--evaluation-periods` controls how many consecutive in-band points
-  are needed to recover to OK (same parameter as breach detection).
-- The alarm evaluates BOTH breach and recovery using the same
-  evaluation periods count. There is no separate recovery-period
-  parameter.
-- For asymmetric behavior (quick to alert, slow to recover), use
-  different alarms or a composite alarm with state logic.
-
-**OK action (notification on recovery):**
-
-```bash
-aws cloudwatch put-metric-alarm \
-  --alarm-name "cpu-anomaly-breach-i-abc123" \
-  --ok-actions "arn:aws:sns:us-east-1:123456789012:anomaly-alerts" \
-  --alarm-actions "arn:aws:sns:us-east-1:123456789012:anomaly-alerts" \
-  ... # other parameters same as Step 6
-```
-
-Setting `--ok-actions` sends an SNS notification when the alarm
-recovers to OK, providing closure on the anomaly event.
+Full behavior: [alarms-and-composite.md](references/alarms-and-composite.md). The alarm returns to OK automatically after the same number of in-band evaluation periods; set `--ok-actions` for recovery notifications.
 
 ## Step 9 — Cross-account anomaly detection
 
-CloudWatch supports cross-account anomaly detection, where a monitoring
-(central) account creates anomaly detectors on metrics from member
-accounts. This requires CloudWatch cross-account observability sharing.
-
-**Prerequisites for cross-account:**
-1. The member account must enable sharing (cloudwatch:PutResourcePolicy).
-2. The monitoring account must have a data source link to the member
-   account.
-3. The anomaly detector is created in the monitoring account,
-   referencing the member account's metric.
-
-**Member account — enable sharing:**
-
-```bash
-aws cloudwatch put-resource-policy \
-  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"AWS":"arn:aws:iam::111111111111:root"},"Action":["cloudwatch:GetMetricData","cloudwatch:GetMetricStatistics"],"Resource":"*"}]}'
-```
-
-**Monitoring account — create detector and link:**
-
-```bash
-# Create data source link to member account
-aws logs create-link --link-name "member-account-link" \
-  --resource-arn "arn:aws:logs:us-east-1:222222222222:log-group:*" \
-  --filter 'logGroupNamePrefix("aws/cloudwatch/")'
-
-# Create detector (metric resolved from linked member account)
-aws cloudwatch put-metric-anomaly-detector \
-  --namespace "AWS/EC2" --metric-name "CPUUtilization" \
-  --dimensions Name=InstanceId,Value=i-abc1234567890 \
-  --stat "Average" --period 300 \
-  --configuration '{"StandardDeviation": 3}'
-```
-
-**Note:** cross-account observability uses the "source account" and
-"monitoring account" model. The detector and alarm live in the
-monitoring account. The metric data is read from the source account via
-the sharing policy.
+Full setup: [alarms-and-composite.md](references/alarms-and-composite.md). The source account enables sharing (`put-resource-policy`); the monitoring account creates the link and hosts the detector + alarm.
 
 ## Step 10 — Composite alarm integration
 
-Composite alarms combine multiple alarms (anomaly + static threshold)
-using AND/OR logic. This is useful for reducing false positives by
-requiring multiple conditions to be true simultaneously.
-
-**Example: anomaly breach AND high absolute threshold:**
-
-```bash
-aws cloudwatch put-composite-alarm \
-  --alarm-name "cpu-composite-anomaly-and-threshold" \
-  --alarm-rule "(ALARM(cpu-anomaly-breach-i-abc123) AND ALARM(cpu-high-threshold-i-abc123))" \
-  --alarm-actions "arn:aws:sns:us-east-1:123456789012:critical-alerts"
-```
-
-**Composite alarm logic patterns:**
-
-| Pattern | Rule expression | Use case |
-|---|---|---|
-| Anomaly AND threshold | `ALARM(anomaly) AND ALARM(threshold)` | Reduce false positives; require both anomaly and high value |
-| Anomaly OR threshold | `ALARM(anomaly) OR ALARM(threshold)` | Broad coverage; alert on either condition |
-| Anomaly AND NOT maintenance | `ALARM(anomaly) AND NOT ALARM(maintenance-mode)` | Suppress anomalies during planned maintenance |
-| Either of two metrics anomalous | `ALARM(cpu-anomaly) OR ALARM(memory-anomaly)` | Alert if either resource is anomalous |
-
-**Key implication:** composite alarms let you combine anomaly detection
-with static thresholds for a layered alerting strategy. This is the
-recommended approach for production — use anomaly detection as the
-primary signal and static thresholds as backstop coverage.
+Full patterns: [alarms-and-composite.md](references/alarms-and-composite.md). Combine anomaly + static-threshold alarms with AND/OR rules for layered alerting.
 
 ## Step 11 — Custom metrics vs built-in
 
-Anomaly detection works on BOTH built-in AWS metrics and custom metrics.
-The configuration is identical; only the namespace and metric name
-differ. Built-in AWS metrics (`AWS/EC2`, `AWS/RDS`, `AWS/ApplicationELB`)
-are well-tested. Custom metrics work if they report regularly at 1-min
-or 5-min resolution. High-resolution custom metrics (1-second) also
-work but accumulate training data faster. Container Insights and Lambda
-Insights metrics are supported — check for sparse data on low-traffic
-functions.
+Details: [advanced-patterns.md](references/advanced-patterns.md). Both built-in and custom metrics work with identical configuration; custom metrics must report regularly — check for sparse data on low-traffic functions.
 
 ## Step 12 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Cross-account observability GA (2023-2024):** Anomaly detectors
-  and alarms in a central monitoring account evaluating metrics from
-  multiple member accounts.
-- **High-resolution metric support (2023-2024):** 1-second resolution
-  custom metrics with anomaly detection.
-- **Composite alarm enhancements (2023-2024):** Extended rule syntax
-  with NOT, nested AND/OR, INSUFFICIENT_DATA state references.
-- **Logs Insights anomaly detection (2024-2025):** Anomaly detection
-  for log-based metrics.
-- **Contributor Insights integration (2025-2026):** Automatically
-  surfaces top contributors when an anomaly is detected.
+Details: [advanced-patterns.md](references/advanced-patterns.md). Cross-account observability GA, high-resolution metric support, composite alarm enhancements, Logs Insights anomaly detection, Contributor Insights integration.
 
 ## NEVER do these things
 
@@ -747,38 +451,13 @@ VERIFICATION_COMMANDS:
   aws cloudwatch get-metric-statistics --namespace AWS/EC2 --metric-name CPUUtilization --statistics Average --period 300 --start-time 2026-07-28T00:00:00Z --end-time 2026-08-12T00:00:00Z --region us-east-1
 ```
 
-## Error handling
+## References (load on demand)
 
-### Detector stuck in LEARNING state
-- The metric does not have enough historical data points. Verify with
-  `get-metric-statistics` that at least 15 data points exist at the
-  configured period. If the metric is new, wait for more data to
-  accumulate. Also check that the namespace, metric name, and
-  dimensions match the actual metric exactly.
-
-### Alarm in INSUFFICIENT_DATA
-- The detector has not reached TRAINED state, or the metric is not
-  producing data. Check the detector state with
-  `describe-anomaly-detectors`. If TRAINED, check the alarm's metric
-  math expression for errors. Verify the SNS topic exists.
-
-### Too many false positive alarms
-- The std dev multiplier is too low for the metric's natural
-  variability. Increase the multiplier (3 → 4) and wait for the model
-  to re-train (up to 15 minutes). Also consider increasing
-  evaluation-periods (3 → 5) for more sustained anomaly detection.
-
-### Anomaly alarm never fires
-- Possible causes: (1) detector in LEARNING state (not enough data),
-  (2) std dev multiplier too high (band too wide), (3) alarm metric
-  math expression is wrong, (4) SNS topic not configured. Check each
-  in order.
-
-### Cross-account detector sees no data
-- The source account has not enabled sharing, or the monitoring
-  account does not have the correct data source link. Verify the
-  resource policy in the source account and the link in the monitoring
-  account.
+- [Sensitivity and tuning](references/sensitivity-and-tuning.md) — std dev multiplier math, tuning workflow, assessment periods (Steps 4 and 7 in detail)
+- [Alarms and composite integration](references/alarms-and-composite.md) — band-breach alarms, recovery to normal, cross-account setup, composite patterns, band visualization (Steps 5, 8, 9, and 10 in detail)
+- [Advanced patterns](references/advanced-patterns.md) — metric compatibility edge cases, the two-week baseline, custom vs built-in metrics, recent features (Steps 2, 11, and 12 in detail)
+- [Error handling](references/error-handling.md) — failure modes and remedies
+- [End-to-end walkthrough](examples/README.md) — full worked example from invocation to verification
 
 ## Domain
 

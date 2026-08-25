@@ -188,123 +188,13 @@ whether it wins. Five non-obvious rules drive the verdict:
 
 ## Pre-flight: bucket metadata gate
 
-Run before classification. Misclassifying these produces false positives.
-
-**Pagination:** `list-bucket-intelligent-tiering-configurations`
-paginates at 100 configurations/page. For most buckets there is only one
-configuration (named `Config` by default). `list-objects-v2` paginates
-at 1,000 keys/page — for large buckets, do NOT iterate live; pull Storage
-Lens aggregate metrics instead.
-
-**Live-account pre-flight (skip if offline audit):**
-1. `aws s3api list-bucket-intelligent-tiering-configurations --bucket
-   <name>` — capture existing configurations (Id, Status, Tierings,
-   Filter).
-2. `aws s3api get-bucket-lifecycle-configuration --bucket <name>` —
-   capture any lifecycle rules that overlap prefixes targeted for
-   Intelligent-Tiering.
-3. `aws s3control get-storage-lens-configuration --config-id default`
-   — capture object-size distribution, access-pattern trend, average
-   object age.
-4. `aws s3api get-object-lock-configuration --bucket <name>` — if
-   Object Lock is enabled, restrict archive-tier recommendations for
-   compliance workloads.
-5. `aws s3api list-objects-v2 --bucket <name> --page-size 1000
-   --max-items 100` — sample the smallest 100 keys for the
-   small-object heuristic (alternative: read the ObjectSizeDistribution
-   from Storage Lens).
-6. For directory buckets: bucket name suffix `--x-s3` signals no
-   Intelligent-Tiering support; skip the configuration dimensions.
-
-**Malformed input:** if the input JSON is invalid or missing required
-fields, emit `VERDICT: ERROR` with `REASON: Bucket configuration is not
-valid JSON or is missing required fields — cannot classify.` and
-`REMEDIATION: Re-fetch with aws s3api
-list-bucket-intelligent-tiering-configurations --bucket <name> --output
-json and re-audit.`
-
-| Bucket attribute | Effect on audit |
-|---|---|
-| Bucket is a directory bucket (name suffix `--x-s3`) | Intelligent-Tiering NOT supported. Verdict: ALREADY_OPTIMAL for ML/AI workloads. |
-| Bucket has S3 Tables prefixes (Apache Iceberg) | Do not propose Intelligent-Tiering on table-data prefixes; tables manage their own lifecycle. Surface as a finding only. |
-| Object Lock `Enabled` COMPLIANCE mode | Restrict archive-tier recommendations for compliance workloads requiring periodic retrieval; Frequent Access only. |
-| Existing IntelligentTieringConfiguration with Status `Enabled` | Compare actual tier distribution from Storage Lens before re-recommending. |
-| Existing lifecycle rule with overlapping prefix | Surface the overlap; pick one system per prefix. |
-| Cross-Region Replication destination | Intelligent-Tiering applies to the destination independently. Run the tree on both sides. |
-| Requester-pays bucket | Monitoring fee bills the bucket owner; retrieval bills the requester. Note in savings estimate. |
+Full gate - pagination notes, live-account CLI listing, malformed-input handling, and the bucket-attribute effect table: [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 ## Process — optimisation logic (apply in order, aggregate all applicable)
 
-### Step 0: Expert knowledge — non-obvious Intelligent-Tiering behaviors
+### Step 0: Expert knowledge - non-obvious Intelligent-Tiering behaviors
 
-These behaviors are easy to misjudge without operational S3 experience.
-Each changes a recommendation if ignored:
-
-- **The monitoring fee bills ALL objects in the configuration's filter
-  scope, not just the ones that tier.** A configuration with
-  `Filter: {Prefix: "data/"}` bills $0.0025/1,000 for every object under
-  `data/`, even those that never leave the Frequent tier. The fee is the
-  cost of access-pattern monitoring — it bills whether or not a tiering
-  event occurs.
-
-- **Archive-tier transitions are configurable.** Default: Archive Access
-  after 90 consecutive days of no access, Deep Archive Access after 180.
-  Override via `Tierings[{AccessTier: ARCHIVE_ACCESS, Days: N}]` where
-  N >= 90, and `Tierings[{AccessTier: DEEP_ARCHIVE_ACCESS, Days: N}]`
-  where N >= 180. For known-cold data, shorter windows capture savings
-  faster.
-
-- **Intelligent-Tiering does not have a minimum-duration charge on
-  Frequent/Infrequent tiers.** This is unique among S3 IA-style tiers.
-  Standard-IA, One-Zone-IA, and Glacier IR all carry 30/90-day
-  minimums. For short-lived unknown-pattern workloads, Intelligent-
-  Tiering is cheaper than a lifecycle-driven IA transition that incurs
-  the minimum-duration charge.
-
-- **Archive Access and Deep Archive Access tiers DO carry 90/180-day
-  minimums.** The Frequent/Infrequent tiers being minimum-free does NOT
-  extend to the archive tiers. Always surface the minimum-duration
-  caveat on archive-tier recommendations.
-
-- **The Infrequent tier has a 128 KB minimum billable size.** A 4 KB
-  object that tiers to Infrequent is billed as 128 KB — a 32x storage-
-  cost inflation. This is why the monitoring-fee gate is critical for
-  small-object buckets.
-
-- **Intelligent-Tiering tier transitions are not instantaneous.** S3
-  evaluates access patterns once daily; tiering transitions occur over
-  hours, not minutes. Do not alarm on a 24-hour lag between access
-  pattern change and tier movement.
-
-- **A configuration with a filter that matches no objects is silently a
-  no-op.** `Filter: {Prefix: "logs/2024/"}` on a bucket where keys live
-  under `2025/logs/` matches nothing. Cross-check the prefix against
-  the actual key layout before declaring ALREADY_OPTIMAL.
-
-- **Small object fee aggregation (2025-2026 feature).** For buckets
-  with very large counts of small objects, AWS can aggregate the
-  Intelligent-Tiering monitoring and small-object fees to reduce per-
-  object billing overhead. This does NOT remove the monitoring fee —
-  it aggregates how the fee is calculated for cost-allocation purposes.
-  The monitoring fee still scales with object count; aggregation
-  changes the billing presentation, not the cost.
-
-- **Intelligent-Tiering and S3 Lifecycle can coexist on the same bucket
-  but should not target the same prefix.** A lifecycle rule that
-  transitions `app/logs/` to Standard-IA at 30 days AND an Intelligent-
-  Tiering configuration scoped to `app/logs/` will produce unpredictable
-  tier movement. Pick one system per prefix.
-
-- **S3 Batch Operations complements Intelligent-Tiering for one-time
-  migrations.** To immediately move existing Standard objects INTO
-  Intelligent-Tiering (rather than waiting for the configuration to
-  apply going forward), use `create-job` with `S3CopyObject` and
-  `TargetStorageClass: INTELLIGENT_TIERING`.
-
-- **Storage Lens provides the access-pattern evidence the
-  configuration depends on.** Always pull Storage Lens metrics covering
-  at least 30 days before recommending Intelligent-Tiering. A 1-day
-  snapshot can misclassify a daily-access bucket as cold.
+Full list - monitoring-fee scope, configurable archive timing, minimum-duration rules, 128 KB billable size, tiering lag, filter no-op risk, fee aggregation, lifecycle coexistence, Batch Operations backfill, Storage Lens evidence: [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ### Step 1: Eligibility gate
 
@@ -464,64 +354,8 @@ IMPLEMENTATION:
        --report-spec '<report-config>'
 ```
 
-### Worked example — small objects rejected by monitoring-fee gate
 
-This example demonstrates the **negative-savings rule**: when the
-monitoring fee exceeds the transition saving, the verdict is
-`ALREADY_OPTIMAL`, never `OPPORTUNITY_FOUND` with negative savings.
-
-```text
-BUCKET: app-config-state
-VERDICT: ALREADY_OPTIMAL
-REASON: Bucket contains 8.2M objects averaging 4.2 KB each (Step 2
-  monitoring-fee gate FAILS). The monitoring fee ($20.50/month) alone
-  exceeds the entire projected transition saving ($0 — objects below
-  the Infrequent tier's 128 KB minimum billable size cannot save).
-  Intelligent-Tiering is REJECTED. Standard is already the cheapest
-  tier for this object-size profile.
-RECOMMENDATION: No changes required. Optionally enable small-object fee
-  aggregation for cost-allocation visibility (does NOT change the
-  monitoring-fee math).
-SAVINGS:
-  CURRENT_MONTHLY: $10.09
-    - Storage: 32.0 GiB × $0.023 = $0.74
-    - GETs: 8.2M × 3/month × $0.00038/1K = $9.35
-    - PUTs: negligible (write-once workload)
-  PROJECTED_MONTHLY (Intelligent-Tiering, best case):
-    - Monitoring fee: 8,200,000 / 1,000 × $0.0025 = $20.50
-    - Storage: 32.0 GiB × $0.023 = $0.74 (no saving — all objects < 128 KB)
-    - GETs: 8.2M × 3/month × $0.00038/1K = $9.35
-    - Total projected: $30.59
-  MONTHLY_SAVING: -$20.50  (NEGATIVE — monitoring fee alone exceeds saving)
-  ANNUAL_SAVING: -$246.00
-  CAVEATS: The proposed plan INCREASES cost by $20.50/month. The verdict
-    is ALREADY_OPTIMAL because Standard is already the cheapest applicable
-    tier for this object-size profile. Do NOT enable Intelligent-Tiering.
-IMPLEMENTATION: None required. Re-evaluate if average object size grows
-  above 128 KB.
-```
-
-### Worked example — already optimal Intelligent-Tiering setup
-
-```text
-BUCKET: data-lake-curated
-VERDICT: ALREADY_OPTIMAL
-REASON: Bucket already has an Intelligent-Tiering configuration with
-  Archive Access at 90 days and Deep Archive Access at 180 days, scoped
-  to the correct prefix. Storage Lens shows the tier distribution matches
-  the access pattern (Frequent 22%, Infrequent 45%, Archive 23%, Deep
-  Archive 10%). Monitoring fee ($150/month) is < 7% of the net saving
-  ($2,100/month).
-RECOMMENDATION: No changes required.
-SAVINGS:
-  CURRENT_MONTHLY: $2,890.00  (current Intelligent-Tiering blended)
-  PROJECTED_MONTHLY: $2,890.00  (no change)
-  MONTHLY_SAVING: $0.00
-  ANNUAL_SAVING: $0.00
-  CAVEATS: Monitoring fee: $150.00/month (60M objects). Tier distribution
-    is healthy — no tuning required.
-IMPLEMENTATION: None required. Posture is correct for the workload.
-```
+Additional worked examples (small-object monitoring-fee rejection; already-optimal configuration): [references/worked-examples.md](references/worked-examples.md).
 
 ## Verdict consistency rules (prevent misclassification)
 
@@ -608,17 +442,6 @@ misleads the operator or produces a non-functional configuration.
    in scope. Always emit `CONFIRM: About to <action>...` and wait for
    explicit operator approval.
 
-## Edge-case handling
-
-These are buckets where the standard pattern produces wrong
-recommendations without explicit handling:
-
-| Pattern | Detection | Fix |
-|---|---|---|
-| **Small objects + frequent access** (50M objects < 128 KB, daily access) | `ObjectSizeDistribution` from Storage Lens: `<128KB` > 20% by count AND access > 1x/day | Verdict `ALREADY_OPTIMAL` (Standard cheapest). Monitoring fee would be pure overhead; Infrequent 128 KB minimum prevents saving. Surface small-object fee aggregation as a cost-allocation finding only. |
-| **Compliance archive with periodic retrieval** (Object Lock COMPLIANCE, quarterly audit) | `get-object-lock-configuration`: COMPLIANCE mode with known retrieval cadence | Restrict to Frequent Access only. Verdict `ALREADY_OPTIMAL` for Intelligent-Tiering (archive tiers defeat retrieval SLA). A fixed lifecycle to Glacier IR for ms-retrieve is the correct pick. |
-| **Mixed hot + cold prefix** (`app/hot/` daily, `app/archive/` yearly) | Storage Lens shows divergent access by prefix | Scope the configuration with `Filter: {Prefix: "app/archive/"}` to limit the monitoring fee to the cold prefix. Leaves the hot prefix on Standard (no wasted monitoring). |
-
 ## Pre-flight safety checks (run before any remediation CLI)
 
 - **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
@@ -645,84 +468,14 @@ recommendations without explicit handling:
   role with appropriate S3 permissions. Verify the role exists before
   recommending Batch.
 
-## Rollback procedure
+## References (load on demand)
 
-1. **Restore the prior configuration:**
-   ```bash
-   aws s3api put-bucket-intelligent-tiering-configuration \
-     --bucket <name> --id Config \
-     --intelligent-tiering-configuration file://<name>-it-config-backup-<timestamp>.json
-   ```
-   This stops FUTURE tiering but does not revert objects already moved.
-
-2. **Identify tiered objects** via Storage Lens tier-distribution drift
-   or S3 Inventory filtered by storage class.
-
-3. **Restore storage class** via S3 Batch Operations with `S3CopyObject`
-   and `TargetStorageClass: STANDARD`. Include copy-request charges in
-   the rollback cost estimate.
-
-## Error handling — CLI and data-source failures
-
-| Failure mode | Detection | Handling |
-|---|---|---|
-| `list-bucket-intelligent-tiering-configurations` returns empty | `IntelligentTieringConfigurationList: []` | Normal — no configuration present. Proceed with recommendation. |
-| `get-storage-lens-configuration` returns `NoSuchConfiguration` | API error | Storage Lens not enabled. Fall back to `list-objects-v2` sample; flag recommendation as MEDIUM confidence. |
-| `put-bucket-intelligent-tiering-configuration` fails with `MalformedXML` | API error | JSON schema error. Common cause: `Days` < 90 for ARCHIVE_ACCESS or < 180 for DEEP_ARCHIVE_ACCESS. Validate the configuration and retry. |
-| `put-bucket-intelligent-tiering-configuration` fails with `AccessDenied` | API error | Caller role lacks `s3:PutIntelligentTieringConfiguration`. Add the permission to the bucket policy or caller IAM. |
-| `list-objects-v2` paginating > 100 pages on a large bucket | Pagination count | STOP iterating live. Use S3 Inventory or Storage Lens aggregate metrics. |
-| Storage Lens shows 0 access data on a known-active bucket | Cross-check with CloudTrail `GetObject` events | Storage Lens may be misconfigured. Trust CloudTrail for access-pattern evidence. |
-
-## Cross-region cost variance detail
-
-S3 pricing varies by region. Always re-state the regional rate in the
-SAVINGS block when the bucket is not in us-east-1. Monitoring fee is
-flat ($0.0025/1K) across all regions.
-
-| Region | Standard / IT-Frequent $/GB-mo | Notes |
-|---|---|---|
-| us-east-1, us-west-2 | 0.023 | Baseline |
-| eu-west-1 (Ireland) | 0.024 | ~4% premium |
-| ap-southeast-1 (Singapore) | 0.025 | ~9% premium |
-| sa-east-1 (Sao Paulo) | 0.0309 | ~35% premium |
-
-**Decision impact:** in high-premium regions, the gap between Frequent
-and Archive tiers is wider, so Intelligent-Tiering captures MORE savings.
-Be more aggressive on archive-tier timing in high-premium regions.
-
-## Recent AWS features (2024-2026)
-
-- **S3 Intelligent-Tiering small object fee aggregation (2025-2026):**
-  For buckets with very large counts of small objects, AWS aggregates
-  the per-object monitoring and small-object fees into bulk billing
-  lines for cost-allocation visibility. This does NOT remove the
-  monitoring fee — it changes how the fee is presented. The gate (Step 2)
-  still applies.
-
-- **Configurable Archive tier timing (2024-2025):** Archive Access
-  (default 90 days) and Deep Archive Access (default 180 days) are now
-  configurable via `Tierings[].Days`. Shorter windows capture savings
-  faster on known-cold data.
-
-- **Intelligent-Tiering filter scopes (2024):** Configurations support
-  `Filter: {Prefix: "...", Tag: {...}}` to scope Intelligent-Tiering
-  to specific object cohorts. Use to limit the monitoring fee to cold
-  prefixes only.
-
-- **S3 Storage Lens expanded (2024-2026):** 29+ metrics including
-  object-size distribution, tier distribution, access-pattern trend.
-  Always pull Storage Lens before recommending Intelligent-Tiering.
-
-- **S3 Batch Operations expanded (2024-2025):** Supports `S3CopyObject`
-  with `TargetStorageClass: INTELLIGENT_TIERING` for one-time backfill.
-
-- **S3 Express One Zone directory buckets (2023-2025):** Single-AZ
-  directory buckets with ms-latency. Do NOT support Intelligent-Tiering.
-  Verdict: ALREADY_OPTIMAL for ML/AI workloads.
-
-- **S3 Tables (managed Apache Iceberg, 2025):** Tables manage their
-  own lifecycle; do NOT propose Intelligent-Tiering on table-data
-  prefixes.
+- [Worked examples](references/worked-examples.md) - full walkthroughs: monitoring-fee rejection (negative-savings rule), already-optimal setup
+- [Error handling](references/error-handling.md) - CLI and data-source failure modes, remedies, and the rollback procedure
+- [Diagnostic commands](references/diagnostic-commands.md) - pre-flight bucket-metadata gate: pagination, CLI listing, malformed-input handling, attribute table
+- [Advanced patterns](references/advanced-patterns.md) - Step 0 expert knowledge, edge-case handling, cross-region cost variance, 2024-2026 AWS features
+- [Intelligent-Tiering cost model](references/intelligent-tiering-cost-model.md) - request fees, retrieval tiers, regional multipliers; load before dollar estimates
+- [Intelligent-Tiering vs lifecycle](references/intelligent-tiering-vs-lifecycle.md) - trade-off analysis for predictable access patterns
 
 ## Domain
 
