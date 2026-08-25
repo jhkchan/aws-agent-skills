@@ -240,3 +240,68 @@ resource "aws_lambda_permission" "share" {
 | Remove permission | `aws lambda remove-permission` |
 | Delete layer version | `aws lambda delete-layer-version` |
 | Attach to function | `aws lambda update-function-configuration --layers` |
+
+---
+
+### ## Step 4 — Layer zip structure (per-runtime path conventions) — packaging examples
+
+**Python example:**
+
+```bash
+# Create the layer directory structure
+mkdir -p layer/python
+pip install -t layer/python/ requests boto3-Powertools
+
+# Zip from inside the directory (so python/ is at the zip root)
+cd layer
+zip -r ../my-python-layer.zip python/
+cd ..
+```
+
+**Node.js example:**
+
+```bash
+mkdir -p layer/nodejs
+cd layer/nodejs
+npm init -y
+npm install @aws-sdk/client-s3
+cd ..
+zip -r ../my-node-layer.zip nodejs/
+cd ..
+```
+
+**provided.al2 example (Go binary):**
+
+```bash
+mkdir -p layer/bin
+cp bootstrap layer/bin/
+cd layer
+zip -r ../my-go-layer.zip bin/
+cd ..
+```
+
+**Common mistake:** zipping the outer directory instead of from
+inside it. `zip -r layer.zip layer/` creates a zip with `layer/` as
+the root — Lambda extracts to `/opt/layer/python/` instead of
+`/opt/python/`. Always `cd` into the directory before zipping.
+
+### Step 8 — AWS Powertools for Python layer ARN lookup
+
+
+```bash
+# Get the latest Powertools layer ARN for your region
+aws lambda list-layers --query 'Layers[?contains(LayerName, `AWSLambdaPowertools`)]'
+
+# Or use the well-known ARN (region-specific; check docs)
+# Example us-east-1:
+# arn:aws:lambda:us-east-1:017000801446:layer:AWSLambdaPowertoolsPythonV3:1
+```
+
+### Step 8 — AWS Powertools for Node.js layer ARN lookup
+
+
+```bash
+# Node.js Powertools layer (region-specific ARN)
+# Example us-east-1:
+# arn:aws:lambda:us-east-1:094274105915:layer:AWSLambdaPowertoolsTypeScript:1
+```

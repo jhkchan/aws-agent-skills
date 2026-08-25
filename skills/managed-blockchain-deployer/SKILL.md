@@ -83,25 +83,7 @@ participation, and (3) the Query API for serverless on-chain data
 reads. They share a service namespace but almost nothing else —
 mixing their concepts is the single most common provisioning error.
 
-Three misconceptions dominate Managed Blockchain misdesign at
-provisioning time:
-
-- **"Starter edition is fine for production."** AWS announced Starter
-  edition retirement: new Starter networks can no longer be created.
-  Standard is the only supported path. A baseline happily provisions
-  Starter.
-
-- **"I need an Ethereum node to query on-chain data."** The Query API
-  is a serverless HTTP API for token balances, transactions, and
-  contract reads across Ethereum mainnet/testnet and Bitcoin. No node,
-  no sync time, no instance cost. A baseline skips to node
-  provisioning.
-
-- **"Fabric channels and chaincode are AWS API operations."** They are
-  not. AWS provisions the infrastructure (network, member, peer node,
-  CA); channels and chaincode are Fabric-layer operations invoked via
-  the Fabric SDK or CLI against the peer endpoint. Conflating the two
-  leads to `aws managedblockchain create-channel` which does not exist.
+→ Extended Mindset rationale moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -133,42 +115,7 @@ creation and CANNOT be changed without destroying and recreating.
 
 ## Expert heuristic: Starter edition retirement
 
-Starter edition was announced for retirement. A baseline model
-provisions Starter for cost; this skill blocks it.
-
-```text
-Operator: "Create a Starter Fabric network — it's cheaper."
-Skill response:
-  [✗] Edition: STARTER is NO LONGER AVAILABLE for new networks. Use STANDARD.
-```
-
-Existing Starter networks continue to run but cannot be upgraded to
-Standard — you must migrate (export ledger, create Standard network,
-re-import). The skill prevents provisioning a dead-end edition.
-
-## Expert heuristic: three product lines, one service
-
-```text
-Managed Blockchain
-├── Hyperledger Fabric  (private consortium)
-│   create-network → create-member → create-node → CA enrollment
-├── Ethereum nodes      (public mainnet/testnet)
-│   create-node (framework=ETHEREUM) → JSON-RPC endpoint
-└── Query API           (serverless on-chain reads, NO node)
-    managedblockchain-query: get-token-balance, list-token-balances,
-    list-transactions, get-contract — per-request, no sync
-```
-
-When an operator says "query the blockchain," the skill asks: do they
-need to RUN a node (Ethereum node), or READ data (Query API)? For
-most read-only use cases, the Query API is cheaper and faster.
-
-## Expert heuristic: channel/chaincode is NOT an AWS API
-
-AWS provisions Fabric infrastructure (network, member, node, CA).
-Channels and chaincode are Fabric-layer operations via the peer CLI.
-`aws managedblockchain create-channel` does not exist. (Covered in
-detail in Steps 6-7 below.)
+→ Expert-heuristic deep dives moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Prerequisites (verify before provisioning)
 
@@ -357,38 +304,7 @@ re-sync).
 The admin certificate is enrolled via the Fabric CA client (not the
 AWS API). This must happen AFTER the member and CA are AVAILABLE.
 
-**Retrieve CA endpoint:**
-
-```bash
-aws managedblockchain get-member \
-  --network-id n-ABCDEFGHIJ1234567 \
-  --member-id m-ABCDEFGHIJ1234567 \
-  --region us-east-1 \
-  --query 'Member.FrameworkAttributes.Fabric.CaEndpoint' --output text
-# Output: ca.m-xxxxxxxxxxxxx.n-xxxxxxxxxxxx.managedblockchain.us-east-1.amazonaws.com:30002
-```
-
-**Download the CA TLS certificate:**
-
-```bash
-aws s3 cp \
-  s3://us-east-1.managedblockchain/etc/managed-blockchain-tls-chain.pem \
-  ./managed-blockchain-tls-chain.pem
-```
-
-**Enroll the admin identity:**
-
-```bash
-fabric-ca-client enroll \
-  -u https://admin:Admin12345!@ca.m-xxxxxxxxxxxxx.n-xxxxxxxxxxxx.managedblockchain.us-east-1.amazonaws.com:30002 \
-  --tls.certfiles ./managed-blockchain-tls-chain.pem \
-  -M ./admin-msp
-```
-
-This produces the admin MSP directory containing the enrollment
-certificate (`cert.pem`), private key (`keystore/`), CA root cert
-(`cacert.pem`), and TLS CA cert (`TLScacert.pem`). This admin cert
-authorizes channel creation, chaincode install, and instantiation.
+→ CA-endpoint retrieval, TLS-cert download, and admin-enrollment CLI moved verbatim to [references/fabric-provisioning-commands.md](references/fabric-provisioning-commands.md).
 
 ## Step 6 — Channel creation
 
@@ -396,22 +312,7 @@ Channels are Fabric-layer private communication lanes between
 subsets of consortium members. Channel creation uses the Fabric peer
 CLI, not the AWS API.
 
-```bash
-export CORE_PEER_ADDRESS=nd-xxxxxxxxxxxxx.m-xxxxxxxxxxxxx.n-xxxxxxxxxxxx.managedblockchain.us-east-1.amazonaws.com:30003
-export CORE_PEER_LOCALMSPID=m-ABCDEFGHIJ1234567MSP
-export CORE_PEER_MSPCONFIGPATH=./admin-msp
-export CORE_PEER_TLS_ROOTCERT_FILE=./managed-blockchain-tls-chain.pem
-
-# Generate channel config transaction
-configtxgen -profile OneOrgChannel -channelID supply-chain-channel -outputCreateChannelTx ./channel.tx
-
-# Create the channel
-peer channel create -c supply-chain-channel -f ./channel.tx \
-  -o $ORDERER_ENDPOINT --tls --cafile ./managed-blockchain-tls-chain.pem
-
-# Join the peer to the channel
-peer channel join -b supply-chain-channel.block
-```
+→ Peer-CLI channel create/join sequence moved verbatim to [references/fabric-provisioning-commands.md](references/fabric-provisioning-commands.md).
 
 **Common mistake:** attempting `aws managedblockchain create-channel`.
 This API does not exist. Channels are a Fabric concept, not an AWS
@@ -421,36 +322,7 @@ resource. The AWS layer stops at the peer node.
 
 Chaincode deployment depends on the Fabric version.
 
-**Fabric 1.4 (install + instantiate):**
-
-```bash
-peer chaincode install -n supply-chain-cc -v 1.0 -p github.com/example/supply-chain -l golang
-
-peer chaincode instantiate -n supply-chain-cc -v 1.0 -C supply-chain-channel \
-  -c '{"function":"init","Args":[]}' \
-  -o $ORDERER_ENDPOINT --tls --cafile ./managed-blockchain-tls-chain.pem
-```
-
-**Fabric 2.x (approve + commit — new decentralized lifecycle):**
-
-```bash
-# Package
-peer lifecycle chaincode package supply-chain-cc.tar.gz \
-  --path github.com/example/supply-chain --lang golang --label supply-chain-cc_1.0
-
-# Install
-peer lifecycle chaincode install supply-chain-cc.tar.gz
-
-# Approve for org
-peer lifecycle chaincode approveformyorg -C supply-chain-channel \
-  -n supply-chain-cc -v 1.0 --package-id $PACKAGE_ID --sequence 1 \
-  --tls --cafile ./managed-blockchain-tls-chain.pem
-
-# Commit (after enough orgs approve)
-peer lifecycle chaincode commit -C supply-chain-channel \
-  -n supply-chain-cc -v 1.0 --sequence 1 \
-  --tls --cafile ./managed-blockchain-tls-chain.pem
-```
+→ Fabric 1.4 and 2.x chaincode lifecycle CLI moved verbatim to [references/fabric-provisioning-commands.md](references/fabric-provisioning-commands.md).
 
 **Version mismatch gotcha:** Fabric 1.4 lifecycle
 (install/instantiate) is incompatible with Fabric 2.x lifecycle
@@ -464,33 +336,7 @@ Ethereum nodes sync to the public Ethereum mainnet or testnet
 (Sepolia/Holesky) and expose a JSON-RPC endpoint. No `create-network`
 needed — the Ethereum network is the public chain; it already exists.
 
-```bash
-NODE_ID=$(aws managedblockchain create-node \
-  --network-id n-ethereum-mainnet \
-  --node-configuration '{
-    "InstanceType": "bc.m5.large",
-    "AvailabilityZone": "us-east-1a",
-    "Framework": "ETHEREUM",
-    "FrameworkConfiguration": {"Ethereum": {}},
-    "LogPublishingConfiguration": {}
-  }' \
-  --region us-east-1 \
-  --query NodeId --output text)
-```
-
-Ethereum networks use predefined IDs (`n-ethereum-mainnet`,
-`n-ethereum-sepolia-testnet`, `n-ethereum-holesky-testnet`). You
-only `create-node` to join.
-
-**Retrieve the JSON-RPC endpoint:**
-
-```bash
-aws managedblockchain get-node \
-  --network-id n-ethereum-mainnet \
-  --node-id $NODE_ID \
-  --region us-east-1 \
-  --query 'Node.FrameworkAttributes.Ethereum.HttpEndpoint' --output text
-```
+→ Ethereum create-node and JSON-RPC endpoint retrieval CLI moved verbatim to [references/ethereum-and-query-api.md](references/ethereum-and-query-api.md).
 
 Characteristics: syncs to mainnet/testnet (full sync takes hours to
 days); HTTP and WebSocket JSON-RPC endpoints; no "member" concept
@@ -506,31 +352,7 @@ predefined network IDs.
 The Query API is a fully serverless, read-only HTTP API for on-chain
 data. No node provisioning, no sync time, no instance cost.
 
-**Query a token balance:**
-
-```bash
-aws managedblockchain-query get-token-balance \
-  --chain-id "ETH_MAINNET" \
-  --owner-identifier '{"IdentifierType": "ADDRESS", "Identifier": "0x1234..."}' \
-  --token-identifier '{"Network": "ETHEREUM", "ContractAddress": "0xdac8..."}' \
-  --region us-east-1
-```
-
-**List all token balances for a wallet:**
-
-```bash
-aws managedblockchain-query list-token-balances \
-  --owner-identifier '{"IdentifierType": "ADDRESS", "Identifier": "0x1234..."}' \
-  --chain-id "ETH_MAINNET" --region us-east-1
-```
-
-**Get a transaction:**
-
-```bash
-aws managedblockchain-query get-transaction \
-  --chain-id "ETH_MAINNET" \
-  --transaction-hash "0xabcd1234..." --region us-east-1
-```
+→ Query API token/transaction CLI examples moved verbatim to [references/ethereum-and-query-api.md](references/ethereum-and-query-api.md).
 
 Characteristics: supports Ethereum mainnet/testnet and Bitcoin;
 IAM-controlled (standard AWS auth, no node keys); per-request pricing
@@ -554,24 +376,7 @@ cost.
 
 ## Step 10 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **Managed Blockchain Query API (2023-2024):** Serverless HTTP API
-  for token balances, transactions, and contract data across Ethereum
-  and Bitcoin. No node required.
-- **Starter edition retirement (2024-2025):** New Starter Fabric
-  networks can no longer be created. Standard is the only path.
-- **Fabric 2.2 support (2023-2024):** New chaincode lifecycle
-  (approve/commit), decentralized governance, private data
-  collections.
-- **Ethereum Sepolia/Holesky testnet (2024-2025):** New testnet
-  networks as Goerli deprecated.
-- **Bitcoin Query API support (2024-2025):** Query API extended to
-  Bitcoin mainnet/testnet.
-- **Batch query operations (2024-2025):** `batch-get-token-balance`
-  and `list-filtered-transaction-events` for bulk reads.
-- **Query API event filtering (2025-2026):** Filter by contract
-  address, token ID, and event type.
+→ Recent AWS features deep dive moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -678,34 +483,14 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### `create-network` fails with edition error
-Operator specified `STARTER`. Starter is retired for new networks.
-Change to `STANDARD` and retry.
+→ Error-handling runbooks moved verbatim to [references/error-handling.md](references/error-handling.md).
 
-### Member/node creation hangs in `CREATING`
-CA endpoint or node not yet available. Poll `get-member` / `get-node`
-every 60 seconds until status is `AVAILABLE` (typically 10-20 min).
+## References (load on demand)
 
-### `create-node` fails with VPC/subnet error
-The specified AZ has no subnet in the member's VPC. Run
-`aws ec2 describe-subnets` to find available AZs, then re-create.
-
-### `fabric-ca-client enroll` fails with connection refused
-CA endpoint not yet AVAILABLE. Poll `get-member`. Verify the TLS
-certificate was downloaded from the correct S3 path. Verify the
-admin password matches member creation.
-
-### Chaincode install fails with lifecycle mismatch
-Operator using Fabric 1.4 lifecycle on a 2.x network, or vice versa.
-Match the lifecycle to the framework version.
-
-### Ethereum node JSON-RPC returns empty responses
-Node is still syncing (hours to days). Check `get-node` status. For
-read-only queries during sync, use the Query API instead.
-
-### Query API returns `AccessDeniedException`
-IAM role lacks `AmazonManagedBlockchainQueryReadOnly`. Attach the
-managed policy or add `managedblockchain-query:*` permissions.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert-heuristic deep dives, extended Mindset rationale, recent features 2023-2026
+- [references/error-handling.md](references/error-handling.md) — error-handling runbooks (edition, CREATING hang, VPC/subnet, CA enroll, lifecycle mismatch, sync, AccessDenied)
+- [references/fabric-provisioning-commands.md](references/fabric-provisioning-commands.md) — Fabric CLI sequence (network, member, node, CA enrollment, channel, chaincode) — extended with Steps 5-7 detail
+- [references/ethereum-and-query-api.md](references/ethereum-and-query-api.md) — Ethereum nodes + Query API detail — extended with Steps 8-9 CLI
 
 ## Domain
 

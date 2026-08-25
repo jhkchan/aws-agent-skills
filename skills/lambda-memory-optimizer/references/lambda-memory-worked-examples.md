@@ -411,3 +411,72 @@ Large container images have high cold-start memory overhead (~256 MB+).
 If MemorySize is at 256 MB, the function may OOM during cold-start
 image extraction. Increase MemorySize to accommodate the image overhead
 OR optimize the image (multi-stage build, distroless base).
+
+---
+
+### Output format — canonical output template
+
+
+Every response MUST use these literal labels in this exact order. No
+markdown headings, no camelCase, no bold substitutes.
+
+```text
+TARGET: <function-name>
+VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
+REASON: <1-2 sentences naming the recommendation and the supporting data>
+POWER_TUNING_RESULTS:
+  | Memory   | Avg Duration | p99 Duration | $/Invocation | Tag            |
+  |----------|-------------|-------------|-------------|----------------|
+  | <MB>     | <ms>        | <ms>        | $<amount>   | current        |
+  | <MB>     | <ms>        | <ms>        | $<amount>   | cost-optimal   |
+  | <MB>     | <ms>        | <ms>        | $<amount>   | latency-optimal|
+COST_COMPARISON:
+  Current:  <MB> at <ms> avg → $<amount>/invocation × <N>/month = $<amount>/month
+  Proposed: <MB> at <ms> avg → $<amount>/invocation × <N>/month = $<amount>/month
+  Saving:   $<amount>/month (<pct>%) — cost-optimal at <MB>
+  Latency:  p99 drops from <ms> to <ms> (<pct>% reduction)
+RECOMMENDATION:
+  Current: <memory> MB at <avg duration> ms, <architecture>, <concurrency>, <init>
+  Proposed: <memory> MB at <projected duration> ms, <architecture>, <concurrency>, <init>
+  Dimensions changed: <memory | pc_memory | init | efs_container_layers | tmp | architecture>
+  Dimensions checked: <list ALL six, each ✓ (no finding) or → (finding)>
+  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
+ESTIMATED_SAVINGS:
+  Current monthly: $<amount>    ← MUST show compute + requests + PC subtotals
+  Projected monthly: $<amount>
+  Monthly saving: $<amount>     ← MUST equal Current − Projected, 2 decimals
+  Annual saving: $<amount>      ← MUST equal Monthly × 12
+  Latency delta: <p99 duration change> ms (<percentage>%)
+MIGRATION_STEPS:
+  1. <specific action with CLI command>
+  2. <verification step>
+CONFIRM: Before executing any state-changing CLI, emit and await operator
+  approval: "CONFIRM: About to <action> on <function-name> in <region>.
+  Proceed? (yes/no)"
+```
+
+### Decision tree (output-order memory decision tree)
+
+### Decision tree
+
+```text
+Is Power Tuning or Compute Optimizer data available?
+├── NO → NEED_MORE_INFO — run Power Tuning before any memory recommendation
+└── YES → Does `cheapest` differ from current MemorySize?
+    ├── YES → Is `cheapest` > current (upsize)?
+    │   ├── YES → CPU-bound workload.
+    │   │         FURTHER_OPTIMIZATION_AVAILABLE.
+    │   │         Set MemorySize to `cheapest`.
+    │   │         Verify projected cost < current cost.
+    │   └── NO → I/O-bound or over-provisioned.
+    │            FURTHER_OPTIMIZATION_AVAILABLE.
+    │            Set MemorySize to `cheapest`.
+    │            Verify duration stays within SLO.
+    └── NO → Does `fastest` offer material latency improvement?
+        ├── YES → FURTHER_OPTIMIZATION_AVAILABLE (latency).
+        │         Surface cost delta — may be cost-increasing.
+        │         Let operator choose based on FinOps vs UX priority.
+        └── NO → All memory dimensions pass.
+                 Check PC, init, EFS, /tmp, architecture in order.
+                 └── All six pass → OPTIMIZED
+```

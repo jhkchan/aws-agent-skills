@@ -91,3 +91,27 @@ without agents.
 The merge is automatic — no operator action required. However, the merge
 has a 15-30 minute propagation delay. Newly installed agents may not
 appear in the console immediately.
+
+---
+
+## Step 2 — Collector registration CLI (moved verbatim from SKILL.md)
+
+```bash
+# Register the Collector with the home region after OVA deployment
+aws discovery associate-configuration-items-to-application \
+  --application-configuration-configuration-id app-xxxxxxx \
+  --configuration-ids ["i-xxxxxxx"] \
+  --region us-east-1
+```
+
+## Appendix B — Collector VM vs Discovery Agent deployment summary (moved verbatim from SKILL.md)
+
+| Dimension | Collector VM (agentless) | Discovery Agent |
+|---|---|---|
+| Form factor | OVA on vCenter/hypervisor | Per-guest install |
+| Data depth | Inventory + VM performance | Process + network + performance |
+| Guest access | No | Yes |
+| Scale | vCenter scope (all VMs) | Per-host deployment |
+| Dependency mapping | No | Yes |
+| OS for anti-pattern | From vCenter tools (may be stale) | From guest (current) |
+

@@ -113,3 +113,18 @@ WAVE N: <complex or retained> — high-dependency or compliance-constrained
 | Retained app breaks after wave | No VPN/Direct Connect plan for retained apps | Add network architecture for retained apps |
 | EOL OS rehosted without upgrade | Anti-pattern ignored | Force replatform for EOL OS servers |
 | DMS cutover with schema mismatch | SCT not run | Run SCT before DMS replication task |
+
+---
+
+## Appendix A — 6R strategy decision matrix (moved verbatim from SKILL.md)
+
+| Signal | Rehost | Replatform | Refactor | Repurchase | Retain | Retire |
+|---|---|---|---|---|---|---|
+| No anti-patterns, low cloud driver | Yes | | | | | |
+| EOL OS but app is stable | | Yes (upgrade OS) | | | | |
+| Self-managed DB, want managed | | Yes (RDS/Aurora) | | | | |
+| Need to scale, current arch limits | | | Yes | | | |
+| Commercial product being replaced | | | | Yes (SaaS) | | |
+| Compliance / hard constraint | | | | | Yes | |
+| Zero utilization (Discovery) | | | | | | Yes |
+

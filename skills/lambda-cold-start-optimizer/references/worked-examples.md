@@ -191,3 +191,44 @@ MIGRATION_STEPS:
   3. Re-run cold-start optimization analysis.
 CONFIRM: (n/a — read-only recommendation)
 ```
+
+
+## Provisioned concurrency sizing (moved from SKILL.md Step 2)
+
+**Sizing provisioned concurrency:**
+```bash
+# Target: p50-p75 of observed ConcurrentExecutions
+aws lambda put-provisioned-concurrency-config \
+  --function-name <name> --qualifier <alias> \
+  --provisioned-concurrent-executions <p50-p75 value>
+
+# Autoscaling via Application Auto Scaling
+aws application-autoscaling register-scalable-target \
+  --service-namespace lambda \
+  --resource-id function:<name>:<alias> \
+  --scalable-dimension lambda:function:ProvisionedConcurrency \
+  --min-capacity <min> --max-capacity <max>
+```
+
+
+## The global-scope init pattern, Python (moved from SKILL.md Step 4)
+
+**The global-scope pattern (Python):**
+```python
+# BAD — per-invocation init
+def handler(event, context):
+    client = boto3.client('dynamodb')  # Re-created every invocation
+    db = psycopg2.connect(...)          # 200-500 ms TLS overhead every time
+
+# GOOD — global-scope init, reused across invocations
+_DDB = boto3.client('dynamodb')  # Created once per container
+_db = None
+def _get_db():
+    global _db
+    if _db is None:
+        _db = psycopg2.connect(...)
+    return _db
+def handler(event, context):
+    db = _get_db()
+```
+

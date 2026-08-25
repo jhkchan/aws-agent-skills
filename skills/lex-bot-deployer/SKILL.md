@@ -81,156 +81,28 @@ with a specific gap citation in the checklist (marked `[✗]`), and
 
 ## Mindset
 
-**One-line takeaway:** A Lex V2 bot is a state machine of intents. Each
-intent declares sample utterances, slots (typed parameters), and
-prompts. A Lambda code hook (when enabled) intercepts between EVERY
-turn — validating slots, branching dialog, and Fulfillment — and an
-alias points to a specific bot version, enabling blue-green deployment.
-
-Three misconceptions dominate Lex V2 misdesign at provisioning time:
-
-- **"Slots elicit in declaration order."** They elicit in PRIORITY order
-  (priority 1 first), and only REQUIRED slots are auto-elicited. A
-  baseline model declares slots and assumes code order. The correct model
-  assigns explicit priorities, puts required slots first, and leaves
-  optional slots to be elicited only when the code hook demands them.
-
-- **"The Lambda code hook runs once at the end."** It does NOT. The
-  DIALOG_CODE_HOOK fires after EVERY user turn — between slot elicitation,
-  confirmation, and fulfillment. It is the dialog manager. A baseline
-  wires `FULFILLMENT_CODE_HOOK` only and is surprised when the bot cannot
-  branch mid-conversation. Opt in to both hooks per intent.
-
-- **"Publishing a bot is enough to make it live."** It is NOT. create-bot
-  yields DRAFT. You MUST call create-bot-version to snapshot DRAFT into a
-  numbered version, then create-resource-link (alias) pointing at it. The
-  runtime uses the alias, not the version directly — this enables
-  blue-green: shift the alias from version N to N+1 with rollback being
-  a single API call.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Mindset — one-line takeaway and three misconceptions".
+> Load when: modelling the bot — slot priority vs declaration order, dialog vs fulfillment hooks, version-vs-alias liveness.
 
 ## Configuration dependency graph (novel heuristic)
 
-Lex V2 configurations are NOT independent. Intents need slots; slots
-need slot types; code hooks need a Lambda ARN with a resource-based
-permission granting Lex service invocation; aliases need versions;
-versions need built intents; channels need an alias. Use this graph to
-sequence provisioning.
-
-| Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| Bot (create-bot) | unique bot name; COPPA flag; IAM permissions | dataPrivacy is IMMUTABLE after creation — set ChildDirected correctly the first time | bot shell that holds locales |
-| Locale (create-bot-locale) | bot exists; localeId (e.g., en-US); voiceId if voice | NLU trains asynchronously; bot is not conversational until locale status is Built | intent/slot modeling |
-| Slot type (create-slot-type) | bot exists; locale exists | slot type values must be unique within the slot type | slots referencing the type |
-| Slot (create-slot) | intent exists; slot type exists (built-in or custom) | priority MUST be 1..100; required slots are elicited in priority order | elicitation flow |
-| Intent (create-intent) | bot + locale exist; sampleUtterances non-empty | intent is not active until locale is rebuilt | conversation state |
-| Code hook (Lambda) | Lambda function deployed in same region; resource-based permission granting `lexv2.amazonaws.com` | DIALOG_CODE_HOOK and FULFILLMENT_CODE_HOOK are SEPARATE flags per intent — opting into one does NOT opt into the other | dialog management + fulfillment |
-| Conversation logs | bot exists; CloudWatch Logs role ARN; KMS key policy grants Lex | audio and text logs are independent toggles; without KMS the logs role is the only encryption | observability |
-| Bot version (create-bot-version) | locale status is Built; DRAFT has changes | version is a SNAPSHOT — immutable once created | reproducible bot state |
-| Alias (create-resource-link) | bot version exists | alias points at exactly one version; shifting it is the blue-green switch | runtime endpoint |
-| Channel integration | alias exists (channels bind to alias); channel-specific credentials | a channel always points at an alias — never at DRAFT | omnichannel publishing |
-
-**The slot-priority and alias rows are the ones a baseline model misses.**
-Slot priority controls elicitation order, but a baseline treats slots
-as unordered. Alias is the runtime's source of truth, but a baseline
-publishes a version and assumes it is live. The procedure below forces
-explicit decisions on each.
-
-**Cross-dependency gotchas:**
-- A locale must be `Built` before you can create a bot version. Changes
-  land in DRAFT — `build-bot-locale` again, then stamp a new version.
-- The Lambda resource-based policy MUST grant `lambda:InvokeFunction` to
-  `lexv2.amazonaws.com` scoped to the bot's ARN, or the code hook
-  silently fails at runtime (no error at config time).
-- KMS key policy must allow the Lex service-linked role
-  `kms:GenerateDataKey` and `kms:Decrypt`, or log delivery fails silently.
-- Aliases are immutable pointers but you CAN call update-resource-link
-  to shift the version — the blue-green switch AND the rollback switch.
-- Multiple locales share one bot but each has its own intents. A bot
-  version snapshots ALL built locales simultaneously.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Configuration dependency graph".
+> Load when: sequencing provisioning — hard dependencies, silent failures, immutability, cross-dependency gotchas.
 
 ## Expert heuristic: slot elicitation priority
 
-A baseline model declares slots and assumes elicitation in code order.
-The correct heuristic recognizes Lex elicits REQUIRED slots in PRIORITY
-order (1 = highest), only when the slot is not already filled.
-
-```text
-Intent: OrderCoffee
-  Slots (declared with priority):
-    CoffeeSize    (priority 1, required, slot type CoffeeSizeType)
-    CoffeeDrink   (priority 2, required, slot type CoffeeDrinkType)
-    CoffeeTemp    (priority 3, optional, slot type AMBIENT)
-
-User: "I'd like a large latte"
-  → Lex fills CoffeeSize=large, CoffeeDrink=latte from the utterance
-  → CoffeeTemp is OPTIONAL — Lex does NOT auto-elicit
-  → Lambda DIALOG_CODE_HOOK can choose to elicit CoffeeTemp or skip
-
-User: "I'd like a coffee"
-  → Lex elicits CoffeeSize first (priority 1, required, not filled)
-  → Then CoffeeDrink (priority 2)
-  → CoffeeTemp skipped unless code hook intervenes
-```
-
-**Key implication:** the priority field is the ONLY way to control
-auto-elicitation order. Required slots with the same priority are
-elicited in undefined order — assign distinct priorities. Optional
-slots MUST be elicited by the Lambda code hook; the bot will not ask
-for them on its own.
+> **Moved verbatim** → [references/intents-and-slots.md](references/intents-and-slots.md) § "Expert heuristic: slot elicitation priority".
+> Load when: declaring slots — priority-driven elicitation order, required vs optional behaviour.
 
 ## Expert heuristic: Lambda code hook fires between every turn
 
-The DIALOG_CODE_HOOK is the dialog manager. It fires after every user
-turn — between slot elicitation, between confirmation, before
-fulfillment. A baseline model wires only FULFILLMENT_CODE_HOOK and
-loses the ability to validate, branch, or skip slots.
-
-```text
-Turn 1: User says "book a flight" → Lex matches BookFlight intent
-  → DIALOG_CODE_HOOK fires (invocationSource = "DialogCodeHook")
-     → Lambda validates, enriches, sets next slot
-  → Lex elicits DepartureCity (priority 1)
-
-Turn 2: User says "San Francisco"
-  → DIALOG_CODE_HOOK fires → Lambda validates city, sets slot
-  → Lex elicits DestinationCity (priority 2)
-
-Final turn: All required slots filled → Lex prompts confirmation
-  → DIALOG_CODE_HOOK fires (user confirmed)
-  → FULFILLMENT_CODE_HOOK fires (invocationSource = "FulfillmentCodeHook")
-     → Lambda performs the action (call API, write DB)
-     → Returns Close action with success message
-```
-
-**Key implication:** treat DIALOG_CODE_HOOK as the validation/branching
-layer and FULFILLMENT_CODE_HOOK as the action layer. Separate them in
-your Lambda by branching on `invocationSource`.
+> **Moved verbatim** → [references/code-hooks-and-aliases.md](references/code-hooks-and-aliases.md) § "Expert heuristic: Lambda code hook fires between every turn".
+> Load when: wiring the code hook — turn-by-turn interception, validation vs action layers.
 
 ## Expert heuristic: alias enables blue-green bot deployment
 
-A Lex V2 alias (resource link) points to exactly one bot version.
-Shifting the alias is the blue-green switch.
-
-```text
-Bot: OrderBot
-  Version 1 (snapshot of DRAFT at 2026-08-01)
-  Version 2 (snapshot of DRAFT at 2026-08-05)
-
-Alias "prod" → Version 1 (live traffic)
-Alias "staging" → Version 2 (QA traffic)
-
-Blue-green rollout:
-  1. Test against staging alias (Version 2)
-  2. update-resource-link → prod alias points to Version 2
-  3. If issue: update-resource-link → prod back to Version 1 (single call)
-
-Channel integrations and runtime clients reference the ALIAS, not the
-version. Shifting the alias atomically shifts all clients.
-```
-
-**Key implication:** NEVER point clients at a specific version. Always
-use an alias. This makes rollback trivial and decouples release from
-deployment.
+> **Moved verbatim** → [references/code-hooks-and-aliases.md](references/code-hooks-and-aliases.md) § "Expert heuristic: alias enables blue-green bot deployment".
+> Load when: publishing versions or shifting traffic — alias-based blue-green and rollback.
 
 ## Prerequisites (verify before provisioning)
 
@@ -368,16 +240,8 @@ aws lexv2-models update-intent \
   --fulfillment-code-hook '{"enabled":true}'
 ```
 
-**Grant Lex permission to invoke the Lambda:**
-
-```bash
-aws lambda add-permission \
-  --function-name OrderCoffeeFulfillment \
-  --statement-id LexInvokePermission \
-  --action lambda:InvokeFunction \
-  --principal lexv2.amazonaws.com \
-  --source-arn "arn:aws:lex:us-east-1:123456789012:bot/$BOT_ID"
-```
+> **Moved verbatim** → [references/code-hooks-and-aliases.md](references/code-hooks-and-aliases.md) § "Grant Lex permission to invoke the Lambda".
+> Load when: wiring the code hook — resource-based permission for lexv2.amazonaws.com scoped to the bot ARN.
 
 **Common mistake:** wiring FULFILLMENT_CODE_HOOK only and being surprised
 the bot cannot validate or branch mid-conversation. Enable both hooks
@@ -491,13 +355,8 @@ calls.
 | `lexv2-models` | Build-time configuration | `create-bot`, `create-intent`, `create-slot`, `build-bot-locale`, `create-bot-version`, `create-resource-link` |
 | `lexv2-runtime` | Runtime conversations | `recognize-text`, `recognize-utterance`, `start-conversation`, `put-session`, `delete-session` |
 
-```bash
-# Send text to the bot (runtime)
-aws lexv2-runtime recognize-text \
-  --bot-id "$BOT_ID" --bot-alias-id "$ALIAS_ID" \
-  --locale-id en-US --session-id "user-1234" \
-  --text "I'd like a large latte"
-```
+> **Moved verbatim** → [references/code-hooks-and-aliases.md](references/code-hooks-and-aliases.md) § "lexv2-runtime recognize-text example".
+> Load when: sending runtime traffic — recognize-text against the alias, never DRAFT.
 
 **Common mistake:** trying to call runtime APIs against the DRAFT
 version. Runtime only works against an alias. Build, version, alias,
@@ -524,23 +383,8 @@ SSM Parameter Store — NEVER inline in the Lambda code.
 
 ## Step 13 — Recent features
 
-- **Lex V2 Generative AI integration (2023-2024):** Built-in Amazon
-  Bedrock fallback when NLU confidence is below threshold. Configure
-  `generativeAIFallback` on the locale.
-- **Amazon Q integration (2024-2025):** Amazon Q Business connectors
-  wire as fulfillment backend for FAQ-style intents, eliminating custom
-  Kendra indexes in common cases.
-- **Improved built-in slot types (2024):** New `AMAZON.TypeOfFood`,
-  `AMAZON.TypeOfSport`, `AMAZON.MusicRecording` reduce custom work.
-- **Audio conversation logs to S3 (2024-2025):** S3 destinations in
-  addition to CloudWatch Logs with KMS encryption on both.
-- **Polly neural voice styles (2024-2025):** Style modulation (newscast,
-  conversation, customer support) via `engine-type=neural` and
-  `voice-style`.
-- **Test workspace API (2023-2024):** Run conversation scripts against
-  a bot version before alias promotion, formalizing blue-green QA.
-- **Genesys Cloud CX connector (2024):** Official Genesys Cloud CX
-  connector for Lex V2 simplifies call-center integrations.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Step 13 — Recent features".
+> Load when: checking 2023-2026 feature availability — Bedrock fallback, Q connectors, slot types, test workspace.
 
 ## NEVER do these things
 
@@ -639,31 +483,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Locale stuck in Building
-- A prior build failed. Check `describe-bot-locale` for errors. Common
-  causes: malformed utterances referencing undefined slots, slot types
-  with no values, duplicate intent names.
+> **Moved verbatim** → [references/error-handling.md](references/error-handling.md) § "Error handling".
+> Load when: a build, hook, alias, log, elicitation, or voice failure occurs.
 
-### Code hook never fires
-- The Lambda resource-based permission is missing or scoped to the wrong
-  bot ARN. Verify with `aws lambda get-policy`. Re-run `add-permission`
-  with the correct `--source-arn`.
+## References (load on demand)
 
-### Runtime returns "Invalid bot alias"
-- The alias does not exist or points at a non-Built version. Build the
-  locale, create a version, then create or update the alias.
-
-### Conversation logs not delivered
-- The Lex service role lacks CloudWatch Logs permissions or the KMS key
-  policy does not grant `lexv2.amazonaws.com`. Create the log group first.
-
-### Slot elicitation order is wrong
-- Slot priorities are not set or are duplicated. Re-run `update-slot`
-  with distinct priorities (1, 2, 3...).
-
-### Voice bot audio quality is poor
-- The engine is `standard`. Switch to `neural` for Polly neural voices.
-  Verify the phone provider is not transcoding to low-bitrate.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — mindset, configuration dependency graph, and recent features moved from this SKILL.md
+- [references/error-handling.md](references/error-handling.md) — error-handling deep dives moved from this SKILL.md
+- [references/intents-and-slots.md](references/intents-and-slots.md) — intent and slot modeling deep reference (slot-elicitation-priority heuristic moved into this file)
+- [references/code-hooks-and-aliases.md](references/code-hooks-and-aliases.md) — code hook and alias deep reference (hook-turn, blue-green, Lambda permission, and runtime-call blocks moved into this file)
 
 ## Domain
 

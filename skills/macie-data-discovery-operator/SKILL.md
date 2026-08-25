@@ -103,22 +103,7 @@ NOTES: <detection coverage rationale, finding severity, remediation caveats>
 
 Three Macie realities drive every operation:
 
-- **Macie must be enabled BEFORE any classification job or finding can
-  exist.** A baseline model jumps to `create-classification-job` without
-  checking whether Macie is enabled. The pre-flight gate catches this —
-  Macie enablement is a prerequisite, not an afterthought.
-
-- **Classification jobs are NOT real-time.** A scheduled job runs on a
-  CRON-like schedule (every 1-30 days). A one-time job runs once. For
-  continuous scanning of all S3, use automated ML-based discovery (the
-  latest feature) — but even that has a scan frequency, not instant
-  detection.
-
-- **Findings are only as good as the data identifiers configured.**
-  Managed identifiers detect common PII (SSN, credit card, email,
-  phone). Custom identifiers use regex for organization-specific
-  patterns (employee IDs, internal token formats). Without custom
-  identifiers, Macie misses organization-specific sensitive data.
+→ Extended Mindset rationale moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Pre-flight: Macie enablement + delegated admin gate
 
@@ -126,17 +111,7 @@ Run before any operation. `get-macie-session` returns the Macie
 enablement status. `get-administrator-account` returns the delegated
 admin (org-level).
 
-**Live-account pre-flight (skip if offline plan):**
-1. `aws macie2 get-macie-session` — confirm Macie is enabled. Capture
-   `status` (ENABLED / PAUSED), `serviceRole`, `findingPublishingFrequency`.
-2. `aws macie2 get-administrator-account` — confirm delegated admin for
-   org-level deployments.
-3. `aws macie2 list-classification-jobs` — check for existing jobs on
-   the target buckets.
-4. `aws s3api list-buckets` — verify target buckets exist and are in
-   scope.
-5. `aws macie2 describe-organization-configuration` — confirm org-level
-   config (auto-enable for new accounts).
+→ Live-account pre-flight command listing moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
 
 | Attribute | Effect on operation |
 |---|---|
@@ -150,27 +125,7 @@ admin (org-level).
 
 ## Expert heuristic: finding severity and detection coverage
 
-Macie findings come in two categories. A baseline model conflates them;
-this heuristic distinguishes them for triage and remediation:
-
-| Finding type | Category | What it detects | Severity range |
-|---|---|---|---|
-| `policy:IAMUser/S3` | Policy finding | Publicly accessible or shared S3 buckets (ACL, bucket policy) | Low, Medium, High |
-| `sensitiveData:S3Object/Custom` | Sensitive data finding | Custom data identifier matched (regex) | High (configurable) |
-| `sensitiveData:S3Object/Multiple` | Sensitive data finding | Multiple managed identifiers matched in one object | High |
-| `sensitiveData:S3Object/<Identifier>` | Sensitive data finding | Specific managed identifier (e.g., `USA_SOCIAL_SECURITY_NUMBER`) | Medium-High |
-
-**Coverage rule:** managed identifiers detect ~150+ PII types across
-regions (US SSN, UK NINO, credit card, email, phone, passport, API
-keys). If the organization has custom data formats (employee IDs,
-internal tokens, proprietary formats), custom identifiers are REQUIRED
-for full coverage — managed identifiers will miss them.
-
-**Severity triage:** `policy:IAMUser/S3` findings (public bucket) are
-typically higher urgency than `sensitiveData:S3Object/Email` (email in
-a private bucket). But `sensitiveData:S3Object/Credit_Card` in a public
-bucket is critical. Cross-reference the finding type with the bucket
-exposure (public vs private) for prioritization.
+→ Expert-heuristic deep dive moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## 10-step operating procedure
 
@@ -504,20 +459,7 @@ delay).
 
 ## Output format
 
-```text
-OPERATION: <enable | classify | custom-id | findings | suppress | auto-discovery | security-hub | remediate | aggregate>
-VERDICT: READY | BLOCKED | COMPLETED
-TARGET: <macie-resource-name>
-PRE_CHECKS:
-  - [PASS|FAIL] <check description>
-STEPS:
-  1. CONFIRM: About to <operation> on <target>. Proceed? (yes/no)
-  2. <exact CLI command with all flags populated>
-POST_VERIFY:
-  - [PASS|FAIL] <verification description>
-STATE: <job status / finding state / Macie status>
-NOTES: <detection coverage, severity, remediation caveats>
-```
+→ Literal output template moved verbatim to [references/worked-examples.md](references/worked-examples.md); the STRICT output contract above carries the authoritative template.
 
 ### Worked example — create classification job (READY)
 
@@ -540,75 +482,23 @@ NOTES: RECOMMENDED selector lets Macie sample bucket content and select relevant
 
 ### Worked example — Macie not enabled (BLOCKED)
 
-```text
-OPERATION: classify
-VERDICT: BLOCKED
-TARGET: pii-scan-2026-08
-PRE_CHECKS:
-  - [FAIL] Macie session NOT ENABLED — get-macie-session returns
-    NotFoundException. Macie must be enabled before creating
-    classification jobs.
-STEPS: (none — pre-checks failed)
-POST_VERIFY: (none)
-STATE: Macie disabled
-NOTES: Enable Macie first: aws macie2 enable-macie-session --finding-publishing-frequency FIFTEEN_MINUTES --status ENABLED. For org-level, designate a delegated admin account via enable-organization-admin-account.
-```
+→ Secondary worked example moved verbatim to [references/worked-examples.md](references/worked-examples.md).
 
 ## Expert heuristic: detection coverage gap analysis
 
-A baseline model says "Macie finds PII." This heuristic explains what
-Macie misses:
-
-```text
-Detection Coverage
-   ├─ Managed identifiers (~150+ PII types)
-   │    ├─ US SSN, passport, driver's license — YES
-   │    ├─ Credit card, bank account, SWIFT — YES
-   │    ├─ AWS access keys, API tokens — YES
-   │    ├─ Email, phone, address — YES
-   │    └─ Organization-specific formats (employee IDs, internal tokens)?
-   │         └─ NO — requires custom data identifiers (regex)
-   │
-   ├─ Custom identifiers (regex + keywords)
-   │    ├─ Effectiveness depends on regex precision
-   │    ├─ Keyword proximity scope reduces false positives
-   │    └─ Must be maintained as data formats evolve
-   │
-   └─ Automated ML-based discovery
-        ├─ ML-adaptive — samples content, selects identifiers
-        ├─ Still NOT instant (queued scan frequency)
-        └─ Does NOT replace custom identifiers for proprietary formats
-```
-
-**Practical implication:** for full coverage, combine managed
-identifiers (for common PII), custom identifiers (for proprietary
-formats), and automated discovery (for ML-adaptive scanning). Relying on
-any single method leaves gaps.
+→ Expert-heuristic deep dive moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Recent AWS features (2024-2026)
 
-- **Macie automated data discovery (ML-based, 2024-2025):** ML-driven
-  continuous scanning of all S3 without manual classification jobs.
-  Adapts identifier selection based on bucket content sampling.
-  Provisioning tip: enable for comprehensive coverage, keep targeted
-  jobs for specific high-risk buckets.
-- **Cross-account Macie findings aggregation (2024-2025):** Org-level
-  delegated admin aggregates findings from all member accounts. Use
-  `list-findings` in the admin account to query across all members.
-  Verify `relationshipStatus=Enabled` for all members.
-- **Macie + Step Functions remediation (2024-2025):** Multi-step
-  remediation workflows triggered by EventBridge. Parse finding details,
-  quarantine objects, restrict ACLs, notify teams. More sophisticated
-  than single-Lambda remediation.
-- **Enhanced managed data identifiers (2024):** Expanded coverage for
-  credentials (API keys, private keys), financial data (IBAN, SWIFT),
-  and region-specific PII (new country passport formats).
-- **Sensitive data discovery for S3 Object Lambda (2024):** Macie scans
-  S3 Object Lambda access points for sensitive data transformed on the
-  fly.
-- **Automated discovery scope controls (2025-2026):** Scope automated
-  discovery to specific accounts or buckets within the org. Reduces cost
-  for large orgs where not all S3 needs scanning.
+→ Recent AWS features deep dive moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert-heuristic deep dives, extended Mindset rationale, recent AWS features 2024-2026
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — live-account pre-flight command listing
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked example (BLOCKED) and the literal output-format template
+- [references/detection-and-remediation.md](references/detection-and-remediation.md) — deep identifier + remediation patterns (identifier categories, suppression, auto-remediation)
+- [references/operating-cli-commands.md](references/operating-cli-commands.md) — copy-pasteable CLI sequence for every operating step
 
 ## Domain
 

@@ -237,3 +237,75 @@ deprecation list before declaring a runtime issue.
 
 Always probe `aws health describe-events` for regional issues before
 declaring a customer-side root cause during a wide-impact incident.
+
+---
+
+### Deep reference: Lambda invocation layer model
+
+
+### Symptom → layer decision matrix (offline classification)
+
+```
+Error string                                  → Layer
+TaskTimeoutException                          → TIMEOUT_CONFIG / TIMEOUT_DOWNSTREAM
+Runtime.ExitError OutOfMemory                 → MEMORY_CONFIG
+InitDuration > 1s on first invocation         → COLD_START
+AccessDenied / "not authorized"               → PERMISSION_EXECUTION_ROLE
+                                               (or PERMISSION_RESOURCE_POLICY
+                                               if cross-account)
+connect ETIMEDOUT / ECONNREFUSED              → VPC_CONNECTIVITY / VPC_ENDPOINT
+Could not decrypt KMS                         → ENV_VAR_KMS
+ReferenceError: X is not defined              → ENV_VAR_MISSING
+async 5xx but caller got 202; DLQ fills       → INVOCATION_ASYNC
+API Gateway 504 / 502                         → INVOCATION_SYNC
+ImagePullFailure                              → ECR_IMAGE / ECR_POLICY
+```
+
+### Memory-to-CPU mapping
+
+| Memory (MB) | vCPU (approx) | Typical use |
+|---|---|---|
+| 128 | 0.083 | Light I/O (S3 trigger copy) |
+| 256 | 0.17 | SDK calls |
+| 512 | 0.24 | API Gateway handlers |
+| 1024 | 0.5 | Small JSON processing |
+| 1769 | 1.0 | Compute-bound threshold |
+| 3072 | 1.75 | Java/JVM |
+| 5120 | 3.0 | Parallel compute |
+| 10240 | 6.0 | Maximum CPU; heavy parallel compute |
+
+### Async retry timeline (default)
+
+```
+T+0s     : invocation fails
+T+0s     : immediate retry (1st)
+T+60s    : retry (2nd)
+T+180s   : retry (3rd) — final
+T+180s   : if all 4 attempts failed:
+           - DLQ: send to DeadLetterConfig.TargetArn (if set)
+           - OnFailure: send to DestinationConfig.OnFailure (if set)
+           - else: discard
+```
+
+Tunable via `put-function-event-invoke-config`:
+`MaximumRetryAttempts` (0-2), `MaximumEventAgeInSeconds` (60-21600).
+
+### EventSourceMapping (SQS/Kafka/Streams) retry semantics
+
+- A failed batch is retried in full up to `MaximumRetryAttempts`
+  (default -1 = infinite for SQS, finite for others).
+- `BisectBatchOnFunctionError: true` recurses to find the offending
+  record in the batch.
+- On exhaustion, partial-item failures route to `DestinationConfig`
+  if configured; otherwise the source (e.g., SQS visibility timeout
+  expiring) handles it.
+
+### Lambda VPC ENI lifecycle
+
+- Pre-2019: each function got its own ENI per subnet; scaled poorly.
+- 2019+: Hyperplane ENI — Lambda uses shared Hyperplane ENIs to reach
+  customer VPCs; function-specific ENIs are no longer created.
+- Removing VPC attachment (`update-function-configuration --vpc-config
+  SubnetIds=[]`) deletes any residual ENIs over minutes.
+- Function update does NOT propagate immediately; cold starts on new
+  execution environments pick up the new VPC config.

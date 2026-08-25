@@ -230,3 +230,122 @@ Each log entry includes:
 
 This makes it easy to correlate log entries with specific deployments
 and track application behavior across redeployments.
+
+## Expert heuristic: managed TLS vs custom domain (moved from SKILL.md)
+
+Lightsail automatically provisions a managed TLS certificate for the
+service's default domain. No manual cert upload or ACM integration is
+needed. For custom domains, add a CNAME record.
+
+```text
+Default domain (managed TLS auto-provisioned):
+  https://<unique-id>.<region>.cs.amazonlightsail.com
+  → TLS certificate auto-managed by Lightsail
+  → HTTPS works immediately after endpoint is active
+
+Custom domain (CNAME to default domain):
+  1. Get the service's public endpoint domain
+  2. Add DNS CNAME: app.example.com → <unique>.<region>.cs.amazonlightsail.com
+  3. Lightsail validates the CNAME and extends TLS to the custom domain
+  4. HTTPS works on app.example.com
+```
+
+**Key implication:** managed TLS means no certificate management
+overhead. The custom domain process is a simple CNAME, not a cert
+upload or ACM validation.
+
+## Step 5 — environment variables template (moved from SKILL.md)
+
+**Environment variables (in containers.json):**
+
+```json
+{
+  "my-app": {
+    "image": "my-app:v1.0",
+    "environment": {
+      "DATABASE_URL": "postgres://...",
+      "LOG_LEVEL": "info",
+      "API_KEY": "secret-value"
+    },
+    "ports": {
+      "8080": "HTTP"
+    }
+  }
+}
+```
+
+## Step 8 — custom domain commands (moved from SKILL.md)
+
+**Get the public endpoint domain:**
+
+```bash
+PUBLIC_DOMAIN=$(aws lightsail get-container-services \
+  --service-name "my-app" \
+  --query 'containerServices[0].publicEndpoint.url' --output text)
+
+echo "Public endpoint: $PUBLIC_DOMAIN"
+```
+
+**Add CNAME record (Route 53 or external DNS):**
+
+```bash
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1DEXAMPLE \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "app.example.com",
+        "Type": "CNAME",
+        "TTL": 300,
+        "ResourceRecords": [{"Value": "'"$PUBLIC_DOMAIN"'"}]
+      }
+    }]
+  }'
+```
+
+## Step 9 — CloudWatch Logs commands (moved from SKILL.md)
+
+```bash
+# Enable CloudWatch Logs in the deployment
+# Logs are automatically sent to the Lightsail log group
+aws lightsail get-container-log \
+  --service-name "my-app" \
+  --container-name "my-app"
+```
+
+**View container logs:**
+
+```bash
+aws logs get-log-events \
+  --log-group-name "/aws/lightsail/container/my-app" \
+  --log-stream-name "my-app/latest"
+```
+
+## Step 4 — verify public endpoint command (moved from SKILL.md)
+
+**Verify public endpoint:**
+
+```bash
+aws lightsail get-container-services \
+  --service-name "my-app" \
+  --query 'containerServices[0].publicEndpoint.{Url:containerName,Health:healthCheck}'
+```
+
+## Step 2 — endpoint.json template (moved from SKILL.md)
+
+**endpoint.json (public endpoint configuration):**
+
+```json
+{
+  "containerName": "my-app",
+  "containerPort": 80,
+  "healthCheck": {
+    "healthyThreshold": 2,
+    "unhealthyThreshold": 2,
+    "intervalSeconds": 5,
+    "path": "/",
+    "successCodes": "200"
+  }
+}
+```

@@ -85,28 +85,8 @@ order. Always pairs the recommendation with exact CLI commands.
 
 ## Mindset
 
-Macie cost optimization is a coverage-vs-cost decision, not a pure
-classification-completeness exercise. The goal is the smallest set of
-high-signal assessments that maintains the security/compliance posture
-— not the maximum scan depth on every bucket.
-
-Five principles guide every recommendation:
-
-- **Automated discovery manages scope; targeted jobs multiply it.**
-  Automated discovery increments only new/changed objects per run;
-  a recurring targeted job re-scans the full included scope each run.
-- **Sampling is the default cost control.** Macie samples up to a
-  per-bucket ceiling; forcing deep evaluation multiplies per-object
-  identifier cost.
-- **Identifier scope is a per-object cost multiplier.** Every managed
-  and custom identifier selected is evaluated against every sampled
-  object. Halving the identifier scope roughly halves per-object cost.
-- **Suppression rules cut re-evaluation.** Suppressing known-safe
-  prefixes prevents Macie from re-emitting findings and re-evaluating
-  the same known-good objects on subsequent runs.
-- **Multi-account delegation centralises and deduplicates.** A single
-  Macie delegated administrator across the org avoids per-account
-  standalone assessment of the same shared data.
+> The five Mindset principles moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — incremental automated discovery, sampling as cost control, identifier scope as multiplier, suppression, delegation.
+> Load them when framing a recommendation.
 
 ## Quick reference — verdict thresholds
 
@@ -131,72 +111,20 @@ these signals before any recommendation. Full CLI sequences are in
 `references/macie-pricing-and-discovery-modes.md`.
 
 **Required data sources** (summarized — see reference for full CLI):
-1. Macie membership / delegated administrator status: `aws macie2 get-macie-account` + `aws organizations list-delegated-administrators --service-principal macie.amazonaws.com`
-2. Classification jobs: `aws macie2 list-classification-jobs` + `describe-classification-job` for each
-3. Automated discovery status: `aws macie2 get-automated-discovery-configuration`
-4. Bucket statistics: `aws macie2 get-bucket-statistics` + `aws macie2 list-buckets` (per Macie membership)
-5. Classification scope (includes/excludes): `aws macie2 get-classification-scope`
-6. Suppression rules: `aws macie2 list-sensitivity-inspection-templates` (filter for suppressions)
-7. Cost Explorer Macie spend: `aws ce get-cost-and-usage --filter '{"Dimensions":{"Key":"SERVICE","Values":["Macie"]}}'`
-8. Findings volume: `aws macie2 list-findings` + `get-findings` (sample for noise assessment)
+> The eight required data-source CLI listings moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md); full sequences are in references/macie-pricing-and-discovery-modes.md.
+> Load it before pulling signals for a recommendation.
 
 ### Data-quality short-circuits
 
-| Condition | Effect on optimization |
-|---|---|
-| Cost Explorer Macie line items absent | **NEED_MORE_INFO**. Macie may not be enabled, or filter is wrong. Verify `get-macie-account`. |
-| Macie window < 14 days | **NEED_MORE_INFO**. Minimum 14 days; 30 days preferred. |
-| `list-classification-jobs` returns empty AND automated discovery disabled | **NEED_MORE_INFO**. No coverage to optimize. |
-| `jobStatus: RUNNING` for > 24 hours on a large bucket | Job is in flight; wait for completion before re-baselining. |
-| `lastRunTime` > 30 days ago on a recurring job | Stale config; job may have errored. Verify `lastRunError`. |
-| IAM denies `macie2:GetClassificationScope` | Surface as BLOCKED; cannot evaluate excludes without scope access. |
-
-When Cost Explorer and Macie job stats disagree, the Macie job stats
-(`bytesProcessed`, `objectsProcessed`) are the ground truth — Cost
-Explorer reflects invoiced spend which may lag by up to 24 hours.
+> The data-quality short-circuit table and the Cost-Explorer-vs-job-stats disagreement rule moved verbatim to [references/error-handling.md](references/error-handling.md).
+> Load it when the data gate fails or numbers disagree.
 
 ## Process — Optimization logic (apply in order)
 
 ### Step 0: Non-obvious behaviours that change the recommendation
 
-These operational gotchas route a recommendation away from the obvious
-choice:
-
-- **Automated discovery is incremental.** It classifies new and changed
-  objects only, on a cadence managed by the service. Recurring
-  targeted jobs re-scan the entire included scope every run — this is
-  the #1 hidden Macie cost multiplier.
-- **`managedDataIdentifierSelector: ALL` is expensive.** Every managed
-  identifier runs against every sampled object. Selecting `INCLUDE`
-  with only the relevant categories (e.g., PII, financial) cuts per-
-  object cost proportionally.
-- **Sampling is per-bucket and configurable.** Macie samples up to a
-  ceiling of objects per bucket per run by default. Forcing full scan
-  multiplies per-object identifier cost — only justified for high-
-  risk buckets with explicit compliance mandates.
-- **Custom identifiers run regex per evaluated object.** A poorly-
-  written regex (catastrophic backtracking) can blow up per-object
-  evaluation time. Audit custom identifiers for regex performance.
-- **Suppression rules apply at the finding level.** Suppressing a
-  known-safe prefix prevents Macie from re-emitting findings for that
-  prefix on subsequent runs, which also reduces re-evaluation cost
-  for re-processed objects.
-- **Per-account standalone Macie duplicates coverage.** In a Macie-
-  enabled org, a single delegated administrator covers all member
-  accounts. Running standalone Macie in member accounts on the same
-  data doubles assessment cost.
-- **Classification export is a one-way valve.** Once exported to S3,
-  findings can be queried via Athena repeatedly without re-invoking
-  Macie. This is the cost-efficient way to do recurring analysis.
-- **`bucketCriteria` is the scope, not just a hint.** Every bucket in
-  `bucketCriteria.matches` is in scope. Mis-classifying a log bucket
-  as "data" puts it in the assessment set.
-- **Log/archive buckets charged at the full per-GB rate.** S3
-  Standard-IA and Glacier objects are still assessed by Macie at the
-  full per-GB rate; the storage class is irrelevant to Macie cost.
-- **The free tier covers a fixed number of buckets.** Macie's free
-  tier includes bucket-level monitoring for a limited number of S3
-  buckets per account. Beyond that, per-bucket monthly fees apply.
+> Step 0 deep-dive moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — incremental discovery, identifier-selector cost, per-bucket sampling, regex backtracking, suppression mechanics, delegation duplication, export one-way valve, bucketCriteria scope, storage-class irrelevance, free-tier limits.
+> Load it before classifying a deployment.
 
 ### Step 1: Discovery mode — automated vs targeted jobs
 
@@ -223,36 +151,13 @@ Is the job recurring (SCHEDULED) on a stable set of buckets?
         └── NO  → Keep targeted but reduce frequency (Step 2).
 ```
 
-**Recurring-to-automated savings math:**
-```
-recurring_job_cost  = GB_in_scope × runs_per_month × $/GB_assessed
-automated_cost      = GB_new_or_changed_per_month × $/GB_assessed
-                    ≈ 0.05–0.20 × recurring_job_cost (typical incremental ratio)
-
-monthly_saving      = recurring_job_cost − automated_cost
-```
-
-Example: 12 TB data lake, daily recurring job at $0.10/GB assessed:
-- Recurring: 12,000 GB × 30 runs × $0.10 = $36,000/month (illustrative)
-- Automated (5% churn): 600 GB × $0.10 = $60/month (illustrative)
-- Saving: ~$35,940/month — recurring coverage of a stable data lake
-  via daily targeted jobs is the dominant Macie cost trap.
+> The recurring-to-automated savings math and the 12 TB worked numbers moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+> Load it when quantifying a discovery-mode migration.
 
 ### Step 2: Scan frequency tuning
 
-For targeted jobs that must stay targeted (e.g., specific compliance
-scan), frequency is the second lever.
-
-**Decision gate:**
-| Current frequency | Compliance requirement | Recommended frequency |
-|---|---|---|
-| Daily | Monthly compliance window | Weekly or monthly |
-| Daily | Quarterly compliance window | Monthly |
-| Weekly | Annual compliance window | Monthly or quarterly |
-| On each upload | None (operational habit) | Weekly batch |
-
-Reducing daily → weekly cuts runs_per_month from ~30 to ~4, a 7.5x
-reduction in per-GB assessment cost for that job.
+> The frequency decision gate and the daily-to-weekly 7.5x reduction moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+> Load it when a targeted job must stay targeted.
 
 ### Step 3: Bucket selection — exclude known-safe and infrequently accessed
 
@@ -268,26 +173,13 @@ safe buckets add per-GB cost with no security value.
 | Known-safe curated | Validated clean (e.g., public assets, images) | Prior Macie run with zero findings; suppression rule exists |
 | Infrequently accessed with no PII history | Per-GB fee not justified by risk | 90-day access pattern; no findings history |
 
-**Applying the exclusion:**
-```bash
-aws macie2 update-classification-scope \
-  --name <scope-name> \
-  --s3 '{"excludes":{"bucketNames":["access-logs-prod","cloudtrail-archive","public-assets"]}}'
-```
+> The update-classification-scope exclusion CLI moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+> Load it when applying an exclusion.
 
 ### Step 4: Sampling vs full scan
 
-Macie samples S3 objects per bucket per run. The default sampling depth
-balances coverage and cost. Forcing deep evaluation multiplies per-
-object identifier cost.
-
-**Sampling decision gate:**
-| Bucket risk | Sampling recommendation |
-|---|---|
-| Low-risk (logs, archives, public assets) | Default sampling; consider full exclusion (Step 3) |
-| Standard business data | Default sampling |
-| High-risk (regulated, customer PII repository) | Default sampling + targeted one-time full scan quarterly |
-| Compliance-mandated full scan | Document the mandate; keep full scan but narrow identifier scope (Step 5) |
+> The sampling decision gate moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+> Load it when sampling depth is questioned.
 
 ### Step 5: Custom and managed identifier scope reduction
 
@@ -308,71 +200,23 @@ aws macie2 update-classification-job \
     "AWSManagedCredentialsKeywords,AWSManagedFinancialUS,AWSManagedPersonalUS"
 ```
 
-**Custom identifier audit:**
-1. List custom identifiers: `aws macie2 list-custom-data-identifiers`
-2. For each, evaluate regex performance on a representative object set.
-3. Consolidate overlapping identifiers (e.g., three variants of the
-   same pattern → one canonical identifier).
-4. Remove identifiers that have not matched in 90 days.
+> The four-step custom identifier audit moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+> Load it when identifier-heavy.
 
 ### Step 6: Suppression rules — cut re-evaluation
 
-Suppression rules prevent Macie from re-emitting findings on known-safe
-objects, which reduces both finding noise and re-evaluation cost on
-subsequent runs that re-process those objects.
-
-**Suppression rule pattern:**
-```bash
-aws macie2 create-findings-filter \
-  --name "suppress-known-safe-logs" \
-  --action ARCHIVE \
-  --finding-criteria '{"criterion":{"s3Bucket.name":{"eq":["access-logs-prod","cloudtrail-archive"]}}}'
-```
-
-**When to add suppression:**
-- Findings recur on the same known-safe objects run-over-run.
-- A bucket has been validated as clean but cannot be excluded (e.g.,
-  ownership boundary).
-- A specific object prefix is known-safe (e.g., `public/images/`).
+> The create-findings-filter pattern and when-to-suppress list moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+> Load it for noisy-finding deployments.
 
 ### Step 7: Multi-account Macie administrator delegation
 
-In a Macie-enabled organization, a single delegated administrator
-account manages Macie across all member accounts. Running standalone
-Macie in member accounts duplicates assessment.
-
-**Delegation check:**
-```bash
-aws organizations list-delegated-administrators \
-  --service-principal macie.amazonaws.com
-```
-
-**Delegation savings:**
-```
-per_account_standalone_cost × N_member_accounts = current_spend
-delegated_admin_cost          = (one administrator + member-account bucket fees)
-saving                        = current_spend − delegated_admin_cost
-```
-
-A single delegated administrator centralises configuration, reduces
-per-account management overhead, and avoids double-assessment of shared
-data.
+> The delegation check CLI and delegation savings math moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+> Load it for org-wide deployments.
 
 ### Step 8: Classification export to S3 for batch analysis
 
-For recurring findings analysis (e.g., monthly compliance reporting),
-exporting classification results to S3 and querying via Athena is
-cheaper than re-invoking Macie or paginating findings via the API.
-
-**Export setup:**
-```bash
-aws macie2 put-classification-export-configuration \
-  --configuration '{"s3Destination":{"bucketName":"macie-export-prod","prefix":"classification/","kmsKeyArn":"arn:aws:kms:us-east-1:<acct>:key/<id>"}}'
-```
-
-**Athena query pattern:** Once exported, partition findings by date and
-bucket; query via Athena at $5/TB scanned. This is the cost-efficient
-way to do recurring analysis vs re-running Macie jobs.
+> The export setup CLI and Athena query pattern moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+> Load it for recurring query workloads.
 
 ### Step 9: Impact estimation
 
@@ -409,50 +253,8 @@ every `NEED_MORE_INFO`/`BLOCKED` gate.
 
 ## Output format
 
-The response is a single block using the literal labels
-`MACIE_JOB:`, `VERDICT:`, `REASON:`, `CHECKLIST:`,
-`ESTIMATED_SAVINGS:`, `MIGRATION_STEPS:`, and `CONFIRM:`. The
-CHECKLIST rows show current scan config vs recommended for every
-optimization dimension (automated vs targeted, sampling rate,
-bucket exclusion, identifier scope, suppression, delegation,
-export pipeline). See "STRICT output contract" below for the
-enforced shape and full worked examples.
-
-```text
-MACIE_JOB: <macie-deployment-or-job-id>
-VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE | NEED_MORE_INFO | BLOCKED
-REASON: <1-2 sentences naming the recommendation and the supporting data>
-CHECKLIST:
-  [→|✓] Discovery mode        current: <targeted SCHEDULED | ONE_TIME | automated>   recommended: <...>
-  [→|✓] Scan frequency        current: <daily | weekly | monthly>                    recommended: <...>
-  [→|✓] Bucket selection      current: <N buckets in scope>                          recommended: <M buckets (exclude <names>)>
-  [→|✓] Object sampling       current: <default | deep/full>                         recommended: <...>
-  [→|✓] Managed identifiers   current: <ALL | INCLUDE [...] >                        recommended: <...>
-  [→|✓] Custom identifiers    current: <N configured, regex audited>                 recommended: <...>
-  [→|✓] Suppression rules     current: <0 | N rules>                                 recommended: <...>
-  [→|✓] Multi-account deleg.  current: <standalone | delegated admin (acct)>         recommended: <...>
-  [→|✓] Export pipeline       current: <none | S3+Athena>                            recommended: <...>
-ESTIMATED_SAVINGS:
-  Current monthly: $<amount>
-    assessment: <GB × runs × $/GB>
-    per-bucket fees: <bucket_count × $/bucket>
-    finding storage: <$amount>
-  Projected monthly: $<amount>
-  Monthly saving: $<amount>     ← MUST equal Current − Projected, 2 decimals
-  Annual saving: $<amount>      ← MUST equal Monthly × 12
-  Assumptions: <list (GB assessed, runs/month, pricing region, etc.)>
-MIGRATION_STEPS:
-  1. <specific action with CLI command>
-  2. <verification step>
-CONFIRM: Before executing any state-changing CLI, emit and await operator
-  approval: "CONFIRM: About to <action> on <macie-deployment> in <region>.
-  Proceed? (yes/no)"
-```
-
-Full worked examples (recurring-to-automated, scan frequency reduction,
-bucket exclusion, identifier scope narrowing, already-optimized,
-NEED_MORE_INFO, and end-to-end walkthrough) are in
-`references/worked-examples.md`.
+> The annotated Output-format template moved verbatim to [references/worked-examples.md](references/worked-examples.md); the STRICT output contract below is the enforced shape.
+> Load it when emitting the result block.
 
 ## STRICT output contract
 
@@ -598,32 +400,8 @@ CONFIRM: About to migrate macie-targeted-pci-scan-prod from recurring
 
 ### Perfect example output — OPTIMIZED (no change recommended)
 
-```text
-MACIE_JOB: macie-automated-discovery-prod
-VERDICT: OPTIMIZED
-REASON: Automated discovery is enabled and incremental, sampling is at
-  service default, all log/archive buckets excluded, identifier scope
-  narrowed to PCI categories, suppression rules cover known-safe
-  prefixes, delegated administrator is in place, and classification
-  export feeds Athena for batch analysis. No dimension has a finding.
-CHECKLIST:
-  [✓] Discovery mode        current: automated data discovery               recommended: keep
-  [✓] Scan frequency        current: service-managed cadence                recommended: keep
-  [✓] Bucket selection      current: 14 buckets in scope (no logs/archive)  recommended: keep
-  [✓] Object sampling       current: default sampling                       recommended: keep
-  [✓] Managed identifiers   current: INCLUDE [PCI categories]               recommended: keep
-  [✓] Custom identifiers    current: 2 configured, regex audited            recommended: keep
-  [✓] Suppression rules     current: 3 rules (known-safe prefixes)          recommended: keep
-  [✓] Multi-account deleg.  current: delegated admin (org-management)       recommended: keep
-  [✓] Export pipeline       current: S3 + Athena                            recommended: keep
-ESTIMATED_SAVINGS:
-  Current monthly: $629.00
-  Projected monthly: $629.00
-  Monthly saving: $0.00
-  Annual saving: $0.00
-MIGRATION_STEPS: (none — no dimension has a finding)
-CONFIRM: (none — no state-changing action proposed)
-```
+> This second perfect example (OPTIMIZED, no change) moved verbatim to [references/worked-examples.md](references/worked-examples.md); the FURTHER_OPTIMIZATION_AVAILABLE example above stays canonical.
+> Load it when the deployment is already optimized.
 
 **Self-check before emit:**
 - [ ] `Current monthly − Projected monthly == Monthly saving` (2 decimals)?
@@ -702,26 +480,8 @@ Extended anti-patterns in `references/macie-pricing-and-discovery-modes.md`.
 
 ## Recent AWS features (2024-2026)
 
-- **Automated data discovery GA (2024-2025):** Service-managed,
-  incremental discovery that classifies new and changed S3 objects on
-  a service-defined cadence. The cost-efficient default for recurring
-  sensitive-data coverage.
-- **Improved managed data identifiers:** Expanded coverage for financial,
-  healthcare, and credentials categories. Selectable via
-  `managedDataIdentifierSelector: INCLUDE` with specific IDs.
-- **Scalable custom data identifiers:** Performance improvements to
-  regex evaluation, but catastrophic backtracking patterns still cause
-  per-object evaluation spikes. Audit custom identifiers regularly.
-- **Multi-account delegation enhancements (2024):** Delegated
-  administrator supports all member accounts in the org; region-by-
-  region delegation required for multi-region deployments.
-- **Classification export to S3 + Athena:** Native export of
-  classification results to S3 for batch Athena analysis. Reduces
-  recurring query cost vs paginating the findings API.
-- **Macie integration with Security Hub:** Findings flow to Security
-  Hub; suppression rules in Macie propagate as `ARCHIVED` in Hub.
-- **S3 data scanning performance (2024-2025):** Improved sampling
-  efficiency for large buckets; reduces per-run overhead.
+> The 2024-2026 feature notes moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+> Load on demand when checking recent feature availability.
 
 ## References
 
@@ -734,6 +494,14 @@ Extended anti-patterns in `references/macie-pricing-and-discovery-modes.md`.
   automated migration, scan frequency reduction, bucket exclusion,
   identifier scope narrowing, suppression rule creation, already-
   optimized, NEED_MORE_INFO, end-to-end walkthrough).
+
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) — pre-existing worked-example set, now also holding the discovery-mode savings math, the annotated Output-format template, and the OPTIMIZED perfect example.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 non-obvious behaviours, the five Mindset principles, optional-lever deep dives (scan frequency, sampling, suppression, delegation, export), the custom identifier audit, and 2024-2026 feature notes.
+- [references/error-handling.md](references/error-handling.md) — data-quality short-circuits for the pre-flight gate and the Cost-Explorer-vs-job-stats disagreement rule.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — required data-source CLI list for the data gate and the bucket-exclusion apply CLI.
+- [references/macie-pricing-and-discovery-modes.md](references/macie-pricing-and-discovery-modes.md) — pre-existing pricing tables, automated-vs-targeted comparison, and full CLI sequences.
 
 ## Domain
 

@@ -460,3 +460,67 @@ resource "aws_lambda_provisioned_concurrency_config" "main" {
   provisioned_concurrent_executions = 10
 }
 ```
+
+
+## Step 10 deep dive: packaging — zip vs ECR (moved from SKILL.md)
+
+**Zip package (for functions <= 50 MB compressed / 250 MB uncompressed):**
+
+```bash
+# Package the function
+zip -r function.zip index.js node_modules/
+
+# Deploy
+aws lambda create-function \
+  --function-name <name> \
+  --runtime nodejs20.x \
+  --handler index.handler \
+  --role arn:aws:iam::<account-id>:role/<execution-role> \
+  --zip-file fileb://function.zip
+```
+
+**ECR container image (for functions > 50 MB or custom runtime):**
+
+```dockerfile
+FROM public.ecr.aws/lambda/nodejs:20
+COPY app.js package*.json ./
+RUN npm ci --production
+CMD [ "app.handler" ]
+```
+
+```bash
+# Build and push
+docker build -t <name> .
+docker tag <name>:latest <account-id>.dkr.ecr.<region>.amazonaws.com/<name>:latest
+aws ecr get-login-password | docker login --username AWS --password-stdin <account-id>.dkr.ecr.<region>.amazonaws.com
+docker push <account-id>.dkr.ecr.<region>.amazonaws.com/<name>:latest
+
+# Deploy
+aws lambda create-function \
+  --function-name <name> \
+  --package-type Image \
+  --code ImageUri=<account-id>.dkr.ecr.<region>.amazonaws.com/<name>:latest \
+  --role arn:aws:iam::<account-id>:role/<execution-role>
+```
+
+The execution role needs `ecr:BatchGetImage` and
+`ecr:GetDownloadUrlForLayer` on the ECR repository, OR you can use a
+resource-based ECR policy.
+
+
+## Step 11 deep dive: logging CLI (moved from SKILL.md)
+
+```bash
+aws logs create-log-group \
+  --log-group-name /aws/lambda/<name> \
+  --retention-in-days 30
+```
+
+If the log group already exists, update retention:
+
+```bash
+aws logs put-retention-policy \
+  --log-group-name /aws/lambda/<name> \
+  --retention-in-days 30
+```
+

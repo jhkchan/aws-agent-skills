@@ -205,3 +205,44 @@ High Lambda concurrency can overwhelm downstream resources:
 | `/tmp` ephemeral storage | 512 MB - 10 GB |
 | Memory | 128 MB - 10,240 MB |
 | Timeout | 1 - 900 seconds |
+
+
+## Step 5 deep dive: VPC configuration (moved from SKILL.md)
+
+```bash
+aws lambda create-function \
+  --function-name <name> \
+  ...
+  --vpc-config SubnetIds=subnet-aaa,subnet-bbb,SecurityGroupIds=sg-xxx
+```
+
+**VPC configuration rules:**
+
+1. **Use PRIVATE subnets** (not public). Lambda creates Hyperplane ENIs
+   in the specified subnets to route traffic to VPC resources. Public
+   subnets cause deployment failures or routing issues.
+2. **Use at least 2 subnets in different AZs** for high availability.
+   Lambda distributes ENIs across subnets.
+3. **Security group:** define inbound rules for resources the function
+   accesses (e.g., the RDS security group allows inbound from the
+   function's security group). Define outbound rules for the function's
+   egress needs.
+4. **NAT Gateway for internet access:** if the VPC-attached function
+   needs internet access (API calls, package downloads, external
+   services), configure:
+   - A NAT Gateway in a PUBLIC subnet with an Elastic IP.
+   - A route table entry in the PRIVATE subnet routing `0.0.0.0/0` to
+     the NAT Gateway.
+   - Without this, the function can reach VPC resources but NOT the
+     internet — this is the #1 Lambda VPC deployment issue.
+
+5. **VPC endpoints for AWS services:** for VPC-attached functions that
+   access AWS services (S3, DynamoDB, Secrets Manager, Systems Manager),
+   use VPC endpoints (Gateway or Interface) to avoid routing through the
+   NAT Gateway (saving NAT data processing costs).
+
+**Lambda execution role VPC permissions:** since 2023, Lambda manages
+Hyperplane ENIs automatically — the execution role no longer needs
+explicit EC2 network interface permissions (`ec2:CreateNetworkInterface`
+etc.). These are handled by the Lambda service-linked role.
+

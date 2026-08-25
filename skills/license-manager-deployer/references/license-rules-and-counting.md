@@ -251,3 +251,28 @@ resource "aws_launch_template" "oracle_workload" {
   }
 }
 ```
+
+## Expert heuristic: vCPU vs instance-based vs cores-based counting (moved from SKILL.md)
+
+A baseline model says "set the license count." The correct heuristic
+recognizes that the counting type fundamentally changes what is measured.
+
+```text
+LicenseCountingType:
+  ├── vCPU      → counts total vCPUs across running associated instances
+  │                Used for: Oracle, many per-vCPU commercial products
+  │                License count = total vCPUs entitled
+  │                100 vCPUs = 50 instances of 2 vCPU each
+  │
+  ├── Instance  → counts each running associated instance as 1 license
+  │                Used for: per-instance software (middleware, ISV tools)
+  │                License count = total instances entitled
+  │
+  └── Core      → counts physical CPU cores (NOT vCPUs)
+                   Used for: SQL Server, Windows Server
+                   License count = total cores entitled
+```
+
+**Key implication:** Oracle Database is vCPU-counted. SQL Server is
+core-counted. Generic per-instance licenses use Instance counting.
+Choosing the wrong type makes the entire configuration non-compliant.

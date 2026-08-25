@@ -309,3 +309,91 @@ resource "aws_memorydb_user" "analytics_ro" {
 | Wait for cluster available | `aws memorydb wait cluster-available` |
 | Delete cluster | `aws memorydb delete-cluster` |
 | Failover Multi-Region | `aws memorydb failover-region` |
+
+---
+
+## Step 4 — Network + security CLI (moved verbatim from SKILL.md)
+
+**Subnet group creation:**
+
+```bash
+aws memorydb create-subnet-group \
+  --subnet-group-name prod-memorydb-subnet \
+  --description "Multi-AZ subnet group for prod MemoryDB" \
+  --subnet-ids subnet-0aaa subnet-0bbb subnet-0ccc \
+  --tags Key=Environment,Value=production
+```
+
+Verify the subnets span >=2 AZs:
+
+```bash
+aws ec2 describe-subnets --subnet-ids subnet-0aaa subnet-0bbb subnet-0ccc \
+  --query 'Subnets[*].AvailabilityZone' --output text
+# Expect at least 2 distinct AZs for Multi-AZ
+```
+
+**Security group rules:**
+
+```bash
+# Inbound: allow the application's SG to reach MemoryDB on port 6379
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-memorydb123 \
+  --protocol tcp \
+  --port 6379 \
+  --source-security-group-id sg-app456
+```
+
+## Step 6 — ACL users and ACL creation CLI (moved verbatim from SKILL.md)
+
+**Create named users with least-privilege access:**
+
+```bash
+# Create a read-write user for the application
+aws memorydb create-user \
+  --user-name app-rw \
+  --authentication-mode Type=password,Passwords='["SecurePassword123!"]' \
+  --access-string "on ~* +@all"
+
+# Create a read-only user for analytics
+aws memorydb create-user \
+  --user-name analytics-ro \
+  --authentication-mode Type=password,Passwords='["AnalyticsPassword456!"]' \
+  --access-string "on ~* -@all +@read"
+
+# Create an ACL and add the users
+aws memorydb create-acl \
+  --acl-name prod-acl \
+  --user-names app-rw analytics-ro
+```
+
+## Step 8 — Snapshot enable / manual / restore CLI (moved verbatim from SKILL.md)
+
+**Enable automated snapshots at creation:**
+
+```bash
+aws memorydb create-cluster ... \
+  --snapshot-retention-limit 7 \
+  --snapshot-window "03:00-05:00"
+```
+
+- `snapshot-retention-limit`: days to keep automated snapshots (0-35).
+- `snapshot-window`: daily backup window (UTC). Avoid overlap with the
+  maintenance window.
+- Snapshots are stored in S3 (AWS-managed bucket).
+
+**Manual snapshot:**
+
+```bash
+aws memorydb create-snapshot \
+  --cluster-name prod-memorydb \
+  --snapshot-name prod-memorydb-2026-08-05-preupgrade
+```
+
+**Restore from snapshot creates a NEW cluster:**
+
+```bash
+aws memorydb create-cluster \
+  --cluster-name prod-memorydb-restored \
+  --snapshot-arn arn:aws:memorydb:us-east-1:123456789012:snapshot:prod-memorydb-snapshot
+```
+

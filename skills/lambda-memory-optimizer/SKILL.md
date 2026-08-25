@@ -30,14 +30,9 @@ metadata:
 
 ## What this skill does
 
-Translates a Lambda function's memory configuration and runtime
-behaviour into a concrete memory-tuning recommendation with a dollar-
-denominated savings estimate AND a latency delta. The verdict is the
-highest-leverage action across six memory dimensions — memory size,
-provisioned concurrency memory footprint, init-phase memory, EFS /
-container-image / Layers overhead, /tmp storage, and architecture
-(ARM64 memory-to-CPU ratio) — applied in priority order. Always pairs
-the recommendation with exact CLI commands or Power Tuning invocation.
+
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+
 
 ## Quick navigation
 
@@ -61,50 +56,14 @@ the recommendation with exact CLI commands or Power Tuning invocation.
 
 ## Quick start
 
-- **The U-curve is the #1 lever.** Lambda couples vCPU to memory (1769
-  MB = 1 vCPU). More memory can REDUCE total cost when faster execution
-  offsets the higher per-GB-second rate. Classic example: 128 MB at 5 s
-  costs $0.0000104/invocation; 512 MB at 1 s costs $0.0000083 — 20%
-  CHEAPER at the higher memory. Always run Power Tuning before assuming
-  128 MB is cheapest.
-- **Cost formula (memorise this):**
-  `cost = (invocations × duration_s × memory_GB × $0.0000166667)
-         + (invocations × $0.0000002)`
-- **Memory size scales the provisioned-concurrency idle bill linearly.**
-  A function at 2 GB with 10 PC executions pays 16x the idle bill of
-  the same concurrency at 128 MB. Right-size memory BEFORE sizing PC.
-- **ARM64 has a different memory-to-CPU ratio.** After migrating from
-  x86_64 to arm64, re-run Power Tuning — the U-curve minimum shifts
-  because the same memory allocation yields a different vCPU slice on
-  Graviton2.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+
 
 ## Mindset
 
-Lambda memory optimization is a price-performance decision, not a pure
-utilization exercise. The goal is the memory configuration that
-minimizes dollar cost while preserving latency and error-rate SLOs —
-not the absolute minimum memory that runs the code. The memory
-allocation is simultaneously a CPU allocation (they are coupled at
-1769 MB = 1 vCPU), so the decision affects both cost and performance.
 
-Four principles guide every recommendation:
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
-- **The cost curve is U-shaped.** As memory increases, duration usually
-  drops faster than the per-GB-second rate rises — up to an inflection
-  point. The optimal memory is workload-specific; Power Tuning measures
-  it empirically.
-- **Cost-optimal ≠ latency-optimal.** The Power Tuning `cheapest` field
-  is the cost minimum; `fastest` is the latency minimum. The two
-  usually differ. Surface both numbers and let the operator choose
-  based on their priority (FinOps vs UX).
-- **CPU-bound vs I/O-bound changes the shape of the U-curve.** CPU-
-  bound workloads see step-function duration improvement at the 1769 MB
-  (1 vCPU) boundary. Pure I/O-bound workloads may be cheapest at 128 MB
-  because CPU allocation does not speed up network waits.
-- **Memory size cascades into provisioned concurrency idle cost.** PC
-  bills per GB-second of provisioned capacity regardless of invocations.
-  Doubling memory doubles the PC idle bill. Right-size memory first,
-  then size PC.
 
 ## Quick reference — verdict thresholds
 
@@ -124,88 +83,22 @@ Four principles guide every recommendation:
 
 ## Pre-flight: data gate (run before any optimization decision)
 
-Memory decisions are only as good as the underlying data. Pull these
-metrics before any recommendation. Full CLI sequences are in
-`references/lambda-memory-and-power-tuning.md`.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
-**Required data sources** (summarized — see reference for full CLI):
-1. Function configuration: `aws lambda get-function-configuration`
-2. Duration + Invocations (14-30 day window): `aws cloudwatch get-metric-statistics --namespace AWS/Lambda`
-3. Memory utilization (Lambda Insights): `aws cloudwatch get-metric-statistics --namespace LambdaInsights --metric-name memory_used`
-4. InitDuration (cold start): `aws cloudwatch get-metric-statistics --metric-name InitDuration` (via Logs Insights)
-5. CPU utilization: `aws cloudwatch get-metric-statistics --namespace LambdaInsights --metric-name cpu_total_time`
-6. Compute Optimizer findings: `aws compute-optimizer get-lambda-function-recommendations`
-7. Provisioned concurrency configs: `aws lambda list-provisioned-concurrency-configs`
-8. Power Tuning result (if available): `cheapest`, `fastest`, `tested` memory values
 
-### Data-quality short-circuits
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
 
-| Condition | Effect on optimization |
-|---|---|
-| `Duration` metric absent (function never invoked) | **NEED_MORE_INFO**. Verify trigger wiring; skip until invocations exist. |
-| `Invocations` Sum = 0 over 14 days | Emit **OPTIMIZED** with note "dormant function." |
-| Observation window < 14 days | **NEED_MORE_INFO**. Minimum 14 days; 30 days preferred. |
-| `memory_used` (Lambda Insights) absent | Fall back to Power Tuning only; mark Memory recommendation MEDIUM confidence. |
-| `InitDuration` absent | Cold-start analysis blocked; skip Step 3. |
-| `cpu_total_time` / Duration < 0.5 | Function is I/O-bound — U-curve likely flat; cost minimum probably at low memory. |
-| `cpu_total_time` / Duration > 0.8 | Function is CPU-bound — U-curve likely has step-function at 1769 MB. |
-| Compute Optimizer enrollment `Inactive` | Proceed with CloudWatch + Power Tuning directly. |
-| Compute Optimizer `lastRefreshTimestamp` > 30 days old | Stale finding. Re-run `get-lambda-function-recommendations`. |
-| Function `State != Active` | Skip optimization; surface as BLOCKED. |
 
-When CloudWatch and Compute Optimizer disagree, Power Tuning is the
-tiebreaker — it measures the actual U-curve.
+
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+
 
 ## Process — Memory optimization logic (apply in order)
 
 ### Step 0: Non-obvious behaviours that change the recommendation
 
-These operational gotchas route a recommendation away from the obvious
-choice:
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
-- **Memory and CPU are coupled at 1769 MB = 1 vCPU.** CPU-bound
-  workloads see step-function duration improvement at this boundary.
-  The cost minimum often lands at or just above 1769 MB for CPU-bound
-  workloads.
-- **The U-curve minimum is workload-specific.** Memory-bound functions
-  may hit minimum cost at 3 GB; pure I/O functions may be cheapest at
-  128 MB. Never assume; always measure via Power Tuning.
-- **Power Tuning measures COST, not just speed.** Read the cost column,
-  not just the duration column. The `cheapest` field is the cost
-  minimum; the `fastest` field is the latency minimum.
-- **ARM64 has a different memory-to-CPU ratio than x86_64.** After
-  migrating architecture, re-run Power Tuning. The U-curve minimum
-  shifts because Graviton2 vCPU allocation differs from x86_64 at the
-  same memory setting.
-- **SnapStart is Java-only and off by default.** SnapStart snapshots
-  the init-phase memory and restores it in ~200 ms instead of re-running
-  init. Eliminates 1-3 s of InitDuration. Does NOT change the per-
-  invocation memory allocation — only the cold-start path.
-- **EFS mounts add ~64 MB resident memory baseline.** A function with
-  EFS mounted cannot run below ~192 MB without risk of OOM. Factor EFS
-  overhead into the headroom calculation.
-- **Container image functions have higher cold-start memory.** Image
-  extraction during init allocates more memory than a zip deployment.
-  Minimum recommended MemorySize for container-image functions: 256 MB.
-- **Lambda Layers add init-time memory pressure.** Each layer is a
-  separate zip extracted during init. Over-using layers (5+ layers)
-  increases InitDuration and may push peak init memory above the
-  allocation, causing cold-start OOM.
-- **Environment variables are limited to 4 KB total.** Oversized env
-  vars don't affect runtime memory but do affect init parse time and
-  cold-start duration. Move large config to Parameter Store / Secrets
-  Manager / AppConfig.
-- **`/tmp` storage is independent of memory since 2022.** Allocate up
-  to 10 GB via `--ephemeral-storage` without changing MemorySize. Bills
-  separately at $0.0000000625/MB-second. Functions using memory as
-  /tmp overflow should decouple via ephemeral storage.
-- **Provisioned concurrency bills per GB-second of provisioned
-  capacity.** A function at 2 GB with 10 PC executions pays 16x the
-  idle bill of the same concurrency at 128 MB. Memory size cascades
-  directly into PC cost.
-- **Power Tuning invokes the function repeatedly.** Ensure the function
-  is idempotent and downstream tolerates test load. Use
-  `parallelInvocation: false` for non-idempotent functions.
 
 ### Step 1: Memory size (the U-curve)
 
@@ -213,20 +106,9 @@ Memory size is the primary lever because of the U-curve: as memory
 increases, CPU increases proportionally, and CPU-bound workloads see
 disproportionate duration reduction.
 
-**The U-curve math:**
-```
-compute_cost = duration_seconds × memory_GB × $0.0000166667
 
-Example: 128 MB at 5 s → $0.0000104/invocation
-         512 MB at 1 s → $0.0000083/invocation (20% CHEAPER)
-         2048 MB at 0.4 s → $0.0000133/invocation (WORSE)
-```
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
-**Finding the U-curve minimum: AWS Lambda Power Tuning.** Open-source
-Step Functions tool that empirically measures the cost-duration curve.
-Deploy via SAR; run an execution; read the `cheapest` and `fastest`
-fields. Full deployment and execution CLI is in
-`references/lambda-memory-and-power-tuning.md`.
 
 **Decision gate after Power Tuning:**
 
@@ -237,36 +119,15 @@ fields. Full deployment and execution CLI is in
 | `cheapest` == current BUT `fastest` is materially faster | **FURTHER_OPTIMIZATION_AVAILABLE** (latency) | Surface the latency improvement; let operator choose. May be cost-increasing. |
 | `cheapest` == current AND `fastest` == current | No memory finding | Proceed to other dimensions. |
 
-**The cost-vs-latency tradeoff:** Power Tuning returns both `cheapest`
-(cost-optimal) and `fastest` (latency-optimal). The two usually differ.
-Always surface BOTH numbers in the recommendation block:
 
-```text
-Cost-optimal:    512 MB at 950 ms ($0.0000083/invocation)
-Latency-optimal: 3008 MB at 410 ms ($0.0000205/invocation)
-Current:         128 MB at 5000 ms ($0.0000104/invocation)
-```
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
-The operator chooses based on whether the priority is FinOps (cost) or
-UX (latency). Never assume; always present both.
 
 ### Step 2: Provisioned concurrency memory footprint
 
-Provisioned concurrency pre-initializes execution environments to
-eliminate cold starts, but charges for idle time. Memory size scales
-the idle bill linearly.
 
-**Pricing impact of memory on PC:**
-```
-PC idle cost = provisioned_concurrent_executions × memory_GB × $0.000015 × seconds_in_month
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
-Example: 10 PC executions at 2048 MB:
-  10 × 2.0 × $0.000015 × 2,592,000 = $777.60/month idle
-
-Same concurrency at 512 MB (after Step 1 right-sizing):
-  10 × 0.5 × $0.000015 × 2,592,000 = $194.40/month idle
-  Saving: $583.20/month (75%) just from memory right-sizing
-```
 
 **Decision tree:**
 ```
@@ -278,9 +139,9 @@ Is provisioned concurrency configured?
               Right-size memory FIRST, then re-evaluate PC count.
 ```
 
-**Right-sizing sequence:** Always apply Step 1 (memory right-sizing)
-BEFORE adjusting PC count. Memory reduction cascades into PC savings
-without any change to the PC configuration itself.
+
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+
 
 ### Step 3: Init-phase memory (cold start)
 
@@ -298,46 +159,14 @@ cold starts and, in extreme cases, OOM during init.
 | InitDuration spikes after dependency update | Trim unused deps. Use `pip install --no-deps`. |
 | OOM during init (rare) | Increase MemorySize to accommodate peak init allocation. |
 
-**SnapStart enablement (Java-only):**
-```bash
-aws lambda update-function-configuration \
-  --function-name <name> \
-  --snap-start '{"ApplyOn":"PublishedVersions"}'
-aws lambda publish-version --function-name <name>
-# Point alias at the new version
-aws lambda update-alias --function-name <name> \
-  --name prod --function-version <new-version>
-```
 
-SnapStart snapshots the init-phase memory and restores it in ~200 ms
-instead of re-running init. Does NOT change the per-invocation memory
-allocation — only the cold-start path. The snapshot is taken AFTER init
-completes, so init-time memory spikes are captured in the snapshot.
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
+
 
 ### Step 4: EFS, container image, and Layers memory overhead
 
-These deployment choices add resident memory overhead that affects the
-minimum viable MemorySize.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
-**EFS overhead:**
-- EFS mounts add ~64 MB resident memory baseline.
-- A function with EFS cannot run below ~192 MB without OOM risk.
-- If EFS is used for infrequent large-file access, consider removing
-  the mount and using S3 pre-signed URLs instead.
-
-**Container image overhead:**
-- Container image functions have higher cold-start memory than zip
-  deployments due to image extraction during init.
-- Minimum recommended MemorySize: 256 MB.
-- Optimize the image: use multi-stage builds, distroless or alpine
-  base images, remove build tools from the runtime image.
-
-**Lambda Layers overhead:**
-- Each layer is a separate zip extracted during init.
-- 1-3 layers: negligible overhead.
-- 5+ layers: measurable InitDuration increase and init memory pressure.
-- Recommendation: consolidate layers; move shared code to a runtime
-  package manager (pip, npm) instead of layers where possible.
 
 ### Step 5: /tmp storage allocation
 
@@ -355,67 +184,34 @@ runtime memory_used)?
           via --ephemeral-storage.
 ```
 
-**Decoupling /tmp from memory:**
-```bash
-aws lambda update-function-configuration \
-  --function-name <name> \
-  --memory-size 256 \
-  --ephemeral-storage '{"Size": 2048}'
-```
 
-**Cost impact:** Decoupling a function from 2048 MB MemorySize (where
-it only needed 256 MB runtime + 1.8 GB /tmp) to 256 MB MemorySize +
-2048 MB ephemeral storage saves ~85% on the compute term while
-preserving the /tmp capacity.
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
+
 
 ### Step 6: ARM64 (Graviton2) memory-to-CPU ratio
 
 ARM64 has a different memory-to-vCPU ratio than x86_64. After migrating
 architecture, the U-curve minimum shifts.
 
-**Key difference:**
-```
-x86_64: 1769 MB = 1 vCPU
-arm64:  Similar coupling but Graviton2 cores are ~20% faster per vCPU
-        for many workloads. The U-curve minimum may be at a LOWER
-        memory setting on arm64 than x86_64 for the same workload.
-```
 
-**Mandatory re-tuning after architecture migration:**
-```bash
-# After migrating to arm64, re-run Power Tuning:
-aws stepfunctions start-execution \
-  --state-machine-arn <power-tuning-arn> \
-  --input '{"lambda":{"resource":"arn:aws:lambda:us-east-1:<acct>:function:<name>","num":5},"power":{"values":[128,256,512,1024,1769,2048,3008]}}'
-```
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
-**Architecture + memory combined recommendation:**
-- Migrate to arm64 (20% compute discount).
-- Re-run Power Tuning on arm64.
-- Set MemorySize to the arm64 U-curve minimum.
-- The combined saving is multiplicative, not additive.
+
+
+Moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md) — load on demand.
+
+
+
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+
 
 ### Step 7: Impact estimation
 
 Compute the monthly savings for each recommendation:
 
-```
-current_monthly_cost =
-  (monthly_invocations × avg_duration_s × current_memory_GB × $0.0000166667)
-  + (monthly_invocations × $0.0000002)
-  + (pc_executions × current_memory_GB × $0.000015 × seconds_in_month)
 
-projected_monthly_cost =
-  (monthly_invocations × projected_duration_s × projected_memory_GB × $0.0000166667)
-  + (monthly_invocations × $0.0000002)
-  + (pc_executions × projected_memory_GB × $0.000015 × seconds_in_month)
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
 
-monthly_saving = current_monthly_cost - projected_monthly_cost
-```
-
-Always state assumptions: monthly invocation count, average duration at
-current and projected memory (from Power Tuning), memory in GB, PC
-configuration, pricing region.
 
 ### Step 8: Final verdict
 
@@ -431,67 +227,12 @@ every `NEED_MORE_INFO`/`BLOCKED` gate.
 
 ## Output format
 
-Every response MUST use these literal labels in this exact order. No
-markdown headings, no camelCase, no bold substitutes.
+Moved verbatim to [references/lambda-memory-worked-examples.md](references/lambda-memory-worked-examples.md) — load on demand.
 
-```text
-TARGET: <function-name>
-VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-REASON: <1-2 sentences naming the recommendation and the supporting data>
-POWER_TUNING_RESULTS:
-  | Memory   | Avg Duration | p99 Duration | $/Invocation | Tag            |
-  |----------|-------------|-------------|-------------|----------------|
-  | <MB>     | <ms>        | <ms>        | $<amount>   | current        |
-  | <MB>     | <ms>        | <ms>        | $<amount>   | cost-optimal   |
-  | <MB>     | <ms>        | <ms>        | $<amount>   | latency-optimal|
-COST_COMPARISON:
-  Current:  <MB> at <ms> avg → $<amount>/invocation × <N>/month = $<amount>/month
-  Proposed: <MB> at <ms> avg → $<amount>/invocation × <N>/month = $<amount>/month
-  Saving:   $<amount>/month (<pct>%) — cost-optimal at <MB>
-  Latency:  p99 drops from <ms> to <ms> (<pct>% reduction)
-RECOMMENDATION:
-  Current: <memory> MB at <avg duration> ms, <architecture>, <concurrency>, <init>
-  Proposed: <memory> MB at <projected duration> ms, <architecture>, <concurrency>, <init>
-  Dimensions changed: <memory | pc_memory | init | efs_container_layers | tmp | architecture>
-  Dimensions checked: <list ALL six, each ✓ (no finding) or → (finding)>
-  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
-ESTIMATED_SAVINGS:
-  Current monthly: $<amount>    ← MUST show compute + requests + PC subtotals
-  Projected monthly: $<amount>
-  Monthly saving: $<amount>     ← MUST equal Current − Projected, 2 decimals
-  Annual saving: $<amount>      ← MUST equal Monthly × 12
-  Latency delta: <p99 duration change> ms (<percentage>%)
-MIGRATION_STEPS:
-  1. <specific action with CLI command>
-  2. <verification step>
-CONFIRM: Before executing any state-changing CLI, emit and await operator
-  approval: "CONFIRM: About to <action> on <function-name> in <region>.
-  Proceed? (yes/no)"
-```
 
-### Decision tree
 
-```text
-Is Power Tuning or Compute Optimizer data available?
-├── NO → NEED_MORE_INFO — run Power Tuning before any memory recommendation
-└── YES → Does `cheapest` differ from current MemorySize?
-    ├── YES → Is `cheapest` > current (upsize)?
-    │   ├── YES → CPU-bound workload.
-    │   │         FURTHER_OPTIMIZATION_AVAILABLE.
-    │   │         Set MemorySize to `cheapest`.
-    │   │         Verify projected cost < current cost.
-    │   └── NO → I/O-bound or over-provisioned.
-    │            FURTHER_OPTIMIZATION_AVAILABLE.
-    │            Set MemorySize to `cheapest`.
-    │            Verify duration stays within SLO.
-    └── NO → Does `fastest` offer material latency improvement?
-        ├── YES → FURTHER_OPTIMIZATION_AVAILABLE (latency).
-        │         Surface cost delta — may be cost-increasing.
-        │         Let operator choose based on FinOps vs UX priority.
-        └── NO → All memory dimensions pass.
-                 Check PC, init, EFS, /tmp, architecture in order.
-                 └── All six pass → OPTIMIZED
-```
+Moved verbatim to [references/lambda-memory-worked-examples.md](references/lambda-memory-worked-examples.md) — load on demand.
+
 
 Full worked examples (memory upsize, memory downsize, PC memory
 cascading, ARM64 re-tuning, already-optimized, end-to-end walkthrough)
@@ -730,24 +471,8 @@ Extended anti-patterns in `references/lambda-memory-worked-examples.md`.
 
 ## Recent AWS features (2024-2026)
 
-- **Lambda SnapStart expansion (2024-2025):** Originally Java-only;
-  expanding to additional runtimes. Check current support matrix.
-- **Lambda ARM64 (Graviton2) GA:** All major runtimes support arm64.
-  ~20% cheaper compute; different memory-to-CPU ratio — re-tune after
-  migration.
-- **AWS Lambda Power Tuning:** De facto standard for empirical memory
-  tuning. Supports parallel invocation, custom payload, visualization
-  URL output, Pareto frontier visualization.
-- **Lambda Insights:** Provides `memory_used`, `cpu_total_time`,
-  `InitDuration`, and other runtime metrics beyond the default AWS/Lambda
-  namespace. Enable via extension Layer. Required for memory-utilization
-  analysis.
-- **Ephemeral storage (`/tmp`) independent configuration (2022+):**
-  Decouple /tmp from MemorySize via `--ephemeral-storage` up to 10 GB.
-  Bills separately at $0.0000000625/MB-second.
-- **Provisioned Concurrency autoscaling (2024):** Application Auto
-  Scaling supports provisioned concurrency on Lambda aliases via target-
-  tracking on `ProvisionedConcurrencyUtilization`.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — load on demand.
+
 
 ## References
 
@@ -760,6 +485,14 @@ Extended anti-patterns in `references/lambda-memory-worked-examples.md`.
   (memory upsize for CPU-bound, memory downsize for I/O-bound, PC memory
   cascading, ARM64 re-tuning, /tmp decoupling, already-optimized, NEED_
   MORE_INFO, end-to-end walkthrough, extended NEVER list, edge cases).
+
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step-0 gotchas, data-quality short-circuits, U-curve and PC pricing math, overhead baselines, recent AWS features
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — data-gate CLI sources, SnapStart enablement, /tmp decoupling, arm64 re-tuning commands
+- [references/lambda-memory-worked-examples.md](references/lambda-memory-worked-examples.md) — full worked examples plus the canonical output template and output-order decision tree
+- [references/lambda-memory-and-power-tuning.md](references/lambda-memory-and-power-tuning.md) — pricing tables, Power Tuning deployment guide, memory-to-CPU mapping
 
 ## Domain
 

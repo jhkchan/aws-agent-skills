@@ -85,153 +85,28 @@ with a specific gap citation in the checklist (marked `[✗]`), and
 
 ## Mindset
 
-**One-line takeaway:** Lightsail Container Service is a simplified
-container hosting platform with all-inclusive pricing. You choose a
-power scale (nano through xlarge) and a node count. The service
-provides a managed HTTPS endpoint with a TLS certificate. For ECR
-private images, you need to provide registry credentials (access key
-and secret). Cost is predictable: the monthly price includes compute,
-storage, and data transfer.
-
-Three misconceptions dominate Lightsail Container misdesign at
-provisioning time:
-
-- **"Power scale and node count are the same thing."** They are not.
-  Power scale (nano/micro/small/medium/large/xlarge) determines the
-  CPU and RAM per node. Node count (1-20) determines how many replicas
-  run. Scaling vertically means increasing power; scaling horizontally
-  means increasing nodes. A medium with 2 nodes is different from a
-  large with 1 node even if the total cost is similar.
-
-- **"ECR private images work without authentication."** They do not.
-  Lightsail Container Service cannot pull from ECR without explicit
-  registry credentials. You must create an IAM access key with ECR
-  read permissions and pass the access key ID and secret to the
-  deployment. Public registry images (Docker Hub) do not need auth.
-
-- **"The managed TLS certificate requires manual configuration."** It
-  does not. Lightsail automatically provisions and manages a TLS
-  certificate for the service's default domain
-  (`<unique>.<region>.cs.amazonlightsail.com`). For custom domains,
-  you add a CNAME record pointing to the service's public endpoint.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Mindset — one-line takeaway and three misconceptions".
+> Load when: modelling the service — power vs node count, ECR auth requirement, managed-TLS behaviour.
 
 ## Configuration dependency graph (novel heuristic)
 
-Lightsail Container configurations are NOT independent. The container
-service must exist before deploying. ECR auth must be configured before
-pulling private images. The public endpoint requires a deployment to be
-active. Use this graph to sequence provisioning.
-
-| Configuration | Hard dependencies (API error without) | Silent failure / immutability | Enables downstream |
-|---|---|---|---|
-| Container service | None | Power scale determines per-node CPU/RAM; can be changed later (requires redeploy) | deployment |
-| Deployment (container image) | Container service exists | Image must be accessible; public images work without auth; ECR images need credentials | running containers |
-| ECR private registry auth | IAM access key with ECR read permission | Credentials stored in deployment; must be updated if key rotated | private image pulls |
-| Public endpoint | At least one container with a port mapped | Endpoint is HTTPS only; managed TLS auto-provisioned | public access |
-| Health check | Public endpoint enabled; path must return 200 | Default path is /; unhealthy endpoint blocks deployment success | deployment verification |
-| Environment variables | Container service exists | Variables are plaintext in the deployment config | app configuration |
-| Secrets | Container service exists | Secrets use Lightsail parameters; not visible in describe calls after creation | sensitive app config |
-| Scale (node count) | Container service exists | Scale 1-20; changing scale triggers rolling redeploy | horizontal capacity |
-| Managed TLS | Public endpoint enabled | Auto-managed; no manual cert upload needed for default domain | HTTPS termination |
-| Custom domain | Public endpoint active; DNS CNAME configured | CNAME must point to the service's public endpoint domain | branded URL |
-| CloudWatch Logs | Container service exists; log driver configured | Logs are available in CloudWatch Logs if enabled | observability |
-
-**The power-scale-vs-node-count row is the one a baseline model
-misses.** A baseline model treats scaling as a single dimension.
-Lightsail separates vertical scaling (power: CPU/RAM per node) from
-horizontal scaling (node count: number of replicas). The trade-off
-matters: a large with 1 node has no redundancy, while a medium with 2
-nodes provides failover at similar cost.
-
-**Cross-dependency gotchas:**
-- ECR auth credentials are per-deployment, not per-service. If you
-  rotate the IAM key, you must create a new deployment version.
-- The public endpoint is only active when a deployment is running with
-  a port mapped. If the deployment fails, the endpoint returns 503.
-- Health check path must return HTTP 200. A path returning 3xx or 4xx
-  marks the endpoint as unhealthy.
-- Changing power scale or node count triggers a rolling redeploy.
-  Existing containers are replaced.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Configuration dependency graph".
+> Load when: sequencing provisioning — hard dependencies, silent failures, cross-dependency gotchas.
 
 ## Expert heuristic: power scale vs node count trade-off
 
-A baseline model says "pick a size and go." The correct heuristic
-recognizes that power scale and node count serve different purposes:
-
-```text
-Power scale (per-node capacity):
-  ├── nano:    0.25 vCPU, 0.5 GB RAM  — dev/testing
-  ├── micro:   0.5 vCPU,  1 GB RAM    — low-traffic
-  ├── small:   1 vCPU,    2 GB RAM    — small production
-  ├── medium:  2 vCPU,    4 GB RAM    — medium production
-  ├── large:   4 vCPU,    8 GB RAM    — high-traffic
-  └── xlarge:  8 vCPU,   16 GB RAM    — compute-intensive
-
-Node count (horizontal replicas):
-  ├── 1 node  — no redundancy (single point of failure)
-  ├── 2 nodes — minimum for high availability
-  └── 3+ nodes — production-grade redundancy
-
-Cost comparison (approximate monthly):
-  large x 1  ≈ medium x 2  ≈ small x 4
-  (similar total cost, but HA requires >= 2 nodes)
-```
-
-**Key implication:** for production, always use at least 2 nodes for
-redundancy. A medium with 2 nodes provides failover; a large with 1
-node does not. The cost is similar, but the availability is very
-different.
+> **Moved verbatim** → [references/power-and-ecr-auth.md](references/power-and-ecr-auth.md) § "Expert heuristic: power scale vs node count trade-off".
+> Load when: choosing power and scale — per-node capacity ladder, replica counts, cost comparison.
 
 ## Expert heuristic: ECR private auth via access key
 
-Lightsail Container Service cannot pull from ECR without explicit
-credentials. You must create an IAM user or role with an access key
-that has `ecr:GetDownloadUrlForLayer`, `ecr:BatchGetImage`, and
-`ecr:GetAuthorizationToken` permissions.
-
-```text
-ECR auth flow:
-  1. Create IAM user (or use existing) with ECR read permissions
-  2. Generate access key (access key ID + secret access key)
-  3. Pass credentials to Lightsail deployment:
-     aws lightsail create-container-service-deployment
-       --service-name my-service
-       --containers file://containers.json
-       --public-endpoint file://endpoint.json
-  4. In containers.json, specify image as:
-     <account>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>
-  5. Lightsail stores the credentials in the deployment
-
-Note: credentials are per-deployment. Rotating the IAM key
-requires a new deployment version.
-```
-
-**Key implication:** for ECR private images, the access key must be
-valid for the lifetime of the deployment. If the key is deactivated or
-deleted, the next deployment pull will fail.
+> **Moved verbatim** → [references/power-and-ecr-auth.md](references/power-and-ecr-auth.md) § "Expert heuristic: ECR private auth via access key".
+> Load when: pulling private images — IAM key flow, required permissions, rotation semantics.
 
 ## Expert heuristic: managed TLS vs custom domain
 
-Lightsail automatically provisions a managed TLS certificate for the
-service's default domain. No manual cert upload or ACM integration is
-needed. For custom domains, add a CNAME record.
-
-```text
-Default domain (managed TLS auto-provisioned):
-  https://<unique-id>.<region>.cs.amazonlightsail.com
-  → TLS certificate auto-managed by Lightsail
-  → HTTPS works immediately after endpoint is active
-
-Custom domain (CNAME to default domain):
-  1. Get the service's public endpoint domain
-  2. Add DNS CNAME: app.example.com → <unique>.<region>.cs.amazonlightsail.com
-  3. Lightsail validates the CNAME and extends TLS to the custom domain
-  4. HTTPS works on app.example.com
-```
-
-**Key implication:** managed TLS means no certificate management
-overhead. The custom domain process is a simple CNAME, not a cert
-upload or ACM validation.
+> **Moved verbatim** → [references/endpoints-and-domains.md](references/endpoints-and-domains.md) § "Expert heuristic: managed TLS vs custom domain".
+> Load when: terminating HTTPS — default-domain TLS, CNAME extension to custom domains.
 
 ## Prerequisites (verify before provisioning)
 
@@ -311,21 +186,8 @@ environment variables. Create a deployment JSON file.
 }
 ```
 
-**endpoint.json (public endpoint configuration):**
-
-```json
-{
-  "containerName": "my-app",
-  "containerPort": 80,
-  "healthCheck": {
-    "healthyThreshold": 2,
-    "unhealthyThreshold": 2,
-    "intervalSeconds": 5,
-    "path": "/",
-    "successCodes": "200"
-  }
-}
-```
+> **Moved verbatim** → [references/endpoints-and-domains.md](references/endpoints-and-domains.md) § "Step 2 — endpoint.json template".
+> Load when: creating the deployment endpoint config — container/port binding and health check.
 
 **Create the deployment:**
 
@@ -341,50 +203,8 @@ aws lightsail create-container-service-deployment \
 For ECR private images, pass registry credentials in the deployment.
 Create an IAM access key with ECR read permissions.
 
-**IAM policy for ECR read access:**
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "ecr:GetDownloadUrlForLayer",
-        "ecr:BatchGetImage",
-        "ecr:GetAuthorizationToken"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
-```
-
-**containers.json with ECR image and credentials:**
-
-```json
-{
-  "my-app": {
-    "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app:v1.0",
-    "command": [],
-    "environment": {
-      "ENV": "production"
-    },
-    "ports": {
-      "8080": "HTTP"
-    }
-  }
-}
-```
-
-**Deploy with ECR credentials:**
-
-```bash
-aws lightsail create-container-service-deployment \
-  --service-name "my-app" \
-  --containers file://containers.json \
-  --public-endpoint file://endpoint.json
-```
+> **Moved verbatim** → [references/power-and-ecr-auth.md](references/power-and-ecr-auth.md) § "Step 3 — ECR templates".
+> Load when: configuring ECR private auth — the read-policy JSON, ECR containers.json, and deployment command.
 
 **Critical:** ECR credentials are registered at the service level, not
 per-deployment. Use `register-container-image` or pass them when
@@ -405,13 +225,8 @@ certificate. The endpoint requires a deployment with a mapped port.
 | Healthy threshold | Consecutive successes | Default 2 |
 | Unhealthy threshold | Consecutive failures | Default 2 |
 
-**Verify public endpoint:**
-
-```bash
-aws lightsail get-container-services \
-  --service-name "my-app" \
-  --query 'containerServices[0].publicEndpoint.{Url:containerName,Health:healthCheck}'
-```
+> **Moved verbatim** → [references/endpoints-and-domains.md](references/endpoints-and-domains.md) § "Step 4 — verify public endpoint command".
+> Load when: checking the endpoint after deploy — publicEndpoint query.
 
 The endpoint URL is:
 `https://<unique-id>.<region>.cs.amazonlightsail.com`
@@ -422,23 +237,8 @@ Environment variables are plaintext in the deployment configuration.
 Secrets use Lightsail's parameter system and are not visible after
 creation.
 
-**Environment variables (in containers.json):**
-
-```json
-{
-  "my-app": {
-    "image": "my-app:v1.0",
-    "environment": {
-      "DATABASE_URL": "postgres://...",
-      "LOG_LEVEL": "info",
-      "API_KEY": "secret-value"
-    },
-    "ports": {
-      "8080": "HTTP"
-    }
-  }
-}
-```
+> **Moved verbatim** → [references/endpoints-and-domains.md](references/endpoints-and-domains.md) § "Step 5 — environment variables template".
+> Load when: configuring app variables — plaintext env vars vs parameter-backed secrets.
 
 **Secrets (stored as parameters):**
 
@@ -451,12 +251,8 @@ layer of protection compared to plaintext environment variables.
 Scale determines the number of container replicas. Changing scale
 triggers a rolling redeploy.
 
-```bash
-# Scale up to 3 nodes
-aws lightsail update-container-service \
-  --service-name "my-app" \
-  --scale 3
-```
+> **Moved verbatim** → [references/power-and-ecr-auth.md](references/power-and-ecr-auth.md) § "Step 6 — scale update command".
+> Load when: changing node count — update-container-service rolling redeploy.
 
 **Scaling guidelines:**
 
@@ -489,33 +285,8 @@ domains that have been validated via CNAME.
 To use a custom domain, add a CNAME record pointing to the service's
 public endpoint domain.
 
-**Get the public endpoint domain:**
-
-```bash
-PUBLIC_DOMAIN=$(aws lightsail get-container-services \
-  --service-name "my-app" \
-  --query 'containerServices[0].publicEndpoint.url' --output text)
-
-echo "Public endpoint: $PUBLIC_DOMAIN"
-```
-
-**Add CNAME record (Route 53 or external DNS):**
-
-```bash
-aws route53 change-resource-record-sets \
-  --hosted-zone-id Z1DEXAMPLE \
-  --change-batch '{
-    "Changes": [{
-      "Action": "CREATE",
-      "ResourceRecordSet": {
-        "Name": "app.example.com",
-        "Type": "CNAME",
-        "TTL": 300,
-        "ResourceRecords": [{"Value": "'"$PUBLIC_DOMAIN"'"}]
-      }
-    }]
-  }'
-```
+> **Moved verbatim** → [references/endpoints-and-domains.md](references/endpoints-and-domains.md) § "Step 8 — custom domain commands".
+> Load when: adding a custom domain — endpoint lookup and Route 53 CNAME change batch.
 
 Once the CNAME resolves, Lightsail extends the managed TLS certificate
 to cover the custom domain.
@@ -525,52 +296,13 @@ to cover the custom domain.
 Lightsail Container Service can send container logs to CloudWatch Logs.
 Logs include stdout/stderr from the container.
 
-```bash
-# Enable CloudWatch Logs in the deployment
-# Logs are automatically sent to the Lightsail log group
-aws lightsail get-container-log \
-  --service-name "my-app" \
-  --container-name "my-app"
-```
-
-**View container logs:**
-
-```bash
-aws logs get-log-events \
-  --log-group-name "/aws/lightsail/container/my-app" \
-  --log-stream-name "my-app/latest"
-```
+> **Moved verbatim** → [references/endpoints-and-domains.md](references/endpoints-and-domains.md) § "Step 9 — CloudWatch Logs commands".
+> Load when: reading container logs — get-container-log and logs get-log-events.
 
 ## Step 10 — Recent features
 
-- **Container service power scale expansion (2023-2024):** Added
-  xlarge power (8 vCPU, 16 GB RAM) for compute-intensive workloads,
-  bringing Lightsail containers closer to ECS-grade capacity.
-
-- **Private container registry auth improvements (2023-2024):**
-  Enhanced ECR auth with support for cross-account ECR pulls and
-  IAM role-based credential refresh.
-
-- **Custom domain auto-validation (2023-2024):** Lightsail now
-  automatically detects CNAME records and extends TLS coverage without
-  manual verification steps.
-
-- **Deployment version history (2024-2025):** Container service now
-  retains up to 10 deployment versions for rollback. Previous versions
-  can be reactivated without recreating the deployment.
-
-- **Environment variable secrets management (2024-2025):** Secrets are
-  now stored using Lightsail's parameter system, providing better
-  isolation than plaintext environment variables.
-
-- **CloudWatch Logs enhancement (2024-2025):** Container logs now
-  include deployment version metadata, making it easier to correlate
-  log entries with specific deployments.
-
-- **VPC peering for Lightsail containers (2025-2026):** Lightsail
-  Container Services can now peer with VPC resources, enabling direct
-  access to RDS databases and other VPC-internal services without
-  public endpoints.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Step 10 — Recent features".
+> Load when: checking 2023-2026 feature availability — xlarge power, ECR auth, domain auto-validation, VPC peering.
 
 ## NEVER do these things
 
@@ -707,78 +439,8 @@ VERIFICATION_COMMANDS:
   aws lightsail get-container-service-deployments --service-name api-gateway
 ```
 
-Deploy commands:
-
-```bash
-# 1. Create the container service (small power, 2 nodes for HA)
-aws lightsail create-container-service \
-  --service-name api-gateway \
-  --power small \
-  --scale 2 \
-  --tags key=Environment,value=production key=Project,value=api-gateway
-
-# 2. Create containers.json with ECR private image + env vars + port
-cat > /tmp/containers.json << 'CJSON'
-{
-  "api-gateway": {
-    "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/api-gateway:v1.2",
-    "environment": {
-      "NODE_ENV": "production",
-      "LOG_LEVEL": "info",
-      "PORT": "8080"
-    },
-    "ports": {
-      "8080": "HTTP"
-    }
-  }
-}
-CJSON
-
-# 3. Create endpoint.json with health check
-cat > /tmp/endpoint.json << 'EJSON'
-{
-  "containerName": "api-gateway",
-  "containerPort": 8080,
-  "healthCheck": {
-    "healthyThreshold": 2,
-    "unhealthyThreshold": 2,
-    "intervalSeconds": 5,
-    "path": "/health",
-    "successCodes": "200"
-  }
-}
-EJSON
-
-# 4. Deploy with ECR credentials
-aws lightsail create-container-service-deployment \
-  --service-name api-gateway \
-  --containers file:///tmp/containers.json \
-  --public-endpoint file:///tmp/endpoint.json
-
-# 5. Verify the public endpoint
-aws lightsail get-container-services \
-  --service-name api-gateway \
-  --query 'containerServices[0].{State:State,Power:Power,Scale:Scale,Url:publicEndpoint.url}'
-
-# 6. Add custom domain CNAME in Route 53
-PUBLIC_DOMAIN=$(aws lightsail get-container-services \
-  --service-name api-gateway \
-  --query 'containerServices[0].publicEndpoint.url' --output text)
-
-aws route53 change-resource-record-sets \
-  --hosted-zone-id Z2DEXAMPLEZONE \
-  --change-batch '{
-    "Changes": [{
-      "Action": "CREATE",
-      "ResourceRecordSet": {
-        "Name": "api.example.com",
-        "Type": "CNAME",
-        "TTL": 300,
-        "ResourceRecords": [{"Value": "'"$PUBLIC_DOMAIN"'"}]
-      }
-    }]
-  }'
-```
+> **Moved verbatim** → [references/worked-examples.md](references/worked-examples.md) § "Worked example — deploy commands".
+> Load when: executing the example end-to-end — create service, deploy with ECR credentials, verify endpoint, add CNAME.
 
 ### Decision tree
 
@@ -812,25 +474,16 @@ Need HTTPS?
 
 ## Error handling
 
-### Deployment stuck in PENDING
-- Check if the container image is accessible. For ECR, verify the IAM
-  access key has ECR read permissions and is not deactivated. For
-  public images, verify the image exists and the tag is correct.
+> **Moved verbatim** → [references/error-handling.md](references/error-handling.md) § "Error handling".
+> Load when: a deployment, endpoint, health-check, or ECR pull failure occurs.
 
-### Public endpoint returns 503
-- Verify the container port is mapped and the container is running.
-  The health check path must return HTTP 200. Check if the application
-  has started successfully by viewing CloudWatch Logs.
+## References (load on demand)
 
-### Health check failing
-- The health check path must return HTTP 200 with the specified success
-  codes. Verify the path exists and responds correctly. A path returning
-  3xx (redirect) or 4xx (client error) will mark the endpoint unhealthy.
-
-### Cannot pull from ECR
-- Verify the IAM access key has `ecr:GetDownloadUrlForLayer`,
-  `ecr:BatchGetImage`, and `ecr:GetAuthorizationToken` permissions.
-  Check if the key has been rotated or deactivated.
+- [references/worked-examples.md](references/worked-examples.md) — worked-example deploy commands moved from this SKILL.md
+- [references/error-handling.md](references/error-handling.md) — error-handling deep dives moved from this SKILL.md
+- [references/advanced-patterns.md](references/advanced-patterns.md) — mindset, configuration dependency graph, and recent features moved from this SKILL.md
+- [references/power-and-ecr-auth.md](references/power-and-ecr-auth.md) — power scale and ECR auth deep reference (heuristics, ECR templates, and scale command moved into this file)
+- [references/endpoints-and-domains.md](references/endpoints-and-domains.md) — endpoint and domain deep reference (TLS heuristic, endpoint/env/domain/log templates moved into this file)
 
 ## Domain
 

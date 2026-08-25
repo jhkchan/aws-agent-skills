@@ -92,42 +92,8 @@ configured at the function URL level, not on the Lambda function
 itself. RESPONSE_STREAM mode enables streaming responses where the
 first byte reaches the client faster than BUFFERED mode.
 
-Four misconceptions dominate Lambda Function URL misdesign at
-provisioning time:
-
-- **"CORS is configured on the Lambda function."** It is not. CORS
-  is configured at the Function URL level via the `--cors` parameter
-  on `create-function-url-config` / `update-function-url-config`. A
-  Lambda function has no CORS settings; the function URL does. A
-  baseline model that configures CORS on the function itself (or in
-  the handler response only) will leave the function URL's CORS
-  policy empty, causing browser preflight failures.
-
-- **"NONE auth is fine for everything."** NONE auth means the
-  function URL is on the public internet with no authentication.
-  Anyone who knows the URL can invoke it. For any authenticated
-  workload, use AWS_IAM auth. The only valid NONE-auth use cases are
-  public-facing endpoints (webhooks, public APIs) where you implement
-  application-level auth inside the handler.
-
-- **"BUFFERED and RESPONSE_STREAM are interchangeable."** They are
-  not. BUFFERED mode waits for the entire response payload before
-  returning (max 6 MB response, subject to the 15-second timeout).
-  RESPONSE_STREAM mode streams the response body as it is generated
-  (first byte faster, useful for LLM token streaming, progressive
-  rendering, and long-running responses). RESPONSE_STREAM changes
-  the handler signature (uses `responseStreamWriter`) and requires
-  the runtime to support streaming (Node.js 14+, Python 3.9+ with
-  wrapper).
-
-- **"I can attach a function URL to any alias."** You cannot attach
-  a function URL to a custom alias (e.g., `prod`, `staging`) without
-  calling `update-function-url-config` with `--qualifier`. Function
-  URLs are attached to the function or to `$LATEST` by default. To
-  point a function URL at a specific alias, you must update the
-  function URL config with the alias as the qualifier. A baseline
-  model that creates an alias and assumes the URL follows it will
-  produce a broken deployment.
+Four-misconception catalog moved to `references/advanced-patterns.md` —
+see "Mindset — four misconceptions".
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -148,109 +114,23 @@ config. Use this graph to sequence provisioning.
 | CloudFront distribution | Function URL exists (as origin) | CloudFront caches at edge; TTL must be tuned; no query-string forwarding by default | custom domain + TLS + edge caching |
 | CloudWatch metrics | Function URL exists | metrics are automatic (no config needed); UrlRequests, Url4xx, Url5xx, UrlLatency | observability |
 
-**The CORS-at-URL-level row is the one a baseline model misses.**
-A baseline model configures CORS inside the Lambda handler's HTTP
-response headers and assumes the browser will accept it. Without the
-CORS policy on the function URL config itself, the browser preflight
-(OPTIONS request) fails because the function URL does not return the
-`Access-Control-Allow-*` headers for preflight. The procedure below
-forces an explicit CORS decision.
-
-**Cross-dependency gotchas:**
-- Auth mode and CORS are independent but both live on the URL config.
-  Changing auth mode does not change CORS and vice versa.
-- RESPONSE_STREAM requires a handler signature change. Switching
-  from BUFFERED to RESPONSE_STREAM without updating the handler
-  produces a runtime error.
-- CloudFront in front of a function URL with AWS_IAM auth requires
-  a custom CloudFront Lambda@Edge or CloudFront Function to sign
-  requests with SigV4. CloudFront cannot natively sign Lambda
-  Function URL requests. For simpler setups, use NONE auth + a
-  CloudFront WAF + application-level auth.
-- The 15-second timeout is a hard limit for function URL invocations
-  regardless of the function's configured timeout. If the function's
-  timeout is 60 seconds, function URL invocations still time out at
-  15 seconds.
+CORS-row walkthrough and cross-dependency gotchas moved to
+`references/advanced-patterns.md` (dependency-graph extras).
 
 ## Expert heuristic: RESPONSE_STREAM first byte advantage
 
-A baseline model says "use BUFFERED, it's simpler." The correct
-heuristic recognizes that RESPONSE_STREAM reduces time-to-first-byte
-dramatically for workloads where the response is generated
-incrementally (LLM token streaming, progressive HTML rendering,
-large data exports).
-
-```text
-BUFFERED mode timeline:
-  Client → Function URL → Lambda handler runs fully → 200 OK + full payload
-  Time to first byte = total handler execution time
-
-RESPONSE_STREAM mode timeline:
-  Client → Function URL → Lambda handler starts → 200 OK + first chunk
-                             → next chunk
-                             → next chunk
-                             → final chunk + stream end
-  Time to first byte = handler startup + first chunk generation time
-```
-
-**Key implication:** for LLM token streaming (streaming completions),
-progressive rendering (streaming HTML), or any workload where the
-client benefits from early data, RESPONSE_STREAM is the correct
-choice. For simple request-response APIs where the full payload is
-available quickly, BUFFERED is fine and simpler.
+Timeline comparison and workload guidance moved to
+`references/advanced-patterns.md` (RESPONSE_STREAM heuristic).
 
 ## Expert heuristic: CORS is at the function URL level
 
-CORS for Lambda Function URLs is NOT set on the Lambda function or
-in the handler alone. It is set on the function URL configuration
-via the `--cors` parameter. This is a common provisioning mistake.
-
-```text
-WRONG (does not work alone):
-  - Lambda handler returns Access-Control-Allow-Origin header
-  - Function URL has NO CORS config
-  → Browser preflight (OPTIONS) fails because the function URL
-    does not return CORS headers for preflight
-
-CORRECT:
-  - Function URL config has --cors with allowOrigins, allowMethods,
-    allowHeaders, exposeHeaders, maxAgeSeconds
-  - Lambda handler ALSO returns Access-Control-Allow-Origin in the
-    response (defense in depth)
-  → Browser preflight succeeds (function URL handles OPTIONS with
-    CORS headers); handler response includes CORS headers for the
-    actual response
-```
-
-**Key implication:** always configure CORS at the function URL level
-using the `--cors` parameter. The handler-level CORS header is a
-secondary defense, not the primary CORS mechanism for function URLs.
+WRONG-vs-CORRECT CORS pattern moved to `references/cors-and-auth.md`;
+summary: CORS is set on the URL config via `--cors`.
 
 ## Expert heuristic: NONE auth is public internet
 
-A baseline model may treat NONE auth as "no auth, like a public API
-Gateway endpoint." The correct framing: NONE auth means the URL is
-on the public internet with zero authentication. The only thing
-stopping unauthorized invocations is the unguessability of the URL
-endpoint ID (a 32-character string). This is NOT a security boundary.
-
-```text
-NONE auth invocation flow:
-  Client → https://<id>.lambda-url.<region>.on.aws/ → Lambda handler
-  No auth check. No IAM evaluation. No API key.
-  Anyone with the URL can invoke.
-
-AWS_IAM auth invocation flow:
-  Client → signs request with SigV4 using IAM credentials
-        → https://<id>.lambda-url.<region>.on.aws/ → Lambda handler
-  IAM evaluates resource-based policy on the Lambda function.
-  Unauthorized → 403 Forbidden.
-```
-
-**Key implication:** use NONE auth ONLY for genuinely public
-endpoints (webhooks, public APIs with application-level auth). For
-any internal or authenticated workload, use AWS_IAM auth with a
-resource-based policy on the Lambda function.
+NONE vs AWS_IAM invocation flows moved to `references/advanced-patterns.md`;
+summary: NONE auth = public internet, no security boundary.
 
 ## Prerequisites (verify before provisioning)
 
@@ -293,22 +173,8 @@ aws lambda create-function-url-config \
   --region us-east-1
 ```
 
-The response includes the `FunctionUrl` — the HTTPS endpoint:
-
-```text
-https://<id>.lambda-url.<region>.on.aws/
-```
-
-**Verify the function URL was created:**
-
-```bash
-aws lambda get-function-url-config \
-  --function-name my-function \
-  --region us-east-1
-```
-
-**Common mistake:** trying to create a function URL on a function
-that does not exist yet. The function must be created first.
+URL response format, verify CLI, and creation mistake moved to
+`references/advanced-patterns.md` + `references/diagnostic-commands.md`.
 
 ## Step 2 — Auth mode (AWS_IAM vs NONE)
 
@@ -324,24 +190,8 @@ that does not exist yet. The function must be created first.
 unguessability of the URL endpoint ID. Do NOT use NONE auth for
 anything that should not be publicly accessible.
 
-**AWS_IAM auth requires a resource-based policy** on the Lambda
-function that grants `lambda:InvokeFunctionUrl` to the intended
-callers:
-
-```bash
-# Add a resource-based policy allowing a principal to invoke the URL
-aws lambda add-permission \
-  --function-name my-function \
-  --statement-id function-url-invoke \
-  --action lambda:InvokeFunctionUrl \
-  --principal arn:aws:iam::111122223333:user/alice \
-  --function-url-auth-type AWS_IAM \
-  --region us-east-1
-```
-
-For cross-account access, set `--principal` to the other account's
-ARN. For service access (e.g., API Gateway, CloudFront), use the
-service principal.
+add-permission resource-policy CLI and cross-account notes moved to
+`references/cors-and-auth.md` (Step 2 detail).
 
 ## Step 3 — CORS configuration
 
@@ -357,37 +207,8 @@ fields:
 | `ExposeHeaders` | Response headers the browser can read | `["date", "x-request-id"]` |
 | `MaxAgeSeconds` | How long (seconds) the browser caches preflight results | `86400` |
 
-**Create a function URL with full CORS:**
-
-```bash
-aws lambda create-function-url-config \
-  --function-name my-function \
-  --auth-type AWS_IAM \
-  --invoke-mode BUFFERED \
-  --cors '{
-    "AllowOrigins": ["https://example.com"],
-    "AllowMethods": ["GET", "POST"],
-    "AllowHeaders": ["content-type", "authorization"],
-    "ExposeHeaders": ["date", "x-request-id"],
-    "MaxAgeSeconds": 86400
-  }' \
-  --region us-east-1
-```
-
-**Update CORS on an existing function URL:**
-
-```bash
-aws lambda update-function-url-config \
-  --function-name my-function \
-  --cors '{
-    "AllowOrigins": ["https://example.com", "https://staging.example.com"],
-    "AllowMethods": ["GET", "POST", "PUT", "DELETE"],
-    "AllowHeaders": ["content-type", "authorization", "x-api-key"],
-    "ExposeHeaders": ["date", "x-request-id", "x-trace-id"],
-    "MaxAgeSeconds": 3600
-  }' \
-  --region us-east-1
-```
+Create-with-CORS and update-CORS CLI sequences moved to
+`references/cors-and-auth.md` (Step 3 detail).
 
 **Critical:** without CORS configuration at the function URL level,
 browser-based clients will fail preflight (OPTIONS) requests. Server-
@@ -405,42 +226,8 @@ browser-enforced policy.
 | Runtime support | All runtimes | Node.js 14+, Python 3.9+ (wrapper), Java 11+ |
 | Use case | Simple request-response | LLM token streaming, progressive rendering, large exports |
 
-**BUFFERED handler (Node.js):**
-
-```javascript
-exports.handler = async (event) => {
-  return {
-    statusCode: 200,
-    body: JSON.stringify({ message: "Hello" })
-  };
-};
-```
-
-**RESPONSE_STREAM handler (Node.js):**
-
-```javascript
-exports.handler = awslambda.streamifyResponse(
-  async (event, responseStream, context) => {
-    responseStream.setContentType("text/plain");
-    responseStream.write("First chunk\n");
-    // Simulate incremental work
-    await new Promise(r => setTimeout(r, 100));
-    responseStream.write("Second chunk\n");
-    responseStream.end();
-  }
-);
-```
-
-**Create a function URL with RESPONSE_STREAM:**
-
-```bash
-aws lambda create-function-url-config \
-  --function-name my-streaming-function \
-  --auth-type NONE \
-  --invoke-mode RESPONSE_STREAM \
-  --cors '{"AllowOrigins":["*"],"AllowMethods":["GET","POST"]}' \
-  --region us-east-1
-```
+BUFFERED/RESPONSE_STREAM handler code and streaming create CLI moved
+to `references/streaming-and-cloudfront.md` (Step 4 detail).
 
 **Critical:** switching invoke mode requires updating the handler
 signature. A BUFFERED handler deployed on a RESPONSE_STREAM function
@@ -468,14 +255,8 @@ Function URL invocation: capped at 15 seconds → HTTP 504
   data within the 15-second window. The first byte must arrive before
   the timeout; subsequent chunks stream until the 15-second limit.
 
-**Verify the function's configured timeout:**
-
-```bash
-aws lambda get-function-configuration \
-  --function-name my-function \
-  --query 'Timeout' \
-  --region us-east-1
-```
+Timeout verification CLI moved to `references/diagnostic-commands.md`.
+The 15-second cap itself is a hard rule (see NEVER #3).
 
 If the timeout exceeds 15 seconds and the workload is served via
 function URL, warn the operator that function URL invocations cap at
@@ -493,14 +274,8 @@ https://<id>.lambda-url.<region>.on.aws/
 The endpoint supports both IPv4 and IPv6 connections. No additional
 configuration is needed — dual-stack is automatic.
 
-**Implications:**
-- Clients on IPv6-only networks (rare but growing) can reach
-  function URLs without NAT64 or other translation.
-- Security groups and WAF rules must account for both IPv4 and IPv6
-  source addresses if filtering by IP.
-- CloudFront in front of a function URL connects via IPv4 by
-  default. For IPv6 client support through CloudFront, enable IPv6
-  on the CloudFront distribution.
+Dual-stack implications (IPv6 clients, SG/WAF, CloudFront IPv6) moved
+to `references/advanced-patterns.md` (Step 6 detail).
 
 ## Step 7 — $LATEST alias constraint
 
@@ -528,14 +303,8 @@ aws lambda update-function-url-config \
 the function URL automatically follows it. It does not. The
 function URL must be explicitly updated with `--qualifier prod`.
 
-**Verify the qualifier:**
-
-```bash
-aws lambda get-function-url-config \
-  --function-name my-function \
-  --qualifier prod \
-  --region us-east-1
-```
+Qualifier verification CLI moved to `references/diagnostic-commands.md`.
+Key rule: update with `--qualifier <alias>` or the URL stays on $LATEST.
 
 **Key implication:** when promoting code from staging to production
 via alias shifting, update the function URL's qualifier if you want
@@ -555,91 +324,13 @@ automatically (no configuration needed):
 
 These metrics are in the `AWS/Lambda` namespace.
 
-**Monitor function URL metrics via CLI:**
-
-```bash
-# Get UrlRequests for the last hour
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/Lambda \
-  --metric-name UrlRequests \
-  --dimensions Name=FunctionName,Value=my-function \
-  --start-time $(date -u -v-1H +%Y-%m-%dT%H:%M:%S) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
-  --period 300 \
-  --statistics Sum \
-  --region us-east-1
-
-# Get Url5xx errors
-aws cloudwatch get-metric-statistics \
-  --namespace AWS/Lambda \
-  --metric-name Url5xx \
-  --dimensions Name=FunctionName,Value=my-function \
-  --start-time $(date -u -v-1H +%Y-%m-%dT%H:%M:%S) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
-  --period 300 \
-  --statistics Sum \
-  --region us-east-1
-```
-
-**Set up alarms for 5xx errors:**
-
-```bash
-aws cloudwatch put-metric-alarm \
-  --alarm-name "lambda-url-5xx-my-function" \
-  --metric-name Url5xx \
-  --namespace AWS/Lambda \
-  --dimensions Name=FunctionName,Value=my-function \
-  --threshold 5 \
-  --comparison-operator GreaterThanThreshold \
-  --period 300 \
-  --evaluation-periods 1 \
-  --statistic Sum \
-  --region us-east-1
-```
+Metric-query and 5xx-alarm CLI moved to `references/diagnostic-commands.md`
+(Step 8 detail). Metric table above is authoritative.
 
 ## Step 9 — Cold start impact
 
-Cold starts affect function URL invocations the same way they affect
-direct Lambda invocations. When a function has not been invoked
-recently, the first invocation includes initialization time (loading
-the runtime, loading the handler code, running the init code).
-
-```text
-Warm invocation latency:
-  Client → Function URL → Lambda (warm) → Response
-  Total = handler execution time
-
-Cold invocation latency:
-  Client → Function URL → Lambda (cold) → Init runtime → Init code → Handler → Response
-  Total = init time + handler execution time
-  Init time can be 100ms–several seconds depending on package size and runtime
-```
-
-**Mitigations:**
-- Use Provisioned Concurrency to pre-initialize execution
-  environments and eliminate cold starts. Function URLs support
-  provisioned concurrency.
-- Keep the deployment package small. Large packages increase init
-  time.
-- Use lighter runtimes (e.g., Node.js, Python) over heavier ones
-  (e.g., Java) if cold start is critical.
-- RESPONSE_STREAM mode reduces perceived cold start latency because
-  the first byte is sent as soon as the handler starts, not after
-  the full response is ready.
-
-**Provisioned concurrency with function URL:**
-
-```bash
-# Set up provisioned concurrency on an alias
-aws lambda put-provisioned-concurrency-config \
-  --function-name my-function \
-  --qualifier prod \
-  --provisioned-concurrent-executions 10 \
-  --region us-east-1
-```
-
-The function URL must point at the alias (`--qualifier prod`) to
-benefit from provisioned concurrency.
+Cold-start timeline, mitigations, and provisioned-concurrency CLI moved
+to `references/advanced-patterns.md` (Step 9 detail).
 
 ## Step 10 — Custom domain via CloudFront + Lambda URL
 
@@ -647,60 +338,8 @@ Lambda Function URLs do not natively support custom domains. To use
 a custom domain (e.g., `api.example.com`), place a CloudFront
 distribution in front of the function URL.
 
-```text
-Client → CloudFront (custom domain: api.example.com)
-       → Origin: https://<id>.lambda-url.<region>.on.aws/
-       → Lambda function URL → Lambda handler
-```
-
-**CloudFront distribution for a function URL:**
-
-```bash
-# Create a CloudFront distribution with the function URL as origin
-aws cloudfront create-distribution \
-  --origin-domain-name "abc123def456.lambda-url.us-east-1.on.aws" \
-  --default-cache-behavior '{
-    "TargetOriginId": "lambda-url-origin",
-    "ViewerProtocolPolicy": "redirect-to-https",
-    "TrustedSigners": {"Enabled": false, "Quantity": 0},
-    "ForwardedValues": {
-      "QueryString": true,
-      "Cookies": {"Forward": "none"},
-      "Headers": {"Quantity": 0}
-    },
-    "MinTTL": 0,
-    "DefaultTTL": 0,
-    "MaxTTL": 0
-  }' \
-  --enabled \
-  --region us-east-1
-```
-
-**Critical considerations for CloudFront + function URL:**
-- Set `DefaultTTL=0` (no caching) unless the function returns
-  cacheable content.
-- Enable query string forwarding (`QueryString: true`) if the
-  handler reads query parameters.
-- For AWS_IAM auth function URLs, CloudFront cannot natively sign
-  requests. Use NONE auth + CloudFront WAF + application-level auth,
-  or use a Lambda@Edge / CloudFront Function to sign requests.
-- For custom domain TLS, attach an ACM certificate to the CloudFront
-  distribution.
-- CloudFront adds latency (an extra hop) but provides edge caching,
-  DDoS protection, and custom domain support.
-
-**Attach a custom domain (ACM + CloudFront):**
-
-```bash
-# Request an ACM certificate (us-east-1 required for CloudFront)
-aws acm request-certificate \
-  --domain-name api.example.com \
-  --validation-method DNS \
-  --region us-east-1
-
-# After validation, associate the certificate with CloudFront
-# (done via CloudFront distribution update)
-```
+CloudFront diagram, distribution CLI, critical considerations, and ACM
+setup moved to `references/streaming-and-cloudfront.md` (Step 10 detail).
 
 ## Step 11 — Pricing
 
@@ -734,33 +373,8 @@ Monthly cost = (requests × $0.20/million)
 
 ## Step 12 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **RESPONSE_STREAM invoke mode (2023-2024):** Added support for
-  streaming responses from function URLs. Enables LLM token
-  streaming, progressive rendering, and long-running response
-  scenarios. Requires a handler signature change and a runtime that
-  supports streaming.
-
-- **Function URL IAM auth enhancements (2023-2024):** Improved
-  support for cross-account IAM access via resource-based policies.
-  The `function-url-auth-type` parameter on `add-permission`
-  enables fine-grained control over who can invoke the URL.
-
-- **Provisioned concurrency for function URLs (2023-2024):**
-  Function URLs now fully support provisioned concurrency when
-  pointed at an alias with a provisioned concurrency configuration.
-  This eliminates cold starts for latency-sensitive workloads.
-
-- **CloudFront integration patterns (2024-2025):** Expanded
-  guidance and patterns for placing CloudFront in front of function
-  URLs, including origin access control patterns, WAF integration,
-  and custom domain management.
-
-- **Function URL metrics in CloudWatch (2024-2025):** Enhanced
-  metric granularity for function URL invocations, including
-  per-qualifier metrics and integration with CloudWatch
-  dashboards and alarms.
+Feature list moved to `references/advanced-patterns.md` —
+see "Step 12 — recent features".
 
 ## NEVER do these things
 
@@ -860,60 +474,13 @@ VERIFICATION_COMMANDS:
 
 ### Worked example — RESPONSE_STREAM with NONE auth and CloudFront
 
-```text
-LAMBDA_FUNCTION_URL: https://xyz789abc012.lambda-url.us-east-1.on.aws/
-VERDICT: READY_TO_DEPLOY
-CHECKLIST:
-  [✓] Lambda function: my-streaming-handler (exists, runtime: nodejs20.x)
-  [✓] Auth mode: NONE (public endpoint — WAF + app-level auth)
-  [✓] Invoke mode: RESPONSE_STREAM
-  [✓] CORS: AllowOrigins=["*"], AllowMethods=["GET","POST"], AllowHeaders=["content-type"], MaxAgeSeconds=3600
-  [✓] Timeout check: function timeout 15s (at function URL cap)
-  [✓] Dual-stack: IPv4 + IPv6 (automatic)
-  [✓] Qualifier: prod
-  [✓] CloudFront custom domain: stream.example.com → https://xyz789abc012.lambda-url.us-east-1.on.aws/
-  [✓] CloudWatch metrics: UrlRequests, Url4xx, Url5xx, UrlLatency (automatic)
-  [✓] Tags: Environment=production, Service=streaming-api
-VERIFICATION_COMMANDS:
-  aws lambda get-function-url-config --function-name my-streaming-handler --qualifier prod --region us-east-1
-  aws cloudfront get-distribution-config --id <distribution-id> --region us-east-1
-  aws cloudwatch get-metric-statistics --namespace AWS/Lambda --metric-name UrlLatency --dimensions Name=FunctionName,Value=my-streaming-handler --start-time 2026-08-11T00:00:00Z --end-time 2026-08-11T01:00:00Z --period 300 --statistics Average --region us-east-1
-```
+This secondary worked example moved to `references/worked-examples.md`.
+The BUFFERED/IAM example above is the primary shape to copy.
 
 ## Error handling
 
-### Browser preflight (OPTIONS) fails with CORS error
-- The function URL does not have CORS configured. Add the `--cors`
-  parameter to the function URL config with AllowOrigins,
-  AllowMethods, and AllowHeaders. CORS is at the function URL level,
-  not the Lambda function level.
-
-### Function URL returns 403 Forbidden
-- If auth type is AWS_IAM, the caller's request is not properly
-  signed with SigV4, or the resource-based policy does not grant
-  `lambda:InvokeFunctionUrl` to the caller. Verify the policy with
-  `aws lambda get-policy`.
-
-### Function URL returns 504 Timeout
-- The handler exceeded the 15-second function URL invocation cap.
-  Reduce handler execution time, use RESPONSE_STREAM mode to start
-  streaming earlier, or move long-running work to async invocation.
-
-### RESPONSE_STREAM returns a runtime error
-- The handler signature does not match RESPONSE_STREAM expectations.
-  Ensure the handler uses `awslambda.streamifyResponse` (Node.js) or
-  the equivalent streaming wrapper for the runtime. Verify the
-  runtime supports streaming.
-
-### Function URL points to wrong alias
-- The function URL is still on `$LATEST`. Update with
-  `--qualifier <alias>` to point at the intended alias.
-
-### CloudFront returns 502/503
-- The origin (function URL) is unreachable or returning errors.
-  Verify the function URL works directly first. Check CloudFront
-  origin settings — the origin must be the full function URL
-  hostname.
+Error symptom catalog (CORS preflight, 403, 504, runtime error, wrong
+alias, CloudFront 502/503) moved to `references/error-handling.md`.
 
 ## Domain
 
@@ -931,3 +498,15 @@ Management.
 - **Function URL metrics** — https://docs.aws.amazon.com/lambda/latest/dg/monitoring-metrics.html#function-url-metrics
 - **CloudFront + Lambda URL** — https://docs.aws.amazon.com/lambda/latest/dg/urls-tutorial.html
 - **Lambda pricing** — https://aws.amazon.com/lambda/pricing/
+## References (load on demand)
+
+- [advanced-patterns.md](references/advanced-patterns.md) — misconceptions,
+  dependency-graph extras, expert heuristics, per-step deep dives
+  (cold start, dual-stack), recent features.
+- [diagnostic-commands.md](references/diagnostic-commands.md) — URL
+  creation/qualifier/timeout verification, CloudWatch metrics CLI.
+- [worked-examples.md](references/worked-examples.md) — secondary
+  RESPONSE_STREAM + CloudFront worked example.
+- [error-handling.md](references/error-handling.md) — error symptom
+  catalog and fixes.
+

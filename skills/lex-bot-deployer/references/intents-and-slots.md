@@ -351,3 +351,33 @@ resource "aws_lexv2models_intent" "order" {
   }
 }
 ```
+
+## Expert heuristic: slot elicitation priority (moved from SKILL.md)
+
+A baseline model declares slots and assumes elicitation in code order.
+The correct heuristic recognizes Lex elicits REQUIRED slots in PRIORITY
+order (1 = highest), only when the slot is not already filled.
+
+```text
+Intent: OrderCoffee
+  Slots (declared with priority):
+    CoffeeSize    (priority 1, required, slot type CoffeeSizeType)
+    CoffeeDrink   (priority 2, required, slot type CoffeeDrinkType)
+    CoffeeTemp    (priority 3, optional, slot type AMBIENT)
+
+User: "I'd like a large latte"
+  → Lex fills CoffeeSize=large, CoffeeDrink=latte from the utterance
+  → CoffeeTemp is OPTIONAL — Lex does NOT auto-elicit
+  → Lambda DIALOG_CODE_HOOK can choose to elicit CoffeeTemp or skip
+
+User: "I'd like a coffee"
+  → Lex elicits CoffeeSize first (priority 1, required, not filled)
+  → Then CoffeeDrink (priority 2)
+  → CoffeeTemp skipped unless code hook intervenes
+```
+
+**Key implication:** the priority field is the ONLY way to control
+auto-elicitation order. Required slots with the same priority are
+elicited in undefined order — assign distinct priorities. Optional
+slots MUST be elicited by the Lambda code hook; the bot will not ask
+for them on its own.

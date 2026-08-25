@@ -166,3 +166,12 @@ beyond any reasonable Lambda Timeout. Always tune both together.
 | Lambda times out; MaxMemoryUsed ≈ MemorySize | "Need higher Timeout" | OOM-before-timeout — raise memory |
 | Step Functions `States.Timeout` | "Lambda timed out" | Task-level `TimeoutSeconds` < Lambda Timeout |
 | API Gateway 504 | "Lambda failed" | Integration 29 s cap fired; Lambda still running |
+
+## HTTP client default timeouts (moved from SKILL.md)
+
+| Client | Default connect timeout | Default request timeout |
+|---|---|---|
+| Node `axios` | none (TCP default ~75s on Linux) | none |
+| Node `fetch` (undici) | none | none |
+| Python `requests` | none (system default) | none |
+| Python `httpx` | 5s | none |

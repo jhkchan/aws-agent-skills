@@ -36,21 +36,8 @@ The automation pipeline is **tag** (identify cohort) → **tier map**
 (Firehose-to-S3 for compliance logs before expiry) → **verify**
 (describe-log-groups confirms retentionInDays is set).
 
-- **Retention is per-log-group.** There is no account-level default.
-  Every log group created without an explicit retention policy stays
-  Never Expire indefinitely. This is the single largest source of
-  unintended CloudWatch Logs cost in AWS accounts.
-- **Auto-retention on CreateLogGroup** closes the gap: an EventBridge
-  rule on the `CreateLogGroup` API call triggers a Lambda (or SSM
-  Automation) that applies the tag-derived retention within seconds of
-  creation. Without this, new log groups remain Never Expire until the
-  next manual sweep.
-- **S3 Firehose export replaces Never Expire for compliance.** Logs
-  that must be retained beyond the maximum 3653-day (10-year) CloudWatch
-  tier — or logs where the per-GB CloudWatch ingest + storage cost
-  exceeds S3 storage cost — should be streamed to S3 via Kinesis
-  Firehose. CloudWatch retention then becomes the "hot query" window
-  (e.g., 90d) while S3 holds the compliance archive (indefinite).
+> The three underlying facts (per-log-group retention, auto-retention on CreateLogGroup, Firehose-to-S3 for compliance) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+> Load them when designing a retention pipeline from scratch.
 
 ## Quick navigation
 
@@ -128,62 +115,13 @@ GAP: Run describe-log-groups and list-tags-log-group, then supply the tag retent
 
 ### Step 0: Expert knowledge — non-obvious CloudWatch Logs behaviors
 
-These behaviors change the automation design if ignored:
-
-- **`put-retention-policy` is eventually consistent.** After the API
-  returns success, `describe-log-groups` may still show the old
-  `retentionInDays` for several seconds. Use a 5-second sleep before
-  verifying.
-
-- **Log groups created by AWS services (Lambda, ECS, CloudTrail) are
-  NOT auto-tagged.** The tag-based retention map will miss these
-  unless an EventBridge rule applies a default or the auto-retention
-  Lambda fires on `CreateLogGroup`.
-
-- **Shortening retention triggers asynchronous bulk deletion.** 500 GB
-  of logs with retention changed from 365d to 7d begins deleting within
-  seconds. No confirmation, no undo. Logs are permanently gone.
-
-- **`delete-retention-policy` resets to Never Expire.** This removes
-  the retention policy entirely — accidental calls cause unbounded
-  growth.
-
-- **Subscription filters (limit 2 per log group since 2024) and
-  metric filters survive retention changes.** Retention controls data
-  lifecycle, not pipelines. But deleting a log group destroys both.
-
-- **Metric filters are evaluated at ingestion time.** Changing
-  retention does not affect already-emitted metrics. Inventory metric
-  filters before any destructive log group operation.
-
-- **Firehose buffers for at least 60 seconds (or 5 MB).** Logs in the
-  last buffer window before expiry may not reach S3. Use a retention
-  window at least 1 day longer than the Firehose buffer.
-
-- **Cross-account subscription filter delivery does NOT carry source
-  retention.** The destination applies its own retention. Always
-  configure retention on BOTH source and destination.
+> Step 0 deep-dive moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md) — eventual consistency, untagged service log groups, async bulk deletion, delete-retention-policy, filter limits, Firehose buffering, cross-account behavior.
+> Load it before designing the automation.
 
 ### Step 1: Inventory the current state
 
-```bash
-# List all log groups with current retention
-aws logs describe-log-groups \
-  --output json \
-  --query 'logGroups[*].[logGroupName,retentionInDays,storedBytes]' \
-  --region us-east-1
-
-# Identify Never Expire groups (retentionInDays is null/absent)
-aws logs describe-log-groups \
-  --output json \
-  --query 'logGroups[?retentionInDays==`null`].logGroupName' \
-  --region us-east-1
-
-# Get tags for a specific group
-aws logs list-tags-log-group \
-  --log-group-name /aws/lambda/my-function \
-  --region us-east-1
-```
+> The inventory CLI (describe-log-groups queries, Never-Expire filter, tag lookup) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+> Load it before baselining an account.
 
 Key observations to surface in the output:
 
@@ -235,48 +173,11 @@ aws logs put-retention-policy \
   --region us-east-1
 ```
 
-Batch automation pattern (with rate limiting — CloudWatch Logs
-throttles at ~5-10 put-retention-policy/sec):
+> The rate-limited batch-apply Python pattern moved verbatim to [references/worked-examples.md](references/worked-examples.md); the single-group CLI above stays canonical.
+> Load it when applying retention across many log groups.
 
-```python
-import boto3, time
-
-logs = boto3.client('logs')
-
-def apply_retention(log_group_name, retention_days):
-    try:
-        logs.put_retention_policy(
-            logGroupName=log_group_name,
-            retentionInDays=retention_days
-        )
-        print(f"OK: {log_group_name} -> {retention_days}d")
-    except logs.exceptions.ClientError as e:
-        if e.response['Error']['Code'] == 'ThrottlingException':
-            time.sleep(2)
-            apply_retention(log_group_name, retention_days)
-        else:
-            print(f"ERROR: {log_group_name} -> {e}")
-
-# Iterate with pagination
-paginator = logs.get_paginator('describe_log_groups')
-for page in paginator.paginate():
-    for lg in page['logGroups']:
-        name = lg['logGroupName']
-        tags = logs.list_tags_log_group(logGroupName=name).get('tags', {})
-        env = tags.get('Environment', 'untagged')
-        tier = TIER_MAP.get(env, DEFAULT_RETENTION)
-        apply_retention(name, tier)
-        time.sleep(0.2)  # Stay under throttle limit
-```
-
-Common errors and fixes:
-
-| Error | Cause | Fix |
-|---|---|---|
-| `InvalidParameterException` | retentionInDays not in allowed set | Round to nearest allowed tier (Appendix A) |
-| `ThrottlingException` | Too many put-retention-policy calls | Add 0.2s sleep between calls; batch in groups of 50 |
-| `ResourceNotFoundException` | Log group deleted between describe and put | Skip; log as "already gone" |
-| `AccessDeniedException` | IAM role missing `logs:PutRetentionPolicy` | Add policy with `logs:PutRetentionPolicy` on `arn:aws:logs:*:*:log-group:*` |
+> The put-retention-policy error table (InvalidParameterException, ThrottlingException, ResourceNotFoundException, AccessDeniedException) moved verbatim to [references/error-handling.md](references/error-handling.md).
+> Load it when apply calls fail.
 
 ### Step 4: Deploy EventBridge auto-retention on CreateLogGroup
 
@@ -314,37 +215,8 @@ aws events put-targets \
   --region us-east-1
 ```
 
-Lambda handler (auto-retention on CreateLogGroup):
-
-```python
-import boto3, json, os
-
-logs = boto3.client('logs')
-
-TIER_MAP = json.loads(os.environ['TIER_MAP'])
-DEFAULT_RETENTION = int(os.environ['DEFAULT_RETENTION'])
-
-def lambda_handler(event, context):
-    # Extract log group name from CloudTrail event
-    log_group_name = event['detail']['requestParameters']['logGroupName']
-
-    # Check for tags (may not be set yet — CreateLogGroup may not include tags)
-    try:
-        tags_resp = logs.list_tags_log_group(logGroupName=log_group_name)
-        env = tags_resp['tags'].get('Environment', 'untagged')
-    except Exception:
-        env = 'untagged'
-
-    retention = TIER_MAP.get(env, DEFAULT_RETENTION)
-
-    logs.put_retention_policy(
-        logGroupName=log_group_name,
-        retentionInDays=retention
-    )
-
-    print(f"Applied {retention}d retention to {log_group_name} (env={env})")
-    return {'statusCode': 200, 'logGroup': log_group_name, 'retention': retention}
-```
+> The auto-retention Lambda handler code moved verbatim to [references/worked-examples.md](references/worked-examples.md); the EventBridge rule and target CLI above stay canonical.
+> Load it when deploying the CreateLogGroup automation.
 
 **Critical timing note:** The `CreateLogGroup` API call creates the
 group but tags may not be set in the same call. If the service creating
@@ -392,49 +264,8 @@ delivered). For logs retained > 90 days, S3 archival is typically
 cheaper. For logs retained < 90 days, CloudWatch is cheaper because
 there is no Firehose delivery cost.
 
-Firehose delivery stream creation:
-
-```bash
-aws firehose create-delivery-stream \
-  --delivery-stream-name log-archive-prod \
-  --delivery-stream-type DirectPut \
-  --s3-destination-configuration '{
-    "RoleARN": "arn:aws:iam::111111111111:role/FirehoseS3Role",
-    "BucketARN": "arn:aws:s3:::com-company-log-archive-prod",
-    "Prefix": "firehose/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/",
-    "ErrorOutputPrefix": "errors/!{firehose:error-output-type}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/",
-    "BufferingHints": {
-      "SizeInMBs": 5,
-      "IntervalInSeconds": 300
-    },
-    "CompressionFormat": "GZIP"
-  }' \
-  --region us-east-1
-```
-
-Subscription filter on the log group forwarding to Firehose:
-
-```bash
-aws logs put-subscription-filter \
-  --log-group-name /aws/lambda/compliance-critical-function \
-  --filter-name archive-to-firehose \
-  --filter-pattern "" \
-  --destination-arn "arn:aws:firehose:us-east-1:111111111111:deliverystream/log-archive-prod" \
-  --role-arn "arn:aws:iam::111111111111:role/CWLogsToFirehoseRole" \
-  --region us-east-1
-```
-
-**Key design decisions for the Firehose pipeline:**
-
-| Decision | Recommended | Why |
-|---|---|---|
-| Buffer size | 5 MB | Balances delivery latency vs S3 PUT cost |
-| Buffer interval | 300 seconds (5 min) | Max freshness without excessive API calls |
-| Compression | GZIP | 3-5x compression on log data; Athena-compatible |
-| S3 prefix structure | `year=YYYY/month=MM/day=DD/` | Athena/Hive partitioning for query |
-| Error output prefix | `errors/!{firehose:error-output-type}/...` | Catch delivery failures |
-| S3 lifecycle policy | Glacier after 90d, Deep Archive after 180d | Long-term compliance storage at lowest cost |
-| KMS encryption | SSE-KMS with customer key | Compliance-grade encryption |
+> The delivery-stream and subscription-filter CLI plus the Firehose design-decision table moved verbatim to [references/firehose-s3-export.md](references/firehose-s3-export.md).
+> Load it when configuring S3 archival.
 
 For the complete Firehose-to-S3 pipeline reference including IAM roles,
 S3 lifecycle policies, and Athena table DDL, see
@@ -471,28 +302,8 @@ automation must enforce one via a combination of:
 2. **Scheduled Lambda sweep** — a daily EventBridge scheduled rule
    that scans for Never Expire groups and applies the default:
 
-```bash
-aws events put-rule \
-  --name daily-retention-sweep \
-  --schedule-expression "rate(1 day)" \
-  --region us-east-1
-```
-
-```python
-# Lambda: sweep for Never Expire groups
-def sweep_handler(event, context):
-    paginator = logs.get_paginator('describe_log_groups')
-    for page in paginator.paginate():
-        for lg in page['logGroups']:
-            if lg.get('retentionInDays') is None:
-                name = lg['logGroupName']
-                logs.put_retention_policy(
-                    logGroupName=name,
-                    retentionInDays=DEFAULT_RETENTION
-                )
-                print(f"Sweep: applied {DEFAULT_RETENTION}d to {name}")
-                time.sleep(0.2)
-```
+> The daily-sweep EventBridge rule and sweep-Lambda code moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+> Load it when enforcing the account-level default.
 
 3. **CloudFormation StackSet** — for CloudFormation-managed log groups,
    always include `RetentionInDays` in the `AWS::Logs::LogGroup`
@@ -508,61 +319,15 @@ each member account. A management-account sweep Lambda provides
 centralized auditing via `organizations list-accounts` + cross-account
 role assumption.
 
-```bash
-aws cloudformation create-stack-set \
-  --stack-set-name cw-log-retention-automation \
-  --template-body file://retention-automation.yaml \
-  --permission-model SERVICE_MANAGED \
-  --auto-deployment 'Enabled=true,RetainStacksOnAccountRemoval=false' \
-  --capabilities CAPABILITY_IAM
-
-aws cloudformation create-stack-instances \
-  --stack-set-name cw-log-retention-automation \
-  --deployment-targets OrganizationalUnitIds='["r-xxxx"]' \
-  --regions '["us-east-1","us-west-2"]'
-```
+> The create-stack-set / create-stack-instances CLI moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+> Load it when rolling out across an Organizations fleet.
 
 ### Step 10: Audit and verify
 
 After deploying retention automation, verify end-to-end:
 
-```bash
-# 1. Check that no Never Expire groups remain (except explicitly exempted)
-aws logs describe-log-groups \
-  --output json \
-  --query 'logGroups[?retentionInDays==`null`].logGroupName' \
-  --region us-east-1
-
-# 2. Verify the EventBridge rule is active
-aws events describe-rule \
-  --name auto-retention-new-log-groups \
-  --region us-east-1
-
-# 3. Test: create a test log group and verify auto-retention
-aws logs create-log-group \
-  --log-group-name /retention-test-$(date +%s) \
-  --region us-east-1
-
-# Wait 10 seconds for EventBridge + Lambda
-sleep 10
-
-aws logs describe-log-groups \
-  --log-group-name-prefix /retention-test- \
-  --region us-east-1
-
-# 4. Verify Firehose delivery stream is active (if archival configured)
-aws firehose describe-delivery-stream \
-  --delivery-stream-name log-archive-prod \
-  --query 'DeliveryStreamDescription.DeliveryStreamStatus' \
-  --region us-east-1
-
-# 5. CloudTrail audit — verify put-retention-policy calls
-aws cloudtrail lookup-events \
-  --lookup-attributes AttributeKey=EventName,AttributeValue=PutRetentionPolicy \
-  --start-time $(date -v-1H +%Y-%m-%dT%H:%M:%S) \
-  --end-time $(date +%Y-%m-%dT%H:%M:%S) \
-  --region us-east-1
-```
+> The end-to-end verification CLI (Never-Expire check, rule status, test log group, Firehose status, CloudTrail audit) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+> Load it after deploying the automation.
 
 ## Output format
 
@@ -608,21 +373,8 @@ TEMPLATE:
 
 ### Worked example — REVIEW_REQUIRED, missing tag schema
 
-```text
-RETENTION: staging-retention-setup
-LOG_GROUP: account-wide (80 groups)
-POLICY:
-  - Tag map: Environment=staging -> 30d (but 52 of 80 groups lack the Environment tag)
-  - Tier: 30 (allowed)
-  - Default: TBD — no account-level default configured
-TRIGGER:
-  - Existing: NONE
-  - New: EventBridge CreateLogGroup rule not yet deployed
-ARCHIVAL: NONE
-VERDICT: REVIEW_REQUIRED
-GAP: 52 of 80 log groups lack the Environment tag. The tag-based retention map will miss them. Options: (1) tag all groups first (aws logs tag-log-group), (2) set an account-level default (14d recommended) that applies to untagged groups. Also, the EventBridge CreateLogGroup rule is not deployed — new groups will still default to Never Expire.
-TEMPLATE: (deploy after tag coverage is resolved)
-```
+> This second worked example moved verbatim to [references/worked-examples.md](references/worked-examples.md); the AUTOMATION_DEPLOYED example above stays canonical.
+> Load it when tag coverage is incomplete.
 
 ## Anti-Patterns — NEVER do these things
 
@@ -715,35 +467,8 @@ see **references/retention-tier-mapping.md** and
 
 ## Recent AWS features (2024-2026)
 
-- **Subscription filter limit increased to 2 per log group (2024):**
-  Previously limited to 1. Now a log group can fan out to both a
-  Firehose archival pipeline AND a real-time Lambda processor. This
-  simplifies the "archive + process" dual-pipeline pattern.
-
-- **CloudWatch Logs data protection (2024-2025):** Masking of
-  sensitive data (PII, credentials) at ingestion. Complementary to
-  retention — data protection runs before logs are stored, so
-  retention policies apply to already-masked data.
-
-- **Firehose Direct Put for CloudWatch Logs (2024):** Firehose can
-  now natively accept CloudWatch Logs subscription filter data
-  without an intermediary Lambda. Reduces cost and latency for the
-  archival pipeline.
-
-- **CloudWatch Logs account-level policies (2024-2025):** AWS
-  introduced account-level data protection policies. While not a
-  full account-level retention default, it indicates AWS is moving
-  toward account-level log governance. Monitor for a future
-  account-level retention feature.
-
-- **Organizations-wide log archive (2025-2026):** AWS launched a
-  service-linked approach for centralized log archival across an
-  Organizations fleet, reducing the need for custom cross-account
-  Lambda sweeps. Evaluate as an alternative to the StackSet pattern.
-
-- **CloudWatch Logs Insights query scheduling (2025):** Scheduled
-  saved queries with S3 export. Useful for periodic compliance
-  reports from log data before it expires.
+> The 2024-2026 feature notes moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+> Load on demand when checking recent feature availability.
 
 ## Expert heuristic: the Never Expire trap
 
@@ -768,6 +493,15 @@ finding CW.1; Cost Explorer CloudWatch Logs trend.
 **Surface in output:** include `NEVER_EXPIRE_GROUPS: <count>` and
 `COST_EXPOSURE: <$amount/month>`. If `NEVER_EXPIRE_GROUPS > 0`, do
 NOT mark the deployment as complete.
+
+## References (load on demand)
+
+- [references/worked-examples.md](references/worked-examples.md) — batch rate-limited apply script, auto-retention Lambda handler, daily-sweep Lambda, and the REVIEW_REQUIRED worked example.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 non-obvious CloudWatch Logs behaviors, the Mindset deep-dive facts, multi-account StackSet CLI, and 2024-2026 feature notes.
+- [references/error-handling.md](references/error-handling.md) — put-retention-policy error table (InvalidParameterException, ThrottlingException, ResourceNotFoundException, AccessDeniedException).
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — inventory CLI (describe-log-groups, tags) and the end-to-end post-deploy verification sequence.
+- [references/firehose-s3-export.md](references/firehose-s3-export.md) — full Firehose-to-S3 pipeline (now also the delivery-stream and subscription-filter CLI plus the design-decision table).
+- [references/retention-tier-mapping.md](references/retention-tier-mapping.md) — complete round-up mapping table and cost-estimation worksheet.
 
 ## Domain
 

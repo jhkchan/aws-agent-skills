@@ -223,3 +223,116 @@ resource "aws_lightsail_container_deployment_version" "main" {
   }
 }
 ```
+
+## Expert heuristic: power scale vs node count trade-off (moved from SKILL.md)
+
+A baseline model says "pick a size and go." The correct heuristic
+recognizes that power scale and node count serve different purposes:
+
+```text
+Power scale (per-node capacity):
+  ├── nano:    0.25 vCPU, 0.5 GB RAM  — dev/testing
+  ├── micro:   0.5 vCPU,  1 GB RAM    — low-traffic
+  ├── small:   1 vCPU,    2 GB RAM    — small production
+  ├── medium:  2 vCPU,    4 GB RAM    — medium production
+  ├── large:   4 vCPU,    8 GB RAM    — high-traffic
+  └── xlarge:  8 vCPU,   16 GB RAM    — compute-intensive
+
+Node count (horizontal replicas):
+  ├── 1 node  — no redundancy (single point of failure)
+  ├── 2 nodes — minimum for high availability
+  └── 3+ nodes — production-grade redundancy
+
+Cost comparison (approximate monthly):
+  large x 1  ≈ medium x 2  ≈ small x 4
+  (similar total cost, but HA requires >= 2 nodes)
+```
+
+**Key implication:** for production, always use at least 2 nodes for
+redundancy. A medium with 2 nodes provides failover; a large with 1
+node does not. The cost is similar, but the availability is very
+different.
+
+## Expert heuristic: ECR private auth via access key (moved from SKILL.md)
+
+Lightsail Container Service cannot pull from ECR without explicit
+credentials. You must create an IAM user or role with an access key
+that has `ecr:GetDownloadUrlForLayer`, `ecr:BatchGetImage`, and
+`ecr:GetAuthorizationToken` permissions.
+
+```text
+ECR auth flow:
+  1. Create IAM user (or use existing) with ECR read permissions
+  2. Generate access key (access key ID + secret access key)
+  3. Pass credentials to Lightsail deployment:
+     aws lightsail create-container-service-deployment
+       --service-name my-service
+       --containers file://containers.json
+       --public-endpoint file://endpoint.json
+  4. In containers.json, specify image as:
+     <account>.dkr.ecr.<region>.amazonaws.com/<repo>:<tag>
+  5. Lightsail stores the credentials in the deployment
+
+Note: credentials are per-deployment. Rotating the IAM key
+requires a new deployment version.
+```
+
+**Key implication:** for ECR private images, the access key must be
+valid for the lifetime of the deployment. If the key is deactivated or
+deleted, the next deployment pull will fail.
+
+## Step 3 — ECR templates: IAM policy, containers.json, deploy command (moved from SKILL.md)
+
+**IAM policy for ECR read access:**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage",
+        "ecr:GetAuthorizationToken"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+**containers.json with ECR image and credentials:**
+
+```json
+{
+  "my-app": {
+    "image": "123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app:v1.0",
+    "command": [],
+    "environment": {
+      "ENV": "production"
+    },
+    "ports": {
+      "8080": "HTTP"
+    }
+  }
+}
+```
+
+**Deploy with ECR credentials:**
+
+```bash
+aws lightsail create-container-service-deployment \
+  --service-name "my-app" \
+  --containers file://containers.json \
+  --public-endpoint file://endpoint.json
+```
+
+## Step 6 — scale update command (moved from SKILL.md)
+
+```bash
+# Scale up to 3 nodes
+aws lightsail update-container-service \
+  --service-name "my-app" \
+  --scale 3
+```

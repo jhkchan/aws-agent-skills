@@ -215,3 +215,12 @@ result = subprocess.run(cmd, timeout=3.0, capture_output=True)
 For workloads spawning many child processes, consider a container
 function with a larger memory allocation; the per-spawn overhead scales
 with available CPU.
+
+## Caller-side hard caps (moved from SKILL.md)
+
+| Caller | Hard cap | Tunable? |
+|---|---|---|
+| API Gateway REST API | 29 s | No |
+| API Gateway HTTP API | 29 s | No |
+| ALB | 60 s default | Yes (1-4000 s) |
+| Step Functions | per `Task.TimeoutSeconds` | Yes |

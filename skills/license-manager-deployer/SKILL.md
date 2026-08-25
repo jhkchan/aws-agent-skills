@@ -85,124 +85,28 @@ with a specific gap citation in the checklist (marked `[✗]`), and
 
 ## Mindset
 
-**One-line takeaway:** A License Manager license configuration defines
-the counting rule (vCPU, instance, or cores), the license count
-entitlement, the enforcement rule (hard limit vs soft limit), and the
-vendor-specific license rule string. License Manager discovers resources
-via Systems Manager and enforces limits by preventing non-compliant EC2
-instance launches. Cross-account sharing requires AWS Organizations
-integration (delegated administrator + service access). Violations are
-detected against the hard limit; alerting goes to SNS/CloudWatch.
-
-Three misconceptions dominate License Manager misconfiguration at
-provisioning time:
-
-- **"License count and vCPU count are the same."** They are NOT. A
-  license configuration has a `LicenseCount` (number of licenses
-  owned). The `LicenseCountingType` determines how consumption is
-  measured: `vCPU` counts total vCPUs across associated instances,
-  `Instance` counts each running instance, `Core` counts physical CPU
-  cores. A license count of 100 with `vCPU` counting means 100 vCPUs
-  total — NOT 100 instances.
-
-- **"Associating a license configuration with a resource automatically
-  tracks it."** Only partially. The license configuration must be
-  associated with a resource, AND Systems Manager inventory must be
-  enabled for discovery of non-EC2 resources. For on-premises or SSM-
-  managed instances, SSM inventory with the `Aws:SoftwareInventory`
-  plugin is REQUIRED for License Manager to discover them.
-
-- **"Cross-account license sharing works out of the box."** It does
-  NOT. Cross-account sharing requires: (1) Organizations with all-
-  features enabled, (2) License Manager enabled as a trusted service,
-  (3) a delegated administrator account, and (4) explicit sharing to
-  member accounts. Without Organizations integration, configurations
-  are account-local.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Mindset — one-line takeaway and three misconceptions".
+> Load when: modelling the configuration — count vs counting-type, discovery prerequisites, Org-sharing requirements.
 
 ## Configuration dependency graph (novel heuristic)
 
-| Configuration | Hard dependencies | Silent failure | Enables |
-|---|---|---|---|
-| License configuration | license type known; count > 0; rule syntax valid | rule errors only caught at enforcement | the tracking entity |
-| License rules | counting type selected; vendor rule format known | wrong syntax = silent non-enforcement | enforcement at launch |
-| Resource association (EC2) | EC2 instance / AMI / launch template exists | association to stopped instance still counts | consumption tracking |
-| Resource association (SSM) | SSM managed instance active; inventory configured | without inventory, on-prem invisible | on-prem tracking |
-| Cross-account sharing | Organizations all-features; trusted service; delegated admin | sharing to non-Org account fails | multi-account distribution |
-| Violation detection | hard limit; resources associated | soft limit never triggers violations | compliance alerting |
-| Grants | allowed operations; principal has IAM permission | grants without expiry = permanent risk | delegated management |
-
-**The license-rules row is the one a baseline model misses.** Creating
-a configuration without the correct `LicenseRules` means License Manager
-accepts it but does NOT enforce vendor-specific conditions. The
-procedure below forces an explicit decision on rules per vendor.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Configuration dependency graph".
+> Load when: sequencing provisioning — hard dependencies, silent failures, what each configuration enables.
 
 ## Expert heuristic: vCPU vs instance-based vs cores-based counting
 
-A baseline model says "set the license count." The correct heuristic
-recognizes that the counting type fundamentally changes what is measured.
-
-```text
-LicenseCountingType:
-  ├── vCPU      → counts total vCPUs across running associated instances
-  │                Used for: Oracle, many per-vCPU commercial products
-  │                License count = total vCPUs entitled
-  │                100 vCPUs = 50 instances of 2 vCPU each
-  │
-  ├── Instance  → counts each running associated instance as 1 license
-  │                Used for: per-instance software (middleware, ISV tools)
-  │                License count = total instances entitled
-  │
-  └── Core      → counts physical CPU cores (NOT vCPUs)
-                   Used for: SQL Server, Windows Server
-                   License count = total cores entitled
-```
-
-**Key implication:** Oracle Database is vCPU-counted. SQL Server is
-core-counted. Generic per-instance licenses use Instance counting.
-Choosing the wrong type makes the entire configuration non-compliant.
+> **Moved verbatim** → [references/license-rules-and-counting.md](references/license-rules-and-counting.md) § "Expert heuristic: vCPU vs instance-based vs cores-based counting".
+> Load when: choosing LicenseCountingType — what vCPU, Instance, and Core counting each measure.
 
 ## Expert heuristic: cross-Org distribution via Organizations
 
-```text
-Cross-account license sharing flow:
-  1. Organization exists with ALL features enabled
-     aws organizations describe-organization --query 'Organization.FeatureSet'
-     → Must be "ALL" (not "CONSOLIDATED_BILLING")
-  2. License Manager is a trusted service
-     aws organizations enable-aws-service-access \
-       --service-principal license-manager.amazonaws.com
-  3. (Recommended) Delegated administrator
-     aws organizations register-delegated-administrator \
-       --account-id <delegated-acct> \
-       --service-principal license-manager.amazonaws.com
-  4. License configuration shared cross-account
-     aws license-manager create-license-configuration-cross-account \
-       --license-configuration-arn arn:aws:license-manager:... \
-       --target-organization-structure '{"OrganizationalUnits":["ou-xxx"]}'
-  5. Target accounts receive the share (automatic for OU-shared)
-  6. Target accounts associate the config with their resources
-```
-
-**Key implication:** Without steps 1-3, step 4 fails. The Organizations
-enablement is a prerequisite, not an option.
+> **Moved verbatim** → [references/cross-account-and-discovery.md](references/cross-account-and-discovery.md) § "Expert heuristic: cross-Org distribution via Organizations".
+> Load when: sharing cross-account — feature-set, trusted-service, delegated-admin, share flow.
 
 ## Expert heuristic: SSM managed instance discovery
 
-For EC2, the license configuration is associated at launch. For on-
-premises or SSM-managed instances, SSM inventory is the discovery
-mechanism.
-
-```text
-SSM discovery flow:
-  1. On-prem server activated as SSM managed instance (mi-xxxx)
-  2. SSM Inventory association collects software data
-     aws ssm create-association --name AWS-InventoryManagement ...
-  3. License Manager reads SSM inventory to discover software
-  4. Consumption tracked against license count
-```
-
-**Key implication:** without SSM inventory, on-premises resources are
-invisible to License Manager.
+> **Moved verbatim** → [references/cross-account-and-discovery.md](references/cross-account-and-discovery.md) § "Expert heuristic: SSM managed instance discovery".
+> Load when: tracking on-premises or SSM-managed resources — the inventory-based discovery flow.
 
 ## Prerequisites (verify before provisioning)
 
@@ -472,20 +376,8 @@ LIC_ARN=$(aws license-manager create-license-configuration \
 
 ## Step 11 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **IAM Identity Center integration (2023-2024):** Self-service portal
-  supports SSO for non-IAM users, simplifying grant access.
-- **Enhanced violation reporting (2023-2024):** Richer EventBridge
-  details — resource ARN, configuration ARN, violation reason code.
-- **Cross-Region license tracking (2023-2024):** Aggregated usage
-  reporting across regions within the same account.
-- **Terraform provider improvements (2023-2024):** `license_rule`
-  now supports structured map, improving readability.
-- **Marketplace integration (2024-2025):** Tracks Marketplace-
-  purchased software alongside BYOL configurations.
-- **CloudWatch metric enhancements (2024-2025):** Consumption metrics
-  published to CloudWatch (consumed, remaining), enabling dashboards.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Step 11 — Recent features".
+> Load when: checking 2023-2026 feature availability — Identity Center SSO, violation reporting, cross-Region tracking.
 
 ## NEVER do these things
 
@@ -578,29 +470,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### License configuration creation fails with validation error
-- Verify `--license-counting-type` is one of `vCPU`, `Instance`, `Core`.
-  Verify `--license-count` is a positive integer. Verify `--license-rules`
-  syntax matches the vendor rule format.
+> **Moved verbatim** → [references/error-handling.md](references/error-handling.md) § "Error handling".
+> Load when: a creation, sharing, discovery, alerting, or consumption-update failure occurs.
 
-### Cross-account sharing fails
-- Verify Organizations is all-features enabled. Verify License Manager
-  is a trusted service. Verify the target account/OU exists in the Org.
+## References (load on demand)
 
-### SSM discovery not finding on-premises resources
-- Verify the server is an active SSM managed instance. Verify the SSM
-  inventory association includes `Aws:SoftwareInventory`. Verify
-  `EnableIntegration=true` in discovery settings.
-
-### Violations not being alerted
-- Verify `LicenseRulesEnforce=true`. Verify the EventBridge rule matches
-  `aws.license-manager` source. Verify the SNS topic policy allows
-  EventBridge to publish.
-
-### License consumption not updating
-- Verify the configuration is associated with running resources. For
-  EC2, verify the association via launch template. For SSM, verify
-  inventory is collecting.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — mindset, configuration dependency graph, and recent features moved from this SKILL.md
+- [references/error-handling.md](references/error-handling.md) — error-handling deep dives moved from this SKILL.md
+- [references/license-rules-and-counting.md](references/license-rules-and-counting.md) — counting-type and license-rule deep reference (counting-type heuristic moved into this file)
+- [references/cross-account-and-discovery.md](references/cross-account-and-discovery.md) — Organizations sharing and SSM discovery deep reference (cross-Org and SSM heuristics moved into this file)
 
 ## Domain
 

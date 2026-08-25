@@ -86,27 +86,7 @@ default, ACLs are REQUIRED (no open access), snapshots are
 recommended, and the cluster topology must plan for durability from
 the start.
 
-Three misconceptions dominate MemoryDB misdesign at provisioning time:
-
-- **"MemoryDB is just ElastiCache with a different name."** It is
-  not. ElastiCache is a cache (data is disposable, durability is
-  optional). MemoryDB is a durable database — it writes transactions
-  to a Multi-AZ transaction log before acknowledging, so a node
-  failure does NOT lose committed data. Pricing reflects this
-  (MemoryDB is more expensive per node). Use MemoryDB when the data
-  MUST survive node loss; use ElastiCache when the data is disposable.
-
-- **"Skip ACLs for simplicity."** MemoryDB REQUIRES an ACL — there
-  is no "open" mode. The default `open-access` ACL allows
-  unrestricted access but should NEVER be used in production. Create
-  named users with least-privilege access (read-only for analytics,
-  read-write for the application).
-
-- **"Data tiering is a free lunch."** Data tiering moves
-  infrequently-accessed keys to an SSD tier, lowering cost — but
-  tiered keys have 100x-1000x the access latency of in-memory keys.
-  Enable tiering only for workloads with a clear hot/cold access
-  pattern, not for general use.
+→ Extended Mindset rationale moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -150,79 +130,15 @@ decision on each before the `create-cluster` call.
 
 ## Expert heuristic: effective memory calculator
 
-MemoryDB markets a node type by total memory, but the usable memory
-for application data is significantly less. A baseline model quotes
-the spec-sheet number; this heuristic gives the real figure.
-
-```text
-usable_per_shard = node_memory_bytes × 0.50
-# 50% rule: Redis reserves ~50% for overhead, COPY-on-write fork
-# during snapshot/failover, and the QUERY/Sort buffer.
-
-total_usable = usable_per_shard × number_of_shards
-max_item_size = 512 MB per single value (Redis hard limit)
-
-# With data tiering (r6gd family):
-#   hot_tier  = node_memory × 0.50   (in-memory; sub-ms)
-#   cold_tier = ssd_size × 0.90      (SSD-backed; 100x-1000x latency)
-```
-
-**Concrete example — db.r6g.24xlarge (612.30 GiB nominal):**
-
-| Topology | Calculation | Usable for application data |
-|---|---|---|
-| 3 shards × 1 primary + 1 replica each | 612.30 × 0.50 × 3 | **918.45 GiB** |
-| 5 shards × 1 primary + 1 replica each | 612.30 × 0.50 × 5 | **1530.75 GiB** |
-| 3 shards, data tiering (r6gd, ~612 GiB RAM + ~1224 GiB SSD) | (612.30 × 0.50 × 3) + (1224 × 0.90 × 3) | **4223.25 GiB** |
-
-**Implication:** data tiering roughly 4-5x the usable budget for the
-same node count — but cold-tier access is 100x-1000x slower.
+→ Expert-heuristic deep dive moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Expert heuristic: shard count estimator
 
-MemoryDB cluster mode distributes writes across shards. Each shard is
-a separate primary; the cluster hash-slots data across 16,384 slots.
-The number of shards is the horizontal-write scaling factor.
-
-```text
-required_shards = ceil(sustained_writes_per_sec / (node_write_baseline × 0.60))
-max_shards = 500   # MemoryDB hard limit (250 soft)
-
-# db.r6g.24xlarge baseline: ~100,000 writes/sec per primary
-# Example: 200,000 writes/sec sustained
-# required_shards = ceil(200000 / (100000 × 0.60)) = 4 shards
-
-# For durability, ALWAYS >=1 replica per shard (Multi-AZ failover)
-```
-
-**Why 60%:** MemoryDB baselines are measured with pipelined `SET` on
-small values. Real-world workloads have larger values and non-
-pipelined patterns. 40% headroom is the threshold observed in
-production incident post-mortems.
+→ Expert-heuristic deep dive moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Expert heuristic: failover promotion semantics
 
-A baseline model says "Multi-AZ gives you failover" without
-explaining what gets promoted and how long it takes.
-
-- **Cluster endpoint is stable.** The configuration endpoint always
-  resolves to the cluster; clients route to the correct shard primary
-  via MOVED/ASK redirection.
-- **Failover is per-SHARD.** A 5-shard cluster can have up to 5
-  simultaneous shard failovers during an AZ event.
-- **Promotion time: ~10-30 seconds per shard** (replica promotion +
-  endpoint update).
-- **Data loss window: zero committed transactions.** MemoryDB writes
-  to a Multi-AZ transaction log before acknowledging — a promoted
-  replica sees all committed writes. In-flight writes during the
-  failover window get errors and must be retried.
-- **Multi-AZ requires replicas in a different AZ than the shard's
-  primary.** A single-AZ subnet group silently blocks Multi-AZ.
-
-**Practical implication:** MemoryDB's durability guarantee (zero
-committed-transaction loss on failover) is what distinguishes it from
-ElastiCache. If the workload tolerates data loss on failover,
-ElastiCache is cheaper; if not, MemoryDB is the answer.
+→ Expert-heuristic deep dive moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## Prerequisites (verify before provisioning)
 
@@ -343,34 +259,7 @@ Verify subnet group spans >=2 AZs before `create-cluster`.
 MemoryDB is **VPC-only** — there is no public IP option (like
 ElastiCache). All clusters live inside a VPC.
 
-**Subnet group creation:**
-
-```bash
-aws memorydb create-subnet-group \
-  --subnet-group-name prod-memorydb-subnet \
-  --description "Multi-AZ subnet group for prod MemoryDB" \
-  --subnet-ids subnet-0aaa subnet-0bbb subnet-0ccc \
-  --tags Key=Environment,Value=production
-```
-
-Verify the subnets span >=2 AZs:
-
-```bash
-aws ec2 describe-subnets --subnet-ids subnet-0aaa subnet-0bbb subnet-0ccc \
-  --query 'Subnets[*].AvailabilityZone' --output text
-# Expect at least 2 distinct AZs for Multi-AZ
-```
-
-**Security group rules:**
-
-```bash
-# Inbound: allow the application's SG to reach MemoryDB on port 6379
-aws ec2 authorize-security-group-ingress \
-  --group-id sg-memorydb123 \
-  --protocol tcp \
-  --port 6379 \
-  --source-security-group-id sg-app456
-```
+→ Subnet-group, AZ-verification, and security-group CLI moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
 **NEVER** open port 6379 to `0.0.0.0/0` — even with TLS and ACLs,
 this exposes the cluster to internet scanning. Always scope inbound
@@ -399,26 +288,7 @@ MemoryDB REQUIRES an ACL to control access — there is no "open" mode
 (unlike ElastiCache). The default `open-access` ACL allows
 unrestricted access and should NEVER be used in production.
 
-**Create named users with least-privilege access:**
-
-```bash
-# Create a read-write user for the application
-aws memorydb create-user \
-  --user-name app-rw \
-  --authentication-mode Type=password,Passwords='["SecurePassword123!"]' \
-  --access-string "on ~* +@all"
-
-# Create a read-only user for analytics
-aws memorydb create-user \
-  --user-name analytics-ro \
-  --authentication-mode Type=password,Passwords='["AnalyticsPassword456!"]' \
-  --access-string "on ~* -@all +@read"
-
-# Create an ACL and add the users
-aws memorydb create-acl \
-  --acl-name prod-acl \
-  --user-names app-rw analytics-ro
-```
+→ ACL user/ACL creation CLI moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
 **Attach the ACL at cluster creation via `--acl-name`.**
 
@@ -457,34 +327,7 @@ next reboot (not immediate).
 MemoryDB supports automated snapshots (RDB files) for point-in-time
 recovery.
 
-**Enable automated snapshots at creation:**
-
-```bash
-aws memorydb create-cluster ... \
-  --snapshot-retention-limit 7 \
-  --snapshot-window "03:00-05:00"
-```
-
-- `snapshot-retention-limit`: days to keep automated snapshots (0-35).
-- `snapshot-window`: daily backup window (UTC). Avoid overlap with the
-  maintenance window.
-- Snapshots are stored in S3 (AWS-managed bucket).
-
-**Manual snapshot:**
-
-```bash
-aws memorydb create-snapshot \
-  --cluster-name prod-memorydb \
-  --snapshot-name prod-memorydb-2026-08-05-preupgrade
-```
-
-**Restore from snapshot creates a NEW cluster:**
-
-```bash
-aws memorydb create-cluster \
-  --cluster-name prod-memorydb-restored \
-  --snapshot-arn arn:aws:memorydb:us-east-1:123456789012:snapshot:prod-memorydb-snapshot
-```
+→ Snapshot enable, manual-snapshot, and restore CLI moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
 
 **Common mistake:** setting retention limit to 0 (snapshots
 disabled). For production MemoryDB, set retention 7-35 days.
@@ -519,25 +362,7 @@ Use tiering only for workloads with a clear hot/cold split.
 
 ## Step 10 — Multi-Region / recent features
 
-**Multi-Region MemoryDB (2023-2024):**
-- Cross-region replication with the Multi-Region engine.
-- Writes go to the primary region; secondary regions serve local
-  reads (async; typical lag < 1 second).
-- Each region's cluster has its own node type, encryption, ACL.
-- Use for: cross-region low-latency reads, DR.
-
-**Recent AWS features (2023-2026):**
-- **Data tiering (2022-2023):** SSD-backed cold tier for large
-  datasets. One-way door — enable at creation.
-- **Multi-Region (2023-2024):** Cross-region replication for DR /
-  geo-distributed reads. Each region has its own cluster.
-- **Graviton (r7g) node types (2023-2024):** ~10% better
-  price/performance over r6g. Default to Graviton for new clusters.
-- **Redis 7.x support (2023-2024):** Sharded pub/sub, functions (Lua
-  enhancement), ACL improvements.
-- **TLS-by-default enforcement (2023-2024):** MemoryDB now enforces
-  TLS at-rest + in-transit by default. Disabling requires explicit
-  opt-out and is NOT recommended.
+→ Multi-Region detail and recent AWS features moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -656,35 +481,14 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Cluster name already exists (`ClusterAlreadyExists`)
+→ Error-handling runbooks moved verbatim to [references/error-handling.md](references/error-handling.md).
 
-- If config matches intent: skip to verification, emit READY_TO_DEPLOY.
-- If config differs: mutable settings (node type, shard count, replica
-  count, parameter group, snapshot retention, security groups, ACL)
-  change via `update-cluster`. TLS, data tiering, and VPC/subnet
-  placement CANNOT be changed — those require a new cluster +
-  snapshot/restore.
+## References (load on demand)
 
-### Multi-AZ create fails (`SubnetGroup does not span multiple AZs`)
-
-**Fix:** add subnets in different AZs via `update-subnet-group`, then
-verify distinct `AvailabilityZone` values via `aws ec2 describe-subnets`.
-
-### ACL auth fails (`NOAUTH` from client)
-
-**Fix:** verify the cluster's ACL includes the user via
-`aws memorydb describe-acls`; verify the client sends
-`AUTH <username> <password>` on connect (most modern Redis drivers do
-this automatically when configured with credentials).
-
-### Data tiering enable fails (`DataTiering cannot be enabled`)
-
-Data tiering requires `db.r6gd` AND `--data-tiering=true` at creation.
-A cluster created without tiering CANNOT be tiered later.
-
-**Fix:** create a NEW cluster with `db.r6gd.<size>` and
-`--data-tiering=true`, then migrate via snapshot/restore or
-dual-write cutover.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert-heuristic deep dives (memory calculator, shard estimator, failover semantics), extended Mindset, Multi-Region/recent features
+- [references/error-handling.md](references/error-handling.md) — error-handling runbooks (ClusterAlreadyExists, Multi-AZ subnet span, NOAUTH, DataTiering)
+- [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — copy-pasteable CLI sequence — extended with Steps 4/6/8 CLI from SKILL.md
+- [references/topology-and-tiering.md](references/topology-and-tiering.md) — shard/replica math, tiering detail, sizing pitfalls
 
 ## Domain
 

@@ -308,3 +308,93 @@ resource "aws_managedblockchain_node" "peer" {
 | Delete node | `aws managedblockchain delete-node` |
 | Delete member | `aws managedblockchain delete-member` |
 | Delete network | `aws managedblockchain delete-network` |
+
+---
+
+## Step 5 — Certificate authority enrollment (moved verbatim from SKILL.md)
+
+**Retrieve CA endpoint:**
+
+```bash
+aws managedblockchain get-member \
+  --network-id n-ABCDEFGHIJ1234567 \
+  --member-id m-ABCDEFGHIJ1234567 \
+  --region us-east-1 \
+  --query 'Member.FrameworkAttributes.Fabric.CaEndpoint' --output text
+# Output: ca.m-xxxxxxxxxxxxx.n-xxxxxxxxxxxx.managedblockchain.us-east-1.amazonaws.com:30002
+```
+
+**Download the CA TLS certificate:**
+
+```bash
+aws s3 cp \
+  s3://us-east-1.managedblockchain/etc/managed-blockchain-tls-chain.pem \
+  ./managed-blockchain-tls-chain.pem
+```
+
+**Enroll the admin identity:**
+
+```bash
+fabric-ca-client enroll \
+  -u https://admin:Admin12345!@ca.m-xxxxxxxxxxxxx.n-xxxxxxxxxxxx.managedblockchain.us-east-1.amazonaws.com:30002 \
+  --tls.certfiles ./managed-blockchain-tls-chain.pem \
+  -M ./admin-msp
+```
+
+This produces the admin MSP directory containing the enrollment
+certificate (`cert.pem`), private key (`keystore/`), CA root cert
+(`cacert.pem`), and TLS CA cert (`TLScacert.pem`). This admin cert
+authorizes channel creation, chaincode install, and instantiation.
+
+## Step 6 — Channel creation CLI (moved verbatim from SKILL.md)
+
+```bash
+export CORE_PEER_ADDRESS=nd-xxxxxxxxxxxxx.m-xxxxxxxxxxxxx.n-xxxxxxxxxxxx.managedblockchain.us-east-1.amazonaws.com:30003
+export CORE_PEER_LOCALMSPID=m-ABCDEFGHIJ1234567MSP
+export CORE_PEER_MSPCONFIGPATH=./admin-msp
+export CORE_PEER_TLS_ROOTCERT_FILE=./managed-blockchain-tls-chain.pem
+
+# Generate channel config transaction
+configtxgen -profile OneOrgChannel -channelID supply-chain-channel -outputCreateChannelTx ./channel.tx
+
+# Create the channel
+peer channel create -c supply-chain-channel -f ./channel.tx \
+  -o $ORDERER_ENDPOINT --tls --cafile ./managed-blockchain-tls-chain.pem
+
+# Join the peer to the channel
+peer channel join -b supply-chain-channel.block
+```
+
+## Step 7 — Chaincode lifecycle CLI (moved verbatim from SKILL.md)
+
+**Fabric 1.4 (install + instantiate):**
+
+```bash
+peer chaincode install -n supply-chain-cc -v 1.0 -p github.com/example/supply-chain -l golang
+
+peer chaincode instantiate -n supply-chain-cc -v 1.0 -C supply-chain-channel \
+  -c '{"function":"init","Args":[]}' \
+  -o $ORDERER_ENDPOINT --tls --cafile ./managed-blockchain-tls-chain.pem
+```
+
+**Fabric 2.x (approve + commit — new decentralized lifecycle):**
+
+```bash
+# Package
+peer lifecycle chaincode package supply-chain-cc.tar.gz \
+  --path github.com/example/supply-chain --lang golang --label supply-chain-cc_1.0
+
+# Install
+peer lifecycle chaincode install supply-chain-cc.tar.gz
+
+# Approve for org
+peer lifecycle chaincode approveformyorg -C supply-chain-channel \
+  -n supply-chain-cc -v 1.0 --package-id $PACKAGE_ID --sequence 1 \
+  --tls --cafile ./managed-blockchain-tls-chain.pem
+
+# Commit (after enough orgs approve)
+peer lifecycle chaincode commit -C supply-chain-channel \
+  -n supply-chain-cc -v 1.0 --sequence 1 \
+  --tls --cafile ./managed-blockchain-tls-chain.pem
+```
+

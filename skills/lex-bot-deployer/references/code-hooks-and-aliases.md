@@ -346,3 +346,80 @@ resource "aws_lexv2models_bot_alias" "prod" {
   description = "Production alias"
 }
 ```
+
+## Expert heuristic: Lambda code hook fires between every turn (moved from SKILL.md)
+
+The DIALOG_CODE_HOOK is the dialog manager. It fires after every user
+turn — between slot elicitation, between confirmation, before
+fulfillment. A baseline model wires only FULFILLMENT_CODE_HOOK and
+loses the ability to validate, branch, or skip slots.
+
+```text
+Turn 1: User says "book a flight" → Lex matches BookFlight intent
+  → DIALOG_CODE_HOOK fires (invocationSource = "DialogCodeHook")
+     → Lambda validates, enriches, sets next slot
+  → Lex elicits DepartureCity (priority 1)
+
+Turn 2: User says "San Francisco"
+  → DIALOG_CODE_HOOK fires → Lambda validates city, sets slot
+  → Lex elicits DestinationCity (priority 2)
+
+Final turn: All required slots filled → Lex prompts confirmation
+  → DIALOG_CODE_HOOK fires (user confirmed)
+  → FULFILLMENT_CODE_HOOK fires (invocationSource = "FulfillmentCodeHook")
+     → Lambda performs the action (call API, write DB)
+     → Returns Close action with success message
+```
+
+**Key implication:** treat DIALOG_CODE_HOOK as the validation/branching
+layer and FULFILLMENT_CODE_HOOK as the action layer. Separate them in
+your Lambda by branching on `invocationSource`.
+
+## Expert heuristic: alias enables blue-green bot deployment (moved from SKILL.md)
+
+A Lex V2 alias (resource link) points to exactly one bot version.
+Shifting the alias is the blue-green switch.
+
+```text
+Bot: OrderBot
+  Version 1 (snapshot of DRAFT at 2026-08-01)
+  Version 2 (snapshot of DRAFT at 2026-08-05)
+
+Alias "prod" → Version 1 (live traffic)
+Alias "staging" → Version 2 (QA traffic)
+
+Blue-green rollout:
+  1. Test against staging alias (Version 2)
+  2. update-resource-link → prod alias points to Version 2
+  3. If issue: update-resource-link → prod back to Version 1 (single call)
+
+Channel integrations and runtime clients reference the ALIAS, not the
+version. Shifting the alias atomically shifts all clients.
+```
+
+**Key implication:** NEVER point clients at a specific version. Always
+use an alias. This makes rollback trivial and decouples release from
+deployment.
+
+## lexv2-runtime recognize-text example (moved from SKILL.md)
+
+```bash
+# Send text to the bot (runtime)
+aws lexv2-runtime recognize-text \
+  --bot-id "$BOT_ID" --bot-alias-id "$ALIAS_ID" \
+  --locale-id en-US --session-id "user-1234" \
+  --text "I'd like a large latte"
+```
+
+## Grant Lex permission to invoke the Lambda (moved from SKILL.md)
+
+**Grant Lex permission to invoke the Lambda:**
+
+```bash
+aws lambda add-permission \
+  --function-name OrderCoffeeFulfillment \
+  --statement-id LexInvokePermission \
+  --action lambda:InvokeFunction \
+  --principal lexv2.amazonaws.com \
+  --source-arn "arn:aws:lex:us-east-1:123456789012:bot/$BOT_ID"
+```

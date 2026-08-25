@@ -242,3 +242,49 @@ appropriate tier is simpler.
 - [ ] Test query: verify logs arrive in S3 within 5 minutes of ingest
 - [ ] DLQ configured on the Lambda if Lambda-to-Firehose is used
 - [ ] Cross-account: destination role trusts source account's logs service
+
+## Moved from SKILL.md — Step 6: Configure S3 archival via Kinesis Firehose
+
+Firehose delivery stream creation:
+
+```bash
+aws firehose create-delivery-stream \
+  --delivery-stream-name log-archive-prod \
+  --delivery-stream-type DirectPut \
+  --s3-destination-configuration '{
+    "RoleARN": "arn:aws:iam::111111111111:role/FirehoseS3Role",
+    "BucketARN": "arn:aws:s3:::com-company-log-archive-prod",
+    "Prefix": "firehose/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/",
+    "ErrorOutputPrefix": "errors/!{firehose:error-output-type}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/",
+    "BufferingHints": {
+      "SizeInMBs": 5,
+      "IntervalInSeconds": 300
+    },
+    "CompressionFormat": "GZIP"
+  }' \
+  --region us-east-1
+```
+
+Subscription filter on the log group forwarding to Firehose:
+
+```bash
+aws logs put-subscription-filter \
+  --log-group-name /aws/lambda/compliance-critical-function \
+  --filter-name archive-to-firehose \
+  --filter-pattern "" \
+  --destination-arn "arn:aws:firehose:us-east-1:111111111111:deliverystream/log-archive-prod" \
+  --role-arn "arn:aws:iam::111111111111:role/CWLogsToFirehoseRole" \
+  --region us-east-1
+```
+
+**Key design decisions for the Firehose pipeline:**
+
+| Decision | Recommended | Why |
+|---|---|---|
+| Buffer size | 5 MB | Balances delivery latency vs S3 PUT cost |
+| Buffer interval | 300 seconds (5 min) | Max freshness without excessive API calls |
+| Compression | GZIP | 3-5x compression on log data; Athena-compatible |
+| S3 prefix structure | `year=YYYY/month=MM/day=DD/` | Athena/Hive partitioning for query |
+| Error output prefix | `errors/!{firehose:error-output-type}/...` | Catch delivery failures |
+| S3 lifecycle policy | Glacier after 90d, Deep Archive after 180d | Long-term compliance storage at lowest cost |
+| KMS encryption | SSE-KMS with customer key | Compliance-grade encryption |

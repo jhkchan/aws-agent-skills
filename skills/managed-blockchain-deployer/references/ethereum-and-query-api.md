@@ -237,3 +237,64 @@ aws managedblockchain get-node \
   --query 'Node.Status' --output text
 # Expected: AVAILABLE (after sync completes)
 ```
+
+---
+
+## Step 8 — Ethereum node provisioning CLI (moved verbatim from SKILL.md)
+
+```bash
+NODE_ID=$(aws managedblockchain create-node \
+  --network-id n-ethereum-mainnet \
+  --node-configuration '{
+    "InstanceType": "bc.m5.large",
+    "AvailabilityZone": "us-east-1a",
+    "Framework": "ETHEREUM",
+    "FrameworkConfiguration": {"Ethereum": {}},
+    "LogPublishingConfiguration": {}
+  }' \
+  --region us-east-1 \
+  --query NodeId --output text)
+```
+
+Ethereum networks use predefined IDs (`n-ethereum-mainnet`,
+`n-ethereum-sepolia-testnet`, `n-ethereum-holesky-testnet`). You
+only `create-node` to join.
+
+**Retrieve the JSON-RPC endpoint:**
+
+```bash
+aws managedblockchain get-node \
+  --network-id n-ethereum-mainnet \
+  --node-id $NODE_ID \
+  --region us-east-1 \
+  --query 'Node.FrameworkAttributes.Ethereum.HttpEndpoint' --output text
+```
+
+## Step 9 — Query API CLI examples (moved verbatim from SKILL.md)
+
+**Query a token balance:**
+
+```bash
+aws managedblockchain-query get-token-balance \
+  --chain-id "ETH_MAINNET" \
+  --owner-identifier '{"IdentifierType": "ADDRESS", "Identifier": "0x1234..."}' \
+  --token-identifier '{"Network": "ETHEREUM", "ContractAddress": "0xdac8..."}' \
+  --region us-east-1
+```
+
+**List all token balances for a wallet:**
+
+```bash
+aws managedblockchain-query list-token-balances \
+  --owner-identifier '{"IdentifierType": "ADDRESS", "Identifier": "0x1234..."}' \
+  --chain-id "ETH_MAINNET" --region us-east-1
+```
+
+**Get a transaction:**
+
+```bash
+aws managedblockchain-query get-transaction \
+  --chain-id "ETH_MAINNET" \
+  --transaction-hash "0xabcd1234..." --region us-east-1
+```
+

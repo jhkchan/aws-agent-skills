@@ -334,3 +334,89 @@ resource "aws_lambda_function_url" "public" {
   }
 }
 ```
+
+
+## Expert heuristic: CORS is at the function URL level
+
+CORS for Lambda Function URLs is NOT set on the Lambda function or
+in the handler alone. It is set on the function URL configuration
+via the `--cors` parameter. This is a common provisioning mistake.
+
+```text
+WRONG (does not work alone):
+  - Lambda handler returns Access-Control-Allow-Origin header
+  - Function URL has NO CORS config
+  → Browser preflight (OPTIONS) fails because the function URL
+    does not return CORS headers for preflight
+
+CORRECT:
+  - Function URL config has --cors with allowOrigins, allowMethods,
+    allowHeaders, exposeHeaders, maxAgeSeconds
+  - Lambda handler ALSO returns Access-Control-Allow-Origin in the
+    response (defense in depth)
+  → Browser preflight succeeds (function URL handles OPTIONS with
+    CORS headers); handler response includes CORS headers for the
+    actual response
+```
+
+**Key implication:** always configure CORS at the function URL level
+using the `--cors` parameter. The handler-level CORS header is a
+secondary defense, not the primary CORS mechanism for function URLs.
+
+
+## Step 2 detail: AWS_IAM resource-based policy CLI
+
+**AWS_IAM auth requires a resource-based policy** on the Lambda
+function that grants `lambda:InvokeFunctionUrl` to the intended
+callers:
+
+```bash
+# Add a resource-based policy allowing a principal to invoke the URL
+aws lambda add-permission \
+  --function-name my-function \
+  --statement-id function-url-invoke \
+  --action lambda:InvokeFunctionUrl \
+  --principal arn:aws:iam::111122223333:user/alice \
+  --function-url-auth-type AWS_IAM \
+  --region us-east-1
+```
+
+For cross-account access, set `--principal` to the other account's
+ARN. For service access (e.g., API Gateway, CloudFront), use the
+service principal.
+
+
+## Step 3 detail: CORS create/update CLI (moved from SKILL.md)
+
+**Create a function URL with full CORS:**
+
+```bash
+aws lambda create-function-url-config \
+  --function-name my-function \
+  --auth-type AWS_IAM \
+  --invoke-mode BUFFERED \
+  --cors '{
+    "AllowOrigins": ["https://example.com"],
+    "AllowMethods": ["GET", "POST"],
+    "AllowHeaders": ["content-type", "authorization"],
+    "ExposeHeaders": ["date", "x-request-id"],
+    "MaxAgeSeconds": 86400
+  }' \
+  --region us-east-1
+```
+
+**Update CORS on an existing function URL:**
+
+```bash
+aws lambda update-function-url-config \
+  --function-name my-function \
+  --cors '{
+    "AllowOrigins": ["https://example.com", "https://staging.example.com"],
+    "AllowMethods": ["GET", "POST", "PUT", "DELETE"],
+    "AllowHeaders": ["content-type", "authorization", "x-api-key"],
+    "ExposeHeaders": ["date", "x-request-id", "x-trace-id"],
+    "MaxAgeSeconds": 3600
+  }' \
+  --region us-east-1
+```
+

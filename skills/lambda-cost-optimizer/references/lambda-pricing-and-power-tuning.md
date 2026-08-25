@@ -258,3 +258,26 @@ Right-sizing to 10 provisioned:
   2 × 1 GB × 730 × 3600 × $0.000015 = $78.84/month wasted on idle
   Saving: $867.24/month
 ```
+
+
+## The U-curve math (moved from SKILL.md Step 1)
+
+**The U-curve math:**
+```
+compute_cost = duration_seconds × memory_GB × $0.0000166667
+
+Example: 128 MB at 5 s → $0.0000104/invocation
+         512 MB at 1 s → $0.0000083/invocation (CHEAPER)
+         2048 MB at 0.4 s → $0.0000133/invocation (WORSE)
+```
+
+
+## On-demand vs provisioned pricing comparison (moved from SKILL.md Step 2)
+
+**Pricing comparison:**
+```
+On-demand:          $0.0000166667/GB-second + $0.0000002/request
+Provisioned:        $0.000015/GB-second    + $0.00005/request (250x higher per request)
+                    Bills for full provisioned window regardless of invocations.
+```
+

@@ -437,3 +437,102 @@ resource "aws_cloudfront_distribution" "api_cdn" {
   }
 }
 ```
+
+
+## Step 4 detail: invoke-mode handlers and CLI (moved from SKILL.md)
+
+**BUFFERED handler (Node.js):**
+
+```javascript
+exports.handler = async (event) => {
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ message: "Hello" })
+  };
+};
+```
+
+**RESPONSE_STREAM handler (Node.js):**
+
+```javascript
+exports.handler = awslambda.streamifyResponse(
+  async (event, responseStream, context) => {
+    responseStream.setContentType("text/plain");
+    responseStream.write("First chunk\n");
+    // Simulate incremental work
+    await new Promise(r => setTimeout(r, 100));
+    responseStream.write("Second chunk\n");
+    responseStream.end();
+  }
+);
+```
+
+**Create a function URL with RESPONSE_STREAM:**
+
+```bash
+aws lambda create-function-url-config \
+  --function-name my-streaming-function \
+  --auth-type NONE \
+  --invoke-mode RESPONSE_STREAM \
+  --cors '{"AllowOrigins":["*"],"AllowMethods":["GET","POST"]}' \
+  --region us-east-1
+```
+
+
+## Step 10 detail: custom domain via CloudFront (moved from SKILL.md)
+
+```text
+Client → CloudFront (custom domain: api.example.com)
+       → Origin: https://<id>.lambda-url.<region>.on.aws/
+       → Lambda function URL → Lambda handler
+```
+
+**CloudFront distribution for a function URL:**
+
+```bash
+# Create a CloudFront distribution with the function URL as origin
+aws cloudfront create-distribution \
+  --origin-domain-name "abc123def456.lambda-url.us-east-1.on.aws" \
+  --default-cache-behavior '{
+    "TargetOriginId": "lambda-url-origin",
+    "ViewerProtocolPolicy": "redirect-to-https",
+    "TrustedSigners": {"Enabled": false, "Quantity": 0},
+    "ForwardedValues": {
+      "QueryString": true,
+      "Cookies": {"Forward": "none"},
+      "Headers": {"Quantity": 0}
+    },
+    "MinTTL": 0,
+    "DefaultTTL": 0,
+    "MaxTTL": 0
+  }' \
+  --enabled \
+  --region us-east-1
+```
+
+**Critical considerations for CloudFront + function URL:**
+- Set `DefaultTTL=0` (no caching) unless the function returns
+  cacheable content.
+- Enable query string forwarding (`QueryString: true`) if the
+  handler reads query parameters.
+- For AWS_IAM auth function URLs, CloudFront cannot natively sign
+  requests. Use NONE auth + CloudFront WAF + application-level auth,
+  or use a Lambda@Edge / CloudFront Function to sign requests.
+- For custom domain TLS, attach an ACM certificate to the CloudFront
+  distribution.
+- CloudFront adds latency (an extra hop) but provides edge caching,
+  DDoS protection, and custom domain support.
+
+**Attach a custom domain (ACM + CloudFront):**
+
+```bash
+# Request an ACM certificate (us-east-1 required for CloudFront)
+aws acm request-certificate \
+  --domain-name api.example.com \
+  --validation-method DNS \
+  --region us-east-1
+
+# After validation, associate the certificate with CloudFront
+# (done via CloudFront distribution update)
+```
+

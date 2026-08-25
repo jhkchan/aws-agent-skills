@@ -79,40 +79,8 @@ raise the timeout only as a stopgap; they identify the budget consumer.
 
 ## Philosophy
 
-Five behaviours separate a senior Lambda engineer from a generalist on
-timeout incidents:
-
-- **The init phase has its own wall clock, separate from the handler's.**
-  Lambda measures init (runtime startup, module load, static
-  initialisers) and invoke (handler execution) against the same Timeout
-  budget. On a cold start the service kills the function at the
-  configured Timeout even if the kill happens during init — the handler
-  never runs, no application logs appear, and operators chase "function
-  returns no logs" instead of "init exceeded the budget."
-
-- **The SDK retry multiplier is the most under-diagnosed timeout cause.**
-  AWS SDK v3 (Node) and boto3 (Python) ship with `maxRetries: 3` and
-  exponential backoff. A transiently slow downstream (throttled DynamoDB,
-  rate-limited API) consumes 3x the per-call latency before the function
-  gives up. Operators who "raise the timeout" without checking SDK
-  `maxRetries` keep paying the multiplier on every invocation.
-
-- **Hyperplane ENIs eliminated VPC cold-start latency in 2019.** The
-  AWS re:Invent 2019 announcement moved VPC-attached Lambda to shared
-  Hyperplane ENIs. Pre-2019 runbooks ("VPC attachment adds 10s cold
-  start") are wrong; VPC-attached cold starts now add 100-500 ms.
-
-- **Step Functions has its own timeout that fires BEFORE Lambda's.** A
-  `Task` state with `TimeoutSeconds: 30` fails the execution at 30 s
-  with `States.Timeout` even if the Lambda function's configured Timeout
-  is 60 s. The Lambda keeps running and may succeed, leaving the Step
-  Functions execution failed with no Lambda-side error.
-
-- **API Gateway returns 504 before Lambda's timeout on sync invokes.**
-  REST APIs and HTTP APIs cap at 29 s — both hard caps, not configurable.
-  A Lambda with Timeout:60s invoked synchronously via API Gateway
-  receives a 504 at 29s from the caller while the function continues
-  for another 31 s and may succeed.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Philosophy — five senior behaviours".
+> Load when: calibrating judgement before probing — init wall clock, SDK retry multiplier, hyperplane ENIs, Step Functions vs Lambda, API Gateway 29 s.
 
 ## Quick reference — timeout triage table
 
@@ -135,35 +103,8 @@ timeout incidents:
 
 ### Pre-flight commands
 
-```bash
-# 1. Function configuration
-aws lambda get-function-configuration \
-  --function-name <name-or-arn> --qualifier <alias-or-version> --output json
-
-# 2. Duration and InitDuration metrics
-aws cloudwatch get-metric-statistics --namespace AWS/Lambda \
-  --metric-name Duration \
-  --dimensions Name=FunctionName,Value=<name> \
-  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 60 --statistics Average,p99,p99.9,Maximum --output json
-
-aws cloudwatch get-metric-statistics --namespace AWS/Lambda \
-  --metric-name MemoryUtilization \
-  --dimensions Name=FunctionName,Value=<name> \
-  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Average,Maximum --output json
-
-# 3. Recent timeouts with surrounding context
-aws logs filter-log-events \
-  --log-group-name /aws/lambda/<name> \
-  --start-time $(date -d '-30 minutes' +%s)000 \
-  --filter-pattern '"Task timed out"' --output json
-
-# 4. X-Ray trace for the slowest invocations
-aws xray get-trace-summaries \
-  --service-name <name> --start-time $(date -d '-30 minutes' +%s) \
-  --end-time $(date +%s) --response-time --output json
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Pre-flight commands".
+> Load when: running live-account probes — function config, Duration/Memory metrics, timeout logs, X-Ray traces.
 
 If the input is malformed (missing FunctionName, absent symptom, no
 REPORT log line or Duration metric), emit INSUFFICIENT_DATA with the
@@ -178,42 +119,8 @@ without a failing probe that matches the symptom.**
 
 ### Step 0: Non-obvious behaviours that change timeout diagnosis
 
-- **The configured `Timeout` covers init AND invoke.** On a cold start
-  the init phase counts against the same budget. A Java function with
-  `InitDuration: 4500 ms` and `Timeout: 5000 ms` has only 500 ms of
-  invoke budget.
-
-- **SnapStart eliminates the init phase wall-clock cost.** With SnapStart
-  enabled (Java 11/17/21), init runs once at version-publish time; cold
-  starts restore from snapshot in 50-200 ms. SnapStart is the FIRST fix
-  for any Java init-phase timeout.
-
-- **The SDK retry multiplier is invisible without log inspection.** AWS
-  SDK v3 logs retries at `INFO` as `"Retrying request ... attempt N of
-  M"`. Without SDK logging enabled, the function appears to hang on a
-  single call; in reality, it made 3 attempts with backoff.
-
-- **`requestTimeout` and `connectTimeout` are different knobs.** In
-  AWS SDK v3, `requestTimeout` is per HTTP attempt; `connectTimeout` is
-  the TCP handshake budget. In axios, `timeout` is the entire request
-  budget but `connect` is separate.
-
-- **Provisioned concurrency init has its own failure mode.** When
-  provisioned concurrency can't initialise N environments, spillover
-  invocations fall through to on-demand — every spillover is a cold
-  start. Watch `ProvisionedConcurrencySpilloverInvocations`.
-
-- **OOM can fire before timeout on memory-proportional workloads.** A
-  function near MemorySize when killed shows `Duration ≈ Timeout` AND
-  `MemoryUtilization: 100`. The layer is TIMEOUT_OOM_BEFORE_TIMEOUT,
-  not TIMEOUT_CONFIG.
-
-- **Step Functions `Task.TimeoutSeconds` defaults to 60 and is
-  per-attempt.** A `Task` with `Retry: [{MaxAttempts: 2}]` has the
-  TimeoutSeconds budget per attempt, not total.
-
-- **API Gateway's 29 s cap is on the integration, not the method.** The
-  Lambda continues to its own Timeout; API Gateway discards the response.
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Step 0: Non-obvious behaviours".
+> Load when: the symptom is ambiguous — init-vs-invoke budget, SnapStart, retry multiplier, connect/request timeouts, spillover, OOM masking.
 
 ### Step 1: Symptom entry — pick the diagnostic branch
 
@@ -233,15 +140,8 @@ without a failing probe that matches the symptom.**
 
 ### Step 2: TIMEOUT_CONFIG vs TIMEOUT_DOWNSTREAM
 
-```bash
-aws lambda get-function-configuration --function-name <name> --output json | \
-  jq '{Timeout, MemorySize, Runtime}'
-aws cloudwatch get-metric-statistics --namespace AWS/Lambda \
-  --metric-name Duration \
-  --dimensions Name=FunctionName,Value=<name> \
-  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 60 --statistics p99,p99.9,Maximum --output json
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Step 2 probe commands".
+> Load when: running the live probe for this branch.
 
 Decision rule:
 - `p99` and `Maximum` both ≈ `Timeout` on every invocation → TIMEOUT_CONFIG
@@ -256,15 +156,8 @@ Decision rule:
 Symptom: TaskTimeoutException with ZERO application log lines on cold
 starts. Warm invocations succeed. `InitDuration` is high.
 
-```bash
-aws logs filter-log-events \
-  --log-group-name /aws/lambda/<name> \
-  --filter-pattern '"Init Duration"' \
-  --start-time $(date -d '-1 hour' +%s)000 --output json
-
-aws lambda get-function-configuration --function-name <name> --output json | \
-  jq '{SnapStart: .SnapStart, Runtime, MemorySize}'
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Step 3 probe commands".
+> Load when: running the live probe for this branch.
 
 | Function profile | Verdict / fix |
 |---|---|
@@ -277,12 +170,8 @@ aws lambda get-function-configuration --function-name <name> --output json | \
 Symptom: bursty timeouts correlated with traffic peaks. Logs contain
 "Retrying request ... attempt N of M" before the kill.
 
-```bash
-aws logs filter-log-events \
-  --log-group-name /aws/lambda/<name> \
-  --start-time $(date -d '-1 hour' +%s)000 \
-  --filter-pattern '"Retrying request"' --output json
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Step 4 probe commands".
+> Load when: running the live probe for this branch.
 
 AWS SDK v3 default is `maxRetries: 3`. With exponential backoff, worst-
 case wall clock is `(maxRetries + 1) × requestTimeout + sum(backoff)`.
@@ -300,12 +189,8 @@ Fixes:
 Symptom: last log line is an outbound HTTP call (`axios.get`, `fetch`,
 `requests.get`) then nothing. Function hangs on a dead or slow host.
 
-| Client | Default connect timeout | Default request timeout |
-|---|---|---|
-| Node `axios` | none (TCP default ~75s on Linux) | none |
-| Node `fetch` (undici) | none | none |
-| Python `requests` | none (system default) | none |
-| Python `httpx` | 5s | none |
+> **Moved verbatim** → [references/sdk-retry-and-client-timeout-reference.md](references/sdk-retry-and-client-timeout-reference.md) § "HTTP client default timeouts".
+> Load when: diagnosing TIMEOUT_HTTP_CLIENT — per-client connect/read default matrix.
 
 **Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: TIMEOUT_HTTP_CLIENT`.
 
@@ -323,9 +208,8 @@ requests.get(url, timeout=(0.5, 3.0))
 Symptom: last log line is "Connecting to DB" / "Connection acquired"
 then nothing. DB itself is healthy (low CPU, low load).
 
-```bash
-aws rds describe-db-proxies --output json
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Step 6 probe commands".
+> Load when: running the live probe for this branch.
 
 If no RDS Proxy exists and the function opens a new connection per
 invocation (outside module scope), each invocation pays 200-1500 ms for
@@ -342,10 +226,8 @@ Symptom: Step Functions execution fails with `States.Timeout` on a
 `Task` invoking Lambda. The Lambda's own CloudWatch shows Duration <
 Timeout (it completed) OR Duration ≈ Step Functions TimeoutSeconds.
 
-```bash
-aws stepfunctions describe-state-machine \
-  --state-machine-arn <arn> --output json | jq '.definition'
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Step 7 probe commands".
+> Load when: running the live probe for this branch.
 
 `Task.TimeoutSeconds` (default 60) fires at the configured value
 regardless of the Lambda function's own `Timeout`.
@@ -360,12 +242,8 @@ Fix: align `Task.TimeoutSeconds ≥ Lambda Timeout + 5s`, OR use
 Symptom: client receives 504 from API Gateway; Lambda's own logs show
 the function completed successfully at, e.g., 35 s.
 
-| Caller | Hard cap | Tunable? |
-|---|---|---|
-| API Gateway REST API | 29 s | No |
-| API Gateway HTTP API | 29 s | No |
-| ALB | 60 s default | Yes (1-4000 s) |
-| Step Functions | per `Task.TimeoutSeconds` | Yes |
+> **Moved verbatim** → [references/init-phase-and-caller-timeout-reference.md](references/init-phase-and-caller-timeout-reference.md) § "Caller-side hard caps".
+> Load when: diagnosing TIMEOUT_ASYNC_APIGW or TIMEOUT_STEP_FUNCTIONS_MISMATCH — caller cap matrix.
 
 **Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: TIMEOUT_ASYNC_APIGW`.
 
@@ -377,16 +255,8 @@ immediately; OR break work into smaller Step Functions tasks under 29 s.
 Symptom: invocations to a provisioned-concurrency alias intermittently
 time out at init. `ProvisionedConcurrencySpilloverInvocations` > 0.
 
-```bash
-aws lambda list-provisioned-concurrency-configs \
-  --function-name <name> --output json
-
-aws cloudwatch get-metric-statistics --namespace AWS/Lambda \
-  --metric-name ProvisionedConcurrencySpilloverInvocations \
-  --dimensions Name=FunctionName,Value=<name>,Name=Resource,Value=<alias> \
-  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Sum --output json
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Step 9 probe commands".
+> Load when: running the live probe for this branch.
 
 **Verdict:** ROOT_CAUSE_IDENTIFIED, `LAYER: TIMEOUT_PROV_CONCURRENCY_INIT`.
 
@@ -398,13 +268,8 @@ reduce image size (container).
 Symptom: `Duration ≈ Timeout` AND `MaxMemoryUsed ≈ MemorySize` on the
 same invocations. The OOM killer fires before the timeout SIGKILL.
 
-```bash
-aws cloudwatch get-metric-statistics --namespace AWS/Lambda \
-  --metric-name MemoryUtilization \
-  --dimensions Name=FunctionName,Value=<name> \
-  --start-time $(date -d '-1 hour' +%FT%TZ) --end-time $(date +%FT%TZ) \
-  --period 300 --statistics Maximum --output json
-```
+> **Moved verbatim** → [references/diagnostic-commands.md](references/diagnostic-commands.md) § "Step 10 probe commands".
+> Load when: running the live probe for this branch.
 
 If `MemoryUtilization: 100` correlates with timeouts, the layer is
 `TIMEOUT_OOM_BEFORE_TIMEOUT`. Fix: raise `MemorySize` first (also
@@ -552,72 +417,15 @@ mismatch) appear in `examples/README.md`.
 
 ## Remediation guidance
 
-### For TIMEOUT_CONFIG — timeout too low
+> **Moved verbatim** → [references/advanced-patterns.md](references/advanced-patterns.md) § "Remediation guidance".
+> Load when: the verdict is known — per-layer fix commands and guardrails.
 
-```bash
-aws lambda update-function-configuration --function-name <name> \
-  --timeout <new> --profile <p>
-```
-Range: 1-900 seconds. For operations > 29 s, consider async invocation.
+## References (load on demand)
 
-### For TIMEOUT_DOWNSTREAM — downstream slow
-
-- DynamoDB: switch to on-demand or raise WriteCapacityUnits.
-- S3: multipart upload for large objects; check bucket region.
-- RDS: add RDS Proxy; check max_connections; slow queries.
-- External HTTP: client-side retry with explicit connect/read timeouts.
-
-### For TIMEOUT_INIT_PHASE
-
-- Java 11/17/21: enable SnapStart and publish a new version.
-- Non-Java: raise MemorySize; defer heavy module loads to first invoke.
-- Container: reduce image size below 500 MB compressed.
-
-### For TIMEOUT_SDK_RETRY_STORM
-
-```javascript
-const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const client = new DynamoDBClient({ maxAttempts: 0 });
-```
-```python
-from botocore.config import Config
-config = Config(retries={'max_attempts': 0})
-client = boto3.client('dynamodb', config=config)
-```
-
-### For TIMEOUT_HTTP_CLIENT
-
-```javascript
-await axios.get(url, { timeout: 3000 });
-```
-```python
-requests.get(url, timeout=(0.5, 3.0))
-```
-
-### For TIMEOUT_DB_CONNECTION
-
-Add RDS Proxy; move connection to module scope; use Aurora Serverless v2.
-
-### For TIMEOUT_STEP_FUNCTIONS_MISMATCH
-
-Align `Task.TimeoutSeconds ≥ Lambda Timeout + 5s`. Or use
-`.waitForTaskToken` for long-running async work.
-
-### For TIMEOUT_ASYNC_APIGW
-
-Move to async invocation (Event type); break work into smaller tasks.
-
-### For TIMEOUT_PROV_CONCURRENCY_INIT
-
-Raise provisioned concurrency; enable SnapStart (Java); reduce image size.
-
-### For TIMEOUT_OOM_BEFORE_TIMEOUT
-
-```bash
-aws lambda update-function-configuration --function-name <name> \
-  --memory-size <new> --profile <p>
-```
-Target ≥ 20% headroom over observed `MaxMemoryUsed`.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight and per-step probe commands moved from this SKILL.md
+- [references/advanced-patterns.md](references/advanced-patterns.md) — philosophy, Step-0 non-obvious behaviours, and remediation guidance moved from this SKILL.md
+- [references/init-phase-and-caller-timeout-reference.md](references/init-phase-and-caller-timeout-reference.md) — init-phase budgets and caller-side timeout caps (caller-cap table moved into this file)
+- [references/sdk-retry-and-client-timeout-reference.md](references/sdk-retry-and-client-timeout-reference.md) — SDK retry multiplier maths and HTTP client timeout defaults (client-default table moved into this file)
 
 ## Domain
 

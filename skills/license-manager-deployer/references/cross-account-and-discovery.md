@@ -309,3 +309,46 @@ resource "aws_licensemanager_cross_account" "shared" {
   })
 }
 ```
+
+## Expert heuristic: cross-Org distribution via Organizations (moved from SKILL.md)
+
+```text
+Cross-account license sharing flow:
+  1. Organization exists with ALL features enabled
+     aws organizations describe-organization --query 'Organization.FeatureSet'
+     → Must be "ALL" (not "CONSOLIDATED_BILLING")
+  2. License Manager is a trusted service
+     aws organizations enable-aws-service-access \
+       --service-principal license-manager.amazonaws.com
+  3. (Recommended) Delegated administrator
+     aws organizations register-delegated-administrator \
+       --account-id <delegated-acct> \
+       --service-principal license-manager.amazonaws.com
+  4. License configuration shared cross-account
+     aws license-manager create-license-configuration-cross-account \
+       --license-configuration-arn arn:aws:license-manager:... \
+       --target-organization-structure '{"OrganizationalUnits":["ou-xxx"]}'
+  5. Target accounts receive the share (automatic for OU-shared)
+  6. Target accounts associate the config with their resources
+```
+
+**Key implication:** Without steps 1-3, step 4 fails. The Organizations
+enablement is a prerequisite, not an option.
+
+## Expert heuristic: SSM managed instance discovery (moved from SKILL.md)
+
+For EC2, the license configuration is associated at launch. For on-
+premises or SSM-managed instances, SSM inventory is the discovery
+mechanism.
+
+```text
+SSM discovery flow:
+  1. On-prem server activated as SSM managed instance (mi-xxxx)
+  2. SSM Inventory association collects software data
+     aws ssm create-association --name AWS-InventoryManagement ...
+  3. License Manager reads SSM inventory to discover software
+  4. Consumption tracked against license count
+```
+
+**Key implication:** without SSM inventory, on-premises resources are
+invisible to License Manager.
