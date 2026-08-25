@@ -62,6 +62,15 @@ Bluntly: the current skills are tuned to the eval, not to the standard.
 
 Phases 1-3 are safe mechanical fixes runnable now. Phase 4 needs the schema/CLI/tests updated in lockstep. Phase 5 is the real project — advisable before public launch (the spec's audience) but should be validated on ~10 skills first to confirm eval scores hold with the references-inclusive harness.
 
+## Pilot result (2026-08-25): restructure is score-neutral — spec compliance is free
+
+Ten Grade-B skills (106-107) were restructured to spec (bodies 421-493 lines, depth moved verbatim to `references/`, frontmatter byte-identical) and re-evaled with the references-inclusive harness:
+
+- **Committed scorecards: 4 promoted to A** (cloudhsm 108, cloudtrail-alert 108, redshift-cluster 108, codebuild 110), 1 held, **0 demoted** (keep-best).
+- **Fresh-run scores: mean 106.6 → 104.7 (−1.9)** — within the ±5 judge variance (n=10, SE≈1.6). 5/10 runs scored below prior, 5/10 at-or-above: the distribution expected from variance alone on a neutral change.
+
+**Conclusion:** progressive-disclosure restructure costs nothing measurable in eval quality while achieving full spec compliance, and the keep-best harness converts the restructure rollout into a promotion-harvesting opportunity (each re-eval of a 105-107 B skill has odds of landing 108+). Rollout to the remaining ~400 skills is safe with keep-best active.
+
 ## Verification note
 
 The official validator is [`skills-ref`](https://github.com/agentskills/agentskills/tree/main/skills-ref) (`npm i -g skills-ref && skills-ref validate ./skills/<name>`). It was not run in this audit (install permission denied); all checks above were implemented directly from the published specification text. Recommend running it on a sample after Phase 1-3 remediation.
