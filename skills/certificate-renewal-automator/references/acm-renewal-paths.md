@@ -190,3 +190,48 @@ aws acm-pca update-certificate-authority \
 | Cert expired despite managed renewal | Cert was orphaned at renewal time | `InUseBy` was empty during 60-day window |
 | SAN cert renewal blocked | One SAN domain validation CNAME missing | Check CNAME for each SAN domain individually |
 | PCA cert renewal failed | CA is not ACTIVE or CA CRL/OCSP misconfigured | Verify CA status and CRL configuration |
+
+## Custom renewal pipeline — Lambda implementation (Step 4)
+
+```python
+import boto3, time
+acm = boto3.client('acm')
+route53 = boto3.client('route53')
+
+def renew_certificate(domain_name, hosted_zone_id):
+    # Request new cert
+    response = acm.request_certificate(
+        DomainName=domain_name, ValidationMethod='DNS',
+        IdempotencyToken=f'renewal-{int(time.time())}',
+        Tags=[{'Key':'ManagedBy','Value':'cert-renewal-automator'}])
+    cert_arn = response['CertificateArn']
+
+    # Add DNS validation CNAME
+    cert = acm.describe_certificate(CertificateArn=cert_arn)['Certificate']
+    for opt in cert.get('DomainValidationOptions', []):
+        cname = opt.get('ResourceRecord', {})
+        if cname:
+            route53.change_resource_record_sets(
+                HostedZoneId=hosted_zone_id,
+                ChangeBatch={'Changes': [{'Action': 'UPSERT', 'ResourceRecordSet': {
+                    'Name': cname['Name'], 'Type': cname['Type'], 'TTL': 300,
+                    'ResourceRecords': [{'Value': cname['Value']}]
+                }}]})
+    # Wait for validation
+    waiter = acm.get_waiter('certificate_validated')
+    waiter.wait(CertificateArn=cert_arn)
+    return cert_arn
+```
+
+## Appendix A — Renewal eligibility matrix
+
+| Cert type | Validation | Attached | Managed renewal | Action |
+|---|---|---|---|---|
+| Public ACM | DNS | ALB/NLB/CF/API GW | Yes | Verify ELIGIBLE |
+| Public ACM | DNS | Orphaned | No | Re-associate or custom |
+| Public ACM | Email | Supported | Yes (email approval) | Migrate to DNS |
+| Imported | N/A | Any | No | Manual re-import |
+| PCA via ACM | DNS | ALB/NLB/API GW | Yes (CA active) | Verify CA health |
+| PCA-exported | N/A | On-prem/IoT | No | Manual issue+export |
+
+See **references/acm-renewal-paths.md** for full CLI references.

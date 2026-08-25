@@ -170,3 +170,49 @@ Resources:
 | Fleet consistency + auto-onboard new accounts | Pattern 2 (StackSet) | Member-side budgets |
 | Cross-account tag-based cost tracking | Pattern 3 (tag in payer) | Requires tag activation |
 | Fleet-wide hard lock on breach | Pattern 4 (SCP at OU) | Use with care; affects all members |
+
+## Step 11 — Multi-account via Organizations Payer (CLI walkthrough) (moved from SKILL.md)
+
+For fleet-wide budget enforcement, deploy budgets from the Payer
+account:
+
+```bash
+# In the Payer account — budget per LinkedAccount
+aws budgets create-budget \
+  --account-id <payer-account-id> \
+  --budget '{
+    "BudgetName": "team-alpha-prod-budget",
+    "BudgetLimit": {"Amount": "50000", "Unit": "USD"},
+    "TimeUnit": "MONTHLY",
+    "BudgetType": "COST",
+    "CostFilters": {
+      "LinkedAccount": ["111111111111"]
+    }
+  }'
+```
+
+For per-member-account enforcement (budget lives in each member):
+
+```bash
+# StackSet deployment
+aws cloudformation create-stack-set \
+  --stack-set-name budget-per-member \
+  --template-body file://budget-template.yaml \
+  --permission-model SERVICE_MANAGED \
+  --capabilities CAPABILITY_IAM \
+  --auto-deployment 'Enabled=true,RetainStacksOnAccountRemoval=false'
+
+aws cloudformation create-stack-instances \
+  --stack-set-name budget-per-member \
+  --deployment-targets 'OrganizationalUnitIds=["ou-abc-123def456"]' \
+  --regions us-east-1
+```
+
+**Multi-account scoping techniques:**
+
+| Technique | Scope | Use case |
+|---|---|---|
+| `CostFilters: LinkedAccount` in payer | Single member | Per-team budget, payer-side enforcement |
+| StackSet to OU | All members in OU | Standard budget per account |
+| SCP at the OU level on breach | All members in OU | Fleet-wide hard lock |
+| Tag-based budget in payer | Cross-account tag scope | "All prod resources across all accounts" |

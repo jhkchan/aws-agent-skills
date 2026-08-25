@@ -279,3 +279,46 @@ Latency improvement: p95 drops from 5,800 ms to ~800 ms (Haiku is faster for sim
 ```
 
 **Step 6 — Emit the output block:** (see the first worked example above)
+
+## Response length control math (moved from SKILL.md)
+
+**Worked example:**
+```
+Without max_tokens:
+  Average output: 800 tokens × $0.015/1k (Sonnet output) = $0.012/invocation
+  1M invocations/month = $12,000/month on output
+
+With max_tokens=200 + "Answer concisely in JSON":
+  Average output: 150 tokens × $0.015/1k = $0.00225/invocation
+  1M invocations/month = $2,250/month on output
+  Saving: $9,750/month (81%)
+```
+
+## Output block template (moved from SKILL.md)
+
+```text
+TARGET: <model-id or workload-name>
+VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
+REASON: <1-2 sentences naming the recommendation and the supporting data>
+RECOMMENDATION:
+  Current: <model>, <input tokens/invocation>, <output tokens/invocation>, <invocations/month>
+  Proposed: <model>, <projected input tokens>, <projected output tokens>, <invocations/month>
+  Dimensions changed: <model | caching | batch | response_length | fine_tune | guardrails | throughput>
+  Dimensions checked: <list ALL seven, each ✓ (no finding) or → (finding)>
+  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
+ESTIMATED_SAVINGS:
+  Current monthly: $<amount>
+    input tokens: <count> × $<rate>/1k = $<amount>
+    output tokens: <count> × $<rate>/1k = $<amount>
+    guardrails: $<amount>
+    KB: $<amount>
+  Projected monthly: $<amount>
+  Monthly saving: $<amount>    ← MUST equal Current − Projected, 2 decimals
+  Annual saving: $<amount>     ← MUST equal Monthly × 12
+MIGRATION_STEPS:
+  1. <specific action with CLI command>
+  2. <verification step>
+CONFIRM: Before executing any state-changing CLI, emit and await operator
+  approval: "CONFIRM: About to <action> on <model/workload> in <region>.
+  Proceed? (yes/no)"
+```

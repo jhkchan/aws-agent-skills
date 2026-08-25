@@ -61,52 +61,13 @@ recommendation with exact CLI commands.
 
 ## Quick start
 
-- **Model selection is the #1 lever.** Claude Haiku is ~60x cheaper
-  per token than Opus and handles the majority of production workloads
-  (classification, extraction, simple Q&A, summarisation). Route only
-  complex reasoning tasks to Sonnet or Opus. A blanket Opus policy is
-  the single most expensive Bedrock mistake.
-- **Cost formula (memorise this):**
-  `monthly_cost = (input_tokens × input_price_per_1k) + (output_tokens × output_price_per_1k)`
-  Where input and output prices differ by model (see pricing reference).
-- **Prompt caching saves up to 90% on repeated context.** If a system
-  prompt or knowledge context is reused across invocations, cache it.
-  Cache hits cost ~10% of the normal input token rate. TTL is 5 minutes
-  default, 1 hour maximum.
-- **Batch inference gives 50% discount.** For non-latency-sensitive
-  workloads (document processing, dataset generation, bulk classification),
-  use the Bedrock Batch API instead of real-time InvokeModel.
-- **Output tokens cost 3-5x more than input tokens.** Across Claude and
-  Nova families, output token pricing is 3-5x the input rate. Reducing
-  output length via max_tokens, stop sequences, or structured output
-  has a disproportionate cost impact.
+Five headline rules and the cost formula moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for the condensed first-read orientation before classifying a workload.
 
 ## Mindset
 
-Bedrock cost optimization is a model-and-context decision, not a pure
-infrastructure exercise. The goal is the cheapest model + context strategy
-that preserves output quality — not the most powerful model applied
-uniformly to every call.
-
-Four principles guide every recommendation:
-
-- **The model hierarchy is a cost ladder.** Opus > Sonnet > Haiku in
-  both capability and price. Most production traffic should land on
-  Haiku or Nova Micro/Lite; reserve Sonnet/Opus for the minority of
-  calls that genuinely require deep reasoning. Model routing (routing
-  simple queries to Haiku, complex ones to Sonnet) captures both tiers.
-- **Prompt caching amortises repeated context.** System prompts,
-  knowledge base context, and few-shot examples are re-sent on every
-  invocation. Caching turns a $5,000/month input token bill into
-  $500/month for the cached portion.
-- **Batch shifts the pricing model.** Batch inference is 50% cheaper
-  but adds latency (minutes to hours). It is ideal for offline
-  workloads and eliminates throttling concerns.
-- **Output is more expensive than input.** A model that produces
-  verbose 1,000-token responses costs 3-5x more than one that produces
-  200-token responses for the same input. Response length control is
-  a pure cost lever with no quality trade-off when structured output
-  is acceptable.
+Mindset principles moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when explaining why model selection dominates the other dimensions.
 
 ## Quick reference — verdict thresholds
 
@@ -129,60 +90,20 @@ Optimization decisions are only as good as the underlying data. Pull
 these metrics before any recommendation. Full CLI in
 `references/bedrock-pricing-and-token-metrics.md`.
 
-**Required data sources** (summarized — see reference for full CLI):
-1. Model list and access: `aws bedrock list-foundation-models`
-2. InputTokenCount + OutputTokenCount (14-30 day window): `aws cloudwatch get-metric-statistics --namespace AWS/Bedrock`
-3. InvocationCount + InvocationLatency: same namespace
-4. Cost Explorer spend: `aws ce get-cost-and-usage --filter Service=Bedrock`
-5. Prompt caching config: `aws bedrock get-prompt` or inspect application code
-6. Guardrails: `aws bedrock list-guardrails`, `aws bedrock get-guardrail`
-7. Batch jobs: `aws bedrock list-model-invocation-jobs`
+Pre-flight data-source command list moved verbatim to [references/bedrock-pricing-and-token-metrics.md](references/bedrock-pricing-and-token-metrics.md).
+Load on demand when wiring live-account data collection before an optimization decision.
 
 ### Data-quality short-circuits
 
-| Condition | Effect on optimization |
-|---|---|
-| `InputTokenCount` metric absent (no invocations in window) | **NEED_MORE_INFO**. Verify model is being invoked; skip until traffic exists. |
-| `InvocationCount` Sum = 0 over 14 days | Emit **OPTIMIZED** with note "dormant model — no spend." |
-| Observation window < 14 days | **NEED_MORE_INFO**. Minimum 14 days; 30 days preferred. |
-| Cost Explorer shows $0 but CloudWatch shows invocations | Free tier or billing delay. Use token-based cost estimate instead. |
-| `ThrottledInvocationCount` > 1% of InvocationCount | Throughput-limited; consider provisioned throughput (Step 7) or batch (Step 3). |
-| Model not in `list-foundation-models` (access denied) | Model not enabled in region. `aws bedrock get-foundation-model --model-identifier <id>` to check. |
-
-When CloudWatch and Cost Explorer disagree, Cost Explorer is the source
-of truth for actual spend; CloudWatch token counts drive optimization modeling.
+Data-quality short-circuit table moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when CloudWatch or Cost Explorer data is missing, stale, zero, or contradictory.
 
 ## Process — Optimization logic (apply in order)
 
 ### Step 0: Non-obvious behaviours that change the recommendation
 
-These operational gotchas route a recommendation away from the obvious:
-- **Output tokens cost 3-5x more than input tokens.** Across Claude
-  models, output is ~5x the input rate; across Nova, ~3x. A model that
-  halves output length saves more than one that halves input length.
-- **Prompt caching has a write premium.** The first invocation populates
-  the cache at ~1.25x the normal input rate; cache hits serve at ~0.1x.
-  Net positive only if the cache is hit > 2x within the TTL window.
-- **Cache TTL is 5 minutes default, 1 hour maximum.** Low-traffic
-  workloads may not hit the cache before it expires. Evaluate cache hit
-  rate before assuming savings.
-- **Batch API has a completion SLA of hours, not seconds.** Do not
-  migrate real-time or interactive workloads to batch.
-- **Fine-tuning has a one-time training cost.** Amortise across expected
-  invocation volume to determine break-even vs few-shot.
-- **Guardrails charge per processed token.** Applying guardrails to both
-  input and output doubles the overhead. Narrow to output-only where
-  possible.
-- **Knowledge Base retrieval adds vector store cost.** Bedrock KB backed
-  by OpenSearch Serverless incurs OCU charges regardless of query volume.
-  For low-volume RAG, this can exceed the model invocation cost.
-- **Provisioned throughput requires a time commitment.** Underutilisation
-  is wasted spend; overestimating traffic is costly.
-- **Embedding model selection matters for RAG cost.** Titan Embed Text
-  v2 is cheaper per token than Cohere Embed.
-- **Model routing adds latency.** A Haiku classifier routing to Sonnet
-  adds one extra invocation. Net positive only when most queries stay
-  on Haiku.
+Step 0 expert-knowledge deep dive (output-token pricing, cache write premium and TTL, batch SLA, fine-tune cost, guardrail scope, KB vector cost, embedding choice, routing latency) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when a recommendation hinges on an operational gotcha.
 
 ### Step 1: Model selection (the #1 lever)
 
@@ -191,29 +112,8 @@ between model tiers is massive — Haiku is ~60x cheaper than Opus per
 token. Downgrading a model that is over-provisioned for the task is the
 single highest-impact optimization.
 
-**Model cost hierarchy (us-east-1, 2026, approximate per 1K tokens):**
-
-```
-Input token pricing (per 1K tokens):
-  Claude Opus:       $0.01500
-  Claude Sonnet:     $0.00300
-  Claude Haiku:      $0.00025
-  Nova Pro:          $0.00080
-  Nova Lite:         $0.00006
-  Nova Micro:        $0.000035
-
-Output token pricing (per 1K tokens):
-  Claude Opus:       $0.07500
-  Claude Sonnet:     $0.01500
-  Claude Haiku:      $0.00125
-  Nova Pro:          $0.00320
-  Nova Lite:         $0.00024
-  Nova Micro:        $0.00014
-
-Ratio (Haiku vs Opus):
-  Input:  $0.00025 / $0.01500 = 60x cheaper
-  Output: $0.00125 / $0.07500 = 60x cheaper
-```
+Full per-1K token pricing hierarchy moved verbatim to [references/bedrock-pricing-and-token-metrics.md](references/bedrock-pricing-and-token-metrics.md).
+Load on demand when computing per-model savings math.
 
 **Task-to-model routing matrix:**
 
@@ -233,17 +133,8 @@ Ratio (Haiku vs Opus):
 | Haiku | Already on cheapest capable model | — | No model finding |
 | Any | Quality regression after downgrade (user reports, eval scores drop > 5%) | Revert | Do NOT downgrade |
 
-**Model routing pattern:** For mixed-complexity workloads, route via
-a lightweight Haiku classifier:
-
-```
-User query → Haiku classifier →
-  ├── "simple" → Haiku (handles query directly)
-  └── "complex" → Sonnet or Opus (handles query)
-```
-
-This adds one Haiku invocation per query but moves 70-80% of traffic
-to the cheapest tier. Net positive when simple-query rate > 50%.
+Haiku-classifier routing pattern moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when designing mixed-complexity model routing.
 
 ### Step 2: Prompt caching (reduce input cost by 90%)
 
@@ -263,55 +154,11 @@ portion.
 | System prompt changes per user or per session | NO (cache misses) |
 | Invocation rate < 1 per 5 minutes | NO (cache expires before reuse) |
 
-**Pricing math:**
-```
-Without caching:
-  cached_portion_tokens × $input_rate_per_1k / 1000 × invocations_per_month
+Prompt-caching pricing math moved verbatim to [references/bedrock-pricing-and-token-metrics.md](references/bedrock-pricing-and-token-metrics.md).
+Load on demand when estimating cache savings.
 
-With caching (assuming 90% cache hit rate):
-  First write: cached_portion_tokens × $input_rate × 1.25 (write premium) × cache_writes_per_month
-  Cache hits: cached_portion_tokens × $input_rate × 0.10 × cache_hits_per_month
-
-Example: 2,000-token system prompt, 1M invocations/month, Claude Sonnet ($0.003/1k input):
-  Without:   2,000 × $0.003/1000 × 1,000,000 = $6,000/month
-  With:      write: 2,000 × $0.003/1000 × 1.25 × ~12,000 (cache writes) = $90/month
-             hits:  2,000 × $0.003/1000 × 0.10 × 988,000 = $592/month
-             total: ~$682/month
-  Saving:    $5,318/month (89%)
-```
-
-**CLI to enable prompt caching:**
-
-Prompt caching is configured at the application layer by setting the
-`cache_point` in the invoke request. Via the AWS SDK:
-
-```python
-import boto3
-client = boto3.client('bedrock-runtime')
-response = client.invoke_model(
-    modelId='anthropic.claude-3-5-sonnet-20241022-v2:0',
-    body=json.dumps({
-        "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 1024,
-        "system": [
-            {
-                "type": "text",
-                "text": "<2,000-token system prompt>",
-                "cache_control": {"type": "ephemeral"}
-            }
-        ],
-        "messages": [{"role": "user", "content": "query"}]
-    })
-)
-```
-
-Or via Bedrock Prompt Management:
-
-```bash
-aws bedrock create-prompt \
-  --name "cached-support-bot" \
-  --default-variant '{"modelId": "anthropic.claude-3-5-sonnet-20241022-v2:0", ...}'
-```
+Prompt-caching enablement CLI (Python SDK cache_control + Prompt Management) moved verbatim to [references/bedrock-pricing-and-token-metrics.md](references/bedrock-pricing-and-token-metrics.md).
+Load on demand when wiring cache_control into the invoke body.
 
 ### Step 3: Batch inference (50% discount)
 
@@ -332,24 +179,8 @@ invocation.
 | Real-time API endpoint | NO |
 | Streaming responses required | NO |
 
-**Pricing comparison:**
-```
-Real-time InvokeModel:
-  input_tokens × $input_rate + output_tokens × $output_rate
-
-Batch (CreateModelInvocationJob):
-  input_tokens × $input_rate × 0.50 + output_tokens × $output_rate × 0.50
-  (50% discount on both input and output)
-```
-
-**CLI to create a batch job:**
-```bash
-aws bedrock create-model-invocation-job \
-  --job-name "bulk-summarisation" \
-  --model-id "anthropic.claude-3-haiku-20240307-v1:0" \
-  --input-data-config '{"s3InputDataConfig": {"s3Uri": "s3://my-bucket/input/"}}' \
-  --output-data-config '{"s3OutputDataConfig": {"s3Uri": "s3://my-bucket/output/"}}'
-```
+Batch pricing comparison and create-model-invocation-job CLI moved verbatim to [references/bedrock-pricing-and-token-metrics.md](references/bedrock-pricing-and-token-metrics.md).
+Load on demand when migrating a workload to batch.
 
 **Batch completion time:** Typically minutes to hours depending on
 dataset size. The job runs asynchronously and writes results to S3.
@@ -368,17 +199,8 @@ is a direct cost saving with no infrastructure change.
 | Structured output (tool use) | Force JSON/array format instead of prose | 30-70% on output cost |
 | Prompt engineering ("Answer in 2 sentences") | Instruct model to be concise | 20-50% on output cost |
 
-**Worked example:**
-```
-Without max_tokens:
-  Average output: 800 tokens × $0.015/1k (Sonnet output) = $0.012/invocation
-  1M invocations/month = $12,000/month on output
-
-With max_tokens=200 + "Answer concisely in JSON":
-  Average output: 150 tokens × $0.015/1k = $0.00225/invocation
-  1M invocations/month = $2,250/month on output
-  Saving: $9,750/month (81%)
-```
+Response-length worked math moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when sizing a max_tokens / structured-output saving.
 
 ### Step 5: Fine-tuning vs few-shot
 
@@ -387,20 +209,8 @@ output quality but add input token cost on every invocation. Fine-
 tuning absorbs those examples into the model weights, allowing a
 cheaper base model to achieve the same quality.
 
-**Break-even analysis:**
-```
-Few-shot cost (monthly):
-  few_shot_tokens × $input_rate × invocations_per_month
-
-Fine-tune cost (one-time):
-  training_job_hours × $training_rate_per_hour + training_tokens × $training_token_rate
-
-Fine-tune serving cost (monthly):
-  fine_tuned_model_input_rate × invocations_per_month
-  (typically same as base model rate; fine-tuned models do NOT cost more per token on Bedrock)
-
-Break-even month = fine_tune_one_time_cost / (few_shot_monthly_cost - fine_tune_serving_monthly_cost)
-```
+Break-even formulas moved verbatim to [references/bedrock-pricing-and-token-metrics.md](references/bedrock-pricing-and-token-metrics.md).
+Load on demand when deciding fine-tune vs few-shot.
 
 **Decision gate:**
 
@@ -413,29 +223,14 @@ Break-even month = fine_tune_one_time_cost / (few_shot_monthly_cost - fine_tune_
 
 ### Step 6: Guardrails and Knowledge Base overhead
 
-**Guardrails cost model:**
-```
-Per invocation: guardrail processes input and/or output tokens.
-Guardrail rate (us-east-1, 2026): ~$0.001/1k tokens processed
-
-If applied to BOTH input and output:
-  overhead = (input_tokens + output_tokens) × $0.001/1k
-
-If applied to OUTPUT ONLY:
-  overhead = output_tokens × $0.001/1k (50% reduction)
-```
+Guardrails cost model moved verbatim to [references/bedrock-pricing-and-token-metrics.md](references/bedrock-pricing-and-token-metrics.md).
+Load on demand when scoping guardrail overhead.
 
 **Recommendation:** Apply guardrails to output only unless input
 filtering is a compliance requirement. Output-only halves the overhead.
 
-**Knowledge Base cost model:**
-```
-Per query: embedding_cost + vector_store_query_cost + model_invocation_cost
-
-OpenSearch Serverless OCU: ~$400/month minimum (0.5 ingestion + 0.5 search)
-  < 10k queries/month: OCU dominates → consider Pinecone or Neptune Analytics
-  > 100k queries/month: model invocation dominates → OCU amortised
-```
+Knowledge Base vector-store cost model moved verbatim to [references/bedrock-pricing-and-token-metrics.md](references/bedrock-pricing-and-token-metrics.md).
+Load on demand when costing a low-volume RAG workload.
 
 ### Step 7: Provisioned throughput vs on-demand
 
@@ -496,32 +291,8 @@ every `NEED_MORE_INFO` gate.
 
 ## Output format
 
-```text
-TARGET: <model-id or workload-name>
-VERDICT: OPTIMIZED | FURTHER_OPTIMIZATION_AVAILABLE
-REASON: <1-2 sentences naming the recommendation and the supporting data>
-RECOMMENDATION:
-  Current: <model>, <input tokens/invocation>, <output tokens/invocation>, <invocations/month>
-  Proposed: <model>, <projected input tokens>, <projected output tokens>, <invocations/month>
-  Dimensions changed: <model | caching | batch | response_length | fine_tune | guardrails | throughput>
-  Dimensions checked: <list ALL seven, each ✓ (no finding) or → (finding)>
-  Confidence: <HIGH/MEDIUM/LOW> — <one-line rationale>
-ESTIMATED_SAVINGS:
-  Current monthly: $<amount>
-    input tokens: <count> × $<rate>/1k = $<amount>
-    output tokens: <count> × $<rate>/1k = $<amount>
-    guardrails: $<amount>
-    KB: $<amount>
-  Projected monthly: $<amount>
-  Monthly saving: $<amount>    ← MUST equal Current − Projected, 2 decimals
-  Annual saving: $<amount>     ← MUST equal Monthly × 12
-MIGRATION_STEPS:
-  1. <specific action with CLI command>
-  2. <verification step>
-CONFIRM: Before executing any state-changing CLI, emit and await operator
-  approval: "CONFIRM: About to <action> on <model/workload> in <region>.
-  Proceed? (yes/no)"
-```
+Output block template moved verbatim to [references/worked-examples.md](references/worked-examples.md). The STRICT output contract below is the authoritative copy kept in SKILL.md.
+Load on demand when rendering the raw output shape.
 
 Full worked examples (model downgrade, prompt caching, batch migration,
 already-optimal, NEED_MORE_INFO, and end-to-end walkthrough) are in
@@ -697,24 +468,8 @@ Extended anti-patterns and error-handling tables in `references/bedrock-pricing-
 
 ## Recent AWS features (2024-2026)
 
-- **Bedrock Prompt Caching (2024-2025):** Caches prompt prefixes to
-  reduce input token cost by up to 90%. Configured via `cache_control`
-  in the invoke body. TTL 5 minutes default, 1 hour maximum.
-- **Bedrock Batch API (2024):** `CreateModelInvocationJob` processes
-  large datasets at 50% discount. Input/output via S3. Async completion.
-- **Bedrock Guardrails (2024-2025):** Content filtering, denied topics,
-  PII redaction. Charges per processed token. Input-only, output-only,
-  or both.
-- **Bedrock Knowledge Bases (2024-2025):** Managed RAG with OpenSearch
-  Serverless, Pinecone, or Neptune Analytics vector stores.
-- **Nova Model Family (2024-2025):** Amazon Nova Micro, Lite, Pro,
-  Premier. Micro/Lite competitive with Haiku on price for simpler tasks.
-- **Bedrock Model Evaluation (2024-2025):** `CreateEvaluationJob` for
-  comparing model outputs on custom datasets. Validates downgrades.
-- **Provisioned Throughput (2024-2025):** Committed-use discount for
-  high-volume models. Hourly to monthly terms.
-- **Titan Embed Text v2 (2024-2025):** Cheaper embedding model for RAG
-  ingestion. Lower per-token rate than Cohere Embed.
+Recent AWS features 2024-2026 (prompt caching, batch API, guardrails, KB, Nova, model evaluation, provisioned throughput, Titan Embed v2) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when checking feature availability windows.
 
 ## References
 
@@ -726,6 +481,13 @@ Extended anti-patterns and error-handling tables in `references/bedrock-pricing-
 - `references/worked-examples.md` — full worked examples (Opus-to-Haiku
   downgrade with caching, prompt caching enable, batch migration, response
   length control, already-optimal, NEED_MORE_INFO, end-to-end walkthrough).
+
+## References (load on demand)
+
+- [references/bedrock-pricing-and-token-metrics.md](references/bedrock-pricing-and-token-metrics.md) — pricing tables and token-metric CLI; now also holds the pre-flight data-source commands, model cost hierarchy, prompt-caching pricing math and CLI, batch pricing/CLI, fine-tune break-even analysis, and Guardrails/KB cost models moved from SKILL.md.
+- [references/worked-examples.md](references/worked-examples.md) — full worked examples; now also holds the response-length-control math and the output block template moved from SKILL.md.
+- [references/error-handling.md](references/error-handling.md) — data-quality short-circuits (missing metrics, dormant model, short window, CE disagreement) moved from SKILL.md.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — quick-start headline rules, mindset, Step 0 non-obvious behaviours, Haiku routing pattern, and Recent AWS features 2024-2026 moved from SKILL.md.
 
 ## Domain
 

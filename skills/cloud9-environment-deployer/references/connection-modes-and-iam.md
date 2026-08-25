@@ -272,3 +272,35 @@ resource "aws_cloud9_environment_ec2" "dev" {
   }
 }
 ```
+
+## Misconception — "Cloud9 needs SSH access (port 22 ingress) to work"
+
+- **"Cloud9 needs SSH access (port 22 ingress) to work."** NOT with SSM
+  connection mode. SSM (Systems Manager) connection uses the SSM agent
+  on the EC2 instance to establish a secure tunnel via AWS backbone —
+  NO inbound security group rule, NO public SSH key, NO bastion host
+  needed. This is the recommended connection mode for security and
+  simplicity. SSH connection mode is the legacy default and requires
+  port 22 ingress + a key pair.
+
+## Expert heuristic: SSM connection eliminates inbound rules
+
+A baseline model says "open port 22 for SSH." The correct heuristic
+recognizes that SSM connection mode is the modern, secure default that
+requires NO inbound security group rules.
+
+```text
+SSH connection mode (legacy):
+  └── Requires: key pair + security group with port 22 ingress + public subnet
+      Risk: port 22 exposed (even to a CIDR); key pair management overhead
+
+SSM connection mode (recommended):
+  └── Requires: SSM agent (pre-installed on AL2/Ubuntu) + instance profile with AmazonSSMManagedInstanceCore
+      No key pair needed; no inbound rule needed; works in private subnets
+      Connection via AWS backbone (not public internet)
+```
+
+**Key implication:** SSM connection mode is more secure (no exposed
+ports), simpler (no key pair management), and more flexible (works in
+private subnets without a bastion). Use SSM unless there is a specific
+reason for SSH (e.g., external SSH client access).

@@ -267,3 +267,13 @@ done
 4. **Circular dependencies between nested stacks:** not allowed. If
    StackA references StackB and StackB references StackA, deployment
    fails. Design a linear or tree dependency graph.
+
+## Misconception — "validate-template is enough"
+
+- **"validate-template is enough."** It is not. `validate-template`
+  checks syntax and basic resource specification compliance against
+  the CloudFormation API. It does NOT catch logical errors (e.g.,
+  circular dependencies, impossible conditions), security anti-
+  patterns (wildcard IAM, unencrypted resources), or cost surprises.
+  cfn-lint catches structural/logical issues. cfn-nag catches
+  security issues. Both are needed in addition to validate-template.

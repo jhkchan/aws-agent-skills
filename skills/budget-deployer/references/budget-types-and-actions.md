@@ -150,3 +150,19 @@ positives — console "dismiss" does not train the model.
 **Production default:** all `Include*` true, `UseBlended=false`,
 `UseAmortized=false`. This matches the invoice total — operators can
 reconcile alert thresholds against the monthly bill.
+
+## Step 9 — Cost filter common patterns (moved from SKILL.md)
+
+(See Step 2 for the full CostFilters reference.) Common patterns:
+
+| Pattern | CostFilters JSON |
+|---|---|
+| Payer-wide budget (no filter) | omit `CostFilters` |
+| Per linked account | `{"LinkedAccount": ["123456789012"]}` |
+| EC2 only | `{"Service": ["Amazon Elastic Compute Cloud - Compute"]}` |
+| Production-tagged resources | `{"TagKeyValue": ["Environment$production"]}` |
+| Multi-region | `{"Region": ["US East (N. Virginia)", "EU (Ireland)"]}` |
+| RI spend only | `{"PurchaseType": ["Reserved Instances"]}` |
+
+Always verify dimension values before deploying:
+`aws ce get-dimension-values --dimension SERVICE --time-period ...`.

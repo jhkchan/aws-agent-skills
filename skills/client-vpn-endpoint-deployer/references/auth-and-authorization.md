@@ -258,3 +258,25 @@ resource "aws_ec2_client_vpn_authorization_rule" "allow_all" {
   authorize_all_groups   = true
 }
 ```
+
+## Expert heuristic: mutual TLS certificate-based auth revocation
+
+With mutual TLS, client certificates are issued by a CA registered in
+ACM. Revoking a client certificate requires uploading a CRL
+(Certificate Revocation List) to the endpoint — there is no
+per-certificate revoke API.
+
+```text
+Mutual TLS auth flow:
+  1. Server certificate (ACM) → endpoint (server side)
+  2. Client certificates signed by same CA → distributed to clients
+  3. To revoke: generate CRL, upload via import-client-vpn-client-certificate-revocation-list
+
+  aws ec2 import-client-vpn-client-certificate-revocation-list \
+    --client-vpn-endpoint-id cvpn-xxx \
+    --certificate-revocation-list file://crl.pem
+```
+
+**Key implication:** plan for certificate lifecycle management. For
+large fleets, SAML federation is often simpler than managing
+individual client certificates and CRLs.

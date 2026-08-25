@@ -230,3 +230,61 @@ aws cloudwatch get-metric-statistics --namespace AWS/CloudFront \
   --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
   --period 300 --statistics Average --output json
 ```
+
+
+
+---
+
+## Step 0: distribution discovery commands (moved from SKILL.md)
+
+```bash
+aws cloudfront list-distributions \
+  --query 'DistributionList.Items[*].{id:Id,domain:DomainName,aliases:Aliases.Items,enabled:Enabled}' \
+  --output json
+
+aws cloudfront get-distribution-config --id <distribution-id> \
+  --query 'DistributionConfig.DefaultCacheBehavior.{target:TargetOriginId,cachePolicy:CachePolicyId,lam:LambdaFunctionAssociations,ttl:DefaultTTL}' \
+  --output json
+```
+
+
+---
+
+## Diagnostic command quick reference (moved from SKILL.md)
+
+```bash
+# Distribution config — cache behaviors, policies, origins, WAF
+aws cloudfront get-distribution-config --id <id> \
+  --query 'DistributionConfig.{origins:Origins.Items,behaviors:CacheBehaviors.Items,default:DefaultCacheBehavior,webACL:WebACLId}' \
+  --output json
+
+# Cache policy details (the cache key definition)
+aws cloudfront get-cache-policy --id <cache-policy-id> \
+  --query 'CachePolicy.CachePolicyConfig.{ttl:{min:MinTTL,def:DefaultTTL,max:MaxTTL},params:ParametersInCacheKeyAndForwardedToOrigin}' \
+  --output json
+
+# Recent invalidations
+aws cloudfront list-invalidations --distribution-id <id> \
+  --query 'InvalidationList.Items[*].{id:Id,status:Status,paths:InvalidationBatch.Paths.Items}' \
+  --output json
+
+# CloudFront metrics — CacheHitRate
+aws cloudwatch get-metric-statistics --namespace AWS/CloudFront \
+  --metric-name CacheHitRate \
+  --dimensions Name=DistributionId,Value=<id> \
+  --start-time $(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ) \
+  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  --period 3600 --statistics Average --output json
+
+# Test caching — request twice, check x-cache
+curl -sI https://<distribution-domain>/path | grep -iE 'x-cache|age|cache-control'
+curl -sI https://<distribution-domain>/path | grep -iE 'x-cache|age|cache-control'
+
+# Test origin directly (bypass CloudFront)
+curl -sI https://<origin-domain>/path | grep -iE 'cache-control|expires|pragma|set-cookie'
+
+# Lambda@Edge functions on the behavior
+aws cloudfront get-distribution-config --id <id> \
+  --query 'DistributionConfig.DefaultCacheBehavior.LambdaFunctionAssociations.Items[*].{type:EventType,arn:LambdaFunctionARN}' \
+  --output json
+```

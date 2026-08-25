@@ -262,3 +262,50 @@ of distribution region. Period: 1 minute (high-resolution) or 1 hour
 - WAF pricing: https://aws.amazon.com/waf/pricing/
 - Shield Advanced pricing: https://aws.amazon.com/shield/pricing/
 - CloudFront Security Savings Bundle: https://aws.amazon.com/cloudfront/security-savings-bundle/
+
+
+
+---
+
+## Deep reference: CloudFront pricing and limit cheat sheet (moved from SKILL.md)
+
+### Price Class pricing tiers (us-east-1 baseline, 2026)
+
+| Price Class | Regions covered | HTTPS req (first 10T) | Egress (first 10TB) |
+|---|---|---|---|
+| PriceClass_100 | US, Canada, Europe | $0.225/M | $0.085/GB |
+| PriceClass_200 | + India, Middle East, Africa | $0.270/M | $0.120/GB |
+| PriceClass_All | + South America, Australia, APAC | $0.285/M (US/EU) / $0.330/M (APAC) | $0.140/GB (APAC) |
+
+Pricing is billed at the edge location that SERVES the request. A
+PriceClass_All distribution with APAC viewers pays APAC rates on
+those requests; the same distribution with PriceClass_100 serves
+those viewers from US/EU edges at US/EU rates (with higher latency).
+
+### CloudFront quota reference (2026)
+
+| Quota | Default | Adjustability |
+|---|---|---|
+| Distributions per account | 200 | Soft (request increase) |
+| Cache behaviors per distribution | 25 | Soft |
+| Origins per distribution | 50 | Soft |
+| Cache policies per account | 20 | Hard |
+| Origin request policies per account | 20 | Hard |
+| CloudFront Functions per account | 100 | Soft |
+| Lambda@Edge function associations per distribution | 100 (across all 4 event types) | Hard |
+| Origin Shield regions | 1 per distribution | Hard (pick one) |
+| WAF Web ACLs per account (CLOUDFRONT scope) | 50 | Soft |
+
+### Lambda@Edge vs CloudFront Functions decision matrix
+
+| Capability | CloudFront Functions | Lambda@Edge |
+|---|---|---|
+| Runtime | JavaScript subset | Node.js, Python |
+| Memory | 2 MB | 128 MB default, up to 10 GB |
+| Wall-clock limit | 1 ms | 5-30 seconds (varies by event type) |
+| External HTTP calls | No | Yes |
+| File system access | No | Yes (/tmp) |
+| Execution location | CloudFront edge (100+ locations) | Regional edge cache (sub-set of edges) |
+| Pricing | $1.00/M invocations (flat) | $0.60/M invocations + $0.0000166667 per GB-second |
+| Use cases | Header manipulation, URL rewrites, token generation, simple auth, A/B routing | SSR, complex auth with external API, response generation, large data transforms |
+| Migration effort (from Lambda@Edge) | Rewrite in JS subset, re-test | n/a |

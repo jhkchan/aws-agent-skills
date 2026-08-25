@@ -95,88 +95,8 @@ REMEDIATION: Retrieve the canonical config with `aws cloudfront get-distribution
 
 ### Step 0: Expert knowledge — non-obvious CloudFront behaviors that change classification
 
-These behaviors are easy to misjudge without operational CloudFront experience.
-Each changes a verdict if ignored:
-
-- **TLSv1.2_2021 vs TLSv1.2_2019 is a cipher-suite difference, not a protocol
-  difference.** Both policies negotiate TLS 1.2+, but `_2021` removes all CBC-mode
-  ciphers, keeping only AEAD suites (GCM). `TLSv1.2_2019` still permits
-  `ECDHE-RSA-AES128-SHA256` (CBC), which is vulnerable to padding-oracle
-  variants under specific conditions. The threshold for INSECURE_TLS is anything
-  below `TLSv1.2_2021`. A policy of `TLSv1.2_2018` or `TLSv1.2_2019` looks
-  "TLS 1.2" but silently includes weak ciphers. Do NOT treat TLSv1.2_2019 as
-  acceptable — the year suffix is the cipher policy, not the TLS version.
-
-- **ViewerProtocolPolicy `redirect-to-https` still accepts the initial HTTP
-  request.** The 301 redirect happens server-side after CloudFront receives the
-  request. The request URL (including query parameters) travels over HTTP
-  before the redirect. For strict environments (PII in query strings, tokens in
-  URLs), `https-only` is the only policy that rejects HTTP at the edge.
-  `redirect-to-https` is acceptable for most workloads but flag the distinction.
-
-- **OriginProtocolPolicy `match-viewer` propagates the viewer's protocol to the
-  origin.** If the viewer connected over HTTP (before a redirect-to-https), and
-  the origin protocol is `match-viewer`, CloudFront connects to the origin over
-  HTTP too. This double-exposure (viewer AND origin on HTTP) is why
-  `match-viewer` on custom origins is classified as INSECURE_TLS, not
-  CONFIG_GAP.
-
-- **OAC vs OAI is not cosmetic.** Origin Access Control (OAC) replaced Origin
-  Access Identity (OAI) in 2022. OAC supports SSE-KMS (OAI does not — OAI
-  cannot pass the KMS Decrypt permission, breaking encrypted S3 origins). OAC
-  also supports IPv6. An S3 origin with OAI but no OAC on an SSE-KMS bucket
-  silently fails (403 Access Denied on object GETs). The presence of OAI does
-  NOT satisfy the OAC requirement — it is a legacy mechanism that should be
-  migrated. However, OAI does keep the bucket private, so it is classified as
-  CONFIG_GAP (should migrate), not NO_OAC (bucket is public).
-
-- **S3 website endpoint as origin forces a public bucket.** The S3 website
-  endpoint (`bucket.s3-website-us-east-1.amazonaws.com`) serves content only
-  if the bucket has public read access — it bypasses S3 access policies
-  entirely. Using it as a CloudFront origin means the bucket is publicly
-  listable and readable. This is categorically different from the S3 REST
-  endpoint, which works with OAC/OAI and private buckets. Always classify a
-  website-endpoint origin as INSECURE_TLS (Step 4) — the remediation is to
-  switch to the REST endpoint and configure OAC.
-
-- **CloudFront WAF Web ACLs must be in us-east-1.** CloudFront is a global
-  service, but the associated Web ACL must exist in us-east-1. A Web ACL in
-  any other region cannot be associated. This is an AWS hard constraint, not
-  a best practice. When verifying WAF association in a live account, check
-  `aws wafv2 list-web-acls --scope CLOUDFRONT --region us-east-1` — the
-  `CLOUDFRONT` scope only exists in us-east-1.
-
-- **WebACLId field stores the ARN for WAFv2.** Even when using WAFv2 (not
-  WAF Classic), the distribution config field is named `WebACLId` and contains
-  the full Web ACL ARN (`arn:aws:wafv2:us-east-1:...:webacl/name/id`). An
-  empty string means no WAF is associated. Do not confuse `WebACLId: ""`
-  with "WAFv2 not supported" — it simply means no association.
-
-- **Default root object absence leaks S3 listings.** If `DefaultRootObject`
-  is empty and the origin is S3, a request to the distribution root path
-  returns the S3 XML bucket listing (in REST mode) or the website index
-  (in website mode). The REST listing exposes object keys, sizes, and last-
-  modified timestamps — an information disclosure that aids enumeration
-  attacks. Set `DefaultRootObject` to `index.html` (or equivalent) even if
-  the distribution serves only API paths.
-
-- **CloudFront access logging requires a bucket ACL grant.** The logging
-  target bucket must grant WRITE and READ_ACP permissions to the
-  `awslogsdelivery` account canonical ID. CloudFront does not use bucket
-  policies for log delivery — it uses ACLs. A bucket with ACLs disabled
-  (BucketOwnerEnforced) will silently reject logs. This is the most common
-  cause of "logging enabled but no logs appearing."
-
-- **Field-level encryption is deprecated.** Removed in 2024. Any distribution
-  still referencing a field-level encryption profile is relying on a
-  decommissioned feature. Flag as a CONFIG_GAP and recommend CloudFront
-  Functions for request-body encryption.
-
-- **TrustedKeyGroups empty does not always mean no access control.** Signed
-  URLs/cookies require trusted key groups OR trusted signers (legacy). An
-  empty list means no signed-URL protection on the cache behavior — but only
-  flag this if the content is intended to be access-controlled (paywalled,
-  authenticated). Public content does not need signed URLs.
+Step 0 expert knowledge (cipher-suite year suffixes, redirect-to-https caveat, match-viewer exposure, OAC vs OAI, website endpoints, us-east-1 WAF, WebACLId ARN, root-object listings, log-delivery ACLs, FLE deprecation, TrustedKeyGroups) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand before classifying any dimension.
 
 ### Step 1: Viewer protocol policy (TLS exposure to the viewer)
 
@@ -363,35 +283,8 @@ REMEDIATION:
 
 ## Edge-case handling
 
-- **Partially malformed config.** If the config JSON parses but individual
-  sections are missing (e.g., `Origins` exists but `DefaultCacheBehavior` is
-  absent), classify the available dimensions and emit an ERROR note for the
-  missing section. Do NOT classify the entire distribution as ERROR when only
-  one dimension is unparseable.
-
-- **Multiple cache behaviors.** Only the **default** cache behavior's
-  `ViewerProtocolPolicy` drives the verdict. Path-specific cache behaviors
-  may have tighter policies, but the default behavior applies to all paths
-  that do not match a pattern — it is the broadest exposure surface.
-
-- **Multiple S3 origins.** Audit each origin independently. If ANY S3 origin
-  lacks OAC, the distribution verdict is NO_OAC (or worse). A single exposed
-  origin compromises the entire distribution.
-
-- **Distribution with both S3 and custom origins.** Evaluate each origin by
-  its type — S3 origins go through Steps 4-5, custom origins go through Step 3.
-  Both findings contribute to the aggregate verdict.
-
-- **ACM certificate in non-us-east-1 region.** Note as a deployment risk but
-  do not change the verdict. CloudFront will reject the association at deploy
-  time; this finding surfaces the issue before the operator attempts deployment.
-
-- **Real-time logging vs standard logging.** `Logging.Enabled` covers standard
-  access logging. Real-time logging is configured separately
-  (`DistributionConfig.RealtimeLogConfigArn`). If real-time logging is
-  configured but standard logging is disabled, note that real-time logging
-  is present but do not flag the CONFIG_GAP — real-time logging satisfies the
-  visibility requirement.
+Edge-case catalog (partial configs, multi-behavior, multi-origin, mixed origins, ACM region, real-time vs standard logging) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when the distribution shape is non-trivial.
 
 ## Anti-Patterns — NEVER
 
@@ -460,154 +353,24 @@ REMEDIATION:
 
 ## Pre-flight safety checks (run before any remediation CLI)
 
-- **MANDATORY CONFIRMATION GATE.** Before any state-changing operation
-  (update-distribution, associate-web-acl, create-origin-access-control),
-  the auditor MUST emit:
-  `CONFIRM: About to <action> on distribution <id> in account <account>.
-  This affects <consequence>. Proceed? (yes/no)`
-  Do NOT execute the CLI command until the operator confirms. Distribution
-  changes propagate globally — a misconfiguration affects every edge location.
-- Confirm the distribution exists and is accessible:
-  `aws cloudfront get-distribution-config --id <id> --profile <p>` — fail
-  closed (skip remediation) if it returns an error.
-- Capture the current distribution config for rollback:
-  `aws cloudfront get-distribution-config --id <id> --output json >
-  /tmp/<id>-config-backup-$(date +%s).json` BEFORE any modification.
-  Distribution configs are versioned via ETag, but there is no automatic
-  rollback — the ETag is required for the update call.
-- Before changing `MinimumProtocolVersion`, verify that no legacy clients
-  require TLS 1.0/1.1. Some embedded devices, legacy POS terminals, or
-  older Java runtimes cannot negotiate TLS 1.2+. Coordinate with application
-  owners before enforcing TLSv1.2_2021.
-- Before creating OAC and updating the origin, prepare the S3 bucket policy
-  update simultaneously. OAC without the bucket policy update breaks all
-  object access; the bucket policy without OAC is inert.
-- Before associating a Web ACL, verify it exists in us-east-1 with
-  `CLOUDFRONT` scope: `aws wafv2 list-web-acls --scope CLOUDFRONT --region
-  us-east-1`. A Web ACL in any other region cannot be associated.
-- **ETag requirement.** Every `update-distribution` call requires the
-  current `ETag` from `get-distribution-config`. A stale ETag (config
-  changed between read and update) causes `PreconditionFailedException`.
-  Always re-fetch the ETag immediately before the update call.
-- **Propagation delay.** Distribution changes take 5-60 minutes to propagate
-  globally after `update-distribution` returns `DeploymentStatus: Deployed`.
-  Do not treat the API response as the effective state — verify via
-  `get-distribution` `Status: Deployed` before declaring remediation complete.
+Pre-flight safety checks (CONFIRMATION GATE, rollback snapshot, ETag requirement, TLS client coordination, OAC+bucket-policy pairing, us-east-1 Web ACL, propagation delay) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load them before emitting any remediation CLI.
 
 ## Remediation guidance
 
-**Ordering principle:** TLS findings first (active data-in-transit exposure),
-then OAC (origin bypass), then CONFIG_GAP items (defense-in-depth). This
-prioritizes by immediate exploitability.
-
-### For INSECURE_TLS — weak TLS minimum protocol (Step 2)
-
-1. Update the distribution config with `MinimumProtocolVersion: TLSv1.2_2021`:
-   ```bash
-   # Fetch current config + ETag
-   aws cloudfront get-distribution-config --id <id> --output json > /tmp/cf-config.json
-   ETAG=$(jq -r '.ETag' /tmp/cf-config.json)
-   # Edit MinimumProtocolVersion in the config to TLSv1.2_2021
-   jq '.DistributionConfig.ViewerCertificate.MinimumProtocolVersion = "TLSv1.2_2021"' \
-     /tmp/cf-config.json | jq '.DistributionConfig' > /tmp/cf-updated.json
-   aws cloudfront update-distribution --id <id> \
-     --if-match "$ETAG" --distribution-config file:///tmp/cf-updated.json
-   ```
-2. Verify propagation: `aws cloudfront get-distribution --id <id>` until
-   `Status: Deployed`.
-
-### For INSECURE_TLS — viewer protocol allow-all (Step 1)
-
-1. Change `ViewerProtocolPolicy` to `redirect-to-https` (or `https-only` for
-   strict environments) in the default cache behavior.
-2. Use the same update-distribution flow as above.
-
-### For INSECURE_TLS — custom origin http-only (Step 3)
-
-1. Change `OriginProtocolPolicy` to `https-only` on the custom origin.
-2. Verify the origin supports HTTPS (has a valid certificate) before the
-   change — CloudFront will fail origin connections if the origin does not
-   listen on 443.
-
-### For INSECURE_TLS — S3 website endpoint origin (Step 4)
-
-1. Switch the origin `DomainName` from `bucket.s3-website-<region>.amazonaws.com`
-   to `bucket.s3.<region>.amazonaws.com` (REST endpoint).
-2. Create an OAC and attach it to the origin (see NO_OAC remediation below).
-3. Update the S3 bucket policy to use OAC (deny all except CloudFront OAC).
-4. Remove public read access from the bucket.
-
-### For NO_OAC — S3 origin without OAC or OAI (Step 5)
-
-1. Create an OAC:
-   ```bash
-   aws cloudfront create-origin-access-control \
-     --origin-access-control-config \
-     '{"Name":"oac-for-<bucket>","Description":"OAC for <bucket>","SigningProtocol":"sigv4","SigningBehavior":"always"}' \
-     --output json
-   OAC_ID=$(jq -r '.OriginAccessControl.Id' /tmp/oac.json)
-   ```
-2. Attach the OAC ID to the origin in the distribution config
-   (`OriginAccessControlId`).
-3. Update the S3 bucket policy to allow CloudFront service principal with the
-   OAC condition:
-   ```json
-   {"Principal": {"Service": "cloudfront.amazonaws.com"},
-    "Condition": {"StringEquals":
-      {"AWS:SourceArn": "arn:aws:cloudfront::<account>:distribution/<id>"}}}
-   ```
-4. Deploy the distribution and verify object access.
-
-### For CONFIG_GAP — no WAF (Step 6)
-
-1. Create or identify a Web ACL in us-east-1 with `CLOUDFRONT` scope.
-2. Associate it:
-   ```bash
-   aws cloudfront update-distribution --id <id> --if-match "$ETAG" \
-     --distribution-config file:///tmp/cf-config-with-waf.json
-   ```
-   where the config has `WebACLId` set to the Web ACL ARN.
-
-### For CONFIG_GAP — logging disabled (Step 7)
-
-1. Create or identify an S3 bucket for logs.
-2. Grant ACL write permission to `awslogsdelivery`:
-   ```bash
-   aws s3api put-object-acl --bucket <log-bucket> --key cf-logs/ \
-     --grant-write 'id="c4c1ede66af53448b93ce283fc5b7c73"' \
-     --grant-read-acp 'id="c4c1ede66af53448b93ce283fc5b7c73"'
-   ```
-   (The canonical ID `c4c1ede66af53448b93ce283fc5b7c73` is the
-   `awslogsdelivery` account.)
-3. Enable logging in the distribution config (`Logging.Enabled: true`).
-
-### For CONFIG_GAP — no geo restriction (Step 8)
-
-1. Set `Restrictions.GeoRestriction.RestrictionType` to `whitelist` or
-   `blacklist` with the appropriate country codes.
-
-### For CONFIG_GAP — legacy OAI without OAC (Step 5)
-
-1. Create an OAC (same as NO_OAC remediation).
-2. Set `OriginAccessControlId` on the origin; clear
-   `S3OriginConfig.OriginAccessIdentity`.
-3. Update the bucket policy from the OAI canonical-user statement to the OAC
-   service-principal statement.
-
-### For OK
-
-1. No remediation required for the current posture.
-2. Recommend periodic re-audit after any config change.
-3. For defense-in-depth, consider adding response headers (Strict-Transport-
-   Security, Content-Security-Policy) via CloudFront response-headers policies.
+Per-verdict remediation CLI sequences (TLS minimum, viewer policy, origin protocol, website endpoint, OAC, WAF, logging, geo, legacy OAI, OK posture) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when writing the REMEDIATION block.
 
 ## Recent AWS features (2024-2026)
 
-- **VPC origins (2024-2025):** CloudFront now supports VPC origins, enabling distribution of private content from VPC-attached ALBs, NLBs, EC2 instances, and ECS services without internet exposure. Auditors should check whether distributions using VPC origins have appropriate origin security groups and that the VPC origin is not inadvertently exposed.
-- **KeyValueStore (2024):** CloudFront KeyValueStore allows serverless key-value data for CloudFront Functions. This does not change the audit verdict but auditors should note that KVS data is mutable and could be used to inject configuration that bypasses origin checks.
-- **Continuous deployment (2024):** CloudFront continuous deployment allows traffic shifting between distribution versions (canary, blue/green). Auditors should verify that the staging distribution has equivalent security configuration (WAF, TLS, OAC) as the primary — a security regression during traffic shifting is a real risk.
-- **TLS 1.3 viewer support (2024):** CloudFront now supports TLS 1.3 for viewer connections. Auditors should recommend upgrading the minimum TLS version to TLSv1.2_2021 or TLSv1.3 where applicable.
-- **Origin Access Control (OAC) for Lambda and MediaStore (2024-2025):** OAC now supports Lambda Function URLs and MediaStore origins in addition to S3. Auditors should verify OAC coverage on all origin types, not just S3.
+Recent AWS features (2024-2026) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when auditing VPC origins, KeyValueStore, continuous deployment, TLS 1.3, or non-S3 OAC origins.
+
+## References (load on demand)
+
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 expert knowledge, edge-case catalog, and recent AWS features moved from SKILL.md
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight safety checks moved from SKILL.md
+- [references/error-handling.md](references/error-handling.md) — per-verdict remediation CLI sequences moved from SKILL.md
 
 ## Domain
 

@@ -281,3 +281,65 @@ resource "aws_cloud9_environment_membership" "reviewer" {
   permissions    = "read-only"
 }
 ```
+
+## Misconceptions — 24/7 runtime and credential sharing
+
+- **"The Cloud9 EC2 instance runs 24/7 unless manually stopped."**
+  Without auto-hibernation, yes — and this is a major cost drain.
+  Auto-hibernation (`--automatic-stop-time-minutes`) stops the EC2
+  instance after N minutes of IDE inactivity. The instance restarts
+  automatically when the user opens the IDE again. This is the single
+  most impactful cost optimization for Cloud9.
+
+- **"Sharing a Cloud9 environment means sharing AWS credentials."** It
+  does NOT. When you share a Cloud9 environment, each user connects
+  using their own AWS credentials (via the environment's IAM managed
+  temporary credentials). The instance profile role is NOT shared; each
+  user's permissions are governed by their own IAM identity federated
+  through Cloud9's credential management.
+
+## Expert heuristic: auto-hibernate for cost control
+
+A baseline model says "create the environment." The correct heuristic
+recognizes that without auto-hibernation, the EC2 instance runs 24/7.
+
+```text
+Auto-hibernation (--automatic-stop-time-minutes):
+  ├── 30 minutes (default for console-created environments)
+  ├── 60 minutes (recommended for active development teams)
+  ├── 240 minutes (for long-running builds/debugging sessions)
+  └── 0 / unset (never auto-stop — HIGHEST COST, avoid)
+
+Cost impact (t3.medium, us-east-1, approximate):
+  No hibernation:   730 hours/month × $0.0416/hour = ~$30/month
+  30-min hibernate: ~4 hours/day × 22 days = 88 hours = ~$3.66/month
+  Savings: ~88% reduction
+```
+
+**Key implication:** auto-hibernation is the single most impactful cost
+optimization for Cloud9. Always set `--automatic-stop-time-minutes`.
+Never leave it unset (0 means never stop).
+
+## Expert heuristic: sharing for team collaboration
+
+```text
+Sharing a Cloud9 environment:
+  ├── Read sharing: user can view code and run commands (read-only)
+  ├── Write sharing: user can edit files (concurrent edits, no merge resolution)
+  └── Each user connects with their OWN AWS credentials
+      → IAM permissions governed by the user's identity, not the instance profile
+      → Managed temporary credentials are scoped per-user
+
+Sharing flow:
+  1. Environment created with --permissions 'read' or 'read,write'
+  2. Share via IAM: add user/role ARN to the environment's permissions
+     aws cloud9 create-environment-membership \
+       --environment-id <env-id> \
+       --user-arn arn:aws:iam::<acct>:user/<user> \
+       --permissions read-write
+  3. User opens the environment from their own Cloud9 console
+```
+
+**Key implication:** sharing does NOT share credentials. Each user's
+AWS permissions are independent. The instance profile is the fallback
+for operations not covered by managed temporary credentials.

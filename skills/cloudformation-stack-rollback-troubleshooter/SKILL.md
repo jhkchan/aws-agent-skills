@@ -130,29 +130,8 @@ generalist on rollback incidents:
 
 ## Pre-flight: stack state and gather-info gate
 
-```bash
-# 1. Stack status and parameters
-aws cloudformation describe-stacks \
-  --stack-name <name-or-arn> --output json
-
-# 2. Stack events (the specific resource that failed to roll back)
-aws cloudformation describe-stack-events \
-  --stack-name <name-or-arn> --output json | \
-  jq '.StackEvents[] | select(.ResourceStatus | test("FAILED|ROLLBACK"))'
-
-# 3. Stack policy (Deny rules that block rollback)
-aws cloudformation get-stack-policy \
-  --stack-name <name-or-arn> --output json
-
-# 4. Drift detection (resources that drifted from template)
-aws cloudformation describe-stack-resource-drifts \
-  --stack-name <name-or-arn> --output json | \
-  jq '.StackResourceDrifts[] | select(.StackResourceDriftStatus != "IN_SYNC")'
-
-# 5. Template summary (resources with Replacement: True)
-aws cloudformation get-template-summary \
-  --stack-name <name-or-arn> --output json
-```
+Pre-flight command listing (stack state, events, policy, drift, template summary) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before running the rollback diagnostic walk.
 
 If the input is malformed (missing StackName, absent stack status, no
 error events), emit INSUFFICIENT_DATA with the missing pieces
@@ -167,38 +146,8 @@ ROOT_CAUSE_IDENTIFIED without a failing probe that matches the symptom.**
 
 ### Step 0: Non-obvious behaviours that change rollback diagnosis
 
-- **`continue-update-rollback --resources-to-skip` is the canonical fix
-  for UPDATE_ROLLBACK_FAILED.** It retries the rollback from the point
-  of failure. Resources listed in `--resources-to-skip` are marked as
-  successfully rolled back without CloudFormation touching them — they
-  become orphaned (still exist physically but CFN no longer tracks them).
-
-- **Custom resources have a 1-hour CloudFormation timeout, separate
-  from the Lambda's own Timeout.** If the Lambda times out at 3s,
-  CloudFormation still waits the full hour before failing. Always check
-  both the Lambda's Timeout and the CFN event timestamp.
-
-- **Nested stacks are independent stacks.** A child in
-  `UPDATE_ROLLBACK_FAILED` must be fixed with its own
-  `continue-update-rollback` before the parent can retry.
-
-- **`DeletionPolicy: Retain` and `UpdateReplacePolicy` change rollback
-  behaviour.** `Retain` prevents resource deletion during rollback
-  (resource may be orphaned). `UpdateReplacePolicy` controls what
-  happens to the old resource during a replacement-driven update.
-
-- **Drift detection must be initiated manually.** CloudFormation does
-  not continuously monitor drift. Always run `detect-stack-drift` then
-  `describe-stack-resource-drifts` proactively during rollback diagnosis.
-
-- **ChangeSet is the safe preview before a rollback retry.** Creating a
-  ChangeSet with the previous template shows exactly which resources
-  will change (Add/Modify/Remove) before executing — especially useful
-  for IAM replacement or dependent resource scenarios.
-
-- **`DisableRollback: true` means CloudFormation did NOT roll back.**
-  The stack stays post-failure with successfully-created resources in
-  place. The operator must manually clean up or fix the stack.
+Step 0 non-obvious rollback behaviours moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when the rollback failure mode is not obvious.
 
 ### Step 1: Symptom entry — pick the diagnostic branch
 
@@ -240,19 +189,8 @@ Symptom: stack events show a `Custom::` or
 `DELETE_FAILED` and the reason includes "timed out," "no response," or
 "Provider returned error."
 
-```bash
-# Identify the provider Lambda (ServiceToken)
-aws cloudformation describe-stack-resource \
-  --stack-name <name> --logical-resource-id <custom-resource-id> \
-  --output json | jq '.StackResourceDetail'
-
-# Check the Lambda's logs
-aws logs filter-log-events \
-  --log-group-name /aws/lambda/<provider-lambda> \
-  --start-time $(date -d '-2 hours' +%s)000 \
-  --filter-pattern '"Task timed out" OR "ERROR" OR "cfnresponse"' \
-  --output json
-```
+CUSTOM_RESOURCE_TIMEOUT probes (ServiceToken lookup + Lambda log filter) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when diagnosing a custom resource that timed out.
 
 Common custom resource failure patterns:
 
@@ -296,16 +234,8 @@ run `continue-update-rollback` on the child, then on the parent.
 Symptom: stack events show an IAM resource with `DELETE_FAILED` during
 rollback. The error mentions "cannot delete" or "is attached to."
 
-```bash
-# Check if old IAM resource is still in use
-aws iam list-attached-role-policies --role-name <old-role> --output json
-aws iam list-instance-profiles-for-role --role-name <old-role> --output json
-
-# Check for Replacement: True on IAM types
-aws cloudformation get-template-summary \
-  --stack-name <name> --output json | \
-  jq '.ResourceTypes[] | select(.ResourceType | test("IAM"))'
-```
+IAM_REPLACEMENT probes (role attachments + template summary) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when an IAM resource blocks the rollback.
 
 The old IAM resource's deletion fails if it has active sessions, is
 attached to instance profiles, or the policy is attached to principals.
@@ -354,14 +284,8 @@ even during rollback.
 Fix: temporarily grant an `Allow` override for the specific resource
 during the rollback, then restore the protective policy:
 
-```bash
-aws cloudformation set-stack-policy --stack-name <name> \
-  --stack-policy-body file://temp-allow-all.json --profile <p>
-aws cloudformation continue-update-rollback --stack-name <name> --profile <p>
-# After rollback: restore original policy
-aws cloudformation set-stack-policy --stack-name <name> \
-  --stack-policy-body file://original-policy.json --profile <p>
-```
+Temporary Allow-policy swap sequence moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when a stack policy blocks the rollback.
 
 ### Step 8: DEPENDENT_RESOURCE_IN_USE — cannot delete in-use resource
 
@@ -559,6 +483,13 @@ appear in `examples/README.md`.
 
 - **IAM resource changes** with `Replacement: True` are irreversible
   during rollback. Verify no active dependencies before deploying.
+
+## References (load on demand)
+
+- [references/stack-status-and-policy-reference.md](references/stack-status-and-policy-reference.md) — stack status, drift, and stack policy reference.
+- [references/custom-resource-and-nested-stack-reference.md](references/custom-resource-and-nested-stack-reference.md) — custom resource and nested stack rollback reference.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pre-flight gather-info listing and Step 3 / 5 / 7 probe commands moved from SKILL.md.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 non-obvious rollback behaviours moved from SKILL.md.
 
 ## Domain
 

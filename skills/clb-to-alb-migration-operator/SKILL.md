@@ -100,15 +100,8 @@ for READY):**
 
 **Cost/time baselines (2026):**
 
-- ALB: $0.0225/hour + $0.008 per LCU-hour (dimensioned on connections,
-  bytes, rule evaluations). CLB is a flat hourly — ALB usually cheaper
-  for L7 workloads.
-- ALB target groups: free. Route 53 weighted routing: $0.50/million
-  queries (first billion free).
-- ACM certificates: free if issued via ACM. Cross-zone: ALB always on
-  and free; CLB was billable.
-- WAF on ALB: $5/rule/month + $1/million requests. ALB Lambda target
-  invocations: billed as Lambda (no extra ALB fee).
+Baselines moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when sizing or justifying the migration.
 
 ## Mindset
 
@@ -142,39 +135,13 @@ Driven by three ALB realities:
 
 Run before classification. Misclassifying these produces wrong plans.
 
-**Pagination:** `elb describe-load-balancers` paginates at 400/page —
-drain `--marker`/`--next-marker`. `elbv2 describe-target-groups`
-paginates at 400/page. `route53 list-resource-record-sets` paginates at
-100/page (use the `--hosted-zone-id`).
+**Pagination:** page-size details moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand before live enumeration.
 
 **Live-account pre-flight (skip if offline plan audit):**
 
-1. `aws elb describe-load-balancers --load-balancer-names <clb-name>
-   --output json` — capture `Scheme`, `Subnets`, `SecurityGroups`,
-   `ListenerDescriptions` (protocol, port, SSLCertificateId),
-   `HealthCheck`, `Policies` (sticky, Proxy Protocol), `Attributes`
-   (ConnectionDraining, CrossZoneLoadBalancing, AccessLog,
-   ConnectionSettings).
-2. `aws elb describe-tags --load-balancer-names <clb-name>` — capture
-   tags for replicating onto the ALB (`create-tags`).
-3. `aws elbv2 describe-load-balancers` (filter by name to confirm the
-   ALB doesn't already exist with the planned name).
-4. `aws acm list-certificates --certificate-statuses ISSUED --output
-   json` — verify each CLB SSL cert ARN resolves to an ACM cert in
-   `ISSUED` state, same region. If the cert is IAM-uploaded
-   (`arn:aws:iam::...:server-certificate/...`), plan to import or
-   re-issue via ACM (ACM-managed renewal is free; IAM cert renewal is
-   manual).
-5. `aws ec2 describe-subnets --subnet-ids <subnet-1> <subnet-2>` —
-   verify AZ spread.
-6. `aws ec2 describe-security-groups --group-ids <target-sg>` — verify
-   the target SG allows the ALB SG (planned) on the target port.
-7. `aws route53 list-resource-record-sets --hosted-zone-id <zone-id>` —
-   capture the CLB alias record (alias or CNAME) for cutover planning.
-8. `aws cloudwatch get-metric-statistics --namespace AWS/ELB --metric-
-   name RequestCount --dimensions Name=LoadBalancerName,Value=<clb>
-   --start-time ... --end-time ...` — baseline traffic volume for
-   weighted-cutover increments.
+Full command list moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand for live pre-flight (CLB metadata, tags, ACM certs, subnets, SGs, Route 53, CloudWatch baseline).
 
 **Malformed input:** if the input JSON is invalid or missing required
 fields, emit `VERDICT: ERROR` with `REASON: CLB configuration is not
@@ -202,56 +169,8 @@ balancer-names <name> --output json and re-plan.`
 
 ### Step 0: Expert knowledge — non-obvious CLB/ALB behaviors
 
-These behaviors are easy to misjudge without migration experience. Each
-changes a plan if ignored:
-
-- **TCP/SSL listeners cannot move to ALB.** ALB supports HTTP and HTTPS
-  only. A CLB with a `TCP:443` listener (SSL passthrough) must either
-  terminate SSL at the ALB (requires the cert and accepting L7
-  inspection) or migrate to an NLB. The skill flags this and routes the
-  listener to NLB planning — do NOT silently drop the listener.
-
-- **Sticky session semantics differ.** CLB `LBCookieStickinessPolicy`
-  generates a load-balancer-generated cookie. ALB `stickiness.type=lb_
-  cookie` does the same with `AWSELB` cookie. CLB `AppCookieStickiness
-  Policy` honors an application cookie name. ALB `stickiness.type=app_
-  cookie` does the same. The names look equivalent but the cookie
-  lifetime semantics differ: CLB's app-cookie stickiness refreshed the
-  expiration on every response; ALB's `app_cookie` does too, but the
-  `duration_seconds` is a fallback only if the application does not set
-  the cookie. Test stickiness post-cutover.
-
-- **Health check semantics differ.** CLB health check `Target: HTTP:8080
-  /healthz` used the `HTTP:` prefix and combined port + path. ALB
-  separates them: `HealthCheckPort: 8080`, `HealthCheckPath: /healthz`,
-  `HealthCheckProtocol: HTTP`. The matcher is also stricter on ALB —
-  `Matcher.HttpCode: 200` matches only 200 by default; CLB matched 200
-  by default. Mismatched matchers cause post-cutover unhealthy targets
-  even though the application is fine.
-
-- **Proxy Protocol is the silent killer.** If the backend application
-  parses the Proxy Protocol binary frame (common for gaming, IoT, and
-  legacy Go services using `ProxyProto` libraries), ALB will break it
-  silently — ALB injects `X-Forwarded-*` headers but no Proxy Protocol
-  frame. The first symptom is "all requests 400 Bad Request" or
-  "connection reset" because the backend tries to parse HTTP as a Proxy
-  Protocol frame. Always check the CLB's `ProxyProtocolPolicyType` and
-  inspect the backend's listener configuration before cutover.
-
-- **DNS cutover is not instant.** Clients cache the CLB DNS name's
-  underlying IP for the TTL (default 60s). Weighted routing cutover
-  (5%/25%/50%/100% over hours) is the safe path for high-traffic
-  workloads. Direct swap is safe for low-traffic internal services.
-
-- **The CLB stays alive during rollback.** Do NOT delete the CLB at
-  cutover. Keep it provisioned for the rollback window (typically
-  24-72 hours). Rollback = flip the Route 53 weighted record back to
-  100/0 (CLB/ALB). Deleting the CLB prematurely is irreversible.
-
-- **Cross-zone on ALB changes distribution.** A CLB with cross-zone off
-  distributes per-AZ; ALB always cross-zone spreads evenly across all
-  targets. If any target is sized for AZ-only load, it may be
-  overwhelmed by ALB's even distribution.
+All Step 0 behaviors moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when a plan touches TCP/SSL listeners, stickiness, health checks, Proxy Protocol, DNS TTL, rollback, or cross-zone.
 
 ### Step 1: plan-migration
 
@@ -451,98 +370,18 @@ NOTES:
 
 ### Worked example — cutover-dns (Phase 1, 5% weighted, READY)
 
-```text
-OPERATION: cutover-dns
-VERDICT: READY
-TARGET: prod-web-clb -> prod-web-alb (account 111111111111, region
-        us-east-1)
-PRE_CHECKS:
-  - [PASS] ALB exists, State: active
-  - [PASS] All targets healthy in tg-web-8080 (3/3 healthy)
-  - [PASS] ALB responds 200 on https://prod-web-alb-.../healthz from
-    a canary client
-  - [PASS] Route 53 hosted zone Z111 has app.example.com A record
-    aliasing CLB (weight 100 implied)
-  - [PASS] CloudWatch baseline: RequestCount ~5000/min, 5xx ~0
-STEPS:
-  1. CONFIRM: About to shift app.example.com to 95% CLB / 5% ALB via
-     Route 53 weighted routing. This routes ~250 req/min to the ALB.
-     Proceed? (yes/no)
-  2. aws route53 change-resource-record-sets --hosted-zone-id Z111
-     --change-batch '{"Changes":[{"Action":"UPSERT","ResourceRecordSet":
-     {"Name":"app.example.com.","Type":"A","SetIdentifier":"clb","Weight":95,
-     "AliasTarget":{"HostedZoneId":"Z3DZXE0K...","DNSName":"dualstack.prod-
-     web-clb-123.us-east-1.elb.amazonaws.com","EvaluateTargetHealth":true}}},
-     {"Action":"UPSERT","ResourceRecordSet":{"Name":"app.example.com.",
-     "Type":"A","SetIdentifier":"alb","Weight":5,"AliasTarget":{...}}]}'
-  3. Monitor 15 minutes: CloudWatch HTTPCode_Target_5XX_Count on ALB;
-     if > baseline+10%, run rollback (Step 5 of Process).
-POST_VERIFY:
-  - (pending execution)
-NOTES:
-  - TTL 60s — clients pick up the new weight within ~60s.
-  - Next phase (25% ALB) after 1 hour at 5% with no regression.
-  - Rollback: UPSERT weights to 100/0 (CLB/ALB). Takes effect in 60s.
-```
+Full block moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when executing cutover-dns Phase 1.
 
 ### Worked example — cutover-dns (BLOCKED, Proxy Protocol backend)
 
-```text
-OPERATION: cutover-dns
-VERDICT: BLOCKED
-TARGET: prod-game-clb -> prod-game-alb (account 111111111111, region
-        us-east-1)
-PRE_CHECKS:
-  - [PASS] ALB exists, State: active
-  - [FAIL] CLB Policy ProxyProtocolPolicyType enabled on backend port
-    4242 — the Go backend parses Proxy Protocol v2 frames. ALB does NOT
-    emit Proxy Protocol; the backend will receive HTTP bytes and try to
-    parse them as a Proxy Protocol header, producing 400/connection
-    reset for 100% of requests.
-STEPS: (none — backend incompatible)
-POST_VERIFY: (none)
-NOTES:
-  - Root cause: ALB cannot emit Proxy Protocol. The backend must be
-    reconfigured to read X-Forwarded-For / X-Forwarded-Proto headers
-    instead of Proxy Protocol frames.
-  - Fix: (a) update the backend listener to disable Proxy Protocol
-    parsing and read X-Forwarded-For, OR (b) keep this listener on an
-    NLB (which supports Proxy Protocol v2) and migrate only HTTP/HTTPS
-    listeners to ALB.
-```
+Full block moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand when a Proxy Protocol backend blocks the cutover.
 
 ### Worked example — verify-cutover (COMPLETED)
 
-```text
-OPERATION: verify-cutover
-VERDICT: COMPLETED
-TARGET: prod-web-clb -> prod-web-alb (account 111111111111, region
-        us-east-1)
-PRE_CHECKS:
-  - [PASS] Route 53 weights: ALB 100, CLB 0
-  - [PASS] DNS globally resolves to ALB (TTL elapsed 24h ago)
-STEPS:
-  1. aws elbv2 describe-target-health --target-group-arn <tg-web-8080>
-  2. aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB
-     --metric-name HTTPCode_Target_5XX_Count ...
-  3. aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB
-     --metric-name TargetResponseTime ...
-POST_VERIFY:
-  - [PASS] describe-target-health: 3/3 targets State: healthy
-  - [PASS] HTTPCode_Target_5XX_Count: 0 over last 60 minutes (CLB
-    baseline was 0-2/min)
-  - [PASS] TargetResponseTime p99: 85ms (CLB baseline was 90ms)
-  - [PASS] ALB access logs in S3 show target_status_code 2xx for 100%
-    of /api/* requests
-  - [PASS] No client-reported errors in the canary dashboard
-NOTES:
-  - Cutover complete. Schedule CLB deletion after 72-hour observation
-    window (2026-08-12).
-  - Keep Route 53 weighted record at ALB:100, CLB:0 until CLB deletion,
-    then remove the CLB weighted record.
-  - Post-migration optimization: consider adding ALB WAF for SQLi/XSS
-    protection (was not possible on CLB).
-```
+Full block moved verbatim to [references/worked-examples.md](references/worked-examples.md).
+Load on demand for the post-cutover verification shape.
 
 ## Anti-Patterns — NEVER
 
@@ -616,78 +455,21 @@ NOTES:
 
 ## Expert heuristic — the top 5 non-obvious signals
 
-A senior migration engineer checks these five things first when a plan
-looks "too clean." Each flips a READY verdict to BLOCKED if missed:
-
-1. **Proxy Protocol on the backend listener.** Check the CLB policy list
-   for `ProxyProtocolPolicyType` AND inspect the backend application's
-   listener config (nginx `proxy_protocol on;`, HAProxy `accept-proxy`,
-   Go `ProxyProto` library). Either side enabling it without the other
-   breaks 100% of requests. ALB has no Proxy Protocol emission —
-   backends must read X-Forwarded-For.
-
-2. **TCP/SSL listeners hiding in the policy list.** A CLB named "web"
-   may still have a `TCP:4242` listener for an admin protocol. The
-   listener list is the source of truth, not the name. Any TCP/SSL
-   listener routes to NLB planning, not ALB.
-
-3. **IAM-uploaded certificates (not ACM).** A cert ARN starting with
-   `arn:aws:iam::` is IAM-uploaded; renewal is manual and there is no
-   free managed rotation. Plan to re-issue via ACM before or during
-   migration so the ALB gets free managed renewal. ACM certs are free
-   and auto-renew.
-
-4. **Deregistration delay mismatch.** The CLB's `ConnectionDraining`
-   timeout maps to the ALB target group's
-   `deregistration_delay.timeout_seconds`. Defaults are both 300s, but a
-   CLB tuned to 60s will leave the ALB at 300s — targets drain slowly
-   during rollback, leaving the operator confused. Always read the CLB
-   attribute and set the ALB target group to match.
-
-5. **Cross-zone off on CLB.** A CLB with cross-zone off distributes
-   per-AZ. Targets in AZ-a only serve AZ-a traffic. ALB is always
-   cross-zone, so post-cutover traffic spreads evenly. If any target is
-   sized for AZ-only load (smaller instances in one AZ), it may be
-   overwhelmed by ALB's even distribution. Pre-scale or rebalance
-   targets before cutover.
+All five signals moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when the plan looks too clean.
 
 ## Recent AWS features (2024-2026)
 
-- **ALB with Lambda targets (2024 GA):** ALB can invoke Lambda
-  functions as targets, with multi-value headers and request/response
-  mapping. Useful for replacing CLB-backed API endpoints with serverless
-  functions without an API Gateway. No Proxy Protocol; the Lambda event
-  includes the original HTTP request.
+Moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand for 2024-2026 ALB feature coverage.
 
-- **ALB with OIDC authentication (2024 GA):** ALB can authenticate users
-  via Amazon Cognito user pools or any OIDC-compliant IdP before
-  forwarding to the target. This was a common reason teams added API
-  Gateway in front of CLB; ALB now does it natively. Configure via
-  `authenticate-cognito` or `authenticate-oidc` action in a listener
-  rule.
+## References (load on demand)
 
-- **WAF on ALB (2024-2026 enhancements):** AWS WAF can be attached to
-  an ALB with managed rule groups (SQLi, XSS, bot control, IP reputation,
-  common RuleSet). CLB had no WAF attachment. Post-migration, enable WAF
-  for defense-in-depth.
-
-- **TLS 1.3 on ALB (`ELBSecurityPolicy-TLS13-1-2-2021-06`, 2024):** ALB
-  supports TLS 1.3 with forward secrecy and 0-RTT. CLB's best was TLS
-  1.2. Migrating unlocks modern TLS; do not carry over the CLB's older
-  policy.
-
-- **ALB HTTP/2 and gRPC (2024):** ALB supports HTTP/2 natively and gRPC
-  routing via listener rules. CLB was HTTP/1.1 only. Migrating unlocks
-  multiplexed connections and gRPC-aware routing.
-
-- **ALB weight-based target group forwarding (2025):** A listener rule
-  action can forward to multiple target groups with weights (e.g., 90%
-  blue / 10% green) for native blue/green deployments without Route 53.
-  CLB required Route 53 weighted for the same effect.
-
-- **Cross-zone load balancing always on (ALB, 2024-2026):** Confirmed
-  always-on and free on ALB. CLB was off by default and billable. Any
-  CLB with cross-zone off will see different distribution post-migration.
+- [references/feature-parity-matrix.md](references/feature-parity-matrix.md) — CLB feature to ALB equivalent mapping.
+- [references/cutover-and-rollback-procedures.md](references/cutover-and-rollback-procedures.md) — weighted cutover phases, direct swap, rollback, cleanup.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — Step 0 expert knowledge, cost baselines, top-5 heuristic, 2024-2026 features.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — pagination rules and live-account pre-flight commands.
+- [references/worked-examples.md](references/worked-examples.md) — secondary worked examples (cutover Phase 1, BLOCKED, verify-cutover COMPLETED).
 
 ## Domain
 

@@ -245,3 +245,51 @@ aws cloudformation set-stack-policy \
 
 **Security note:** always restore the protective policy immediately
 after the update. Leaving a permissive policy defeats the purpose.
+
+## Misconceptions — "I can update a stack without a ChangeSet" and "cfn-nag is optional"
+
+- **"I can update a stack without a ChangeSet."** You can, but you
+  should NOT. A ChangeSet shows the EXACT resource changes an update
+  will make (Add, Modify, Remove, Replace). Without reviewing a
+  ChangeSet, you may accidentally replace a resource that causes
+  downtime (e.g., replacing an RDS instance with a new one because an
+  immutable property changed). Always create and review a ChangeSet
+  before executing it.
+
+- **"cfn-nag is optional."** It is not. cfn-nag catches security
+  anti-patterns that cfn-lint does not: wildcard IAM policies
+  (`Resource: "*"`), unencrypted S3 buckets, security groups with
+  `0.0.0.0/0` ingress, databases without encryption, and other
+  violations of security best practices. Skipping cfn-nag means
+  deploying templates with known security weaknesses.
+
+## Expert heuristic: reading a ChangeSet
+
+A baseline model says "create a ChangeSet." The correct heuristic
+reads the ChangeSet and interprets the `Action` and `Replacement`
+fields:
+
+```text
+Action: "Add" → new resource | "Modify" → update | "Remove" → delete
+
+Replacement (for Modify):
+  "True"        → REPLACED (old deleted, new created) — downtime for stateful
+  "False"       → updated in place (no downtime)
+  "Conditional" → replacement may or may not occur
+```
+
+**Key implication:** `Replacement: True` on a stateful resource (RDS,
+EC2, EFS) means data loss unless the resource has a retention policy.
+Always review `Replacement` fields before executing.
+
+## Expert heuristic: cfn-nag finding severities
+
+```text
+CRITICAL → MUST fix before deploy (wildcard IAM, unencrypted S3, SSH from 0.0.0.0/0)
+WARNING  → SHOULD review (Resource: "*", no versioning, no backup retention)
+VIOLATION → Advisory (missing DeletionPolicy, no Outputs)
+```
+
+**Key implication:** CRITICAL findings block deployment (verdict:
+REVIEW_REQUIRED). WARNINGs require review but may proceed with
+documented justification.

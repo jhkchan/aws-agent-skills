@@ -189,3 +189,33 @@ template, overwriting any out-of-band changes.
 - [Operation preferences](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-concepts.html#stacksets-concepts-operation-preferences)
 - [StackSet drift detection](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-drift.html)
 - [Managed execution](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-managed-execution.html)
+
+## Blast-radius tuning heuristic (moved from SKILL.md)
+
+Operation preferences look like a minor knob; they are the single
+most important blast-radius control on a StackSet deployment. A
+baseline model accepts the defaults; this heuristic explains tuning.
+
+```text
+FailureToleranceCount / FailureTolerancePercentage
+  → number (or %) of instances that can fail BEFORE halting the operation
+  → DEFAULT: 0 (any failure halts) — TOO conservative for large fan-outs
+  → Recommendation: set so ≤5% of instances can fail without halting
+
+MaxConcurrentCount / MaxConcurrentPercentage
+  → number (or %) of instances deployed IN PARALLEL
+  → DEFAULT: 1 (sequential) — TOO slow for large fan-outs
+  → Recommendation: 5-10 for typical orgs
+
+Count and Percentage variants are MUTUALLY EXCLUSIVE per operation.
+RegionConcurrencyType: SEQUENTIAL (default) or PARALLEL.
+RegionOrder: only for SEQUENTIAL (e.g., ['us-east-1','us-west-2']).
+```
+
+**Production pattern:** `FailureTolerancePercentage=5`,
+`MaxConcurrentPercentage=20`, `RegionConcurrencyType=SEQUENTIAL`,
+`RegionOrder=[primary, secondary]`. Tolerate 5% failure, run 20%
+of accounts in parallel per region, deploy regions sequentially.
+
+**Safe pattern:** `FailureToleranceCount=0`, `MaxConcurrentCount=1`.
+Halt on ANY failure, deploy ONE account at a time.

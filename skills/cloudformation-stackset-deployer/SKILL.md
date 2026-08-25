@@ -78,35 +78,8 @@ If any prerequisite is missing, the verdict is
 
 ## Mindset
 
-**One-line takeaway:** A StackSet deploys ONE CloudFormation
-template across MANY accounts and/or regions from ONE
-administrator account. SERVICE_MANAGED integrates with AWS
-Organizations for automatic future-account inclusion; SELF_MANAGED
-requires explicit account lists and IAM role handshakes per target
-account. Operation preferences control blast radius — failure
-tolerance + max concurrency are the two dials.
-
-Three misconceptions dominate StackSet misdesign:
-
-- **"StackSets and nested stacks are interchangeable."** A nested
-  stack is a child inside ONE parent stack in ONE account/region.
-  A StackSet is a multi-account/multi-region deployment wrapper.
-  Use nested stacks for decomposition within one stack; use
-  StackSets for fan-out across accounts/regions.
-
-- **"SELF_MANAGED is simpler."** It is not, for any org with more
-  than a few accounts. SELF_MANAGED requires an administration role
-  in the admin account AND an execution role (with matching trust
-  policy) in EVERY target account. New accounts are NOT auto-
-  included. SERVICE_MANAGED leverages Organizations trusted access —
-  no per-account role setup and new accounts in targeted OUs are
-  included automatically.
-
-- **"Default operation preferences are fine."** Defaults
-  (`FailureToleranceCount=0`, `MaxConcurrentCount=1`) are too
-  conservative for large fan-outs. Tune failure tolerance so a
-  single account failure does not halt the deployment, and tune
-  max concurrency to control the parallel blast radius.
+Mindset — three StackSet misconceptions moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when framing permission-model and blast-radius decisions.
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -130,108 +103,23 @@ stack instances stuck in OUTDATED?" later.
 | StackSet drift detection | StackSet exists; both models supported | must be enabled explicitly via `detect-stack-set-drift`; NOT retroactive for past drift | StackSet-level drift status |
 | Stack instance drift | stack instance exists | each instance has its own drift status; detected on-demand or via managed execution | per-instance remediation |
 
-**The immutable rows are the ones a baseline model misses.** The
-permission model is set at StackSet creation and CANNOT be changed
-without deleting and recreating the StackSet. The administration
-role name is similarly immutable. The procedure below forces an
-explicit decision on each before the `create-stack-set` call.
-
-**Cross-dependency gotchas:**
-- SELF_MANAGED cannot be "upgraded" to SERVICE_MANAGED — must
-  delete and recreate.
-- SERVICE_MANAGED always skips the management (formerly "master")
-  account. Use a SELF_MANAGED StackSet or standalone stack for it.
-- Regions × accounts = cartesian product. N accounts × M regions =
-  N×M stack instances.
-- Disabling Organizations trusted access after a SERVICE_MANAGED
-  StackSet exists breaks all future operations on that StackSet.
+Dependency-graph takeaways and cross-dependency gotchas moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when sequencing provisioning or debugging stuck instances.
 
 ## Expert heuristic: SELF_MANAGED role handshake lifecycle
 
-The SELF_MANAGED permission model is the #1 source of "why won't my
-stack instance deploy?" issues. A baseline model says "create the
-roles and go"; this heuristic explains the actual trust chain.
-
-```text
-Administrator account:
-  → AWSCloudFormationStackSetAdministrationRole
-     trust: cloudformation.amazonaws.com
-     policy: sts:AssumeRole on arn:aws:iam::<target>:role/AWSCloudFormationStackSetExecutionRole
-
-For EACH target account:
-  → AWSCloudFormationStackSetExecutionRole
-     trust: arn:aws:iam::<admin-account-id>:root
-     policy: cloudformation:* + iam:PassRole
-
-On create-stack-instances:
-  → CloudFormation assumes administration role → assumes execution role
-    → creates member stack in target account
-
-Common failures:
-  → execution role missing/wrong name in target → INOPERABLE
-  → trust policy missing admin account ID → AccessDenied
-  → SCP blocking cloudformation → silent skip
-```
-
-**Key implication:** every target account must have the execution
-role pre-provisioned (via a bootstrap StackSet or manual IAM).
+SELF_MANAGED role handshake lifecycle heuristic moved verbatim to [references/permission-models-and-roles.md](references/permission-models-and-roles.md).
+Load on demand when diagnosing INOPERABLE stack instances.
 
 ## Expert heuristic: SERVICE_MANAGED trusted access setup
 
-SERVICE_MANAGED is simpler at scale but requires one-time
-Organizations trusted-access enablement that a baseline model
-often omits.
-
-```text
-One-time enablement (management account):
-  aws organizations enable-aws-service-access \
-    --service-principal cloudformation.amazonaws.com
-
-Verify:
-  aws organizations list-aws-service-access-for-organization \
-    --service-principal cloudformation.amazonaws.com
-
-Result:
-  → CloudFormation creates AWSServiceRoleForCloudFormationStackSetsOrgNS
-    SLR in the management account
-  → Member accounts get a service-linked role when targeted
-  → Trust path: CloudFormation → Organizations → member account SLR
-  → No admin/execution role setup required
-```
-
-**Key implication:** if trusted access is later disabled, all
-SERVICE_MANAGED StackSets become read-only until re-enabled. Treat
-trusted access as a permanent dependency.
+SERVICE_MANAGED trusted-access setup heuristic moved verbatim to [references/permission-models-and-roles.md](references/permission-models-and-roles.md).
+Load on demand when enabling Organizations trusted access.
 
 ## Expert heuristic: operation preferences blast radius tuning
 
-Operation preferences look like a minor knob; they are the single
-most important blast-radius control on a StackSet deployment. A
-baseline model accepts the defaults; this heuristic explains tuning.
-
-```text
-FailureToleranceCount / FailureTolerancePercentage
-  → number (or %) of instances that can fail BEFORE halting the operation
-  → DEFAULT: 0 (any failure halts) — TOO conservative for large fan-outs
-  → Recommendation: set so ≤5% of instances can fail without halting
-
-MaxConcurrentCount / MaxConcurrentPercentage
-  → number (or %) of instances deployed IN PARALLEL
-  → DEFAULT: 1 (sequential) — TOO slow for large fan-outs
-  → Recommendation: 5-10 for typical orgs
-
-Count and Percentage variants are MUTUALLY EXCLUSIVE per operation.
-RegionConcurrencyType: SEQUENTIAL (default) or PARALLEL.
-RegionOrder: only for SEQUENTIAL (e.g., ['us-east-1','us-west-2']).
-```
-
-**Production pattern:** `FailureTolerancePercentage=5`,
-`MaxConcurrentPercentage=20`, `RegionConcurrencyType=SEQUENTIAL`,
-`RegionOrder=[primary, secondary]`. Tolerate 5% failure, run 20%
-of accounts in parallel per region, deploy regions sequentially.
-
-**Safe pattern:** `FailureToleranceCount=0`, `MaxConcurrentCount=1`.
-Halt on ANY failure, deploy ONE account at a time.
+Operation-preferences blast-radius tuning heuristic moved verbatim to [references/operation-preferences-and-drift.md](references/operation-preferences-and-drift.md).
+Load on demand when tuning failure tolerance and concurrency.
 
 ## Prerequisites (verify before provisioning)
 
@@ -486,82 +374,13 @@ for composition.
 
 ## Step 8 — Update and delete operations
 
-**Update the StackSet (propagates to all instances):**
-
-```bash
-aws cloudformation update-stack-set \
-  --stack-set-name my-stackset \
-  --template-url https://s3.amazonaws.com/my-bucket/template-v2.yaml \
-  --parameters ParameterKey=ExampleParam,ParameterValue=newvalue \
-  --operation-preferences FailureTolerancePercentage=5,MaxConcurrentPercentage=20
-```
-
-- `update-stack-set` propagates the new template/parameters to ALL
-  existing stack instances, respecting operation preferences.
-- For SERVICE_MANAGED + managed execution, drifted instances are
-  auto-reconciled as part of the update.
-
-**Delete specific instances:**
-
-```bash
-aws cloudformation delete-stack-instances \
-  --stack-set-name my-stackset \
-  --deployment-targets Accounts="111111111111" \
-  --regions "us-east-1" \
-  --retain-stacks false
-```
-
-`--retain-stacks false` (default) deletes underlying stacks; `true`
-orphans them (remain but unmanaged).
-
-**Delete the StackSet (after all instances removed):**
-
-```bash
-aws cloudformation delete-stack-set --stack-set-name my-stackset
-```
-
-You MUST delete all stack instances first (`delete-stack-instances`),
-then delete the StackSet. Calling `delete-stack-set` while instances
-exist fails.
+Update and delete command listings (update-stack-set, delete-stack-instances, delete-stack-set) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when emitting lifecycle commands.
 
 ## Step 9 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **StackSet-level drift detection (2023-2024):** StackSets expose
-  `DriftStatus` at the StackSet level (aggregated from instances).
-  Combined with managed execution, drift is detected continuously
-  and reconciled automatically on updates.
-
-- **Managed execution for SERVICE_MANAGED (2023-2024):**
-  `ManagedExecution.Active=true` enables continuous drift detection
-  AND automatic reconciliation of account-targeting changes (when
-  accounts join/leave a targeted OU, instances are created/deleted
-  automatically).
-
-- **Detailed status for stack instances (2023-2024):**
-  `StackInstance.ComprehensiveStatus` exposes granular status
-  (`PENDING`, `RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED`,
-  `INOPERABLE`, `OUTDATED`) per instance.
-
-- **AccountFilterType for SERVICE_MANAGED (2023-2024):**
-  `INTERSECTION` (default), `DIFFERENCE`, `TARGET`, `UNION` —
-  enables fine-grained targeting within an OU (e.g., "deploy to OU
-  but exclude sandbox accounts").
-
-- **CloudFormation IaC generator (2023-2025):** Generates
-  CloudFormation templates from existing AWS resources. Use
-  `create-generated-template` to scan resources and produce a
-  template deployable via StackSets. Useful for "lift and shift"
-  of existing resources into a StackSet-managed baseline.
-
-- **Per-resource drift detail (2024-2025):** `detect-stack-resource-
-  drift` now surfaces the specific resource that drifted, not just
-  the instance-level status.
-
-- **RegionConcurrencyType PARALLEL (2024-2025):** Operation
-  preferences support `RegionConcurrencyType=PARALLEL` for faster
-  multi-region deployments.
+Recent AWS features (StackSet drift status, managed execution, AccountFilterType, IaC generator) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when confirming feature availability or vintage.
 
 ## NEVER do these things
 
@@ -672,27 +491,16 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### `StackInstance` status is `INOPERABLE`
-- **SELF_MANAGED:** the execution role is missing or has a broken
-  trust policy in that target account. Verify the role exists in
-  the target account.
-- **SERVICE_MANAGED:** an SCP is blocking CloudFormation in that
-  account, or the account was removed from the OU. Verify OU
-  membership: `aws organizations list-parents --child-id <account>`.
+Error-handling deep dives (INOPERABLE, InvalidOperationException, InsufficientCapabilities, DRIFTED) moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when an operation fails or an instance is stuck.
 
-### `InvalidOperationException` on create-stack-set
-- **SERVICE_MANAGED:** Organizations trusted access is not enabled.
-  Run: `aws organizations enable-aws-service-access --service-principal cloudformation.amazonaws.com`.
+## References (load on demand)
 
-### `InsufficientCapabilities` error
-- Template creates IAM/macros but `--capabilities` was not passed.
-  Add `CAPABILITY_IAM` (or `CAPABILITY_NAMED_IAM`, `CAPABILITY_AUTO_EXPAND`).
-
-### StackSet drift status is `DRIFTED` and not reconciling
-- **SERVICE_MANAGED + managed execution:** ensure
-  `ManagedExecution.Active=true` and trigger `update-stack-set`.
-- **SELF_MANAGED or managed execution off:** run
-  `detect-stack-set-drift`, then `update-stack-instances` to reset.
+- [references/permission-models-and-roles.md](references/permission-models-and-roles.md) — IAM role deep dive; now also holds the SELF_MANAGED handshake and SERVICE_MANAGED trusted-access heuristics moved from SKILL.md.
+- [references/operation-preferences-and-drift.md](references/operation-preferences-and-drift.md) — operation preferences and drift detail; now also holds the blast-radius tuning heuristic moved from SKILL.md.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — Step 8 update/delete command listings moved from SKILL.md.
+- [references/error-handling.md](references/error-handling.md) — INOPERABLE, InvalidOperationException, InsufficientCapabilities, and drift reconciliation handling moved from SKILL.md.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — mindset, dependency-graph gotchas, and recent AWS features moved from SKILL.md.
 
 ## Domain
 

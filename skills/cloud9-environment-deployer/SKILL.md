@@ -91,27 +91,9 @@ what AWS permissions the IDE has.
 Three misconceptions dominate Cloud9 misconfiguration at provisioning
 time:
 
-- **"Cloud9 needs SSH access (port 22 ingress) to work."** NOT with SSM
-  connection mode. SSM (Systems Manager) connection uses the SSM agent
-  on the EC2 instance to establish a secure tunnel via AWS backbone —
-  NO inbound security group rule, NO public SSH key, NO bastion host
-  needed. This is the recommended connection mode for security and
-  simplicity. SSH connection mode is the legacy default and requires
-  port 22 ingress + a key pair.
+Misconception detail — "Cloud9 needs SSH access to work" (SSM connection eliminates ingress): [Connection modes and IAM](references/connection-modes-and-iam.md).
 
-- **"The Cloud9 EC2 instance runs 24/7 unless manually stopped."**
-  Without auto-hibernation, yes — and this is a major cost drain.
-  Auto-hibernation (`--automatic-stop-time-minutes`) stops the EC2
-  instance after N minutes of IDE inactivity. The instance restarts
-  automatically when the user opens the IDE again. This is the single
-  most impactful cost optimization for Cloud9.
-
-- **"Sharing a Cloud9 environment means sharing AWS credentials."** It
-  does NOT. When you share a Cloud9 environment, each user connects
-  using their own AWS credentials (via the environment's IAM managed
-  temporary credentials). The instance profile role is NOT shared; each
-  user's permissions are governed by their own IAM identity federated
-  through Cloud9's credential management.
+Misconception detail — "runs 24/7 unless stopped" (auto-hibernation) and "sharing shares credentials" (per-user managed temporary credentials): [Sharing and cost optimization](references/sharing-and-cost-optimization.md).
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -136,73 +118,11 @@ requires the instance profile to have SSM permissions
 (`AmazonSSMManagedInstanceCore` policy). Without it, the environment is
 created but the IDE fails to connect silently.
 
-## Expert heuristic: SSM connection eliminates inbound rules
+Full heuristic (SSH legacy vs SSM recommended requirements, key implication): [Connection modes and IAM](references/connection-modes-and-iam.md).
 
-A baseline model says "open port 22 for SSH." The correct heuristic
-recognizes that SSM connection mode is the modern, secure default that
-requires NO inbound security group rules.
+Full heuristic (timeout ladder, t3.medium cost math, key implication): [Sharing and cost optimization](references/sharing-and-cost-optimization.md).
 
-```text
-SSH connection mode (legacy):
-  └── Requires: key pair + security group with port 22 ingress + public subnet
-      Risk: port 22 exposed (even to a CIDR); key pair management overhead
-
-SSM connection mode (recommended):
-  └── Requires: SSM agent (pre-installed on AL2/Ubuntu) + instance profile with AmazonSSMManagedInstanceCore
-      No key pair needed; no inbound rule needed; works in private subnets
-      Connection via AWS backbone (not public internet)
-```
-
-**Key implication:** SSM connection mode is more secure (no exposed
-ports), simpler (no key pair management), and more flexible (works in
-private subnets without a bastion). Use SSM unless there is a specific
-reason for SSH (e.g., external SSH client access).
-
-## Expert heuristic: auto-hibernate for cost control
-
-A baseline model says "create the environment." The correct heuristic
-recognizes that without auto-hibernation, the EC2 instance runs 24/7.
-
-```text
-Auto-hibernation (--automatic-stop-time-minutes):
-  ├── 30 minutes (default for console-created environments)
-  ├── 60 minutes (recommended for active development teams)
-  ├── 240 minutes (for long-running builds/debugging sessions)
-  └── 0 / unset (never auto-stop — HIGHEST COST, avoid)
-
-Cost impact (t3.medium, us-east-1, approximate):
-  No hibernation:   730 hours/month × $0.0416/hour = ~$30/month
-  30-min hibernate: ~4 hours/day × 22 days = 88 hours = ~$3.66/month
-  Savings: ~88% reduction
-```
-
-**Key implication:** auto-hibernation is the single most impactful cost
-optimization for Cloud9. Always set `--automatic-stop-time-minutes`.
-Never leave it unset (0 means never stop).
-
-## Expert heuristic: sharing for team collaboration
-
-```text
-Sharing a Cloud9 environment:
-  ├── Read sharing: user can view code and run commands (read-only)
-  ├── Write sharing: user can edit files (concurrent edits, no merge resolution)
-  └── Each user connects with their OWN AWS credentials
-      → IAM permissions governed by the user's identity, not the instance profile
-      → Managed temporary credentials are scoped per-user
-
-Sharing flow:
-  1. Environment created with --permissions 'read' or 'read,write'
-  2. Share via IAM: add user/role ARN to the environment's permissions
-     aws cloud9 create-environment-membership \
-       --environment-id <env-id> \
-       --user-arn arn:aws:iam::<acct>:user/<user> \
-       --permissions read-write
-  3. User opens the environment from their own Cloud9 console
-```
-
-**Key implication:** sharing does NOT share credentials. Each user's
-AWS permissions are independent. The instance profile is the fallback
-for operations not covered by managed temporary credentials.
+Full heuristic (read vs write sharing, sharing flow, key implication): [Sharing and cost optimization](references/sharing-and-cost-optimization.md).
 
 ## Prerequisites (verify before provisioning)
 
@@ -278,25 +198,11 @@ need external SSH client access.
 
 The instance profile MUST include `AmazonSSMManagedInstanceCore`:
 
-```bash
-# Verify the instance profile role has SSM permissions
-aws iam list-attached-role-policies \
-  --role-name Cloud9InstanceProfile \
-  --query 'AttachedPolicies[*].PolicyName' --output text
-# Must include AmazonSSMManagedInstanceCore
-```
+SSM-mode verification commands (list-attached-role-policies must include AmazonSSMManagedInstanceCore): [Diagnostic commands](references/diagnostic-commands.md).
 
 ### SSH mode requirements
 
-```bash
-# Key pair must exist
-aws ec2 describe-key-pairs --key-names my-cloud9-key
-
-# Security group must allow port 22 from trusted CIDR
-aws ec2 describe-security-groups \
-  --group-ids sg-aaa11122 \
-  --query 'SecurityGroups[0].IpPermissions[?FromPort==`22`]'
-```
+SSH-mode verification commands (describe-key-pairs, port-22 security-group check): [Diagnostic commands](references/diagnostic-commands.md).
 
 ## Step 3 — Platform selection (Amazon Linux, Ubuntu)
 
@@ -485,66 +391,11 @@ The instance profile is NOT shared. Permissions are governed per-user.
 
 ## Step 9 — Git integration (CodeCommit, GitHub)
 
-### AWS CodeCommit integration
-
-```bash
-# The instance profile needs CodeCommit permissions
-# Attach AWSCodeCommitReadOnly (or PowerUser) to the role
-
-# Inside the Cloud9 IDE, configure Git credentials
-git config --global credential.helper '!aws codecommit credential-helper $@'
-git config --global credential.UseHttpPath true
-
-# Clone a CodeCommit repo
-git clone https://git-codecommit.us-east-1.amazonaws.com/v1/repos/my-repo
-```
-
-### GitHub integration
-
-```bash
-# Inside the Cloud9 IDE, configure GitHub credentials
-# Option 1: SSH key (generate in IDE, add to GitHub)
-ssh-keygen -t ed25519 -C "cloud9-dev"
-cat ~/.ssh/id_ed25519.pub
-# Add the public key to GitHub → Settings → SSH keys
-
-# Option 2: HTTPS with personal access token
-git clone https://github.com/org/repo.git
-# Enter token when prompted
-
-# Option 3: GitHub CLI
-sudo yum install -y gh  # Amazon Linux
-gh auth login
-```
+CodeCommit credential-helper setup and GitHub options (SSH key, HTTPS token, GitHub CLI): [Advanced patterns](references/advanced-patterns.md).
 
 ## Step 10 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **SSM connection mode maturity (2023-2024):** SSM connection is now
-  the recommended default for new Cloud9 environments, eliminating port
-  22 exposure and key pair management. All Amazon Linux 2 and Ubuntu
-  Cloud9 AMIs ship with the SSM agent pre-installed.
-
-- **Ubuntu 22.04 support (2023-2024):** Cloud9 now supports Ubuntu
-  22.04 LTS as a platform option, in addition to Amazon Linux 2 and
-  Ubuntu 18.04. Includes updated Node.js 18, Python 3.10, and Go 1.20.
-
-- **CloudWatch integration for Cloud9 (2023-2024):** Cloud9 now
-  publishes EC2 instance metrics (CPU, memory, network) to CloudWatch,
-  enabling dashboards and alarms for environment health monitoring.
-
-- **Enhanced no-ingress support (2024-2025):** SSM connection mode now
-  works with VPC endpoints for SSM, enabling fully private Cloud9
-  environments with no internet gateway and no NAT gateway.
-
-- **Terraform provider support (2024-2025):** The Terraform
-  `aws_cloud9_environment_ec2` resource now supports all connection
-  types and automatic-stop-time-minutes, with improved drift detection.
-
-- **Cost optimization dashboards (2024-2025):** AWS Cost Explorer now
-  includes Cloud9-specific cost breakdowns, showing per-environment
-  EC2 uptime and hibernation savings.
+Recent features (SSM maturity, Ubuntu 22.04, CloudWatch integration, no-ingress VPC endpoints, Terraform support, cost dashboards): [Advanced patterns](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -642,38 +493,15 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Environment creation fails
-- Verify the subnet exists and is in the same region. Verify the
-  instance type is valid. Verify the instance profile exists and has
-  the correct trust policy. For SSM mode, verify
-  `AmazonSSMManagedInstanceCore` is attached.
+Symptom-to-fix mappings (creation failure, SSM/SSH connect failure, hibernation not triggering, sharing not working, stuck instance): [Error handling](references/error-handling.md).
 
-### IDE fails to connect (SSM mode)
-- Verify the instance profile has `AmazonSSMManagedInstanceCore`. Verify
-  the SSM agent is running (check Systems Manager console). Verify
-  outbound connectivity to SSM endpoints (NAT gateway, VPC endpoints,
-  or IGW for public subnets).
+## References (load on demand)
 
-### IDE fails to connect (SSH mode)
-- Verify the key pair matches. Verify port 22 is allowed in the security
-  group from the user's IP. Verify the instance is in a public subnet
-  with an internet gateway route.
-
-### Auto-hibernation not triggering
-- Verify `--automatic-stop-time-minutes` is set (not 0). Note: the
-  timer counts IDE inactivity, not EC2 CPU utilization. The IDE must
-  be closed or idle (no active terminal sessions).
-
-### Sharing not working for a user
-- Verify the user's IAM identity is correct. Verify the user has
-  `cloud9:GetUserPermissions` and `cloud9:DescribeEnvironmentMemberships`
-  permissions. The user must open the environment from their own Cloud9
-  console.
-
-### EC2 instance stuck in stopped state
-- If hibernated, opening the IDE should restart it. If it does not,
-  manually start: `aws ec2 start-instances --instance-ids <i-id>`.
-  Verify the instance is not in error state.
+- [Connection modes and IAM](references/connection-modes-and-iam.md) — SSM/SSH detail, SSM-eliminates-ingress heuristic, SSH-access misconception
+- [Sharing and cost optimization](references/sharing-and-cost-optimization.md) — sharing/hibernation detail, cost-control and collaboration heuristics, 24/7 and credential-sharing misconceptions
+- [Diagnostic commands](references/diagnostic-commands.md) — SSM-mode and SSH-mode requirement verification commands
+- [Advanced patterns](references/advanced-patterns.md) — Git integration (CodeCommit, GitHub), recent features
+- [Error handling](references/error-handling.md) — creation, connect, hibernation, sharing, and stuck-instance failure mappings
 
 ## Domain
 

@@ -171,50 +171,9 @@ Authorization rules (evaluated top-down, first match wins):
 broad. A broad `0.0.0.0/0` allow rule should be the LAST rule.
 Reordering requires deleting and recreating rules (no reorder API).
 
-## Expert heuristic: split-tunnel DNS leak prevention
+Full heuristic (broken vs correct resolution trace, full-tunnel trade-off, key implication): [Routes, DNS, and tunnel](references/routes-dns-and-tunnel.md).
 
-Split-tunnel routes only VPC-relevant traffic through the VPN. Without
-custom DNS servers, clients use their local resolver for DNS queries —
-including queries for VPC private hostnames — which fail.
-
-```text
-Split-tunnel with NO custom DNS (BROKEN):
-  Client → DNS query for ip-10-0-1-5.ec2.internal
-    → Local resolver (8.8.8.8) → NXDOMAIN → fails
-
-Split-tunnel WITH custom DNS (CORRECT):
-  Endpoint config: DnsServers = ["10.0.0.2"]  (VPC .2 resolver)
-  Client → DNS query → VPN tunnel → VPC DNS resolver → resolves ✓
-
-Full-tunnel (no DNS leak risk):
-  All traffic including DNS goes through tunnel → no custom DNS needed
-  Downside: all internet traffic egresses via AWS (cost)
-```
-
-**Key implication:** when `SplitTunnel=true`, always set
-`DnsServers=["<VPC-DNS-resolver>"]` (the VPC CIDR `.2` address).
-
-## Expert heuristic: mutual TLS certificate-based auth revocation
-
-With mutual TLS, client certificates are issued by a CA registered in
-ACM. Revoking a client certificate requires uploading a CRL
-(Certificate Revocation List) to the endpoint — there is no
-per-certificate revoke API.
-
-```text
-Mutual TLS auth flow:
-  1. Server certificate (ACM) → endpoint (server side)
-  2. Client certificates signed by same CA → distributed to clients
-  3. To revoke: generate CRL, upload via import-client-vpn-client-certificate-revocation-list
-
-  aws ec2 import-client-vpn-client-certificate-revocation-list \
-    --client-vpn-endpoint-id cvpn-xxx \
-    --certificate-revocation-list file://crl.pem
-```
-
-**Key implication:** plan for certificate lifecycle management. For
-large fleets, SAML federation is often simpler than managing
-individual client certificates and CRLs.
+Full heuristic (mutual TLS auth flow, CRL upload command, fleet-lifecycle key implication): [Auth and authorization](references/auth-and-authorization.md).
 
 ## Prerequisites (verify before provisioning)
 
@@ -425,16 +384,7 @@ Client VPN publishes metrics under `AWS/ClientVPN` namespace.
 
 ## Step 12 — Recent features
 
-- **SAML 2.0 federation (2023-2024):** Full SAML-based authentication
-  enabling SSO through Okta, Azure AD, etc.
-- **Self-service portal (2023-2024):** Web-based portal for user
-  self-enrollment and configuration download.
-- **Session duration control (2023-2024):** Configurable session
-  duration (1-24 hours) before re-authentication. Default 20 hours.
-- **IPv6 Client VPN (2024-2025):** IPv6 support for dual-stack
-  environments.
-- **Performance improvements (2024-2025):** Up to 10,000 concurrent
-  connections per endpoint (soft limit).
+Recent features (SAML 2.0 federation, self-service portal, session duration control, IPv6, 10,000 concurrent connections): [Advanced patterns](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -525,20 +475,14 @@ VERIFICATION_COMMANDS:
 
 ## Error handling
 
-### Clients connect but cannot reach any IP
-- Missing authorization rule. Create at least one
-  `authorize-client-vpn-ingress` rule. Without it, clients route nowhere.
+Symptom-to-fix mappings (connect-but-no-access, split-tunnel DNS failure, association limit, rule shadowing): [Error handling](references/error-handling.md).
 
-### DNS resolution fails for VPC hostnames in split-tunnel
-- Custom DNS servers not configured. Set `DnsServers=["<VPC-DNS>"]`.
+## References (load on demand)
 
-### Subnet association fails with association limit exceeded
-- AWS processes associations sequentially. Wait for existing
-  associations to reach `available` before creating new ones.
-
-### Authorization rule shadows specific rule
-- Rules are first-match-wins. Delete and recreate in the correct order
-  (specific first, broad last).
+- [Auth and authorization](references/auth-and-authorization.md) — auth-type detail, authorization-rule ordering, mutual-TLS CRL revocation heuristic
+- [Routes, DNS, and tunnel](references/routes-dns-and-tunnel.md) — route/DNS/tunnel detail, split-tunnel DNS leak prevention heuristic
+- [Advanced patterns](references/advanced-patterns.md) — recent features (SAML federation, self-service portal, session duration, IPv6, connection scaling)
+- [Error handling](references/error-handling.md) — connect-but-no-access, split-tunnel DNS failures, association limits, rule shadowing
 
 ## Domain
 

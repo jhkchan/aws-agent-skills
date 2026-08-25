@@ -361,3 +361,427 @@ Triggers:
 For a fleet of 20 pipelines averaging 50 actions/month each, monthly
 CodePipeline cost is ~$130 — usually negligible vs. engineering time
 saved.
+
+## V2 trigger example (Step 1: source stage design)
+
+**V2 trigger example:**
+```yaml
+Triggers:
+  - GitConfiguration:
+      Push:
+        - Branches:
+            - main
+          FilePathIncludes:
+            - "src/**"
+    ProviderType: CodeStarSourceConnection
+```
+
+## buildspec.yml minimum (Step 2: build stage design)
+
+**buildspec.yml minimum:**
+```yaml
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      nodejs: 18
+    commands:
+      - npm ci
+  build:
+    commands:
+      - npm run build
+      - npm run test:unit
+  post_build:
+    commands:
+      - npm run test:integration
+artifacts:
+  files:
+    - '**/*'
+  base-directory: dist
+cache:
+  paths:
+    - node_modules/**/*
+```
+
+## Step 4: Deploy stage design — strategy blocks
+
+#### CloudFormation deploy (create-change-set + execute)
+
+```yaml
+- Name: Deploy
+  Actions:
+    - Name: CreateChangeSet
+      ActionTypeId:
+        Category: Deploy
+        Owner: AWS
+        Provider: CloudFormation
+        Version: 1
+      Configuration:
+        ActionMode: CHANGE_SET_REPLACE
+        StackName: !Sub "${AppName}-prod"
+        ChangeSetName: !Sub "${AppName}-prod-changeset"
+        TemplatePath: BuildOutput::template.yaml
+        RoleArn: !GetAtt DeployRole.Arn
+        Capabilities: CAPABILITY_IAM,CAPABILITY_NAMED_IAM
+      InputArtifacts:
+        - Name: BuildOutput
+      RunOrder: 1
+    - Name: ExecuteChangeSet
+      ActionTypeId:
+        Category: Deploy
+        Owner: AWS
+        Provider: CloudFormation
+        Version: 1
+      Configuration:
+        ActionMode: CHANGE_SET_EXECUTE
+        StackName: !Sub "${AppName}-prod"
+        ChangeSetName: !Sub "${AppName}-prod-changeset"
+      RunOrder: 2
+```
+
+#### CodeDeploy in-place (EC2)
+
+```yaml
+- Name: Deploy
+  Actions:
+    - Name: DeployEC2
+      ActionTypeId:
+        Category: Deploy
+        Owner: AWS
+        Provider: CodeDeploy
+        Version: 1
+      Configuration:
+        ApplicationName: !Ref CodeDeployAppName
+        DeploymentGroupName: !Ref CodeDeployDGName
+      InputArtifacts:
+        - Name: BuildOutput
+```
+
+#### CodeDeploy blue/green (Lambda)
+
+```yaml
+DeploymentStyle:
+  DeploymentType: BLUE_GREEN
+  DeploymentOption: WITH_TRAFFIC_CONTROL
+  DeploymentOverview:
+    Canary10Percent5Minutes: {}
+```
+
+The canary config specifies 10% traffic shift for 5 minutes, then the
+remaining 90%. PreTrafficHook / PostTrafficHook Lambda functions run
+before/after the shift and can fail the deployment programmatically.
+
+#### ECS rolling with circuit breaker
+
+```yaml
+DeploymentConfiguration:
+  DeploymentCircuitBreaker:
+    Enable: true
+    Rollback: true
+  MaximumPercent: 200
+  MinimumHealthyPercent: 100
+```
+
+The circuit breaker rolls back automatically if a deployment fails to
+stabilize within the healthy-percent thresholds.
+
+#### Route53 weighted routing (manual blue/green)
+
+```yaml
+- Name: ShiftTraffic10
+  ActionTypeId:
+    Category: Invoke
+    Owner: AWS
+    Provider: Lambda
+    Version: 1
+  Configuration:
+    FunctionName: traffic-shifter
+    UserParameters: '{"blue_weight": 90, "green_weight": 10}'
+```
+
+The Lambda function updates the Route53 weighted record set. Pair with
+CloudWatch alarms that auto-rollback if error rate spikes.
+
+## Step 5: Cross-account deployment design — IAM pieces and policies
+
+**Three IAM pieces (all required):**
+
+1. **Source-account pipeline role** — must allow `sts:AssumeRole` on
+   the target deploy role.
+2. **Target-account deploy role** — trust policy:
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [{
+       "Effect": "Allow",
+       "Principal": {"Service": "codepipeline.amazonaws.com"},
+       "Action": "sts:AssumeRole",
+       "Condition": {"StringEquals": {
+         "aws:SourceAccount": "<source-account-id>"
+       }}
+     }]
+   }
+   ```
+3. **Artifact KMS key policy** — must grant the target account
+   `kms:Decrypt`, `kms:GenerateDataKey`.
+
+**Artifact bucket policy** must grant the target account
+`s3:GetObject` on the artifact prefix.
+
+## Step 6: Pipeline monitoring design — EventBridge rule and approval gate
+
+**EventBridge rule for pipeline failures:**
+```yaml
+EventPattern:
+  source:
+    - aws.codepipeline
+  detail-type:
+    - CodePipeline Pipeline Execution State Change
+  detail:
+    state:
+      - FAILED
+      - CANCELED
+Target:
+  Arn: !Ref PipelineFailureTopic
+```
+
+**Manual approval gate:**
+```yaml
+- Name: ApprovalGate
+  Actions:
+    - Name: Approve
+      ActionTypeId:
+        Category: Approval
+        Owner: AWS
+        Provider: Manual
+        Version: 1
+      Configuration:
+        NotificationArn: !Ref ApprovalTopic
+        CustomData: "Review and approve production deployment"
+```
+
+Missing `NotificationArn` = silent gate. Approvers never know they're
+needed.
+
+## Patterns — pipeline-as-code templates (CloudFormation, CDK, Terraform)
+
+### CloudFormation (AWS::CodePipeline::Pipeline)
+
+```yaml
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  AppName:
+    Type: String
+  GitHubConnectionArn:
+    Type: String
+  ArtifactKeyArn:
+    Type: String
+Resources:
+  PipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: codepipeline.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCodePipelineFullAccess
+      Policies:
+        - PolicyName: ArtifactAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject, s3:ListBucket]
+                Resource:
+                  - !GetAtt ArtifactBucket.Arn
+                  - !Sub "${ArtifactBucket.Arn}/*"
+              - Effect: Allow
+                Action: [kms:Encrypt, kms:Decrypt, kms:GenerateDataKey, kms:DescribeKey]
+                Resource: !Ref ArtifactKeyArn
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      RoleArn: !GetAtt PipelineRole.Arn
+      PipelineType: V2
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
+        EncryptionKey:
+          Id: !Ref ArtifactKeyArn
+          Type: KMS
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeStarConnection
+                Version: 1
+              Configuration:
+                ConnectionArn: !Ref GitHubConnectionArn
+                FullRepositoryId: !Sub "${GitHubOwner}/${GitHubRepo}"
+                BranchName: main
+                OutputArtifactFormat: CODE_ZIP
+              OutputArtifacts:
+                - Name: SourceOutput
+        - Name: Build
+          Actions:
+            - Name: Build
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: 1
+              Configuration:
+                ProjectName: !Ref BuildProject
+              InputArtifacts:
+                - Name: SourceOutput
+              OutputArtifacts:
+                - Name: BuildOutput
+        - Name: Approval
+          Actions:
+            - Name: Approve
+              ActionTypeId:
+                Category: Approval
+                Owner: AWS
+                Provider: Manual
+                Version: 1
+              Configuration:
+                NotificationArn: !Ref ApprovalTopic
+                CustomData: "Review and approve production deployment"
+        - Name: Deploy
+          Actions:
+            - Name: CreateChangeSet
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: 1
+              Configuration:
+                ActionMode: CHANGE_SET_REPLACE
+                StackName: !Sub "${AppName}-prod"
+                ChangeSetName: !Sub "${AppName}-changeset"
+                TemplatePath: BuildOutput::template.yaml
+                RoleArn: !GetAtt DeployRole.Arn
+              InputArtifacts:
+                - Name: BuildOutput
+              RunOrder: 1
+            - Name: ExecuteChangeSet
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: 1
+              Configuration:
+                ActionMode: CHANGE_SET_EXECUTE
+                StackName: !Sub "${AppName}-prod"
+                ChangeSetName: !Sub "${AppName}-changeset"
+              RunOrder: 2
+```
+
+### CDK (Pipelines module)
+
+```typescript
+import * as cdk from 'aws-cdk-lib';
+import * as pipelines from 'aws-cdk-lib/pipelines';
+import * as codebuild from 'aws-cdk-lib/aws-codebuild';
+
+const app = new cdk.App();
+const pipeline = new pipelines.CodePipeline(this, 'Pipeline', {
+  pipelineName: `${appName}-pipeline`,
+  synth: new pipelines.CodeBuildStep('Synth', {
+    input: pipelines.CodePipelineSource.connection(`${githubOwner}/${githubRepo}`, 'main', {
+      connectionArn: githubConnectionArn,
+    }),
+    buildEnvironment: {
+      buildImage: codebuild.LinuxBuildImage.STANDARD_7_0,
+      privileged: true,
+    },
+    commands: ['npm ci', 'npm run build', 'npx cdk synth'],
+  }),
+  crossAccountKeys: true,
+});
+
+const prodStage = pipeline.addStage(new ProdAppStage(app, 'Prod', {
+  env: prodEnv,
+}));
+prodStage.addPost(new pipelines.ShellStep('SmokeTest', {
+  commands: ['curl -f https://prod.example.com/health'],
+}));
+```
+
+### Terraform (aws_codepipeline)
+
+```hcl
+resource "aws_codepipeline" "this" {
+  name     = "${var.app_name}-pipeline"
+  role_arn = aws_iam_role.pipeline.arn
+  pipeline_type = "V2"
+
+  artifact_store {
+    type     = "S3"
+    location = aws_s3_bucket.artifacts.id
+    encryption_key {
+      id   = aws_kms_key.artifacts.arn
+      type = "KMS"
+    }
+  }
+
+  stage {
+    name = "Source"
+    action {
+      name             = "Source"
+      category         = "Source"
+      owner            = "AWS"
+      provider         = "CodeStarConnection"
+      version          = "1"
+      output_artifacts = ["source_output"]
+      configuration = {
+        ConnectionArn        = var.github_connection_arn
+        FullRepositoryId     = "${var.github_owner}/${var.github_repo}"
+        BranchName           = "main"
+        OutputArtifactFormat = "CODE_ZIP"
+      }
+    }
+  }
+
+  stage {
+    name = "Build"
+    action {
+      name      = "Build"
+      category  = "Build"
+      owner     = "AWS"
+      provider  = "CodeBuild"
+      version   = "1"
+      input_artifacts  = ["source_output"]
+      output_artifacts = ["build_output"]
+      configuration = {
+        ProjectName = aws_codebuild_project.this.name
+      }
+    }
+  }
+
+  stage {
+    name = "Deploy"
+    action {
+      name     = "Deploy"
+      category = "Deploy"
+      owner    = "AWS"
+      provider = "CloudFormation"
+      version  = "1"
+      input_artifacts = ["build_output"]
+      configuration = {
+        ActionMode     = "REPLACE_ON_FAILURE"
+        StackName      = "${var.app_name}-prod"
+        TemplatePath   = "build_output::template.yaml"
+        RoleArn        = aws_iam_role.deploy.arn
+        Capabilities   = "CAPABILITY_IAM,CAPABILITY_NAMED_IAM"
+      }
+    }
+  }
+}
+```

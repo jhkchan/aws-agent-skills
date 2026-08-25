@@ -280,3 +280,33 @@ aws configservice put-conformance-pack \
 Where `conformance-pack.yaml` declares the
 `cloudformation-stack-drift-detection-check` managed rule scoped to
 `AWS::CloudFormation::Stack`.
+
+## 9. Resource import flow — full CLI sequence (moved from SKILL.md Step 5)
+
+**Resource import flow (high-level):**
+
+```bash
+# 1. Generate the resources-to-import JSON:
+cat > resources-to-import.json <<EOF
+[
+  {
+    "ResourceType": "AWS::S3::Bucket",
+    "LogicalResourceId": "MyBucket",
+    "ResourceIdentifier": { "BucketName": "my-existing-bucket" }
+  }
+]
+EOF
+
+# 2. Create an IMPORT change set:
+aws cloudformation create-change-set \
+  --stack-name <name> \
+  --change-set-name import-bucket \
+  --change-set-type IMPORT \
+  --resources-to-import file://resources-to-import.json \
+  --template-body file://template-with-bucket.yaml \
+  --capabilities CAPABILITY_IAM
+
+# 3. Review and execute:
+aws cloudformation describe-change-set --stack-name <name> --change-set-name import-bucket
+aws cloudformation execute-change-set --stack-name <name> --change-set-name import-bucket
+```

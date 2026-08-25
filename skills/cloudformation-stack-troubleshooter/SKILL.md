@@ -38,45 +38,8 @@ dependency", "stack delete failed".
 
 ## Mindset
 
-**One-line takeaway:** every CloudFormation stack failure surfaces a
-`ResourceStatusReason` on the failing resource in
-`describe-stack-events`, and the stack's `StackStatus` identifies which
-phase of the lifecycle broke. These two signals are the primary
-diagnostic surface — the job of this skill is to walk from the stack
-status to the specific resource, then from the `ResourceStatusReason` to
-the specific root cause (IAM, limit, immutable property, dependent
-resource, custom-resource timeout, nested stack).
-
-Three facts make CloudFormation troubleshooting different from generic
-service debugging:
-
-- **`StackStatus` is the lifecycle phase, not the root cause.**
-  `CREATE_FAILED`, `UPDATE_FAILED`, `UPDATE_ROLLBACK_COMPLETE`,
-  `ROLLBACK_COMPLETE`, `DELETE_FAILED` each name a phase where the stack
-  broke. The actionable cause is in the failing resource's
-  `ResourceStatusReason`, which is a short string that often embeds the
-  underlying service's error message (e.g.,
-  `Resource creation cancelled` vs `API: iam:CreateRole AccessDenied`).
-  Always read both fields.
-
-- **Updates can require Replacement, and Replacement is irreversible.**
-  When a ChangeSet reports `Replacement: true` for a resource,
-  CloudFormation will create a new physical resource and delete the old
-  one. Many properties are immutable (e.g., an RDS DBInstance's
-  `DBInstanceIdentifier`, a DynamoDB table's `KeySchema`, an IAM role's
-  `RoleName`). Operators often run `update-stack` without first reviewing
-  the ChangeSet and are surprised when the resource is replaced. The
-  ChangeSet is the diagnostic surface for updates — always read it.
-
-- **Rollback is not recovery.** When a CREATE or UPDATE fails,
-  CloudFormation attempts to roll back. If the rollback also fails, the
-  stack enters `ROLLBACK_COMPLETE` (after a failed CREATE) or
-  `UPDATE_ROLLBACK_FAILED` (after a failed UPDATE). In both states, the
-  stack is broken and cannot be updated — it must be deleted (and, for
-  UPDATE_ROLLBACK_FAILED, continued with `ContinueUpdateRollback` to
-  skip the failing resource). Operators often keep retrying `update-stack`
-  on a `ROLLBACK_COMPLETE` stack and are confused when CloudFormation
-  rejects it.
+Mindset — three facts that differentiate CloudFormation failures moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when framing the diagnostic walk.
 
 ## Quick reference — stack status to failure category
 
@@ -208,41 +171,11 @@ deleting any successfully-created resources, and the stack ends in
 | No `CREATE_FAILED` event, but stack ends in `ROLLBACK_COMPLETE` after a long pause | A `CreationPolicy` `Count` or `TimeoutSignal` was never satisfied (common on EC2 / Auto Scaling groups with no cfn-init / cfn-signal) | Read the `CreationPolicy`; verify the instance runs `cfn-signal` and reaches the desired count |
 | `CloudFormation cannot create a change set...` for a CREATE with nested stacks | A nested stack's template is invalid or its parameters are wrong | Diagnose the child stack independently with `describe-stacks --stack-name <nested-arn>` |
 
-**Diagnostic commands:**
+CREATE_FAILED diagnostic command listing moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when probing a failed CREATE.
 
-```bash
-# Identify the stack and its status:
-aws cloudformation describe-stacks --stack-name <name> \
-  --query 'Stacks[0].{name:StackName,status:StackStatus,reason:StackStatusReason,role:RoleArn,capabilities:Capabilities}'
-
-# Find the first CREATE_FAILED resource (the real cause):
-aws cloudformation describe-stack-events --stack-name <name> \
-  --query 'StackEvents[?ResourceStatus==`CREATE_FAILED`].{logical:LogicalResourceId,type:ResourceType,physical:PhysicalResourceId,reason:ResourceStatusReason,ts:Timestamp}' \
-  --output table
-
-# Find the earliest failure to identify the root resource:
-aws cloudformation describe-stack-events --stack-name <name> \
-  --query 'reverse(StackEvents[?ResourceStatus==`CREATE_FAILED`])[-1]'
-```
-
-**Common fix patterns:**
-
-- **IAM permission (`AccessDenied`):** attach a policy to the
-  CloudFormation execution role (or the deploying principal) granting
-  the action scoped to the resource ARN. For stacks creating IAM
-  resources, pass `--capabilities CAPABILITY_IAM` or
-  `CAPABILITY_NAMED_IAM` on `create-stack` / `update-stack`.
-- **Service limit (`LimitExceeded`):** request a quota increase via
-  Service Quotas, or delete stale resources in the account.
-- **Resource already exists:** either delete the existing resource, or
-  use `cloudformation import-resources` to bring it under stack
-  management, or rename the resource in the template.
-- **Invalid property:** fix the template; run
-  `cfn-lint template.yaml` before re-deploying.
-- **Custom resource timeout:** fix the Lambda function so it calls
-  `cfn-response.send(event, context, "SUCCESS", …)` within
-  `CreationPolicy.TimeoutInMinutes`; check the function's logs for the
-  actual exception.
+CREATE_FAILED common fix patterns moved verbatim to [references/failure-catalog-and-decision-tree.md](references/failure-catalog-and-decision-tree.md).
+Load on demand when writing REMEDIATION for a failed CREATE.
 
 ### Step 3: UPDATE_FAILED diagnostic
 
@@ -263,38 +196,11 @@ in `UPDATE_ROLLBACK_FAILED` (see Step 6).
 | Nested stack `UPDATE_FAILED` | The child stack's update failed; the parent reports `UPDATE_FAILED` for the `AWS::CloudFormation::Stack` resource | Diagnose the child stack independently |
 | Circular dependency in template | `DependsOn` or implicit references form a cycle; `cfn-lint` flags it pre-deploy | Run `cfn-lint`; remove the cycle |
 
-**Diagnostic walk:**
+UPDATE_FAILED diagnostic walk moved verbatim to [references/failure-catalog-and-decision-tree.md](references/failure-catalog-and-decision-tree.md).
+Load on demand when sequencing ChangeSet review for a failed UPDATE.
 
-1. **Always create a ChangeSet before updating.** Never run
-   `update-stack` blind — always run `create-change-set`, then
-   `describe-change-set`, then `execute-change-set` after review.
-2. **For each changed resource in the ChangeSet,** read `Action`
-   (`Add` / `Modify` / `Remove`) and `Replacement` (`True` / `False` /
-   `Conditional`).
-3. **If `Replacement: True`,** identify which properties caused the
-   replacement (`DetailedStatus` / `Scope` / `PolicyAction`). Decide
-   whether to (a) proceed with the replacement, (b) refactor to avoid
-   the immutable-property change (e.g., blue-green via a new resource),
-   or (c) use `UpdateReplacePolicy` to control delete/retain on the old
-   resource.
-4. **For `UPDATE_FAILED` without replacement,** read the
-   `ResourceStatusReason` verbatim — it usually embeds the underlying
-   service's error.
-
-**Common fix patterns:**
-
-- **Immutable property change:** refactor the template to introduce the
-  new resource alongside the old one (blue-green), then cut over and
-  delete the old. Or use `UpdateReplacePolicy: Retain` to keep the old
-  resource after replacement.
-- **Missing CAPABILITY_IAM on update:** pass
-  `--capabilities CAPABILITY_IAM` (or `CAPABILITY_NAMED_IAM`,
-  `CAPABILITY_AUTO_EXPAND`) on `update-stack` / `create-change-set`.
-- **Drift:** run `detect-stack-drift`; either `import-resources` to
-  align the stack with reality, or reset the resource to match the
-  template before re-deploying.
-- **DependsOn cycle:** remove the cycle; let CloudFormation compute
-  implicit dependencies from `Ref` / `GetAtt` / `DependsOn`.
+UPDATE_FAILED common fix patterns moved verbatim to [references/failure-catalog-and-decision-tree.md](references/failure-catalog-and-decision-tree.md).
+Load on demand when writing REMEDIATION for a failed UPDATE.
 
 ### Step 4: DELETE_FAILED diagnostic
 
@@ -311,31 +217,11 @@ failing resource is resolved.
 | `Role <name> cannot be deleted because it has <N> policies` | An IAM role has inline or attached policies that block deletion (or active sessions) | Detach policies; ensure no active sessions; delete the role manually if needed |
 | Nested stack `DELETE_FAILED` | A child stack cannot be deleted (one of the above reasons applies in the child) | Diagnose the child stack independently |
 
-**Diagnostic walk:**
+DELETE_FAILED diagnostic walk moved verbatim to [references/failure-catalog-and-decision-tree.md](references/failure-catalog-and-decision-tree.md).
+Load on demand when walking a blocked stack delete.
 
-1. **Read `describe-stack-events` for the `DELETE_FAILED` resource.**
-   The `ResourceStatusReason` names the specific blocker.
-2. **For S3 buckets,** list objects AND versions — buckets with
-   versioning enabled have objects in non-current versions that block
-   deletion.
-3. **For `DeletionPolicy: Retain`,** confirm in the template — the
-   resource will not be deleted; the operator must delete it manually
-   if they want it gone.
-
-**Common fix patterns:**
-
-- **S3 bucket not empty:** add a `Custom::S3Cleanup` (Lambda-backed)
-  to the template that empties the bucket on Delete, or empty it
-  manually with `aws s3 rm s3://<bucket> --recursive` (and
-  `--versions` if versioned) before retrying the stack delete.
-- **Dependent resources:** delete or detach the dependents outside
-  CloudFormation, then retry the stack delete.
-- **`DeletionPolicy: Retain`:** if the resource should be deleted on
-  stack delete, change the policy to `Delete` in the template and
-  update the stack before deleting.
-- **Custom resource Delete:** fix the Lambda function to handle Delete
-  idempotently; ensure it always sends `SUCCESS` (Delete should not
-  fail the stack delete even if the physical resource is already gone).
+DELETE_FAILED common fix patterns moved verbatim to [references/failure-catalog-and-decision-tree.md](references/failure-catalog-and-decision-tree.md).
+Load on demand when writing REMEDIATION for a blocked delete.
 
 ### Step 5: ROLLBACK_FAILED diagnostic (stack stuck in ROLLBACK_COMPLETE)
 
@@ -355,16 +241,8 @@ stack and receive `UpdateRollbackComplete` errors — this is by design.
 | `StackStatus: ROLLBACK_FAILED` (rollback itself failed) | A resource could not be deleted during rollback | Identify the `DELETE_FAILED` resource (Step 4); resolve the blocker; CloudFormation will resume rollback automatically, or use `ContinueUpdateRollback` (for UPDATE_ROLLBACK_FAILED) |
 | Resources were created but the stack is in `ROLLBACK_COMPLETE` | The visible resources have already been deleted by rollback; the operator is seeing a stale console view | Refresh `describe-stack-resources`; the only valid next action is delete |
 
-**Diagnostic walk:**
-
-1. **Confirm `StackStatus: ROLLBACK_COMPLETE`** via `describe-stacks`.
-2. **Read the original `CREATE_FAILED` reason** from
-   `describe-stack-events` to identify the root cause.
-3. **Fix the template or the IAM/limit issue** identified in Step 2.
-4. **Delete the stack:**
-   `aws cloudformation delete-stack --stack-name <name>`.
-5. **Re-create with the fixed template:**
-   `aws cloudformation create-stack --stack-name <name> --template-body file://fixed.yaml --capabilities CAPABILITY_IAM`.
+ROLLBACK_COMPLETE recovery walk (delete + recreate commands) moved verbatim to [references/failure-catalog-and-decision-tree.md](references/failure-catalog-and-decision-tree.md).
+Load on demand when recovering a ROLLBACK_COMPLETE stack.
 
 ### Step 6: UPDATE_ROLLBACK_FAILED diagnostic (nested stack and others)
 
@@ -395,11 +273,8 @@ resource and complete the rollback, returning the stack to
 3. **For nested stacks,** diagnose the child stack independently —
    the child's `UPDATE_ROLLBACK_FAILED` is the real cause.
 4. **Decide whether to skip the failing resource:**
-   ```bash
-   aws cloudformation continue-update-rollback \
-     --stack-name <name> \
-     --resources-to-skip <logical-id-of-failing-resource>
-   ```
+   continue-update-rollback skip command moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+   Load on demand when unblocking UPDATE_ROLLBACK_FAILED.
    This returns the stack to `UPDATE_ROLLBACK_COMPLETE`, after which it
    can be updated again.
 5. **After rollback completes,** re-attempt the original UPDATE with a
@@ -514,84 +389,8 @@ REMEDIATION:
 
 ## Expert edge cases
 
-These patterns represent genuine, non-obvious CloudFormation failure
-modes that a senior operator would catch but a generalist would miss.
-
-### The first `CREATE_FAILED` is the cause; the rest are cascade
-
-When a stack fails to create, CloudFormation cancels all in-flight
-resources. `describe-stack-events` may show many `CREATE_FAILED`
-resources, but only the **first** (by timestamp) is the real cause —
-the rest were cancelled as a cascade. Filter events by
-`ResourceStatus: CREATE_FAILED` and sort by `Timestamp` ascending; the
-earliest is the root cause.
-
-### `Replacement: True` is not always visible in `describe-stack-events`
-
-When an UPDATE fails because of a replacement, the
-`ResourceStatusReason` may say only `Resource update cancelled` — the
-replacement intent is visible only in the ChangeSet's
-`Changes[].ResourceChange.Replacement`. Always cross-reference
-`describe-change-set` for an UPDATE diagnosis, not just events.
-
-### `DeletionPolicy: Retain` does not fail the stack delete
-
-Operators sometimes believe a Retain resource causes `DELETE_FAILED`.
-It does not. CloudFormation skips Retain resources and reports them as
-`DELETE_SKIPPED` in events. A genuine `DELETE_FAILED` is always a
-resource CloudFormation tried to delete but could not (S3 bucket not
-empty, dependent resource, custom resource not signalling).
-
-### Nested stacks: the parent's status lags the child's
-
-A parent stack in `UPDATE_ROLLBACK_IN_PROGRESS` often reflects a child
-that already failed. The parent's `describe-stack-events` will show the
-`AWS::CloudFormation::Stack` resource as the failure point, but the
-real cause is inside the child. Always drill into the child stack —
-the `PhysicalResourceId` of the nested-stack resource is the child's
-ARN.
-
-### `ContinueUpdateRollback --resources-to-skip` is the only recovery from UPDATE_ROLLBACK_FAILED
-
-There is no `retry-rollback` API. The only recovery is
-`ContinueUpdateRollback`, optionally with `--resources-to-skip` for a
-resource that cannot be rolled back (e.g., a replaced resource whose
-old version is gone). After completion, the stack returns to
-`UPDATE_ROLLBACK_COMPLETE` and can be updated again. Skipping leaves
-the resource in a potentially inconsistent state — document and
-reconcile manually.
-
-### Drift can cause UPDATE_FAILED on an unrelated property change
-
-A resource drifted out-of-band (e.g., an S3 bucket's policy edited
-directly). A later stack UPDATE that touches a different property
-fails because CloudFormation reconciles the drifted property too.
-`detect-stack-drift` reveals the drifted property; either import the
-current state or reset it before re-deploying.
-
-### Custom resources must handle Delete idempotently
-
-A custom resource's Lambda function must always send `SUCCESS` for a
-`Delete` request, even if the physical resource is already gone. A
-function that returns `FAILED` on Delete because the resource is
-missing will block stack delete indefinitely. Standard pattern: check
-existence; if absent, return `SUCCESS` without error.
-
-### CreationPolicy TimeoutSignal is not a CREATE_FAILED resource error
-
-When a `CreationPolicy` `Count` or `TimeoutInMinutes` is not satisfied
-(common on EC2 / ASG where cfn-init / cfn-signal is not wired),
-CloudFormation reports `CREATE_FAILED` with reason `The following
-resource(s) failed to create: [ASG].` — but the instances may be
-running and healthy. The fix is in the user-data (`cfn-signal -e 0`)
-or the ASG desired capacity, not the template resource itself.
-
-### Service limits can be hard or soft; only Soft can be raised via Quotas
-
-`LimitExceeded` for S3 buckets per account (Soft, default 100) can be
-raised via Service Quotas; so can IAM entities per account (default
-5000) and VPCs per region (default 5, has a ceiling). Confirm via
-`aws service-quotas get-service-quota`.
+Expert edge cases (9 non-obvious failure modes) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when the failure mode does not match the obvious pattern.
 
 ## Expert heuristic — "Read the ResourceStatusReason, not the StackStatus"
 
@@ -664,27 +463,8 @@ read the `ResourceStatusReason` for the earliest failing event. The
 
 ## Recent AWS features (2024-2026)
 
-- **Import resources into an existing stack (enhanced 2024-2025):**
-  `cloudformation import-resources` (resource-level import) lets you
-  bring an out-of-band resource under stack management without a full
-  stack import. Useful when CREATE_FAILED reports "resource already
-  exists".
-- **ContinueUpdateRollback with nested-stack skip (2024):** enhanced
-  to skip nested-stack child resources, making recovery from
-  `UPDATE_ROLLBACK_FAILED` on nested stacks less destructive.
-- **CloudFormation Drift Detection for nested stacks (2024-2025):**
-  drift detection now recurses into nested stacks, surfacing child
-  drift in the parent's `describe-stack-resource-drifts`.
-- **cfn-lint v1 (2024-2025):** new rule set, stricter on IAM resource
-  properties and `DependsOn` cycles. Update pinned versions before
-  relying on results.
-- **Service Quotas integration (2025):** per-account stack count and
-  stack-instance count visible in Service Quotas, simplifying
-  `LimitExceeded` triage.
-- **UpdateReplacePolicy (GA):** controls retain / delete / snapshot
-  behaviour for the OLD physical resource on a Replacement. Set
-  `UpdateReplacePolicy: Retain` to keep the old resource after a
-  replacement — critical for UPDATE_FAILED recovery.
+Recent AWS features (resource import, nested-stack skip, cfn-lint v1, UpdateReplacePolicy) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when confirming feature availability or vintage.
 
 ## References
 
@@ -692,6 +472,12 @@ See `references/failure-catalog-and-decision-tree.md` for the full
 per-category walk with worked examples per StackStatus, and
 `references/diagnostic-commands.md` for the canonical command script
 for each failure category.
+
+## References (load on demand)
+
+- [references/failure-catalog-and-decision-tree.md](references/failure-catalog-and-decision-tree.md) — full per-category walk; now also holds the Step 2-6 diagnostic walks and common fix patterns moved from SKILL.md.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — canonical command script; now also holds the CREATE_FAILED command listing and the continue-update-rollback skip command moved from SKILL.md.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — mindset, expert edge cases, and recent AWS features moved from SKILL.md.
 
 ## Domain
 

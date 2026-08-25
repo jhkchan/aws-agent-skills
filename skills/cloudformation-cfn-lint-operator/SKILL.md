@@ -98,28 +98,9 @@ defense-in-depth validation pipeline.
 Three misconceptions dominate CloudFormation validation misdesign at
 operation time:
 
-- **"validate-template is enough."** It is not. `validate-template`
-  checks syntax and basic resource specification compliance against
-  the CloudFormation API. It does NOT catch logical errors (e.g.,
-  circular dependencies, impossible conditions), security anti-
-  patterns (wildcard IAM, unencrypted resources), or cost surprises.
-  cfn-lint catches structural/logical issues. cfn-nag catches
-  security issues. Both are needed in addition to validate-template.
+Misconception detail — "validate-template is enough" (what it catches and misses): [Linting and validation](references/linting-and-validation.md).
 
-- **"I can update a stack without a ChangeSet."** You can, but you
-  should NOT. A ChangeSet shows the EXACT resource changes an update
-  will make (Add, Modify, Remove, Replace). Without reviewing a
-  ChangeSet, you may accidentally replace a resource that causes
-  downtime (e.g., replacing an RDS instance with a new one because an
-  immutable property changed). Always create and review a ChangeSet
-  before executing it.
-
-- **"cfn-nag is optional."** It is not. cfn-nag catches security
-  anti-patterns that cfn-lint does not: wildcard IAM policies
-  (`Resource: "*"`), unencrypted S3 buckets, security groups with
-  `0.0.0.0/0` ingress, databases without encryption, and other
-  violations of security best practices. Skipping cfn-nag means
-  deploying templates with known security weaknesses.
+Misconception detail — "update without a ChangeSet" (replacement downtime) and "cfn-nag is optional" (security anti-patterns): [Security and changesets](references/security-and-changesets.md).
 
 ## Configuration dependency graph (novel heuristic)
 
@@ -186,36 +167,9 @@ Layer 4: ChangeSet (API call, deployment preview)
 full pipeline (cfn-lint → validate-template → cfn-nag → ChangeSet) is
 the defense-in-depth approach.
 
-## Expert heuristic: reading a ChangeSet
+Full heuristic (Action and Replacement field semantics, stateful-resource data-loss implication): [Security and changesets](references/security-and-changesets.md).
 
-A baseline model says "create a ChangeSet." The correct heuristic
-reads the ChangeSet and interprets the `Action` and `Replacement`
-fields:
-
-```text
-Action: "Add" → new resource | "Modify" → update | "Remove" → delete
-
-Replacement (for Modify):
-  "True"        → REPLACED (old deleted, new created) — downtime for stateful
-  "False"       → updated in place (no downtime)
-  "Conditional" → replacement may or may not occur
-```
-
-**Key implication:** `Replacement: True` on a stateful resource (RDS,
-EC2, EFS) means data loss unless the resource has a retention policy.
-Always review `Replacement` fields before executing.
-
-## Expert heuristic: cfn-nag finding severities
-
-```text
-CRITICAL → MUST fix before deploy (wildcard IAM, unencrypted S3, SSH from 0.0.0.0/0)
-WARNING  → SHOULD review (Resource: "*", no versioning, no backup retention)
-VIOLATION → Advisory (missing DeletionPolicy, no Outputs)
-```
-
-**Key implication:** CRITICAL findings block deployment (verdict:
-REVIEW_REQUIRED). WARNINGs require review but may proceed with
-documented justification.
+Full severity ladder (CRITICAL / WARNING / VIOLATION and verdict effect): [Security and changesets](references/security-and-changesets.md).
 
 ## Prerequisites (verify before operating)
 
@@ -412,27 +366,7 @@ aws cloudformation validate-template --template-body file://child-application.ya
 
 ## Step 9 — Resource import and macro validation
 
-**Resource import** brings existing AWS resources under CloudFormation
-management. Each imported resource MUST have `DeletionPolicy: Retain`.
-Not all resource types support import — check the support matrix.
-Drift detection runs during import.
-
-```bash
-aws cloudformation create-change-set \
-  --stack-name my-stack --change-set-name import-cs \
-  --change-set-type IMPORT \
-  --template-body file://template-import.yaml \
-  --resources-to-import file://resources.json --region us-east-1
-```
-
-**Macro expansion:** macros transform template content via Lambda at
-deployment time. cfn-lint and validate-template see the PRE-macro
-template. Use `get-template-summary` to inspect the expanded output.
-
-```bash
-aws cloudformation get-template-summary \
-  --template-body file://template-with-macro.yaml --region us-east-1
-```
+Resource-import change-set commands and macro get-template-summary inspection: [Advanced patterns](references/advanced-patterns.md).
 
 ## Step 10 — IaC pipeline integration (CodePipeline + cfn-lint)
 
@@ -440,84 +374,18 @@ Integrate validation into a CodePipeline CI/CD pipeline as a quality
 gate. The pipeline runs cfn-lint, cfn-nag, and creates a ChangeSet
 before manual approval and execution.
 
-**Pipeline gating logic:**
-1. cfn-lint must pass (no errors).
-2. cfn-nag must pass (no CRITICAL findings).
-3. ChangeSet must be created (review required for replacements).
-4. Execute ChangeSet only after manual approval.
-
-```yaml
-# CodePipeline Build stage with cfn-lint and cfn-nag gates
-- Name: ValidateTemplate
-  Actions:
-    - Name: cfnLint
-      ActionTypeId: { Category: Build, Owner: AWS, Provider: CodeBuild, Version: "1" }
-      Configuration: { ProjectName: cfn-lint-project }
-      RunOrder: 1
-    - Name: cfnNag
-      ActionTypeId: { Category: Build, Owner: AWS, Provider: CodeBuild, Version: "1" }
-      Configuration: { ProjectName: cfn-nag-project }
-      RunOrder: 2
-    - Name: createChangeSet
-      ActionTypeId: { Category: Deploy, Owner: AWS, Provider: CloudFormation, Version: "1" }
-      Configuration:
-        ActionMode: CHANGE_SET_REPLACE
-        StackName: !Ref StackName
-        ChangeSetName: pipeline-changeset
-        Capabilities: CAPABILITY_NAMED_IAM
-      RunOrder: 3
-```
+Pipeline gating logic sequence and the CodePipeline Build-stage YAML: [Advanced patterns](references/advanced-patterns.md).
 
 ## Step 11 — Rollback template archive
 
 Archive the current template before deploying a new version. This
 enables rollback by deploying the archived template.
 
-```bash
-# Archive the current template to versioned S3
-aws cloudformation get-template --stack-name my-stack \
-  --query 'TemplateBody' --region us-east-1 > "template-$(date +%Y%m%d%H%M%S).yaml"
-aws s3 cp "template-$(date +%Y%m%d%H%M%S).yaml" s3://my-cfn-archive/templates/ --region us-east-1
-
-# To roll back: deploy the archived template
-aws cloudformation update-stack --stack-name my-stack \
-  --template-body file://template-previous.yaml --region us-east-1
-```
+Archive-and-rollback command listing (get-template to S3, update-stack rollback): [Diagnostic commands](references/diagnostic-commands.md).
 
 ## Step 13 — Recent features
 
-**Recent AWS features (2023-2026):**
-
-- **cfn-lint enhanced resource specification coverage (2023-2024):**
-  cfn-lint now covers all AWS resource specifications including
-  newer services (AppRunner, Bedrock, Security Hub). Rules are
-  auto-generated from the AWS resource specification JSON.
-
-- **CloudFormation Hooks (2023-2024):** Hooks allow pre-deployment
-  and post-deployment evaluation of template changes. Hooks run
-  BEFORE a ChangeSet is executed, enabling proactive policy
-  enforcement (e.g., block templates with unencrypted resources).
-
-- **cfn-nag improved IAM analysis (2023-2024):** Enhanced IAM policy
-  analysis in cfn-nag, including detection of privilege escalation
-  patterns, unused IAM actions, and cross-account trust
-  relationships.
-
-- **Drift detection improvements (2023-2024):** Extended drift
-  detection support to additional resource types (including
-  CloudFront distributions, API Gateway REST APIs, and AppSync
-  APIs). Previously, many resource types were not supported by drift
-  detection.
-
-- **ChangeSet nested stack visibility (2024-2025):** ChangeSet now
-  shows changes within nested stacks, not just the parent stack.
-  Previously, nested stack changes were opaque in the ChangeSet
-  view.
-
-- **SAM CLI cfn-lint integration (2024-2025):** The SAM CLI now
-  integrates cfn-lint directly, running lint checks during
-  `sam build` and `sam deploy` without requiring a separate cfn-lint
-  invocation.
+Recent features (resource-spec coverage, CloudFormation Hooks, IAM analysis, drift detection, nested-stack ChangeSets, SAM CLI integration): [Advanced patterns](references/advanced-patterns.md).
 
 ## NEVER do these things
 
@@ -614,49 +482,20 @@ VERIFICATION_COMMANDS:
   aws cloudformation describe-change-set --change-set-name update-20260805 --stack-name my-app-stack --region us-east-1
 ```
 
-### Worked example — cfn-nag finds CRITICAL findings (REVIEW_REQUIRED)
-
-```text
-CFN_LINT: template.yaml → my-app-stack
-VERDICT: REVIEW_REQUIRED
-CHECKLIST:
-  [✓] Template file: template.yaml
-  [✓] cfn-lint: PASSED (0 errors, 1 warning)
-  [✓] validate-template: PASSED
-  [!] cfn-nag: CRITICAL FINDINGS (2) — F1: IAM policy with Resource "*" in role TaskExecutionRole; F1000: Security group ingress from 0.0.0.0/0 to port 22
-  [✓] ChangeSet: Not created (blocked by cfn-nag findings)
-  [✓] Drift detection: IN_SYNC
-  [✓] Stack policy: Not set
-VERIFICATION_COMMANDS:
-  cfn-lint template.yaml
-  cfn_nag_scan --input-path template.yaml
-```
+Full REVIEW_REQUIRED worked example (F1 wildcard IAM + F1000 public SSH ingress): [Worked examples](references/worked-examples.md).
 
 ## Error handling
 
-### cfn-lint fails with errors
-- Fix structural/logical errors: correct `Ref` targets, resolve
-  circular dependencies, add missing required properties.
+Symptom-to-fix mappings (cfn-lint errors, validate failure, CRITICAL findings, Replacement: True, DRIFTED, rollback): [Error handling](references/error-handling.md).
 
-### validate-template fails
-- Invalid syntax or resource properties. Fix the template structure.
-  Check the AWS resource specification for correct property names.
+## References (load on demand)
 
-### cfn-nag finds CRITICAL findings
-- Fix security anti-patterns: scope IAM policies, add encryption,
-  restrict ingress. Suppress false positives with justification.
-
-### ChangeSet shows unexpected Replacement: True
-- An immutable property changed. Review the changed property. If
-  unintentional, revert the change before executing the ChangeSet.
-
-### Drift detection shows DRIFTED
-- Resources modified outside CloudFormation. Update the template to
-  match actual configuration, or revert out-of-band changes.
-
-### Stack deployment fails (rollback)
-- CloudFormation auto-rolls back to the previous known-good state.
-  Review `describe-stack-events` for the cause. Fix and retry.
+- [Linting and validation](references/linting-and-validation.md) — cfn-lint/validate-template detail, "validate-template is enough" misconception
+- [Security and changesets](references/security-and-changesets.md) — cfn-nag/ChangeSet detail, ChangeSet-reading and severity heuristics, misconception detail
+- [Advanced patterns](references/advanced-patterns.md) — resource import and macro validation, CodePipeline gating, recent features
+- [Worked examples](references/worked-examples.md) — REVIEW_REQUIRED (cfn-nag CRITICAL findings) worked example
+- [Error handling](references/error-handling.md) — tool-failure, drift, and rollback symptom mappings
+- [Diagnostic commands](references/diagnostic-commands.md) — rollback template archive commands
 
 ## Domain
 

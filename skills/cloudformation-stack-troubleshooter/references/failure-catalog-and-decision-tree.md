@@ -271,3 +271,106 @@ architecture changes. Confirm via
 Run `cfn-lint template.yaml` before every `create-stack` /
 `update-stack`. Most `Properties validation failed` errors are caught
 by `cfn-lint` and never reach CloudFormation.
+
+## Diagnostic walks and common fix patterns (moved from SKILL.md)
+
+### A-fix — CREATE_FAILED common fix patterns (moved from SKILL.md Step 2)
+
+**Common fix patterns:**
+
+- **IAM permission (`AccessDenied`):** attach a policy to the
+  CloudFormation execution role (or the deploying principal) granting
+  the action scoped to the resource ARN. For stacks creating IAM
+  resources, pass `--capabilities CAPABILITY_IAM` or
+  `CAPABILITY_NAMED_IAM` on `create-stack` / `update-stack`.
+- **Service limit (`LimitExceeded`):** request a quota increase via
+  Service Quotas, or delete stale resources in the account.
+- **Resource already exists:** either delete the existing resource, or
+  use `cloudformation import-resources` to bring it under stack
+  management, or rename the resource in the template.
+- **Invalid property:** fix the template; run
+  `cfn-lint template.yaml` before re-deploying.
+- **Custom resource timeout:** fix the Lambda function so it calls
+  `cfn-response.send(event, context, "SUCCESS", …)` within
+  `CreationPolicy.TimeoutInMinutes`; check the function's logs for the
+  actual exception.
+
+### B-walk — UPDATE_FAILED diagnostic walk (moved from SKILL.md Step 3)
+
+**Diagnostic walk:**
+
+1. **Always create a ChangeSet before updating.** Never run
+   `update-stack` blind — always run `create-change-set`, then
+   `describe-change-set`, then `execute-change-set` after review.
+2. **For each changed resource in the ChangeSet,** read `Action`
+   (`Add` / `Modify` / `Remove`) and `Replacement` (`True` / `False` /
+   `Conditional`).
+3. **If `Replacement: True`,** identify which properties caused the
+   replacement (`DetailedStatus` / `Scope` / `PolicyAction`). Decide
+   whether to (a) proceed with the replacement, (b) refactor to avoid
+   the immutable-property change (e.g., blue-green via a new resource),
+   or (c) use `UpdateReplacePolicy` to control delete/retain on the old
+   resource.
+4. **For `UPDATE_FAILED` without replacement,** read the
+   `ResourceStatusReason` verbatim — it usually embeds the underlying
+   service's error.
+
+### B-fix — UPDATE_FAILED common fix patterns (moved from SKILL.md Step 3)
+
+**Common fix patterns:**
+
+- **Immutable property change:** refactor the template to introduce the
+  new resource alongside the old one (blue-green), then cut over and
+  delete the old. Or use `UpdateReplacePolicy: Retain` to keep the old
+  resource after replacement.
+- **Missing CAPABILITY_IAM on update:** pass
+  `--capabilities CAPABILITY_IAM` (or `CAPABILITY_NAMED_IAM`,
+  `CAPABILITY_AUTO_EXPAND`) on `update-stack` / `create-change-set`.
+- **Drift:** run `detect-stack-drift`; either `import-resources` to
+  align the stack with reality, or reset the resource to match the
+  template before re-deploying.
+- **DependsOn cycle:** remove the cycle; let CloudFormation compute
+  implicit dependencies from `Ref` / `GetAtt` / `DependsOn`.
+
+### C-walk — DELETE_FAILED diagnostic walk (moved from SKILL.md Step 4)
+
+**Diagnostic walk:**
+
+1. **Read `describe-stack-events` for the `DELETE_FAILED` resource.**
+   The `ResourceStatusReason` names the specific blocker.
+2. **For S3 buckets,** list objects AND versions — buckets with
+   versioning enabled have objects in non-current versions that block
+   deletion.
+3. **For `DeletionPolicy: Retain`,** confirm in the template — the
+   resource will not be deleted; the operator must delete it manually
+   if they want it gone.
+
+### C-fix — DELETE_FAILED common fix patterns (moved from SKILL.md Step 4)
+
+**Common fix patterns:**
+
+- **S3 bucket not empty:** add a `Custom::S3Cleanup` (Lambda-backed)
+  to the template that empties the bucket on Delete, or empty it
+  manually with `aws s3 rm s3://<bucket> --recursive` (and
+  `--versions` if versioned) before retrying the stack delete.
+- **Dependent resources:** delete or detach the dependents outside
+  CloudFormation, then retry the stack delete.
+- **`DeletionPolicy: Retain`:** if the resource should be deleted on
+  stack delete, change the policy to `Delete` in the template and
+  update the stack before deleting.
+- **Custom resource Delete:** fix the Lambda function to handle Delete
+  idempotently; ensure it always sends `SUCCESS` (Delete should not
+  fail the stack delete even if the physical resource is already gone).
+
+### D-walk — ROLLBACK_COMPLETE recovery walk (moved from SKILL.md Step 5)
+
+**Diagnostic walk:**
+
+1. **Confirm `StackStatus: ROLLBACK_COMPLETE`** via `describe-stacks`.
+2. **Read the original `CREATE_FAILED` reason** from
+   `describe-stack-events` to identify the root cause.
+3. **Fix the template or the IAM/limit issue** identified in Step 2.
+4. **Delete the stack:**
+   `aws cloudformation delete-stack --stack-name <name>`.
+5. **Re-create with the fixed template:**
+   `aws cloudformation create-stack --stack-name <name> --template-body file://fixed.yaml --capabilities CAPABILITY_IAM`.

@@ -230,3 +230,30 @@ aws cloudformation delete-stack --stack-name <name>
 
 For repeatable teardowns, add a `Custom::S3Cleanup` (Lambda-backed)
 resource to the template that empties the bucket on `Delete`.
+
+## 14. CREATE_FAILED diagnostic commands (moved from SKILL.md Step 2)
+
+**Diagnostic commands:**
+
+```bash
+# Identify the stack and its status:
+aws cloudformation describe-stacks --stack-name <name> \
+  --query 'Stacks[0].{name:StackName,status:StackStatus,reason:StackStatusReason,role:RoleArn,capabilities:Capabilities}'
+
+# Find the first CREATE_FAILED resource (the real cause):
+aws cloudformation describe-stack-events --stack-name <name> \
+  --query 'StackEvents[?ResourceStatus==`CREATE_FAILED`].{logical:LogicalResourceId,type:ResourceType,physical:PhysicalResourceId,reason:ResourceStatusReason,ts:Timestamp}' \
+  --output table
+
+# Find the earliest failure to identify the root resource:
+aws cloudformation describe-stack-events --stack-name <name> \
+  --query 'reverse(StackEvents[?ResourceStatus==`CREATE_FAILED`])[-1]'
+```
+
+## 15. UPDATE_ROLLBACK_FAILED — skip the failing resource (moved from SKILL.md Step 6)
+
+   ```bash
+   aws cloudformation continue-update-rollback \
+     --stack-name <name> \
+     --resources-to-skip <logical-id-of-failing-resource>
+   ```

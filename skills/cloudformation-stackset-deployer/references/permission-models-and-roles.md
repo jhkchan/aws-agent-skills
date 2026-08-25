@@ -195,3 +195,60 @@ time.
 - [Self-managed permissions](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-prereqs-self-managed.html)
 - [Service-managed permissions](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-orgs-enable-trusted-access.html)
 - [Booting StackSets execution role](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-prereqs-self-managed.html#stacksets-prereqs-accountsetup)
+
+## SELF_MANAGED role handshake lifecycle (moved from SKILL.md)
+
+The SELF_MANAGED permission model is the #1 source of "why won't my
+stack instance deploy?" issues. A baseline model says "create the
+roles and go"; this heuristic explains the actual trust chain.
+
+```text
+Administrator account:
+  → AWSCloudFormationStackSetAdministrationRole
+     trust: cloudformation.amazonaws.com
+     policy: sts:AssumeRole on arn:aws:iam::<target>:role/AWSCloudFormationStackSetExecutionRole
+
+For EACH target account:
+  → AWSCloudFormationStackSetExecutionRole
+     trust: arn:aws:iam::<admin-account-id>:root
+     policy: cloudformation:* + iam:PassRole
+
+On create-stack-instances:
+  → CloudFormation assumes administration role → assumes execution role
+    → creates member stack in target account
+
+Common failures:
+  → execution role missing/wrong name in target → INOPERABLE
+  → trust policy missing admin account ID → AccessDenied
+  → SCP blocking cloudformation → silent skip
+```
+
+**Key implication:** every target account must have the execution
+role pre-provisioned (via a bootstrap StackSet or manual IAM).
+
+## SERVICE_MANAGED trusted access setup (moved from SKILL.md)
+
+SERVICE_MANAGED is simpler at scale but requires one-time
+Organizations trusted-access enablement that a baseline model
+often omits.
+
+```text
+One-time enablement (management account):
+  aws organizations enable-aws-service-access \
+    --service-principal cloudformation.amazonaws.com
+
+Verify:
+  aws organizations list-aws-service-access-for-organization \
+    --service-principal cloudformation.amazonaws.com
+
+Result:
+  → CloudFormation creates AWSServiceRoleForCloudFormationStackSetsOrgNS
+    SLR in the management account
+  → Member accounts get a service-linked role when targeted
+  → Trust path: CloudFormation → Organizations → member account SLR
+  → No admin/execution role setup required
+```
+
+**Key implication:** if trusted access is later disabled, all
+SERVICE_MANAGED StackSets become read-only until re-enabled. Treat
+trusted access as a permanent dependency.

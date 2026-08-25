@@ -186,23 +186,8 @@ share the SNS topic).
 baseline model misses.** The procedure below forces an explicit check on
 both before any `create-budget-action` call.
 
-**Cross-dependency gotchas:**
-
-- A budget action targeting a linked account requires the action role
-  in THAT linked account, not the payer. A common error is provisioning
-  the role in the payer and expecting it to apply an IAM policy to an
-  IAM principal in a linked account.
-- SNS topics with SSE-KMS will silently drop notifications from Budgets
-  unless the KMS key policy grants `kms:GenerateDataKey*` and
-  `kms:Decrypt` to `budgets.amazonaws.com` and
-  `ce.amazonaws.com`. AWS-managed KMS keys (`alias/aws/sns`) work
-  out-of-the-box.
-- Budget notifications on `FORECAST` alerts fire earlier than `ACTUAL`
-  but forecast is a trailing model — it is less accurate in the first
-  ~14 days of a budget period.
-- Usage budgets (RI/SP utilization/coverage) do NOT support budget
-  actions — only SNS/email/Slack notifications. Do not attempt to wire
-  an IAM policy/EC2 stop action on a usage budget; the API rejects it.
+Cross-dependency gotchas (linked-account action role, SSE-KMS key policy, forecast accuracy window, usage budgets reject actions) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when the dependency graph flags a silent-failure path.
 
 ## Expert heuristic: threshold tiering for cost budgets
 
@@ -244,73 +229,13 @@ have multiple actions at different thresholds.
 
 ## Expert heuristic: anomaly detection sensitivity tuning
 
-Cost Anomaly Detection uses a machine-learning model on your historical
-Cost Explorer usage data. The model needs **at least ~30 days** of
-history before its predictions are reliable. Three configuration choices
-dominate false-positive rates:
-
-- **`Feedback` API (`put-feedback`)**: the model does NOT auto-learn
-  from SNS-dismissed alerts. You must explicitly call
-  `aws ce put-feedback --anomaly-id <id> --is-anomaly NO` to suppress a
-  false positive. Operators frequently mark alerts as "not an anomaly"
-  in the console but do not realize the model only updates via
-  `put-feedback`. Plan for this in the runbook.
-- **Subscription `Threshold`**: the dollar amount above which an
-  anomaly is published to SNS. Default is `$0`. **Always set a
-  threshold** (typical: `$100` or `$1000` depending on total account
-  spend). A `$0` threshold produces daily noise from minor variances.
-- **Monitor `MonitorSpecification`**: a service-scoped monitor
-  (`Dimension=SERVICE`) gives cleaner signals than the default
-  account-wide monitor. For multi-service accounts, provision per-
-  service dimensional monitors rather than relying on the
-  account-wide one.
+Anomaly-detection sensitivity tuning (put-feedback, subscription threshold, monitor specification) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when tuning anomaly false-positive rates.
 
 ## Expert heuristic: API, cost, and timing quirks
 
-These operational details are not in the Budgets documentation front
-page but cause real production incidents:
-
-- **Budgets has a free tier of 2 budgets per account.** The first 2
-  budgets (cost or usage) are free; each additional budget costs
-  ~$0.10/day (~$3/month). This is rarely surfaced during provisioning
-  and shows up as an unexpected line item. For organizations with 50+
-  linked accounts each getting 3 budgets, the budget cost itself can
-  exceed $1,500/month. Consolidate to payer-level budgets with
-  `CostFilters` for linked-account scoping rather than provisioning
-  per-linked-account budgets.
-
-- **The Budgets API has a throttling limit of ~1 update per second
-  per account.** `update-budget`, `create-notification`, and
-  `create-budget-action` share this limit. Terraform/CloudFormation
-  runs that update dozens of budgets in parallel will hit
-  `ThrottlingException`. Sequence budget updates with a 1.5-second
-  delay between calls. The limit is account-wide, not per-budget.
-
-- **The forecast model loses accuracy in the first 10-14 days of a
-  budget period.** AWS Budgets forecast uses a trailing weighted
-  average of the last 14-21 days of actual spend. In the first half
-  of a monthly budget period, the forecast is extrapolated from
-  sparse data and can be off by 30-50%. FORECAST alerts that fire in
-  days 1-14 are unreliable; treat them as informational. After day
-  15, forecast accuracy improves to within ~10-15% of actual.
-
-- **RI/SP coverage and utilization budgets evaluate every 6-8 hours,
-  not in real time.** Usage budgets (`RI_UTILIZATION`, `RI_COVERAGE`,
-  `SP_UTILIZATION`, `SP_COVERAGE`) pull from Cost Explorer's usage
-  data pipeline, which has a 6-8 hour processing delay. A budget
-  alert for RI utilization dropping below 80% may fire 6-8 hours
-  after the actual utilization change. For time-sensitive RI/SP
-  monitoring, supplement with CloudWatch + Cost Explorer API polling
-  at higher frequency.
-
-- **Cost allocation tag activation has a 12-24 hour propagation
-  delay.** Activating a tag key in Billing -> Cost Allocation Tags
-  does not make the tag immediately available in
-  `CostFilters.TagKeyValue`. Budgets created with a tag filter
-  before the tag is fully propagated will return zero spend until
-  the tag data flows through. Always verify tag activation via
-  `aws ce get-cost-and-usage --group-by Type=TAG,Key=<key>` before
-  creating a tag-scoped budget.
+Free-tier budget limit, API throttling, forecast accuracy window, RI/SP evaluation lag, and tag-activation propagation moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when provisioning at scale or debugging timing.
 
 ## Prerequisites (verify before provisioning)
 
@@ -385,196 +310,43 @@ propagation.
 
 ### Step 3 — Cost budget configuration (amount + time period + unit)
 
-```bash
-aws budgets create-budget \
-  --account-id 111111111111 \
-  --budget '{"BudgetName":"prod-monthly-cost","BudgetLimit":{"Amount":"10000","Unit":"USD"},"TimeUnit":"MONTHLY","BudgetType":"COST","CostFilters":{"Service":["Amazon Elastic Compute Cloud - Compute"]},"CostTypes":{"IncludeTax":true,"IncludeSubscription":true,"UseBlended":false,"IncludeRefund":false,"IncludeCredit":true,"IncludeUpfront":true,"IncludeRecurring":true,"IncludeOtherSubscription":true,"IncludeSupport":true,"IncludeDiscount":true,"UseAmortized":false}}'
-```
-
-**CostTypes defaults:** `IncludeTax=true` (tax is on the invoice);
-`IncludeSubscription=true` (Support, Marketplace); `UseBlended=false`
-(Blended averages across linked accounts, masking overages);
-`UseAmortized=false` for budget alerts, `true` for amortized RI/SP
-analysis — pick one consistently.
-
-**Zero-spend guardrail** (sandbox / new account): `BudgetLimit.Amount=0.01`,
-`Unit=USD`. Then attach `ACTUAL > 50%` to SNS — a 50% threshold on a
-$0.01 budget fires on the first dollar.
+Step 3 cost-budget CLI, CostTypes defaults, and zero-spend variant moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+Load on demand when emitting the create-budget command.
 
 ### Step 4 — Usage budget configuration (RI/SP utilization/coverage)
 
-```bash
-# RI Utilization budget — alert when RI utilization drops below 80%
-aws budgets create-budget --account-id 111111111111 \
-  --budget '{"BudgetName":"ri-utilization-target","BudgetLimit":{"Amount":"80","Unit":"PERCENTAGE"},"TimeUnit":"MONTHLY","BudgetType":"RI_UTILIZATION"}'
-# Savings Plan Coverage budget (latest GA feature) — same pattern with BudgetType SP_COVERAGE
-```
-
-**Usage budget constraints:** Usage budgets (`RI_*`, `SP_*`) do NOT
-support budget actions (IAM/EC2/SSM). Only SNS/email/Slack
-notifications. Set `ComparisonOperator` to `LESS_THAN_THRESHOLD` for
-utilization/coverage targets — alerts fire when actual drops below the
-target.
+Step 4 usage-budget CLI and LESS_THAN_THRESHOLD constraint moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+Load on demand when provisioning RI/SP budgets.
 
 ### Step 5 — Cost Anomaly Detection (monitor + subscription)
 
-Cost Anomaly Detection is **separate from AWS Budgets** — it is a Cost
-Explorer (CE) API. Provisioning requires two API calls.
-
-```bash
-# Service-level monitor (recommended over default account-wide)
-aws ce create-anomaly-monitor \
-  --anomaly-monitor '{"Name":"service-anomaly-monitor","Type":"DIMENSIONAL","MonitorDimension":"SERVICE"}'
-
-# Subscription to SNS — anomaly > $100 publishes to topic
-aws ce create-anomaly-subscription \
-  --anomaly-subscription '{"Name":"prod-anomaly-subscription","Frequency":"DAILY","Threshold":100.0,"MonitorArn":"arn:aws:ce::111111111111:anomaly-monitor/default","Subscribers":[{"Address":"arn:aws:sns:us-east-1:111111111111:cost-anomaly-alerts","Type":"SNS"}]}'
-```
-
-The default account-wide monitor ARN is
-`arn:aws:ce::<account-id>:anomaly-monitor/default`. Dimensional monitors
-must be explicitly created. The topic policy must allow
-`Principal: Service: ce.amazonaws.com` to `sns:Publish` — this is a
-**different principal** from Budgets. Operators frequently reuse a
-Budgets SNS topic for anomalies and wonder why anomaly alerts never
-fire — the topic policy lacks the `ce.amazonaws.com` principal.
-Frequency: `IMMEDIATE` (noisy); `DAILY` (batched, recommended);
-`WEEKLY` (slow).
+Step 5 create-anomaly-monitor / create-anomaly-subscription CLI and ce.amazonaws.com principal note moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+Load on demand when provisioning anomaly detection.
 
 ### Step 6 — Budget alerts (actual vs forecast, threshold percentages)
 
-```bash
-# 80% ACTUAL — early warning (repeat for 90, 100; add 100% FORECAST)
-aws budgets create-notification \
-  --account-id 111111111111 --budget-name "prod-monthly-cost" \
-  --notification '{"NotificationType":"ACTUAL","ComparisonOperator":"GREATER_THAN","Threshold":80,"ThresholdType":"PERCENTAGE"}' \
-  --subscribers Address=arn:aws:sns:us-east-1:111111111111:budget-alerts,Type=SNS
-```
-
-**Threshold types:** `PERCENTAGE` (relative to `BudgetLimit`, default)
-or `ABSOLUTE_VALUE` (explicit dollar amount). Use `ABSOLUTE_VALUE` when
-the threshold should not change if the budget limit changes.
-
-**Actual vs Forecast:** `ACTUAL` is definitive; `FORECAST` is predictive
-(uses trailing ~30 days). Pair them — forecast alone is unreliable in
-the first 14 days of a budget period. **Usage budgets (RI_*, SP_*)**
-support `ACTUAL` only — `FORECAST` is rejected by the API for non-COST
-budget types.
+Step 6 create-notification CLI, threshold types, and actual-vs-forecast pairing moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+Load on demand when attaching notifications.
 
 ### Step 7 — Budget actions (IAM policy / EC2 stop / SNS)
 
-Budget actions require an **IAM role** that trusts `budgets.amazonaws.com`
-and has permission for the action. This is the most commonly missed
-prerequisite.
-
-**IAM role template (trust + permission policy for APPLY_IAM_POLICY):**
-
-```bash
-# Trust policy MUST have Principal: Service: budgets.amazonaws.com
-cat > /tmp/budget-actions-trust.json <<'EOF'
-{"Version":"2012-10-17","Statement":[{"Effect":"Allow",
-"Principal":{"Service":"budgets.amazonaws.com"},"Action":"sts:AssumeRole"}]}
-EOF
-# Permission policy grants: iam:AttachUserPolicy, iam:AttachRolePolicy,
-# iam:DetachUserPolicy, iam:DetachRolePolicy, iam:ListAttached*Policies
-aws iam create-role --role-name BudgetActionsRole \
-  --assume-role-policy-document file:///tmp/budget-actions-trust.json
-```
-
-**Create the action — APPLY_IAM_POLICY at 100% ACTUAL:**
-
-```bash
-aws budgets create-budget-action \
-  --account-id 111111111111 --budget-name "prod-monthly-cost" \
-  --notification-type ACTUAL --action-type APPLY_IAM_POLICY \
-  --action-threshold '{"ActionThresholdValue":100,"ActionThresholdType":"PERCENTAGE"}' \
-  --definition '{"IamActionDefinition":{"PolicyArn":"arn:aws:iam::111111111111:policy/BudgetDenyAll","Roles":["SandboxAppRole"]}}' \
-  --execution-role-arn arn:aws:iam::111111111111:role/BudgetActionsRole \
-  --approval-model AUTOMATIC
-```
-
-For EC2 stop, use `--action-type RUN_SSM_DOCUMENTS` with
-`SsmActionDefinition.ActionSubType=STOP_EC2_INSTANCES` (or
-`STOP_RDS_INSTANCE` for non-prod databases, 2024 GA).
-
-**Action types:** `APPLY_IAM_POLICY` (attach policy to principals),
-`REMOVE_IAM_POLICY` (detach — reverse an APPLY when budget resets),
-`RUN_SSM_DOCUMENTS` (run SSM doc: `STOP_EC2_INSTANCES` /
-`STOP_RDS_INSTANCE`).
-
-**`ApprovalModel`:** `AUTOMATIC` (sandbox/dev — action fires on breach)
-or `MANUAL` (production — requires human approval in the console).
-
-**Cross-account constraint:** the `ExecutionRoleArn` MUST be in the same
-account as the target resource. For a budget on a linked account that
-stops EC2 in that linked account, the role must exist in the linked
-account, not the payer.
+Step 7 action-role template, create-budget-action CLI, action types, approval model, and cross-account constraint moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+Load on demand when provisioning budget actions.
 
 ### Step 8 — SNS topic + subscription + IAM policy
 
-The SNS topic is the alerting backbone for both Budgets and Cost
-Anomaly Detection. Provision it in `us-east-1`.
-
-```bash
-TOPIC_ARN=$(aws sns create-topic --name budget-alerts --region us-east-1 --query TopicArn --output text)
-
-# Topic policy MUST allow BOTH budgets.amazonaws.com AND ce.amazonaws.com
-cat > /tmp/budget-topic-policy.json <<EOF
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Principal": {"Service": ["budgets.amazonaws.com", "ce.amazonaws.com"]},
-    "Action": "sns:Publish",
-    "Resource": "$TOPIC_ARN"
-  }]
-}
-EOF
-aws sns set-topic-attributes --topic-arn "$TOPIC_ARN" \
-  --attribute-name Policy --attribute-value file:///tmp/budget-topic-policy.json
-
-aws sns subscribe --topic-arn "$TOPIC_ARN" --protocol email \
-  --notification-endpoint finops@example.com
-```
-
-**Encrypted topic caveat:** if the topic uses SSE-KMS with a customer
-CMK, the KMS key policy MUST grant `kms:GenerateDataKey*` and
-`kms:Decrypt` to BOTH `budgets.amazonaws.com` and `ce.amazonaws.com`.
-AWS-managed `alias/aws/sns` works out-of-the-box. Customer CMK without
-the grant silently drops notifications — no error, no log. Email
-subscriptions require the recipient to confirm; until confirmed,
-`list-subscriptions-by-topic` shows `PendingConfirmation`.
+Step 8 SNS topic creation, two-principal topic policy, and SSE-KMS caveat moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+Load on demand when provisioning the alerting backbone.
 
 ### Step 9 — Cost filters (service / linked account / tag / region)
 
-(See Step 2 for the full CostFilters reference.) Common patterns:
-
-| Pattern | CostFilters JSON |
-|---|---|
-| Payer-wide budget (no filter) | omit `CostFilters` |
-| Per linked account | `{"LinkedAccount": ["123456789012"]}` |
-| EC2 only | `{"Service": ["Amazon Elastic Compute Cloud - Compute"]}` |
-| Production-tagged resources | `{"TagKeyValue": ["Environment$production"]}` |
-| Multi-region | `{"Region": ["US East (N. Virginia)", "EU (Ireland)"]}` |
-| RI spend only | `{"PurchaseType": ["Reserved Instances"]}` |
-
-Always verify dimension values before deploying:
-`aws ce get-dimension-values --dimension SERVICE --time-period ...`.
+CostFilters common-pattern table moved verbatim to [references/budget-types-and-actions.md](references/budget-types-and-actions.md).
+Load on demand when scoping a budget.
 
 ### Step 10 — Verification
 
-```bash
-aws budgets describe-budget --account-id 111111111111 --budget-name prod-monthly-cost
-aws budgets describe-notifications-for-budget --account-id 111111111111 --budget-name prod-monthly-cost
-aws budgets describe-budget-actions --account-id 111111111111 --budget-name prod-monthly-cost
-aws budgets describe-budget-action-executions --account-id 111111111111 \
-  --budget-name prod-monthly-cost \
-  --time-period Start=2026-08-01T00:00:00Z,End=2026-08-10T23:59:59Z
-aws ce get-anomaly-monitors
-aws ce get-anomaly-subscriptions
-aws sns get-topic-attributes --topic-arn arn:aws:sns:us-east-1:111111111111:budget-alerts
-aws sns list-subscriptions-by-topic --topic-arn arn:aws:sns:us-east-1:111111111111:budget-alerts
-```
+Step 10 verification commands moved verbatim to [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md).
+Load on demand after deployment.
 
 ## NEVER do these things (top)
 
@@ -671,21 +443,8 @@ VERIFICATION_COMMANDS:
 
 ## Error handling (quick triage)
 
-- **`InvalidParameterException` on `create-budget-action`:** role missing
-  or trust policy lacks `budgets.amazonaws.com`; policy ARN / target
-  principal does not exist; cross-account role not in linked account.
-- **`create-notification` succeeds but alerts never fire:** SNS
-  subscription is `PendingConfirmation`; topic policy lacks
-  `budgets.amazonaws.com` principal; customer-CMK key policy lacks
-  `kms:GenerateDataKey*` for `budgets.amazonaws.com`.
-- **Cost Anomaly subscription created but no alerts fire:** monitor not
-  `ACTIVE`; topic policy lacks `ce.amazonaws.com` principal; subscription
-  `Threshold` set above actual impact; monitor <7 days old (needs ~30
-  days of CE history).
-- **Budget action fires but does not take effect:** role lacks
-  `iam:AttachUserPolicy` / `ssm:StartAutomationExecution`;
-  `ApprovalModel=MANUAL` and nobody approved it; target resource in a
-  different account than the ExecutionRoleArn.
+Error-handling quick-triage entries moved verbatim to [references/error-handling.md](references/error-handling.md).
+Load on demand when a deployment fails or alerts never fire.
 
 ## Decision tree: notify-only vs action tier
 
@@ -701,28 +460,15 @@ Production budget (cannot tolerate deny/stop)?
 
 ## Recent AWS features (2024-2026)
 
-- **Savings Plan Budget alerts (2024-2025 GA):** AWS Budgets now
-  supports `SP_UTILIZATION` and `SP_COVERAGE` budget types natively.
-  Previously these were only available via Cost Explorer queries. The
-  Budgets API surfaces them as first-class usage budgets with SNS/email
-  notifications (no actions — see Step 4 constraint).
-- **Cost Anomaly Detection Feedback API GA (2024-2025):**
-  `aws ce put-feedback` lets operators annotate false positives and
-  true positives directly via CLI. The ML model learns ONLY from
-  explicit feedback — console "dismiss" does not train it. Plan a
-  runbook step to call `put-feedback` for each reviewed anomaly.
-- **Anomaly Monitor `MonitorSpecification` JSON (2024-2025):**
-  dimensional monitors now accept a `MonitorSpecification` JSON filter
-  for `ANOMALY_TOTAL_IMPACT_ABSOLUTE` and
-  `ANOMALY_TOTAL_IMPACT_PERCENTAGE`. Provisioning tip: set both —
-  dollar for absolute impact, percent for relative impact.
-- **Budget Actions regional expansion (2024-2025):** `RUN_SSM_DOCUMENTS`
-  now supports `STOP_RDS_INSTANCE` (in addition to
-  `STOP_EC2_INSTANCES`). Use for non-production databases.
-- **Cost Explorer tag-based filters in Budgets (2024):**
-  `CostFilters.TagKeyValue` now accepts up to 50 tag key-value pairs
-  per budget (up from 10). Provisioning tip: complex tag filters still
-  require tags to be activated in Billing → Cost Allocation Tags.
+Recent AWS features 2024-2026 (SP budget types, CAD feedback API, MonitorSpecification, STOP_RDS_INSTANCE, tag filter limits) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when checking feature availability windows.
+
+## References (load on demand)
+
+- [references/provisioning-cli-commands.md](references/provisioning-cli-commands.md) — full provisioning CLI sequence; now also holds the Step 3-8 and Step 10 command payloads moved from SKILL.md.
+- [references/budget-types-and-actions.md](references/budget-types-and-actions.md) — BudgetType, action, and CostFilters reference; now also holds the Step 9 cost-filter pattern table moved from SKILL.md.
+- [references/error-handling.md](references/error-handling.md) — quick-triage failure modes moved from SKILL.md.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — cross-dependency gotchas, anomaly-sensitivity tuning, API/cost/timing quirks, and Recent AWS features moved from SKILL.md.
 
 ## Domain
 

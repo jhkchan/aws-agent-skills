@@ -265,3 +265,26 @@ aws cloudwatch put-metric-alarm \
 5. **Concurrent subnet associations fail.** AWS processes
    associations sequentially. Wait for each to reach `available`
    before creating the next.
+
+## Expert heuristic: split-tunnel DNS leak prevention
+
+Split-tunnel routes only VPC-relevant traffic through the VPN. Without
+custom DNS servers, clients use their local resolver for DNS queries —
+including queries for VPC private hostnames — which fail.
+
+```text
+Split-tunnel with NO custom DNS (BROKEN):
+  Client → DNS query for ip-10-0-1-5.ec2.internal
+    → Local resolver (8.8.8.8) → NXDOMAIN → fails
+
+Split-tunnel WITH custom DNS (CORRECT):
+  Endpoint config: DnsServers = ["10.0.0.2"]  (VPC .2 resolver)
+  Client → DNS query → VPN tunnel → VPC DNS resolver → resolves ✓
+
+Full-tunnel (no DNS leak risk):
+  All traffic including DNS goes through tunnel → no custom DNS needed
+  Downside: all internet traffic egresses via AWS (cost)
+```
+
+**Key implication:** when `SplitTunnel=true`, always set
+`DnsServers=["<VPC-DNS-resolver>"]` (the VPC CIDR `.2` address).

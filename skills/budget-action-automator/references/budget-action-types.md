@@ -124,3 +124,38 @@ Bootstrap trust policy:
   CLI. Recommended for production SCP on first deploy.
 - `AUTOMATIC` — fires immediately on threshold breach. Only after
   validation cycle (see SKILL.md expert heuristic).
+
+## Appendix A — Common budget action types (summary) (moved from SKILL.md)
+
+The most-used `ActionType` values. The default for any new
+enforcement should be SNS notification; escalate to IAM/SCP only
+after notification alone has failed to contain spend.
+
+| Pattern | Action type | Reversible | Notes |
+|---|---|---|---|
+| Notify only | `Notification` (not `put-budget-action`) | Yes | SNS or email |
+| Restrict IAM user | `APPLY_IAM_ACTION` | Yes (detach policy) | Per-user enforcement |
+| Block new resources | `APPLY_SCP_FAMILY` | Yes (detach SCP) | Org/OU/account scope |
+| Stop EC2 | `APPLY_SSM_ACTION` (STOP_EC2_INSTANCES) | Yes (start instances) | Static instance list |
+| Custom (Slack, tag, multi-region) | EventBridge → Lambda | Varies | Full Lambda power |
+
+For the full table (input parameters, threshold pairing, safety
+profiles, and execution role requirements), see
+**references/budget-action-types.md**. Always cross-reference the
+action type's parameter contract with your `put-budget-action`
+payload.
+
+## Appendix B — Decision tree (which action type) (moved from SKILL.md)
+
+```
+Is the goal enforcement or notification?
+├─ Notification only → SNS via create-notification + subscribe
+└─ Enforcement → Is the target an Org member account?
+                  ├─ Yes → Is the fix blocking new resources?
+                  │        ├─ Yes → APPLY_SCP_FAMILY (Step 5)
+                  │        └─ No  → APPLY_IAM_ACTION for per-user (Step 6)
+                  └─ No (standalone) → APPLY_IAM_ACTION or EventBridge+Lambda (Step 7)
+
+Is the budget type RI/SP coverage or utilization?
+└─ Notify-only — no enforcement action. Use SNS for human review.
+```

@@ -295,33 +295,8 @@ any `update-stack`).
 | The drifted resource is no longer needed | `REMOVE_FROM_TEMPLATE` | Delete the resource from the template and `update-stack`. For physical resources that should persist, set `DeletionPolicy: Retain`. |
 | The drift is owned by another team or requires approval | `ESCALATE_TO_OWNER` | Surface the CloudTrail actor and Config timeline; route to the resource owner. Do not self-serve a reset. |
 
-**Resource import flow (high-level):**
-
-```bash
-# 1. Generate the resources-to-import JSON:
-cat > resources-to-import.json <<EOF
-[
-  {
-    "ResourceType": "AWS::S3::Bucket",
-    "LogicalResourceId": "MyBucket",
-    "ResourceIdentifier": { "BucketName": "my-existing-bucket" }
-  }
-]
-EOF
-
-# 2. Create an IMPORT change set:
-aws cloudformation create-change-set \
-  --stack-name <name> \
-  --change-set-name import-bucket \
-  --change-set-type IMPORT \
-  --resources-to-import file://resources-to-import.json \
-  --template-body file://template-with-bucket.yaml \
-  --capabilities CAPABILITY_IAM
-
-# 3. Review and execute:
-aws cloudformation describe-change-set --stack-name <name> --change-set-name import-bucket
-aws cloudformation execute-change-set --stack-name <name> --change-set-name import-bucket
-```
+Resource import flow (resources-to-import JSON + IMPORT change set) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand when emitting the import CLI sequence.
 
 ### Step 6: Validate via ChangeSet before applying any fix
 
@@ -366,30 +341,8 @@ ChangeSet:
 | **AWS Config Conformance Pack** | Account / org | Deploy a conformance pack with `cloudformation-stack-drift-detection-check` and custom rules that alert on `StackDriftStatus: DRIFTED`. Combine with an SNS topic and Lambda remediation for auto-detection. |
 | **CloudTrail alarm on direct mutations** | Per resource | CloudWatch metric filter on CloudTrail for direct API calls on CFN-managed resources, alarming on out-of-band changes within minutes. |
 
-The IAM `aws:CalledViaFirst` condition is the canonical pattern for
-"only CloudFormation may touch this resource":
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "DenyDirectMutationOnCfnManagedResources",
-      "Effect": "Deny",
-      "NotAction": [
-        "s3:Get*",
-        "s3:List*"
-      ],
-      "Resource": "arn:aws:s3:::my-cfn-managed-bucket",
-      "Condition": {
-        "StringNotEquals": {
-          "aws:CalledViaFirst": "cloudformation.amazonaws.com"
-        }
-      }
-    }
-  ]
-}
-```
+IAM `aws:CalledViaFirst` prevention policy deep dive (full JSON) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when authoring drift-prevention IAM policy.
 
 ## Output format
 
@@ -472,130 +425,13 @@ REMEDIATION:
 
 ## Expert edge cases
 
-These patterns represent genuine, non-obvious CloudFormation drift
-behaviours that a senior operator would catch but a generalist would
-miss.
-
-### Drift detection does not run automatically
-
-CloudFormation does not run drift detection on a schedule. The console
-"drift status" column reflects the **last manual run**. A stack may
-report `IN_SYNC` based on a stale detection hours or days old. Always
-run `detect-stack-drift` before diagnosing, then poll
-`describe-stack-drift-detection-status`. For continuous posture, pair
-AWS Config with the `cloudformation-stack-drift-detection-check`
-managed rule on a schedule.
-
-### Not all resource types support drift detection
-
-CloudFormation drift detection covers most AWS resources, but some
-resource types (e.g., `AWS::CloudFormation::WaitConditionHandle`,
-some third-party registered types, and resources with custom
-`Default` values in extensions) report `NOT_CHECKED`. A stack can
-report `DRIFTED` based on partial coverage — and conversely,
-`IN_SYNC` based on partial coverage does not mean the un-checked
-resources have not drifted. Always inspect the per-resource
-`ResourceDriftStatus`, not just the stack-level
-`StackDriftStatus`.
-
-### Drift on tags is reported as MODIFIED but rarely impactful
-
-Tags are mutable and almost never block updates. A `MODIFIED` drift
-where the only `PropertyDifference` is `Tags` is low-priority and can
-usually be resolved by `RESET_TO_DRIFT` (accept the actual tags into
-the template) without risk. Reserve urgency for drift on
-configuration properties that affect Replacement.
-
-### `aws:CalledViaFirst` is the canonical prevention condition
-
-A simple deny on the underlying service API breaks CloudFormation too.
-The correct pattern is a `Condition` that allows the API only when
-`aws:CalledViaFirst == cloudformation.amazonaws.com` — CloudFormation
-sets this context key when it makes a downstream API call on behalf
-of the stack. Apply the deny to all principals that should not make
-direct changes, including the CloudFormation execution role itself
-(the role inherits the context key correctly when CloudFormation
-calls the service).
-
-### Import does not reset drift — it imports the resource
-
-Operators sometimes run `import-resources` expecting it to align the
-template to the actual state. It does — but only because the operator
-supplies a template that matches the actual resource. Import does not
-auto-generate the template from the resource's current configuration.
-For that, use the IaC Generator (`cloudformation create-generated-template`),
-which emits a template fragment from the existing resource; then
-import that fragment into the stack.
-
-### Nested stack drift requires drilling into the child
-
-A parent stack reports `DRIFTED` based on its own resources plus the
-aggregate of its child stacks. A child in `DRIFTED` state propagates
-up. The parent's `describe-stack-resource-drifts` shows the
-`AWS::CloudFormation::Stack` resource as the carrier, but the actual
-drifted resources are in the child. Always drill into the child via
-its ARN (the parent resource's `PhysicalResourceId`).
-
-### CDK drift differs from CloudFormation drift
-
-`cdk drift` (2025) compares the synthesized template to the deployed
-stack, but CDK construct-level drift is not the same as CloudFormation
-resource-level drift. A CDK construct may synthesise into multiple
-resources; construct-level drift hides which underlying resource
-diverged. Always cross-reference the CloudFormation
-`describe-stack-resource-drifts` for resource-level detail when
-remediating CDK drift.
-
-### `DeletionPolicy: Retain` resources drift silently after stack delete
-
-A resource with `DeletionPolicy: Retain` is skipped on stack delete —
-it persists in the account. Subsequent direct changes to that orphaned
-resource are not tracked by CloudFormation (the stack no longer
-exists). Use AWS Config to track these resources, or attach a
-CloudTrail alarm scoped to the resource ARN.
-
-### Drift can cause UPDATE_FAILED on an unrelated property change
-
-A resource drifted out-of-band (e.g., an S3 bucket policy edited
-directly). A later stack UPDATE that touches a different property
-(e.g., lifecycle configuration) can fail because CloudFormation
-reconciles all properties, including the drifted one. The fix is
-either to revert the drift before the update, or to update the
-template to match the drift first.
-
-### Resource import requires exact property match
-
-The template used in `--resources-to-import` must declare the
-resource with properties that match the actual physical resource at
-import time. A mismatch causes `IMPORT_FAILED` (similar to
-`CREATE_FAILED` for normal stacks). Always run `cfn-lint` on the
-import template and verify property values via Config or the
-underlying service's describe API before the import.
+Expert edge cases (10 non-obvious drift behaviours) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when the drift signal does not match the obvious pattern.
 
 ## Expert heuristic — "Read the per-resource ResourceDriftStatus, not the stack-level StackDriftStatus"
 
-The single most common diagnostic mistake is treating the stack-level
-`StackDriftStatus: DRIFTED` as the diagnosis. It is the symptom. The
-actionable signal is the per-resource `ResourceDriftStatus` on each
-resource returned by `describe-stack-resource-drifts`, including the
-specific `PropertyDifferences` for each drifted property.
-
-Quick lookup table for common drift resolutions:
-
-| Per-resource finding | What it means | Default resolution |
-|---|---|---|
-| `MODIFIED` on a mutable property | Property edited out-of-band; update is safe | `RESET_TO_DRIFT` if intentional, else `REVERT_TO_TEMPLATE` |
-| `MODIFIED` on an immutable property | Property edited out-of-band; update triggers Replacement | `REVERT_TO_TEMPLATE` first; only `RESET_TO_DRIFT` if Replacement is acceptable |
-| `DELETED` on a resource with no dependents | Resource removed manually; nothing depends on it | `REMOVE_FROM_TEMPLATE` or `update-stack` to recreate |
-| `DELETED` on a resource with dependents in the stack | Resource removed manually; downstream resources will fail | `update-stack` to recreate first; then verify dependents |
-| `ADDITION` (via Config) of a resource that should be managed | Out-of-band resource that overlaps the stack's responsibility | `IMPORT` to bring under management |
-| `NOT_CHECKED` on a critical resource | Drift detection unsupported; unknown state | Pair AWS Config rule with periodic CloudTrail review |
-
-When in doubt, run:
-`aws cloudformation describe-stack-resource-drifts --stack-name <name>`
-and read the `ResourceDriftStatus` and `PropertyDifferences` for each
-non-`IN_SYNC` resource. The stack-level `StackDriftStatus` is the
-symptom; the per-resource drift is the diagnosis.
+Expert heuristic — per-resource ResourceDriftStatus lookup table moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when classifying per-resource findings into resolutions.
 
 ## Anti-Patterns — NEVER
 
@@ -640,34 +476,8 @@ symptom; the per-resource drift is the diagnosis.
 
 ## Recent AWS features (2024-2026)
 
-- **CloudFormation drift detection for nested stacks (2024-2025):**
-  drift detection now recurses into nested child stacks, surfacing
-  child drift via the parent's `describe-stack-resource-drifts`. The
-  parent's `AWS::CloudFormation::Stack` resource carries the child's
-  aggregate drift status; the per-resource detail is in the child.
-- **Resource-level import (`import-resources`, enhanced 2024-2025):**
-  bring an out-of-band resource under stack management without a
-  full stack import. The `--resources-to-import` payload maps an
-  existing physical resource to a new logical id in the template.
-- **CDK drift detection (`cdk drift`, 2025):** CDK v2.180+ exposes
-  `cdk drift <stack-name>`, comparing the synthesized template to
-  the deployed stack. Construct-level drift is reported; cross-
-  reference CloudFormation for resource-level detail.
-- **IaC Generator (`create-generated-template`, 2024-2025):** generates
-  CloudFormation template fragments from existing resources in the
-  account. Useful for producing the template required for an
-  `import-resources` operation on drifted or out-of-band resources.
-- **CloudFormation Hooks (GA, 2024-2025):** pre-deployment Hooks fire
-  on `CREATE_PRE_DEPLOYMENT`, `UPDATE_PRE_DEPLOYMENT`, and
-  `DELETE_PRE_DEPLOYMENT`. Hooks do not prevent out-of-band drift
-  directly but enforce compliance on the next stack update.
-- **Conformance Pack: `cloudformation-stack-drift-detection-check`**
-  (managed rule, 2024): schedules drift detection on a cadence and
-  alerts on `StackDriftStatus: DRIFTED`. Pair with SNS + Lambda for
-  auto-detection and remediation.
-- **`aws:CalledViaFirst` condition key (enhanced 2024-2025):** now
-  broadly supported across services, enabling precise IAM policies
-  that allow mutations only when made via CloudFormation.
+Recent AWS features (nested-stack drift, resource import, cdk drift, IaC Generator, Hooks) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when confirming feature availability or vintage.
 
 ## References
 
@@ -676,6 +486,12 @@ per-drift-type decision matrix with worked examples for each
 resolution strategy, and `references/diagnostic-commands.md` for the
 canonical command script for drift detection, forensic walk, and
 remediation.
+
+## References (load on demand)
+
+- [references/drift-types-and-resolution.md](references/drift-types-and-resolution.md) — full per-drift-type decision matrix and resolution playbook.
+- [references/diagnostic-commands.md](references/diagnostic-commands.md) — canonical command script; now also holds the Step 5 resource-import flow moved from SKILL.md.
+- [references/advanced-patterns.md](references/advanced-patterns.md) — expert edge-case catalog, Step 8 IAM prevention deep dive, per-resource heuristic, and recent AWS features moved from SKILL.md.
 
 ## Domain
 

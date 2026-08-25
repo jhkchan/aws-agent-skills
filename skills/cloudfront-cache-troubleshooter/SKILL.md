@@ -61,65 +61,8 @@ Three facts make CloudFront cache diagnosis different:
 
 ## Expert heuristic
 
-Five non-obvious behaviors that a senior CDN engineer knows from
-operational experience. Each changes the diagnostic conclusion if
-missed:
-
-- **Cache hit ratio reported by CloudFront is edge-only, not end-to-
-  end.** The `CacheHitRate` metric measures the percentage of requests
-  served from edge POPs without going to the origin. But the "true"
-  hit ratio also depends on whether Origin Shield is enabled. Without
-  Origin Shield, each of the 400+ edge POPs maintains its own
-  independent cache. A distribution with 1M unique objects and 50
-  requests/object may show a 95% edge hit rate but still send 20,000+
-  origin requests (one per object per POP that sees traffic). With
-  Origin Shield, all POPs share a single second-tier cache, collapsing
-  those 20,000 origin requests into ~1,000. The reported
-  `CacheHitRate` does not change, but origin load drops by 95%.
-
-- **Lambda@Edge execution time is NOT included in the cache key, but
-  it affects whether a response is cacheable.** If a `viewer-request`
-  or `origin-request` function takes > 30 seconds, CloudFront drops
-  the connection (504) even if the origin would have returned a
-  cacheable 200. More subtly, an `origin-response` function that
-  modifies headers (e.g., adding `Cache-Control: no-store`) overrides
-  the origin's cacheability directive. The function's execution time
-  is billed separately and does not appear in the `Age` header. When
-  diagnosing cache misses on behaviors with Lambda@Edge, always check
-  whether the function is rewriting cache headers — the cache policy
-  may be correct but the function is overriding it at runtime.
-
-- **Origin Shield doubles the cache storage cost but can halve origin
-  requests.** Origin Shield is billed at the same data transfer rate
-  as standard CloudFront-to-origin traffic, but it adds a second cache
-  layer. For distributions with high object count and low per-object
-  request volume, Origin Shield's cost can exceed the origin request
-  savings. Break-even is typically ~3 requests per object per POP per
-  TTL window. Below that, Origin Shield is a net cost increase; above
-  it, a net savings.
-
-- **Compressed objects have strict size limits; uncompressed have no
-  explicit limit but face practical timeouts.** CloudFront
-  auto-compresses objects between 1,000 and 50,000,000 bytes when
-  `Compress: true` is set on the cache behavior. Objects above 50 MB
-  are never compressed. For objects between 50 MB and 20 GB, the
-  response is streamed uncompressed. Objects above 20 GB fail with a
-  502. S3 multipart uploads that produce objects > 50 MB will not
-  benefit from CloudFront compression regardless of the cache policy
-  setting — the compression eligibility check happens before the
-  cache lookup.
-
-- **CloudFront Functions and Lambda@Edge have fundamentally different
-  caching interaction models.** CloudFront Functions run at the viewer
-  edge in a sub-millisecond VM; they execute on every request and do
-  NOT see cached responses — they run before the cache lookup.
-  Lambda@Edge `origin-response` and `viewer-response` functions run
-  AFTER the cache lookup and can modify the cached response. A common
-  mistake is using a CloudFront Function to add headers that should
-  influence caching (e.g., `Vary`) — the function runs too early in
-  the request lifecycle for the header to affect the cache key. Use a
-  cache policy or origin-response Lambda@Edge for header-based cache
-  key variation.
+Five senior-CDN-engineer heuristics (edge-only hit ratio, Lambda@Edge header rewrites, Origin Shield break-even, compression size limits, Functions vs Lambda@Edge cache timing) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when the symptom contradicts the cache policy analysis.
 
 ## Quick reference — symptom to cache issue
 
@@ -144,15 +87,8 @@ missed:
 
 If distribution/domain unknown:
 
-```bash
-aws cloudfront list-distributions \
-  --query 'DistributionList.Items[*].{id:Id,domain:DomainName,aliases:Aliases.Items,enabled:Enabled}' \
-  --output json
-
-aws cloudfront get-distribution-config --id <distribution-id> \
-  --query 'DistributionConfig.DefaultCacheBehavior.{target:TargetOriginId,cachePolicy:CachePolicyId,lam:LambdaFunctionAssociations,ttl:DefaultTTL}' \
-  --output json
-```
+list-distributions / get-distribution-config discovery commands moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Run them when the distribution ID or domain is unknown.
 
 ### Step 1: Identify the symptom category
 
@@ -544,67 +480,16 @@ content, static vs dynamic mixing).
 
 ## Diagnostic command quick reference
 
-```bash
-# Distribution config — cache behaviors, policies, origins, WAF
-aws cloudfront get-distribution-config --id <id> \
-  --query 'DistributionConfig.{origins:Origins.Items,behaviors:CacheBehaviors.Items,default:DefaultCacheBehavior,webACL:WebACLId}' \
-  --output json
-
-# Cache policy details (the cache key definition)
-aws cloudfront get-cache-policy --id <cache-policy-id> \
-  --query 'CachePolicy.CachePolicyConfig.{ttl:{min:MinTTL,def:DefaultTTL,max:MaxTTL},params:ParametersInCacheKeyAndForwardedToOrigin}' \
-  --output json
-
-# Recent invalidations
-aws cloudfront list-invalidations --distribution-id <id> \
-  --query 'InvalidationList.Items[*].{id:Id,status:Status,paths:InvalidationBatch.Paths.Items}' \
-  --output json
-
-# CloudFront metrics — CacheHitRate
-aws cloudwatch get-metric-statistics --namespace AWS/CloudFront \
-  --metric-name CacheHitRate \
-  --dimensions Name=DistributionId,Value=<id> \
-  --start-time $(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ) \
-  --end-time $(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  --period 3600 --statistics Average --output json
-
-# Test caching — request twice, check x-cache
-curl -sI https://<distribution-domain>/path | grep -iE 'x-cache|age|cache-control'
-curl -sI https://<distribution-domain>/path | grep -iE 'x-cache|age|cache-control'
-
-# Test origin directly (bypass CloudFront)
-curl -sI https://<origin-domain>/path | grep -iE 'cache-control|expires|pragma|set-cookie'
-
-# Lambda@Edge functions on the behavior
-aws cloudfront get-distribution-config --id <id> \
-  --query 'DistributionConfig.DefaultCacheBehavior.LambdaFunctionAssociations.Items[*].{type:EventType,arn:LambdaFunctionARN}' \
-  --output json
-```
+Diagnostic command quick-reference listing (config, cache policy, invalidations, CacheHitRate, x-cache probes, origin bypass, Lambda@Edge) moved verbatim to [references/diagnostic-commands.md](references/diagnostic-commands.md).
+Load on demand for live-account probing.
 
 See `references/diagnostic-commands.md` for the full command script per
 cache issue category.
 
 ## Recent AWS features (2024-2026)
 
-- **CloudFront Functions vs Lambda@Edge execution model (2024-2025):**
-  CloudFront Functions run before cache lookup in a sub-millisecond VM
-  at every edge; Lambda@Edge `origin-response`/`viewer-response` run
-  after cache lookup. Functions cannot influence the cache key; use a
-  cache policy or Lambda@Edge for header-based cache variation.
-- **CloudFront KeyValueStore for Lambda@Edge (2024 GA):** Lightweight KV
-  store accessible from Lambda@Edge without calling origin. Reduces origin
-  calls in edge logic, improving cache hit ratio.
-- **CloudFront Origin Shield enhancements (2024-2025):** Improved hit ratio
-  metrics and finer-grained control. Use as second-tier cache.
-- **CloudFront additional metrics (2024-2025):** Per-cache-behavior metrics
-  including `OriginRequestCount`, `4xxErrorRate`, `5xxErrorRate`. Isolate
-  cache issues to specific behaviors.
-- **Cache policy override improvements (2024):** Better support for
-  overriding origin `Cache-Control` via policy's `OriginCacheControlHeaders`.
-- **CloudFront Logs to CloudWatch Logs (2024-2025):** Direct export to
-  CloudWatch Logs enabling real-time analysis via Logs Insights.
-- **Response Headers Policy (2024-2025):** More granular control over
-  security headers (HSTS, CSP) without Lambda@Edge.
+Recent AWS features (2024-2026) moved verbatim to [references/advanced-patterns.md](references/advanced-patterns.md).
+Load on demand when Functions vs Lambda@Edge timing, KeyValueStore, Origin Shield metrics, or Logs-to-CloudWatch are in play.
 
 ## References
 
@@ -612,6 +497,7 @@ cache issue category.
 - `references/diagnostic-commands.md` — canonical command script per cache issue
 - `references/worked-examples.md` — worked examples, managed policy reference,
   cache key normalization, and Lambda@Edge edge cases
+- [references/advanced-patterns.md](references/advanced-patterns.md) — senior-engineer heuristics and recent AWS features (2024-2026) moved from SKILL.md
 
 ## Domain
 
