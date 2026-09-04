@@ -80,6 +80,33 @@ scales with *installed* skills, not the repo: a project that auto-triggers 10 sk
 - Never mass-install all 410 (`@gh:jhkchan/aws-agent-skills/` as an autotrigger line
   would also trip §1.5 — by design).
 
+## Security audit (OWASP Agentic Skills Top 10 tooling, 2026-09-04)
+
+Swept all 410 skills with the independent AST10 implementation
+([jhkchan/owasp-ast10-agent-skills](https://github.com/jhkchan/owasp-ast10-agent-skills),
+`audit` — 10 detector categories, 45 static checks per skill):
+
+| Result | Count |
+|---|---|
+| ERROR-level findings (decided attack scenarios) | **0 / 410 skills** |
+| Malicious payload / obfuscated exec / C2 / egress call sites | 0 (no bundled executable scripts ship at all) |
+| Identity-artifact reads, SOUL.md/MEMORY.md persistence, config-file hijacking | 0 |
+| Over-privilege grants (declared write/network/shell scope) | 0 declared — nothing to over-grant |
+| Warning signals | 3 rules × 410 skills, all one root fact: no USF v1 `skill.usf.yaml` security manifest (content_hash / permissions / sandbox). USF v1 is a proposal; the tool itself notes this is "the normal state of a real package" |
+
+Complementary scans: repo-wide regex sweep for live credential patterns found only
+`AKIAIOSFODNN7EXAMPLE` (AWS's canonical documentation-example key) and a bare
+`-----BEGIN RSA PRIVATE KEY-----` header — intentional fake fixtures inside eval
+scenarios, not secrets.
+
+**What a static sweep cannot decide** (the tool's own decidability ledger, honored here):
+prose-level intent — typosquatting lookalikes (AST01-S01), prompt injection inside
+instructions (AST01-S03, AST05-S05), fake "setup required" coercion (AST01-S04), and
+malicious-intent-entirely-in-prose (AST08-S01/S03) — plus update drift (AST07) and
+governance/process scenarios (AST09), which compare versions or live outside any one
+package. For this repo that residual reduces to instruction text: every skill is
+SKILL.md + references + eval fixtures, with zero executable entry scripts (§6 above).
+
 ## Deprecation & versioning
 
 - `metadata.lifecycle_status`: active | deprecated | retired (schema-enforced).
