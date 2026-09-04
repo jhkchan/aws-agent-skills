@@ -2,7 +2,7 @@
 """Generate the README scorecard table from committed eval scorecard JSON.
 
 Discovers ``eval/scorecards/*.json``, parses each scorecard artifact, and
-emits a markdown table into ``README.md`` between sentinel markers so the
+emits a markdown table into ``SKILLS.md`` between sentinel markers so the
 table is always sourced from committed artifacts — never hand-typed.
 
 Usage::
@@ -20,7 +20,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_SCORECARDS_DIR = REPO_ROOT / "eval" / "scorecards"
-DEFAULT_README = REPO_ROOT / "README.md"
+DEFAULT_README = REPO_ROOT / "SKILLS.md"
 
 BEGIN_MARKER = "<!-- BEGIN EVAL SCORECARD TABLE -->"
 END_MARKER = "<!-- END EVAL SCORECARD TABLE -->"
