@@ -50,16 +50,20 @@ node cli/bin/cli.js status        # coverage + eval status summary
 
 ## Calling a skill precisely (`@skills` protocol)
 
-This repo is a `@skills`-compatible skill source (atskills.one):
+This repo is a `@skills`-compatible skill source (atskills.one), verified end-to-end
+against the protocol's reference CLI:
 
 ```
 @skills:gh:jhkchan/aws-agent-skills/skills/<skill-name>
 ```
 
-409 skills > the protocol's 128-skill browsing limit, so point agents at the catalog first:
+410 skills > the protocol's 128-skill browsing limit, so point agents at the catalog first:
 `@skills:gh:jhkchan/aws-agent-skills/skills/skill-catalog` — 13 family tables with exact
-paths, task types, and one-liners. See [SKILL_GOVERNANCE.md](SKILL_GOVERNANCE.md) for the
-full protocol audit and rules.
+paths, task types, and one-liners. To vendor a skill into a project:
+`atskills save gh:jhkchan/aws-agent-skills/skills/<name>` (local-first thereafter;
+auto-trigger via an `@gh:` line in `.atskills/.autotrigger`). See
+[SKILL_GOVERNANCE.md](SKILL_GOVERNANCE.md) for the full protocol audit, verified CLI
+transcript, and residency guidance.
 
 ## Quickstart
 
