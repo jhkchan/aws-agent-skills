@@ -1,0 +1,91 @@
+# Universal Agentic Skill Format v1.0 manifest.
+#
+#   schema:    https://github.com/jhkchan/owasp-ast10-agent-skills/blob/main/schemas/usf-v1.schema.json
+#   generator: ../../scripts/generate_usf_manifests.py  (policy documented there)
+#
+# Generated for the aws-agent-skills repository; signed at release with the
+# key did:web:jhkchan.github.io publishes. A verified signature answers
+# "who published this", never "is this safe".
+---
+name: s3-directory-bucket-deployer
+version: "0.1.0"
+
+# The runtime whose skill-directory format this package is validated against
+# (agentskills.io spec compliance + @skills resolution, verified end-to-end).
+# SKILL.md `compatibility` names the broader expected set; only the checked
+# runtime is declared here.
+platforms: [claude]
+
+description: >-
+  Provisions S3 Express One Zone directory buckets and S3 Tables table buckets with production defaults: directory bucket name format (base-name--az-id--x-s3), Availability Zone ID targeting, zone affinity for co-located compute (EC2/ECS/EKS in the same AZ for single-digit- millisecond latency), S3 Express One Zone pricing characteristics (lowest latency, highest requests/sec), table buckets for Apache Iceberg via S3 Tables, and the hard limitations (no cross-region replication, no versioning, no Object Lock, no Transfer Acceleration). Emits READY_TO_DEPLOY / PREREQUISITES_MISSING with every item verified and copy-pasteable s3api / s3tables / ec2 commands.
+
+author:
+  name: "aws-agent-skills contributors"
+  # identity + signing_key are written by the release signer in the same
+  # operation as `signature` below, and both are inside the signed payload.
+  # `identity` and `signing_key` are written by scripts/sign_usf.py in the same
+  # operation as `signature` below, and both are INSIDE the signed payload. A
+  # signature whose key anchors to nothing is the false trust signal AST10 warns
+  # about, so the signer cannot produce one without the anchor, and neither field
+  # can be swapped for another publisher's without breaking the signature.
+  # The key is published at https://jhkchan.github.io/.well-known/did.json; this
+  # anchor is worth exactly as much as control of that domain and its TLS. A
+  # verified signature answers "who published this", never "is this safe".
+  identity: "did:web:jhkchan.github.io"
+  signing_key: "ed25519:77fb87cd4a46dd524190f72cee510d0ad934b0df4acc40366f9b8a8dc87593a6"
+
+permissions:
+  files:
+    read:
+      - ./SKILL.md
+      - ./skill.usf.yaml
+      - ./references/advanced-patterns.md
+      - ./references/directory-bucket-config-patterns.md
+      - ./references/provisioning-cli-commands.md
+      - ./references/worked-examples.md
+      - ./example/README.md
+    # The package is instructions: it writes nothing, ever.
+    write: []
+    deny_write:
+      # The identity-file floor. `write: []` is a property of this package;
+      # `deny_write` is what has to survive a port to a runtime whose default
+      # is write-everything.
+      - SOUL.md
+      - MEMORY.md
+      - AGENTS.md
+  network:
+    # No package egress. Default-deny with an empty allowlist means no host is
+    # reachable. AWS API calls the instructions direct are runtime-mediated via
+    # the aws CLI (see requires.binaries), not package egress.
+    allow: []
+    deny: "*"
+  shell: false
+  tools:
+    - read_file
+
+requires:
+  # Every skill drives or ingests AWS CLI output (see SKILL.md compatibility).
+  binaries: [aws]
+
+# Permission-derived floor is L0 (read-only, no egress, no shell). The tier
+# reflects the skill's instructed effect class, which over-declares on purpose:
+# following this skill creates or modifies cloud infrastructure, so the effect is elevated even though the package itself writes nothing.
+risk_tier: L2
+
+scan_status:
+  scanner: "jhkchan/owasp-ast10-agent-skills audit"
+  last_scanned: "2026-09-04"
+  result: "pass"
+
+signature: "ed25519:6c0c504732a61b8f2ec54a8e3f964f1f2be5572ec88e1be53c932468ece2464800f96af8b8a762b4ba480cf2641c61fd8a0afe79601a9e552e119bef1c90230a"
+
+# sha256 over this skill's hashed surface (SKILL.md, references/*.md,
+# scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
+# computed by the vendored algorithm in scripts/generate_usf_manifests.py and
+# re-checked by the release signer's preflight.
+content_hash: "sha256:6635841e0682a3cc5ec2d7d824b755ee98ef3acbeab66c9a6b22c61979c276d8"
+
+changelog:
+  - version: "0.1.0"
+    date: "2026-09-04"
+    notes: "Initial USF v1.0 manifest for s3-directory-bucket-deployer."

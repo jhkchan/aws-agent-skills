@@ -1,0 +1,91 @@
+# Universal Agentic Skill Format v1.0 manifest.
+#
+#   schema:    https://github.com/jhkchan/owasp-ast10-agent-skills/blob/main/schemas/usf-v1.schema.json
+#   generator: ../../scripts/generate_usf_manifests.py  (policy documented there)
+#
+# Generated for the aws-agent-skills repository; signed at release with the
+# key did:web:jhkchan.github.io publishes. A verified signature answers
+# "who published this", never "is this safe".
+---
+name: elasticache-cost-optimizer
+version: "0.1.0"
+
+# The runtime whose skill-directory format this package is validated against
+# (agentskills.io spec compliance + @skills resolution, verified end-to-end).
+# SKILL.md `compatibility` names the broader expected set; only the checked
+# runtime is declared here.
+platforms: [claude]
+
+description: >-
+  Optimises Amazon ElastiCache cost across seven dimensions — node-type right-sizing (CloudWatch EngineCPUUtilization, CPUUtilization, CurrConnections), Graviton node migration (cache.r6g/r7g ~20% cheaper than cache.m5/r5), Reserved Node vs On-Demand (1yr/3yr, modify-reserved-cache-nodes-offering exchange), replication group topology (fewer larger nodes vs many small, replica count, cluster mode sharding cost), ElastiCache Serverless (auto-scaling, per-GB-hour pricing), persistence cost (AOF vs RDB snapshots), and data tiering (r6gd/r7gd SSD-backed). Distinguishes Redis vs Memcached for cost. Covers latest Serverless, Graviton r7g, and data tiering. Emits OPTIMIZED, OPPORTUNITY_FOUND, or ALREADY_OPTIMAL per cluster with estimated monthly savings.
+
+author:
+  name: "aws-agent-skills contributors"
+  # identity + signing_key are written by the release signer in the same
+  # operation as `signature` below, and both are inside the signed payload.
+  # `identity` and `signing_key` are written by scripts/sign_usf.py in the same
+  # operation as `signature` below, and both are INSIDE the signed payload. A
+  # signature whose key anchors to nothing is the false trust signal AST10 warns
+  # about, so the signer cannot produce one without the anchor, and neither field
+  # can be swapped for another publisher's without breaking the signature.
+  # The key is published at https://jhkchan.github.io/.well-known/did.json; this
+  # anchor is worth exactly as much as control of that domain and its TLS. A
+  # verified signature answers "who published this", never "is this safe".
+  identity: "did:web:jhkchan.github.io"
+  signing_key: "ed25519:77fb87cd4a46dd524190f72cee510d0ad934b0df4acc40366f9b8a8dc87593a6"
+
+permissions:
+  files:
+    read:
+      - ./SKILL.md
+      - ./skill.usf.yaml
+      - ./references/advanced-patterns.md
+      - ./references/diagnostic-commands.md
+      - ./references/elasticache-pricing-reference.md
+      - ./references/worked-examples.md
+      - ./examples/README.md
+    # The package is instructions: it writes nothing, ever.
+    write: []
+    deny_write:
+      # The identity-file floor. `write: []` is a property of this package;
+      # `deny_write` is what has to survive a port to a runtime whose default
+      # is write-everything.
+      - SOUL.md
+      - MEMORY.md
+      - AGENTS.md
+  network:
+    # No package egress. Default-deny with an empty allowlist means no host is
+    # reachable. AWS API calls the instructions direct are runtime-mediated via
+    # the aws CLI (see requires.binaries), not package egress.
+    allow: []
+    deny: "*"
+  shell: false
+  tools:
+    - read_file
+
+requires:
+  # Every skill drives or ingests AWS CLI output (see SKILL.md compatibility).
+  binaries: [aws]
+
+# Permission-derived floor is L0 (read-only, no egress, no shell). The tier
+# reflects the skill's instructed effect class, which over-declares on purpose:
+# following this skill creates or modifies cloud infrastructure, so the effect is elevated even though the package itself writes nothing.
+risk_tier: L2
+
+scan_status:
+  scanner: "jhkchan/owasp-ast10-agent-skills audit"
+  last_scanned: "2026-09-04"
+  result: "pass"
+
+signature: "ed25519:6ddbee275806c60e3f01ba23134406019a642080aecd03da0e6dd64e5302967413a0888922b02c8dce88e9f2078f6a32eb95c930bf92ae921c95b5c4f6fb3f03"
+
+# sha256 over this skill's hashed surface (SKILL.md, references/*.md,
+# scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
+# computed by the vendored algorithm in scripts/generate_usf_manifests.py and
+# re-checked by the release signer's preflight.
+content_hash: "sha256:ece8e5b0bc11d5859b3b59902260b28579373b349c3109ef89257d35972a4650"
+
+changelog:
+  - version: "0.1.0"
+    date: "2026-09-04"
+    notes: "Initial USF v1.0 manifest for elasticache-cost-optimizer."

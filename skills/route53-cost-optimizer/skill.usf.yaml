@@ -1,0 +1,91 @@
+# Universal Agentic Skill Format v1.0 manifest.
+#
+#   schema:    https://github.com/jhkchan/owasp-ast10-agent-skills/blob/main/schemas/usf-v1.schema.json
+#   generator: ../../scripts/generate_usf_manifests.py  (policy documented there)
+#
+# Generated for the aws-agent-skills repository; signed at release with the
+# key did:web:jhkchan.github.io publishes. A verified signature answers
+# "who published this", never "is this safe".
+---
+name: route53-cost-optimizer
+version: "0.1.0"
+
+# The runtime whose skill-directory format this package is validated against
+# (agentskills.io spec compliance + @skills resolution, verified end-to-end).
+# SKILL.md `compatibility` names the broader expected set; only the checked
+# runtime is declared here.
+platforms: [claude]
+
+description: >-
+  Optimises Amazon Route 53 DNS cost across seven dimensions: hosted zone cost reduction (consolidating low-traffic domains, detecting unused zones that still bill $0.50/month), health check cost analysis (endpoint checks at $0.50/month vs calculated checks which are free), DNS query volume analysis per zone (standard queries $0.40/B, latency-based routing +$0.20/B, geolocation +$0.30/B), traffic policy vs simple routing cost (traffic policies are $50/month flat), routing policy surcharge evaluation, private hosted zone VPC association audit, DNSSEC cost impact (KMS signing key at $1/key/month), and query logging volume reduction (CloudWatch ingestion $0.50/GB). Emits FURTHER_OPTIMIZATION_AVAILABLE, OPTIMIZED, or ALREADY_OPTIMAL.
+
+author:
+  name: "aws-agent-skills contributors"
+  # identity + signing_key are written by the release signer in the same
+  # operation as `signature` below, and both are inside the signed payload.
+  # `identity` and `signing_key` are written by scripts/sign_usf.py in the same
+  # operation as `signature` below, and both are INSIDE the signed payload. A
+  # signature whose key anchors to nothing is the false trust signal AST10 warns
+  # about, so the signer cannot produce one without the anchor, and neither field
+  # can be swapped for another publisher's without breaking the signature.
+  # The key is published at https://jhkchan.github.io/.well-known/did.json; this
+  # anchor is worth exactly as much as control of that domain and its TLS. A
+  # verified signature answers "who published this", never "is this safe".
+  identity: "did:web:jhkchan.github.io"
+  signing_key: "ed25519:77fb87cd4a46dd524190f72cee510d0ad934b0df4acc40366f9b8a8dc87593a6"
+
+permissions:
+  files:
+    read:
+      - ./SKILL.md
+      - ./skill.usf.yaml
+      - ./references/advanced-patterns.md
+      - ./references/diagnostic-commands.md
+      - ./references/route53-pricing-and-configuration.md
+      - ./references/worked-examples.md
+      - ./examples/README.md
+    # The package is instructions: it writes nothing, ever.
+    write: []
+    deny_write:
+      # The identity-file floor. `write: []` is a property of this package;
+      # `deny_write` is what has to survive a port to a runtime whose default
+      # is write-everything.
+      - SOUL.md
+      - MEMORY.md
+      - AGENTS.md
+  network:
+    # No package egress. Default-deny with an empty allowlist means no host is
+    # reachable. AWS API calls the instructions direct are runtime-mediated via
+    # the aws CLI (see requires.binaries), not package egress.
+    allow: []
+    deny: "*"
+  shell: false
+  tools:
+    - read_file
+
+requires:
+  # Every skill drives or ingests AWS CLI output (see SKILL.md compatibility).
+  binaries: [aws]
+
+# Permission-derived floor is L0 (read-only, no egress, no shell). The tier
+# reflects the skill's instructed effect class, which over-declares on purpose:
+# following this skill creates or modifies cloud infrastructure, so the effect is elevated even though the package itself writes nothing.
+risk_tier: L2
+
+scan_status:
+  scanner: "jhkchan/owasp-ast10-agent-skills audit"
+  last_scanned: "2026-09-04"
+  result: "pass"
+
+signature: "ed25519:a95a21ca6c3be9c1496005afdb0a39641aff406e88842be516475585675b4274182e2c200b0131b890990c1716c00669537900154d7d43a7854e076347c25b04"
+
+# sha256 over this skill's hashed surface (SKILL.md, references/*.md,
+# scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
+# computed by the vendored algorithm in scripts/generate_usf_manifests.py and
+# re-checked by the release signer's preflight.
+content_hash: "sha256:832f7588d744a9e51d28b5f29367e9eef9d52c2ad1a52adb6e7004b327ed98dc"
+
+changelog:
+  - version: "0.1.0"
+    date: "2026-09-04"
+    notes: "Initial USF v1.0 manifest for route53-cost-optimizer."
