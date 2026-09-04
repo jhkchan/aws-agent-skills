@@ -1,0 +1,91 @@
+# Universal Agentic Skill Format v1.0 manifest.
+#
+#   schema:    https://github.com/jhkchan/owasp-ast10-agent-skills/blob/main/schemas/usf-v1.schema.json
+#   generator: ../../scripts/generate_usf_manifests.py  (policy documented there)
+#
+# Generated for the aws-agent-skills repository; signed at release with the
+# key did:web:jhkchan.github.io publishes. A verified signature answers
+# "who published this", never "is this safe".
+---
+name: vpc-network-deployer
+version: "0.1.0"
+
+# The runtime whose skill-directory format this package is validated against
+# (agentskills.io spec compliance + @skills resolution, verified end-to-end).
+# SKILL.md `compatibility` names the broader expected set; only the checked
+# runtime is declared here.
+platforms: [claude]
+
+description: >-
+  Provisions production-grade VPCs with secure, well-architected network infrastructure: RFC 1918 CIDR planning with growth headroom, multi-AZ public/private/database subnet tiers, NAT Gateway HA placement (1-per-AZ vs single for cost), Internet Gateway vs Egress-Only Gateway (IPv6), least-privilege route table design (public→IGW, private→NAT, database→ local-only), Security Groups that reference by name not CIDR, stateless NACLs for defense-in-depth, VPC Flow Logs with long retention, Gateway (S3/DynamoDB — free) vs Interface VPC Endpoints (private DNS, per-AZ cost), DHCP option sets and Route 53 Resolver DNS resolution, VPC peering vs Transit Gateway for multi-VPC, and IPv6 dual-stack considerations. Emits a deterministic deployment plan with a READY_TO_DEPLOY checklist and network archite.
+
+author:
+  name: "aws-agent-skills contributors"
+  # identity + signing_key are written by the release signer in the same
+  # operation as `signature` below, and both are inside the signed payload.
+  # `identity` and `signing_key` are written by scripts/sign_usf.py in the same
+  # operation as `signature` below, and both are INSIDE the signed payload. A
+  # signature whose key anchors to nothing is the false trust signal AST10 warns
+  # about, so the signer cannot produce one without the anchor, and neither field
+  # can be swapped for another publisher's without breaking the signature.
+  # The key is published at https://jhkchan.github.io/.well-known/did.json; this
+  # anchor is worth exactly as much as control of that domain and its TLS. A
+  # verified signature answers "who published this", never "is this safe".
+  identity: "did:web:jhkchan.github.io"
+  signing_key: "ed25519:77fb87cd4a46dd524190f72cee510d0ad934b0df4acc40366f9b8a8dc87593a6"
+
+permissions:
+  files:
+    read:
+      - ./SKILL.md
+      - ./skill.usf.yaml
+      - ./references/advanced-patterns.md
+      - ./references/cidr-planning-guide.md
+      - ./references/diagnostic-commands.md
+      - ./references/vpc-endpoint-types.md
+      - ./references/worked-examples.md
+    # The package is instructions: it writes nothing, ever.
+    write: []
+    deny_write:
+      # The identity-file floor. `write: []` is a property of this package;
+      # `deny_write` is what has to survive a port to a runtime whose default
+      # is write-everything.
+      - SOUL.md
+      - MEMORY.md
+      - AGENTS.md
+  network:
+    # No package egress. Default-deny with an empty allowlist means no host is
+    # reachable. AWS API calls the instructions direct are runtime-mediated via
+    # the aws CLI (see requires.binaries), not package egress.
+    allow: []
+    deny: "*"
+  shell: false
+  tools:
+    - read_file
+
+requires:
+  # Every skill drives or ingests AWS CLI output (see SKILL.md compatibility).
+  binaries: [aws]
+
+# Permission-derived floor is L0 (read-only, no egress, no shell). The tier
+# reflects the skill's instructed effect class, which over-declares on purpose:
+# following this skill creates or modifies cloud infrastructure, so the effect is elevated even though the package itself writes nothing.
+risk_tier: L2
+
+scan_status:
+  scanner: "jhkchan/owasp-ast10-agent-skills audit"
+  last_scanned: "2026-09-04"
+  result: "pass"
+
+signature: "ed25519:4634bc76986e9e2d6dc374c6edea9492bd45aadef54fd3ae0c40ae922c4864f32ad3d985ae94fa0328017047e2a77174535f774a27e1dca60e8a2bbe8fc0ff0e"
+
+# sha256 over this skill's hashed surface (SKILL.md, references/*.md,
+# scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
+# computed by the vendored algorithm in scripts/generate_usf_manifests.py and
+# re-checked by the release signer's preflight.
+content_hash: "sha256:3bc9b04957b36740fe1fd72bf7bf54d30ebd6d50dcc6ccfefbecfe02e22d1d5e"
+
+changelog:
+  - version: "0.1.0"
+    date: "2026-09-04"
+    notes: "Initial USF v1.0 manifest for vpc-network-deployer."

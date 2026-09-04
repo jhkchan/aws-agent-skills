@@ -1,0 +1,91 @@
+# Universal Agentic Skill Format v1.0 manifest.
+#
+#   schema:    https://github.com/jhkchan/owasp-ast10-agent-skills/blob/main/schemas/usf-v1.schema.json
+#   generator: ../../scripts/generate_usf_manifests.py  (policy documented there)
+#
+# Generated for the aws-agent-skills repository; signed at release with the
+# key did:web:jhkchan.github.io publishes. A verified signature answers
+# "who published this", never "is this safe".
+---
+name: kinesis-firehose-troubleshooter
+version: "0.1.0"
+
+# The runtime whose skill-directory format this package is validated against
+# (agentskills.io spec compliance + @skills resolution, verified end-to-end).
+# SKILL.md `compatibility` names the broader expected set; only the checked
+# runtime is declared here.
+platforms: [claude]
+
+description: >-
+  Diagnoses Amazon Kinesis Data Firehose delivery stream failures via a systematic 8-symptom decision tree: delivery to S3 fails (bucket deleted, KMS key policy, bucket region mismatch), data transformation Lambda fails (Lambda timeout, exception, resource policy), delivery lag (buffering hints too large, Lambda slow, throttling), data format conversion fails (incorrect JSON, Hive SerDe mismatch for Parquet/ORC), delivery to OpenSearch fails (cluster unreachable, auth failure, circuit breaker), delivery to Redshift fails (COPY command failure, staging bucket issue), and latest destinations (Firehose to Snowflake, HTTP endpoint, Splunk delivery). Maps each symptom to root cause via diagnostic commands and specific fixes. Emits ROOT_CAUSE_FOUND with a fix plan, NEED_MORE_INFO with the next dia.
+
+author:
+  name: "aws-agent-skills contributors"
+  # identity + signing_key are written by the release signer in the same
+  # operation as `signature` below, and both are inside the signed payload.
+  # `identity` and `signing_key` are written by scripts/sign_usf.py in the same
+  # operation as `signature` below, and both are INSIDE the signed payload. A
+  # signature whose key anchors to nothing is the false trust signal AST10 warns
+  # about, so the signer cannot produce one without the anchor, and neither field
+  # can be swapped for another publisher's without breaking the signature.
+  # The key is published at https://jhkchan.github.io/.well-known/did.json; this
+  # anchor is worth exactly as much as control of that domain and its TLS. A
+  # verified signature answers "who published this", never "is this safe".
+  identity: "did:web:jhkchan.github.io"
+  signing_key: "ed25519:77fb87cd4a46dd524190f72cee510d0ad934b0df4acc40366f9b8a8dc87593a6"
+
+permissions:
+  files:
+    read:
+      - ./SKILL.md
+      - ./skill.usf.yaml
+      - ./references/advanced-patterns.md
+      - ./references/diagnostic-commands.md
+      - ./references/firehose-delivery-diagnostics.md
+      - ./references/worked-examples.md
+      - ./examples/README.md
+    # The package is instructions: it writes nothing, ever.
+    write: []
+    deny_write:
+      # The identity-file floor. `write: []` is a property of this package;
+      # `deny_write` is what has to survive a port to a runtime whose default
+      # is write-everything.
+      - SOUL.md
+      - MEMORY.md
+      - AGENTS.md
+  network:
+    # No package egress. Default-deny with an empty allowlist means no host is
+    # reachable. AWS API calls the instructions direct are runtime-mediated via
+    # the aws CLI (see requires.binaries), not package egress.
+    allow: []
+    deny: "*"
+  shell: false
+  tools:
+    - read_file
+
+requires:
+  # Every skill drives or ingests AWS CLI output (see SKILL.md compatibility).
+  binaries: [aws]
+
+# Permission-derived floor is L0 (read-only, no egress, no shell). The tier
+# reflects the skill's instructed effect class, which over-declares on purpose:
+# diagnosis is read-only, but documented remediation may reconfigure or restart components.
+risk_tier: L1
+
+scan_status:
+  scanner: "jhkchan/owasp-ast10-agent-skills audit"
+  last_scanned: "2026-09-04"
+  result: "pass"
+
+signature: "ed25519:ee67897b6ec8695091c1e49a88651cab3c124a441d3bcbb69f8c61ea23e3d80058e19ac2fd013b44a5038ee53adb8f9de803ea5c2fe0029aca78c02488d4380f"
+
+# sha256 over this skill's hashed surface (SKILL.md, references/*.md,
+# scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
+# computed by the vendored algorithm in scripts/generate_usf_manifests.py and
+# re-checked by the release signer's preflight.
+content_hash: "sha256:74b07371bb435d826cc0b075619c5ee92488662686fab0ac6c2671718dcd8776"
+
+changelog:
+  - version: "0.1.0"
+    date: "2026-09-04"
+    notes: "Initial USF v1.0 manifest for kinesis-firehose-troubleshooter."

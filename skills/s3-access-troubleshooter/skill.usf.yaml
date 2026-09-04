@@ -1,0 +1,92 @@
+# Universal Agentic Skill Format v1.0 manifest.
+#
+#   schema:    https://github.com/jhkchan/owasp-ast10-agent-skills/blob/main/schemas/usf-v1.schema.json
+#   generator: ../../scripts/generate_usf_manifests.py  (policy documented there)
+#
+# Generated for the aws-agent-skills repository; signed at release with the
+# key did:web:jhkchan.github.io publishes. A verified signature answers
+# "who published this", never "is this safe".
+---
+name: s3-access-troubleshooter
+version: "0.1.0"
+
+# The runtime whose skill-directory format this package is validated against
+# (agentskills.io spec compliance + @skills resolution, verified end-to-end).
+# SKILL.md `compatibility` names the broader expected set; only the checked
+# runtime is declared here.
+platforms: [claude]
+
+description: >-
+  Diagnoses AWS S3 access failures via a systematic six-symptom diagnostic decision tree covering 403 Access Denied on GetObject (object ARN vs bucket ARN, KMS key policy, BPA, Object Ownership), 403 on PutObject (SSE enforcement, Object Lock retention, bucket full, KMS GenerateDataKey), 403 on ListBucket (bucket ARN, prefix-scoped resources), cross-account failures (identity + bucket policy intersection, KMS in both accounts), presigned URL failures (expiry, SigV4 credential scope, region), and unexpected public access (BPA hierarchy, legacy ACL, Access Point policy). Maps each symptom to a specific policy layer (account BPA, bucket BPA, bucket policy, KMS key policy, Object Ownership, ACL, VPC endpoint policy, CloudFront OAC, Access Point policy) with the BPA hierarchy: account-level > buc.
+
+author:
+  name: "aws-agent-skills contributors"
+  # identity + signing_key are written by the release signer in the same
+  # operation as `signature` below, and both are inside the signed payload.
+  # `identity` and `signing_key` are written by scripts/sign_usf.py in the same
+  # operation as `signature` below, and both are INSIDE the signed payload. A
+  # signature whose key anchors to nothing is the false trust signal AST10 warns
+  # about, so the signer cannot produce one without the anchor, and neither field
+  # can be swapped for another publisher's without breaking the signature.
+  # The key is published at https://jhkchan.github.io/.well-known/did.json; this
+  # anchor is worth exactly as much as control of that domain and its TLS. A
+  # verified signature answers "who published this", never "is this safe".
+  identity: "did:web:jhkchan.github.io"
+  signing_key: "ed25519:77fb87cd4a46dd524190f72cee510d0ad934b0df4acc40366f9b8a8dc87593a6"
+
+permissions:
+  files:
+    read:
+      - ./SKILL.md
+      - ./skill.usf.yaml
+      - ./references/advanced-patterns.md
+      - ./references/bpa-hierarchy-and-truth-tables.md
+      - ./references/diagnostic-commands.md
+      - ./references/error-handling.md
+      - ./references/kms-and-s3-cross-account-chain.md
+      - ./examples/README.md
+    # The package is instructions: it writes nothing, ever.
+    write: []
+    deny_write:
+      # The identity-file floor. `write: []` is a property of this package;
+      # `deny_write` is what has to survive a port to a runtime whose default
+      # is write-everything.
+      - SOUL.md
+      - MEMORY.md
+      - AGENTS.md
+  network:
+    # No package egress. Default-deny with an empty allowlist means no host is
+    # reachable. AWS API calls the instructions direct are runtime-mediated via
+    # the aws CLI (see requires.binaries), not package egress.
+    allow: []
+    deny: "*"
+  shell: false
+  tools:
+    - read_file
+
+requires:
+  # Every skill drives or ingests AWS CLI output (see SKILL.md compatibility).
+  binaries: [aws]
+
+# Permission-derived floor is L0 (read-only, no egress, no shell). The tier
+# reflects the skill's instructed effect class, which over-declares on purpose:
+# diagnosis is read-only, but documented remediation may reconfigure or restart components.
+risk_tier: L1
+
+scan_status:
+  scanner: "jhkchan/owasp-ast10-agent-skills audit"
+  last_scanned: "2026-09-04"
+  result: "pass"
+
+signature: "ed25519:838abadde85defc3158ebd1bd4f8fc649604d1f4f65bf2d0c8e6955fc9af00cc0c5c3228e9136bb0b739a63d15d343656cb1e0f02f76f4bc04e1eb9cd0c51006"
+
+# sha256 over this skill's hashed surface (SKILL.md, references/*.md,
+# scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
+# computed by the vendored algorithm in scripts/generate_usf_manifests.py and
+# re-checked by the release signer's preflight.
+content_hash: "sha256:e9b63ba7d421ecfa1eb02e2d7d09a3dcda4ab64851bc7c27f2c9370fac836928"
+
+changelog:
+  - version: "0.1.0"
+    date: "2026-09-04"
+    notes: "Initial USF v1.0 manifest for s3-access-troubleshooter."

@@ -6,6 +6,8 @@
 
 **409 eval-backed AWS CloudOps agent skills** across **13 AWS service families** and **6 task types** (audit · deploy · troubleshoot · optimize · operate · automate) — every skill ships with a committed, median-of-3-judge-scored eval scorecard. Measured, not asserted. Built on the [softaworks skill-judge](https://github.com/softaworks/agent-toolkit/tree/main/skills/skill-judge) 8-dimension rubric, with co-located structured evals (cases + baselines + delta comparison) on every skill.
 
+Every skill also ships a **signed [USF v1](https://github.com/jhkchan/owasp-ast10-agent-skills/blob/main/schemas/usf-v1.schema.json) manifest** (`skill.usf.yaml`: declared permissions, risk tier, content hash, ed25519 signature anchored to `did:web:jhkchan.github.io`) and passed the OWASP **AST10** detector sweep with zero findings — see [SKILL_GOVERNANCE.md](SKILL_GOVERNANCE.md).
+
 ---
 
 ## Why eval-backed?
