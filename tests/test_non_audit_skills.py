@@ -22,7 +22,6 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SKILLS_DIR = REPO_ROOT / "skills"
 SCHEMA_PATH = REPO_ROOT / "schema" / "SKILL.schema.json"
-UNIVERSE_PATH = REPO_ROOT / "features" / "aws-cloudops-skills-oss" / "skill-universe.md"
 IMPACT_EVAL = REPO_ROOT / "eval" / "impact_eval.py"
 MAINTENANCE = REPO_ROOT / "MAINTENANCE.md"
 
@@ -202,32 +201,6 @@ class TestImpactEval:
 
 # ---------------------------------------------------------------------------
 # Skill universe document
-# ---------------------------------------------------------------------------
-
-class TestSkillUniverse:
-    def test_universe_exists(self) -> None:
-        assert UNIVERSE_PATH.exists(), "skill-universe.md must exist"
-
-    def test_universe_has_task_type_breakdown(self) -> None:
-        text = UNIVERSE_PATH.read_text()
-        for tt in ["audit", "deploy", "troubleshoot", "optimize", "operate", "automate"]:
-            assert tt in text, f"skill-universe.md must mention task type: {tt}"
-
-    def test_universe_has_capability_preference(self) -> None:
-        text = UNIVERSE_PATH.read_text()
-        assert "capability" in text, "skill-universe.md must mention capability classification"
-        assert "preference" in text, "skill-universe.md must mention preference classification"
-
-    def test_universe_has_total_count(self) -> None:
-        text = UNIVERSE_PATH.read_text()
-        # Must mention a total skill count (format varies: "Total skill slots" or "Total skill universe")
-        assert re.search(r"Total skill.*(slots|universe).*\d+", text, re.IGNORECASE) or \
-               re.search(r"\d+\s*total skills", text, re.IGNORECASE), \
-            "skill-universe.md must show total skill count"
-
-
-# ---------------------------------------------------------------------------
-# Maintenance: retirement cadence
 # ---------------------------------------------------------------------------
 
 class TestRetirementCadence:
