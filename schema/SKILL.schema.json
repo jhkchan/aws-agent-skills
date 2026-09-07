@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/jhkchan/aws-agent-skills/schema/SKILL.schema.json",
   "title": "AWS CloudOps Agent Skill Schema (agentskills.io compliant)",
-  "description": "Schema for SKILL.md YAML frontmatter. Follows the agentskills.io spec with AWS-CloudOps-auditor extensions in metadata (pipeline phase, CloudOps family, verdict shape). Validates the full softaworks pattern frontmatter used by every shipped skill.",
+  "description": "Schema for SKILL.md YAML frontmatter. Follows the agentskills.io spec with AWS-CloudOps-auditor extensions in metadata (pipeline phase, CloudOps family, verdict shape). Validates the softaworks-pattern frontmatter used by every shipped skill.",
   "type": "object",
   "required": [
     "name",
