@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:4634bc76986e9e2d6dc374c6edea9492bd45aadef54fd3ae0c40ae922c4864f32ad3d985ae94fa0328017047e2a77174535f774a27e1dca60e8a2bbe8fc0ff0e"
+signature: "ed25519:be2902b79804f877b1aa26185a258b440ee224f81e8abf9d36be0afa7c6e0b8e5e0b634d251143b031a2df79ab16f65b1e81a5e16b72f42b2ef865b332401607"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:3bc9b04957b36740fe1fd72bf7bf54d30ebd6d50dcc6ccfefbecfe02e2
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for vpc-network-deployer."

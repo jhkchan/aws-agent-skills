@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:7d7d2c1cf6047ba01eb7537e0c5ae2b4e7cd3835ebcaf74262f5fabf063019e34faa1e7f0627ad82ca7e7537cfeb16f6554a222b762a9705d1d4d023aa76b005"
+signature: "ed25519:8b12e6bce2bd0f809f0efbf86e5f57c57448f6f7996e3d3f4bda6f7ee8df937111147f79012e636ad34ca1ff380179b1596996d74b8ef3c622db074e6753490e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:1d508c9fca7fe17488c1630525415abc003cfb26c6b7252c5bad6158f8
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for greengrass-component-deployer."

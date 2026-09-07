@@ -72,10 +72,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:b789bd6cf4dccc5032ad5b0fd73572b2950e2d01e4b548f3cd9271f4e03f509d3390be5068796b76f9c40a33208a62e495637926770496f976333389f307ce0d"
+signature: "ed25519:20dfc640b29e1aed6b4ebf9879e9ac359bbed6c02d5c0900c820055bd625ddcddfa1b11b681899f25cc5eb9523f5c9510779a606b4f21d390ea4521ae3edb409"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -85,5 +85,5 @@ content_hash: "sha256:58cb5ca8e4e8668e44cf6ed4598f90edb8850e31728a1f9d1f33d0d2ea
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for trustedadvisor-check-auditor."

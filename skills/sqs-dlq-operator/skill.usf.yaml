@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:5f2610b61de781570e4985d914ea8fd67b1692b043d04a29ac53f214c576a7c31027dc878ade2a8b0911ebf71b248f6ab478608ff20148ad82725dd372b8ce02"
+signature: "ed25519:3a5197f8c96c227499630f9ba0d51d4fec40cd403d2b22ed0b128eaaefbbeea8d3f19eb2b5d14ea27c935953a4e43c368875a48bf3d5a1f8da0ac7478060cc07"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:b829b9914ba1f460c07d3d9a52ce86dfea38d0344c6f6613457039027e
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for sqs-dlq-operator."

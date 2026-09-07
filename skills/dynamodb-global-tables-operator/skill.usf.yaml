@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:fef9bd71be9e444e11fd77e603948bbb44b8cba3a05d0bd974c01f9e55f32f5a936fb3fdaeca73bb16f6aa14a2b3592592d64219f30e032ba98b1f6d2b02a009"
+signature: "ed25519:f371b9c84f821084847a7fe1a24c0e47385383743a2d12fb3a9bf5f640dea181de225b2ca7bf7ba2e98470bee5a7474eb867ded091152bcc3a8213b6cc2b0209"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:b23392be77f5a50c8289347634b1ab5757e607ca379c18630cbc0eb8c1
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for dynamodb-global-tables-operator."

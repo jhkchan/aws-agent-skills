@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:4dff596b65aa7aa23c865131610fbdcb4a6b0f798d4e82b105f13729aecb774b65130c3cb9f0ab97160af7e733bad46351f34fd501cb4f35f21cf1697ce64505"
+signature: "ed25519:f03e346f52cd0c44a68db069e8492773d713d55625cdd4fc2d6f6b700546adc4f83759ce91aed20661923f832264b46938e4ee219c8c1c2bb353b69c4a49dc00"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:76b095ff018fab48273e72b97e74d6d65cd1945225de1b9c4b6a966861
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for ecr-replication-deployer."

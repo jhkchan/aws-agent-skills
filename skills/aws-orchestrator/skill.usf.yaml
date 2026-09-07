@@ -71,10 +71,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:99137b662ea7a393796e4bdf10247c9413c94fea3e0463bb3fb2839434e04c1fda50df8f3a5c58b6aabdf151c5ade93bcefcbcb2e53abea91bfb5525f47e7105"
+signature: "ed25519:7b6407d79bbdb3761105702735bf0ceac6b22375ff2e30b35275aa0d92bdfc14d0193925328de14b8bfdcd55c1321fa6820ccb33dc5f762bfb81d88d4796f80c"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -84,5 +84,5 @@ content_hash: "sha256:853bc6921853478adfed874af426c677c23a1b674dccc1d3d3b837337b
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for aws-orchestrator."

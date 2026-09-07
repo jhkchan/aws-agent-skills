@@ -73,10 +73,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:3bd6c640463fd7e87a9d9ad1d82e3f0736790dc4f3685fc53a0e20cb5651da927a5cbd43afed6ecc913973546dd91aa456ab9457cd6d6f77b4349d2134c6b606"
+signature: "ed25519:c44abd298f79b11a8b45fc9e27aeb9e68786347aa4d7fe933ea58e6dbf4fb3ea6f05d679d441cb3f7f84cef5e729fc85c70c9e57dc30507dd8a54b8fa0d5db06"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:11206f7552986d3e19ac9a19e4478fababecbb387e9111a14a0133464d
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for eventbridge-rule-deployer."

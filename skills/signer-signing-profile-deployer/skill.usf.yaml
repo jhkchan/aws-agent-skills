@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:4a33eb35b726d58a0c3fa4eed0cecc8ba7e5de4a375648a3248e7cbcaa3b4bebab49fd1ffc51e68c66057ce5669c218b182ced6df8abf06eb052fd2948ce3707"
+signature: "ed25519:06eafe6467db488e03cf51940a6ef48055170c0f7ba3688b23f8ddff5216e1f1d43fac112b2ae59274e2065de2212cb96b7c289117cc8250e7d0b46242184b0b"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:fd65e8d3a925f805332d43de2e1894b48b9fee745542df0ca9f9b925a5
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for signer-signing-profile-deployer."

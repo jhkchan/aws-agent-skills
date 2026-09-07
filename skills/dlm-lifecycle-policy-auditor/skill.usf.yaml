@@ -71,10 +71,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:7d2067484ada09c44826c64299e557ff38fc5d6fd62afae81abe0b8ef83e4c60a68550aa7e8f658c7e4402edd15401dad8c9e1f2b752b65864146a2695fa3d02"
+signature: "ed25519:8798a88cd754848aabfde9af621c53e3fb1ede4520fd438a2590f2ea9d8c295f0ca3f5c0dd304f772b4596fb6aed21961e9695ffee3805e4e498107a2c322b07"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -84,5 +84,5 @@ content_hash: "sha256:8e2e43ba8308734b7fcdda17ba9c5d91e3432158015bd79944f7a85ad5
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for dlm-lifecycle-policy-auditor."

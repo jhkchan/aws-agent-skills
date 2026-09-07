@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:86b380ebb2814383334c06c119ad3eefa8b36a876a710d09e58fe206b5d6e01b9efa13d4a36c4b77555a749904c9f5c974ac7d91aadb8752fe26ee74ac667702"
+signature: "ed25519:6bc26a3ec71b1fe620f57c1fbd9b2eea0458cd257add59b21e4e3b1ad6c16153b45349113ef7cf3a4790355df0ce39a1b1e063538362354fa30fc1c64a819d09"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:7bcf78d171647c82eaccc6fc6cb1adc82e6c6c0f9c0e8cfabcb175dd1043c0cc"
+content_hash: "sha256:c972fab3c9dd36ed746f12b49d5d0d73e3f7090eb9b1e3b7bb858602fe5dd608"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for lambda-layer-deployer."

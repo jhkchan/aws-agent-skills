@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:c31b1e631fc679bcf95de471027c46478288bdd282332dc1952bb9f8d1fa1f1d37f5dcfa00fb1387ee9f3d5db1f5cf595110b9737291ffa86e51b890423ca00f"
+signature: "ed25519:f830d51adbb7db0f698cf488cf92590b30896050bafdf90cacb691c98fd7f782f51c5b67862c24a67d929c7bb0c9a7dd91cd50a32836ddc60d1b2139f2d0c504"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:34350821eb98c6cd7067799182dfd944ac99a13e02706d4ab573530b71
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for iam-role-deployer."

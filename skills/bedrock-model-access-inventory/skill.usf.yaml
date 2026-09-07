@@ -69,18 +69,18 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:98e21e46dd14a2debb42b768b097ebfacd3c1cff5e82c1aca10b6623559e5c02a3e87dcaf446b8027888cd18f7f7de8d852906db47a5332f4c43f293d2ce950c"
+signature: "ed25519:d1c555f75d4081d350ee30861f59c81c4e96e546ebd24b8ef9cac0f226752bd4a9ebf7a34efbd95dde6fdfbf112c0412aad8ef9d22cc10c0b3a4efa0971e3c08"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:87ac3fee496f6434a750c9ff4bd3756a8a965098323a290f03508d0baee3ae4e"
+content_hash: "sha256:4d0ab8c2a605ca47e9d04c50dae7dcc4c6fa25670657f1a359c4f9e04c82ddc7"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for bedrock-model-access-inventory."

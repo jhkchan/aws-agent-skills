@@ -72,10 +72,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:a9326129ce229e19b48d3466933bde8ddbfb46a02590b5e960302c3fcf3c517e14c3916a791c85366e007f3d21471702bf732c685cb513d88f3bf8b4a9f6d10d"
+signature: "ed25519:4800ecd02afd22b6a9641bbd72e4241da548f099bf6f60e63c69b55b00f0dba3a36fe68dd9858cd081074fc646abaae0bf599007a3621d84f20f6f827735c90d"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -85,5 +85,5 @@ content_hash: "sha256:baf652f31c42a1ab059f8a2aad8326491f9105accb2f57eb1406a92a9b
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cleanrooms-collaboration-auditor."

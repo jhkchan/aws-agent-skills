@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:bc4c0b6e6e04a1c2179b4cf76abfd879776faa47e4f841a44f39dbce7f908067d878bd35918f7e9c45a097ac007ce1840dc7724abbbba9b6e11da1c5eae4b205"
+signature: "ed25519:c99f4dbb90241a9c69b6c6d28939ce93c036fbb051995e18fca39db8de7b948bb91aeef0acac15db28baff5bc45b762c30f4721170997c910cdd64cd3f8fad01"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:f55bbce62e5fe627a896ef44ddcfee72167e466f36713d33a22c300dc2
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for redshift-cluster-optimizer."

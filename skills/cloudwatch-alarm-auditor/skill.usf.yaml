@@ -39,7 +39,6 @@ permissions:
     read:
       - ./SKILL.md
       - ./skill.usf.yaml
-      - ./references/advanced-patterns 2.md
       - ./references/advanced-patterns.md
     # The package is instructions: it writes nothing, ever.
     write: []
@@ -71,18 +70,18 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:692c430b025b71380fc1b6be4056968df0ecebfb0e75d28a545e7906e2090d6005481814cb09d7d86b55a6f006d26ba7152131502f62045e1fa3ec02c5718a0f"
+signature: "ed25519:b0c8617dad389747f3d19e5dea5ed2e7521169c7b1ba27b09cc00ab72319cbd6a3686d610a7635306a8d1a31f5a862c5f8647a9bf4cb494e5269dba95656100e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:d21a5d8106c6775120f056411910354440e3ce21a8b46e3427fd58ff51f9d9a5"
+content_hash: "sha256:ba643e47914a6b394476faf0b569a1cc9d38fdc5791f56315ff135a2d7b99603"
 
 changelog:
   - version: "0.2.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cloudwatch-alarm-auditor."

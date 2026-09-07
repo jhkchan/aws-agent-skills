@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:fc8f6ee0882278e3a6a7e53b7b9a2893c69096837f6adca818689330aaaba82c0190e08e993abc9e7ec2129837757cccc2f603af09716905ff0bd0ef97727808"
+signature: "ed25519:87b6d64304f1fd477dc30344dc7d7e369fca5d43d273e88444845e7a404519170dc05f15d10708c27aa9d60d2c0235518d96d4d1425c98911d1ccb04457e4805"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:2752111bafaa20f1a1dcea7ed388322b3ea3f0bb82575bd54b9d2b3879
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for drift-detection-automator."

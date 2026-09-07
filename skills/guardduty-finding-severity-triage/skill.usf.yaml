@@ -74,10 +74,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:175862b8bdaecbc67a4a0118be9d646b425ff53b022dde034960ae28c6dd23184ef12afce7a275ad955d159a20c0c03f8bd98f9c10235ac9c0ca08007058d00b"
+signature: "ed25519:fd7c04c48a7959b0961442df3837aa1bc88a372ae0b03e922c9014eccb3504a2803d7fe2a562cb1b4a7fe035fbf72324d62db83b678bfa944153954dbc53eb0a"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:ec4005722e66191f6ca4e5c53cbab94f292077f85840d71309e10bd965
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for guardduty-finding-severity-triage."

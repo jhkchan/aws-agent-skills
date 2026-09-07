@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:40d9c717cdad1d5704def6a923336053a4c1b0158378e8b8946be769e1ae0b2ac9b1fa13fef7210a63998e0ec40d4bb25c47a015a0e8ca6b7707bfb6d1f7da09"
+signature: "ed25519:174e24cf08dbac94566d2f351a4627b65ca45ae0b5e8f882279ce58c67f4706d33537157d3d44a9350410df78017623f58c36a609ee0605ac9428cfda02eaa00"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:8073b7f7fcda215f5c2af5bc78faf5b66b2b974d2977a11b3f770670153975e4"
+content_hash: "sha256:f6f5edab2364312af44766dbec60ee65f14139d6d0e9e77067ad119c8023cd09"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for opensearch-alerting-deployer."

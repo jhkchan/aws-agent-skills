@@ -40,7 +40,6 @@ permissions:
       - ./SKILL.md
       - ./skill.usf.yaml
       - ./references/advanced-patterns.md
-      - ./references/diagnostic-commands 2.md
       - ./references/diagnostic-commands.md
       - ./references/error-handling.md
       - ./references/throttling-metrics-and-write-sharding.md
@@ -76,18 +75,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:895a7e1d3adb3c671d271fb8adfbbb36a4dc7b39eb211c1accb039219d1e056c7619a76aa489bd9b2ca7f7167756d499736f61011c9356c25d38f60b1e5a8d06"
+signature: "ed25519:39892a1338c1b19ac5ae0ba68dc5fabc0fd4009db50a112bd478226108b3fe2d70fb2e75da4698d5a185bd7dc1a44a8d713a6ee62badc24a7b44cf8535e6f10e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:278ba93d80ff1c64fcb94fb7c9a8d325ab0c71cf10d406c81b4c04fa8ac33958"
+content_hash: "sha256:bdbc286a6d40885f91f337fbc9c0eec1948e08f1c36864013a80ad3120205ebb"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for dynamodb-throttling-optimizer."

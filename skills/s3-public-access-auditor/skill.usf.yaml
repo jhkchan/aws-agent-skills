@@ -74,18 +74,18 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:6ac0586da5051fd5b9bb1046d29bb36edcb52b3b45e86f15a7bf899752d07a9d7ea9e26054ff36164fb820778b583237972af2e2e7327afa90217d34b94a860d"
+signature: "ed25519:7eebacd8f832d23ac9581a6843a4a099deb2a0cefb78867921650bf80a923e8e26c4c0edd3eed32c87defc57ecb6ec965acd0483e56debc4a83dd7a9b710660f"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:8cc6de1dd699095cc80eee9acff17535bd5d9cc0345703256f88ce16a224d70c"
+content_hash: "sha256:77ce55704f479a51c772fb89bfe9422f5886d78a193ccc84809dbc278ce164e4"
 
 changelog:
   - version: "0.4.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for s3-public-access-auditor."

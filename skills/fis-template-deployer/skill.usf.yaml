@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:cf973447b2a29ff8336b9b7d8645e9090c59f8fa7721297cf54067760d20843f2bd8901cc07e099a2ed44c11d32d77694dcca0d8c0e023cf7be2845cc44e6b0e"
+signature: "ed25519:6ed207960696637ddb6631fb6eeb7837b96ce7cf7b096a40a1b84004c420d5c7ddeb738534cb97f966c47d417b763c6540729a66824732bfd500630cfed5ec03"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:6d8d18c3ea76d16be4a55982e8deab74974622954b9260f40151fb360d87a0a6"
+content_hash: "sha256:12dd492d8011782411b960157b927e605c34c9193c701ca037875234f3ab6f82"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for fis-template-deployer."

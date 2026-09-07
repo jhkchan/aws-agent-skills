@@ -69,10 +69,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:bbdde84598d8696566aaf0665f505fc57546ece60879f7cd0043b3bc61969250d3e1758dc200798ac6a860d76449e950c03c65f6721e383e54cce9aa2c05920e"
+signature: "ed25519:e120bc3600042de57277e10162082067332039ed61baf57061bf5e182d3c9b4dfaa9b9f2c96b7474774a5fb0e54f5e37e0d178decc4dd9302f35c597cb94bc04"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -82,5 +82,5 @@ content_hash: "sha256:e8b9f50658fd1eb7087cb4a2fce3cce1df22db9c4d9a58105f6a98d7e2
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for controltower-control-auditor."

@@ -73,10 +73,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:910b6722ca9a63f639a20ab8c6a8f57ad6693891fd663a3f061f8b5fd2bdd2975c2869c8a4cebe4c69eecda5daeeec07870ea5159162e05c0db577cb9640a101"
+signature: "ed25519:49a72b9744d274c8ca85c9085cc89e5c5a51c87080543196472c5fb8886cd1f17b6dc43353dc419641fbd569941f2579759acd55240dd19a014524db9843420e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:0953475c4c6d267837ff4e540c2bfa20722b234c8a7c3196bc9d22ee29
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cloudtrail-gap-troubleshooter."

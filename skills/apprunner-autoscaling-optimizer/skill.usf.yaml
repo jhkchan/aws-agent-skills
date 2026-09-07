@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:ef9f76c0d2d49baaff3d63928b69f71c6f8a52ecf2689d8f0f9772b3c2258712cb0f81d4c404a5e7c5e037a305b4be2a24a51095884d0e3aded1809457ee7301"
+signature: "ed25519:129b5831a8a12d7c1f6f4c3f0e3e4b2963c6afaee4e0a1212621b92a65abd5f10b22e2faa46d22d8ebeff93d083206d23c0688d3bfc6153bc48ffd5c43cf7403"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:8a64a462f13811d174d209c42359ac743167cc37b453bd9fce47e74151
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for apprunner-autoscaling-optimizer."

@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:4321e6cb45a3067a5901114ba8ab3a9b082878ad7bc51f063c7a5574135e0877473a86e4c06340835b78fc5e7ee11e31cac455ddd005d9dab9aff8c294d2ec0e"
+signature: "ed25519:45e1e369676b76fd2714c8f8111a89585fde3432d8212b62d74fa6b67077c565a69073893217b9820bce9526a6797308320d652d7d04cfc9a3a68329ab945a09"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:a53a9f80c4788f4d0c709a4a9ee38ab575efffd4ac7b755b90442def60
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for lambda-memory-optimizer."

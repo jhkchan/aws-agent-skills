@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:51faba79470b52915ddbd6629bf986a83354f7ae55ed25f26a9af1753676081e1e97f65eeb40a7f6fd2f61fe86960b1a181b911170270d6906e33470f7f66909"
+signature: "ed25519:4eb791fd82abbd533269d395124180f55c960bc8d46e345b5b092dc326a01d4dbc9a5a564c13256bb232abde2bb12d1b262fa71827a545d207c7bffdcd4afe0a"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:a311a73990dfb4dd5dc830c923d27a58a2e10410953802176d8a0b01d3
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for ec2-instance-rightsizer."

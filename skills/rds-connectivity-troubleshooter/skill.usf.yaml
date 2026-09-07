@@ -75,10 +75,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:136b3d8dba26593c5d0f8e860ca6c150bdf6af2244da891f7a39f9cfe67a39fe5058b1855c71df4549ca0da183869d4c27ed865815159c10c10101f103f2aa01"
+signature: "ed25519:bfdffa714db85beb1e4bc003ab5dddfaae5ed058c3932f2f11ed998f692997681dca0e0778bd9f75084506682e322db9cd2d17dd3f7281e28f8e631d0eef8606"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:637213ee9508bff714fcba63d203dd7162a9e15b699ac18c13e8224993
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for rds-connectivity-troubleshooter."

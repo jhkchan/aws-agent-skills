@@ -75,10 +75,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:194de0b115a4e5dea0c9c2c7af1b76f957e097df516de1ef7816e3403f0457d89187d8b7e3b647bb4b5836b8e6dbe7df707c850aa0bb92dc465b7dc01c08f504"
+signature: "ed25519:d2cb271b222475116655d0c7621e56538fb9ca52c32b3bf332047dd8ecc7bf42cbe20ed4b629445cf10c747a5d84093aa91c02e00cfad5dd360a006c3eb8b305"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:dec40d11bc07b1fceb2877b017dd058c9a1d32bcb5261599b4d84c129e
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for ecs-task-troubleshooter."

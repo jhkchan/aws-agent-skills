@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:dad06721a0737386a074ec5a7e31a457ec2b7b08fa3027a7f9b594ebd7e294ae68c929d147cfca6d9eca2849bf5637834093b0362335dfe1e6872c6e19cef303"
+signature: "ed25519:7ad0833c9aac9c3bfc9000742f1a28c95c2b29f2ea4d055150120d58fa6efad7427145d4f725a7ec0d01946a3daab74347083861b160cbf5a8f53c17dfeb6f06"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:3d747f94efb7d48d8f09853c5dc4bd3e55a6aa34b0d8832240724b0e306c3ce7"
+content_hash: "sha256:c0ca54a9de06960444143406e343e488e354a3fac41810dc78237479e0c4a156"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for kinesis-analytics-deployer."

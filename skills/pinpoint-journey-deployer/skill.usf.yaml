@@ -75,18 +75,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:ef61a1831787ba81dc5c1d316016c5a5c42341252a6b54a6aebdf378a11c7eb389cfc7b3bc3a86d71a5f1c6cd10cc1b55f064e5850e08d7898dc4848f75b550d"
+signature: "ed25519:86e6f2654c004940cd68d9da0dd16f68f64ef2e5a6a83b4c7e2c18bcf2a733f16f66af97960efd9e3c806b965d672427f3cce76fd25aaabc09c1e806d696c40e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:44614a59f3f7bbf9f96ebbc39facec1b52f202c372b94fa091be22f8ee2340cc"
+content_hash: "sha256:252a7fdd00d6d2337c9b3fb1c70137a7cd95f8448bd51bea66b69d7ed2cfee54"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for pinpoint-journey-deployer."

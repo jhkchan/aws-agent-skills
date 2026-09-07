@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:e11a7a275b6363dbd485ced55b0223a579830782d55ed4d092c8de93d4cf4b63c63901152a35574b5a8fdce3a1a25aac463e4e4578d3cfc4ef36b06ad79e3603"
+signature: "ed25519:c1a9f17f2d05844ac3f9dbf96ae4e581f8bb72990445ec3fcca5546d098af1fad7dd3cb60f136d0e356520d87214f6dca82b27def0becaacd6ea105c809e1608"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:b5f7e6aa228dcd04db9f50cb24a99a7200b52a1f596b1f683f0d4f9c02
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for clb-to-alb-migration-operator."

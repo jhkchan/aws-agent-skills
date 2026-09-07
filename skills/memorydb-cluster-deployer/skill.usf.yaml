@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:5f75b5aa7bf418914f4091d4876bc0d2eb8a211b7bdf3dfbc0b6f8ad8062b5fd1e712eac28ba0e5cb6575c3210fddc5d9d04c53b853d05f4eaede0945c634704"
+signature: "ed25519:43f90c6a26ead62ac2a4bc50c0e920d7bbedd34f68a2595e9d85efc4e24301c586b4be19d533dd913295641b718871f1da973b046101c1e8b51410570ee86d0e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:a714952252f144f3fc13c6334f232af0ee4570d20af0c3ff4efbc88e07fa1411"
+content_hash: "sha256:ec979dad82eedf2f280bcadb00276565bf218acce96d27be69ce7df9ae41ad29"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for memorydb-cluster-deployer."

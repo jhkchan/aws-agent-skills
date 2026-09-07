@@ -73,18 +73,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:f7a27657ef5dd84c17518ea110535eef788e9659fe6206dbfabbb6dbbf852b0fa5adec7e305ae2ea59543f9f7c6f202db1da3c416d7da8dba3ffb65147cd7f0e"
+signature: "ed25519:78aebbfb726741e71979397c74b26bcf25bd679b24adf220701aa167ed4a96e97e5e2d0aa11ee2f931657acf39103f137207ad9c54f7371b138e5de9919e6c0e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:32561a78236d29aa4e2317e8479da6cb32d3f454244bd85bacfe9b07447b6823"
+content_hash: "sha256:de9e6099dbf64aa1f4c3b972aefe121366cd871bdcd3c2432b67654f5d40f216"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for lakeformation-permissions-deployer."

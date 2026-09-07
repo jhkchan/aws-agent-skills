@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:79a43da54f29a3b3113f3869bd7fb146e2f726de239bd460bf888202d303771745cb18b99729d0a60cb9075945f203a59796af7c03531b9fce902f74e95e6303"
+signature: "ed25519:69734e1c60fc2ac27cbf5ab248a928c852f055d965a310ab3a6f6664807324bf592ef795829f986442f6b7a1ff03f16b10d1c20cafb21f57716459ceb9a8460a"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:4de36b1500319421ee82eb27525c8cd1cc0ab3c74b7c60e117e5651e2f
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for guardduty-finding-automator."

@@ -39,19 +39,15 @@ permissions:
     read:
       - ./SKILL.md
       - ./skill.usf.yaml
-      - ./references/advanced-patterns 2.md
       - ./references/advanced-patterns 3.md
       - ./references/advanced-patterns 4.md
       - ./references/advanced-patterns.md
-      - ./references/diagnostic-commands 2.md
       - ./references/diagnostic-commands 3.md
       - ./references/diagnostic-commands 4.md
       - ./references/diagnostic-commands.md
-      - ./references/error-handling 2.md
       - ./references/error-handling 3.md
       - ./references/error-handling 4.md
       - ./references/error-handling.md
-      - ./references/worked-examples 2.md
       - ./references/worked-examples 3.md
       - ./references/worked-examples 4.md
       - ./references/worked-examples.md
@@ -86,18 +82,18 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:80dfa11217aebeb2f5117a5f8d4a473c3104b02f7b8a3dc57b6a48b135ce5cc7f8f783d7e89183b338e21737122c5fdde2519259045d7a385118edbc5114710f"
+signature: "ed25519:866145a23d44a441083f953e5aae5fff990d315d903230995945aa24bf7753609f49108909e75da63234d0147d6f7f539cffdd4fd51ec9213d6a48f3357dee0d"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:aced4a1321e9e8ef1e52f275b71d593f52797ca1df3228a76a3289e38a6fbcc4"
+content_hash: "sha256:87028143ae662f7f1491e780fffec63dc83dbf04836dede86966e3073adafa0e"
 
 changelog:
   - version: "0.2.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for accessanalyzer-finding-triage."

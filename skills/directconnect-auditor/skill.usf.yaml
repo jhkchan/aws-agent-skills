@@ -73,10 +73,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:853c756ebdfb4ca0b50704fc4ed9f9a71348d9f169f4cf93002f347492e0ac1f618645e1212c5f2d05faa832eeac418786e543c341767195d77f09b8d8c45b0e"
+signature: "ed25519:127b15f4c560ba3a0c38bf550b5a15e8c3f46fd39b6534a704d048087193179ef3b490fddec5dd1f7d52d96c88eafe0123af138f1022b63a58fe6965d9fdad0e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:23c84dc235d686e30dbe6d83a5dab8f8557b2b2e8eaead687ba7dde3b5
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for directconnect-auditor."

@@ -42,7 +42,6 @@ permissions:
       - ./references/advanced-patterns.md
       - ./references/diagnostic-commands.md
       - ./references/express-asl-patterns.md
-      - ./references/iam-and-logging-templates 2.md
       - ./references/iam-and-logging-templates.md
       - ./references/scheduling-and-observability.md
       - ./references/worked-examples.md
@@ -77,18 +76,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:6291e407d362b1309f47c47e2bdf1ea789f48c53d2f8479ae097e8dbcce0d04b5cc3bccabc3fc8d43b71bc454ffa6f227813271db8bc798bf3219c8976cb3a0e"
+signature: "ed25519:d09624f2c6e65f8f17d5fd4bdea1c091e8f3161f4276dc182da4a86e64e7a656c263873b8323a2412a2b62387b533f1cfe0057d90152c957a374e99938c91102"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:a17329b0e43ae2c997a57619ca0eecfa24389fa96d3fd5a2f15a0aa39f496178"
+content_hash: "sha256:73ccac760e4116768c9874df710a54b262db1838eb8bab16f3e6a80c6f38dc4c"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for stepfunctions-express-deployer."

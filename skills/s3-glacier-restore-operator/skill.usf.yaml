@@ -76,10 +76,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:1f09011cb26da79a87af12fa3cf72afb44b9c235db964d60f9c46c4606524e0068e4c7a045169d96ffb42572ef7997e2ab6764e413a7c8470405cf25edda1e0b"
+signature: "ed25519:55c3fc76fd86065796e21059f812fc547020153922b1b7000c1e7979d7741e3e7acad79ca26a28b6cd32b48bd5f87deb366060aaa52f40e207765fd5c08c0c04"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:ff62243379dea5a2e0f346e40c6b33b7c89fdcdffe2e9f95e51ff90b9e
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for s3-glacier-restore-operator."

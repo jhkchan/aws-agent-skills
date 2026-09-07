@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:0bf5a1c8f1ce52b574b1955ccde79f53230eb940172567211598067eddb13d4c5058205f5d47a56539a9cb259b9a4bebb1a5af1df5d3950af73837f2bca9860c"
+signature: "ed25519:deb1a60aee95c2e5b8f878ffc3fde761df2702812703eb06e466e6f976f30d1186550e16bb033c12f035a1e47c9d4decd8ece8b81cb866f2aa410ccc760a2d0a"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:172e90aa8fe7e4eaed02c3f3b38e7cf7d73c84b3926975530945bf9173564d04"
+content_hash: "sha256:fc8935e34827591f794354e1d164c6b09c010625718ef3072b7f3eea72447b50"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for redshift-serverless-deployer."

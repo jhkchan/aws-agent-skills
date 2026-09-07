@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:66cb4f64430f799e5562949856fa8600333e9506704f61ec6b583da1981ae3f938ace9df619b0cd3b3c8c4c1c8b461b508cb8406f2c863ae8671e5d1270be50f"
+signature: "ed25519:ca1cd88d7f7dbfc1ce24e5b6924db081ccf59d0c9c514e400ef644c25282048ab382382ba0411fffa0a004a36f5575ce73c300f6263413dfbf4b89abbdbbbe09"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:103f34ce8c800bb064aa615b3a3db64b45cd56e9183664f5c08774ef0d
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for grafana-data-source-deployer."

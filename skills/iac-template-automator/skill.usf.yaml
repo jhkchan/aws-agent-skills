@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:f906b17e9d684fe2c512ec377747d081a91a75739ea70c567842c0b3a29cc22a464afecb48c5e364d3ffa7f337e881512238750fdff425d07fb425f18d59ca00"
+signature: "ed25519:d0406033f452618ae8623dcd9f5be2ab8c7ca9fbf016f0c99b7bbd7ed7234d885d45c5007360d91208b2398badd667808d69cc8f1ee02a9ac904c8c44563940f"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:ca405984325921f568caa3a3cdc5cd879acbedaee3112750f575cf76e3
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for iac-template-automator."

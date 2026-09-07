@@ -71,10 +71,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:26cf361dd6a02a75adcacce3f46a16574092f6ada14d2601d5d2c2bd679175d1cab628714e01e8c884d0572fe4a1d74ffc0680caf7b7a7273153890247fced09"
+signature: "ed25519:0298a8758558d7d4ca761c45cc3648b0d9446223d6f2829de895e2f2546cf373f38fe495eb02d1cb13823d3ad4efe7813f6e16194185e111fc218247c373a303"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -84,5 +84,5 @@ content_hash: "sha256:c3ba18a74dcc64164c7ec48e94ef231c9d712d2c62de5c476ee11f2637
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for ecs-task-definition-auditor."

@@ -73,10 +73,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:8b33da9c5cf008512daad056d55d289710ebc6438646a4752d7346cccf1a9ec20fff45818bb09315e4335150927125f6d796c588582ade7415ad4620d0b65801"
+signature: "ed25519:e6f14fe40f8d054797cb9c763a832c220acbe809d95bc66e64ff3a6f94c428810937fa813b3b76cd0fde0db2bb89ac502e75e056220517a06740f4503bc42e04"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:f642252251a5a53cb75fdcd7fed8087bafc3df6f1ac845c0f25a071c76
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for apigateway-throttle-optimizer."

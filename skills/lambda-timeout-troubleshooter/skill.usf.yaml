@@ -74,10 +74,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:e07b9c0c5210f3292ccc6d325fd639bf68e210dc1f9dc3554715e1761c3c32cf0443a3c5bfcafac4cf87bfbea60cbcebf2bf24afb0c1dae98ca1d667a16abb0a"
+signature: "ed25519:481ffc56d6d854c804f57f934201ee9b079d333823b677240c09b8a1539fd42c7a4784de8f6f631f00b449ad545cac11716ff48544f0f93129d952f771f04d0b"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:755627404f62e3a9c8d10b363d07afde4487dda51bbc151433c03ea5ce
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for lambda-timeout-troubleshooter."

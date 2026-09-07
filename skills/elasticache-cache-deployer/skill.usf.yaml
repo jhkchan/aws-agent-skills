@@ -75,18 +75,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:286d8bfa1033faed7a42315c1fd5b78a16aabd0cf331180fc9d145acf2cd6396e0ea9b1815a1a097318b6bec96b588f78b039634088802608fee336af444500d"
+signature: "ed25519:1050f73d814b8d8ee8295e7fce98f4720f4818851cb87d612d1339e7cd6e187d8359bbade50b44a04ef31fa246bd39d5d4015c9618e7018e039fdcd19832fb0a"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:0a2a1759aea3e4559ef947e806c94fd5b5b03e1e4e9f59b1ebda431d2544db74"
+content_hash: "sha256:970d91d3b2bbb79ccf531be4a0a3bc88b4a3ac40d69a715f40f91257d0edd210"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for elasticache-cache-deployer."

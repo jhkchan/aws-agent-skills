@@ -74,10 +74,10 @@ risk_tier: L3
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:a4b16cc24c83af58e062a7d6edf3729aefff7c1950f0a465209f94d3b4fdecea91862821e7d3fa2ce27c02b470498a61ef26a5668d9e13c6d123b5a813f5550e"
+signature: "ed25519:85a61ce2aa75808273ad1704576df57b2c221d53c4fe4f13df6134b9454490385f1a373276ca857e293775dec259ef2af8cd9fb65a5ae7de5819cf74728dc500"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:c835c2596c0d3535e2592d9a1c59d296abd90f8672cde964dc0b6858d8
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for auto-remediation-automator."

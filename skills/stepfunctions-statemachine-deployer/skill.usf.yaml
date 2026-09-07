@@ -44,7 +44,6 @@ permissions:
       - ./references/diagnostic-commands.md
       - ./references/error-handling.md
       - ./references/iam-and-logging-templates.md
-      - ./references/service-integration-patterns 2.md
       - ./references/service-integration-patterns.md
       - ./examples/README.md
     # The package is instructions: it writes nothing, ever.
@@ -77,18 +76,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:97b1535f1c2feb63ab5ece555a02a6bbe297350309c387f7e0643907a2af74668e67efe0cf0dfe58abb995ba4ace8301e17f1f3b8b0773a18849bc13198d7902"
+signature: "ed25519:d9ac7f08b488dbd33ec830c0bfa046ab8b70da66b7d0f3a8cf174c456e2de328434be62ebef1008bce1e26423a438cbe933daa5cb3d7a5374d0ccd2d434bde03"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:f558af829299657f79f93922fbda041b797d21ba8e2843815e20b79fb000625a"
+content_hash: "sha256:6f998c0e5d5166d33edf838e983b662712217e9f73de87deff26d075cbaab2ae"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for stepfunctions-statemachine-deployer."

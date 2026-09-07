@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:8696e3e600c5ea6f4856e8871c8a6c50214c3276777588c2fbcfad5373f419c6e4020aaafdeb795f99adce963c5dadad819bc273fc2156be1a1ad7fae4ce950d"
+signature: "ed25519:628a9e51cde945a42554f5a45b3a81bd6662899d670ec8dc7a4170cd51b58baa1c8ba1cace9260a629adffec0c49a30da186b2ec772741816e4fcac706e8ac06"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:16a390cdc28ce6207ef46de9f2ac7d0191ded5f18cae39ef449d67374e
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cur-automation-automator."

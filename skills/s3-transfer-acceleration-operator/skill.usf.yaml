@@ -76,18 +76,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:b2375c95544bff2925c158e53affa2dd6b0fa4459712096863e1c2c54fc38825d5c70a9cbeee9578580118258091cd3fe0788b0e675f46ebbd7fdcf62fa8bc08"
+signature: "ed25519:da9a92820f0dff8af82d3af3ae29e121416ed2c0e9384f73d4de550a5b462dfeb3168a05ee4221a33de512ae0ae32aab983981a69b098df608c2e0a29a32e10b"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:908fd5e6ba319b377bffd1b74303cbf9d0408921d83ca504ea8ec5d7d8165f5b"
+content_hash: "sha256:353c6b463cb288712c046375d0b78f09aa985b0e570b80310e0eb73c7a0bbb1b"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for s3-transfer-acceleration-operator."

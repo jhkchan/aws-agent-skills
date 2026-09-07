@@ -71,10 +71,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:167005c549e98e6f85208318ebf8bea01fe5441259938505041b428c96beaff2e6ed95aa06d3104e2792d154e068d8db8da81acb8319d5d259f7b8592d3a6404"
+signature: "ed25519:6e701fcce6288b483fe72d0bbe260604ab38393f64b267206b32334b6067bf9292231c4ba01170053f34301d3c3f19a769c4da7c9f49c9f2ea6992bfbbd9a905"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -84,5 +84,5 @@ content_hash: "sha256:3a811727556d0afe28086b5912f772af137b1b147e364b0baa1ca26bde
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for route53-record-auditor."

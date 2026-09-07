@@ -73,10 +73,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:0a69d8f9131dcb1986544dd16b003745bcc0709b6eee26267772453eb8550ca094459dcbfedea3dc1e2b3fe551022cbe271f09202da6efdb00d7c8af52d2cf0d"
+signature: "ed25519:688c907fadcf3e5f3a73220978caa96fb7ab090a321a447a22ebacb9496b190de2ea3020ae44e981a43d81aa34a7f945ad681e33cc6433e7c9c99a0e90097b0d"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:5581f9b2fcc4e1d0e9c09de86f073ff95525d782ed3ddfebce7219a5c8
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for ec2-reserved-capacity-optimizer."

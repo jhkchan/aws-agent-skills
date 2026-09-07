@@ -358,8 +358,6 @@ the faster route to shipping eval-backed work today.
   `openai.gpt-oss-20b` on some skills.
 - **Judge** (scores the run): `openai.gpt-oss-120b-1:0` via the softaworks skill-judge
   rubric, median of 3 runs.
-- 
-  
 
 ### What does Grade A mean? Why do you ship Grade B skills?
 

@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:fd6306863cb7576dbf4fb76a6745ec11d15e85a61630c456ae1ce1a80b376adb64a9ee3ebe5f92d567357f11b9d156debb89f5e6b443ef84a476a70e6aafc502"
+signature: "ed25519:daf0662674fda580143b624a71186e8755f3a96591fe408a4b92889b6d77313b7b815667f77f436d6b9ea630e6d9b5aa56207148e3839f3411e8c8f388241c09"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:dd3f721f1f86dde75a7d2a93be857419a4540fa6b36a87e39c83154d42
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cloudformation-stackset-deployer."

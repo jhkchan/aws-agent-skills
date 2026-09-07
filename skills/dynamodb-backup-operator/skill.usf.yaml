@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:0b3c27af7c9d74b6e58a0b2fb45ce08a2c857b73d1e3213cb557f5c84d6412f876d4e4582119a4f445fa4b1712deec1ce125e6348cc03706ffe437539babdd00"
+signature: "ed25519:5faad1705550eeb005aa95643c5147641828dd16a32625215d6c097626cab2c92b5298928ffd537ad9f4ff70d11fab9eb1c025106b0797800d8443322454df04"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:5f6f9febfc313d9896dc1c31b8d50f5ab9f2829261adb67a01a1aa3ebc
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for dynamodb-backup-operator."

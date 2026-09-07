@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:c69b81ee56be73a7ddd16fc2da3f17d58b57ed8505dd46db04e418e7219a78d64ef6e978ad27456cc89d488e394aaf87006fd39c271f1ae33be1d360730bf702"
+signature: "ed25519:a393c38f4bc70a738eb1c00e4182500709d19ed5b1e63a08fc66c66c37ffb04037e20fa63a90797286577055011bb1a56f052880809815ee21934d9e02b16c04"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:7f746b6fb888d6cea7a85f2dfafea2fa4c5b9770ce3e9e7cdb9e26b3f4
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for eks-autoscaling-automator."

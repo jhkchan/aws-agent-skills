@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:795f9c4ccd50eeaea64029b57f8af5a7424aea84f19e4e1d24415966ec79c3d89d98a939825e563f77dc667855b916d2a28a8079a9d6e353d63237cc2eef5408"
+signature: "ed25519:1e1acabe8f0d2114fbe087c4b560b7b4cfc0d656928509a5ac845ae7a7ba3da993a78c40864424cffff69117b8e31e833f14d654e08f2f278e38623aa71ff90a"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:b24f734fb7793d0987fa65a26179f3923806c75d7dde587137cbd04330
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for migration-hub-strategy-deployer."

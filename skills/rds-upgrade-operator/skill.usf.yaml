@@ -76,10 +76,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:74c34b8a3ced0b3dece03d172b0e6193fc165a0954110e00a187c3966adb0799311ac8818298a55a1d93fe23f3d141ec07dcadd36edfab1133ccb140279e420d"
+signature: "ed25519:dae01640bbfd5e5ec3efbb4e680c7135bb2366589f5b26006e982c18c0b5b1fde912f3f9ce7d78c281b06016504fdb043a34ed898b7d161b2a6ccfc5dc27070d"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:10879345ed607cfa5dec3c0c13cbb20204916e91ff5d6dc51260f96479
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for rds-upgrade-operator."

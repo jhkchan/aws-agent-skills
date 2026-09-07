@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:6c0c504732a61b8f2ec54a8e3f964f1f2be5572ec88e1be53c932468ece2464800f96af8b8a762b4ba480cf2641c61fd8a0afe79601a9e552e119bef1c90230a"
+signature: "ed25519:a288fb22d904efe63e2eb0de3b09d8a0cd1a4ed992932d036fd9ed9f9f85cd78624e59add972f42c64780f9a35afe106dcbcb892edc886549eff26eef5b5b20c"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:6635841e0682a3cc5ec2d7d824b755ee98ef3acbeab66c9a6b22c61979
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for s3-directory-bucket-deployer."

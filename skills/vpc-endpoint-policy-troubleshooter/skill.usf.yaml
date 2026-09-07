@@ -76,18 +76,18 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:b7e2eeef54727fbe0502da2ba0be7385ab7e72cd3b1254a76b20d596ddd02813ce433e3ab5c14e954e5e627882573dfc38eb3e5a9717db0c1f6520c083d7920f"
+signature: "ed25519:6554070ccb503fc7a76276ff48a8840b7b30d622c493484ac9e683004b29b89afd57a87647d574e2a28fd4b8c46ac641a1055727e78b84f6163bac290eb73502"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:b6e6c436fce0fdbc16fda61d5bdfeb2de3b4924afce8d64f09a444c473276d44"
+content_hash: "sha256:ed938605854c35678ff389a9df8e1655bb95e2a7fdcaa577f1ea2210f3ac46bc"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for vpc-endpoint-policy-troubleshooter."

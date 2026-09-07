@@ -75,18 +75,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:a1da951bd36c8bf8e94929d6b3b255c7500e60c9da9674a5967ea989c6837683c4c22d2d77a84fb4192d0ec780105bfd85fe48aa3cf7cdadc9cc47a9b1b4e802"
+signature: "ed25519:20196d31f1a4530bd60a19265a8af86bb8dc2c23e8b8abf9099836c6a698e476ae6a524f3865414f71d7a8fa5b4226fbdde378821f77e9b769becf04cc920702"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:10230c8206372b7cf76ff625c0ff92d57027a24cfc62f0a65470354302483a22"
+content_hash: "sha256:4eaf56c3de42acf52ef59507b594050d0502095d18a50e8f3f5d26c60536a87b"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for rds-bluegreen-deployer."

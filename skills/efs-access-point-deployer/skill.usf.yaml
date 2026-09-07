@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:c6d3f34a8ab45f0d8c1c33f8354fba012ae0b92460cd50825815e60fb50131df739a3473b7c5b6e0a0a9c360ba6068e724f8224f5dd1157a625d85a4c1671d0d"
+signature: "ed25519:f68a6ff7b14e9633aef9c5d3b33c490bdcb57f5e80a42ea37ef5a03b126066baf92516c71c398602c1a4e168aeb0a64e191ad7ef335c5a0a171771047a8dac0c"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:06417c11f8adb1250d039139a3c9f2b9be7a82eda878dbbca5cfc65597831e7f"
+content_hash: "sha256:f1200af58fbf1cfc9891033a1a5e1e300c95536a004e42a77253e2b29a9192ab"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for efs-access-point-deployer."

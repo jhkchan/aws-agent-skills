@@ -73,18 +73,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:e8bf4ccb4a5028f1360da6262cd6d357e94527e8ef84548072d8d773e8d48008a215578e74a0a5aec6da04ca4cafc62a856b006ed2f60f68d9179ad508b8d70a"
+signature: "ed25519:58a7f9841c906464d4b4f2f77f991983e1d83537c37dfcd5ea4c8740c60b85871b3d9d78d0056562c51efc7139c1ceb633b7dd59996129d603313bfef4bb2a09"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:b4df50e5bfbb2ab297d572f31aafb059636c3ec17663ce7c958f7681d226be1e"
+content_hash: "sha256:be168c3d6c1c4358e960b377ad097ab2ea5f832da2d02ba5da0343262c7d15f1"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for xray-tracing-deployer."

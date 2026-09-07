@@ -72,10 +72,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:423b04ff31d4a76e1437fb7120757e0b2aaadd79bc0e1eca246df5072553119e3da7933b73222bd2098919e91f42252744770a8f4e4ae855a15c2540d8bf3909"
+signature: "ed25519:e66b108f22b89c92c993ea01878a66a0b673bc0edcae89465861689e6d8bdd4ca7ff57b3ae71fa67cef062d5c3665aa65419cdec5e8eac7ac401d98fba6c4c05"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -85,5 +85,5 @@ content_hash: "sha256:979ae4e9897e5f083033a5159a6d2d40b74043efc288b09f2db2d1e8bd
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cloudwatch-logs-retention-auditor."

@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:bfd5fc54f4d7a35b9a0f3705f5bd8a2bdd894cfc6232a8f0b2e44ea3872c1f5a277363ef3a0a9dd4a5d6b4538e5e346a64b73f6b0e0c233eafa0e05bff4a4c06"
+signature: "ed25519:dd13c38d2a137f8c1dc7783ce47d9c2fd6f458320225802b20ca33265145d8376e344a2502416870c038f7a90fa67f6aed6a8030e576c0a7a48eeccb3ce1ca02"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:e64363e60580f27b3cd86c0e6084618703bc8fe9aef7705987e08cc564f40617"
+content_hash: "sha256:11940fe47d73c2b492af56a4e91abe2d1fd781632a0750f7e4b794fc9a3c4dba"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for sagemaker-pipeline-deployer."

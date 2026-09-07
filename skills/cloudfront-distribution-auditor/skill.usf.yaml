@@ -72,10 +72,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:73d47051611d2b164e565cb01e3cf837b574053fd847e5345c36d93a3fa309ad00d161e5dcef223fe6aebc9eb260e634c0bc136a1dd515c2d05caf0d33fca90f"
+signature: "ed25519:a492b394e8d2a9b4ca82151f27fc7a2351634ab9662aed6d24e1ee6dbbe1a165b45e09fc35a7205f61bbfc3dc914f30ba0c311a74315f3d61328bad7dc5dd20e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -85,5 +85,5 @@ content_hash: "sha256:6000698180709e3e030d8c43e931d81709b41b44b1193c62d4ad360e09
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cloudfront-distribution-auditor."

@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:ae9b7232446ff1139f871426ebfebac66b156c202e65f30b75f8e39c4b71f8d15e7ed99c54d7ccdefc2cde9337d00c68b65366f8dcf4d80890bcde6dd642160a"
+signature: "ed25519:2435eb2252afb02a7c25b6606d62ec65ca5188448f6139ba314c5a73fde76d218b10c8d013f56151fc8799755e189c71e3416eb50ae5175188ccf5950645ed0d"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:af1e1b24bdf8139e9c42e964d252d8363db5b13896f355c5588965346e69f779"
+content_hash: "sha256:bf594d030534a238ce0eb7def14a194376caae653a9f06846716e83751912f27"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for dms-endpoint-deployer."

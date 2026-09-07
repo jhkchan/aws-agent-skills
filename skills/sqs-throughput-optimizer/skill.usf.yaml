@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:8dc5939b7c903d948cb60e6f686699945ffa7abc93ad90b33947be3bbec32bced329dea4026eeb8bd1dfa01e53226bb7bbab03129df88322ca22d93b6051f300"
+signature: "ed25519:cf8a47229fa9a7f3addd0db4004c4cf4229c7c9468c22c1cc5a5e50cfbf65007d8a8e489d84145ab349eae87ca9f56d72cb1368cef479f46a3ea3c090d44790a"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:ece19670268e171ac0540c38b83b8ade08ea5414c0892c2c0bbc4f2daa6c3984"
+content_hash: "sha256:4b7e10fc1f7d4a3c6daddf4670058d94cc2a6fb93239dc0002b8e4236d260c2d"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for sqs-throughput-optimizer."

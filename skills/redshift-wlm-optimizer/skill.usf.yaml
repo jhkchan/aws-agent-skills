@@ -73,10 +73,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:d1be1e5202bca2999faa39d450ed687b5d587dd78f4b10fa62afc1903bd98f10e844bb81dd6c1e4799da4756ab1552f900fea20894232bfdf67943994f62280b"
+signature: "ed25519:987e0610925cee10745a7b8d46e318a32066ba41ba4b1694f7b047727970b2e97d930698d84e54295402d6b2754fa40b015e10848ff4bceed08f58c807b23301"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:e161dd8fb40f8267df4d2e3871202bac0b516aa3d7712d8191f447f072
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for redshift-wlm-optimizer."

@@ -71,10 +71,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:8cf2985c8861cd5c4cc7fe87219ad6e5f4ef348164f9653bf0049114331486463c9f9a97c8f4f71ba0e1a0f08c897c79ee2275179ff8fa5b92c7b66518828009"
+signature: "ed25519:31589fdc062237b641f96e589dd56908b234898f017ac88fb89a3a0339b5c5362f583efcd153c730850e23933d85a3c308286c2d7902c7b3921656b3465e4b00"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -84,5 +84,5 @@ content_hash: "sha256:feeedfc9704eddb4a274c2e46b3dc79b4f7c484d7b297969c3033a850c
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for sagemaker-endpoint-auditor."

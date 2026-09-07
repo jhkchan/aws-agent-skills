@@ -72,10 +72,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:c2029d8c8ff7fc868aafb4b3f07f2f71935abc74810cfbaccc82b1d3f7df07b0340160b57d20cd8f77965ce156a6f7ab5e52f26a13f0d6357dbad569066c2b09"
+signature: "ed25519:761f54f53359561f72395547b4217de4edaf32dd88b6b98a9139535d9dcca7f6547d8528ae1efd5ae0c7370d799ad33612d4271fb8ac7d623b376271db74ac0a"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -85,5 +85,5 @@ content_hash: "sha256:c5afdadaa8ce61e28d149fb5d089c986e8f839490810293ddcc6f650f3
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for kinesis-stream-auditor."

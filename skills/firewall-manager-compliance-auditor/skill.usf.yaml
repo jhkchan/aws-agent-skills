@@ -73,10 +73,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:a1de73465dfbf832829add7f8119f283280517734593aba49b0122c44f5b9bce9486a68c729a340f53d60a3247800d5e46c206430f6475ab8ac9a0d37d762203"
+signature: "ed25519:73b126af1a92aa8f01abf15232c74482856ed8c6d8c5681819f82c05ce96fe2a317e68567f5ecd60bd183046aca9fafc24697f55c3603dd2ccf00951dea88d07"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:cae4296380786447873f20876e89b6669de95f718df016019436f1c1ed
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for firewall-manager-compliance-auditor."

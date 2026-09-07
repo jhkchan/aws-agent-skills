@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:1c798b1dfa6dba1d5bc892c0843db0e21d3f736d3dbd895bea74f0e1eb2d9975142c6fc932544de61f0569fe4b2d4c787258088f7006982416e9eb2d21cf8306"
+signature: "ed25519:4d570d34b1dabbc0ab1885fd0d135e723e91f182b5d8e7e3d4844fa205c000c1ebf7f18fd4f1a5ac58428350571f28c02ffa779fe4735c85ef6356206958f50b"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:740c1730da2aa75138d88202e133673da71b626fde08aea0fd367f4c89
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for data-transfer-optimizer."

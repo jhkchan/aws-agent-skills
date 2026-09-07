@@ -73,10 +73,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:7bb1914201ecddf28c070e4b2d7ce60406c2f7237fcbdd62e526e5cd0bb5c8533e8c8364dbbda85b66a9c242bc0752d2b92d9f949005c68806a33590b18d0004"
+signature: "ed25519:1f2111bfde3d3fe75ea5c31325026b299f674f25ebfe169446dc3c26d9369a4ef4dc1f8fe118e704245837ca5b9820516132282ad75d60c85f0cd7e5f7122305"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:2268fb6c196a2044aef18f5d0b00d1642b83d2ddf9dbe7ec631f2ded75
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for vpc-lattice-auth-auditor."
