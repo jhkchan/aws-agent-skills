@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:f3575517671d840d84ab5412cb75e8d02a4c7682949a1eaa482ee669760f7638462d4c2b4e49b70deb888903769acd01694af9be6a77d9af0ee9d5558c5ef308"
+signature: "ed25519:93bfd6cf67b381187ce4c3c8ed8466cc78a3243b2cf4fbbcaddb9ca456460a33a4d6bed17bed98776938ab5f16a27b04920815b79dd18f16d3b328ecbe7c8f0f"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:58c50496603b72997826e257f0522e765cc0cfed6463fc33bfda497583
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cloudhsm-cluster-deployer."

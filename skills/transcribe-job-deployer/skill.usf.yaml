@@ -76,10 +76,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:aa747f8b415cdb30afa624b84dcb24828f04ff53c67b95bea85393c273b3d2f86af1b10c524705eea644438870dba9f0738dfb4d98d358b50392c22f52be5308"
+signature: "ed25519:488cb08ab5edfae07c8c03d9d9598d2b4e278f939d430bf855cff913da04581ceb76bd8ad39d2956bdae4c9b225f7b6d86344957dea0b3d1021c33aaca505708"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:3a81a85cd0054e753a19a37b8b652ddb556c37c4dc252fb60f29a348c8
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for transcribe-job-deployer."

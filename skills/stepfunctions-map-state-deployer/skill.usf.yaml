@@ -40,7 +40,6 @@ permissions:
       - ./SKILL.md
       - ./skill.usf.yaml
       - ./references/advanced-patterns.md
-      - ./references/distributed-map-and-s3 2.md
       - ./references/distributed-map-and-s3.md
       - ./references/error-handling.md
       - ./references/map-configuration-and-batching.md
@@ -75,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:58d7629e5ada7b7d881a8e1101fffa949be58284a87f823c4085c7ce1586b0367c2e514e291c38c4fc625085745907afbd2c75cbb9a85009cc98aecb0949eb01"
+signature: "ed25519:ef320ff45895f94899d13875b4c61735029f65834fbffed9a58479820a4cc28d369482ab9890978682304ed4c5a9b884567d9cdca7f712a719622650e21cb909"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:8d30cf3acab196b314ec58e77eda2c962c9d228dca02fcbfa2d8d30a12774941"
+content_hash: "sha256:90169f17eee465246819aec0709eeb2532baadda61bcdab124da1d5578cade83"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for stepfunctions-map-state-deployer."

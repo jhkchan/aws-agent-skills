@@ -56,7 +56,7 @@ source — the npm package `atskills` is not yet published, E404) against this r
 | Cloud resolution | `atskills get gh:jhkchan/aws-agent-skills/skills/s3-public-access-auditor` | ✅ fetches, caches (`~/.cache/atskills`), prints SKILL.md + full bundle (eval/, evals/, references/) |
 | Catalog entry point | `atskills get …/skills/skill-catalog` | ✅ 87-line body; 13 `references/by-family/` tables listed |
 | §1.5 refusal | `atskills get …/skills` and repo root | ✅ refuses ("holds 410 skills — over the 128") with a narrowing list — exactly as documented |
-| Vendoring | `atskills save …/skills/vpc-peering-deployer` | ✅ copies to `.atskills/gh/…/`, `.source` pins revision `e3a1f4c` |
+| Vendoring | `atskills save …/skills/vpc-peering-deployer` | ✅ copies to `.atskills/gh/…/`, `.source` pins the release revision |
 | Local-first after save | `atskills get gh:…/vpc-peering-deployer` | ✅ answers from the vendored copy, no network |
 | Auto-trigger residency | `.autotrigger` line `@gh:…/vpc-peering-deployer` | ✅ `triggers` shows the skill `[saved]`; `prompt` injects name + description + path only |
 | Unknown frontmatter fields | (throughout) | ✅ `license`, `compatibility`, `metadata.*` ignored per forward-compat rule — no rejections |

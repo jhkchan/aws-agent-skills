@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:22ab50fac235980b1c912b4605122ecc6399bb6fde813dc804a941f739de149712f7ee186e892c836f487dde54d8979b9b59b5faf1b35200c8e2c6a4e41ea008"
+signature: "ed25519:6e5ff3d3b64fbd2905400288f54d136500cb5a5c443c42dfbe58a56b640a4f32ca77c69121c2cef4899ab43da3251a093fc66fded45ee4b4db2cddf55fe7fc07"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:0c7267fd1a9d28b45e56825596c7d89f773d5fcb83ce6d6dfaf15db129eaa0a2"
+content_hash: "sha256:0b705231e1ed16813b00bcea82aeedc0faded422f6c7a7d9b233a1bbc945d987"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for ram-resource-share-deployer."

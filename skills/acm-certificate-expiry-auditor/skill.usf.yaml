@@ -69,10 +69,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:782e34e72ade09236907117bbb2605d03a4f13e7676cf511ceb3f15eaeacb34bcc0ad792710c860dd2f112e75aa31381cc4707934dc6d79cabc64b5333b12105"
+signature: "ed25519:8eadab3f2ae727e930202ae2b13a5ccecb05f110245c8ff595956b6b34f1560aaa660937eb72afa74f0bbbd2899aae6c153d6c364ed40bff29601336a8c3c707"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -82,5 +82,5 @@ content_hash: "sha256:ba8f48e6c840f4d5ab3f5e43e1ae1e18c24216cb658b35ac88b7916406
 
 changelog:
   - version: "0.2.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for acm-certificate-expiry-auditor."

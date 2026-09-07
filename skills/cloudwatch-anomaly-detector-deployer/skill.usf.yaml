@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:9ff39b71ed42112de32dcd30262fc52aba549387b17307091ddaed6fe1800a543c7bbd3078bae9672e0329ba42e795d680d9927a7d9429b35544e78391f2210d"
+signature: "ed25519:3374b86552ea4c859fb73044fc2213f337fb2bb0c31474a3eb6046024baeba0efc5f320644bff4faa48b8af2b7a742d08469cefdc5885b672cb99cf4e789b208"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:db9b5ad41d2427893a7c02856ff420bbd82096fa68e89ffe4d5209b31843a5fb"
+content_hash: "sha256:5cea1e77286b1e94dde03a457086d123a3ec59a99b231d7529030151a58b22b3"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cloudwatch-anomaly-detector-deployer."

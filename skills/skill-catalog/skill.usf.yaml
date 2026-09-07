@@ -70,10 +70,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:d8c7f72adde9918c643c7902b96a15a9b4eb8b8e6ae10a27a695bf2d1ea26c8a4373466f53617e96726ddc74108e579b9e785200e104160b70b9a2252335d808"
+signature: "ed25519:4beafb1a78a31a9dd2d123549abcb8e69c5b02b19d6d9a40f1be03e80a8d7a0580e6c19e105aef3ca1971091c93d750a0e0e83f9c84591eea266e47f6d94db07"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:5f9b5f35c3b8921f74361bb785585fca3df8d7f89f889416ff16c8243a
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for skill-catalog."

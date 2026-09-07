@@ -71,10 +71,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:2a15dd98b3d4b27785ebbd21404a07acc29df1c2835b33eb20431994f934c82ceb29257c38eed8dcc20b37989d192f9574f9a12f7e2fc21a66eae1dd50a73000"
+signature: "ed25519:2e7b58e698c6f6941e555468d78d0e266354433825fb9694f1d59c3b78dd52b4c4a1e890ac6e4557b1ef3ae6b47ddf624ca2591c1665fd1aef8e0b2bf34a3e09"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -84,5 +84,5 @@ content_hash: "sha256:0de11427ae023c14bd4630d2def90975d7e4e3cd1cc9d4a643c23d385f
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for eks-cluster-auditor."

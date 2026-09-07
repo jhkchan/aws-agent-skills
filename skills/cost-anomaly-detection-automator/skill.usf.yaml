@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:aea884dda6891b6245f70ff4a75e411d4db4e3455a5c20af4cba6ba44e5184e69bf1d87443de64ea434b1e9d3a7dd730def9b8ee2b5cf8e4d62876868f312303"
+signature: "ed25519:4d7104b2a1b7676b60fdaf86d6949fd70ec1dc2c892f28e53d06fc68d7ce5f5d06b424b7564e920fda52eac5ba8f1c76955e360cbb33ca35418111bd6f4ef506"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:efa39f30ad551e2f0c56288a2a43060351578bbc35515f91ce430d60b3
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cost-anomaly-detection-automator."

@@ -39,17 +39,14 @@ permissions:
     read:
       - ./SKILL.md
       - ./skill.usf.yaml
-      - ./references/advanced-patterns 2.md
       - ./references/advanced-patterns 3.md
       - ./references/advanced-patterns 4.md
       - ./references/advanced-patterns.md
       - ./references/backend-gen2-reference.md
       - ./references/build-and-domain-reference.md
-      - ./references/error-handling 2.md
       - ./references/error-handling 3.md
       - ./references/error-handling 4.md
       - ./references/error-handling.md
-      - ./references/worked-examples 2.md
       - ./references/worked-examples 3.md
       - ./references/worked-examples 4.md
       - ./references/worked-examples.md
@@ -84,18 +81,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:ceaccb9e624708a6a94c6ec73a8e936cc9573d50c131956455c4f664d177ea0fe02541c00e113863f4c800fa29c0e5853b54b1d0d308c7c40d3d423537d4eb0b"
+signature: "ed25519:1724ce28b8b06e676b689846d594ccfca3ae5d25ad7c967df21ddde1511004145670c4ae47a2d2d72a284f9b91d586e39537f12ede88659740cbe89f04784602"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:045a212136e5e53ddb4a878669680c06447c715d29d4fc0e88e3bc5acd787403"
+content_hash: "sha256:590323e135aa9c952219f3b3dcfc2a95368d3c7bf170972e31104c700aa2202e"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for amplify-app-deployer."

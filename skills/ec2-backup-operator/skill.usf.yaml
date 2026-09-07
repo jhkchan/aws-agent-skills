@@ -40,7 +40,6 @@ permissions:
       - ./SKILL.md
       - ./skill.usf.yaml
       - ./references/advanced-patterns.md
-      - ./references/diagnostic-commands 2.md
       - ./references/diagnostic-commands.md
       - ./references/restore-procedures.md
       - ./references/worked-examples.md
@@ -75,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:32e50e1795aa80d749db7cadf1e64c1fdc41a39b976805e27f34373011bdee86240046172e5294622e35dcd80859de62d9cf08d5ca6ec7bd2a40067eba573702"
+signature: "ed25519:8c7d185c690b8b27eee1ebc024c9ee2615d4891144b5b4eab25df61fc5267c2b773a2409d23f3aa405654a5605ed9d3e5a6ffe112094e528dc40b9bd046b3905"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:6a811a196095d4b050bde7d4fd49cd983754bd15268229639701e9a5a4dc1c53"
+content_hash: "sha256:5fedbab969e76839c482eced71cffd42e97dda8a83ed2c240fb6d995992178c3"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for ec2-backup-operator."

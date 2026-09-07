@@ -74,10 +74,10 @@ risk_tier: L3
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:f839c3102ffcc178de7f1da8207feb6d08c9cb811c1cc3debe18e61c863e214bf6ceef8c8d61ae17e64ff80c46be6c9ba570ae27b2163fe7b465e127f2efdc06"
+signature: "ed25519:d00e51b9a4ffe1b0f06ad983f4ce0a5dbc8815785e45ec7d7fc575be181caa0cc3e4971d6bf4edcfd9143ab0ec3a49288b8330af9ec36725ffcd82db2cd60a03"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:b2fc18de2c53caf188b87eb727639940fab1dcfd4aa1242a73b47e2549
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for incident-response-automator."

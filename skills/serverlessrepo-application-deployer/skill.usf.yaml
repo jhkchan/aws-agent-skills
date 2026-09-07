@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:7c693903ffd56f0ce649f5da7b6244eb456beb15a2bfa70f9ae18e4910cc5da84473cfea7e26151e19b19aa1be6506893087b34ce1aa8a796d1380fa37055b0f"
+signature: "ed25519:9ee08d386a1dddd976d2592493a1d22d09f893870a3e59b158674afb0ae0bb6b849ff6b0527b5a1e3b6322cdcd5c2e54e4da2a3e6f35584ed8a72efb7c91360c"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:646345c54ccbf692f5c1733193ff0c1c7f05ef9ef3a4861cfc221c24d767fde3"
+content_hash: "sha256:eb1ddc4dd4bb63df170fa93d0effa4d9d6318fb08220883c112b6765ff9da819"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for serverlessrepo-application-deployer."

@@ -72,10 +72,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:5c7005e5635053582dbfbb37ac972ecc1dad25d8396561205106731e274af5131392a3d4ca3ed2b4f449be0290e4471c7001161bf275467024285e24142cc20a"
+signature: "ed25519:649d571418e877f9888f617be42b959f86529dc7c61b0fdd4bd39c50f61fa3bd0a52ac7a84fd7789e36e536e681bd66c24c8d229c144ba53510794a31464c500"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -85,5 +85,5 @@ content_hash: "sha256:4dab66799be271f66c5653534a5b948aaf41516d12289e1239f042ecc0
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for rds-instance-auditor."

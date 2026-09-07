@@ -76,18 +76,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:0f1281e71329f01a80a2a36618552cdda31725d0707aa2130af118eda1b10bef78a205dc58ff24122b66d0e19764dda45bf1df0f37f8ad6bd08de9e8e37a2d09"
+signature: "ed25519:cea7d7b4ce2e563bd10b5761ba1bb9ad2b73eebb495bf49779e5c48ce55c7c5390968eff325e85ba991eb07252d1357c86c87b0d325a53a78f018725239a910e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:16f8a8680deaed40d926f6b2d3a5c201a0d6ecb707d15e4d75da32e5a87e8f5e"
+content_hash: "sha256:dbc5088827b8ade598369c3f308d5d9ab5b7696259b7bdc82572115f8c12bfa6"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for timestream-database-deployer."

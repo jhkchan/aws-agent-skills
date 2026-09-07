@@ -76,10 +76,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:1f9dc3356d2128936cb5b71aca695652aab2837006940fe69d5e28f71e4469f888342ae47d404c4c4a427eea09b79bdc21cdcda1621e41af3a9c6cd2df766306"
+signature: "ed25519:2c69c946f2c43001be23ed9f59b50241730357f14e3a3edd30c44a723e9365e6c68e9b2bc863f9a98f37b8688119a838e61cf0422dbef2efdfe82617a0092007"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:7f7045a524b93747bc5c1f1cf1380fdfc05279888086b5c9aa7c588246
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for route53-failover-operator."

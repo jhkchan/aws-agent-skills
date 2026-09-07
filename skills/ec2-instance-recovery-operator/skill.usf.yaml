@@ -76,10 +76,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:b84cbf3564157f1a896d633216e61a5eb8c70f1025f6f3e0cc88c661e917ab02438af48f2a9bdc3b075a375a13e39492a6b0a97c9d79eb59c7362e321bd0390c"
+signature: "ed25519:04d724372824ffdcf6f3a69400227ba66f46c591bffe9f4e18d0e845d5b4a84bbcc47ae206357d454cd51263066bbdce9b5e36d24f5989b3f342b4c06e5c0d0d"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:113b3513bb28284df1fe32bced4d5a57952a8ddebe5192809f38c4c0e8
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for ec2-instance-recovery-operator."

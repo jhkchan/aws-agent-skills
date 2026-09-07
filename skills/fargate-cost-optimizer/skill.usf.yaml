@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:30144df73a5d45420bab9ae2f1be754b190f467cd98b61c10791deca6814861f166fbe232722b972eeab3847f551f322f44c03cc53442f2e55e4443b29caa40f"
+signature: "ed25519:c0e44a00fe0194dd90f8b2e689117c4fc08088947397e41a386dda2da0d1e7c10bcd2bb43acfc2e5a0e5f3fce6a5fccb23f6b33f754df4f66cbdb63b3daba407"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:40a951f261d1c1923a121326d0abe1c2be41dbfc1e14e2a667df4c6fc0
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for fargate-cost-optimizer."

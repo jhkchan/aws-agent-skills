@@ -73,10 +73,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:d01b434f60f53efbdcf351e1e76d1869ec00f9dde2922e97b99f43e491117867045a3a36a9fcdf66256ce85ac99abdb3e516947a354e6a9fd25adaeec3d58708"
+signature: "ed25519:e1d5a71788166662ab176f09b38c459c72f087e966e966ad245fe431e4e9216e3337bb1b03bd214c12cfe138253458aeb072778c063a4e0f2a5a028a2cbb4905"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:dbe1eaf27cad566680a61d1474d231c4fdf62633943fea81a84328d93d
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for opensearch-serverless-deployer."

@@ -69,10 +69,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:90afae6fb71a0b27c777e3d25ce12984eb8b8d3189fcd0844dc60134a7da590ce15d907e3b3308076a2a320b9cd7874d4b7c46b4c93347126ae1801a6ef39b0a"
+signature: "ed25519:b5ad8b2e4bc00d227b882490b319cdc1f3e13532495ceb6d7da00125a0fbfd2838ddf01c0e0b20979b6225e3e8542a8441717a807fad3d2d8667e530cc628104"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -82,5 +82,5 @@ content_hash: "sha256:fc952283f12023657fdedfee0545e7b8f1d6bf87d1a3a62ce06a948ef1
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for emr-cluster-auditor."

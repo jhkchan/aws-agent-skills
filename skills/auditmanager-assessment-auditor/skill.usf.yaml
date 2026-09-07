@@ -71,10 +71,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:cc78ce1b4d24e9ef4ba2dedf8c93b69b5baa113753bbdde93afa3448a541cb60ebb19a9ed5b98df553346399b75faa8ae4f3204f61aff119ebc25d9ef9ec630a"
+signature: "ed25519:5a52d435688f3558ea8e5097195f85d06bad469aad155fa26fbb6e0774c3a1c2654836398ec7312104adb5df662f224cf79286516173bb0bf37f036e07b0cf07"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -84,5 +84,5 @@ content_hash: "sha256:5636d59058ef6f959c6baac9ca36ced0817f45605dfee72ae69bf962c3
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for auditmanager-assessment-auditor."

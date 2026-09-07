@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:bd582c68a34d3e4604d970359015fbbf4cb3ea22ec96356266d33d998a7324cb7211f3228897bf47603e6ae64582d43a361f6b83388639dd8ab71d40724eab0f"
+signature: "ed25519:2bccaac4e23152566b338273ad03231ec2222588e16f8efc96f04ab3a92a06e0d2c1d243abb45eb25c13ac7e82971a34aceaed6fdc1c34650b5e1b2f4fe2560d"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:8bd6172f531a26e049ecbb7370695780676ea6d7d2727bbb9fa79543698349ba"
+content_hash: "sha256:b1706fd397f412c2df349ec034a2b355719ad51c3a6c3bfd143e3dfea52dd20e"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for personalize-campaign-deployer."

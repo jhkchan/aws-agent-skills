@@ -71,10 +71,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:d3343007eb4488981abb19483b7ff0bc15c3a22dbda283a3fc9c0d8633857586d545968d43b140516182e51aad6e8727cbb17015b6e1b621945ce16adcce7803"
+signature: "ed25519:77e48b37c6304d4a0e401542dc817346c107041a03a0420813406ed3d1cfd5e0b5de14841a9fb7f6ee64ac2319cbc5b92cb67879c9036ab99b2316ef95bf8e09"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -84,5 +84,5 @@ content_hash: "sha256:10b3802799d7464653c3ea509a9b29f434ccb3c77564e129dac266006b
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for detective-investigation-coverage-auditor."

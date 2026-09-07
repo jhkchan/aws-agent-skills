@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:bc66c0ebf7214258d9605572cc0a5c1c1ac2c0eee40ce5acc0c671fcd84102ccb5e04de97abe59c5f96572fe0cb34cc59d7a25f8534ba098e4c088fad3017403"
+signature: "ed25519:c19807a45764ca97d05cf27b40b19b35b2ddbeaed0753adc7c4b1302be168c40b507f9db847434fd52ff66f778a59671e4f08ef2022e0751bde083aabfa0090d"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:7d56ab500ff52507a9fe94d80b9bd18739acabecbbc9a84c8aa4ef9091
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for opensearch-migration-operator."

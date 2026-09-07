@@ -73,10 +73,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:660ff97db33fd11a3d1e9a05969b0a9b9a3d65f31c057ae0e9e53a8c861869ee98f92e5d891ebb87e361700c31683d06d9c0232ca838207ef2c321bccb8d8d0c"
+signature: "ed25519:3364856f68e9df7ce0fc55b15b7ee5d2597b995dacb6efa5481df163c06b51c161f71e9714f882353b76868377eb8d4d2094884c3232d6d289bfe7af6912b006"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:38ab823587905b714b049108c82f836716bd02d6db4c1af60bcbdffb5d
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cloudwatch-alarm-operator."

@@ -75,10 +75,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:a21cea462bec36e0adc687792f5637fe9891632c3672f98635210e007f1219e046ef560967523236d16368c726c3242bde4a0e6d1f2f68df17abc81d6a1a2807"
+signature: "ed25519:565e196be95559995806d4497bafb317b4baa4ddb0f96fb697627b67d258d8ae7398392175c8e13c9f045d5ca46f51f74fe3f99d508f96cdab654d0e4ae57100"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:0841de076522b3f357e4a46b1a539809825bb6bcc0715f069f3eebe0c2
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cognito-auth-troubleshooter."

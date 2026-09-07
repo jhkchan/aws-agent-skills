@@ -76,10 +76,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:45c617376f0663bb86db567f9208625e51c009d63439a34da0067a50db2f974dc5214667ef6e5434bd096a87fa695f4d3a555e747f5a9981ec676d8064caad06"
+signature: "ed25519:143375fabe482aece011b28c5013bb1ff38748aa8f694e589b8c9e95751872de9629ca66e932b7123dbd8a4b4d5799ab6305b6c5fcfb38c8617f79491762f703"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:4b9e3eebeb27cbe309ae668f160e53dc1b566f297358485b6e98d897a0
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for polly-voice-deployer."

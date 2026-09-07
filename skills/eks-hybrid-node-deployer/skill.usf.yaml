@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:829f93057520ffbbae89519c3809133dbe5672d4690a0160d4e5e44d9bfe910a2ff97cecc0852bb4ec1be630a5602c2daf1ba0009536a987bf0e452e8214a504"
+signature: "ed25519:743d894b49797df4bf6a5c0cf759bb0582e5744f7d177651b5a011d0635117c5d95ba77be5650f482b1ccd5897efcd2c12ea67d1f64d5ead0d73bc9608f27e0b"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:433bfa8ba0af25badd4965a6276aa53cfcaa942fe72b5662914e8915330228ac"
+content_hash: "sha256:e6833fe41c830e94aab5f495145f451446aad414afe317c89a325be1cb596e7f"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for eks-hybrid-node-deployer."

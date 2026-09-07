@@ -75,18 +75,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:4fad855060898f6bbafd3e61e8ff9441c8bd3dd04132d10bb6f21f7d1c10703b581daa2f2039cb1f3b951e55c0970fb3949db56b100be08515fe308c17249108"
+signature: "ed25519:a5b762b1bd773e2e547e785bb1317702021e7f2d763b6fc1d467f4b44616d5865045b08d4470c19a2bc6a6ca26f32c1465d61d39e544642c771ba831e4ed920c"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:39dbc5691182a0d005bfaee29f6f3d47556ff83ac8a7df473fda9374da5490e5"
+content_hash: "sha256:773ef7c4d94927cf0449804287a9cc7d74a8f766b7e84b0c93a9577e75c43df6"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cloud9-environment-deployer."

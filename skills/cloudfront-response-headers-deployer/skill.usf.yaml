@@ -76,10 +76,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:fc55586ccad6f6725a8d3241de0a93edb7690d7b88cfa00109606f61300354c8539ddcc026c42eb4d74e15b34daf6728692ea06471af8fafdea7c69c45919701"
+signature: "ed25519:73eae0359f200aa8216ec797325fb98ca463438656c0fc29855cbaccd195f00146317b3b428164d75d6768ce0cd634c9a51c2f8ca8d439bba3775b4ecdecd30b"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:39594341bf18f3d09015c67d9fe73fad53a52e92b1adb8e85e5a710c2b
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cloudfront-response-headers-deployer."

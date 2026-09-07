@@ -71,10 +71,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:b83026067527ddb35005e1b8ee75f521e5d7090538b656499bcc17b2359c064f45245b1f6e54ed27eefc2fc29c0dd0a5903dc742abef196d22e9eb6689ea9305"
+signature: "ed25519:58731a93aaefa9cee1673083b96d9fc6b57306ff85fd5e50b4a07aa6bee92c219ff8444bcdfa1b22270cecb1f4734b7a76231532c61bc9cf08b871e868e18f0d"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -84,5 +84,5 @@ content_hash: "sha256:26ac9f266a1ffa38f126db70004668641c80d87ecc01cc170cad1cfe43
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for verified-permissions-policy-auditor."

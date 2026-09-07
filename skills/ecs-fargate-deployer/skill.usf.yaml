@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:295150ac141c98abc67457d87778fa6f8939a78cee4c8ef719072901979a57e589535f3012a60ed76fabcfa5006763eed8105c5b64364860f0cbb796d98a0604"
+signature: "ed25519:d754e58de4dac5b47edb7a1b0f7142ce73798879681ffbc1710e9fc247f3c5068e5f12c4514047d61100773e0ef926a4ff7abf08ed1d0925b78a6edc6637800f"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:5b923c9f67c56d9ecfff030f7b8a1b0ddb18eadc1b45d0e379b60f5acd4ecd2f"
+content_hash: "sha256:f0555db8a2e54697654ac9f14f6487b1d2ed6e032f834a0155b2a9cdd27e1bf9"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for ecs-fargate-deployer."

@@ -39,13 +39,10 @@ permissions:
     read:
       - ./SKILL.md
       - ./skill.usf.yaml
-      - ./references/advanced-patterns 2.md
       - ./references/advanced-patterns.md
-      - ./references/diagnostic-commands 2.md
       - ./references/diagnostic-commands.md
       - ./references/subscription-confirmation-and-delivery.md
       - ./references/subscription-protocols-and-attributes.md
-      - ./references/worked-examples 2.md
       - ./references/worked-examples.md
       - ./examples/README.md
     # The package is instructions: it writes nothing, ever.
@@ -78,18 +75,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:a40af0c32e4963c8558dfd8983ed295a795bf8a0cde868d17ddbea0ad19070248d2ce9a65cfd7a78b4f21ad42f3d85b40e4dd5613f0c96271122c1d2d867cd0a"
+signature: "ed25519:cdcfd7440b81b2f5130ef4886c257473ad9f4f796a9279e743353d922e2dade2e394891b368a966b31503f0e7bc190ee815d44b080b525371e19f1af76e13d0f"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:6b65a087057ab8b561be67afca0f5a4889896cf5ee9bb4e0548815ba82b9b41c"
+content_hash: "sha256:1a0f2c1971b811f7e1bd217a17cc29f5a185712f59113d651d04783bc315f967"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for sns-subscription-operator."

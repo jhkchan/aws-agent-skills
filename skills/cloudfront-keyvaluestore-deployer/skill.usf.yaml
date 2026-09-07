@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:f57963a97c879002028ad85cbf587e51d558ff9bff4cdf62ea3364b4d460e0d0ef9abd7e1778719463adec279175ccf5e1ce1ed1f1a5de5abc58abc963ce3d0b"
+signature: "ed25519:ee120765b3b022b2eea9ef44d7a7128873fa2ad27ba821cf661a55ef173041b271901c76660ef2b8dbdb2406183aa12c5a65e84b83e26f18e678977a7ae7c803"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:6dd1ccd7cedbb1df982c593e1dd21f12cdfeb4650c25e66f1865a3b264
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cloudfront-keyvaluestore-deployer."

@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:57fc7e737e73bf6609c65d3a1964c3688def98bbacacbecae009b8655c2d924c0ae74e4d43bfc1ad89bc40dd736aac55e9758661fdf843c52c8d6d3c323c950a"
+signature: "ed25519:1cb8f0c62ca1f2cffd5698a1a79406252d8a5b8d157ba0eff21b6e49e5c1343f5a619069950b52e429fa95d8c6e28f8e5c32afa829588e10902d19d6c7346f0e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:20f99acd416d4da406923b1d569538ad8e9efa1837b37e85634c712268bbbcb4"
+content_hash: "sha256:17972007dbd15b9a9cea3e17754605d20aab6ccba49aedb6a5bd422b61c9c839"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for client-vpn-endpoint-deployer."

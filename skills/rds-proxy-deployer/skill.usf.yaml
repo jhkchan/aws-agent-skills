@@ -73,18 +73,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:ce9cb58e9c4fe86e7994b91fe306b5154174340598b4e422422dad0d5f9df7629a56320b8dac722ab93d273b11135a48378d01351e79948397e0884f567c900e"
+signature: "ed25519:6c373903bebfad45447e7e8fd9ecd7e399f51bea7ddd6b5b5821231d94e4afa90df9977d1ec6cb46bea8afbb2d261c4b74fd4e99e6a23bf2dcd3b55c9748e00f"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:86a599def3c432b8c467a60239d45f7bcbabc233085d10003282f6d8de7ad04a"
+content_hash: "sha256:ac2ecdf0cdf4d24ee6be16b5b97806aa352b9bea3f935db3623ba35e842013a7"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for rds-proxy-deployer."

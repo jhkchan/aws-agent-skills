@@ -70,10 +70,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:c88ec61e3852525da6652003afae451629f0d4bb32e3de06965a1e7ebf077a16093ec9ac99c643d0c182c793a6b9c733bd7d278a5ea0e11ce3809cf005e17d0e"
+signature: "ed25519:a2ef62c2da74489003d93586f762b4b072009f64915a87552f1f8d316dd55b63df39d6964e5e488d2d7be0f996509672eff1cf1f8ed19c086f2b16e8b7f32908"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -83,5 +83,5 @@ content_hash: "sha256:c8961532d0e16c61ebafff0299396f75de385db2ef9b3b7a5aba7783cc
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for efs-filesystem-auditor."

@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:e2de05489c2694ea292a5d64a8b8669ad037e7a25c60c5d984cc30529792163ff0f8ff34b1dca83aaa741a07bd37c3f82699d8ebb491d2bb781fa388072ba001"
+signature: "ed25519:f51bc12ab73bb3a02d035e5348eaa1d045fb5fe2b9eed9e89b60c2de6a285528d4be28fa2695bcec10771e85c6525755fb84cb2d549dcafc49cad25eb18ef20a"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:cff6bf681b467258b67c2c44695dad29438914a5625115dd89eb2108a8
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for log-retention-automator."

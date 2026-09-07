@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:225824efb98411a47cc8031a7af4cb4acfd80f4698438d36aa5470f49efe610f06c4e5a3d6b0897137e07844dd81092a8d733b588cecbc934dafe607cb21600e"
+signature: "ed25519:917e9e8a50eb7f79413c52fffd2353144d6bdc3629ea4e5fc70d82abf9c6a34de0c35caedde65e672ac62b04c6b7d47327a600b73133ff1984cacfc32523ab04"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:950cac8a8416e557c6377747ec595942d3e69b294e63f5c0eea5dc77ff1be376"
+content_hash: "sha256:43bf6e224bda3c299b96acdb1158480a7e9a8e904cb6f67ac0d0288362922b74"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for eventbridge-scheduler-deployer."

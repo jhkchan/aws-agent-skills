@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:439df7470c973db0f0e6134bcc35b72c63b856f76316b3dfdb2d15f95411ee53863966b18caf4fa18033034eab3d2f8b51609681b7adf7dbfc7e48f8ef190205"
+signature: "ed25519:0fd79fb1425853c61d35fa4b4d11dbdb2c2f1d7b1d4d66b23b42d5728a83de5fc92a11520720441323060f9497c19b67462dcc0f7d0a041b0eb0a3a8baf0790c"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:f6277142d002dfe74726c18dc8fd0f004641ba8d0ffbfae13b0babfcf8
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for lightsail-instance-deployer."

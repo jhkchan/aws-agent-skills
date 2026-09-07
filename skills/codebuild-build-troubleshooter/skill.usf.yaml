@@ -75,10 +75,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:31522caf44fb17c14a69458f35189d21838235759a60c436e485bf193fdb1a7d37821c3e6537aebd6fa9b0c47aa9b1cdd1652a648bebdd1bab78cd211d405f0d"
+signature: "ed25519:df43dee82bdba1bb0ecc2618029e1976e9e22e7eea9684c2543011ac54e9025423b5cb248657dfb3b4122eb4006092667dcee670d67c42bdd82d0654b1681a09"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:95958bc3dfb814fa09fa5a464f378de4755baf233b758f29ea543609a8
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for codebuild-build-troubleshooter."

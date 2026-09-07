@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:ee0ae07d8fff6d6c0abe9c4fbf8d3fa3c22e513a140b1d7cb7082f9ef20587e60561f90ca243127ab8795498fdfa25a307539adf23cefad2bc5bbdce3883d703"
+signature: "ed25519:a9e454ca2061ce4fbc754e4618f8057d08eb2a559925a5f5e7e96cf8ce4f23e9bbb66549c4cd18bac3ab026d347437fe1650cf78966d71933c67a60713f7eb0c"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:4d79c698cca107a49e1b76e0ef8ef2001f775919f911ad8d0dd24c117d
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cloudtrail-alert-automator."

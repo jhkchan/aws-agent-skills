@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:8ed87cbe23a2a618328637c70409ac8978bcb7dd42f53b1916686d5be89c4f295eb2df5f37056941261b42eac076bc04aa64db25f26a64f25be5e879456e1708"
+signature: "ed25519:8dc7d0ad51af0752917cfa384c6224e1d598fa2d5a9bb839368a2743fbf79a0ab0326aafada44069058da5328eac002d9016f22f5e772b122769d183bcba7e04"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:31f83d666260758778a463d2086be02bc0b6859331deea31f0b761cdef9708e1"
+content_hash: "sha256:ab01b2a2fac957c4fbc359fc18dd7b956c8e6728766421fff89bf749c202b33f"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for keyspaces-keyspace-deployer."

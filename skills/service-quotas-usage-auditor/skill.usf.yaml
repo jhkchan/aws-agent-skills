@@ -70,10 +70,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:a07a4760a38389e73588036fcddff284563a2e41a67811a882ecd46bfda774f40d5a93f4092d51f5c7ad723b4f245fd96ad3d8ebfa85d679a46309014bc6ac07"
+signature: "ed25519:a80bf57a4428c00f4a862122a73d0b103510a362261d72d82c9e7dabf28241860b5b973dcc55c86d642d0bb24dedd69a2256f3abb2bd87850fc86b9e6d26d10b"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -83,5 +83,5 @@ content_hash: "sha256:7af6cf058b724fd274735e337ceb21321beee52e4e19e4966b35ba24e4
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for service-quotas-usage-auditor."

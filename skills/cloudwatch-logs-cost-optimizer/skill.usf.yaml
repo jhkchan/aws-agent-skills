@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:6f990fa70d680853dc142bb3db19d00b8119eedd20891fa601ba09f0d858cc9c2c623ce84415463d0b1caa427a64fcbf64cf468006c708cea4b0dae523e3b002"
+signature: "ed25519:fbc4f43b4ba5de247caa1c6ebd1028fa1603b29cfc58c3477b7fbca69680f7afe6433e26949b864b2d627afb5aedf4bbcfbbf856dcd91bfa3ad9e5c5d54b1e00"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:171cdf795d88d3a0747a1aaf7696d719ae64bc8bd78d5cbb26ba3a45a8
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cloudwatch-logs-cost-optimizer."

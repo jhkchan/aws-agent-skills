@@ -71,10 +71,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:1e76db34f3fc66d7daf273d8dbe27d512e43b93635137903e91d7e2b12302b99571a9ff6a5a6ede7986a9ca3edef3aabdb95b44fde88f3f7790fc175b8ed620b"
+signature: "ed25519:9158fc1b3aaffa7f222f047176f544a706aab7281a6cd26685b3df7dcf1bf7e335889d18a295553a02c4794bb7f49631aafa3b89e10fef0b1aec50f6c75b1500"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -84,5 +84,5 @@ content_hash: "sha256:6257f24780cec7139b50051ab380309d3707ff5739c419466bc9d92130
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for health-event-auditor."

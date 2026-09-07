@@ -71,10 +71,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:8698b998a90e27f32bacd67dc715602538d0d0e18039fe5c88cebf9f339f6192850d949ba07ff8fcef9ef65f04ae72652ce08e3b7b619676504a7d4d0298f001"
+signature: "ed25519:821c0997c63687d7ec1c14fc52e8b3bcb1025db13a975764b7b03868b89d96b3b7b95b1b98bbfe8ed515a32bdb5f0eff26e90abb265f041f6f34fc60ebaa780e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -84,5 +84,5 @@ content_hash: "sha256:fd6fffa7f19419eaffb0bb2aafcc716222259b0070f2b97233e79c8846
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for codepipeline-pipeline-auditor."

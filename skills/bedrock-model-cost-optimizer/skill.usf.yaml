@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:c687ee77823b29522357ce89a82f6fcdd0c40f2865c95d49e0997951058a23ac0a862b6ce0d50db4e4b7c8ac746f2bbe96b4cb45ded15d4bb0a313fccec78e0a"
+signature: "ed25519:36c4c0a75237719f52248e1b253755a2f72a6378274f01003ad85a86db0045dd1fa6c8ce5dcf9c430d4e753187035b228b5764a3b6385f51b1fb68235214e100"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:3dca399e44ab2c3c0db4d0539a11560e8db9a2a70e9b38023e73dd73fd
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for bedrock-model-cost-optimizer."

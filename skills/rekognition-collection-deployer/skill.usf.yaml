@@ -75,18 +75,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:82f54fa854fa9eed795bd96fbb9eac39b1d61674f7b13f8a037ec0aa5f7a6312eeeb98893a1d8f047518406baacc208d88b16b93c1f5b35733d9695fa3a34107"
+signature: "ed25519:fe687105430ef3ede7da924fdf806114e06bee7c0c3d009b0a222045c71a01c465bb9241afcf6afcd6ad53e2aeb288b759e9ba6b2702250892532d46229e2c0e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:8f78edcbbac88d974c0260575fa5e06746b7d6ae7c04100ea9c338b723abb58d"
+content_hash: "sha256:28eb9ae5495d084842bd834f4caed8b6a7e414e28ee1cd153c1217a92c15e61b"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for rekognition-collection-deployer."

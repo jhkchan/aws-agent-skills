@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:98c019cd24499668dbe7c52a0626579662a770b9cd0d3e638c967ce05c272c9623667cda9766839a6dee7730f0e62edad31a7ee379df8a2dcfa1c43c90f0d306"
+signature: "ed25519:deea8e949f4674efbc398ba9c117e9d0bb6689da0a4467a9ab0d8b56d804f0d2056a52f63201a44e670a732556428c91ff22e74bc300c360bcc37981adf7f70e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:7ab9530af46064497099a2f081589d5cfaad6f97d92541e905d1b62457
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for dr-failover-automator."

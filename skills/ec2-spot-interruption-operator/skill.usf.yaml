@@ -76,10 +76,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:894005e41a939c0e27aa91b1f96fead85cbfd5f22ba13160f35f6060104122faecbf448afd5be8e25ff13167c59c6471761d31a5b28021d3a4d767a444bdb00b"
+signature: "ed25519:5bf481b9dd83462ba61b9fcf7db9a0e0266dcd6143a789c4c8394d96c3025bf4c94f2ed54c29324b96aec40e873cbb9c73377d2933883c8334ab4859fcf4e30c"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:c581db95499d486dd706f2562654cfb82915645a39e444d2df9f8701b8
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for ec2-spot-interruption-operator."

@@ -75,18 +75,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:91f54391494930113e4ef5c517e8b0e9daeed58895fbc415e2647ce01bf07939e79e1f2bddffeef114f8d01b20ea816cb89246d9f76fb857d0b6ff680ea73f0b"
+signature: "ed25519:9aafd38f086b169ccfdf437f60b4a4576480a1cd8f87744bf4f056ab692e1aaf0c64bcb8958264f78bd61ca4a9e7e739cd8abd2304d75e6cfbf5a7ee0249900e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:5ebfa1fb1c5ae783a82710f384d706c7e4d24717f86bce41214e9a952e1e96b5"
+content_hash: "sha256:936b5d401e84236e0c150f9ac487be7aad65430846ab10ed5b52432644018265"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cognito-identity-pool-deployer."

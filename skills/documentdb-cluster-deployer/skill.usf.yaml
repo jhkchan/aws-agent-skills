@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:c48c377e12ae7400241534864402e3d3811a087f182da8f2136dcb67313073412ee90be6f66d70a5016948f3c38bb6040020157bb2d0f0b5621b2e6af70b3409"
+signature: "ed25519:b10d9d81d9f78d806482c2e95e0b2bff2c715a03e77b8a3822c456dd0a45061db9b79239ddf35ea45d0ff6a059ea690caaf2a0b911ebf9b09a792b90a4a1020c"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:2b37c9c931b31b11f09bc9dd2c7e1bd7fd2df7593b6810334cf0986ba0e97719"
+content_hash: "sha256:f51e7e1aeae7b2c3539c4e9c176a2caa27a3bc82e31d15e99b02cc9dc6155061"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for documentdb-cluster-deployer."

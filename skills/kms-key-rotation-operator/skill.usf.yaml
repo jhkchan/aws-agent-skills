@@ -76,10 +76,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:1565cb1a14457c50559568ad938a222076f787f860df7b0d2068a05a7577ec5cc5974c30f07ce1379c2477af72b03d31f5406d1b46eb30e3046146e8ee4f0507"
+signature: "ed25519:299e1709aa215aab78d1671f5526152896768c7ebca24f98a55d9ef252f1bb8f144f2a879ccc76e491348fc4a2b019895097ba258c5a6278a50ce1bd3955a701"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:f8d2ae1068cb360e30442b67a3eed14a69b1c0146449a6d36de79f16e9
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for kms-key-rotation-operator."

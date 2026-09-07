@@ -72,10 +72,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:32d4b3a470ded2ab3946013cff469fe615a464f70703df253636f55efc0252c0cfd13f53d873af3c2c4d633185825e151e57c26036c60ba579965b2c17c2070d"
+signature: "ed25519:35d23dc7306fbb7ca34a1bd88cb168cfea68febcde3b1d6e6c4728e05ca3b374fa9b48d512ebb23f52d4c7828b8b5dd5523b12df92f426d4dcc307569d023708"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -85,5 +85,5 @@ content_hash: "sha256:1046430f78cc8cd3142bd013c8f5e469deb8584043dbb41eb320af69fb
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for athena-workgroup-auditor."

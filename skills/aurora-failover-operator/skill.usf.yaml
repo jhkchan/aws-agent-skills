@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:9fbc9bd9aea1449f8efc298efc57917ac0c705284c30b7b2e93b8642e6462b0aa20ca28c61bc9a65fbbec38c22bbf17a2243aac4da5b73c31823ac07b7001a01"
+signature: "ed25519:e8f46f7049dea4d138c82b8ded1465e441257de6ff8a00af8e4738d3e7172f19cf9a0012dabaec4f8f0aace237944727218a0186fc01f83b8fa6655c79b1a202"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:9ecd2fc36d8ccbcaf66768dc24402012dc66bae2eb15a5848a6a73a724
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for aurora-failover-operator."

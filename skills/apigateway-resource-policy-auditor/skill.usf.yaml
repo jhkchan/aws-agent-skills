@@ -70,10 +70,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:c246d0eab652ef06fe2a3960a0d0c13dd1337d27b291ab5501f067af9e9e1f8f0dfdf4016eace38351781cd523dfd8d975f87c8df3a68fad47b568237a1eb201"
+signature: "ed25519:4d0eb1ad9c3d794e3678b517da61a776da4add86312409d12617fbdc0807ba88839fa9dd90ceb114d906c790cfcdce2d8b202f6d021431bd279ce53064ce7108"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -83,5 +83,5 @@ content_hash: "sha256:96eb925981d884d8d6156b065e75f94d0b742b6da45365f84e7d02ea5b
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for apigateway-resource-policy-auditor."

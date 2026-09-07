@@ -71,10 +71,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:a48393acc28f1361f3e719d68226906d326aaa5c5dd000a9bef4eb15bcab41735f5b685fda787520404450ecb9f34237c7c55ab4bd84d38c4185bf458725920c"
+signature: "ed25519:c3656a0c734348a9336d8bf2e2548d274cf98daf74958674013e4614a8f286f961206c9580d09d8938d10f3fb72e6d6ea8ad2383a3d0d7ee1eaaf555b217ad06"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -84,5 +84,5 @@ content_hash: "sha256:603c1e4b627215f7ad6a8dd7e5084abd947eca7f5a17b3e3e0c1908913
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for msk-cluster-auditor."

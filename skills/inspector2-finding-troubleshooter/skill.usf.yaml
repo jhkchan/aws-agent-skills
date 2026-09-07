@@ -75,18 +75,18 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:7a549407b2732333b595d71744863f21f293b08e977c5819a2906734e5032d24babe1be7834c9d22b350f791205d8f03584a447aa76bf0a9cd10ddcf0eb5110e"
+signature: "ed25519:061d5290e1f4996bb5fa88a7e82b3f831441684f5fade72ac376a65d816f20ddf91117399915b93b0b53168999347458a92bf9a46293c0975309abf0357fab03"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:32488c82fa59d59a575adbd6b7d733486cb004b6fac3bee41c1cafed75f78e77"
+content_hash: "sha256:a45a14d7de9675ee1093444beca51956ef42bc0d04dc472f30f0fe872042cadc"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for inspector2-finding-troubleshooter."

@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:3afce287a8f61f5d8a8ae46d174a267b27d30055f8ff0c3ad04837bd3ea6b4d59e331a49902719392866bbb883d02c8a23420f970f4429a238d45a6e74e9420d"
+signature: "ed25519:1052af386bc1b0658f7f40e003877b26c75c5c9e8a05bc03b14d8c4bd5d71d63968935d8299a1876f7c83614d70350f990f4c7d2dcdd8edc759f1bb5a946da04"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:1674776fe7ff94ecd3d1ae81aa6a155d3d9a36d4f823fe5381897d3166675c2f"
+content_hash: "sha256:710a04c60d4c528e57a2e2217db6e31065a8cc4f50fb180fd71845f729dd7fbb"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for amazon-mq-broker-deployer."

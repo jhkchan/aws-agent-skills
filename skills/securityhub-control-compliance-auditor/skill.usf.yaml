@@ -73,10 +73,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:e46c5c61a96b45098424893662808012a6eee71bda1c35f1cb89ee3d18a0b0e69f7617aa6dfebad7c75d62733d2e7b1d26009f9a0432fef453dd22d2c68f8a0a"
+signature: "ed25519:4938aa644288098c4e057c8aafd03f57b7f5a9b346712635be19fb027761c5df48ab07741e223c0284e2cf70693395eb4a66c06cc925315509a4d4ea8673bf08"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:e044361237ea62402fed5e9387cf444f55985d63f6b7313475324e2718
 
 changelog:
   - version: "0.2.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for securityhub-control-compliance-auditor."

@@ -75,10 +75,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:217efb5f462467a95a76c3c30be688c95eb934d3a83248375b8a6bb2374dde78258072806f679e591daa487fea4e717e5f88166fb27c225c3a73d6236830ad04"
+signature: "ed25519:506f4aca980146390672c67f576a996c0344c37d1743f56a25e12b7775753dee2ea1aa625606f036627fdc6195a645ad7f4627ba79eee8022e2d4530046eea02"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:41bf531c4a8c592d6c0c06fdc095deabc855698be777fd4af0578a90a6
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for transit-gateway-routing-troubleshooter."

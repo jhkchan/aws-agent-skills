@@ -75,10 +75,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:f52dc6f5719dedd04f30ed1277ccea6a0518801dc9f7187f3d7f010b01e15dc534f042661e1066f719c3e7aeda53f645421079606b0bae315e827c0d57f45603"
+signature: "ed25519:b209c35cf444b551b49e877199ba66a2198c2410cb53cbb90030afce0b0a98d056e11a05d4ff9ec8bd537b5d70c633c826fd709ef18050048a4f3f42a80deb02"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:0512e0b129713fc274e7aab03f2a1b08dbb4fa4a25f8c088a05cd7179c
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for apigateway-5xx-troubleshooter."

@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:95bdcfd71d89e7b9c34afcbbdb3be10171e7eadda82099b9c310fba9a36b57a61cac548ca003c26d634117470b1d4523850579c911f80183b0f9368e1e6c2808"
+signature: "ed25519:7f53188eadef9ffb6b93ac0f7b5be6f0a374892a490f94755ceafe2e68f09f43a38c0ce03fcd8e0d6fb83c38e8e15f45eebf0bce2c760443bb34f6e67badc20d"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:669d9e608d3a103a60973a78a6b7dffb65c5122f9aaf46288b8ca7241e
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for lambda-cold-start-optimizer."

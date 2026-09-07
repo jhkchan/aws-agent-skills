@@ -76,10 +76,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:ea4d27399cceba246de78515cadb70d9d4587154cd1814bf2e85fbb0b122179c00547bc4a25cb6b31fb33362f84bc99a27ed764e4c33cefddc90c9ab89e67a05"
+signature: "ed25519:a59b73eac4388224e75605dd0642fd9ca50d730058910bc8d52bc3a5040bfe44104ed3c87b7f90fdf77ad879cfea44be4e078ad109f95a9379f89044ad34f000"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:398f8c3007ff77b2e64869b94c512462ccd28ab713ae9817544694cfc0
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for sagemaker-model-registry-operator."

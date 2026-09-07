@@ -71,10 +71,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:e1b3acd917cc6dc0641e96a548cd87c202a47810782e461dc1e642ae0360732f1c440e67e01e1715aa9d76a943d87f6d58e38ef3d754e317ff4588e0f43d980e"
+signature: "ed25519:cfee43172e0fc53c08474f7bdffda295d17c1c0c7047896d4c7f7a26cb8dc1612048bdac9206a5d89f79ff759e9b825fe8daadc696912172008a3b300a86440d"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -84,5 +84,5 @@ content_hash: "sha256:b7d0e1355185444c48d886c07c44d3c77a23159f102c3f3752b4d4becd
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for networkmanager-core-network-auditor."

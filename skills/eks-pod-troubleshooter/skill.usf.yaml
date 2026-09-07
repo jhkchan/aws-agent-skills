@@ -73,10 +73,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:6a4ddcf04d867d96350b91bf6886ebad4411bd0ec511e59de26279badad8e449e4ee17b42496c8fabb6827ae92a5ddcb164a7be8b186151fcb2f0e31e5070107"
+signature: "ed25519:85620880fae88dcf4ea849cac423f3dc6c49acd3f35ec0823597bb38856699346fd30cf5a32e99019fa143e0888ed5b3abd4a8112a3f43c0281d475b27ddbf0b"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:3f9c969aa4ebe03191cee0ff2966510c6599cea040ade7c634adba8eca
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for eks-pod-troubleshooter."

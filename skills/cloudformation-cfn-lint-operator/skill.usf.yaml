@@ -76,10 +76,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:4490867a87af78bb7896429960673ea5d2302272ef216b471fb5b9dd733827dfc7ef0e75ed0198619c996acba6d712971bac798e8ef0598e611758ff0aff2d0b"
+signature: "ed25519:6326022c05d2da110846507fe9293f961e1504685479d12bb5d8c3b792c10fec724f10d5028ec8861796170e8fa286a66792a2f87b5aaca04ab9c44228f26507"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:aab54221d42c71067c3e72ac6467f00add3fb8ae9b3603268547865f50
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cloudformation-cfn-lint-operator."

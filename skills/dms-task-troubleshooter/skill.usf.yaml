@@ -75,10 +75,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:6b11dd97008e385cc2a96de7402ea9a8ecece2ebf68a37687ddd3dc7b932d40085be4f27b1c3cecedab3a5465208dd49f302d455ff4d75884af748aee48a930e"
+signature: "ed25519:9fcdfa43053ef7fcfc1516311de656392a98d6e34eedd317d990e76b07be183927970ccc00273a1964e7f7de651cd6a32520d28dca77b41b8b419a1d9a711d04"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:291b871af75683e643f185acd38d3746d37d90876bc94752cb721eff96
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for dms-task-troubleshooter."

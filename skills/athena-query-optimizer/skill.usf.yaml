@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:6de7bdbd76a9e1d635f9a2dc741601d7a7857bc34e893abb5bc586cdef6540937bfe98c5cdd21b5401701618d128a4b394dfa08ad345a7a584104ca4486a8700"
+signature: "ed25519:8f7329eb242c5d13d3ec9af759cb2cfca113acd638d58cc436c075f35a8bf56c586e6086e31f0320da9fcbd66213086182a57752721840443c04c3d2f3f53e0f"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:4698ef785f0da73723f9c35c84b5fc6f177a78be4e5187bd895f82d966
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for athena-query-optimizer."

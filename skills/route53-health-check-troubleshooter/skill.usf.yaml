@@ -76,10 +76,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:7b78d97cc38cda94caac49c2b49b379d074febe67e7bbd668104d5a36dc46f3312e3d9f261f8c304a6b713da46566b318cb5eb3611402485d76aa869c3074d08"
+signature: "ed25519:c4d78ee2e0aa6ec742ebfef670184cc4e3ab9dd3dc42944646f45a1d8e4b4d1fc2818029d5b03900aa4b2e6b3429a91c88b26b1c990144410899e43eddffe30b"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:0a70893bdcf7c95d426d4bb3bb83d967c5b2a517af8026fe78c389377d
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for route53-health-check-troubleshooter."

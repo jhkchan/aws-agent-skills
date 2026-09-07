@@ -70,10 +70,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:696f7d584cea9c04dc99a36504d3c9090c58412feb90c0d4b1c4f45d47e653862aecc022ebb6f913841461aa55271edcf39924ac7c1490002315faf61d460202"
+signature: "ed25519:0a05e6bacb883d6853be92eceb96d6d263ded5d9141281e8a91ddc96703bf30e119440ac8d88328839ff3ee6c0754ac8b1f9f1bf8f0bd72bf3ea04607e66ed0d"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -83,5 +83,5 @@ content_hash: "sha256:7fe1df02662a87ceb1c8b67c253f8796bddb16cb7f441e831b43ae31b2
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cloudhsm-cluster-posture-auditor."

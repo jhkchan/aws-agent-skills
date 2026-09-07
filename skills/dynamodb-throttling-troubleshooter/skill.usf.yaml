@@ -43,7 +43,6 @@ permissions:
       - ./references/capacity-math.md
       - ./references/diagnostic-commands.md
       - ./references/throttle-decision-tree.md
-      - ./references/worked-examples 2.md
       - ./references/worked-examples.md
       - ./examples/README.md
     # The package is instructions: it writes nothing, ever.
@@ -76,18 +75,18 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:5fe320b025dd80c1101525ba21096e874e560cebcb29139e1e9461e8df0d559eaeb46400ca446dc266a0fa2796ef188c00f842224f7d39fa7331d76b3a3fd202"
+signature: "ed25519:86a86f82fc8671ffee66529e51969c458202f43486a80413851eb31611b14c635bd4c947eb8a8a5b3cbd8eb018db42e832b793af27d37617a57d7cb7ff71890e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:2cc8e715e59c7a447f4861350f0245c2d46ca97975061ca946872604888cac98"
+content_hash: "sha256:19b3dee87237462140f25ae1f9c6978cc460f85e4791fc580e65a28040222861"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for dynamodb-throttling-troubleshooter."

@@ -73,10 +73,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:fddc0456d59605dc0d6d7f6361ef6d6d68056c748fad1dd661af95bc01c46bd820a2bcd99136794d81aa8c1cecd5f9cad8f404289658103bb83c43dfe5564b0a"
+signature: "ed25519:809c039f335f070f4614df7d0a0efda774d77d2d69eaca54eb5f05b47300d9fb30bcaf4c6f2ac63620dc5670a734325e5b9980757f2b0ff9884f0b2ddc8db40f"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:d87d0d601f6827b577542d8671cb7b3c5182a684704529d7236887987f
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for lambda-runtime-deprecation-auditor."

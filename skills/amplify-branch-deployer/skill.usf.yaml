@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:1542aa2f0301e9167b2ff497e5c659a0aea750e27254154c45444bd0d9a8bb24dc66d3df69a16bb07858d9a2df25128f3200bc3acb5146fc5ae91141a8111b02"
+signature: "ed25519:a141666c16cb952c0c1076a4de3a78ed7afb4cf13c28e87c68f09b94489c59ed2a6b9f476f3d29c36679f48c279eb5feb2b9bd1cab5f985715362a72c0f1190f"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:e4c0fde91d39c802eedc5fad306fa0800bc9df2110930879f22ece6cd82668ca"
+content_hash: "sha256:37f6682ce9424f68bf64cd508fa80772beba70e2339e187563ddb164d14356f4"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for amplify-branch-deployer."

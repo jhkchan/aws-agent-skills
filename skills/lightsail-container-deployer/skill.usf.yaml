@@ -75,18 +75,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:2d93e47aeda67a888b9435c1f9c02ad446dd0a2017101796eb38a516eb22f4b4ba78003626c4f376d57170a3b93833f7b5287373815704507d89caf1b176bd0b"
+signature: "ed25519:3a3b9627f2e3c23df590cf9f8f145b7c080376bf77dbc97f12a5de9a1bdb025f292feb64310333de0cef1903e8138fda2daf377c24a6f7bbd09ce900b6bd1800"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:0b350268eed476a33bb6b463df53bf979cb2df8ee2ae714b12fa7181076357af"
+content_hash: "sha256:928d3fe0322055e1edc19959c233f7f1744f3705029df2243de63e281738a075"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for lightsail-container-deployer."

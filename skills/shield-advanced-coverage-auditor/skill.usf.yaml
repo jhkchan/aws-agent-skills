@@ -71,10 +71,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:8d8ec750fde3d723982d1d86744b5961a6e0f7259e470fca61bb72d89ebb7c12fe34e9d3394c2973d4bf25c8291cb90929cc573ef27028432187c57d1d1a6e09"
+signature: "ed25519:a4d8d5e7356158c8a90b28cdf9ac2cce941601732ed699c4404283097cda3041e7b55b83dc266fda2bc6b49ceb1413699d559e5294e93c068337fb0d7706560d"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -84,5 +84,5 @@ content_hash: "sha256:8b447ebf633dff63e0365ece51401e2e67049a0a98261e734b44e7988b
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for shield-advanced-coverage-auditor."

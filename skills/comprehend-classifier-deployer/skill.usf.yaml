@@ -75,18 +75,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:a98cc099a93f4c01e1991a85d1b891316f50fdada7cabde0db017a59a2673fbc01314e52e09b819115900ea19ca672b361a3d62e405dfd3f9f036a7f8e08030e"
+signature: "ed25519:bb973d7912c82c2f10d2683651f06ec09918e1a2fcbda3282b9772acd9ecedf902f7c8c41828ac1903e318198b1ed01da8bbbc7e8ea371d4564ffbdf5a41ca0b"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:492aa07f6f5e654333eb641191ce6971911af33ff60ca47d35ef1f93452bb45e"
+content_hash: "sha256:0e4c3110535e93b8c881921fea62fc6391265b463c23bb49ccbcf54d084dfa9f"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for comprehend-classifier-deployer."

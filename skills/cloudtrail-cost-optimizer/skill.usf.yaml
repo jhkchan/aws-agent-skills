@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:d3e9ce5210835fef0cc41fe2186ab37b2480e0b58f64e72aa57b74ec39e26e2b73030181f6f9a57eb016c42663c5faa09a5556ccb3ae2c15f160497e6292940b"
+signature: "ed25519:afc6337ee021e7ccad410b3e8c4560fc9b15fc4784f8d297fb03093a75fd800a40839f119663f27adcb26625112b10e6a6f1720ca85bf46e5b5d938329bb550c"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:bfcf966696cc40c4140e7b02aad467aa8638eba9f9f5c9bcf14705273f
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for cloudtrail-cost-optimizer."

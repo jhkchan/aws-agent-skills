@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:d5ff9af7cdcde7b6547b6f007097d5fb700960657da34efac1e4c3ea204c89b36ed370e9fcbde1b7465914f6bff7141581e31278199199cae3ebc88d3fccdc0b"
+signature: "ed25519:d2b2d93500bc1ac76745319a41a9ecb3eee2a2d42bfce178f97589a79c9c2f2223aa1ca8e31a34251d9711085b1699323bebff2bced9d8aea7ed97fdf3e94a04"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:e08c09d21c3624fd31cce6c04b801eaef72afa3583764d0f8d9e9d2d40
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for transfer-family-deployer."

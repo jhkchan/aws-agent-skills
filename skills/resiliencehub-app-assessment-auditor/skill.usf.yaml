@@ -72,10 +72,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:c0a8c267323f879b997b3cb803b016e87dbff37e522663793b65b6ece1f54a7870db2a2d506308c8aaceeb268ba1099064c5f7dfde30adc44ee5bc030fd4a80d"
+signature: "ed25519:44264fb2738b8b9cdcdad78712cd9e7b2659531635a3615041db1bd1af178bbcebe500d76c3a7e1cbddda52c35a4b5ccea50e15b96f4100bcc58337aac37a907"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -85,5 +85,5 @@ content_hash: "sha256:41c7af8af94694f53cd570b0e1b935c7eca18201d805ad4e93ab390971
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for resiliencehub-app-assessment-auditor."

@@ -39,13 +39,10 @@ permissions:
     read:
       - ./SKILL.md
       - ./skill.usf.yaml
-      - ./references/advanced-patterns 2.md
       - ./references/advanced-patterns.md
       - ./references/audit-manager-controls.md
-      - ./references/diagnostic-commands 2.md
       - ./references/diagnostic-commands.md
       - ./references/legal-hold-and-vault-lock.md
-      - ./references/worked-examples 2.md
       - ./references/worked-examples.md
       - ./example/README.md
     # The package is instructions: it writes nothing, ever.
@@ -78,18 +75,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:37f79e403dbbf3edb22f5f39261d62c82317317a628f754a9004abe1e6175e3074b62c6eb446c73904d472150848e0c2fa62d6fd0d15b2d0f7ee3764f5de3f04"
+signature: "ed25519:1cafb01be3217861546ca18528cdc3e27769036922e7fcf625e4f0d6d8e66b4e368c4b1aaab6915d456c16aaca853a294764b6d2e0cb5cd983d316df561ce50a"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:2d3e1c847846b98db5de4c3b4cfb66189ff4dac1a09676ba2883f0ecd321e376"
+content_hash: "sha256:74b4c6404d1409495c4e1756f4f424314ce65386d1a3fdaed58f3c6f9d42c148"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for backup-compliance-automator."

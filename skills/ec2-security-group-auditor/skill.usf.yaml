@@ -73,10 +73,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:fa755d486001b5f0ae672f05b97664399ae00b0eae2998360f27319f573e0af867d6a75af52c6a2b614f457f672c799348685fba4a21ff82fbe38766bef0300a"
+signature: "ed25519:deecffdcf72eae811de685a6f417ff5c22530b248206cf0e7f94d3bc5419fbb38c05ac4fbdaeccfc33565106fe3fc10ac844e0fdea27ac2ba1606c70540f2307"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:c6903984d5427f6c12332be4e103f91a9b2c9113dbf2d516cb5fe3661c
 
 changelog:
   - version: "0.4.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for ec2-security-group-auditor."

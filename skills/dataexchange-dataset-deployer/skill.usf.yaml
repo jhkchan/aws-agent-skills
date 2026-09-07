@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:32d896cabeac573bc8dcdc93adbc4bfe565d6582a755b020dda3c4c65c4f416f23ad70e521bce1e411585494d0b9d3cb69d28d2be123e1af2e8218f28a41ba00"
+signature: "ed25519:ed4b83b4ab2482e14bccfc43c2d1fc928f9ccf7094042bcfe975541913ecbb2b01f412f1f2413842d4492fec40718097817d625e236e6e7b863743f585eea00a"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:570a7580843c2d9ccc5ca1e735ab2d525af9e555fae7c877f58c5b77e6
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for dataexchange-dataset-deployer."

@@ -75,18 +75,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:91d39f76122f6b41d3a85e28932a070a779ee3426a00135f4769dc420b4b8c03a668580f3b2f34abf9cfd52f8658b3f9286fcfa3b588c9c424bfdbc92a805b07"
+signature: "ed25519:85a77154ae1472ed7912d1e5f6e8faab9d54f4e829ff906f9ad2c88e11ecb966fb9b5ca140b973aeb1529d0a133f99df987ec2b5c886b234fcebe9d696201a01"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:8e14f26d106595cb2ba7cd81fd3799c3e7da3c1800c2074f654fb80a63e28da6"
+content_hash: "sha256:35ac23b19b0f66accb929c9ab164a2387d5d7f1cdc5b6499ed3c4e87d22d35be"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for macie-data-discovery-operator."

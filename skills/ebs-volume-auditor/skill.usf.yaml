@@ -69,10 +69,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:7e3a805ab02a7543a3bcb2c5336f2de4f361a185ee07a8ef913496c7de77e3d6a6bcb104638c59019137504f92f398668531cf0cbe219624be68ac6dc42ceb02"
+signature: "ed25519:e15b8aa827aca8d711c536793a73d1830b368765c86c8a3713ecadc7f307d0492cfe07ee2ea4e3756a4c239393d0d3e4c072735110b7e2f6ebacfd46b0738904"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -82,5 +82,5 @@ content_hash: "sha256:1546229980e857fc30fdcd91edc2664daf33c8ce17f97ef7c6e8dcf721
 
 changelog:
   - version: "0.1.1"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for ebs-volume-auditor."

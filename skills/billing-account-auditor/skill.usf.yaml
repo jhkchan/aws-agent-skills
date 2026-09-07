@@ -71,10 +71,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:295f22612381edcf46368fee27ee479674528753069dcf0dbc51b30baa6d2a2294e88c6cd32ec86c7646a134f7d32b70360e02e53db6f92f249f26bfb87f5d0d"
+signature: "ed25519:a04b63661dc8a40fe3a06e5d9f2601f3dd9bd3de2e0df7939d7e10563773e1490d9a044ba14fd09d1a6994e7c1d211e94b3ef3458beda262863d18dc54388209"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -84,5 +84,5 @@ content_hash: "sha256:8f90ca5bf3c0e526ce07936860f75450f9941fcad54bea57d2aa4308a0
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for billing-account-auditor."

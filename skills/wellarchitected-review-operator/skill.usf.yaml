@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:c59f659f8983737b3273ae1836944bb3c3a598ee55d65b52ee408f0c3d59825959cd8e5012a6669fd9e9869466d4ec74e1366ac1232c9272e937d3171dce130c"
+signature: "ed25519:b6f3aa289b587ea717290d42cbff7ce1f7a1030f254221e8099de304c7274b4530800cace812c5ef4a1a090d8184549fea24ccd48d51f3ca7ec6c1c0ac889609"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:af20122249e63563df135d277bf5d7ac9ad66496f40fa5e8d979991af6
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for wellarchitected-review-operator."

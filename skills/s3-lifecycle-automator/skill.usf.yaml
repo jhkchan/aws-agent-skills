@@ -73,10 +73,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:3d33ccab64697c2b61afa1a00861cb72c7c7ab9b611c3281947f85279b1e608e860abc605eb5005cfb768ea36bb5ea18dae3625104f81283bea1a212c437e70f"
+signature: "ed25519:2cfb91fe60e9833109f70441e011bfc835bb565af4925d2d69cfdd3015ea66609039eb0b243280b18f18fcdae98543f49345044029f4d57784ee229bd80e690b"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:bec97f93f738a3399b5af752aeda5b394688fcf09a79f86347b39640b9
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for s3-lifecycle-automator."

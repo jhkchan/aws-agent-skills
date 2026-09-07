@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:fb5bc34f55cbc9b4feced23214accc787617caa1a20ae3961213d3f778c4448eb02db04862fb0c4471e47ee81c725b20a258a2187c3135d2b190be5f63271e04"
+signature: "ed25519:8568f778cb448c7bd482768b1bc9ce82d20d063876738aa638fe11f88adc7db6c3595e89ff82a96596cb0efab4df7fbd70b866c625fb435d1934da045084af0f"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:4e9792c5b2d755b3fff2a6d47555b6cb22c37afbb9f222cc4d889d0bb253ca9a"
+content_hash: "sha256:ba771cf91d9edba5445340ee3927395a124b7adad09358258793f26ab3f8d237"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for textract-document-deployer."

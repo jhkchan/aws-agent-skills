@@ -71,10 +71,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:328126a59937dabb2afb9f65f91914aa9591b80e3579a06c70ec6172374ff1df214c0b4bd69d2aa0b2295e9f450420b6b9ed0b5ee7d59f176b82185e83a0a50e"
+signature: "ed25519:7c10413b2655646f4f1e71a95117b8c35e5a15c2d6f0bc1f46248e75783a89047a5ae7aacff368212d8ca6a3bd617f63a211712cdd345576893a7e71458fdf04"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -84,5 +84,5 @@ content_hash: "sha256:689f8777d6fd2f3621e8e56e016f2178f417377b3b3b7f3fe1c391c001
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for wellarchitected-workload-auditor."

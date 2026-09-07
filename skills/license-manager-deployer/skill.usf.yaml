@@ -74,18 +74,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:03decf15de0afc14e1ffdbd710c31018010b8c81fd2e628c265275015addaf639d6aa9f2cf7ed5e78ae3f30e9ae393919c0625a17df848120f3e36b7a9a0490a"
+signature: "ed25519:e6dd4eca1fc6cb735346b5a222587a7a0962b6784c8f59ef9e92bf505c7e770a06b6cef2eedbc9450c85dd1f6e1416d31139c631e37a7a34c0932798ee2e1605"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:989cb70f4f3d4eaba373ed955a33e1d4e40eaadbfc08ffea0a682d8890fb9758"
+content_hash: "sha256:cf7bb78b53d187ed589c0d9a801407cbf2b50275723ff42389e4a69309f5ecea"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for license-manager-deployer."

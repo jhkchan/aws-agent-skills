@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:4c628eac96f3c3834b15e25edcc7d36b033c4403c5be583c4754d3f09d45886555f22495512da7a2adb5c3d3a7aaedc21b6cec849473104fd9f5d77caa18d804"
+signature: "ed25519:8aceaf6f9d8b4a7bbe5f8b53284ca63cf17049581448de228ac25151b55b1e7e30373c569d01702a43322247bee195b9486c96760fc301d07a99c6bcd11d4103"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:3db346c1e68024262ff9bb79cdcaeced6b322c43d7d46d0d77c614c497
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for dynamodb-capacity-optimizer."

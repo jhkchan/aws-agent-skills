@@ -75,18 +75,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:c3fdb8124a6117b662c6000493b8ef317a8e7309e4614ae945e26ca19b8a250b892cdeaa537c539bdae4177caca5cc5449b6f1e9af9121d4c0440424195fd40d"
+signature: "ed25519:c7cf613c4af51fad47aab2fdc614f667fea4d06f7d71c79abe55b15794dd4e2e3b5574c55ee7fcfbdd2aa47aacf03560f6771ac334730651ed9d8527f34c8c08"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:67c7e412d5e5fe39acbc534b752493166a604d9d7112c5663f7d310b076d3df7"
+content_hash: "sha256:cc4b4eddf99456f77331e3ca6707efe8ffaa1e10d545daffb64dd84b7f6a8d0f"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for rolesanywhere-trust-deployer."

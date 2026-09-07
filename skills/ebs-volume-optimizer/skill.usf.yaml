@@ -43,7 +43,6 @@ permissions:
       - ./references/diagnostic-commands.md
       - ./references/ebs-pricing-and-type-matrix.md
       - ./references/error-handling.md
-      - ./references/worked-examples 2.md
       - ./references/worked-examples.md
       - ./examples/README.md
     # The package is instructions: it writes nothing, ever.
@@ -76,18 +75,18 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-04"
+  last_scanned: "2026-09-07"
   result: "pass"
 
-signature: "ed25519:6080cbf8f923c0d896ea46910150104bd1d613ac238bee0d403d486841a3045e831e8f328ed98d5547f076a2e1374192bf16e5086bd269727370060a105fcb0f"
+signature: "ed25519:77dcebe208fe360f86d52f930aa333ec188315aed8c517d4b6c3009ddba1e70650a8c1d86e781b9ea846abe0b56a1bea69012adde61779a7ef59a65f6c34e50c"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:510fac6dfe6b37dde8c68b80a6287281879b4f3f51ca2ff5e63c29b25cf1cfc1"
+content_hash: "sha256:81831a2f85352d97da50727195dccb69d8aaa18be25dcfc6f190c4e52bee17c8"
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-04"
+    date: "2026-09-07"
     notes: "Initial USF v1.0 manifest for ebs-volume-optimizer."
