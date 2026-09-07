@@ -84,11 +84,20 @@ behaviorally tested in every host.
 
 ### Method 3 — Claude Code plugin marketplace
 
-The repo ships `.claude-plugin/marketplace.json`:
+The repo ships a validated `.claude-plugin/marketplace.json` with **two plugins**:
 
 ```bash
 claude plugin marketplace add jhkchan/aws-agent-skills
+
+claude plugin install aws-cloudops@aws-agent-skills       # router: catalog + orchestrator (~300 tokens)
+claude plugin install aws-cloudops-full@aws-agent-skills  # everything: 410 skills + 388 commands (~106K tokens)
 ```
+
+`aws-cloudops` (the default choice) installs only the skill-catalog and the orchestrator —
+about 300 always-on tokens — and routes you to any of the 410 skills on demand.
+`aws-cloudops-full` installs the complete library; its ~106K always-on description cost is
+measured (`claude plugin details aws-cloudops-full`), so reserve it for dedicated
+AWS-working sessions or large-context plans.
 
 ### Discovery CLI (no install)
 

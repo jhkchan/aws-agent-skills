@@ -1,0 +1,22 @@
+{
+  "name": "aws-cloudops",
+  "displayName": "AWS CloudOps Agent Skills",
+  "description": "410 eval-backed AWS CloudOps agent skills across 13 AWS service families and 6 task types, with committed skill-judge scorecards and signed USF v1 security manifests.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Jacky Chan",
+    "url": "https://github.com/jhkchan"
+  },
+  "homepage": "https://github.com/jhkchan/aws-agent-skills",
+  "repository": "https://github.com/jhkchan/aws-agent-skills",
+  "license": "Apache-2.0",
+  "keywords": [
+    "aws",
+    "cloudops",
+    "agent-skills",
+    "eval-backed",
+    "security-audit",
+    "cost-optimization",
+    "universal-skill-format"
+  ]
+}
