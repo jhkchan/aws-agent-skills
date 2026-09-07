@@ -1,7 +1,7 @@
 {
   "name": "@jhkchan/aws-agent-skills",
   "version": "0.1.0",
-  "description": "Eval-backed AWS CloudOps agent skills — detective auditors with deterministic verdicts, pipeline orchestration, and co-located evals",
+  "description": "Eval-backed AWS CloudOps agent skills \u2014 detective auditors with deterministic verdicts, pipeline orchestration, and co-located evals",
   "license": "Apache-2.0",
   "author": "Jacky Chan",
   "repository": {

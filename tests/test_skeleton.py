@@ -1,6 +1,6 @@
 """S-001 — Repo skeleton created.
 
-Given: the local working directory <repo-root>
+Given: the local working directory the repository root
 When: the build creates the repo skeleton
 Then: skills/, eval/, .github/workflows/, README.md, CONTRIBUTING.md,
       LICENSE (Apache-2.0), CODEOWNERS exist with correct structure
