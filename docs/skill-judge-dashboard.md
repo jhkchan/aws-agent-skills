@@ -19,18 +19,18 @@ wedge); Grade B = >=84/120 (Tier B, assertion-backed full pattern).
 
 ## 8-Dimension Rubric
 
-Each dimension is scored 0-15 (total max: 120).
+D1 is weighted highest (max 20), D7 lowest (max 10), the rest max 15 — total 120. Names below are exactly as the judge emits them (`eval/judge_prompt.txt` / committed scorecards).
 
-| Dimension | ID | What it measures |
-|---|---|---|
-| Clarity | D1 | Is the skill's logic clear and unambiguous? |
-| Completeness | D2 | Does it cover the documented scope exhaustively? |
-| Correctness | D3 | Are the classifications/verdicts technically correct? |
-| Edge Case Handling | D4 | Does it handle multi-statement, malformed, and edge inputs? |
-| Example Quality | D5 | Are the test cases representative and challenging? |
-| Error Handling | D6 | Does it fail gracefully with clear messages? |
-| Context Awareness | D7 | Does it account for AWS service interactions and dependencies? |
-| Maintainability | D8 | Is the skill definition maintainable and extensible? |
+| ID | Dimension | Max | What it measures |
+|---|---|---|---|
+| D1 | Knowledge Delta | 20 | Expert content a capable model doesn't already know |
+| D2 | Mindset + Appropriate Procedures | 15 | Encodes AWS-specific procedures and audit flows, not generic advice |
+| D3 | Anti-Pattern Quality | 15 | Concrete NEVER-lists and pitfalls with precise triggers |
+| D4 | Specification Compliance | 15 | Follows the skill's own declared output contract |
+| D5 | Progressive Disclosure | 15 | Compact body, depth in references loaded on demand |
+| D6 | Freedom Calibration | 15 | Right level of constraint — neither rigid nor laissez-faire |
+| D7 | Pattern Recognition | 10 | Recognizable structure that aids comprehension |
+| D8 | Practical Usability | 15 | Decision trees, exact CLI syntax, working examples |
 
 ---
 

@@ -253,10 +253,10 @@ skills/*/eval/test-cases.yaml
 
 | Dimension | Weight | | Dimension | Weight |
 |---|---|---|---|---|
-| D1 Knowledge delta | 20 | | D5 Progressive disclosure | 15 |
-| D2 Completeness | 15 | | D6 Interoperability | 15 |
-| D3 Accuracy | 15 | | D7 Efficiency | 10 |
-| D4 Clarity | 15 | | D8 Practical usability | 15 |
+| D1 Knowledge Delta | 20 | | D5 Progressive Disclosure | 15 |
+| D2 Mindset + Appropriate Procedures | 15 | | D6 Freedom Calibration | 15 |
+| D3 Anti-Pattern Quality | 15 | | D7 Pattern Recognition | 10 |
+| D4 Specification Compliance | 15 | | D8 Practical Usability | 15 |
 
 **Grade A ≥ 108/120.** Current distribution: **240 A / 167 B** (407 scored). The shipped
 Grade Bs sit at 96–107 — strong, but short of the floor on at least one dimension (the
