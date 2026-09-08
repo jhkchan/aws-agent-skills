@@ -100,16 +100,21 @@ about 300 always-on tokens — and routes you to any of the 410 skills on demand
 measured (`claude plugin details aws-cloudops-full`), so reserve it for dedicated
 AWS-working sessions or large-context plans.
 
-### Discovery CLI (no install)
+### Method 4 — npm (`npx`, zero-install discovery)
 
 ```bash
-cd aws-agent-skills
-node cli/bin/cli.js list                                  # all skills, grouped by task type
-node cli/bin/cli.js list --task-type troubleshoot         # filter
-node cli/bin/cli.js route "why is my Lambda timing out"   # natural-language routing
-node cli/bin/cli.js route "audit my S3 buckets for public access"
-node cli/bin/cli.js status                                # coverage + eval summary
+npx aws-agent-skills list                                 # all skills, grouped by task type
+npx aws-agent-skills list --task-type troubleshoot         # filter
+npx aws-agent-skills route "why is my Lambda timing out"   # natural-language routing
+npx aws-agent-skills route "audit my S3 buckets for public access"
+npx aws-agent-skills status                                # coverage + eval summary
 ```
+
+The [`aws-agent-skills`](https://www.npmjs.com/package/aws-agent-skills) package (Node 20+,
+zero dependencies) ships the discovery CLI and a compact 410-skill catalog — not the skill
+content itself, which stays addressable via GitHub and `@skills`. Install it globally with
+`npm i -g aws-agent-skills` for the `aws-agent-skills` / `aws-skills` binaries, or run the
+CLI from a clone with `node cli/bin/cli.js <command>`.
 
 ---
 
@@ -185,7 +190,7 @@ Full multi-finding walkthroughs live in each skill's `examples/` directory.
 
 - **Ask the catalog**: install `skills/skill-catalog` — 13 family tables mapping all 409
   task skills to exact paths, task types, and one-line descriptions.
-- **Ask the CLI**: `node cli/bin/cli.js route "<your task>"`.
+- **Ask the CLI**: `npx aws-agent-skills route "<your task>"`.
 - **Slash commands**: 388 ready-made commands in `commands/aws/`, e.g.
   `/aws:audit-s3-public-access`, `/aws:deploy-s3-secure-bucket`.
 - **Address it precisely**:
