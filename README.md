@@ -7,6 +7,7 @@
 [![security: AST10 sweep 0 findings · USF v1 signed 410/410 · did:web anchored](https://img.shields.io/badge/security-AST10%200%20findings%20%C2%B7%20USF%20signed%20410%2F410-b54708)](SKILL_GOVERNANCE.md)
 [![format: agentskills.io open spec compliant, 410/410](https://img.shields.io/badge/format-agentskills.io%20compliant%20410%2F410-495057)](SPEC_COMPLIANCE_REPORT.md)
 [![license: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-495057)](LICENSE)
+[![npm: aws-agent-skills](https://img.shields.io/npm/v/aws-agent-skills)](https://www.npmjs.com/package/aws-agent-skills)
 
 **AWS CloudOps agent skills — measured, not asserted.** 410 skills across 13 AWS service
 families and 6 task types (audit · deploy · troubleshoot · optimize · operate · automate).
