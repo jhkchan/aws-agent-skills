@@ -76,10 +76,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:c223fd4511da54561a66424f27e96294db0782bc42fffe7d83ce9c36b2725aaf2b84d4a021c808fe33bd0a79d14d34b531d9a2184ddd65ebd9cbcd299f34150c"
+signature: "ed25519:d70a9eb04db6c9d289c5c9398e9cf2e0ec507ff808b7f99042299f6daf10e61c535289850199c0caa3c5ae8334054b4aad9bc29f6499cb8630ab203d7935d20d"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:8b887dfb34c965c8358881c98ad413f614d20847e55b5290deae1c5895
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for athena-query-failure-troubleshooter."

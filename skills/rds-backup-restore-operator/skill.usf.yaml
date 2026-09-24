@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:d6b926d916c80864f1d23984a44c148c615a6a07b6de94c408e6d3d190d38c23c7ac0a0d0db3c29d326f2834115b236d72e1fae91141151a0f64c7596e922b05"
+signature: "ed25519:915a7844411c06ad2d659234dff86ae4fc8597a80e1ab06fbf12243d1e8728d4bdc39fccf9c5a7a9e82de3bc7cc4b1279726591d5b7fc090bd69ce8e3a287e07"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:8ba6cf6b3c4f297bf478a044d1a13c8c8d57fe4afe9f787e04e8e5c1ee
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for rds-backup-restore-operator."

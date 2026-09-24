@@ -76,10 +76,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:6e849085b2451432e4846e3cf7c4c01095bc28cf23328305037ea9deaace7145276420ce3ecc96018257a0b851e19fe10fbcd73e555e5d5391d0286b4dfc1f00"
+signature: "ed25519:8bd7aaa9c5923842bd904d693567fc4bba6938550b5d56d8875f38d7e1304d6e7f804d3c6f4e416a92284b0b5bdf5829eb1ae37ef648e820e26bb8ac02b66e0f"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:f1d633216de8bbab9ffd71c4a8dea2fdd683ed64f6ccc031823bf2f5c5
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for s3-replication-operator."

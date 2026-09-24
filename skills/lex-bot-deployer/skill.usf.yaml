@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:90f2460d594aa6038db5f4ad28070218004433f9b39791790c823dd1625362ae2cacaeed89b0da7e999966cecf793cc9dcb1b9599a1900d9f4efcef1c6ee500e"
+signature: "ed25519:255b966f4dace53e5d3d847b2ab1c42f922b916619b279dcba8be015062cc8719fddc774f36abaf32cf92cbfa6b08dc59c8b6e6ade00142e5b1cc1ae9d6d6909"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:ca25f75749c1dc181aa844ad85e46083075b15be4534cac0bca1128996
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for lex-bot-deployer."

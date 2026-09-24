@@ -74,10 +74,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:eeee70290cc05cff20e4d64252325f3840a0957b80779b4104466592b355dc9b5535f81e30fed2d952cdf8ae26a7f459ba6c6ac0924881c10fc997671120ea03"
+signature: "ed25519:5d38be996cbba6340143a0ed515ad90d8f8d7b3d1666fbf145857cbd5438c37d273a8e6baf471b08bc8967ec2f8a7c64f23be77f54fb041fea3d2023d16e9e03"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:cbad7ec8a38f77df03e283aa563b347d6107d89d27ef96a9e63931fe32
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for cloudformation-stack-rollback-troubleshooter."

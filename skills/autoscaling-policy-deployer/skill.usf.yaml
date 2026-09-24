@@ -76,10 +76,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:d4ddde73e6cbc723153d5f70cd68d32b6359a5673feeb094f5e37ed9cf00505e6f77fa322057ed7e96bcea92807108c95e0f7b379fbc3714c30d1483e1c7040a"
+signature: "ed25519:b31e62502cd74f7207ebc995b48a04fb678b9abe69c9f3edd4fba0d2370c9c3d25472d3e1cb6c347a9ccc7ad2af2e1fafe95fd676b8d920d934a529cb9e8d006"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:e415dc8a5e129ed4488a8323bf295f6ed1c953a5c865ced100e53152a4
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for autoscaling-policy-deployer."

@@ -71,10 +71,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:cebce1984ef4515677e8af6fdae811004eb68236678ca316f8f213629f82835f7ac42075f26029c2dbe482ec34e7a081733d6adc9cab6ed36892deab31b8fb08"
+signature: "ed25519:f6ecce402f697698d66996371a92947ac39dc6033771b31393b7146b395721a6992117c2807cdae972c8515b4be9d7646a8d8f1c52284425ad76cd213fc2d501"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -84,5 +84,5 @@ content_hash: "sha256:066d1cd9bced6f25c8edd0b94bf2f0440c8044f6326bb1fb23dbb5bb72
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for ssm-managed-instance-auditor."

@@ -75,10 +75,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:248db8ab33a3ef8542860ef9935f406ef873d4147d7a840fa74e920b98c8c321bde3f4ced564cd7742e7b94c9f240ed4bc790ebba19116bacfb9561cb9648c0a"
+signature: "ed25519:c33015c1706d134149da771fb9fcc09efd3028b54e26995b0d707acd763086b7532d12e925469a17cc887219d2cd5dfa6344fe4c2de634f9604be2628e5dce02"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:68ac8336baf423591dbca93a6182f729eace66dc9f29039d639fff8f0e
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for kafka-connect-troubleshooter."

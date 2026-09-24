@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:2ac7d67782525cfa226559f48f5bc641919fdb34c3dda03162bdc43e6058835c8a5a450dbb152d5315909a1957a2e8fd1668637c9fe2c0f689eada5d341b560b"
+signature: "ed25519:171753a67285fdd308d491c9fd94cae8a99b7c303a5c3553ebf977f232e5d5ffa97ab474d7a4410c17c7e702ed561be2835e3e8e63c3bd8f113a9bc8da03e207"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:9427b4f0b40fd2178507ac28006c414ac1f5b550c3ef406cd2685713a9
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for sqs-fifo-deployer."

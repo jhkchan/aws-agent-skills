@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:39892a1338c1b19ac5ae0ba68dc5fabc0fd4009db50a112bd478226108b3fe2d70fb2e75da4698d5a185bd7dc1a44a8d713a6ee62badc24a7b44cf8535e6f10e"
+signature: "ed25519:472ea0696284f94ee1ca7db9ea7576f5c616aaca368aa2c9d4bd3fe0e242357dd501cbdf8fd7b6e40b42ba35ebea63055412e5e410d585c47972f5728dad440d"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:bdbc286a6d40885f91f337fbc9c0eec1948e08f1c36864013a80ad3120
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for dynamodb-throttling-optimizer."

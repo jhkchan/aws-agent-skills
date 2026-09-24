@@ -74,10 +74,10 @@ risk_tier: L3
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:49846024f765db00ab5514b9ab4e1ba7d3d394f03377b69d463467f8dc0494f94029ee065df0eea75194a9f181b07c8a5c7ece6f7c6b9b5d1726e54a74731f0c"
+signature: "ed25519:2f3aa2f8a3ac554ec9f976b000ee638567a36ca5634493053c642fae023b77dcb5bf84f2daeb493842956556383c5800bf5350e1b766d9af8923f7c76fad9409"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:31960ff06c5558d7ef7e4185b43c94546ec289a17ea8193913b27c1ba5
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for s3-version-cleanup-operator."

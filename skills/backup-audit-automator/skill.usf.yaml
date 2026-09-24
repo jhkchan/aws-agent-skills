@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:481445d6e01a3660b8d0bed3eb784f702ab914a99c2a5fd370cc4a40f8114ba64fa43c06357030d4b359df625404e7d7ee326ae3551566ca91cdc23a727d6c07"
+signature: "ed25519:5c6788f7dcf7f8a260691099ca73b8a2561a9cdf671105aea15aa4cd2f5aa85538eff6b40aee1262b84bd22cd505c789496e837c36e83c796b2de71f7288850c"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:025b315ffbf64042a8ea6f32942bda8f878fd6f9f9eb2bcd9eff715775
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for backup-audit-automator."

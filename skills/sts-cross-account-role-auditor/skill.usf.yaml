@@ -73,10 +73,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:9daadc1de7604a46a22664ce6a4e77f3c1afb727b715f4dfbc3a800b1e6f36cb8a7324367e7bc663488d439acaf5c5a7799aeb856ae66ca9b566737e13e3200b"
+signature: "ed25519:0d3c6a741d11df3c5066ac586470967efb96fb5304e7ba2d9f4e5e48e14ae97ef6d11e73353585a4b4c237d8934ea691951030d479574c335c2f17db3e78930e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:d7da7b3bd3ff8e74338af1b3b56af2b0dc271b8f2b771bdf6a388ab243
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for sts-cross-account-role-auditor."

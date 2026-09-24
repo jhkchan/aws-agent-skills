@@ -76,10 +76,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:f1a8dc4ae7c09fd84eee033a76903432d7b66e49679f21be62aa48135507cb235d1cc90eb81e742151cef7efaa8ce16ff636e6b7e5ba328185369cfc8ad0b70e"
+signature: "ed25519:fa271b022000e3dd26fa032c54984913d4b40ca3a9d36c3241b066fa0738c095668310af33529edbe17a93e52b918019bcd0057ec41c1a5b402479ea198a5d02"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:c93cf69fb9e5f6a9864e6c88b91717a02d49e9a444e2ffd849ccaa640f
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for cloudfront-invalidation-operator."

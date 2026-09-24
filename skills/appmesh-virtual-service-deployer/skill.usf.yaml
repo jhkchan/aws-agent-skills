@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:7aad4edebfd5042d93cdba0c2d31a862f0eabb4d0ad82419017960e29ca5f7125742de80e56bfa812f4caef0f3760840d4aaac3299d6e7b95e0da37d08c9d309"
+signature: "ed25519:7202a22a4dafef37fa28f083a4ef31843db5eb35417c73b9834dd838482000f6eed2cb5b6e097a63c2ff88ee5ec73d0bb5d05de7438d5d852576cb963b1e3a04"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:be76b150447a920f0e0cab1495c2de782f8894eaa1fd03fde137832987
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for appmesh-virtual-service-deployer."

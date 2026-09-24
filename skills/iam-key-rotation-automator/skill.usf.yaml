@@ -73,10 +73,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:73d95d92ae4a74965d52a77a941095d12de7d04a5ea16122f6c126c2d835b6d264abeac5b6160091615ac5f5740b338247e7135ce51b754f89517b9f98e97e04"
+signature: "ed25519:4285625fd01917e1345179d70a97276b704c1d3aa67d664594c9f7f325be14227cd124f07bb7d33000dfd66635c0070a2163b46f14b077e15160b3f1f0c9fa0c"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:abca7683cc6ad1a4701121dcebf307e80a8bdc9e58965a0015e377b7a4
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for iam-key-rotation-automator."

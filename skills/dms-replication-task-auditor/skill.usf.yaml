@@ -69,10 +69,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:d40080a698f1de89abdcc87fb6da73180fab64afe1056edcf72c09940dddcfa5849d01c7aaa2384225357bfcf6ff86d6be5c8120191c9971b7596e1c710f410b"
+signature: "ed25519:173517744a6f11f00016d6b213db423c123f962bc134b47821f460cef3bcb1cd308c0e6bd31626b76e885eee4a23e29d1f9d5d2d7941acbf6fa70427c608760d"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -82,5 +82,5 @@ content_hash: "sha256:9a0c2a2295e772c3379fa72b2eb9cbe9e6097d847f70159908893e18dc
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for dms-replication-task-auditor."

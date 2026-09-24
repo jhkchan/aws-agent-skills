@@ -75,10 +75,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:881f2ddda123fb14a193937bf83d71027d14282d9a12e2207d0c594a61b11dfd3aa9c567fc6200f6392683f9ac43361071e384b4571158b07cc926c4a2f09801"
+signature: "ed25519:cf89f6500488f94c06485e07456c0bda4e5c4210a9ad508e2e967abd43afa0a57d1198a5bfb338eb64d564a84f44ab5941ddd7e26857ea38fbd38b57e36bff0f"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:53f175f41882842a5bdc74dbbe76eba0b9bc3101a03212bb64e2c5075c
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for secretsmanager-rotation-auditor."

@@ -73,10 +73,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:4bcfb4aca47090a29fee4533645b855e9e2b4d6f6e5cb0b0722a534ac16904b690f30cd224b0846500c83357f1ad2145687a759172b21f1663a4c20074094f09"
+signature: "ed25519:32e00479bea37abc005cd3605db3b189bc8512de2c25856b5870e79bc9de1be0053e27dc4ee44c838f4a7e8e39cf0c8d84d39613893902ddca5cbf5987d0bb0c"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:e4c8c94af6886984d6ab22febdb8fead0610554363657e2e36d122b037
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for kms-key-deployer."

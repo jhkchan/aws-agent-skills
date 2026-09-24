@@ -72,10 +72,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:3aa87b98acadc6f50bc5b030b61eb8fa6a89eeea512cf7e851441a626a9a3370872d4e8cd492eef1f7454f7e9637fc22b6b4f6e1cb91673f0b66bd6e5f0c5801"
+signature: "ed25519:cfb65fe9fa3e6885e53b0c63779bdd9cdf2cf103ec045156038b69952f27451eaf3b4d97ce88ec4e43ab12cb943397f29e32065d1e1fa9730019b1b7eabfd408"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -85,5 +85,5 @@ content_hash: "sha256:d1bc310354855d88e717afaf8ca353ff35a765ac30bb481902b41d3911
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for backup-vault-deployer."

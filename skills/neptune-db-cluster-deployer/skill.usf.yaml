@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:9c4372e6dbc4d22a80994057c3c7662e88f863ea935981a1f13a65e1f2ebeb6e8ab4ec1b8a346a51aa7b077eeea2d4dd8f85ffc3b178ca07d305edf514315900"
+signature: "ed25519:27d77de70a6326f97d4f00e9ec7f3efe67d9717cd0eb1336a20cc73e9bf00710261639fff6ea4a1cca8a1d0f76dd162308a9553dd3c4ee9b9f614f49f0947f0c"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:0c1e906afe39be4dc3ee26573cec792e2a1c7048a9e5ddb0f87cfb1b3a
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for neptune-db-cluster-deployer."

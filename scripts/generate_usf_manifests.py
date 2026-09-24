@@ -103,7 +103,7 @@ TIER_OVERRIDES = {
     "skill-catalog": "L0",
 }
 
-SCAN_DATE = "2026-09-07"
+SCAN_DATE = "2026-09-23"
 SCANNER = "jhkchan/owasp-ast10-agent-skills audit"
 
 

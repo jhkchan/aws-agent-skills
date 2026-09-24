@@ -73,10 +73,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:dbc080dcbb294131765cc9c678fafb4e8125ceaf6962ed6a968d9af5b134ca6f5fadcb7afe38883e59b0aacf20957657d07942cec37545ac1aedb4443c62f809"
+signature: "ed25519:3f07d00f51dbce4e7fda7a85d568261c8418e243cc62ab100ae527c6cc907d8afefc5f80f680a8bb83981315a26fbd166f7956748e13c47d94d68d23cbcc770a"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:0fca67fef031ecbaf41d5dbab396fe4f18caee03e2bb9a8634befde66c
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for cloudfront-502-troubleshooter."

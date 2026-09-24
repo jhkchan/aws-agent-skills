@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:8ab72cf76150b5d40e3f96537336573a1733b75a27ae4910ae826ff8dbef5d8663fe78311288ffafcccf70971cc71f8d1b7581e4e050a60d42b53d7f9b9d340a"
+signature: "ed25519:fac752cd67f0996bd589cbb776405cc3167c0fea8ebb737cff05d8d829791792cd730fe228befc85d8793c7a7e2b438cd85f686b9328f20bed0ad78cdedd800b"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:11e4c1bd3af8149929ce7bff8aa3f318baa37b5825ee58b0aafe0446fd
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for s3-storage-class-optimizer."

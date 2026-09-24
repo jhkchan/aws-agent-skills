@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:7eb740a9b3f42ea939329f44b5b1b00a654e93ae693f1b4a22305e7e95c9dbf08bf4cb5252d6f3f414aac61dac1a35c5ad8ecb3c820703e083469a1567aa1601"
+signature: "ed25519:4476da23f7c55d25efd48b02bd54bdfbb2d3dcaaf6d25614dbc0ec7806d577720da3a9bc579f36b5adee51c492d8e41774ec3ca0744cdd6c2b5e130bc69e4d0b"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:9cbeff2e3917b54a08549642954f68c5b048869d5b4871d84266b3a0c5
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for quicksight-dashboard-deployer."

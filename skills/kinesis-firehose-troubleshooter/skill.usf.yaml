@@ -74,10 +74,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:b30466b2f4a784372bc11923d0d7d1bdbb772189ff693db528e7fa641257a94630e099dd07650b556eb949752d3ec3a4d7294903800398ad091e014cf34c010a"
+signature: "ed25519:e3dac0a96ad9f561d934dcde051e7d63d04893a2006455995f10bdbe5436f69167be10137652e2d15fd902665e65ceb546243b52a6e813a5b7d70d0b95a1ca09"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:74b07371bb435d826cc0b075619c5ee92488662686fab0ac6c2671718d
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for kinesis-firehose-troubleshooter."

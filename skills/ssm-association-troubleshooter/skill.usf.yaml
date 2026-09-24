@@ -70,10 +70,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:46d5693fdd05e753afeec29c88938cf8618a2c734fdf4b61f25d912f57a72480cc301f0ba0f616c88e5560979f79e040c703bd5fed8aa92562f2290623af1503"
+signature: "ed25519:97051c1cde38061d47938e65e97de0d0af98b8268d35c76d0aea023be4e71d30987d906ed65e32cc5172fe852910a3d0786bfdb46271510fc41a2ed962a88900"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -83,5 +83,5 @@ content_hash: "sha256:45f105ec6c2e8ad7837065ae9ffe0c7968c81e90616cf33eb26271a2fc
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for ssm-association-troubleshooter."

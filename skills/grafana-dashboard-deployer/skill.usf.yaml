@@ -73,10 +73,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:84613e3332a5c19e6096c83079e55b473b20d91e87c1f556351d72c2422e8870d8fb0bcb4c7e074889714ea952fbca757231ad6ec5e911ee9f486faca2493001"
+signature: "ed25519:493f3da41dd1b754e6c3998859b692c214000cec210b83bfaf9ee8ca22bf472e23214ec57a1360ef67e7e441bd13ad83d92161ae037c771fbd28bb0b20cab206"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:31e99c77093ceb6f02520d429acd43b121cd03ae90deced985b3098b3f
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for grafana-dashboard-deployer."

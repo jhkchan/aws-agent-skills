@@ -75,10 +75,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:6bacae1f909799dda493cf0cbd9bea1b5796125606ffccccbe259bdd4d2c20e2c87244f96484275813324b81c3c34b1b39914cb9d74e28059467728b9856f104"
+signature: "ed25519:f4ba29ebc75118ff9bb49c05b5d4b33d69fd2b2c16dd8af8f4e7901e2aa04afb9684bdac2b5aa65fa8f48538ad8ff18d6ce2e10acab62b1ca8bca9502dcfd40a"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:d9132d78ecca57ee8d08a9d6e1bb5164a0179407f5947ac1fde8830341
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for lambda-invocation-troubleshooter."

@@ -76,10 +76,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:c06e8923d952808a66bc71892dd8badcbf55ceb6aef61534d3ccb8541108f8cd5721d0a44d33376e60ccf67fe224980eba8d273c1fc09f16b3aed52568664908"
+signature: "ed25519:0e4420e47a40a19f4f80fbe20e029293a71c77794c7e1756f5ad5233b825842fe603fb466e5e414cc838a750d11e27a73765e73f5baf4bbcca76b92a33405c01"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:c084958394186142db1f0fc6efd52aa90506fb2468cf46550ef7cb25cc
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for cloudwatch-synthetics-troubleshooter."

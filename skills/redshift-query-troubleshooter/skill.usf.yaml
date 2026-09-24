@@ -75,10 +75,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:864ff85b5957e8b32a4a8b0f9ddfe356ec719da6c4364bb33a6bc06eac0178de8560ac47c55de5bde12b0ae9e432fb5e10dd1ab66acc54dcb8605c49cbb0c009"
+signature: "ed25519:b7efd7a80aaa2c2759e08fcb6cd7cabe2232e82df97785cf7e004f01dab897db8948538b3760034623675bf009ae5aa4b3f09329c02ee99e582469285e335b02"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:d91e38fc911712462d6b092b497690d0794839c7159340c27cdf3582b0
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for redshift-query-troubleshooter."

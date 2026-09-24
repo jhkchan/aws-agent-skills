@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:8f361e27db25026d2ca5d8cc25c5aa28f6ba6829f70c9bb212fa058af98a27e1990815c41fc72e9fd58ddc0a6b24396f58ebb84d6d284bc60f20f7ead69c860e"
+signature: "ed25519:8749934435990ef06e45d5551f2b644dcb32291cfea7efdf0ebd6cd950bbd8e454d8934af1f9d5dfce0a206716ea389bd3e6e2711e5e507dac27db7de9bca20c"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:9d191375ddaf035e7d5b24e46286f9694bb2a919a705b6e56e4ee8a482
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for ses-email-deployer."

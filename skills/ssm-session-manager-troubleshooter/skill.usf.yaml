@@ -74,10 +74,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:4a5e10f788beeecaac830a1c8a8dd3fd9c167e2e8197caddeab69d16ae72aca95e86df1bf4f12ed485d695ab7e61cef83229423e921908a62430824a474e2307"
+signature: "ed25519:ffc79af75ae81069dfa9dc6cee9ccc56bfaf3e4605e7f46dbf60a9302e4153b321fc729bc34380d34b4b27b3124c22b8eca82492ccfcf944706f0573feb29002"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:f900c80cbfb022b0f59ed7a4e59c32139096a18b24c03b7bcb094496de
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for ssm-session-manager-troubleshooter."

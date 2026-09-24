@@ -71,10 +71,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:6fbf0121e091aad791cad932bff2382aa85deb58939524f3185102e0add7609e1f3db3aad2bc055793726cd4829c891eb706f96479e10b93b472da5f82e00400"
+signature: "ed25519:43623ba3a71a96381695d2f7b50c5dbac1b81016a09b550daf6d72b1abef157f884caf218c29efba09142b08b8102b013f942061ede00b1b7ac574f5a3458d04"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -84,5 +84,5 @@ content_hash: "sha256:44d09d690b3a6bf15a261bf403b11944073416cdda564e88b03aae0eb9
 
 changelog:
   - version: "0.3.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for iam-least-privilege-advisor."

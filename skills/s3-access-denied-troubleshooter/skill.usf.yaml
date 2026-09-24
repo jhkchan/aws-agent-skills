@@ -75,10 +75,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:2fd0454ab537b8108a3a095e4446e6347d65f135d021ea7c7629d4376c41b42c151ad1b1eef9b4ef98a0107c26529e3dc68c7a5408ca4225a89040216c5b9e00"
+signature: "ed25519:f7aa66defddae0f6141b078211dfedd6f410c62a1a069c74704cf1a4584ae520f1496a07e23358cafef6919870c0f66c4dd7f35da4f646d4fd625de8594c510f"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:4860a14a9eb452687b819441a999558fc5a2469dd62ff2c019212f04c1
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for s3-access-denied-troubleshooter."

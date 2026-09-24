@@ -75,10 +75,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:0d09c2893557b8e677b99d1fb54d4df2c2c2654fed551c80c8fd48f042bed5b446b8381eabd02a21214c2f19f930140051a2c4fefb016ca54acd576f57aff603"
+signature: "ed25519:c0eaee3a99572d193270689a9bceb5098d31965f17d701a519374c638b8901f1d1164e643bb9a1fefcdec0fe41385fb6c6a9c6d30729cdcc0c0b203810d48c0d"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:3821157135c875a28b2cd8975ad2052ac35758ba38b79124a97912489e
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for iam-permission-troubleshooter."

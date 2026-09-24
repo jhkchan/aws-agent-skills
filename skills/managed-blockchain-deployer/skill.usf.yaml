@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:91b1b56afe6ea5cea828b57002d6d9892d14ed110663525c2e26ca241b12bbffccd023a9747e085c599b68174cb079caac077dc3f30d8701d8a68a1228baa803"
+signature: "ed25519:fa3cc565a54750b377afb49b6042e97d4337f8792a5e69f8d7f466ff8a2a358dee250a08832ed2ec14ea4b794f729f9c7330d0d992704a854b8ce5f0519c6405"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:06547a966211269fd7c0d779a5815a3fae2a8bb88c16f0cd3405cf34c7
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for managed-blockchain-deployer."

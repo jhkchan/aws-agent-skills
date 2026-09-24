@@ -70,10 +70,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:07fef18ddc0ea56ebd7e63d8ac5bac87ee199649bd92eca0f8ff98f9e85c14da39713d71a2683a66c8ab74304d914bc52c1b7a92a7c29d1f17daca0b1a59cc0a"
+signature: "ed25519:6bc8b669a387b3cb97c9ff18359c61ecc4530d213298ad9a238f1688d31237b6222001d8e6f12672372e64ee78e360739b7e7076999f848b86373650ee84a30e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -83,5 +83,5 @@ content_hash: "sha256:ebba55c5750fbbde47a4454318c34aab3108909823b89108b60f8c3d81
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for cost-optimization-hub-recommendations-auditor."

@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:eb42b2a797166c6c90189d8f635ac2b64f4c89c1960d5e639edb3656dee8934b60b491410498128b6b256c79ab5830d0f5f7e185af8c06348526c77dd7840c0d"
+signature: "ed25519:367937930cd7010516af584f68325fa1cea72df6ea632a574c8d4e553adb8c3a4c4eaac75570b1cdba7f4f02397c7d803522be70ba4cc12aae28fa1e7f5dea08"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:17b220de006f6fa2e0d3cb2334b79415de10008a3ee0e53a5ad8ef97e4
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for cloudfront-cost-optimizer."

@@ -76,10 +76,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:355e23807976520dee6daa2fa135b2b357b71e157e6bc42566d57682f04f1c5d5dd2e70d69cd2cb78c79e7a5618706ac4b45f6752af40c42c206582916616507"
+signature: "ed25519:9e4a959bd63f3a82e66acf036ad5f62bc6168ff49249109285a8b2f8fb590a4e3afdee9092d701eda6d5f88f62897644084cfe6059dddac918a9f00521c9a604"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:a9f531a85ea024d4c8caaf48bb7719b9355aa62d36fa77eb65b776e1a5
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for inspector2-coverage-operator."

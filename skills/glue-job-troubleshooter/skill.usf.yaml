@@ -74,10 +74,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:da6c279aed5f439f9bc264a4d1a5c8d826d523270fedf6e106a5b6face723bf7aa3cf3261b89e7de924835c7f158d0ab50d5a5a8344cc3a4a82cd5de15389308"
+signature: "ed25519:dbf393ce18348e2a08b8126aecc1456e67b925f19722696dd2c95f10a79663a42614b2f571af839b430feefcd1554b8f55914e3e637e66640fdde9566c3c5c07"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:4eac83b96f6ab7c682628bd7c78b523e486ffc8b80700557e1fedec0d2
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for glue-job-troubleshooter."

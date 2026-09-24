@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:da0dd160904b6e88824fda05c70b519183c61af31c85a2ae196227b71abfabbff8284ceaa6c140ae1fb19a5072ca95de7a3c389a0af422e9383987e35d25f10c"
+signature: "ed25519:0b9c6d4b87b48beaa2e444718f1c8596d5670407c67d86c69b6c0382275a97538eeae8dea8be0d0b247bc98c1984d38751b72f766e2a5162fd61fa9db88d4a0e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:4868c5a1afe2c0c1b5877639ba98d215dfdf3a3f950ac57685107ffec3
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for multi-account-governance-automator."

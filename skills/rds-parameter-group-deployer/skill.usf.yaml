@@ -73,10 +73,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:49413a0fec743a12e9887535c79aece71ad75e32e32a57386afa2c2c84abb123c3310c37df390f10c5974f6dc695aaf00b0d2a2f275e6f65f2f311c10698c203"
+signature: "ed25519:d715106eb5696f8a54bfd22ac00ac9baf7061f0451597f398fab1b8b2fd5fe8212f6e0793e898a69ba5d44204f8c0b669741cba3adaceb91dc12860eea9f9900"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:6d1304bee860f1d610f96fbcfed9ba92285866a68f80c63c3a7d3c8bf5
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for rds-parameter-group-deployer."

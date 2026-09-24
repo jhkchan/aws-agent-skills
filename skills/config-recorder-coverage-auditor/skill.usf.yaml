@@ -72,10 +72,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:1648ebd527fe1ae006b84d05e1c382eb503fed7273464bc69a7a551ecd27c2e6001a602c37e696eecc8df906e376ca4223edaa3c91fb4295bb2970e8065f4200"
+signature: "ed25519:999f876e8e3eb18f145d7f3ca6dad54ac79b7a5674b4406fa3bc1f57c0e42b02b5ff5147526f5b4ae0b76cb0b5f516d51c0563782b5bfe64f1dfdad29994b100"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -85,5 +85,5 @@ content_hash: "sha256:7f0e666c6851d0ced7eb471784dd2456c09ea4f56c2ac32f2baed86e4e
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for config-recorder-coverage-auditor."

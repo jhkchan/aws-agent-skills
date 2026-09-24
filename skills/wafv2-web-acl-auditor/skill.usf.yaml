@@ -73,10 +73,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:a94d8c11a24b93adfbf268550a2d0c051ae530dfea65957b307a3ab810eadfd9222cf31eda58231b513e83fe9b42fdb7709a9094aacb7e70615b46d67b4b3e0b"
+signature: "ed25519:fc6fc9de5b13e6fcd40d9458b27e8fd829e83947974b8e0e1763ba04283f0d660838bbb9acf8e1194769c54ffe0b5c294eb948ac84146ad77b0098d4717c7508"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:8413b3bfbfab3ce94195036a401a131dea930569211c3069c9b0551601
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for wafv2-web-acl-auditor."

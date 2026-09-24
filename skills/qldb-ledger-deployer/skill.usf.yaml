@@ -76,10 +76,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:25bc6412af250635dd88679541fc06da961a9bf7b5c70e451f83b6dff237e514d510e293e4a3ab14fee7c691c599495ea5939115214ea4579aa87efaa3b9f10c"
+signature: "ed25519:2399f5e3508322c0be2608978bd280ee1f2eb42d98ae456891567f83f9e0a625584f6bad28884cf1188f6531b9c6d5561b6a491bc0dfac96cc91d8a6dee84e0f"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:6a383db1e140664aedf987a06660482dafb2c69795d25f1335d8707429
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for qldb-ledger-deployer."

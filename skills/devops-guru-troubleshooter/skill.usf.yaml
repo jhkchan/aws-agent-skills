@@ -73,10 +73,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:1028a398f0e0656cd52d5f9389b6f3a66ce46efbc560a703d6d035469fdcea6935a198ac4fdc7cbaecc657ee0caf368dd209f50d4e24228a61e52a4cc9805a0e"
+signature: "ed25519:02013a267d32a28b591da386e8e9a559916e458a72ae491af4ac716593a0d76c2dfd36d75b7f72b8b4324b9553dba4d4c8af185c68b9f9a8607d102e17942b05"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:9ecd70f39adc452e9e65a47346ae29b25998c4e3dcb3e3f2478181d64c
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for devops-guru-troubleshooter."

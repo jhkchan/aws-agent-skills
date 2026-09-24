@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:78dccb37b423f54124cb3061997d2c27696b81017c5050e79c5477302c64a39b13e0611fb6e6dfcf496ba72e1fb711d05555a07a385bd7563d2d771791998103"
+signature: "ed25519:c4f7de7b3cd910e84c7aedff43e1fd4b5498c72ccbb4e7d8b2baa35a9a10edb8e1c1a97953b15cec1cf79a20cdfd07c7b03ef68c154db3ac75f32d33242f4f08"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:eafec19950604dd661a794ce38603882eaac0b2008c052679b4cd76d98
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for certificate-renewal-automator."

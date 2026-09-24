@@ -75,10 +75,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:ed8baa5d973ab2117675cd548da5daf7fb2e76fcbedb35644f9e433e97494ae47ed9778e77c9025a6a36cde0d6d55ba5f94a6060d6ff3ad32ca93d7586c49103"
+signature: "ed25519:6793d83e766bb42c74932c1365e019519635dee25b2a59c77c86ade07a8cc27db340c38f25a7f1845f55a4aa022b26188d2579dd6577f8f6ee4401c310c38f07"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:400652d70541d9aba9c4d901eb0c1639a6a095a482191a3608c7605f39
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for alb-5xx-troubleshooter."

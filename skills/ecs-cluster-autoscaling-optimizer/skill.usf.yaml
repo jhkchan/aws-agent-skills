@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:0d0b588309773e1eef0a70a7d02a5c311256ddc87238679d6efc6f803eda26d3f7f92738d9db5058f1f0c648a0edfb96b0997d0715c774034733dc97b0812a07"
+signature: "ed25519:8e0464bc4731d2de8e50fb3d796abdbc84423f233486eaaf9b1da3eddeec675612acb25dc386379f30c6d75ff179234587609641f80ac87ad1f310bf97a9da02"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:42e9048aaedb685d9131b3c18de950818b8063c5f5d17ed59da7ef9a3a
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for ecs-cluster-autoscaling-optimizer."

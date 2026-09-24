@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:e8a8bb2c0c26e1aeb70b69e95e2a717ccb4411e55a9271dc57bc30ca3e0f8b0e4cb82f21870c7d54e42fde078f9ed97adb84ad2fe3bc9cf25374315ff0f3ea0d"
+signature: "ed25519:185004ae61aea0ed6c48785f7068985d211414e6068cb54c6185164378bebff8a26a45b14da4690bf0582fae3f26c57696d0311acc685dbd08eada287f0f2004"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:5bd75bb608544027c88a913ab5498c0df9c891e09adb9eff7cb073dfa4
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for cloudtrail-lake-query-deployer."

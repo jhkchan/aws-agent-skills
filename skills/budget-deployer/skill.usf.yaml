@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:fb928a4d2e59cf02002a86debee2ae8d154724add92c507cc52cba8a012233b5cc82705115aba20a1d45f2a6a087211fd1b9193c8eeadb5c318e03f01903a009"
+signature: "ed25519:8e4d64dc6ffc30ee24a51bfaccb7f6485ecc7a6e46235f9b978b231a99133560a8062bcf52bc95d6bf816ab170fc24c11e04a804845ab329f06688cf44ecb40d"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:9443307500adbac552bad38330583e071574b8ca579c37221432177bd9
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for budget-deployer."

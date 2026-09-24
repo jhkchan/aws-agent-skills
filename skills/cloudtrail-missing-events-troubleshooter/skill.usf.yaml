@@ -75,10 +75,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:74fdf022375087015eb84191f995f4ccf19e1fe2304f9dd8f22ba262ecfaa298536046820ed8070db01ecd1a99026183b223d84cdbac91b5147d3d3c2c718201"
+signature: "ed25519:a06931ea864f9ce2fa6678b038b64cad8aceacc7debec3ba84ee4a3cc3481236774cd67d27876ca711bbb3d262b40dfa6b58a2a436c0355fe19ecf792441620f"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:6214f83f29dba99453ff0b5314f4b5da15902405f02deccf835838c9e1
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for cloudtrail-missing-events-troubleshooter."

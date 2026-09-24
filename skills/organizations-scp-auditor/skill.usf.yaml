@@ -69,10 +69,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:e79242d46e95b5b8e9cfd24d51865b3791372bcf8f38f80ca11478d45b3552938044a9754c1f8bd3ff5fdb6f4da991e03212dc956245e4b6e94ee7e0bf6f1008"
+signature: "ed25519:29c5059fc4c977ab7b3dad470d281ba7da1e8460234484a0737f23433be13aec8e4ff4622ddb29b1d87668750210b1675095cb00e82e485a8e05b792dd589609"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -82,5 +82,5 @@ content_hash: "sha256:ea7f267fb979df9ceddab4c18c54919da4c303b1d355169cdc811f8031
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for organizations-scp-auditor."

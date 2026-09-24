@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:4511b73775127503cbf5403d06c034e70309262ab800766a85338887dfcfd1134d5b567a1c43295a0a4961f38addd197cb0a02d1a687b04a51c64b341718e60f"
+signature: "ed25519:e0cfa7882ea8e35e0f6262e6e920e3b8f6ce6fae33d0737ce54b2b671c1aa3db15f2cdeb9e767d629be5578ad1e34f3229132276b31bbab200b7202d6f475d00"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:8cbf804e18e68fb6c97ad44630e9bf3a708325093a0502536de4ba6e7a
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for cicd-pipeline-automator."

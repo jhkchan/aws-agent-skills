@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:b69c95daa0f9c55d185703597a36bbee7e9393065832107a03b4ff657128c0dbf6e5223a3a2b7bc88a47868de7cbd7e63a1e35aee422e55906a03573c57c4601"
+signature: "ed25519:f0736be284ae75a79facab922412eaef7840d334beac32f5470a509a35add357b3a0ff4fc63deaa2306e3b9294b0ca7887a5fa73a40ceff040332d0a4de16b01"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:84573ca02d0078916cd4f5c671e6748391608b0c306e9ec38927e82035
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for fsx-filesystem-deployer."

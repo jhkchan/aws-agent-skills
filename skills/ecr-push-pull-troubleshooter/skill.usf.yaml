@@ -76,10 +76,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:def0e864de18d84c4a476cb2a960ae987f18631f0a5c00546e6f2b4466dc0741bf8c1ce71775496770e2749879aa8cc0ad56f957423d6e505231db287c195e0b"
+signature: "ed25519:ff317d181f8ca3bd745e7474b5275214c59b9c175bb98ce1f0eca4cae4869ff397c611a8db101a5c861194574ada71dd21a53a342a6d641e47c627d0d50c2a08"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:1e1b5fb81d5aad3b0a4314d7a87de4593e81c89147c62e978566d9a264
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for ecr-push-pull-troubleshooter."

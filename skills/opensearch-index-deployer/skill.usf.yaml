@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:242853a152dbfb48016bcc551c5bd001bae0539de01a4a8f30108d157dfd77feec2e3d325fef8fafc7f5dd65a4234db3bf1cdb0ab2ed508bc926470db9108d06"
+signature: "ed25519:f90b7dac21064542f46f2ad45d58b4d93b7e1736cea5bbf0a1b859127664729a41d972676eb54d6c2c5f116abffeca3726e5748f9f875720f7f8849050dc240a"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:943a9726266f35ecf022cddad897b8e0d1324158d4e3540d27af08d3f8
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for opensearch-index-deployer."

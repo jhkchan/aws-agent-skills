@@ -73,10 +73,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:9ffc0426e315bcc90478104ac90e6bb8c5713fc59c792c10af1c7e519b04b8acfd1acf7788e407224bb4e0c79b3a7180011ac69dfcd07ca2465f0633eda0fd0f"
+signature: "ed25519:b741ac2afab9b20e332d5ee474953c22a8b389a4c2282d87b51efbdb18cc2c5b3619f5fa38b1155cd29ac3b61ca10fa64c6f04f1bf8d80867152401c24430f02"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:3e7c6289855836f4583ecad29b92935b92b841b1af3ed988e9bf824e48
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for cloudformation-drift-troubleshooter."

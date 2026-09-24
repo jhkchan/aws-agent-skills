@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:a955afe80780f0eee7f710b1678227181888d1588c13d9957377bdd5fe61f70a5c8e374230d82d29ebd459c52179da131249f5d7e394345436f725f81dfb5e0a"
+signature: "ed25519:5988f9a5637a375b2d11c8e57df02a5767e5be120debbc08bd27821cbd15bbe1f8ed130178289380c9eb1cde9f756fc5742eb9506455255f39fe436bf016740b"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:56d7198eefed097e04b33dc0dad597087d51eb5d7e85e588b3169d5793
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for apigateway-websocket-deployer."

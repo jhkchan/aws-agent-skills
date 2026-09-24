@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:146a732b07dbac80a0e660b97b831b07fde140478504db83095b5812826f9a68b2a98d1a652cf969e42baefc4935a1c0d9cbe790ae4857f7b1e58adccd040a06"
+signature: "ed25519:85152146ef0d873bee659afb2d42eda7cee903265db7ff33e75f377d702ce41befa401cf51947da167e13eba53ccb2f7ab873e791dcb008aeac459eb57670903"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:c26b5e56b9ee522298d23ac4528c7b9cebe04fac35f51761026f2feb91
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for iot-core-thing-deployer."

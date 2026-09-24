@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:1d6931fdf77b83d58bc010591ae485ba8be3b424a1cd1d923ce68fefc02af92dd514d129da7418e4f908a5e0704eebd57d5e188293f1de5e8ec6d2f73eb8240d"
+signature: "ed25519:5708da4e826eef1f8e9fd4b5dcc6c8e8a6d39826345e1a13b50d89c13b020c6b26bfd963a503af71c08e5b1ab026297033cbecbbfbd7cadd2dcf47264a65c006"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:1b8851071cd39aa1e0031b84509ce050c5661aca1b06703362bb16e00d
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for route53-routing-policy-deployer."

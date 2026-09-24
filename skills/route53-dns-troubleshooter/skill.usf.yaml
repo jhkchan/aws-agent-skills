@@ -76,10 +76,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:461adc67e58abfa3dac32215aa1c23e1c07eea58c1ebbaa78706fa57e72ec7e34172646de09edec95807065c31b9731194815290167166194bcaf071f3982a00"
+signature: "ed25519:bc427f4f36a2f0c5f100a2a1bdfe3889068ad04e253f2f47203ae23be4abfdf53c4bc64f10ecb9827004b66f258540b9c5fbc0a8855d205ad1c3804c6b4a130e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:cae5cfd9cd939540401c4804966f79b0296c2d762e427ccd8723c8c342
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for route53-dns-troubleshooter."

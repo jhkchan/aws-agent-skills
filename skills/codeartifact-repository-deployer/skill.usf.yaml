@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:651f37be92274184fe9a111bf8401c4189f1ab289d4198b33087bcf0fe8ecafc863fa02968ac1b288fb045532350ef54c33c2bef298aa2b6e725d9bba456ef0e"
+signature: "ed25519:39ed538187e2231fe39c6318729091c0c797a998376a4870764e405554eb2148f1d66677812a96bbf9630ccd54b259e221fad2ad7f3176f78cd772e0336d3903"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:bddf8c22cd3a6ca6fbe4283c18f9715b33463716c6a2388c990268ce6a
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for codeartifact-repository-deployer."

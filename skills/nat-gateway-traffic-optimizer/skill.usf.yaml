@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:1f936e7133da0dd7e2f0b61888f1f2cfd6b433275bb7a476e81f86fc404e6d13b64022c5f785d4be6d462afbbd019c54fc81f83e36c1f6630efa8814810d4804"
+signature: "ed25519:e147cc0f4a591ce285fb1a771801d4b8a0c4dbcf3281e1199917cb0fea7a6b72bc7798eccad3faf2ceb0323aca33168057936da2e8ba963d35204a0c92866d02"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:f173983772c0228a453697a21b124078ddcbda1bc6811037e5d021712a
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for nat-gateway-traffic-optimizer."

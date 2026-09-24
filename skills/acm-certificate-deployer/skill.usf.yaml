@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:8febaa6429e7c08e202132934f8c40659c07850a30dfe9234f0719d2d6e0ce69393e09c6e33a7b08f85847964685ae8497022dbde8fdd80803ce66465360ec04"
+signature: "ed25519:b3011acf72c1e0c9d3b08bafeef5c404ff7b2cab0c240219b3278ad9ac18922a0024b7047c08b0beb7e3f403b0d6896b7cf979b2eca557684bfc8cdd1782be09"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:48d423b09213f83d60b6ed55fa60e2662803575966d66b7e8a15c901ca
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for acm-certificate-deployer."

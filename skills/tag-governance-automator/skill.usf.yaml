@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:9d020db0f98ad6439e80c7e676aab28fa796e210c226338b2be1f13f17ef870d2a8df196155a54414ef9a7f6d3862a55ea9b88812d60f5a2fff4485e9e4fb30b"
+signature: "ed25519:feaf0f5921271672af8d8f4c12cbbde31a1d29a7b193d99e07c7ea298db791dc7917b4a781ca55023d2ca94562a66928452587c225a634a6c0e5f0de40945c02"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:6b8037c8d4d0ec195d652928a498b435b03528a316c4f8869c173562b9
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for tag-governance-automator."

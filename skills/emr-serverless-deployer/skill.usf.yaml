@@ -73,10 +73,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:a1fcd004fb206317c230e63c088ec0a5b0f595422562131cfa4323261caca64d849d0eac920f0bc944cbd35558005725b23b07f08948226ec5c227eeec106b04"
+signature: "ed25519:7f3c00cdb4cbee61ecde7ad088cfc809f26495c860a446297e62ff062d89e6508f809c182135a92f67438f860e9843d1903f803dab5345af32b3e13e9ac9980c"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:68a3c51b6c33d29b382ac708f0234ced96b32b7438e65e0e91b243a1d0
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for emr-serverless-deployer."

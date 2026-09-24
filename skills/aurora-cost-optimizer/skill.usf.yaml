@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:b2d12490b193cdb97e7e377ee3c7f676564040660ad9e800e8f61e7f0206e5c1307db339f26d3f56f6c219203e42975b0df1da0f3c08e0f2fbfe881c48d3f300"
+signature: "ed25519:494fc457e96c22856d482cb41ff9afae0dbd39d7378a1b8a137cc07e43a5e0ffd73e9c8dda6aa825088b7476b5d41b8dea03f0ec71ceeb250372ab5f312c2607"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:1e1f9b08bca5324482bb4a9b2d87d21cc6aa92a48a6ea280884e2052af
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for aurora-cost-optimizer."

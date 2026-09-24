@@ -76,10 +76,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:2c6865bf76c37dc22155d0ea05f73cbbcad62a750c6256033ff000207a500634f811da7cf9dc70b5ca3e094f4f7ce0edfbeab10634fcac442475625e5f721d0f"
+signature: "ed25519:9dad7a72ad64fee9721d33dda958886f39352ce065eafb156e9b682ff00b64c77600a3f3b12367a85607790708f91d31bc08ea93fb04c24b1efec5f7f6ec310d"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:79189ea931c7d169152609f1c1821835735ba5ebf2d540ce26582f17cb
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for elastic-beanstalk-deployer."

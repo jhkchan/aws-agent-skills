@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:47bc21edf7df33093e5dc67aaacbf28efe2aa93f66e7f3fdb732dbafc17541ec17fd02c5769fcee44e3d168f91357f684dedd62d3c8bb627ee703a9bc209ee04"
+signature: "ed25519:da5c0bf8a1a2128b426a286dd797304a98a7209f3786890af688b29a226ac00161d420fafbd06d5984f0f2aa04cdbfeccd9fa0fde27bb8b24214b64ada049d0e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:f2713aa2a9a41629aa4a058254e43822f24cece4333f70d2af6fdbeec2
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for eks-upgrade-operator."

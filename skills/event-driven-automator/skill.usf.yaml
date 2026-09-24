@@ -73,10 +73,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:758d9cf279a4868bbda73449651a0fce3cb38e171d5f875736d95c1c0a32023896d8823c22184f8108f135dea0449a9c7ca693b4182d756f6eb44b7f08f7cc06"
+signature: "ed25519:1987e2a81bf61f0f0e0595a1922c6511401973b615e6ca9e95324b461e1afa6c2101fcbfb787742efd2babfcf9aa1b884f5af02af781133a51569e39ea6b0005"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:3a6e96fb2617893d377062c480b88553af3c5285d21beffcfc84167328
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for event-driven-automator."

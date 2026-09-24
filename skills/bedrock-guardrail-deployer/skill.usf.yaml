@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:1451b1c61378a3c44f584b5eb3ac085df3cdf1f8787241b42985b605cc092d4dd61e6ac56b08416b7aa48261bb633d20965be46ab2e22e250ee5921837dd4202"
+signature: "ed25519:771bb7bddb5229e5d87230740e8d67fa3cc62f3b3f04ffca9f9d578436d3ccc90d3b13192569011cd193169a494900692e06f186054aaeb315df82e0162f2a0b"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:0970c285ca45a9b46393621493688db6fc9eb99944e2e7fc9417554e67
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for bedrock-guardrail-deployer."

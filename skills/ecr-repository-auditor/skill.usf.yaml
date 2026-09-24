@@ -71,10 +71,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:6b87ea71cbb7f568666b43978935b4dd7d51555a250efaa27c8eda20b7cf7a2d065d83640793a69933e46f169fa7670dcec8bbdf7ec41621035fa7067c057408"
+signature: "ed25519:d735cb95913e1b36c458f8d6729c55495bd658a6c069b3e38eb83508254aa56f8cb990229f9d838562b4e1577d2a50e0ccf6e60aaf348a72be9ea43f6038cd0f"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -84,5 +84,5 @@ content_hash: "sha256:efee62edf2bf2302ee52e2161706e83200a16b032620f99a75c5613812
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for ecr-repository-auditor."

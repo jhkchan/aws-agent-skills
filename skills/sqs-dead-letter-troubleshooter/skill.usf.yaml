@@ -76,10 +76,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:eb1ec48c2a720715231229b03bb529e2135384cedc5be012606172420e35487f351be926442390a6db210beb105e5d4d4c87e17e8a05d7880ac5b2c0a529160c"
+signature: "ed25519:1adafbe14acb8e7113cceefd66435cfb68277d27ba87bf2b172fcd1859eb032c0e4fe519e623b5c8760e4718fc6af7e0bdea96a22f30830f83bdeb6a9bf60807"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:3cd98f7e67a13674b76a012bacf098d8cd24b760ed80c94895a6e6dc74
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for sqs-dead-letter-troubleshooter."

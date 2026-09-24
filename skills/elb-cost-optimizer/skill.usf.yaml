@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:bbd79b83b7fde3fd2d4fcaa120b661075fda84ff456783b8470a3c1869c6a1903d0f996570b6432d70bf7160ff046a7221a4d7184761f0ddfa2f92d375aa8d0f"
+signature: "ed25519:d57eaffc093f88709c6a413ad66a538cb4ead0e55de8328e94077e71526df4a22ed79065d5afecad8775493731c112610a8eae8cebb6a5256ff6be31f0a42d09"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:ab7d2cf98f04492700d7467ca775e273f7edcef1711c38379749d98e5d
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for elb-cost-optimizer."

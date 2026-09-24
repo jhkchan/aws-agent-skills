@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:5c2edc0b8e1d6c926b4deb39cae73311b2f78f76a2daf32bb5b448476f875ff90653f92edf131bf4eefd1ca7fb4cd8e2be4531ea5644e57f6da1fd236c05dd09"
+signature: "ed25519:174b429a2fd4d076f0f0d26be65d4fb700c79a71b08573487e187f8726d5be174a0bc286d5b11a5e8dc56d94f9cc3cf30b379d86b41c03f78f0da4b8c0a8140e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:315cbe2639053e8cb17729b337516aa15a874934b07013019ef9eeed76
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for cloudwatch-rum-deployer."

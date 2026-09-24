@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:057c8f82e7856941019947760231d1697c45fa735384599e8b7f0c9c5f1aed84da792da6ffb619dd9ad56c451f9cbcef2e922feed6e474a67a94d09d91b21c03"
+signature: "ed25519:ba9ca12224d0269ee69d549c6d8cf2ec8f3a3bc908481859139f8bb7f8df2c3e5143530c37965af1a065acde9d43ba49642ebfe3d2296b91c3cac2a3c2503501"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:70d9317d34a398637dc58880d10f643a0f6a113b6c69383dad2871317d
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for s3-performance-optimizer."

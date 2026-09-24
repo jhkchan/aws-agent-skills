@@ -39,17 +39,9 @@ permissions:
     read:
       - ./SKILL.md
       - ./skill.usf.yaml
-      - ./references/advanced-patterns 3.md
-      - ./references/advanced-patterns 4.md
       - ./references/advanced-patterns.md
-      - ./references/diagnostic-commands 3.md
-      - ./references/diagnostic-commands 4.md
       - ./references/diagnostic-commands.md
-      - ./references/error-handling 3.md
-      - ./references/error-handling 4.md
       - ./references/error-handling.md
-      - ./references/worked-examples 3.md
-      - ./references/worked-examples 4.md
       - ./references/worked-examples.md
       - ./example/README.md
     # The package is instructions: it writes nothing, ever.
@@ -82,18 +74,18 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:866145a23d44a441083f953e5aae5fff990d315d903230995945aa24bf7753609f49108909e75da63234d0147d6f7f539cffdd4fd51ec9213d6a48f3357dee0d"
+signature: "ed25519:56d08a8ade437002567b78aff96057ac0fd31a957ce3ed466b0b408c0abe06180589ded7d075d2a90ffa210cd07b482ca6d098111b68c19629753b32e372c40c"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
 # computed by the vendored algorithm in scripts/generate_usf_manifests.py and
 # re-checked by the release signer's preflight.
-content_hash: "sha256:87028143ae662f7f1491e780fffec63dc83dbf04836dede86966e3073adafa0e"
+content_hash: "sha256:825e7f440816dfa03b03addcaafb1de620ce270e2b1e9b90ab3a82ce4f2b1ab2"
 
 changelog:
   - version: "0.2.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for accessanalyzer-finding-triage."

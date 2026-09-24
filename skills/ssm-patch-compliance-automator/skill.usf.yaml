@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:e7d28156fd266c453999ea174422f01f33bfb277ea9c33309a095af3a295a0f3ec79500f362b93cc5e2ee77d7f29971620a2e5973b12706b33939a64892b2308"
+signature: "ed25519:2fd6b76ddd85ad640eb105141704b720b91ba73e4654a7f507bdf02ed964d3a74f394a21f4b6d6f43a66cbb17c9c6d33142a4b52803d29afc23c4798bbd6e00c"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:e08f576a115cfe82a49cb5c127ff7948fa0dd88950474abd34449fa098
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for ssm-patch-compliance-automator."

@@ -76,10 +76,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:0fee552e229ed829ba4830016e25aed017012fb4526c9b9e30397e057e92c24f1b583ec84608041af1b777d156295077277938d6fd629add7ec9096cae09c608"
+signature: "ed25519:2df844c65c3e873c794a68423229817331d16c1a4b69da3a6c6053b9d7affd2b5c17b0b4457664afd40b8a35468fc1445b50d590a28d94855a9032500cd04809"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:655ce1e0b584ff1fee8ab1a4ba36e9e14c31c3d74e203130ee43ca62c6
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for neptune-graph-deployer."

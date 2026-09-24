@@ -72,10 +72,10 @@ risk_tier: L0
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:c592c14d816669dcdd4e408fa8cdbb04f20f7cfd5676ff317aaa6acbfa2b75ed7aa9fe9847a8eda9d40cdf550578afed37f9214039beefc73e2f9fd4d7925e04"
+signature: "ed25519:c980c5463d25556d506d863f0c95169c77d176f5ad1a00f7e69b6081f97907643a99ab908e138ce4fd8981f3b7374d87bedf38492b2a9cf99cfea39fb6895a0d"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -85,5 +85,5 @@ content_hash: "sha256:496c20df7f28f62f075614de1ff271ca8052808a92be9e59a7e2dc0e96
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for glue-crawler-job-auditor."

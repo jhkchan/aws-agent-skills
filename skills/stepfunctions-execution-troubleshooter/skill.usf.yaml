@@ -74,10 +74,10 @@ risk_tier: L1
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:1dd5c16d2c103cb3fdf6f0943e8bc682af3fb4499b8ce514039da0355c98499cdf09ef97717ac33dea02823faa5ef7ba86a67814cb0b3cb2f4eb68a1b9ebef0b"
+signature: "ed25519:581c244e92e3854fad550d0f13ff51586fb1944f6b669739ecc808745de8f3d5af8ca8e212d2849952c45012cf35e89c92efa7926699800093ce804665d9c304"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:f6534ced9641a80e0288b9802d1709eb95191d7992568eb37b5a9f2136
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for stepfunctions-execution-troubleshooter."

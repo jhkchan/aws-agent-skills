@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:111e9994d79380dd0b23abcddccf81240d75ff402c87a63ca54d673b58bc3f8ab935fab34b965eaf1567ae055789344fede3be9c585e7448d465bce1c5b3ea06"
+signature: "ed25519:2ca11e5595e78fef5138a96a43b7d417e1e65a164119c99846becb3eeb793e20eea6772b0bf7490e68310557a86e06d617106f5ea230cb6fa5fd7f9bbc2c8f03"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:60d7e667984504af49ca2fba57387e410658ad404d0e6d57ebe676b0bb
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for dynamodb-autoscaling-deployer."

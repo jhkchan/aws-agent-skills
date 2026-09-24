@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:a0dace261d5ec50bf8b07ba8428ad88f217d94fd27e5afdeb6fa719a4a744bbd2d759ee2457dbc9bdcb8851fafa4f79cb6285673dac30d835132627dabfc3701"
+signature: "ed25519:8ad5d2bec8fd0e96fc2e637e685ce593d41eb3bad1e0730b118b03566a7abf796f3acf647933b845c2a85dbd7f6c6f5c05f36ee9e421a7c8cffa1108379a8001"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:74d1c23475a614136ed0fec2db18424eb2451a4ebaf5729afe06c2c6ae
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for firewall-manager-deployer."

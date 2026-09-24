@@ -74,10 +74,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:e16399672dd32a08b9e3248f8bd3f0f935e516245c9a333f3576117b4b917fc0284deaa3d3b9f9fcaec8483a0c7bc583cd5a5406c8f52f246195f265d6c12506"
+signature: "ed25519:2714b2d9a2b647344c303b872efd6a75292bc806cb6d1d8f86c89cc6d94bd1a25f42f6d6795695761653d9fd15f2b4763017cf885fe6462fb093f17a3bd33304"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -87,5 +87,5 @@ content_hash: "sha256:67905b354e6d82c822c0541f753d5154b14ffe0baef4eb99c4f6c6e0ff
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for firehose-delivery-stream-deployer."

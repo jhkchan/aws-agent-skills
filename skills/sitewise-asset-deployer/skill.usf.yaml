@@ -76,10 +76,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:2f9c5c63361afe1c6b3cf4af688b37ef3b4a900c590f99689a398847f86dc06e2e68edd934703b2fd0f2aef9638942813ccea0a3060671da9bb6ff977498da0e"
+signature: "ed25519:6b5b4447df66aec923c998ecde982d087d9a01fcaa5a9fec5bcfa052fe4a92fb86f5ee7acea86ed042f818e733efa4634c7b19e2db42e03bd752189fb60eac0a"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -89,5 +89,5 @@ content_hash: "sha256:a0b770a31bb7dae79e7dee0adabba20ff5615fa49393db893de0b3c934
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for sitewise-asset-deployer."

@@ -73,10 +73,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:78308de454025e64a5f797f5dbc7aa0b61b4efc1519971647f56361c45c54f7580b0441743ccd2d1e485ded495ff7b2605865e02b348bf2a56bf84238053b100"
+signature: "ed25519:c559036e62e7201acf050e53ae20389bae7d690f6550599d4d4efaa3c9c18a6c7c29ff36716e69e5b60bad68d2083955cd2441315a2f94a83f08e006ec0ea30e"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -86,5 +86,5 @@ content_hash: "sha256:a5e94de4c84696661ac6f265c904d610e4e3dd63547053adb30daa79b9
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for sagemaker-training-job-operator."

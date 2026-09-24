@@ -75,10 +75,10 @@ risk_tier: L2
 
 scan_status:
   scanner: "jhkchan/owasp-ast10-agent-skills audit"
-  last_scanned: "2026-09-07"
+  last_scanned: "2026-09-23"
   result: "pass"
 
-signature: "ed25519:f361af10a5639a5a229b99729301f84ec2de633d0741b4994d741f35e8d854c21b069a5174377a831a109ef8a17647c7debe4bbf0a189ff291a2293892e2e209"
+signature: "ed25519:e7b85244d44e2ffc199288aa92fd56165199ad14954d5f737f29f9fa4c5dd847a1c26a258ea9150efe10e058baf49ee4ff5062e54dddb0ccd75536102fdaba07"
 
 # sha256 over this skill's hashed surface (SKILL.md, references/*.md,
 # scripts/*.py, evals/evals.json — the runtime-loaded instruction bytes),
@@ -88,5 +88,5 @@ content_hash: "sha256:a1a2ae165733716463e056e8edd9680c61ce921bb32c8442b4d0b803aa
 
 changelog:
   - version: "0.1.0"
-    date: "2026-09-07"
+    date: "2026-09-23"
     notes: "Initial USF v1.0 manifest for ec2-rightsizing-optimizer."
